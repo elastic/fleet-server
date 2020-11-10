@@ -1,0 +1,6 @@
+Missing stuff
+
+- handle upgrade and unenroll events
+- audit logging on saved objects etc.
+- runs as admin; doesn't drop creds.
+- stats

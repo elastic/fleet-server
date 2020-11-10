@@ -1,0 +1,13 @@
+[Unit]
+Description=Elastic Fleet Daemon
+After=network.target
+Requires=network.target
+
+[Service]
+ExecStart=/usr/bin/fleet
+Type=simple
+Restart=always
+RestartSec=3
+StartLimitInterval=40
+StartLimitBurst=10
+LimitNOFILE=999999
