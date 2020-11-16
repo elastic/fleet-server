@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+//go:generate schema-generate -o internal/pkg/model/schema.go -p model model/schema.json
+
 package main
 
 import (

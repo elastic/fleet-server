@@ -3,6 +3,7 @@ module fleet
 go 1.14
 
 require (
+	github.com/a-h/generate v0.0.0-20190312091541-e59c34d33fb3 // indirect
 	github.com/dgraph-io/ristretto v0.0.3
 	github.com/elastic/beats/v7 v7.10.0
 	github.com/elastic/go-elasticsearch/v8 v8.0.0-20200728144331-527225d8e836

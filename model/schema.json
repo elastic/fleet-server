@@ -1,0 +1,290 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "agent-metadata": {
+      "title": "Agent Metadata",
+      "description": "An Elastic Agent metadata",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The unique identifier for the Elastic Agent",
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "description": "The version of the Elastic Agent",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "host": {
+      "title": "Host Metadata",
+      "description": "The host metadata for the Elastic Agent",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The ID of the host",
+          "type": "string"
+        },
+        "architecture": {
+          "description": "The architecture for the Elastic Agent",
+          "type": "string"
+        },
+        "name": {
+          "description": "The hostname of the Elastic Agent",
+          "type": "string"
+        },
+        "ip": {
+          "description": "The IP addresses of the Elastic Agent",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "architecture",
+        "name"
+      ]
+    },
+    "server": {
+      "title": "Server",
+      "description": "A Fleet Server",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "The unique identifier for the Fleet Server",
+          "type": "string",
+          "format": "uuid"
+        },
+        "agent": { "$ref": "#/definitions/agent-metadata" },
+        "host": { "$ref": "#/definitions/host" }
+      }
+    },
+    "policy": {
+      "title": "Policy",
+      "description": "A policy that an Elastic Agent is attached to",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "The unique identifier for the policy revision",
+          "type": "string",
+          "format": "uuid"
+        },
+        "@timestamp": {
+          "description": "Date/time the policy revision was created",
+          "type": "string",
+          "format": "date-time"
+        },
+        "policy_id": {
+          "description": "The ID of the policy",
+          "type": "string",
+          "format": "uuid"
+        },
+        "revision": {
+          "description": "The revision of the policy",
+          "type": "integer"
+        },
+        "data": {
+          "description": "The data for the policy",
+          "type": "string"
+        },
+        "default_fleet_server": {
+          "description": "True when this policy is the default policy to start Fleet Server",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_id",
+        "policy_id",
+        "revision",
+        "data",
+        "default_fleet_server"
+      ]
+    },
+    "agent": {
+      "title": "Agent",
+      "description": "An Elastic Agent that has enrolled into Fleet",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "The unique identifier for the Elastic Agent",
+          "type": "string",
+          "format": "uuid"
+        },
+        "_version": {
+          "description": "The version of the document in the index",
+          "type": "integer"
+        },
+        "agent": { "$ref": "#/definitions/agent-metadata" },
+        "local_metadata": {
+          "description": "Local metadata information for the Elastic Agent",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "access_api_key_id": {
+          "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
+          "type": "integer"
+        },
+        "default_api_key": {
+          "description": "API key the Elastic Agent uses to authenticate with elasticsearch",
+          "type": "string"
+        },
+        "default_api_key_id": {
+          "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
+          "type": "integer"
+        },
+        "policy_id": {
+          "description": "The policy ID for the Elastic Agent",
+          "type": "string",
+          "format": "uuid"
+        },
+        "policy_revision": {
+          "description": "The current policy revision for the Elastic Agent",
+          "type": "integer"
+        },
+        "enrolled_at": {
+          "description": "Date/time the Elastic Agent enrolled",
+          "type": "string",
+          "format": "date-time"
+        },
+        "unenrolled_at": {
+          "description": "Date/time the Elastic Agent unenrolled",
+          "type": "string",
+          "format": "date-time"
+        },
+        "unenrollment_started_at": {
+          "description": "Date/time the Elastic Agent unenrolled started",
+          "type": "string",
+          "format": "date-time"
+        },
+        "upgraded_at": {
+          "description": "Date/time the Elastic Agent was last upgraded",
+          "type": "string",
+          "format": "date-time"
+        },
+        "upgrade_started_at": {
+          "description": "Date/time the Elastic Agent started the current upgrade",
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "description": "Date/time the Elastic Agent was last updated",
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "_id",
+        "_version",
+        "agent_version",
+        "access_api_key_id",
+        "policy_id",
+        "enrolled_at",
+        "updated_at"
+      ]
+    }
+  },
+  "checkin": {
+    "title": "Checkin",
+    "description": "An Elastic Agent checkin to Fleet",
+    "type": "object",
+    "properties": {
+      "_id": {
+        "description": "The unique identifier for the Elastic Agent checkin",
+        "type": "string",
+        "format": "uuid"
+      },
+      "@timestamp": {
+        "description": "Date/time the checkin was created",
+        "type": "string",
+        "format": "date-time"
+      },
+      "agent": { "$ref": "#/definitions/agent-metadata" },
+      "host": { "$ref": "#/definitions/host" },
+      "server_id": {
+        "description": "The unique identifier for the Fleet Server that the Elastic Agent communicated with",
+        "type": "string",
+        "format": "uuid"
+      },
+      "status": {
+        "description": "The current overall status of the Elastic Agent",
+        "type": "string",
+        "enum": ["enrolling", "healthy", "error", "degraded", "offline", "unenrolling", "upgrading"]
+      },
+      "message": {
+        "description": "The current overall status message of the Elastic Agent",
+        "type": "string"
+      },
+      "policy": {
+        "title": "Checkin Policy",
+        "description": "The current status of the applied policy",
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The ID for the policy",
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "description": "The revision of the policy",
+            "type": "integer"
+          },
+          "inputs": {
+            "title": "Checkin Policy Input",
+            "description": "The current input status per policy",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "description": "The ID for the input",
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "template_id": {
+                  "description": "The template ID for the input",
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "description": "The current status of the input",
+                  "type": "string",
+                  "enum": ["healthy", "error", "degraded"]
+                },
+                "message": {
+                  "description": "The current status message of the intput",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "template_id",
+                "status",
+                "message"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "inputs"
+        ]
+      }
+    },
+    "required": [
+      "_id",
+      "agent",
+      "status",
+      "message",
+      "enrolled_at",
+      "updated_at"
+    ]
+  }
+}

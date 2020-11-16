@@ -43,4 +43,9 @@ clean: ## - Clean up build artifacts
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
 	rm -rf ./bin/ *.rpm
 
-	
+.PHONY: generate
+generate: ## - Generate schema models
+	@printf "${CMD_COLOR_ON} Installing module for go generate\n${CMD_COLOR_OFF}"
+	go install github.com/a-h/generate/...
+	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
+	go generate ./...
