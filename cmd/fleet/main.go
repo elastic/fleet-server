@@ -106,7 +106,7 @@ func installSignalHandler() context.Context {
 
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "fleet-server",
+		Use:   "fleet-server",
 		Short: "Fleet Server controls a fleet of Elastic Agents",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfgPath, err := cmd.Flags().GetString("config")

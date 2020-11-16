@@ -35,7 +35,7 @@ type ElasticsearchBackoff struct {
 // Elasticsearch is the configuration for elasticsearch.
 type Elasticsearch struct {
 	Protocol         string               `config:"protocol"`
-	Hosts            []string			  `config:"hosts"`
+	Hosts            []string             `config:"hosts"`
 	Path             string               `config:"path"`
 	Params           map[string]string    `config:"parameters"`
 	Headers          map[string]string    `config:"headers"`
