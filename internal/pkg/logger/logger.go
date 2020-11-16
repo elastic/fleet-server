@@ -18,13 +18,14 @@
 package logger
 
 import (
-	"fleet/internal/pkg/config"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"fleet/internal/pkg/config"
 )
 
 const (
