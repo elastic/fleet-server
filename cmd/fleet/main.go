@@ -15,11 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package main
+package fleet
 
 import (
 	"context"
-	"os"
+	"fleet/internal/pkg/config"
+	"github.com/spf13/cobra"
 	"time"
 
 	"fleet/internal/pkg/env"
@@ -37,14 +38,6 @@ func checkErr(err error) {
 	if err != nil && err != context.Canceled {
 		panic(err)
 	}
-}
-
-func logInit() {
-	logger.Init(
-		os.Stdout,
-		env.LogLevel("INFO"),
-		env.LogPretty(),
-	)
 }
 
 func runBulkCheckin(ctx context.Context, sv saved.CRUD) *BulkCheckin {
@@ -111,28 +104,45 @@ func installSignalHandler() context.Context {
 	return signal.HandleInterrupt(rootCtx)
 }
 
-func main() {
+func NewCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "fleet-server",
+		Short: "Fleet Server controls a fleet of Elastic Agents",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfgPath, err := cmd.Flags().GetString("config")
+			if err != nil {
+				return err
+			}
+			cfg, err := config.LoadFile(cfgPath)
+			if err != nil {
+				return err
+			}
 
-	logInit()
+			logger.Init(&cfg.Logging)
 
-	ctx := installSignalHandler()
+			ctx := installSignalHandler()
 
-	installProfiler(ctx)
+			installProfiler(ctx)
 
-	checkErr(initGlobalCache())
+			checkErr(initGlobalCache())
 
-	_, bulker := InitES(ctx)
-	sv := saved.NewMgr(bulker, savedObjectKey())
+			_, bulker := InitES(ctx)
+			sv := saved.NewMgr(bulker, savedObjectKey())
 
-	pm := runPolicyMon(ctx, sv)
-	ba := runBulkActions(ctx, sv)
-	bc := runBulkCheckin(ctx, sv)
-	ct := NewCheckinT(bc, ba, pm)
-	et := NewEnrollerT()
+			pm := runPolicyMon(ctx, sv)
+			ba := runBulkActions(ctx, sv)
+			bc := runBulkCheckin(ctx, sv)
+			ct := NewCheckinT(bc, ba, pm)
+			et := NewEnrollerT()
 
-	router := NewRouter(ctx, sv, ct, et)
+			router := NewRouter(ctx, sv, ct, et)
 
-	err := runServer(ctx, router)
+			err = runServer(ctx, router)
+			log.Info().Err(err).Msg("Fleet Server exited")
 
-	log.Info().Err(err).Msg("Exit fleet")
+			return nil
+		},
+	}
+	cmd.Flags().StringP("config", "c", "fleet-server.yml", "Configuration for Fleet Server")
+	return cmd
 }

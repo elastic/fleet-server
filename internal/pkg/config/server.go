@@ -15,38 +15,29 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package fleet
+package config
 
-import (
-	"context"
-	"fleet/internal/pkg/saved"
-
-	"github.com/julienschmidt/httprouter"
-)
-
-const (
-	ROUTE_ENROLL  = "/api/fleet/agents/:id"
-	ROUTE_CHECKIN = "/api/fleet/agents/:id/checkin"
-	ROUTE_ACKS    = "/api/fleet/agents/:id/acks"
-)
-
-type Router struct {
-	sv saved.CRUD
-	ct *CheckinT
-	et *EnrollerT
+// ServerTimeouts is the configuration for the server timeouts
+type ServerTimeouts struct {
+	Read  int `config:"read"`
+	Write int `config:"write"`
 }
 
-func NewRouter(ctx context.Context, sv saved.CRUD, ct *CheckinT, et *EnrollerT) *httprouter.Router {
+// InitDefaults initializes the defaults for the configuration.
+func (c *ServerTimeouts) InitDefaults() {
+	c.Read = 5        // 5 seconds
+	c.Write = 60 * 10 // 10 minutes (long poll)
+}
 
-	r := Router{
-		sv: sv,
-		ct: ct,
-		et: et,
-	}
+// Server is the configuration for the server
+type Server struct {
+	Host     string         `config:"host"`
+	Port     uint16         `config:"host"`
+	Timeouts ServerTimeouts `config:"timeouts"`
+}
 
-	router := httprouter.New()
-	router.POST(ROUTE_ENROLL, r.handleEnroll)
-	router.POST(ROUTE_CHECKIN, r.handleCheckin)
-	router.POST(ROUTE_ACKS, r.handleAcks)
-	return router
+// InitDefaults initializes the defaults for the configuration.
+func (c *Server) InitDefaults() {
+	c.Host = "0.0.0.0"
+	c.Port = 8000
 }

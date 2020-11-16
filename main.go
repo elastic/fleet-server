@@ -15,38 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package fleet
+package main
 
 import (
-	"context"
-	"fleet/internal/pkg/saved"
+	"fmt"
+	"os"
 
-	"github.com/julienschmidt/httprouter"
+	"fleet/cmd/fleet"
 )
 
-const (
-	ROUTE_ENROLL  = "/api/fleet/agents/:id"
-	ROUTE_CHECKIN = "/api/fleet/agents/:id/checkin"
-	ROUTE_ACKS    = "/api/fleet/agents/:id/acks"
-)
-
-type Router struct {
-	sv saved.CRUD
-	ct *CheckinT
-	et *EnrollerT
-}
-
-func NewRouter(ctx context.Context, sv saved.CRUD, ct *CheckinT, et *EnrollerT) *httprouter.Router {
-
-	r := Router{
-		sv: sv,
-		ct: ct,
-		et: et,
+func main() {
+	cmd := fleet.NewCommand()
+	if err := cmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-
-	router := httprouter.New()
-	router.POST(ROUTE_ENROLL, r.handleEnroll)
-	router.POST(ROUTE_CHECKIN, r.handleCheckin)
-	router.POST(ROUTE_ACKS, r.handleAcks)
-	return router
 }

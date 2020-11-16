@@ -18,13 +18,14 @@
 package logger
 
 import (
-	"io"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"fleet/internal/pkg/config"
 )
 
 const (
@@ -53,18 +54,16 @@ func strToLevel(s string) zerolog.Level {
 	return l
 }
 
-func Init(w io.Writer, levelS string, pretty bool) {
-	level := strToLevel(levelS)
-
+func Init(cfg *config.Logging) {
 	zerolog.TimeFieldFormat = time.StampMicro
 
-	if pretty {
+	if cfg.Pretty {
 		log.Logger = log.Output(zerolog.ConsoleWriter{
-			Out:        w,
+			Out:        cfg.DestinationWriter(),
 			TimeFormat: kPrettyTimeFormat,
-		}).Level(level)
+		}).Level(cfg.LogLevel())
 	} else {
-		log.Logger = log.Output(w).Level(level)
+		log.Logger = log.Output(cfg.DestinationWriter()).Level(cfg.LogLevel())
 	}
 
 	log.Info().

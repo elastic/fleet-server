@@ -15,38 +15,37 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package fleet
+package config
 
 import (
-	"context"
-	"fleet/internal/pkg/saved"
-
-	"github.com/julienschmidt/httprouter"
+	"github.com/elastic/go-ucfg"
+	"github.com/elastic/go-ucfg/yaml"
 )
 
-const (
-	ROUTE_ENROLL  = "/api/fleet/agents/:id"
-	ROUTE_CHECKIN = "/api/fleet/agents/:id/checkin"
-	ROUTE_ACKS    = "/api/fleet/agents/:id/acks"
-)
-
-type Router struct {
-	sv saved.CRUD
-	ct *CheckinT
-	et *EnrollerT
+// DefaultOptions defaults options used to read the configuration
+var DefaultOptions = []ucfg.Option{
+	ucfg.PathSep("."),
+	ucfg.ResolveEnv,
+	ucfg.VarExp,
 }
 
-func NewRouter(ctx context.Context, sv saved.CRUD, ct *CheckinT, et *EnrollerT) *httprouter.Router {
+// Config is the global configuration.
+type Config struct {
+	Elasticsearch Elasticsearch `config:"elasticsearch"`
+	Server        Server        `config:"server"`
+	Logging       Logging       `config:"logging"`
+}
 
-	r := Router{
-		sv: sv,
-		ct: ct,
-		et: et,
+// LoadFile take a path and load the file and return a new configuration.
+func LoadFile(path string) (*Config, error) {
+	var cfg Config
+	c, err := yaml.NewConfigWithFile(path, DefaultOptions...)
+	if err != nil {
+		return nil, err
 	}
-
-	router := httprouter.New()
-	router.POST(ROUTE_ENROLL, r.handleEnroll)
-	router.POST(ROUTE_CHECKIN, r.handleCheckin)
-	router.POST(ROUTE_ACKS, r.handleAcks)
-	return router
+	err = c.Unpack(&c, DefaultOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return &cfg, nil
 }
