@@ -34,7 +34,7 @@ run: image ## - Run the smallest and secured golang docker image based on scratc
 .PHONY: local
 local: ## - Build packages using local environment
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
-	go build -ldflags="${LDFLAGS}" -o ./bin/fleet ./cmd/fleet/
+	go build -ldflags="${LDFLAGS}" -o ./bin/fleet .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
 
