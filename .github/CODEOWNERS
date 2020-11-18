@@ -1,0 +1,3 @@
+# CI Specific
+/.ci/ @elastic/observablt-robots
+/Jenkinsfile @elastic/observablt-robots
