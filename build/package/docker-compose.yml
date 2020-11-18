@@ -1,0 +1,18 @@
+version: '3'
+
+networks:
+  private_lan:
+    driver: bridge
+
+services:
+  fleet:
+    image: fleet:latest
+    environment:
+      - LOG_LEVEL=DEBUG
+    networks:
+      - private_lan
+    ulimits:
+      nofile:
+        soft: 500000
+        hard: 500000
+
