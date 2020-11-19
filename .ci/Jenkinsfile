@@ -37,7 +37,7 @@ pipeline {
     stage('Local') {
       steps {
         cleanup()
-        withMageEnv(){
+        withGoEnv(){
           dir("${BASE_DIR}"){
             sh(label: 'local',script: 'make local')
           }
@@ -47,7 +47,7 @@ pipeline {
     stage('Test') {
       steps {
         cleanup()
-        withMageEnv(){
+        withGoEnv(){
           dir("${BASE_DIR}"){
             sh(label: 'test', script: 'make test')
           }
@@ -57,7 +57,7 @@ pipeline {
     stage('Rpm') {
       steps {
         cleanup()
-        withMageEnv(){
+        withGoEnv(){
           dir("${BASE_DIR}"){
             sh(label: 'rpm', script: 'make rpm')
           }
@@ -67,7 +67,7 @@ pipeline {
     stage('Run') {
       steps {
         cleanup()
-        withMageEnv(){
+        withGoEnv(){
           dir("${BASE_DIR}"){
             sh(label: 'run', script: 'make run')
           }
