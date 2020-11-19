@@ -44,6 +44,16 @@ pipeline {
         }
       }
     }
+    stage('Test') {
+      steps {
+        cleanup()
+        withMageEnv(){
+          dir("${BASE_DIR}"){
+            sh(label: 'test', script: 'make test')
+          }
+        }
+      }
+    }
     stage('Rpm') {
       steps {
         cleanup()
