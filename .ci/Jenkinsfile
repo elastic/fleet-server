@@ -54,26 +54,6 @@ pipeline {
         }
       }
     }
-    stage('Rpm') {
-      steps {
-        cleanup()
-        withGoEnv(){
-          dir("${BASE_DIR}"){
-            sh(label: 'rpm', script: 'make rpm')
-          }
-        }
-      }
-    }
-    stage('Run') {
-      steps {
-        cleanup()
-        withGoEnv(){
-          dir("${BASE_DIR}"){
-            sh(label: 'run', script: 'make run')
-          }
-        }
-      }
-    }
   }
   post {
     cleanup {
