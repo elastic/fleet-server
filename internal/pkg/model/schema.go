@@ -69,8 +69,8 @@ type AgentMetadata struct {
 	Version string `json:"version"`
 }
 
-// Host The host metadata for the Elastic Agent
-type Host struct {
+// HostMetadata The host metadata for the Elastic Agent
+type HostMetadata struct {
 
 	// The architecture for the Elastic Agent
 	Architecture string `json:"architecture"`
@@ -132,7 +132,7 @@ type PolicyLeader struct {
 // Server A Fleet Server
 type Server struct {
 	Agent *AgentMetadata `json:"agent"`
-	Host  *Host          `json:"host"`
+	Host  *HostMetadata  `json:"host"`
 
 	// The unique identifier for the Fleet Server
 	Id     string      `json:"_id"`
@@ -517,7 +517,7 @@ func (strct *AgentMetadata) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (strct *Host) MarshalJSON() ([]byte, error) {
+func (strct *HostMetadata) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
 	comma := false
@@ -577,7 +577,7 @@ func (strct *Host) MarshalJSON() ([]byte, error) {
 	return rv, nil
 }
 
-func (strct *Host) UnmarshalJSON(b []byte) error {
+func (strct *HostMetadata) UnmarshalJSON(b []byte) error {
 	architectureReceived := false
 	idReceived := false
 	nameReceived := false

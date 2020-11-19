@@ -21,7 +21,7 @@
         "version"
       ]
     },
-    "host": {
+    "host-metadata": {
       "title": "Host Metadata",
       "description": "The host metadata for the Elastic Agent",
       "type": "object",
@@ -87,8 +87,8 @@
           "type": "integer"
         },
         "agent": { "$ref": "#/definitions/agent-metadata" },
-        "host": { "$ref": "#/definitions/host" },
-        "server": { "ref":  "#definitions/server" }
+        "host": { "$ref": "#/definitions/host-metadata" },
+        "server": { "ref":  "#/definitions/server-metadata" }
       },
       "required": [
         "_id",
@@ -163,7 +163,7 @@
           "type": "string",
           "format": "date-time"
         },
-        "server": { "ref":  "#definitions/server" }
+        "server": { "ref":  "#/definitions/server-metadata" }
       },
       "required": [
         "_id",
@@ -270,7 +270,7 @@
         "format": "date-time"
       },
       "agent": { "$ref": "#/definitions/agent-metadata" },
-      "host": { "$ref": "#/definitions/host" },
+      "host": { "$ref": "#/definitions/host-metadata" },
       "server": { "$ref": "#/definitions/server-metadata" },
       "status": {
         "description": "The current overall status of the Elastic Agent",
