@@ -2,4 +2,6 @@
 
 bin/
 *.rpm
+build/
+
 fleet-server
