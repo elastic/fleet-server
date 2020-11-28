@@ -26,8 +26,12 @@ import (
 	"fleet/cmd/fleet"
 )
 
+var (
+	Version string
+)
+
 func main() {
-	cmd := fleet.NewCommand()
+	cmd := fleet.NewCommand(Version)
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

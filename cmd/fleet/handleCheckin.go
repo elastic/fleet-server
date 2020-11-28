@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"time"
 
+	"fleet/internal/pkg/action"
 	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/saved"
 
@@ -66,17 +67,23 @@ type CheckinT struct {
 	bc *BulkCheckin
 	ba *BulkActions
 	pm *PolicyMon
+	ad *ActionDispatcher
+	tr *action.TokenResolver
 }
 
-func NewCheckinT(bc *BulkCheckin, ba *BulkActions, pm *PolicyMon) *CheckinT {
+func NewCheckinT(bc *BulkCheckin, ba *BulkActions, pm *PolicyMon, ad *ActionDispatcher, tr *action.TokenResolver) *CheckinT {
 	return &CheckinT{
 		bc: bc,
 		ba: ba,
 		pm: pm,
+		ad: ad,
+		tr: tr,
 	}
 }
 
 func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id string, sv saved.CRUD) error {
+
+	log.Debug().Str("agent_id", id).Msg("Handle checkin")
 
 	agent, err := authAgent(r, id, sv)
 
@@ -106,6 +113,28 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	defer ct.ba.Unsubscribe(actionSub)
 	actionCh := actionSub.Ch()
 
+	// Subscribe for actions dispatching
+	// New agent actions dispatching
+	// replacement for the bulkActions above
+	var ackToken string
+	if v, ok := fields[FieldAckToken]; ok {
+		if s, ok := v.(string); ok {
+			ackToken = s
+		}
+	}
+
+	// If token not found default to _seq_no -1 for subscription, since _seq_no start with 0
+	seqNo := int64(-1)
+	sn, err := ct.tr.Resolve(ctx, ackToken)
+	if err != nil && err != action.ErrTokenNotFound {
+		return err
+	}
+	seqNo = int64(sn)
+
+	aSub := ct.ad.Subscribe(agent.Id, seqNo)
+	defer ct.ad.Unsubscribe(aSub)
+	actCh := aSub.Ch()
+
 	// Subscribe to policy manager for changes on PolicyId > policyRev
 	sub, err := ct.pm.Subscribe(agent.PolicyId, agent.PolicyRev)
 	if err != nil {
@@ -124,7 +153,11 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	// Intial update on checkin, and any user fields that might have changed
 	ct.bc.CheckIn(agent.Id, fields)
 
-	var actions []ActionResp
+	var (
+		actions []ActionResp
+	)
+
+	// TODO: implement check initial pending actions
 
 LOOP:
 	for {
@@ -133,6 +166,11 @@ LOOP:
 			return ctx.Err()
 		case actionList := <-actionCh:
 			actions = append(actions, convertActions(actionList)...)
+			break LOOP
+		case actionListX := <-actCh:
+			var acs []ActionResp
+			acs, ackToken = convertActionsX(agent.Id, actionListX)
+			actions = append(actions, acs...)
 			break LOOP
 		case action := <-sub.C:
 			actionResp, err := parsePolicy(ctx, sv, agent.Id, action)
@@ -151,8 +189,9 @@ LOOP:
 
 	// For now, empty response
 	resp := CheckinResponse{
-		Action:  "checkin",
-		Actions: actions,
+		AckToken: ackToken,
+		Action:   "checkin",
+		Actions:  actions,
 	}
 
 	data, err := json.Marshal(&resp)
@@ -182,6 +221,25 @@ func convertActions(actionList []Action) []ActionResp {
 	}
 
 	return respList
+}
+
+func convertActionsX(agentID string, actionList []ActionX) ([]ActionResp, string) {
+	var ackToken string
+
+	respList := make([]ActionResp, 0, len(actionList))
+	for _, action := range actionList {
+		respList = append(respList, ActionResp{
+			AgentId:     agentID,
+			CreatedAt:   action.CreatedAt,
+			Data:        []byte(action.Data),
+			Id:          action.Id,
+			Type:        action.Type,
+			Applicaiton: action.Application,
+		})
+		ackToken = action.Token
+	}
+
+	return respList, ackToken
 }
 
 func parsePolicy(ctx context.Context, sv saved.CRUD, agentId string, action Action) (*ActionResp, error) {
@@ -347,4 +405,10 @@ func parseMeta(agent *Agent, req *CheckinRequest) (fields saved.Fields, err erro
 		}
 	}
 	return fields, nil
+}
+
+func resolveActionToken(token string) int64 {
+	log.Debug().Str("token", token).Int64("seq_no", -1).Msg("Resolved action token")
+	// TODO: implement token resolution
+	return -1
 }

@@ -17,19 +17,8 @@
 
 package dsl
 
-const (
-	kKeywordNULL        = "null"
-	kKeywordSize        = "size"
-	kKeywordSort        = "sort"
-	kKeywordQuery       = "query"
-	kKeywordBool        = "bool"
-	kKeywordFilter      = "filter"
-	kKeywordMust        = "must"
-	kKeywordMustNot     = "must_not"
-	kKeywordTerm        = "term"
-	kKeywordTerms       = "terms"
-	kKeywordExists      = "exists"
-	kKeywordGreaterThan = "gt"
-	kKeywordField       = "field"
-	kKeywordBoost       = "boost"
-)
+func (n *Node) Filter() *Node {
+	childNode := n.findOrCreateChildByName(kKeywordFilter)
+	childNode.nodeList = nodeListT{}
+	return childNode
+}

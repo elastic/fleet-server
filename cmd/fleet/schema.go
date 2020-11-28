@@ -35,6 +35,7 @@ const (
 	FieldPolicyRev     = "policy_revision"
 	FieldPackages      = "packages"
 	FieldLastCheckin   = "last_checkin"
+	FieldAckToken      = "ack_token"
 	FieldLocalMetadata = "local_metadata"
 )
 
@@ -108,7 +109,8 @@ type Agent struct {
 	DefaultApiKey      string          `json:"default_api_key" saved:"encrypt"`
 	UpdatedAt          string          `json:"updated_at,omitempty"`
 	CurrentErrorEvents interface{}     `json:"current_error_events"`
-	Packages           string          `json:"packages"`
+	Packages           []string        `json:"packages"`
+	AckToken           string          `json:"ack_token,omitempty"`
 }
 
 // Wrong: no AAD;
@@ -161,8 +163,9 @@ type CheckinRequest struct {
 }
 
 type CheckinResponse struct {
-	Action  string       `json:"action"`
-	Actions []ActionResp `json:"actions,omitempty"`
+	AckToken string       `json:"ack_token,omitempty"`
+	Action   string       `json:"action"`
+	Actions  []ActionResp `json:"actions,omitempty"`
 }
 
 type AckRequest struct {
@@ -174,11 +177,12 @@ type AckResponse struct {
 }
 
 type ActionResp struct {
-	AgentId   string          `json:"agent_id"`
-	CreatedAt string          `json:"created_at"`
-	Data      json.RawMessage `json:"data"`
-	Id        string          `json:"id"`
-	Type      string          `json:"type"`
+	AgentId     string          `json:"agent_id"`
+	CreatedAt   string          `json:"created_at"`
+	Data        json.RawMessage `json:"data"`
+	Id          string          `json:"id"`
+	Type        string          `json:"type"`
+	Applicaiton string          `json:"application"`
 }
 
 type Event struct {

@@ -1,6 +1,52 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "action": {
+      "title": "Agent action",
+      "description": "An Elastic Agent action",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The unique identifier for the Elastic Agent action",
+          "type": "string",
+          "format": "uuid"
+        },
+        "@timestamp": {
+          "description": "Date/time the action was created",
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiration": {
+          "description": "The action expiration date/time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "type": {
+          "description": "The action type. APP_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",
+          "type": "string"
+        },
+        "application": {
+          "description": "The well know application identifier the actions should be routed to.",
+          "type": "string"
+        },
+        "agents": {
+          "description": "The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "data": {
+          "description": "The opaque action payload.",
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
     "agent-metadata": {
       "title": "Agent Metadata",
       "description": "An Elastic Agent metadata",

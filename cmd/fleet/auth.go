@@ -25,6 +25,7 @@ import (
 	"fleet/internal/pkg/apikey"
 	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/saved"
+
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
 )
@@ -80,6 +81,7 @@ func authAgent(r *http.Request, id string, sv saved.CRUD) (*Agent, error) {
 		return nil, err
 	}
 
+	// TODO: read the agent record with the last aciton token
 	agent, err := findAgentByApiKeyId(r.Context(), sv, key.Id)
 	if err != nil {
 		return nil, err
