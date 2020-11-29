@@ -125,12 +125,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	// Subscribe for actions dispatching
 	// New agent actions dispatching
 	// replacement for the bulkActions above
-	var ackToken string
-	if v, ok := fields[FieldAckToken]; ok {
-		if s, ok := v.(string); ok {
-			ackToken = s
-		}
-	}
+	ackToken := req.AckToken
 
 	// If token not found default to _seq_no -1 for subscription, since _seq_no start with 0
 	seqNo := int64(-1)
@@ -160,7 +155,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	defer longPoll.Stop()
 
 	// Intial update on checkin, and any user fields that might have changed
-	ct.bc.CheckIn(agent.Id, fields)
+	ct.bc.CheckIn(agent.Id, fields, seqNo)
 
 	// Initial fetch for pending actions
 	pendingActions, err := ct.fc.FetchAgentActions(ctx, agent.Id, seqNo)
@@ -198,7 +193,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 				log.Trace().Msg("Fire long poll")
 				break LOOP
 			case <-tick.C:
-				ct.bc.CheckIn(agent.Id, nil)
+				ct.bc.CheckIn(agent.Id, nil, seqNo)
 			}
 		}
 	}

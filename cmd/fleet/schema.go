@@ -162,6 +162,7 @@ type EnrollResponse struct {
 }
 
 type CheckinRequest struct {
+	AckToken  string          `json:"ack_token,omitempty"`
 	Events    []Event         `json:"events"`
 	LocalMeta json.RawMessage `json:"local_metadata"`
 }

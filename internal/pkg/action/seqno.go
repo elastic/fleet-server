@@ -21,8 +21,9 @@ func GetSeqNo(ctx context.Context, es *elasticsearch.Client) (seqno int64, err e
 	const query = `
 		{
 		  "aggs": {
-		    "max_action_seq_no": { "max": { "field": "action_seq_no" } }
-		  }
+		    "max_action_seq_no": { "max": { "field": "_seq_no" } }
+		  },
+		  "size": 0
 		}
 	`
 	res, err := es.Search(

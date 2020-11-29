@@ -19,26 +19,36 @@ package fleet
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
+	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/saved"
+
 	"github.com/rs/zerolog/log"
 )
 
-type BulkCheckin struct {
-	mut     sync.Mutex
-	pending map[string]saved.Fields
+type PendingData struct {
+	fields saved.Fields
+	seqNo  int64
 }
 
-func NewBulkCheckin() *BulkCheckin {
+type BulkCheckin struct {
+	bulker  bulk.Bulk
+	mut     sync.Mutex
+	pending map[string]PendingData
+}
+
+func NewBulkCheckin(bulker bulk.Bulk) *BulkCheckin {
 	return &BulkCheckin{
-		pending: make(map[string]saved.Fields),
+		bulker:  bulker,
+		pending: make(map[string]PendingData),
 	}
 }
 
-func (bc *BulkCheckin) CheckIn(id string, fields saved.Fields) error {
+func (bc *BulkCheckin) CheckIn(id string, fields saved.Fields, seqNo int64) error {
 
 	if fields == nil {
 		fields = make(saved.Fields)
@@ -48,7 +58,7 @@ func (bc *BulkCheckin) CheckIn(id string, fields saved.Fields) error {
 	fields[FieldLastCheckin] = timeNow
 
 	bc.mut.Lock()
-	bc.pending[id] = fields
+	bc.pending[id] = PendingData{fields, seqNo}
 	bc.mut.Unlock()
 	return nil
 }
@@ -82,7 +92,7 @@ func (bc *BulkCheckin) flush(ctx context.Context, sv saved.CRUD) error {
 
 	bc.mut.Lock()
 	pending := bc.pending
-	bc.pending = make(map[string]saved.Fields, len(pending))
+	bc.pending = make(map[string]PendingData, len(pending))
 	bc.mut.Unlock()
 
 	if len(pending) == 0 {
@@ -90,12 +100,33 @@ func (bc *BulkCheckin) flush(ctx context.Context, sv saved.CRUD) error {
 	}
 
 	updates := make([]saved.UpdateT, 0, len(pending))
-	for id, fields := range pending {
+	seqNoUpdates := make([]bulk.BulkOp, 0, len(pending))
+
+	for id, pendingData := range pending {
 		updates = append(updates, saved.UpdateT{
 			Id:     id,
 			Type:   AGENT_SAVED_OBJECT_TYPE,
-			Fields: fields,
+			Fields: pendingData.fields,
 		})
+
+		if pendingData.seqNo >= 0 {
+			source, err := json.Marshal(map[string]interface{}{
+				"doc": map[string]interface{}{
+					"action_seq_no": pendingData.seqNo,
+					"updated_at":    time.Now().UTC().Format(time.RFC3339),
+				},
+			})
+
+			if err != nil {
+				return err
+			}
+
+			seqNoUpdates = append(seqNoUpdates, bulk.BulkOp{
+				Id:    id,
+				Body:  source,
+				Index: ".fleet-agents", //TODO: extract constant
+			})
+		}
 	}
 
 	err := sv.MUpdate(ctx, updates)
@@ -106,5 +137,18 @@ func (bc *BulkCheckin) flush(ctx context.Context, sv saved.CRUD) error {
 		Int("cnt", len(updates)).
 		Msg("Flush checkin")
 
+	if err != nil {
+		return err
+	}
+
+	if len(seqNoUpdates) > 0 {
+		start := time.Now()
+		err := bc.bulker.MUpdate(ctx, seqNoUpdates, bulk.WithRefresh())
+		log.Debug().
+			Err(err).
+			Dur("rtt", time.Since(start)).
+			Int("cnt", len(seqNoUpdates)).
+			Msg("Flush seqno updates")
+	}
 	return err
 }

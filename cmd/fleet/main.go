@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fleet/internal/pkg/action"
+	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/seqno"
@@ -46,9 +47,9 @@ func checkErr(err error) {
 	}
 }
 
-func runBulkCheckin(ctx context.Context, sv saved.CRUD) *BulkCheckin {
+func runBulkCheckin(ctx context.Context, bulker bulk.Bulk, sv saved.CRUD) *BulkCheckin {
 
-	bc := NewBulkCheckin()
+	bc := NewBulkCheckin(bulker)
 	go func() {
 		for {
 			err := bc.Run(ctx, sv)
@@ -169,7 +170,10 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		// TODO: remove this after the indices bootstrapping logic implemented in ES plugin
 		checkErr(esboot.EnsureESIndices(ctx, es))
 
+		// Start new actions monitoring
 		am := runActionMon(ctx, es)
+
+		// Start dispatcher for the actions
 		ad := runActionDispatcher(ctx, am)
 		tr, err := action.NewTokenResolver(es)
 		checkErr(err)
@@ -182,7 +186,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 
 		pm := runPolicyMon(ctx, sv)
 		ba := runBulkActions(ctx, sv)
-		bc := runBulkCheckin(ctx, sv)
+		bc := runBulkCheckin(ctx, bulker, sv)
 		ct := NewCheckinT(bc, ba, pm, ad, tr, fc)
 		et := NewEnrollerT(bulker)
 
