@@ -17,21 +17,12 @@
 
 package dsl
 
-const (
-	kKeywordNULL        = "null"
-	kKeywordSize        = "size"
-	kKeywordSort        = "sort"
-	kKeywordQuery       = "query"
-	kKeywordSource      = "_source"
-	kKeywordExcludes    = "excludes"
-	kKeywordBool        = "bool"
-	kKeywordFilter      = "filter"
-	kKeywordMust        = "must"
-	kKeywordMustNot     = "must_not"
-	kKeywordTerm        = "term"
-	kKeywordTerms       = "terms"
-	kKeywordExists      = "exists"
-	kKeywordGreaterThan = "gt"
-	kKeywordField       = "field"
-	kKeywordBoost       = "boost"
-)
+func (n *Node) Source() *Node {
+	return n.findOrCreateChildByName(kKeywordSource)
+}
+
+func (n *Node) Excludes(arr []string) *Node {
+	childNode := n.appendOrSetChildNode(kKeywordExcludes)
+	childNode.leaf = arr
+	return childNode
+}

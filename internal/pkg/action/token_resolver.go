@@ -53,6 +53,9 @@ func NewTokenResolver(es *elasticsearch.Client) (*TokenResolver, error) {
 }
 
 func (r *TokenResolver) Resolve(ctx context.Context, token string) (seqno uint64, err error) {
+	if token == "" {
+		return seqno, ErrTokenNotFound
+	}
 	if v, ok := r.cache.Get(token); ok {
 		seqno = v.(uint64)
 		log.Debug().Str("token", token).Uint64("seqno", seqno).Msg("Found token cached")
@@ -69,19 +72,6 @@ func (r *TokenResolver) Resolve(ctx context.Context, token string) (seqno uint64
 	r.cache.Add(token, seqno)
 
 	return
-}
-
-type Hit struct {
-	ID    string `json:"_id"`
-	SeqNo uint64 `json:"_seq_no"`
-}
-
-type Result struct {
-	Hits []Hit `json:"hits"`
-}
-
-type SearchResponse struct {
-	Result Result `json:"hits"`
 }
 
 func (r *TokenResolver) queryES(ctx context.Context, token string) (seqno uint64, err error) {
@@ -105,7 +95,7 @@ func (r *TokenResolver) queryES(ctx context.Context, token string) (seqno uint64
 		return
 	}
 
-	var ares SearchResponse
+	var ares esutil.SearchResponse
 	err = json.NewDecoder(res.Body).Decode(&ares)
 	if err != nil {
 		return

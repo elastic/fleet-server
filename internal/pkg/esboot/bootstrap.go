@@ -33,7 +33,7 @@ const (
 			"type" : "keyword"
 		  },
 		  "access_api_key_id" : {
-			"type" : "integer"
+			"type" : "keyword"
 		  },
 		  "policy_id" : {
 			"type" : "keyword"

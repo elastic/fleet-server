@@ -18,20 +18,6 @@ const (
 	defaultSeqNo         = int64(-1) // the _seq_no in elasticsearch start with 0
 )
 
-type Hit struct {
-	ID     string          `json:"_id"`
-	SeqNo  uint64          `json:"_seq_no"`
-	Source json.RawMessage `json:"_source"`
-}
-
-type Result struct {
-	Hits []Hit `json:"hits"`
-}
-
-type SearchResponse struct {
-	Result Result `json:"hits"`
-}
-
 type Monitor struct {
 	es            *elasticsearch.Client
 	query         *action.SearchQuery
@@ -41,7 +27,7 @@ type Monitor struct {
 
 	log zerolog.Logger
 
-	outCh chan []Hit
+	outCh chan []esutil.Hit
 }
 
 type MonitorOption func(*Monitor)
@@ -53,7 +39,7 @@ func NewMonitor(es *elasticsearch.Client, index string, opts ...MonitorOption) *
 		checkInterval: defaultCheckInterval * time.Second,
 		seqno:         defaultSeqNo,
 		log:           log.With().Str("index", index).Str("ctx", "seqno monitor").Logger(),
-		outCh:         make(chan []Hit, 1),
+		outCh:         make(chan []esutil.Hit, 1),
 	}
 
 	for _, opt := range opts {
@@ -85,7 +71,7 @@ func WithSeqNo(seqno int64) MonitorOption {
 	}
 }
 
-func (m *Monitor) Output() <-chan []Hit {
+func (m *Monitor) Output() <-chan []esutil.Hit {
 	return m.outCh
 }
 
@@ -123,6 +109,9 @@ func (m *Monitor) checkNewDocuments(ctx context.Context) {
 		action.SeqNo:      m.seqno,
 		action.Expiration: now,
 	})
+	if err != nil {
+		return
+	}
 
 	es := m.es
 	res, err := es.Search(
@@ -140,13 +129,15 @@ func (m *Monitor) checkNewDocuments(ctx context.Context) {
 
 	if err != nil {
 		log.Warn().Err(err).Msg("Error response for new documents")
+		return
 	}
 
-	var ares SearchResponse
+	var ares esutil.SearchResponse
 
 	err = json.NewDecoder(res.Body).Decode(&ares)
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to parse query response")
+		return
 	}
 
 	sz := len(ares.Result.Hits)

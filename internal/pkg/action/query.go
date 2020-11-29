@@ -12,6 +12,8 @@ type SearchQuery struct {
 	tmpl *dsl.Tmpl
 
 	tokenSeqNo, tokenExpiration, tokenAgents dsl.Token
+
+	sourceExclude []string
 }
 
 type SearchOptFunc func(*SearchQuery)
@@ -34,6 +36,12 @@ func WithAgents() SearchOptFunc {
 	}
 }
 
+func WithSourceExclude(sourceExclude ...string) SearchOptFunc {
+	return func(q *SearchQuery) {
+		q.sourceExclude = sourceExclude
+	}
+}
+
 func NewSearchQuery(opts ...SearchOptFunc) (*SearchQuery, error) {
 	q := &SearchQuery{
 		tmpl: dsl.NewTmpl(),
@@ -45,6 +53,9 @@ func NewSearchQuery(opts ...SearchOptFunc) (*SearchQuery, error) {
 
 	root := dsl.NewRoot()
 	root.Param("seq_no_primary_term", true)
+	if len(q.sourceExclude) > 0 {
+		root.Source().Excludes(q.sourceExclude)
+	}
 
 	if q.tokenSeqNo != "" || q.tokenExpiration != "" || q.tokenAgents != "" {
 		filterNode := root.Query().Bool().Filter()

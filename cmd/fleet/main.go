@@ -169,10 +169,12 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		// TODO: remove this after the indices bootstrapping logic implemented in ES plugin
 		checkErr(esboot.EnsureESIndices(ctx, es))
 
-		// Should be integrated with rollout (currently in bulkActions)
 		am := runActionMon(ctx, es)
 		ad := runActionDispatcher(ctx, am)
 		tr, err := action.NewTokenResolver(es)
+		checkErr(err)
+
+		fc, err := action.NewFetcher(es)
 		checkErr(err)
 		// END: experimental
 
@@ -181,8 +183,8 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		pm := runPolicyMon(ctx, sv)
 		ba := runBulkActions(ctx, sv)
 		bc := runBulkCheckin(ctx, sv)
-		ct := NewCheckinT(bc, ba, pm, ad, tr)
-		et := NewEnrollerT()
+		ct := NewCheckinT(bc, ba, pm, ad, tr, fc)
+		et := NewEnrollerT(bulker)
 
 		router := NewRouter(ctx, sv, ct, et)
 

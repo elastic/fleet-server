@@ -2,25 +2,15 @@ package fleet
 
 import (
 	"context"
-	"encoding/json"
+	"fleet/internal/pkg/action"
+	"fleet/internal/pkg/esutil"
 	"fleet/internal/pkg/seqno"
 	"sync"
 
 	"github.com/rs/zerolog/log"
 )
 
-// TODO: better name
-type ActionX struct {
-	Id          string          `json:"id"`
-	Token       string          `json:"token"`
-	SeqNo       uint64          `json:"seqno"`
-	Type        string          `json:"type"`
-	Agents      []string        `json:"agents"`
-	Application string          `json:"application"`
-	Data        json.RawMessage `json:"data"`
-	CreatedAt   string          `json:"@timestamp"`
-	Expiration  string          `json:"expiration"`
-}
+type ActionX = action.ActionX
 
 type ActionSubX struct {
 	agentId string
@@ -89,29 +79,11 @@ func (ad *ActionDispatcher) Unsubscribe(sub *ActionSubX) {
 	log.Debug().Str("agentId", sub.agentId).Int("sz", sz).Msg("Action dispatcher unsubscribe")
 }
 
-func (ad *ActionDispatcher) process(ctx context.Context, hits []seqno.Hit) {
+func (ad *ActionDispatcher) process(ctx context.Context, hits []esutil.Hit) {
 	// Parse hits into map of agent -> actions
 	// Actions are ordered by sequence
 
-	var (
-		actions []ActionX
-	)
-
-	for _, hit := range hits {
-		log.Debug().Str("id", hit.ID).Uint64("seqNo", hit.SeqNo).Str("source", string(hit.Source)).Msg("New Action")
-
-		var action ActionX
-		err := json.Unmarshal(hit.Source, &action)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to parse the action details")
-			continue
-		}
-
-		// Elasticsearch _id serves as a token for the action _seq_no
-		action.Token = hit.ID
-		action.SeqNo = hit.SeqNo
-		actions = append(actions, action)
-	}
+	actions := action.HitsToActions(hits)
 
 	agentActions := make(map[string][]ActionX)
 	for _, action := range actions {

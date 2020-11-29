@@ -69,15 +69,24 @@ type CheckinT struct {
 	pm *PolicyMon
 	ad *ActionDispatcher
 	tr *action.TokenResolver
+	fc *action.Fetcher
 }
 
-func NewCheckinT(bc *BulkCheckin, ba *BulkActions, pm *PolicyMon, ad *ActionDispatcher, tr *action.TokenResolver) *CheckinT {
+// TODO: revisit for refactroring, too many params
+func NewCheckinT(bc *BulkCheckin,
+	ba *BulkActions,
+	pm *PolicyMon,
+	ad *ActionDispatcher,
+	tr *action.TokenResolver,
+	fc *action.Fetcher,
+) *CheckinT {
 	return &CheckinT{
 		bc: bc,
 		ba: ba,
 		pm: pm,
 		ad: ad,
 		tr: tr,
+		fc: fc,
 	}
 }
 
@@ -153,37 +162,44 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	// Intial update on checkin, and any user fields that might have changed
 	ct.bc.CheckIn(agent.Id, fields)
 
-	var (
-		actions []ActionResp
-	)
+	// Initial fetch for pending actions
+	pendingActions, err := ct.fc.FetchAgentActions(ctx, agent.Id, seqNo)
+	if err != nil {
+		return err
+	}
+	actions, ackToken := convertActionsX(agent.Id, pendingActions)
 
-	// TODO: implement check initial pending actions
-
-LOOP:
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case actionList := <-actionCh:
-			actions = append(actions, convertActions(actionList)...)
-			break LOOP
-		case actionListX := <-actCh:
-			var acs []ActionResp
-			acs, ackToken = convertActionsX(agent.Id, actionListX)
-			actions = append(actions, acs...)
-			break LOOP
-		case action := <-sub.C:
-			actionResp, err := parsePolicy(ctx, sv, agent.Id, action)
-			if err != nil {
-				return err
+	if len(actions) > 0 {
+		log.Debug().Str("agent_id", agent.Id).Interface("action", actions).Msg("Got initial actions")
+	}
+	// TODO: refactor this func, it's getting too long
+	if len(actions) == 0 {
+	LOOP:
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case actionList := <-actionCh:
+				actions = append(actions, convertActions(actionList)...)
+				break LOOP
+			case actionListX := <-actCh:
+				var acs []ActionResp
+				acs, ackToken = convertActionsX(agent.Id, actionListX)
+				actions = append(actions, acs...)
+				break LOOP
+			case action := <-sub.C:
+				actionResp, err := parsePolicy(ctx, sv, agent.Id, action)
+				if err != nil {
+					return err
+				}
+				actions = append(actions, *actionResp)
+				break LOOP
+			case <-longPoll.C:
+				log.Trace().Msg("Fire long poll")
+				break LOOP
+			case <-tick.C:
+				ct.bc.CheckIn(agent.Id, nil)
 			}
-			actions = append(actions, *actionResp)
-			break LOOP
-		case <-longPoll.C:
-			log.Trace().Msg("Fire long poll")
-			break LOOP
-		case <-tick.C:
-			ct.bc.CheckIn(agent.Id, nil)
 		}
 	}
 

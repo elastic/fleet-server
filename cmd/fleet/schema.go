@@ -28,6 +28,10 @@ const (
 )
 
 const (
+	IndexFleetAgents = ".fleet-agents"
+)
+
+const (
 	TypePolicyChange = "POLICY_CHANGE"
 )
 
