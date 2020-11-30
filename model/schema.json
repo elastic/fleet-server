@@ -21,7 +21,7 @@
         "version"
       ]
     },
-    "host": {
+    "host-metadata": {
       "title": "Host Metadata",
       "description": "The host metadata for the Elastic Agent",
       "type": "object",
@@ -52,6 +52,26 @@
         "name"
       ]
     },
+    "server-metadata": {
+      "title": "Server Metadata",
+      "description": "A Fleet Server metadata",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The unique identifier for the Fleet Server",
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "description": "The version of the Fleet Server",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
     "server": {
       "title": "Server",
       "description": "A Fleet Server",
@@ -62,9 +82,21 @@
           "type": "string",
           "format": "uuid"
         },
+        "_version": {
+          "description": "The version of the document in the index",
+          "type": "integer"
+        },
         "agent": { "$ref": "#/definitions/agent-metadata" },
-        "host": { "$ref": "#/definitions/host" }
-      }
+        "host": { "$ref": "#/definitions/host-metadata" },
+        "server": { "ref":  "#/definitions/server-metadata" }
+      },
+      "required": [
+        "_id",
+        "_version",
+        "agent",
+        "host",
+        "server"
+      ]
     },
     "policy": {
       "title": "Policy",
@@ -86,8 +118,12 @@
           "type": "string",
           "format": "uuid"
         },
-        "revision": {
-          "description": "The revision of the policy",
+        "revision_idx": {
+          "description": "The revision index of the policy",
+          "type": "integer"
+        },
+        "coordinator_idx": {
+          "description": "The coordinator index of the policy",
           "type": "integer"
         },
         "data": {
@@ -102,9 +138,37 @@
       "required": [
         "_id",
         "policy_id",
-        "revision",
+        "revision_idx",
+        "coordinator_idx",
         "data",
         "default_fleet_server"
+      ]
+    },
+    "policy-leader": {
+      "title": "Policy Leader",
+      "description": "The current leader Fleet Server for a policy",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "The unique identifier for the policy",
+          "type": "string",
+          "format": "uuid"
+        },
+        "_version": {
+          "description": "The version of the document in the index",
+          "type": "integer"
+        },
+        "@timestamp": {
+          "description": "Date/time the leader was taken or held",
+          "type": "string",
+          "format": "date-time"
+        },
+        "server": { "ref":  "#/definitions/server-metadata" }
+      },
+      "required": [
+        "_id",
+        "_version",
+        "server"
       ]
     },
     "agent": {
@@ -206,12 +270,8 @@
         "format": "date-time"
       },
       "agent": { "$ref": "#/definitions/agent-metadata" },
-      "host": { "$ref": "#/definitions/host" },
-      "server_id": {
-        "description": "The unique identifier for the Fleet Server that the Elastic Agent communicated with",
-        "type": "string",
-        "format": "uuid"
-      },
+      "host": { "$ref": "#/definitions/host-metadata" },
+      "server": { "$ref": "#/definitions/server-metadata" },
       "status": {
         "description": "The current overall status of the Elastic Agent",
         "type": "string",
