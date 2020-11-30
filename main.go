@@ -16,6 +16,7 @@
 // under the License.
 
 //go:generate schema-generate -o internal/pkg/model/schema.go -p model model/schema.json
+//go:generate go fmt internal/pkg/model/schema.go
 
 package main
 

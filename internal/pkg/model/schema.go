@@ -3,10 +3,10 @@
 package model
 
 import (
-    "bytes"
-    "encoding/json"
-    "errors"
-    "fmt"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
 )
 
 // Root
@@ -15,223 +15,249 @@ type Root interface{}
 // Action An Elastic Agent action
 type Action struct {
 
-  // The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids
-  Agents []string `json:"agents,omitempty"`
+	// The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids
+	Agents []string `json:"agents,omitempty"`
 
-  // The well know application identifier the actions should be routed to.
-  Application string `json:"application,omitempty"`
+	// The well know application identifier the actions should be routed to.
+	Application string `json:"application,omitempty"`
 
-  // The opaque action payload.
-  Data *Data `json:"data,omitempty"`
+	// The opaque action payload.
+	Data *Data `json:"data,omitempty"`
 
-  // The action expiration date/time
-  Expiration string `json:"expiration,omitempty"`
+	// The action expiration date/time
+	Expiration string `json:"expiration,omitempty"`
 
-  // The unique identifier for the Elastic Agent action
-  Id string `json:"id"`
+	// The unique identifier for the Elastic Agent action
+	Id string `json:"id"`
 
-  // Date/time the action was created
-  Timestamp string `json:"@timestamp,omitempty"`
+	// Date/time the action was created
+	Timestamp string `json:"@timestamp,omitempty"`
 
-  // The action type. APP_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.
-  Type string `json:"type,omitempty"`
+	// The action type. APP_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.
+	Type string `json:"type,omitempty"`
 }
 
 // Agent An Elastic Agent that has enrolled into Fleet
 type Agent struct {
 
-  // ID of the API key the Elastic Agent must used to contact Fleet Server
-  AccessApiKeyId int `json:"access_api_key_id"`
-  Agent *AgentMetadata `json:"agent,omitempty"`
+	// ID of the API key the Elastic Agent must used to contact Fleet Server
+	AccessApiKeyId int            `json:"access_api_key_id"`
+	Agent          *AgentMetadata `json:"agent,omitempty"`
 
-  // API key the Elastic Agent uses to authenticate with elasticsearch
-  DefaultApiKey string `json:"default_api_key,omitempty"`
+	// API key the Elastic Agent uses to authenticate with elasticsearch
+	DefaultApiKey string `json:"default_api_key,omitempty"`
 
-  // ID of the API key the Elastic Agent uses to authenticate with elasticsearch
-  DefaultApiKeyId int `json:"default_api_key_id,omitempty"`
+	// ID of the API key the Elastic Agent uses to authenticate with elasticsearch
+	DefaultApiKeyId int `json:"default_api_key_id,omitempty"`
 
-  // Date/time the Elastic Agent enrolled
-  EnrolledAt string `json:"enrolled_at"`
+	// Date/time the Elastic Agent enrolled
+	EnrolledAt string `json:"enrolled_at"`
 
-  // The unique identifier for the Elastic Agent
-  Id string `json:"_id"`
+	// The unique identifier for the Elastic Agent
+	Id string `json:"_id"`
 
-  // Local metadata information for the Elastic Agent
-  LocalMetadata *LocalMetadata `json:"local_metadata,omitempty"`
+	// Local metadata information for the Elastic Agent
+	LocalMetadata *LocalMetadata `json:"local_metadata,omitempty"`
 
-  // The policy ID for the Elastic Agent
-  PolicyId string `json:"policy_id"`
+	// The policy ID for the Elastic Agent
+	PolicyId string `json:"policy_id"`
 
-  // The current policy revision for the Elastic Agent
-  PolicyRevision int `json:"policy_revision,omitempty"`
+	// The current policy revision for the Elastic Agent
+	PolicyRevision int `json:"policy_revision,omitempty"`
 
-  // Date/time the Elastic Agent unenrolled
-  UnenrolledAt string `json:"unenrolled_at,omitempty"`
+	// Date/time the Elastic Agent unenrolled
+	UnenrolledAt string `json:"unenrolled_at,omitempty"`
 
-  // Date/time the Elastic Agent unenrolled started
-  UnenrollmentStartedAt string `json:"unenrollment_started_at,omitempty"`
+	// Date/time the Elastic Agent unenrolled started
+	UnenrollmentStartedAt string `json:"unenrollment_started_at,omitempty"`
 
-  // Date/time the Elastic Agent was last updated
-  UpdatedAt string `json:"updated_at"`
+	// Date/time the Elastic Agent was last updated
+	UpdatedAt string `json:"updated_at"`
 
-  // Date/time the Elastic Agent started the current upgrade
-  UpgradeStartedAt string `json:"upgrade_started_at,omitempty"`
+	// Date/time the Elastic Agent started the current upgrade
+	UpgradeStartedAt string `json:"upgrade_started_at,omitempty"`
 
-  // Date/time the Elastic Agent was last upgraded
-  UpgradedAt string `json:"upgraded_at,omitempty"`
+	// Date/time the Elastic Agent was last upgraded
+	UpgradedAt string `json:"upgraded_at,omitempty"`
 
-  // The version of the document in the index
-  Version int `json:"_version"`
+	// The version of the document in the index
+	Version int `json:"_version"`
 }
 
 // AgentMetadata An Elastic Agent metadata
 type AgentMetadata struct {
 
-  // The unique identifier for the Elastic Agent
-  Id string `json:"id"`
+	// The unique identifier for the Elastic Agent
+	Id string `json:"id"`
 
-  // The version of the Elastic Agent
-  Version string `json:"version"`
+	// The version of the Elastic Agent
+	Version string `json:"version"`
 }
 
-// Data The opaque action payload.
-type Data struct {
-  AdditionalProperties map[string]interface{} `json:"-,omitempty"`
-}
+// HostMetadata The host metadata for the Elastic Agent
+type HostMetadata struct {
 
-// Host The host metadata for the Elastic Agent
-type Host struct {
+	// The architecture for the Elastic Agent
+	Architecture string `json:"architecture"`
 
-  // The architecture for the Elastic Agent
-  Architecture string `json:"architecture"`
+	// The ID of the host
+	Id string `json:"id"`
 
-  // The ID of the host
-  Id string `json:"id"`
+	// The IP addresses of the Elastic Agent
+	Ip []string `json:"ip,omitempty"`
 
-  // The IP addresses of the Elastic Agent
-  Ip []string `json:"ip,omitempty"`
-
-  // The hostname of the Elastic Agent
-  Name string `json:"name"`
+	// The hostname of the Elastic Agent
+	Name string `json:"name"`
 }
 
 // LocalMetadata Local metadata information for the Elastic Agent
 type LocalMetadata struct {
-  AdditionalProperties map[string]interface{} `json:"-,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-,omitempty"`
 }
 
 // Policy A policy that an Elastic Agent is attached to
 type Policy struct {
 
-  // The data for the policy
-  Data string `json:"data"`
+	// The coordinator index of the policy
+	CoordinatorIdx int `json:"coordinator_idx"`
 
-  // True when this policy is the default policy to start Fleet Server
-  DefaultFleetServer bool `json:"default_fleet_server"`
+	// The data for the policy
+	Data string `json:"data"`
 
-  // The unique identifier for the policy revision
-  Id string `json:"_id"`
+	// True when this policy is the default policy to start Fleet Server
+	DefaultFleetServer bool `json:"default_fleet_server"`
 
-  // The ID of the policy
-  PolicyId string `json:"policy_id"`
+	// The unique identifier for the policy revision
+	Id string `json:"_id"`
 
-  // The revision of the policy
-  Revision int `json:"revision"`
+	// The ID of the policy
+	PolicyId string `json:"policy_id"`
 
-  // Date/time the policy revision was created
-  Timestamp string `json:"@timestamp,omitempty"`
+	// The revision index of the policy
+	RevisionIdx int `json:"revision_idx"`
+
+	// Date/time the policy revision was created
+	Timestamp string `json:"@timestamp,omitempty"`
+}
+
+// PolicyLeader The current leader Fleet Server for a policy
+type PolicyLeader struct {
+
+	// The unique identifier for the policy
+	Id     string      `json:"_id"`
+	Server interface{} `json:"server"`
+
+	// Date/time the leader was taken or held
+	Timestamp string `json:"@timestamp,omitempty"`
+
+	// The version of the document in the index
+	Version int `json:"_version"`
 }
 
 // Server A Fleet Server
 type Server struct {
-  Agent *AgentMetadata `json:"agent,omitempty"`
-  Host *Host `json:"host,omitempty"`
+	Agent *AgentMetadata `json:"agent"`
+	Host  *HostMetadata  `json:"host"`
 
-  // The unique identifier for the Fleet Server
-  Id string `json:"_id,omitempty"`
+	// The unique identifier for the Fleet Server
+	Id     string      `json:"_id"`
+	Server interface{} `json:"server"`
+
+	// The version of the document in the index
+	Version int `json:"_version"`
+}
+
+// ServerMetadata A Fleet Server metadata
+type ServerMetadata struct {
+
+	// The unique identifier for the Fleet Server
+	Id string `json:"id"`
+
+	// The version of the Fleet Server
+	Version string `json:"version"`
 }
 
 func (strct *Action) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
-    comma := false
-    // Marshal the "agents" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"agents\": ")
+	comma := false
+	// Marshal the "agents" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"agents\": ")
 	if tmp, err := json.Marshal(strct.Agents); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "application" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"application\": ")
+	// Marshal the "application" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"application\": ")
 	if tmp, err := json.Marshal(strct.Application); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "data" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"data\": ")
+	// Marshal the "data" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"data\": ")
 	if tmp, err := json.Marshal(strct.Data); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "expiration" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"expiration\": ")
+	// Marshal the "expiration" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"expiration\": ")
 	if tmp, err := json.Marshal(strct.Expiration); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "Id" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "id" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"id\": ")
+	// "Id" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"id\": ")
 	if tmp, err := json.Marshal(strct.Id); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "@timestamp" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"@timestamp\": ")
+	// Marshal the "@timestamp" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"@timestamp\": ")
 	if tmp, err := json.Marshal(strct.Timestamp); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "type" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"type\": ")
+	// Marshal the "type" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"type\": ")
 	if tmp, err := json.Marshal(strct.Type); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
 
@@ -241,231 +267,231 @@ func (strct *Action) MarshalJSON() ([]byte, error) {
 }
 
 func (strct *Action) UnmarshalJSON(b []byte) error {
-    idReceived := false
-    var jsonMap map[string]json.RawMessage
-    if err := json.Unmarshal(b, &jsonMap); err != nil {
-        return err
-    }
-    // parse all the defined properties
-    for k, v := range jsonMap {
-        switch k {
-        case "agents":
-            if err := json.Unmarshal([]byte(v), &strct.Agents); err != nil {
-                return err
-             }
-        case "application":
-            if err := json.Unmarshal([]byte(v), &strct.Application); err != nil {
-                return err
-             }
-        case "data":
-            if err := json.Unmarshal([]byte(v), &strct.Data); err != nil {
-                return err
-             }
-        case "expiration":
-            if err := json.Unmarshal([]byte(v), &strct.Expiration); err != nil {
-                return err
-             }
-        case "id":
-            if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
-                return err
-             }
-            idReceived = true
-        case "@timestamp":
-            if err := json.Unmarshal([]byte(v), &strct.Timestamp); err != nil {
-                return err
-             }
-        case "type":
-            if err := json.Unmarshal([]byte(v), &strct.Type); err != nil {
-                return err
-             }
-        }
-    }
-    // check if id (a required property) was received
-    if !idReceived {
-        return errors.New("\"id\" is required but was not present")
-    }
-    return nil
+	idReceived := false
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
+	}
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		case "agents":
+			if err := json.Unmarshal([]byte(v), &strct.Agents); err != nil {
+				return err
+			}
+		case "application":
+			if err := json.Unmarshal([]byte(v), &strct.Application); err != nil {
+				return err
+			}
+		case "data":
+			if err := json.Unmarshal([]byte(v), &strct.Data); err != nil {
+				return err
+			}
+		case "expiration":
+			if err := json.Unmarshal([]byte(v), &strct.Expiration); err != nil {
+				return err
+			}
+		case "id":
+			if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
+				return err
+			}
+			idReceived = true
+		case "@timestamp":
+			if err := json.Unmarshal([]byte(v), &strct.Timestamp); err != nil {
+				return err
+			}
+		case "type":
+			if err := json.Unmarshal([]byte(v), &strct.Type); err != nil {
+				return err
+			}
+		}
+	}
+	// check if id (a required property) was received
+	if !idReceived {
+		return errors.New("\"id\" is required but was not present")
+	}
+	return nil
 }
 
 func (strct *Agent) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
-    comma := false
-    // "AccessApiKeyId" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "access_api_key_id" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"access_api_key_id\": ")
+	comma := false
+	// "AccessApiKeyId" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "access_api_key_id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"access_api_key_id\": ")
 	if tmp, err := json.Marshal(strct.AccessApiKeyId); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "agent" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"agent\": ")
+	// Marshal the "agent" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"agent\": ")
 	if tmp, err := json.Marshal(strct.Agent); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "default_api_key" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"default_api_key\": ")
+	// Marshal the "default_api_key" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"default_api_key\": ")
 	if tmp, err := json.Marshal(strct.DefaultApiKey); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "default_api_key_id" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"default_api_key_id\": ")
+	// Marshal the "default_api_key_id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"default_api_key_id\": ")
 	if tmp, err := json.Marshal(strct.DefaultApiKeyId); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "EnrolledAt" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "enrolled_at" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"enrolled_at\": ")
+	// "EnrolledAt" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "enrolled_at" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"enrolled_at\": ")
 	if tmp, err := json.Marshal(strct.EnrolledAt); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "Id" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "_id" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"_id\": ")
+	// "Id" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "_id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"_id\": ")
 	if tmp, err := json.Marshal(strct.Id); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "local_metadata" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"local_metadata\": ")
+	// Marshal the "local_metadata" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"local_metadata\": ")
 	if tmp, err := json.Marshal(strct.LocalMetadata); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "PolicyId" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "policy_id" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"policy_id\": ")
+	// "PolicyId" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "policy_id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"policy_id\": ")
 	if tmp, err := json.Marshal(strct.PolicyId); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "policy_revision" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"policy_revision\": ")
+	// Marshal the "policy_revision" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"policy_revision\": ")
 	if tmp, err := json.Marshal(strct.PolicyRevision); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "unenrolled_at" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"unenrolled_at\": ")
+	// Marshal the "unenrolled_at" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"unenrolled_at\": ")
 	if tmp, err := json.Marshal(strct.UnenrolledAt); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "unenrollment_started_at" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"unenrollment_started_at\": ")
+	// Marshal the "unenrollment_started_at" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"unenrollment_started_at\": ")
 	if tmp, err := json.Marshal(strct.UnenrollmentStartedAt); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "UpdatedAt" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "updated_at" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"updated_at\": ")
+	// "UpdatedAt" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "updated_at" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"updated_at\": ")
 	if tmp, err := json.Marshal(strct.UpdatedAt); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "upgrade_started_at" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"upgrade_started_at\": ")
+	// Marshal the "upgrade_started_at" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"upgrade_started_at\": ")
 	if tmp, err := json.Marshal(strct.UpgradeStartedAt); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "upgraded_at" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"upgraded_at\": ")
+	// Marshal the "upgraded_at" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"upgraded_at\": ")
 	if tmp, err := json.Marshal(strct.UpgradedAt); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "Version" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "_version" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"_version\": ")
+	// "Version" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "_version" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"_version\": ")
 	if tmp, err := json.Marshal(strct.Version); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
 
@@ -475,142 +501,142 @@ func (strct *Agent) MarshalJSON() ([]byte, error) {
 }
 
 func (strct *Agent) UnmarshalJSON(b []byte) error {
-    access_api_key_idReceived := false
-    enrolled_atReceived := false
-    _idReceived := false
-    policy_idReceived := false
-    updated_atReceived := false
-    _versionReceived := false
-    var jsonMap map[string]json.RawMessage
-    if err := json.Unmarshal(b, &jsonMap); err != nil {
-        return err
-    }
-    // parse all the defined properties
-    for k, v := range jsonMap {
-        switch k {
-        case "access_api_key_id":
-            if err := json.Unmarshal([]byte(v), &strct.AccessApiKeyId); err != nil {
-                return err
-             }
-            access_api_key_idReceived = true
-        case "agent":
-            if err := json.Unmarshal([]byte(v), &strct.Agent); err != nil {
-                return err
-             }
-        case "default_api_key":
-            if err := json.Unmarshal([]byte(v), &strct.DefaultApiKey); err != nil {
-                return err
-             }
-        case "default_api_key_id":
-            if err := json.Unmarshal([]byte(v), &strct.DefaultApiKeyId); err != nil {
-                return err
-             }
-        case "enrolled_at":
-            if err := json.Unmarshal([]byte(v), &strct.EnrolledAt); err != nil {
-                return err
-             }
-            enrolled_atReceived = true
-        case "_id":
-            if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
-                return err
-             }
-            _idReceived = true
-        case "local_metadata":
-            if err := json.Unmarshal([]byte(v), &strct.LocalMetadata); err != nil {
-                return err
-             }
-        case "policy_id":
-            if err := json.Unmarshal([]byte(v), &strct.PolicyId); err != nil {
-                return err
-             }
-            policy_idReceived = true
-        case "policy_revision":
-            if err := json.Unmarshal([]byte(v), &strct.PolicyRevision); err != nil {
-                return err
-             }
-        case "unenrolled_at":
-            if err := json.Unmarshal([]byte(v), &strct.UnenrolledAt); err != nil {
-                return err
-             }
-        case "unenrollment_started_at":
-            if err := json.Unmarshal([]byte(v), &strct.UnenrollmentStartedAt); err != nil {
-                return err
-             }
-        case "updated_at":
-            if err := json.Unmarshal([]byte(v), &strct.UpdatedAt); err != nil {
-                return err
-             }
-            updated_atReceived = true
-        case "upgrade_started_at":
-            if err := json.Unmarshal([]byte(v), &strct.UpgradeStartedAt); err != nil {
-                return err
-             }
-        case "upgraded_at":
-            if err := json.Unmarshal([]byte(v), &strct.UpgradedAt); err != nil {
-                return err
-             }
-        case "_version":
-            if err := json.Unmarshal([]byte(v), &strct.Version); err != nil {
-                return err
-             }
-            _versionReceived = true
-        }
-    }
-    // check if access_api_key_id (a required property) was received
-    if !access_api_key_idReceived {
-        return errors.New("\"access_api_key_id\" is required but was not present")
-    }
-    // check if enrolled_at (a required property) was received
-    if !enrolled_atReceived {
-        return errors.New("\"enrolled_at\" is required but was not present")
-    }
-    // check if _id (a required property) was received
-    if !_idReceived {
-        return errors.New("\"_id\" is required but was not present")
-    }
-    // check if policy_id (a required property) was received
-    if !policy_idReceived {
-        return errors.New("\"policy_id\" is required but was not present")
-    }
-    // check if updated_at (a required property) was received
-    if !updated_atReceived {
-        return errors.New("\"updated_at\" is required but was not present")
-    }
-    // check if _version (a required property) was received
-    if !_versionReceived {
-        return errors.New("\"_version\" is required but was not present")
-    }
-    return nil
+	access_api_key_idReceived := false
+	enrolled_atReceived := false
+	_idReceived := false
+	policy_idReceived := false
+	updated_atReceived := false
+	_versionReceived := false
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
+	}
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		case "access_api_key_id":
+			if err := json.Unmarshal([]byte(v), &strct.AccessApiKeyId); err != nil {
+				return err
+			}
+			access_api_key_idReceived = true
+		case "agent":
+			if err := json.Unmarshal([]byte(v), &strct.Agent); err != nil {
+				return err
+			}
+		case "default_api_key":
+			if err := json.Unmarshal([]byte(v), &strct.DefaultApiKey); err != nil {
+				return err
+			}
+		case "default_api_key_id":
+			if err := json.Unmarshal([]byte(v), &strct.DefaultApiKeyId); err != nil {
+				return err
+			}
+		case "enrolled_at":
+			if err := json.Unmarshal([]byte(v), &strct.EnrolledAt); err != nil {
+				return err
+			}
+			enrolled_atReceived = true
+		case "_id":
+			if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
+				return err
+			}
+			_idReceived = true
+		case "local_metadata":
+			if err := json.Unmarshal([]byte(v), &strct.LocalMetadata); err != nil {
+				return err
+			}
+		case "policy_id":
+			if err := json.Unmarshal([]byte(v), &strct.PolicyId); err != nil {
+				return err
+			}
+			policy_idReceived = true
+		case "policy_revision":
+			if err := json.Unmarshal([]byte(v), &strct.PolicyRevision); err != nil {
+				return err
+			}
+		case "unenrolled_at":
+			if err := json.Unmarshal([]byte(v), &strct.UnenrolledAt); err != nil {
+				return err
+			}
+		case "unenrollment_started_at":
+			if err := json.Unmarshal([]byte(v), &strct.UnenrollmentStartedAt); err != nil {
+				return err
+			}
+		case "updated_at":
+			if err := json.Unmarshal([]byte(v), &strct.UpdatedAt); err != nil {
+				return err
+			}
+			updated_atReceived = true
+		case "upgrade_started_at":
+			if err := json.Unmarshal([]byte(v), &strct.UpgradeStartedAt); err != nil {
+				return err
+			}
+		case "upgraded_at":
+			if err := json.Unmarshal([]byte(v), &strct.UpgradedAt); err != nil {
+				return err
+			}
+		case "_version":
+			if err := json.Unmarshal([]byte(v), &strct.Version); err != nil {
+				return err
+			}
+			_versionReceived = true
+		}
+	}
+	// check if access_api_key_id (a required property) was received
+	if !access_api_key_idReceived {
+		return errors.New("\"access_api_key_id\" is required but was not present")
+	}
+	// check if enrolled_at (a required property) was received
+	if !enrolled_atReceived {
+		return errors.New("\"enrolled_at\" is required but was not present")
+	}
+	// check if _id (a required property) was received
+	if !_idReceived {
+		return errors.New("\"_id\" is required but was not present")
+	}
+	// check if policy_id (a required property) was received
+	if !policy_idReceived {
+		return errors.New("\"policy_id\" is required but was not present")
+	}
+	// check if updated_at (a required property) was received
+	if !updated_atReceived {
+		return errors.New("\"updated_at\" is required but was not present")
+	}
+	// check if _version (a required property) was received
+	if !_versionReceived {
+		return errors.New("\"_version\" is required but was not present")
+	}
+	return nil
 }
 
 func (strct *AgentMetadata) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
-    comma := false
-    // "Id" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "id" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"id\": ")
+	comma := false
+	// "Id" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"id\": ")
 	if tmp, err := json.Marshal(strct.Id); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "Version" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "version" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"version\": ")
+	// "Version" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "version" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"version\": ")
 	if tmp, err := json.Marshal(strct.Version); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
 
@@ -620,136 +646,90 @@ func (strct *AgentMetadata) MarshalJSON() ([]byte, error) {
 }
 
 func (strct *AgentMetadata) UnmarshalJSON(b []byte) error {
-    idReceived := false
-    versionReceived := false
-    var jsonMap map[string]json.RawMessage
-    if err := json.Unmarshal(b, &jsonMap); err != nil {
-        return err
-    }
-    // parse all the defined properties
-    for k, v := range jsonMap {
-        switch k {
-        case "id":
-            if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
-                return err
-             }
-            idReceived = true
-        case "version":
-            if err := json.Unmarshal([]byte(v), &strct.Version); err != nil {
-                return err
-             }
-            versionReceived = true
-        }
-    }
-    // check if id (a required property) was received
-    if !idReceived {
-        return errors.New("\"id\" is required but was not present")
-    }
-    // check if version (a required property) was received
-    if !versionReceived {
-        return errors.New("\"version\" is required but was not present")
-    }
-    return nil
-}
-
-func (strct *Data) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	buf.WriteString("{")
-    comma := false
-    // Marshal any additional Properties
-    for k, v := range strct.AdditionalProperties {
-		if comma {
-			buf.WriteString(",")
-		}
-        buf.WriteString(fmt.Sprintf("\"%s\":", k))
-		if tmp, err := json.Marshal(v); err != nil {
-			return nil, err
-		} else {
-			buf.Write(tmp)
-		}
-        comma = true
+	idReceived := false
+	versionReceived := false
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
 	}
-
-	buf.WriteString("}")
-	rv := buf.Bytes()
-	return rv, nil
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		case "id":
+			if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
+				return err
+			}
+			idReceived = true
+		case "version":
+			if err := json.Unmarshal([]byte(v), &strct.Version); err != nil {
+				return err
+			}
+			versionReceived = true
+		}
+	}
+	// check if id (a required property) was received
+	if !idReceived {
+		return errors.New("\"id\" is required but was not present")
+	}
+	// check if version (a required property) was received
+	if !versionReceived {
+		return errors.New("\"version\" is required but was not present")
+	}
+	return nil
 }
 
-func (strct *Data) UnmarshalJSON(b []byte) error {
-    var jsonMap map[string]json.RawMessage
-    if err := json.Unmarshal(b, &jsonMap); err != nil {
-        return err
-    }
-    // parse all the defined properties
-    for k, v := range jsonMap {
-        switch k {
-        default:
-            // an additional "interface{}" value
-            var additionalValue interface{}
-            if err := json.Unmarshal([]byte(v), &additionalValue); err != nil {
-                return err // invalid additionalProperty
-            }
-            if strct.AdditionalProperties == nil {
-                strct.AdditionalProperties = make(map[string]interface{}, 0)
-            }
-            strct.AdditionalProperties[k]= additionalValue
-        }
-    }
-    return nil
-}
-
-func (strct *Host) MarshalJSON() ([]byte, error) {
+func (strct *HostMetadata) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
-    comma := false
-    // "Architecture" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "architecture" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"architecture\": ")
+	comma := false
+	// "Architecture" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "architecture" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"architecture\": ")
 	if tmp, err := json.Marshal(strct.Architecture); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "Id" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "id" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"id\": ")
+	// "Id" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"id\": ")
 	if tmp, err := json.Marshal(strct.Id); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "ip" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"ip\": ")
+	// Marshal the "ip" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"ip\": ")
 	if tmp, err := json.Marshal(strct.Ip); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "Name" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "name" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"name\": ")
+	// "Name" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "name" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"name\": ")
 	if tmp, err := json.Marshal(strct.Name); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
 
@@ -758,69 +738,69 @@ func (strct *Host) MarshalJSON() ([]byte, error) {
 	return rv, nil
 }
 
-func (strct *Host) UnmarshalJSON(b []byte) error {
-    architectureReceived := false
-    idReceived := false
-    nameReceived := false
-    var jsonMap map[string]json.RawMessage
-    if err := json.Unmarshal(b, &jsonMap); err != nil {
-        return err
-    }
-    // parse all the defined properties
-    for k, v := range jsonMap {
-        switch k {
-        case "architecture":
-            if err := json.Unmarshal([]byte(v), &strct.Architecture); err != nil {
-                return err
-             }
-            architectureReceived = true
-        case "id":
-            if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
-                return err
-             }
-            idReceived = true
-        case "ip":
-            if err := json.Unmarshal([]byte(v), &strct.Ip); err != nil {
-                return err
-             }
-        case "name":
-            if err := json.Unmarshal([]byte(v), &strct.Name); err != nil {
-                return err
-             }
-            nameReceived = true
-        }
-    }
-    // check if architecture (a required property) was received
-    if !architectureReceived {
-        return errors.New("\"architecture\" is required but was not present")
-    }
-    // check if id (a required property) was received
-    if !idReceived {
-        return errors.New("\"id\" is required but was not present")
-    }
-    // check if name (a required property) was received
-    if !nameReceived {
-        return errors.New("\"name\" is required but was not present")
-    }
-    return nil
+func (strct *HostMetadata) UnmarshalJSON(b []byte) error {
+	architectureReceived := false
+	idReceived := false
+	nameReceived := false
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
+	}
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		case "architecture":
+			if err := json.Unmarshal([]byte(v), &strct.Architecture); err != nil {
+				return err
+			}
+			architectureReceived = true
+		case "id":
+			if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
+				return err
+			}
+			idReceived = true
+		case "ip":
+			if err := json.Unmarshal([]byte(v), &strct.Ip); err != nil {
+				return err
+			}
+		case "name":
+			if err := json.Unmarshal([]byte(v), &strct.Name); err != nil {
+				return err
+			}
+			nameReceived = true
+		}
+	}
+	// check if architecture (a required property) was received
+	if !architectureReceived {
+		return errors.New("\"architecture\" is required but was not present")
+	}
+	// check if id (a required property) was received
+	if !idReceived {
+		return errors.New("\"id\" is required but was not present")
+	}
+	// check if name (a required property) was received
+	if !nameReceived {
+		return errors.New("\"name\" is required but was not present")
+	}
+	return nil
 }
 
 func (strct *LocalMetadata) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
-    comma := false
-    // Marshal any additional Properties
-    for k, v := range strct.AdditionalProperties {
+	comma := false
+	// Marshal any additional Properties
+	for k, v := range strct.AdditionalProperties {
 		if comma {
 			buf.WriteString(",")
 		}
-        buf.WriteString(fmt.Sprintf("\"%s\":", k))
+		buf.WriteString(fmt.Sprintf("\"%s\":", k))
 		if tmp, err := json.Marshal(v); err != nil {
 			return nil, err
 		} else {
 			buf.Write(tmp)
 		}
-        comma = true
+		comma = true
 	}
 
 	buf.WriteString("}")
@@ -829,106 +809,119 @@ func (strct *LocalMetadata) MarshalJSON() ([]byte, error) {
 }
 
 func (strct *LocalMetadata) UnmarshalJSON(b []byte) error {
-    var jsonMap map[string]json.RawMessage
-    if err := json.Unmarshal(b, &jsonMap); err != nil {
-        return err
-    }
-    // parse all the defined properties
-    for k, v := range jsonMap {
-        switch k {
-        default:
-            // an additional "interface{}" value
-            var additionalValue interface{}
-            if err := json.Unmarshal([]byte(v), &additionalValue); err != nil {
-                return err // invalid additionalProperty
-            }
-            if strct.AdditionalProperties == nil {
-                strct.AdditionalProperties = make(map[string]interface{}, 0)
-            }
-            strct.AdditionalProperties[k]= additionalValue
-        }
-    }
-    return nil
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
+	}
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		default:
+			// an additional "interface{}" value
+			var additionalValue interface{}
+			if err := json.Unmarshal([]byte(v), &additionalValue); err != nil {
+				return err // invalid additionalProperty
+			}
+			if strct.AdditionalProperties == nil {
+				strct.AdditionalProperties = make(map[string]interface{}, 0)
+			}
+			strct.AdditionalProperties[k] = additionalValue
+		}
+	}
+	return nil
 }
 
 func (strct *Policy) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
-    comma := false
-    // "Data" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "data" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"data\": ")
+	comma := false
+	// "CoordinatorIdx" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "coordinator_idx" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"coordinator_idx\": ")
+	if tmp, err := json.Marshal(strct.CoordinatorIdx); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// "Data" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "data" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"data\": ")
 	if tmp, err := json.Marshal(strct.Data); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "DefaultFleetServer" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "default_fleet_server" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"default_fleet_server\": ")
+	// "DefaultFleetServer" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "default_fleet_server" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"default_fleet_server\": ")
 	if tmp, err := json.Marshal(strct.DefaultFleetServer); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "Id" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "_id" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"_id\": ")
+	// "Id" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "_id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"_id\": ")
 	if tmp, err := json.Marshal(strct.Id); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "PolicyId" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "policy_id" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"policy_id\": ")
+	// "PolicyId" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "policy_id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"policy_id\": ")
 	if tmp, err := json.Marshal(strct.PolicyId); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // "Revision" field is required
-    // only required object types supported for marshal checking (for now)
-    // Marshal the "revision" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"revision\": ")
-	if tmp, err := json.Marshal(strct.Revision); err != nil {
+	// "RevisionIdx" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "revision_idx" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"revision_idx\": ")
+	if tmp, err := json.Marshal(strct.RevisionIdx); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
-    // Marshal the "@timestamp" field
-    if comma { 
-        buf.WriteString(",") 
-    }
-    buf.WriteString("\"@timestamp\": ")
+	// Marshal the "@timestamp" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"@timestamp\": ")
 	if tmp, err := json.Marshal(strct.Timestamp); err != nil {
 		return nil, err
- 	} else {
- 		buf.Write(tmp)
+	} else {
+		buf.Write(tmp)
 	}
 	comma = true
 
@@ -938,68 +931,396 @@ func (strct *Policy) MarshalJSON() ([]byte, error) {
 }
 
 func (strct *Policy) UnmarshalJSON(b []byte) error {
-    dataReceived := false
-    default_fleet_serverReceived := false
-    _idReceived := false
-    policy_idReceived := false
-    revisionReceived := false
-    var jsonMap map[string]json.RawMessage
-    if err := json.Unmarshal(b, &jsonMap); err != nil {
-        return err
-    }
-    // parse all the defined properties
-    for k, v := range jsonMap {
-        switch k {
-        case "data":
-            if err := json.Unmarshal([]byte(v), &strct.Data); err != nil {
-                return err
-             }
-            dataReceived = true
-        case "default_fleet_server":
-            if err := json.Unmarshal([]byte(v), &strct.DefaultFleetServer); err != nil {
-                return err
-             }
-            default_fleet_serverReceived = true
-        case "_id":
-            if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
-                return err
-             }
-            _idReceived = true
-        case "policy_id":
-            if err := json.Unmarshal([]byte(v), &strct.PolicyId); err != nil {
-                return err
-             }
-            policy_idReceived = true
-        case "revision":
-            if err := json.Unmarshal([]byte(v), &strct.Revision); err != nil {
-                return err
-             }
-            revisionReceived = true
-        case "@timestamp":
-            if err := json.Unmarshal([]byte(v), &strct.Timestamp); err != nil {
-                return err
-             }
-        }
-    }
-    // check if data (a required property) was received
-    if !dataReceived {
-        return errors.New("\"data\" is required but was not present")
-    }
-    // check if default_fleet_server (a required property) was received
-    if !default_fleet_serverReceived {
-        return errors.New("\"default_fleet_server\" is required but was not present")
-    }
-    // check if _id (a required property) was received
-    if !_idReceived {
-        return errors.New("\"_id\" is required but was not present")
-    }
-    // check if policy_id (a required property) was received
-    if !policy_idReceived {
-        return errors.New("\"policy_id\" is required but was not present")
-    }
-    // check if revision (a required property) was received
-    if !revisionReceived {
-        return errors.New("\"revision\" is required but was not present")
-    }
-    return nil
+	coordinator_idxReceived := false
+	dataReceived := false
+	default_fleet_serverReceived := false
+	_idReceived := false
+	policy_idReceived := false
+	revision_idxReceived := false
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
+	}
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		case "coordinator_idx":
+			if err := json.Unmarshal([]byte(v), &strct.CoordinatorIdx); err != nil {
+				return err
+			}
+			coordinator_idxReceived = true
+		case "data":
+			if err := json.Unmarshal([]byte(v), &strct.Data); err != nil {
+				return err
+			}
+			dataReceived = true
+		case "default_fleet_server":
+			if err := json.Unmarshal([]byte(v), &strct.DefaultFleetServer); err != nil {
+				return err
+			}
+			default_fleet_serverReceived = true
+		case "_id":
+			if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
+				return err
+			}
+			_idReceived = true
+		case "policy_id":
+			if err := json.Unmarshal([]byte(v), &strct.PolicyId); err != nil {
+				return err
+			}
+			policy_idReceived = true
+		case "revision_idx":
+			if err := json.Unmarshal([]byte(v), &strct.RevisionIdx); err != nil {
+				return err
+			}
+			revision_idxReceived = true
+		case "@timestamp":
+			if err := json.Unmarshal([]byte(v), &strct.Timestamp); err != nil {
+				return err
+			}
+		}
+	}
+	// check if coordinator_idx (a required property) was received
+	if !coordinator_idxReceived {
+		return errors.New("\"coordinator_idx\" is required but was not present")
+	}
+	// check if data (a required property) was received
+	if !dataReceived {
+		return errors.New("\"data\" is required but was not present")
+	}
+	// check if default_fleet_server (a required property) was received
+	if !default_fleet_serverReceived {
+		return errors.New("\"default_fleet_server\" is required but was not present")
+	}
+	// check if _id (a required property) was received
+	if !_idReceived {
+		return errors.New("\"_id\" is required but was not present")
+	}
+	// check if policy_id (a required property) was received
+	if !policy_idReceived {
+		return errors.New("\"policy_id\" is required but was not present")
+	}
+	// check if revision_idx (a required property) was received
+	if !revision_idxReceived {
+		return errors.New("\"revision_idx\" is required but was not present")
+	}
+	return nil
+}
+
+func (strct *PolicyLeader) MarshalJSON() ([]byte, error) {
+	buf := bytes.NewBuffer(make([]byte, 0))
+	buf.WriteString("{")
+	comma := false
+	// "Id" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "_id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"_id\": ")
+	if tmp, err := json.Marshal(strct.Id); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// "Server" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "server" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"server\": ")
+	if tmp, err := json.Marshal(strct.Server); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// Marshal the "@timestamp" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"@timestamp\": ")
+	if tmp, err := json.Marshal(strct.Timestamp); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// "Version" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "_version" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"_version\": ")
+	if tmp, err := json.Marshal(strct.Version); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+
+	buf.WriteString("}")
+	rv := buf.Bytes()
+	return rv, nil
+}
+
+func (strct *PolicyLeader) UnmarshalJSON(b []byte) error {
+	_idReceived := false
+	serverReceived := false
+	_versionReceived := false
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
+	}
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		case "_id":
+			if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
+				return err
+			}
+			_idReceived = true
+		case "server":
+			if err := json.Unmarshal([]byte(v), &strct.Server); err != nil {
+				return err
+			}
+			serverReceived = true
+		case "@timestamp":
+			if err := json.Unmarshal([]byte(v), &strct.Timestamp); err != nil {
+				return err
+			}
+		case "_version":
+			if err := json.Unmarshal([]byte(v), &strct.Version); err != nil {
+				return err
+			}
+			_versionReceived = true
+		}
+	}
+	// check if _id (a required property) was received
+	if !_idReceived {
+		return errors.New("\"_id\" is required but was not present")
+	}
+	// check if server (a required property) was received
+	if !serverReceived {
+		return errors.New("\"server\" is required but was not present")
+	}
+	// check if _version (a required property) was received
+	if !_versionReceived {
+		return errors.New("\"_version\" is required but was not present")
+	}
+	return nil
+}
+
+func (strct *Server) MarshalJSON() ([]byte, error) {
+	buf := bytes.NewBuffer(make([]byte, 0))
+	buf.WriteString("{")
+	comma := false
+	// "Agent" field is required
+	if strct.Agent == nil {
+		return nil, errors.New("agent is a required field")
+	}
+	// Marshal the "agent" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"agent\": ")
+	if tmp, err := json.Marshal(strct.Agent); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// "Host" field is required
+	if strct.Host == nil {
+		return nil, errors.New("host is a required field")
+	}
+	// Marshal the "host" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"host\": ")
+	if tmp, err := json.Marshal(strct.Host); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// "Id" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "_id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"_id\": ")
+	if tmp, err := json.Marshal(strct.Id); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// "Server" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "server" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"server\": ")
+	if tmp, err := json.Marshal(strct.Server); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// "Version" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "_version" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"_version\": ")
+	if tmp, err := json.Marshal(strct.Version); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+
+	buf.WriteString("}")
+	rv := buf.Bytes()
+	return rv, nil
+}
+
+func (strct *Server) UnmarshalJSON(b []byte) error {
+	agentReceived := false
+	hostReceived := false
+	_idReceived := false
+	serverReceived := false
+	_versionReceived := false
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
+	}
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		case "agent":
+			if err := json.Unmarshal([]byte(v), &strct.Agent); err != nil {
+				return err
+			}
+			agentReceived = true
+		case "host":
+			if err := json.Unmarshal([]byte(v), &strct.Host); err != nil {
+				return err
+			}
+			hostReceived = true
+		case "_id":
+			if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
+				return err
+			}
+			_idReceived = true
+		case "server":
+			if err := json.Unmarshal([]byte(v), &strct.Server); err != nil {
+				return err
+			}
+			serverReceived = true
+		case "_version":
+			if err := json.Unmarshal([]byte(v), &strct.Version); err != nil {
+				return err
+			}
+			_versionReceived = true
+		}
+	}
+	// check if agent (a required property) was received
+	if !agentReceived {
+		return errors.New("\"agent\" is required but was not present")
+	}
+	// check if host (a required property) was received
+	if !hostReceived {
+		return errors.New("\"host\" is required but was not present")
+	}
+	// check if _id (a required property) was received
+	if !_idReceived {
+		return errors.New("\"_id\" is required but was not present")
+	}
+	// check if server (a required property) was received
+	if !serverReceived {
+		return errors.New("\"server\" is required but was not present")
+	}
+	// check if _version (a required property) was received
+	if !_versionReceived {
+		return errors.New("\"_version\" is required but was not present")
+	}
+	return nil
+}
+
+func (strct *ServerMetadata) MarshalJSON() ([]byte, error) {
+	buf := bytes.NewBuffer(make([]byte, 0))
+	buf.WriteString("{")
+	comma := false
+	// "Id" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"id\": ")
+	if tmp, err := json.Marshal(strct.Id); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// "Version" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "version" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"version\": ")
+	if tmp, err := json.Marshal(strct.Version); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+
+	buf.WriteString("}")
+	rv := buf.Bytes()
+	return rv, nil
+}
+
+func (strct *ServerMetadata) UnmarshalJSON(b []byte) error {
+	idReceived := false
+	versionReceived := false
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
+	}
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		case "id":
+			if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
+				return err
+			}
+			idReceived = true
+		case "version":
+			if err := json.Unmarshal([]byte(v), &strct.Version); err != nil {
+				return err
+			}
+			versionReceived = true
+		}
+	}
+	// check if id (a required property) was received
+	if !idReceived {
+		return errors.New("\"id\" is required but was not present")
+	}
+	// check if version (a required property) was received
+	if !versionReceived {
+		return errors.New("\"version\" is required but was not present")
+	}
+	return nil
 }
