@@ -44,9 +44,45 @@
       },
       "required": [
         "id",
-        "version"
+        "agents"
       ]
     },
+
+    "action-result": {
+      "title": "Agent action results",
+      "description": "An Elastic Agent action results",
+      "type": "object",
+      "properties": {
+        "@timestamp": {
+          "description": "Date/time the action was created",
+          "type": "string",
+          "format": "date-time"
+        },
+        "agent": {
+          "description": "The agent id.",
+          "type": "string"
+        },
+        "action": {
+          "description": "The action id.",
+          "type": "string"
+        },
+        "error": {
+          "description": "The action error message.",
+          "type": "string"
+        },
+        "data": {
+          "description": "The opaque action result payload.",
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "id",
+        "agent",
+        "action"
+      ]
+    },
+
     "agent-metadata": {
       "title": "Agent Metadata",
       "description": "An Elastic Agent metadata",
@@ -134,7 +170,7 @@
         },
         "agent": { "$ref": "#/definitions/agent-metadata" },
         "host": { "$ref": "#/definitions/host-metadata" },
-        "server": { "ref":  "#/definitions/server-metadata" }
+        "server": { "$ref":  "#/definitions/server-metadata" }
       },
       "required": [
         "_id",
@@ -209,7 +245,7 @@
           "type": "string",
           "format": "date-time"
         },
-        "server": { "ref":  "#/definitions/server-metadata" }
+        "server": { "$ref":  "#/definitions/server-metadata" }
       },
       "required": [
         "_id",
