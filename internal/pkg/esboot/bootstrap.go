@@ -130,9 +130,9 @@ type indexConfig struct {
 }
 
 var indexConfigs = map[string]indexConfig{
-	".fleet-agents":         {mapping: agentMapping},
-	".fleet-actions":        {mapping: actionsMapping},
-	".fleet-action-results": {mapping: resultsMapping, datastream: true},
+	".fleet-agents":          {mapping: agentMapping},
+	".fleet-actions":         {mapping: actionsMapping},
+	".fleet-actions-results": {mapping: resultsMapping, datastream: true},
 }
 
 // Bootstrap creates .fleet-actions data stream

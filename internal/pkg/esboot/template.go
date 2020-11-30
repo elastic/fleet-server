@@ -26,7 +26,7 @@ const (
 	defaultTemplate = `
 	{
 		"version": %v,
-		"index_patterns": [ "%s*" ],
+		"index_patterns": [ "%s" ],
 		%s
 		"priority": 200,
 		"template": {
