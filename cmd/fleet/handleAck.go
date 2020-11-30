@@ -50,7 +50,7 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 
 // TODO: Handle UPGRADE and UNENROLL
 func _handleAcks(w http.ResponseWriter, r *http.Request, id string, sv saved.CRUD) error {
-	agent, err := authAgent(r, id, sv)
+	agent, err := authAgent(r, id, sv, nil)
 	if err != nil {
 		return err
 	}

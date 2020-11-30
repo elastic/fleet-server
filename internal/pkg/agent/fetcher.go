@@ -15,54 +15,59 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package action
+package agent
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fleet/internal/pkg/dsl"
 	"fleet/internal/pkg/esutil"
-	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	fieldID   = "_id"
+	IndexName = ".fleet-agents"
+)
+
+var (
+	ErrNotFound = errors.New("agent not found")
+)
+
 type Fetcher struct {
-	es    *elasticsearch.Client
-	query *SearchQuery
+	es   *elasticsearch.Client
+	tmpl *dsl.Tmpl
 }
 
 func NewFetcher(es *elasticsearch.Client) (*Fetcher, error) {
-	query, err := NewSearchQuery(
-		WithExpiration(),
-		WithSeqNo(),
-		WithAgents(),
-		WithSourceExclude("agents"),
-	)
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
 
-	if err != nil {
+	tokenFieldID := tmpl.Bind(fieldID)
+
+	root.Query().Bool().Filter().Term(fieldID, tokenFieldID, nil)
+	root.Source().Includes("action_seq_no")
+
+	if err := tmpl.Resolve(root); err != nil {
 		return nil, err
 	}
 
 	f := &Fetcher{
-		es:    es,
-		query: query,
+		es:   es,
+		tmpl: tmpl,
 	}
 	return f, nil
 }
 
-func (f *Fetcher) FetchAgentActions(ctx context.Context, agentId string, seqno int64) ([]ActionX, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	dslQuery, err := f.query.Render(map[string]interface{}{
-		SeqNo:      seqno,
-		Expiration: now,
-		Agents:     []string{agentId},
-	})
+func (f *Fetcher) FetchAgentSeqNo(ctx context.Context, agentId string) (seqno uint64, err error) {
+	dslQuery, err := f.tmpl.RenderOne(fieldID, agentId)
 
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	es := f.es
@@ -73,24 +78,40 @@ func (f *Fetcher) FetchAgentActions(ctx context.Context, agentId string, seqno i
 	)
 
 	if err != nil {
-		log.Warn().Err(err).Msg("Failed query new actions")
-		return nil, err
+		log.Warn().Err(err).Msg("Failed query agent")
+		return
 	}
 	defer res.Body.Close()
 	err = esutil.CheckResponseError(res)
 
 	if err != nil {
-		log.Warn().Err(err).Msg("Error response for new actions")
-		return nil, err
+		log.Warn().Err(err).Msg("Error response for agent")
+		return
 	}
 
 	var ares esutil.SearchResponse
 
 	err = json.NewDecoder(res.Body).Decode(&ares)
 	if err != nil {
-		log.Warn().Err(err).Msg("Failed to parse new actions response")
-		return nil, err
+		log.Warn().Err(err).Msg("Failed to parse agent hits")
+		return
 	}
 
-	return HitsToActions(ares.Result.Hits), nil
+	if len(ares.Result.Hits) == 0 {
+		return seqno, ErrNotFound
+	}
+
+	var minAgent struct {
+		ActionSeqNo *uint64 `json:"action_seq_no"`
+	}
+
+	err = json.Unmarshal(ares.Result.Hits[0].Source, &minAgent)
+	if err != nil {
+		return
+	}
+	if minAgent.ActionSeqNo == nil {
+		return seqno, ErrNotFound
+	}
+
+	return *minAgent.ActionSeqNo, nil
 }

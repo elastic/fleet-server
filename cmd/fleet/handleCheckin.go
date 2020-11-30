@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"fleet/internal/pkg/action"
+	"fleet/internal/pkg/agent"
 	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/saved"
 
@@ -70,6 +71,7 @@ type CheckinT struct {
 	ad *ActionDispatcher
 	tr *action.TokenResolver
 	fc *action.Fetcher
+	af *agent.Fetcher
 }
 
 // TODO: revisit for refactroring, too many params
@@ -79,6 +81,7 @@ func NewCheckinT(bc *BulkCheckin,
 	ad *ActionDispatcher,
 	tr *action.TokenResolver,
 	fc *action.Fetcher,
+	af *agent.Fetcher,
 ) *CheckinT {
 	return &CheckinT{
 		bc: bc,
@@ -87,6 +90,7 @@ func NewCheckinT(bc *BulkCheckin,
 		ad: ad,
 		tr: tr,
 		fc: fc,
+		af: af,
 	}
 }
 
@@ -94,7 +98,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 
 	log.Debug().Str("agent_id", id).Msg("Handle checkin")
 
-	agent, err := authAgent(r, id, sv)
+	agent, err := authAgent(r, id, sv, ct.af)
 
 	if err != nil {
 		return err
@@ -130,10 +134,20 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	// If token not found default to _seq_no -1 for subscription, since _seq_no start with 0
 	seqNo := int64(-1)
 	sn, err := ct.tr.Resolve(ctx, ackToken)
-	if err != nil && err != action.ErrTokenNotFound {
-		return err
+	if err != nil {
+		if err == action.ErrTokenNotFound {
+			err = nil
+		} else {
+			return err
+		}
+	} else {
+		seqNo = int64(sn)
 	}
-	seqNo = int64(sn)
+
+	// If seqNo < 0, check the agent record
+	if seqNo < 0 && agent.ActionSeqNo >= 0 {
+		seqNo = agent.ActionSeqNo
+	}
 
 	aSub := ct.ad.Subscribe(agent.Id, seqNo)
 	defer ct.ad.Unsubscribe(aSub)
@@ -416,10 +430,4 @@ func parseMeta(agent *Agent, req *CheckinRequest) (fields saved.Fields, err erro
 		}
 	}
 	return fields, nil
-}
-
-func resolveActionToken(token string) int64 {
-	log.Debug().Str("token", token).Int64("seq_no", -1).Msg("Resolved action token")
-	// TODO: implement token resolution
-	return -1
 }

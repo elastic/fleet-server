@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fleet/internal/pkg/action"
+	"fleet/internal/pkg/agent"
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/esboot"
@@ -164,7 +165,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 
 		es, bulker := InitES(ctx)
 
-		// START: experimental
+		// START: agent actions POC
 
 		// Initial indices bootstrapping, needed for agents actions development
 		// TODO: remove this after the indices bootstrapping logic implemented in ES plugin
@@ -178,16 +179,20 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		tr, err := action.NewTokenResolver(es)
 		checkErr(err)
 
+		// TODO: refactor data fetching
 		fc, err := action.NewFetcher(es)
 		checkErr(err)
-		// END: experimental
+
+		af, err := agent.NewFetcher(es)
+		checkErr(err)
+		// END: agent actions POC
 
 		sv := saved.NewMgr(bulker, savedObjectKey())
 
 		pm := runPolicyMon(ctx, sv)
 		ba := runBulkActions(ctx, sv)
 		bc := runBulkCheckin(ctx, bulker, sv)
-		ct := NewCheckinT(bc, ba, pm, ad, tr, fc)
+		ct := NewCheckinT(bc, ba, pm, ad, tr, fc, af)
 		et := NewEnrollerT(bulker)
 
 		router := NewRouter(ctx, sv, ct, et)

@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"time"
 
+	"fleet/internal/pkg/agent"
 	"fleet/internal/pkg/apikey"
 	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/saved"
@@ -74,7 +75,7 @@ func authApiKey(r *http.Request, client *elasticsearch.Client) (*apikey.ApiKey, 
 	return key, err
 }
 
-func authAgent(r *http.Request, id string, sv saved.CRUD) (*Agent, error) {
+func authAgent(r *http.Request, id string, sv saved.CRUD, af *agent.Fetcher) (*Agent, error) {
 	// authenticate
 	key, err := authApiKey(r, sv.Client())
 	if err != nil {
@@ -82,20 +83,36 @@ func authAgent(r *http.Request, id string, sv saved.CRUD) (*Agent, error) {
 	}
 
 	// TODO: read the agent record with the last aciton token
-	agent, err := findAgentByApiKeyId(r.Context(), sv, key.Id)
+	agnt, err := findAgentByApiKeyId(r.Context(), sv, key.Id)
 	if err != nil {
 		return nil, err
 	}
 
 	// validate key alignment
-	if agent.AccessApiKeyId != key.Id {
+	if agnt.AccessApiKeyId != key.Id {
 		log.Debug().
 			Err(ErrAgentCorrupted).
-			Interface("agent", &agent).
+			Interface("agent", &agnt).
 			Str("key.Id", key.Id).
 			Msg("agent id mismatch")
 		return nil, ErrAgentCorrupted
 	}
 
-	return agent, nil
+	if af != nil {
+		seqno, err := af.FetchAgentSeqNo(r.Context(), id)
+
+		agnt.ActionSeqNo = -1
+		if err != nil {
+			if err == agent.ErrNotFound {
+				log.Debug().Str("agent_id", id).Msg("Agent action sequence not found")
+				return agnt, nil
+			}
+			return nil, err
+		}
+
+		log.Debug().Str("agent_id", id).Uint64("action_seq_no", seqno).Msg("Agent action sequence found")
+		agnt.ActionSeqNo = int64(seqno)
+	}
+
+	return agnt, nil
 }

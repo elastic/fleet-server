@@ -114,7 +114,7 @@ type Agent struct {
 	UpdatedAt          string          `json:"updated_at,omitempty"`
 	CurrentErrorEvents interface{}     `json:"current_error_events"`
 	Packages           []string        `json:"packages"`
-	AckToken           string          `json:"ack_token,omitempty"`
+	ActionSeqNo        int64           `json:"action_seq_no"`
 }
 
 // Wrong: no AAD;

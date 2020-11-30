@@ -24,6 +24,7 @@ const (
 	kKeywordQuery       = "query"
 	kKeywordSource      = "_source"
 	kKeywordExcludes    = "excludes"
+	kKeywordIncludes    = "includes"
 	kKeywordBool        = "bool"
 	kKeywordFilter      = "filter"
 	kKeywordMust        = "must"
