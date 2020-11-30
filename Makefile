@@ -2,7 +2,7 @@ COMMIT=$(shell git rev-parse --short HEAD)
 VERSION ?= $(shell head -n 1 VERSION 2> /dev/null || echo "0.0.0")
 BUILD=$(shell date +%FT%T%z)
 LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Build=${BUILD}
-PACKAGE_PATH=./build/package/
+PACKAGE_PATH=./dev-tools/package/
 DOCKER_BUILD=@export DOCKER_CONTENT_TRUST=1 && export DOCKER_BUILDKIT=1 && docker build --build-arg COMMIT='$(COMMIT)' --build-arg VERSION='$(VERSION)' --build-arg LDFLAGS='$(LDFLAGS)' -f $(PACKAGE_PATH)Dockerfile
 
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
@@ -28,7 +28,7 @@ image:	## - Build the elastic fleet docker images
 .PHONY: run
 run: image ## - Run the smallest and secured golang docker image based on scratch
 	@printf "${CMD_COLOR_ON} Run the elastic fleet docker image\n${CMD_COLOR_OFF}"
-	@docker-compose -f ./build/package/docker-compose.yml up 
+	@docker-compose -f ./dev-tools/package/docker-compose.yml up 
 
 
 .PHONY: local
