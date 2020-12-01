@@ -110,7 +110,7 @@ func (ad *ActionDispatcher) getSub(agentId string) (ActionSubX, bool) {
 func (ad *ActionDispatcher) dispatch(ctx context.Context, agentId string, actions []ActionX) {
 	sub, ok := ad.getSub(agentId)
 	if !ok {
-		log.Info().Str("agent_id", agentId).Msg("Agent is not currently connected. Not dispatching actions.")
+		log.Debug().Str("agent_id", agentId).Msg("Agent is not currently connected. Not dispatching actions.")
 		return
 	}
 	select {

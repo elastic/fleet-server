@@ -104,7 +104,7 @@ func authAgent(r *http.Request, id string, sv saved.CRUD, af *agent.Fetcher) (*A
 		agnt.ActionSeqNo = -1
 		if err != nil {
 			if err == agent.ErrNotFound {
-				log.Debug().Str("agent_id", id).Msg("Agent action sequence not found")
+				log.Debug().Str("agent_id", id).Uint64("action_seq_no", seqno).Msg("Agent action sequence not found")
 				return agnt, nil
 			}
 			return nil, err
