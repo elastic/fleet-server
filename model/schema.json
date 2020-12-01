@@ -1,6 +1,88 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "action": {
+      "title": "Agent action",
+      "description": "An Elastic Agent action",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The unique identifier for the Elastic Agent action",
+          "type": "string",
+          "format": "uuid"
+        },
+        "@timestamp": {
+          "description": "Date/time the action was created",
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiration": {
+          "description": "The action expiration date/time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "type": {
+          "description": "The action type. APP_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",
+          "type": "string"
+        },
+        "input_id": {
+          "description": "The input identifier the actions should be routed to.",
+          "type": "string"
+        },
+        "agents": {
+          "description": "The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "data": {
+          "description": "The opaque action payload.",
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "id",
+        "agents"
+      ]
+    },
+
+    "action-result": {
+      "title": "Agent action results",
+      "description": "An Elastic Agent action results",
+      "type": "object",
+      "properties": {
+        "@timestamp": {
+          "description": "Date/time the action was created",
+          "type": "string",
+          "format": "date-time"
+        },
+        "agent_id": {
+          "description": "The agent id.",
+          "type": "string"
+        },
+        "action_id": {
+          "description": "The action id.",
+          "type": "string"
+        },
+        "error": {
+          "description": "The action error message.",
+          "type": "string"
+        },
+        "data": {
+          "description": "The opaque action result payload.",
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "id",
+        "agent",
+        "action"
+      ]
+    },
+
     "agent-metadata": {
       "title": "Agent Metadata",
       "description": "An Elastic Agent metadata",
@@ -88,7 +170,7 @@
         },
         "agent": { "$ref": "#/definitions/agent-metadata" },
         "host": { "$ref": "#/definitions/host-metadata" },
-        "server": { "ref":  "#/definitions/server-metadata" }
+        "server": { "$ref":  "#/definitions/server-metadata" }
       },
       "required": [
         "_id",
@@ -163,7 +245,7 @@
           "type": "string",
           "format": "date-time"
         },
-        "server": { "ref":  "#/definitions/server-metadata" }
+        "server": { "$ref":  "#/definitions/server-metadata" }
       },
       "required": [
         "_id",
