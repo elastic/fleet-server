@@ -19,46 +19,38 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
+
 	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 )
 
-// ElasticsearchBackoff is the backoff configuration for Elasticsearch.
-type ElasticsearchBackoff struct {
-	Init time.Duration
-	Max  time.Duration
-}
-
-// InitDefaults initializes the defaults for the configuration.
-func (c *ElasticsearchBackoff) InitDefaults() {
-	c.Init = 1 * time.Second
-	c.Max = 60 * time.Second
-}
+var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
 // Elasticsearch is the configuration for elasticsearch.
 type Elasticsearch struct {
-	Protocol         string               `config:"protocol"`
-	Hosts            []string             `config:"hosts"`
-	Path             string               `config:"path"`
-	Params           map[string]string    `config:"parameters"`
-	Headers          map[string]string    `config:"headers"`
-	Username         string               `config:"username"`
-	Password         string               `config:"password"`
-	APIKey           string               `config:"api_key"`
-	ProxyURL         string               `config:"proxy_url"`
-	ProxyDisable     bool                 `config:"proxy_disable"`
-	LoadBalance      bool                 `config:"loadbalance"`
-	CompressionLevel int                  `config:"compression_level" validate:"min=0, max=9"`
-	EscapeHTML       bool                 `config:"escape_html"`
-	TLS              *tlscommon.Config    `config:"ssl"`
-	Kerberos         *kerberos.Config     `config:"kerberos"`
-	BulkMaxSize      int                  `config:"bulk_max_size"`
-	MaxRetries       int                  `config:"max_retries"`
-	Timeout          time.Duration        `config:"timeout"`
-	Backoff          ElasticsearchBackoff `config:"backoff"`
+	Protocol          string            `config:"protocol"`
+	Hosts             []string          `config:"hosts"`
+	Path              string            `config:"path"`
+	Headers           map[string]string `config:"headers"`
+	Username          string            `config:"username"`
+	Password          string            `config:"password"`
+	APIKey            string            `config:"api_key"`
+	ProxyURL          string            `config:"proxy_url"`
+	ProxyDisable      bool              `config:"proxy_disable"`
+	TLS               *tlscommon.Config `config:"ssl"`
+	MaxRetries        int               `config:"max_retries"`
+	MaxConnPerHost    int               `config:"max_conn_per_host"`
+	BulkFlushInterval time.Duration     `config:"bulk_flush_interval"`
+	Timeout           time.Duration     `config:"timeout"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -67,7 +59,8 @@ func (c *Elasticsearch) InitDefaults() {
 	c.Hosts = []string{"localhost:9200"}
 	c.Timeout = 90 * time.Second
 	c.MaxRetries = 3
-	c.LoadBalance = true
+	c.MaxConnPerHost = 128
+	c.BulkFlushInterval = 250 * time.Millisecond
 }
 
 // Validate ensures that the configuration is valid.
@@ -83,7 +76,64 @@ func (c *Elasticsearch) Validate() error {
 			return err
 		}
 	}
+	if c.TLS != nil && c.TLS.IsEnabled() {
+		_, err := tlscommon.LoadTLSConfig(c.TLS)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// ToESConfig converts the configuration object into the config for the elasticsearch client.
+func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
+	// build the addresses
+	addrs := make([]string, len(c.Hosts))
+	for i, host := range c.Hosts {
+		addr, err := makeURL(c.Protocol, c.Path, host, 9200)
+		if err != nil {
+			return elasticsearch.Config{}, err
+		}
+		addrs[i] = addr
+	}
+
+	// build the transport from the config
+	httpTransport := http.DefaultTransport.(*http.Transport)
+	httpTransport = httpTransport.Clone()
+	if c.TLS != nil && c.TLS.IsEnabled() {
+		tls, err := tlscommon.LoadTLSConfig(c.TLS)
+		if err != nil {
+			return elasticsearch.Config{}, err
+		}
+		httpTransport.TLSClientConfig = tls.ToConfig()
+	}
+	if c.ProxyURL != "" && !c.ProxyDisable {
+		proxyUrl, err := common.ParseURL(c.ProxyURL)
+		if err != nil {
+			return elasticsearch.Config{}, err
+		}
+		httpTransport.Proxy = http.ProxyURL(proxyUrl)
+	}
+	httpTransport.MaxConnsPerHost = c.MaxConnPerHost
+	httpTransport.MaxIdleConnsPerHost = 32
+	httpTransport.TLSHandshakeTimeout = 10 * time.Second
+	httpTransport.IdleConnTimeout = 60 * time.Second
+	httpTransport.ResponseHeaderTimeout = c.Timeout
+	httpTransport.DialContext = (&net.Dialer{Timeout: time.Second * 10}).DialContext
+
+	h := http.Header{}
+	for key, val := range c.Headers {
+		h.Set(key, val)
+	}
+
+	return elasticsearch.Config{
+		Addresses:  addrs,
+		Username:   c.Username,
+		Password:   c.Password,
+		Header:     h,
+		Transport:  httpTransport,
+		MaxRetries: c.MaxRetries,
+	}, nil
 }
 
 // Output is the output configuration to elasticsearch.
@@ -104,4 +154,46 @@ func (c *Output) Validate() error {
 	// clear Extra because its valid (only used for validation)
 	c.Extra = nil
 	return nil
+}
+
+func makeURL(defaultScheme string, defaultPath string, rawURL string, defaultPort int) (string, error) {
+	if defaultScheme == "" {
+		defaultScheme = "http"
+	}
+	if !hasScheme.MatchString(rawURL) {
+		rawURL = fmt.Sprintf("%v://%v", defaultScheme, rawURL)
+	}
+	addr, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+
+	scheme := addr.Scheme
+	host := addr.Host
+	port := strconv.Itoa(defaultPort)
+
+	if host == "" {
+		host = "localhost"
+	} else {
+		// split host and optional port
+		if splitHost, splitPort, err := net.SplitHostPort(host); err == nil {
+			host = splitHost
+			port = splitPort
+		}
+
+		// Check if ipv6
+		if strings.Count(host, ":") > 1 && strings.Count(host, "]") == 0 {
+			host = "[" + host + "]"
+		}
+	}
+
+	// Assign default path if not set
+	if addr.Path == "" {
+		addr.Path = defaultPath
+	}
+
+	// reconstruct url
+	addr.Scheme = scheme
+	addr.Host = host + ":" + port
+	return addr.String(), nil
 }

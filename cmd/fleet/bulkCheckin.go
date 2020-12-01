@@ -22,10 +22,12 @@ import (
 	"sync"
 	"time"
 
-	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/saved"
+
 	"github.com/rs/zerolog/log"
 )
+
+const kBulkCheckinFlushInterval = 10 * time.Second
 
 type BulkCheckin struct {
 	mut     sync.Mutex
@@ -55,8 +57,7 @@ func (bc *BulkCheckin) CheckIn(id string, fields saved.Fields) error {
 
 func (bc *BulkCheckin) Run(ctx context.Context, sv saved.CRUD) error {
 
-	flushInterval := env.BulkCheckinFlushInterval(time.Second * 10)
-	tick := time.NewTicker(flushInterval)
+	tick := time.NewTicker(kBulkCheckinFlushInterval)
 
 	var err error
 LOOP:

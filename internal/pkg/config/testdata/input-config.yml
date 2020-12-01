@@ -9,5 +9,5 @@ inputs:
       host: "localhost"
       port: 8888
       timeouts:
-        read: 20
-        write: 5
+        read: 20s
+        write: 5s

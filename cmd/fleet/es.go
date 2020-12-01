@@ -19,17 +19,10 @@ package fleet
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
-	"fmt"
-	"net"
-	"net/http"
-	"strings"
-	"time"
-
 	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/env"
-
+	"fleet/internal/pkg/config"
+	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
 )
@@ -66,40 +59,23 @@ func Info(ctx context.Context, es *elasticsearch.Client) (*InfoResponse, error) 
 	return &resp, err
 }
 
-func InitESClient(ctx context.Context) (*elasticsearch.Client, error) {
+func InitESClient(ctx context.Context, cfg *config.Elasticsearch) (*elasticsearch.Client, error) {
 
-	addr := strings.Split(env.ESUrl("https://localhost:9200"), ",")
-	user := env.ESUsername("elastic")
-	pass := env.ESPassword("changeme")
-	mcph := env.ESMaxConnsPerHost(128)
-	skip := env.ESSkipVerify(false)
+	escfg, err := cfg.ToESConfig()
+	if err != nil {
+		return nil, err
+	}
+	addr := cfg.Hosts
+	user := cfg.Username
+	mcph := cfg.MaxConnPerHost
 
 	log.Debug().
 		Strs("addr", addr).
 		Str("user", user).
 		Int("maxConnsPersHost", mcph).
-		Bool("tlsSkipVerify", skip).
 		Msg("init es")
 
-	// TODO: config via kibana cfg
-	es, err := elasticsearch.NewClient(
-		elasticsearch.Config{
-			Addresses: addr,
-			Username:  user,
-			Password:  pass,
-			Transport: &http.Transport{
-				MaxConnsPerHost:       mcph,
-				MaxIdleConnsPerHost:   32,
-				TLSHandshakeTimeout:   time.Second * 10,
-				IdleConnTimeout:       60 * time.Second,
-				ResponseHeaderTimeout: time.Second * 60,
-				DialContext:           (&net.Dialer{Timeout: time.Second * 10}).DialContext,
-				TLSClientConfig: &tls.Config{
-					MinVersion:         tls.VersionTLS11,
-					InsecureSkipVerify: skip,
-				},
-			},
-		})
+	es, err := elasticsearch.NewClient(escfg)
 	if err != nil {
 		return nil, err
 	}
@@ -119,12 +95,12 @@ func InitESClient(ctx context.Context) (*elasticsearch.Client, error) {
 	return es, nil
 }
 
-func InitES(ctx context.Context) (*elasticsearch.Client, bulk.Bulk) {
+func InitES(ctx context.Context, cfg *config.Elasticsearch) (*elasticsearch.Client, bulk.Bulk) {
 
-	es, err := InitESClient(ctx)
+	es, err := InitESClient(ctx, cfg)
 	checkErr(err)
 
-	flushInterval := env.BulkFlushInterval(time.Millisecond * 250)
+	flushInterval := cfg.BulkFlushInterval
 
 	blk := bulk.NewBulker(es)
 	go func() {

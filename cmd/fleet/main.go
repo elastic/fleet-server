@@ -34,6 +34,8 @@ import (
 	"fleet/internal/pkg/signal"
 )
 
+const kPolicyThrottle = time.Millisecond * 5
+
 var Version string
 
 func checkErr(err error) {
@@ -75,8 +77,7 @@ func runBulkActions(ctx context.Context, sv saved.CRUD) *BulkActions {
 }
 
 func runPolicyMon(ctx context.Context, sv saved.CRUD) *PolicyMon {
-	throttle := env.PolicyThrottle(time.Millisecond * 5)
-	pm, err := NewPolicyMon(throttle)
+	pm, err := NewPolicyMon(kPolicyThrottle)
 	checkErr(err)
 
 	go func() {
@@ -87,9 +88,8 @@ func runPolicyMon(ctx context.Context, sv saved.CRUD) *PolicyMon {
 	return pm
 }
 
-func installProfiler(ctx context.Context) {
-	addr := env.ProfileBind("localhost:6060")
-	profile.RunProfiler(ctx, addr)
+func installProfiler(ctx context.Context, cfg *config.Server) {
+	profile.RunProfiler(ctx, cfg.Profile.Bind)
 }
 
 func savedObjectKey() string {
@@ -121,11 +121,11 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 
 		ctx := installSignalHandler()
 
-		installProfiler(ctx)
+		installProfiler(ctx, &cfg.Inputs[0].Server)
 
 		checkErr(initGlobalCache())
 
-		es, bulker := InitES(ctx)
+		es, bulker := InitES(ctx, &cfg.Output.Elasticsearch)
 
 		// Initial indices bootstrapping, needed for agents actions development
 		// TODO: remove this after the indices bootstrapping logic implemented in ES plugin
@@ -137,11 +137,11 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		ba := runBulkActions(ctx, sv)
 		bc := runBulkCheckin(ctx, bulker, sv)
 		ct := NewCheckinT(bc, ba, pm)
-		et := NewEnrollerT()
+		et := NewEnrollerT(&cfg.Inputs[0].Server)
 
 		router := NewRouter(ctx, sv, ct, et)
 
-		err = runServer(ctx, router)
+		err = runServer(ctx, router, &cfg.Inputs[0].Server)
 		log.Info().Err(err).Msg("Fleet Server exited")
 
 		return nil

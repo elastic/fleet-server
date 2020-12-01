@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fleet/internal/pkg/config"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,7 +30,6 @@ import (
 	"github.com/gofrs/uuid"
 
 	"fleet/internal/pkg/apikey"
-	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/saved"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -39,8 +39,7 @@ import (
 )
 
 const (
-	kEnrollKeyTTL = time.Second * 5
-	kEnrollMod    = "enroll"
+	kEnrollMod = "enroll"
 
 	kCacheAccessInitTTL = time.Second * 30 // Cache a bit longer to handle expensive inital checkin
 	kCacheEnrollmentTTL = time.Second * 30
@@ -56,10 +55,10 @@ type EnrollerT struct {
 	throttle *semaphore.Weighted
 }
 
-func NewEnrollerT() *EnrollerT {
+func NewEnrollerT(cfg *config.Server) *EnrollerT {
 	// This value has more to do with the throughput of elastic search than anything else
 	// if you have a large elastic search cluster, you can be more aggressive.
-	maxEnrollPending := int64(env.MaxEnrollPending(64))
+	maxEnrollPending := cfg.MaxEnrollPending
 
 	return &EnrollerT{
 		throttle: semaphore.NewWeighted(maxEnrollPending),
