@@ -98,8 +98,21 @@ func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
 	}
 
 	// build the transport from the config
-	httpTransport := http.DefaultTransport.(*http.Transport)
-	httpTransport = httpTransport.Clone()
+	httpTransport := &http.Transport{
+		DialContext:            (&net.Dialer{
+			Timeout: 10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout:    10 * time.Second,
+		DisableKeepAlives:      false,
+		DisableCompression:     false,
+		MaxIdleConns:           100,
+		MaxIdleConnsPerHost:    32,
+		MaxConnsPerHost:        c.MaxConnPerHost,
+		IdleConnTimeout:        60 * time.Second,
+		ResponseHeaderTimeout:  c.Timeout,
+		ExpectContinueTimeout:  1 * time.Second,
+	}
 	if c.TLS != nil && c.TLS.IsEnabled() {
 		tls, err := tlscommon.LoadTLSConfig(c.TLS)
 		if err != nil {
@@ -114,12 +127,6 @@ func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
 		}
 		httpTransport.Proxy = http.ProxyURL(proxyUrl)
 	}
-	httpTransport.MaxConnsPerHost = c.MaxConnPerHost
-	httpTransport.MaxIdleConnsPerHost = 32
-	httpTransport.TLSHandshakeTimeout = 10 * time.Second
-	httpTransport.IdleConnTimeout = 60 * time.Second
-	httpTransport.ResponseHeaderTimeout = c.Timeout
-	httpTransport.DialContext = (&net.Dialer{Timeout: time.Second * 10}).DialContext
 
 	h := http.Header{}
 	for key, val := range c.Headers {
