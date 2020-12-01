@@ -212,7 +212,6 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		}
 	}
 
-	// For now, empty response
 	resp := CheckinResponse{
 		AckToken: ackToken,
 		Action:   "checkin",
