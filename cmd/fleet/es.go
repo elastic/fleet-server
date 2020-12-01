@@ -66,7 +66,7 @@ func Info(ctx context.Context, es *elasticsearch.Client) (*InfoResponse, error) 
 	return &resp, err
 }
 
-func InitES(ctx context.Context) (*elasticsearch.Client, bulk.Bulk) {
+func InitESClient(ctx context.Context) (*elasticsearch.Client, error) {
 
 	addr := strings.Split(env.ESUrl("https://localhost:9200"), ",")
 	user := env.ESUsername("elastic")
@@ -100,17 +100,29 @@ func InitES(ctx context.Context) (*elasticsearch.Client, bulk.Bulk) {
 				},
 			},
 		})
-	checkErr(err)
+	if err != nil {
+		return nil, err
+	}
 
 	// Validate connection
 	resp, err := Info(ctx, es)
-	checkErr(err)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Info().
 		Str("name", resp.ClusterName).
 		Str("uuid", resp.ClusterUUID).
 		Str("vers", resp.Version.Number).
 		Msg("Cluster Info")
+
+	return es, nil
+}
+
+func InitES(ctx context.Context) (*elasticsearch.Client, bulk.Bulk) {
+
+	es, err := InitESClient(ctx)
+	checkErr(err)
 
 	flushInterval := env.BulkFlushInterval(time.Millisecond * 250)
 

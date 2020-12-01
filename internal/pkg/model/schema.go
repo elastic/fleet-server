@@ -12,6 +12,50 @@ import (
 // Root
 type Root interface{}
 
+// Action An Elastic Agent action
+type Action struct {
+
+	// The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids
+	Agents []string `json:"agents"`
+
+	// The opaque action payload.
+	Data *Data `json:"data,omitempty"`
+
+	// The action expiration date/time
+	Expiration string `json:"expiration,omitempty"`
+
+	// The unique identifier for the Elastic Agent action
+	Id string `json:"id"`
+
+	// The input identifier the actions should be routed to.
+	InputId string `json:"input_id,omitempty"`
+
+	// Date/time the action was created
+	Timestamp string `json:"@timestamp,omitempty"`
+
+	// The action type. APP_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.
+	Type string `json:"type,omitempty"`
+}
+
+// ActionResult An Elastic Agent action results
+type ActionResult struct {
+
+	// The action id.
+	ActionId string `json:"action_id,omitempty"`
+
+	// The agent id.
+	AgentId string `json:"agent_id,omitempty"`
+
+	// The opaque action result payload.
+	Data *Data `json:"data,omitempty"`
+
+	// The action error message.
+	Error string `json:"error,omitempty"`
+
+	// Date/time the action was created
+	Timestamp string `json:"@timestamp,omitempty"`
+}
+
 // Agent An Elastic Agent that has enrolled into Fleet
 type Agent struct {
 
@@ -69,6 +113,11 @@ type AgentMetadata struct {
 	Version string `json:"version"`
 }
 
+// Data The opaque action result payload.
+type Data struct {
+	AdditionalProperties map[string]interface{} `json:"-,omitempty"`
+}
+
 // HostMetadata The host metadata for the Elastic Agent
 type HostMetadata struct {
 
@@ -119,8 +168,8 @@ type Policy struct {
 type PolicyLeader struct {
 
 	// The unique identifier for the policy
-	Id     string      `json:"_id"`
-	Server interface{} `json:"server"`
+	Id     string          `json:"_id"`
+	Server *ServerMetadata `json:"server"`
 
 	// Date/time the leader was taken or held
 	Timestamp string `json:"@timestamp,omitempty"`
@@ -135,8 +184,8 @@ type Server struct {
 	Host  *HostMetadata  `json:"host"`
 
 	// The unique identifier for the Fleet Server
-	Id     string      `json:"_id"`
-	Server interface{} `json:"server"`
+	Id     string          `json:"_id"`
+	Server *ServerMetadata `json:"server"`
 
 	// The version of the document in the index
 	Version int `json:"_version"`
@@ -150,6 +199,150 @@ type ServerMetadata struct {
 
 	// The version of the Fleet Server
 	Version string `json:"version"`
+}
+
+func (strct *Action) MarshalJSON() ([]byte, error) {
+	buf := bytes.NewBuffer(make([]byte, 0))
+	buf.WriteString("{")
+	comma := false
+	// "Agents" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "agents" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"agents\": ")
+	if tmp, err := json.Marshal(strct.Agents); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// Marshal the "data" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"data\": ")
+	if tmp, err := json.Marshal(strct.Data); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// Marshal the "expiration" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"expiration\": ")
+	if tmp, err := json.Marshal(strct.Expiration); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// "Id" field is required
+	// only required object types supported for marshal checking (for now)
+	// Marshal the "id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"id\": ")
+	if tmp, err := json.Marshal(strct.Id); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// Marshal the "input_id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"input_id\": ")
+	if tmp, err := json.Marshal(strct.InputId); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// Marshal the "@timestamp" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"@timestamp\": ")
+	if tmp, err := json.Marshal(strct.Timestamp); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+	// Marshal the "type" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"type\": ")
+	if tmp, err := json.Marshal(strct.Type); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
+
+	buf.WriteString("}")
+	rv := buf.Bytes()
+	return rv, nil
+}
+
+func (strct *Action) UnmarshalJSON(b []byte) error {
+	agentsReceived := false
+	idReceived := false
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
+	}
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		case "agents":
+			if err := json.Unmarshal([]byte(v), &strct.Agents); err != nil {
+				return err
+			}
+			agentsReceived = true
+		case "data":
+			if err := json.Unmarshal([]byte(v), &strct.Data); err != nil {
+				return err
+			}
+		case "expiration":
+			if err := json.Unmarshal([]byte(v), &strct.Expiration); err != nil {
+				return err
+			}
+		case "id":
+			if err := json.Unmarshal([]byte(v), &strct.Id); err != nil {
+				return err
+			}
+			idReceived = true
+		case "input_id":
+			if err := json.Unmarshal([]byte(v), &strct.InputId); err != nil {
+				return err
+			}
+		case "@timestamp":
+			if err := json.Unmarshal([]byte(v), &strct.Timestamp); err != nil {
+				return err
+			}
+		case "type":
+			if err := json.Unmarshal([]byte(v), &strct.Type); err != nil {
+				return err
+			}
+		}
+	}
+	// check if agents (a required property) was received
+	if !agentsReceived {
+		return errors.New("\"agents\" is required but was not present")
+	}
+	// check if id (a required property) was received
+	if !idReceived {
+		return errors.New("\"id\" is required but was not present")
+	}
+	return nil
 }
 
 func (strct *Agent) MarshalJSON() ([]byte, error) {
@@ -517,6 +710,52 @@ func (strct *AgentMetadata) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (strct *Data) MarshalJSON() ([]byte, error) {
+	buf := bytes.NewBuffer(make([]byte, 0))
+	buf.WriteString("{")
+	comma := false
+	// Marshal any additional Properties
+	for k, v := range strct.AdditionalProperties {
+		if comma {
+			buf.WriteString(",")
+		}
+		buf.WriteString(fmt.Sprintf("\"%s\":", k))
+		if tmp, err := json.Marshal(v); err != nil {
+			return nil, err
+		} else {
+			buf.Write(tmp)
+		}
+		comma = true
+	}
+
+	buf.WriteString("}")
+	rv := buf.Bytes()
+	return rv, nil
+}
+
+func (strct *Data) UnmarshalJSON(b []byte) error {
+	var jsonMap map[string]json.RawMessage
+	if err := json.Unmarshal(b, &jsonMap); err != nil {
+		return err
+	}
+	// parse all the defined properties
+	for k, v := range jsonMap {
+		switch k {
+		default:
+			// an additional "interface{}" value
+			var additionalValue interface{}
+			if err := json.Unmarshal([]byte(v), &additionalValue); err != nil {
+				return err // invalid additionalProperty
+			}
+			if strct.AdditionalProperties == nil {
+				strct.AdditionalProperties = make(map[string]interface{}, 0)
+			}
+			strct.AdditionalProperties[k] = additionalValue
+		}
+	}
+	return nil
+}
+
 func (strct *HostMetadata) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
@@ -864,7 +1103,9 @@ func (strct *PolicyLeader) MarshalJSON() ([]byte, error) {
 	}
 	comma = true
 	// "Server" field is required
-	// only required object types supported for marshal checking (for now)
+	if strct.Server == nil {
+		return nil, errors.New("server is a required field")
+	}
 	// Marshal the "server" field
 	if comma {
 		buf.WriteString(",")
@@ -1001,7 +1242,9 @@ func (strct *Server) MarshalJSON() ([]byte, error) {
 	}
 	comma = true
 	// "Server" field is required
-	// only required object types supported for marshal checking (for now)
+	if strct.Server == nil {
+		return nil, errors.New("server is a required field")
+	}
 	// Marshal the "server" field
 	if comma {
 		buf.WriteString(",")

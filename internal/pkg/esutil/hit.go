@@ -15,26 +15,20 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//go:generate schema-generate -o internal/pkg/model/schema.go -p model model/schema.json
-//go:generate go fmt internal/pkg/model/schema.go
+package esutil
 
-package main
+import "encoding/json"
 
-import (
-	"fmt"
-	"os"
+type Hit struct {
+	ID     string          `json:"_id"`
+	SeqNo  uint64          `json:"_seq_no"`
+	Source json.RawMessage `json:"_source"`
+}
 
-	"fleet/cmd/fleet"
-)
+type Result struct {
+	Hits []Hit `json:"hits"`
+}
 
-var (
-	Version string
-)
-
-func main() {
-	cmd := fleet.NewCommand(Version)
-	if err := cmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+type SearchResponse struct {
+	Result Result `json:"hits"`
 }

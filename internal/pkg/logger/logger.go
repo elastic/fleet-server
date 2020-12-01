@@ -39,6 +39,8 @@ func strToLevel(s string) zerolog.Level {
 	switch strings.TrimSpace(s) {
 	case "trace":
 		l = zerolog.TraceLevel
+	case "debug":
+		l = zerolog.DebugLevel
 	case "info":
 		l = zerolog.InfoLevel
 	case "warn":
