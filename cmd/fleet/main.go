@@ -20,24 +20,23 @@ package fleet
 import (
 	"context"
 	"errors"
+	"time"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+
 	"fleet/internal/pkg/action"
 	"fleet/internal/pkg/agent"
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/esboot"
-	"fleet/internal/pkg/seqno"
-	"time"
-
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/spf13/cobra"
-
 	"fleet/internal/pkg/env"
+	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/logger"
 	"fleet/internal/pkg/profile"
 	"fleet/internal/pkg/saved"
+	"fleet/internal/pkg/seqno"
 	"fleet/internal/pkg/signal"
-
-	"github.com/rs/zerolog/log"
 )
 
 var Version string

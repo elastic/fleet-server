@@ -25,8 +25,8 @@
           "description": "The action type. APP_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",
           "type": "string"
         },
-        "application": {
-          "description": "The well know application identifier the actions should be routed to.",
+        "input_id": {
+          "description": "The input identifier the actions should be routed to.",
           "type": "string"
         },
         "agents": {
@@ -58,11 +58,11 @@
           "type": "string",
           "format": "date-time"
         },
-        "agent": {
+        "agent_id": {
           "description": "The agent id.",
           "type": "string"
         },
-        "action": {
+        "action_id": {
           "description": "The action id.",
           "type": "string"
         },

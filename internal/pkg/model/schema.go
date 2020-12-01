@@ -16,10 +16,7 @@ type Root interface{}
 type Action struct {
 
 	// The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids
-	Agents []string `json:"agents,omitempty"`
-
-	// The well know application identifier the actions should be routed to.
-	Application string `json:"application,omitempty"`
+	Agents []string `json:"agents"`
 
 	// The opaque action payload.
 	Data *Data `json:"data,omitempty"`
@@ -30,11 +27,33 @@ type Action struct {
 	// The unique identifier for the Elastic Agent action
 	Id string `json:"id"`
 
+	// The input identifier the actions should be routed to.
+	InputId string `json:"input_id,omitempty"`
+
 	// Date/time the action was created
 	Timestamp string `json:"@timestamp,omitempty"`
 
 	// The action type. APP_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.
 	Type string `json:"type,omitempty"`
+}
+
+// ActionResult An Elastic Agent action results
+type ActionResult struct {
+
+	// The action id.
+	ActionId string `json:"action_id,omitempty"`
+
+	// The agent id.
+	AgentId string `json:"agent_id,omitempty"`
+
+	// The opaque action result payload.
+	Data *Data `json:"data,omitempty"`
+
+	// The action error message.
+	Error string `json:"error,omitempty"`
+
+	// Date/time the action was created
+	Timestamp string `json:"@timestamp,omitempty"`
 }
 
 // Agent An Elastic Agent that has enrolled into Fleet
@@ -94,7 +113,7 @@ type AgentMetadata struct {
 	Version string `json:"version"`
 }
 
-// Data The opaque action payload.
+// Data The opaque action result payload.
 type Data struct {
 	AdditionalProperties map[string]interface{} `json:"-,omitempty"`
 }
@@ -149,8 +168,8 @@ type Policy struct {
 type PolicyLeader struct {
 
 	// The unique identifier for the policy
-	Id     string      `json:"_id"`
-	Server interface{} `json:"server"`
+	Id     string          `json:"_id"`
+	Server *ServerMetadata `json:"server"`
 
 	// Date/time the leader was taken or held
 	Timestamp string `json:"@timestamp,omitempty"`
@@ -165,8 +184,8 @@ type Server struct {
 	Host  *HostMetadata  `json:"host"`
 
 	// The unique identifier for the Fleet Server
-	Id     string      `json:"_id"`
-	Server interface{} `json:"server"`
+	Id     string          `json:"_id"`
+	Server *ServerMetadata `json:"server"`
 
 	// The version of the document in the index
 	Version int `json:"_version"`
@@ -186,23 +205,14 @@ func (strct *Action) MarshalJSON() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.WriteString("{")
 	comma := false
+	// "Agents" field is required
+	// only required object types supported for marshal checking (for now)
 	// Marshal the "agents" field
 	if comma {
 		buf.WriteString(",")
 	}
 	buf.WriteString("\"agents\": ")
 	if tmp, err := json.Marshal(strct.Agents); err != nil {
-		return nil, err
-	} else {
-		buf.Write(tmp)
-	}
-	comma = true
-	// Marshal the "application" field
-	if comma {
-		buf.WriteString(",")
-	}
-	buf.WriteString("\"application\": ")
-	if tmp, err := json.Marshal(strct.Application); err != nil {
 		return nil, err
 	} else {
 		buf.Write(tmp)
@@ -243,6 +253,17 @@ func (strct *Action) MarshalJSON() ([]byte, error) {
 		buf.Write(tmp)
 	}
 	comma = true
+	// Marshal the "input_id" field
+	if comma {
+		buf.WriteString(",")
+	}
+	buf.WriteString("\"input_id\": ")
+	if tmp, err := json.Marshal(strct.InputId); err != nil {
+		return nil, err
+	} else {
+		buf.Write(tmp)
+	}
+	comma = true
 	// Marshal the "@timestamp" field
 	if comma {
 		buf.WriteString(",")
@@ -272,6 +293,7 @@ func (strct *Action) MarshalJSON() ([]byte, error) {
 }
 
 func (strct *Action) UnmarshalJSON(b []byte) error {
+	agentsReceived := false
 	idReceived := false
 	var jsonMap map[string]json.RawMessage
 	if err := json.Unmarshal(b, &jsonMap); err != nil {
@@ -284,10 +306,7 @@ func (strct *Action) UnmarshalJSON(b []byte) error {
 			if err := json.Unmarshal([]byte(v), &strct.Agents); err != nil {
 				return err
 			}
-		case "application":
-			if err := json.Unmarshal([]byte(v), &strct.Application); err != nil {
-				return err
-			}
+			agentsReceived = true
 		case "data":
 			if err := json.Unmarshal([]byte(v), &strct.Data); err != nil {
 				return err
@@ -301,6 +320,10 @@ func (strct *Action) UnmarshalJSON(b []byte) error {
 				return err
 			}
 			idReceived = true
+		case "input_id":
+			if err := json.Unmarshal([]byte(v), &strct.InputId); err != nil {
+				return err
+			}
 		case "@timestamp":
 			if err := json.Unmarshal([]byte(v), &strct.Timestamp); err != nil {
 				return err
@@ -310,6 +333,10 @@ func (strct *Action) UnmarshalJSON(b []byte) error {
 				return err
 			}
 		}
+	}
+	// check if agents (a required property) was received
+	if !agentsReceived {
+		return errors.New("\"agents\" is required but was not present")
 	}
 	// check if id (a required property) was received
 	if !idReceived {
@@ -1076,7 +1103,9 @@ func (strct *PolicyLeader) MarshalJSON() ([]byte, error) {
 	}
 	comma = true
 	// "Server" field is required
-	// only required object types supported for marshal checking (for now)
+	if strct.Server == nil {
+		return nil, errors.New("server is a required field")
+	}
 	// Marshal the "server" field
 	if comma {
 		buf.WriteString(",")
@@ -1213,7 +1242,9 @@ func (strct *Server) MarshalJSON() ([]byte, error) {
 	}
 	comma = true
 	// "Server" field is required
-	// only required object types supported for marshal checking (for now)
+	if strct.Server == nil {
+		return nil, errors.New("server is a required field")
+	}
 	// Marshal the "server" field
 	if comma {
 		buf.WriteString(",")

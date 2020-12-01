@@ -27,15 +27,15 @@ import (
 // New actions struct
 // TODO: better name once the actions are consolidated
 type ActionX struct {
-	Id          string          `json:"id"`
-	Token       string          `json:"token"`
-	SeqNo       uint64          `json:"seqno"`
-	Type        string          `json:"type"`
-	Agents      []string        `json:"agents"`
-	Application string          `json:"application"`
-	Data        json.RawMessage `json:"data"`
-	CreatedAt   string          `json:"@timestamp"`
-	Expiration  string          `json:"expiration"`
+	Id         string          `json:"id"`
+	Token      string          `json:"token"`
+	SeqNo      uint64          `json:"seqno"`
+	Type       string          `json:"type"`
+	Agents     []string        `json:"agents"`
+	InputID    string          `json:"input_id"`
+	Data       json.RawMessage `json:"data"`
+	CreatedAt  string          `json:"@timestamp"`
+	Expiration string          `json:"expiration"`
 }
 
 func HitsToActions(hits []esutil.Hit) []ActionX {

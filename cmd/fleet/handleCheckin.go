@@ -253,12 +253,12 @@ func convertActionsX(agentID string, actionList []ActionX) ([]ActionResp, string
 	respList := make([]ActionResp, 0, len(actionList))
 	for _, action := range actionList {
 		respList = append(respList, ActionResp{
-			AgentId:     agentID,
-			CreatedAt:   action.CreatedAt,
-			Data:        []byte(action.Data),
-			Id:          action.Id,
-			Type:        action.Type,
-			Applicaiton: action.Application,
+			AgentId:   agentID,
+			CreatedAt: action.CreatedAt,
+			Data:      []byte(action.Data),
+			Id:        action.Id,
+			Type:      action.Type,
+			InputID:   action.InputID,
 		})
 		ackToken = action.Token
 	}

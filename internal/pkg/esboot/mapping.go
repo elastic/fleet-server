@@ -10,9 +10,6 @@ const (
 		"agents": {
 			"type": "keyword"
 		},
-		"application": {
-			"type": "keyword"
-		},
 		"data": {
 			"enabled" : false,
 			"type": "object"
@@ -21,6 +18,9 @@ const (
 			"type": "date"
 		},
 		"id": {
+			"type": "keyword"
+		},
+		"input_id": {
 			"type": "keyword"
 		},
 		"@timestamp": {
@@ -35,10 +35,10 @@ const (
 	// ActionResult An Elastic Agent action results
 	kMappingActionResult = `{
 	"properties": {
-		"action": {
+		"action_id": {
 			"type": "keyword"
 		},
-		"agent": {
+		"agent_id": {
 			"type": "keyword"
 		},
 		"data": {
@@ -119,7 +119,7 @@ const (
 	}
 }`
 
-	// Data The opaque action payload.
+	// Data The opaque action result payload.
 	kMappingData = `{
 	"properties": {
 		
