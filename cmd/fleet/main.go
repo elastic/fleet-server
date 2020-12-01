@@ -117,7 +117,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 			return err
 		}
 
-		logger.Init(&cfg.Logging)
+		logger.Init(&cfg.Fleet.Agent.Logging)
 
 		ctx := installSignalHandler()
 

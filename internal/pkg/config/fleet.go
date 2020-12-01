@@ -19,64 +19,49 @@ package config
 
 import (
 	"fmt"
-	"io"
-	"os"
-	"strings"
-
 	"github.com/rs/zerolog"
+	"strings"
 )
 
-// Logging is the logging configuration
-type Logging struct {
-	Destination string `config:"dest"`
-	Level       string `config:"level"`
-	Pretty      bool   `config:"pretty"`
+// AgentLogging is the log level set on the Agent.
+type AgentLogging struct {
+	Level string `config:"level"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
-func (c *Logging) InitDefaults() {
-	c.Destination = "stdout"
+func (c *AgentLogging) InitDefaults() {
 	c.Level = "info"
-	c.Pretty = true
 }
 
 // Validate ensures that the configuration is valid.
-func (c *Logging) Validate() error {
-	if _, err := strToDest(c.Destination); err != nil {
-		return err
-	}
+func (c *AgentLogging) Validate() error {
 	if _, err := strToLevel(c.Level); err != nil {
 		return err
 	}
 	return nil
 }
 
-// DestinationWriter returns configured destination io.Writer
-func (c *Logging) DestinationWriter() io.Writer {
-	w, _ := strToDest(c.Destination)
-	return w
-}
-
 // LogLevel returns configured zerolog.Level
-func (c *Logging) LogLevel() zerolog.Level {
+func (c *AgentLogging) LogLevel() zerolog.Level {
 	l, _ := strToLevel(c.Level)
 	return l
 }
 
-func strToDest(s string) (io.Writer, error) {
-	w := os.Stdout
+// Agent is the ID and logging configuration of the Agent running this Fleet Server.
+type Agent struct {
+	ID      string       `config:"id"`
+	Logging AgentLogging `config:"logging"`
+}
 
-	s = strings.ToLower(s)
-	switch strings.TrimSpace(s) {
-	case "stdout":
-		w = os.Stdout
-	case "stderr":
-		w = os.Stderr
-	default:
-		return w, fmt.Errorf("invalid dest ; must be one of: stdout, stderr")
-	}
+// Host is the ID of the host of the Agent running this Fleet Server.
+type Host struct {
+	ID string `config:"id"`
+}
 
-	return w, nil
+// Fleet is the configuration of Agent running inside of Fleet.
+type Fleet struct {
+	Agent Agent `config:"agent"`
+	Host  Host  `config:"host"`
 }
 
 func strToLevel(s string) (zerolog.Level, error) {
@@ -84,20 +69,16 @@ func strToLevel(s string) (zerolog.Level, error) {
 
 	s = strings.ToLower(s)
 	switch strings.TrimSpace(s) {
-	case "trace":
-		l = zerolog.TraceLevel
+	case "debug":
+		l = zerolog.DebugLevel
 	case "info":
 		l = zerolog.InfoLevel
-	case "warn":
+	case "warning":
 		l = zerolog.WarnLevel
 	case "error":
 		l = zerolog.ErrorLevel
-	case "fatal":
-		l = zerolog.FatalLevel
-	case "panic":
-		l = zerolog.PanicLevel
 	default:
-		return l, fmt.Errorf("invalid log level; must be one of: trace, info, warn, error, fatal, panic")
+		return l, fmt.Errorf("invalid log level; must be one of: debug, info, warning, error")
 	}
 
 	return l, nil

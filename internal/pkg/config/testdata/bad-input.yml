@@ -1,0 +1,7 @@
+output:
+  elasticsearch:
+    hosts: ["localhost:9200"]
+    username: "elastic"
+    password: "changeme"
+inputs:
+  - type: other

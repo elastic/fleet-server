@@ -32,6 +32,12 @@ type ElasticsearchBackoff struct {
 	Max  time.Duration
 }
 
+// InitDefaults initializes the defaults for the configuration.
+func (c *ElasticsearchBackoff) InitDefaults() {
+	c.Init = 1 * time.Second
+	c.Max = 60 * time.Second
+}
+
 // Elasticsearch is the configuration for elasticsearch.
 type Elasticsearch struct {
 	Protocol         string               `config:"protocol"`
@@ -62,24 +68,40 @@ func (c *Elasticsearch) InitDefaults() {
 	c.Timeout = 90 * time.Second
 	c.MaxRetries = 3
 	c.LoadBalance = true
-	c.Backoff = ElasticsearchBackoff{
-		Init: 1 * time.Second,
-		Max:  60 * time.Second,
-	}
 }
 
 // Validate ensures that the configuration is valid.
 func (c *Elasticsearch) Validate() error {
 	if c.APIKey != "" {
-		return fmt.Errorf("cannot run with api_key; must use username/password")
+		return fmt.Errorf("cannot connect to elasticsearch with api_key; must use username/password")
 	}
 	if c.Username == "" || c.Password == "" {
-		return fmt.Errorf("cannot run without username/password")
+		return fmt.Errorf("cannot connect to elasticsearch without username/password")
 	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
 		if _, err := common.ParseURL(c.ProxyURL); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+// Output is the output configuration to elasticsearch.
+type Output struct {
+	Elasticsearch Elasticsearch          `config:"elasticsearch"`
+	Extra         map[string]interface{} `config:",inline"`
+}
+
+// Validate validates that only elasticsearch is defined on the output.
+func (c *Output) Validate() error {
+	if c.Extra == nil {
+		return nil
+	}
+	_, ok := c.Extra["elasticsearch"]
+	if (!ok && len(c.Extra) > 0) || (ok && len(c.Extra) > 1) {
+		return fmt.Errorf("can only contain elasticsearch key")
+	}
+	// clear Extra because its valid (only used for validation)
+	c.Extra = nil
 	return nil
 }

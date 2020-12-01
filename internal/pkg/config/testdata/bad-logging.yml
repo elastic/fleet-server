@@ -1,0 +1,9 @@
+output:
+  elasticsearch:
+    hosts: ["localhost:9200"]
+    username: "elastic"
+    password: "changeme"
+fleet:
+  agent:
+    logging:
+      level: trace

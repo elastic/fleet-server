@@ -17,6 +17,8 @@
 
 package config
 
+import "fmt"
+
 // ServerTimeouts is the configuration for the server timeouts
 type ServerTimeouts struct {
 	Read  int `config:"read"`
@@ -32,7 +34,7 @@ func (c *ServerTimeouts) InitDefaults() {
 // Server is the configuration for the server
 type Server struct {
 	Host     string         `config:"host"`
-	Port     uint16         `config:"host"`
+	Port     uint16         `config:"port"`
 	Timeouts ServerTimeouts `config:"timeouts"`
 }
 
@@ -40,4 +42,25 @@ type Server struct {
 func (c *Server) InitDefaults() {
 	c.Host = "0.0.0.0"
 	c.Port = 8000
+	c.Timeouts.InitDefaults()
+}
+
+// Input is the input defined by Agent to run Fleet Server.
+type Input struct {
+	Type   string `config:"type"`
+	Server Server `config:"server"`
+}
+
+// InitDefaults initializes the defaults for the configuration.
+func (c *Input) InitDefaults() {
+	c.Type = "fleet-server"
+	c.Server.InitDefaults()
+}
+
+// Validate ensures that the configuration is valid.
+func (c *Input) Validate() error {
+	if c.Type != "fleet-server" {
+		return fmt.Errorf("input type must be fleet-server")
+	}
+	return nil
 }
