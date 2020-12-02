@@ -1,0 +1,7 @@
+output:
+  elasticsearch:
+    hosts: ["localhost:9200"]
+    username: "elastic"
+    password: "changeme"
+  error:
+    bad: "should not be here"

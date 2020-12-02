@@ -19,13 +19,11 @@ package fleet
 
 import (
 	"context"
+	"fleet/internal/pkg/config"
+	slog "log"
 	"net"
 	"net/http"
-	"time"
 
-	slog "log"
-
-	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/rate"
 
 	"github.com/julienschmidt/httprouter"
@@ -40,12 +38,12 @@ func diagConn(c net.Conn, s http.ConnState) {
 		Msg("connection state change")
 }
 
-func runServer(ctx context.Context, router *httprouter.Router) error {
+func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Server) error {
 
-	addr := env.ServerBind("localhost:8000")
-	rdto := env.ServerReadTimeout(5)
-	wrto := env.ServerWriteTimeout(60 * 10)   // 10m long poll
-	mhbz := env.ServerMaxHeaderByteSize(8192) // 8k
+	addr := cfg.Host
+	rdto := cfg.Timeouts.Read
+	wrto := cfg.Timeouts.Write
+	mhbz := cfg.MaxHeaderByteSize
 	bctx := func(net.Listener) context.Context { return ctx }
 
 	log.Info().
@@ -79,7 +77,7 @@ func runServer(ctx context.Context, router *httprouter.Router) error {
 		}
 	}()
 
-	ln, err := makeListener(ctx, addr)
+	ln, err := makeListener(ctx, addr, cfg)
 	if err != nil {
 		return err
 	}
@@ -87,8 +85,8 @@ func runServer(ctx context.Context, router *httprouter.Router) error {
 	defer ln.Close()
 
 	// TODO: Use tls.Config to properly lock down tls connection
-	keyFile := env.KeyFile("")
-	certFile := env.CertFile("")
+	keyFile := cfg.TLS.Key
+	certFile := cfg.TLS.Cert
 
 	if keyFile != "" || certFile != "" {
 		return server.ServeTLS(ln, certFile, keyFile)
@@ -97,15 +95,15 @@ func runServer(ctx context.Context, router *httprouter.Router) error {
 	return server.Serve(ln)
 }
 
-func makeListener(ctx context.Context, addr string) (net.Listener, error) {
+func makeListener(ctx context.Context, addr string, cfg *config.Server) (net.Listener, error) {
 	// Create listener
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
 
-	rateLimitBurst := env.ServerRateLimitBurst(1024)
-	rateLimitInterval := env.ServerRateLimitInterval(time.Millisecond * 5)
+	rateLimitBurst := cfg.RateLimitBurst
+	rateLimitInterval := cfg.RateLimitInterval
 
 	if rateLimitInterval != 0 {
 		log.Info().Dur("interval", rateLimitInterval).Int("burst", rateLimitBurst).Msg("Server rate limiter installed")

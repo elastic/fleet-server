@@ -18,6 +18,7 @@
 package config
 
 import (
+	"fmt"
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/yaml"
 )
@@ -27,25 +28,43 @@ var DefaultOptions = []ucfg.Option{
 	ucfg.PathSep("."),
 	ucfg.ResolveEnv,
 	ucfg.VarExp,
+	ucfg.FieldReplaceValues("inputs"),
 }
 
 // Config is the global configuration.
 type Config struct {
-	Elasticsearch Elasticsearch `config:"elasticsearch"`
-	Server        Server        `config:"server"`
-	Logging       Logging       `config:"logging"`
+	Fleet  Fleet   `config:"fleet"`
+	Output Output  `config:"output"`
+	Inputs []Input `config:"inputs"`
+}
+
+// InitDefaults initializes the defaults for the configuration.
+func (c *Config) InitDefaults() {
+	c.Inputs = make([]Input, 1)
+	c.Inputs[0].InitDefaults()
+}
+
+// Validate ensures that the configuration is valid.
+func (c *Config) Validate() error {
+	if c.Inputs == nil || len(c.Inputs) == 0 {
+		return fmt.Errorf("a fleet-server input can be defined")
+	}
+	if len(c.Inputs) > 1 {
+		return fmt.Errorf("only 1 fleet-server input can be defined")
+	}
+	return nil
 }
 
 // LoadFile take a path and load the file and return a new configuration.
 func LoadFile(path string) (*Config, error) {
-	var cfg Config
+	cfg := &Config{}
 	c, err := yaml.NewConfigWithFile(path, DefaultOptions...)
 	if err != nil {
 		return nil, err
 	}
-	err = c.Unpack(&c, DefaultOptions...)
+	err = c.Unpack(cfg, DefaultOptions...)
 	if err != nil {
 		return nil, err
 	}
-	return &cfg, nil
+	return cfg, nil
 }

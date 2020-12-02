@@ -56,18 +56,10 @@ func strToLevel(s string) zerolog.Level {
 	return l
 }
 
-func Init(cfg *config.Logging) {
+func Init(cfg *config.AgentLogging) {
 	zerolog.TimeFieldFormat = time.StampMicro
 
-	if cfg.Pretty {
-		log.Logger = log.Output(zerolog.ConsoleWriter{
-			Out:        cfg.DestinationWriter(),
-			TimeFormat: kPrettyTimeFormat,
-		}).Level(cfg.LogLevel())
-	} else {
-		log.Logger = log.Output(cfg.DestinationWriter()).Level(cfg.LogLevel())
-	}
-
+	log.Logger = log.Output(os.Stdout).Level(cfg.LogLevel())
 	log.Info().
 		Int("pid", os.Getpid()).
 		Int("ppid", os.Getppid()).

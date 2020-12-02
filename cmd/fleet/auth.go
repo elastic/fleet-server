@@ -23,13 +23,15 @@ import (
 	"time"
 
 	"fleet/internal/pkg/apikey"
-	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/saved"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
 )
 
-var kApiKeyTTL = env.ApiKeyTTL(time.Second * 5)
+const (
+	kAPIKeyTTL = 5 * time.Second
+)
+
 var ErrApiKeyNotEnabled = errors.New("APIKey not enabled")
 
 func authApiKey(r *http.Request, client *elasticsearch.Client) (*apikey.ApiKey, error) {
@@ -65,7 +67,7 @@ func authApiKey(r *http.Request, client *elasticsearch.Client) (*apikey.ApiKey, 
 		Msg("ApiKey authenticated")
 
 	if info.Enabled {
-		gCache.SetApiKey(*key, kApiKeyTTL)
+		gCache.SetApiKey(*key, kAPIKeyTTL)
 	} else {
 		err = ErrApiKeyNotEnabled
 	}

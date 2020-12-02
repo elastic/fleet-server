@@ -22,12 +22,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fleet/internal/pkg/config"
 	"fmt"
 	"net/http"
 	"reflect"
 	"time"
 
-	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"
@@ -38,8 +38,8 @@ var (
 	ErrAgentNotFound  = errors.New("agent not found")
 	ErrAgentCorrupted = errors.New("agent record corrupted")
 
-	kCheckinTimeout  = env.CheckinTimeout(30)   // 30s
-	kLongPollTimeout = env.LongPollTimeout(300) // 5m
+	kCheckinTimeout  = 30 * time.Second
+	kLongPollTimeout = 300 * time.Second // 5m
 )
 
 func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -63,9 +63,10 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 type CheckinT struct {
-	bc *BulkCheckin
-	ba *BulkActions
-	pm *PolicyMon
+	cfg *config.Server
+	bc  *BulkCheckin
+	ba  *BulkActions
+	pm  *PolicyMon
 }
 
 func NewCheckinT(bc *BulkCheckin, ba *BulkActions, pm *PolicyMon) *CheckinT {
