@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package config
 
 import (
@@ -41,7 +45,7 @@ func TestConfig(t *testing.T) {
 					{
 						Type: "fleet-server",
 						Server: Server{
-							Host: "0.0.0.0",
+							Host: "localhost",
 							Port: 8000,
 							Timeouts: ServerTimeouts{
 								Read:  5 * time.Second,
@@ -82,7 +86,7 @@ func TestConfig(t *testing.T) {
 					{
 						Type: "fleet-server",
 						Server: Server{
-							Host: "0.0.0.0",
+							Host: "localhost",
 							Port: 8000,
 							Timeouts: ServerTimeouts{
 								Read:  5 * time.Second,
@@ -123,7 +127,7 @@ func TestConfig(t *testing.T) {
 					{
 						Type: "fleet-server",
 						Server: Server{
-							Host: "0.0.0.0",
+							Host: "localhost",
 							Port: 8000,
 							Timeouts: ServerTimeouts{
 								Read:  5 * time.Second,
