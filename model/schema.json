@@ -39,12 +39,11 @@
         "data": {
           "description": "The opaque action payload.",
           "type": "object",
-          "additionalProperties": true
+          "format": "raw"
         }
       },
       "required": [
-        "id",
-        "agents"
+        "id"
       ]
     },
 
@@ -73,7 +72,7 @@
         "data": {
           "description": "The opaque action result payload.",
           "type": "object",
-          "additionalProperties": true
+          "format": "raw"
         }
       },
       "required": [
@@ -271,7 +270,7 @@
         "local_metadata": {
           "description": "Local metadata information for the Elastic Agent",
           "type": "object",
-          "additionalProperties": true
+          "format": "raw"
         },
         "access_api_key_id": {
           "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
