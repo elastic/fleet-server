@@ -114,6 +114,10 @@ func (ad *ActionDispatcher) dispatch(ctx context.Context, agentId string, action
 	}
 	select {
 	case sub.Ch() <- actions:
-	case <-ctx.Done():
+	default:
+		// This prevents action dispatch blocking when the agent subscription channel is full
+		// in the case when the agent request loop received the actions on long poll but didn't unsubscribe
+		// from the dispatcher.
+		// It is safe to drop them since the agent already has actions and will come around on the next check-in to pick up these new actions.
 	}
 }
