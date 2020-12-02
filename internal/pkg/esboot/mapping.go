@@ -123,7 +123,7 @@ const (
 	}
 }`
 
-	// Data The opaque action result payload.
+	// Data The opaque action payload.
 	kMappingData = `{
 	"properties": {
 		
