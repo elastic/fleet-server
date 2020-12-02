@@ -9,7 +9,6 @@ require (
 	github.com/elastic/go-ucfg v0.8.3
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/google/go-cmp v0.4.0
-	github.com/google/uuid v1.1.2-0.20190416172445-c2e93f3ae59f
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mitchellh/mapstructure v1.3.3
 	github.com/rs/zerolog v1.19.0

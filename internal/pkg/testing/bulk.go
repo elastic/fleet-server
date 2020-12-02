@@ -8,7 +8,7 @@ import (
 	"context"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 
 	"fleet/internal/pkg/bulk"
 )
@@ -18,12 +18,18 @@ type MockBulk struct {
 }
 
 func (m MockBulk) Create(ctx context.Context, index, id string, body []byte, opts ...bulk.Opt) (string, error) {
-	i := uuid.New()
+	i, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
 	return i.String(), nil
 }
 
 func (m MockBulk) Index(ctx context.Context, index, id string, body []byte, opts ...bulk.Opt) (string, error) {
-	i := uuid.New()
+	i, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
 	return i.String(), nil
 }
 
