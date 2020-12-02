@@ -17,6 +17,8 @@
 
 //go:generate schema-generate -o internal/pkg/model/schema.go -p model model/schema.json
 //go:generate go fmt internal/pkg/model/schema.go
+//go:generate schema-generate -m es -o internal/pkg/esboot/mapping.go -p esboot model/schema.json
+//go:generate go fmt internal/pkg/esboot/mapping.go
 
 package main
 
