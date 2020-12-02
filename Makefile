@@ -50,6 +50,30 @@ generate: ## - Generate schema models
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
 	go generate ./...
 
+.PHONY: check
+check:
+	@$(MAKE) generate
+	@$(MAKE) check-headers
+	@$(MAKE) check-go
+	@$(MAKE) check-no-changes
+
+.PHONY: check-headers
+check-headers:
+	@go install github.com/elastic/go-licenser
+	@go-licenser -license Elastic
+
+.PHONY: check-go
+check-go:
+	@go fmt ./...
+	@go vet ./...
+	@go mod tidy
+
+.PHONY: check-no-changes
+check-no-changes:
+	@git diff | cat
+	@git update-index --refresh
+	@git diff-index --exit-code HEAD --
+
 .PHONY: test
 test: ## - Run some tests
-	go test ./...
+	@go test -race ./...

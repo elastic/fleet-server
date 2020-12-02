@@ -34,6 +34,16 @@ pipeline {
         stash allowEmpty: true, name: 'source', useDefaultExcludes: false
       }
     }
+    stage('Check') {
+      steps {
+        cleanup()
+        withGoEnv(){
+          dir("${BASE_DIR}"){
+            sh(label: 'check',script: 'make check')
+          }
+        }
+      }
+    }
     stage('Local') {
       steps {
         cleanup()
