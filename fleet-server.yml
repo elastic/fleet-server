@@ -1,4 +1,5 @@
-elasticsearch:
-  hosts: '${ELASTICSEARCH_HOSTS:elasticsearch:9200}'
-  username: '${ELASTICSEARCH_USERNAME:}'
-  password: '${ELASTICSEARCH_PASSWORD:}'
+output:
+  elasticsearch:
+    hosts: '${ELASTICSEARCH_HOSTS:elasticsearch:9200}'
+    username: '${ELASTICSEARCH_USERNAME:}'
+    password: '${ELASTICSEARCH_PASSWORD:}'
