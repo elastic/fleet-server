@@ -8,6 +8,8 @@ import (
 	"context"
 	"fleet/internal/pkg/config"
 	"github.com/stretchr/testify/require"
+	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,9 +38,16 @@ func TestRunServer(t *testing.T) {
 
 	router := NewRouter(ctx, sv, ct, et)
 
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
 		err = runServer(ctx, router, cfg)
+		wg.Done()
 	}()
 	<-time.After(500 * time.Millisecond)
-	require.NoError(t, err)
+	cancel()
+	wg.Wait()
+	if err != http.ErrServerClosed {
+		require.NoError(t, err)
+	}
 }
