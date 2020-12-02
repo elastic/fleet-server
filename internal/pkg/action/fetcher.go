@@ -35,10 +35,10 @@ type Fetcher struct {
 
 func NewFetcher(es *elasticsearch.Client) (*Fetcher, error) {
 	query, err := NewSearchQuery(
-		WithExpiration(),
-		WithSeqNo(),
-		WithAgents(),
-		WithSourceExclude("agents"),
+		ExpectExpiration(),
+		ExpectSeqNo(),
+		ExpectAgents(),
+		Exclude("agents"),
 	)
 
 	if err != nil {

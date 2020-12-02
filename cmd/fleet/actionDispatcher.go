@@ -4,7 +4,6 @@ import (
 	"context"
 	"fleet/internal/pkg/action"
 	"fleet/internal/pkg/esutil"
-	"fleet/internal/pkg/seqno"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -23,13 +22,13 @@ func (as ActionSubX) Ch() chan []ActionX {
 }
 
 type ActionDispatcher struct {
-	am *seqno.Monitor
+	am *action.Monitor
 
 	mx   sync.RWMutex
 	subs map[string]ActionSubX
 }
 
-func NewActionDispatcher(am *seqno.Monitor) *ActionDispatcher {
+func NewActionDispatcher(am *action.Monitor) *ActionDispatcher {
 	return &ActionDispatcher{
 		am:   am,
 		subs: make(map[string]ActionSubX),

@@ -96,7 +96,6 @@ func ParseResponseError(res *esapi.Response) (*ErrorResponse, error) {
 	if res.StatusCode >= http.StatusBadRequest {
 		// Read the original body content, in case if it was a error from the cloud response
 		// {"ok":false,"message":"Unknown deployment."}
-		// So we can log it
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			return nil, &ClientError{

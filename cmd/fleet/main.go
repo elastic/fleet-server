@@ -35,7 +35,6 @@ import (
 	"fleet/internal/pkg/logger"
 	"fleet/internal/pkg/profile"
 	"fleet/internal/pkg/saved"
-	"fleet/internal/pkg/seqno"
 	"fleet/internal/pkg/signal"
 )
 
@@ -92,7 +91,7 @@ func runPolicyMon(ctx context.Context, sv saved.CRUD) *PolicyMon {
 	return pm
 }
 
-func runActionMon(ctx context.Context, es *elasticsearch.Client) *seqno.Monitor {
+func runActionMon(ctx context.Context, es *elasticsearch.Client) *action.Monitor {
 
 	sn, err := action.GetSeqNo(ctx, es)
 	if err != nil {
@@ -103,7 +102,7 @@ func runActionMon(ctx context.Context, es *elasticsearch.Client) *seqno.Monitor 
 		checkErr(err)
 	}
 
-	am := seqno.NewMonitor(es, action.IndexName, seqno.WithSeqNo(sn))
+	am := action.NewMonitor(es, action.IndexName, action.WithSeqNo(sn))
 
 	go func() {
 		err := am.Run(ctx)
@@ -113,7 +112,7 @@ func runActionMon(ctx context.Context, es *elasticsearch.Client) *seqno.Monitor 
 	return am
 }
 
-func runActionDispatcher(ctx context.Context, am *seqno.Monitor) *ActionDispatcher {
+func runActionDispatcher(ctx context.Context, am *action.Monitor) *ActionDispatcher {
 	ad := NewActionDispatcher(am)
 
 	go func() {

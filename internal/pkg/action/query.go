@@ -35,27 +35,27 @@ type SearchQuery struct {
 
 type SearchOptFunc func(*SearchQuery)
 
-func WithSeqNo() SearchOptFunc {
+func ExpectSeqNo() SearchOptFunc {
 	return func(q *SearchQuery) {
 		q.tokenSeqNo = q.tmpl.Bind(SeqNo)
 	}
 }
 
-func WithExpiration() SearchOptFunc {
+func ExpectExpiration() SearchOptFunc {
 	return func(q *SearchQuery) {
 		q.tokenExpiration = q.tmpl.Bind(Expiration)
 	}
 }
 
-func WithAgents() SearchOptFunc {
+func ExpectAgents() SearchOptFunc {
 	return func(q *SearchQuery) {
 		q.tokenAgents = q.tmpl.Bind(Agents)
 	}
 }
 
-func WithSourceExclude(sourceExclude ...string) SearchOptFunc {
+func Exclude(exclude ...string) SearchOptFunc {
 	return func(q *SearchQuery) {
-		q.sourceExclude = sourceExclude
+		q.sourceExclude = exclude
 	}
 }
 

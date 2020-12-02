@@ -15,13 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package seqno
+package action
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fleet/internal/pkg/action"
 	"fleet/internal/pkg/esutil"
 	"time"
 
@@ -37,7 +36,7 @@ const (
 
 type Monitor struct {
 	es            *elasticsearch.Client
-	query         *action.SearchQuery
+	query         *SearchQuery
 	index         string
 	checkInterval time.Duration
 	seqno         int64
@@ -64,9 +63,9 @@ func NewMonitor(es *elasticsearch.Client, index string, opts ...MonitorOption) *
 	}
 
 	var err error
-	m.query, err = action.NewSearchQuery(
-		action.WithExpiration(),
-		action.WithSeqNo(),
+	m.query, err = NewSearchQuery(
+		ExpectExpiration(),
+		ExpectSeqNo(),
 	)
 
 	if err != nil {
@@ -123,8 +122,8 @@ func (m *Monitor) checkNewDocuments(ctx context.Context) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	dslQuery, err := m.query.Render(map[string]interface{}{
-		action.SeqNo:      m.seqno,
-		action.Expiration: now,
+		SeqNo:      m.seqno,
+		Expiration: now,
 	})
 	if err != nil {
 		return
