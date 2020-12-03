@@ -37,7 +37,7 @@
           }
         },
         "data": {
-          "description": "The opaque action payload.",
+          "description": "The opaque payload.",
           "type": "object",
           "format": "raw"
         }
@@ -70,7 +70,7 @@
           "type": "string"
         },
         "data": {
-          "description": "The opaque action result payload.",
+          "description": "The opaque payload.",
           "type": "object",
           "format": "raw"
         }
