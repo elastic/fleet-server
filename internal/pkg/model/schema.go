@@ -19,7 +19,7 @@ type Action struct {
 	// The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids
 	Agents []string `json:"agents,omitempty"`
 
-	// The opaque action payload.
+	// The opaque payload.
 	Data json.RawMessage `json:"data,omitempty"`
 
 	// The action expiration date/time
@@ -47,7 +47,7 @@ type ActionResult struct {
 	// The agent id.
 	AgentId string `json:"agent_id,omitempty"`
 
-	// The opaque action result payload.
+	// The opaque payload.
 	Data json.RawMessage `json:"data,omitempty"`
 
 	// The action error message.
@@ -61,14 +61,14 @@ type ActionResult struct {
 type Agent struct {
 
 	// ID of the API key the Elastic Agent must used to contact Fleet Server
-	AccessApiKeyId int            `json:"access_api_key_id"`
+	AccessApiKeyId int64          `json:"access_api_key_id"`
 	Agent          *AgentMetadata `json:"agent,omitempty"`
 
 	// API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultApiKey string `json:"default_api_key,omitempty"`
 
 	// ID of the API key the Elastic Agent uses to authenticate with elasticsearch
-	DefaultApiKeyId int `json:"default_api_key_id,omitempty"`
+	DefaultApiKeyId int64 `json:"default_api_key_id,omitempty"`
 
 	// Date/time the Elastic Agent enrolled
 	EnrolledAt string `json:"enrolled_at"`
@@ -83,7 +83,7 @@ type Agent struct {
 	PolicyId string `json:"policy_id"`
 
 	// The current policy revision for the Elastic Agent
-	PolicyRevision int `json:"policy_revision,omitempty"`
+	PolicyRevision int64 `json:"policy_revision,omitempty"`
 
 	// Date/time the Elastic Agent unenrolled
 	UnenrolledAt string `json:"unenrolled_at,omitempty"`
@@ -101,7 +101,7 @@ type Agent struct {
 	UpgradedAt string `json:"upgraded_at,omitempty"`
 
 	// The version of the document in the index
-	Version int `json:"_version"`
+	Version int64 `json:"_version"`
 }
 
 // AgentMetadata An Elastic Agent metadata
@@ -114,7 +114,7 @@ type AgentMetadata struct {
 	Version string `json:"version"`
 }
 
-// Data The opaque action result payload.
+// Data The opaque payload.
 type Data struct {
 }
 
@@ -142,7 +142,7 @@ type LocalMetadata struct {
 type Policy struct {
 
 	// The coordinator index of the policy
-	CoordinatorIdx int `json:"coordinator_idx"`
+	CoordinatorIdx int64 `json:"coordinator_idx"`
 
 	// The data for the policy
 	Data string `json:"data"`
@@ -157,7 +157,7 @@ type Policy struct {
 	PolicyId string `json:"policy_id"`
 
 	// The revision index of the policy
-	RevisionIdx int `json:"revision_idx"`
+	RevisionIdx int64 `json:"revision_idx"`
 
 	// Date/time the policy revision was created
 	Timestamp string `json:"@timestamp,omitempty"`
@@ -174,7 +174,7 @@ type PolicyLeader struct {
 	Timestamp string `json:"@timestamp,omitempty"`
 
 	// The version of the document in the index
-	Version int `json:"_version"`
+	Version int64 `json:"_version"`
 }
 
 // Server A Fleet Server
@@ -187,7 +187,7 @@ type Server struct {
 	Server *ServerMetadata `json:"server"`
 
 	// The version of the document in the index
-	Version int `json:"_version"`
+	Version int64 `json:"_version"`
 }
 
 // ServerMetadata A Fleet Server metadata
