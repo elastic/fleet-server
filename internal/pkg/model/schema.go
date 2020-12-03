@@ -61,14 +61,17 @@ type ActionResult struct {
 type Agent struct {
 
 	// ID of the API key the Elastic Agent must used to contact Fleet Server
-	AccessApiKeyId int64          `json:"access_api_key_id"`
-	Agent          *AgentMetadata `json:"agent,omitempty"`
+	AccessApiKeyId string `json:"access_api_key_id"`
+
+	// The last acknowledged action sequence number for the Elastic Agent
+	ActionSeqNo int64          `json:"action_seq_no,omitempty"`
+	Agent       *AgentMetadata `json:"agent,omitempty"`
 
 	// API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultApiKey string `json:"default_api_key,omitempty"`
 
 	// ID of the API key the Elastic Agent uses to authenticate with elasticsearch
-	DefaultApiKeyId int64 `json:"default_api_key_id,omitempty"`
+	DefaultApiKeyId string `json:"default_api_key_id,omitempty"`
 
 	// Date/time the Elastic Agent enrolled
 	EnrolledAt string `json:"enrolled_at"`

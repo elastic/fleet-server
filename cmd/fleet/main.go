@@ -8,9 +8,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
-
+	"fleet/internal/pkg/action"
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/env"
@@ -19,6 +17,9 @@ import (
 	"fleet/internal/pkg/profile"
 	"fleet/internal/pkg/saved"
 	"fleet/internal/pkg/signal"
+
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 )
 
 const kPolicyThrottle = time.Millisecond * 5
@@ -33,7 +34,7 @@ func checkErr(err error) {
 
 func runBulkCheckin(ctx context.Context, bulker bulk.Bulk, sv saved.CRUD) *BulkCheckin {
 
-	bc := NewBulkCheckin()
+	bc := NewBulkCheckin(bulker)
 	go func() {
 		for {
 			err := bc.Run(ctx, sv)
@@ -73,6 +74,31 @@ func runPolicyMon(ctx context.Context, sv saved.CRUD) *PolicyMon {
 	}()
 
 	return pm
+}
+
+func runActionMon(ctx context.Context, bulker bulk.Bulk) *action.Monitor {
+	am, err := action.NewMonitor(bulker)
+	if err != nil {
+		checkErr(err)
+	}
+
+	go func() {
+		err := am.Run(ctx)
+		checkErr(err)
+	}()
+
+	return am
+}
+
+func runActionDispatcher(ctx context.Context, am *action.Monitor) *action.Dispatcher {
+	ad := action.NewDispatcher(am)
+
+	go func() {
+		err := ad.Run(ctx)
+		checkErr(err)
+	}()
+
+	return ad
 }
 
 func installProfiler(ctx context.Context, cfg *config.Server) {
@@ -118,13 +144,19 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		// TODO: remove this after the indices bootstrapping logic implemented in ES plugin
 		checkErr(esboot.EnsureESIndices(ctx, es))
 
+		// Start new actions monitoring
+		am := runActionMon(ctx, bulker)
+		ad := runActionDispatcher(ctx, am)
+		tr, err := action.NewTokenResolver(bulker)
+		checkErr(err)
+
 		sv := saved.NewMgr(bulker, savedObjectKey())
 
 		pm := runPolicyMon(ctx, sv)
 		ba := runBulkActions(ctx, sv)
 		bc := runBulkCheckin(ctx, bulker, sv)
-		ct := NewCheckinT(bc, ba, pm)
-		et := NewEnrollerT(&cfg.Inputs[0].Server)
+		ct := NewCheckinT(bc, ba, pm, am, ad, tr, bulker)
+		et := NewEnrollerT(&cfg.Inputs[0].Server, bulker)
 
 		router := NewRouter(ctx, sv, ct, et)
 

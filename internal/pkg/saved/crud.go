@@ -268,7 +268,7 @@ func (m *mgr) FindByNode(ctx context.Context, node *dsl.Node) ([]Hit, error) {
 
 func (m *mgr) FindRaw(ctx context.Context, body []byte) ([]Hit, error) {
 
-	searchHits, err := m.idx.Search(ctx, []string{kIndexKibana}, body)
+	searcResult, err := m.idx.Search(ctx, []string{kIndexKibana}, body)
 
 	if err != nil {
 		return nil, err
@@ -276,7 +276,7 @@ func (m *mgr) FindRaw(ctx context.Context, body []byte) ([]Hit, error) {
 
 	var hits []Hit
 
-	for _, h := range searchHits.Hits {
+	for _, h := range searcResult.Hits {
 
 		o, err := parseId(h.Id)
 		if err != nil {
