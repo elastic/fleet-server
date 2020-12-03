@@ -2,6 +2,11 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:generate schema-generate -s -o internal/pkg/model/schema.go -p model model/schema.json
+//go:generate go fmt internal/pkg/model/schema.go
+//go:generate schema-generate -m es -o internal/pkg/esboot/mapping.go -p esboot model/schema.json
+//go:generate go fmt internal/pkg/esboot/mapping.go
+
 package main
 
 import (
