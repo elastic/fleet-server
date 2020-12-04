@@ -12,6 +12,12 @@ func WithRangeGT(v interface{}) RangeOpt {
 	}
 }
 
+func WithRangeLTE(v interface{}) RangeOpt {
+	return func(nmap nodeMapT) {
+		nmap[kKeywordLessThanEq] = &Node{leaf: v}
+	}
+}
+
 func (n *Node) Range(field string, opts ...RangeOpt) {
 
 	fieldNode := &Node{

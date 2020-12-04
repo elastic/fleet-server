@@ -120,6 +120,14 @@ func (t *Tmpl) Resolve(n *Node) error {
 	return nil
 }
 
+func (t *Tmpl) MustResolve(n *Node) *Tmpl {
+	err := t.Resolve(n)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
 // Convenince function to avoid map when only one token
 func (t *Tmpl) RenderOne(name string, v interface{}) ([]byte, error) {
 	d, err := json.Marshal(v)
@@ -147,6 +155,14 @@ func (t *Tmpl) Render(m map[string]interface{}) ([]byte, error) {
 	}
 
 	return t.render(marshalMap, sum)
+}
+
+func (t *Tmpl) MustRender(m map[string]interface{}) []byte {
+	b, err := t.Render(m)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 func (t *Tmpl) render(m map[string][]byte, sum int) ([]byte, error) {

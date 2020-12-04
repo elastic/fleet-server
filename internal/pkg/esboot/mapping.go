@@ -62,6 +62,9 @@ const (
 	kMappingAgent = `{
 	"properties": {
 		"access_api_key_id": {
+			"type": "keyword"
+		},
+		"action_seq_no": {
 			"type": "integer"
 		},
 		"agent": {
@@ -78,7 +81,7 @@ const (
 			"type": "keyword"
 		},
 		"default_api_key_id": {
-			"type": "integer"
+			"type": "keyword"
 		},
 		"enrolled_at": {
 			"type": "date"

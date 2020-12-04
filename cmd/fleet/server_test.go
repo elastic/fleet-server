@@ -7,11 +7,12 @@ package fleet
 import (
 	"context"
 	"fleet/internal/pkg/config"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"fleet/internal/pkg/saved"
 	ftesting "fleet/internal/pkg/testing"
@@ -32,9 +33,9 @@ func TestRunServer(t *testing.T) {
 	pm, err := NewPolicyMon(kPolicyThrottle)
 	require.NoError(t, err)
 	ba := NewBulkActions()
-	bc := NewBulkCheckin()
-	ct := NewCheckinT(bc, ba, pm)
-	et := NewEnrollerT(cfg)
+	bc := NewBulkCheckin(nil)
+	ct := NewCheckinT(nil, bc, ba, pm, nil, nil, nil, nil)
+	et := NewEnrollerT(cfg, nil)
 
 	router := NewRouter(ctx, sv, ct, et)
 

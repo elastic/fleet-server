@@ -274,7 +274,7 @@
         },
         "access_api_key_id": {
           "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
-          "type": "integer"
+          "type": "string"
         },
         "default_api_key": {
           "description": "API key the Elastic Agent uses to authenticate with elasticsearch",
@@ -282,7 +282,7 @@
         },
         "default_api_key_id": {
           "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
-          "type": "integer"
+          "type": "string"
         },
         "policy_id": {
           "description": "The policy ID for the Elastic Agent",
@@ -322,6 +322,10 @@
           "description": "Date/time the Elastic Agent was last updated",
           "type": "string",
           "format": "date-time"
+        },
+        "action_seq_no": {
+          "description": "The last acknowledged action sequence number for the Elastic Agent",
+          "type": "integer"
         }
       },
       "required": [

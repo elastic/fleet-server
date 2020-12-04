@@ -45,8 +45,8 @@ func (m MockBulk) MUpdate(ctx context.Context, ops []bulk.BulkOp, opts ...bulk.O
 	return nil
 }
 
-func (m MockBulk) Search(ctx context.Context, index []string, body []byte, opts ...bulk.Opt) (*bulk.HitsT, error) {
-	return &bulk.HitsT{}, nil
+func (m MockBulk) Search(ctx context.Context, index []string, body []byte, opts ...bulk.Opt) (*bulk.ResultT, error) {
+	return &bulk.ResultT{}, nil
 }
 
 func (m MockBulk) Client() *elasticsearch.Client {

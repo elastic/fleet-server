@@ -69,6 +69,7 @@ func (i *MgetResponseItem) deriveError() error {
 
 type HitT struct {
 	Id     string          `json:"_id"`
+	SeqNo  int64           `json:"_seq_no"`
 	Index  string          `json:"_index"`
 	Source json.RawMessage `json:"_source"`
 	Score  *float64        `json:"_score"`
@@ -83,6 +84,24 @@ type HitsT struct {
 	MaxScore *float64 `json:"max_score"`
 }
 
+type Aggregation struct {
+	Value float64 `json:"value"`
+}
+
+type ResultT struct {
+	HitsT
+	Aggregations map[string]Aggregation
+}
+
+type ErrorT struct {
+	Type   string `json:"type"`
+	Reason string `json:"reason"`
+	Cause  struct {
+		Type   string `json:"type"`
+		Reason string `json:"reason"`
+	} `json:"caused_by"`
+}
+
 type MsearchResponseItem struct {
 	Status   int    `json:"status"`
 	Took     uint64 `json:"took"`
@@ -93,16 +112,10 @@ type MsearchResponseItem struct {
 		Skipped    uint64 `json:"skipped"`
 		Failed     uint64 `json:"failed"`
 	} `json:"_shards"`
-	Hits HitsT `json:"hits"`
+	Hits         HitsT                  `json:"hits"`
+	Aggregations map[string]Aggregation `json:"aggregations,omitempty"`
 
-	Error struct {
-		Type   string `json:"type"`
-		Reason string `json:"reason"`
-		Cause  struct {
-			Type   string `json:"type"`
-			Reason string `json:"reason"`
-		} `json:"caused_by"`
-	} `json:"error,omitempty"`
+	Error ErrorT `json:"error,omitempty"`
 }
 
 type MsearchResponse struct {

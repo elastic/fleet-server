@@ -95,7 +95,8 @@ type Agent struct {
 	DefaultApiKey      string          `json:"default_api_key" saved:"encrypt"`
 	UpdatedAt          string          `json:"updated_at,omitempty"`
 	CurrentErrorEvents interface{}     `json:"current_error_events"`
-	Packages           string          `json:"packages"`
+	Packages           []string        `json:"packages"`
+	ActionSeqNo        int64           `json:"-"` // New fleet property should not be serialized to saved objects
 }
 
 // Wrong: no AAD;
@@ -143,13 +144,15 @@ type EnrollResponse struct {
 }
 
 type CheckinRequest struct {
+	AckToken  string          `json:"ack_token,omitempty"`
 	Events    []Event         `json:"events"`
 	LocalMeta json.RawMessage `json:"local_metadata"`
 }
 
 type CheckinResponse struct {
-	Action  string       `json:"action"`
-	Actions []ActionResp `json:"actions,omitempty"`
+	AckToken string       `json:"ack_token,omitempty"`
+	Action   string       `json:"action"`
+	Actions  []ActionResp `json:"actions,omitempty"`
 }
 
 type AckRequest struct {
