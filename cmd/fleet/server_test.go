@@ -34,7 +34,7 @@ func TestRunServer(t *testing.T) {
 	require.NoError(t, err)
 	ba := NewBulkActions()
 	bc := NewBulkCheckin(nil)
-	ct := NewCheckinT(bc, ba, pm, nil, nil, nil, nil)
+	ct := NewCheckinT(nil, bc, ba, pm, nil, nil, nil, nil)
 	et := NewEnrollerT(cfg, nil)
 
 	router := NewRouter(ctx, sv, ct, et)
