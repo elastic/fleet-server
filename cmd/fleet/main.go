@@ -145,17 +145,23 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		checkErr(esboot.EnsureESIndices(ctx, es))
 
 		// Start new actions monitoring
-		am := runActionMon(ctx, bulker)
-		ad := runActionDispatcher(ctx, am)
-		tr, err := action.NewTokenResolver(bulker)
-		checkErr(err)
+		var am *action.Monitor
+		var ad *action.Dispatcher
+		var tr *action.TokenResolver
+		// Behind the feature flag
+		if cfg.Features.Enabled(config.FeatureActions) {
+			am = runActionMon(ctx, bulker)
+			ad = runActionDispatcher(ctx, am)
+			tr, err = action.NewTokenResolver(bulker)
+			checkErr(err)
+		}
 
 		sv := saved.NewMgr(bulker, savedObjectKey())
 
 		pm := runPolicyMon(ctx, sv)
 		ba := runBulkActions(ctx, sv)
 		bc := runBulkCheckin(ctx, bulker, sv)
-		ct := NewCheckinT(bc, ba, pm, am, ad, tr, bulker)
+		ct := NewCheckinT(cfg, bc, ba, pm, am, ad, tr, bulker)
 		et := NewEnrollerT(&cfg.Inputs[0].Server, bulker)
 
 		router := NewRouter(ctx, sv, ct, et)

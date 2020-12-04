@@ -8,3 +8,7 @@ fleet:
   agent:
     logging:
       level: '${LOG_LEVEL:INFO}'
+
+features:
+  actions:
+    enabled: false

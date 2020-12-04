@@ -54,7 +54,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 type CheckinT struct {
-	cfg          *config.Server
+	cfg          *config.Config
 	bc           *BulkCheckin
 	ba           *BulkActions
 	pm           *PolicyMon
@@ -66,6 +66,7 @@ type CheckinT struct {
 }
 
 func NewCheckinT(
+	cfg *config.Config,
 	bc *BulkCheckin,
 	ba *BulkActions,
 	pm *PolicyMon,
@@ -79,6 +80,7 @@ func NewCheckinT(
 		panic(err)
 	}
 	return &CheckinT{
+		cfg:          cfg,
 		bc:           bc,
 		ba:           ba,
 		pm:           pm,
@@ -150,11 +152,18 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	ct.bc.CheckIn(agent.Id, fields, seqno)
 
 	// Initial fetch for pending actions
-	pendingActions, err := ct.fetchAgentPendingActions(ctx, seqno, agent.Id)
-	if err != nil {
-		return err
+	var (
+		actions  []ActionResp
+		ackToken string
+	)
+
+	if ct.cfg.Features.Enabled(config.FeatureActions) {
+		pendingActions, err := ct.fetchAgentPendingActions(ctx, seqno, agent.Id)
+		if err != nil {
+			return err
+		}
+		actions, ackToken = convertActionsX(agent.Id, pendingActions)
 	}
-	actions, ackToken := convertActionsX(agent.Id, pendingActions)
 
 	if len(actions) == 0 {
 	LOOP:
