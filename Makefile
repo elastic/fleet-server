@@ -120,5 +120,5 @@ test-int: int-docker-start test-int-set int-docker-stop
 .PHONY: test-int-set
 test-int-set:
 	# Initialize indices one before running all the tests
-	@go run ./dev-tools/integration/main.go
-	@go test -v -tags=integration -count=1 -race ./...
+	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go run ./dev-tools/integration/main.go
+	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go test -v -tags=integration -count=1 -race ./...
