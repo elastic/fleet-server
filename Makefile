@@ -75,7 +75,7 @@ check-no-changes:
 	@git diff-index --exit-code HEAD --
 
 .PHONY: test
-test: test-unit test-int
+test: test-unit #test-int
 
 .PHONY: test-unit
 test-unit: ## - Run some tests
