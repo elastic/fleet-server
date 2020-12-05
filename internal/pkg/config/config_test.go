@@ -2,14 +2,16 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// +build !integration
+
 package config
 
 import (
-	"github.com/elastic/go-ucfg"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/elastic/go-ucfg"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
