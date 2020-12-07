@@ -62,7 +62,11 @@ func createBaseActionsQuery() (tmpl *dsl.Tmpl, root, filter *dsl.Node) {
 }
 
 func SearchActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, params map[string]interface{}) ([]ActionDoc, error) {
-	res, err := Search(ctx, bulker, tmpl, FleetActions, params)
+	return searchActions(ctx, bulker, tmpl, FleetActions, params)
+}
+
+func searchActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) ([]ActionDoc, error) {
+	res, err := Search(ctx, bulker, tmpl, index, params)
 	if err != nil {
 		return nil, err
 	}

@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package es
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 	"fmt"
+
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
 )
@@ -46,7 +47,7 @@ func Info(ctx context.Context, es *elasticsearch.Client) (*InfoResponse, error) 
 	return &resp, err
 }
 
-func InitESClient(ctx context.Context, cfg *config.Elasticsearch) (*elasticsearch.Client, error) {
+func InitClient(ctx context.Context, cfg *config.Elasticsearch) (*elasticsearch.Client, error) {
 
 	escfg, err := cfg.ToESConfig()
 	if err != nil {
@@ -82,10 +83,12 @@ func InitESClient(ctx context.Context, cfg *config.Elasticsearch) (*elasticsearc
 	return es, nil
 }
 
-func InitES(ctx context.Context, cfg *config.Elasticsearch) (*elasticsearch.Client, bulk.Bulk) {
+func Init(ctx context.Context, cfg *config.Elasticsearch) (*elasticsearch.Client, bulk.Bulk, error) {
 
-	es, err := InitESClient(ctx, cfg)
-	checkErr(err)
+	es, err := InitClient(ctx, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	flushInterval := cfg.BulkFlushInterval
 
@@ -95,5 +98,5 @@ func InitES(ctx context.Context, cfg *config.Elasticsearch) (*elasticsearch.Clie
 		log.Info().Err(err).Msg("Bulker exit")
 	}()
 
-	return es, blk
+	return es, blk, nil
 }

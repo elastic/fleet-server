@@ -12,6 +12,7 @@ import (
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/env"
+	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/logger"
 	"fleet/internal/pkg/profile"
@@ -138,7 +139,8 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 
 		checkErr(initGlobalCache())
 
-		es, bulker := InitES(ctx, &cfg.Output.Elasticsearch)
+		es, bulker, err := es.Init(ctx, &cfg.Output.Elasticsearch)
+		checkErr(err)
 
 		// Initial indices bootstrapping, needed for agents actions development
 		// TODO: remove this after the indices bootstrapping logic implemented in ES plugin

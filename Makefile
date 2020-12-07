@@ -75,5 +75,50 @@ check-no-changes:
 	@git diff-index --exit-code HEAD --
 
 .PHONY: test
-test: ## - Run some tests
+test: test-unit #test-int
+
+.PHONY: test-unit
+test-unit: ## - Run some tests
 	@go test -v -race ./...
+
+##################################################
+# Integration testing targets
+##################################################
+
+# Load environment (ES version and creds)
+include ./dev-tools/integration/.env
+export $(shell sed 's/=.*//' ./dev-tools/integration/.env)
+
+# Start ES with docker without waiting
+.PHONY: int-docker-start-async
+int-docker-start-async:
+	@docker-compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans elasticsearch
+
+# Wait for ES to be ready
+.PHONY: int-docker-wait
+int-docker-wait:
+	@./dev-tools/integration/wait-for-elasticsearch.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}
+
+# Start integration docker setup with wait for when the ES is ready
+.PHONY: int-docker-start
+int-docker-start: int-docker-start-async int-docker-wait
+
+# Stop integration docker setup
+.PHONY: int-docker-stop
+int-docker-stop:
+	@docker-compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env down
+
+# Run integration tests with starting/stopping docker
+.PHONY: test-int
+test-int: int-docker-start test-int-set int-docker-stop
+
+# Run integration tests without starting/stopping docker
+# Useful for development where you:
+# 1. Start integration environment
+# 2. Develop/test/repeat
+# 3  Stop integration environment when done
+.PHONY: test-int-set
+test-int-set:
+	# Initialize indices one before running all the tests
+	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go run ./dev-tools/integration/main.go
+	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go test -v -tags=integration -count=1 -race ./...
