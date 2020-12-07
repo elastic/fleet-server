@@ -27,7 +27,7 @@ func main() {
 	checkErr(err)
 
 	ctx := context.Background()
-	es, _, err := es.Init(ctx, &cfg.Output.Elasticsearch)
+	es, err := es.New(ctx, cfg)
 	checkErr(err)
 
 	err = esboot.EnsureESIndices(ctx, es)

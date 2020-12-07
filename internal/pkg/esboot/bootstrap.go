@@ -62,10 +62,10 @@ func EnsureDatastream(ctx context.Context, client *es.Client, name string, idxcf
 	return nil
 }
 
-func EnsureIndex(ctx context.Context, es *elasticsearch.Client, name, mapping string) error {
-	err := EnsureTemplate(ctx, es, name, mapping, false)
+func EnsureIndex(ctx context.Context, client *es.Client, name, mapping string) error {
+	err := EnsureTemplate(ctx, client, name, mapping, false)
 	if err != nil {
 		return err
 	}
-	return CreateIndex(ctx, es, name)
+	return CreateIndex(ctx, client, name)
 }

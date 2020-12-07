@@ -244,13 +244,13 @@ func (f *fleetServer) runServer(ctx context.Context, errCh chan<- error) (contex
 
 	// Behind the feature flag
 	if f.cfg.Features.Enabled(config.FeatureActions) {
-		am, err = runActionMon(ctx, bulker)
+		am, err = runActionMon(ctx, f.es.Bulk())
 		if err != nil {
 			serverCancel()
 			return nil, err
 		}
 		ad = runActionDispatcher(ctx, am)
-		tr, err = action.NewTokenResolver(bulker)
+		tr, err = action.NewTokenResolver(f.es.Bulk())
 		if err != nil {
 			serverCancel()
 			return nil, err
@@ -258,9 +258,9 @@ func (f *fleetServer) runServer(ctx context.Context, errCh chan<- error) (contex
 	}
 
 	ba := runBulkActions(serverCtx, f.sv)
-	bc := runBulkCheckin(serverCtx, bulker, f.sv)
-	ct := NewCheckinT(bc, ba, pm, am, ad, tr, bulker)
-	et := NewEnrollerT(&f.cfg.Inputs[0].Server, bulker)
+	bc := runBulkCheckin(serverCtx, f.es.Bulk(), f.sv)
+	ct := NewCheckinT(f.cfg, bc, ba, pm, am, ad, tr, f.es.Bulk())
+	et := NewEnrollerT(&f.cfg.Inputs[0].Server, f.es.Bulk())
 	router := NewRouter(f.sv, ct, et)
 
 	err = runServer(serverCtx, router, &f.cfg.Inputs[0].Server, errCh)
