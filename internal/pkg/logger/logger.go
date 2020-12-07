@@ -5,8 +5,11 @@
 package logger
 
 import (
+	"context"
+	"fleet/internal/pkg/reload"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -18,6 +21,9 @@ import (
 const (
 	kPrettyTimeFormat = "15:04:05.000000"
 )
+
+var once sync.Once
+var gLogger *logger
 
 func strToLevel(s string) zerolog.Level {
 	l := zerolog.DebugLevel
@@ -43,16 +49,38 @@ func strToLevel(s string) zerolog.Level {
 	return l
 }
 
-func Init(cfg *config.AgentLogging) {
-	zerolog.TimeFieldFormat = time.StampMicro
+type logger struct {
+	cfg *config.Config
+}
 
-	log.Logger = log.Output(os.Stdout).Level(cfg.LogLevel())
-	log.Info().
-		Int("pid", os.Getpid()).
-		Int("ppid", os.Getppid()).
-		Str("exe", os.Args[0]).
-		Strs("args", os.Args[1:]).
-		Msg("boot")
+// Reload reloads the logger configuration.
+func (l *logger) Reload(_ context.Context, cfg *config.Config) error {
+	if l.cfg.Fleet.Agent.Logging != cfg.Fleet.Agent.Logging {
+		// reload the logger to new config level
+		log.Logger = log.Output(os.Stdout).Level(cfg.Fleet.Agent.Logging.LogLevel())
+	}
+	l.cfg = cfg
+	return nil
+}
 
-	log.Debug().Strs("env", os.Environ()).Msg("environment")
+// Init initializes the logger.
+func Init(cfg *config.Config) reload.Reloadable {
+	once.Do(func() {
+		gLogger = &logger{
+			cfg: cfg,
+		}
+
+		zerolog.TimeFieldFormat = time.StampMicro
+
+		log.Logger = log.Output(os.Stdout).Level(cfg.Fleet.Agent.Logging.LogLevel())
+		log.Info().
+			Int("pid", os.Getpid()).
+			Int("ppid", os.Getppid()).
+			Str("exe", os.Args[0]).
+			Strs("args", os.Args[1:]).
+			Msg("boot")
+
+		log.Debug().Strs("env", os.Environ()).Msg("environment")
+	})
+	return gLogger
 }

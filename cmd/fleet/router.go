@@ -5,8 +5,6 @@
 package fleet
 
 import (
-	"context"
-
 	"fleet/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"
@@ -24,7 +22,7 @@ type Router struct {
 	et *EnrollerT
 }
 
-func NewRouter(ctx context.Context, sv saved.CRUD, ct *CheckinT, et *EnrollerT) *httprouter.Router {
+func NewRouter(sv saved.CRUD, ct *CheckinT, et *EnrollerT) *httprouter.Router {
 
 	r := Router{
 		sv: sv,

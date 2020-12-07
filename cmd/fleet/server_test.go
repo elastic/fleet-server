@@ -39,17 +39,25 @@ func TestRunServer(t *testing.T) {
 	ct := NewCheckinT(nil, bc, ba, pm, nil, nil, nil, nil)
 	et := NewEnrollerT(cfg, nil)
 
-	router := NewRouter(ctx, sv, ct, et)
+	router := NewRouter(sv, ct, et)
+	errCh := make(chan error)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		err = runServer(ctx, router, cfg)
+		err = runServer(ctx, router, cfg, errCh)
 		wg.Done()
 	}()
-	<-time.After(500 * time.Millisecond)
+	var errFromChan error
+	select {
+	case err := <-errCh:
+		errFromChan = err
+	case <-time.After(500 * time.Millisecond):
+		break
+	}
 	cancel()
 	wg.Wait()
+	require.NoError(t, errFromChan)
 	if err != http.ErrServerClosed {
 		require.NoError(t, err)
 	}

@@ -92,7 +92,7 @@ func setup(ctx context.Context, t *testing.T, index string) (bulk.Bulk, []model.
 		t.Fatal(err)
 	}
 
-	cli, bulker, err := es.Init(ctx, &cfg.Output.Elasticsearch)
+	cli, err := es.New(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,12 +101,12 @@ func setup(ctx context.Context, t *testing.T, index string) (bulk.Bulk, []model.
 	if err != nil {
 		t.Fatal(err)
 	}
-	actions, err := storeRandomActions(ctx, bulker, index)
+	actions, err := storeRandomActions(ctx, cli.Bulk(), index)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return bulker, actions
+	return cli.Bulk(), actions
 }
 
 func TestSearchActionsQuery(t *testing.T) {

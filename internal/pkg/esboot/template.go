@@ -8,12 +8,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esutil"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
 )
 
@@ -50,14 +50,14 @@ type AckResponse struct {
 	Acknowledged bool `json:"acknowledged"`
 }
 
-func EnsureTemplate(ctx context.Context, es *elasticsearch.Client, name, mapping string, ilm bool) (err error) {
+func EnsureTemplate(ctx context.Context, client *es.Client, name, mapping string, ilm bool) (err error) {
 	templateName := nameWithSuffix(name, templateSuffix)
 
 	// Get current template
-	res, err := es.Indices.GetTemplate(
-		es.Indices.GetTemplate.WithContext(ctx),
-		es.Indices.GetTemplate.WithFlatSettings(true),
-		es.Indices.GetTemplate.WithName(templateName),
+	res, err := client.Indices.GetTemplate(
+		client.Indices.GetTemplate.WithContext(ctx),
+		client.Indices.GetTemplate.WithFlatSettings(true),
+		client.Indices.GetTemplate.WithName(templateName),
 	)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func EnsureTemplate(ctx context.Context, es *elasticsearch.Client, name, mapping
 
 	if res.StatusCode != http.StatusOK {
 		// Template not found, create a new one
-		return createTemplate(ctx, es, name, templateVersion, settings, mapping, ilm)
+		return createTemplate(ctx, client, name, templateVersion, settings, mapping, ilm)
 	}
 
 	// Decode template from response
@@ -86,7 +86,7 @@ func EnsureTemplate(ctx context.Context, es *elasticsearch.Client, name, mapping
 	template, ok := r[name]
 	if !ok {
 		// Template not found, create a new one
-		return createTemplate(ctx, es, name, templateVersion, settings, mapping, ilm)
+		return createTemplate(ctx, client, name, templateVersion, settings, mapping, ilm)
 	}
 
 	// Check settings
@@ -105,10 +105,10 @@ func EnsureTemplate(ctx context.Context, es *elasticsearch.Client, name, mapping
 		Int("new template version", templateVersion).
 		Msg("Creating template")
 
-	return createTemplate(ctx, es, name, templateVersion, settings, mapping, ilm)
+	return createTemplate(ctx, client, name, templateVersion, settings, mapping, ilm)
 }
 
-func createTemplate(ctx context.Context, es *elasticsearch.Client, name string, templateVersion int, settings, mapping string, ilm bool) error {
+func createTemplate(ctx context.Context, client *es.Client, name string, templateVersion int, settings, mapping string, ilm bool) error {
 
 	log.Info().Str("name", name).Msg("Create template")
 
@@ -118,9 +118,9 @@ func createTemplate(ctx context.Context, es *elasticsearch.Client, name string, 
 	}
 	body := fmt.Sprintf(defaultTemplate, templateVersion, name, datastream, mapping, settings)
 
-	res, err := es.Indices.PutIndexTemplate(name,
+	res, err := client.Indices.PutIndexTemplate(name,
 		strings.NewReader(body),
-		es.Indices.PutIndexTemplate.WithContext(ctx),
+		client.Indices.PutIndexTemplate.WithContext(ctx),
 	)
 	if err != nil {
 		return err
