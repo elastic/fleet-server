@@ -8,16 +8,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esutil"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
 )
 
-func CreateDatastream(ctx context.Context, es *elasticsearch.Client, name string) error {
-	res, err := es.Indices.CreateDataStream(name,
-		es.Indices.CreateDataStream.WithContext(ctx),
+func CreateDatastream(ctx context.Context, client *es.Client, name string) error {
+	res, err := client.Indices.CreateDataStream(name,
+		client.Indices.CreateDataStream.WithContext(ctx),
 	)
 
 	if err != nil {

@@ -6,8 +6,7 @@ package esboot
 
 import (
 	"context"
-
-	"github.com/elastic/go-elasticsearch/v8"
+	"fleet/internal/pkg/es"
 )
 
 // Temporary ES indices bootstrapping until we move this logic to a proper place
@@ -28,9 +27,9 @@ var indexConfigs = map[string]indexConfig{
 }
 
 // Bootstrap creates .fleet-actions data stream
-func EnsureESIndices(ctx context.Context, es *elasticsearch.Client) error {
+func EnsureESIndices(ctx context.Context, client *es.Client) error {
 	for name, idxcfg := range indexConfigs {
-		err := EnsureDatastream(ctx, es, name, idxcfg)
+		err := EnsureDatastream(ctx, client, name, idxcfg)
 		if err != nil {
 			return err
 		}
@@ -38,23 +37,23 @@ func EnsureESIndices(ctx context.Context, es *elasticsearch.Client) error {
 	return nil
 }
 
-func EnsureDatastream(ctx context.Context, es *elasticsearch.Client, name string, idxcfg indexConfig) error {
+func EnsureDatastream(ctx context.Context, client *es.Client, name string, idxcfg indexConfig) error {
 	if idxcfg.datastream {
-		err := EnsureILMPolicy(ctx, es, name)
+		err := EnsureILMPolicy(ctx, client, name)
 		if err != nil {
 			return err
 		}
 	}
 
-	err := EnsureTemplate(ctx, es, name, idxcfg.mapping, idxcfg.datastream)
+	err := EnsureTemplate(ctx, client, name, idxcfg.mapping, idxcfg.datastream)
 	if err != nil {
 		return err
 	}
 
 	if idxcfg.datastream {
-		err = CreateDatastream(ctx, es, name)
+		err = CreateDatastream(ctx, client, name)
 	} else {
-		err = CreateIndex(ctx, es, name)
+		err = CreateIndex(ctx, client, name)
 	}
 	if err != nil {
 		return err

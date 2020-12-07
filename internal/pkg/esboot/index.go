@@ -8,16 +8,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esutil"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
 )
 
-func CreateIndex(ctx context.Context, es *elasticsearch.Client, name string) error {
-	res, err := es.Indices.Create(name,
-		es.Indices.Create.WithContext(ctx),
+func CreateIndex(ctx context.Context, client *es.Client, name string) error {
+	res, err := client.Indices.Create(name,
+		client.Indices.Create.WithContext(ctx),
 	)
 
 	if err != nil {
