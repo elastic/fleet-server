@@ -32,7 +32,7 @@ type Bulk interface {
 
 	MUpdate(ctx context.Context, ops []BulkOp, opts ...Opt) error
 
-	Search(ctx context.Context, index []string, body []byte, opts ...Opt) (*HitsT, error)
+	Search(ctx context.Context, index []string, body []byte, opts ...Opt) (*ResultT, error)
 
 	Client() *elasticsearch.Client
 }
@@ -594,7 +594,7 @@ func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byt
 	return r.Source, nil
 }
 
-func (b *Bulker) Search(ctx context.Context, index []string, body []byte, opts ...Opt) (*HitsT, error) {
+func (b *Bulker) Search(ctx context.Context, index []string, body []byte, opts ...Opt) (*ResultT, error) {
 	opt := b.parseOpts(opts...)
 
 	// Serialize request
@@ -619,7 +619,7 @@ func (b *Bulker) Search(ctx context.Context, index []string, body []byte, opts .
 
 	// Interpret response
 	r := resp.data.(*MsearchResponseItem)
-	return &r.Hits, nil
+	return &ResultT{r.Hits, r.Aggregations}, nil
 }
 
 func (b *Bulker) writeMsearchMeta(buf *bytes.Buffer, indices []string) error {

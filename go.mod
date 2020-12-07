@@ -3,15 +3,17 @@ module fleet
 go 1.14
 
 require (
-	github.com/aleksmaus/generate v0.0.0-20201203164202-39b37e43d8f3
+	github.com/aleksmaus/generate v0.0.0-20201205133607-4e21ec896244
 	github.com/dgraph-io/ristretto v0.0.3
 	github.com/elastic/beats/v7 v7.10.0
 	github.com/elastic/go-elasticsearch/v8 v8.0.0-20200728144331-527225d8e836
 	github.com/elastic/go-ucfg v0.8.3
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/google/go-cmp v0.4.0
+	github.com/hashicorp/golang-lru v0.5.2-0.20190520140433-59383c442f7d
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mitchellh/mapstructure v1.3.3
+	github.com/rs/xid v1.2.1
 	github.com/rs/zerolog v1.19.0
 	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/testify v1.6.1

@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"
@@ -22,7 +23,7 @@ var ErrEventAgentIdMismatch = errors.New("event agentId mismatch")
 func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	id := ps.ByName("id")
 
-	err := _handleAcks(w, r, id, rt.sv)
+	err := _handleAcks(w, r, id, rt.sv, rt.ct.bulker)
 
 	if err != nil {
 		code := http.StatusBadRequest
@@ -36,8 +37,8 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 }
 
 // TODO: Handle UPGRADE and UNENROLL
-func _handleAcks(w http.ResponseWriter, r *http.Request, id string, sv saved.CRUD) error {
-	agent, err := authAgent(r, id, sv)
+func _handleAcks(w http.ResponseWriter, r *http.Request, id string, sv saved.CRUD, bulker bulk.Bulk) error {
+	agent, err := authAgent(r, id, sv, bulker)
 	if err != nil {
 		return err
 	}

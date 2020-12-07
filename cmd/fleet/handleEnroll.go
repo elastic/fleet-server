@@ -8,18 +8,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fleet/internal/pkg/config"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
-	"github.com/gofrs/uuid"
-
 	"fleet/internal/pkg/apikey"
+	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/config"
+	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/saved"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/gofrs/uuid"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/semaphore"
@@ -40,15 +41,17 @@ var (
 
 type EnrollerT struct {
 	throttle *semaphore.Weighted
+	bulker   bulk.Bulk
 }
 
-func NewEnrollerT(cfg *config.Server) *EnrollerT {
+func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk) *EnrollerT {
 	// This value has more to do with the throughput of elastic search than anything else
 	// if you have a large elastic search cluster, you can be more aggressive.
 	maxEnrollPending := cfg.MaxEnrollPending
 
 	return &EnrollerT{
 		throttle: semaphore.NewWeighted(maxEnrollPending),
+		bulker:   bulker,
 	}
 
 }
@@ -138,7 +141,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request, sv saved.CRUD) ([]byte, error
 		return nil, err
 	}
 
-	resp, err := _enroll(r.Context(), sv, *req, *erec)
+	resp, err := _enroll(r.Context(), sv, et.bulker, *req, *erec)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +149,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request, sv saved.CRUD) ([]byte, error
 	return json.Marshal(resp)
 }
 
-func _enroll(ctx context.Context, sv saved.CRUD, req EnrollRequest, erec EnrollmentApiKey) (*EnrollResponse, error) {
+func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollRequest, erec EnrollmentApiKey) (*EnrollResponse, error) {
 
 	if req.SharedId != "" {
 		// TODO: Support pre-existing install
@@ -205,10 +208,18 @@ func _enroll(ctx context.Context, sv saved.CRUD, req EnrollRequest, erec Enrollm
 		saved.WithRefresh(),
 	)
 	if err != nil {
+		fmt.Println("ERR:", err)
 		return nil, err
 	}
 	if id != fmt.Sprintf("%s:%s", AGENT_SAVED_OBJECT_TYPE, agentId) {
 		return nil, ErrAgentIdFailure
+	}
+
+	// Save agent in the .fleet-agents index as well
+	// The saved object above will be transfered to .fleet-agent index in the future
+	err = createFleetAgent(ctx, bulker, agentId, agentData)
+	if err != nil {
+		return nil, err
 	}
 
 	resp := EnrollResponse{
@@ -231,6 +242,19 @@ func _enroll(ctx context.Context, sv saved.CRUD, req EnrollRequest, erec Enrollm
 	gCache.SetApiKey(*accessApiKey, kCacheAccessInitTTL)
 
 	return &resp, nil
+}
+
+func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent Agent) error {
+	data, err := json.Marshal(agent)
+	if err != nil {
+		return err
+	}
+
+	_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func generateAccessApiKey(ctx context.Context, client *elasticsearch.Client, agentId string) (*apikey.ApiKey, error) {

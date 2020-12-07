@@ -10,6 +10,21 @@ import (
 	"fmt"
 )
 
+type ErrorT struct {
+	Type   string `json:"type"`
+	Reason string `json:"reason"`
+	Cause  struct {
+		Type   string `json:"type"`
+		Reason string `json:"reason"`
+	} `json:"caused_by"`
+}
+
+// Acknowledgement response
+type AckResponse struct {
+	Acknowledged bool   `json:"acknowledged"`
+	Error        ErrorT `json:"error,omitempty"`
+}
+
 type BulkIndexerResponse struct {
 	Took      int                                  `json:"took"`
 	HasErrors bool                                 `json:"errors"`
@@ -32,14 +47,7 @@ type BulkIndexerResponseItem struct {
 	//		Failed     int `json:"failed"`
 	//	} `json:"_shards"`
 
-	Error struct {
-		Type   string `json:"type"`
-		Reason string `json:"reason"`
-		Cause  struct {
-			Type   string `json:"type"`
-			Reason string `json:"reason"`
-		} `json:"caused_by"`
-	} `json:"error,omitempty"`
+	Error ErrorT `json:"error,omitempty"`
 }
 
 type MgetResponse struct {
@@ -67,8 +75,10 @@ func (i *MgetResponseItem) deriveError() error {
 	return nil
 }
 
+// TODO: refactor to a separate package
 type HitT struct {
 	Id     string          `json:"_id"`
+	SeqNo  int64           `json:"_seq_no"`
 	Index  string          `json:"_index"`
 	Source json.RawMessage `json:"_source"`
 	Score  *float64        `json:"_score"`
@@ -83,6 +93,15 @@ type HitsT struct {
 	MaxScore *float64 `json:"max_score"`
 }
 
+type Aggregation struct {
+	Value float64 `json:"value"`
+}
+
+type ResultT struct {
+	HitsT
+	Aggregations map[string]Aggregation
+}
+
 type MsearchResponseItem struct {
 	Status   int    `json:"status"`
 	Took     uint64 `json:"took"`
@@ -93,16 +112,10 @@ type MsearchResponseItem struct {
 		Skipped    uint64 `json:"skipped"`
 		Failed     uint64 `json:"failed"`
 	} `json:"_shards"`
-	Hits HitsT `json:"hits"`
+	Hits         HitsT                  `json:"hits"`
+	Aggregations map[string]Aggregation `json:"aggregations,omitempty"`
 
-	Error struct {
-		Type   string `json:"type"`
-		Reason string `json:"reason"`
-		Cause  struct {
-			Type   string `json:"type"`
-			Reason string `json:"reason"`
-		} `json:"caused_by"`
-	} `json:"error,omitempty"`
+	Error ErrorT `json:"error,omitempty"`
 }
 
 type MsearchResponse struct {
@@ -120,6 +133,13 @@ type ErrElastic struct {
 	}
 }
 
+func (e *ErrElastic) Unwrap() error {
+	if e.Type == "index_not_found_exception" {
+		return ErrIndexNotFound
+	}
+	return nil
+}
+
 func (e ErrElastic) Error() string {
 	return fmt.Sprintf("Elastic fail %d:%s:%s", e.Status, e.Type, e.Reason)
 }
@@ -128,55 +148,37 @@ var (
 	ErrElasticVersionConflict = errors.New("elastic version conflict")
 	ErrElasticNotFound        = errors.New("elastic not found")
 	ErrInvalidBody            = errors.New("invalid body")
+	ErrIndexNotFound          = errors.New("index not found")
 )
 
 func (b *BulkIndexerResponseItem) deriveError() error {
-	if b.Status == 200 || b.Status == 201 {
-		return nil
-	}
-
-	var err error
-	switch b.Error.Type {
-	case "version_conflict_engine_exception":
-		err = ErrElasticVersionConflict
-	default:
-		err = ErrElastic{
-			Status: b.Status,
-			Type:   b.Error.Type,
-			Reason: b.Error.Reason,
-			Cause: struct {
-				Type   string
-				Reason string
-			}{
-				b.Error.Cause.Type,
-				b.Error.Cause.Reason,
-			},
-		}
-	}
-
-	return err
+	return TranslateError(b.Status, b.Error)
 }
 
 func (b *MsearchResponseItem) deriveError() error {
-	if b.Status == 200 {
+	return TranslateError(b.Status, b.Error)
+}
+
+func TranslateError(status int, e ErrorT) error {
+	if status == 200 || status == 201 {
 		return nil
 	}
 
 	var err error
-	switch b.Error.Type {
+	switch e.Type {
 	case "version_conflict_engine_exception":
 		err = ErrElasticVersionConflict
 	default:
-		err = ErrElastic{
-			Status: b.Status,
-			Type:   b.Error.Type,
-			Reason: b.Error.Reason,
+		err = &ErrElastic{
+			Status: status,
+			Type:   e.Type,
+			Reason: e.Reason,
 			Cause: struct {
 				Type   string
 				Reason string
 			}{
-				b.Error.Cause.Type,
-				b.Error.Cause.Reason,
+				e.Cause.Type,
+				e.Cause.Reason,
 			},
 		}
 	}

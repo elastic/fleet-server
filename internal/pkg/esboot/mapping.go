@@ -9,7 +9,7 @@ package esboot
 const (
 
 	// Action An Elastic Agent action
-	kMappingAction = `{
+	MappingAction = `{
 	"properties": {
 		"agents": {
 			"type": "keyword"
@@ -37,7 +37,7 @@ const (
 }`
 
 	// ActionResult An Elastic Agent action results
-	kMappingActionResult = `{
+	MappingActionResult = `{
 	"properties": {
 		"action_id": {
 			"type": "keyword"
@@ -59,9 +59,12 @@ const (
 }`
 
 	// Agent An Elastic Agent that has enrolled into Fleet
-	kMappingAgent = `{
+	MappingAgent = `{
 	"properties": {
 		"access_api_key_id": {
+			"type": "keyword"
+		},
+		"action_seq_no": {
 			"type": "integer"
 		},
 		"agent": {
@@ -78,7 +81,7 @@ const (
 			"type": "keyword"
 		},
 		"default_api_key_id": {
-			"type": "integer"
+			"type": "keyword"
 		},
 		"enrolled_at": {
 			"type": "date"
@@ -112,7 +115,7 @@ const (
 }`
 
 	// AgentMetadata An Elastic Agent metadata
-	kMappingAgentMetadata = `{
+	MappingAgentMetadata = `{
 	"properties": {
 		"id": {
 			"type": "keyword"
@@ -124,14 +127,14 @@ const (
 }`
 
 	// Data The opaque payload.
-	kMappingData = `{
+	MappingData = `{
 	"properties": {
 		
 	}
 }`
 
 	// HostMetadata The host metadata for the Elastic Agent
-	kMappingHostMetadata = `{
+	MappingHostMetadata = `{
 	"properties": {
 		"architecture": {
 			"type": "keyword"
@@ -149,14 +152,14 @@ const (
 }`
 
 	// LocalMetadata Local metadata information for the Elastic Agent
-	kMappingLocalMetadata = `{
+	MappingLocalMetadata = `{
 	"properties": {
 		
 	}
 }`
 
 	// Policy A policy that an Elastic Agent is attached to
-	kMappingPolicy = `{
+	MappingPolicy = `{
 	"properties": {
 		"coordinator_idx": {
 			"type": "integer"
@@ -180,7 +183,7 @@ const (
 }`
 
 	// PolicyLeader The current leader Fleet Server for a policy
-	kMappingPolicyLeader = `{
+	MappingPolicyLeader = `{
 	"properties": {
 		"server": {
 			"properties": {
@@ -199,7 +202,7 @@ const (
 }`
 
 	// Server A Fleet Server
-	kMappingServer = `{
+	MappingServer = `{
 	"properties": {
 		"agent": {
 			"properties": {
@@ -241,7 +244,7 @@ const (
 }`
 
 	// ServerMetadata A Fleet Server metadata
-	kMappingServerMetadata = `{
+	MappingServerMetadata = `{
 	"properties": {
 		"id": {
 			"type": "keyword"

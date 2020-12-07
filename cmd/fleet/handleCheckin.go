@@ -9,12 +9,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fleet/internal/pkg/config"
 	"fmt"
 	"net/http"
 	"reflect"
 	"time"
 
+	"fleet/internal/pkg/action"
+	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/config"
+	"fleet/internal/pkg/dl"
+	"fleet/internal/pkg/dsl"
 	"fleet/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"
@@ -50,23 +54,47 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 type CheckinT struct {
-	cfg *config.Server
-	bc  *BulkCheckin
-	ba  *BulkActions
-	pm  *PolicyMon
+	cfg          *config.Config
+	bc           *BulkCheckin
+	ba           *BulkActions
+	pm           *PolicyMon
+	gcp          action.GlobalCheckpointProvider
+	ad           *action.Dispatcher
+	tr           *action.TokenResolver
+	bulker       bulk.Bulk
+	queryActions *dsl.Tmpl
 }
 
-func NewCheckinT(bc *BulkCheckin, ba *BulkActions, pm *PolicyMon) *CheckinT {
+func NewCheckinT(
+	cfg *config.Config,
+	bc *BulkCheckin,
+	ba *BulkActions,
+	pm *PolicyMon,
+	gcp action.GlobalCheckpointProvider,
+	ad *action.Dispatcher,
+	tr *action.TokenResolver,
+	bulker bulk.Bulk,
+) *CheckinT {
+	queryActions, err := dl.PrepareAgentActionsQuery()
+	if err != nil {
+		panic(err)
+	}
 	return &CheckinT{
-		bc: bc,
-		ba: ba,
-		pm: pm,
+		cfg:          cfg,
+		bc:           bc,
+		ba:           ba,
+		pm:           pm,
+		gcp:          gcp,
+		ad:           ad,
+		tr:           tr,
+		bulker:       bulker,
+		queryActions: queryActions,
 	}
 }
 
 func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id string, sv saved.CRUD) error {
 
-	agent, err := authAgent(r, id, sv)
+	agent, err := authAgent(r, id, sv, ct.bulker)
 
 	if err != nil {
 		return err
@@ -94,6 +122,17 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	defer ct.ba.Unsubscribe(actionSub)
 	actionCh := actionSub.Ch()
 
+	// Resolve AckToken from request, fallback on the agent record
+	seqno, err := ct.resolveSeqNo(ctx, req, agent)
+	if err != nil {
+		return err
+	}
+
+	// Subsribe to actions dispatcher
+	aSub := ct.ad.Subscribe(agent.Id, seqno)
+	defer ct.ad.Unsubscribe(aSub)
+	actCh := aSub.Ch()
+
 	// Subscribe to policy manager for changes on PolicyId > policyRev
 	sub, err := ct.pm.Subscribe(agent.PolicyId, agent.PolicyRev)
 	if err != nil {
@@ -110,37 +149,57 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	defer longPoll.Stop()
 
 	// Intial update on checkin, and any user fields that might have changed
-	ct.bc.CheckIn(agent.Id, fields)
+	ct.bc.CheckIn(agent.Id, fields, seqno)
 
-	var actions []ActionResp
+	// Initial fetch for pending actions
+	var (
+		actions  []ActionResp
+		ackToken string
+	)
 
-LOOP:
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case actionList := <-actionCh:
-			actions = append(actions, convertActions(actionList)...)
-			break LOOP
-		case action := <-sub.C:
-			actionResp, err := parsePolicy(ctx, sv, agent.Id, action)
-			if err != nil {
-				return err
+	if ct.cfg.Features.Enabled(config.FeatureActions) {
+		pendingActions, err := ct.fetchAgentPendingActions(ctx, seqno, agent.Id)
+		if err != nil {
+			return err
+		}
+		actions, ackToken = convertActionsX(agent.Id, pendingActions)
+	}
+
+	if len(actions) == 0 {
+	LOOP:
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case acdocs := <-actCh:
+				var acs []ActionResp
+				acs, ackToken = convertActionsX(agent.Id, acdocs)
+				actions = append(actions, acs...)
+				break LOOP
+			case actionList := <-actionCh:
+				actions = append(actions, convertActions(actionList)...)
+				break LOOP
+			case action := <-sub.C:
+				actionResp, err := parsePolicy(ctx, sv, agent.Id, action)
+				if err != nil {
+					return err
+				}
+				actions = append(actions, *actionResp)
+				break LOOP
+			case <-longPoll.C:
+				log.Trace().Msg("Fire long poll")
+				break LOOP
+			case <-tick.C:
+				ct.bc.CheckIn(agent.Id, nil, seqno)
 			}
-			actions = append(actions, *actionResp)
-			break LOOP
-		case <-longPoll.C:
-			log.Trace().Msg("Fire long poll")
-			break LOOP
-		case <-tick.C:
-			ct.bc.CheckIn(agent.Id, nil)
 		}
 	}
 
 	// For now, empty response
 	resp := CheckinResponse{
-		Action:  "checkin",
-		Actions: actions,
+		AckToken: ackToken,
+		Action:   "checkin",
+		Actions:  actions,
 	}
 
 	data, err := json.Marshal(&resp)
@@ -157,6 +216,39 @@ LOOP:
 	return nil
 }
 
+// Resolve AckToken from request, fallback on the agent record
+func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent *Agent) (seqno int64, err error) {
+	// Resolve AckToken from request, fallback on the agent record
+	ackToken := req.AckToken
+	seqno = agent.ActionSeqNo
+
+	if ackToken != "" {
+		var sn int64
+		sn, err = ct.tr.Resolve(ctx, ackToken)
+		if err != nil {
+			if errors.Is(err, dl.ErrNotFound) {
+				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("Token not found")
+				err = nil
+			} else {
+				return
+			}
+		}
+		seqno = sn
+	}
+	return seqno, nil
+}
+
+func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno int64, agentId string) ([]dl.ActionDoc, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	return dl.SearchActions(ctx, ct.bulker, ct.queryActions, map[string]interface{}{
+		dl.FieldSeqNo:      seqno,
+		dl.FieldMaxSeqNo:   ct.gcp.GetCheckpoint(),
+		dl.FieldExpiration: now,
+		dl.FieldAgents:     []string{agentId},
+	})
+}
+
 func convertActions(actionList []Action) []ActionResp {
 	respList := make([]ActionResp, 0, len(actionList))
 	for _, action := range actionList {
@@ -170,6 +262,28 @@ func convertActions(actionList []Action) []ActionResp {
 	}
 
 	return respList
+}
+
+func convertActionsX(agentId string, acdocs []dl.ActionDoc) ([]ActionResp, string) {
+	var ackToken string
+	sz := len(acdocs)
+
+	respList := make([]ActionResp, 0, sz)
+	for _, acdoc := range acdocs {
+		respList = append(respList, ActionResp{
+			AgentId:   agentId,
+			CreatedAt: acdoc.Timestamp,
+			Data:      []byte(acdoc.Data),
+			Id:        acdoc.Id,
+			Type:      acdoc.Type,
+		})
+	}
+
+	if sz > 0 {
+		ackToken = acdocs[sz-1].DocID
+	}
+
+	return respList, ackToken
 }
 
 func parsePolicy(ctx context.Context, sv saved.CRUD, agentId string, action Action) (*ActionResp, error) {

@@ -6,20 +6,22 @@ package fleet
 
 import (
 	"context"
-	"fleet/internal/pkg/es"
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
-
+	"fleet/internal/pkg/action"
+	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/env"
+	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/logger"
 	"fleet/internal/pkg/profile"
 	"fleet/internal/pkg/saved"
 	"fleet/internal/pkg/signal"
+
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 )
 
 const kPolicyThrottle = time.Millisecond * 5
@@ -32,8 +34,9 @@ func checkErr(err error) {
 	}
 }
 
-func runBulkCheckin(ctx context.Context, sv saved.CRUD) *BulkCheckin {
-	bc := NewBulkCheckin()
+func runBulkCheckin(ctx context.Context, bulker bulk.Bulk, sv saved.CRUD) *BulkCheckin {
+
+	bc := NewBulkCheckin(bulker)
 	go func() {
 		for {
 			err := bc.Run(ctx, sv)
@@ -47,6 +50,7 @@ func runBulkCheckin(ctx context.Context, sv saved.CRUD) *BulkCheckin {
 }
 
 func runBulkActions(ctx context.Context, sv saved.CRUD) *BulkActions {
+
 	ba := NewBulkActions()
 	go func() {
 		for {
@@ -57,6 +61,7 @@ func runBulkActions(ctx context.Context, sv saved.CRUD) *BulkActions {
 			log.Error().Err(err).Msg("Restart bulk actions on error")
 		}
 	}()
+
 	return ba
 }
 
@@ -75,6 +80,31 @@ func runPolicyMon(ctx context.Context, sv saved.CRUD) (*PolicyMon, error) {
 		}
 	}()
 	return pm, err
+}
+
+func runActionMon(ctx context.Context, bulker bulk.Bulk) *action.Monitor {
+	am, err := action.NewMonitor(bulker)
+	if err != nil {
+		checkErr(err)
+	}
+
+	go func() {
+		err := am.Run(ctx)
+		checkErr(err)
+	}()
+
+	return am
+}
+
+func runActionDispatcher(ctx context.Context, am *action.Monitor) *action.Dispatcher {
+	ad := action.NewDispatcher(am)
+
+	go func() {
+		err := ad.Run(ctx)
+		checkErr(err)
+	}()
+
+	return ad
 }
 
 func savedObjectKey() string {
@@ -200,9 +230,22 @@ func (f *fleetServer) runServer(ctx context.Context, errCh chan<- error) (contex
 		serverCancel()
 		return nil, err
 	}
+
+	// Start new actions monitoring
+	var am *action.Monitor
+	var ad *action.Dispatcher
+	var tr *action.TokenResolver
+	// Behind the feature flag
+	if cfg.Features.Enabled(config.FeatureActions) {
+		am = runActionMon(ctx, bulker)
+		ad = runActionDispatcher(ctx, am)
+		tr, err = action.NewTokenResolver(bulker)
+		checkErr(err)
+	}
+
 	ba := runBulkActions(serverCtx, f.sv)
 	bc := runBulkCheckin(serverCtx, f.sv)
-	ct := NewCheckinT(bc, ba, pm)
+	ct := NewCheckinT(bc, ba, pm, am, ad, tr, bulker)
 	et := NewEnrollerT(&f.cfg.Inputs[0].Server)
 	router := NewRouter(f.sv, ct, et)
 

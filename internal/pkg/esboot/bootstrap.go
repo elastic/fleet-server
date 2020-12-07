@@ -18,12 +18,12 @@ type indexConfig struct {
 }
 
 var indexConfigs = map[string]indexConfig{
-	".fleet-servers":         {mapping: kMappingServer},
-	".fleet-policies":        {mapping: kMappingPolicy},
-	".fleet-policies-leader": {mapping: kMappingPolicyLeader},
-	".fleet-agents":          {mapping: kMappingAgent},
-	".fleet-actions":         {mapping: kMappingAction},
-	".fleet-actions-results": {mapping: kMappingActionResult, datastream: true},
+	".fleet-servers":         {mapping: MappingServer},
+	".fleet-policies":        {mapping: MappingPolicy},
+	".fleet-policies-leader": {mapping: MappingPolicyLeader},
+	".fleet-agents":          {mapping: MappingAgent},
+	".fleet-actions":         {mapping: MappingAction},
+	".fleet-actions-results": {mapping: MappingActionResult, datastream: true},
 }
 
 // Bootstrap creates .fleet-actions data stream
@@ -60,4 +60,12 @@ func EnsureDatastream(ctx context.Context, client *es.Client, name string, idxcf
 	}
 
 	return nil
+}
+
+func EnsureIndex(ctx context.Context, es *elasticsearch.Client, name, mapping string) error {
+	err := EnsureTemplate(ctx, es, name, mapping, false)
+	if err != nil {
+		return err
+	}
+	return CreateIndex(ctx, es, name)
 }
