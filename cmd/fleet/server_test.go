@@ -45,15 +45,17 @@ func TestRunServer(t *testing.T) {
 		err = runServer(ctx, router, cfg, errCh)
 		wg.Done()
 	}()
+	var errFromChan error
 	select {
-	case errFromChan := <-errCh:
-		err = errFromChan
+	case err := <-errCh:
+		errFromChan = err
 	case <-time.After(500 * time.Millisecond):
 		break
 	}
 	cancel()
 	wg.Wait()
-	if err != http.ErrServerClosed && err != context.Canceled {
+	require.NoError(t, errFromChan)
+	if err != http.ErrServerClosed {
 		require.NoError(t, err)
 	}
 }

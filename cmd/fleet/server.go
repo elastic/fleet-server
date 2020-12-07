@@ -80,7 +80,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	}
 
 	go func(ln net.Listener) {
-		if err := server.Serve(ln); err != nil {
+		if err := server.Serve(ln); err != nil && err != context.Canceled {
 			errCh <- err
 		}
 	}(ln)
