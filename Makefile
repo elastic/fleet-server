@@ -97,7 +97,7 @@ int-docker-start-async:
 # Wait for ES to be ready
 .PHONY: int-docker-wait
 int-docker-wait:
-	@./dev-tools/integration/wait-for-elasticsearch.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:9200
+	@./dev-tools/integration/wait-for-elasticsearch.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}
 
 # Start integration docker setup with wait for when the ES is ready
 .PHONY: int-docker-start
