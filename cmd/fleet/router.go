@@ -5,8 +5,6 @@
 package fleet
 
 import (
-	"context"
-
 	"fleet/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"

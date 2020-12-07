@@ -82,28 +82,34 @@ func runPolicyMon(ctx context.Context, sv saved.CRUD) (*PolicyMon, error) {
 	return pm, err
 }
 
-func runActionMon(ctx context.Context, bulker bulk.Bulk) *action.Monitor {
+func runActionMon(ctx context.Context, bulker bulk.Bulk) (*action.Monitor, error) {
 	am, err := action.NewMonitor(bulker)
 	if err != nil {
-		checkErr(err)
+		return nil, err
 	}
-
 	go func() {
-		err := am.Run(ctx)
-		checkErr(err)
+		for {
+			err := am.Run(ctx)
+			if err == context.Canceled {
+				break
+			}
+			log.Error().Err(err).Msg("Restart action monitor on error")
+		}
 	}()
-
-	return am
+	return am, nil
 }
 
 func runActionDispatcher(ctx context.Context, am *action.Monitor) *action.Dispatcher {
 	ad := action.NewDispatcher(am)
-
 	go func() {
-		err := ad.Run(ctx)
-		checkErr(err)
+		for {
+			err := ad.Run(ctx)
+			if err == context.Canceled {
+				break
+			}
+			log.Error().Err(err).Msg("Restart action dispatcher on error")
+		}
 	}()
-
 	return ad
 }
 
@@ -235,18 +241,26 @@ func (f *fleetServer) runServer(ctx context.Context, errCh chan<- error) (contex
 	var am *action.Monitor
 	var ad *action.Dispatcher
 	var tr *action.TokenResolver
+
 	// Behind the feature flag
-	if cfg.Features.Enabled(config.FeatureActions) {
-		am = runActionMon(ctx, bulker)
+	if f.cfg.Features.Enabled(config.FeatureActions) {
+		am, err = runActionMon(ctx, bulker)
+		if err != nil {
+			serverCancel()
+			return nil, err
+		}
 		ad = runActionDispatcher(ctx, am)
 		tr, err = action.NewTokenResolver(bulker)
-		checkErr(err)
+		if err != nil {
+			serverCancel()
+			return nil, err
+		}
 	}
 
 	ba := runBulkActions(serverCtx, f.sv)
-	bc := runBulkCheckin(serverCtx, f.sv)
+	bc := runBulkCheckin(serverCtx, bulker, f.sv)
 	ct := NewCheckinT(bc, ba, pm, am, ad, tr, bulker)
-	et := NewEnrollerT(&f.cfg.Inputs[0].Server)
+	et := NewEnrollerT(&f.cfg.Inputs[0].Server, bulker)
 	router := NewRouter(f.sv, ct, et)
 
 	err = runServer(serverCtx, router, &f.cfg.Inputs[0].Server, errCh)
