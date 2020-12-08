@@ -173,6 +173,7 @@ func TestToESConfig(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			res, err := test.cfg.ToESConfig()
 			require.NoError(t, err)
+			test.result.Header.Set("X-elastic-product-origin", "fleet")
 			if !assert.True(t, cmp.Equal(test.result, res, copts...)) {
 				diff := cmp.Diff(test.result, res, copts...)
 				if diff != "" {

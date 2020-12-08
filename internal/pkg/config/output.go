@@ -120,6 +120,10 @@ func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
 		h.Set(key, val)
 	}
 
+	// Set special header "X-elastic-product-origin" for .fleet-* indices based on the latest conversation with ES team
+	// This eliminates the warning while accessing the system index
+	h.Set("X-elastic-product-origin", "fleet")
+
 	return elasticsearch.Config{
 		Addresses:  addrs,
 		Username:   c.Username,
