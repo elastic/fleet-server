@@ -6,9 +6,11 @@ package fleet
 
 import (
 	"fleet/internal/pkg/apikey"
+	"fleet/internal/pkg/model"
+	"time"
+
 	"github.com/dgraph-io/ristretto"
 	"github.com/rs/zerolog/log"
-	"time"
 )
 
 type ApiKey = apikey.ApiKey
@@ -88,24 +90,24 @@ func (c Cache) ValidApiKey(key ApiKey) bool {
 	return ok
 }
 
-func (c Cache) GetEnrollmentApiKey(id string) (EnrollmentApiKey, bool) {
+func (c Cache) GetEnrollmentApiKey(id string) (model.EnrollmentApiKey, bool) {
 	scopedKey := "record:" + id
 	if v, ok := c.cache.Get(scopedKey); ok {
 		log.Trace().Str("id", id).Msg("Enrollment cache HIT")
-		key, ok := v.(EnrollmentApiKey)
+		key, ok := v.(model.EnrollmentApiKey)
 
 		if !ok {
 			log.Error().Str("id", id).Msg("Enrollment cache cast fail")
-			return EnrollmentApiKey{}, false
+			return model.EnrollmentApiKey{}, false
 		}
 		return key, ok
 	}
 
 	log.Trace().Str("id", id).Msg("EnrollmentApiKey cache MISS")
-	return EnrollmentApiKey{}, false
+	return model.EnrollmentApiKey{}, false
 }
 
-func (c Cache) SetEnrollmentApiKey(id string, key EnrollmentApiKey, cost int64, ttl time.Duration) {
+func (c Cache) SetEnrollmentApiKey(id string, key model.EnrollmentApiKey, cost int64, ttl time.Duration) {
 	scopedKey := "record:" + id
 	ok := c.cache.SetWithTTL(scopedKey, key, cost, ttl)
 	log.Trace().

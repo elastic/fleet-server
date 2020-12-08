@@ -87,7 +87,7 @@ func MigrateEnrollmentAPIKeys(ctx context.Context, sv saved.CRUD, bulker bulk.Bu
 
 func findExistingEnrollmentAPIKey(hay []model.EnrollmentApiKey, needle enrollmentApiKey) (*model.EnrollmentApiKey, bool) {
 	for _, rec := range hay {
-		if rec.ApiKeyId == needle.ApiKey {
+		if rec.ApiKeyId == needle.ApiKeyId {
 			return &rec, true
 		}
 	}

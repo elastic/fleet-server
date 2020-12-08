@@ -17,6 +17,8 @@ import (
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/dl"
+	"fleet/internal/pkg/dsl"
+	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/saved"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -40,19 +42,25 @@ var (
 )
 
 type EnrollerT struct {
-	throttle *semaphore.Weighted
-	bulker   bulk.Bulk
+	throttle               *semaphore.Weighted
+	bulker                 bulk.Bulk
+	queryTmplEnrollmentKey *dsl.Tmpl
 }
 
-func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk) *EnrollerT {
+func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk) (*EnrollerT, error) {
 	// This value has more to do with the throughput of elastic search than anything else
 	// if you have a large elastic search cluster, you can be more aggressive.
 	maxEnrollPending := cfg.MaxEnrollPending
 
-	return &EnrollerT{
-		throttle: semaphore.NewWeighted(maxEnrollPending),
-		bulker:   bulker,
+	tmpl, err := dl.PrepareQueryAPIKeyByID()
+	if err != nil {
+		return nil, err
 	}
+	return &EnrollerT{
+		throttle:               semaphore.NewWeighted(maxEnrollPending),
+		bulker:                 bulker,
+		queryTmplEnrollmentKey: tmpl,
+	}, nil
 
 }
 
@@ -130,7 +138,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request, sv saved.CRUD) ([]byte, error
 		return nil, err
 	}
 
-	erec, err := fetchEnrollmentKeyRecord(r.Context(), key.Id, sv)
+	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), key.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +157,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request, sv saved.CRUD) ([]byte, error
 	return json.Marshal(resp)
 }
 
-func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollRequest, erec EnrollmentApiKey) (*EnrollResponse, error) {
+func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollRequest, erec model.EnrollmentApiKey) (*EnrollResponse, error) {
 
 	if req.SharedId != "" {
 		// TODO: Support pre-existing install
@@ -171,12 +179,12 @@ func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollReq
 
 	agentId := u.String()
 
-	accessApiKey, err := generateAccessApiKey(ctx, sv.Client(), agentId)
+	accessApiKey, err := generateAccessApiKey(ctx, bulker.Client(), agentId)
 	if err != nil {
 		return nil, err
 	}
 
-	defaultOutputApiKey, err := generateOutputApiKey(ctx, sv.Client(), agentId, "default")
+	defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agentId, "default")
 	if err != nil {
 		return nil, err
 	}
@@ -200,6 +208,8 @@ func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollReq
 		DefaultApiKey:   defaultOutputApiKey.Token(),
 	}
 
+	// TODO: remove once kibana switched completely to the .fleet-agents
+	// Leaving it here still, so it is a double save to both .kibana saved objects and .fleet-agents
 	id, err := sv.Create(
 		ctx,
 		AGENT_SAVED_OBJECT_TYPE,
@@ -208,7 +218,6 @@ func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollReq
 		saved.WithRefresh(),
 	)
 	if err != nil {
-		fmt.Println("ERR:", err)
 		return nil, err
 	}
 	if id != fmt.Sprintf("%s:%s", AGENT_SAVED_OBJECT_TYPE, agentId) {
@@ -266,40 +275,24 @@ func generateOutputApiKey(ctx context.Context, client *elasticsearch.Client, age
 	return apikey.Create(ctx, client, name, "", []byte(kFleetOutputRolesJSON))
 }
 
-func fetchEnrollmentKeyRecord(ctx context.Context, id string, sv saved.CRUD) (*EnrollmentApiKey, error) {
+func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentApiKey, error) {
 
 	if key, ok := gCache.GetEnrollmentApiKey(id); ok {
 		return &key, nil
 	}
 
-	fields := map[string]interface{}{
-		"api_key_id": id,
-	}
-
-	// Pull API key record from saved objects
-	hits, err := sv.FindByField(ctx, ENROLLMENT_API_KEYS_SAVED_OBJECT_TYPE, fields)
+	// Pull API key record from .fleet-enrollment-api-keys
+	rec, err := dl.SearchEnrollmentAPIKey(ctx, et.bulker, et.queryTmplEnrollmentKey, id)
 	if err != nil {
 		return nil, err
 	}
 
-	// Expect only one hit
-	if len(hits) != 1 {
-		return nil, fmt.Errorf("hit count mismatch %v", len(hits))
-	}
-
-	hit := hits[0]
-
-	var rec EnrollmentApiKey
-	if err := sv.Decode(hit, &rec); err != nil {
-		return nil, err
-	}
-
 	if !rec.Active {
-		return nil, fmt.Errorf("Record is inactive")
-	} else {
-		cost := int64(len(hit.Data))
-		gCache.SetEnrollmentApiKey(id, rec, cost, kCacheEnrollmentTTL)
+		return nil, fmt.Errorf("record is inactive")
 	}
+
+	cost := int64(len(rec.ApiKey))
+	gCache.SetEnrollmentApiKey(id, rec, cost, kCacheEnrollmentTTL)
 
 	return &rec, nil
 }

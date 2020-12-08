@@ -4,7 +4,18 @@
 
 package dl
 
-import "fleet/internal/pkg/dsl"
+import (
+	"context"
+	"encoding/json"
+	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/dsl"
+	"fleet/internal/pkg/model"
+	"fmt"
+)
+
+const (
+	FieldApiKeyID = "api_key_id"
+)
 
 // PrepareQueryAllAPIKeys prepares a query. For migration only.
 func PrepareQueryAllAPIKeys(size uint64) ([]byte, error) {
@@ -18,4 +29,35 @@ func PrepareQueryAllAPIKeys(size uint64) ([]byte, error) {
 		return nil, err
 	}
 	return tmpl.Render(nil)
+}
+
+func PrepareQueryAPIKeyByID() (*dsl.Tmpl, error) {
+	tmpl := dsl.NewTmpl()
+
+	root := dsl.NewRoot()
+	root.Query().Bool().Filter().Term(FieldApiKeyID, tmpl.Bind(FieldApiKeyID), nil)
+
+	err := tmpl.Resolve(root)
+	if err != nil {
+		return nil, err
+	}
+	return tmpl, err
+}
+
+func SearchEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, id string) (rec model.EnrollmentApiKey, err error) {
+	res, err := SearchWithOneParam(ctx, bulker, tmpl, FleetEnrollmentAPIKeys, FieldApiKeyID, id)
+	if err != nil {
+		return
+	}
+
+	sz := len(res.Hits)
+	if sz != 1 {
+		return rec, fmt.Errorf("hit count mismatch %v", sz)
+	}
+
+	err = json.Unmarshal(res.Hits[0].Source, &rec)
+	if err != nil {
+		return
+	}
+	return
 }

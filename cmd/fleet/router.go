@@ -5,6 +5,7 @@
 package fleet
 
 import (
+	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"
@@ -17,17 +18,19 @@ const (
 )
 
 type Router struct {
-	sv saved.CRUD
-	ct *CheckinT
-	et *EnrollerT
+	sv     saved.CRUD
+	bulker bulk.Bulk
+	ct     *CheckinT
+	et     *EnrollerT
 }
 
-func NewRouter(sv saved.CRUD, ct *CheckinT, et *EnrollerT) *httprouter.Router {
+func NewRouter(sv saved.CRUD, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT) *httprouter.Router {
 
 	r := Router{
-		sv: sv,
-		ct: ct,
-		et: et,
+		sv:     sv,
+		bulker: bulker,
+		ct:     ct,
+		et:     et,
 	}
 
 	router := httprouter.New()
