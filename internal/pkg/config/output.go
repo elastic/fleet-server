@@ -48,12 +48,6 @@ func (c *Elasticsearch) InitDefaults() {
 	c.MaxRetries = 3
 	c.MaxConnPerHost = 128
 	c.BulkFlushInterval = 250 * time.Millisecond
-
-	// Set special header "X-elastic-product-origin" for .fleet-* indices based on the latest conversation with ES team
-	// This eliminates the warning while accessing the system index
-	c.Headers = map[string]string{
-		"X-elastic-product-origin": "fleet",
-	}
 }
 
 // Validate ensures that the configuration is valid.
@@ -124,6 +118,12 @@ func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
 	h := http.Header{}
 	for key, val := range c.Headers {
 		h.Set(key, val)
+	}
+
+	// Set special header "X-elastic-product-origin" for .fleet-* indices based on the latest conversation with ES team
+	// This eliminates the warning while accessing the system index
+	c.Headers = map[string]string{
+		"X-elastic-product-origin": "fleet",
 	}
 
 	return elasticsearch.Config{
