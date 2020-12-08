@@ -6,8 +6,9 @@ package dl
 
 // Indices names
 const (
-	FleetActions = ".fleet-actions"
-	FleetAgents  = ".fleet-agents"
+	FleetActions           = ".fleet-actions"
+	FleetAgents            = ".fleet-agents"
+	FleetEnrollmentAPIKeys = ".fleet-enrollment-api-keys"
 )
 
 // Query fields

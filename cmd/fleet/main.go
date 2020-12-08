@@ -170,6 +170,10 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
+	err = esboot.Migrate(ctx, sv, es.Bulk())
+	if err != nil {
+		return err
+	}
 
 	var funcs []runner.RunFunc
 	var wg sync.WaitGroup

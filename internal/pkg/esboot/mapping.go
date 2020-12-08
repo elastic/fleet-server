@@ -133,6 +133,36 @@ const (
 	}
 }`
 
+	// EnrollmentApiKey An Elastic Agent enrollment API key
+	MappingEnrollmentApiKey = `{
+	"properties": {
+		"active": {
+			"type": "boolean"
+		},
+		"api_key": {
+			"type": "keyword"
+		},
+		"api_key_id": {
+			"type": "keyword"
+		},
+		"created_at": {
+			"type": "date"
+		},
+		"expire_at": {
+			"type": "date"
+		},
+		"name": {
+			"type": "keyword"
+		},
+		"policy_id": {
+			"type": "keyword"
+		},
+		"updated_at": {
+			"type": "date"
+		}		
+	}
+}`
+
 	// HostMetadata The host metadata for the Elastic Agent
 	MappingHostMetadata = `{
 	"properties": {

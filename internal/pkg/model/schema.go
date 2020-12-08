@@ -121,6 +121,26 @@ type AgentMetadata struct {
 type Data struct {
 }
 
+// EnrollmentApiKey An Elastic Agent enrollment API key
+type EnrollmentApiKey struct {
+
+	// True when the key is active
+	Active bool `json:"active,omitempty"`
+
+	// Api key
+	ApiKey string `json:"api_key"`
+
+	// The unique identifier for the enrollment key, currently xid
+	ApiKeyId  string `json:"api_key_id"`
+	CreatedAt string `json:"created_at,omitempty"`
+	ExpireAt  string `json:"expire_at,omitempty"`
+
+	// Enrollment key name
+	Name      string `json:"name,omitempty"`
+	PolicyId  string `json:"policy_id,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+}
+
 // HostMetadata The host metadata for the Elastic Agent
 type HostMetadata struct {
 

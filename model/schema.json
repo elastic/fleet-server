@@ -337,6 +337,48 @@
         "enrolled_at",
         "updated_at"
       ]
+    },
+    "enrollment_api_key": {
+      "title": "Enrollment API key",
+      "description": "An Elastic Agent enrollment API key",
+      "type": "object",
+      "properties": {
+        "active": {
+          "description": "True when the key is active",
+          "type": "boolean"
+        },
+        "api_key_id": {
+          "description": "The unique identifier for the enrollment key, currently xid",
+          "type": "string"
+        },
+        "api_key": {
+          "description": "Api key",
+          "type": "string"
+        },
+        "name": {
+          "description": "Enrollment key name",
+          "type": "string"
+        },
+        "policy_id": {
+          "type": "string"
+        },
+        "expire_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "api_key_id",
+        "api_key"
+      ]
     }
   },
   "checkin": {
