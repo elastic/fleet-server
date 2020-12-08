@@ -122,9 +122,7 @@ func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
 
 	// Set special header "X-elastic-product-origin" for .fleet-* indices based on the latest conversation with ES team
 	// This eliminates the warning while accessing the system index
-	c.Headers = map[string]string{
-		"X-elastic-product-origin": "fleet",
-	}
+	c.Headers["X-elastic-product-origin"] = "fleet"
 
 	return elasticsearch.Config{
 		Addresses:  addrs,
