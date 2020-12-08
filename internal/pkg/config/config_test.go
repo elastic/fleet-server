@@ -216,6 +216,11 @@ func TestConfig(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
+				if test.cfg.Output.Elasticsearch.Headers == nil {
+					test.cfg.Output.Elasticsearch.Headers = map[string]string{
+						"X-elastic-product-origin": "fleet",
+					}
+				}
 				if !assert.True(t, cmp.Equal(test.cfg, cfg)) {
 					diff := cmp.Diff(test.cfg, cfg)
 					if diff != "" {
