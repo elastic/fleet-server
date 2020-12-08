@@ -45,7 +45,7 @@ func TestRunServer(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		err = runServer(ctx, router, cfg, errCh)
+		err = runServer(ctx, router, cfg)
 		wg.Done()
 	}()
 	var errFromChan error

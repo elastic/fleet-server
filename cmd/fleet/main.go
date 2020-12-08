@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"fleet/internal/pkg/action"
-	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/logger"
 	"fleet/internal/pkg/profile"
+	"fleet/internal/pkg/runner"
 	"fleet/internal/pkg/saved"
 	"fleet/internal/pkg/signal"
 
@@ -32,85 +32,6 @@ func checkErr(err error) {
 	if err != nil && err != context.Canceled {
 		panic(err)
 	}
-}
-
-func runBulkCheckin(ctx context.Context, bulker bulk.Bulk, sv saved.CRUD) *BulkCheckin {
-
-	bc := NewBulkCheckin(bulker)
-	go func() {
-		for {
-			err := bc.Run(ctx, sv)
-			if err == context.Canceled {
-				break
-			}
-			log.Error().Err(err).Msg("Restart bulk checkin on error")
-		}
-	}()
-	return bc
-}
-
-func runBulkActions(ctx context.Context, sv saved.CRUD) *BulkActions {
-
-	ba := NewBulkActions()
-	go func() {
-		for {
-			err := ba.Run(ctx, sv)
-			if err == context.Canceled {
-				break
-			}
-			log.Error().Err(err).Msg("Restart bulk actions on error")
-		}
-	}()
-
-	return ba
-}
-
-func runPolicyMon(ctx context.Context, sv saved.CRUD) (*PolicyMon, error) {
-	pm, err := NewPolicyMon(kPolicyThrottle)
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		for {
-			err := pm.Monitor(ctx, sv)
-			if err == context.Canceled {
-				break
-			}
-			log.Error().Err(err).Msg("Restart policy monitor on error")
-		}
-	}()
-	return pm, err
-}
-
-func runActionMon(ctx context.Context, bulker bulk.Bulk) (*action.Monitor, error) {
-	am, err := action.NewMonitor(bulker)
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		for {
-			err := am.Run(ctx)
-			if err == context.Canceled {
-				break
-			}
-			log.Error().Err(err).Msg("Restart action monitor on error")
-		}
-	}()
-	return am, nil
-}
-
-func runActionDispatcher(ctx context.Context, am *action.Monitor) *action.Dispatcher {
-	ad := action.NewDispatcher(am)
-	go func() {
-		for {
-			err := ad.Run(ctx)
-			if err == context.Canceled {
-				break
-			}
-			log.Error().Err(err).Msg("Restart action dispatcher on error")
-		}
-	}()
-	return ad
 }
 
 func savedObjectKey() string {
@@ -129,6 +50,7 @@ func installSignalHandler() context.Context {
 
 func getRunCommand(version string) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+
 		cfgPath, err := cmd.Flags().GetString("config")
 		if err != nil {
 			return err
@@ -144,7 +66,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		err = initGlobalCache()
 		checkErr(err)
 
-		srv, err := NewFleetServer(ctx, cfg)
+		srv, err := NewFleetServer(cfg)
 		checkErr(err)
 
 		return srv.Run(ctx)
@@ -161,141 +83,160 @@ func NewCommand(version string) *cobra.Command {
 	return cmd
 }
 
-type fleetServer struct {
-	cfg *config.Config
-
-	es *es.Client
-	sv saved.CRUD
-
-	lock           sync.Mutex
-	profilerCancel context.CancelFunc
-	serverCancel   context.CancelFunc
-	errCh          chan error
+type FleetServer struct {
+	cfg   *config.Config
+	cfgCh chan *config.Config
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(ctx context.Context, cfg *config.Config) (*fleetServer, error) {
-	es, err := es.New(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	sv := saved.NewMgr(es.Bulk(), savedObjectKey())
-	return &fleetServer{
-		cfg: cfg,
-		es:  es,
-		sv:  sv,
+func NewFleetServer(cfg *config.Config) (*FleetServer, error) {
+	return &FleetServer{
+		cfg:   cfg,
+		cfgCh: make(chan *config.Config, 1),
 	}, nil
 }
 
 // Run runs the fleet server.
-func (f *fleetServer) Run(ctx context.Context) error {
-	// Initial indices bootstrapping, needed for agents actions development
-	// TODO: remove this after the indices bootstrapping logic implemented in ES plugin
-	err := esboot.EnsureESIndices(ctx, f.es)
-	if err != nil {
-		return err
+func (f *FleetServer) Run(ctx context.Context) error {
+	var curCfg *config.Config
+	newCfg := f.cfg
+
+	// To avoid repeating the same code for policy server and http server
+	// The original code required them to be restarted independently,
+	// to avoid restarting HTTP server when the profiler is enabled/disabled
+	start := func(cn context.CancelFunc,
+		wg *sync.WaitGroup,
+		runfn runner.RunFunc,
+		errCh chan<- error,
+	) context.CancelFunc {
+		if cn != nil {
+			cn()
+		}
+		wg.Wait()
+		cx, cn := context.WithCancel(ctx)
+		runner.Start(cx, wg, runfn, func(er error) {
+			if er != nil {
+				errCh <- er
+			}
+		})
+		return cn
 	}
 
-	// profiler restarts on reload
-	profilerCtx, profilerCancel := context.WithCancel(ctx)
-	err = profile.RunProfiler(profilerCtx, f.cfg.Inputs[0].Server.Profile.Bind)
-	if err != nil {
-		profilerCancel()
-		return err
-	}
+	var (
+		proCancel, srvCancel context.CancelFunc
+		proWg, srvWg         sync.WaitGroup
+	)
 
-	// server restarts on reload
-	errCh := make(chan error)
-	serverCancel, err := f.runServer(ctx, errCh)
-	if err != nil {
-		profilerCancel()
-		serverCancel()
-		return err
-	}
-	f.lock.Lock()
-	f.profilerCancel = profilerCancel
-	f.serverCancel = serverCancel
-	f.errCh = errCh
-	f.lock.Unlock()
+	for {
+		ech := make(chan error, 2)
 
-	// block until error or main context is closed
-	select {
-	case err := <-errCh:
-		log.Error().Err(err).Str("bind", f.cfg.Inputs[0].Server.BindAddress()).Msg("Fleet Server failed")
-		return err
-	case <-ctx.Done():
-		log.Info().Err(err).Msg("Fleet Server exited")
-		return nil
+		if curCfg == nil || curCfg.Inputs[0].Server.Profile.Bind != newCfg.Inputs[0].Server.Profile.Bind {
+			proCancel = start(proCancel, &proWg, func(ctx context.Context) error {
+				return profile.RunProfiler(ctx, newCfg.Inputs[0].Server.Profile.Bind)
+			}, ech)
+		}
+
+		if curCfg == nil || curCfg.Inputs[0].Server != newCfg.Inputs[0].Server {
+			srvCancel = start(srvCancel, &srvWg, func(ctx context.Context) error {
+				return f.runServer(ctx, newCfg)
+			}, ech)
+		}
+
+		curCfg = newCfg
+
+		// Listen for errors or context cancel
+		select {
+		case newCfg = <-f.cfgCh:
+			log.Debug().Msg("Server configuration update")
+		case err := <-ech:
+			log.Error().Err(err).Msg("Fleet Server failed")
+		case <-ctx.Done():
+			log.Info().Msg("Fleet Server exited")
+			return nil
+		}
 	}
 }
 
-func (f *fleetServer) runServer(ctx context.Context, errCh chan<- error) (context.CancelFunc, error) {
-	serverCtx, serverCancel := context.WithCancel(ctx)
-	pm, err := runPolicyMon(serverCtx, f.sv)
+func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
+	es, err := es.New(ctx, cfg)
 	if err != nil {
-		serverCancel()
-		return nil, err
+		return err
+	}
+	sv := saved.NewMgr(es.Bulk(), savedObjectKey())
+
+	// Initial indices bootstrapping, needed for agents actions development
+	// TODO: remove this after the indices bootstrapping logic implemented in ES plugin
+	err = esboot.EnsureESIndices(ctx, es)
+	if err != nil {
+		return err
 	}
 
-	// Start new actions monitoring
+	var funcs []runner.RunFunc
+	var wg sync.WaitGroup
+
+	// Policy monitor
+	pm, err := NewPolicyMon(kPolicyThrottle)
+	funcs = append(funcs, runner.LoggedRunFunc("Policy monitor", func(ctx context.Context) error {
+		return pm.Monitor(ctx, sv)
+	}))
+
+	// Actions monitoring
 	var am *action.Monitor
 	var ad *action.Dispatcher
 	var tr *action.TokenResolver
 
 	// Behind the feature flag
 	if f.cfg.Features.Enabled(config.FeatureActions) {
-		am, err = runActionMon(ctx, f.es.Bulk())
+		am, err = action.NewMonitor(es.Bulk())
 		if err != nil {
-			serverCancel()
-			return nil, err
+			return err
 		}
-		ad = runActionDispatcher(ctx, am)
-		tr, err = action.NewTokenResolver(f.es.Bulk())
+		funcs = append(funcs, runner.LoggedRunFunc("Action monitor", am.Run))
+
+		ad = action.NewDispatcher(am)
+		funcs = append(funcs, runner.LoggedRunFunc("Action dispatcher", ad.Run))
+		tr, err = action.NewTokenResolver(es.Bulk())
 		if err != nil {
-			serverCancel()
-			return nil, err
+			return err
 		}
 	}
 
-	ba := runBulkActions(serverCtx, f.sv)
-	bc := runBulkCheckin(serverCtx, f.es.Bulk(), f.sv)
-	ct := NewCheckinT(f.cfg, bc, ba, pm, am, ad, tr, f.es.Bulk())
-	et := NewEnrollerT(&f.cfg.Inputs[0].Server, f.es.Bulk())
-	router := NewRouter(f.sv, ct, et)
+	ba := NewBulkActions()
+	funcs = append(funcs, runner.LoggedRunFunc("Bulk action", func(ctx context.Context) error {
+		return ba.Run(ctx, sv)
+	}))
 
-	err = runServer(serverCtx, router, &f.cfg.Inputs[0].Server, errCh)
-	if err != nil {
-		serverCancel()
-		return nil, err
-	}
-	return serverCancel, nil
+	bc := NewBulkCheckin(es.Bulk())
+	funcs = append(funcs, runner.LoggedRunFunc("Bulk checkin", func(ctx context.Context) error {
+		return bc.Run(ctx, sv)
+	}))
+
+	ct := NewCheckinT(f.cfg, bc, ba, pm, am, ad, tr, es.Bulk())
+	et := NewEnrollerT(&f.cfg.Inputs[0].Server, es.Bulk())
+	router := NewRouter(sv, ct, et)
+
+	funcs = append(funcs, runner.LoggedRunFunc("Http server", func(ctx context.Context) error {
+		return runServer(ctx, router, &f.cfg.Inputs[0].Server)
+	}))
+
+	runner.StartGroup(ctx, &wg, funcs,
+		func(er error) {
+			if err == nil {
+				err = er
+			}
+		},
+	)
+
+	wg.Wait()
+
+	return nil
 }
 
 // Reload reloads the fleet server with the latest configuration.
-func (f *fleetServer) Reload(ctx context.Context, cfg *config.Config) error {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	if err := f.es.Reload(ctx, cfg); err != nil {
-		return err
+func (f *FleetServer) Reload(ctx context.Context, cfg *config.Config) error {
+	select {
+	case f.cfgCh <- cfg:
+	case <-ctx.Done():
 	}
-	if f.cfg.Inputs[0].Server.Profile.Bind != cfg.Inputs[0].Server.Profile.Bind {
-		f.profilerCancel()
-		profilerCtx, profilerCancel := context.WithCancel(ctx)
-		err := profile.RunProfiler(profilerCtx, cfg.Inputs[0].Server.Profile.Bind)
-		if err != nil {
-			profilerCancel()
-			return err
-		}
-		f.profilerCancel = profilerCancel
-	}
-	if f.cfg.Inputs[0].Server != cfg.Inputs[0].Server {
-		f.serverCancel()
-		serverCancel, err := f.runServer(ctx, f.errCh)
-		if err != nil {
-			return err
-		}
-		f.serverCancel = serverCancel
-	}
-	f.cfg = cfg
 	return nil
 }

@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
@@ -74,36 +73,6 @@ func (c *Client) Info(ctx context.Context) (*InfoResponse, error) {
 // Bulk returns the hulk interface to perform bulk operations.
 func (c *Client) Bulk() bulk.Bulk {
 	return c.blk
-}
-
-// Reload reloads the client with the updated configuration.
-func (c *Client) Reload(ctx context.Context, cfg *config.Config) error {
-	if !reflect.DeepEqual(c.cfg.Output.Elasticsearch, cfg.Output.Elasticsearch) {
-		// reload the ES client
-		escfg, err := cfg.Output.Elasticsearch.ToESConfig()
-		if err != nil {
-			return err
-		}
-		es, err := elasticsearch.NewClient(escfg)
-		if err != nil {
-			return err
-		}
-		resp, err := info(ctx, es)
-		if err != nil {
-			return err
-		}
-
-		// replace the transport
-		// as that is only thing that was changed
-		c.Client.Transport = es.Transport
-		log.Info().
-			Str("name", resp.ClusterName).
-			Str("uuid", resp.ClusterUUID).
-			Str("vers", resp.Version.Number).
-			Msg("Cluster Info")
-	}
-	c.cfg = cfg
-	return nil
 }
 
 type InfoResponse struct {
