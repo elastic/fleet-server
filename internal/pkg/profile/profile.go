@@ -36,12 +36,11 @@ func RunProfiler(ctx context.Context, addr string) error {
 		BaseContext: bctx,
 	}
 
-	go func() {
-		log.Info().Str("bind", addr).Msg("Installing profiler")
-		if err := server.ListenAndServe(); err != nil {
-			log.Error().Err(err).Str("bind", addr).Msg("Fail install profiler")
-		}
-	}()
+	log.Info().Str("bind", addr).Msg("Installing profiler")
+	if err := server.ListenAndServe(); err != nil {
+		log.Error().Err(err).Str("bind", addr).Msg("Fail install profiler")
+		return err
+	}
 
 	return nil
 }

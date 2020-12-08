@@ -122,16 +122,20 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	defer ct.ba.Unsubscribe(actionSub)
 	actionCh := actionSub.Ch()
 
-	// Resolve AckToken from request, fallback on the agent record
-	seqno, err := ct.resolveSeqNo(ctx, req, agent)
-	if err != nil {
-		return err
-	}
+	var actCh chan []dl.ActionDoc
+	var seqno int64
+	if ct.cfg.Features.Enabled(config.FeatureActions) {
+		// Resolve AckToken from request, fallback on the agent record
+		seqno, err := ct.resolveSeqNo(ctx, req, agent)
+		if err != nil {
+			return err
+		}
 
-	// Subsribe to actions dispatcher
-	aSub := ct.ad.Subscribe(agent.Id, seqno)
-	defer ct.ad.Unsubscribe(aSub)
-	actCh := aSub.Ch()
+		// Subsribe to actions dispatcher
+		aSub := ct.ad.Subscribe(agent.Id, seqno)
+		defer ct.ad.Unsubscribe(aSub)
+		actCh = aSub.Ch()
+	}
 
 	// Subscribe to policy manager for changes on PolicyId > policyRev
 	sub, err := ct.pm.Subscribe(agent.PolicyId, agent.PolicyRev)
@@ -222,7 +226,7 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 	ackToken := req.AckToken
 	seqno = agent.ActionSeqNo
 
-	if ackToken != "" {
+	if ct.tr != nil && ackToken != "" {
 		var sn int64
 		sn, err = ct.tr.Resolve(ctx, ackToken)
 		if err != nil {

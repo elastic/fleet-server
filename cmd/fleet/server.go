@@ -25,7 +25,7 @@ func diagConn(c net.Conn, s http.ConnState) {
 		Msg("connection state change")
 }
 
-func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Server, errCh chan<- error) error {
+func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Server) error {
 
 	addr := cfg.BindAddress()
 	rdto := cfg.Timeouts.Read
@@ -79,11 +79,9 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 		return server.ServeTLS(ln, certFile, keyFile)
 	}
 
-	go func(ln net.Listener) {
-		if err := server.Serve(ln); err != nil && err != context.Canceled {
-			errCh <- err
-		}
-	}(ln)
+	if err := server.Serve(ln); err != nil && err != context.Canceled {
+		return err
+	}
 
 	return nil
 }
