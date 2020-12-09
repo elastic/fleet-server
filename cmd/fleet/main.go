@@ -15,6 +15,7 @@ import (
 	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/logger"
+	"fleet/internal/pkg/migrate"
 	"fleet/internal/pkg/profile"
 	"fleet/internal/pkg/runner"
 	"fleet/internal/pkg/saved"
@@ -170,7 +171,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-	err = esboot.Migrate(ctx, sv, es.Bulk())
+	err = migrate.Migrate(ctx, sv, es.Bulk())
 	if err != nil {
 		return err
 	}
@@ -216,8 +217,11 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	}))
 
 	ct := NewCheckinT(f.cfg, bc, ba, pm, am, ad, tr, es.Bulk())
-	et := NewEnrollerT(&f.cfg.Inputs[0].Server, es.Bulk())
-	router := NewRouter(sv, ct, et)
+	et, err := NewEnrollerT(&f.cfg.Inputs[0].Server, es.Bulk())
+	if err != nil {
+		return err
+	}
+	router := NewRouter(sv, es.Bulk(), ct, et)
 
 	funcs = append(funcs, runner.LoggedRunFunc("Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &f.cfg.Inputs[0].Server)

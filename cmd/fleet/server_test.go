@@ -31,15 +31,17 @@ func TestRunServer(t *testing.T) {
 	cfg.Host = "localhost"
 	cfg.Port = port
 
-	sv := saved.NewMgr(ftesting.MockBulk{}, savedObjectKey())
+	bulker := ftesting.MockBulk{}
+	sv := saved.NewMgr(bulker, savedObjectKey())
 	pm, err := NewPolicyMon(kPolicyThrottle)
 	require.NoError(t, err)
 	ba := NewBulkActions()
 	bc := NewBulkCheckin(nil)
 	ct := NewCheckinT(nil, bc, ba, pm, nil, nil, nil, nil)
-	et := NewEnrollerT(cfg, nil)
+	et, err := NewEnrollerT(cfg, nil)
+	require.NoError(t, err)
 
-	router := NewRouter(sv, ct, et)
+	router := NewRouter(sv, bulker, ct, et)
 	errCh := make(chan error)
 
 	var wg sync.WaitGroup

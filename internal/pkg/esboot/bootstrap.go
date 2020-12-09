@@ -18,13 +18,13 @@ type indexConfig struct {
 }
 
 var indexConfigs = map[string]indexConfig{
-	".fleet-actions":             {mapping: MappingAction},
-	".fleet-actions-results":     {mapping: MappingActionResult, datastream: true},
-	".fleet-agents":              {mapping: MappingAgent},
-	".fleet-enrollment-api-keys": {mapping: MappingEnrollmentApiKey},
-	".fleet-policies":            {mapping: MappingPolicy},
-	".fleet-policies-leader":     {mapping: MappingPolicyLeader},
-	".fleet-servers":             {mapping: MappingServer},
+	".fleet-actions":             {mapping: es.MappingAction},
+	".fleet-actions-results":     {mapping: es.MappingActionResult, datastream: true},
+	".fleet-agents":              {mapping: es.MappingAgent},
+	".fleet-enrollment-api-keys": {mapping: es.MappingEnrollmentApiKey},
+	".fleet-policies":            {mapping: es.MappingPolicy},
+	".fleet-policies-leader":     {mapping: es.MappingPolicyLeader},
+	".fleet-servers":             {mapping: es.MappingServer},
 }
 
 // Bootstrap creates .fleet-actions data stream
