@@ -9,20 +9,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
 )
 
-type Client struct {
-	*elasticsearch.Client
-	cfg *config.Config
-	blk bulk.Bulk
-}
-
-func New(ctx context.Context, cfg *config.Config) (*Client, error) {
+func NewClient(ctx context.Context, cfg *config.Config) (*elasticsearch.Client, error) {
 	escfg, err := cfg.Output.Elasticsearch.ToESConfig()
 	if err != nil {
 		return nil, err
@@ -54,25 +47,7 @@ func New(ctx context.Context, cfg *config.Config) (*Client, error) {
 		Str("vers", resp.Version.Number).
 		Msg("Cluster Info")
 
-	flushInterval := cfg.Output.Elasticsearch.BulkFlushInterval
-
-	blk := bulk.NewBulker(es)
-	go func() {
-		err := blk.Run(ctx, bulk.WithFlushInterval(flushInterval))
-		log.Info().Err(err).Msg("Bulker exit")
-	}()
-
-	return &Client{es, cfg, blk}, nil
-}
-
-// Info returns the information for the connected cluster.
-func (c *Client) Info(ctx context.Context) (*InfoResponse, error) {
-	return info(ctx, c.Client)
-}
-
-// Bulk returns the hulk interface to perform bulk operations.
-func (c *Client) Bulk() bulk.Bulk {
-	return c.blk
+	return es, nil
 }
 
 type InfoResponse struct {

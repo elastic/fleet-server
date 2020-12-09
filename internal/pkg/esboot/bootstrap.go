@@ -7,6 +7,8 @@ package esboot
 import (
 	"context"
 	"fleet/internal/pkg/es"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // Temporary ES indices bootstrapping until we move this logic to a proper place
@@ -28,9 +30,9 @@ var indexConfigs = map[string]indexConfig{
 }
 
 // Bootstrap creates .fleet-actions data stream
-func EnsureESIndices(ctx context.Context, client *es.Client) error {
+func EnsureESIndices(ctx context.Context, cli *elasticsearch.Client) error {
 	for name, idxcfg := range indexConfigs {
-		err := EnsureDatastream(ctx, client, name, idxcfg)
+		err := EnsureDatastream(ctx, cli, name, idxcfg)
 		if err != nil {
 			return err
 		}
@@ -38,23 +40,23 @@ func EnsureESIndices(ctx context.Context, client *es.Client) error {
 	return nil
 }
 
-func EnsureDatastream(ctx context.Context, client *es.Client, name string, idxcfg indexConfig) error {
+func EnsureDatastream(ctx context.Context, cli *elasticsearch.Client, name string, idxcfg indexConfig) error {
 	if idxcfg.datastream {
-		err := EnsureILMPolicy(ctx, client, name)
+		err := EnsureILMPolicy(ctx, cli, name)
 		if err != nil {
 			return err
 		}
 	}
 
-	err := EnsureTemplate(ctx, client, name, idxcfg.mapping, idxcfg.datastream)
+	err := EnsureTemplate(ctx, cli, name, idxcfg.mapping, idxcfg.datastream)
 	if err != nil {
 		return err
 	}
 
 	if idxcfg.datastream {
-		err = CreateDatastream(ctx, client, name)
+		err = CreateDatastream(ctx, cli, name)
 	} else {
-		err = CreateIndex(ctx, client, name)
+		err = CreateIndex(ctx, cli, name)
 	}
 	if err != nil {
 		return err
@@ -63,10 +65,10 @@ func EnsureDatastream(ctx context.Context, client *es.Client, name string, idxcf
 	return nil
 }
 
-func EnsureIndex(ctx context.Context, client *es.Client, name, mapping string) error {
-	err := EnsureTemplate(ctx, client, name, mapping, false)
+func EnsureIndex(ctx context.Context, cli *elasticsearch.Client, name, mapping string) error {
+	err := EnsureTemplate(ctx, cli, name, mapping, false)
 	if err != nil {
 		return err
 	}
-	return CreateIndex(ctx, client, name)
+	return CreateIndex(ctx, cli, name)
 }

@@ -2,13 +2,14 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package dl
+package monitor
 
 import (
 	"context"
 	"encoding/json"
+	"fleet/internal/pkg/es"
 
-	"fleet/internal/pkg/bulk"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 type shard struct {
@@ -24,20 +25,16 @@ type indexStats struct {
 type statsResponse struct {
 	IndexStats map[string]indexStats `json:"indices"`
 
-	Error bulk.ErrorT `json:"error,omitempty"`
+	Error es.ErrorT `json:"error,omitempty"`
 }
 
-// QueryGlobalCheckpoint returns index global checkpoint
-func QueryGlobalCheckpoint(ctx context.Context, bulker bulk.Bulk, index string) (seqno int64, err error) {
+func queryGlobalCheckpoint(ctx context.Context, es *elasticsearch.Client, index string) (seqno int64, err error) {
 	seqno = defaultSeqNo
 
-	// Can't use the regular bulk search for _stats
-	cli := bulker.Client()
-
-	res, err := cli.Indices.Stats(
-		cli.Indices.Stats.WithContext(ctx),
-		cli.Indices.Stats.WithIndex(index),
-		cli.Indices.Stats.WithLevel("shards"),
+	res, err := es.Indices.Stats(
+		es.Indices.Stats.WithContext(ctx),
+		es.Indices.Stats.WithIndex(index),
+		es.Indices.Stats.WithLevel("shards"),
 	)
 
 	if err != nil {

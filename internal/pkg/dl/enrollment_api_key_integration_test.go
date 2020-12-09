@@ -56,7 +56,7 @@ func setupEnrollmentAPIKeys(ctx context.Context, t *testing.T, index string) (bu
 		t.Fatal(err)
 	}
 
-	cli, err := es.New(ctx, cfg)
+	cli, bulker, err := bulk.InitES(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,12 +65,12 @@ func setupEnrollmentAPIKeys(ctx context.Context, t *testing.T, index string) (bu
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec, err := storeRandomEnrollmentAPIKey(ctx, cli.Bulk(), index)
+	rec, err := storeRandomEnrollmentAPIKey(ctx, bulker, index)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return cli.Bulk(), rec
+	return bulker, rec
 }
 
 func TestSearchEnrollmentAPIKey(t *testing.T) {
