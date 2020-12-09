@@ -38,7 +38,8 @@ func TestRunServer(t *testing.T) {
 	ba := NewBulkActions()
 	bc := NewBulkCheckin(nil)
 	ct := NewCheckinT(nil, bc, ba, pm, nil, nil, nil, nil)
-	et := NewEnrollerT(cfg, nil)
+	et, err := NewEnrollerT(cfg, nil)
+	require.NoError(t, err)
 
 	router := NewRouter(sv, bulker, ct, et)
 	errCh := make(chan error)
