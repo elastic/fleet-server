@@ -11,6 +11,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/es"
 )
 
 // MockBulk is a mock bulk interface.
@@ -45,8 +46,8 @@ func (m MockBulk) MUpdate(ctx context.Context, ops []bulk.BulkOp, opts ...bulk.O
 	return nil
 }
 
-func (m MockBulk) Search(ctx context.Context, index []string, body []byte, opts ...bulk.Opt) (*bulk.ResultT, error) {
-	return &bulk.ResultT{}, nil
+func (m MockBulk) Search(ctx context.Context, index []string, body []byte, opts ...bulk.Opt) (*es.ResultT, error) {
+	return &es.ResultT{}, nil
 }
 
 func (m MockBulk) Client() *elasticsearch.Client {

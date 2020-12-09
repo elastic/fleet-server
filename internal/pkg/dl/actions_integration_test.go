@@ -92,7 +92,7 @@ func setupActions(ctx context.Context, t *testing.T, index string) (bulk.Bulk, [
 		t.Fatal(err)
 	}
 
-	cli, err := es.New(ctx, cfg)
+	cli, bulker, err := bulk.InitES(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,12 +101,12 @@ func setupActions(ctx context.Context, t *testing.T, index string) (bulk.Bulk, [
 	if err != nil {
 		t.Fatal(err)
 	}
-	actions, err := storeRandomActions(ctx, cli.Bulk(), index)
+	actions, err := storeRandomActions(ctx, bulker, index)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return cli.Bulk(), actions
+	return bulker, actions
 }
 
 func TestSearchActionsQuery(t *testing.T) {

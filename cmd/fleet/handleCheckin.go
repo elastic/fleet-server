@@ -19,6 +19,7 @@ import (
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/dsl"
+	"fleet/internal/pkg/monitor"
 	"fleet/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"
@@ -58,7 +59,7 @@ type CheckinT struct {
 	bc           *BulkCheckin
 	ba           *BulkActions
 	pm           *PolicyMon
-	gcp          action.GlobalCheckpointProvider
+	gcp          monitor.GlobalCheckpointProvider
 	ad           *action.Dispatcher
 	tr           *action.TokenResolver
 	bulker       bulk.Bulk
@@ -70,7 +71,7 @@ func NewCheckinT(
 	bc *BulkCheckin,
 	ba *BulkActions,
 	pm *PolicyMon,
-	gcp action.GlobalCheckpointProvider,
+	gcp monitor.GlobalCheckpointProvider,
 	ad *action.Dispatcher,
 	tr *action.TokenResolver,
 	bulker bulk.Bulk,

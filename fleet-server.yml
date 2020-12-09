@@ -11,4 +11,4 @@ fleet:
 
 features:
   actions:
-    enabled: false
+    enabled: true
