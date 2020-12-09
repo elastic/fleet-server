@@ -86,7 +86,7 @@ func storeRandomActions(ctx context.Context, bulker bulk.Bulk, index string) ([]
 	return actions, err
 }
 
-func setup(ctx context.Context, t *testing.T, index string) (bulk.Bulk, []model.Action) {
+func setupActions(ctx context.Context, t *testing.T, index string) (bulk.Bulk, []model.Action) {
 	cfg, err := config.LoadFile("../../../fleet-server.yml")
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func setup(ctx context.Context, t *testing.T, index string) (bulk.Bulk, []model.
 		t.Fatal(err)
 	}
 
-	err = esboot.EnsureIndex(ctx, cli, index, esboot.MappingAction)
+	err = esboot.EnsureIndex(ctx, cli, index, es.MappingAction)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestSearchActionsQuery(t *testing.T) {
 
 	// temp index name to avoid collisions with other parallel tests
 	index := xid.New().String()
-	bulker, actions := setup(ctx, t, index)
+	bulker, actions := setupActions(ctx, t, index)
 
 	t.Run("all agents actions", func(t *testing.T) {
 		tmpl, err := PrepareAllAgentActionsQuery()

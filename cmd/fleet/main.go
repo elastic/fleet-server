@@ -15,6 +15,7 @@ import (
 	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/logger"
+	"fleet/internal/pkg/migrate"
 	"fleet/internal/pkg/profile"
 	"fleet/internal/pkg/runner"
 	"fleet/internal/pkg/saved"
@@ -170,7 +171,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-	err = esboot.Migrate(ctx, sv, es.Bulk())
+	err = migrate.Migrate(ctx, sv, es.Bulk())
 	if err != nil {
 		return err
 	}

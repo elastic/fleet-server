@@ -52,7 +52,7 @@ func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk) (*EnrollerT, error) {
 	// if you have a large elastic search cluster, you can be more aggressive.
 	maxEnrollPending := cfg.MaxEnrollPending
 
-	tmpl, err := dl.PrepareQueryAPIKeyByID()
+	tmpl, err := dl.PrepareEnrollmentAPIKeyByIDQuery()
 	if err != nil {
 		return nil, err
 	}

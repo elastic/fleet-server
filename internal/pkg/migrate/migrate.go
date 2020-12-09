@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package esboot
+package migrate
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func Migrate(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk) error {
 func MigrateEnrollmentAPIKeys(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk) error {
 
 	// Query all enrollment keys from the new schema
-	raw, err := dl.PrepareQueryAllAPIKeys(1000)
+	raw, err := dl.RenderAllEnrollmentAPIKeysQuery(1000)
 	if err != nil {
 		return err
 	}

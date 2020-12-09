@@ -8,12 +8,10 @@ DOCKER_BUILD=@export DOCKER_CONTENT_TRUST=1 && export DOCKER_BUILDKIT=1 && docke
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
 CMD_COLOR_OFF=\033[0m
 
-
 .PHONY: help
 help: ## - Show help message
 	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
-
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | sed -e "s/^Makefile://" | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: rpm
 rpm: ## - Build x86_64 linux RPM
@@ -51,19 +49,19 @@ generate: ## - Generate schema models
 	go generate ./...
 
 .PHONY: check
-check:
+check: ## - Run all checks
 	@$(MAKE) generate
 	@$(MAKE) check-headers
 	@$(MAKE) check-go
 	@$(MAKE) check-no-changes
 
 .PHONY: check-headers
-check-headers:
+check-headers:  ## - Check copyright headers
 	@go install github.com/elastic/go-licenser
 	@go-licenser -license Elastic
 
 .PHONY: check-go
-check-go:
+check-go: ## - Run go fmt, go vet, go mod tidy
 	@go fmt ./...
 	@go vet ./...
 	@go mod tidy
@@ -75,10 +73,12 @@ check-no-changes:
 	@git diff-index --exit-code HEAD --
 
 .PHONY: test
-test: test-unit #test-int
+test:  ## - Run all tests
+	@$(MAKE) test-unit 
+	@$(MAKE) test-int
 
-.PHONY: test-unit
-test-unit: ## - Run some tests
+.PHONY: test-unit 
+test-unit: ## - Run unit tests only
 	@go test -v -race ./...
 
 ##################################################
@@ -101,16 +101,21 @@ int-docker-wait:
 
 # Start integration docker setup with wait for when the ES is ready
 .PHONY: int-docker-start
-int-docker-start: int-docker-start-async int-docker-wait
+int-docker-start: ## - Start docker envronment for integration tests and wait until it's ready
+	@$(MAKE) int-docker-start-async
+	@$(MAKE) int-docker-wait
 
 # Stop integration docker setup
 .PHONY: int-docker-stop
-int-docker-stop:
+int-docker-stop: ## - Stop docker environment for integration tests
 	@docker-compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env down
 
 # Run integration tests with starting/stopping docker
 .PHONY: test-int
-test-int: int-docker-start test-int-set int-docker-stop
+test-int: ## - Run integration tests with full setup (slow!)
+	@$(MAKE) int-docker-start
+	@$(MAKE) test-int-set
+	@$(MAKE) int-docker-stop
 
 # Run integration tests without starting/stopping docker
 # Useful for development where you:
@@ -118,7 +123,7 @@ test-int: int-docker-start test-int-set int-docker-stop
 # 2. Develop/test/repeat
 # 3  Stop integration environment when done
 .PHONY: test-int-set
-test-int-set:
+test-int-set: ## - Run integration tests without setup
 	# Initialize indices one before running all the tests
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go run ./dev-tools/integration/main.go
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go test -v -tags=integration -count=1 -race ./...
