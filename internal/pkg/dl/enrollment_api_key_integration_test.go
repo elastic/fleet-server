@@ -96,4 +96,13 @@ func TestSearchEnrollmentAPIKey(t *testing.T) {
 		t.Fatal(diff)
 	}
 
+	foundRec, err = searchEnrollmentAPIKey(ctx, bulker, index, tmpl, xid.New().String())
+	if err == nil {
+		t.Fatal("expected error")
+	} else {
+		diff := cmp.Diff(err.Error(), "hit count mismatch 0")
+		if diff != "" {
+			t.Fatal(diff)
+		}
+	}
 }
