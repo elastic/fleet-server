@@ -4,7 +4,11 @@
 
 package es
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"reflect"
+	"strings"
+)
 
 // Error
 type ErrorT struct {
@@ -39,8 +43,63 @@ type HitsT struct {
 	MaxScore *float64 `json:"max_score"`
 }
 
+type Bucket struct {
+	Key          string           `json:"key"`
+	DocCount     int64            `json:"doc_count"`
+	Aggregations map[string]HitsT `json:"-"`
+}
+
+type _bucket Bucket
+
+func (b *Bucket) UnmarshalJSON(data []byte) error {
+	b2 := _bucket{}
+	err := json.Unmarshal(data, &b2)
+	if err != nil {
+		return err
+	}
+	var aggs map[string]interface{}
+	err = json.Unmarshal(data, &aggs)
+	if err != nil {
+		return err
+	}
+	typ := reflect.TypeOf(b2)
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
+		if jsonTag != "" && jsonTag != "-" {
+			delete(aggs, jsonTag)
+		}
+	}
+	b2.Aggregations = make(map[string]HitsT)
+	for name, value := range aggs {
+		vMap, ok := value.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		hMap, ok := vMap["hits"]
+		if !ok {
+			continue
+		}
+		data, err := json.Marshal(hMap)
+		if err != nil {
+			return err
+		}
+		var hits HitsT
+		err = json.Unmarshal(data, &hits)
+		if err != nil {
+			return err
+		}
+		b2.Aggregations[name] = hits
+	}
+	*b = Bucket(b2)
+	return nil
+}
+
 type Aggregation struct {
-	Value float64 `json:"value"`
+	Value                   float64  `json:"value"`
+	DocCountErrorUpperBound int64    `json:"doc_count_error_upper_bound"`
+	SumOtherDocCount        int64    `json:"sum_other_doc_count"`
+	Buckets                 []Bucket `json:"buckets,omitempty"`
 }
 
 type Response struct {

@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package coordinator
 
 import (
@@ -14,38 +18,47 @@ type coordinatorZeroT struct {
 	log zerolog.Logger
 
 	policy model.Policy
-	in chan model.Policy
-	out chan model.Policy
+	in     chan model.Policy
+	out    chan model.Policy
 }
 
 // NewCoordinatorZero creates a V0 coordinator.
 func NewCoordinatorZero(policy model.Policy) (Coordinator, error) {
 	return &coordinatorZeroT{
-		log: log.With().Str("ctx", "coordinator v0").Str("policyId", policy.Id).Logger(),
+		log:    log.With().Str("ctx", "coordinator v0").Str("policyId", policy.PolicyId).Logger(),
 		policy: policy,
-		in: make(chan model.Policy, 1),
-		out: make(chan model.Policy),
+		in:     make(chan model.Policy, 1),
+		out:    make(chan model.Policy),
 	}, nil
 }
 
-// Run runs the coordinator for the policy.
-func (c *coordinatorZeroT) Run(ctx context.Context) (err error) {
-	c.log.Info().Msg("Start")
-	defer func() {
-		c.log.Info().Err(err).Msg("Exited")
-	}()
+// Name returns the "v0" name.
+func (c *coordinatorZeroT) Name() string {
+	return "v0"
+}
 
+// Run runs the coordinator for the policy.
+func (c *coordinatorZeroT) Run(ctx context.Context) error {
 	c.in <- c.policy
 	for {
 		select {
 		case p := <-c.in:
-			newPolicy, err := c.handlePolicy(p)
+			newData, err := c.handlePolicy(p.Data)
 			if err != nil {
 				c.log.Err(err).Msg("failed to handle policy")
 				continue
 			}
-			c.policy = newPolicy
-			c.out <- newPolicy
+			if p.CoordinatorIdx == 0 {
+				p.CoordinatorIdx = 1
+				p.Data = newData
+				c.policy = p
+				c.out <- p
+			} else if newData != p.Data {
+				p.CoordinatorIdx += 1
+				p.Data = newData
+				c.policy = p
+				c.out <- p
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -65,8 +78,7 @@ func (c *coordinatorZeroT) Output() <-chan model.Policy {
 
 // handlePolicy handles the new policy.
 //
-// Just increments the coordinator index, does nothing else.
-func (c *coordinatorZeroT) handlePolicy(p model.Policy) (model.Policy, error) {
-	p.CoordinatorIdx += 1
-	return p, nil
+// Does nothing at the moment.
+func (c *coordinatorZeroT) handlePolicy(data string) (string, error) {
+	return data, nil
 }

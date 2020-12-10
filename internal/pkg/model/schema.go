@@ -173,9 +173,6 @@ type Policy struct {
 	// True when this policy is the default policy to start Fleet Server
 	DefaultFleetServer bool `json:"default_fleet_server"`
 
-	// The unique identifier for the policy revision
-	Id string `json:"_id"`
-
 	// The ID of the policy
 	PolicyId string `json:"policy_id"`
 
@@ -188,29 +185,17 @@ type Policy struct {
 
 // PolicyLeader The current leader Fleet Server for a policy
 type PolicyLeader struct {
-
-	// The unique identifier for the policy
-	Id     string          `json:"_id"`
 	Server *ServerMetadata `json:"server"`
 
 	// Date/time the leader was taken or held
 	Timestamp string `json:"@timestamp,omitempty"`
-
-	// The version of the document in the index
-	Version int64 `json:"_version"`
 }
 
 // Server A Fleet Server
 type Server struct {
-	Agent *AgentMetadata `json:"agent"`
-	Host  *HostMetadata  `json:"host"`
-
-	// The unique identifier for the Fleet Server
-	Id     string          `json:"_id"`
+	Agent  *AgentMetadata  `json:"agent"`
+	Host   *HostMetadata   `json:"host"`
 	Server *ServerMetadata `json:"server"`
-
-	// The version of the document in the index
-	Version int64 `json:"_version"`
 }
 
 // ServerMetadata A Fleet Server metadata

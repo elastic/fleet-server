@@ -6,6 +6,7 @@ package fleet
 
 import (
 	"context"
+	"fleet/internal/pkg/coordinator"
 	"sync"
 	"time"
 
@@ -69,7 +70,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		err = initGlobalCache()
 		checkErr(err)
 
-		srv, err := NewFleetServer(cfg)
+		srv, err := NewFleetServer(cfg, version)
 		checkErr(err)
 
 		return srv.Run(ctx)
@@ -87,15 +88,18 @@ func NewCommand(version string) *cobra.Command {
 }
 
 type FleetServer struct {
+	version string
+
 	cfg   *config.Config
 	cfgCh chan *config.Config
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config) (*FleetServer, error) {
+func NewFleetServer(cfg *config.Config, version string) (*FleetServer, error) {
 	return &FleetServer{
-		cfg:   cfg,
-		cfgCh: make(chan *config.Config, 1),
+		version: version,
+		cfg:     cfg,
+		cfgCh:   make(chan *config.Config, 1),
 	}, nil
 }
 
@@ -181,6 +185,16 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	var funcs []runner.RunFunc
 	var wg sync.WaitGroup
 
+	// Coordinator policy monitor
+	pim, err := monitor.New(dl.FleetPolicies, es)
+	if err != nil {
+		return err
+	}
+	cord := coordinator.NewMonitor(cfg.Fleet, f.version, bulker, pim, coordinator.NewCoordinatorZero)
+	funcs = append(funcs, runner.LoggedRunFunc("Coordinator policy monitor", func(ctx context.Context) error {
+		return cord.Run(ctx)
+	}))
+
 	// Policy monitor
 	pm, err := NewPolicyMon(kPolicyThrottle)
 	funcs = append(funcs, runner.LoggedRunFunc("Policy monitor", func(ctx context.Context) error {
@@ -188,7 +202,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	}))
 
 	// Actions monitoring
-	var am *monitor.Monitor
+	var am monitor.Monitor
 	var ad *action.Dispatcher
 	var tr *action.TokenResolver
 

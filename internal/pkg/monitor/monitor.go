@@ -55,8 +55,19 @@ type GlobalCheckpointProvider interface {
 	GetCheckpoint() int64
 }
 
-// Monitor monitors for new documents, theoretically can be applied to any index conforming the schema
-type Monitor struct {
+// Monitor monitors for new documents in an index
+type Monitor interface {
+	GlobalCheckpointProvider
+
+	// Run runs the monitor
+	Run(ctx context.Context) error
+
+	// Output is the channel the monitor send new documents to
+	Output() <-chan []es.HitT
+}
+
+// monitorT monitors for new documents in an index
+type monitorT struct {
 	cli  *elasticsearch.Client
 	tmpl *dsl.Tmpl
 
@@ -71,12 +82,12 @@ type Monitor struct {
 	outCh chan []es.HitT
 }
 
-// MonitorOption monitor functional option
-type MonitorOption func(*Monitor)
+// Option monitor functional option
+type Option func(Monitor)
 
-// NewMonitor creates new monitor
-func New(index string, cli *elasticsearch.Client, opts ...MonitorOption) (*Monitor, error) {
-	m := &Monitor{
+// New creates new monitor
+func New(index string, cli *elasticsearch.Client, opts ...Option) (Monitor, error) {
+	m := &monitorT{
 		index:          index,
 		cli:            cli,
 		checkInterval:  defaultCheckInterval * time.Second,
@@ -101,40 +112,40 @@ func New(index string, cli *elasticsearch.Client, opts ...MonitorOption) (*Monit
 }
 
 // WithCheckInterval sets a periodic check interval
-func WithCheckInterval(interval time.Duration) MonitorOption {
-	return func(m *Monitor) {
-		m.checkInterval = interval
+func WithCheckInterval(interval time.Duration) Option {
+	return func(m Monitor) {
+		m.(*monitorT).checkInterval = interval
 	}
 }
 
 // WithExpiration sets adds the expiration field to the monitor query
-func WithExpiration(withExpiration bool) MonitorOption {
-	return func(m *Monitor) {
-		m.withExpiration = withExpiration
+func WithExpiration(withExpiration bool) Option {
+	return func(m Monitor) {
+		m.(*monitorT).withExpiration = withExpiration
 	}
 }
 
 // Output output channel for the monitor
-func (m *Monitor) Output() <-chan []es.HitT {
+func (m *monitorT) Output() <-chan []es.HitT {
 	return m.outCh
 }
 
 // GetCheckpoint implements GlobalCheckpointProvider interface
-func (m *Monitor) GetCheckpoint() int64 {
+func (m *monitorT) GetCheckpoint() int64 {
 	return m.loadCheckpoint()
 }
 
-func (m *Monitor) storeCheckpoint(val int64) {
+func (m *monitorT) storeCheckpoint(val int64) {
 	m.log.Debug().Int64("checkpoint", val).Msg("Updated checkpoint")
 	atomic.StoreInt64(&m.checkpoint, val)
 }
 
-func (m *Monitor) loadCheckpoint() int64 {
+func (m *monitorT) loadCheckpoint() int64 {
 	return atomic.LoadInt64(&m.checkpoint)
 }
 
 // Run runs monitor.
-func (m *Monitor) Run(ctx context.Context) (err error) {
+func (m *monitorT) Run(ctx context.Context) (err error) {
 	m.log.Info().Msg("Start")
 	defer func() {
 		m.log.Info().Err(err).Msg("Exited")
@@ -164,7 +175,7 @@ func (m *Monitor) Run(ctx context.Context) (err error) {
 	}
 }
 
-func (m *Monitor) checkGlobalCheckpoint(ctx context.Context) error {
+func (m *monitorT) checkGlobalCheckpoint(ctx context.Context) error {
 	gcp, err := queryGlobalCheckpoint(ctx, m.cli, m.index)
 	if err != nil {
 		m.log.Error().Err(err).Msg("Failed to check the global checkpoint")
@@ -178,7 +189,7 @@ func (m *Monitor) checkGlobalCheckpoint(ctx context.Context) error {
 	return nil
 }
 
-func (m *Monitor) checkNewDocuments(ctx context.Context, seqno, maxSeqNo int64) error {
+func (m *monitorT) checkNewDocuments(ctx context.Context, seqno, maxSeqNo int64) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	params := map[string]interface{}{
@@ -229,7 +240,7 @@ func (m *Monitor) checkNewDocuments(ctx context.Context, seqno, maxSeqNo int64) 
 	return nil
 }
 
-func (m *Monitor) prepareQuery() (tmpl *dsl.Tmpl, err error) {
+func (m *monitorT) prepareQuery() (tmpl *dsl.Tmpl, err error) {
 	tmpl = dsl.NewTmpl()
 
 	root := dsl.NewRoot()

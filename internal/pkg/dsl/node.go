@@ -33,6 +33,14 @@ func (n *Node) MarshalJSON() ([]byte, error) {
 	return []byte(kKeywordNULL), nil
 }
 
+func (n *Node) MustMarshalJSON() []byte {
+	res, err := n.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
 func (n *Node) findOrCreateChildByName(keyword string) *Node {
 	if node, ok := n.nodeMap[keyword]; ok {
 		return node

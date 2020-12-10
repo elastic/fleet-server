@@ -25,4 +25,5 @@ const (
 	kKeywordSource      = "_source"
 	kKeywordTerm        = "term"
 	kKeywordTerms       = "terms"
+	kKeywordTopHits     = "top_hits"
 )

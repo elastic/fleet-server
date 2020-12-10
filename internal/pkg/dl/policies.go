@@ -1,55 +1,80 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package dl
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
-
+	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/model"
+	"fmt"
 	"sync"
 
-	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/dsl"
-	"fleet/internal/pkg/model"
 )
 
 var (
-	tmplQueryLatestPolicies     *dsl.Tmpl
+	tmplQueryLatestPolicies     []byte
 	initQueryLatestPoliciesOnce sync.Once
 )
 
 var ErrPolicyLeaderNotFound = errors.New("policy has no leader")
 
-func prepareQueryLatestPolicies() *dsl.Tmpl {
-	tmpl := dsl.NewTmpl()
+func prepareQueryLatestPolicies() []byte {
 	root := dsl.NewRoot()
-	root.Query().Bool().Filter().Term(FieldId, tmpl.Bind(FieldId), nil)
-
-	return tmpl.MustResolve(root)
+	root.Size(0)
+	policyId := root.Aggs().Agg(FieldPolicyId)
+	policyId.Terms("field", FieldPolicyId, nil)
+	revisionIdx := policyId.Aggs().Agg(FieldRevisionIdx).TopHits()
+	revisionIdx.Size(1)
+	rSort := revisionIdx.Sort()
+	rSort.SortOrder(FieldRevisionIdx, dsl.SortDescend)
+	rSort.SortOrder(FieldCoordinatorIdx, dsl.SortDescend)
+	return root.MustMarshalJSON()
 }
 
-func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, policyId string) (policies []model.Policy, err error) {
+// QueryLatestPolices gets the latest revision for a policy
+func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk) ([]model.Policy, error) {
 	initQueryLatestPoliciesOnce.Do(func() {
 		tmplQueryLatestPolicies = prepareQueryLatestPolicies()
 	})
 
-	query, err := tmplQueryLatestPolicies.RenderOne(FieldId, policyId)
+	aggErr := fmt.Errorf("missing expected aggregation result")
+	res, err := bulker.Search(ctx, []string{FleetPolicies}, tmplQueryLatestPolicies)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	res, err := bulker.Search(ctx, []string{FleetPoliciesLeader}, query)
-	if err != nil {
-		return
+	policyId, ok := res.Aggregations[FieldPolicyId]
+	if !ok {
+		return nil, aggErr
 	}
-
-	if len(res.Hits) == 0 {
-		return leader, ErrAgentNotFound
+	if len(policyId.Buckets) == 0 {
+		return []model.Policy{}, nil
 	}
-
-	hit := res.Hits[0]
-	err = json.Unmarshal(hit.Source, &leader)
-
-	return leader, err
+	policies := make([]model.Policy, len(policyId.Buckets))
+	for i, bucket := range policyId.Buckets {
+		revisionIdx, ok := bucket.Aggregations[FieldRevisionIdx]
+		if !ok || len(revisionIdx.Hits) != 1 {
+			return nil, aggErr
+		}
+		hit := revisionIdx.Hits[0]
+		err = json.Unmarshal(hit.Source, &policies[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return policies, nil
 }
 
-
+// CreatePolicy creates a new policy in the index
+func CreatePolicy(ctx context.Context, bulker bulk.Bulk, policy model.Policy) (string, error) {
+	data, err := json.Marshal(&policy)
+	if err != nil {
+		return "", err
+	}
+	return bulker.Create(ctx, FleetPolicies, "", data)
+}

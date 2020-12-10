@@ -9,7 +9,9 @@ const (
 	FleetActions           = ".fleet-actions"
 	FleetAgents            = ".fleet-agents"
 	FleetEnrollmentAPIKeys = ".fleet-enrollment-api-keys"
+	FleetPolicies          = ".fleet-policies"
 	FleetPoliciesLeader    = ".fleet-policies-leader"
+	FleetServers           = ".fleet-servers"
 )
 
 // Query fields
@@ -18,8 +20,10 @@ const (
 	FieldSource = "_source"
 	FieldId     = "_id"
 
-	FieldPolicyId = "policy_id"
-	FieldMaxSeqNo = "max_seq_no"
+	FieldPolicyId       = "policy_id"
+	FieldRevisionIdx    = "revision_idx"
+	FieldCoordinatorIdx = "coordinator_idx"
+	FieldMaxSeqNo       = "max_seq_no"
 )
 
 // Public constants
