@@ -9,6 +9,7 @@ const (
 	FleetActions           = ".fleet-actions"
 	FleetAgents            = ".fleet-agents"
 	FleetEnrollmentAPIKeys = ".fleet-enrollment-api-keys"
+	FleetPoliciesLeader    = ".fleet-policies-leader"
 )
 
 // Query fields
@@ -17,6 +18,7 @@ const (
 	FieldSource = "_source"
 	FieldId     = "_id"
 
+	FieldPolicyId = "policy_id"
 	FieldMaxSeqNo = "max_seq_no"
 )
 
