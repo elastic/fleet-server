@@ -26,6 +26,7 @@ func TestConfig(t *testing.T) {
 			cfg: &Config{
 				Fleet: Fleet{
 					Agent: Agent{
+						ID: "1e4954ce-af37-4731-9f4a-407b08e69e42",
 						Logging: AgentLogging{
 							Level: "info",
 						},
@@ -67,6 +68,7 @@ func TestConfig(t *testing.T) {
 			cfg: &Config{
 				Fleet: Fleet{
 					Agent: Agent{
+						ID: "1e4954ce-af37-4731-9f4a-407b08e69e42",
 						Logging: AgentLogging{
 							Level: "error",
 						},
@@ -108,6 +110,7 @@ func TestConfig(t *testing.T) {
 			cfg: &Config{
 				Fleet: Fleet{
 					Agent: Agent{
+						ID: "1e4954ce-af37-4731-9f4a-407b08e69e42",
 						Logging: AgentLogging{
 							Level: "info",
 						},
@@ -149,6 +152,7 @@ func TestConfig(t *testing.T) {
 			cfg: &Config{
 				Fleet: Fleet{
 					Agent: Agent{
+						ID: "1e4954ce-af37-4731-9f4a-407b08e69e42",
 						Logging: AgentLogging{
 							Level: "info",
 						},
@@ -198,8 +202,11 @@ func TestConfig(t *testing.T) {
 		"bad-output": {
 			err: "can only contain elasticsearch key",
 		},
-		"empty": {
+		"bad-no-output": {
 			err: "cannot connect to elasticsearch without username/password",
+		},
+		"bad-no-agent-id": {
+			err: "string value is not set",
 		},
 	}
 

@@ -27,7 +27,7 @@ func createRandomPolicy(id string, revisionIdx int) model.Policy {
 	now := time.Now().UTC()
 	return model.Policy{
 		PolicyId:           id,
-		RevisionIdx:        revisionIdx,
+		RevisionIdx:        int64(revisionIdx),
 		CoordinatorIdx:     0,
 		Data:               "policy",
 		DefaultFleetServer: false,
@@ -42,11 +42,11 @@ func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string) (mod
 		rec = createRandomPolicy(id, i)
 		body, err := json.Marshal(rec)
 		if err != nil {
-			return nil, err
+			return model.Policy{}, err
 		}
 		_, err = bulker.Create(ctx, index, "", body, bulk.WithRefresh())
 		if err != nil {
-			return nil, err
+			return model.Policy{}, err
 		}
 	}
 	return rec, nil

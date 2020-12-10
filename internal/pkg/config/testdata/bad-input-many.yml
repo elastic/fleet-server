@@ -3,6 +3,9 @@ output:
     hosts: ["localhost:9200"]
     username: "elastic"
     password: "changeme"
+fleet:
+  agent:
+    id: 1e4954ce-af37-4731-9f4a-407b08e69e42
 inputs:
   - type: fleet-server
   - type: fleet-server
