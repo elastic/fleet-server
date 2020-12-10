@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fleet/internal/pkg/config"
+	"fleet/internal/pkg/es"
 	"fmt"
 	"time"
 
@@ -32,7 +34,7 @@ type Bulk interface {
 
 	MUpdate(ctx context.Context, ops []BulkOp, opts ...Opt) error
 
-	Search(ctx context.Context, index []string, body []byte, opts ...Opt) (*ResultT, error)
+	Search(ctx context.Context, index []string, body []byte, opts ...Opt) (*es.ResultT, error)
 
 	Client() *elasticsearch.Client
 }
@@ -81,8 +83,25 @@ const (
 	defaultMaxPending        = 32
 )
 
-func NewBulker(es *elasticsearch.Client) *Bulker {
+func InitES(ctx context.Context, cfg *config.Config) (*elasticsearch.Client, Bulk, error) {
 
+	es, err := es.NewClient(ctx, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	flushInterval := cfg.Output.Elasticsearch.BulkFlushInterval
+
+	blk := NewBulker(es)
+	go func() {
+		err := blk.Run(ctx, WithFlushInterval(flushInterval))
+		log.Info().Err(err).Msg("Bulker exit")
+	}()
+
+	return es, blk, nil
+}
+
+func NewBulker(es *elasticsearch.Client) *Bulker {
 	return &Bulker{
 		es: es,
 		ch: make(chan bulkT),
@@ -594,7 +613,7 @@ func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byt
 	return r.Source, nil
 }
 
-func (b *Bulker) Search(ctx context.Context, index []string, body []byte, opts ...Opt) (*ResultT, error) {
+func (b *Bulker) Search(ctx context.Context, index []string, body []byte, opts ...Opt) (*es.ResultT, error) {
 	opt := b.parseOpts(opts...)
 
 	// Serialize request
@@ -619,7 +638,7 @@ func (b *Bulker) Search(ctx context.Context, index []string, body []byte, opts .
 
 	// Interpret response
 	r := resp.data.(*MsearchResponseItem)
-	return &ResultT{r.Hits, r.Aggregations}, nil
+	return &es.ResultT{HitsT: r.Hits, Aggregations: r.Aggregations}, nil
 }
 
 func (b *Bulker) writeMsearchMeta(buf *bytes.Buffer, indices []string) error {
@@ -676,7 +695,7 @@ func (b *Bulker) validateMeta(index, id string) error {
 // TODO: Fail on non-escaped line feeds
 func (b *Bulker) validateBody(body []byte) error {
 	if !json.Valid(body) {
-		return ErrInvalidBody
+		return es.ErrInvalidBody
 	}
 
 	return nil

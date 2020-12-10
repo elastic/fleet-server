@@ -7,13 +7,13 @@ package esboot
 import (
 	"context"
 	"encoding/json"
-	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esutil"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -35,14 +35,14 @@ const (
 	ilmPolicySuffix = "ilm-policy"
 )
 
-func EnsureILMPolicy(ctx context.Context, client *es.Client, name string) error {
+func EnsureILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string) error {
 	policy := GetILMPolicyName(name)
 
 	lg := log.With().Str("policy", policy).Logger()
 
-	res, err := client.ILM.GetLifecycle(
-		client.ILM.GetLifecycle.WithPolicy(policy),
-		client.ILM.GetLifecycle.WithContext(ctx),
+	res, err := cli.ILM.GetLifecycle(
+		cli.ILM.GetLifecycle.WithPolicy(policy),
+		cli.ILM.GetLifecycle.WithContext(ctx),
 	)
 
 	// Check if general error, network failure, timeout, etc.
@@ -66,7 +66,7 @@ func EnsureILMPolicy(ctx context.Context, client *es.Client, name string) error 
 		// Got 404 from Elasticsearch
 		if errRes.Status == http.StatusNotFound {
 			lg.Info().Msgf("ILM policy is not found. Create a new one.")
-			err = createILMPolicy(ctx, client, name)
+			err = createILMPolicy(ctx, cli, name)
 			if err != nil {
 				return err
 			}
@@ -93,7 +93,7 @@ func EnsureILMPolicy(ctx context.Context, client *es.Client, name string) error 
 
 	// Fetched the ILM policy successfully. Check the settings and if they need to be updated.
 	if res.StatusCode == http.StatusOK {
-		err = checkUpdateILMPolicy(ctx, client, lg, policy, res.Body)
+		err = checkUpdateILMPolicy(ctx, cli, lg, policy, res.Body)
 		if err != nil {
 			lg.Warn().Err(err).Msg("Failed to update ILM policy settings")
 			return err
@@ -103,7 +103,7 @@ func EnsureILMPolicy(ctx context.Context, client *es.Client, name string) error 
 	return nil
 }
 
-func checkUpdateILMPolicy(ctx context.Context, client *es.Client, lg zerolog.Logger, name string, r io.Reader) error {
+func checkUpdateILMPolicy(ctx context.Context, cli *elasticsearch.Client, lg zerolog.Logger, name string, r io.Reader) error {
 	policy := GetILMPolicyName(name)
 	lg.Info().Msg("Check ILM policy settings if they need to be updated")
 
@@ -138,12 +138,12 @@ func checkUpdateILMPolicy(ctx context.Context, client *es.Client, lg zerolog.Log
 			Str("new_delete_age", newDeleteAge).
 			Msgf("ILM policy settings were changed. Check if needs to be updated.")
 
-		return createILMPolicy(ctx, client, name)
+		return createILMPolicy(ctx, cli, name)
 	}
 	return nil
 }
 
-func createILMPolicy(ctx context.Context, client *es.Client, name string) error {
+func createILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string) error {
 	policy := GetILMPolicyName(name)
 	body := mustRender(renderILMPolicy(ilmRolloverSize, ilmRolloverAge, ilmDeleteAge))
 
@@ -151,9 +151,9 @@ func createILMPolicy(ctx context.Context, client *es.Client, name string) error 
 	// in that case let's just create the ILM policy
 	log.Debug().Str("policy", policy).Str("body", body).Msg("Creating ILM policy")
 
-	res, err := client.ILM.PutLifecycle(policy,
-		client.ILM.PutLifecycle.WithBody(strings.NewReader(body)),
-		client.ILM.PutLifecycle.WithContext(ctx),
+	res, err := cli.ILM.PutLifecycle(policy,
+		cli.ILM.PutLifecycle.WithBody(strings.NewReader(body)),
+		cli.ILM.PutLifecycle.WithContext(ctx),
 	)
 	if err != nil {
 		return err

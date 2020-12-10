@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"fleet/internal/pkg/action"
+	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
+	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/env"
-	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/logger"
 	"fleet/internal/pkg/migrate"
+	"fleet/internal/pkg/monitor"
 	"fleet/internal/pkg/profile"
 	"fleet/internal/pkg/runner"
 	"fleet/internal/pkg/saved"
@@ -159,11 +161,11 @@ func (f *FleetServer) Run(ctx context.Context) error {
 }
 
 func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
-	es, err := es.New(ctx, cfg)
+	es, bulker, err := bulk.InitES(ctx, cfg)
 	if err != nil {
 		return err
 	}
-	sv := saved.NewMgr(es.Bulk(), savedObjectKey())
+	sv := saved.NewMgr(bulker, savedObjectKey())
 
 	// Initial indices bootstrapping, needed for agents actions development
 	// TODO: remove this after the indices bootstrapping logic implemented in ES plugin
@@ -171,7 +173,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-	err = migrate.Migrate(ctx, sv, es.Bulk())
+	err = migrate.Migrate(ctx, sv, bulker)
 	if err != nil {
 		return err
 	}
@@ -186,13 +188,13 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	}))
 
 	// Actions monitoring
-	var am *action.Monitor
+	var am *monitor.Monitor
 	var ad *action.Dispatcher
 	var tr *action.TokenResolver
 
 	// Behind the feature flag
 	if f.cfg.Features.Enabled(config.FeatureActions) {
-		am, err = action.NewMonitor(es.Bulk())
+		am, err = monitor.New(dl.FleetActions, es, monitor.WithExpiration(true))
 		if err != nil {
 			return err
 		}
@@ -200,7 +202,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 
 		ad = action.NewDispatcher(am)
 		funcs = append(funcs, runner.LoggedRunFunc("Action dispatcher", ad.Run))
-		tr, err = action.NewTokenResolver(es.Bulk())
+		tr, err = action.NewTokenResolver(bulker)
 		if err != nil {
 			return err
 		}
@@ -211,17 +213,17 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return ba.Run(ctx, sv)
 	}))
 
-	bc := NewBulkCheckin(es.Bulk())
+	bc := NewBulkCheckin(bulker)
 	funcs = append(funcs, runner.LoggedRunFunc("Bulk checkin", func(ctx context.Context) error {
 		return bc.Run(ctx, sv)
 	}))
 
-	ct := NewCheckinT(f.cfg, bc, ba, pm, am, ad, tr, es.Bulk())
-	et, err := NewEnrollerT(&f.cfg.Inputs[0].Server, es.Bulk())
+	ct := NewCheckinT(f.cfg, bc, ba, pm, am, ad, tr, bulker)
+	et, err := NewEnrollerT(&f.cfg.Inputs[0].Server, bulker)
 	if err != nil {
 		return err
 	}
-	router := NewRouter(sv, es.Bulk(), ct, et)
+	router := NewRouter(sv, bulker, ct, et)
 
 	funcs = append(funcs, runner.LoggedRunFunc("Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &f.cfg.Inputs[0].Server)

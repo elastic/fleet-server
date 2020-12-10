@@ -9,9 +9,10 @@ import (
 	"encoding/json"
 	"sync"
 
-	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/dl"
+	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/model"
+	"fleet/internal/pkg/monitor"
 
 	"github.com/rs/zerolog/log"
 )
@@ -27,13 +28,13 @@ func (s Sub) Ch() chan []dl.ActionDoc {
 }
 
 type Dispatcher struct {
-	am *Monitor
+	am *monitor.Monitor
 
 	mx   sync.RWMutex
 	subs map[string]Sub
 }
 
-func NewDispatcher(am *Monitor) *Dispatcher {
+func NewDispatcher(am *monitor.Monitor) *Dispatcher {
 	return &Dispatcher{
 		am:   am,
 		subs: make(map[string]Sub),
@@ -83,7 +84,7 @@ func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	log.Debug().Str("agentId", sub.agentId).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
-func (d *Dispatcher) process(ctx context.Context, hits []bulk.HitT) {
+func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	// Parse hits into map of agent -> actions
 	// Actions are ordered by sequence
 

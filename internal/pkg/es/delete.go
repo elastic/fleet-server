@@ -7,7 +7,6 @@ package es
 import (
 	"context"
 	"encoding/json"
-	"fleet/internal/pkg/bulk"
 
 	"github.com/elastic/go-elasticsearch/v8"
 )
@@ -21,13 +20,13 @@ func DeleteIndices(ctx context.Context, es *elasticsearch.Client, indices []stri
 	}
 	defer res.Body.Close()
 
-	var ares bulk.AckResponse
+	var ares AckResponse
 	err = json.NewDecoder(res.Body).Decode(&ares)
 	if err != nil {
 		return err
 	}
 	if !ares.Acknowledged {
-		err = bulk.TranslateError(res.StatusCode, ares.Error)
+		err = TranslateError(res.StatusCode, ares.Error)
 	}
 
 	return err

@@ -9,9 +9,10 @@ import (
 
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/dsl"
+	"fleet/internal/pkg/es"
 )
 
-func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) (*bulk.HitsT, error) {
+func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) (*es.HitsT, error) {
 	query, err := tmpl.Render(params)
 	if err != nil {
 		return nil, err
@@ -25,7 +26,7 @@ func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string,
 	return &res.HitsT, nil
 }
 
-func SearchWithOneParam(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, name string, v interface{}) (*bulk.HitsT, error) {
+func SearchWithOneParam(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, name string, v interface{}) (*es.HitsT, error) {
 	query, err := tmpl.RenderOne(name, v)
 	if err != nil {
 		return nil, err

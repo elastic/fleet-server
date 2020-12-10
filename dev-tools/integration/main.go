@@ -27,7 +27,7 @@ func main() {
 	checkErr(err)
 
 	ctx := context.Background()
-	es, err := es.New(ctx, cfg)
+	es, err := es.NewClient(ctx, cfg)
 	checkErr(err)
 
 	err = esboot.EnsureESIndices(ctx, es)
