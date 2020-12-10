@@ -6,13 +6,13 @@ package fleet
 
 import (
 	"context"
-	"fleet/internal/pkg/coordinator"
 	"sync"
 	"time"
 
 	"fleet/internal/pkg/action"
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
+	"fleet/internal/pkg/coordinator"
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/esboot"
@@ -190,10 +190,9 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
+	funcs = append(funcs, runner.LoggedRunFunc("Policy index monitor", pim.Run))
 	cord := coordinator.NewMonitor(cfg.Fleet, f.version, bulker, pim, coordinator.NewCoordinatorZero)
-	funcs = append(funcs, runner.LoggedRunFunc("Coordinator policy monitor", func(ctx context.Context) error {
-		return cord.Run(ctx)
-	}))
+	funcs = append(funcs, runner.LoggedRunFunc("Coordinator policy monitor", cord.Run))
 
 	// Policy monitor
 	pm, err := NewPolicyMon(kPolicyThrottle)
