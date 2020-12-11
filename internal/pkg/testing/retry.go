@@ -37,6 +37,7 @@ func RetryCount(count int) RetryOption {
 
 // Retry helper that can have sleep and max count
 func Retry(t *testing.T, ctx context.Context, f RetryFunc, opts ...RetryOption) {
+	t.Helper()
 	o := retryOptionT{
 		sleep: 100 * time.Millisecond,
 		count: 3,

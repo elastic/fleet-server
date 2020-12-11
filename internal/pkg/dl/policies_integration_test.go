@@ -13,11 +13,11 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
-	"github.com/rs/xid"
 
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/model"
+	ftesting "fleet/internal/pkg/testing"
 )
 
 func createRandomPolicy(id string, revisionIdx int) model.Policy {
@@ -49,10 +49,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	// temp index name to avoid collisions with other parallel tests
-	index := xid.New().String()
-	bulker := setupIndex(ctx, t, index, es.MappingPolicy)
-
+	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicy)
 	recs := map[string]model.Policy{}
 	for i := 0; i < 0; i++ {
 		rec, err := storeRandomPolicy(ctx, bulker, index)
@@ -81,10 +78,7 @@ func TestCreatePolicy(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	// temp index name to avoid collisions with other parallel tests
-	index := xid.New().String()
-	bulker := setupIndex(ctx, t, index, es.MappingPolicy)
-
+	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicy)
 	policyId := uuid.Must(uuid.NewV4()).String()
 	p := createRandomPolicy(policyId, 1)
 	id, err := CreatePolicy(ctx, bulker, p, WithIndexName(index))

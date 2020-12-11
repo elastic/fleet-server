@@ -12,13 +12,14 @@ import (
 	"testing"
 	"time"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/model"
-
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
+
+	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/es"
+	"fleet/internal/pkg/model"
+	ftesting "fleet/internal/pkg/testing"
 )
 
 func createRandomEnrollmentAPIKey() model.EnrollmentApiKey {
@@ -48,24 +49,21 @@ func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index st
 	return rec, err
 }
 
-func setupEnrollmentAPIKeys(ctx context.Context, t *testing.T, index string) (bulk.Bulk, model.EnrollmentApiKey) {
-	bulker := setupIndex(ctx, t, index, es.MappingEnrollmentApiKey)
+func setupEnrollmentAPIKeys(ctx context.Context, t *testing.T) (string, bulk.Bulk, model.EnrollmentApiKey) {
+	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingEnrollmentApiKey)
 	rec, err := storeRandomEnrollmentAPIKey(ctx, bulker, index)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return bulker, rec
+	return index, bulker, rec
 }
 
 func TestSearchEnrollmentAPIKey(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	// temp index name to avoid collisions with other parallel tests
-	index := xid.New().String()
-	bulker, rec := setupEnrollmentAPIKeys(ctx, t, index)
-
+	index, bulker, rec := setupEnrollmentAPIKeys(ctx, t)
 	tmpl, err := PrepareEnrollmentAPIKeyByIDQuery()
 	if err != nil {
 		t.Fatal(err)

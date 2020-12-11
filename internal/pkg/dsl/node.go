@@ -14,9 +14,10 @@ type nodeMapT map[string]*Node
 type nodeListT []*Node
 
 type Node struct {
-	leaf     interface{}
-	nodeMap  nodeMapT
-	nodeList nodeListT
+	leaf        interface{}
+	nodeMap     nodeMapT
+	nodeList    nodeListT
+	preventNull bool
 }
 
 func (n *Node) MarshalJSON() ([]byte, error) {
@@ -29,7 +30,9 @@ func (n *Node) MarshalJSON() ([]byte, error) {
 	case n.nodeList != nil:
 		return json.Marshal(n.nodeList)
 	}
-
+	if n.preventNull {
+		return []byte("{}"), nil
+	}
 	return []byte(kKeywordNULL), nil
 }
 

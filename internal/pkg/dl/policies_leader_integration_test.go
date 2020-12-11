@@ -13,21 +13,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
-	"github.com/rs/xid"
-
 	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/model"
 	ftesting "fleet/internal/pkg/testing"
+	"github.com/gofrs/uuid"
 )
 
 func TestSearchPolicyLeaders(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	// temp index name to avoid collisions with other parallel tests
-	index := xid.New().String()
-	bulker := setupIndex(ctx, t, index, es.MappingPolicyLeader)
+	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicyLeader)
 
 	// insert a policy leaders to search for
 	serverId := uuid.Must(uuid.NewV4()).String()
@@ -60,9 +56,7 @@ func TestTakePolicyLeadership(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	// temp index name to avoid collisions with other parallel tests
-	index := xid.New().String()
-	bulker := setupIndex(ctx, t, index, es.MappingPolicyLeader)
+	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicyLeader)
 
 	serverId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
@@ -97,9 +91,7 @@ func TestReleasePolicyLeadership(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	// temp index name to avoid collisions with other parallel tests
-	index := xid.New().String()
-	bulker := setupIndex(ctx, t, index, es.MappingPolicyLeader)
+	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicyLeader)
 
 	serverId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
@@ -139,9 +131,7 @@ func TestReleasePolicyLeadership_NothingIfNotLeader(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	// temp index name to avoid collisions with other parallel tests
-	index := xid.New().String()
-	bulker := setupIndex(ctx, t, index, es.MappingPolicyLeader)
+	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicyLeader)
 
 	serverId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()

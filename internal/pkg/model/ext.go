@@ -15,3 +15,13 @@ func (m *PolicyLeader) Time() (time.Time, error) {
 func (m *PolicyLeader) SetTime(t time.Time) {
 	m.Timestamp = t.Format(time.RFC3339Nano)
 }
+
+// Time returns the time for the server.
+func (m *Server) Time() (time.Time, error) {
+	return time.Parse(time.RFC3339Nano, m.Timestamp)
+}
+
+// SetTime sets the timestamp.
+func (m *Server) SetTime(t time.Time) {
+	m.Timestamp = t.Format(time.RFC3339Nano)
+}

@@ -4,13 +4,14 @@
 
 // +build integration
 
-package dl
+package testing
 
 import (
 	"context"
 	"testing"
 
 	"github.com/elastic/go-ucfg/yaml"
+	"github.com/rs/xid"
 
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
@@ -40,14 +41,28 @@ func init() {
 	}
 }
 
-func setupIndex(ctx context.Context, t *testing.T, index string, mapping string) bulk.Bulk {
-	cli, bulker, err := bulk.InitES(ctx, &defaultCfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = esboot.EnsureIndex(ctx, cli, index, mapping)
+func SetupBulk(ctx context.Context, t *testing.T, opts ...bulk.BulkOpt) bulk.Bulk {
+	t.Helper()
+	_, bulker, err := bulk.InitES(ctx, &defaultCfg, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return bulker
+}
+
+func SetupIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, mapping string) string {
+	t.Helper()
+	index := xid.New().String()
+	err := esboot.EnsureIndex(ctx, bulker.Client(), index, mapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return index
+}
+
+func SetupIndexWithBulk(ctx context.Context, t *testing.T, mapping string, opts ...bulk.BulkOpt) (string, bulk.Bulk) {
+	t.Helper()
+	bulker := SetupBulk(ctx, t, opts...)
+	index := SetupIndex(ctx, t, bulker, mapping)
+	return index, bulker
 }

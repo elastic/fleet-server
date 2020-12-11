@@ -5,27 +5,54 @@
 package dl
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
+	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
-
+	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/model"
 )
 
 // EnsureServer ensures that this server is written in the index.
-func EnsureServer(cli *elasticsearch.Client, version string, agent model.AgentMetadata, host model.HostMetadata) error {
+func EnsureServer(ctx context.Context, bulker bulk.Bulk, version string, agent model.AgentMetadata, host model.HostMetadata, opts ...Option) error {
 	var server model.Server
+	o := newOption(FleetServers, opts...)
+	data, err := bulker.Read(ctx, o.indexName, agent.Id)
+	if err != nil && err != es.ErrElasticNotFound {
+		return err
+	}
+	if err == es.ErrElasticNotFound {
+		server.Agent = &agent
+		server.Host = &host
+		server.Server = &model.ServerMetadata{
+			Id:      agent.Id,
+			Version: version,
+		}
+		server.SetTime(time.Now().UTC())
+		data, err = json.Marshal(&server)
+		if err != nil {
+			return err
+		}
+		_, err = bulker.Create(ctx, o.indexName, agent.Id, data)
+		return err
+	}
+	err = json.Unmarshal(data, &server)
+	if err != nil {
+		return err
+	}
 	server.Agent = &agent
 	server.Host = &host
 	server.Server = &model.ServerMetadata{
 		Id:      agent.Id,
 		Version: version,
 	}
-	data, err := json.Marshal(&server)
+	server.SetTime(time.Now().UTC())
+	data, err = json.Marshal(&struct {
+		Doc model.Server `json:"doc"`
+	}{server})
 	if err != nil {
 		return err
 	}
-	_, err = cli.Update(FleetServers, agent.Id, bytes.NewBuffer(data))
-	return err
+	return bulker.Update(ctx, o.indexName, agent.Id, data)
 }

@@ -60,6 +60,10 @@ type monitorT struct {
 	metadataInterval  time.Duration
 	coordRestartDelay time.Duration
 
+	serversIndex  string
+	policiesIndex string
+	leadersIndex  string
+
 	policies map[string]policyT
 }
 
@@ -76,6 +80,9 @@ func NewMonitor(fleet config.Fleet, version string, bulker bulk.Bulk, monitor mo
 		leaderInterval:    defaultLeaderInterval,
 		metadataInterval:  defaultMetadataInterval,
 		coordRestartDelay: defaultCoordinatorRestartDelay,
+		serversIndex:      dl.FleetServers,
+		policiesIndex:     dl.FleetPolicies,
+		leadersIndex:      dl.FleetPoliciesLeader,
 		policies:          make(map[string]policyT),
 	}
 }
@@ -118,7 +125,7 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 			}
 			lT.Reset(m.checkInterval)
 		case <-ctx.Done():
-			m.releaseLeadership(ctx)
+			m.releaseLeadership()
 			return ctx.Err()
 		}
 	}
@@ -164,14 +171,14 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 // ensureLeadership ensures leadership is held or needs to be taken over.
 func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	m.log.Debug().Msg("ensuring leadership of policies")
-	err := dl.EnsureServer(m.bulker.Client(), m.version, m.agentMetadata, m.hostMetadata)
+	err := dl.EnsureServer(ctx, m.bulker, m.version, m.agentMetadata, m.hostMetadata, dl.WithIndexName(m.serversIndex))
 	if err != nil {
 		return err
 	}
 
 	// fetch current policies and leaders
 	leaders := map[string]model.PolicyLeader{}
-	policies, err := dl.QueryLatestPolicies(ctx, m.bulker)
+	policies, err := dl.QueryLatestPolicies(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if err != nil {
 		return err
 	}
@@ -180,7 +187,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		for i, p := range policies {
 			ids[i] = p.PolicyId
 		}
-		leaders, err = dl.SearchPolicyLeaders(ctx, m.bulker, ids)
+		leaders, err = dl.SearchPolicyLeaders(ctx, m.bulker, ids, dl.WithIndexName(m.leadersIndex))
 		if err != nil {
 			return err
 		}
@@ -213,7 +220,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		pt.id = p.PolicyId
 		go func(p model.Policy, pt policyT) {
 			l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
-			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.version)
+			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.version, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l.Err(err).Msg("failed to take ownership")
 				if pt.cord != nil {
@@ -228,14 +235,14 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 				cord, err := m.factory(p)
 				if err != nil {
 					l.Err(err).Msg("failed to start coordinator")
-					_ = dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval)
+					_ = dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 					res <- pt
 					return
 				}
 
 				cordCtx, canceller := context.WithCancel(ctx)
 				go runCoordinator(cordCtx, cord, l, m.coordRestartDelay)
-				go runCoordinatorOutput(cordCtx, cord, m.bulker, l)
+				go runCoordinatorOutput(cordCtx, cord, m.bulker, l, m.policiesIndex)
 				pt.cord = cord
 				pt.canceller = canceller
 			}
@@ -255,21 +262,23 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 }
 
 // releaseLeadership releases current leadership
-func (m *monitorT) releaseLeadership(ctx context.Context) {
+func (m *monitorT) releaseLeadership() {
 	var wg sync.WaitGroup
 	wg.Add(len(m.policies))
 	for _, pt := range m.policies {
-		go func(ctx context.Context, pt policyT) {
+		go func(pt policyT) {
 			if pt.cord != nil {
 				pt.canceller()
 			}
-			err := dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval)
+			// uses a background context, because the context for the
+			// monitor will be cancelled at this point in the code
+			err := dl.ReleasePolicyLeadership(context.Background(), m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
 				l.Err(err).Msg("failed to release leadership")
 			}
 			wg.Done()
-		}(ctx, pt)
+		}(pt)
 	}
 	wg.Wait()
 }
@@ -342,12 +351,12 @@ func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d t
 	}
 }
 
-func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bulk, l zerolog.Logger) {
+func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bulk, l zerolog.Logger, policiesIndex string) {
 	for {
 		select {
 		case p := <-cord.Output():
 			s := l.With().Int64(dl.FieldRevisionIdx, p.RevisionIdx).Int64(dl.FieldCoordinatorIdx, p.CoordinatorIdx).Logger()
-			_, err := dl.CreatePolicy(ctx, bulker, p)
+			_, err := dl.CreatePolicy(ctx, bulker, p, dl.WithIndexName(policiesIndex))
 			if err != nil {
 				l.Err(err).Msg("failed to insert a new policy revision")
 			} else {

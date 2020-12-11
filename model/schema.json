@@ -158,6 +158,11 @@
       "description": "A Fleet Server",
       "type": "object",
       "properties": {
+        "@timestamp": {
+          "description": "Date/time the server was updated",
+          "type": "string",
+          "format": "date-time"
+        },
         "agent": { "$ref": "#/definitions/agent-metadata" },
         "host": { "$ref": "#/definitions/host-metadata" },
         "server": { "$ref":  "#/definitions/server-metadata" }
