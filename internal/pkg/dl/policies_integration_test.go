@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/model"
-
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
+
+	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/es"
+	"fleet/internal/pkg/model"
 )
 
 func createRandomPolicy(id string, revisionIdx int) model.Policy {

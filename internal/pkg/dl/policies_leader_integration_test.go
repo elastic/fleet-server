@@ -9,7 +9,6 @@ package dl
 import (
 	"context"
 	"encoding/json"
-	"fleet/internal/pkg/model"
 	"fmt"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/rs/xid"
 
 	"fleet/internal/pkg/es"
+	"fleet/internal/pkg/model"
 	ftesting "fleet/internal/pkg/testing"
 )
 

@@ -8,8 +8,9 @@ package dl
 
 import (
 	"context"
-	"github.com/elastic/go-ucfg/yaml"
 	"testing"
+
+	"github.com/elastic/go-ucfg/yaml"
 
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
