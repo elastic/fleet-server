@@ -8,14 +8,11 @@ package dl
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
 	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/model"
 
 	"github.com/gofrs/uuid"
@@ -40,42 +37,12 @@ func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string) (mod
 	id := uuid.Must(uuid.NewV4()).String()
 	for i := 1; i < 4; i++ {
 		rec = createRandomPolicy(id, i)
-		body, err := json.Marshal(rec)
-		if err != nil {
-			return model.Policy{}, err
-		}
-		_, err = bulker.Create(ctx, index, "", body, bulk.WithRefresh())
+		_, err := CreatePolicy(ctx, bulker, rec, WithIndexName(index))
 		if err != nil {
 			return model.Policy{}, err
 		}
 	}
 	return rec, nil
-}
-
-func setupPolicies(ctx context.Context, t *testing.T, index string) (bulk.Bulk, map[string]model.Policy) {
-	cfg, err := config.LoadFile("../../../fleet-server.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cli, bulker, err := bulk.InitES(ctx, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = esboot.EnsureIndex(ctx, cli, index, es.MappingPolicy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	policies := map[string]model.Policy{}
-	for i := 0; i < 0; i++ {
-		rec, err := storeRandomPolicy(ctx, bulker, index)
-		if err != nil {
-			t.Fatal(err)
-		}
-		policies[rec.PolicyId] = rec
-	}
-	return bulker, policies
 }
 
 func TestQueryLatestPolicies(t *testing.T) {
@@ -84,9 +51,18 @@ func TestQueryLatestPolicies(t *testing.T) {
 
 	// temp index name to avoid collisions with other parallel tests
 	index := xid.New().String()
-	bulker, recs := setupPolicies(ctx, t, index)
+	bulker := setupIndex(ctx, t, index, es.MappingPolicy)
 
-	policies, err := QueryLatestPolicies(ctx, bulker)
+	recs := map[string]model.Policy{}
+	for i := 0; i < 0; i++ {
+		rec, err := storeRandomPolicy(ctx, bulker, index)
+		if err != nil {
+			t.Fatal(err)
+		}
+		recs[rec.PolicyId] = rec
+	}
+
+	policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,5 +74,26 @@ func TestQueryLatestPolicies(t *testing.T) {
 	diff := cmp.Diff(recs, byID)
 	if diff != "" {
 		t.Fatal(diff)
+	}
+}
+
+func TestCreatePolicy(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
+	// temp index name to avoid collisions with other parallel tests
+	index := xid.New().String()
+	bulker := setupIndex(ctx, t, index, es.MappingPolicy)
+
+	policyId := uuid.Must(uuid.NewV4()).String()
+	p := createRandomPolicy(policyId, 1)
+	id, err := CreatePolicy(ctx, bulker, p, WithIndexName(index))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = bulker.Read(ctx, index, id)
+	if err != nil {
+		t.Fatal(err)
 	}
 }

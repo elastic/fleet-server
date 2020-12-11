@@ -13,9 +13,7 @@ import (
 	"time"
 
 	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/model"
 
 	"github.com/gofrs/uuid"
@@ -51,20 +49,7 @@ func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index st
 }
 
 func setupEnrollmentAPIKeys(ctx context.Context, t *testing.T, index string) (bulk.Bulk, model.EnrollmentApiKey) {
-	cfg, err := config.LoadFile("../../../fleet-server.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cli, bulker, err := bulk.InitES(ctx, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = esboot.EnsureIndex(ctx, cli, index, es.MappingEnrollmentApiKey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	bulker := setupIndex(ctx, t, index, es.MappingEnrollmentApiKey)
 	rec, err := storeRandomEnrollmentAPIKey(ctx, bulker, index)
 	if err != nil {
 		t.Fatal(err)

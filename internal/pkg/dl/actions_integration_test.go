@@ -13,9 +13,7 @@ import (
 	"time"
 
 	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/esboot"
 	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/rnd"
 
@@ -87,20 +85,7 @@ func storeRandomActions(ctx context.Context, bulker bulk.Bulk, index string) ([]
 }
 
 func setupActions(ctx context.Context, t *testing.T, index string) (bulk.Bulk, []model.Action) {
-	cfg, err := config.LoadFile("../../../fleet-server.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cli, bulker, err := bulk.InitES(ctx, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = esboot.EnsureIndex(ctx, cli, index, es.MappingAction)
-	if err != nil {
-		t.Fatal(err)
-	}
+	bulker := setupIndex(ctx, t, index, es.MappingAction)
 	actions, err := storeRandomActions(ctx, bulker, index)
 	if err != nil {
 		t.Fatal(err)

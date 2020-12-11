@@ -37,13 +37,14 @@ func prepareQueryLatestPolicies() []byte {
 }
 
 // QueryLatestPolices gets the latest revision for a policy
-func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk) ([]model.Policy, error) {
+func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]model.Policy, error) {
 	initQueryLatestPoliciesOnce.Do(func() {
 		tmplQueryLatestPolicies = prepareQueryLatestPolicies()
 	})
 
+	o := newOption(FleetPolicies, opt...)
 	aggErr := fmt.Errorf("missing expected aggregation result")
-	res, err := bulker.Search(ctx, []string{FleetPolicies}, tmplQueryLatestPolicies)
+	res, err := bulker.Search(ctx, []string{o.indexName}, tmplQueryLatestPolicies)
 	if err != nil {
 		return nil, err
 	}
@@ -71,10 +72,11 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk) ([]model.Policy,
 }
 
 // CreatePolicy creates a new policy in the index
-func CreatePolicy(ctx context.Context, bulker bulk.Bulk, policy model.Policy) (string, error) {
+func CreatePolicy(ctx context.Context, bulker bulk.Bulk, policy model.Policy, opt ...Option) (string, error) {
+	o := newOption(FleetPolicies, opt...)
 	data, err := json.Marshal(&policy)
 	if err != nil {
 		return "", err
 	}
-	return bulker.Create(ctx, FleetPolicies, "", data)
+	return bulker.Create(ctx, o.indexName, "", data)
 }
