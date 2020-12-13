@@ -316,6 +316,11 @@
           "type": "string"
         },
         "agent": { "$ref": "#/definitions/agent-metadata" },
+        "user_provided_metadata": {
+          "description": "User provided metadata information for the Elastic Agent",
+          "type": "object",
+          "format": "raw"
+        },
         "local_metadata": {
           "description": "Local metadata information for the Elastic Agent",
           "type": "object",

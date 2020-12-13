@@ -6,7 +6,6 @@ package action
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 
 	"fleet/internal/pkg/dl"
@@ -20,10 +19,10 @@ import (
 type Sub struct {
 	agentId string
 	seqNo   int64
-	ch      chan []dl.ActionDoc
+	ch      chan []model.Action
 }
 
-func (s Sub) Ch() chan []dl.ActionDoc {
+func (s Sub) Ch() chan []model.Action {
 	return s.ch
 }
 
@@ -53,7 +52,7 @@ func (d *Dispatcher) Run(ctx context.Context) (err error) {
 }
 
 func (d *Dispatcher) Subscribe(agentId string, seqNo int64) *Sub {
-	cbCh := make(chan []dl.ActionDoc, 1)
+	cbCh := make(chan []model.Action, 1)
 
 	sub := Sub{
 		agentId: agentId,
@@ -88,25 +87,25 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	// Parse hits into map of agent -> actions
 	// Actions are ordered by sequence
 
-	agentAcDocs := make(map[string][]dl.ActionDoc)
+	agentActions := make(map[string][]model.Action)
 	for _, hit := range hits {
 		var action model.Action
-		err := json.Unmarshal(hit.Source, &action)
+		err := dl.Unmarshal(hit, &action)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to unmarshal action document")
+			break
 		}
 		for _, agentId := range action.Agents {
-			arr := agentAcDocs[agentId]
-			arr = append(arr, dl.ActionDoc{
-				Action: action,
-				DocID:  hit.Id,
-				SeqNo:  hit.SeqNo})
-			agentAcDocs[agentId] = arr
+			arr := agentActions[agentId]
+			actionNoAgents := action
+			actionNoAgents.Agents = nil
+			arr = append(arr, actionNoAgents)
+			agentActions[agentId] = arr
 		}
 	}
 
-	for agentId, acdocs := range agentAcDocs {
-		d.dispatch(ctx, agentId, acdocs)
+	for agentId, actions := range agentActions {
+		d.dispatch(ctx, agentId, actions)
 	}
 }
 
@@ -117,7 +116,7 @@ func (d *Dispatcher) getSub(agentId string) (Sub, bool) {
 	return sub, ok
 }
 
-func (d *Dispatcher) dispatch(ctx context.Context, agentId string, acdocs []dl.ActionDoc) {
+func (d *Dispatcher) dispatch(ctx context.Context, agentId string, acdocs []model.Action) {
 	sub, ok := d.getSub(agentId)
 	if !ok {
 		log.Debug().Str("agent_id", agentId).Msg("Agent is not currently connected. Not dispatching actions.")

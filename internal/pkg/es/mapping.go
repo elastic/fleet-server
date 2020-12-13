@@ -131,6 +131,10 @@ const (
 		},
 		"upgraded_at": {
 			"type": "date"
+		},
+		"user_provided_metadata": {
+			"enabled" : false,
+			"type": "object"
 		}		
 	}
 }`
@@ -303,6 +307,13 @@ const (
 		"version": {
 			"type": "keyword"
 		}		
+	}
+}`
+
+	// UserProvidedMetadata User provided metadata information for the Elastic Agent
+	MappingUserProvidedMetadata = `{
+	"properties": {
+		
 	}
 }`
 )

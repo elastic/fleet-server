@@ -17,7 +17,6 @@ import (
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/dsl"
 	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/saved"
 
@@ -42,9 +41,8 @@ var (
 )
 
 type EnrollerT struct {
-	throttle               *semaphore.Weighted
-	bulker                 bulk.Bulk
-	queryTmplEnrollmentKey *dsl.Tmpl
+	throttle *semaphore.Weighted
+	bulker   bulk.Bulk
 }
 
 func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk) (*EnrollerT, error) {
@@ -52,14 +50,9 @@ func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk) (*EnrollerT, error) {
 	// if you have a large elastic search cluster, you can be more aggressive.
 	maxEnrollPending := cfg.MaxEnrollPending
 
-	tmpl, err := dl.PrepareEnrollmentAPIKeyByIDQuery()
-	if err != nil {
-		return nil, err
-	}
 	return &EnrollerT{
-		throttle:               semaphore.NewWeighted(maxEnrollPending),
-		bulker:                 bulker,
-		queryTmplEnrollmentKey: tmpl,
+		throttle: semaphore.NewWeighted(maxEnrollPending),
+		bulker:   bulker,
 	}, nil
 
 }
@@ -196,13 +189,12 @@ func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollReq
 		Str("defaultOutputApiKey.Id", defaultOutputApiKey.Id).
 		Msg("Created api key")
 
-	agentData := Agent{
+	agentData := model.Agent{
 		Active:          true,
 		PolicyId:        erec.PolicyId,
 		Type:            req.Type,
 		EnrolledAt:      nowStr,
-		UserMeta:        req.Meta.User,
-		LocalMeta:       req.Meta.Local,
+		LocalMetadata:   req.Meta.Local,
 		AccessApiKeyId:  accessApiKey.Id,
 		DefaultApiKeyId: defaultOutputApiKey.Id,
 		DefaultApiKey:   defaultOutputApiKey.Token(),
@@ -239,8 +231,8 @@ func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollReq
 			PolicyId:       agentData.PolicyId,
 			Type:           agentData.Type,
 			EnrolledAt:     agentData.EnrolledAt,
-			UserMeta:       agentData.UserMeta,
-			LocalMeta:      agentData.LocalMeta,
+			UserMeta:       agentData.UserProvidedMetadata,
+			LocalMeta:      agentData.LocalMetadata,
 			AccessApiKeyId: agentData.AccessApiKeyId,
 			AccessAPIKey:   accessApiKey.Token(),
 			Status:         "online",
@@ -253,7 +245,7 @@ func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollReq
 	return &resp, nil
 }
 
-func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent Agent) error {
+func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent) error {
 	data, err := json.Marshal(agent)
 	if err != nil {
 		return err
@@ -282,7 +274,7 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	}
 
 	// Pull API key record from .fleet-enrollment-api-keys
-	rec, err := dl.SearchEnrollmentAPIKey(ctx, et.bulker, et.queryTmplEnrollmentKey, id)
+	rec, err := dl.FindEnrollmentAPIKey(ctx, et.bulker, dl.QueryEnrollmentAPIKeyByID, id)
 	if err != nil {
 		return nil, err
 	}

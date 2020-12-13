@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"reflect"
 	"time"
@@ -18,7 +17,7 @@ import (
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/dsl"
+	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/monitor"
 	"fleet/internal/pkg/saved"
 
@@ -38,7 +37,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 	// TODO: Consider rate limit here
 
 	id := ps.ByName("id")
-	err := rt.ct._handleCheckin(w, r, id, rt.sv)
+	err := rt.ct._handleCheckin(w, r, id, rt.bulker)
 
 	if err != nil {
 		code := http.StatusBadRequest
@@ -55,15 +54,14 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 type CheckinT struct {
-	cfg          *config.Config
-	bc           *BulkCheckin
-	ba           *BulkActions
-	pm           *PolicyMon
-	gcp          monitor.GlobalCheckpointProvider
-	ad           *action.Dispatcher
-	tr           *action.TokenResolver
-	bulker       bulk.Bulk
-	queryActions *dsl.Tmpl
+	cfg    *config.Config
+	bc     *BulkCheckin
+	ba     *BulkActions
+	pm     *PolicyMon
+	gcp    monitor.GlobalCheckpointProvider
+	ad     *action.Dispatcher
+	tr     *action.TokenResolver
+	bulker bulk.Bulk
 }
 
 func NewCheckinT(
@@ -76,26 +74,21 @@ func NewCheckinT(
 	tr *action.TokenResolver,
 	bulker bulk.Bulk,
 ) *CheckinT {
-	queryActions, err := dl.PrepareAgentActionsQuery()
-	if err != nil {
-		panic(err)
-	}
 	return &CheckinT{
-		cfg:          cfg,
-		bc:           bc,
-		ba:           ba,
-		pm:           pm,
-		gcp:          gcp,
-		ad:           ad,
-		tr:           tr,
-		bulker:       bulker,
-		queryActions: queryActions,
+		cfg:    cfg,
+		bc:     bc,
+		ba:     ba,
+		pm:     pm,
+		gcp:    gcp,
+		ad:     ad,
+		tr:     tr,
+		bulker: bulker,
 	}
 }
 
-func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id string, sv saved.CRUD) error {
+func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk) error {
 
-	agent, err := authAgent(r, id, sv, ct.bulker)
+	agent, err := authAgent(r, id, ct.bulker)
 
 	if err != nil {
 		return err
@@ -123,7 +116,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	defer ct.ba.Unsubscribe(actionSub)
 	actionCh := actionSub.Ch()
 
-	var actCh chan []dl.ActionDoc
+	var actCh chan []model.Action
 	var seqno int64
 	if ct.cfg.Features.Enabled(config.FeatureActions) {
 		// Resolve AckToken from request, fallback on the agent record
@@ -139,7 +132,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	}
 
 	// Subscribe to policy manager for changes on PolicyId > policyRev
-	sub, err := ct.pm.Subscribe(agent.PolicyId, agent.PolicyRev)
+	sub, err := ct.pm.Subscribe(agent.PolicyId, agent.PolicyRevision)
 	if err != nil {
 		return err
 	}
@@ -185,7 +178,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 				actions = append(actions, convertActions(actionList)...)
 				break LOOP
 			case action := <-sub.C:
-				actionResp, err := parsePolicy(ctx, sv, agent.Id, action)
+				actionResp, err := parsePolicy(ctx, bulker, agent.Id, action)
 				if err != nil {
 					return err
 				}
@@ -222,7 +215,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 }
 
 // Resolve AckToken from request, fallback on the agent record
-func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent *Agent) (seqno int64, err error) {
+func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent *model.Agent) (seqno int64, err error) {
 	// Resolve AckToken from request, fallback on the agent record
 	ackToken := req.AckToken
 	seqno = agent.ActionSeqNo
@@ -243,10 +236,10 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 	return seqno, nil
 }
 
-func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno int64, agentId string) ([]dl.ActionDoc, error) {
+func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno int64, agentId string) ([]model.Action, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	return dl.SearchActions(ctx, ct.bulker, ct.queryActions, map[string]interface{}{
+	return dl.FindActions(ctx, ct.bulker, dl.QueryAgentActions, map[string]interface{}{
 		dl.FieldSeqNo:      seqno,
 		dl.FieldMaxSeqNo:   ct.gcp.GetCheckpoint(),
 		dl.FieldExpiration: now,
@@ -269,7 +262,7 @@ func convertActions(actionList []Action) []ActionResp {
 	return respList
 }
 
-func convertActionsX(agentId string, acdocs []dl.ActionDoc) ([]ActionResp, string) {
+func convertActionsX(agentId string, acdocs []model.Action) ([]ActionResp, string) {
 	var ackToken string
 	sz := len(acdocs)
 
@@ -285,13 +278,13 @@ func convertActionsX(agentId string, acdocs []dl.ActionDoc) ([]ActionResp, strin
 	}
 
 	if sz > 0 {
-		ackToken = acdocs[sz-1].DocID
+		ackToken = acdocs[sz-1].Id
 	}
 
 	return respList, ackToken
 }
 
-func parsePolicy(ctx context.Context, sv saved.CRUD, agentId string, action Action) (*ActionResp, error) {
+func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, action Action) (*ActionResp, error) {
 	// Need to inject the default api key into the object. So:
 	// 1) Deserialize the action
 	// 2) Lookup the DefaultApiKey in the save agent (we purposefully didn't decode it before)
@@ -305,28 +298,22 @@ func parsePolicy(ctx context.Context, sv saved.CRUD, agentId string, action Acti
 	}
 
 	// Repull and decode the agent object
-	var agent Agent
-	if err := sv.Read(ctx, AGENT_SAVED_OBJECT_TYPE, agentId, &agent); err != nil {
+	var agent model.Agent
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldId, agentId)
+	if err != nil {
 		return nil, err
 	}
 
 	if agent.DefaultApiKey == "" {
-		defaultOutputApiKey, err := generateOutputApiKey(ctx, sv.Client(), agent.Id, "default")
+		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agent.Id, "default")
 		if err != nil {
 			return nil, err
 		}
 		agent.DefaultApiKey = defaultOutputApiKey.Token()
 		agent.DefaultApiKeyId = defaultOutputApiKey.Id
 
-		// TODO: Consider how to fix update to do this?
-		opts := []saved.Option{
-			saved.WithId(agentId),
-			saved.WithOverwrite(),
-			saved.WithRefresh(),
-		}
-
-		log.Info().Str("agentId", agentId).Msg("Rewriting full agent record to pick up deafult output key.")
-		if _, err = sv.Create(ctx, AGENT_SAVED_OBJECT_TYPE, agent, opts...); err != nil {
+		log.Info().Str("agentId", agentId).Msg("Rewriting full agent record to pick up default output key.")
+		if err = dl.IndexAgent(ctx, bulker, agent); err != nil {
 			return nil, err
 		}
 	}
@@ -381,56 +368,19 @@ func setMapObj(obj map[string]interface{}, val interface{}, keys ...string) bool
 	return true
 }
 
-// Node.JS Fleet does this on a shared timer; not sure why is more efficient.
-func updateCheckinTimestamp(ctx context.Context, sv saved.CRUD, agent *Agent, fields saved.Fields) error {
-	timeNow := time.Now().UTC().Format(time.RFC3339)
-
-	if fields == nil {
-		fields = make(saved.Fields)
+func findAgentByApiKeyId(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByAssessAPIKeyID, dl.FieldAccessAPIKeyID, id)
+	if err != nil && errors.Is(err, dl.ErrNotFound) {
+		err = ErrAgentNotFound
 	}
-
-	fields[FieldLastCheckin] = timeNow
-
-	return sv.Update(ctx, AGENT_SAVED_OBJECT_TYPE, agent.Id, fields)
-}
-
-func findAgentByApiKeyId(ctx context.Context, sv saved.CRUD, id string) (*Agent, error) {
-
-	raw, err := apiKeyQueryTmpl.RenderOne(kTmplApiKeyField, id)
-	if err != nil {
-		return nil, err
-	}
-
-	// Pull API key record from saved objects
-	hits, err := sv.FindRaw(ctx, raw)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(hits) == 0 {
-		return nil, ErrAgentNotFound
-	}
-
-	// Expect only one hit
-	if len(hits) != 1 {
-		return nil, fmt.Errorf("hit count mismatch %v", len(hits))
-	}
-
-	// Don't bother decrypting agent key; do straight decode instead of saved.Decode
-	var agent Agent
-	if err := json.Unmarshal(hits[0].Data, &agent); err != nil {
-		return nil, err
-	}
-
-	agent.Id = hits[0].Id
-	return &agent, nil
+	return &agent, err
 }
 
 // parseMeta compares the agent and the request local_metadata content
 // and returns fields to update the agent record or nil
-func parseMeta(agent *Agent, req *CheckinRequest) (fields saved.Fields, err error) {
+func parseMeta(agent *model.Agent, req *CheckinRequest) (fields saved.Fields, err error) {
 	// Quick comparison first
-	if bytes.Equal(req.LocalMeta, agent.LocalMeta) {
+	if bytes.Equal(req.LocalMeta, agent.LocalMetadata) {
 		log.Trace().Msg("Quick comparing local metadata is equal")
 		return nil, nil
 	}
@@ -442,7 +392,7 @@ func parseMeta(agent *Agent, req *CheckinRequest) (fields saved.Fields, err erro
 	if err != nil {
 		return nil, err
 	}
-	err = json.Unmarshal(agent.LocalMeta, &agentLocalMeta)
+	err = json.Unmarshal(agent.LocalMetadata, &agentLocalMeta)
 	if err != nil {
 		return nil, err
 	}

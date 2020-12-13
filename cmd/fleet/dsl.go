@@ -14,24 +14,6 @@ const (
 	kTmplAgentIdField = "AgentIdList"
 )
 
-var apiKeyQueryTmpl = genQueryTemplate()
-
-func genQueryTemplate() *dsl.Tmpl {
-	tmpl := dsl.NewTmpl()
-	token := tmpl.Bind(kTmplApiKeyField)
-
-	root := saved.NewQuery(AGENT_SAVED_OBJECT_TYPE)
-
-	field := saved.ScopeField(AGENT_SAVED_OBJECT_TYPE, "access_api_key_id")
-	root.Query().Bool().Must().Term(field, token, nil)
-
-	if err := tmpl.Resolve(root); err != nil {
-		panic(err)
-	}
-
-	return tmpl
-}
-
 var agentActionQueryTmpl = genAgentActionQueryTemplate()
 
 func genAgentActionQueryTemplate() *dsl.Tmpl {

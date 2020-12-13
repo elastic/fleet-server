@@ -31,7 +31,6 @@ func SearchWithOneParam(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, i
 	if err != nil {
 		return nil, err
 	}
-
 	res, err := bulker.Search(ctx, []string{index}, query)
 	if err != nil {
 		return nil, err

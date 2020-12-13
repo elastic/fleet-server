@@ -139,6 +139,9 @@ type Agent struct {
 
 	// Date/time the Elastic Agent was last upgraded
 	UpgradedAt string `json:"upgraded_at,omitempty"`
+
+	// User provided metadata information for the Elastic Agent
+	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata,omitempty"`
 }
 
 // AgentMetadata An Elastic Agent metadata
@@ -244,4 +247,8 @@ type ServerMetadata struct {
 
 	// The version of the Fleet Server
 	Version string `json:"version"`
+}
+
+// UserProvidedMetadata User provided metadata information for the Elastic Agent
+type UserProvidedMetadata struct {
 }
