@@ -11,6 +11,9 @@ const (
 	// Action An Elastic Agent action
 	MappingAction = `{
 	"properties": {
+		"action_id": {
+			"type": "keyword"
+		},
 		"agents": {
 			"type": "keyword"
 		},
@@ -20,9 +23,6 @@ const (
 		},
 		"expiration": {
 			"type": "date"
-		},
-		"id": {
-			"type": "keyword"
 		},
 		"input_id": {
 			"type": "keyword"
@@ -67,6 +67,9 @@ const (
 		"action_seq_no": {
 			"type": "integer"
 		},
+		"active": {
+			"type": "boolean"
+		},
 		"agent": {
 			"properties": {
 				"id": {
@@ -86,15 +89,33 @@ const (
 		"enrolled_at": {
 			"type": "date"
 		},
+		"last_checkin": {
+			"type": "date"
+		},
+		"last_checkin_status": {
+			"type": "keyword"
+		},
+		"last_updated": {
+			"type": "date"
+		},
 		"local_metadata": {
 			"enabled" : false,
 			"type": "object"
+		},
+		"packages": {
+			"type": "keyword"
 		},
 		"policy_id": {
 			"type": "keyword"
 		},
 		"policy_revision": {
 			"type": "integer"
+		},
+		"shared_id": {
+			"type": "keyword"
+		},
+		"type": {
+			"type": "keyword"
 		},
 		"unenrolled_at": {
 			"type": "date"

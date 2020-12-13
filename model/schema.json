@@ -6,8 +6,16 @@
       "description": "An Elastic Agent action",
       "type": "object",
       "properties": {
-        "id": {
-          "description": "The unique identifier for the Elastic Agent action",
+        "_id": {
+          "description": "The unique identifier for action document",
+          "type": "string"
+        },
+        "_seq_no": {
+          "description": "The action sequence number",
+          "type": "integer"
+        },
+        "action_id": {
+          "description": "The unique identifier for the Elastic Agent action. There could be multiple documents with the same action_id if the action is split into two separate documents.",
           "type": "string",
           "format": "uuid"
         },
@@ -266,32 +274,17 @@
           "description": "The version of the document in the index",
           "type": "integer"
         },
-        "agent": { "$ref": "#/definitions/agent-metadata" },
-        "local_metadata": {
-          "description": "Local metadata information for the Elastic Agent",
-          "type": "object",
-          "format": "raw"
-        },
-        "access_api_key_id": {
-          "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
+        "shared_id": {
+          "description": "Shared ID",
           "type": "string"
         },
-        "default_api_key": {
-          "description": "API key the Elastic Agent uses to authenticate with elasticsearch",
+        "type": {
+          "description": "Type",
           "type": "string"
         },
-        "default_api_key_id": {
-          "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
-          "type": "string"
-        },
-        "policy_id": {
-          "description": "The policy ID for the Elastic Agent",
-          "type": "string",
-          "format": "uuid"
-        },
-        "policy_revision": {
-          "description": "The current policy revision for the Elastic Agent",
-          "type": "integer"
+        "active": {
+          "description": "Active flag",
+          "type": "boolean"
         },
         "enrolled_at": {
           "description": "Date/time the Elastic Agent enrolled",
@@ -318,10 +311,58 @@
           "type": "string",
           "format": "date-time"
         },
+        "access_api_key_id": {
+          "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
+          "type": "string"
+        },
+        "agent": { "$ref": "#/definitions/agent-metadata" },
+        "local_metadata": {
+          "description": "Local metadata information for the Elastic Agent",
+          "type": "object",
+          "format": "raw"
+        },
+        "policy_id": {
+          "description": "The policy ID for the Elastic Agent",
+          "type": "string",
+          "format": "uuid"
+        },
+        "policy_revision": {
+          "description": "The current policy revision for the Elastic Agent",
+          "type": "integer"
+        },
+        "last_updated": {
+          "description": "Date/time the Elastic Agent was last updated",
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_checkin": {
+          "description": "Date/time the Elastic Agent checked in last time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_checkin_status": {
+          "description": "Lst checkin status",
+          "type": "string"
+        },
+        "default_api_key_id": {
+          "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
+          "type": "string"
+        },
+        "default_api_key": {
+          "description": "API key the Elastic Agent uses to authenticate with elasticsearch",
+          "type": "string"
+        },
         "updated_at": {
           "description": "Date/time the Elastic Agent was last updated",
           "type": "string",
           "format": "date-time"
+        },
+        "packages": {
+          "description": "Packages array",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "action_seq_no": {
           "description": "The last acknowledged action sequence number for the Elastic Agent",
@@ -330,12 +371,10 @@
       },
       "required": [
         "_id",
-        "_version",
-        "agent_version",
-        "access_api_key_id",
-        "policy_id",
+        "type",
+        "active",
         "enrolled_at",
-        "updated_at"
+        "status"
       ]
     },
     "enrollment_api_key": {

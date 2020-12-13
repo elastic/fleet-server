@@ -23,11 +23,12 @@ type AckResponse struct {
 }
 
 type HitT struct {
-	Id     string          `json:"_id"`
-	SeqNo  int64           `json:"_seq_no"`
-	Index  string          `json:"_index"`
-	Source json.RawMessage `json:"_source"`
-	Score  *float64        `json:"_score"`
+	Id      string          `json:"_id"`
+	SeqNo   int64           `json:"_seq_no"`
+	Version int64           `json:"version"`
+	Index   string          `json:"_index"`
+	Source  json.RawMessage `json:"_source"`
+	Score   *float64        `json:"_score"`
 }
 
 type HitsT struct {

@@ -13,8 +13,28 @@ import (
 // Root
 type Root interface{}
 
+type ESInitializer interface {
+	ESInitialize(id string, seqno, version int64)
+}
+
+type ESDocument struct {
+	Id      string `json:"-"`
+	Version int64  `json:"-"`
+	SeqNo   int64  `json:"-"`
+}
+
+func (d *ESDocument) ESInitialize(id string, seqno, version int64) {
+	d.Id = id
+	d.SeqNo = seqno
+	d.Version = version
+}
+
 // Action An Elastic Agent action
 type Action struct {
+	ESDocument
+
+	// The unique identifier for the Elastic Agent action. There could be multiple documents with the same action_id if the action is split into two separate documents.
+	ActionId string `json:"action_id,omitempty"`
 
 	// The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids
 	Agents []string `json:"agents,omitempty"`
@@ -24,9 +44,6 @@ type Action struct {
 
 	// The action expiration date/time
 	Expiration string `json:"expiration,omitempty"`
-
-	// The unique identifier for the Elastic Agent action
-	Id string `json:"id"`
 
 	// The input identifier the actions should be routed to.
 	InputId string `json:"input_id,omitempty"`
@@ -40,6 +57,7 @@ type Action struct {
 
 // ActionResult An Elastic Agent action results
 type ActionResult struct {
+	ESDocument
 
 	// The action id.
 	ActionId string `json:"action_id,omitempty"`
@@ -59,13 +77,17 @@ type ActionResult struct {
 
 // Agent An Elastic Agent that has enrolled into Fleet
 type Agent struct {
+	ESDocument
 
 	// ID of the API key the Elastic Agent must used to contact Fleet Server
-	AccessApiKeyId string `json:"access_api_key_id"`
+	AccessApiKeyId string `json:"access_api_key_id,omitempty"`
 
 	// The last acknowledged action sequence number for the Elastic Agent
-	ActionSeqNo int64          `json:"action_seq_no,omitempty"`
-	Agent       *AgentMetadata `json:"agent,omitempty"`
+	ActionSeqNo int64 `json:"action_seq_no,omitempty"`
+
+	// Active flag
+	Active bool           `json:"active"`
+	Agent  *AgentMetadata `json:"agent,omitempty"`
 
 	// API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultApiKey string `json:"default_api_key,omitempty"`
@@ -76,17 +98,32 @@ type Agent struct {
 	// Date/time the Elastic Agent enrolled
 	EnrolledAt string `json:"enrolled_at"`
 
-	// The unique identifier for the Elastic Agent
-	Id string `json:"_id"`
+	// Date/time the Elastic Agent checked in last time
+	LastCheckin string `json:"last_checkin,omitempty"`
+
+	// Lst checkin status
+	LastCheckinStatus string `json:"last_checkin_status,omitempty"`
+
+	// Date/time the Elastic Agent was last updated
+	LastUpdated string `json:"last_updated,omitempty"`
 
 	// Local metadata information for the Elastic Agent
 	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
 
+	// Packages array
+	Packages []string `json:"packages,omitempty"`
+
 	// The policy ID for the Elastic Agent
-	PolicyId string `json:"policy_id"`
+	PolicyId string `json:"policy_id,omitempty"`
 
 	// The current policy revision for the Elastic Agent
 	PolicyRevision int64 `json:"policy_revision,omitempty"`
+
+	// Shared ID
+	SharedId string `json:"shared_id,omitempty"`
+
+	// Type
+	Type string `json:"type"`
 
 	// Date/time the Elastic Agent unenrolled
 	UnenrolledAt string `json:"unenrolled_at,omitempty"`
@@ -95,16 +132,13 @@ type Agent struct {
 	UnenrollmentStartedAt string `json:"unenrollment_started_at,omitempty"`
 
 	// Date/time the Elastic Agent was last updated
-	UpdatedAt string `json:"updated_at"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 
 	// Date/time the Elastic Agent started the current upgrade
 	UpgradeStartedAt string `json:"upgrade_started_at,omitempty"`
 
 	// Date/time the Elastic Agent was last upgraded
 	UpgradedAt string `json:"upgraded_at,omitempty"`
-
-	// The version of the document in the index
-	Version int64 `json:"_version"`
 }
 
 // AgentMetadata An Elastic Agent metadata
@@ -123,6 +157,7 @@ type Data struct {
 
 // EnrollmentApiKey An Elastic Agent enrollment API key
 type EnrollmentApiKey struct {
+	ESDocument
 
 	// True when the key is active
 	Active bool `json:"active,omitempty"`
@@ -163,6 +198,7 @@ type LocalMetadata struct {
 
 // Policy A policy that an Elastic Agent is attached to
 type Policy struct {
+	ESDocument
 
 	// The coordinator index of the policy
 	CoordinatorIdx int64 `json:"coordinator_idx"`
@@ -172,9 +208,6 @@ type Policy struct {
 
 	// True when this policy is the default policy to start Fleet Server
 	DefaultFleetServer bool `json:"default_fleet_server"`
-
-	// The unique identifier for the policy revision
-	Id string `json:"_id"`
 
 	// The ID of the policy
 	PolicyId string `json:"policy_id"`
@@ -188,29 +221,19 @@ type Policy struct {
 
 // PolicyLeader The current leader Fleet Server for a policy
 type PolicyLeader struct {
-
-	// The unique identifier for the policy
-	Id     string          `json:"_id"`
+	ESDocument
 	Server *ServerMetadata `json:"server"`
 
 	// Date/time the leader was taken or held
 	Timestamp string `json:"@timestamp,omitempty"`
-
-	// The version of the document in the index
-	Version int64 `json:"_version"`
 }
 
 // Server A Fleet Server
 type Server struct {
-	Agent *AgentMetadata `json:"agent"`
-	Host  *HostMetadata  `json:"host"`
-
-	// The unique identifier for the Fleet Server
-	Id     string          `json:"_id"`
+	ESDocument
+	Agent  *AgentMetadata  `json:"agent"`
+	Host   *HostMetadata   `json:"host"`
 	Server *ServerMetadata `json:"server"`
-
-	// The version of the document in the index
-	Version int64 `json:"_version"`
 }
 
 // ServerMetadata A Fleet Server metadata
