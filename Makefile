@@ -74,12 +74,19 @@ check-no-changes:
 
 .PHONY: test
 test:  ## - Run all tests
+	@mkdir -p build
 	@$(MAKE) test-unit 
 	# @$(MAKE) test-int
+	@$(MAKE) junit
 
 .PHONY: test-unit 
 test-unit: ## - Run unit tests only
-	@go test -v -race ./...
+	@go test -v -race ./... | tee build/test-unit.out
+
+.PHONY: junit
+junit: ## - Run unit tests only
+	@go get -v -u github.com/jstemmer/go-junit-report
+	$(foreach file, $(wildcard build/*), go-junit-report > "${file}.xml" < ${file};)
 
 ##################################################
 # Integration testing targets
@@ -114,7 +121,7 @@ int-docker-stop: ## - Stop docker environment for integration tests
 .PHONY: test-int
 test-int: ## - Run integration tests with full setup (slow!)
 	@$(MAKE) int-docker-start
-	@$(MAKE) test-int-set
+	@$(MAKE) test-int-set | tee build/test-init.out
 	@$(MAKE) int-docker-stop
 
 # Run integration tests without starting/stopping docker
