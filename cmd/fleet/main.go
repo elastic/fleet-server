@@ -193,19 +193,17 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	var tr *action.TokenResolver
 
 	// Behind the feature flag
-	if f.cfg.Features.Enabled(config.FeatureActions) {
-		am, err = monitor.New(dl.FleetActions, es, monitor.WithExpiration(true))
-		if err != nil {
-			return err
-		}
-		funcs = append(funcs, runner.LoggedRunFunc("Action monitor", am.Run))
+	am, err = monitor.New(dl.FleetActions, es, monitor.WithExpiration(true))
+	if err != nil {
+		return err
+	}
+	funcs = append(funcs, runner.LoggedRunFunc("Action monitor", am.Run))
 
-		ad = action.NewDispatcher(am)
-		funcs = append(funcs, runner.LoggedRunFunc("Action dispatcher", ad.Run))
-		tr, err = action.NewTokenResolver(bulker)
-		if err != nil {
-			return err
-		}
+	ad = action.NewDispatcher(am)
+	funcs = append(funcs, runner.LoggedRunFunc("Action dispatcher", ad.Run))
+	tr, err = action.NewTokenResolver(bulker)
+	if err != nil {
+		return err
 	}
 
 	ba := NewBulkActions()

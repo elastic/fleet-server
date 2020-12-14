@@ -6,7 +6,6 @@ package dl
 
 import (
 	"context"
-	"encoding/json"
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/dsl"
 	"fleet/internal/pkg/model"
@@ -15,6 +14,10 @@ import (
 
 const (
 	FieldApiKeyID = "api_key_id"
+)
+
+var (
+	QueryEnrollmentAPIKeyByID = prepareFindEnrollmentAPIKeyByID()
 )
 
 // RenderAllEnrollmentAPIKeysQuery render all enrollment api keys query. For migration only.
@@ -31,26 +34,21 @@ func RenderAllEnrollmentAPIKeysQuery(size uint64) ([]byte, error) {
 	return tmpl.Render(nil)
 }
 
-// PrepareEnrollmentAPIKeyByIDQuery
-func PrepareEnrollmentAPIKeyByIDQuery() (*dsl.Tmpl, error) {
+func prepareFindEnrollmentAPIKeyByID() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 
 	root := dsl.NewRoot()
 	root.Query().Bool().Filter().Term(FieldApiKeyID, tmpl.Bind(FieldApiKeyID), nil)
 
-	err := tmpl.Resolve(root)
-	if err != nil {
-		return nil, err
-	}
-
-	return tmpl, nil
+	tmpl.MustResolve(root)
+	return tmpl
 }
 
-func SearchEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, id string) (rec model.EnrollmentApiKey, err error) {
-	return searchEnrollmentAPIKey(ctx, bulker, FleetEnrollmentAPIKeys, tmpl, id)
+func FindEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, id string) (rec model.EnrollmentApiKey, err error) {
+	return findEnrollmentAPIKey(ctx, bulker, FleetEnrollmentAPIKeys, tmpl, id)
 }
 
-func searchEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, tmpl *dsl.Tmpl, id string) (rec model.EnrollmentApiKey, err error) {
+func findEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, tmpl *dsl.Tmpl, id string) (rec model.EnrollmentApiKey, err error) {
 	res, err := SearchWithOneParam(ctx, bulker, tmpl, index, FieldApiKeyID, id)
 	if err != nil {
 		return
@@ -61,9 +59,6 @@ func searchEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string,
 		return rec, fmt.Errorf("hit count mismatch %v", sz)
 	}
 
-	err = json.Unmarshal(res.Hits[0].Source, &rec)
-	if err != nil {
-		return
-	}
-	return
+	err = res.Hits[0].Unmarshal(&rec)
+	return rec, err
 }

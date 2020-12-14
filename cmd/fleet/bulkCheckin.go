@@ -87,57 +87,36 @@ func (bc *BulkCheckin) flush(ctx context.Context, sv saved.CRUD) error {
 		return nil
 	}
 
-	updates := make([]saved.UpdateT, 0, len(pending))
-	seqNoUpdates := make([]bulk.BulkOp, 0, len(pending))
+	updates := make([]bulk.BulkOp, 0, len(pending))
 
 	for id, pendingData := range pending {
-		updates = append(updates, saved.UpdateT{
-			Id:     id,
-			Type:   AGENT_SAVED_OBJECT_TYPE,
-			Fields: pendingData.fields,
+		doc := pendingData.fields
+		doc[dl.FieldUpdatedAt] = time.Now().UTC().Format(time.RFC3339)
+		if pendingData.seqNo >= 0 {
+			doc[dl.FieldActionSeqNo] = pendingData.seqNo
+		}
+
+		source, err := json.Marshal(map[string]interface{}{
+			"doc": doc,
 		})
 
-		if pendingData.seqNo >= 0 {
-			source, err := json.Marshal(map[string]interface{}{
-				"doc": map[string]interface{}{
-					"action_seq_no": pendingData.seqNo,
-					"updated_at":    time.Now().UTC().Format(time.RFC3339),
-				},
-			})
-
-			if err != nil {
-				return err
-			}
-
-			seqNoUpdates = append(seqNoUpdates, bulk.BulkOp{
-				Id:    id,
-				Body:  source,
-				Index: dl.FleetAgents,
-			})
+		if err != nil {
+			return err
 		}
+
+		updates = append(updates, bulk.BulkOp{
+			Id:    id,
+			Body:  source,
+			Index: dl.FleetAgents,
+		})
 	}
 
-	err := sv.MUpdate(ctx, updates)
-
+	err := bc.bulker.MUpdate(ctx, updates, bulk.WithRefresh())
 	log.Debug().
 		Err(err).
 		Dur("rtt", time.Since(start)).
 		Int("cnt", len(updates)).
-		Msg("Flush checkin")
-
-	if err != nil {
-		return err
-	}
-
-	if len(seqNoUpdates) > 0 {
-		start := time.Now()
-		err := bc.bulker.MUpdate(ctx, seqNoUpdates, bulk.WithRefresh())
-		log.Debug().
-			Err(err).
-			Dur("rtt", time.Since(start)).
-			Int("cnt", len(seqNoUpdates)).
-			Msg("Flush seqno updates")
-	}
+		Msg("Flush updates")
 
 	return err
 }

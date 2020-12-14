@@ -72,49 +72,6 @@ type AgentAction struct {
 	Data      string `json:"data" saved:"encrypt"`
 }
 
-type Agent struct {
-	Id                 string          `json:"-"`
-	SharedId           string          `json:"shared_id"`
-	Type               string          `json:"type"`
-	Active             bool            `json:"active"`
-	EnrolledAt         string          `json:"enrolled_at"`
-	UnEnrolledAt       string          `json:"unenrolled_at,omitempty"`
-	UnEnrollStart      string          `json:"unenrollment_started_at,omitempty"`
-	UpgradeAt          string          `json:"upgraded_at,omitempty"`
-	UpgradeStart       string          `json:"upgrade_started_at,omitempty"`
-	AccessApiKeyId     string          `json:"access_api_key_id"`
-	Version            string          `json:"version"`
-	UserMeta           json.RawMessage `json:"user_provided_metadata"`
-	LocalMeta          json.RawMessage `json:"local_metadata"`
-	PolicyId           string          `json:"policy_id"`
-	PolicyRev          uint64          `json:"policy_revision"`
-	LastUpdated        string          `json:"last_updated,omitempty"`
-	LastCheckin        string          `json:"last_checkin,omitempty"`
-	LastStatus         string          `json:"last_checkin_status"`
-	DefaultApiKeyId    string          `json:"default_api_key_id" saved:"aad"`
-	DefaultApiKey      string          `json:"default_api_key" saved:"encrypt"`
-	UpdatedAt          string          `json:"updated_at,omitempty"`
-	CurrentErrorEvents interface{}     `json:"current_error_events"`
-	Packages           []string        `json:"packages"`
-	ActionSeqNo        int64           `json:"-"` // New fleet property should not be serialized to saved objects
-}
-
-// Wrong: no AAD;
-// This defeats the signature check;
-// can copy from one to another and will dispatch.
-
-type EnrollmentApiKey struct {
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	ApiKey    string `json:"api_key" saved:"encrypt"`
-	ApiKeyId  string `json:"api_key_id"`
-	PolicyId  string `json:"policy_id"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-	ExpireAt  string `json:"expire_at"`
-	Active    bool   `json:"active"`
-}
-
 type EnrollRequest struct {
 	Type     string `json:"type"`
 	SharedId string `json:"shared_id"`
@@ -188,7 +145,7 @@ type Action struct {
 	Id        string `json:"-"`
 	AgentId   string `json:"agent_id,omitempty"`
 	PolicyId  string `json:"policy_id,omitempty" saved:"aad"`
-	PolicyRev uint64 `json:"policy_revision,omitempty" saved:"aad"`
+	PolicyRev int64  `json:"policy_revision,omitempty" saved:"aad"`
 	Type      string `json:"type"`
 	Data      string `json:"data" saved:"encrypt"`
 	AckData   string `json:"ack_data" saved:"aad"`

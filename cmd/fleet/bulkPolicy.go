@@ -26,7 +26,7 @@ const (
 type PolicySub struct {
 	id  string
 	idx uint64
-	rev uint64
+	rev int64
 	C   chan Action
 }
 
@@ -91,7 +91,7 @@ LOOP:
 	return err
 }
 
-func (pm *PolicyMon) getLatestAction(ctx context.Context, sv saved.CRUD, id string, rev uint64) (*Action, error) {
+func (pm *PolicyMon) getLatestAction(ctx context.Context, sv saved.CRUD, id string, rev int64) (*Action, error) {
 
 	m := map[string]interface{}{
 		kTmplPolicyId:  id,
@@ -143,7 +143,7 @@ func (pm *PolicyMon) Process(ctx context.Context, sv saved.CRUD) error {
 	for policyId, p := range pm.policies {
 		numPolicies += 1
 
-		go func(id string, rev uint64) {
+		go func(id string, rev int64) {
 			action, err := pm.getLatestAction(ctx, sv, id, rev)
 			select {
 			case ch <- respT{err, action, id}:
@@ -278,8 +278,8 @@ func (pm *PolicyMon) updatePolicy(policyId string, action *Action) ([]PolicySub,
 
 	log.Info().
 		Str("policyId", policyId).
-		Uint64("orev", p.action.PolicyRev).
-		Uint64("nrev", action.PolicyRev).
+		Int64("orev", p.action.PolicyRev).
+		Int64("nrev", action.PolicyRev).
 		RawJSON("data", []byte(action.Data)).
 		Msg("New policy")
 
@@ -299,7 +299,7 @@ func (pm *PolicyMon) updatePolicy(policyId string, action *Action) ([]PolicySub,
 	return subs, nil
 }
 
-func (pm *PolicyMon) Subscribe(id string, rev uint64) (*PolicySub, error) {
+func (pm *PolicyMon) Subscribe(id string, rev int64) (*PolicySub, error) {
 	if _, err := uuid.FromString(id); err != nil {
 		return nil, err
 	}

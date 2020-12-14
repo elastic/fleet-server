@@ -53,7 +53,10 @@ func createRandomActions() ([]model.Action, error) {
 		}
 
 		action := model.Action{
-			Id:         uuid.Must(uuid.NewV4()).String(),
+			ESDocument: model.ESDocument{
+				Id: xid.New().String(),
+			},
+			ActionId:   uuid.Must(uuid.NewV4()).String(),
 			Timestamp:  r.Time(now, 2, 5, time.Second, rnd.TimeBefore).Format(time.RFC3339),
 			Expiration: r.Time(now, 12, 25, time.Minute, rnd.TimeAfter).Format(time.RFC3339),
 			Type:       "APP_ACTION",
@@ -78,7 +81,7 @@ func storeRandomActions(ctx context.Context, bulker bulk.Bulk, index string) ([]
 		if err != nil {
 			return nil, err
 		}
-		_, err = bulker.Create(ctx, index, "", body, bulk.WithRefresh())
+		_, err = bulker.Create(ctx, index, action.Id, body, bulk.WithRefresh())
 		if err != nil {
 			return nil, err
 		}
@@ -120,12 +123,8 @@ func TestSearchActionsQuery(t *testing.T) {
 	bulker, actions := setupActions(ctx, t, index)
 
 	t.Run("all agents actions", func(t *testing.T) {
-		tmpl, err := PrepareAllAgentActionsQuery()
-		if err != nil {
-			t.Fatal(err)
-		}
 
-		foundActions, err := searchActions(ctx, bulker, tmpl, index, map[string]interface{}{
+		foundActions, err := findActions(ctx, bulker, QueryAllAgentActions, index, map[string]interface{}{
 			FieldSeqNo:      -1,
 			FieldMaxSeqNo:   len(actions),
 			FieldExpiration: now,

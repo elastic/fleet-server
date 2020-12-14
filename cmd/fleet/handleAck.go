@@ -10,8 +10,11 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/dl"
+	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"
@@ -38,7 +41,7 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 
 // TODO: Handle UPGRADE and UNENROLL
 func _handleAcks(w http.ResponseWriter, r *http.Request, id string, sv saved.CRUD, bulker bulk.Bulk) error {
-	agent, err := authAgent(r, id, sv, bulker)
+	agent, err := authAgent(r, id, bulker)
 	if err != nil {
 		return err
 	}
@@ -55,7 +58,7 @@ func _handleAcks(w http.ResponseWriter, r *http.Request, id string, sv saved.CRU
 
 	log.Trace().RawJSON("raw", raw).Msg("Ack request")
 
-	if err = _handleAckEvents(r.Context(), agent, req.Events, sv); err != nil {
+	if err = _handleAckEvents(r.Context(), agent, req.Events, sv, bulker); err != nil {
 		return err
 	}
 
@@ -74,7 +77,7 @@ func _handleAcks(w http.ResponseWriter, r *http.Request, id string, sv saved.CRU
 	return nil
 }
 
-func _handleAckEvents(ctx context.Context, agent *Agent, events []Event, sv saved.CRUD) error {
+func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, sv saved.CRUD, bulker bulk.Bulk) error {
 
 	// Retrieve each action
 	m := map[string][]Action{}
@@ -100,7 +103,7 @@ func _handleAckEvents(ctx context.Context, agent *Agent, events []Event, sv save
 	// TODO: handle UPGRADE and UNENROLL
 
 	if actions, ok := m[TypePolicyChange]; ok {
-		if err := _handlePolicyChange(ctx, agent, actions, sv); err != nil {
+		if err := _handlePolicyChange(ctx, agent, actions, bulker); err != nil {
 			return err
 		}
 	}
@@ -108,7 +111,7 @@ func _handleAckEvents(ctx context.Context, agent *Agent, events []Event, sv save
 	return nil
 }
 
-func _handlePolicyChange(ctx context.Context, agent *Agent, actions []Action, sv saved.CRUD) error {
+func _handlePolicyChange(ctx context.Context, agent *model.Agent, actions []Action, bulker bulk.Bulk) error {
 
 	// If more than one, pick the winner;
 	// 0) Correctly typed
@@ -130,12 +133,29 @@ func _handlePolicyChange(ctx context.Context, agent *Agent, actions []Action, sv
 
 	if found {
 
+		updates := make([]bulk.BulkOp, 0, 1)
 		fields := map[string]interface{}{
-			FieldPolicyRev: bestAction.PolicyRev,
-			FieldPackages:  bestAction.AckData,
+			dl.FieldPolicyRevision: bestAction.PolicyRev,
+			dl.FieldPackages:       bestAction.AckData,
+		}
+		fields[dl.FieldUpdatedAt] = time.Now().UTC().Format(time.RFC3339)
+
+		source, err := json.Marshal(map[string]interface{}{
+			"doc": fields,
+		})
+
+		if err != nil {
+			return err
 		}
 
-		if err := sv.Update(ctx, AGENT_SAVED_OBJECT_TYPE, agent.Id, fields, saved.WithRefresh()); err != nil {
+		updates = append(updates, bulk.BulkOp{
+			Id:    agent.Id,
+			Body:  source,
+			Index: dl.FleetAgents,
+		})
+
+		err = bulker.MUpdate(ctx, updates, bulk.WithRefresh())
+		if err != nil {
 			return err
 		}
 	}

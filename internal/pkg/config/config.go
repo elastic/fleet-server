@@ -21,10 +21,9 @@ var DefaultOptions = []ucfg.Option{
 
 // Config is the global configuration.
 type Config struct {
-	Fleet    Fleet    `config:"fleet"`
-	Output   Output   `config:"output"`
-	Inputs   []Input  `config:"inputs"`
-	Features Features `config:"features"`
+	Fleet  Fleet   `config:"fleet"`
+	Output Output  `config:"output"`
+	Inputs []Input `config:"inputs"`
 }
 
 // InitDefaults initializes the defaults for the configuration.

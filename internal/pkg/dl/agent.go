@@ -7,70 +7,57 @@ package dl
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"sync"
 
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/dsl"
 	"fleet/internal/pkg/model"
+
+	"github.com/gofrs/uuid"
 )
 
-var ErrAgentNotFound = errors.New("agent not found")
+const (
+	FieldAccessAPIKeyID = "access_api_key_id"
+)
 
 var (
-	tmplQueryAgentByID     *dsl.Tmpl
-	initQueryAgentByIDOnce sync.Once
+	QueryAgentByAssessAPIKeyID = prepareAgentFindByAccessAPIKeyID()
+	QueryAgentByID             = prepareAgentFindByID()
 )
 
-func prepareQueryAgent() *dsl.Tmpl {
-	tmpl := dsl.NewTmpl()
-	root := dsl.NewRoot()
-	root.Query().Bool().Filter().Term(FieldId, tmpl.Bind(FieldId), nil)
-
-	return tmpl.MustResolve(root)
+func prepareAgentFindByID() *dsl.Tmpl {
+	return prepareAgentFindByField(FieldId)
 }
 
-// QueryAgentById queries the agent by id.
-func QueryAgentById(ctx context.Context, bulker bulk.Bulk, agentId string) (agent model.Agent, err error) {
-	agent, err = queryAgentById(ctx, bulker, agentId)
-	if err != nil {
-		return
-	}
-
-	return
+func prepareAgentFindByAccessAPIKeyID() *dsl.Tmpl {
+	return prepareAgentFindByField(FieldAccessAPIKeyID)
 }
 
-func QueryAgentActionSeqNo(ctx context.Context, bulker bulk.Bulk, agentId string) (seqno int64, err error) {
-	agent, err := queryAgentById(ctx, bulker, agentId)
-
-	_ = agent
-	if err != nil {
-		return
-	}
-	return agent.ActionSeqNo, nil
+func prepareAgentFindByField(field string) *dsl.Tmpl {
+	return prepareFindByField(field, map[string]interface{}{"version": true})
 }
 
-func queryAgentById(ctx context.Context, bulker bulk.Bulk, agentId string) (agent model.Agent, err error) {
-	initQueryAgentByIDOnce.Do(func() {
-		tmplQueryAgentByID = prepareQueryAgent()
-	})
-
-	query, err := tmplQueryAgentByID.RenderOne(FieldId, agentId)
-	if err != nil {
-		return
-	}
-
-	res, err := bulker.Search(ctx, []string{FleetAgents}, query)
+func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name string, v interface{}) (agent model.Agent, err error) {
+	res, err := SearchWithOneParam(ctx, bulker, tmpl, FleetAgents, name, v)
 	if err != nil {
 		return
 	}
 
 	if len(res.Hits) == 0 {
-		return agent, ErrAgentNotFound
+		return agent, ErrNotFound
 	}
 
-	hit := res.Hits[0]
-	err = json.Unmarshal(hit.Source, &agent)
-
+	err = res.Hits[0].Unmarshal(&agent)
 	return agent, err
+}
+
+func IndexAgent(ctx context.Context, bulker bulk.Bulk, agent model.Agent) error {
+	if agent.Id == "" {
+		agent.Id = uuid.Must(uuid.NewV4()).String()
+	}
+	body, err := json.Marshal(agent)
+	if err != nil {
+		return err
+	}
+	_, err = bulker.Index(ctx, FleetAgents, agent.Id, body, bulk.WithRefresh())
+	return err
 }

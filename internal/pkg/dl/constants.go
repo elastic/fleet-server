@@ -17,7 +17,13 @@ const (
 	FieldSource = "_source"
 	FieldId     = "_id"
 
-	FieldMaxSeqNo = "max_seq_no"
+	FieldMaxSeqNo    = "max_seq_no"
+	FieldActionSeqNo = "action_seq_no"
+
+	FieldPolicyRevision = "policy_revision"
+	FieldPackages       = "packages"
+
+	FieldUpdatedAt = "updated_at"
 )
 
 // Public constants
