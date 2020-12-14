@@ -9,7 +9,6 @@ import (
 
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/dsl"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/rs/zerolog/log"
@@ -20,7 +19,6 @@ const cacheSize = 5000
 type TokenResolver struct {
 	bulker bulk.Bulk
 	cache  *lru.Cache
-	tmpl   *dsl.Tmpl
 }
 
 func NewTokenResolver(bulker bulk.Bulk) (*TokenResolver, error) {
@@ -29,11 +27,9 @@ func NewTokenResolver(bulker bulk.Bulk) (*TokenResolver, error) {
 		return nil, err
 	}
 
-	tmpl, err := dl.PrepareQuerySeqNoByDocId()
 	return &TokenResolver{
 		bulker: bulker,
 		cache:  cache,
-		tmpl:   tmpl,
 	}, nil
 }
 
@@ -47,7 +43,7 @@ func (r *TokenResolver) Resolve(ctx context.Context, token string) (seqno int64,
 		return
 	}
 
-	seqno, err = dl.QuerySeqNoByDocId(ctx, r.bulker, r.tmpl, dl.FleetActions, token)
+	seqno, err = dl.FindSeqNoByDocID(ctx, r.bulker, dl.QuerySeqNoByDocID, dl.FleetActions, token)
 	if err != nil {
 		return
 	}

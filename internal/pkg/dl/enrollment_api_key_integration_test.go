@@ -25,6 +25,9 @@ import (
 func createRandomEnrollmentAPIKey() model.EnrollmentApiKey {
 	now := time.Now().UTC()
 	return model.EnrollmentApiKey{
+		ESDocument: model.ESDocument{
+			Id: xid.New().String(),
+		},
 		Active:    true,
 		ApiKey:    "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		ApiKeyId:  xid.New().String(),
@@ -42,7 +45,7 @@ func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index st
 	if err != nil {
 		return
 	}
-	_, err = bulker.Create(ctx, index, "", body, bulk.WithRefresh())
+	_, err = bulker.Create(ctx, index, rec.Id, body, bulk.WithRefresh())
 	if err != nil {
 		return
 	}
@@ -64,12 +67,7 @@ func TestSearchEnrollmentAPIKey(t *testing.T) {
 	defer cn()
 
 	index, bulker, rec := setupEnrollmentAPIKeys(ctx, t)
-	tmpl, err := PrepareEnrollmentAPIKeyByIDQuery()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	foundRec, err := searchEnrollmentAPIKey(ctx, bulker, index, tmpl, rec.ApiKeyId)
+	foundRec, err := findEnrollmentAPIKey(ctx, bulker, index, QueryEnrollmentAPIKeyByID, rec.ApiKeyId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +77,7 @@ func TestSearchEnrollmentAPIKey(t *testing.T) {
 		t.Fatal(diff)
 	}
 
-	foundRec, err = searchEnrollmentAPIKey(ctx, bulker, index, tmpl, xid.New().String())
+	foundRec, err = findEnrollmentAPIKey(ctx, bulker, index, QueryEnrollmentAPIKeyByID, xid.New().String())
 	if err == nil {
 		t.Fatal("expected error")
 	} else {

@@ -9,7 +9,3 @@ fleet:
     id: 1e4954ce-af37-4731-9f4a-407b08e69e42
     logging:
       level: '${LOG_LEVEL:INFO}'
-
-features:
-  actions:
-    enabled: true

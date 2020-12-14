@@ -11,8 +11,7 @@ import (
 
 	"fleet/internal/pkg/apikey"
 	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/saved"
+	"fleet/internal/pkg/model"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
@@ -65,26 +64,17 @@ func authApiKey(r *http.Request, client *elasticsearch.Client) (*apikey.ApiKey, 
 	return key, err
 }
 
-func authAgent(r *http.Request, id string, sv saved.CRUD, bulker bulk.Bulk) (*Agent, error) {
+func authAgent(r *http.Request, id string, bulker bulk.Bulk) (*model.Agent, error) {
 	// authenticate
-	key, err := authApiKey(r, sv.Client())
+	key, err := authApiKey(r, bulker.Client())
 	if err != nil {
 		return nil, err
 	}
 
-	agent, err := findAgentByApiKeyId(r.Context(), sv, key.Id)
+	agent, err := findAgentByApiKeyId(r.Context(), bulker, key.Id)
 	if err != nil {
 		return nil, err
 	}
-
-	agent.ActionSeqNo = dl.UndefinedSeqNo
-	seqno, err := dl.QueryAgentActionSeqNo(r.Context(), bulker, id)
-	if err != nil {
-		if err != dl.ErrAgentNotFound {
-			log.Debug().Str("agent_id", id).Int64("action_seq_no", seqno).Msg("Failed to fetch agent last action sequence number")
-		}
-	}
-	agent.ActionSeqNo = seqno
 
 	// validate key alignment
 	if agent.AccessApiKeyId != key.Id {

@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"strings"
+
+	"fleet/internal/pkg/model"
 )
 
 // Error
@@ -27,11 +29,23 @@ type AckResponse struct {
 }
 
 type HitT struct {
-	Id     string          `json:"_id"`
-	SeqNo  int64           `json:"_seq_no"`
-	Index  string          `json:"_index"`
-	Source json.RawMessage `json:"_source"`
-	Score  *float64        `json:"_score"`
+	Id      string          `json:"_id"`
+	SeqNo   int64           `json:"_seq_no"`
+	Version int64           `json:"version"`
+	Index   string          `json:"_index"`
+	Source  json.RawMessage `json:"_source"`
+	Score   *float64        `json:"_score"`
+}
+
+func (hit *HitT) Unmarshal(v interface{}) error {
+	err := json.Unmarshal(hit.Source, v)
+	if err != nil {
+		return err
+	}
+	if s, ok := v.(model.ESInitializer); ok {
+		s.ESInitialize(hit.Id, hit.SeqNo, hit.Version)
+	}
+	return nil
 }
 
 type HitsT struct {

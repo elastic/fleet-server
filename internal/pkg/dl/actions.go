@@ -6,7 +6,6 @@ package dl
 
 import (
 	"context"
-	"encoding/json"
 
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/dsl"
@@ -18,32 +17,26 @@ const (
 	FieldExpiration = "expiration"
 )
 
-type ActionDoc struct {
-	model.Action
-	DocID string
-	SeqNo int64
-}
+var (
+	QueryAllAgentActions = prepareFindAllAgentsActions()
+	QueryAgentActions    = prepareFindAgentActions()
+)
 
-func PrepareAllAgentActionsQuery() (tmpl *dsl.Tmpl, err error) {
+func prepareFindAllAgentsActions() *dsl.Tmpl {
 	tmpl, root, _ := createBaseActionsQuery()
-	if err := tmpl.Resolve(root); err != nil {
-		return nil, err
-	}
-	return
+	tmpl.MustResolve(root)
+	return tmpl
 }
 
-func PrepareAgentActionsQuery() (tmpl *dsl.Tmpl, err error) {
+func prepareFindAgentActions() *dsl.Tmpl {
 	tmpl, root, filter := createBaseActionsQuery()
 
 	filter.Terms(FieldAgents, tmpl.Bind(FieldAgents), nil)
 
 	root.Source().Excludes(FieldAgents)
 
-	if err := tmpl.Resolve(root); err != nil {
-		return nil, err
-	}
-
-	return
+	tmpl.MustResolve(root)
+	return tmpl
 }
 
 func createBaseActionsQuery() (tmpl *dsl.Tmpl, root, filter *dsl.Node) {
@@ -61,25 +54,25 @@ func createBaseActionsQuery() (tmpl *dsl.Tmpl, root, filter *dsl.Node) {
 	return
 }
 
-func SearchActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, params map[string]interface{}) ([]ActionDoc, error) {
-	return searchActions(ctx, bulker, tmpl, FleetActions, params)
+func FindActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, params map[string]interface{}) ([]model.Action, error) {
+	return findActions(ctx, bulker, tmpl, FleetActions, params)
 }
 
-func searchActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) ([]ActionDoc, error) {
+func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) ([]model.Action, error) {
 	res, err := Search(ctx, bulker, tmpl, index, params)
 	if err != nil {
 		return nil, err
 	}
 
-	docs := make([]ActionDoc, len(res.Hits))
+	actions := make([]model.Action, 0, len(res.Hits))
 
-	for i, hit := range res.Hits {
+	for _, hit := range res.Hits {
 		var action model.Action
-		err = json.Unmarshal(hit.Source, &action)
+		err := hit.Unmarshal(&action)
 		if err != nil {
 			return nil, err
 		}
-		docs[i] = ActionDoc{action, hit.Id, hit.SeqNo}
+		actions = append(actions, action)
 	}
-	return docs, err
+	return actions, err
 }
