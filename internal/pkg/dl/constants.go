@@ -20,7 +20,6 @@ const (
 	FieldSource = "_source"
 	FieldId     = "_id"
 
-	FieldMaxSeqNo       = "max_seq_no"
 	FieldMaxSeqNo    = "max_seq_no"
 	FieldActionSeqNo = "action_seq_no"
 

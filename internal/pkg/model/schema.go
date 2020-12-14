@@ -212,9 +212,6 @@ type Policy struct {
 	// True when this policy is the default policy to start Fleet Server
 	DefaultFleetServer bool `json:"default_fleet_server"`
 
-	// The unique identifier for the policy revision
-	Id string `json:"_id"`
-
 	// The ID of the policy
 	PolicyId string `json:"policy_id"`
 
