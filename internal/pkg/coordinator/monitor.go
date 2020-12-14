@@ -6,7 +6,6 @@ package coordinator
 
 import (
 	"context"
-	"encoding/json"
 	"net"
 	"os"
 	"runtime"
@@ -89,9 +88,9 @@ func NewMonitor(fleet config.Fleet, version string, bulker bulk.Bulk, monitor mo
 
 // Run runs the monitor.
 func (m *monitorT) Run(ctx context.Context) (err error) {
-	m.log.Info().Msg("Start")
+	m.log.Info().Msg("start")
 	defer func() {
-		m.log.Info().Err(err).Msg("Exited")
+		m.log.Info().Err(err).Msg("exited")
 	}()
 
 	// Ensure leadership on startup
@@ -117,7 +116,7 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 			}
 		case <-mT.C:
 			m.calcMetadata()
-			mT.Reset(m.checkInterval)
+			mT.Reset(m.metadataInterval)
 		case <-lT.C:
 			err = m.ensureLeadership(ctx)
 			if err != nil {
@@ -136,7 +135,7 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 	new := false
 	for _, hit := range hits {
 		var policy model.Policy
-		err := json.Unmarshal(hit.Source, &policy)
+		err := hit.Unmarshal(&policy)
 		if err != nil {
 			return err
 		}
@@ -194,7 +193,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	}
 
 	// determine the policies that lead needs to be taken
-	lead := []model.Policy{}
+	var lead []model.Policy
 	now := time.Now().UTC()
 	for _, policy := range policies {
 		leader, ok := leaders[policy.PolicyId]
@@ -219,24 +218,31 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		pt, _ := m.policies[p.PolicyId]
 		pt.id = p.PolicyId
 		go func(p model.Policy, pt policyT) {
+			defer func() {
+				res <- pt
+			}()
+
 			l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
 			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.version, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l.Err(err).Msg("failed to take ownership")
 				if pt.cord != nil {
-					pt.canceller()
-					pt.canceller = nil
 					pt.cord = nil
 				}
-				res <- pt
+				if pt.canceller != nil {
+					pt.canceller()
+					pt.canceller = nil
+				}
 				return
 			}
 			if pt.cord == nil {
 				cord, err := m.factory(p)
 				if err != nil {
 					l.Err(err).Msg("failed to start coordinator")
-					_ = dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
-					res <- pt
+					err = dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
+					if err != nil {
+						l.Err(err).Msg("failed to release policy leadership")
+					}
 					return
 				}
 
@@ -246,7 +252,6 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 				pt.cord = cord
 				pt.canceller = canceller
 			}
-			res <- pt
 		}(p, pt)
 	}
 	for range lead {
@@ -272,7 +277,9 @@ func (m *monitorT) releaseLeadership() {
 			}
 			// uses a background context, because the context for the
 			// monitor will be cancelled at this point in the code
-			err := dl.ReleasePolicyLeadership(context.Background(), m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			err := dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
 				l.Err(err).Msg("failed to release leadership")
@@ -341,10 +348,13 @@ func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d t
 		err := cord.Run(ctx)
 		if err != context.Canceled {
 			l.Err(err).Msg("coordinator failed")
+			t := time.NewTimer(d)
 			select {
-			case <-time.After(d):
+			case <-t.C:
+				t.Stop()
 				break
 			case <-ctx.Done():
+				t.Stop()
 				return
 			}
 		}

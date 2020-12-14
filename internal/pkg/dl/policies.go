@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/model"
-	"fmt"
 	"sync"
 
 	"fleet/internal/pkg/dsl"
@@ -22,6 +21,7 @@ var (
 )
 
 var ErrPolicyLeaderNotFound = errors.New("policy has no leader")
+var ErrMissingAggregations = errors.New("missing expected aggregation result")
 
 func prepareQueryLatestPolicies() []byte {
 	root := dsl.NewRoot()
@@ -43,7 +43,6 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 	})
 
 	o := newOption(FleetPolicies, opt...)
-	aggErr := fmt.Errorf("missing expected aggregation result")
 	res, err := bulker.Search(ctx, []string{o.indexName}, tmplQueryLatestPolicies)
 	if err != nil {
 		return nil, err
@@ -51,7 +50,7 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 
 	policyId, ok := res.Aggregations[FieldPolicyId]
 	if !ok {
-		return nil, aggErr
+		return nil, ErrMissingAggregations
 	}
 	if len(policyId.Buckets) == 0 {
 		return []model.Policy{}, nil
@@ -60,10 +59,10 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 	for i, bucket := range policyId.Buckets {
 		revisionIdx, ok := bucket.Aggregations[FieldRevisionIdx]
 		if !ok || len(revisionIdx.Hits) != 1 {
-			return nil, aggErr
+			return nil, ErrMissingAggregations
 		}
 		hit := revisionIdx.Hits[0]
-		err = json.Unmarshal(hit.Source, &policies[i])
+		err = hit.Unmarshal(&policies[i])
 		if err != nil {
 			return nil, err
 		}

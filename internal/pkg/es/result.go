@@ -6,9 +6,6 @@ package es
 
 import (
 	"encoding/json"
-	"reflect"
-	"strings"
-
 	"fleet/internal/pkg/model"
 )
 
@@ -58,6 +55,8 @@ type HitsT struct {
 }
 
 type Bucket struct {
+	// any fields added here with json tags must also be added to the
+	// delete calls in the `UnmarshalJSON` function below
 	Key          string           `json:"key"`
 	DocCount     int64            `json:"doc_count"`
 	Aggregations map[string]HitsT `json:"-"`
@@ -76,14 +75,11 @@ func (b *Bucket) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	typ := reflect.TypeOf(b2)
-	for i := 0; i < typ.NumField(); i++ {
-		field := typ.Field(i)
-		jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
-		if jsonTag != "" && jsonTag != "-" {
-			delete(aggs, jsonTag)
-		}
-	}
+	// remove the json keys that already unmarshalled into the
+	// bucket. this needs to stay in sync with the json tags
+	// from `Bucket`.
+	delete(aggs, "key")
+	delete(aggs, "doc_count")
 	b2.Aggregations = make(map[string]HitsT)
 	for name, value := range aggs {
 		vMap, ok := value.(map[string]interface{})

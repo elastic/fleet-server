@@ -54,7 +54,7 @@ func SearchPolicyLeaders(ctx context.Context, bulker bulk.Bulk, ids []string, op
 	leaders = map[string]model.PolicyLeader{}
 	for _, hit := range res.Hits {
 		var l model.PolicyLeader
-		err = json.Unmarshal(hit.Source, &l)
+		err = hit.Unmarshal(&l)
 		if err != nil {
 			return
 		}
