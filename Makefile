@@ -77,16 +77,16 @@ test:  ## - Run all tests
 	@mkdir -p build
 	@$(MAKE) test-unit 
 	# @$(MAKE) test-int
-	@$(MAKE) junit
+	@$(MAKE) junit-report
 
 .PHONY: test-unit 
 test-unit: ## - Run unit tests only
 	@go test -v -race ./... | tee build/test-unit.out
 
-.PHONY: junit
-junit: ## - Run unit tests only
+.PHONY: junit-report
+junit-report: ## - Run the junit-report generation for all the out files generated
 	@go get -v -u github.com/jstemmer/go-junit-report
-	$(foreach file, $(wildcard build/*), go-junit-report > "${file}.xml" < ${file};)
+	$(foreach file, $(wildcard build/*.out), go-junit-report > "${file}.xml" < ${file};)
 
 ##################################################
 # Integration testing targets
