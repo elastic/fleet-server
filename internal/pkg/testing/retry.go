@@ -51,15 +51,16 @@ func Retry(t *testing.T, ctx context.Context, f RetryFunc, opts ...RetryOption) 
 		if err == nil {
 			return
 		}
-		t := time.NewTicker(o.sleep)
-		select {
-		case <-t.C:
-			t.Stop()
-			break
-		case <-ctx.Done():
-			t.Stop()
-			return
-		}
+		sleepWithContext(ctx, o.sleep)
 	}
 	t.Fatal(err)
+}
+
+func sleepWithContext(ctx context.Context, dur time.Duration) {
+	t := time.NewTimer(dur)
+	defer t.Stop()
+	select {
+	case <-t.C:
+	case <-ctx.Done():
+	}
 }

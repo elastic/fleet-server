@@ -351,7 +351,6 @@ func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d t
 			t := time.NewTimer(d)
 			select {
 			case <-t.C:
-				t.Stop()
 				break
 			case <-ctx.Done():
 				t.Stop()
