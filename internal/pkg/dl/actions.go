@@ -68,7 +68,7 @@ func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index st
 
 	for _, hit := range res.Hits {
 		var action model.Action
-		err := Unmarshal(hit, &action)
+		err := hit.Unmarshal(&action)
 		if err != nil {
 			return nil, err
 		}

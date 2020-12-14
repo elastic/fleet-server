@@ -4,11 +4,10 @@
 
 // +build !integration
 
-package dl
+package es
 
 import (
 	"encoding/json"
-	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/model"
 	"testing"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/rs/xid"
 )
 
-func TestUnmarshal(t *testing.T) {
+func TestHitUnmarshal(t *testing.T) {
 	action := model.Action{
 		ESDocument: model.ESDocument{
 			Id:      xid.New().String(),
@@ -53,7 +52,7 @@ func TestUnmarshal(t *testing.T) {
 		t.Error(diff)
 	}
 
-	hit := es.HitT{
+	hit := HitT{
 		Id:      action.Id,
 		SeqNo:   action.SeqNo,
 		Version: action.Version,
@@ -62,7 +61,7 @@ func TestUnmarshal(t *testing.T) {
 
 	var actionFromHit model.Action
 
-	err = Unmarshal(hit, &actionFromHit)
+	err = hit.Unmarshal(&actionFromHit)
 	if err != nil {
 		t.Fatal(err)
 	}

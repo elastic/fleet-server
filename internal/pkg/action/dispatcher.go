@@ -8,7 +8,6 @@ import (
 	"context"
 	"sync"
 
-	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/monitor"
@@ -90,7 +89,7 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	agentActions := make(map[string][]model.Action)
 	for _, hit := range hits {
 		var action model.Action
-		err := dl.Unmarshal(hit, &action)
+		err := hit.Unmarshal(&action)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to unmarshal action document")
 			break

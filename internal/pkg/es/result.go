@@ -4,7 +4,10 @@
 
 package es
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fleet/internal/pkg/model"
+)
 
 // Error
 type ErrorT struct {
@@ -29,6 +32,17 @@ type HitT struct {
 	Index   string          `json:"_index"`
 	Source  json.RawMessage `json:"_source"`
 	Score   *float64        `json:"_score"`
+}
+
+func (hit *HitT) Unmarshal(v interface{}) error {
+	err := json.Unmarshal(hit.Source, v)
+	if err != nil {
+		return err
+	}
+	if s, ok := v.(model.ESInitializer); ok {
+		s.ESInitialize(hit.Id, hit.SeqNo, hit.Version)
+	}
+	return nil
 }
 
 type HitsT struct {

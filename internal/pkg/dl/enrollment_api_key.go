@@ -59,6 +59,6 @@ func findEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, t
 		return rec, fmt.Errorf("hit count mismatch %v", sz)
 	}
 
-	err = Unmarshal(res.Hits[0], &rec)
+	err = res.Hits[0].Unmarshal(&rec)
 	return rec, err
 }

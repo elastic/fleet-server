@@ -46,7 +46,7 @@ func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name strin
 		return agent, ErrNotFound
 	}
 
-	err = Unmarshal(res.Hits[0], &agent)
+	err = res.Hits[0].Unmarshal(&agent)
 	return agent, err
 }
 
