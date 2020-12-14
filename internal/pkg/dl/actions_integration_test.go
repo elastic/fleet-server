@@ -14,6 +14,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
+	"github.com/rs/xid"
 
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/es"
