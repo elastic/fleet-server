@@ -157,6 +157,7 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			log.Debug().Msg("Server configuration update")
 		case err := <-ech:
 			log.Error().Err(err).Msg("Fleet Server failed")
+			return nil
 		case <-ctx.Done():
 			log.Info().Msg("Fleet Server exited")
 			return nil
@@ -165,7 +166,12 @@ func (f *FleetServer) Run(ctx context.Context) error {
 }
 
 func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
-	es, bulker, err := bulk.InitES(ctx, cfg)
+	// Bulker is started in its own context and managed inside of this function. This is done so
+	// when the `ctx` is cancelled every worker using the bulker can get everything written on
+	// shutdown before the bulker is then cancelled.
+	bulkCtx, bulkCancel := context.WithCancel(context.Background())
+	defer bulkCancel()
+	es, bulker, err := bulk.InitES(bulkCtx, cfg)
 	if err != nil {
 		return err
 	}
