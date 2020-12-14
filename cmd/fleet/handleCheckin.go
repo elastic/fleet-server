@@ -117,19 +117,17 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	actionCh := actionSub.Ch()
 
 	var actCh chan []model.Action
-	var seqno int64
-	if ct.cfg.Features.Enabled(config.FeatureActions) {
-		// Resolve AckToken from request, fallback on the agent record
-		seqno, err := ct.resolveSeqNo(ctx, req, agent)
-		if err != nil {
-			return err
-		}
 
-		// Subsribe to actions dispatcher
-		aSub := ct.ad.Subscribe(agent.Id, seqno)
-		defer ct.ad.Unsubscribe(aSub)
-		actCh = aSub.Ch()
+	// Resolve AckToken from request, fallback on the agent record
+	seqno, err := ct.resolveSeqNo(ctx, req, agent)
+	if err != nil {
+		return err
 	}
+
+	// Subsribe to actions dispatcher
+	aSub := ct.ad.Subscribe(agent.Id, seqno)
+	defer ct.ad.Unsubscribe(aSub)
+	actCh = aSub.Ch()
 
 	// Subscribe to policy manager for changes on PolicyId > policyRev
 	sub, err := ct.pm.Subscribe(agent.PolicyId, agent.PolicyRevision)
@@ -155,13 +153,12 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		ackToken string
 	)
 
-	if ct.cfg.Features.Enabled(config.FeatureActions) {
-		pendingActions, err := ct.fetchAgentPendingActions(ctx, seqno, agent.Id)
-		if err != nil {
-			return err
-		}
-		actions, ackToken = convertActionsX(agent.Id, pendingActions)
+	// Check agent pending actions first
+	pendingActions, err := ct.fetchAgentPendingActions(ctx, seqno, agent.Id)
+	if err != nil {
+		return err
 	}
+	actions, ackToken = convertActionsX(agent.Id, pendingActions)
 
 	if len(actions) == 0 {
 	LOOP:
