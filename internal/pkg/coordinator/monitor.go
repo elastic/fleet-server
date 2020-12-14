@@ -21,6 +21,7 @@ import (
 	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/monitor"
+	"fleet/internal/pkg/sleep"
 )
 
 const (
@@ -348,13 +349,8 @@ func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d t
 		err := cord.Run(ctx)
 		if err != context.Canceled {
 			l.Err(err).Msg("coordinator failed")
-			t := time.NewTimer(d)
-			select {
-			case <-t.C:
+			if sleep.WithContext(ctx, d) == context.Canceled {
 				break
-			case <-ctx.Done():
-				t.Stop()
-				return
 			}
 		}
 	}
