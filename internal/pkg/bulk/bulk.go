@@ -83,18 +83,18 @@ const (
 	defaultMaxPending        = 32
 )
 
-func InitES(ctx context.Context, cfg *config.Config) (*elasticsearch.Client, Bulk, error) {
+func InitES(ctx context.Context, cfg *config.Config, opts ...BulkOpt) (*elasticsearch.Client, Bulk, error) {
 
 	es, err := es.NewClient(ctx, cfg)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	flushInterval := cfg.Output.Elasticsearch.BulkFlushInterval
+	opts = append(opts, WithFlushInterval(cfg.Output.Elasticsearch.BulkFlushInterval))
 
 	blk := NewBulker(es)
 	go func() {
-		err := blk.Run(ctx, WithFlushInterval(flushInterval))
+		err := blk.Run(ctx, opts...)
 		log.Info().Err(err).Msg("Bulker exit")
 	}()
 

@@ -36,13 +36,15 @@ func (c *AgentLogging) LogLevel() zerolog.Level {
 
 // Agent is the ID and logging configuration of the Agent running this Fleet Server.
 type Agent struct {
-	ID      string       `config:"id"`
+	ID      string       `config:"id" validate:"required"`
+	Version string       `config:"version"`
 	Logging AgentLogging `config:"logging"`
 }
 
 // Host is the ID of the host of the Agent running this Fleet Server.
 type Host struct {
-	ID string `config:"id"`
+	ID   string `config:"id"`
+	Name string `config:"name"`
 }
 
 // Fleet is the configuration of Agent running inside of Fleet.

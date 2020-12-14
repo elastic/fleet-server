@@ -26,13 +26,13 @@ func (s Sub) Ch() chan []model.Action {
 }
 
 type Dispatcher struct {
-	am *monitor.Monitor
+	am monitor.Monitor
 
 	mx   sync.RWMutex
 	subs map[string]Sub
 }
 
-func NewDispatcher(am *monitor.Monitor) *Dispatcher {
+func NewDispatcher(am monitor.Monitor) *Dispatcher {
 	return &Dispatcher{
 		am:   am,
 		subs: make(map[string]Sub),

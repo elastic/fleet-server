@@ -294,6 +294,9 @@ const (
 					"type": "keyword"
 				}				
 			}
+		},
+		"@timestamp": {
+			"type": "date"
 		}		
 	}
 }`

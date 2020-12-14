@@ -15,6 +15,8 @@ const (
 	kKeywordGreaterThan = "gt"
 	kKeywordIncludes    = "includes"
 	kKeywordLessThanEq  = "lte"
+	kKeywordMatchAll    = "match_all"
+	kKeywordMatchNone   = "match_none"
 	kKeywordMax         = "max"
 	kKeywordMust        = "must"
 	kKeywordMustNot     = "must_not"
@@ -25,4 +27,5 @@ const (
 	kKeywordSource      = "_source"
 	kKeywordTerm        = "term"
 	kKeywordTerms       = "terms"
+	kKeywordTopHits     = "top_hits"
 )
