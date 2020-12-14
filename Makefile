@@ -92,6 +92,7 @@ export $(shell sed 's/=.*//' ./dev-tools/integration/.env)
 # Start ES with docker without waiting
 .PHONY: int-docker-start-async
 int-docker-start-async:
+	docker-compose --version
 	@docker-compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans elasticsearch
 
 # Wait for ES to be ready
