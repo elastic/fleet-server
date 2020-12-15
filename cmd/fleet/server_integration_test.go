@@ -179,8 +179,9 @@ func TestServerUnauthorized(t *testing.T) {
 		}
 	})
 
-	// Expecting 400 or 404
-	t.Run("agent not found", func(t *testing.T) {
+	// Unauthorized, expecting error from /_security/_authenticate
+	t.Run("unauthorized", func(t *testing.T) {
+		const expectedErrResponsePrefix = `Fail Auth: [401 Unauthorized]`
 		for _, u := range agenturls {
 			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}")))
 			require.NoError(t, err)
@@ -191,19 +192,14 @@ func TestServerUnauthorized(t *testing.T) {
 			require.NoError(t, err)
 			defer res.Body.Close()
 
-			expectedStatusCode := 400
-			if strings.HasSuffix(u, "/checkin") {
-				expectedStatusCode = 404
-			}
-			diff := cmp.Diff(expectedStatusCode, res.StatusCode)
+			diff := cmp.Diff(400, res.StatusCode)
 			if diff != "" {
 				t.Fatal(diff)
 			}
 
 			raw, _ := ioutil.ReadAll(res.Body)
-			diff = cmp.Diff("agent not found\n", string(raw))
-			if diff != "" {
-				t.Fatal(diff)
+			if !strings.HasPrefix(string(raw), expectedErrResponsePrefix) {
+				t.Fatalf("unexpected error: %s", string(raw))
 			}
 		}
 	})
