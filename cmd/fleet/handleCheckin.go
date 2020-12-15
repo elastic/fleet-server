@@ -222,7 +222,7 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 		sn, err = ct.tr.Resolve(ctx, ackToken)
 		if err != nil {
 			if errors.Is(err, dl.ErrNotFound) {
-				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("Token not found")
+				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("Action token not found")
 				err = nil
 			} else {
 				return

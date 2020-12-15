@@ -9,9 +9,7 @@ import (
 )
 
 const (
-	AGENT_SAVED_OBJECT_TYPE               = "fleet-agents"
-	ENROLLMENT_API_KEYS_SAVED_OBJECT_TYPE = "fleet-enrollment-api-keys"
-	AGENT_ACTION_SAVED_OBJECT_TYPE        = "fleet-agent-actions"
+	AGENT_ACTION_SAVED_OBJECT_TYPE = "fleet-agent-actions"
 )
 
 const (
