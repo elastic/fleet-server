@@ -41,7 +41,7 @@ local: ## - Build packages using local environment
 .PHONY: clean
 clean: ## - Clean up build artifacts
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
-	rm -rf ./bin/ *.rpm
+	rm -rf ./bin/ *.rpm ./build/
 
 .PHONY: generate
 generate: ## - Generate schema models
