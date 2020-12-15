@@ -152,3 +152,13 @@ type Action struct {
 	SentAt    string `json:"sent_at"`
 	CreatedAt string `json:"created_at"`
 }
+
+type ActionResultRequest struct {
+	ActionId string          `json:"action_id" validate:"required"`
+	Data     json.RawMessage `json:"data,omitempty"`
+	Error    string          `json:"error,omitempty"`
+}
+
+type ActionResultResponse struct {
+	Acknowledged bool `json:"acknowledged"`
+}

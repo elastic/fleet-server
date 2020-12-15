@@ -8,6 +8,7 @@ import (
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/saved"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -15,27 +16,31 @@ const (
 	ROUTE_ENROLL  = "/api/fleet/agents/:id"
 	ROUTE_CHECKIN = "/api/fleet/agents/:id/checkin"
 	ROUTE_ACKS    = "/api/fleet/agents/:id/acks"
+	ROUTE_RESULT  = "/api/fleet/agents/:id/result"
 )
 
 type Router struct {
-	sv     saved.CRUD
-	bulker bulk.Bulk
-	ct     *CheckinT
-	et     *EnrollerT
+	sv       saved.CRUD
+	bulker   bulk.Bulk
+	ct       *CheckinT
+	et       *EnrollerT
+	validate *validator.Validate
 }
 
 func NewRouter(sv saved.CRUD, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT) *httprouter.Router {
 
 	r := Router{
-		sv:     sv,
-		bulker: bulker,
-		ct:     ct,
-		et:     et,
+		sv:       sv,
+		bulker:   bulker,
+		ct:       ct,
+		et:       et,
+		validate: validator.New(),
 	}
 
 	router := httprouter.New()
 	router.POST(ROUTE_ENROLL, r.handleEnroll)
 	router.POST(ROUTE_CHECKIN, r.handleCheckin)
 	router.POST(ROUTE_ACKS, r.handleAcks)
+	router.POST(ROUTE_RESULT, r.handleActionResult)
 	return router
 }

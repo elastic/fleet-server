@@ -7,6 +7,7 @@ package dl
 // Indices names
 const (
 	FleetActions           = ".fleet-actions"
+	FleetActionsResults    = ".fleet-actions-results"
 	FleetAgents            = ".fleet-agents"
 	FleetEnrollmentAPIKeys = ".fleet-enrollment-api-keys"
 	FleetPolicies          = ".fleet-policies"
