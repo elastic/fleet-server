@@ -159,50 +159,54 @@ func TestServerUnauthorized(t *testing.T) {
 	// Expecting no authorization header error
 	// Not sure if this is right response, just capturing what we have so far
 	// TODO: revisit error response format
-	for _, u := range allurls {
-		res, err := cli.Post(u, "application/json", bytes.NewBuffer([]byte("{}")))
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer res.Body.Close()
-		diff := cmp.Diff(400, res.StatusCode)
-		if diff != "" {
-			t.Fatal(diff)
-		}
+	t.Run("no auth header", func(t *testing.T) {
+		for _, u := range allurls {
+			res, err := cli.Post(u, "application/json", bytes.NewBuffer([]byte("{}")))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			diff := cmp.Diff(400, res.StatusCode)
+			if diff != "" {
+				t.Fatal(diff)
+			}
 
-		raw, _ := ioutil.ReadAll(res.Body)
-		diff = cmp.Diff("no authorization header\n", string(raw))
-		if diff != "" {
-			t.Fatal(diff)
+			raw, _ := ioutil.ReadAll(res.Body)
+			diff = cmp.Diff("no authorization header\n", string(raw))
+			if diff != "" {
+				t.Fatal(diff)
+			}
 		}
-	}
+	})
 
 	// Expecting 400 or 404
-	for _, u := range agenturls {
-		req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}")))
-		require.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "ApiKey ZExqY1hYWUJJUVVxWDVia2JvVGM6M05XaUt5aHBRYk9YSTRQWDg4YWp0UQ==")
-		res, err := cli.Do(req)
+	t.Run("agent not found", func(t *testing.T) {
+		for _, u := range agenturls {
+			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}")))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "ApiKey ZExqY1hYWUJJUVVxWDVia2JvVGM6M05XaUt5aHBRYk9YSTRQWDg4YWp0UQ==")
+			res, err := cli.Do(req)
 
-		require.NoError(t, err)
-		defer res.Body.Close()
+			require.NoError(t, err)
+			defer res.Body.Close()
 
-		expectedStatusCode := 400
-		if strings.HasSuffix(u, "/checkin") {
-			expectedStatusCode = 404
-		}
-		diff := cmp.Diff(expectedStatusCode, res.StatusCode)
-		if diff != "" {
-			t.Fatal(diff)
-		}
+			expectedStatusCode := 400
+			if strings.HasSuffix(u, "/checkin") {
+				expectedStatusCode = 404
+			}
+			diff := cmp.Diff(expectedStatusCode, res.StatusCode)
+			if diff != "" {
+				t.Fatal(diff)
+			}
 
-		raw, _ := ioutil.ReadAll(res.Body)
-		diff = cmp.Diff("agent not found\n", string(raw))
-		if diff != "" {
-			t.Fatal(diff)
+			raw, _ := ioutil.ReadAll(res.Body)
+			diff = cmp.Diff("agent not found\n", string(raw))
+			if diff != "" {
+				t.Fatal(diff)
+			}
 		}
-	}
+	})
 
 	// Stop test server
 	cancel()
