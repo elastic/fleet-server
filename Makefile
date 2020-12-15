@@ -1,4 +1,3 @@
-SHELL = /bin/bash
 .SHELLFLAGS = -eo pipefail
 COMMIT=$(shell git rev-parse --short HEAD)
 VERSION ?= $(shell head -n 1 VERSION 2> /dev/null || echo "0.0.0")
