@@ -237,6 +237,9 @@ type Server struct {
 	Agent  *AgentMetadata  `json:"agent"`
 	Host   *HostMetadata   `json:"host"`
 	Server *ServerMetadata `json:"server"`
+
+	// Date/time the server was updated
+	Timestamp string `json:"@timestamp,omitempty"`
 }
 
 // ServerMetadata A Fleet Server metadata

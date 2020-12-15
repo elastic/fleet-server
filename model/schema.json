@@ -166,22 +166,16 @@
       "description": "A Fleet Server",
       "type": "object",
       "properties": {
-        "_id": {
-          "description": "The unique identifier for the Fleet Server",
+        "@timestamp": {
+          "description": "Date/time the server was updated",
           "type": "string",
-          "format": "uuid"
-        },
-        "_version": {
-          "description": "The version of the document in the index",
-          "type": "integer"
+          "format": "date-time"
         },
         "agent": { "$ref": "#/definitions/agent-metadata" },
         "host": { "$ref": "#/definitions/host-metadata" },
         "server": { "$ref":  "#/definitions/server-metadata" }
       },
       "required": [
-        "_id",
-        "_version",
         "agent",
         "host",
         "server"
@@ -192,11 +186,6 @@
       "description": "A policy that an Elastic Agent is attached to",
       "type": "object",
       "properties": {
-        "_id": {
-          "description": "The unique identifier for the policy revision",
-          "type": "string",
-          "format": "uuid"
-        },
         "@timestamp": {
           "description": "Date/time the policy revision was created",
           "type": "string",
@@ -225,7 +214,6 @@
         }
       },
       "required": [
-        "_id",
         "policy_id",
         "revision_idx",
         "coordinator_idx",
@@ -238,15 +226,6 @@
       "description": "The current leader Fleet Server for a policy",
       "type": "object",
       "properties": {
-        "_id": {
-          "description": "The unique identifier for the policy",
-          "type": "string",
-          "format": "uuid"
-        },
-        "_version": {
-          "description": "The version of the document in the index",
-          "type": "integer"
-        },
         "@timestamp": {
           "description": "Date/time the leader was taken or held",
           "type": "string",
@@ -255,8 +234,6 @@
         "server": { "$ref":  "#/definitions/server-metadata" }
       },
       "required": [
-        "_id",
-        "_version",
         "server"
       ]
     },

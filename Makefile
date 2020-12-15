@@ -76,7 +76,7 @@ check-no-changes:
 test:  ## - Run all tests
 	@mkdir -p build
 	@$(MAKE) test-unit 
-	# @$(MAKE) test-int
+	@$(MAKE) test-int
 	@$(MAKE) junit-report
 
 .PHONY: test-unit 

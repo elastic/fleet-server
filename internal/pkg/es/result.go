@@ -54,8 +54,62 @@ type HitsT struct {
 	MaxScore *float64 `json:"max_score"`
 }
 
+type Bucket struct {
+	// any fields added here with json tags must also be added to the
+	// delete calls in the `UnmarshalJSON` function below
+	Key          string           `json:"key"`
+	DocCount     int64            `json:"doc_count"`
+	Aggregations map[string]HitsT `json:"-"`
+}
+
+type _bucket Bucket
+
+func (b *Bucket) UnmarshalJSON(data []byte) error {
+	b2 := _bucket{}
+	err := json.Unmarshal(data, &b2)
+	if err != nil {
+		return err
+	}
+	var aggs map[string]interface{}
+	err = json.Unmarshal(data, &aggs)
+	if err != nil {
+		return err
+	}
+	// remove the json keys that already unmarshalled into the
+	// bucket. this needs to stay in sync with the json tags
+	// from `Bucket`.
+	delete(aggs, "key")
+	delete(aggs, "doc_count")
+	b2.Aggregations = make(map[string]HitsT)
+	for name, value := range aggs {
+		vMap, ok := value.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		hMap, ok := vMap["hits"]
+		if !ok {
+			continue
+		}
+		data, err := json.Marshal(hMap)
+		if err != nil {
+			return err
+		}
+		var hits HitsT
+		err = json.Unmarshal(data, &hits)
+		if err != nil {
+			return err
+		}
+		b2.Aggregations[name] = hits
+	}
+	*b = Bucket(b2)
+	return nil
+}
+
 type Aggregation struct {
-	Value float64 `json:"value"`
+	Value                   float64  `json:"value"`
+	DocCountErrorUpperBound int64    `json:"doc_count_error_upper_bound"`
+	SumOtherDocCount        int64    `json:"sum_other_doc_count"`
+	Buckets                 []Bucket `json:"buckets,omitempty"`
 }
 
 type Response struct {

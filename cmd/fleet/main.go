@@ -12,6 +12,7 @@ import (
 	"fleet/internal/pkg/action"
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/config"
+	"fleet/internal/pkg/coordinator"
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/env"
 	"fleet/internal/pkg/esboot"
@@ -69,7 +70,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		err = initGlobalCache()
 		checkErr(err)
 
-		srv, err := NewFleetServer(cfg)
+		srv, err := NewFleetServer(cfg, version)
 		checkErr(err)
 
 		return srv.Run(ctx)
@@ -87,15 +88,18 @@ func NewCommand(version string) *cobra.Command {
 }
 
 type FleetServer struct {
+	version string
+
 	cfg   *config.Config
 	cfgCh chan *config.Config
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config) (*FleetServer, error) {
+func NewFleetServer(cfg *config.Config, version string) (*FleetServer, error) {
 	return &FleetServer{
-		cfg:   cfg,
-		cfgCh: make(chan *config.Config, 1),
+		version: version,
+		cfg:     cfg,
+		cfgCh:   make(chan *config.Config, 1),
 	}, nil
 }
 
@@ -153,6 +157,7 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			log.Debug().Msg("Server configuration update")
 		case err := <-ech:
 			log.Error().Err(err).Msg("Fleet Server failed")
+			return nil
 		case <-ctx.Done():
 			log.Info().Msg("Fleet Server exited")
 			return nil
@@ -161,7 +166,12 @@ func (f *FleetServer) Run(ctx context.Context) error {
 }
 
 func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
-	es, bulker, err := bulk.InitES(ctx, cfg)
+	// Bulker is started in its own context and managed inside of this function. This is done so
+	// when the `ctx` is cancelled every worker using the bulker can get everything written on
+	// shutdown before the bulker is then cancelled.
+	bulkCtx, bulkCancel := context.WithCancel(context.Background())
+	defer bulkCancel()
+	es, bulker, err := bulk.InitES(bulkCtx, cfg)
 	if err != nil {
 		return err
 	}
@@ -181,6 +191,15 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	var funcs []runner.RunFunc
 	var wg sync.WaitGroup
 
+	// Coordinator policy monitor
+	pim, err := monitor.New(dl.FleetPolicies, es)
+	if err != nil {
+		return err
+	}
+	funcs = append(funcs, runner.LoggedRunFunc("Policy index monitor", pim.Run))
+	cord := coordinator.NewMonitor(cfg.Fleet, f.version, bulker, pim, coordinator.NewCoordinatorZero)
+	funcs = append(funcs, runner.LoggedRunFunc("Coordinator policy monitor", cord.Run))
+
 	// Policy monitor
 	pm, err := NewPolicyMon(kPolicyThrottle)
 	funcs = append(funcs, runner.LoggedRunFunc("Policy monitor", func(ctx context.Context) error {
@@ -188,7 +207,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	}))
 
 	// Actions monitoring
-	var am *monitor.Monitor
+	var am monitor.Monitor
 	var ad *action.Dispatcher
 	var tr *action.TokenResolver
 
