@@ -75,7 +75,7 @@ check-no-changes:
 .PHONY: test
 test:  ## - Run all tests
 	@$(MAKE) test-unit 
-	# @$(MAKE) test-int
+	@$(MAKE) test-int
 
 .PHONY: test-unit 
 test-unit: ## - Run unit tests only
