@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fleet/internal/pkg/esutil"
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -26,9 +25,9 @@ func CreateIndex(ctx context.Context, cli *elasticsearch.Client, name string) er
 
 	defer res.Body.Close()
 
-	err = esutil.CheckResponseError(res)
+	err = checkResponseError(res)
 	if err != nil {
-		if errors.Is(err, esutil.ErrResourceAlreadyExists) {
+		if errors.Is(err, errResourceAlreadyExists) {
 			log.Info().Str("name", name).Msg("Index already exists")
 			return nil
 		}
