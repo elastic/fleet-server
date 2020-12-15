@@ -6,7 +6,6 @@ package fleet
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"fleet/internal/pkg/action"
@@ -20,12 +19,13 @@ import (
 	"fleet/internal/pkg/migrate"
 	"fleet/internal/pkg/monitor"
 	"fleet/internal/pkg/profile"
-	"fleet/internal/pkg/runner"
 	"fleet/internal/pkg/saved"
 	"fleet/internal/pkg/signal"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 const kPolicyThrottle = time.Millisecond * 5
@@ -103,55 +103,68 @@ func NewFleetServer(cfg *config.Config, version string) (*FleetServer, error) {
 	}, nil
 }
 
+type runFunc func(context.Context) error
+
 // Run runs the fleet server.
 func (f *FleetServer) Run(ctx context.Context) error {
 	var curCfg *config.Config
 	newCfg := f.cfg
 
-	// To avoid repeating the same code for policy server and http server
-	// The original code required them to be restarted independently,
-	// to avoid restarting HTTP server when the profiler is enabled/disabled
-	start := func(cn context.CancelFunc,
-		wg *sync.WaitGroup,
-		runfn runner.RunFunc,
-		errCh chan<- error,
-	) context.CancelFunc {
+	// Replace context with cancellable ctx
+	// in order to automatically cancel all the go routines
+	// that were started in the scope of this function on function exit
+	ctx, cn := context.WithCancel(ctx)
+	defer cn()
+
+	stop := func(cn context.CancelFunc, g *errgroup.Group) {
 		if cn != nil {
 			cn()
 		}
-		wg.Wait()
-		cx, cn := context.WithCancel(ctx)
-		runner.Start(cx, wg, runfn, func(er error) {
-			if er != nil {
-				errCh <- er
+		if g != nil {
+			g.Wait()
+		}
+	}
+
+	start := func(ctx context.Context, runfn runFunc, ech chan<- error) (*errgroup.Group, context.CancelFunc) {
+		ctx, cn = context.WithCancel(ctx)
+		g, ctx := errgroup.WithContext(ctx)
+
+		g.Go(func() error {
+			err := runfn(ctx)
+			if err != nil {
+				ech <- err
 			}
+			return err
 		})
-		return cn
+		return g, cn
 	}
 
 	var (
 		proCancel, srvCancel context.CancelFunc
-		proWg, srvWg         sync.WaitGroup
+		proEg, srvEg         *errgroup.Group
 	)
 
 	for {
 		ech := make(chan error, 2)
 
+		// Restart profiler
 		if curCfg == nil || curCfg.Inputs[0].Server.Profile.Bind != newCfg.Inputs[0].Server.Profile.Bind {
-			proCancel = start(proCancel, &proWg, func(ctx context.Context) error {
+			stop(proCancel, proEg)
+			proEg, proCancel = start(ctx, func(ctx context.Context) error {
 				return profile.RunProfiler(ctx, newCfg.Inputs[0].Server.Profile.Bind)
 			}, ech)
 		}
 
+		// Restart server
 		if curCfg == nil || curCfg.Inputs[0].Server != newCfg.Inputs[0].Server {
-			srvCancel = start(srvCancel, &srvWg, func(ctx context.Context) error {
+			stop(srvCancel, srvEg)
+			srvEg, srvCancel = start(ctx, func(ctx context.Context) error {
 				return f.runServer(ctx, newCfg)
 			}, ech)
 		}
 
 		curCfg = newCfg
 
-		// Listen for errors or context cancel
 		select {
 		case newCfg = <-f.cfgCh:
 			log.Debug().Msg("Server configuration update")
@@ -162,6 +175,20 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			log.Info().Msg("Fleet Server exited")
 			return nil
 		}
+	}
+}
+
+func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error {
+	return func() error {
+		log.Debug().Msg(tag + " started")
+		err := runfn(ctx)
+		var ev *zerolog.Event
+		if err != nil {
+			log.Error().Err(err)
+		}
+		ev = log.Debug()
+		ev.Msg(tag + " exited")
+		return err
 	}
 }
 
@@ -188,21 +215,22 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return err
 	}
 
-	var funcs []runner.RunFunc
-	var wg sync.WaitGroup
+	// Replacing to errgroup context
+	g, ctx := errgroup.WithContext(ctx)
 
 	// Coordinator policy monitor
 	pim, err := monitor.New(dl.FleetPolicies, es)
 	if err != nil {
 		return err
 	}
-	funcs = append(funcs, runner.LoggedRunFunc("Policy index monitor", pim.Run))
+
+	g.Go(loggedRunFunc(ctx, "Policy index monitor", pim.Run))
 	cord := coordinator.NewMonitor(cfg.Fleet, f.version, bulker, pim, coordinator.NewCoordinatorZero)
-	funcs = append(funcs, runner.LoggedRunFunc("Coordinator policy monitor", cord.Run))
+	g.Go(loggedRunFunc(ctx, "Coordinator policy monitor", cord.Run))
 
 	// Policy monitor
 	pm, err := NewPolicyMon(kPolicyThrottle)
-	funcs = append(funcs, runner.LoggedRunFunc("Policy monitor", func(ctx context.Context) error {
+	g.Go(loggedRunFunc(ctx, "Policy monitor", func(ctx context.Context) error {
 		return pm.Monitor(ctx, sv)
 	}))
 
@@ -216,22 +244,22 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-	funcs = append(funcs, runner.LoggedRunFunc("Action monitor", am.Run))
+	g.Go(loggedRunFunc(ctx, "Action monitor", am.Run))
 
 	ad = action.NewDispatcher(am)
-	funcs = append(funcs, runner.LoggedRunFunc("Action dispatcher", ad.Run))
+	g.Go(loggedRunFunc(ctx, "Action dispatcher", ad.Run))
 	tr, err = action.NewTokenResolver(bulker)
 	if err != nil {
 		return err
 	}
 
 	ba := NewBulkActions()
-	funcs = append(funcs, runner.LoggedRunFunc("Bulk action", func(ctx context.Context) error {
+	g.Go(loggedRunFunc(ctx, "Bulk action", func(ctx context.Context) error {
 		return ba.Run(ctx, sv)
 	}))
 
 	bc := NewBulkCheckin(bulker)
-	funcs = append(funcs, runner.LoggedRunFunc("Bulk checkin", func(ctx context.Context) error {
+	g.Go(loggedRunFunc(ctx, "Bulk checkin", func(ctx context.Context) error {
 		return bc.Run(ctx, sv)
 	}))
 
@@ -242,21 +270,11 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	}
 	router := NewRouter(sv, bulker, ct, et)
 
-	funcs = append(funcs, runner.LoggedRunFunc("Http server", func(ctx context.Context) error {
+	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &f.cfg.Inputs[0].Server)
 	}))
 
-	runner.StartGroup(ctx, &wg, funcs,
-		func(er error) {
-			if err == nil {
-				err = er
-			}
-		},
-	)
-
-	wg.Wait()
-
-	return nil
+	return g.Wait()
 }
 
 // Reload reloads the fleet server with the latest configuration.
