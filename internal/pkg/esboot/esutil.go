@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	ErrResourceAlreadyExists = errors.New("resource already exists")
+	errResourceAlreadyExists = errors.New("resource already exists")
 )
 
 type ClientError struct {
@@ -42,7 +42,7 @@ func (e *ClientError) Unwrap() error {
 	return e.err
 }
 
-type ErrorResponse struct {
+type errorResponse struct {
 	Error struct {
 		Type   string `json:"type"`
 		Reason string `json:"reason"`
@@ -52,9 +52,9 @@ type ErrorResponse struct {
 	err error // Wrapped error
 }
 
-func CheckResponseError(res *esapi.Response) error {
+func checkResponseError(res *esapi.Response) error {
 	if res.StatusCode >= http.StatusBadRequest {
-		resErr, err := ParseResponseError(res)
+		resErr, err := parseResponseError(res)
 		if err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ func CheckResponseError(res *esapi.Response) error {
 		}
 
 		if resErr.Error.Type == esErrorResourceAlreadyExists {
-			cerr.err = ErrResourceAlreadyExists
+			cerr.err = errResourceAlreadyExists
 		}
 
 		if resErr.Error.Type != "" {
@@ -78,8 +78,8 @@ func CheckResponseError(res *esapi.Response) error {
 	return nil
 }
 
-func ParseResponseError(res *esapi.Response) (*ErrorResponse, error) {
-	var eres ErrorResponse
+func parseResponseError(res *esapi.Response) (*errorResponse, error) {
+	var eres errorResponse
 	if res.StatusCode >= http.StatusBadRequest {
 		// Read the original body content, in case if it was a error from the cloud response
 		// {"ok":false,"message":"Unknown deployment."}

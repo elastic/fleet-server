@@ -25,9 +25,9 @@ func CreateIndex(ctx context.Context, cli *elasticsearch.Client, name string) er
 
 	defer res.Body.Close()
 
-	err = CheckResponseError(res)
+	err = checkResponseError(res)
 	if err != nil {
-		if errors.Is(err, ErrResourceAlreadyExists) {
+		if errors.Is(err, errResourceAlreadyExists) {
 			log.Info().Str("name", name).Msg("Index already exists")
 			return nil
 		}

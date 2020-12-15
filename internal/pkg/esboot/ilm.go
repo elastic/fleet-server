@@ -56,7 +56,7 @@ func EnsureILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 	if res.StatusCode == http.StatusNotFound {
 		// Got 404. Could be from elastic, could be from the cloud if deployment is not found.
 		// Parse response to figure out the details from JSON body
-		errRes, err := ParseResponseError(res)
+		errRes, err := parseResponseError(res)
 		if err != nil {
 			lg.Warn().Err(err).Msgf("Failed to parse ILM policy not found response.")
 			return err
@@ -81,7 +81,7 @@ func EnsureILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 	}
 
 	// Check for other possible error responses
-	err = CheckResponseError(res)
+	err = checkResponseError(res)
 	if err != nil {
 		lg.Info().Err(err).Msgf("Error response on fetching ILM Policy")
 		return err
@@ -158,7 +158,7 @@ func createILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 		return err
 	}
 	defer res.Body.Close()
-	return CheckResponseError(res)
+	return checkResponseError(res)
 }
 
 func GetILMPolicyName(name string) string {
