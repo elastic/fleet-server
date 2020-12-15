@@ -7,7 +7,6 @@ package esboot
 import (
 	"context"
 	"encoding/json"
-	"fleet/internal/pkg/esutil"
 	"io"
 	"net/http"
 	"strconv"
@@ -57,7 +56,7 @@ func EnsureILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 	if res.StatusCode == http.StatusNotFound {
 		// Got 404. Could be from elastic, could be from the cloud if deployment is not found.
 		// Parse response to figure out the details from JSON body
-		errRes, err := esutil.ParseResponseError(res)
+		errRes, err := ParseResponseError(res)
 		if err != nil {
 			lg.Warn().Err(err).Msgf("Failed to parse ILM policy not found response.")
 			return err
@@ -74,7 +73,7 @@ func EnsureILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 		}
 
 		// Return elasticsearch error details
-		return &esutil.ClientError{
+		return &ClientError{
 			StatusCode: errRes.Status,
 			Type:       errRes.Error.Type,
 			Reason:     errRes.Error.Reason,
@@ -82,7 +81,7 @@ func EnsureILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 	}
 
 	// Check for other possible error responses
-	err = esutil.CheckResponseError(res)
+	err = CheckResponseError(res)
 	if err != nil {
 		lg.Info().Err(err).Msgf("Error response on fetching ILM Policy")
 		return err
@@ -159,7 +158,7 @@ func createILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 		return err
 	}
 	defer res.Body.Close()
-	return esutil.CheckResponseError(res)
+	return CheckResponseError(res)
 }
 
 func GetILMPolicyName(name string) string {

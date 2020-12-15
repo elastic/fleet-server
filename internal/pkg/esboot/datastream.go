@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fleet/internal/pkg/esutil"
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -26,9 +25,9 @@ func CreateDatastream(ctx context.Context, cli *elasticsearch.Client, name strin
 
 	defer res.Body.Close()
 
-	err = esutil.CheckResponseError(res)
+	err = CheckResponseError(res)
 	if err != nil {
-		if errors.Is(err, esutil.ErrResourceAlreadyExists) {
+		if errors.Is(err, ErrResourceAlreadyExists) {
 			log.Info().Str("name", name).Msg("Datastream already exists")
 			return nil
 		}

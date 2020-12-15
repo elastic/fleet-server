@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fleet/internal/pkg/esutil"
 	"fmt"
 	"net/http"
 	"strings"
@@ -127,9 +126,9 @@ func createTemplate(ctx context.Context, cli *elasticsearch.Client, name string,
 	}
 	defer res.Body.Close()
 
-	err = esutil.CheckResponseError(res)
+	err = CheckResponseError(res)
 	if err != nil {
-		if errors.Is(err, esutil.ErrResourceAlreadyExists) {
+		if errors.Is(err, ErrResourceAlreadyExists) {
 			log.Info().Str("name", name).Msg("Index template already exists")
 			return nil
 		}
