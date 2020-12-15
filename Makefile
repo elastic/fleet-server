@@ -1,4 +1,7 @@
-.SHELLFLAGS = -eo pipefail
+.SILENT:
+.SHELLFLAGS=-eo pipefail
+SHELL = /bin/bash
+
 COMMIT=$(shell git rev-parse --short HEAD)
 VERSION ?= $(shell head -n 1 VERSION 2> /dev/null || echo "0.0.0")
 BUILD=$(shell date +%FT%T%z)
