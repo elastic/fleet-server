@@ -6,6 +6,7 @@ package testing
 
 import (
 	"context"
+	"fleet/internal/pkg/sleep"
 	"testing"
 	"time"
 )
@@ -51,16 +52,9 @@ func Retry(t *testing.T, ctx context.Context, f RetryFunc, opts ...RetryOption) 
 		if err == nil {
 			return
 		}
-		sleepWithContext(ctx, o.sleep)
+		if err = sleep.WithContext(ctx, o.sleep); err != nil {
+			break
+		}
 	}
 	t.Fatal(err)
-}
-
-func sleepWithContext(ctx context.Context, dur time.Duration) {
-	t := time.NewTimer(dur)
-	defer t.Stop()
-	select {
-	case <-t.C:
-	case <-ctx.Done():
-	}
 }
