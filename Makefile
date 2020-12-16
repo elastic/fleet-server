@@ -1,7 +1,4 @@
-.SILENT:
-.SHELLFLAGS=-eo pipefail
-SHELL = /bin/bash
-
+SHELL=/bin/bash
 COMMIT=$(shell git rev-parse --short HEAD)
 VERSION ?= $(shell head -n 1 VERSION 2> /dev/null || echo "0.0.0")
 BUILD=$(shell date +%FT%T%z)
@@ -77,15 +74,18 @@ check-no-changes:
 	@git diff-index --exit-code HEAD --
 
 .PHONY: test
-test:  ## - Run all tests
-	@mkdir -p build
+test: prepare-test-context  ## - Run all tests
 	@$(MAKE) test-unit 
 	@$(MAKE) test-int
 	@$(MAKE) junit-report
 
 .PHONY: test-unit 
-test-unit: ## - Run unit tests only
-	@go test -v -race ./... | tee build/test-unit.out
+test-unit: prepare-test-context  ## - Run unit tests only
+	set -o pipefail; go test -v -race ./... | tee build/test-unit.out
+
+.PHONY: prepare-test-context
+prepare-test-context: ## - Prepare the test context folders
+	@mkdir -p build
 
 .PHONY: junit-report
 junit-report: ## - Run the junit-report generation for all the out files generated
@@ -123,9 +123,9 @@ int-docker-stop: ## - Stop docker environment for integration tests
 
 # Run integration tests with starting/stopping docker
 .PHONY: test-int
-test-int: ## - Run integration tests with full setup (slow!)
+test-int: prepare-test-context  ## - Run integration tests with full setup (slow!)
 	@$(MAKE) int-docker-start
-	@$(MAKE) test-int-set | tee build/test-init.out
+	@set -o pipefail; $(MAKE) test-int-set | tee build/test-init.out
 	@$(MAKE) int-docker-stop
 
 # Run integration tests without starting/stopping docker
