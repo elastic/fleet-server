@@ -16,7 +16,6 @@ const (
 	ROUTE_ENROLL  = "/api/fleet/agents/:id"
 	ROUTE_CHECKIN = "/api/fleet/agents/:id/checkin"
 	ROUTE_ACKS    = "/api/fleet/agents/:id/acks"
-	ROUTE_RESULT  = "/api/fleet/agents/:id/result"
 )
 
 type Router struct {
@@ -41,6 +40,5 @@ func NewRouter(sv saved.CRUD, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT) *ht
 	router.POST(ROUTE_ENROLL, r.handleEnroll)
 	router.POST(ROUTE_CHECKIN, r.handleCheckin)
 	router.POST(ROUTE_ACKS, r.handleAcks)
-	router.POST(ROUTE_RESULT, r.handleActionResult)
 	return router
 }
