@@ -148,7 +148,6 @@ func TestServerUnauthorized(t *testing.T) {
 	agenturls := []string{
 		srv.buildUrl(agentId, "checkin"),
 		srv.buildUrl(agentId, "acks"),
-		srv.buildUrl(agentId, "result"),
 	}
 
 	allurls := []string{
