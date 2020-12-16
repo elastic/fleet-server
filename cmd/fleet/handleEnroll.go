@@ -18,7 +18,6 @@ import (
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/model"
-	"fleet/internal/pkg/saved"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
@@ -66,7 +65,7 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	data, err := rt.et.handleEnroll(r, rt.sv)
+	data, err := rt.et.handleEnroll(r)
 
 	if err != nil {
 		code := http.StatusBadRequest
@@ -118,7 +117,7 @@ func (et *EnrollerT) acquireSemaphore(ctx context.Context) error {
 	return nil
 }
 
-func (et *EnrollerT) handleEnroll(r *http.Request, sv saved.CRUD) ([]byte, error) {
+func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 
 	if err := et.acquireSemaphore(r.Context()); err != nil {
 		return nil, err
@@ -126,7 +125,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request, sv saved.CRUD) ([]byte, error
 
 	defer et.throttle.Release(1)
 
-	key, err := authApiKey(r, sv.Client())
+	key, err := authApiKey(r, et.bulker.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +141,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request, sv saved.CRUD) ([]byte, error
 		return nil, err
 	}
 
-	resp, err := _enroll(r.Context(), sv, et.bulker, *req, *erec)
+	resp, err := _enroll(r.Context(), et.bulker, *req, *erec)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +149,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request, sv saved.CRUD) ([]byte, error
 	return json.Marshal(resp)
 }
 
-func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollRequest, erec model.EnrollmentApiKey) (*EnrollResponse, error) {
+func _enroll(ctx context.Context, bulker bulk.Bulk, req EnrollRequest, erec model.EnrollmentApiKey) (*EnrollResponse, error) {
 
 	if req.SharedId != "" {
 		// TODO: Support pre-existing install
@@ -200,24 +199,6 @@ func _enroll(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk, req EnrollReq
 		DefaultApiKey:   defaultOutputApiKey.Token(),
 	}
 
-	// TODO: remove once kibana switched completely to the .fleet-agents
-	// Leaving it here still, so it is a double save to both .kibana saved objects and .fleet-agents
-	id, err := sv.Create(
-		ctx,
-		AGENT_SAVED_OBJECT_TYPE,
-		agentData,
-		saved.WithId(agentId),
-		saved.WithRefresh(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	if id != fmt.Sprintf("%s:%s", AGENT_SAVED_OBJECT_TYPE, agentId) {
-		return nil, ErrAgentIdFailure
-	}
-
-	// Save agent in the .fleet-agents index as well
-	// The saved object above will be transfered to .fleet-agent index in the future
 	err = createFleetAgent(ctx, bulker, agentId, agentData)
 	if err != nil {
 		return nil, err

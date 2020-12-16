@@ -68,8 +68,9 @@ type Monitor interface {
 
 // monitorT monitors for new documents in an index
 type monitorT struct {
-	cli  *elasticsearch.Client
-	tmpl *dsl.Tmpl
+	cli       *elasticsearch.Client
+	tmplCheck *dsl.Tmpl
+	tmplQuery *dsl.Tmpl
 
 	index          string
 	checkInterval  time.Duration
@@ -80,6 +81,8 @@ type monitorT struct {
 	log zerolog.Logger
 
 	outCh chan []es.HitT
+
+	readyCh chan error
 }
 
 // Option monitor functional option
@@ -102,11 +105,17 @@ func New(index string, cli *elasticsearch.Client, opts ...Option) (Monitor, erro
 
 	m.log = log.With().Str("index", m.index).Str("ctx", "index monitor").Logger()
 
-	tmpl, err := m.prepareQuery()
+	tmplCheck, err := m.prepareCheckQuery()
 	if err != nil {
 		return nil, err
 	}
-	m.tmpl = tmpl
+	m.tmplCheck = tmplCheck
+
+	tmplQuery, err := m.prepareQuery()
+	if err != nil {
+		return nil, err
+	}
+	m.tmplQuery = tmplQuery
 
 	return m, nil
 }
@@ -125,6 +134,13 @@ func WithExpiration(withExpiration bool) Option {
 	}
 }
 
+// WithReadyChan allows to pass the channel that will signal when monitor is ready
+func WithReadyChan(readyCh chan error) Option {
+	return func(m Monitor) {
+		m.(*monitorT).readyCh = readyCh
+	}
+}
+
 // Output output channel for the monitor
 func (m *monitorT) Output() <-chan []es.HitT {
 	return m.outCh
@@ -136,7 +152,7 @@ func (m *monitorT) GetCheckpoint() int64 {
 }
 
 func (m *monitorT) storeCheckpoint(val int64) {
-	m.log.Debug().Int64("checkpoint", val).Msg("Updated checkpoint")
+	m.log.Debug().Int64("checkpoint", val).Msg("updated checkpoint")
 	atomic.StoreInt64(&m.checkpoint, val)
 }
 
@@ -146,19 +162,31 @@ func (m *monitorT) loadCheckpoint() int64 {
 
 // Run runs monitor.
 func (m *monitorT) Run(ctx context.Context) (err error) {
-	m.log.Info().Msg("Start")
+	m.log.Info().Msg("start")
 	defer func() {
-		m.log.Info().Err(err).Msg("Exited")
+		m.log.Info().Err(err).Msg("exited")
+	}()
+
+	defer func() {
+		if m.readyCh != nil {
+			m.readyCh <- err
+		}
 	}()
 
 	// Initialize global checkpoint from the index stats
 	var checkpoint int64
 	checkpoint, err = queryGlobalCheckpoint(ctx, m.cli, m.index)
 	if err != nil {
-		m.log.Error().Err(err).Msg("Failed to initialize the global checkpoint")
+		m.log.Error().Err(err).Msg("failed to initialize the global checkpoint")
 		return err
 	}
 	m.storeCheckpoint(checkpoint)
+
+	// Signal the monitor is ready
+	if m.readyCh != nil {
+		m.readyCh <- nil
+		m.readyCh = nil
+	}
 
 	// Start timer loop to check for global checkpoint changes
 	t := time.NewTimer(m.checkInterval)
@@ -166,8 +194,12 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 	for {
 		select {
 		case <-t.C:
-			// Check global checkout change
-			m.checkGlobalCheckpoint(ctx)
+			hits, err := m.check(ctx)
+			if err != nil {
+				m.log.Error().Err(err).Msg("failed checking new documents")
+			} else {
+				m.notify(ctx, hits)
+			}
 			t.Reset(m.checkInterval)
 		case <-ctx.Done():
 			return ctx.Err()
@@ -175,58 +207,7 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 	}
 }
 
-func (m *monitorT) checkGlobalCheckpoint(ctx context.Context) error {
-	gcp, err := queryGlobalCheckpoint(ctx, m.cli, m.index)
-	if err != nil {
-		m.log.Error().Err(err).Msg("Failed to check the global checkpoint")
-		return err
-	}
-
-	checkpoint := m.loadCheckpoint()
-	if gcp > checkpoint {
-		m.checkNewDocuments(ctx, checkpoint, gcp)
-	}
-	return nil
-}
-
-func (m *monitorT) checkNewDocuments(ctx context.Context, seqno, maxSeqNo int64) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	params := map[string]interface{}{
-		dl.FieldSeqNo:    seqno,
-		dl.FieldMaxSeqNo: maxSeqNo,
-	}
-
-	if m.withExpiration {
-		params[dl.FieldExpiration] = now
-	}
-
-	query, err := m.tmpl.Render(params)
-	if err != nil {
-		return err
-	}
-
-	res, err := m.cli.Search(
-		m.cli.Search.WithContext(ctx),
-		m.cli.Search.WithIndex(m.index),
-		m.cli.Search.WithBody(bytes.NewBuffer(query)),
-	)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-
-	var esres es.Response
-	err = json.NewDecoder(res.Body).Decode(&esres)
-	if err != nil {
-		return err
-	}
-
-	if res.IsError() {
-		return es.TranslateError(res.StatusCode, esres.Error)
-	}
-
-	hits := esres.Hits.Hits
+func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 	sz := len(hits)
 	if sz > 0 {
 		maxVal := hits[sz-1].SeqNo
@@ -237,26 +218,120 @@ func (m *monitorT) checkNewDocuments(ctx context.Context, seqno, maxSeqNo int64)
 		case <-ctx.Done():
 		}
 	}
-	return nil
 }
 
-func (m *monitorT) prepareQuery() (tmpl *dsl.Tmpl, err error) {
-	tmpl = dsl.NewTmpl()
+func (m *monitorT) check(ctx context.Context) ([]es.HitT, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
 
-	root := dsl.NewRoot()
-	root.Param(seqNoPrimaryTerm, true)
+	checkpoint := m.loadCheckpoint()
 
-	filter := root.Query().Bool().Filter()
-	filter.Range(fieldSeqNo, dsl.WithRangeGT(tmpl.Bind(fieldSeqNo)))
-	filter.Range(fieldSeqNo, dsl.WithRangeLTE(tmpl.Bind(fieldMaxSeqNo)))
+	// Run check query that detects that there are new documents available
+	params := map[string]interface{}{
+		dl.FieldSeqNo: checkpoint,
+	}
 	if m.withExpiration {
-		filter.Range(fieldExpiration, dsl.WithRangeGT(tmpl.Bind(fieldExpiration)))
+		params[dl.FieldExpiration] = now
 	}
 
+	hits, err := m.search(ctx, m.tmplCheck, params)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(hits) == 0 {
+		return nil, nil
+	}
+
+	// New documents are detected, fetch global checkpoint
+	gcp, err := queryGlobalCheckpoint(ctx, m.cli, m.index)
+	if err != nil {
+		m.log.Error().Err(err).Msg("failed to check the global checkpoint")
+		return nil, err
+	}
+
+	// If global check point is still not greater that the current known checkpoint, return nothing
+	if gcp <= checkpoint {
+		return nil, nil
+	}
+
+	// Fetch documents capped by the global checkpoint
+	// Reusing params for the documents query
+	params[dl.FieldMaxSeqNo] = gcp
+
+	hits, err = m.search(ctx, m.tmplQuery, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return hits, nil
+}
+
+func (m *monitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[string]interface{}) ([]es.HitT, error) {
+	query, err := tmpl.Render(params)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := m.cli.Search(
+		m.cli.Search.WithContext(ctx),
+		m.cli.Search.WithIndex(m.index),
+		m.cli.Search.WithBody(bytes.NewBuffer(query)),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	var esres es.Response
+	err = json.NewDecoder(res.Body).Decode(&esres)
+	if err != nil {
+		return nil, err
+	}
+
+	if res.IsError() {
+		return nil, es.TranslateError(res.StatusCode, esres.Error)
+	}
+
+	return esres.Hits.Hits, nil
+}
+
+// Prepares minimal query to do the quick check without reading all matches full documents
+func (m *monitorT) prepareCheckQuery() (tmpl *dsl.Tmpl, err error) {
+	tmpl, root := m.prepareCommon(false)
+
+	root.Source().Includes(dl.FieldSeqNo)
+	root.Size(1)
+
+	if err := tmpl.Resolve(root); err != nil {
+		return nil, err
+	}
+	return
+}
+
+// Prepares full documents query
+func (m *monitorT) prepareQuery() (tmpl *dsl.Tmpl, err error) {
+	tmpl, root := m.prepareCommon(true)
 	root.Sort().SortOrder(fieldSeqNo, dsl.SortAscend)
 
 	if err := tmpl.Resolve(root); err != nil {
 		return nil, err
 	}
 	return
+}
+
+func (m *monitorT) prepareCommon(limitMax bool) (*dsl.Tmpl, *dsl.Node) {
+	tmpl := dsl.NewTmpl()
+
+	root := dsl.NewRoot()
+	root.Param(seqNoPrimaryTerm, true)
+
+	filter := root.Query().Bool().Filter()
+	filter.Range(fieldSeqNo, dsl.WithRangeGT(tmpl.Bind(fieldSeqNo)))
+	if limitMax {
+		filter.Range(fieldSeqNo, dsl.WithRangeLTE(tmpl.Bind(fieldMaxSeqNo)))
+	}
+	if m.withExpiration {
+		filter.Range(fieldExpiration, dsl.WithRangeGT(tmpl.Bind(fieldExpiration)))
+	}
+
+	return tmpl, root
 }

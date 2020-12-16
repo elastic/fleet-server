@@ -9,7 +9,6 @@ import (
 )
 
 const (
-	AGENT_SAVED_OBJECT_TYPE        = "fleet-agents"
 	AGENT_ACTION_SAVED_OBJECT_TYPE = "fleet-agent-actions"
 )
 
