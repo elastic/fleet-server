@@ -8,95 +8,13 @@ package dl
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
-	"github.com/rs/xid"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/model"
-	"fleet/internal/pkg/rnd"
 	ftesting "fleet/internal/pkg/testing"
 )
-
-func createRandomActions() ([]model.Action, error) {
-	r := rnd.New()
-
-	sz := r.Int(1, 11)
-	agentIds := make([]string, sz)
-	for i := 0; i < sz; i++ {
-		agentIds[i] = uuid.Must(uuid.NewV4()).String()
-	}
-
-	sz = r.Int(4, 9)
-
-	now := time.Now().UTC()
-
-	actions := make([]model.Action, sz)
-
-	for i := 0; i < sz; i++ {
-		start := r.Int(0, len(agentIds))
-		end := start + r.Int(0, len(agentIds)-start)
-
-		payload := map[string]interface{}{
-			uuid.Must(uuid.NewV4()).String(): uuid.Must(uuid.NewV4()).String(),
-		}
-
-		data, err := json.Marshal(payload)
-		if err != nil {
-			return nil, err
-		}
-
-		action := model.Action{
-			ESDocument: model.ESDocument{
-				Id: xid.New().String(),
-			},
-			ActionId:   uuid.Must(uuid.NewV4()).String(),
-			Timestamp:  r.Time(now, 2, 5, time.Second, rnd.TimeBefore).Format(time.RFC3339),
-			Expiration: r.Time(now, 12, 25, time.Minute, rnd.TimeAfter).Format(time.RFC3339),
-			Type:       "APP_ACTION",
-			InputId:    "osquery",
-			Agents:     agentIds[start:end],
-			Data:       data,
-		}
-
-		actions[i] = action
-	}
-	return actions, nil
-}
-
-func storeRandomActions(ctx context.Context, bulker bulk.Bulk, index string) ([]model.Action, error) {
-	actions, err := createRandomActions()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, action := range actions {
-		body, err := json.Marshal(action)
-		if err != nil {
-			return nil, err
-		}
-		_, err = bulker.Create(ctx, index, action.Id, body, bulk.WithRefresh())
-		if err != nil {
-			return nil, err
-		}
-	}
-	return actions, err
-}
-
-func setupActions(ctx context.Context, t *testing.T) (string, bulk.Bulk, []model.Action) {
-	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingAction)
-	actions, err := storeRandomActions(ctx, bulker, index)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return index, bulker, actions
-}
 
 func TestSearchActionsQuery(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
@@ -104,7 +22,7 @@ func TestSearchActionsQuery(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	index, bulker, actions := setupActions(ctx, t)
+	index, bulker, actions := ftesting.SetupActions(ctx, t, 1, 11)
 
 	t.Run("all agents actions", func(t *testing.T) {
 
