@@ -206,7 +206,8 @@
         },
         "data": {
           "description": "The data for the policy",
-          "type": "string"
+          "type": "object",
+          "format": "raw"
         },
         "default_fleet_server": {
           "description": "True when this policy is the default policy to start Fleet Server",
@@ -308,8 +309,12 @@
           "type": "string",
           "format": "uuid"
         },
-        "policy_revision": {
-          "description": "The current policy revision for the Elastic Agent",
+        "policy_revision_idx": {
+          "description": "The current policy revision_idx for the Elastic Agent",
+          "type": "integer"
+        },
+        "policy_coordinator_idx": {
+          "description": "The current policy coordinator for the Elastic Agent",
           "type": "integer"
         },
         "last_updated": {

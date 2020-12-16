@@ -18,6 +18,7 @@ import (
 	"fleet/internal/pkg/logger"
 	"fleet/internal/pkg/migrate"
 	"fleet/internal/pkg/monitor"
+	"fleet/internal/pkg/policy"
 	"fleet/internal/pkg/profile"
 	"fleet/internal/pkg/saved"
 	"fleet/internal/pkg/signal"
@@ -229,10 +230,8 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	g.Go(loggedRunFunc(ctx, "Coordinator policy monitor", cord.Run))
 
 	// Policy monitor
-	pm, err := NewPolicyMon(kPolicyThrottle)
-	g.Go(loggedRunFunc(ctx, "Policy monitor", func(ctx context.Context) error {
-		return pm.Monitor(ctx, sv)
-	}))
+	pm := policy.NewMonitor(bulker, pim, kPolicyThrottle)
+	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
 
 	// Actions monitoring
 	var am monitor.Monitor

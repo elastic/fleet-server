@@ -23,11 +23,11 @@ const (
 	FieldMaxSeqNo    = "max_seq_no"
 	FieldActionSeqNo = "action_seq_no"
 
-	FieldPolicyId       = "policy_id"
-	FieldRevisionIdx    = "revision_idx"
-	FieldCoordinatorIdx = "coordinator_idx"
-	FieldPolicyRevision = "policy_revision"
-	FieldPackages       = "packages"
+	FieldPolicyId             = "policy_id"
+	FieldRevisionIdx          = "revision_idx"
+	FieldCoordinatorIdx       = "coordinator_idx"
+	FieldPolicyRevisionIdx    = "policy_revision_idx"
+	FieldPolicyCoordinatorIdx = "policy_coordinator_idx"
 
 	FieldUpdatedAt = "updated_at"
 )

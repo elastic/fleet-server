@@ -9,9 +9,8 @@ import (
 )
 
 const (
-	AGENT_SAVED_OBJECT_TYPE               = "fleet-agents"
-	ENROLLMENT_API_KEYS_SAVED_OBJECT_TYPE = "fleet-enrollment-api-keys"
-	AGENT_ACTION_SAVED_OBJECT_TYPE        = "fleet-agent-actions"
+	AGENT_SAVED_OBJECT_TYPE        = "fleet-agents"
+	AGENT_ACTION_SAVED_OBJECT_TYPE = "fleet-agent-actions"
 )
 
 const (
@@ -19,8 +18,6 @@ const (
 )
 
 const (
-	FieldPolicyRev     = "policy_revision"
-	FieldPackages      = "packages"
 	FieldLastCheckin   = "last_checkin"
 	FieldLocalMetadata = "local_metadata"
 )

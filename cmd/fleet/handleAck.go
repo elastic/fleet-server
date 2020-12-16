@@ -10,6 +10,8 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"fleet/internal/pkg/bulk"
@@ -17,6 +19,7 @@ import (
 	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/saved"
 
+	"github.com/gofrs/uuid"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
 )
@@ -82,10 +85,14 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, s
 	// Retrieve each action
 	m := map[string][]Action{}
 
+	var policyAcks []string
 	for _, ev := range events {
-
 		if ev.AgentId != "" && ev.AgentId != agent.Id {
 			return ErrEventAgentIdMismatch
+		}
+		if strings.HasPrefix(ev.ActionId, "policy:") {
+			policyAcks = append(policyAcks, ev.ActionId)
+			continue
 		}
 
 		action, ok := gCache.GetAction(ev.ActionId)
@@ -100,50 +107,46 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, s
 		m[action.Type] = append(actionList, action)
 	}
 
-	// TODO: handle UPGRADE and UNENROLL
-
-	if actions, ok := m[TypePolicyChange]; ok {
-		if err := _handlePolicyChange(ctx, agent, actions, bulker); err != nil {
+	if policyAcks != nil {
+		if err := _handlePolicyChange(ctx, bulker, agent, policyAcks...); err != nil {
 			return err
 		}
 	}
 
+	// TODO: handle UPGRADE and UNENROLL
+
 	return nil
 }
 
-func _handlePolicyChange(ctx context.Context, agent *model.Agent, actions []Action, bulker bulk.Bulk) error {
-
+func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Agent, actionIds ...string) error {
 	// If more than one, pick the winner;
-	// 0) Correctly typed
-	// 1) Correct policy id
-	// 2) Highest revision number
+	// 0) Correct policy id
+	// 1) Highest revision/coordinator number
 
-	var found bool
-	var bestAction Action
-
-	for _, a := range actions {
-		switch {
-		case a.Type != TypePolicyChange:
-		case a.PolicyId != agent.PolicyId:
-		case !found || a.PolicyRev > bestAction.PolicyRev:
+	found := false
+	currRev := agent.PolicyRevisionIdx
+	currCoord := agent.PolicyCoordinatorIdx
+	for _, a := range actionIds {
+		action, ok := parsePolicyAction(a)
+		if ok && action.policyId == agent.PolicyId && (action.revIdx > currRev ||
+			(action.revIdx == currRev && action.coordIdx > currCoord)) {
 			found = true
-			bestAction = a
+			currRev = action.revIdx
+			currCoord = action.coordIdx
 		}
 	}
 
 	if found {
-
 		updates := make([]bulk.BulkOp, 0, 1)
 		fields := map[string]interface{}{
-			dl.FieldPolicyRevision: bestAction.PolicyRev,
-			dl.FieldPackages:       bestAction.AckData,
+			dl.FieldPolicyRevisionIdx:    currRev,
+			dl.FieldPolicyCoordinatorIdx: currCoord,
 		}
 		fields[dl.FieldUpdatedAt] = time.Now().UTC().Format(time.RFC3339)
 
 		source, err := json.Marshal(map[string]interface{}{
 			"doc": fields,
 		})
-
 		if err != nil {
 			return err
 		}
@@ -161,4 +164,36 @@ func _handlePolicyChange(ctx context.Context, agent *model.Agent, actions []Acti
 	}
 
 	return nil
+}
+
+type policyAction struct {
+	policyId string
+	revIdx   int64
+	coordIdx int64
+}
+
+func parsePolicyAction(actionId string) (policyAction, bool) {
+	split := strings.Split(actionId, ":")
+	if len(split) != 4 {
+		return policyAction{}, false
+	}
+	if split[0] != "policy" {
+		return policyAction{}, false
+	}
+	if _, err := uuid.FromString(split[1]); err != nil {
+		return policyAction{}, false
+	}
+	revIdx, err := strconv.Atoi(split[2])
+	if err != nil {
+		return policyAction{}, false
+	}
+	coordIdx, err := strconv.Atoi(split[3])
+	if err != nil {
+		return policyAction{}, false
+	}
+	return policyAction{
+		policyId: split[1],
+		revIdx:   int64(revIdx),
+		coordIdx: int64(coordIdx),
+	}, true
 }

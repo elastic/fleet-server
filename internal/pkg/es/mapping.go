@@ -105,10 +105,13 @@ const (
 		"packages": {
 			"type": "keyword"
 		},
+		"policy_coordinator_idx": {
+			"type": "integer"
+		},
 		"policy_id": {
 			"type": "keyword"
 		},
-		"policy_revision": {
+		"policy_revision_idx": {
 			"type": "integer"
 		},
 		"shared_id": {
@@ -220,7 +223,8 @@ const (
 			"type": "integer"
 		},
 		"data": {
-			"type": "keyword"
+			"enabled" : false,
+			"type": "object"
 		},
 		"default_fleet_server": {
 			"type": "boolean"
