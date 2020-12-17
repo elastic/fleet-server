@@ -157,7 +157,7 @@ type AgentMetadata struct {
 	Version string `json:"version"`
 }
 
-// Data The data for the policy
+// Data The opaque payload.
 type Data struct {
 }
 
@@ -209,7 +209,7 @@ type Policy struct {
 	// The coordinator index of the policy
 	CoordinatorIdx int64 `json:"coordinator_idx"`
 
-	// The data for the policy
+	// The opaque payload.
 	Data json.RawMessage `json:"data"`
 
 	// True when this policy is the default policy to start Fleet Server

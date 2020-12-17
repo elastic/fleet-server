@@ -154,7 +154,7 @@ const (
 	}
 }`
 
-	// Data The data for the policy
+	// Data The opaque payload.
 	MappingData = `{
 	"properties": {
 		

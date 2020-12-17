@@ -205,7 +205,7 @@
           "type": "integer"
         },
         "data": {
-          "description": "The data for the policy",
+          "description": "The opaque payload.",
           "type": "object",
           "format": "raw"
         },
