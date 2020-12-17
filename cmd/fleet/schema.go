@@ -125,36 +125,15 @@ type ActionResp struct {
 }
 
 type Event struct {
-	Type      string `json:"type"`
-	SubType   string `json:"subtype"`
-	AgentId   string `json:"agent_id"`
-	ActionId  string `json:"action_id"`
-	PolicyId  string `json:"policy_id"`
-	StreamId  string `json:"stream_id"`
-	Timestamp string `json:"timestamp"`
-	Message   string `json:"message"`
-	Payload   string `json:"payload"`
-	Data      string `json:"data"`
-}
-
-type Action struct {
-	Id        string `json:"-"`
-	AgentId   string `json:"agent_id,omitempty"`
-	PolicyId  string `json:"policy_id,omitempty" saved:"aad"`
-	PolicyRev int64  `json:"policy_revision,omitempty" saved:"aad"`
-	Type      string `json:"type"`
-	Data      string `json:"data" saved:"encrypt"`
-	AckData   string `json:"ack_data" saved:"aad"`
-	SentAt    string `json:"sent_at"`
-	CreatedAt string `json:"created_at"`
-}
-
-type ActionResultRequest struct {
-	ActionId string          `json:"action_id" validate:"required"`
-	Data     json.RawMessage `json:"data,omitempty"`
-	Error    string          `json:"error,omitempty"`
-}
-
-type ActionResultResponse struct {
-	Acknowledged bool `json:"acknowledged"`
+	Type      string          `json:"type"`
+	SubType   string          `json:"subtype"`
+	AgentId   string          `json:"agent_id"`
+	ActionId  string          `json:"action_id"`
+	PolicyId  string          `json:"policy_id"`
+	StreamId  string          `json:"stream_id"`
+	Timestamp string          `json:"timestamp"`
+	Message   string          `json:"message"`
+	Payload   string          `json:"payload,omitempty"`
+	Data      json.RawMessage `json:"data,omitempty"`
+	Error     string          `json:"error,omitempty"`
 }

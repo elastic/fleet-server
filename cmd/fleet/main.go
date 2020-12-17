@@ -252,22 +252,17 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return err
 	}
 
-	ba := NewBulkActions()
-	g.Go(loggedRunFunc(ctx, "Bulk action", func(ctx context.Context) error {
-		return ba.Run(ctx, sv)
-	}))
-
 	bc := NewBulkCheckin(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", func(ctx context.Context) error {
 		return bc.Run(ctx, sv)
 	}))
 
-	ct := NewCheckinT(f.cfg, bc, ba, pm, am, ad, tr, bulker)
+	ct := NewCheckinT(f.cfg, bc, pm, am, ad, tr, bulker)
 	et, err := NewEnrollerT(&f.cfg.Inputs[0].Server, bulker)
 	if err != nil {
 		return err
 	}
-	router := NewRouter(sv, bulker, ct, et)
+	router := NewRouter(bulker, ct, et)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &f.cfg.Inputs[0].Server)

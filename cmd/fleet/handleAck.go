@@ -17,8 +17,6 @@ import (
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/model"
-	"fleet/internal/pkg/saved"
-
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
 )
@@ -28,7 +26,7 @@ var ErrEventAgentIdMismatch = errors.New("event agentId mismatch")
 func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	id := ps.ByName("id")
 
-	err := _handleAcks(w, r, id, rt.sv, rt.ct.bulker)
+	err := _handleAcks(w, r, id, rt.ct.bulker)
 
 	if err != nil {
 		code := http.StatusBadRequest
@@ -42,7 +40,7 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 }
 
 // TODO: Handle UPGRADE and UNENROLL
-func _handleAcks(w http.ResponseWriter, r *http.Request, id string, sv saved.CRUD, bulker bulk.Bulk) error {
+func _handleAcks(w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk) error {
 	agent, err := authAgent(r, id, bulker)
 	if err != nil {
 		return err
@@ -60,7 +58,7 @@ func _handleAcks(w http.ResponseWriter, r *http.Request, id string, sv saved.CRU
 
 	log.Trace().RawJSON("raw", raw).Msg("Ack request")
 
-	if err = _handleAckEvents(r.Context(), agent, req.Events, sv, bulker); err != nil {
+	if err = _handleAckEvents(r.Context(), agent, req.Events, bulker); err != nil {
 		return err
 	}
 
@@ -79,11 +77,7 @@ func _handleAcks(w http.ResponseWriter, r *http.Request, id string, sv saved.CRU
 	return nil
 }
 
-func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, sv saved.CRUD, bulker bulk.Bulk) error {
-
-	// Retrieve each action
-	m := map[string][]Action{}
-
+func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, bulker bulk.Bulk) error {
 	var policyAcks []string
 	for _, ev := range events {
 		if ev.AgentId != "" && ev.AgentId != agent.Id {
@@ -94,16 +88,15 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, s
 			continue
 		}
 
-		action, ok := gCache.GetAction(ev.ActionId)
-		if !ok {
-			if err := sv.Read(ctx, AGENT_ACTION_SAVED_OBJECT_TYPE, ev.ActionId, &action); err != nil {
-				return err
-			}
+		acr := model.ActionResult{
+			ActionId: ev.ActionId,
+			AgentId:  agent.Id,
+			Data:     ev.Data,
+			Error:    ev.Error,
 		}
-
-		// TODO: Handle not found diffently?  Ignore ACK?
-		actionList := m[action.Type]
-		m[action.Type] = append(actionList, action)
+		if _, err := dl.CreateActionResult(ctx, bulker, acr); err != nil {
+			return err
+		}
 	}
 
 	if len(policyAcks) > 0 {

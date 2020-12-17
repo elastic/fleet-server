@@ -8,7 +8,6 @@ require (
 	github.com/elastic/beats/v7 v7.10.0
 	github.com/elastic/go-elasticsearch/v8 v8.0.0-20200728144331-527225d8e836
 	github.com/elastic/go-ucfg v0.8.3
-	github.com/go-playground/validator/v10 v10.4.1
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/google/go-cmp v0.4.0
 	github.com/hashicorp/go-cleanhttp v0.5.1

@@ -39,7 +39,7 @@ func NewCache() (Cache, error) {
 	return Cache{cache}, err
 }
 
-func (c Cache) SetAction(id string, action Action, cost int64) {
+func (c Cache) SetAction(id string, action model.Action, cost int64) {
 	ok := c.cache.Set(id, action, cost)
 	log.Trace().
 		Bool("ok", ok).
@@ -48,20 +48,20 @@ func (c Cache) SetAction(id string, action Action, cost int64) {
 		Msg("Action cache SET")
 }
 
-func (c Cache) GetAction(id string) (Action, bool) {
+func (c Cache) GetAction(id string) (model.Action, bool) {
 	if v, ok := c.cache.Get(id); ok {
 		log.Trace().Str("id", id).Msg("Action cache HIT")
-		action, ok := v.(Action)
+		action, ok := v.(model.Action)
 
 		if !ok {
 			log.Error().Str("id", id).Msg("Action cache cast fail")
-			return Action{}, false
+			return model.Action{}, false
 		}
 		return action, ok
 	}
 
 	log.Trace().Str("id", id).Msg("Action cache MISS")
-	return Action{}, false
+	return model.Action{}, false
 }
 
 func (c Cache) SetApiKey(key ApiKey, ttl time.Duration) {
