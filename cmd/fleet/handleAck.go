@@ -126,12 +126,12 @@ func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Age
 	currRev := agent.PolicyRevisionIdx
 	currCoord := agent.PolicyCoordinatorIdx
 	for _, a := range actionIds {
-		action, ok := policy.ActionFromString(a)
-		if ok && action.PolicyId == agent.PolicyId && (action.RevisionIdx > currRev ||
-			(action.RevisionIdx == currRev && action.CoordinatorIdx > currCoord)) {
+		rev, ok := policy.RevisionFromString(a)
+		if ok && rev.PolicyId == agent.PolicyId && (rev.RevisionIdx > currRev ||
+			(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
 			found = true
-			currRev = action.RevisionIdx
-			currCoord = action.CoordinatorIdx
+			currRev = rev.RevisionIdx
+			currCoord = rev.CoordinatorIdx
 		}
 	}
 

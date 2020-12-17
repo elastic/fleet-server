@@ -88,7 +88,7 @@ func TestMonitor_Integration(t *testing.T) {
 	}()
 
 	timedout := false
-	tm := time.NewTimer(2 * time.Second)
+	tm := time.NewTimer(3 * time.Second)
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()
@@ -109,6 +109,6 @@ func TestMonitor_Integration(t *testing.T) {
 		t.Fatal(merr)
 	}
 	if timedout {
-		t.Fatal("never got policy update; timed out after 2s")
+		t.Fatal("never got policy update; timed out after 3s")
 	}
 }

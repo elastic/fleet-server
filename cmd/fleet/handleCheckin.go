@@ -223,7 +223,7 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 		sn, err = ct.tr.Resolve(ctx, ackToken)
 		if err != nil {
 			if errors.Is(err, dl.ErrNotFound) {
-				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("Action token not found")
+				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("Revision token not found")
 				err = nil
 			} else {
 				return
@@ -327,12 +327,12 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.
 		return nil, err
 	}
 
-	a := policy.ActionFromPolicy(p)
+	r := policy.RevisionFromPolicy(p)
 	resp := ActionResp{
 		AgentId:   agent.Id,
 		CreatedAt: p.Timestamp,
 		Data:      dataJSON,
-		Id:        a.String(),
+		Id:        r.String(),
 		Type:      TypePolicyChange,
 	}
 

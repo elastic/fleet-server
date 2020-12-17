@@ -243,10 +243,10 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-	g.Go(loggedRunFunc(ctx, "Action monitor", am.Run))
+	g.Go(loggedRunFunc(ctx, "Revision monitor", am.Run))
 
 	ad = action.NewDispatcher(am)
-	g.Go(loggedRunFunc(ctx, "Action dispatcher", ad.Run))
+	g.Go(loggedRunFunc(ctx, "Revision dispatcher", ad.Run))
 	tr, err = action.NewTokenResolver(bulker)
 	if err != nil {
 		return err

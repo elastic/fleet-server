@@ -22,9 +22,10 @@ import (
 )
 
 const (
-	defaultCheckInterval  = 1         // check every second for the new action
-	defaultSeqNo          = int64(-1) // the _seq_no in elasticsearch start with 0
-	defaultWithExpiration = false
+	defaultCheckInterval       = 1 * time.Second // check every second for the new action
+	defaultSubscriptionTimeout = 5 * time.Second // max amount of time subscription has to read from channel
+	defaultSeqNo               = int64(-1)       // the _seq_no in elasticsearch start with 0
+	defaultWithExpiration      = false
 )
 
 const (
@@ -97,6 +98,7 @@ type monitorT struct {
 
 	index          string
 	checkInterval  time.Duration
+	subTimeout     time.Duration
 	withExpiration bool
 
 	checkpoint int64 // index global checkpoint
@@ -117,7 +119,8 @@ func New(index string, cli *elasticsearch.Client, opts ...Option) (Monitor, erro
 	m := &monitorT{
 		index:          index,
 		cli:            cli,
-		checkInterval:  defaultCheckInterval * time.Second,
+		checkInterval:  defaultCheckInterval,
+		subTimeout:     defaultSubscriptionTimeout,
 		withExpiration: defaultWithExpiration,
 		checkpoint:     defaultSeqNo,
 		subs:           make(map[uint64]*subT),
@@ -171,7 +174,7 @@ func (m *monitorT) Subscribe() Subscription {
 
 	s := &subT{
 		idx: idx,
-		c:   make(chan []es.HitT),
+		c:   make(chan []es.HitT, 1),
 	}
 
 	m.mut.Lock()
@@ -186,7 +189,6 @@ func (m *monitorT) Unsubscribe(sub Subscription) {
 	if !ok {
 		return
 	}
-	close(s.c)
 
 	m.mut.Lock()
 	_, ok = m.subs[s.idx]
@@ -269,18 +271,15 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 		for _, s := range m.subs {
 			go func(s *subT) {
 				defer wg.Done()
-				defer func() {
-					// recover from the "send on closed channel"
-					//
-					// if a subscriber doesn't read from the channel
-					// and then unsubscribes the channel will be closed
-					// golang provides no way of handling this without
-					// dealing with the panic of sending on a closed channel
-					recover()
-				}()
+				lc, cn := context.WithTimeout(ctx, m.subTimeout)
+				defer cn()
 				select {
 				case s.c <- hits:
-				case <-ctx.Done():
+				case <-lc.Done():
+					err := ctx.Err()
+					if err == context.DeadlineExceeded {
+						m.log.Err(err).Dur("timeout", m.subTimeout)
+					}
 				}
 			}(s)
 		}

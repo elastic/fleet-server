@@ -81,7 +81,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	}()
 
 	timedout := false
-	tm := time.NewTimer(500 * time.Millisecond)
+	tm := time.NewTimer(2 * time.Second)
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()
@@ -99,7 +99,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 		t.Fatal(merr)
 	}
 	if timedout {
-		t.Fatal("never got policy update; timed out after 500ms")
+		t.Fatal("never got policy update; timed out after 2s")
 	}
 }
 
@@ -159,7 +159,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	}()
 
 	gotPolicy := false
-	tm := time.NewTimer(500 * time.Millisecond)
+	tm := time.NewTimer(1 * time.Second)
 	select {
 	case <-s.Output():
 		gotPolicy = true
@@ -232,7 +232,7 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 	}()
 
 	gotPolicy := false
-	tm := time.NewTimer(500 * time.Millisecond)
+	tm := time.NewTimer(1 * time.Second)
 	select {
 	case <-s.Output():
 		gotPolicy = true
@@ -292,7 +292,7 @@ func TestMonitor_NewPolicyExists(t *testing.T) {
 	}
 
 	timedout := false
-	tm := time.NewTimer(500 * time.Millisecond)
+	tm := time.NewTimer(2 * time.Second)
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()

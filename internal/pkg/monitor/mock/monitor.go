@@ -8,6 +8,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/monitor"
@@ -92,9 +93,15 @@ func (m *MockIndexMonitor) Notify(ctx context.Context, hits []es.HitT) {
 		for _, s := range m.subs {
 			go func(s *mockSubT) {
 				defer wg.Done()
+				lc, cn := context.WithTimeout(ctx, 5*time.Second)
+				defer cn()
 				select {
 				case s.c <- hits:
-				case <-ctx.Done():
+				case <-lc.Done():
+					err := ctx.Err()
+					if err == context.DeadlineExceeded {
+						panic(err)
+					}
 				}
 			}(s)
 		}

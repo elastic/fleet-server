@@ -13,50 +13,50 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-// Action is a policy action that is sent as an action ID to an agent.
-type Action struct {
+// Revision is a policy revision that is sent as an action ID to an agent.
+type Revision struct {
 	PolicyId       string
 	RevisionIdx    int64
 	CoordinatorIdx int64
 }
 
-// ActionFromPolicy creates the action from the policy.
-func ActionFromPolicy(policy model.Policy) Action {
-	return Action{
+// RevisionFromPolicy creates the revision from the policy.
+func RevisionFromPolicy(policy model.Policy) Revision {
+	return Revision{
 		PolicyId:       policy.PolicyId,
 		RevisionIdx:    policy.RevisionIdx,
 		CoordinatorIdx: policy.CoordinatorIdx,
 	}
 }
 
-// ActionFromString converts the string to an action.
-func ActionFromString(actionId string) (Action, bool) {
+// RevisionFromString converts the string to a policy revision.
+func RevisionFromString(actionId string) (Revision, bool) {
 	split := strings.Split(actionId, ":")
 	if len(split) != 4 {
-		return Action{}, false
+		return Revision{}, false
 	}
 	if split[0] != "policy" {
-		return Action{}, false
+		return Revision{}, false
 	}
 	if _, err := uuid.FromString(split[1]); err != nil {
-		return Action{}, false
+		return Revision{}, false
 	}
 	revIdx, err := strconv.ParseInt(split[2], 10, 64)
 	if err != nil {
-		return Action{}, false
+		return Revision{}, false
 	}
 	coordIdx, err := strconv.ParseInt(split[3], 10, 64)
 	if err != nil {
-		return Action{}, false
+		return Revision{}, false
 	}
-	return Action{
+	return Revision{
 		PolicyId:       split[1],
 		RevisionIdx:    revIdx,
 		CoordinatorIdx: coordIdx,
 	}, true
 }
 
-// String returns the ID string for the action.
-func (a *Action) String() string {
+// String returns the ID string for the policy revision.
+func (a *Revision) String() string {
 	return fmt.Sprintf("policy:%s:%d:%d", a.PolicyId, a.RevisionIdx, a.CoordinatorIdx)
 }
