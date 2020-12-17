@@ -8,9 +8,6 @@ package fleet
 
 import (
 	"context"
-	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/monitor/mock"
-	"fleet/internal/pkg/policy"
 	"net/http"
 	"sync"
 	"testing"
@@ -18,6 +15,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"fleet/internal/pkg/cache"
+	"fleet/internal/pkg/config"
+	"fleet/internal/pkg/monitor/mock"
+	"fleet/internal/pkg/policy"
 	ftesting "fleet/internal/pkg/testing"
 )
 
@@ -32,12 +33,14 @@ func TestRunServer(t *testing.T) {
 	cfg.Host = "localhost"
 	cfg.Port = port
 
+	c, err := cache.New()
+	require.NoError(t, err)
 	bulker := ftesting.MockBulk{}
 	pim := mock.NewMockIndexMonitor()
 	pm := policy.NewMonitor(bulker, pim, kPolicyThrottle)
 	bc := NewBulkCheckin(nil)
-	ct := NewCheckinT(nil, bc, pm, nil, nil, nil, nil)
-	et, err := NewEnrollerT(cfg, nil)
+	ct := NewCheckinT(nil, c, bc, pm, nil, nil, nil, nil)
+	et, err := NewEnrollerT(cfg, nil, c)
 	require.NoError(t, err)
 
 	router := NewRouter(bulker, ct, et)

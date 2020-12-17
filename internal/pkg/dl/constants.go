@@ -24,13 +24,15 @@ const (
 	FieldMaxSeqNo    = "max_seq_no"
 	FieldActionSeqNo = "action_seq_no"
 
+	FieldActionId             = "action_id"
 	FieldPolicyId             = "policy_id"
 	FieldRevisionIdx          = "revision_idx"
 	FieldCoordinatorIdx       = "coordinator_idx"
 	FieldPolicyRevisionIdx    = "policy_revision_idx"
 	FieldPolicyCoordinatorIdx = "policy_coordinator_idx"
 
-	FieldUpdatedAt = "updated_at"
+	FieldUpdatedAt    = "updated_at"
+	FieldUnenrolledAt = "unenrolled_at"
 )
 
 // Public constants

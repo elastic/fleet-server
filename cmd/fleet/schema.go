@@ -14,6 +14,7 @@ const (
 
 const (
 	TypePolicyChange = "POLICY_CHANGE"
+	TypeUnenroll     = "UNENROLL"
 )
 
 const (

@@ -11,6 +11,7 @@ import (
 
 	"fleet/internal/pkg/apikey"
 	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/cache"
 	"fleet/internal/pkg/model"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -23,14 +24,14 @@ const (
 
 var ErrApiKeyNotEnabled = errors.New("APIKey not enabled")
 
-func authApiKey(r *http.Request, client *elasticsearch.Client) (*apikey.ApiKey, error) {
+func authApiKey(r *http.Request, client *elasticsearch.Client, c cache.Cache) (*apikey.ApiKey, error) {
 
 	key, err := apikey.ExtractAPIKey(r)
 	if err != nil {
 		return nil, err
 	}
 
-	if gCache.ValidApiKey(*key) {
+	if c.ValidApiKey(*key) {
 		return key, nil
 	}
 
@@ -56,7 +57,7 @@ func authApiKey(r *http.Request, client *elasticsearch.Client) (*apikey.ApiKey, 
 		Msg("ApiKey authenticated")
 
 	if info.Enabled {
-		gCache.SetApiKey(*key, kAPIKeyTTL)
+		c.SetApiKey(*key, kAPIKeyTTL)
 	} else {
 		err = ErrApiKeyNotEnabled
 	}
@@ -64,9 +65,9 @@ func authApiKey(r *http.Request, client *elasticsearch.Client) (*apikey.ApiKey, 
 	return key, err
 }
 
-func authAgent(r *http.Request, id string, bulker bulk.Bulk) (*model.Agent, error) {
+func authAgent(r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
 	// authenticate
-	key, err := authApiKey(r, bulker.Client())
+	key, err := authApiKey(r, bulker.Client(), c)
 	if err != nil {
 		return nil, err
 	}

@@ -8,15 +8,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fleet/internal/pkg/policy"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
 	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/cache"
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/model"
+	"fleet/internal/pkg/policy"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
@@ -27,7 +28,7 @@ var ErrEventAgentIdMismatch = errors.New("event agentId mismatch")
 func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	id := ps.ByName("id")
 
-	err := _handleAcks(w, r, id, rt.ct.bulker)
+	err := _handleAcks(w, r, id, rt.ct.bulker, rt.ct.cache)
 
 	if err != nil {
 		code := http.StatusBadRequest
@@ -40,9 +41,9 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 }
 
-// TODO: Handle UPGRADE and UNENROLL
-func _handleAcks(w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk) error {
-	agent, err := authAgent(r, id, bulker)
+// TODO: Handle UPGRADE
+func _handleAcks(w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) error {
+	agent, err := authAgent(r, id, bulker, c)
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ func _handleAcks(w http.ResponseWriter, r *http.Request, id string, bulker bulk.
 
 	log.Trace().RawJSON("raw", raw).Msg("Ack request")
 
-	if err = _handleAckEvents(r.Context(), agent, req.Events, bulker); err != nil {
+	if err = _handleAckEvents(r.Context(), agent, req.Events, bulker, c); err != nil {
 		return err
 	}
 
@@ -78,15 +79,32 @@ func _handleAcks(w http.ResponseWriter, r *http.Request, id string, bulker bulk.
 	return nil
 }
 
-func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, bulker bulk.Bulk) error {
+func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, bulker bulk.Bulk, c cache.Cache) error {
 	var policyAcks []string
+	var unenroll bool
 	for _, ev := range events {
 		if ev.AgentId != "" && ev.AgentId != agent.Id {
 			return ErrEventAgentIdMismatch
 		}
 		if strings.HasPrefix(ev.ActionId, "policy:") {
-			policyAcks = append(policyAcks, ev.ActionId)
+			if ev.Error == "" {
+				// only added if no error on action
+				policyAcks = append(policyAcks, ev.ActionId)
+			}
 			continue
+		}
+
+		action, ok := c.GetAction(ev.ActionId)
+		if !ok {
+			actions, err := dl.FindAction(ctx, bulker, ev.ActionId)
+			if err != nil {
+				return err
+			}
+			if len(actions) == 0 {
+				return errors.New("no matching action")
+			}
+			action = actions[0]
+			c.SetAction(action)
 		}
 
 		acr := model.ActionResult{
@@ -98,6 +116,10 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 		if _, err := dl.CreateActionResult(ctx, bulker, acr); err != nil {
 			return err
 		}
+
+		if ev.Error == "" && action.Type == TypeUnenroll {
+			unenroll = true
+		}
 	}
 
 	if len(policyAcks) > 0 {
@@ -106,7 +128,13 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 		}
 	}
 
-	// TODO: handle UPGRADE and UNENROLL
+	if unenroll {
+		if err := _handleUnenroll(ctx, bulker, agent); err != nil {
+			return err
+		}
+	}
+
+	// TODO: handle UPGRADE
 
 	return nil
 }
@@ -157,4 +185,28 @@ func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Age
 	}
 
 	return nil
+}
+
+func _handleUnenroll(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) error {
+	updates := make([]bulk.BulkOp, 0, 1)
+	now := time.Now().UTC().Format(time.RFC3339)
+	fields := map[string]interface{}{
+		dl.FieldUnenrolledAt: now,
+		dl.FieldUpdatedAt:    now,
+	}
+
+	source, err := json.Marshal(map[string]interface{}{
+		"doc": fields,
+	})
+	if err != nil {
+		return err
+	}
+
+	updates = append(updates, bulk.BulkOp{
+		Id:    agent.Id,
+		Body:  source,
+		Index: dl.FleetAgents,
+	})
+
+	return bulker.MUpdate(ctx, updates, bulk.WithRefresh())
 }
