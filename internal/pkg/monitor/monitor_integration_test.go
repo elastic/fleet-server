@@ -73,39 +73,47 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 	actions, err := ftesting.StoreRandomActions(ctx, bulker, index, 1, 7)
 	require.NoError(t, err)
 
-	var gotActions []model.Action
+	gotActions := make([][]model.Action, 2)
 	// Listen monitor updates
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
-		for {
-			select {
-			case hits := <-mon.Output():
-				for _, hit := range hits {
-					var action model.Action
-					er := hit.Unmarshal(&action)
-					require.NoError(t, er)
-					gotActions = append(gotActions, action)
-					if len(gotActions) == len(actions) {
-						return
+	mwg.Add(2)
+	for i := 0; i < 2; i++ {
+		go func(gotActions []model.Action) {
+			defer mwg.Done()
+			s := mon.Subscribe()
+			defer mon.Unsubscribe(s)
+			for {
+				select {
+				case hits := <-s.Output():
+					for _, hit := range hits {
+						var action model.Action
+						er := hit.Unmarshal(&action)
+						require.NoError(t, er)
+						gotActions = append(gotActions, action)
+						if len(gotActions) == len(actions) {
+							return
+						}
 					}
+				case <-ctx.Done():
+					return
 				}
-			case <-ctx.Done():
-				return
 			}
-		}
-	}()
+		}(gotActions[i])
+	}
 	mwg.Wait()
 
 	// Need to set the seqno that are known only after the documents where indexed
 	// in order to compare the slices of structs as a whole
-	for i, a := range gotActions {
+	for i, a := range gotActions[0] {
 		actions[i].SeqNo = a.SeqNo
 	}
 
 	// The documents should be the same and in the same order
-	diff := cmp.Diff(actions, gotActions)
+	diff := cmp.Diff(actions, gotActions[0])
+	if diff != "" {
+		t.Fatal(diff)
+	}
+	diff = cmp.Diff(actions, gotActions[1])
 	if diff != "" {
 		t.Fatal(diff)
 	}
@@ -114,5 +122,4 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 	mcn()
 	wg.Wait()
 	require.NoError(t, merr)
-
 }

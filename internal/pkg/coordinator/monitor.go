@@ -101,6 +101,10 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 		return err
 	}
 
+	// Subscribe to the monitor for policies
+	s := m.monitor.Subscribe()
+	defer m.monitor.Unsubscribe(s)
+
 	// Start timer to update metadata (mainly for updated IP addresses of the host)
 	mT := time.NewTimer(m.metadataInterval)
 	defer mT.Stop()
@@ -110,7 +114,7 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 	defer lT.Stop()
 	for {
 		select {
-		case hits := <-m.monitor.Output():
+		case hits := <-s.Output():
 			err = m.handlePolicies(ctx, hits)
 			if err != nil {
 				return err
@@ -252,6 +256,11 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 				go runCoordinatorOutput(cordCtx, cord, m.bulker, l, m.policiesIndex)
 				pt.cord = cord
 				pt.canceller = canceller
+			} else {
+				err = pt.cord.Update(ctx, p)
+				if err != nil {
+					l.Err(err).Msg("failed to update coordinator")
+				}
 			}
 		}(p, pt)
 	}

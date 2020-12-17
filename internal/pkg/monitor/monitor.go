@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -34,6 +35,8 @@ const (
 	fieldExpiration = "expiration"
 )
 
+var gCounter uint64
+
 type HitT struct {
 	Id     string          `json:"_id"`
 	SeqNo  int64           `json:"_seq_no"`
@@ -55,6 +58,12 @@ type GlobalCheckpointProvider interface {
 	GetCheckpoint() int64
 }
 
+// Subscription is a subscription to get notified for new documents
+type Subscription interface {
+	// Output is the channel the monitor send new documents to
+	Output() <-chan []es.HitT
+}
+
 // Monitor monitors for new documents in an index
 type Monitor interface {
 	GlobalCheckpointProvider
@@ -62,8 +71,22 @@ type Monitor interface {
 	// Run runs the monitor
 	Run(ctx context.Context) error
 
-	// Output is the channel the monitor send new documents to
-	Output() <-chan []es.HitT
+	// Subscribe to get notified of documents
+	Subscribe() Subscription
+
+	// Unsubscribe from getting notifications on documents
+	Unsubscribe(sub Subscription)
+}
+
+// Subscription is a subscription to get notified for new documents
+type subT struct {
+	idx uint64
+	c chan []es.HitT
+}
+
+// subT is the channel the monitor send new documents to
+func (s *subT) Output() <-chan []es.HitT {
+	return s.c
 }
 
 // monitorT monitors for new documents in an index
@@ -80,7 +103,8 @@ type monitorT struct {
 
 	log zerolog.Logger
 
-	outCh chan []es.HitT
+	mut  sync.RWMutex
+	subs map[uint64]*subT
 
 	readyCh chan error
 }
@@ -96,7 +120,7 @@ func New(index string, cli *elasticsearch.Client, opts ...Option) (Monitor, erro
 		checkInterval:  defaultCheckInterval * time.Second,
 		withExpiration: defaultWithExpiration,
 		checkpoint:     defaultSeqNo,
-		outCh:          make(chan []es.HitT, 1),
+		subs: make(map[uint64]*subT),
 	}
 
 	for _, opt := range opts {
@@ -141,9 +165,35 @@ func WithReadyChan(readyCh chan error) Option {
 	}
 }
 
-// Output output channel for the monitor
-func (m *monitorT) Output() <-chan []es.HitT {
-	return m.outCh
+// Subscribe to get notified of documents
+func (m *monitorT) Subscribe() Subscription {
+	idx := atomic.AddUint64(&gCounter, 1)
+
+	s := &subT{
+		idx: idx,
+		c: make(chan []es.HitT),
+	}
+
+
+	m.mut.Lock()
+	m.subs[idx] = s
+	m.mut.Unlock()
+	return s
+}
+
+// Unsubscribe from getting notifications on documents
+func (m *monitorT) Unsubscribe(sub Subscription) {
+	s, ok := sub.(*subT)
+	if !ok {
+		return
+	}
+
+	m.mut.Lock()
+	_, ok = m.subs[s.idx]
+	if ok {
+		delete(m.subs, s.idx)
+	}
+	m.mut.Unlock()
 }
 
 // GetCheckpoint implements GlobalCheckpointProvider interface
@@ -213,10 +263,22 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 		maxVal := hits[sz-1].SeqNo
 		m.storeCheckpoint(maxVal)
 
-		select {
-		case m.outCh <- hits:
-		case <-ctx.Done():
+		m.mut.RLock()
+		subs := m.subs
+		m.mut.RUnlock()
+
+		var wg sync.WaitGroup
+		wg.Add(len(subs))
+		for _, s := range subs {
+			go func(){
+				defer wg.Done()
+				select {
+				case s.c <- hits:
+				case <-ctx.Done():
+				}
+			}()
 		}
+		wg.Wait()
 	}
 }
 

@@ -38,6 +38,8 @@ type Monitor interface {
 	Unsubscribe(sub Subscription) error
 }
 
+type policyFetcher func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error)
+
 type subT struct {
 	idx uint64
 
@@ -63,6 +65,7 @@ type monitorT struct {
 	kickCh   chan struct{}
 	policies map[string]policyT
 
+	policyF policyFetcher
 	policiesIndex string
 	throttle      time.Duration
 }
@@ -83,12 +86,15 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duratio
 		kickCh:        make(chan struct{}),
 		policies:      make(map[string]policyT),
 		throttle:      throttle,
+		policyF: 	   dl.QueryLatestPolicies,
 		policiesIndex: dl.FleetPolicies,
 	}
 }
 
 // Run runs the monitor.
 func (m *monitorT) Run(ctx context.Context) error {
+	s := m.monitor.Subscribe()
+	defer m.monitor.Unsubscribe(s)
 
 LOOP:
 	for {
@@ -99,7 +105,7 @@ LOOP:
 			if err := m.process(ctx); err != nil {
 				return err
 			}
-		case hits := <-m.monitor.Output():
+		case hits := <-s.Output():
 			policies := make([]model.Policy, len(hits))
 			for i, hit := range hits {
 				err := hit.Unmarshal(&policies[i])
@@ -117,12 +123,12 @@ LOOP:
 }
 
 func (m *monitorT) process(ctx context.Context) error {
-	policies, err := dl.QueryLatestPolicies(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
+	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if err != nil {
 		return err
 	}
 	if len(policies) == 0 {
-		m.log.Debug().Msg("No policy to monitor")
+		m.log.Debug().Msg("no policy to monitor")
 		return nil
 	}
 	return m.processPolicies(ctx, policies)
@@ -171,7 +177,7 @@ func (m *monitorT) rollout(ctx context.Context, policy model.Policy) error {
 		return nil
 	}
 	if len(subs) == 0 {
-		zlog.Info().Msg("No pending subscriptions to revised policy")
+		zlog.Info().Msg("no pending subscriptions to revised policy")
 		return nil
 	}
 
@@ -193,7 +199,7 @@ func (m *monitorT) rollout(ctx context.Context, policy model.Policy) error {
 	zlog.Info().
 		Int("nSubs", len(subs)).
 		Dur("throttle", m.throttle).
-		Msg("Policy rollout begin")
+		Msg("policy rollout begin")
 
 	var err error
 LOOP:
@@ -215,7 +221,7 @@ LOOP:
 			// A block here indicates a logic error somewheres.
 			zlog.Error().
 				Str("policyId", policy.PolicyId).
-				Msg("Should never block on policy channel")
+				Msg("should never block on policy channel")
 		}
 
 	}
@@ -223,7 +229,7 @@ LOOP:
 	zlog.Info().
 		Err(err).
 		Dur("tdiff", time.Since(start)).
-		Msg("Policy rollout end")
+		Msg("policy rollout end")
 
 	return err
 }
@@ -256,7 +262,7 @@ func (m *monitorT) updatePolicy(policy model.Policy) []subT {
 		Int64("nrev", policy.RevisionIdx).
 		Int64("ocoord", p.policy.CoordinatorIdx).
 		Int64("ncoord", policy.CoordinatorIdx).
-		Msg("New policy")
+		Msg("new policy")
 
 	subs := make([]subT, 0, len(p.subs))
 	for idx, sub := range p.subs {
@@ -315,7 +321,7 @@ func (m *monitorT) Subscribe(agentId string, policyId string, revisionIdx int64,
 			select {
 			case m.kickCh <- struct{}{}:
 			default:
-				m.log.Debug().Msg("Kick channel full")
+				m.log.Debug().Msg("kick channel full")
 			}
 		}
 		p.subs[idx] = s
