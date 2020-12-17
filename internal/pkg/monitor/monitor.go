@@ -186,6 +186,7 @@ func (m *monitorT) Unsubscribe(sub Subscription) {
 	if !ok {
 		return
 	}
+	close(s.c)
 
 	m.mut.Lock()
 	_, ok = m.subs[s.idx]
@@ -268,6 +269,15 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 		for _, s := range m.subs {
 			go func(s *subT) {
 				defer wg.Done()
+				defer func() {
+					// recover from the "send on closed channel"
+					//
+					// if a subscriber doesn't read from the channel
+					// and then unsubscribes the channel will be closed
+					// golang provides no way of handling this without
+					// dealing with the panic of sending on a closed channel
+					recover()
+				}()
 				select {
 				case s.c <- hits:
 				case <-ctx.Done():

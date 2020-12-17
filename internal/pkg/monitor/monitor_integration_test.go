@@ -73,6 +73,7 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 	subs := []Subscription{
 		mon.Subscribe(),
 		mon.Subscribe(),
+		mon.Subscribe(), // no goroutine will read from the output
 	}
 
 	// Create random actions
@@ -105,6 +106,7 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 			}
 		}(i, subs[i])
 	}
+	mon.Unsubscribe(subs[2]) // unsubscribe (nothing read from the channel)
 	mwg.Wait()
 
 	// Need to set the seqno that are known only after the documents where indexed

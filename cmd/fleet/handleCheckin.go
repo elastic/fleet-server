@@ -9,8 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fleet/internal/pkg/policy"
-	"fmt"
 	"net/http"
 	"reflect"
 	"time"
@@ -21,6 +19,7 @@ import (
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/monitor"
+	"fleet/internal/pkg/policy"
 	"fleet/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"
@@ -283,7 +282,7 @@ func convertActionsX(agentId string, acdocs []model.Action) ([]ActionResp, strin
 	return respList, ackToken
 }
 
-func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, policy model.Policy) (*ActionResp, error) {
+func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.Policy) (*ActionResp, error) {
 	// Need to inject the default api key into the object. So:
 	// 1) Deserialize the action
 	// 2) Lookup the DefaultApiKey in the save agent (we purposefully didn't decode it before)
@@ -292,7 +291,7 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, policy m
 	// 5) Re-serialize and return AgentResp structure
 
 	var actionObj map[string]interface{}
-	if err := json.Unmarshal(policy.Data, &actionObj); err != nil {
+	if err := json.Unmarshal(p.Data, &actionObj); err != nil {
 		return nil, err
 	}
 
@@ -328,19 +327,16 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, policy m
 		return nil, err
 	}
 
+	a := policy.ActionFromPolicy(p)
 	resp := ActionResp{
 		AgentId:   agent.Id,
-		CreatedAt: policy.Timestamp,
+		CreatedAt: p.Timestamp,
 		Data:      dataJSON,
-		Id:        idForPolicy(policy.PolicyId, policy.RevisionIdx, policy.CoordinatorIdx),
+		Id:        a.String(),
 		Type:      TypePolicyChange,
 	}
 
 	return &resp, nil
-}
-
-func idForPolicy(policyId string, revIdx int64, coordIdx int64) string {
-	return fmt.Sprintf("policy:%s:%d:%d", policyId, revIdx, coordIdx)
 }
 
 func setMapObj(obj map[string]interface{}, val interface{}, keys ...string) bool {

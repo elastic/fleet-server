@@ -8,9 +8,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fleet/internal/pkg/policy"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -19,7 +19,6 @@ import (
 	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/saved"
 
-	"github.com/gofrs/uuid"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
 )
@@ -107,7 +106,7 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, s
 		m[action.Type] = append(actionList, action)
 	}
 
-	if policyAcks != nil {
+	if len(policyAcks) > 0 {
 		if err := _handlePolicyChange(ctx, bulker, agent, policyAcks...); err != nil {
 			return err
 		}
@@ -127,12 +126,12 @@ func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Age
 	currRev := agent.PolicyRevisionIdx
 	currCoord := agent.PolicyCoordinatorIdx
 	for _, a := range actionIds {
-		action, ok := parsePolicyAction(a)
-		if ok && action.policyId == agent.PolicyId && (action.revIdx > currRev ||
-			(action.revIdx == currRev && action.coordIdx > currCoord)) {
+		action, ok := policy.ActionFromString(a)
+		if ok && action.PolicyId == agent.PolicyId && (action.RevisionIdx > currRev ||
+			(action.RevisionIdx == currRev && action.CoordinatorIdx > currCoord)) {
 			found = true
-			currRev = action.revIdx
-			currCoord = action.coordIdx
+			currRev = action.RevisionIdx
+			currCoord = action.CoordinatorIdx
 		}
 	}
 
@@ -164,36 +163,4 @@ func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Age
 	}
 
 	return nil
-}
-
-type policyAction struct {
-	policyId string
-	revIdx   int64
-	coordIdx int64
-}
-
-func parsePolicyAction(actionId string) (policyAction, bool) {
-	split := strings.Split(actionId, ":")
-	if len(split) != 4 {
-		return policyAction{}, false
-	}
-	if split[0] != "policy" {
-		return policyAction{}, false
-	}
-	if _, err := uuid.FromString(split[1]); err != nil {
-		return policyAction{}, false
-	}
-	revIdx, err := strconv.Atoi(split[2])
-	if err != nil {
-		return policyAction{}, false
-	}
-	coordIdx, err := strconv.Atoi(split[3])
-	if err != nil {
-		return policyAction{}, false
-	}
-	return policyAction{
-		policyId: split[1],
-		revIdx:   int64(revIdx),
-		coordIdx: int64(coordIdx),
-	}, true
 }
