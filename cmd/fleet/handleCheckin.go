@@ -230,23 +230,23 @@ func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno int64, a
 	})
 }
 
-func convertActions(agentId string, acdocs []model.Action) ([]ActionResp, string) {
+func convertActions(agentId string, actions []model.Action) ([]ActionResp, string) {
 	var ackToken string
-	sz := len(acdocs)
+	sz := len(actions)
 
 	respList := make([]ActionResp, 0, sz)
-	for _, acdoc := range acdocs {
+	for _, action := range actions {
 		respList = append(respList, ActionResp{
 			AgentId:   agentId,
-			CreatedAt: acdoc.Timestamp,
-			Data:      []byte(acdoc.Data),
-			Id:        acdoc.Id,
-			Type:      acdoc.Type,
+			CreatedAt: action.Timestamp,
+			Data:      []byte(action.Data),
+			Id:        action.ActionId,
+			Type:      action.Type,
 		})
 	}
 
 	if sz > 0 {
-		ackToken = acdocs[sz-1].Id
+		ackToken = actions[sz-1].Id
 	}
 
 	return respList, ackToken
