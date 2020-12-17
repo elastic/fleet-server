@@ -189,8 +189,10 @@ func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Age
 
 func _handleUnenroll(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) error {
 	updates := make([]bulk.BulkOp, 0, 1)
+	now := time.Now().UTC().Format(time.RFC3339)
 	fields := map[string]interface{}{
-		dl.FieldUnenrolledAt: time.Now().UTC().Format(time.RFC3339),
+		dl.FieldUnenrolledAt: now,
+		dl.FieldUpdatedAt:    now,
 	}
 
 	source, err := json.Marshal(map[string]interface{}{
