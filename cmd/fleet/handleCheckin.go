@@ -19,6 +19,7 @@ import (
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/monitor"
+	"fleet/internal/pkg/policy"
 	"fleet/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"
@@ -57,7 +58,7 @@ type CheckinT struct {
 	cfg    *config.Config
 	bc     *BulkCheckin
 	ba     *BulkActions
-	pm     *PolicyMon
+	pm     policy.Monitor
 	gcp    monitor.GlobalCheckpointProvider
 	ad     *action.Dispatcher
 	tr     *action.TokenResolver
@@ -68,7 +69,7 @@ func NewCheckinT(
 	cfg *config.Config,
 	bc *BulkCheckin,
 	ba *BulkActions,
-	pm *PolicyMon,
+	pm policy.Monitor,
 	gcp monitor.GlobalCheckpointProvider,
 	ad *action.Dispatcher,
 	tr *action.TokenResolver,
@@ -130,11 +131,11 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	actCh = aSub.Ch()
 
 	// Subscribe to policy manager for changes on PolicyId > policyRev
-	sub, err := ct.pm.Subscribe(agent.PolicyId, agent.PolicyRevision)
+	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyId, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
 	if err != nil {
 		return err
 	}
-	defer ct.pm.Unsubscribe(*sub)
+	defer ct.pm.Unsubscribe(sub)
 
 	// Update check-in timestamp on timeout
 	tick := time.NewTicker(kCheckinTimeout)
@@ -174,8 +175,8 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 			case actionList := <-actionCh:
 				actions = append(actions, convertActions(actionList)...)
 				break LOOP
-			case action := <-sub.C:
-				actionResp, err := parsePolicy(ctx, bulker, agent.Id, action)
+			case policy := <-sub.Output():
+				actionResp, err := parsePolicy(ctx, bulker, agent.Id, policy)
 				if err != nil {
 					return err
 				}
@@ -222,7 +223,7 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 		sn, err = ct.tr.Resolve(ctx, ackToken)
 		if err != nil {
 			if errors.Is(err, dl.ErrNotFound) {
-				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("Action token not found")
+				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("Revision token not found")
 				err = nil
 			} else {
 				return
@@ -281,16 +282,16 @@ func convertActionsX(agentId string, acdocs []model.Action) ([]ActionResp, strin
 	return respList, ackToken
 }
 
-func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, action Action) (*ActionResp, error) {
+func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.Policy) (*ActionResp, error) {
 	// Need to inject the default api key into the object. So:
 	// 1) Deserialize the action
 	// 2) Lookup the DefaultApiKey in the save agent (we purposefully didn't decode it before)
 	// 3) If not there, generate and persist DefaultAPIKey
 	// 4) Inject default api key into structure
-	// 5) Reserialize and return AgentResp structre
+	// 5) Re-serialize and return AgentResp structure
 
 	var actionObj map[string]interface{}
-	if err := json.Unmarshal([]byte(action.Data), &actionObj); err != nil {
+	if err := json.Unmarshal(p.Data, &actionObj); err != nil {
 		return nil, err
 	}
 
@@ -315,28 +316,24 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, action A
 		}
 	}
 
-	var ok bool
-	if ok = setMapObj(actionObj, agent.DefaultApiKey, "policy", "outputs", "default", "api_key"); !ok {
-		ok = setMapObj(actionObj, agent.DefaultApiKey, "policy", "config", "default", "api_key")
+	if ok := setMapObj(actionObj, agent.DefaultApiKey, "outputs", "default", "api_key"); !ok {
+		log.Debug().Msg("Cannot inject api_key into policy")
 	}
 
-	dataJSON := []byte(action.Data)
-	if ok {
-		// Reserialize
-		var err error
-		if dataJSON, err = json.Marshal(actionObj); err != nil {
-			return nil, err
-		}
-	} else {
-		log.Debug().Msg("Cannot inject api_key into action")
+	dataJSON, err := json.Marshal(struct {
+		Policy map[string]interface{} `json:"policy"`
+	}{actionObj})
+	if err != nil {
+		return nil, err
 	}
 
+	r := policy.RevisionFromPolicy(p)
 	resp := ActionResp{
 		AgentId:   agent.Id,
-		CreatedAt: action.CreatedAt,
+		CreatedAt: p.Timestamp,
 		Data:      dataJSON,
-		Id:        action.Id,
-		Type:      action.Type,
+		Id:        r.String(),
+		Type:      TypePolicyChange,
 	}
 
 	return &resp, nil

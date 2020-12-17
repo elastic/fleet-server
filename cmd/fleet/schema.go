@@ -17,8 +17,6 @@ const (
 )
 
 const (
-	FieldPolicyRev     = "policy_revision"
-	FieldPackages      = "packages"
 	FieldLastCheckin   = "last_checkin"
 	FieldLocalMetadata = "local_metadata"
 )

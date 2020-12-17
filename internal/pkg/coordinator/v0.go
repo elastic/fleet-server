@@ -6,6 +6,7 @@ package coordinator
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -53,7 +54,7 @@ func (c *coordinatorZeroT) Run(ctx context.Context) error {
 				p.Data = newData
 				c.policy = p
 				c.out <- p
-			} else if newData != p.Data {
+			} else if string(newData) != string(p.Data) {
 				p.CoordinatorIdx += 1
 				p.Data = newData
 				c.policy = p
@@ -79,6 +80,6 @@ func (c *coordinatorZeroT) Output() <-chan model.Policy {
 // handlePolicy handles the new policy.
 //
 // Does nothing at the moment.
-func (c *coordinatorZeroT) handlePolicy(data string) (string, error) {
+func (c *coordinatorZeroT) handlePolicy(data json.RawMessage) (json.RawMessage, error) {
 	return data, nil
 }

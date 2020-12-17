@@ -8,12 +8,13 @@ package es
 
 import (
 	"encoding/json"
-	"fleet/internal/pkg/model"
 	"testing"
 
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
+
+	"fleet/internal/pkg/model"
 )
 
 func TestHitUnmarshal(t *testing.T) {

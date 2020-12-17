@@ -40,11 +40,13 @@ func NewDispatcher(am monitor.Monitor) *Dispatcher {
 }
 
 func (d *Dispatcher) Run(ctx context.Context) (err error) {
+	s := d.am.Subscribe()
+	defer d.am.Unsubscribe(s)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case hits := <-d.am.Output():
+		case hits := <-s.Output():
 			d.process(ctx, hits)
 		}
 	}

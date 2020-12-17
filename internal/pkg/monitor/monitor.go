@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,9 +22,10 @@ import (
 )
 
 const (
-	defaultCheckInterval  = 1         // check every second for the new action
-	defaultSeqNo          = int64(-1) // the _seq_no in elasticsearch start with 0
-	defaultWithExpiration = false
+	defaultCheckInterval       = 1 * time.Second // check every second for the new action
+	defaultSubscriptionTimeout = 5 * time.Second // max amount of time subscription has to read from channel
+	defaultSeqNo               = int64(-1)       // the _seq_no in elasticsearch start with 0
+	defaultWithExpiration      = false
 )
 
 const (
@@ -33,6 +35,8 @@ const (
 	fieldMaxSeqNo   = "max_seq_no"
 	fieldExpiration = "expiration"
 )
+
+var gCounter uint64
 
 type HitT struct {
 	Id     string          `json:"_id"`
@@ -55,6 +59,12 @@ type GlobalCheckpointProvider interface {
 	GetCheckpoint() int64
 }
 
+// Subscription is a subscription to get notified for new documents
+type Subscription interface {
+	// Output is the channel the monitor send new documents to
+	Output() <-chan []es.HitT
+}
+
 // Monitor monitors for new documents in an index
 type Monitor interface {
 	GlobalCheckpointProvider
@@ -62,8 +72,22 @@ type Monitor interface {
 	// Run runs the monitor
 	Run(ctx context.Context) error
 
-	// Output is the channel the monitor send new documents to
-	Output() <-chan []es.HitT
+	// Subscribe to get notified of documents
+	Subscribe() Subscription
+
+	// Unsubscribe from getting notifications on documents
+	Unsubscribe(sub Subscription)
+}
+
+// Subscription is a subscription to get notified for new documents
+type subT struct {
+	idx uint64
+	c   chan []es.HitT
+}
+
+// subT is the channel the monitor send new documents to
+func (s *subT) Output() <-chan []es.HitT {
+	return s.c
 }
 
 // monitorT monitors for new documents in an index
@@ -74,13 +98,15 @@ type monitorT struct {
 
 	index          string
 	checkInterval  time.Duration
+	subTimeout     time.Duration
 	withExpiration bool
 
 	checkpoint int64 // index global checkpoint
 
 	log zerolog.Logger
 
-	outCh chan []es.HitT
+	mut  sync.RWMutex
+	subs map[uint64]*subT
 
 	readyCh chan error
 }
@@ -93,10 +119,11 @@ func New(index string, cli *elasticsearch.Client, opts ...Option) (Monitor, erro
 	m := &monitorT{
 		index:          index,
 		cli:            cli,
-		checkInterval:  defaultCheckInterval * time.Second,
+		checkInterval:  defaultCheckInterval,
+		subTimeout:     defaultSubscriptionTimeout,
 		withExpiration: defaultWithExpiration,
 		checkpoint:     defaultSeqNo,
-		outCh:          make(chan []es.HitT, 1),
+		subs:           make(map[uint64]*subT),
 	}
 
 	for _, opt := range opts {
@@ -141,9 +168,34 @@ func WithReadyChan(readyCh chan error) Option {
 	}
 }
 
-// Output output channel for the monitor
-func (m *monitorT) Output() <-chan []es.HitT {
-	return m.outCh
+// Subscribe to get notified of documents
+func (m *monitorT) Subscribe() Subscription {
+	idx := atomic.AddUint64(&gCounter, 1)
+
+	s := &subT{
+		idx: idx,
+		c:   make(chan []es.HitT, 1),
+	}
+
+	m.mut.Lock()
+	m.subs[idx] = s
+	m.mut.Unlock()
+	return s
+}
+
+// Unsubscribe from getting notifications on documents
+func (m *monitorT) Unsubscribe(sub Subscription) {
+	s, ok := sub.(*subT)
+	if !ok {
+		return
+	}
+
+	m.mut.Lock()
+	_, ok = m.subs[s.idx]
+	if ok {
+		delete(m.subs, s.idx)
+	}
+	m.mut.Unlock()
 }
 
 // GetCheckpoint implements GlobalCheckpointProvider interface
@@ -213,10 +265,26 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 		maxVal := hits[sz-1].SeqNo
 		m.storeCheckpoint(maxVal)
 
-		select {
-		case m.outCh <- hits:
-		case <-ctx.Done():
+		m.mut.RLock()
+		var wg sync.WaitGroup
+		wg.Add(len(m.subs))
+		for _, s := range m.subs {
+			go func(s *subT) {
+				defer wg.Done()
+				lc, cn := context.WithTimeout(ctx, m.subTimeout)
+				defer cn()
+				select {
+				case s.c <- hits:
+				case <-lc.Done():
+					err := ctx.Err()
+					if err == context.DeadlineExceeded {
+						m.log.Err(err).Dur("timeout", m.subTimeout)
+					}
+				}
+			}(s)
 		}
+		m.mut.RUnlock()
+		wg.Wait()
 	}
 }
 

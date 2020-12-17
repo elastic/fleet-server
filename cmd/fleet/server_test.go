@@ -9,6 +9,8 @@ package fleet
 import (
 	"context"
 	"fleet/internal/pkg/config"
+	"fleet/internal/pkg/monitor/mock"
+	"fleet/internal/pkg/policy"
 	"net/http"
 	"sync"
 	"testing"
@@ -33,8 +35,8 @@ func TestRunServer(t *testing.T) {
 
 	bulker := ftesting.MockBulk{}
 	sv := saved.NewMgr(bulker, savedObjectKey())
-	pm, err := NewPolicyMon(kPolicyThrottle)
-	require.NoError(t, err)
+	pim := mock.NewMockIndexMonitor()
+	pm := policy.NewMonitor(bulker, pim, kPolicyThrottle)
 	ba := NewBulkActions()
 	bc := NewBulkCheckin(nil)
 	ct := NewCheckinT(nil, bc, ba, pm, nil, nil, nil, nil)

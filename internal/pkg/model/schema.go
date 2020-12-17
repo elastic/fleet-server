@@ -113,11 +113,14 @@ type Agent struct {
 	// Packages array
 	Packages []string `json:"packages,omitempty"`
 
+	// The current policy coordinator for the Elastic Agent
+	PolicyCoordinatorIdx int64 `json:"policy_coordinator_idx,omitempty"`
+
 	// The policy ID for the Elastic Agent
 	PolicyId string `json:"policy_id,omitempty"`
 
-	// The current policy revision for the Elastic Agent
-	PolicyRevision int64 `json:"policy_revision,omitempty"`
+	// The current policy revision_idx for the Elastic Agent
+	PolicyRevisionIdx int64 `json:"policy_revision_idx,omitempty"`
 
 	// Shared ID
 	SharedId string `json:"shared_id,omitempty"`
@@ -206,8 +209,8 @@ type Policy struct {
 	// The coordinator index of the policy
 	CoordinatorIdx int64 `json:"coordinator_idx"`
 
-	// The data for the policy
-	Data string `json:"data"`
+	// The opaque payload.
+	Data json.RawMessage `json:"data"`
 
 	// True when this policy is the default policy to start Fleet Server
 	DefaultFleetServer bool `json:"default_fleet_server"`

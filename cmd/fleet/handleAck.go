@@ -8,8 +8,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fleet/internal/pkg/policy"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"fleet/internal/pkg/bulk"
@@ -82,10 +84,14 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, s
 	// Retrieve each action
 	m := map[string][]Action{}
 
+	var policyAcks []string
 	for _, ev := range events {
-
 		if ev.AgentId != "" && ev.AgentId != agent.Id {
 			return ErrEventAgentIdMismatch
+		}
+		if strings.HasPrefix(ev.ActionId, "policy:") {
+			policyAcks = append(policyAcks, ev.ActionId)
+			continue
 		}
 
 		action, ok := gCache.GetAction(ev.ActionId)
@@ -100,50 +106,46 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, s
 		m[action.Type] = append(actionList, action)
 	}
 
-	// TODO: handle UPGRADE and UNENROLL
-
-	if actions, ok := m[TypePolicyChange]; ok {
-		if err := _handlePolicyChange(ctx, agent, actions, bulker); err != nil {
+	if len(policyAcks) > 0 {
+		if err := _handlePolicyChange(ctx, bulker, agent, policyAcks...); err != nil {
 			return err
 		}
 	}
 
+	// TODO: handle UPGRADE and UNENROLL
+
 	return nil
 }
 
-func _handlePolicyChange(ctx context.Context, agent *model.Agent, actions []Action, bulker bulk.Bulk) error {
-
+func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Agent, actionIds ...string) error {
 	// If more than one, pick the winner;
-	// 0) Correctly typed
-	// 1) Correct policy id
-	// 2) Highest revision number
+	// 0) Correct policy id
+	// 1) Highest revision/coordinator number
 
-	var found bool
-	var bestAction Action
-
-	for _, a := range actions {
-		switch {
-		case a.Type != TypePolicyChange:
-		case a.PolicyId != agent.PolicyId:
-		case !found || a.PolicyRev > bestAction.PolicyRev:
+	found := false
+	currRev := agent.PolicyRevisionIdx
+	currCoord := agent.PolicyCoordinatorIdx
+	for _, a := range actionIds {
+		rev, ok := policy.RevisionFromString(a)
+		if ok && rev.PolicyId == agent.PolicyId && (rev.RevisionIdx > currRev ||
+			(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
 			found = true
-			bestAction = a
+			currRev = rev.RevisionIdx
+			currCoord = rev.CoordinatorIdx
 		}
 	}
 
 	if found {
-
 		updates := make([]bulk.BulkOp, 0, 1)
 		fields := map[string]interface{}{
-			dl.FieldPolicyRevision: bestAction.PolicyRev,
-			dl.FieldPackages:       bestAction.AckData,
+			dl.FieldPolicyRevisionIdx:    currRev,
+			dl.FieldPolicyCoordinatorIdx: currCoord,
 		}
 		fields[dl.FieldUpdatedAt] = time.Now().UTC().Format(time.RFC3339)
 
 		source, err := json.Marshal(map[string]interface{}{
 			"doc": fields,
 		})
-
 		if err != nil {
 			return err
 		}

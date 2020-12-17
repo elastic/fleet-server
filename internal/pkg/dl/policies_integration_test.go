@@ -26,7 +26,7 @@ func createRandomPolicy(id string, revisionIdx int) model.Policy {
 		PolicyId:           id,
 		RevisionIdx:        int64(revisionIdx),
 		CoordinatorIdx:     0,
-		Data:               "policy",
+		Data:               []byte("{}"),
 		DefaultFleetServer: false,
 		Timestamp:          now.Format(time.RFC3339),
 	}
