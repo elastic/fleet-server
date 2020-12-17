@@ -17,6 +17,7 @@ import (
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/model"
+
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
 )
