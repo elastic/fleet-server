@@ -57,7 +57,6 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 type CheckinT struct {
 	cfg    *config.Config
 	bc     *BulkCheckin
-	ba     *BulkActions
 	pm     policy.Monitor
 	gcp    monitor.GlobalCheckpointProvider
 	ad     *action.Dispatcher
@@ -68,7 +67,6 @@ type CheckinT struct {
 func NewCheckinT(
 	cfg *config.Config,
 	bc *BulkCheckin,
-	ba *BulkActions,
 	pm policy.Monitor,
 	gcp monitor.GlobalCheckpointProvider,
 	ad *action.Dispatcher,
@@ -78,7 +76,6 @@ func NewCheckinT(
 	return &CheckinT{
 		cfg:    cfg,
 		bc:     bc,
-		ba:     ba,
 		pm:     pm,
 		gcp:    gcp,
 		ad:     ad,
@@ -110,15 +107,6 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		return err
 	}
 
-	actionSub, err := ct.ba.Subscribe(agent.Id)
-	if err != nil {
-		return err
-	}
-	defer ct.ba.Unsubscribe(actionSub)
-	actionCh := actionSub.Ch()
-
-	var actCh chan []model.Action
-
 	// Resolve AckToken from request, fallback on the agent record
 	seqno, err := ct.resolveSeqNo(ctx, req, agent)
 	if err != nil {
@@ -128,7 +116,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	// Subsribe to actions dispatcher
 	aSub := ct.ad.Subscribe(agent.Id, seqno)
 	defer ct.ad.Unsubscribe(aSub)
-	actCh = aSub.Ch()
+	actCh := aSub.Ch()
 
 	// Subscribe to policy manager for changes on PolicyId > policyRev
 	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyId, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
@@ -159,7 +147,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	if err != nil {
 		return err
 	}
-	actions, ackToken = convertActionsX(agent.Id, pendingActions)
+	actions, ackToken = convertActions(agent.Id, pendingActions)
 
 	if len(actions) == 0 {
 	LOOP:
@@ -169,11 +157,8 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 				return ctx.Err()
 			case acdocs := <-actCh:
 				var acs []ActionResp
-				acs, ackToken = convertActionsX(agent.Id, acdocs)
+				acs, ackToken = convertActions(agent.Id, acdocs)
 				actions = append(actions, acs...)
-				break LOOP
-			case actionList := <-actionCh:
-				actions = append(actions, convertActions(actionList)...)
 				break LOOP
 			case policy := <-sub.Output():
 				actionResp, err := parsePolicy(ctx, bulker, agent.Id, policy)
@@ -245,22 +230,7 @@ func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno int64, a
 	})
 }
 
-func convertActions(actionList []Action) []ActionResp {
-	respList := make([]ActionResp, 0, len(actionList))
-	for _, action := range actionList {
-		respList = append(respList, ActionResp{
-			AgentId:   action.AgentId,
-			CreatedAt: action.CreatedAt,
-			Data:      []byte(action.Data),
-			Id:        action.Id,
-			Type:      action.Type,
-		})
-	}
-
-	return respList
-}
-
-func convertActionsX(agentId string, acdocs []model.Action) ([]ActionResp, string) {
+func convertActions(agentId string, acdocs []model.Action) ([]ActionResp, string) {
 	var ackToken string
 	sz := len(acdocs)
 

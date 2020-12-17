@@ -18,7 +18,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"fleet/internal/pkg/saved"
 	ftesting "fleet/internal/pkg/testing"
 )
 
@@ -34,16 +33,14 @@ func TestRunServer(t *testing.T) {
 	cfg.Port = port
 
 	bulker := ftesting.MockBulk{}
-	sv := saved.NewMgr(bulker, savedObjectKey())
 	pim := mock.NewMockIndexMonitor()
 	pm := policy.NewMonitor(bulker, pim, kPolicyThrottle)
-	ba := NewBulkActions()
 	bc := NewBulkCheckin(nil)
-	ct := NewCheckinT(nil, bc, ba, pm, nil, nil, nil, nil)
+	ct := NewCheckinT(nil, bc, pm, nil, nil, nil, nil)
 	et, err := NewEnrollerT(cfg, nil)
 	require.NoError(t, err)
 
-	router := NewRouter(sv, bulker, ct, et)
+	router := NewRouter(bulker, ct, et)
 	errCh := make(chan error)
 
 	var wg sync.WaitGroup
