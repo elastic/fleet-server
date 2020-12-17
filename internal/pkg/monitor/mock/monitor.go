@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package mock
 
 import (
@@ -13,7 +17,7 @@ var gMockIndexCounter uint64
 
 type mockSubT struct {
 	idx uint64
-	c chan []es.HitT
+	c   chan []es.HitT
 }
 
 func (s *mockSubT) Output() <-chan []es.HitT {
@@ -31,7 +35,7 @@ type MockIndexMonitor struct {
 func NewMockIndexMonitor() *MockIndexMonitor {
 	return &MockIndexMonitor{
 		checkpoint: -1,
-		subs: make(map[uint64]*mockSubT),
+		subs:       make(map[uint64]*mockSubT),
 	}
 }
 
@@ -51,9 +55,8 @@ func (m *MockIndexMonitor) Subscribe() monitor.Subscription {
 
 	s := &mockSubT{
 		idx: idx,
-		c: make(chan []es.HitT),
+		c:   make(chan []es.HitT),
 	}
-
 
 	m.mut.Lock()
 	m.subs[idx] = s
@@ -84,20 +87,18 @@ func (m *MockIndexMonitor) Notify(ctx context.Context, hits []es.HitT) {
 		m.checkpoint = maxVal
 
 		m.mut.RLock()
-		subs := m.subs
-		m.mut.RUnlock()
-
 		var wg sync.WaitGroup
-		wg.Add(len(subs))
-		for _, s := range subs {
-			go func(){
+		wg.Add(len(m.subs))
+		for _, s := range m.subs {
+			go func(s *mockSubT) {
 				defer wg.Done()
 				select {
 				case s.c <- hits:
 				case <-ctx.Done():
 				}
-			}()
+			}(s)
 		}
+		m.mut.RUnlock()
 		wg.Wait()
 	}
 }

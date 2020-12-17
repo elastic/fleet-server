@@ -69,6 +69,12 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 	err = <-readyCh
 	require.NoError(t, err)
 
+	// Create subscriptions before creating the actions, otherwise they can be missed
+	subs := []Subscription{
+		mon.Subscribe(),
+		mon.Subscribe(),
+	}
+
 	// Create random actions
 	actions, err := ftesting.StoreRandomActions(ctx, bulker, index, 1, 7)
 	require.NoError(t, err)
@@ -78,9 +84,8 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 	var mwg sync.WaitGroup
 	mwg.Add(2)
 	for i := 0; i < 2; i++ {
-		go func(gotActions []model.Action) {
+		go func(i int, s Subscription) {
 			defer mwg.Done()
-			s := mon.Subscribe()
 			defer mon.Unsubscribe(s)
 			for {
 				select {
@@ -89,8 +94,8 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 						var action model.Action
 						er := hit.Unmarshal(&action)
 						require.NoError(t, er)
-						gotActions = append(gotActions, action)
-						if len(gotActions) == len(actions) {
+						gotActions[i] = append(gotActions[i], action)
+						if len(gotActions[i]) == len(actions) {
 							return
 						}
 					}
@@ -98,7 +103,7 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 					return
 				}
 			}
-		}(gotActions[i])
+		}(i, subs[i])
 	}
 	mwg.Wait()
 

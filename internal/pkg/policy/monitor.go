@@ -22,6 +22,8 @@ import (
 	"fleet/internal/pkg/monitor"
 )
 
+var gCounter uint64
+
 type Subscription interface {
 	// Output returns a new policy that needs to be sent based on the current subscription.
 	Output() <-chan model.Policy
@@ -65,12 +67,10 @@ type monitorT struct {
 	kickCh   chan struct{}
 	policies map[string]policyT
 
-	policyF policyFetcher
+	policyF       policyFetcher
 	policiesIndex string
 	throttle      time.Duration
 }
-
-var gCounter uint64
 
 // Output returns a new policy that needs to be sent based on the current subscription.
 func (s *subT) Output() <-chan model.Policy {
@@ -86,7 +86,7 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duratio
 		kickCh:        make(chan struct{}),
 		policies:      make(map[string]policyT),
 		throttle:      throttle,
-		policyF: 	   dl.QueryLatestPolicies,
+		policyF:       dl.QueryLatestPolicies,
 		policiesIndex: dl.FleetPolicies,
 	}
 }

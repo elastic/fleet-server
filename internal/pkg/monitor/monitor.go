@@ -81,7 +81,7 @@ type Monitor interface {
 // Subscription is a subscription to get notified for new documents
 type subT struct {
 	idx uint64
-	c chan []es.HitT
+	c   chan []es.HitT
 }
 
 // subT is the channel the monitor send new documents to
@@ -120,7 +120,7 @@ func New(index string, cli *elasticsearch.Client, opts ...Option) (Monitor, erro
 		checkInterval:  defaultCheckInterval * time.Second,
 		withExpiration: defaultWithExpiration,
 		checkpoint:     defaultSeqNo,
-		subs: make(map[uint64]*subT),
+		subs:           make(map[uint64]*subT),
 	}
 
 	for _, opt := range opts {
@@ -171,9 +171,8 @@ func (m *monitorT) Subscribe() Subscription {
 
 	s := &subT{
 		idx: idx,
-		c: make(chan []es.HitT),
+		c:   make(chan []es.HitT),
 	}
-
 
 	m.mut.Lock()
 	m.subs[idx] = s
@@ -264,20 +263,18 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 		m.storeCheckpoint(maxVal)
 
 		m.mut.RLock()
-		subs := m.subs
-		m.mut.RUnlock()
-
 		var wg sync.WaitGroup
-		wg.Add(len(subs))
-		for _, s := range subs {
-			go func(){
+		wg.Add(len(m.subs))
+		for _, s := range m.subs {
+			go func(s *subT) {
 				defer wg.Done()
 				select {
 				case s.c <- hits:
 				case <-ctx.Done():
 				}
-			}()
+			}(s)
 		}
+		m.mut.RUnlock()
 		wg.Wait()
 	}
 }

@@ -9,7 +9,6 @@ package policy
 import (
 	"context"
 	"encoding/json"
-
 	"sync"
 	"testing"
 	"time"
@@ -18,10 +17,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
 
-	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/bulk"
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/es"
+	"fleet/internal/pkg/model"
 	"fleet/internal/pkg/monitor/mock"
 	ftesting "fleet/internal/pkg/testing"
 )
@@ -61,10 +60,10 @@ func TestMonitor_NewPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
-		CoordinatorIdx:     1,
-		Data:               []byte("{}"),
-		RevisionIdx:        1,
+		PolicyId:       policyId,
+		CoordinatorIdx: 1,
+		Data:           []byte("{}"),
+		RevisionIdx:    1,
 	}
 	policyData, err := json.Marshal(&policy)
 	if err != nil {
@@ -73,10 +72,10 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id: rId,
-				SeqNo: 1,
+				Id:      rId,
+				SeqNo:   1,
 				Version: 1,
-				Source: policyData,
+				Source:  policyData,
 			},
 		})
 	}()
@@ -139,10 +138,10 @@ func TestMonitor_SamePolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
-		CoordinatorIdx:     1,
-		Data:               []byte("{}"),
-		RevisionIdx:        1,
+		PolicyId:       policyId,
+		CoordinatorIdx: 1,
+		Data:           []byte("{}"),
+		RevisionIdx:    1,
 	}
 	policyData, err := json.Marshal(&policy)
 	if err != nil {
@@ -151,10 +150,10 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id: rId,
-				SeqNo: 1,
+				Id:      rId,
+				SeqNo:   1,
 				Version: 1,
-				Source: policyData,
+				Source:  policyData,
 			},
 		})
 	}()
@@ -212,10 +211,10 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
-		CoordinatorIdx:     0,
-		Data:               []byte("{}"),
-		RevisionIdx:        2,
+		PolicyId:       policyId,
+		CoordinatorIdx: 0,
+		Data:           []byte("{}"),
+		RevisionIdx:    2,
 	}
 	policyData, err := json.Marshal(&policy)
 	if err != nil {
@@ -224,10 +223,10 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id: rId,
-				SeqNo: 1,
+				Id:      rId,
+				SeqNo:   1,
 				Version: 1,
-				Source: policyData,
+				Source:  policyData,
 			},
 		})
 	}()
@@ -268,10 +267,10 @@ func TestMonitor_NewPolicyExists(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
-		CoordinatorIdx:     1,
-		Data:               []byte("{}"),
-		RevisionIdx:        2,
+		PolicyId:       policyId,
+		CoordinatorIdx: 1,
+		Data:           []byte("{}"),
+		RevisionIdx:    2,
 	}
 
 	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
