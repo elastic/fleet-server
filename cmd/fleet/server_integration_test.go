@@ -9,9 +9,6 @@ package fleet
 import (
 	"bytes"
 	"context"
-	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/logger"
-	"fleet/internal/pkg/sleep"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -22,13 +19,16 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"fleet/internal/pkg/cache"
+	"fleet/internal/pkg/config"
+	"fleet/internal/pkg/logger"
+	"fleet/internal/pkg/sleep"
 	ftesting "fleet/internal/pkg/testing"
-
-	"github.com/hashicorp/go-cleanhttp"
 )
 
 const (
@@ -62,7 +62,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 		return nil, err
 	}
 
-	err = initGlobalCache()
+	c, err := cache.New()
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
 
-	srv, err := NewFleetServer(cfg, serverVersion)
+	srv, err := NewFleetServer(cfg, c, serverVersion)
 	if err != nil {
 		return nil, err
 	}

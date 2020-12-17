@@ -10,6 +10,7 @@ import (
 
 	"fleet/internal/pkg/action"
 	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/cache"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/coordinator"
 	"fleet/internal/pkg/dl"
@@ -68,10 +69,10 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		logger.Init(cfg)
 
 		ctx := installSignalHandler()
-		err = initGlobalCache()
+		c, err := cache.New()
 		checkErr(err)
 
-		srv, err := NewFleetServer(cfg, version)
+		srv, err := NewFleetServer(cfg, c, version)
 		checkErr(err)
 
 		return srv.Run(ctx)
@@ -93,14 +94,16 @@ type FleetServer struct {
 
 	cfg   *config.Config
 	cfgCh chan *config.Config
+	cache cache.Cache
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config, version string) (*FleetServer, error) {
+func NewFleetServer(cfg *config.Config, c cache.Cache, version string) (*FleetServer, error) {
 	return &FleetServer{
 		version: version,
 		cfg:     cfg,
 		cfgCh:   make(chan *config.Config, 1),
+		cache:   c,
 	}, nil
 }
 
@@ -257,8 +260,8 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return bc.Run(ctx, sv)
 	}))
 
-	ct := NewCheckinT(f.cfg, bc, pm, am, ad, tr, bulker)
-	et, err := NewEnrollerT(&f.cfg.Inputs[0].Server, bulker)
+	ct := NewCheckinT(f.cfg, f.cache, bc, pm, am, ad, tr, bulker)
+	et, err := NewEnrollerT(&f.cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
 	}

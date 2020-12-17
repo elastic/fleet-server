@@ -15,6 +15,7 @@ import (
 
 	"fleet/internal/pkg/apikey"
 	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/cache"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/model"
@@ -29,7 +30,7 @@ import (
 const (
 	kEnrollMod = "enroll"
 
-	kCacheAccessInitTTL = time.Second * 30 // Cache a bit longer to handle expensive inital checkin
+	kCacheAccessInitTTL = time.Second * 30 // Cache a bit longer to handle expensive initial checkin
 	kCacheEnrollmentTTL = time.Second * 30
 )
 
@@ -42,9 +43,10 @@ var (
 type EnrollerT struct {
 	throttle *semaphore.Weighted
 	bulker   bulk.Bulk
+	cache    cache.Cache
 }
 
-func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk) (*EnrollerT, error) {
+func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk, c cache.Cache) (*EnrollerT, error) {
 	// This value has more to do with the throughput of elastic search than anything else
 	// if you have a large elastic search cluster, you can be more aggressive.
 	maxEnrollPending := cfg.MaxEnrollPending
@@ -52,6 +54,7 @@ func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk) (*EnrollerT, error) {
 	return &EnrollerT{
 		throttle: semaphore.NewWeighted(maxEnrollPending),
 		bulker:   bulker,
+		cache:    c,
 	}, nil
 
 }
@@ -125,7 +128,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 
 	defer et.throttle.Release(1)
 
-	key, err := authApiKey(r, et.bulker.Client())
+	key, err := authApiKey(r, et.bulker.Client(), et.cache)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +144,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 		return nil, err
 	}
 
-	resp, err := _enroll(r.Context(), et.bulker, *req, *erec)
+	resp, err := _enroll(r.Context(), et.bulker, et.cache, *req, *erec)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +152,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 	return json.Marshal(resp)
 }
 
-func _enroll(ctx context.Context, bulker bulk.Bulk, req EnrollRequest, erec model.EnrollmentApiKey) (*EnrollResponse, error) {
+func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollRequest, erec model.EnrollmentApiKey) (*EnrollResponse, error) {
 
 	if req.SharedId != "" {
 		// TODO: Support pre-existing install
@@ -221,7 +224,7 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, req EnrollRequest, erec mode
 	}
 
 	// We are Kool & and the Gang; cache the access key to avoid the roundtrip on impending checkin
-	gCache.SetApiKey(*accessApiKey, kCacheAccessInitTTL)
+	c.SetApiKey(*accessApiKey, kCacheAccessInitTTL)
 
 	return &resp, nil
 }
@@ -250,7 +253,7 @@ func generateOutputApiKey(ctx context.Context, client *elasticsearch.Client, age
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentApiKey, error) {
 
-	if key, ok := gCache.GetEnrollmentApiKey(id); ok {
+	if key, ok := et.cache.GetEnrollmentApiKey(id); ok {
 		return &key, nil
 	}
 
@@ -265,7 +268,7 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	}
 
 	cost := int64(len(rec.ApiKey))
-	gCache.SetEnrollmentApiKey(id, rec, cost, kCacheEnrollmentTTL)
+	et.cache.SetEnrollmentApiKey(id, rec, cost, kCacheEnrollmentTTL)
 
 	return &rec, nil
 }

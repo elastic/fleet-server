@@ -18,12 +18,23 @@ const (
 )
 
 var (
+	QueryAction          = prepareFindAction()
 	QueryAllAgentActions = prepareFindAllAgentsActions()
 	QueryAgentActions    = prepareFindAgentActions()
 )
 
 func prepareFindAllAgentsActions() *dsl.Tmpl {
 	tmpl, root, _ := createBaseActionsQuery()
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
+func prepareFindAction() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	filter := root.Query().Bool().Filter()
+	filter.Term(FieldActionId, tmpl.Bind(FieldActionId), nil)
+	root.Source().Excludes(FieldAgents)
 	tmpl.MustResolve(root)
 	return tmpl
 }
@@ -52,6 +63,13 @@ func createBaseActionsQuery() (tmpl *dsl.Tmpl, root, filter *dsl.Node) {
 
 	root.Sort().SortOrder(FieldSeqNo, dsl.SortAscend)
 	return
+}
+
+func FindAction(ctx context.Context, bulker bulk.Bulk, id string, opts ...Option) ([]model.Action, error) {
+	o := newOption(FleetActions, opts...)
+	return findActions(ctx, bulker, QueryAction, o.indexName, map[string]interface{}{
+		FieldActionId: id,
+	})
 }
 
 func FindActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, params map[string]interface{}) ([]model.Action, error) {

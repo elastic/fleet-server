@@ -15,6 +15,7 @@ import (
 
 	"fleet/internal/pkg/action"
 	"fleet/internal/pkg/bulk"
+	"fleet/internal/pkg/cache"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/dl"
 	"fleet/internal/pkg/model"
@@ -56,6 +57,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 
 type CheckinT struct {
 	cfg    *config.Config
+	cache  cache.Cache
 	bc     *BulkCheckin
 	pm     policy.Monitor
 	gcp    monitor.GlobalCheckpointProvider
@@ -66,6 +68,7 @@ type CheckinT struct {
 
 func NewCheckinT(
 	cfg *config.Config,
+	c cache.Cache,
 	bc *BulkCheckin,
 	pm policy.Monitor,
 	gcp monitor.GlobalCheckpointProvider,
@@ -75,6 +78,7 @@ func NewCheckinT(
 ) *CheckinT {
 	return &CheckinT{
 		cfg:    cfg,
+		cache:  c,
 		bc:     bc,
 		pm:     pm,
 		gcp:    gcp,
@@ -86,7 +90,7 @@ func NewCheckinT(
 
 func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk) error {
 
-	agent, err := authAgent(r, id, ct.bulker)
+	agent, err := authAgent(r, id, ct.bulker, ct.cache)
 
 	if err != nil {
 		return err
