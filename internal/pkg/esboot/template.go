@@ -128,7 +128,7 @@ func createTemplate(ctx context.Context, cli *elasticsearch.Client, name string,
 
 	err = checkResponseError(res)
 	if err != nil {
-		if errors.Is(err, errResourceAlreadyExists) {
+		if errors.Is(err, ErrResourceAlreadyExists) {
 			log.Info().Str("name", name).Msg("Index template already exists")
 			return nil
 		}

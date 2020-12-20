@@ -6,10 +6,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fleet/internal/pkg/config"
 	"fleet/internal/pkg/es"
 	"fleet/internal/pkg/esboot"
 	"fmt"
+
+	"github.com/rs/zerolog/log"
 )
 
 func checkErr(err error) {
@@ -36,7 +39,12 @@ func main() {
 	// Create .kibana index for integration tests
 	// This temporarily until all the parts are unplugged from .kibana
 	// Otherwise the fleet server fails to start at the moment
-	err = esboot.EnsureIndex(ctx, es, ".kibana", kibanaMapping)
+	const name = ".kibana"
+	err = esboot.EnsureIndex(ctx, es, name, kibanaMapping)
+	if errors.Is(err, esboot.ErrResourceAlreadyExists) {
+		log.Info().Str("name", name).Msg("Index already exists")
+		err = nil
+	}
 	checkErr(err)
 }
 

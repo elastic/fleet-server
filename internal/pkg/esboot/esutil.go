@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
@@ -20,7 +21,7 @@ const (
 )
 
 var (
-	errResourceAlreadyExists = errors.New("resource already exists")
+	ErrResourceAlreadyExists = errors.New("resource already exists")
 )
 
 type ClientError struct {
@@ -65,8 +66,9 @@ func checkResponseError(res *esapi.Response) error {
 			Reason:     resErr.Error.Reason,
 		}
 
-		if resErr.Error.Type == esErrorResourceAlreadyExists {
-			cerr.err = errResourceAlreadyExists
+		if resErr.Error.Type == esErrorResourceAlreadyExists ||
+			strings.HasSuffix(resErr.Error.Reason, "already exists as alias") {
+			cerr.err = ErrResourceAlreadyExists
 		}
 
 		if resErr.Error.Type != "" {
