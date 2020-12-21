@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	kIndexKibana      = ".kibana"
+	kIndexKibana      = ".kibana*"
 	kMigrationVersion = "7.9.0" // TODO: bring in during build
 )
 
