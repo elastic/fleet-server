@@ -237,12 +237,12 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
 
 	// Actions monitoring
-	var am monitor.Monitor
+	var am monitor.SimpleMonitor
 	var ad *action.Dispatcher
 	var tr *action.TokenResolver
 
 	// Behind the feature flag
-	am, err = monitor.New(dl.FleetActions, es, monitor.WithExpiration(true))
+	am, err = monitor.NewSimple(dl.FleetActions, es, monitor.WithExpiration(true))
 	if err != nil {
 		return err
 	}

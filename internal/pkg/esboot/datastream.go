@@ -27,7 +27,7 @@ func CreateDatastream(ctx context.Context, cli *elasticsearch.Client, name strin
 
 	err = checkResponseError(res)
 	if err != nil {
-		if errors.Is(err, errResourceAlreadyExists) {
+		if errors.Is(err, ErrResourceAlreadyExists) {
 			log.Info().Str("name", name).Msg("Datastream already exists")
 			return nil
 		}

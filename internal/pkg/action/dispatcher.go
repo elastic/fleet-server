@@ -26,13 +26,13 @@ func (s Sub) Ch() chan []model.Action {
 }
 
 type Dispatcher struct {
-	am monitor.Monitor
+	am monitor.SimpleMonitor
 
 	mx   sync.RWMutex
 	subs map[string]Sub
 }
 
-func NewDispatcher(am monitor.Monitor) *Dispatcher {
+func NewDispatcher(am monitor.SimpleMonitor) *Dispatcher {
 	return &Dispatcher{
 		am:   am,
 		subs: make(map[string]Sub),
@@ -40,13 +40,11 @@ func NewDispatcher(am monitor.Monitor) *Dispatcher {
 }
 
 func (d *Dispatcher) Run(ctx context.Context) (err error) {
-	s := d.am.Subscribe()
-	defer d.am.Unsubscribe(s)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case hits := <-s.Output():
+		case hits := <-d.am.Output():
 			d.process(ctx, hits)
 		}
 	}
