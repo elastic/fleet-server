@@ -249,12 +249,27 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 	}
 }
 
-// Commenting the flaky test for now. It was failing intermittently before this PR change.
-// Can't reproduce it on my box, but seeing it happending with CI builds.
-// It is reproducable if you add delay in the go routine that runs the monitor
-// the line monitor merr = monitor.Run(ctx).
-// Which points to the race condition that is happening more often on the slower CI build machines.
-func xTestMonitor_NewPolicyExists(t *testing.T) {
+func TestMonitor_NewPolicyExists(t *testing.T) {
+
+	tests := []struct {
+		name  string
+		delay time.Duration
+	}{
+		{"monitor no delay", 0},
+
+		// Tests the defect where the delay running the monitor was causing race
+		// https://github.com/elastic/fleet-server/issues/48
+		{"monitor with delay", 100 * time.Millisecond},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			runTestMonitor_NewPolicyExists(t, tc.delay)
+		})
+	}
+}
+
+func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -286,6 +301,7 @@ func xTestMonitor_NewPolicyExists(t *testing.T) {
 	var mwg sync.WaitGroup
 	mwg.Add(1)
 	go func() {
+		time.Sleep(delay)
 		defer mwg.Done()
 		merr = monitor.Run(ctx)
 	}()

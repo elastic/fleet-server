@@ -83,7 +83,7 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duratio
 		log:           log.With().Str("ctx", "policy agent manager").Logger(),
 		bulker:        bulker,
 		monitor:       monitor,
-		kickCh:        make(chan struct{}),
+		kickCh:        make(chan struct{}, 1),
 		policies:      make(map[string]policyT),
 		throttle:      throttle,
 		policyF:       dl.QueryLatestPolicies,
@@ -317,7 +317,6 @@ func (m *monitorT) Subscribe(agentId string, policyId string, revisionIdx int64,
 		if !ok {
 			p = policyT{subs: make(map[uint64]subT)}
 			m.policies[policyId] = p
-
 			select {
 			case m.kickCh <- struct{}{}:
 			default:
