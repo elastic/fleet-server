@@ -6,12 +6,12 @@ package fleet
 
 import (
 	"context"
-	"fleet/internal/pkg/config"
+	"fleet-server/internal/pkg/config"
 	slog "log"
 	"net"
 	"net/http"
 
-	"fleet/internal/pkg/rate"
+	"fleet-server/internal/pkg/rate"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"

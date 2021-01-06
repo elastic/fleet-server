@@ -13,9 +13,9 @@ import (
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/rs/xid"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/esboot"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/config"
+	"fleet-server/internal/pkg/esboot"
 )
 
 var defaultCfg config.Config

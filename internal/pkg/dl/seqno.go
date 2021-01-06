@@ -7,8 +7,8 @@ package dl
 import (
 	"context"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/dsl"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/dsl"
 )
 
 const (

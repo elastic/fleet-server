@@ -7,8 +7,8 @@ package dl
 import (
 	"context"
 	"encoding/json"
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/model"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/model"
 	"time"
 )
 

@@ -14,12 +14,12 @@ import (
 
 	"github.com/gofrs/uuid"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/model"
-	"fleet/internal/pkg/monitor"
-	ftesting "fleet/internal/pkg/testing"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/dl"
+	"fleet-server/internal/pkg/es"
+	"fleet-server/internal/pkg/model"
+	"fleet-server/internal/pkg/monitor"
+	ftesting "fleet-server/internal/pkg/testing"
 )
 
 const testMonitorIntervalMS = 100

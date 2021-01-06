@@ -5,7 +5,7 @@
 package fleet
 
 import (
-	"fleet/internal/pkg/bulk"
+	"fleet-server/internal/pkg/bulk"
 	"github.com/julienschmidt/httprouter"
 )
 

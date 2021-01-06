@@ -6,7 +6,7 @@ package bulk
 
 import (
 	"encoding/json"
-	"fleet/internal/pkg/es"
+	"fleet-server/internal/pkg/es"
 )
 
 type BulkIndexerResponse struct {

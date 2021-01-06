@@ -7,8 +7,8 @@ package action
 import (
 	"context"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/dl"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/dl"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/rs/zerolog/log"

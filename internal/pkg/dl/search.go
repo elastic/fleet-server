@@ -7,9 +7,9 @@ package dl
 import (
 	"context"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/dsl"
-	"fleet/internal/pkg/es"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/dsl"
+	"fleet-server/internal/pkg/es"
 )
 
 func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) (*es.HitsT, error) {

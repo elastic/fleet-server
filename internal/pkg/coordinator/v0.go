@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"fleet/internal/pkg/model"
+	"fleet-server/internal/pkg/model"
 )
 
 // coordinatorZeroT is V0 coordinator that just takes a subscribed policy and outputs the same policy.

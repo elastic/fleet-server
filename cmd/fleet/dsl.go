@@ -5,8 +5,8 @@
 package fleet
 
 import (
-	"fleet/internal/pkg/dsl"
-	"fleet/internal/pkg/saved"
+	"fleet-server/internal/pkg/dsl"
+	"fleet-server/internal/pkg/saved"
 )
 
 const (

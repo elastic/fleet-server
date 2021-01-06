@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/cache"
-	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/model"
-	"fleet/internal/pkg/policy"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/cache"
+	"fleet-server/internal/pkg/dl"
+	"fleet-server/internal/pkg/model"
+	"fleet-server/internal/pkg/policy"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"

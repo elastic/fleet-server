@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/dsl"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/dsl"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"

@@ -15,13 +15,13 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/model"
-	"fleet/internal/pkg/monitor"
-	"fleet/internal/pkg/sleep"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/config"
+	"fleet-server/internal/pkg/dl"
+	"fleet-server/internal/pkg/es"
+	"fleet-server/internal/pkg/model"
+	"fleet-server/internal/pkg/monitor"
+	"fleet-server/internal/pkg/sleep"
 )
 
 const (

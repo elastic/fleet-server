@@ -1,4 +1,4 @@
-module fleet
+module fleet-server
 
 go 1.14
 

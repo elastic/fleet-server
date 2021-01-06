@@ -14,7 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
 
-	"fleet/internal/pkg/model"
+	"fleet-server/internal/pkg/model"
 )
 
 func TestHitUnmarshal(t *testing.T) {

@@ -5,7 +5,7 @@
 package policy
 
 import (
-	"fleet/internal/pkg/model"
+	"fleet-server/internal/pkg/model"
 	"fmt"
 	"strconv"
 	"strings"

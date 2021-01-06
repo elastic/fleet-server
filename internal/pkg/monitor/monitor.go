@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/dsl"
-	"fleet/internal/pkg/es"
+	"fleet-server/internal/pkg/dl"
+	"fleet-server/internal/pkg/dsl"
+	"fleet-server/internal/pkg/es"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"

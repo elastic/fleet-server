@@ -13,12 +13,12 @@ import (
 	"net/http"
 	"time"
 
-	"fleet/internal/pkg/apikey"
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/cache"
-	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/model"
+	"fleet-server/internal/pkg/apikey"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/cache"
+	"fleet-server/internal/pkg/config"
+	"fleet-server/internal/pkg/dl"
+	"fleet-server/internal/pkg/model"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"

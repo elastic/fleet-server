@@ -15,9 +15,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/model"
-	ftesting "fleet/internal/pkg/testing"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/model"
+	ftesting "fleet-server/internal/pkg/testing"
 )
 
 func TestMonitorEmptyIndex(t *testing.T) {

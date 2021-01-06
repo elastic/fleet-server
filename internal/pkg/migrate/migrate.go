@@ -7,10 +7,10 @@ package migrate
 import (
 	"context"
 	"encoding/json"
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/model"
-	"fleet/internal/pkg/saved"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/dl"
+	"fleet-server/internal/pkg/model"
+	"fleet-server/internal/pkg/saved"
 )
 
 type enrollmentApiKey struct {

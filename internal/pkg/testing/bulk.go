@@ -10,8 +10,8 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/es"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/es"
 )
 
 // MockBulk is a mock bulk interface.

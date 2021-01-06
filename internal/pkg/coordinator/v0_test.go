@@ -8,7 +8,7 @@ package coordinator
 
 import (
 	"context"
-	"fleet/internal/pkg/model"
+	"fleet-server/internal/pkg/model"
 	"github.com/gofrs/uuid"
 	"testing"
 	"time"

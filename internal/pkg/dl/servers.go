@@ -9,9 +9,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/model"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/es"
+	"fleet-server/internal/pkg/model"
 )
 
 // EnsureServer ensures that this server is written in the index.

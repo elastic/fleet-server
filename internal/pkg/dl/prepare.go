@@ -4,7 +4,7 @@
 
 package dl
 
-import "fleet/internal/pkg/dsl"
+import "fleet-server/internal/pkg/dsl"
 
 func prepareFindByField(field string, params map[string]interface{}) *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()

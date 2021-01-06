@@ -8,11 +8,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/model"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/model"
 	"sync"
 
-	"fleet/internal/pkg/dsl"
+	"fleet-server/internal/pkg/dsl"
 )
 
 var (

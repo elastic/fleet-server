@@ -9,10 +9,10 @@ package testing
 import (
 	"context"
 	"encoding/json"
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/model"
-	"fleet/internal/pkg/rnd"
+	"fleet-server/internal/pkg/bulk"
+	"fleet-server/internal/pkg/es"
+	"fleet-server/internal/pkg/model"
+	"fleet-server/internal/pkg/rnd"
 	"testing"
 	"time"
 

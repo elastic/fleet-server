@@ -7,7 +7,7 @@ package monitor
 import (
 	"context"
 	"encoding/json"
-	"fleet/internal/pkg/es"
+	"fleet-server/internal/pkg/es"
 
 	"github.com/elastic/go-elasticsearch/v8"
 )

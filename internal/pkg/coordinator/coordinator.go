@@ -7,7 +7,7 @@ package coordinator
 import (
 	"context"
 
-	"fleet/internal/pkg/model"
+	"fleet-server/internal/pkg/model"
 )
 
 // Factory creates a new coordinator for a policy.

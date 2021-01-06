@@ -7,9 +7,9 @@ package main
 import (
 	"context"
 	"errors"
-	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/esboot"
+	"fleet-server/internal/pkg/config"
+	"fleet-server/internal/pkg/es"
+	"fleet-server/internal/pkg/esboot"
 	"fmt"
 
 	"github.com/rs/zerolog/log"

@@ -6,7 +6,7 @@ package testing
 
 import (
 	"context"
-	"fleet/internal/pkg/sleep"
+	"fleet-server/internal/pkg/sleep"
 	"testing"
 	"time"
 )
