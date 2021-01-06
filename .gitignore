@@ -6,3 +6,4 @@ bin/
 build/
 
 fleet-server
+fleet-server.dev.yml
