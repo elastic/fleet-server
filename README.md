@@ -54,7 +54,7 @@ POST /_security/user/kibana_fleet_system
 }
 ```
 
-Than configure your Kibana with
+Then configure your Kibana with
 ```
 elasticsearch.username: 'kibana_fleet_system'
 elasticsearch.password: 'changeme'
