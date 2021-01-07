@@ -11,8 +11,8 @@ description: Elastic Fleet
 vendor: "Elastic NV"
 homepage: "http://www.elastic.co/"
 contents:
-  - src: ./bin/fleet-server
-    dst: /usr/bin/fleet-server
+  - src: ./bin/fleet
+    dst: /usr/bin/fleet
 
   - src: ./systemd/fleet.service
     dst: /usr/lib/systemd/system/fleet.service
