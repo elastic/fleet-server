@@ -10,9 +10,15 @@ maintainer: "devops@endgame.com"
 description: Elastic Fleet
 vendor: "Elastic NV"
 homepage: "http://www.elastic.co/"
-files:
-  ./bin/fleet: "/usr/bin/fleet"
-config_files:
-  ./systemd/fleet.service: "/usr/lib/systemd/system/fleet.service"
-  ./fleet-server.yml: "/usr/share/fleet/fleet-server.yml"
+contents:
+  - src: ./bin/fleet
+    dst: /usr/bin/fleet
+
+  - src: ./systemd/fleet.service
+    dst: /usr/lib/systemd/system/fleet.service
+    type: config
+
+  - src: ./fleet-server.yml
+    dst: /usr/share/fleet/fleet-server.yml
+    type: config
 

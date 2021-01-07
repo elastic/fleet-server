@@ -87,7 +87,7 @@ COPY --from=builder /go/bin/fleet ./bin/fleet
 env APP_VERSION=${VERSION}
 env APP_RELEASE=${COMMIT}
 
-RUN /nfpm pkg --config ./build/rpm/nfpm.yaml --target out.rpm
+RUN nfpm pkg --config ./dev-tools/rpm/nfpm.yaml --target out.rpm
 
 ############################
 # STEP 5 rpm

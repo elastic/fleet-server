@@ -4,7 +4,7 @@ After=network.target
 Requires=network.target
 
 [Service]
-ExecStart=/usr/bin/fleet -c /usr/share/fleet/fleet-server.yml
+ExecStart=/usr/bin/fleet-server -c /usr/share/fleet/fleet-server.yml
 Type=simple
 Restart=always
 RestartSec=3
