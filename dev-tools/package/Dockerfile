@@ -45,7 +45,7 @@ from buildenv as builder
 
 # Build the binary, use ldflags to minimize executable size
 ARG LDFLAGS
-RUN --mount=type=cache,target=/root/.cache/go-build go build -trimpath -ldflags="$LDFLAGS" -o /go/bin/fleet .
+RUN --mount=type=cache,target=/root/.cache/go-build go build -trimpath -ldflags="$LDFLAGS" -o /go/bin/fleet-server .
 
 COPY ./fleet-server.yml /go/bin/fleet-server.yml
 
@@ -61,7 +61,7 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /etc/passwd /etc/passwd
 
 # Copy our static executable
-COPY --from=builder /go/bin/fleet /go/bin/fleet
+COPY --from=builder /go/bin/fleet-server /go/bin/fleet-server
 COPY --from=builder /go/bin/fleet-server.yml /go/bin/fleet-server.yml
 
 # Use an unprivileged user.
@@ -71,7 +71,7 @@ USER appuser
 WORKDIR "/go/bin/"
 
 # Run the fleet binary.
-ENTRYPOINT ["./fleet"]
+ENTRYPOINT ["./fleet-server"]
 
 ############################
 # STEP 2 rpmbuild
@@ -82,12 +82,12 @@ FROM goreleaser/nfpm as rpmbuild
 COPY . .
 
 # Copy our static executables
-COPY --from=builder /go/bin/fleet ./bin/fleet
+COPY --from=builder /go/bin/fleet-server ./bin/fleet-server
 
 env APP_VERSION=${VERSION}
 env APP_RELEASE=${COMMIT}
 
-RUN /nfpm pkg --config ./build/rpm/nfpm.yaml --target out.rpm
+RUN nfpm pkg --config ./dev-tools/rpm/nfpm.yaml --target out.rpm
 
 ############################
 # STEP 5 rpm

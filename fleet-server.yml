@@ -1,8 +1,8 @@
 output:
   elasticsearch:
-    hosts: '${ELASTICSEARCH_HOSTS:elasticsearch:9200}'
-    username: '${ELASTICSEARCH_USERNAME:}'
-    password: '${ELASTICSEARCH_PASSWORD:}'
+    hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
+    username: '${ELASTICSEARCH_USERNAME:elastic}'
+    password: '${ELASTICSEARCH_PASSWORD:changeme}'
 
 fleet:
   agent:
