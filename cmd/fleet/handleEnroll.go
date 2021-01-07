@@ -191,12 +191,18 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		Str("defaultOutputApiKey.Id", defaultOutputApiKey.Id).
 		Msg("Created api key")
 
+	// Update the local metadata agent id
+	localMeta, err := updateLocalMetaAgentId(req.Meta.Local, agentId)
+	if err != nil {
+		return nil, err
+	}
+
 	agentData := model.Agent{
 		Active:          true,
 		PolicyId:        erec.PolicyId,
 		Type:            req.Type,
 		EnrolledAt:      nowStr,
-		LocalMetadata:   req.Meta.Local,
+		LocalMetadata:   localMeta,
 		AccessApiKeyId:  accessApiKey.Id,
 		DefaultApiKeyId: defaultOutputApiKey.Id,
 		DefaultApiKey:   defaultOutputApiKey.Token(),
@@ -227,6 +233,62 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 	c.SetApiKey(*accessApiKey, kCacheAccessInitTTL)
 
 	return &resp, nil
+}
+
+// updateMetaLocalAgentId updates the agent id in the local metadata if exists
+// At the time of writing the local metadata blob looks something like this
+// {
+//     "elastic": {
+//         "agent": {
+//             "id": "1b9c327a-c93a-4aef-b67f-effbef54d836",
+//             "version": "8.0.0",
+//             "snapshot": false,
+//             "upgradeable": false
+//         }
+//     },
+//     "host": {
+//         "architecture": "x86_64",
+//         "hostname": "eh-Hounddiamond",
+//         "name": "eh-Hounddiamond",
+//         "id": "1b9c327a-c93a-4aef-b67f-effbef54d836"
+//     },
+//     "os": {
+//         "family": "darwin",
+//         "kernel": "19.6.0",
+//         "platform": "darwin",
+//         "version": "10.15.7",
+//         "name": "Mac OS X",
+//         "full": "Mac OS X(10.15.7)"
+//     }
+// }
+func updateLocalMetaAgentId(data []byte, agentId string) ([]byte, error) {
+	if data == nil {
+		return data, nil
+	}
+
+	var m map[string]interface{}
+	err := json.Unmarshal(data, &m)
+	if err != nil {
+		return nil, err
+	}
+
+	if v, ok := m["elastic"]; ok {
+		if sm, ok := v.(map[string]interface{}); ok {
+			if v, ok = sm["agent"]; ok {
+				if sm, ok = v.(map[string]interface{}); ok {
+					if _, ok = sm["id"]; ok {
+						sm["id"] = agentId
+						data, err = json.Marshal(m)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return data, nil
 }
 
 func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent) error {
