@@ -206,6 +206,7 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		AccessApiKeyId:  accessApiKey.Id,
 		DefaultApiKeyId: defaultOutputApiKey.Id,
 		DefaultApiKey:   defaultOutputApiKey.Token(),
+		ActionSeqNo:     dl.UndefinedSeqNo,
 	}
 
 	err = createFleetAgent(ctx, bulker, agentId, agentData)
