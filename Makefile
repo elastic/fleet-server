@@ -54,6 +54,7 @@ check: ## - Run all checks
 	@$(MAKE) generate
 	@$(MAKE) check-headers
 	@$(MAKE) check-go
+	@$(MAKE) notice
 	@$(MAKE) check-no-changes
 
 .PHONY: check-headers
@@ -66,6 +67,19 @@ check-go: ## - Run go fmt, go vet, go mod tidy
 	@go fmt ./...
 	@go vet ./...
 	@go mod tidy
+
+.PHONY: notice
+notice: ## - Generates the NOTICE.txt file.
+	@echo "Generating NOTICE.txt"
+	@go mod tidy
+	@go mod download
+	go list -m -json all | go run go.elastic.co/go-licence-detector \
+		-includeIndirect \
+		-rules dev-tools/notice/rules.json \
+		-overrides dev-tools/notice/overrides.json \
+		-noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
+		-noticeOut NOTICE.txt \
+		-depsOut ""
 
 .PHONY: check-no-changes
 check-no-changes:
