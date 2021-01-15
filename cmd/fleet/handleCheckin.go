@@ -282,7 +282,7 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.
 		if err != nil {
 			return nil, err
 		}
-		agent.DefaultApiKey = defaultOutputApiKey.Config()
+		agent.DefaultApiKey = defaultOutputApiKey.Agent()
 		agent.DefaultApiKeyId = defaultOutputApiKey.Id
 
 		log.Info().Str("agentId", agentId).Msg("Rewriting full agent record to pick up default output key.")
