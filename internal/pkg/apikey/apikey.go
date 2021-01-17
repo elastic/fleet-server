@@ -58,6 +58,10 @@ func (k ApiKey) Token() string {
 	return base64.StdEncoding.EncodeToString([]byte(s))
 }
 
+func (k ApiKey) Agent() string {
+	return fmt.Sprintf("%s:%s", k.Id, k.Key)
+}
+
 func ExtractAPIKey(r *http.Request) (*ApiKey, error) {
 	s, ok := r.Header[AuthKey]
 	if !ok {

@@ -205,7 +205,7 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		LocalMetadata:   localMeta,
 		AccessApiKeyId:  accessApiKey.Id,
 		DefaultApiKeyId: defaultOutputApiKey.Id,
-		DefaultApiKey:   defaultOutputApiKey.Token(),
+		DefaultApiKey:   defaultOutputApiKey.Agent(),
 		ActionSeqNo:     dl.UndefinedSeqNo,
 	}
 
