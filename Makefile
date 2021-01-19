@@ -1,18 +1,18 @@
 SHELL=/bin/bash
-VERSION=$(shell awk '/const defaultVersion/{print $$NF}' main.go | tr -d '"')
+DEFAULT_VERSION=$(shell awk '/const defaultVersion/{print $$NF}' main.go | tr -d '"')
 TARGET_ARCH_386=x86
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
 PLATFORMS ?= darwin/amd64 linux/386 linux/amd64 linux/arm64 windows/386 windows/amd64
 
 ifeq ($(SNAPSHOT),true)
-BUILD_VERSION=${VERSION}-SNAPSHOT
+VERSION=${DEFAULT_VERSION}-SNAPSHOT
 else
-BUILD_VERSION=${VERSION}
+VERSION=${DEFAULT_VERSION}
 endif
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
-LDFLAGS=-w -s -X main.Version=${BUILD_VERSION}
+LDFLAGS=-w -s -X main.Version=${VERSION}
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
 CMD_COLOR_OFF=\033[0m
 
