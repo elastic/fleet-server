@@ -5,10 +5,11 @@
 package policy
 
 import (
-	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 
 	"github.com/gofrs/uuid"
 )

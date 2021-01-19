@@ -6,10 +6,11 @@ package dl
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"fmt"
 )
 
 const (
