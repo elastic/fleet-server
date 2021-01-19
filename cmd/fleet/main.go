@@ -32,8 +32,6 @@ import (
 
 const kPolicyThrottle = time.Millisecond * 5
 
-var Version string
-
 func checkErr(err error) {
 	if err != nil && err != context.Canceled {
 		panic(err)

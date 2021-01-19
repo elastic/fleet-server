@@ -1,11 +1,18 @@
 SHELL=/bin/bash
-COMMIT=$(shell git rev-parse --short HEAD)
-VERSION ?= $(shell head -n 1 VERSION 2> /dev/null || echo "0.0.0")
-BUILD=$(shell date +%FT%T%z)
-LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Build=${BUILD}
-PACKAGE_PATH=./dev-tools/package/
-DOCKER_BUILD=@export DOCKER_CONTENT_TRUST=1 && export DOCKER_BUILDKIT=1 && docker build --build-arg COMMIT='$(COMMIT)' --build-arg VERSION='$(VERSION)' --build-arg LDFLAGS='$(LDFLAGS)' -f $(PACKAGE_PATH)Dockerfile
+DEFAULT_VERSION=$(shell awk '/const defaultVersion/{print $$NF}' main.go | tr -d '"')
+TARGET_ARCH_386=x86
+TARGET_ARCH_amd64=x86_64
+TARGET_ARCH_arm64=arm64
+PLATFORMS ?= darwin/amd64 linux/386 linux/amd64 linux/arm64 windows/386 windows/amd64
 
+ifeq ($(SNAPSHOT),true)
+VERSION=${DEFAULT_VERSION}-SNAPSHOT
+else
+VERSION=${DEFAULT_VERSION}
+endif
+
+PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
+LDFLAGS=-w -s -X main.Version=${VERSION}
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
 CMD_COLOR_OFF=\033[0m
 
@@ -14,33 +21,16 @@ help: ## - Show help message
 	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | sed -e "s/^Makefile://" | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: rpm
-rpm: ## - Build x86_64 linux RPM
-	@printf "${CMD_COLOR_ON} Build rpm\n${CMD_COLOR_OFF}"
-	@${DOCKER_BUILD} --ssh default  --target rpm -o ./  .
-
-.PHONY: image
-image:	## - Build the elastic fleet docker images
-	@printf "${CMD_COLOR_ON} Build the elastic fleet docker image\n${CMD_COLOR_OFF}"
-	${DOCKER_BUILD} --ssh default --target fleet -t fleet .
-
-.PHONY: run
-run: image ## - Run the smallest and secured golang docker image based on scratch
-	@printf "${CMD_COLOR_ON} Run the elastic fleet docker image\n${CMD_COLOR_OFF}"
-	@docker-compose -f ./dev-tools/package/docker-compose.yml up 
-
-
 .PHONY: local
-local: ## - Build packages using local environment
+local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
-	go build -ldflags="${LDFLAGS}" -o ./bin/fleet .
+	go build -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
-
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
-	rm -rf ./bin/ *.rpm ./build/
+	rm -rf ./bin/ ./build/
 
 .PHONY: generate
 generate: ## - Generate schema models
@@ -105,6 +95,42 @@ prepare-test-context: ## - Prepare the test context folders
 junit-report: ## - Run the junit-report generation for all the out files generated
 	@go get -v -u github.com/jstemmer/go-junit-report
 	$(foreach file, $(wildcard build/*.out), go-junit-report > "${file}.xml" < ${file};)
+
+##################################################
+# Release building targets
+##################################################
+
+build/distributions:
+	@mkdir -p build/distributions
+
+.PHONY: $(PLATFORM_TARGETS)
+$(PLATFORM_TARGETS): release-%:
+	$(eval $@_OS := $(firstword $(subst /, ,$(lastword $(subst release-, ,$@)))))
+	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst release-, ,$@)))))
+	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build -ldflags="${LDFLAGS}" -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
+	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
+
+.PHONY: package-target
+package-target: build/distributions
+ifeq ($(OS),windows)
+	@cd build/binaries && zip -q -r ../distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH).zip fleet-server-$(VERSION)-$(OS)-$(ARCH)
+	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-$(ARCH).zip > fleet-server-$(VERSION)-$(OS)-$(ARCH).zip.sha512
+else
+	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz fleet-server-$(VERSION)-$(OS)-$(ARCH)
+	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz > fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz.sha512
+endif
+
+.PHONY: release
+release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
+
+.PHONY: release-manager-snapshot
+release-manager-snapshot: ## - Builds a snapshot release. The Go version defined in .go-version will be installed and used for the build.
+	@$(MAKE) SNAPSHOT=true release-manager-release
+
+.PHONY: release-manager-release
+release-manager-release: ## - Builds a snapshot release. The Go version defined in .go-version will be installed and used for the build.
+	./dev-tools/run_with_go_ver $(MAKE) release
 
 ##################################################
 # Integration testing targets
