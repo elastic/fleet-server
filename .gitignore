@@ -8,4 +8,5 @@ bin/
 build/
 
 fleet-server
+fleet_server
 fleet-server.dev.yml
