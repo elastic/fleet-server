@@ -16,10 +16,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/model"
-	ftesting "fleet/internal/pkg/testing"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 func createRandomEnrollmentAPIKey() model.EnrollmentApiKey {

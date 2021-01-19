@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/model"
-	ftesting "fleet/internal/pkg/testing"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/gofrs/uuid"
 )
 

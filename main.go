@@ -16,7 +16,7 @@ import (
 	// Needed for the generator not to be nuked by go tidy. Fails make check otherwise.
 	_ "github.com/aleksmaus/generate"
 
-	"fleet/cmd/fleet"
+	"github.com/elastic/fleet-server/v7/cmd/fleet"
 )
 
 const defaultVersion = "8.0.0"

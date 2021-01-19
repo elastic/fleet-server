@@ -6,7 +6,7 @@ package logger
 
 import (
 	"context"
-	"fleet/internal/pkg/reload"
+	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"os"
 	"strings"
 	"sync"
@@ -15,7 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"fleet/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
 
 const (

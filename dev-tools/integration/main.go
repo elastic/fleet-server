@@ -7,10 +7,11 @@ package main
 import (
 	"context"
 	"errors"
-	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/esboot"
 	"fmt"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/esboot"
 
 	"github.com/rs/zerolog/log"
 )

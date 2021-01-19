@@ -24,11 +24,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"fleet/internal/pkg/cache"
-	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/logger"
-	"fleet/internal/pkg/sleep"
-	ftesting "fleet/internal/pkg/testing"
+	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 const (

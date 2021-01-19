@@ -1,4 +1,4 @@
-module fleet
+module github.com/elastic/fleet-server/v7
 
 go 1.14
 

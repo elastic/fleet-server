@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"fleet/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"

@@ -6,7 +6,7 @@ package es
 
 import (
 	"encoding/json"
-	"fleet/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
 // Error

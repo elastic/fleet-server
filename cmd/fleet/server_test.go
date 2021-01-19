@@ -15,11 +15,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"fleet/internal/pkg/cache"
-	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/monitor/mock"
-	"fleet/internal/pkg/policy"
-	ftesting "fleet/internal/pkg/testing"
+	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 func TestRunServer(t *testing.T) {

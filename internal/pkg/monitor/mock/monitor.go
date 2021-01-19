@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/monitor"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 )
 
 var gMockIndexCounter uint64

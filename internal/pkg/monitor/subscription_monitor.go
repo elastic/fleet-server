@@ -6,7 +6,7 @@ package monitor
 
 import (
 	"context"
-	"fleet/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"sync"
 	"sync/atomic"
 	"time"

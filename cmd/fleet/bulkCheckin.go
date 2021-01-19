@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/dl"
-	"fleet/internal/pkg/saved"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/saved"
 
 	"github.com/rs/zerolog/log"
 )

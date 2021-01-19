@@ -5,8 +5,8 @@
 package fleet
 
 import (
-	"fleet/internal/pkg/dsl"
-	"fleet/internal/pkg/saved"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/saved"
 )
 
 const (

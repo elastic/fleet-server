@@ -6,7 +6,7 @@ package bulk
 
 import (
 	"encoding/json"
-	"fleet/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 type BulkIndexerResponse struct {

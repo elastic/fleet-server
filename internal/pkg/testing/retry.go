@@ -6,7 +6,7 @@ package testing
 
 import (
 	"context"
-	"fleet/internal/pkg/sleep"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"testing"
 	"time"
 )
