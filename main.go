@@ -19,8 +19,10 @@ import (
 	"fleet/cmd/fleet"
 )
 
+const defaultVersion = "8.0.0"
+
 var (
-	Version string
+	Version string = defaultVersion
 )
 
 func main() {
