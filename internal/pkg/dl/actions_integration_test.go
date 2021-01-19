@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	ftesting "fleet/internal/pkg/testing"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 func TestSearchActionsQuery(t *testing.T) {

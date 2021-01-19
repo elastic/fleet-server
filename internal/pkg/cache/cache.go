@@ -10,8 +10,8 @@ import (
 	"github.com/dgraph-io/ristretto"
 	"github.com/rs/zerolog/log"
 
-	"fleet/internal/pkg/apikey"
-	"fleet/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
 type ApiKey = apikey.ApiKey

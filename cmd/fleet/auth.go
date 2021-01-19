@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"time"
 
-	"fleet/internal/pkg/apikey"
-	"fleet/internal/pkg/bulk"
-	"fleet/internal/pkg/cache"
-	"fleet/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"

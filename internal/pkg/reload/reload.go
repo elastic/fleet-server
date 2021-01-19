@@ -7,7 +7,7 @@ package reload
 import (
 	"context"
 
-	"fleet/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
 
 // Reloadable interface that ensures that a manager can be reloaded with updated config.

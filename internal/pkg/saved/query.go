@@ -7,7 +7,7 @@ package saved
 import (
 	"fmt"
 
-	"fleet/internal/pkg/dsl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 )
 
 func NewQuery(ty string) *dsl.Node {

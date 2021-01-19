@@ -5,7 +5,7 @@
 package policy
 
 import (
-	"fleet/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"fmt"
 	"strconv"
 	"strings"

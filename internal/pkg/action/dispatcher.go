@@ -8,9 +8,9 @@ import (
 	"context"
 	"sync"
 
-	"fleet/internal/pkg/es"
-	"fleet/internal/pkg/model"
-	"fleet/internal/pkg/monitor"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 
 	"github.com/rs/zerolog/log"
 )

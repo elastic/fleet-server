@@ -8,8 +8,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fleet/internal/pkg/config"
-	"fleet/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"fmt"
 	"time"
 
