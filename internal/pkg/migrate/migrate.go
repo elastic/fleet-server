@@ -7,8 +7,11 @@ package migrate
 import (
 	"context"
 	"encoding/json"
+	"errors"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/saved"
 )
@@ -42,12 +45,19 @@ func MigrateEnrollmentAPIKeys(ctx context.Context, sv saved.CRUD, bulker bulk.Bu
 	}
 
 	var recs []model.EnrollmentApiKey
+	var resHits []es.HitT
 	res, err := bulker.Search(ctx, []string{dl.FleetEnrollmentAPIKeys}, raw, bulk.WithRefresh())
 	if err != nil {
-		return err
+		if errors.Is(err, es.ErrIndexNotFound) {
+			err = nil
+		} else {
+			return err
+		}
+	} else {
+		resHits = res.Hits
 	}
 
-	for _, hit := range res.Hits {
+	for _, hit := range resHits {
 		var rec model.EnrollmentApiKey
 		err := json.Unmarshal(hit.Source, &rec)
 		if err != nil {

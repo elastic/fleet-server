@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 )
@@ -125,6 +126,11 @@ LOOP:
 func (m *monitorT) process(ctx context.Context) error {
 	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if err != nil {
+		if errors.Is(err, es.ErrIndexNotFound) {
+			err = nil
+		} else {
+			err = nil
+		}
 		return err
 	}
 	if len(policies) == 0 {
