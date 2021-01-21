@@ -478,7 +478,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-	err = migrate.Migrate(ctx, sv, bulker)
+	err = migrate.Migrate(ctx, log.Logger, sv, bulker)
 	if err != nil {
 		return err
 	}

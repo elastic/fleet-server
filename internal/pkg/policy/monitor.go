@@ -127,9 +127,8 @@ func (m *monitorT) process(ctx context.Context) error {
 	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
-			err = nil
-		} else {
-			err = nil
+			m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
+			return nil
 		}
 		return err
 	}
