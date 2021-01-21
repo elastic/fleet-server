@@ -7,10 +7,14 @@ package migrate
 import (
 	"context"
 	"encoding/json"
+	"errors"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/saved"
+	"github.com/rs/zerolog"
 )
 
 type enrollmentApiKey struct {
@@ -29,11 +33,11 @@ type enrollmentApiKey struct {
 // This is for development only (1 instance of fleet)
 // Not safe for multiple instances of fleet
 // Initially needed to migrate the enrollment-api-keys that kibana creates
-func Migrate(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk) error {
-	return MigrateEnrollmentAPIKeys(ctx, sv, bulker)
+func Migrate(ctx context.Context, log zerolog.Logger, sv saved.CRUD, bulker bulk.Bulk) error {
+	return MigrateEnrollmentAPIKeys(ctx, log, sv, bulker)
 }
 
-func MigrateEnrollmentAPIKeys(ctx context.Context, sv saved.CRUD, bulker bulk.Bulk) error {
+func MigrateEnrollmentAPIKeys(ctx context.Context, log zerolog.Logger, sv saved.CRUD, bulker bulk.Bulk) error {
 
 	// Query all enrollment keys from the new schema
 	raw, err := dl.RenderAllEnrollmentAPIKeysQuery(1000)
@@ -42,12 +46,21 @@ func MigrateEnrollmentAPIKeys(ctx context.Context, sv saved.CRUD, bulker bulk.Bu
 	}
 
 	var recs []model.EnrollmentApiKey
+	var resHits []es.HitT
 	res, err := bulker.Search(ctx, []string{dl.FleetEnrollmentAPIKeys}, raw, bulk.WithRefresh())
 	if err != nil {
-		return err
+		if errors.Is(err, es.ErrIndexNotFound) {
+			log.Debug().Str("index", dl.FleetEnrollmentAPIKeys).Msg(es.ErrIndexNotFound.Error())
+			// Continue with migration if the .fleet-enrollment-api-keys index is not found
+			err = nil
+		} else {
+			return err
+		}
+	} else {
+		resHits = res.Hits
 	}
 
-	for _, hit := range res.Hits {
+	for _, hit := range resHits {
 		var rec model.EnrollmentApiKey
 		err := json.Unmarshal(hit.Source, &rec)
 		if err != nil {
