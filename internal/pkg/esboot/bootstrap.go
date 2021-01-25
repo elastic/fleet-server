@@ -7,6 +7,7 @@ package esboot
 import (
 	"context"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
@@ -21,13 +22,13 @@ type indexConfig struct {
 var indexConfigs = map[string]indexConfig{
 	// Commenting out the boostrapping for now here, just in case if it needs to be "enabled" again.
 	// Will remove all the boostrapping code completely later once all is fully integrated
-	// ".fleet-actions":             {mapping: es.MappingAction},
-	// ".fleet-actions-results":     {mapping: es.MappingActionResult, datastream: true},
-	// ".fleet-agents":              {mapping: es.MappingAgent},
-	// ".fleet-enrollment-api-keys": {mapping: es.MappingEnrollmentApiKey},
-	// ".fleet-policies":            {mapping: es.MappingPolicy},
-	// ".fleet-policies-leader":     {mapping: es.MappingPolicyLeader},
-	// ".fleet-servers":             {mapping: es.MappingServer},
+	".fleet-actions":             {mapping: es.MappingAction},
+	".fleet-actions-results":     {mapping: es.MappingActionResult, datastream: true},
+	".fleet-agents":              {mapping: es.MappingAgent},
+	".fleet-enrollment-api-keys": {mapping: es.MappingEnrollmentApiKey},
+	".fleet-policies":            {mapping: es.MappingPolicy},
+	".fleet-policies-leader":     {mapping: es.MappingPolicyLeader},
+	".fleet-servers":             {mapping: es.MappingServer},
 }
 
 // Bootstrap creates .fleet-actions data stream
