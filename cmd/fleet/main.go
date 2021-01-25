@@ -208,13 +208,20 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 
 	// Initial indices bootstrapping, needed for agents actions development
 	// TODO: remove this after the indices bootstrapping logic implemented in ES plugin
-	err = esboot.EnsureESIndices(ctx, es)
-	if err != nil {
-		return err
-	}
-	err = migrate.Migrate(ctx, log.Logger, sv, bulker)
-	if err != nil {
-		return err
+	bootFlag := env.GetStr(
+		"FLEET_ES_BOOT",
+		"",
+	)
+	if bootFlag == "1" {
+		log.Debug().Msg("FLEET_ES_BOOT is set to true, perform bootstrap")
+		err = esboot.EnsureESIndices(ctx, es)
+		if err != nil {
+			return err
+		}
+		err = migrate.Migrate(ctx, log.Logger, sv, bulker)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Replacing to errgroup context
