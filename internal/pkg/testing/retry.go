@@ -52,9 +52,7 @@ func Retry(t *testing.T, ctx context.Context, f RetryFunc, opts ...RetryOption) 
 		if err == nil {
 			return
 		}
-		if err = sleep.WithContext(ctx, o.sleep); err != nil {
-			break
-		}
+		sleep.WithContext(ctx, o.sleep)
 	}
 	t.Fatal(err)
 }

@@ -56,3 +56,17 @@ func LoadFile(path string) (*Config, error) {
 	}
 	return cfg, nil
 }
+
+// LoadString take config as a string and return a new configuration.
+func LoadString(str string) (*Config, error) {
+	cfg := &Config{}
+	c, err := yaml.NewConfig([]byte(str), DefaultOptions...)
+	if err != nil {
+		return nil, err
+	}
+	err = c.Unpack(cfg, DefaultOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}

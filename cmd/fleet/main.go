@@ -6,6 +6,10 @@ package fleet
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
@@ -23,7 +27,11 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/profile"
 	"github.com/elastic/fleet-server/v7/internal/pkg/saved"
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
+	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -31,12 +39,6 @@ import (
 )
 
 const kPolicyThrottle = time.Millisecond * 5
-
-func checkErr(err error) {
-	if err != nil && err != context.Canceled {
-		panic(err)
-	}
-}
 
 func savedObjectKey() string {
 	key := env.GetStr(
@@ -54,26 +56,56 @@ func installSignalHandler() context.Context {
 
 func getRunCommand(version string) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-
-		cfgPath, err := cmd.Flags().GetString("config")
+		c, err := cache.New()
 		if err != nil {
 			return err
 		}
-		cfg, err := config.LoadFile(cfgPath)
-		if err != nil {
-			return err
-		}
-
-		logger.Init(cfg)
 
 		ctx := installSignalHandler()
-		c, err := cache.New()
-		checkErr(err)
+		agentMode, err := cmd.Flags().GetBool("agent-mode")
+		if err != nil {
+			return err
+		}
 
-		srv, err := NewFleetServer(cfg, c, version)
-		checkErr(err)
+		if agentMode {
+			// Executing under Elastic Agent, logger starts at level info until
+			// the first configuration is received and then it is reloaded to
+			// match the selected logging level from Elastic Agent.
+			l := logger.Init(&config.Config{
+				Fleet: config.Fleet{
+					Agent: config.Agent{
+						Logging: config.AgentLogging{
+							Level: "info",
+						},
+					},
+				},
+			})
 
-		return srv.Run(ctx)
+			agent, err := NewAgentMode(os.Stdin, c, version, l)
+			if err != nil {
+				return err
+			}
+
+			return agent.Run(ctx)
+		} else {
+			cfgPath, err := cmd.Flags().GetString("config")
+			if err != nil {
+				return err
+			}
+			cfg, err := config.LoadFile(cfgPath)
+			if err != nil {
+				return err
+			}
+
+			logger.Init(cfg)
+
+			srv, err := NewFleetServer(cfg, c, version, status.NewLog())
+			if err != nil {
+				return err
+			}
+
+			return srv.Run(ctx)
+		}
 	}
 }
 
@@ -84,24 +116,184 @@ func NewCommand(version string) *cobra.Command {
 		RunE:  getRunCommand(version),
 	}
 	cmd.Flags().StringP("config", "c", "fleet-server.yml", "Configuration for Fleet Server")
+	cmd.Flags().Bool("agent-mode", false, "Running under execution of the Elastic Agent")
 	return cmd
 }
 
-type FleetServer struct {
+type AgentMode struct {
+	cache   cache.Cache
 	version string
 
-	cfg   *config.Config
-	cfgCh chan *config.Config
-	cache cache.Cache
+	reloadables []reload.Reloadable
+
+	client client.Client
+
+	lock         sync.Mutex
+	firstCfg     chan *config.Config
+	srv          *FleetServer
+	srvCtx       context.Context
+	srvCanceller context.CancelFunc
+	startChan    chan struct{}
+}
+
+func NewAgentMode(reader io.Reader, c cache.Cache, version string, reloadables ...reload.Reloadable) (*AgentMode, error) {
+	var err error
+
+	a := &AgentMode{
+		cache:       c,
+		version:     version,
+		reloadables: reloadables,
+	}
+	a.client, err = client.NewFromReader(reader, a)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (a *AgentMode) Run(ctx context.Context) error {
+	ctx, canceller := context.WithCancel(ctx)
+	defer canceller()
+
+	a.firstCfg = make(chan *config.Config)
+	a.startChan = make(chan struct{}, 1)
+	log.Info().Msg("starting communication connection back to Elastic Agent")
+	err := a.client.Start(ctx)
+	if err != nil {
+		return err
+	}
+
+	// wait for the initial configuration to be sent from the
+	// Elastic Agent before starting the actual Fleet Server.
+	log.Info().Msg("waiting for Elastic Agent to send initial configuration")
+	var cfg *config.Config
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("never received initial configuration")
+	case cfg = <-a.firstCfg:
+	}
+
+	// start fleet server with the initial configuration and its
+	// own context (needed so when OnStop occurs the fleet server
+	// is stopped and not the elastic-agent-client as well)
+	srvCtx, srvCancel := context.WithCancel(ctx)
+	defer srvCancel()
+	log.Info().Msg("received initial configuration starting Fleet Server")
+	srv, err := NewFleetServer(cfg, a.cache, a.version, status.NewChained(status.NewLog(), a.client))
+	if err != nil {
+		// unblock startChan even though there was an error
+		a.startChan <- struct{}{}
+		return err
+	}
+	a.lock.Lock()
+	close(a.firstCfg)
+	a.firstCfg = nil
+	a.srv = srv
+	a.srvCtx = srvCtx
+	a.srvCanceller = srvCancel
+	a.lock.Unlock()
+
+	// trigger startChan so OnConfig can continue
+	a.startChan <- struct{}{}
+
+	return a.srv.Run(srvCtx)
+}
+
+func (a *AgentMode) OnConfig(s string) {
+	a.lock.Lock()
+	srv := a.srv
+	ctx := a.srvCtx
+	canceller := a.srvCanceller
+	cfgChan := a.firstCfg
+	startChan := a.startChan
+	a.lock.Unlock()
+
+	var cfg *config.Config
+	var err error
+	defer func() {
+		if err != nil {
+			log.Err(err).Msg("failed to reload configuration")
+			if canceller != nil {
+				canceller()
+			}
+		}
+	}()
+
+	cfg, err = config.LoadString(s)
+	if err != nil {
+		return
+	}
+
+	if cfgChan != nil {
+		// reload the generic reloadables
+		for _, r := range a.reloadables {
+			err = r.Reload(ctx, cfg)
+			if err != nil {
+				return
+			}
+		}
+
+		// send starting configuration so Fleet Server can start
+		cfgChan <- cfg
+
+		// block handling more OnConfig calls until the Fleet Server
+		// has been fully started
+		<-startChan
+	} else if srv != nil {
+		// reload the generic reloadables
+		for _, r := range a.reloadables {
+			err = r.Reload(ctx, cfg)
+			if err != nil {
+				return
+			}
+		}
+
+		// reload the server
+		err = srv.Reload(ctx, cfg)
+		if err != nil {
+			return
+		}
+	} else {
+		err = fmt.Errorf("internal service should have been started")
+		return
+	}
+}
+
+func (a *AgentMode) OnStop() {
+	a.lock.Lock()
+	canceller := a.srvCanceller
+	a.lock.Unlock()
+
+	if canceller != nil {
+		canceller()
+	}
+}
+
+func (a *AgentMode) OnError(err error) {
+	// Log communication error through the logger. These errors are only
+	// provided for logging purposes. The elastic-agent-client handles
+	// retries and reconnects internally automatically.
+	log.Err(err)
+}
+
+type FleetServer struct {
+	version  string
+	policyId string
+
+	cfg      *config.Config
+	cfgCh    chan *config.Config
+	cache    cache.Cache
+	reporter status.Reporter
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config, c cache.Cache, version string) (*FleetServer, error) {
+func NewFleetServer(cfg *config.Config, c cache.Cache, version string, reporter status.Reporter) (*FleetServer, error) {
 	return &FleetServer{
-		version: version,
-		cfg:     cfg,
-		cfgCh:   make(chan *config.Config, 1),
-		cache:   c,
+		version:  version,
+		cfg:      cfg,
+		cfgCh:    make(chan *config.Config, 1),
+		cache:    c,
+		reporter: reporter,
 	}, nil
 }
 
@@ -146,8 +338,16 @@ func (f *FleetServer) Run(ctx context.Context) error {
 		proEg, srvEg         *errgroup.Group
 	)
 
+	started := false
 	for {
 		ech := make(chan error, 2)
+
+		if started {
+			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil)
+		} else {
+			started = true
+			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
+		}
 
 		// Restart profiler
 		if curCfg == nil || curCfg.Inputs[0].Server.Profile.Bind != newCfg.Inputs[0].Server.Profile.Bind {
@@ -171,9 +371,11 @@ func (f *FleetServer) Run(ctx context.Context) error {
 		case newCfg = <-f.cfgCh:
 			log.Debug().Msg("Server configuration update")
 		case err := <-ech:
+			f.reporter.Status(proto.StateObserved_FAILED, "Failed", nil)
 			log.Error().Err(err).Msg("Fleet Server failed")
 			return nil
 		case <-ctx.Done():
+			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil)
 			log.Info().Msg("Fleet Server exited")
 			return nil
 		}
@@ -240,6 +442,10 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	// Policy monitor
 	pm := policy.NewMonitor(bulker, pim, kPolicyThrottle)
 	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
+
+	// Policy self monitor
+	sm := policy.NewSelfMonitor(bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
+	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 
 	// Actions monitoring
 	var am monitor.SimpleMonitor
