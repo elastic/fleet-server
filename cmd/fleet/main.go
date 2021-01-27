@@ -71,12 +71,14 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 			return err
 		}
 
+		var l *logger.Logger
+		var runErr error
 		if agentMode {
 			cfg, err := config.FromConfig(cliCfg)
 			if err != nil {
 				return err
 			}
-			l, err := logger.Init(cfg)
+			l, err = logger.Init(cfg)
 			if err != nil {
 				return err
 			}
@@ -86,10 +88,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 				return err
 			}
 
-			err = agent.Run(installSignalHandler())
-			log.Err(err)
-			l.Sync()
-			return err
+			runErr = agent.Run(installSignalHandler())
 		} else {
 			cfgPath, err := cmd.Flags().GetString("config")
 			if err != nil {
@@ -108,7 +107,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 				return err
 			}
 
-			l, err := logger.Init(cfg)
+			l, err = logger.Init(cfg)
 			if err != nil {
 				return err
 			}
@@ -118,11 +117,16 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 				return err
 			}
 
-			err = srv.Run(installSignalHandler())
-			log.Err(err)
-			l.Sync()
-			return err
+			runErr = srv.Run(installSignalHandler())
 		}
+
+		if runErr != nil && runErr != context.Canceled {
+			log.Error().Err(runErr).Msg("Exiting")
+			l.Sync()
+			return runErr
+		}
+		l.Sync()
+		return nil
 	}
 }
 
@@ -428,9 +432,9 @@ func (f *FleetServer) Run(ctx context.Context) error {
 		case newCfg = <-f.cfgCh:
 			log.Debug().Msg("Server configuration update")
 		case err := <-ech:
-			f.reporter.Status(proto.StateObserved_FAILED, "Failed", nil)
+			f.reporter.Status(proto.StateObserved_FAILED, err.Error(), nil)
 			log.Error().Err(err).Msg("Fleet Server failed")
-			return nil
+			return err
 		case <-ctx.Done():
 			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil)
 			log.Info().Msg("Fleet Server exited")
