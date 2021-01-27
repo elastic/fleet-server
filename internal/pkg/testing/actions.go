@@ -9,12 +9,13 @@ package testing
 import (
 	"context"
 	"encoding/json"
+	"testing"
+	"time"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rnd"
-	"testing"
-	"time"
 
 	"github.com/gofrs/uuid"
 	"github.com/rs/xid"
@@ -60,7 +61,7 @@ func CreateRandomActions(min, max int) ([]model.Action, error) {
 			Timestamp:  r.Time(now, 2, 5, time.Second, rnd.TimeBefore).Format(time.RFC3339),
 			Expiration: r.Time(now, 12, 25, time.Minute, rnd.TimeAfter).Format(time.RFC3339),
 			Type:       "APP_ACTION",
-			InputId:    "osquery",
+			InputType:  "osquery",
 			Agents:     aid,
 			Data:       data,
 		}

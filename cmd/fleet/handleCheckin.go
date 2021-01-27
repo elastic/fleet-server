@@ -246,7 +246,7 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 			Data:      []byte(action.Data),
 			Id:        action.ActionId,
 			Type:      action.Type,
-			InputId:   action.InputId,
+			InputType: action.InputType,
 		})
 	}
 

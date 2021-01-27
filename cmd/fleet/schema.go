@@ -123,7 +123,7 @@ type ActionResp struct {
 	Data      json.RawMessage `json:"data"`
 	Id        string          `json:"id"`
 	Type      string          `json:"type"`
-	InputId   string          `json:"input_id"`
+	InputType string          `json:"input_type"`
 }
 
 type Event struct {
