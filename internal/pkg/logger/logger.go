@@ -18,7 +18,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 )
 
 const (
@@ -26,7 +25,7 @@ const (
 )
 
 var once sync.Once
-var gLogger *logger
+var gLogger *Logger
 
 func strToLevel(s string) zerolog.Level {
 	l := zerolog.DebugLevel
@@ -52,38 +51,57 @@ func strToLevel(s string) zerolog.Level {
 	return l
 }
 
-type logger struct {
-	cfg *config.Config
+// WriterSync implements a Sync function.
+type WriterSync interface {
+	// Sync syncs the logger to its output.
+	Sync() error
+}
+
+// Logger for the Fleet Server.
+type Logger struct {
+	cfg  *config.Config
+	sync WriterSync
 }
 
 // Reload reloads the logger configuration.
-func (l *logger) Reload(_ context.Context, cfg *config.Config) error {
+func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 	if changed(l.cfg, cfg) {
 		// reload the logger
-		l, err := configure(cfg)
+		logger, w, err := configure(cfg)
 		if err != nil {
 			return err
 		}
-		log.Logger = l
+		log.Logger = logger
+		l.sync = w
 	}
 	l.cfg = cfg
 	return nil
 }
 
+func (l *Logger) Sync() {
+	if l.sync != nil {
+		l.sync.Sync()
+	}
+}
+
 // Init initializes the logger.
-func Init(cfg *config.Config) (reload.Reloadable, error) {
+func Init(cfg *config.Config) (*Logger, error) {
 	var err error
 	once.Do(func() {
 		var l zerolog.Logger
-		gLogger = &logger{
+		var w WriterSync
+		gLogger = &Logger{
 			cfg: cfg,
 		}
 
-		l, err = configure(cfg)
+		l, w, err = configure(cfg)
 		if err != nil {
 			return
 		}
+
 		zerolog.TimeFieldFormat = time.StampMicro
+
+		gLogger.sync = w
 		log.Logger = l
 		log.Info().
 			Int("pid", os.Getpid()).
@@ -123,9 +141,9 @@ func level(cfg *config.Config) zerolog.Level {
 	return cfg.Logging.LogLevel()
 }
 
-func configure(cfg *config.Config) (zerolog.Logger, error) {
+func configure(cfg *config.Config) (zerolog.Logger, WriterSync, error) {
 	if cfg.Logging.ToStderr {
-		return log.Output(os.Stderr).Level(level(cfg)), nil
+		return log.Output(os.Stderr).Level(level(cfg)), os.Stderr, nil
 	}
 	if cfg.Logging.ToFiles {
 		files := cfg.Logging.Files
@@ -143,9 +161,17 @@ func configure(cfg *config.Config) (zerolog.Logger, error) {
 			file.RedirectStderr(files.RedirectStderr),
 		)
 		if err != nil {
-			return zerolog.Logger{}, err
+			return zerolog.Logger{}, nil, err
 		}
-		return log.Output(rotator).Level(level(cfg)), nil
+		return log.Output(rotator).Level(level(cfg)), rotator, nil
 	}
-	return log.Output(ioutil.Discard).Level(level(cfg)), nil
+	return log.Output(ioutil.Discard).Level(level(cfg)), &nopSync{}, nil
+}
+
+type nopSync struct {
+}
+
+// Sync does nothing.
+func (*nopSync) Sync() error {
+	return nil
 }

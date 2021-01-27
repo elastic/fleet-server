@@ -88,6 +88,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 
 			err = agent.Run(installSignalHandler())
 			log.Err(err)
+			l.Sync()
 			return err
 		} else {
 			cfgPath, err := cmd.Flags().GetString("config")
@@ -107,7 +108,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 				return err
 			}
 
-			_, err = logger.Init(cfg)
+			l, err := logger.Init(cfg)
 			if err != nil {
 				return err
 			}
@@ -119,6 +120,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 
 			err = srv.Run(installSignalHandler())
 			log.Err(err)
+			l.Sync()
 			return err
 		}
 	}
