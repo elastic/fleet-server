@@ -78,6 +78,7 @@ func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 	return nil
 }
 
+// Sync syncs the logger to its output.
 func (l *Logger) Sync() {
 	if l.sync != nil {
 		l.sync.Sync()
