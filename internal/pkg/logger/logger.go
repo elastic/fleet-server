@@ -6,16 +6,19 @@ package logger
 
 import (
 	"context"
-	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/elastic/beats/v7/libbeat/common/file"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 )
 
 const (
@@ -55,24 +58,33 @@ type logger struct {
 
 // Reload reloads the logger configuration.
 func (l *logger) Reload(_ context.Context, cfg *config.Config) error {
-	if l.cfg.Fleet.Agent.Logging != cfg.Fleet.Agent.Logging {
-		// reload the logger to new config level
-		log.Logger = log.Output(os.Stdout).Level(cfg.Fleet.Agent.Logging.LogLevel())
+	if changed(l.cfg, cfg) {
+		// reload the logger
+		l, err := configure(cfg)
+		if err != nil {
+			return err
+		}
+		log.Logger = l
 	}
 	l.cfg = cfg
 	return nil
 }
 
 // Init initializes the logger.
-func Init(cfg *config.Config) reload.Reloadable {
+func Init(cfg *config.Config) (reload.Reloadable, error) {
+	var err error
 	once.Do(func() {
+		var l zerolog.Logger
 		gLogger = &logger{
 			cfg: cfg,
 		}
 
+		l, err = configure(cfg)
+		if err != nil {
+			return
+		}
 		zerolog.TimeFieldFormat = time.StampMicro
-
-		log.Logger = log.Output(os.Stdout).Level(cfg.Fleet.Agent.Logging.LogLevel())
+		log.Logger = l
 		log.Info().
 			Int("pid", os.Getpid()).
 			Int("ppid", os.Getppid()).
@@ -82,5 +94,58 @@ func Init(cfg *config.Config) reload.Reloadable {
 
 		log.Debug().Strs("env", os.Environ()).Msg("environment")
 	})
-	return gLogger
+	return gLogger, err
+}
+
+func changed(a *config.Config, b *config.Config) bool {
+	if a.Fleet.Agent.Logging != b.Fleet.Agent.Logging {
+		return true
+	}
+	al := a.Logging
+	aFiles := al.Files
+	al.Files = nil
+	bl := b.Logging
+	bFiles := bl.Files
+	bl.Files = nil
+	if al != bl {
+		return true
+	}
+	if (aFiles == nil && bFiles != nil) || (aFiles != nil && bFiles == nil) || (*aFiles != *bFiles) {
+		return true
+	}
+	return false
+}
+
+func level(cfg *config.Config) zerolog.Level {
+	if cfg.Fleet.Agent.Logging.Level != "" {
+		return cfg.Fleet.Agent.Logging.LogLevel()
+	}
+	return cfg.Logging.LogLevel()
+}
+
+func configure(cfg *config.Config) (zerolog.Logger, error) {
+	if cfg.Logging.ToStderr {
+		return log.Output(os.Stderr).Level(level(cfg)), nil
+	}
+	if cfg.Logging.ToFiles {
+		files := cfg.Logging.Files
+		if files == nil {
+			files = &config.LoggingFiles{}
+			files.InitDefaults()
+		}
+		filename := filepath.Join(files.Path, files.Name)
+		rotator, err := file.NewFileRotator(filename,
+			file.MaxSizeBytes(files.MaxSize),
+			file.MaxBackups(files.MaxBackups),
+			file.Permissions(os.FileMode(files.Permissions)),
+			file.Interval(files.Interval),
+			file.RotateOnStartup(files.RotateOnStartup),
+			file.RedirectStderr(files.RedirectStderr),
+		)
+		if err != nil {
+			return zerolog.Logger{}, err
+		}
+		return log.Output(rotator).Level(level(cfg)), nil
+	}
+	return log.Output(ioutil.Discard).Level(level(cfg)), nil
 }

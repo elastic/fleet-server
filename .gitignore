@@ -4,9 +4,10 @@
 .vscode/
 
 bin/
-*.rpm
 build/
 
 fleet-server
 fleet_server
 fleet-server.dev.yml
+*.log
+*.log.*

@@ -7,6 +7,8 @@ package fleet
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/go-ucfg"
+	"github.com/elastic/go-ucfg/yaml"
 	"io"
 	"os"
 	"sync"
@@ -25,13 +27,13 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/profile"
+	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"github.com/elastic/fleet-server/v7/internal/pkg/saved"
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -61,50 +63,59 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 			return err
 		}
 
-		ctx := installSignalHandler()
+		cfgObject := cmd.Flags().Lookup("E").Value.(*config.Flag)
+		cliCfg := cfgObject.Config()
+
 		agentMode, err := cmd.Flags().GetBool("agent-mode")
 		if err != nil {
 			return err
 		}
 
 		if agentMode {
-			// Executing under Elastic Agent, logger starts at level info until
-			// the first configuration is received and then it is reloaded to
-			// match the selected logging level from Elastic Agent.
-			l := logger.Init(&config.Config{
-				Fleet: config.Fleet{
-					Agent: config.Agent{
-						Logging: config.AgentLogging{
-							Level: "info",
-						},
-					},
-				},
-			})
-
-			agent, err := NewAgentMode(os.Stdin, c, version, l)
+			cfg, err := config.FromConfig(cliCfg)
+			if err != nil {
+				return err
+			}
+			l, err := logger.Init(cfg)
 			if err != nil {
 				return err
 			}
 
-			return agent.Run(ctx)
+			agent, err := NewAgentMode(cliCfg, os.Stdin, c, version, l)
+			if err != nil {
+				return err
+			}
+
+			return agent.Run(installSignalHandler())
 		} else {
 			cfgPath, err := cmd.Flags().GetString("config")
 			if err != nil {
 				return err
 			}
-			cfg, err := config.LoadFile(cfgPath)
+			cfgData, err := yaml.NewConfigWithFile(cfgPath, config.DefaultOptions...)
+			if err != nil {
+				return err
+			}
+			err = cfgData.Merge(cliCfg, config.DefaultOptions...)
+			if err != nil {
+				return err
+			}
+			cfg, err := config.FromConfig(cfgData)
 			if err != nil {
 				return err
 			}
 
-			logger.Init(cfg)
+			_, err = logger.Init(cfg)
+			if err != nil {
+				return err
+			}
 
 			srv, err := NewFleetServer(cfg, c, version, status.NewLog())
 			if err != nil {
 				return err
 			}
 
-			return srv.Run(ctx)
+			return srv.Run(installSignalHandler())
 		}
 	}
 }
@@ -117,10 +128,12 @@ func NewCommand(version string) *cobra.Command {
 	}
 	cmd.Flags().StringP("config", "c", "fleet-server.yml", "Configuration for Fleet Server")
 	cmd.Flags().Bool("agent-mode", false, "Running under execution of the Elastic Agent")
+	cmd.Flags().VarP(config.NewFlag(), "E", "E", "Overwrite configuration value")
 	return cmd
 }
 
 type AgentMode struct {
+	cliCfg  *ucfg.Config
 	cache   cache.Cache
 	version string
 
@@ -128,7 +141,7 @@ type AgentMode struct {
 
 	client client.Client
 
-	lock         sync.Mutex
+	mux          sync.Mutex
 	firstCfg     chan *config.Config
 	srv          *FleetServer
 	srvCtx       context.Context
@@ -136,10 +149,11 @@ type AgentMode struct {
 	startChan    chan struct{}
 }
 
-func NewAgentMode(reader io.Reader, c cache.Cache, version string, reloadables ...reload.Reloadable) (*AgentMode, error) {
+func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, c cache.Cache, version string, reloadables ...reload.Reloadable) (*AgentMode, error) {
 	var err error
 
 	a := &AgentMode{
+		cliCfg:      cliCfg,
 		cache:       c,
 		version:     version,
 		reloadables: reloadables,
@@ -185,13 +199,13 @@ func (a *AgentMode) Run(ctx context.Context) error {
 		a.startChan <- struct{}{}
 		return err
 	}
-	a.lock.Lock()
+	a.mux.Lock()
 	close(a.firstCfg)
 	a.firstCfg = nil
 	a.srv = srv
 	a.srvCtx = srvCtx
 	a.srvCanceller = srvCancel
-	a.lock.Unlock()
+	a.mux.Unlock()
 
 	// trigger startChan so OnConfig can continue
 	a.startChan <- struct{}{}
@@ -200,13 +214,14 @@ func (a *AgentMode) Run(ctx context.Context) error {
 }
 
 func (a *AgentMode) OnConfig(s string) {
-	a.lock.Lock()
+	a.mux.Lock()
+	cliCfg := ucfg.MustNewFrom(a.cliCfg, config.DefaultOptions...)
 	srv := a.srv
 	ctx := a.srvCtx
 	canceller := a.srvCanceller
 	cfgChan := a.firstCfg
 	startChan := a.startChan
-	a.lock.Unlock()
+	a.mux.Unlock()
 
 	var cfg *config.Config
 	var err error
@@ -219,7 +234,17 @@ func (a *AgentMode) OnConfig(s string) {
 		}
 	}()
 
-	cfg, err = config.LoadString(s)
+	// load configuration and then merge it on top of the CLI configuration
+	var cfgData *ucfg.Config
+	cfgData, err = yaml.NewConfig([]byte(s), config.DefaultOptions...)
+	if err != nil {
+		return
+	}
+	err = cliCfg.Merge(cfgData, config.DefaultOptions...)
+	if err != nil {
+		return
+	}
+	cfg, err = config.FromConfig(cliCfg)
 	if err != nil {
 		return
 	}
@@ -260,9 +285,9 @@ func (a *AgentMode) OnConfig(s string) {
 }
 
 func (a *AgentMode) OnStop() {
-	a.lock.Lock()
+	a.mux.Lock()
 	canceller := a.srvCanceller
-	a.lock.Unlock()
+	a.mux.Unlock()
 
 	if canceller != nil {
 		canceller()

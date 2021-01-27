@@ -15,13 +15,13 @@ type AgentLogging struct {
 	Level string `config:"level"`
 }
 
-// InitDefaults initializes the defaults for the configuration.
-func (c *AgentLogging) InitDefaults() {
-	c.Level = "info"
-}
-
 // Validate ensures that the configuration is valid.
 func (c *AgentLogging) Validate() error {
+	if c.Level == "" {
+		// allowed to be empty because `agent.logging.level` is only
+		// an override of the logging level from `logging.level`
+		return nil
+	}
 	if _, err := strToLevel(c.Level); err != nil {
 		return err
 	}
@@ -36,7 +36,7 @@ func (c *AgentLogging) LogLevel() zerolog.Level {
 
 // Agent is the ID and logging configuration of the Agent running this Fleet Server.
 type Agent struct {
-	ID      string       `config:"id" validate:"required"`
+	ID      string       `config:"id"`
 	Version string       `config:"version"`
 	Logging AgentLogging `config:"logging"`
 }

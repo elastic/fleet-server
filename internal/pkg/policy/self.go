@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
@@ -93,7 +95,16 @@ LOOP:
 func (m *selfMonitorT) process(ctx context.Context) error {
 	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if err != nil {
-		return err
+		elasticErr, ok := err.(*es.ErrElastic)
+		if !ok {
+			return err
+		}
+		if elasticErr.Status != http.StatusNotFound {
+			return err
+		}
+		// index does not exist; yet!
+		m.updateStatus()
+		return nil
 	}
 	if len(policies) == 0 {
 		m.updateStatus()

@@ -71,7 +71,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 
 	defer ln.Close()
 
-	// TODO: Use tls.Config to properly lock down tls connection
+	// TODO: Use tls.Config to properly mux down tls connection
 	keyFile := cfg.TLS.Key
 	certFile := cfg.TLS.Cert
 
