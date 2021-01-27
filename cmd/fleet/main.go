@@ -132,6 +132,11 @@ func NewCommand(version string) *cobra.Command {
 	return cmd
 }
 
+type firstCfg struct {
+	cfg *config.Config
+	err error
+}
+
 type AgentMode struct {
 	cliCfg  *ucfg.Config
 	cache   cache.Cache
@@ -142,7 +147,7 @@ type AgentMode struct {
 	client client.Client
 
 	mux          sync.Mutex
-	firstCfg     chan *config.Config
+	firstCfg     chan firstCfg
 	srv          *FleetServer
 	srvCtx       context.Context
 	srvCanceller context.CancelFunc
@@ -169,7 +174,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	ctx, canceller := context.WithCancel(ctx)
 	defer canceller()
 
-	a.firstCfg = make(chan *config.Config)
+	a.firstCfg = make(chan firstCfg)
 	a.startChan = make(chan struct{}, 1)
 	log.Info().Msg("starting communication connection back to Elastic Agent")
 	err := a.client.Start(ctx)
@@ -180,11 +185,18 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	// wait for the initial configuration to be sent from the
 	// Elastic Agent before starting the actual Fleet Server.
 	log.Info().Msg("waiting for Elastic Agent to send initial configuration")
-	var cfg *config.Config
+	var cfg firstCfg
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("never received initial configuration")
 	case cfg = <-a.firstCfg:
+	}
+
+	// possible that first configuration resulted in an error
+	if cfg.err != nil {
+		// unblock startChan even though there was an error
+		a.startChan <- struct{}{}
+		return cfg.err
 	}
 
 	// start fleet server with the initial configuration and its
@@ -193,7 +205,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	srvCtx, srvCancel := context.WithCancel(ctx)
 	defer srvCancel()
 	log.Info().Msg("received initial configuration starting Fleet Server")
-	srv, err := NewFleetServer(cfg, a.cache, a.version, status.NewChained(status.NewLog(), a.client))
+	srv, err := NewFleetServer(cfg.cfg, a.cache, a.version, status.NewChained(status.NewLog(), a.client))
 	if err != nil {
 		// unblock startChan even though there was an error
 		a.startChan <- struct{}{}
@@ -227,6 +239,17 @@ func (a *AgentMode) OnConfig(s string) {
 	var err error
 	defer func() {
 		if err != nil {
+			if cfgChan != nil {
+				// failure on first config
+				cfgChan <- firstCfg{
+					cfg: nil,
+					err: err,
+				}
+				// block until startChan signalled
+				<-startChan
+				return
+			}
+
 			log.Err(err).Msg("failed to reload configuration")
 			if canceller != nil {
 				canceller()
@@ -259,7 +282,10 @@ func (a *AgentMode) OnConfig(s string) {
 		}
 
 		// send starting configuration so Fleet Server can start
-		cfgChan <- cfg
+		cfgChan <- firstCfg{
+			cfg: cfg,
+			err: nil,
+		}
 
 		// block handling more OnConfig calls until the Fleet Server
 		// has been fully started
