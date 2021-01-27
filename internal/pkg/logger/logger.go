@@ -66,6 +66,9 @@ type Logger struct {
 // Reload reloads the logger configuration.
 func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 	if changed(l.cfg, cfg) {
+		// sync before reload
+		l.Sync()
+
 		// reload the logger
 		logger, w, err := configure(cfg)
 		if err != nil {
@@ -91,26 +94,25 @@ func Init(cfg *config.Config) (*Logger, error) {
 	once.Do(func() {
 		var l zerolog.Logger
 		var w WriterSync
-		gLogger = &Logger{
-			cfg: cfg,
-		}
-
 		l, w, err = configure(cfg)
 		if err != nil {
 			return
 		}
 
+		log.Logger = l
+		gLogger = &Logger{
+			cfg:  cfg,
+			sync: w,
+		}
+
 		zerolog.TimeFieldFormat = time.StampMicro
 
-		gLogger.sync = w
-		log.Logger = l
 		log.Info().
 			Int("pid", os.Getpid()).
 			Int("ppid", os.Getppid()).
 			Str("exe", os.Args[0]).
 			Strs("args", os.Args[1:]).
 			Msg("boot")
-
 		log.Debug().Strs("env", os.Environ()).Msg("environment")
 	})
 	return gLogger, err
