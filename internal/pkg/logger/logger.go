@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,36 +19,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
 
-const (
-	kPrettyTimeFormat = "15:04:05.000000"
-)
-
 var once sync.Once
 var gLogger *Logger
-
-func strToLevel(s string) zerolog.Level {
-	l := zerolog.DebugLevel
-
-	s = strings.ToLower(s)
-	switch strings.TrimSpace(s) {
-	case "trace":
-		l = zerolog.TraceLevel
-	case "debug":
-		l = zerolog.DebugLevel
-	case "info":
-		l = zerolog.InfoLevel
-	case "warn":
-		l = zerolog.WarnLevel
-	case "error":
-		l = zerolog.ErrorLevel
-	case "fatal":
-		l = zerolog.FatalLevel
-	case "panic":
-		l = zerolog.PanicLevel
-	}
-
-	return l
-}
 
 // WriterSync implements a Sync function.
 type WriterSync interface {
