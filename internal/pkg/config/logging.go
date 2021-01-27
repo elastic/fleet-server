@@ -42,8 +42,6 @@ func (c *LoggingFiles) InitDefaults() {
 // Logging configuration.
 type Logging struct {
 	Level    string        `config:"level"`
-	JSON     bool          `config:"json"`
-	ECS      bool          `config:"ecs"`
 	ToStderr bool          `config:"to_stderr"`
 	ToFiles  bool          `config:"to_files"`
 	Files    *LoggingFiles `config:"files"`

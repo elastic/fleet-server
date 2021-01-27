@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"io/ioutil"
 	"net/http"
 	"path"
@@ -81,7 +82,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
 
-	srv, err := NewFleetServer(cfg, c, serverVersion)
+	srv, err := NewFleetServer(cfg, c, serverVersion, status.NewLog())
 	if err != nil {
 		return nil, err
 	}
