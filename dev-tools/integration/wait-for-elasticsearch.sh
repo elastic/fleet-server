@@ -30,9 +30,9 @@ until [ "$health" = 'green' ]; do
     health="$(curl -fsSL "$host/_cat/health?h=status")"
     echo $health
     health="$(echo "$health" | tr -d '[:space:]')"
-    >&2 echo "Elastic Search is unavailable - sleeping"
+    >&2 echo "Elasticsearch is unavailable - sleeping"
     sleep 1
 done
 
->&2 echo "Elastic Search is up"
+>&2 echo "Elasticsearch is up"
 exec $cmd
