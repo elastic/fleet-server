@@ -45,8 +45,8 @@ type Action struct {
 	// The action expiration date/time
 	Expiration string `json:"expiration,omitempty"`
 
-	// The input identifier the actions should be routed to.
-	InputId string `json:"input_id,omitempty"`
+	// The input type the actions should be routed to.
+	InputType string `json:"input_type,omitempty"`
 
 	// Date/time the action was created
 	Timestamp string `json:"@timestamp,omitempty"`

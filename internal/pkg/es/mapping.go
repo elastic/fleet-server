@@ -24,7 +24,7 @@ const (
 		"expiration": {
 			"type": "date"
 		},
-		"input_id": {
+		"input_type": {
 			"type": "keyword"
 		},
 		"@timestamp": {
