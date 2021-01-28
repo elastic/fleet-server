@@ -26,10 +26,8 @@ func TestConfig(t *testing.T) {
 			cfg: &Config{
 				Fleet: Fleet{
 					Agent: Agent{
-						ID: "1e4954ce-af37-4731-9f4a-407b08e69e42",
-						Logging: AgentLogging{
-							Level: "info",
-						},
+						ID:      "1e4954ce-af37-4731-9f4a-407b08e69e42",
+						Logging: AgentLogging{},
 					},
 				},
 				Output: Output{
@@ -61,6 +59,12 @@ func TestConfig(t *testing.T) {
 							Profile:           ServerProfile{Bind: "localhost:6060"},
 						},
 					},
+				},
+				Logging: Logging{
+					Level:    "info",
+					ToStderr: false,
+					ToFiles:  true,
+					Files:    nil,
 				},
 			},
 		},
@@ -104,16 +108,20 @@ func TestConfig(t *testing.T) {
 						},
 					},
 				},
+				Logging: Logging{
+					Level:    "info",
+					ToStderr: false,
+					ToFiles:  true,
+					Files:    nil,
+				},
 			},
 		},
 		"input": {
 			cfg: &Config{
 				Fleet: Fleet{
 					Agent: Agent{
-						ID: "1e4954ce-af37-4731-9f4a-407b08e69e42",
-						Logging: AgentLogging{
-							Level: "info",
-						},
+						ID:      "1e4954ce-af37-4731-9f4a-407b08e69e42",
+						Logging: AgentLogging{},
 					},
 				},
 				Output: Output{
@@ -146,16 +154,20 @@ func TestConfig(t *testing.T) {
 						},
 					},
 				},
+				Logging: Logging{
+					Level:    "info",
+					ToStderr: false,
+					ToFiles:  true,
+					Files:    nil,
+				},
 			},
 		},
 		"input-config": {
 			cfg: &Config{
 				Fleet: Fleet{
 					Agent: Agent{
-						ID: "1e4954ce-af37-4731-9f4a-407b08e69e42",
-						Logging: AgentLogging{
-							Level: "info",
-						},
+						ID:      "1e4954ce-af37-4731-9f4a-407b08e69e42",
+						Logging: AgentLogging{},
 					},
 				},
 				Output: Output{
@@ -188,6 +200,12 @@ func TestConfig(t *testing.T) {
 						},
 					},
 				},
+				Logging: Logging{
+					Level:    "info",
+					ToStderr: false,
+					ToFiles:  true,
+					Files:    nil,
+				},
 			},
 		},
 		"bad-input": {
@@ -201,12 +219,6 @@ func TestConfig(t *testing.T) {
 		},
 		"bad-output": {
 			err: "can only contain elasticsearch key",
-		},
-		"bad-no-output": {
-			err: "cannot connect to elasticsearch without username/password",
-		},
-		"bad-no-agent-id": {
-			err: "string value is not set",
 		},
 	}
 
