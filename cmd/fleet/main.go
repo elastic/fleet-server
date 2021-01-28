@@ -505,7 +505,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
 
 	// Policy self monitor
-	sm := policy.NewSelfMonitor(bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
+	sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
 	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 
 	// Actions monitoring

@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"net/http"
 	"sync"
 
@@ -32,6 +33,7 @@ type selfMonitorT struct {
 	log zerolog.Logger
 
 	mut     sync.Mutex
+	fleet   config.Fleet
 	bulker  bulk.Bulk
 	monitor monitor.Monitor
 
@@ -48,9 +50,10 @@ type selfMonitorT struct {
 //
 // Ensures that the policy that this Fleet Server attached to exists and that it
 // has a Fleet Server input defined.
-func NewSelfMonitor(bulker bulk.Bulk, monitor monitor.Monitor, policyId string, reporter status.Reporter) SelfMonitor {
+func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monitor, policyId string, reporter status.Reporter) SelfMonitor {
 	return &selfMonitorT{
 		log:           log.With().Str("ctx", "policy self monitor").Logger(),
+		fleet:         fleet,
 		bulker:        bulker,
 		monitor:       monitor,
 		policyId:      policyId,
@@ -169,10 +172,16 @@ func (m *selfMonitorT) updateStatus() error {
 		return fmt.Errorf("assigned policy does not have fleet-server input")
 	}
 
+	status := proto.StateObserved_HEALTHY
+	extendMsg := ""
+	if m.fleet.Agent.ID == "" {
+		status = proto.StateObserved_DEGRADED
+		extendMsg = "; missing config fleet.agent.id"
+	}
 	if m.policyId == "" {
-		m.reporter.Status(proto.StateObserved_HEALTHY, "Running on default policy with Fleet Server integration", nil)
+		m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), nil)
 	} else {
-		m.reporter.Status(proto.StateObserved_HEALTHY, fmt.Sprintf("Running on policy with Fleet Server integration: %s", m.policyId), nil)
+		m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyId, extendMsg), nil)
 	}
 	return nil
 }
