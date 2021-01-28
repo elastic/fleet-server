@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+// Policy is the configuration policy to use.
+type Policy struct {
+	ID string `config:"id"`
+}
+
 // ServerTimeouts is the configuration for the server timeouts
 type ServerTimeouts struct {
 	Read  time.Duration `config:"read"`
@@ -75,6 +80,7 @@ func (c *Server) BindAddress() string {
 // Input is the input defined by Agent to run Fleet Server.
 type Input struct {
 	Type   string `config:"type"`
+	Policy Policy `config:"policy"`
 	Server Server `config:"server"`
 }
 

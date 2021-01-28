@@ -55,9 +55,6 @@ func (c *Elasticsearch) Validate() error {
 	if c.APIKey != "" {
 		return fmt.Errorf("cannot connect to elasticsearch with api_key; must use username/password")
 	}
-	if c.Username == "" || c.Password == "" {
-		return fmt.Errorf("cannot connect to elasticsearch without username/password")
-	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
 		if _, err := common.ParseURL(c.ProxyURL); err != nil {
 			return err

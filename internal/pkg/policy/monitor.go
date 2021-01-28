@@ -80,7 +80,7 @@ func (s *subT) Output() <-chan model.Policy {
 // NewMonitor creates the policy monitor for subscribing agents.
 func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duration) Monitor {
 	return &monitorT{
-		log:           log.With().Str("ctx", "policy agent manager").Logger(),
+		log:           log.With().Str("ctx", "policy agent monitor").Logger(),
 		bulker:        bulker,
 		monitor:       monitor,
 		kickCh:        make(chan struct{}, 1),

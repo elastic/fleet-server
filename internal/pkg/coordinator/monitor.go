@@ -89,13 +89,17 @@ func NewMonitor(fleet config.Fleet, version string, bulker bulk.Bulk, monitor mo
 
 // Run runs the monitor.
 func (m *monitorT) Run(ctx context.Context) (err error) {
-	m.log.Info().Msg("start")
-	defer func() {
-		m.log.Info().Err(err).Msg("exited")
-	}()
+	// When ID of the Agent is not provided to Fleet Server then the Agent
+	// has not enrolled. The Fleet Server cannot become a leader until the
+	// Agent it is running under has been enrolled.
+	m.calcMetadata()
+	if m.agentMetadata.Id == "" {
+		m.log.Warn().Msg("missing config fleet.agent.id; acceptable until Elastic Agent has enrolled")
+		<-ctx.Done()
+		return ctx.Err()
+	}
 
 	// Ensure leadership on startup
-	m.calcMetadata()
 	err = m.ensureLeadership(ctx)
 	if err != nil {
 		return err
