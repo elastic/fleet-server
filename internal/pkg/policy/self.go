@@ -7,6 +7,7 @@ package policy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"net/http"
@@ -105,9 +106,6 @@ func (m *selfMonitorT) process(ctx context.Context) error {
 		if elasticErr.Status != http.StatusNotFound {
 			return err
 		}
-		// index does not exist; yet!
-		m.updateStatus()
-		return nil
 	}
 	if len(policies) == 0 {
 		m.updateStatus()
@@ -169,7 +167,7 @@ func (m *selfMonitorT) updateStatus() error {
 		return err
 	}
 	if !data.HasType("fleet-server") {
-		return fmt.Errorf("assigned policy does not have fleet-server input")
+		return errors.New("assigned policy does not have fleet-server input")
 	}
 
 	status := proto.StateObserved_HEALTHY

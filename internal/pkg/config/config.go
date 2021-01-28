@@ -5,7 +5,7 @@
 package config
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/flag"
@@ -36,11 +36,11 @@ func (c *Config) InitDefaults() {
 
 // Validate ensures that the configuration is valid.
 func (c *Config) Validate() error {
-	if c.Inputs == nil || len(c.Inputs) == 0 {
-		return fmt.Errorf("a fleet-server input must be defined")
+	if len(c.Inputs) == 0 {
+		return errors.New("a fleet-server input must be defined")
 	}
 	if len(c.Inputs) > 1 {
-		return fmt.Errorf("only 1 fleet-server input can be defined")
+		return errors.New("only 1 fleet-server input can be defined")
 	}
 	return nil
 }

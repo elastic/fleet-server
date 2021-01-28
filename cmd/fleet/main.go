@@ -40,7 +40,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const kPolicyThrottle = time.Millisecond * 5
+const (
+	kPolicyThrottle = time.Millisecond * 5
+	kAgentMode      = "agent-mode"
+)
 
 func savedObjectKey() string {
 	key := env.GetStr(
@@ -66,7 +69,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 		cfgObject := cmd.Flags().Lookup("E").Value.(*config.Flag)
 		cliCfg := cfgObject.Config()
 
-		agentMode, err := cmd.Flags().GetBool("agent-mode")
+		agentMode, err := cmd.Flags().GetBool(kAgentMode)
 		if err != nil {
 			return err
 		}
@@ -137,7 +140,7 @@ func NewCommand(version string) *cobra.Command {
 		RunE:  getRunCommand(version),
 	}
 	cmd.Flags().StringP("config", "c", "fleet-server.yml", "Configuration for Fleet Server")
-	cmd.Flags().Bool("agent-mode", false, "Running under execution of the Elastic Agent")
+	cmd.Flags().Bool(kAgentMode, false, "Running under execution of the Elastic Agent")
 	cmd.Flags().VarP(config.NewFlag(), "E", "E", "Overwrite configuration value")
 	return cmd
 }
@@ -154,7 +157,7 @@ type AgentMode struct {
 
 	reloadables []reload.Reloadable
 
-	client client.Client
+	agent client.Client
 
 	mux          sync.Mutex
 	firstCfg     chan firstCfg
@@ -173,7 +176,7 @@ func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, c cache.Cache, version 
 		version:     version,
 		reloadables: reloadables,
 	}
-	a.client, err = client.NewFromReader(reader, a)
+	a.agent, err = client.NewFromReader(reader, a)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +190,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	a.firstCfg = make(chan firstCfg)
 	a.startChan = make(chan struct{}, 1)
 	log.Info().Msg("starting communication connection back to Elastic Agent")
-	err := a.client.Start(ctx)
+	err := a.agent.Start(ctx)
 	if err != nil {
 		return err
 	}
@@ -215,7 +218,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	srvCtx, srvCancel := context.WithCancel(ctx)
 	defer srvCancel()
 	log.Info().Msg("received initial configuration starting Fleet Server")
-	srv, err := NewFleetServer(cfg.cfg, a.cache, a.version, status.NewChained(status.NewLog(), a.client))
+	srv, err := NewFleetServer(cfg.cfg, a.cache, a.version, status.NewChained(status.NewLog(), a.agent))
 	if err != nil {
 		// unblock startChan even though there was an error
 		a.startChan <- struct{}{}
