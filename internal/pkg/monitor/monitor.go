@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"sync/atomic"
 	"time"
 
@@ -291,7 +292,15 @@ func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[
 	}
 
 	if res.IsError() {
-		return nil, es.TranslateError(res.StatusCode, esres.Error)
+		err = es.TranslateError(res.StatusCode, esres.Error)
+	}
+
+	if err != nil {
+		if errors.Is(err, es.ErrIndexNotFound) {
+			m.log.Debug().Str("index", m.index).Msg(es.ErrIndexNotFound.Error())
+			return nil, nil
+		}
+		return nil, err
 	}
 
 	return esres.Hits.Hits, nil

@@ -6,6 +6,7 @@ package coordinator
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"runtime"
@@ -188,6 +189,10 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	leaders := map[string]model.PolicyLeader{}
 	policies, err := dl.QueryLatestPolicies(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if err != nil {
+		if errors.Is(err, es.ErrIndexNotFound) {
+			m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
+			return nil
+		}
 		return err
 	}
 	if len(policies) > 0 {
@@ -197,6 +202,10 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		}
 		leaders, err = dl.SearchPolicyLeaders(ctx, m.bulker, ids, dl.WithIndexName(m.leadersIndex))
 		if err != nil {
+			if errors.Is(err, es.ErrIndexNotFound) {
+				m.log.Debug().Str("index", m.leadersIndex).Msg(es.ErrIndexNotFound.Error())
+				return nil
+			}
 			return err
 		}
 	}
