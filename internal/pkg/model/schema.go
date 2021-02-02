@@ -51,7 +51,7 @@ type Action struct {
 	// Date/time the action was created
 	Timestamp string `json:"@timestamp,omitempty"`
 
-	// The action type. APP_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.
+	// The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.
 	Type string `json:"type,omitempty"`
 }
 
