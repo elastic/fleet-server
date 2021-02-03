@@ -15,6 +15,8 @@ import (
 const (
 	FieldAgents     = "agents"
 	FieldExpiration = "expiration"
+
+	maxAgentActionsFetchSize = 100
 )
 
 var (
@@ -44,6 +46,8 @@ func prepareFindAgentActions() *dsl.Tmpl {
 
 	filter.Terms(FieldAgents, tmpl.Bind(FieldAgents), nil)
 
+	// Select more actions per agent since the agents array is not loaded
+	root.Size(maxAgentActionsFetchSize)
 	root.Source().Excludes(FieldAgents)
 
 	tmpl.MustResolve(root)
