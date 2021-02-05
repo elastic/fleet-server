@@ -30,7 +30,7 @@
           "format": "date-time"
         },
         "type": {
-          "description": "The action type. APP_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",
+          "description": "The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",
           "type": "string"
         },
         "input_type": {
