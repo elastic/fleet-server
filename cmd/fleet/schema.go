@@ -127,15 +127,18 @@ type ActionResp struct {
 }
 
 type Event struct {
-	Type      string          `json:"type"`
-	SubType   string          `json:"subtype"`
-	AgentId   string          `json:"agent_id"`
-	ActionId  string          `json:"action_id"`
-	PolicyId  string          `json:"policy_id"`
-	StreamId  string          `json:"stream_id"`
-	Timestamp string          `json:"timestamp"`
-	Message   string          `json:"message"`
-	Payload   string          `json:"payload,omitempty"`
-	Data      json.RawMessage `json:"data,omitempty"`
-	Error     string          `json:"error,omitempty"`
+	Type        string          `json:"type"`
+	SubType     string          `json:"subtype"`
+	AgentId     string          `json:"agent_id"`
+	ActionId    string          `json:"action_id"`
+	PolicyId    string          `json:"policy_id"`
+	StreamId    string          `json:"stream_id"`
+	Timestamp   string          `json:"timestamp"`
+	Message     string          `json:"message"`
+	Payload     string          `json:"payload,omitempty"`
+	StartedAt   string          `json:"started_at"`
+	CompletedAt string          `json:"completed_at"`
+	ActionData  json.RawMessage `json:"action_data,omitempty"`
+	Data        json.RawMessage `json:"data,omitempty"`
+	Error       string          `json:"error,omitempty"`
 }
