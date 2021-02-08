@@ -55,9 +55,16 @@ type Action struct {
 	Type string `json:"type,omitempty"`
 }
 
+// ActionData The opaque payload.
+type ActionData struct {
+}
+
 // ActionResult An Elastic Agent action results
 type ActionResult struct {
 	ESDocument
+
+	// The opaque payload.
+	ActionData json.RawMessage `json:"action_data,omitempty"`
 
 	// The action id.
 	ActionId string `json:"action_id,omitempty"`
@@ -65,11 +72,17 @@ type ActionResult struct {
 	// The agent id.
 	AgentId string `json:"agent_id,omitempty"`
 
+	// Date/time the action was completed
+	CompletedAt string `json:"completed_at,omitempty"`
+
 	// The opaque payload.
 	Data json.RawMessage `json:"data,omitempty"`
 
 	// The action error message.
 	Error string `json:"error,omitempty"`
+
+	// Date/time the action was started
+	StartedAt string `json:"started_at,omitempty"`
 
 	// Date/time the action was created
 	Timestamp string `json:"@timestamp,omitempty"`

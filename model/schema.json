@@ -73,6 +73,21 @@
           "description": "The action id.",
           "type": "string"
         },
+        "started_at": {
+          "description": "Date/time the action was started",
+          "type": "string",
+          "format": "date-time"
+        },
+        "completed_at": {
+          "description": "Date/time the action was completed",
+          "type": "string",
+          "format": "date-time"
+        },
+        "action_data": {
+          "description": "The opaque payload.",
+          "type": "object",
+          "format": "raw"
+        },
         "error": {
           "description": "The action error message.",
           "type": "string"

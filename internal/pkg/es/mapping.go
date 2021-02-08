@@ -36,14 +36,28 @@ const (
 	}
 }`
 
+	// ActionData The opaque payload.
+	MappingActionData = `{
+	"properties": {
+		
+	}
+}`
+
 	// ActionResult An Elastic Agent action results
 	MappingActionResult = `{
 	"properties": {
+		"action_data": {
+			"enabled" : false,
+			"type": "object"
+		},
 		"action_id": {
 			"type": "keyword"
 		},
 		"agent_id": {
 			"type": "keyword"
+		},
+		"completed_at": {
+			"type": "date"
 		},
 		"data": {
 			"enabled" : false,
@@ -51,6 +65,9 @@ const (
 		},
 		"error": {
 			"type": "keyword"
+		},
+		"started_at": {
+			"type": "date"
 		},
 		"@timestamp": {
 			"type": "date"
