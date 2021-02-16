@@ -108,10 +108,13 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 		}
 
 		acr := model.ActionResult{
-			ActionId: ev.ActionId,
-			AgentId:  agent.Id,
-			Data:     ev.Data,
-			Error:    ev.Error,
+			ActionId:    ev.ActionId,
+			AgentId:     agent.Id,
+			StartedAt:   ev.StartedAt,
+			CompletedAt: ev.CompletedAt,
+			ActionData:  ev.ActionData,
+			Data:        ev.Data,
+			Error:       ev.Error,
 		}
 		if _, err := dl.CreateActionResult(ctx, bulker, acr); err != nil {
 			return err
