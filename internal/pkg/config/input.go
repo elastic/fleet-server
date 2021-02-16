@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+const kDefaultHost = "localhost"
+const kDefaultPort = 8220
+
 // Policy is the configuration policy to use.
 type Policy struct {
 	ID string `config:"id"`
@@ -58,8 +61,8 @@ type Server struct {
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *Server) InitDefaults() {
-	c.Host = "localhost"
-	c.Port = 8000
+	c.Host = kDefaultHost
+	c.Port = kDefaultPort
 	c.Timeouts.InitDefaults()
 	c.MaxHeaderByteSize = 8192 // 8k
 	c.RateLimitBurst = 1024

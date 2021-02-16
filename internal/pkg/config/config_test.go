@@ -46,8 +46,8 @@ func TestConfig(t *testing.T) {
 					{
 						Type: "fleet-server",
 						Server: Server{
-							Host: "localhost",
-							Port: 8000,
+							Host: kDefaultHost,
+							Port: kDefaultPort,
 							Timeouts: ServerTimeouts{
 								Read:  5 * time.Second,
 								Write: 60 * 10 * time.Second,
@@ -94,8 +94,8 @@ func TestConfig(t *testing.T) {
 					{
 						Type: "fleet-server",
 						Server: Server{
-							Host: "localhost",
-							Port: 8000,
+							Host: kDefaultHost,
+							Port: kDefaultPort,
 							Timeouts: ServerTimeouts{
 								Read:  5 * time.Second,
 								Write: 60 * 10 * time.Second,
@@ -140,8 +140,8 @@ func TestConfig(t *testing.T) {
 					{
 						Type: "fleet-server",
 						Server: Server{
-							Host: "localhost",
-							Port: 8000,
+							Host: kDefaultHost,
+							Port: kDefaultPort,
 							Timeouts: ServerTimeouts{
 								Read:  5 * time.Second,
 								Write: 60 * 10 * time.Second,
@@ -186,7 +186,7 @@ func TestConfig(t *testing.T) {
 					{
 						Type: "fleet-server",
 						Server: Server{
-							Host: "localhost",
+							Host: kDefaultHost,
 							Port: 8888,
 							Timeouts: ServerTimeouts{
 								Read:  20 * time.Second,
