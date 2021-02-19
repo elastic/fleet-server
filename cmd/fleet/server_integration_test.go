@@ -47,7 +47,7 @@ func (s *tserver) baseUrl() string {
 	input := s.cfg.Inputs[0]
 	tls := input.Server.TLS
 	schema := "http"
-	if tls.Key != "" || tls.Cert != "" {
+	if tls != nil && tls.IsEnabled() {
 		schema = "https"
 	}
 	return fmt.Sprintf("%s://%s:%d", schema, input.Server.Host, input.Server.Port)
