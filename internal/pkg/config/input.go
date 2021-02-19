@@ -6,6 +6,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 	"strings"
 	"time"
 )
@@ -48,15 +49,15 @@ type ServerTLS struct {
 
 // Server is the configuration for the server
 type Server struct {
-	Host              string         `config:"host"`
-	Port              uint16         `config:"port"`
-	TLS               ServerTLS      `config:"tls"`
-	Timeouts          ServerTimeouts `config:"timeouts"`
-	MaxHeaderByteSize int            `config:"max_header_byte_size"`
-	RateLimitBurst    int            `config:"rate_limit_burst"`
-	RateLimitInterval time.Duration  `config:"rate_limit_interval"`
-	MaxEnrollPending  int64          `config:"max_enroll_pending"`
-	Profile           ServerProfile  `config:"profile"`
+	Host              string            `config:"host"`
+	Port              uint16            `config:"port"`
+	TLS               *tlscommon.Config `config:"ssl"`
+	Timeouts          ServerTimeouts    `config:"timeouts"`
+	MaxHeaderByteSize int               `config:"max_header_byte_size"`
+	RateLimitBurst    int               `config:"rate_limit_burst"`
+	RateLimitInterval time.Duration     `config:"rate_limit_interval"`
+	MaxEnrollPending  int64             `config:"max_enroll_pending"`
+	Profile           ServerProfile     `config:"profile"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
