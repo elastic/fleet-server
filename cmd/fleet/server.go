@@ -39,7 +39,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 		Str("bind", addr).
 		Dur("rdTimeout", rdto).
 		Dur("wrTimeout", wrto).
-		Msg("Server listening")
+		Msg("server listening")
 
 	server := http.Server{
 		Addr:           addr,
@@ -59,10 +59,10 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	go func() {
 		select {
 		case <-ctx.Done():
-			log.Debug().Msg("Force server close on ctx.Done()")
+			log.Debug().Msg("force server close on ctx.Done()")
 			server.Close()
 		case <-forceCh:
-			log.Debug().Msg("Go routine forced closed on exit")
+			log.Debug().Msg("go routine forced closed on exit")
 		}
 	}()
 
@@ -80,6 +80,8 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 		}
 		server.TLSConfig = tlsCfg.ToConfig()
 		ln = tls.NewListener(ln, server.TLSConfig)
+	} else {
+		log.Warn().Msg("exposed over insecure HTTP; enablement of TLS is strongly recommended")
 	}
 
 	ln = wrapRateLimitter(ctx, ln, cfg)
@@ -98,7 +100,7 @@ func wrapRateLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) 
 		log.Info().Dur("interval", rateLimitInterval).Int("burst", rateLimitBurst).Msg("Server rate limiter installed")
 		ln = rate.NewRateListener(ctx, ln, rateLimitBurst, rateLimitInterval)
 	} else {
-		log.Info().Msg("Server connection rate limiter disabled")
+		log.Info().Msg("server connection rate limiter disabled")
 	}
 
 	return ln
