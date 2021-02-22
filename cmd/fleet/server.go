@@ -6,13 +6,15 @@ package fleet
 
 import (
 	"context"
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"crypto/tls"
 	slog "log"
 	"net"
 	"net/http"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rate"
 
+	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
 )
@@ -37,7 +39,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 		Str("bind", addr).
 		Dur("rdTimeout", rdto).
 		Dur("wrTimeout", wrto).
-		Msg("Server listening")
+		Msg("server listening")
 
 	server := http.Server{
 		Addr:           addr,
@@ -57,28 +59,32 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	go func() {
 		select {
 		case <-ctx.Done():
-			log.Debug().Msg("Force server close on ctx.Done()")
+			log.Debug().Msg("force server close on ctx.Done()")
 			server.Close()
 		case <-forceCh:
-			log.Debug().Msg("Go routine forced closed on exit")
+			log.Debug().Msg("go routine forced closed on exit")
 		}
 	}()
 
-	ln, err := makeListener(ctx, addr, cfg)
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 
 	defer ln.Close()
 
-	// TODO: Use tls.Config to properly mux down tls connection
-	keyFile := cfg.TLS.Key
-	certFile := cfg.TLS.Cert
-
-	if keyFile != "" || certFile != "" {
-		return server.ServeTLS(ln, certFile, keyFile)
+	if cfg.TLS != nil && cfg.TLS.IsEnabled() {
+		tlsCfg, err := tlscommon.LoadTLSConfig(cfg.TLS)
+		if err != nil {
+			return err
+		}
+		server.TLSConfig = tlsCfg.ToConfig()
+		ln = tls.NewListener(ln, server.TLSConfig)
+	} else {
+		log.Warn().Msg("exposed over insecure HTTP; enablement of TLS is strongly recommended")
 	}
 
+	ln = wrapRateLimitter(ctx, ln, cfg)
 	if err := server.Serve(ln); err != nil && err != context.Canceled {
 		return err
 	}
@@ -86,13 +92,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	return nil
 }
 
-func makeListener(ctx context.Context, addr string, cfg *config.Server) (net.Listener, error) {
-	// Create listener
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-
+func wrapRateLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) net.Listener {
 	rateLimitBurst := cfg.RateLimitBurst
 	rateLimitInterval := cfg.RateLimitInterval
 
@@ -100,10 +100,10 @@ func makeListener(ctx context.Context, addr string, cfg *config.Server) (net.Lis
 		log.Info().Dur("interval", rateLimitInterval).Int("burst", rateLimitBurst).Msg("Server rate limiter installed")
 		ln = rate.NewRateListener(ctx, ln, rateLimitBurst, rateLimitInterval)
 	} else {
-		log.Info().Msg("Server connection rate limiter disabled")
+		log.Info().Msg("server connection rate limiter disabled")
 	}
 
-	return ln, err
+	return ln
 }
 
 type stubLogger struct {
