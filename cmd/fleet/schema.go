@@ -36,26 +36,23 @@ const kFleetAccessRolesJSON = `
 `
 
 const kFleetOutputRolesJSON = `
-{
-	"fleet-output": {
-		"cluster": ["monitor"],
-		"index": [{
-			"names": [
-				"logs-*",
-				"metrics-*",
-				"events-*",
-				".ds-logs-*",
-				".ds-metrics-*",
-				".ds-events-*"
-			],
-			"privileges": [
-				"write",
-				"create_index",
-				"indices:admin/auto_create"
-			]
-		}]
-	}
-}
+ {
+ 	"fleet-output": {
+ 		"cluster": ["monitor"],
+ 		"index": [{
+ 			"names": [
+ 				"logs-*",
+ 				"metrics-*",
+ 				"traces-*",
+ 				".logs-endpoint.diagnostic.collection-*"
+ 			],
+ 			"privileges": [
+ 				"auto_configure",
+ 				"create_doc"
+ 			]
+ 		}]
+ 	}
+ }
 `
 
 // Wrong: no AAD;
