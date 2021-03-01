@@ -11,7 +11,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/esboot"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
 
 	"github.com/rs/zerolog/log"
 )
@@ -34,15 +34,15 @@ func main() {
 	es, err := es.NewClient(ctx, cfg)
 	checkErr(err)
 
-	err = esboot.EnsureESIndices(ctx, es)
+	err = esutil.EnsureESIndices(ctx, es)
 	checkErr(err)
 
 	// Create .kibana index for integration tests
 	// This temporarily until all the parts are unplugged from .kibana
 	// Otherwise the fleet server fails to start at the moment
 	const name = ".kibana"
-	err = esboot.EnsureIndex(ctx, es, name, kibanaMapping)
-	if errors.Is(err, esboot.ErrResourceAlreadyExists) {
+	err = esutil.EnsureIndex(ctx, es, name, kibanaMapping)
+	if errors.Is(err, esutil.ErrResourceAlreadyExists) {
 		log.Info().Str("name", name).Msg("Index already exists")
 		err = nil
 	}
