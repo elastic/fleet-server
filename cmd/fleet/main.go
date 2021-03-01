@@ -27,7 +27,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/profile"
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
-	"github.com/elastic/fleet-server/v7/internal/pkg/saved"
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 
@@ -469,7 +468,6 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-	sv := saved.NewMgr(bulker, savedObjectKey())
 
 	// Replacing to errgroup context
 	g, ctx := errgroup.WithContext(ctx)
@@ -512,9 +510,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	}
 
 	bc := NewBulkCheckin(bulker)
-	g.Go(loggedRunFunc(ctx, "Bulk checkin", func(ctx context.Context) error {
-		return bc.Run(ctx, sv)
-	}))
+	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
 	ct := NewCheckinT(f.cfg, f.cache, bc, pm, am, ad, tr, bulker)
 	et, err := NewEnrollerT(&f.cfg.Inputs[0].Server, bulker, f.cache)
