@@ -12,15 +12,16 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/saved"
 
 	"github.com/rs/zerolog/log"
 )
 
+type Fields map[string]interface{}
+
 const kBulkCheckinFlushInterval = 10 * time.Second
 
 type PendingData struct {
-	fields saved.Fields
+	fields Fields
 	seqNo  int64
 }
 
@@ -37,10 +38,10 @@ func NewBulkCheckin(bulker bulk.Bulk) *BulkCheckin {
 	}
 }
 
-func (bc *BulkCheckin) CheckIn(id string, fields saved.Fields, seqno int64) error {
+func (bc *BulkCheckin) CheckIn(id string, fields Fields, seqno int64) error {
 
 	if fields == nil {
-		fields = make(saved.Fields)
+		fields = make(Fields)
 	}
 
 	timeNow := time.Now().UTC().Format(time.RFC3339)
@@ -52,7 +53,7 @@ func (bc *BulkCheckin) CheckIn(id string, fields saved.Fields, seqno int64) erro
 	return nil
 }
 
-func (bc *BulkCheckin) Run(ctx context.Context, sv saved.CRUD) error {
+func (bc *BulkCheckin) Run(ctx context.Context) error {
 
 	tick := time.NewTicker(kBulkCheckinFlushInterval)
 
@@ -61,7 +62,7 @@ LOOP:
 	for {
 		select {
 		case <-tick.C:
-			if err = bc.flush(ctx, sv); err != nil {
+			if err = bc.flush(ctx); err != nil {
 				log.Error().Err(err).Msg("Eat bulk checkin error; Keep on truckin'")
 				err = nil
 			}
@@ -75,7 +76,7 @@ LOOP:
 	return err
 }
 
-func (bc *BulkCheckin) flush(ctx context.Context, sv saved.CRUD) error {
+func (bc *BulkCheckin) flush(ctx context.Context) error {
 	start := time.Now()
 
 	bc.mut.Lock()

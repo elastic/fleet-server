@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
-	"github.com/elastic/fleet-server/v7/internal/pkg/saved"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
@@ -347,7 +346,7 @@ func findAgentByApiKeyId(ctx context.Context, bulker bulk.Bulk, id string) (*mod
 
 // parseMeta compares the agent and the request local_metadata content
 // and returns fields to update the agent record or nil
-func parseMeta(agent *model.Agent, req *CheckinRequest) (fields saved.Fields, err error) {
+func parseMeta(agent *model.Agent, req *CheckinRequest) (fields Fields, err error) {
 	// Quick comparison first
 	if bytes.Equal(req.LocalMeta, agent.LocalMetadata) {
 		log.Trace().Msg("Quick comparing local metadata is equal")
@@ -355,8 +354,8 @@ func parseMeta(agent *model.Agent, req *CheckinRequest) (fields saved.Fields, er
 	}
 
 	// Compare local_metadata content and update if different
-	var reqLocalMeta saved.Fields
-	var agentLocalMeta saved.Fields
+	var reqLocalMeta Fields
+	var agentLocalMeta Fields
 	err = json.Unmarshal(req.LocalMeta, &reqLocalMeta)
 	if err != nil {
 		return nil, err
