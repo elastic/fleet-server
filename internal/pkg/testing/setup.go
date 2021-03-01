@@ -15,7 +15,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/esboot"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
 )
 
 var defaultCfg config.Config
@@ -53,7 +53,7 @@ func SetupBulk(ctx context.Context, t *testing.T, opts ...bulk.BulkOpt) bulk.Bul
 func SetupIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, mapping string) string {
 	t.Helper()
 	index := xid.New().String()
-	err := esboot.EnsureIndex(ctx, bulker.Client(), index, mapping)
+	err := esutil.EnsureIndex(ctx, bulker.Client(), index, mapping)
 	if err != nil {
 		t.Fatal(err)
 	}

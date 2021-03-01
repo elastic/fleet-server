@@ -7,12 +7,13 @@ package fleet
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/go-ucfg"
-	"github.com/elastic/go-ucfg/yaml"
 	"io"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/elastic/go-ucfg"
+	"github.com/elastic/go-ucfg/yaml"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -21,9 +22,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/coordinator"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/env"
-	"github.com/elastic/fleet-server/v7/internal/pkg/esboot"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/elastic/fleet-server/v7/internal/pkg/migrate"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/profile"
@@ -471,24 +470,6 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return err
 	}
 	sv := saved.NewMgr(bulker, savedObjectKey())
-
-	// Initial indices bootstrapping, needed for agents actions development
-	// TODO: remove this after the indices bootstrapping logic implemented in ES plugin
-	bootFlag := env.GetStr(
-		"FLEET_ES_BOOT",
-		"",
-	)
-	if bootFlag == "1" {
-		log.Debug().Msg("FLEET_ES_BOOT is set to true, perform bootstrap")
-		err = esboot.EnsureESIndices(ctx, es)
-		if err != nil {
-			return err
-		}
-		err = migrate.Migrate(ctx, log.Logger, sv, bulker)
-		if err != nil {
-			return err
-		}
-	}
 
 	// Replacing to errgroup context
 	g, ctx := errgroup.WithContext(ctx)
