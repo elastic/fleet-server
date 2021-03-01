@@ -6,8 +6,9 @@ package config
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
 	"strings"
+
+	"github.com/rs/zerolog"
 )
 
 // AgentLogging is the log level set on the Agent.
@@ -58,6 +59,8 @@ func strToLevel(s string) (zerolog.Level, error) {
 
 	s = strings.ToLower(s)
 	switch strings.TrimSpace(s) {
+	case "trace":
+		l = zerolog.TraceLevel
 	case "debug":
 		l = zerolog.DebugLevel
 	case "info":
@@ -67,7 +70,7 @@ func strToLevel(s string) (zerolog.Level, error) {
 	case "error":
 		l = zerolog.ErrorLevel
 	default:
-		return l, fmt.Errorf("invalid log level; must be one of: debug, info, warning, error")
+		return l, fmt.Errorf("invalid log level; must be one of: trace, debug, info, warning, error")
 	}
 
 	return l, nil
