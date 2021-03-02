@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/beats/v7/libbeat/monitoring"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/net/netutil"
 )
 
 var (
@@ -107,6 +108,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	}
 
 	ln = wrapRateLimitter(ctx, ln, cfg)
+	ln = wrapConnLimitter(ctx, ln, cfg)
 	if err := server.Serve(ln); err != nil && err != context.Canceled {
 		return err
 	}
@@ -127,6 +129,22 @@ func wrapRateLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) 
 		ln = rate.NewRateListener(ctx, ln, rateLimitBurst, rateLimitInterval)
 	} else {
 		log.Info().Msg("server connection rate limiter disabled")
+	}
+
+	return ln
+}
+
+func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) net.Listener {
+	hardLimit := cfg.MaxConnections
+
+	if hardLimit != 0 {
+		log.Info().
+			Int("hardConnLimit", hardLimit).
+			Msg("server hard connection limiter installed")
+
+		ln = netutil.LimitListener(ln, hardLimit)
+	} else {
+		log.Info().Msg("server hard connection limiter disabled")
 	}
 
 	return ln
