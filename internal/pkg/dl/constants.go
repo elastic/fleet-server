@@ -31,6 +31,7 @@ const (
 	FieldPolicyRevisionIdx    = "policy_revision_idx"
 	FieldPolicyCoordinatorIdx = "policy_coordinator_idx"
 
+	FieldActive       = "active"
 	FieldUpdatedAt    = "updated_at"
 	FieldUnenrolledAt = "unenrolled_at"
 )

@@ -194,6 +194,7 @@ func _handleUnenroll(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) 
 	updates := make([]bulk.BulkOp, 0, 1)
 	now := time.Now().UTC().Format(time.RFC3339)
 	fields := map[string]interface{}{
+		dl.FieldActive:       false,
 		dl.FieldUnenrolledAt: now,
 		dl.FieldUpdatedAt:    now,
 	}
