@@ -7,10 +7,15 @@ package monitor
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 
 	"github.com/elastic/go-elasticsearch/v8"
 )
+
+var ErrGlobalCheckpoint = errors.New("global checkpoint error")
 
 type shard struct {
 	SeqNo struct {
@@ -49,7 +54,21 @@ func queryGlobalCheckpoint(ctx context.Context, es *elasticsearch.Client, index 
 		return
 	}
 
-	if stats, ok := sres.IndexStats[index]; ok {
+	if len(sres.IndexStats) > 1 {
+		indices := make([]string, 0, len(sres.IndexStats))
+		for k := range sres.IndexStats {
+			indices = append(indices, k)
+		}
+		return seqno, fmt.Errorf("more than one indices found %v, %w", indices, ErrGlobalCheckpoint)
+	}
+
+	if len(sres.IndexStats) > 0 {
+		// Grab the first and only index stats
+		var stats indexStats
+		for _, stats = range sres.IndexStats {
+			break
+		}
+
 		if shards, ok := stats.Shards["0"]; ok {
 			if len(shards) > 0 {
 				seqno = shards[0].SeqNo.GlobalCheckpoint
