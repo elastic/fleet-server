@@ -181,7 +181,7 @@ func TestServerUnauthorized(t *testing.T) {
 
 	// Unauthorized, expecting error from /_security/_authenticate
 	t.Run("unauthorized", func(t *testing.T) {
-		const expectedErrResponsePrefix = `Fail Auth: [401 Unauthorized]`
+		const expectedErrResponsePrefix = `fail Auth: [401 Unauthorized]`
 		for _, u := range agenturls {
 			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}")))
 			require.NoError(t, err)
