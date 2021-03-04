@@ -8,12 +8,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
