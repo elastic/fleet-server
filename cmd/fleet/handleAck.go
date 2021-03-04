@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -191,6 +192,13 @@ func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Age
 }
 
 func _handleUnenroll(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) error {
+	apiKeys := _getAPIKeyIDs(agent)
+	if len(apiKeys) > 0 {
+		if err := apikey.Invalidate(ctx, bulker.Client(), apiKeys...); err != nil {
+			return err
+		}
+	}
+
 	updates := make([]bulk.BulkOp, 0, 1)
 	now := time.Now().UTC().Format(time.RFC3339)
 	fields := map[string]interface{}{
@@ -213,4 +221,15 @@ func _handleUnenroll(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) 
 	})
 
 	return bulker.MUpdate(ctx, updates, bulk.WithRefresh())
+}
+
+func _getAPIKeyIDs(agent *model.Agent) []string {
+	keys := make([]string, 0, 1)
+	if agent.AccessApiKeyId != "" {
+		keys = append(keys, agent.AccessApiKeyId)
+	}
+	if agent.DefaultApiKeyId != "" {
+		keys = append(keys, agent.DefaultApiKeyId)
+	}
+	return keys
 }

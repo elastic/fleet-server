@@ -48,7 +48,7 @@ func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	}
 
 	if res.IsError() {
-		return nil, fmt.Errorf("Fail Auth: %s", res.String())
+		return nil, fmt.Errorf("fail Auth: %s", res.String())
 	}
 
 	var info SecurityInfo

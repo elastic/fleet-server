@@ -48,7 +48,7 @@ func Create(ctx context.Context, client *elasticsearch.Client, name, ttl string,
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, fmt.Errorf("Fail CreateAPIKey: %s", res.String())
+		return nil, fmt.Errorf("fail CreateAPIKey: %s", res.String())
 	}
 
 	type APIKeyResponse struct {
