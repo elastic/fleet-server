@@ -15,9 +15,22 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/rate"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
+	"github.com/elastic/beats/v7/libbeat/monitoring"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
 )
+
+var (
+	registry     *monitoring.Registry
+	cntHttpNew   *monitoring.Uint
+	cntHttpClose *monitoring.Uint
+)
+
+func init() {
+	registry = monitoring.Default.NewRegistry("http_server")
+	cntHttpNew = monitoring.NewUint(registry, "tcp_open")
+	cntHttpClose = monitoring.NewUint(registry, "tcp_close")
+}
 
 func diagConn(c net.Conn, s http.ConnState) {
 	log.Trace().
@@ -25,6 +38,13 @@ func diagConn(c net.Conn, s http.ConnState) {
 		Str("remote", c.RemoteAddr().String()).
 		Str("state", s.String()).
 		Msg("connection state change")
+
+	switch s {
+	case http.StateNew:
+		cntHttpNew.Inc()
+	case http.StateClosed:
+		cntHttpClose.Inc()
+	}
 }
 
 func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Server) error {
@@ -66,7 +86,9 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 		}
 	}()
 
-	ln, err := net.Listen("tcp", addr)
+	var listenCfg net.ListenConfig
+
+	ln, err := listenCfg.Listen(ctx, "tcp", addr)
 	if err != nil {
 		return err
 	}
@@ -97,7 +119,11 @@ func wrapRateLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) 
 	rateLimitInterval := cfg.RateLimitInterval
 
 	if rateLimitInterval != 0 {
-		log.Info().Dur("interval", rateLimitInterval).Int("burst", rateLimitBurst).Msg("Server rate limiter installed")
+		log.Info().
+			Dur("interval", rateLimitInterval).
+			Int("burst", rateLimitBurst).
+			Msg("Server rate limiter installed")
+
 		ln = rate.NewRateListener(ctx, ln, rateLimitBurst, rateLimitInterval)
 	} else {
 		log.Info().Msg("server connection rate limiter disabled")

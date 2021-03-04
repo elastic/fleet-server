@@ -459,6 +459,15 @@ func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error 
 }
 
 func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
+
+	metricsServer, err := f.initMetrics(ctx, cfg)
+	switch {
+	case err != nil:
+		return err
+	case metricsServer != nil:
+		defer metricsServer.Stop()
+	}
+
 	// Bulker is started in its own context and managed inside of this function. This is done so
 	// when the `ctx` is cancelled every worker using the bulker can get everything written on
 	// shutdown before the bulker is then cancelled.
