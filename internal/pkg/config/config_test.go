@@ -66,6 +66,10 @@ func TestConfig(t *testing.T) {
 					ToFiles:  true,
 					Files:    nil,
 				},
+				HTTP: HTTP{
+					Host: kDefaultHTTPHost,
+					Port: kDefaultHTTPPort,
+				},
 			},
 		},
 		"fleet-logging": {
@@ -114,6 +118,10 @@ func TestConfig(t *testing.T) {
 					ToFiles:  true,
 					Files:    nil,
 				},
+				HTTP: HTTP{
+					Host: kDefaultHTTPHost,
+					Port: kDefaultHTTPPort,
+				},
 			},
 		},
 		"input": {
@@ -160,6 +168,10 @@ func TestConfig(t *testing.T) {
 					ToFiles:  true,
 					Files:    nil,
 				},
+				HTTP: HTTP{
+					Host: kDefaultHTTPHost,
+					Port: kDefaultHTTPPort,
+				},
 			},
 		},
 		"input-config": {
@@ -205,6 +217,10 @@ func TestConfig(t *testing.T) {
 					ToStderr: false,
 					ToFiles:  true,
 					Files:    nil,
+				},
+				HTTP: HTTP{
+					Host: kDefaultHTTPHost,
+					Port: kDefaultHTTPPort,
 				},
 			},
 		},
