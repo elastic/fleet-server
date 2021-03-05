@@ -57,6 +57,7 @@ type Server struct {
 	MaxHeaderByteSize int               `config:"max_header_byte_size"`
 	RateLimitBurst    int               `config:"rate_limit_burst"`
 	RateLimitInterval time.Duration     `config:"rate_limit_interval"`
+	MaxConnections    int               `config:"max_connections"`
 	MaxEnrollPending  int64             `config:"max_enroll_pending"`
 	Profile           ServerProfile     `config:"profile"`
 }
@@ -69,6 +70,7 @@ func (c *Server) InitDefaults() {
 	c.MaxHeaderByteSize = 8192 // 8k
 	c.RateLimitBurst = 1024
 	c.RateLimitInterval = 5 * time.Millisecond
+	c.MaxConnections = 0 // no limit
 	c.MaxEnrollPending = 64
 	c.Profile.InitDefaults()
 }
