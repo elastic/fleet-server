@@ -231,7 +231,7 @@ func TestConfig(t *testing.T) {
 			err: "only 1 fleet-server input can be defined",
 		},
 		"bad-logging": {
-			err: "invalid log level; must be one of: debug, info, warning, error",
+			err: "invalid log level; must be one of: trace, debug, info, warning, error",
 		},
 		"bad-output": {
 			err: "can only contain elasticsearch key",
