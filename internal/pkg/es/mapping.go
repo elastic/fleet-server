@@ -171,6 +171,47 @@ const (
 	}
 }`
 
+	// Artifact An artifact served by Fleet
+	MappingArtifact = `{
+	"properties": {
+		"body": {
+			"enabled" : false,
+			"type": "object"
+		},
+		"compressionAlgorithm": {
+			"type": "keyword"
+		},
+		"created": {
+			"type": "date"
+		},
+		"decodedSha256": {
+			"type": "keyword"
+		},
+		"decodedSize": {
+			"type": "integer"
+		},
+		"encodedSha256": {
+			"type": "keyword"
+		},
+		"encodedSize": {
+			"type": "integer"
+		},
+		"encryptionAlgorithm": {
+			"type": "keyword"
+		},
+		"identifier": {
+			"type": "keyword"
+		}		
+	}
+}`
+
+	// Body Encoded artifact data
+	MappingBody = `{
+	"properties": {
+		
+	}
+}`
+
 	// Data The opaque payload.
 	MappingData = `{
 	"properties": {
