@@ -27,8 +27,7 @@ import (
 )
 
 var (
-	ErrAgentNotFound  = errors.New("agent not found")
-	ErrAgentCorrupted = errors.New("agent record corrupted")
+	ErrAgentNotFound = errors.New("agent not found")
 
 	kCheckinTimeout  = 30 * time.Second
 	kLongPollTimeout = 300 * time.Second // 5m
