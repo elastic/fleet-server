@@ -34,6 +34,8 @@ const (
 	FieldActive       = "active"
 	FieldUpdatedAt    = "updated_at"
 	FieldUnenrolledAt = "unenrolled_at"
+
+	FieldEncodedSha256 = "encodedSha256"
 )
 
 // Public constants
