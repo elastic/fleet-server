@@ -139,3 +139,33 @@ func (c Cache) SetEnrollmentApiKey(id string, key model.EnrollmentApiKey, cost i
 		Dur("ttl", ttl).
 		Msg("EnrollmentApiKey cache SET")
 }
+
+func (c Cache) GetArtifact(sha2 string) (model.Artifact, bool) {
+	scopedKey := "artifact:" + sha2
+	if v, ok := c.cache.Get(scopedKey); ok {
+		log.Trace().Str("sha2", sha2).Msg("Artifact cache HIT")
+		key, ok := v.(model.Artifact)
+
+		if !ok {
+			log.Error().Str("sha2", sha2).Msg("Artifact cache cast fail")
+			return model.Artifact{}, false
+		}
+		return key, ok
+	}
+
+	log.Trace().Str("sha2", sha2).Msg("Artifact cache MISS")
+	return model.Artifact{}, false
+}
+
+// TODO: strip body and spool to on disk cache if larger than a size threshold
+func (c Cache) SetArtifact(sha2 string, artifact model.Artifact, ttl time.Duration) {
+	scopedKey := "artifact:" + sha2
+	cost := int64(len(artifact.Body))
+	ok := c.cache.SetWithTTL(scopedKey, artifact, cost, ttl)
+	log.Trace().
+		Bool("ok", ok).
+		Str("sha2", sha2).
+		Int64("cost", cost).
+		Dur("ttl", ttl).
+		Msg("Artifact cache SET")
+}

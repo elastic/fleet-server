@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+
     "action": {
       "title": "Agent action",
       "description": "An Elastic Agent action",
@@ -125,6 +126,63 @@
         "version"
       ]
     },
+
+    "artifact": {
+      "title": "Artifact",
+      "description": "An artifact served by Fleet",
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "description": "Human readable artifact identifier",
+          "type": "string"
+        },
+        "compressionAlgorithm": {
+          "description": "Name of compression algorithm applied to artifact",
+          "type": "string"
+        },
+        "encryptionAlgorithm": {
+          "description": "Name of encryption algorithm applied to artifact",
+          "type": "string"
+        },
+        "encodedSha256": {
+          "description": "SHA256 of artifact after encoding has been applied",
+          "type": "string"
+        },
+        "encodedSize": {
+          "description": "Size of artifact after encoding has been applied",
+          "type": "integer"
+        },
+        "decodedSha256": {
+          "description": "SHA256 of artifact before encoding has been applied",
+          "type": "string"
+        },
+        "decodedSize": {
+          "description": "Size of artifact before encoding has been applied",
+          "type": "integer"
+        },
+        "created": {
+          "description": "Timestamp artifact was created",
+          "type": "string",
+          "format": "date-time"
+        },
+        "body": {
+          "description": "Encoded artifact data",
+          "type": "object",
+          "format": "raw"
+        }
+      },
+      "required": [
+        "identifier",
+        "compressionAlgorithm",
+        "encodedSha256",
+        "encodedSize",
+        "decodedSha256",
+        "decodedSize",
+        "created",
+        "body"
+      ]
+    },
+  
     "host-metadata": {
       "title": "Host Metadata",
       "description": "The host metadata for the Elastic Agent",

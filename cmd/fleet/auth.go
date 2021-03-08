@@ -23,6 +23,7 @@ const (
 )
 
 var ErrApiKeyNotEnabled = errors.New("APIKey not enabled")
+var ErrAgentCorrupted = errors.New("agent record corrupted")
 
 func authApiKey(r *http.Request, client *elasticsearch.Client, c cache.Cache) (*apikey.ApiKey, error) {
 
@@ -79,11 +80,11 @@ func authAgent(r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) (*mo
 
 	// validate key alignment
 	if agent.AccessApiKeyId != key.Id {
-		log.Debug().
+		log.Info().
 			Err(ErrAgentCorrupted).
 			Interface("agent", &agent).
 			Str("key.Id", key.Id).
-			Msg("agent id mismatch")
+			Msg("agent API key id mismatch agent record")
 		return nil, ErrAgentCorrupted
 	}
 

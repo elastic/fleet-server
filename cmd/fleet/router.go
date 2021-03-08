@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	ROUTE_ENROLL  = "/api/fleet/agents/:id"
-	ROUTE_CHECKIN = "/api/fleet/agents/:id/checkin"
-	ROUTE_ACKS    = "/api/fleet/agents/:id/acks"
+	ROUTE_ENROLL    = "/api/fleet/agents/:id"
+	ROUTE_CHECKIN   = "/api/fleet/agents/:id/checkin"
+	ROUTE_ACKS      = "/api/fleet/agents/:id/acks"
+	ROUTE_ARTIFACTS = "/api/fleet/artifacts/:id/:sha2"
 )
 
 type Router struct {
@@ -33,5 +34,6 @@ func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT) *httprouter.Router
 	router.POST(ROUTE_ENROLL, r.handleEnroll)
 	router.POST(ROUTE_CHECKIN, r.handleCheckin)
 	router.POST(ROUTE_ACKS, r.handleAcks)
+	router.GET(ROUTE_ARTIFACTS, r.handleArtifacts)
 	return router
 }

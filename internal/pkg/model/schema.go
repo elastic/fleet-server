@@ -170,6 +170,42 @@ type AgentMetadata struct {
 	Version string `json:"version"`
 }
 
+// Artifact An artifact served by Fleet
+type Artifact struct {
+	ESDocument
+
+	// Encoded artifact data
+	Body json.RawMessage `json:"body"`
+
+	// Name of compression algorithm applied to artifact
+	CompressionAlgorithm string `json:"compressionAlgorithm"`
+
+	// Timestamp artifact was created
+	Created string `json:"created"`
+
+	// SHA256 of artifact before encoding has been applied
+	DecodedSha256 string `json:"decodedSha256"`
+
+	// Size of artifact before encoding has been applied
+	DecodedSize int64 `json:"decodedSize"`
+
+	// SHA256 of artifact after encoding has been applied
+	EncodedSha256 string `json:"encodedSha256"`
+
+	// Size of artifact after encoding has been applied
+	EncodedSize int64 `json:"encodedSize"`
+
+	// Name of encryption algorithm applied to artifact
+	EncryptionAlgorithm string `json:"encryptionAlgorithm,omitempty"`
+
+	// Human readable artifact identifier
+	Identifier string `json:"identifier"`
+}
+
+// Body Encoded artifact data
+type Body struct {
+}
+
 // Data The opaque payload.
 type Data struct {
 }
