@@ -132,7 +132,7 @@ type Event struct {
 	StreamId    string          `json:"stream_id"`
 	Timestamp   string          `json:"timestamp"`
 	Message     string          `json:"message"`
-	Payload     string          `json:"payload,omitempty"`
+	Payload     json.RawMessage `json:"payload,omitempty"`
 	StartedAt   string          `json:"started_at"`
 	CompletedAt string          `json:"completed_at"`
 	ActionData  json.RawMessage `json:"action_data,omitempty"`
