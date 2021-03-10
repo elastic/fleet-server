@@ -53,6 +53,30 @@ KIBANA_HOST=http://localhost:5601 KIBANA_USERNAME=elastic KIBANA_PASSWORD=change
 
 This will start up Elastic Agent with fleet-server and directly enroll it. In addition Fleet is setup.
 
+## Running Elastic Agent with fleet-server in container
+
+If you want to run Elastic Agent and fleet-server in a container but built Kibana from source, you have to add the following to your `config/kibana.dev.yml`:
+
+```
+server.host: 0.0.0.0
+```
+
+This makes sure, Kibana is accessible from the container. Start Kibana as before but for Elasticsearch, run the following command:
+
+```
+yarn es snapshot -E xpack.security.authc.api_key.enabled=true -E http.host=0.0.0.0
+```
+
+This makes sure also Elasticsearch is accessible to the container.
+
+Start the Elastic Agent with the following command:
+
+```
+docker run -e KIBANA_HOST=http://{YOUR-IP}:5601 -e KIBANA_USERNAME=elastic -e KIBANA_PASSWORD=changeme -e ELASTICSEARCH_HOST=http://{YOUR-IP}:9200 -e ELASTICSEARCH_USERNAME=elastic -e ELASTICSEARCH_PASSWORD=changeme -e KIBANA_FLEET_SETUP=1 -e FLEET_SERVER_ENABLE=1 -e FLEET_SERVER_INSECURE_HTTP=1 docker.elastic.co/beats/elastic-agent:8.0.0-SNAPSHOT
+```
+
+Replace {YOUR-IP} with the IP address of your machine.
+
 ## fleet-server repo
 
 By default the above will download the most recent snapshot build for fleet-server. To use your own development build, run `make release` in the fleet-server repository, go to `build/distributions` and copy the `.tar.gz` and `sha512` file to the `data/elastic-agent-{hash}/downloads` inside the elastic-agent directory. Now you run with your own build of fleet-server.
