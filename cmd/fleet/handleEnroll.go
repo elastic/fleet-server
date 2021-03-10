@@ -160,7 +160,6 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 	}
 
 	now := time.Now()
-	nowStr := now.UTC().Format(time.RFC3339)
 
 	// Generate an ID here so we can pre-create the api key and avoid a round trip
 	u, err := uuid.NewV4()
@@ -201,7 +200,7 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		Active:          true,
 		PolicyId:        erec.PolicyId,
 		Type:            req.Type,
-		EnrolledAt:      nowStr,
+		EnrolledAt:      now.UTC().Format(time.RFC3339),
 		LocalMetadata:   localMeta,
 		AccessApiKeyId:  accessApiKey.Id,
 		DefaultApiKeyId: defaultOutputApiKey.Id,
@@ -347,6 +346,7 @@ func decodeEnrollRequest(data io.Reader) (*EnrollRequest, error) {
 
 	// Validate
 	switch req.Type {
+	// TODO: Should these be converted to constant? Need to be kept in sync with Kibana?
 	case "EPHEMERAL", "PERMANENT", "TEMPORARY":
 	default:
 		return nil, ErrUnknownEnrollType

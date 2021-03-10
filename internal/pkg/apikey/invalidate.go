@@ -14,7 +14,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
-// Invalidate invalidates the provides API keys by ID.
+// Invalidate invalidates the provided API keys by ID.
 func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string) error {
 
 	payload := struct {
