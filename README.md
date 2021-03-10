@@ -21,13 +21,7 @@ yarn kbn bootstrap
 
 This will take a while the first time it is run. An error might be return in case not a valid node version is installed. Use nvm to install the correct version.
 
-Next, Kibana and Elasticsearch must be started. On the Kibana side, an additional configuration flag is required. I personally put this into `config/kibana.dev.yml` in the Kibana repo as this file is ignored from git. The content to put in there is:
-
-```
-xpack.fleet.agents.fleetServerEnabled: true
-```
-
-This enables the fleet-server setup in Kibana. Now the following two commands must be run in parallel:
+Now the following two commands must be run in parallel:
 
 ```
 # Start ES
@@ -38,6 +32,8 @@ yarn start --no-base-path
 ```
 
 As soon as all is running, go to `http://localhost:5601`, enter `elastic/changeme` as credential and navigate to Fleet. Trigger the Fleet setup. As soon as this is completed, copy the `policy id` and `enrollment token` for the fleet-server policy. The policy id can be copied from the URL, the enrollment token can be found in the Enrollment Token list. 
+
+NOTE: This step can be skipped if the full command below for the Elastic Agent is used.
 
 Now Kibana is running and ready. The next step is to setup Elastic Agent.
 
@@ -52,17 +48,11 @@ SNAPSHOT=true DEV=true PLATFORMS=darwin mage package
 The above assumes you are running on OS X. Put the platform in you are running on. This speeds up packaging as it only builds it for your platform. As soon as this is completed (it might take a while for the first time) navigate to `build/distributions` and unpackage the `.tar.gz`. Navigate into the elastic-agent directory and start the Elastic Agent:
 
 ```
-sudo ./elastic-agent -v
+KIBANA_HOST=http://localhost:5601 KIBANA_USERNAME=elastic KIBANA_PASSWORD=changeme ELASTICSEARCH_HOST=http://localhost:9200 ELASTICSEARCH_USERNAME=elastic ELASTICSEARCH_PASSWORD=changeme KIBANA_FLEET_SETUP=1 FLEET_SERVER_ENABLE=1 sudo ./elastic-agent container
 ```
 
-Currently a second command has to be run in parallel to setup fleet-server. Take the enrollment token and policy id you copied from Kibana and replace it in the command below:
+This will start up Elastic Agent with fleet-server and directly enroll it. In addition Fleet is setup.
 
-```
-sudo ./elastic-agent enroll --enrollment-token {enrollment-token} --fleet-server http://elastic:changeme@localhost:9200 --fleet-server-policy {fleet-server-policy-id}
-```
+## fleet-server repo
 
-This will start up fleet-server and the command should complete. After this, navigate to Kibana and check if the Elastic Agent with fleet-server shows up.
-
-
-
-sudo ./elastic-agent -v
+By default the above will download the most recent snapshot build for fleet-server. To use your own development build, run `make release` in the fleet-server repository, go to `build/distributions` and copy the `.tar.gz` and `sha512` file to the `data/elastic-agent-{hash}/downloads` inside the elastic-agent directory. Now you run with your own build of fleet-server.
