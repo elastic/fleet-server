@@ -6,10 +6,12 @@ package fleet
 
 import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/julienschmidt/httprouter"
 )
 
 const (
+	ROUTE_STATUS = "/api/status"
 	ROUTE_ENROLL  = "/api/fleet/agents/:id"
 	ROUTE_CHECKIN = "/api/fleet/agents/:id/checkin"
 	ROUTE_ACKS    = "/api/fleet/agents/:id/acks"
@@ -17,19 +19,24 @@ const (
 
 type Router struct {
 	bulker bulk.Bulk
+	ver    string
 	ct     *CheckinT
 	et     *EnrollerT
+	sm     policy.SelfMonitor
 }
 
-func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT) *httprouter.Router {
+func NewRouter(bulker bulk.Bulk, ver string, ct *CheckinT, et *EnrollerT, sm policy.SelfMonitor) *httprouter.Router {
 
 	r := Router{
 		bulker: bulker,
+		ver:    ver,
 		ct:     ct,
 		et:     et,
+		sm:     sm,
 	}
 
 	router := httprouter.New()
+	router.GET(ROUTE_STATUS, r.handleStatus)
 	router.POST(ROUTE_ENROLL, r.handleEnroll)
 	router.POST(ROUTE_CHECKIN, r.handleCheckin)
 	router.POST(ROUTE_ACKS, r.handleAcks)

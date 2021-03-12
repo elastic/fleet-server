@@ -43,7 +43,7 @@ func TestRunServer(t *testing.T) {
 	et, err := NewEnrollerT(cfg, nil, c)
 	require.NoError(t, err)
 
-	router := NewRouter(bulker, ct, et)
+	router := NewRouter(bulker, "test", ct, et, nil)
 	errCh := make(chan error)
 
 	var wg sync.WaitGroup

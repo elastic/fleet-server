@@ -139,3 +139,9 @@ type Event struct {
 	Data        json.RawMessage `json:"data,omitempty"`
 	Error       string          `json:"error,omitempty"`
 }
+
+type StatusResponse struct {
+	Name string `json:"name"`
+	Version string `json:"version"`
+	Status string `json:"status"`
+}
