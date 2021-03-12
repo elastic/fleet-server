@@ -17,9 +17,9 @@ import (
 func (rt Router) handleStatus(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	status := rt.sm.Status()
 	resp := StatusResponse{
-		Name: "fleet-server",
+		Name:    "fleet-server",
 		Version: rt.ver,
-		Status: status.String(),
+		Status:  status.String(),
 	}
 
 	data, err := json.Marshal(&resp)

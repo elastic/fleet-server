@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	ROUTE_STATUS = "/api/status"
+	ROUTE_STATUS  = "/api/status"
 	ROUTE_ENROLL  = "/api/fleet/agents/:id"
 	ROUTE_CHECKIN = "/api/fleet/agents/:id/checkin"
 	ROUTE_ACKS    = "/api/fleet/agents/:id/acks"
