@@ -133,6 +133,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 		return nil, err
 	}
 
+	// Validate that an enrollment record exists for a key with this id.
 	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), key.Id)
 	if err != nil {
 		return nil, err
