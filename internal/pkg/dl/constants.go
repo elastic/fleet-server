@@ -9,6 +9,7 @@ const (
 	FleetActions           = ".fleet-actions"
 	FleetActionsResults    = ".fleet-actions-results"
 	FleetAgents            = ".fleet-agents"
+	FleetArtifacts         = ".fleet-artifacts"
 	FleetEnrollmentAPIKeys = ".fleet-enrollment-api-keys"
 	FleetPolicies          = ".fleet-policies"
 	FleetPoliciesLeader    = ".fleet-policies-leader"
@@ -35,7 +36,8 @@ const (
 	FieldUpdatedAt    = "updated_at"
 	FieldUnenrolledAt = "unenrolled_at"
 
-	FieldEncodedSha256 = "encodedSha256"
+	FieldDecodedSha256 = "decodedSha256"
+	FieldIdentifier    = "identifier"
 )
 
 // Public constants
