@@ -16,6 +16,9 @@ const (
 	ROUTE_CHECKIN   = "/api/fleet/agents/:id/checkin"
 	ROUTE_ACKS      = "/api/fleet/agents/:id/acks"
 	ROUTE_ARTIFACTS = "/api/fleet/artifacts/:id/:sha2"
+
+	// Support previous relative path exposed in Kibana until all feature flags are flipped
+	ROUTE_ARTIFACTS_DEPRECATED = "/api/endpoint/artifacts/download/:id/:sha2"
 )
 
 type Router struct {
@@ -41,5 +44,9 @@ func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, sm policy.SelfMoni
 	router.POST(ROUTE_CHECKIN, r.handleCheckin)
 	router.POST(ROUTE_ACKS, r.handleAcks)
 	router.GET(ROUTE_ARTIFACTS, r.handleArtifacts)
+
+	// deprecated: TODO: remove
+	router.GET(ROUTE_ARTIFACTS_DEPRECATED, r.handleArtifacts)
+
 	return router
 }

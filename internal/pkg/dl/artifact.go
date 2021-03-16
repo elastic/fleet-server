@@ -7,40 +7,42 @@ package dl
 import (
 	"context"
 	"encoding/json"
-	"errors"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
-const (
-	artifactsIndexName = ".fleet-artifacts"
-)
-
 var (
-	QueryArtifactBySha2 = prepareQueryArtifactBySha2()
-	ErrConflict         = errors.New("Fail multiple artifacts for the same sha256")
+	QueryArtifactTmpl = prepareQueryArtifact()
 )
 
-func prepareQueryArtifactBySha2() *dsl.Tmpl {
+func prepareQueryArtifact() *dsl.Tmpl {
 	root := dsl.NewRoot()
 	tmpl := dsl.NewTmpl()
 
-	root.Query().Bool().Filter().Term(FieldEncodedSha256, tmpl.Bind(FieldEncodedSha256), nil)
+	must := root.Query().Bool().Must()
+	must.Term(FieldDecodedSha256, tmpl.Bind(FieldDecodedSha256), nil)
+	must.Term(FieldIdentifier, tmpl.Bind(FieldIdentifier), nil)
 	tmpl.MustResolve(root)
 	return tmpl
 }
 
-func FindArtifactBySha256(ctx context.Context, bulker bulk.Bulk, sha2 string) (*model.Artifact, error) {
+func FindArtifact(ctx context.Context, bulker bulk.Bulk, ident, sha2 string) (*model.Artifact, error) {
 
-	res, err := SearchWithOneParam(
+	params := map[string]interface{}{
+		FieldDecodedSha256: sha2,
+		FieldIdentifier:    ident,
+	}
+
+	res, err := Search(
 		ctx,
 		bulker,
-		QueryArtifactBySha2,
-		artifactsIndexName,
-		FieldEncodedSha256,
-		sha2,
+		QueryArtifactTmpl,
+		FleetArtifacts,
+		params,
 	)
 
 	if err != nil {
@@ -52,7 +54,12 @@ func FindArtifactBySha256(ctx context.Context, bulker bulk.Bulk, sha2 string) (*
 	}
 
 	if len(res.Hits) > 1 {
-		return nil, ErrConflict
+		log.Warn().
+			Str("ident", ident).
+			Str("sha2", sha2).
+			Int("cnt", len(res.Hits)).
+			Str("used", res.Hits[0].Id).
+			Msg("Multiple HITS on artifact query.  Using the first returned.")
 	}
 
 	// deserialize
