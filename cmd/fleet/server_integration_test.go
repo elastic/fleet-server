@@ -105,7 +105,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 	start := time.Now()
 	cli := cleanhttp.DefaultClient()
 	for {
-		res, err := cli.Get(s.baseUrl())
+		res, err := cli.Get(s.baseUrl() + "/api/status")
 		if err != nil {
 			if time.Since(start) > dur {
 				return err
