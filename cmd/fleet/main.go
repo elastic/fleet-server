@@ -526,7 +526,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-	router := NewRouter(bulker, ct, et)
+	router := NewRouter(bulker, ct, et, sm)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &f.cfg.Inputs[0].Server)
