@@ -25,11 +25,10 @@ type Router struct {
 	sm     policy.SelfMonitor
 }
 
-func NewRouter(bulker bulk.Bulk, ver string, ct *CheckinT, et *EnrollerT, sm policy.SelfMonitor) *httprouter.Router {
+func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, sm policy.SelfMonitor) *httprouter.Router {
 
 	r := Router{
 		bulker: bulker,
-		ver:    ver,
 		ct:     ct,
 		et:     et,
 		sm:     sm,
