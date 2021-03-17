@@ -28,6 +28,8 @@ import (
 type SelfMonitor interface {
 	// Run runs the monitor.
 	Run(ctx context.Context) error
+	// Status gets current status of monitor.
+	Status() proto.StateObserved_Status
 }
 
 type selfMonitorT struct {
@@ -39,6 +41,7 @@ type selfMonitorT struct {
 	monitor monitor.Monitor
 
 	policyId string
+	status   proto.StateObserved_Status
 	reporter status.Reporter
 
 	policy *model.Policy
@@ -58,6 +61,7 @@ func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monito
 		bulker:        bulker,
 		monitor:       monitor,
 		policyId:      policyId,
+		status:        proto.StateObserved_STARTING,
 		reporter:      reporter,
 		policyF:       dl.QueryLatestPolicies,
 		policiesIndex: dl.FleetPolicies,
@@ -94,6 +98,12 @@ LOOP:
 	}
 
 	return nil
+}
+
+func (m *selfMonitorT) Status() proto.StateObserved_Status {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	return m.status
 }
 
 func (m *selfMonitorT) process(ctx context.Context) error {
@@ -151,8 +161,12 @@ func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.P
 }
 
 func (m *selfMonitorT) updateStatus() error {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+
 	if m.policy == nil {
 		// no policy found
+		m.status = proto.StateObserved_STARTING
 		if m.policyId == "" {
 			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on default policy with Fleet Server integration", nil)
 		} else {
@@ -176,6 +190,7 @@ func (m *selfMonitorT) updateStatus() error {
 		status = proto.StateObserved_DEGRADED
 		extendMsg = "; missing config fleet.agent.id"
 	}
+	m.status = status
 	if m.policyId == "" {
 		m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), nil)
 	} else {
