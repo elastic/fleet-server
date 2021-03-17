@@ -41,16 +41,17 @@ func authApiKey(r *http.Request, client *elasticsearch.Client, c cache.Cache) (*
 	info, err := key.Authenticate(r.Context(), client)
 
 	if err != nil {
-		log.Error().
+		log.Info().
 			Err(err).
-			Dur("tdiff", time.Since(start)).
+			Str("id", key.Id).
+			Dur("rtt", time.Since(start)).
 			Msg("ApiKey fail authentication")
 		return nil, err
 	}
 
 	log.Trace().
 		Str("id", key.Id).
-		Dur("tdiff", time.Since(start)).
+		Dur("rtt", time.Since(start)).
 		Str("UserName", info.UserName).
 		Strs("Roles", info.Roles).
 		Bool("enabled", info.Enabled).
@@ -61,6 +62,11 @@ func authApiKey(r *http.Request, client *elasticsearch.Client, c cache.Cache) (*
 		c.SetApiKey(*key, kAPIKeyTTL)
 	} else {
 		err = ErrApiKeyNotEnabled
+		log.Info().
+			Err(err).
+			Str("id", key.Id).
+			Dur("rtt", time.Since(start)).
+			Msg("ApiKey not enabled")
 	}
 
 	return key, err
