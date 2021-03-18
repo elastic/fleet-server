@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/coordinator"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/env"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -42,15 +41,6 @@ const (
 	kPolicyThrottle = time.Millisecond * 5
 	kAgentMode      = "agent-mode"
 )
-
-func savedObjectKey() string {
-	key := env.GetStr(
-		"ES_SAVED_KEY",
-		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-	)
-	log.Debug().Str("key", key).Msg("saved objects")
-	return key
-}
 
 func installSignalHandler() context.Context {
 	rootCtx := context.Background()
@@ -460,6 +450,7 @@ func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error 
 
 func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
 
+	// The metricsServer is only enabled if http.enabled is set in the config
 	metricsServer, err := f.initMetrics(ctx, cfg)
 	switch {
 	case err != nil:
