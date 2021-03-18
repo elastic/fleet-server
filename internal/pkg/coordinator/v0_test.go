@@ -32,7 +32,8 @@ func TestCoordinatorZero(t *testing.T) {
 
 	go func() {
 		if err := coord.Run(ctx); err != nil && err != context.Canceled {
-			t.Fatal(err)
+			t.Error(err)
+			return
 		}
 	}()
 

@@ -10,5 +10,22 @@ fleet:
     logging:
       level: '${LOG_LEVEL:INFO}'
 
+# Input config provided by the Elastic Agent for the server
+#inputs:
+#  - type:
+#    policy:
+#    server:
+
 logging:
   to_stderr: true
+  #to_files:
+  #files:
+  #level:
+
+# Enables the stats endpoint under http://localhost:5601 by default.
+# Additional stats can be found under http://127.0.0.1:5066/stats and http://127.0.0.1:5066/state
+http.enabled: true
+#http.host: http://127.0.0.1
+#http.port: 5601
+#http.named_pipe.user:
+#http.named_pipe.security_descriptor:
