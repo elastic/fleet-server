@@ -47,13 +47,23 @@ func installSignalHandler() context.Context {
 	return signal.HandleInterrupt(rootCtx)
 }
 
+func makeCache(cfg *config.Config) (cache.Cache, error) {
+
+	log.Info().
+		Int64("numCounters", cfg.Cache.NumCounters).
+		Int64("maxCost", cfg.Cache.MaxCost).
+		Msg("makeCache")
+
+	cacheCfg := cache.Config{
+		NumCounters: cfg.Cache.NumCounters,
+		MaxCost:     cfg.Cache.MaxCost,
+	}
+
+	return cache.New(cacheCfg)
+}
+
 func getRunCommand(version string) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		c, err := cache.New()
-		if err != nil {
-			return err
-		}
-
 		cfgObject := cmd.Flags().Lookup("E").Value.(*config.Flag)
 		cliCfg := cfgObject.Config()
 
@@ -70,6 +80,11 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 				return err
 			}
 			l, err = logger.Init(cfg)
+			if err != nil {
+				return err
+			}
+
+			c, err := makeCache(cfg)
 			if err != nil {
 				return err
 			}
@@ -99,6 +114,11 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 			}
 
 			l, err = logger.Init(cfg)
+			if err != nil {
+				return err
+			}
+
+			c, err := makeCache(cfg)
 			if err != nil {
 				return err
 			}

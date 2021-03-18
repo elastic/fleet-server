@@ -63,7 +63,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 		return nil, err
 	}
 
-	c, err := cache.New()
+	c, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
 	if err != nil {
 		return nil, err
 	}

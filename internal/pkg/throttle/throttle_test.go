@@ -17,7 +17,7 @@ func TestThrottleZero(t *testing.T) {
 	// but still cannot acquire existing that has not timed out
 	throttle := NewThrottle(0)
 
-	N := rand.Intn(2048) + 10
+	N := rand.Intn(64) + 10
 
 	var tokens []*Token
 	for i := 0; i < N; i++ {
@@ -106,7 +106,7 @@ func TestThrottleN(t *testing.T) {
 		}
 
 		// Any subsequent request should fail because at max
-		try := rand.Intn(1000) + 1
+		try := rand.Intn(64) + 1
 		for i := 0; i < try; i++ {
 
 			key := strconv.Itoa(N + i)

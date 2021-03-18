@@ -22,20 +22,25 @@ type Cache struct {
 	cache *ristretto.Cache
 }
 
+type Config struct {
+	NumCounters int64 // number of keys to track frequency of
+	MaxCost     int64 // maximum cost of cache in 'cost' units
+}
+
 type actionCache struct {
 	actionId   string
 	actionType string
 }
 
 // New creates a new cache.
-func New() (Cache, error) {
-	cfg := &ristretto.Config{
-		NumCounters: 1000000,           // number of keys to track frequency of
-		MaxCost:     100 * 1024 * 1024, // maximum cost of cache (100MB)
+func New(cfg Config) (Cache, error) {
+	rcfg := &ristretto.Config{
+		NumCounters: cfg.NumCounters,
+		MaxCost:     cfg.MaxCost,
 		BufferItems: 64,
 	}
 
-	cache, err := ristretto.NewCache(cfg)
+	cache, err := ristretto.NewCache(rcfg)
 	return Cache{cache}, err
 }
 
