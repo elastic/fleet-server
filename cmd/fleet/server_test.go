@@ -33,7 +33,7 @@ func TestRunServer(t *testing.T) {
 	cfg.Host = "localhost"
 	cfg.Port = port
 
-	c, err := cache.New()
+	c, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 	bulker := ftesting.MockBulk{}
 	pim := mock.NewMockIndexMonitor()
