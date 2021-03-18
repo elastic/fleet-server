@@ -27,6 +27,7 @@ type Config struct {
 	Inputs  []Input `config:"inputs"`
 	Logging Logging `config:"logging"`
 	HTTP    HTTP    `config:"http"`
+	Cache   Cache   `config:"cache"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -34,6 +35,7 @@ func (c *Config) InitDefaults() {
 	c.Inputs = make([]Input, 1)
 	c.Inputs[0].InitDefaults()
 	c.HTTP.InitDefaults()
+	c.Cache.InitDefaults()
 }
 
 // Validate ensures that the configuration is valid.
