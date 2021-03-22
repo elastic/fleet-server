@@ -178,28 +178,31 @@ const (
 			"enabled" : false,
 			"type": "object"
 		},
-		"compressionAlgorithm": {
+		"compression_algorithm": {
 			"type": "keyword"
 		},
 		"created": {
 			"type": "date"
 		},
-		"decodedSha256": {
+		"decoded_sha256": {
 			"type": "keyword"
 		},
-		"decodedSize": {
+		"decoded_size": {
 			"type": "integer"
 		},
-		"encodedSha256": {
+		"encoded_sha256": {
 			"type": "keyword"
 		},
-		"encodedSize": {
+		"encoded_size": {
 			"type": "integer"
 		},
-		"encryptionAlgorithm": {
+		"encryption_algorithm": {
 			"type": "keyword"
 		},
 		"identifier": {
+			"type": "keyword"
+		},
+		"package_name": {
 			"type": "keyword"
 		}		
 	}
