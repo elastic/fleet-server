@@ -178,28 +178,31 @@ type Artifact struct {
 	Body json.RawMessage `json:"body"`
 
 	// Name of compression algorithm applied to artifact
-	CompressionAlgorithm string `json:"compressionAlgorithm"`
+	CompressionAlgorithm string `json:"compression_algorithm,omitempty"`
 
 	// Timestamp artifact was created
 	Created string `json:"created"`
 
 	// SHA256 of artifact before encoding has been applied
-	DecodedSha256 string `json:"decodedSha256"`
+	DecodedSha256 string `json:"decoded_sha256,omitempty"`
 
 	// Size of artifact before encoding has been applied
-	DecodedSize int64 `json:"decodedSize"`
+	DecodedSize int64 `json:"decoded_size,omitempty"`
 
 	// SHA256 of artifact after encoding has been applied
-	EncodedSha256 string `json:"encodedSha256"`
+	EncodedSha256 string `json:"encoded_sha256,omitempty"`
 
 	// Size of artifact after encoding has been applied
-	EncodedSize int64 `json:"encodedSize"`
+	EncodedSize int64 `json:"encoded_size,omitempty"`
 
 	// Name of encryption algorithm applied to artifact
-	EncryptionAlgorithm string `json:"encryptionAlgorithm,omitempty"`
+	EncryptionAlgorithm string `json:"encryption_algorithm,omitempty"`
 
 	// Human readable artifact identifier
 	Identifier string `json:"identifier"`
+
+	// Name of the package that owns this artifact
+	PackageName string `json:"package_name,omitempty"`
 }
 
 // Body Encoded artifact data
