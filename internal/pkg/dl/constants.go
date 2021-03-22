@@ -36,7 +36,7 @@ const (
 	FieldUpdatedAt    = "updated_at"
 	FieldUnenrolledAt = "unenrolled_at"
 
-	FieldDecodedSha256 = "decodedSha256"
+	FieldDecodedSha256 = "decoded_sha256"
 	FieldIdentifier    = "identifier"
 )
 
