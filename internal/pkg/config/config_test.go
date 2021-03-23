@@ -56,7 +56,14 @@ func TestConfig(t *testing.T) {
 							MaxEnrollPending:  64,
 							RateLimitBurst:    1024,
 							RateLimitInterval: 5 * time.Millisecond,
-							Profile:           ServerProfile{Bind: "localhost:6060"},
+							Profile: ServerProfile{
+								Enabled: false,
+								Bind:    "localhost:6060",
+							},
+						},
+						Cache: Cache{
+							NumCounters: defaultCacheNumCounters,
+							MaxCost:     defaultCacheMaxCost,
 						},
 					},
 				},
@@ -69,10 +76,6 @@ func TestConfig(t *testing.T) {
 				HTTP: HTTP{
 					Host: kDefaultHTTPHost,
 					Port: kDefaultHTTPPort,
-				},
-				Cache: Cache{
-					NumCounters: defaultCacheNumCounters,
-					MaxCost:     defaultCacheMaxCost,
 				},
 			},
 		},
@@ -112,7 +115,14 @@ func TestConfig(t *testing.T) {
 							MaxEnrollPending:  64,
 							RateLimitBurst:    1024,
 							RateLimitInterval: 5 * time.Millisecond,
-							Profile:           ServerProfile{Bind: "localhost:6060"},
+							Profile: ServerProfile{
+								Enabled: false,
+								Bind:    "localhost:6060",
+							},
+						},
+						Cache: Cache{
+							NumCounters: defaultCacheNumCounters,
+							MaxCost:     defaultCacheMaxCost,
 						},
 					},
 				},
@@ -125,10 +135,6 @@ func TestConfig(t *testing.T) {
 				HTTP: HTTP{
 					Host: kDefaultHTTPHost,
 					Port: kDefaultHTTPPort,
-				},
-				Cache: Cache{
-					NumCounters: defaultCacheNumCounters,
-					MaxCost:     defaultCacheMaxCost,
 				},
 			},
 		},
@@ -166,7 +172,14 @@ func TestConfig(t *testing.T) {
 							MaxEnrollPending:  64,
 							RateLimitBurst:    1024,
 							RateLimitInterval: 5 * time.Millisecond,
-							Profile:           ServerProfile{Bind: "localhost:6060"},
+							Profile: ServerProfile{
+								Enabled: false,
+								Bind:    "localhost:6060",
+							},
+						},
+						Cache: Cache{
+							NumCounters: defaultCacheNumCounters,
+							MaxCost:     defaultCacheMaxCost,
 						},
 					},
 				},
@@ -179,10 +192,6 @@ func TestConfig(t *testing.T) {
 				HTTP: HTTP{
 					Host: kDefaultHTTPHost,
 					Port: kDefaultHTTPPort,
-				},
-				Cache: Cache{
-					NumCounters: defaultCacheNumCounters,
-					MaxCost:     defaultCacheMaxCost,
 				},
 			},
 		},
@@ -220,7 +229,14 @@ func TestConfig(t *testing.T) {
 							MaxEnrollPending:  64,
 							RateLimitBurst:    1024,
 							RateLimitInterval: 5 * time.Millisecond,
-							Profile:           ServerProfile{Bind: "localhost:6060"},
+							Profile: ServerProfile{
+								Enabled: false,
+								Bind:    "localhost:6060",
+							},
+						},
+						Cache: Cache{
+							NumCounters: defaultCacheNumCounters,
+							MaxCost:     defaultCacheMaxCost,
 						},
 					},
 				},
@@ -233,10 +249,6 @@ func TestConfig(t *testing.T) {
 				HTTP: HTTP{
 					Host: kDefaultHTTPHost,
 					Port: kDefaultHTTPPort,
-				},
-				Cache: Cache{
-					NumCounters: defaultCacheNumCounters,
-					MaxCost:     defaultCacheMaxCost,
 				},
 			},
 		},
