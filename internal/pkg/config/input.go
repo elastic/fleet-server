@@ -34,8 +34,8 @@ func (c *ServerTimeouts) InitDefaults() {
 
 // ServerProfile is the configuration for profiling the server.
 type ServerProfile struct {
-	Enabled bool `config:"enabled"`
-	Bind string `config:"bind"`
+	Enabled bool   `config:"enabled"`
+	Bind    string `config:"bind"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -62,7 +62,6 @@ type Server struct {
 	MaxConnections    int               `config:"max_connections"`
 	MaxEnrollPending  int64             `config:"max_enroll_pending"`
 	Profile           ServerProfile     `config:"profile"`
-
 }
 
 // InitDefaults initializes the defaults for the configuration.
