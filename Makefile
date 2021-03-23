@@ -3,11 +3,13 @@ DEFAULT_VERSION=$(shell awk '/const defaultVersion/{print $$NF}' main.go | tr -d
 TARGET_ARCH_386=x86
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
-PLATFORMS ?= darwin/amd64 linux/386 linux/amd64 linux/arm64 windows/386 windows/amd64
+PLATFORMS ?= darwin/amd64 darwin/arm64 linux/386 linux/amd64 linux/arm64 windows/386 windows/amd64
 BUILDMODE_linux_amd64=-buildmode=pie
 BUILDMODE_linux_arm64=-buildmode=pie
 BUILDMODE_windows_386=-buildmode=pie
 BUILDMODE_windows_amd64=-buildmode=pie
+BUILDMODE_darwin_amd64=-buildmode=pie
+BUILDMODE_darwin_amd64=-buildmode=pie
 
 ifeq ($(SNAPSHOT),true)
 VERSION=${DEFAULT_VERSION}-SNAPSHOT
