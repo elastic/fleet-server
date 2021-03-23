@@ -34,11 +34,13 @@ func (c *ServerTimeouts) InitDefaults() {
 
 // ServerProfile is the configuration for profiling the server.
 type ServerProfile struct {
+	Enabled bool `config:"enabled"`
 	Bind string `config:"bind"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *ServerProfile) InitDefaults() {
+	c.Enabled = false
 	c.Bind = "localhost:6060"
 }
 
@@ -60,6 +62,7 @@ type Server struct {
 	MaxConnections    int               `config:"max_connections"`
 	MaxEnrollPending  int64             `config:"max_enroll_pending"`
 	Profile           ServerProfile     `config:"profile"`
+
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -89,12 +92,14 @@ type Input struct {
 	Type   string `config:"type"`
 	Policy Policy `config:"policy"`
 	Server Server `config:"server"`
+	Cache  Cache  `config:"cache"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *Input) InitDefaults() {
 	c.Type = "fleet-server"
 	c.Server.InitDefaults()
+	c.Cache.InitDefaults()
 }
 
 // Validate ensures that the configuration is valid.
