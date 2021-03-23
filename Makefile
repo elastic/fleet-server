@@ -7,6 +7,15 @@ BUILDMODE_ARCH_386= ## ASLR either not supported or weak on 32bit machines
 BUILDMODE_ARCH_amd64=-buildmode=pie
 BUILDMODE_ARCH_arm64=-buildmode=pie
 PLATFORMS ?= darwin/amd64 darwin/arm64 linux/386 linux/amd64 linux/arm64 windows/386 windows/amd64
+<<<<<<< HEAD
+=======
+BUILDMODE_linux_amd64=-buildmode=pie
+BUILDMODE_linux_arm64=-buildmode=pie
+BUILDMODE_windows_386=-buildmode=pie
+BUILDMODE_windows_amd64=-buildmode=pie
+BUILDMODE_darwin_amd64=-buildmode=pie
+BUILDMODE_darwin_arm64=-buildmode=pie
+>>>>>>> bb913bd... Fix incorrect buildmode for arm64/darwin
 
 ifeq ($(SNAPSHOT),true)
 VERSION=${DEFAULT_VERSION}-SNAPSHOT
