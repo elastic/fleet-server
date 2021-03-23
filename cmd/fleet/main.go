@@ -50,13 +50,13 @@ func installSignalHandler() context.Context {
 func makeCache(cfg *config.Config) (cache.Cache, error) {
 
 	log.Info().
-		Int64("numCounters", cfg.Cache.NumCounters).
-		Int64("maxCost", cfg.Cache.MaxCost).
+		Int64("numCounters", cfg.Inputs[0].Cache.NumCounters).
+		Int64("maxCost", cfg.Inputs[0].Cache.MaxCost).
 		Msg("makeCache")
 
 	cacheCfg := cache.Config{
-		NumCounters: cfg.Cache.NumCounters,
-		MaxCost:     cfg.Cache.MaxCost,
+		NumCounters: cfg.Inputs[0].Cache.NumCounters,
+		MaxCost:     cfg.Inputs[0].Cache.MaxCost,
 	}
 
 	return cache.New(cacheCfg)
@@ -422,11 +422,14 @@ func (f *FleetServer) Run(ctx context.Context) error {
 		}
 
 		// Restart profiler
-		if curCfg == nil || curCfg.Inputs[0].Server.Profile.Bind != newCfg.Inputs[0].Server.Profile.Bind {
+		if curCfg == nil || curCfg.Inputs[0].Server.Profile.Enabled != newCfg.Inputs[0].Server.Profile.Enabled || curCfg.Inputs[0].Server.Profile.Bind != newCfg.Inputs[0].Server.Profile.Bind {
 			stop(proCancel, proEg)
-			proEg, proCancel = start(ctx, func(ctx context.Context) error {
-				return profile.RunProfiler(ctx, newCfg.Inputs[0].Server.Profile.Bind)
-			}, ech)
+			proEg, proCancel = nil, nil
+			if newCfg.Inputs[0].Server.Profile.Enabled {
+				proEg, proCancel = start(ctx, func(ctx context.Context) error {
+					return profile.RunProfiler(ctx, newCfg.Inputs[0].Server.Profile.Bind)
+				}, ech)
+			}
 		}
 
 		// Restart server
