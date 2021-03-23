@@ -9,7 +9,7 @@ BUILDMODE_linux_arm64=-buildmode=pie
 BUILDMODE_windows_386=-buildmode=pie
 BUILDMODE_windows_amd64=-buildmode=pie
 BUILDMODE_darwin_amd64=-buildmode=pie
-BUILDMODE_darwin_amd64=-buildmode=pie
+BUILDMODE_darwin_arm64=-buildmode=pie
 
 ifeq ($(SNAPSHOT),true)
 VERSION=${DEFAULT_VERSION}-SNAPSHOT
