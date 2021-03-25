@@ -45,7 +45,7 @@ To build the Elastic Agent from source, check out the beats repository. Navigate
 SNAPSHOT=true DEV=true PLATFORMS=darwin mage package
 ```
 
-The above assumes you are running on OS X. Put the platform in you are running on. This speeds up packaging as it only builds it for your platform. As soon as this is completed (it might take a while for the first time) navigate to `build/distributions` and unpackage the `.tar.gz`. Navigate into the elastic-agent directory and start the Elastic Agent:
+The above assumes you are running on OS X. Put the platform in you are running on. This speeds up packaging as it only builds it for your platform. As soon as this is completed (it might take a while for the first time) navigate to `build/distributions` and unpackage the `.tar.gz`. Change working directory to the elastic-agent directory and start the Elastic Agent:
 
 ```
 KIBANA_HOST=http://localhost:5601 KIBANA_USERNAME=elastic KIBANA_PASSWORD=changeme ELASTICSEARCH_HOST=http://localhost:9200 ELASTICSEARCH_USERNAME=elastic ELASTICSEARCH_PASSWORD=changeme KIBANA_FLEET_SETUP=1 FLEET_SERVER_ENABLE=1 sudo ./elastic-agent container
