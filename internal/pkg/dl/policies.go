@@ -90,18 +90,3 @@ func CreatePolicy(ctx context.Context, bulker bulk.Bulk, policy model.Policy, op
 	}
 	return bulker.Create(ctx, o.indexName, "", data)
 }
-
-// FindPolicyByID find policy by ID
-func FindPolicyByID(ctx context.Context, bulker bulk.Bulk, policyID string) (policy model.Policy, err error) {
-	res, err := SearchWithOneParam(ctx, bulker, queryPolicyByID, FleetPolicies, FieldPolicyId, policyID)
-	if err != nil {
-		return
-	}
-
-	if len(res.Hits) == 0 {
-		return policy, ErrNotFound
-	}
-
-	err = res.Hits[0].Unmarshal(&policy)
-	return policy, err
-}

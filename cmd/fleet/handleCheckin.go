@@ -48,7 +48,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 
 		// Don't log connection drops
 		if err != context.Canceled {
-			log.Error().Err(err).Str("id", id).Int("code", code).Msg("Fail checkin")
+			log.Error().Err(err).Str("id", id).Int("code", code).Msg("fail checkin")
 		}
 		http.Error(w, err.Error(), code)
 	}
@@ -195,7 +195,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		return err
 	}
 
-	log.Trace().RawJSON("resp", data).Msg("Checkin response")
+	log.Trace().RawJSON("resp", data).Msg("checkin response")
 
 	return nil
 }
@@ -211,7 +211,7 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 		sn, err = ct.tr.Resolve(ctx, ackToken)
 		if err != nil {
 			if errors.Is(err, dl.ErrNotFound) {
-				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("Revision token not found")
+				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("revision token not found")
 				err = nil
 			} else {
 				return
@@ -289,19 +289,22 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.
 		if err != nil {
 			return nil, err
 		}
-		log.Debug().Str("agentId", agentId).Msg("Agent API key is missing")
+		needKey = true
+		log.Debug().Str("agentId", agentId).Msg("agent API key is not present")
 	} else {
 		hash, roles, needKey, err = policy.CheckOutputPermissionsChanged(agent.PolicyOutputPermissionsHash, actionObj[policy.OutputPermissionsProperty])
 		if err != nil {
 			return nil, err
 		}
 		if needKey {
-			log.Debug().Str("agentId", agentId).Msg("Policy output permissions changed")
+			log.Debug().Str("agentId", agentId).Msg("policy output permissions changed")
+		} else {
+			log.Debug().Str("agentId", agentId).Msg("policy output permissions are the same")
 		}
 	}
 
 	if needKey {
-		log.Debug().Str("agentId", agentId).Interface("roles", roles).Str("hash", hash).Msg("Generating a new API key")
+		log.Debug().Str("agentId", agentId).RawJSON("roles", roles).Str("hash", hash).Msg("generating a new API key")
 		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agent.Id, policy.DefaultOutputName, roles)
 		if err != nil {
 			return nil, err
@@ -310,7 +313,7 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.
 		agent.DefaultApiKeyId = defaultOutputApiKey.Id
 		agent.PolicyOutputPermissionsHash = hash
 
-		log.Info().Str("agentId", agentId).Msg("Rewriting full agent record to pick up default output key.")
+		log.Info().Str("agentId", agentId).Msg("rewriting full agent record to pick up default output key.")
 		if err = dl.IndexAgent(ctx, bulker, agent); err != nil {
 			return nil, err
 		}
@@ -325,7 +328,7 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.
 
 	if outputs != nil {
 		if ok := setMapObj(outputs, agent.DefaultApiKey, "default", "api_key"); !ok {
-			log.Debug().Msg("Cannot inject api_key into policy")
+			log.Debug().Msg("cannot inject api_key into policy")
 		} else {
 			outputRaw, err := json.Marshal(outputs)
 			if err != nil {
@@ -390,7 +393,7 @@ func findAgentByApiKeyId(ctx context.Context, bulker bulk.Bulk, id string) (*mod
 func parseMeta(agent *model.Agent, req *CheckinRequest) (fields Fields, err error) {
 	// Quick comparison first
 	if bytes.Equal(req.LocalMeta, agent.LocalMetadata) {
-		log.Trace().Msg("Quick comparing local metadata is equal")
+		log.Trace().Msg("quick comparing local metadata is equal")
 		return nil, nil
 	}
 
@@ -407,7 +410,7 @@ func parseMeta(agent *model.Agent, req *CheckinRequest) (fields Fields, err erro
 	}
 
 	if reqLocalMeta != nil && !reflect.DeepEqual(reqLocalMeta, agentLocalMeta) {
-		log.Info().RawJSON("req.LocalMeta", req.LocalMeta).Msg("Applying new local metadata")
+		log.Info().RawJSON("req.LocalMeta", req.LocalMeta).Msg("applying new local metadata")
 		fields = map[string]interface{}{
 			FieldLocalMetadata: req.LocalMeta,
 		}

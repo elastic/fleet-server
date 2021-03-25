@@ -24,48 +24,6 @@ var (
 	ErrInvalidPermissionsFormat  = errors.New("invalid permissions format")
 )
 
-// The sample output permissions JSON from policy
-// At the moment we are only generating the key for the default output,
-// so the hashing will be on default output only
-// {
-//     "default": {
-//         "fallback": [{
-//             "names": [
-//                 "logs-*",
-//                 "metrics-*",
-//                 "traces-*",
-//                 ".logs-endpoint.diagnostic.collection-*"
-//             ],
-//             "privileges": [
-//                 "auto_configure",
-//                 "create_doc"
-//             ]
-//         }]
-//     }
-// }
-//
-// Expected to be translated into the roles descriptors format for create API key
-// https://www.elastic.co/guide/en/elasticsearch/reference/current/security-api-create-api-key.html
-// For example:
-// {
-//     "fallback": {
-//         "index": [
-//             {
-//                 "names": [
-//                 "logs-*",
-//                 "metrics-*",
-//                 "traces-*",
-//                 ".logs-endpoint.diagnostic.collection-*"
-//                 ],
-//                 "privileges": [
-//                     "auto_configure",
-//                     "create_doc"
-//                 ]
-//             }
-//         ]
-//     }
-// }
-
 func GetRoleDescriptors(outputPermissionsRaw []byte) (hash string, roles []byte, err error) {
 	if len(outputPermissionsRaw) == 0 {
 		return
@@ -76,32 +34,13 @@ func GetRoleDescriptors(outputPermissionsRaw []byte) (hash string, roles []byte,
 		return
 	}
 
-	res := make(smap.Map)
-
-	for role, v := range output {
-		permissions, ok := v.([]interface{})
-		if !ok {
-			return hash, roles, ErrInvalidPermissionsFormat
-		}
-
-		idx := make([]interface{}, 0, len(permissions))
-
-		for _, permission := range permissions {
-			idx = append(idx, permission)
-		}
-
-		m := make(smap.Map)
-		m["index"] = idx
-		res[role] = m
-	}
-
 	// Calculating the hash of the original output map
 	hash, err = output.Hash()
 	if err != nil {
 		return
 	}
 
-	roles, err = json.Marshal(res)
+	roles, err = json.Marshal(output)
 	if err != nil {
 		return
 	}

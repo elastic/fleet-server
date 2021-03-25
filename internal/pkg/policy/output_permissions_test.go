@@ -15,78 +15,90 @@ import (
 
 const (
 	fallbackPermissions = `
-{
-	"default": {
-		"fallback": [{
-			"names": [
-				"logs-*",
-				"metrics-*",
-				"traces-*",
-				".logs-endpoint.diagnostic.collection-*"
-			],
-			"privileges": [
-				"auto_configure",
-				"create_doc"
-			]
-		}]
+	{
+		"default": {
+			"_fallback": {
+				"indices": [
+					{
+						"names": [
+							"logs-*",
+							"metrics-*",
+							"traces-*",
+							".logs-endpoint.diagnostic.collection-*"
+						],
+						"privileges": [
+							"auto_configure",
+							"create_doc"
+						]
+					}
+				]
+			}
+		}
 	}	
-}
 `
-	fallbackPermissionsHash = "6ca4f8d194b1efdbe3d2b1c3c18a0ebb954f08ea74a861785e07848f44f43752"
+	fallbackPermissionsHash = "48e2e1dfe0e64df0dd841e96e28bb82ff6273432e9ebccca259a3278ff86ee4c"
 
 	outputPermissions = `
-{
-    "default": {
-        "nginx-logs-1": [
-            {
-                "names": [
-                    "logs-nginx.access-*",
-                    "logs-nginx.error-*"
-                ],
-                "privileges": [
-                    "append"
-                ]
-            }
-        ],
-        "nginx-metrics-1": [
-            {
-                "names": [
-                    "metrics-nginx.substatus-*"
-                ],
-                "privileges": [
-                    "append"
-                ]
-            }
-        ],
-        "endpoint-policy1-part1": [
-            {
-                "names": [
-                    ".logs-endpoint.diagnostic.collection-*"
-                ],
-                "privileges": [
-                    "read"
-                ]
-            }
-        ],
-        "endpoint-policy1-part2": [
-            {
-                "names": [
-                    "metrics-endpoint-*"
-                ],
-                "privileges": [
-                    "append"
-                ]
-            }
-        ]
-    }
-}
+	{
+		"default": {
+			"nginx-logs-1": {
+				"indices": [
+					{
+						"names": [
+							"logs-nginx.access-*",
+							"logs-nginx.error-*"
+						],
+						"privileges": [
+							"append"
+						]
+					}
+				]
+			},
+			"nginx-metrics-1": {
+				"indices": [
+					{
+						"names": [
+							"metrics-nginx.substatus-*"
+						],
+						"privileges": [
+							"append"
+						]
+					}
+				]
+			},
+			"endpoint-policy1-part1": {
+				"indices": [
+					{
+						"names": [
+							".logs-endpoint.diagnostic.collection-*"
+						],
+						"privileges": [
+							"read"
+						]
+					}
+				]
+			},
+			"endpoint-policy1-part2": {
+				"indices": [
+					{
+						"names": [
+							"metrics-endpoint-*"
+						],
+						"privileges": [
+							"append"
+						]
+					}
+				]
+			}
+		}
+	}	
 `
-	outputPermissionsHash = "73a2d2ab58cbc977d87fa138cf13347d47be1bd59523c36b3db1b08baa0b762c"
+	outputPermissionsHash = "42c955b5df44eec374dc66a97ab8c2045a88583af499aba81345c4221e473ead"
 
 	resultDescriptors = `
 {
     "endpoint-policy1-part1": {
-        "index": [
+        "indices": [
             {
                 "names": [
                     ".logs-endpoint.diagnostic.collection-*"
@@ -98,7 +110,7 @@ const (
         ]
     },
     "endpoint-policy1-part2": {
-        "index": [
+        "indices": [
             {
                 "names": [
                     "metrics-endpoint-*"
@@ -110,7 +122,7 @@ const (
         ]
     },
     "nginx-logs-1": {
-        "index": [
+        "indices": [
             {
                 "names": [
                     "logs-nginx.access-*",
@@ -123,7 +135,7 @@ const (
         ]
     },
     "nginx-metrics-1": {
-        "index": [
+        "indices": [
             {
                 "names": [
                     "metrics-nginx.substatus-*"

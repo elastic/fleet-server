@@ -19,7 +19,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
@@ -180,35 +179,6 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		return nil, err
 	}
 
-	// Fetch policy in order to get the permissions for the output api key
-	p, err := dl.FindPolicyByID(ctx, bulker, erec.PolicyId)
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse top level only, consistent as check-in handling
-	var policyMap map[string]json.RawMessage
-	if err := json.Unmarshal(p.Data, &policyMap); err != nil {
-		return nil, err
-	}
-
-	permHash, roles, err := policy.GetRoleDescriptors(policyMap[policy.OutputPermissionsProperty])
-	if err != nil {
-		return nil, err
-	}
-
-	defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agentId, policy.DefaultOutputName, roles)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Debug().
-		Dur("rtt", time.Since(now)).
-		Str("agentId", agentId).
-		Str("accessApiKey.Id", accessApiKey.Id).
-		Str("defaultOutputApiKey.Id", defaultOutputApiKey.Id).
-		Msg("Created api key")
-
 	// Update the local metadata agent id
 	localMeta, err := updateLocalMetaAgentId(req.Meta.Local, agentId)
 	if err != nil {
@@ -216,16 +186,13 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 	}
 
 	agentData := model.Agent{
-		Active:                      true,
-		PolicyId:                    erec.PolicyId,
-		Type:                        req.Type,
-		EnrolledAt:                  now.UTC().Format(time.RFC3339),
-		LocalMetadata:               localMeta,
-		AccessApiKeyId:              accessApiKey.Id,
-		DefaultApiKeyId:             defaultOutputApiKey.Id,
-		DefaultApiKey:               defaultOutputApiKey.Agent(),
-		ActionSeqNo:                 dl.UndefinedSeqNo,
-		PolicyOutputPermissionsHash: permHash,
+		Active:         true,
+		PolicyId:       erec.PolicyId,
+		Type:           req.Type,
+		EnrolledAt:     now.UTC().Format(time.RFC3339),
+		LocalMetadata:  localMeta,
+		AccessApiKeyId: accessApiKey.Id,
+		ActionSeqNo:    dl.UndefinedSeqNo,
 	}
 
 	err = createFleetAgent(ctx, bulker, agentId, agentData)
