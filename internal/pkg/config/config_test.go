@@ -77,6 +77,13 @@ func TestConfig(t *testing.T) {
 					Host: kDefaultHTTPHost,
 					Port: kDefaultHTTPPort,
 				},
+				Cache: Cache{
+					NumCounters: defaultCacheNumCounters,
+					MaxCost:     defaultCacheMaxCost,
+				},
+				Monitor: Monitor{
+					FetchSize: defaultFetchSize,
+				},
 			},
 		},
 		"fleet-logging": {
@@ -136,6 +143,13 @@ func TestConfig(t *testing.T) {
 					Host: kDefaultHTTPHost,
 					Port: kDefaultHTTPPort,
 				},
+				Cache: Cache{
+					NumCounters: defaultCacheNumCounters,
+					MaxCost:     defaultCacheMaxCost,
+				},
+				Monitor: Monitor{
+					FetchSize: defaultFetchSize,
+				},
 			},
 		},
 		"input": {
@@ -193,6 +207,13 @@ func TestConfig(t *testing.T) {
 					Host: kDefaultHTTPHost,
 					Port: kDefaultHTTPPort,
 				},
+				Cache: Cache{
+					NumCounters: defaultCacheNumCounters,
+					MaxCost:     defaultCacheMaxCost,
+				},
+				Monitor: Monitor{
+					FetchSize: defaultFetchSize,
+				},
 			},
 		},
 		"input-config": {
@@ -249,6 +270,13 @@ func TestConfig(t *testing.T) {
 				HTTP: HTTP{
 					Host: kDefaultHTTPHost,
 					Port: kDefaultHTTPPort,
+				},
+				Cache: Cache{
+					NumCounters: defaultCacheNumCounters,
+					MaxCost:     defaultCacheMaxCost,
+				},
+				Monitor: Monitor{
+					FetchSize: defaultFetchSize,
 				},
 			},
 		},
