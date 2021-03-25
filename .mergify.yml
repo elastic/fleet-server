@@ -29,3 +29,23 @@ pull_request_rules:
       backport:
         branches:
           - "7.12"
+  - name: automatic merge for 7.x when CI passes
+    conditions:
+      - check-success=fleet-server/pr-merge
+      - check-success=CLA
+      - base=7.x
+    actions:
+      merge:
+        method: squash
+        strict: smart+fasttrack
+        priority: low
+  - name: automatic merge for 7.12 when CI passes
+    conditions:
+      - check-success=fleet-server/pr-merge
+      - check-success=CLA
+      - base=7.12
+    actions:
+      merge:
+        method: squash
+        strict: smart+fasttrack
+        priority: low
