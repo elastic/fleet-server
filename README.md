@@ -51,7 +51,7 @@ The above assumes you are running on OS X. Put the platform in you are running o
 KIBANA_HOST=http://localhost:5601 KIBANA_USERNAME=elastic KIBANA_PASSWORD=changeme ELASTICSEARCH_HOST=http://localhost:9200 ELASTICSEARCH_USERNAME=elastic ELASTICSEARCH_PASSWORD=changeme KIBANA_FLEET_SETUP=1 FLEET_SERVER_ENABLE=1 sudo ./elastic-agent container
 ```
 
-This will start up Elastic Agent with fleet-server and directly enroll it. In addition Fleet is setup.
+This will start up Elastic Agent with fleet-server and directly enroll it. In addition Fleet is setup inside of Kibana.
 
 ## Running Elastic Agent with fleet-server in container
 
