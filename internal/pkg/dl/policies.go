@@ -8,16 +8,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"sync"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 )
 
 var (
-	tmplQueryLatestPolicies     []byte
-	initQueryLatestPoliciesOnce sync.Once
+	tmplQueryLatestPolicies = prepareQueryLatestPolicies()
+
+	queryPolicyByID = preparePolicyFindByID()
 )
 
 var ErrPolicyLeaderNotFound = errors.New("policy has no leader")
@@ -36,12 +37,22 @@ func prepareQueryLatestPolicies() []byte {
 	return root.MustMarshalJSON()
 }
 
+func preparePolicyFindByID() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+
+	root.Size(1)
+	root.Query().Bool().Filter().Term(FieldPolicyId, tmpl.Bind(FieldPolicyId), nil)
+	sort := root.Sort()
+	sort.SortOrder(FieldRevisionIdx, dsl.SortDescend)
+	sort.SortOrder(FieldCoordinatorIdx, dsl.SortDescend)
+
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
 // QueryLatestPolices gets the latest revision for a policy
 func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]model.Policy, error) {
-	initQueryLatestPoliciesOnce.Do(func() {
-		tmplQueryLatestPolicies = prepareQueryLatestPolicies()
-	})
-
 	o := newOption(FleetPolicies, opt...)
 	res, err := bulker.Search(ctx, []string{o.indexName}, tmplQueryLatestPolicies)
 	if err != nil {
@@ -78,4 +89,19 @@ func CreatePolicy(ctx context.Context, bulker bulk.Bulk, policy model.Policy, op
 		return "", err
 	}
 	return bulker.Create(ctx, o.indexName, "", data)
+}
+
+// FindPolicyByID find policy by ID
+func FindPolicyByID(ctx context.Context, bulker bulk.Bulk, policyID string) (policy model.Policy, err error) {
+	res, err := SearchWithOneParam(ctx, bulker, queryPolicyByID, FleetPolicies, FieldPolicyId, policyID)
+	if err != nil {
+		return
+	}
+
+	if len(res.Hits) == 0 {
+		return policy, ErrNotFound
+	}
+
+	err = res.Hits[0].Unmarshal(&policy)
+	return policy, err
 }

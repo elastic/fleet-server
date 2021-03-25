@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
@@ -179,7 +180,24 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		return nil, err
 	}
 
-	defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agentId, "default")
+	// Fetch policy in order to get the permissions for the output api key
+	p, err := dl.FindPolicyByID(ctx, bulker, erec.PolicyId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse top level only, consistent as check-in handling
+	var policyMap map[string]json.RawMessage
+	if err := json.Unmarshal(p.Data, &policyMap); err != nil {
+		return nil, err
+	}
+
+	permHash, roles, err := policy.GetRoleDescriptors(policyMap[policy.OutputPermissionsProperty])
+	if err != nil {
+		return nil, err
+	}
+
+	defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agentId, policy.DefaultOutputName, roles)
 	if err != nil {
 		return nil, err
 	}
@@ -198,15 +216,16 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 	}
 
 	agentData := model.Agent{
-		Active:          true,
-		PolicyId:        erec.PolicyId,
-		Type:            req.Type,
-		EnrolledAt:      now.UTC().Format(time.RFC3339),
-		LocalMetadata:   localMeta,
-		AccessApiKeyId:  accessApiKey.Id,
-		DefaultApiKeyId: defaultOutputApiKey.Id,
-		DefaultApiKey:   defaultOutputApiKey.Agent(),
-		ActionSeqNo:     dl.UndefinedSeqNo,
+		Active:                      true,
+		PolicyId:                    erec.PolicyId,
+		Type:                        req.Type,
+		EnrolledAt:                  now.UTC().Format(time.RFC3339),
+		LocalMetadata:               localMeta,
+		AccessApiKeyId:              accessApiKey.Id,
+		DefaultApiKeyId:             defaultOutputApiKey.Id,
+		DefaultApiKey:               defaultOutputApiKey.Agent(),
+		ActionSeqNo:                 dl.UndefinedSeqNo,
+		PolicyOutputPermissionsHash: permHash,
 	}
 
 	err = createFleetAgent(ctx, bulker, agentId, agentData)
@@ -309,9 +328,9 @@ func generateAccessApiKey(ctx context.Context, client *elasticsearch.Client, age
 	return apikey.Create(ctx, client, agentId, "", []byte(kFleetAccessRolesJSON))
 }
 
-func generateOutputApiKey(ctx context.Context, client *elasticsearch.Client, agentId string, outputName string) (*apikey.ApiKey, error) {
+func generateOutputApiKey(ctx context.Context, client *elasticsearch.Client, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
 	name := fmt.Sprintf("%s:%s", agentId, outputName)
-	return apikey.Create(ctx, client, name, "", []byte(kFleetOutputRolesJSON))
+	return apikey.Create(ctx, client, name, "", roles)
 }
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentApiKey, error) {

@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
+	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
@@ -263,7 +264,8 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.
 	// 4) Inject default api key into structure
 	// 5) Re-serialize and return AgentResp structure
 
-	var actionObj map[string]interface{}
+	// using json.RawMessage to avoid the full json de-serialization
+	var actionObj map[string]json.RawMessage
 	if err := json.Unmarshal(p.Data, &actionObj); err != nil {
 		return nil, err
 	}
@@ -275,13 +277,38 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.
 		return nil, err
 	}
 
+	// Check if need to generate a new output api key
+	var (
+		hash    string
+		needKey bool
+		roles   []byte
+	)
+
 	if agent.DefaultApiKey == "" {
-		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agent.Id, "default")
+		hash, roles, err = policy.GetRoleDescriptors(actionObj[policy.OutputPermissionsProperty])
+		if err != nil {
+			return nil, err
+		}
+		log.Debug().Str("agentId", agentId).Msg("Agent API key is missing")
+	} else {
+		hash, roles, needKey, err = policy.CheckOutputPermissionsChanged(agent.PolicyOutputPermissionsHash, actionObj[policy.OutputPermissionsProperty])
+		if err != nil {
+			return nil, err
+		}
+		if needKey {
+			log.Debug().Str("agentId", agentId).Msg("Policy output permissions changed")
+		}
+	}
+
+	if needKey {
+		log.Debug().Str("agentId", agentId).Interface("roles", roles).Str("hash", hash).Msg("Generating a new API key")
+		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agent.Id, policy.DefaultOutputName, roles)
 		if err != nil {
 			return nil, err
 		}
 		agent.DefaultApiKey = defaultOutputApiKey.Agent()
 		agent.DefaultApiKeyId = defaultOutputApiKey.Id
+		agent.PolicyOutputPermissionsHash = hash
 
 		log.Info().Str("agentId", agentId).Msg("Rewriting full agent record to pick up default output key.")
 		if err = dl.IndexAgent(ctx, bulker, agent); err != nil {
@@ -289,12 +316,27 @@ func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.
 		}
 	}
 
-	if ok := setMapObj(actionObj, agent.DefaultApiKey, "outputs", "default", "api_key"); !ok {
-		log.Debug().Msg("Cannot inject api_key into policy")
+	// Parse the outputs maps in order to inject the api key
+	const outputsProperty = "outputs"
+	outputs, err := smap.Parse(actionObj[outputsProperty])
+	if err != nil {
+		return nil, err
+	}
+
+	if outputs != nil {
+		if ok := setMapObj(outputs, agent.DefaultApiKey, "default", "api_key"); !ok {
+			log.Debug().Msg("Cannot inject api_key into policy")
+		} else {
+			outputRaw, err := json.Marshal(outputs)
+			if err != nil {
+				return nil, err
+			}
+			actionObj[outputsProperty] = json.RawMessage(outputRaw)
+		}
 	}
 
 	dataJSON, err := json.Marshal(struct {
-		Policy map[string]interface{} `json:"policy"`
+		Policy map[string]json.RawMessage `json:"policy"`
 	}{actionObj})
 	if err != nil {
 		return nil, err
