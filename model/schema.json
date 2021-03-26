@@ -430,7 +430,10 @@
         },
         "action_seq_no": {
           "description": "The last acknowledged action sequence number for the Elastic Agent",
-          "type": "integer"
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
         }
       },
       "required": [

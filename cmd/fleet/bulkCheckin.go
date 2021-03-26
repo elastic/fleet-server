@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/rs/zerolog/log"
 )
@@ -22,7 +23,7 @@ const kBulkCheckinFlushInterval = 10 * time.Second
 
 type PendingData struct {
 	fields Fields
-	seqNo  int64
+	seqNo  sqn.SeqNo
 }
 
 type BulkCheckin struct {
@@ -38,7 +39,7 @@ func NewBulkCheckin(bulker bulk.Bulk) *BulkCheckin {
 	}
 }
 
-func (bc *BulkCheckin) CheckIn(id string, fields Fields, seqno int64) error {
+func (bc *BulkCheckin) CheckIn(id string, fields Fields, seqno sqn.SeqNo) error {
 
 	if fields == nil {
 		fields = make(Fields)
@@ -93,7 +94,7 @@ func (bc *BulkCheckin) flush(ctx context.Context) error {
 	for id, pendingData := range pending {
 		doc := pendingData.fields
 		doc[dl.FieldUpdatedAt] = time.Now().UTC().Format(time.RFC3339)
-		if pendingData.seqNo >= 0 {
+		if pendingData.seqNo.IsSet() {
 			doc[dl.FieldActionSeqNo] = pendingData.seqNo
 		}
 
