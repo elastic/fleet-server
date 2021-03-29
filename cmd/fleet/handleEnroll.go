@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
@@ -206,7 +207,7 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		AccessApiKeyId:  accessApiKey.Id,
 		DefaultApiKeyId: defaultOutputApiKey.Id,
 		DefaultApiKey:   defaultOutputApiKey.Agent(),
-		ActionSeqNo:     dl.UndefinedSeqNo,
+		ActionSeqNo:     []int64{sqn.UndefinedSeqNo},
 	}
 
 	err = createFleetAgent(ctx, bulker, agentId, agentData)

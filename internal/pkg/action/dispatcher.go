@@ -11,13 +11,14 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/rs/zerolog/log"
 )
 
 type Sub struct {
 	agentId string
-	seqNo   int64
+	seqNo   sqn.SeqNo
 	ch      chan []model.Action
 }
 
@@ -50,7 +51,7 @@ func (d *Dispatcher) Run(ctx context.Context) (err error) {
 	}
 }
 
-func (d *Dispatcher) Subscribe(agentId string, seqNo int64) *Sub {
+func (d *Dispatcher) Subscribe(agentId string, seqNo sqn.SeqNo) *Sub {
 	cbCh := make(chan []model.Action, 1)
 
 	sub := Sub{

@@ -4,6 +4,8 @@
 
 package dl
 
+import "github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+
 // Indices names
 const (
 	FleetActions           = ".fleet-actions"
@@ -42,13 +44,8 @@ const (
 	FieldIdentifier    = "identifier"
 )
 
-// Public constants
-const (
-	UndefinedSeqNo = -1
-)
-
 // Private constants
 const (
-	defaultSeqNo     = UndefinedSeqNo
+	defaultSeqNo     = sqn.UndefinedSeqNo
 	seqNoPrimaryTerm = "seq_no_primary_term"
 )
