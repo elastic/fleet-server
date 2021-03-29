@@ -96,7 +96,7 @@ type Agent struct {
 	AccessApiKeyId string `json:"access_api_key_id,omitempty"`
 
 	// The last acknowledged action sequence number for the Elastic Agent
-	ActionSeqNo int64 `json:"action_seq_no,omitempty"`
+	ActionSeqNo []int64 `json:"action_seq_no,omitempty"`
 
 	// Active flag
 	Active bool           `json:"active"`

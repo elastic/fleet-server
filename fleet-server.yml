@@ -12,9 +12,13 @@ fleet:
 
 # Input config provided by the Elastic Agent for the server
 #inputs:
-#  - type:
-#    policy:
+#  - type: fleet-server
 #    server:
+#      host: localhost
+#      port: 8220
+#    cache:
+#      num_counters: 500000  # 10x times expected count
+#      max_cost: 50 * 1024 * 1024  # 50MiB cache size
 
 logging:
   to_stderr: true
