@@ -180,6 +180,18 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		return nil, err
 	}
 
+	defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agentId, "default")
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debug().
+		Dur("rtt", time.Since(now)).
+		Str("agentId", agentId).
+		Str("accessApiKey.Id", accessApiKey.Id).
+		Str("defaultOutputApiKey.Id", defaultOutputApiKey.Id).
+		Msg("Created api key")
+
 	// Update the local metadata agent id
 	localMeta, err := updateLocalMetaAgentId(req.Meta.Local, agentId)
 	if err != nil {
@@ -187,13 +199,15 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 	}
 
 	agentData := model.Agent{
-		Active:         true,
-		PolicyId:       erec.PolicyId,
-		Type:           req.Type,
-		EnrolledAt:     now.UTC().Format(time.RFC3339),
-		LocalMetadata:  localMeta,
-		AccessApiKeyId: accessApiKey.Id,
-		ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
+		Active:          true,
+		PolicyId:        erec.PolicyId,
+		Type:            req.Type,
+		EnrolledAt:      now.UTC().Format(time.RFC3339),
+		LocalMetadata:   localMeta,
+		AccessApiKeyId:  accessApiKey.Id,
+		DefaultApiKeyId: defaultOutputApiKey.Id,
+		DefaultApiKey:   defaultOutputApiKey.Agent(),
+		ActionSeqNo:     []int64{sqn.UndefinedSeqNo},
 	}
 
 	err = createFleetAgent(ctx, bulker, agentId, agentData)
@@ -296,9 +310,9 @@ func generateAccessApiKey(ctx context.Context, client *elasticsearch.Client, age
 	return apikey.Create(ctx, client, agentId, "", []byte(kFleetAccessRolesJSON))
 }
 
-func generateOutputApiKey(ctx context.Context, client *elasticsearch.Client, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
+func generateOutputApiKey(ctx context.Context, client *elasticsearch.Client, agentId string, outputName string) (*apikey.ApiKey, error) {
 	name := fmt.Sprintf("%s:%s", agentId, outputName)
-	return apikey.Create(ctx, client, name, "", roles)
+	return apikey.Create(ctx, client, name, "", []byte(kFleetOutputRolesJSON))
 }
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentApiKey, error) {
