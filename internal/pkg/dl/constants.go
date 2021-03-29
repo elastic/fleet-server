@@ -34,9 +34,11 @@ const (
 	FieldPolicyRevisionIdx    = "policy_revision_idx"
 	FieldPolicyCoordinatorIdx = "policy_coordinator_idx"
 
-	FieldActive       = "active"
-	FieldUpdatedAt    = "updated_at"
-	FieldUnenrolledAt = "unenrolled_at"
+	FieldActive           = "active"
+	FieldUpdatedAt        = "updated_at"
+	FieldUnenrolledAt     = "unenrolled_at"
+	FieldUpgradedAt       = "upgraded_at"
+	FieldUpgradeStartedAt = "upgrade_started_at"
 
 	FieldDecodedSha256 = "decoded_sha256"
 	FieldIdentifier    = "identifier"
