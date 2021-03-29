@@ -11,11 +11,11 @@ Third party libraries used by the Elastic Beats project:
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aleksmaus/generate
-Version: v0.0.0-20201213151810-c5bc68a6a42f
+Version: v0.0.0-20210326194607-c630e07a2742
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aleksmaus/generate@v0.0.0-20201213151810-c5bc68a6a42f/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aleksmaus/generate@v0.0.0-20210326194607-c630e07a2742/LICENSE.txt:
 
 MIT License
 
