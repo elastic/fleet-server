@@ -394,10 +394,6 @@
           "description": "The current policy coordinator for the Elastic Agent",
           "type": "integer"
         },
-        "policy_output_permissions_hash": {
-          "description": "The policy output permissions hash",
-          "type": "string"
-        },
         "last_updated": {
           "description": "Date/time the Elastic Agent was last updated",
           "type": "string",
