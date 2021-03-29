@@ -42,7 +42,6 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 }
 
-// TODO: Handle UPGRADE
 func _handleAcks(w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) error {
 	agent, err := authAgent(r, id, bulker, c)
 	if err != nil {
@@ -65,7 +64,6 @@ func _handleAcks(w http.ResponseWriter, r *http.Request, id string, bulker bulk.
 		return err
 	}
 
-	// TODO: flesh this out
 	resp := AckResponse{"acks"}
 
 	data, err := json.Marshal(&resp)
@@ -121,8 +119,14 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 			return err
 		}
 
-		if ev.Error == "" && action.Type == TypeUnenroll {
-			unenroll = true
+		if ev.Error == "" {
+			if action.Type == TypeUnenroll {
+				unenroll = true
+			} else if action.Type == TypeUpgrade {
+				if err := _handleUpgrade(ctx, bulker, agent); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
@@ -137,8 +141,6 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 			return err
 		}
 	}
-
-	// TODO: handle UPGRADE
 
 	return nil
 }
@@ -205,6 +207,30 @@ func _handleUnenroll(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) 
 		dl.FieldActive:       false,
 		dl.FieldUnenrolledAt: now,
 		dl.FieldUpdatedAt:    now,
+	}
+
+	source, err := json.Marshal(map[string]interface{}{
+		"doc": fields,
+	})
+	if err != nil {
+		return err
+	}
+
+	updates = append(updates, bulk.BulkOp{
+		Id:    agent.Id,
+		Body:  source,
+		Index: dl.FleetAgents,
+	})
+
+	return bulker.MUpdate(ctx, updates, bulk.WithRefresh())
+}
+
+func _handleUpgrade(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) error {
+	updates := make([]bulk.BulkOp, 0, 1)
+	now := time.Now().UTC().Format(time.RFC3339)
+	fields := map[string]interface{}{
+		dl.FieldUpgradedAt:       now,
+		dl.FieldUpgradeStartedAt: nil,
 	}
 
 	source, err := json.Marshal(map[string]interface{}{
