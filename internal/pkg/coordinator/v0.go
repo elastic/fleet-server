@@ -76,12 +76,7 @@ func (c *coordinatorZeroT) updatePolicy(p model.Policy) error {
 	if err != nil {
 		return err
 	}
-	if p.CoordinatorIdx == 0 {
-		p.CoordinatorIdx = 1
-		p.Data = newData
-		c.policy = p
-		c.out <- p
-	} else if string(newData) != string(p.Data) {
+	if p.CoordinatorIdx == 0 || string(newData) != string(p.Data) {
 		p.CoordinatorIdx += 1
 		p.Data = newData
 		c.policy = p
