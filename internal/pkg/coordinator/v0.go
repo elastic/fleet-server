@@ -28,7 +28,7 @@ func NewCoordinatorZero(policy model.Policy) (Coordinator, error) {
 	return &coordinatorZeroT{
 		log:    log.With().Str("ctx", "coordinator v0").Str("policyId", policy.PolicyId).Logger(),
 		policy: policy,
-		in:     make(chan model.Policy, 1),
+		in:     make(chan model.Policy),
 		out:    make(chan model.Policy),
 	}, nil
 }
@@ -40,25 +40,18 @@ func (c *coordinatorZeroT) Name() string {
 
 // Run runs the coordinator for the policy.
 func (c *coordinatorZeroT) Run(ctx context.Context) error {
-	c.in <- c.policy
+	err := c.updatePolicy(c.policy)
+	if err != nil {
+		c.log.Err(err).Msg("failed to handle policy")
+	}
+
 	for {
 		select {
 		case p := <-c.in:
-			newData, err := c.handlePolicy(p.Data)
+			err = c.updatePolicy(p)
 			if err != nil {
 				c.log.Err(err).Msg("failed to handle policy")
 				continue
-			}
-			if p.CoordinatorIdx == 0 {
-				p.CoordinatorIdx = 1
-				p.Data = newData
-				c.policy = p
-				c.out <- p
-			} else if string(newData) != string(p.Data) {
-				p.CoordinatorIdx += 1
-				p.Data = newData
-				c.policy = p
-				c.out <- p
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -77,7 +70,22 @@ func (c *coordinatorZeroT) Output() <-chan model.Policy {
 	return c.out
 }
 
-// handlePolicy handles the new policy.
+// updatePolicy performs the working of incrementing the coordinator idx.
+func (c *coordinatorZeroT) updatePolicy(p model.Policy) error {
+	newData, err := c.handlePolicy(p.Data)
+	if err != nil {
+		return err
+	}
+	if p.CoordinatorIdx == 0 || string(newData) != string(p.Data) {
+		p.CoordinatorIdx += 1
+		p.Data = newData
+		c.policy = p
+		c.out <- p
+	}
+	return nil
+}
+
+// handlePolicy performs the actual work of coordination.
 //
 // Does nothing at the moment.
 func (c *coordinatorZeroT) handlePolicy(data json.RawMessage) (json.RawMessage, error) {
