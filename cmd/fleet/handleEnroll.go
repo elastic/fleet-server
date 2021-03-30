@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
@@ -186,17 +187,6 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 	}
 
 	agentData := model.Agent{
-<<<<<<< HEAD
-		Active:          true,
-		PolicyId:        erec.PolicyId,
-		Type:            req.Type,
-		EnrolledAt:      now.UTC().Format(time.RFC3339),
-		LocalMetadata:   localMeta,
-		AccessApiKeyId:  accessApiKey.Id,
-		DefaultApiKeyId: defaultOutputApiKey.Id,
-		DefaultApiKey:   defaultOutputApiKey.Agent(),
-		ActionSeqNo:     dl.UndefinedSeqNo,
-=======
 		Active:         true,
 		PolicyId:       erec.PolicyId,
 		Type:           req.Type,
@@ -204,7 +194,6 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		LocalMetadata:  localMeta,
 		AccessApiKeyId: accessApiKey.Id,
 		ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
->>>>>>> a743bad... Indexing permissions as part of the Elastic Agent policy (#187)
 	}
 
 	err = createFleetAgent(ctx, bulker, agentId, agentData)

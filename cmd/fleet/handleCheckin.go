@@ -21,11 +21,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
-<<<<<<< HEAD
-=======
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
->>>>>>> a743bad... Indexing permissions as part of the Elastic Agent policy (#187)
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
@@ -205,7 +202,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 }
 
 // Resolve AckToken from request, fallback on the agent record
-func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent *model.Agent) (seqno int64, err error) {
+func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent *model.Agent) (seqno sqn.SeqNo, err error) {
 	// Resolve AckToken from request, fallback on the agent record
 	ackToken := req.AckToken
 	seqno = agent.ActionSeqNo
@@ -221,16 +218,16 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 				return
 			}
 		}
-		seqno = sn
+		seqno = []int64{sn}
 	}
 	return seqno, nil
 }
 
-func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno int64, agentId string) ([]model.Action, error) {
+func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentId string) ([]model.Action, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	return dl.FindActions(ctx, ct.bulker, dl.QueryAgentActions, map[string]interface{}{
-		dl.FieldSeqNo:      seqno,
+		dl.FieldSeqNo:      seqno.Get(0),
 		dl.FieldMaxSeqNo:   ct.gcp.GetCheckpoint(),
 		dl.FieldExpiration: now,
 		dl.FieldAgents:     []string{agentId},
