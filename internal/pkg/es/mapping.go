@@ -128,6 +128,9 @@ const (
 		"policy_id": {
 			"type": "keyword"
 		},
+		"policy_output_permissions_hash": {
+			"type": "keyword"
+		},
 		"policy_revision_idx": {
 			"type": "integer"
 		},

@@ -36,26 +36,6 @@ const kFleetAccessRolesJSON = `
 }
 `
 
-const kFleetOutputRolesJSON = `
- {
- 	"fleet-output": {
- 		"cluster": ["monitor"],
- 		"index": [{
- 			"names": [
- 				"logs-*",
- 				"metrics-*",
- 				"traces-*",
- 				".logs-endpoint.diagnostic.collection-*"
- 			],
- 			"privileges": [
- 				"auto_configure",
- 				"create_doc"
- 			]
- 		}]
- 	}
- }
-`
-
 // Wrong: no AAD;
 // This defeats the signature check;
 // can copy from one to another and will dispatch.
