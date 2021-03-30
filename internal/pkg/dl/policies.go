@@ -27,7 +27,7 @@ func prepareQueryLatestPolicies() []byte {
 	root := dsl.NewRoot()
 	root.Size(0)
 	policyId := root.Aggs().Agg(FieldPolicyId)
-	policyId.Terms("field", FieldPolicyId, nil)
+	policyId.Terms("field", FieldPolicyId, nil).Size(10000)
 	revisionIdx := policyId.Aggs().Agg(FieldRevisionIdx).TopHits()
 	revisionIdx.Size(1)
 	rSort := revisionIdx.Sort()

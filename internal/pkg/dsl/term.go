@@ -4,7 +4,7 @@
 
 package dsl
 
-func (n *Node) Term(field string, value interface{}, boost *float64) {
+func (n *Node) Term(field string, value interface{}, boost *float64) *Node {
 	childNode := n.appendOrSetChildNode(kKeywordTerm)
 
 	leaf := value
@@ -22,9 +22,10 @@ func (n *Node) Term(field string, value interface{}, boost *float64) {
 	childNode.nodeMap = nodeMapT{field: &Node{
 		leaf: leaf,
 	}}
+	return childNode
 }
 
-func (n *Node) Terms(field string, value interface{}, boost *float64) {
+func (n *Node) Terms(field string, value interface{}, boost *float64) *Node {
 	childNode := n.appendOrSetChildNode(kKeywordTerms)
 
 	childNode.nodeMap = nodeMapT{
@@ -34,4 +35,5 @@ func (n *Node) Terms(field string, value interface{}, boost *float64) {
 	if boost != nil {
 		childNode.nodeMap[kKeywordBoost] = &Node{leaf: *boost}
 	}
+	return childNode
 }
