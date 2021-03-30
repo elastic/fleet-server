@@ -25,9 +25,16 @@ const (
 	defaultCheckInterval  = 1 * time.Second // check every second for the new action
 	defaultSeqNo          = int64(-1)       // the _seq_no in elasticsearch start with 0
 	defaultWithExpiration = false
-	defaultFetchSize      = 10
 
-	tightLoopCheckInterval = 50 * time.Millisecond // when we get a full page (fetchSize) of documents, use this interval to repeatedly poll for more records
+	// Making the default fetch size larger, in order to increase the throughput of the monitor.
+	// This is configurable as well, so can be adjusted based on the memory size of the container if needed.
+	// Seems like the usage of smaller actions, one or few agents in the action document would be more prevalent in the future.
+	// For example, as of now the current size of osquery action JSON document for 1000 agents is 40KB.
+	// Assuiming the worst case scenario of 1000 of document fetched, we are looking at 50MB slice.
+	// One action can be split up into multiple documents up to the 1000 agents per action if needed.
+	defaultFetchSize = 1000
+
+	tightLoopCheckInterval = 10 * time.Millisecond // when we get a full page (fetchSize) of documents, use this interval to repeatedly poll for more records
 )
 
 const (
@@ -128,6 +135,15 @@ func NewSimple(index string, cli *elasticsearch.Client, opts ...Option) (SimpleM
 	m.tmplQuery = tmplQuery
 
 	return m, nil
+}
+
+// WithCheckInterval sets a periodic check interval
+func WithFetchSize(fetchSize int) Option {
+	return func(m SimpleMonitor) {
+		if fetchSize > 0 {
+			m.(*simpleMonitorT).fetchSize = fetchSize
+		}
+	}
 }
 
 // WithCheckInterval sets a periodic check interval
