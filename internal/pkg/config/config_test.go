@@ -65,6 +65,9 @@ func TestConfig(t *testing.T) {
 							NumCounters: defaultCacheNumCounters,
 							MaxCost:     defaultCacheMaxCost,
 						},
+						Monitor: Monitor{
+							FetchSize: defaultFetchSize,
+						},
 					},
 				},
 				Logging: Logging{
@@ -124,6 +127,9 @@ func TestConfig(t *testing.T) {
 							NumCounters: defaultCacheNumCounters,
 							MaxCost:     defaultCacheMaxCost,
 						},
+						Monitor: Monitor{
+							FetchSize: defaultFetchSize,
+						},
 					},
 				},
 				Logging: Logging{
@@ -181,6 +187,9 @@ func TestConfig(t *testing.T) {
 							NumCounters: defaultCacheNumCounters,
 							MaxCost:     defaultCacheMaxCost,
 						},
+						Monitor: Monitor{
+							FetchSize: defaultFetchSize,
+						},
 					},
 				},
 				Logging: Logging{
@@ -237,6 +246,9 @@ func TestConfig(t *testing.T) {
 						Cache: Cache{
 							NumCounters: defaultCacheNumCounters,
 							MaxCost:     defaultCacheMaxCost,
+						},
+						Monitor: Monitor{
+							FetchSize: defaultFetchSize,
 						},
 					},
 				},
