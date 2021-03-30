@@ -132,6 +132,9 @@ type Agent struct {
 	// The policy ID for the Elastic Agent
 	PolicyId string `json:"policy_id,omitempty"`
 
+	// The policy output permissions hash
+	PolicyOutputPermissionsHash string `json:"policy_output_permissions_hash,omitempty"`
+
 	// The current policy revision_idx for the Elastic Agent
 	PolicyRevisionIdx int64 `json:"policy_revision_idx,omitempty"`
 
