@@ -38,7 +38,6 @@ pull_request_rules:
       merge:
         method: squash
         strict: smart+fasttrack
-        priority: low
   - name: automatic merge for 7.12 when CI passes
     conditions:
       - check-success=fleet-server/pr-merge
@@ -48,4 +47,3 @@ pull_request_rules:
       merge:
         method: squash
         strict: smart+fasttrack
-        priority: low
