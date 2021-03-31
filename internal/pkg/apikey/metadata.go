@@ -4,7 +4,7 @@
 
 package apikey
 
-const fleetAgent = "fleet-agent"
+const FleetAgentApplication = "fleet-agent"
 
 type Type int
 
@@ -21,24 +21,4 @@ type Metadata struct {
 	Application string `json:"application"`
 	AgentId     string `json:"agent_id"`
 	Type        string `json:"type"`
-}
-
-func NewMetadata() Metadata {
-	return Metadata{
-		Application: fleetAgent,
-	}
-}
-
-type MetadataFunc func(m *Metadata)
-
-func WithAgentId(agentId string) MetadataFunc {
-	return func(m *Metadata) {
-		m.AgentId = agentId
-	}
-}
-
-func WithType(t Type) MetadataFunc {
-	return func(m *Metadata) {
-		m.Type = t.String()
-	}
 }
