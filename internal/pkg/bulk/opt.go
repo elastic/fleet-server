@@ -31,6 +31,7 @@ type bulkOptT struct {
 	flushThresholdCnt int
 	flushThresholdSz  int
 	maxPending        int
+	queuePrealloc     int
 }
 
 type BulkOpt func(*bulkOptT)
