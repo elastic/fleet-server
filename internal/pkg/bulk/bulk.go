@@ -82,6 +82,7 @@ const (
 	defaultFlushThresholdCnt = 32768
 	defaultFlushThresholdSz  = 1024 * 1024 * 10
 	defaultMaxPending        = 32
+	defaultQueuePrealloc     = 64
 )
 
 func InitES(ctx context.Context, cfg *config.Config, opts ...BulkOpt) (*elasticsearch.Client, Bulk, error) {
@@ -119,6 +120,7 @@ func (b *Bulker) parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		flushThresholdCnt: defaultFlushThresholdCnt,
 		flushThresholdSz:  defaultFlushThresholdSz,
 		maxPending:        defaultMaxPending,
+		queuePrealloc:     defaultQueuePrealloc,
 	}
 
 	for _, f := range opts {
@@ -182,7 +184,7 @@ func (b *Bulker) Run(ctx context.Context, opts ...BulkOpt) error {
 
 		queues = append(queues, &queueT{
 			action: action,
-			queue:  make([]bulkT, 0, bopts.flushThresholdCnt),
+			queue:  make([]bulkT, 0, bopts.queuePrealloc),
 		})
 	}
 
@@ -198,7 +200,7 @@ func (b *Bulker) Run(ctx context.Context, opts ...BulkOpt) error {
 				}
 
 				q.pending = 0
-				q.queue = make([]bulkT, 0, bopts.flushThresholdCnt)
+				q.queue = make([]bulkT, 0, bopts.queuePrealloc)
 			}
 		}
 
