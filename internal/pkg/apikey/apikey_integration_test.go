@@ -39,7 +39,8 @@ func TestCreateApiKeyWithMetadata(t *testing.T) {
 	// Create the key
 	agentId := uuid.Must(uuid.NewV4()).String()
 	name := uuid.Must(uuid.NewV4()).String()
-	akey, err := Create(ctx, bulker.Client(), TypeAccess, agentId, name, "", []byte(testFleetRoles))
+	akey, err := Create(ctx, bulker.Client(), name, "", []byte(testFleetRoles),
+		WithAgentId(agentId), WithType(TypeAccess))
 	if err != nil {
 		t.Fatal(err)
 	}

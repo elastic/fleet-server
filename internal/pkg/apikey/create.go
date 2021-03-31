@@ -14,26 +14,13 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
-const fleetAgent = "fleet-agent"
+func Create(ctx context.Context, client *elasticsearch.Client, name, ttl string, roles []byte, metaopts ...MetadataFunc) (*ApiKey, error) {
 
-type Type int
+	metadata := NewMetadata()
 
-const (
-	TypeAccess Type = iota
-	TypeOutput
-)
-
-func (t Type) String() string {
-	return []string{"access", "output"}[t]
-}
-
-type Metadata struct {
-	Application string `json:"application"`
-	AgentId     string `json:"agent_id"`
-	Type        string `json:"type"`
-}
-
-func Create(ctx context.Context, client *elasticsearch.Client, keyType Type, agentId, name, ttl string, roles []byte) (*ApiKey, error) {
+	for _, opt := range metaopts {
+		opt(&metadata)
+	}
 
 	payload := struct {
 		Name       string          `json:"name,omitempty"`
@@ -44,11 +31,7 @@ func Create(ctx context.Context, client *elasticsearch.Client, keyType Type, age
 		Name:       name,
 		Expiration: ttl,
 		Roles:      roles,
-		Metadata: Metadata{
-			Application: fleetAgent,
-			AgentId:     agentId,
-			Type:        keyType.String(),
-		},
+		Metadata:   metadata,
 	}
 
 	body, err := json.Marshal(&payload)
