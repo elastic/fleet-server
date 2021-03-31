@@ -22,6 +22,7 @@ var (
 	ErrMalformedHeader = errors.New("malformed authorization header")
 	ErrMalformedToken  = errors.New("malformed token")
 	ErrInvalidToken    = errors.New("token not valid utf8")
+	ErrApiKeyNotFound  = errors.New("api key not found")
 )
 
 var AuthKey = http.CanonicalHeaderKey("Authorization")

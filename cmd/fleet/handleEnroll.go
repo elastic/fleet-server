@@ -293,12 +293,12 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 }
 
 func generateAccessApiKey(ctx context.Context, client *elasticsearch.Client, agentId string) (*apikey.ApiKey, error) {
-	return apikey.Create(ctx, client, agentId, "", []byte(kFleetAccessRolesJSON))
+	return apikey.Create(ctx, client, apikey.TypeAccess, agentId, agentId, "", []byte(kFleetAccessRolesJSON))
 }
 
 func generateOutputApiKey(ctx context.Context, client *elasticsearch.Client, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
 	name := fmt.Sprintf("%s:%s", agentId, outputName)
-	return apikey.Create(ctx, client, name, "", roles)
+	return apikey.Create(ctx, client, apikey.TypeOutput, agentId, name, "", roles)
 }
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentApiKey, error) {
