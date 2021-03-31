@@ -18,7 +18,7 @@ func (t Type) String() string {
 }
 
 type Metadata struct {
-	Application string `json:"application"`
-	AgentId     string `json:"agent_id"`
-	Type        string `json:"type"`
+	Application string `json:"application,omitempty"`
+	AgentId     string `json:"agent_id,omitempty"`
+	Type        string `json:"type,omitempty"`
 }
