@@ -4,7 +4,7 @@
 
 package apikey
 
-const FleetAgentApplication = "fleet-agent"
+const ManagedByFleetServer = "fleet-server"
 
 type Type int
 
@@ -18,7 +18,17 @@ func (t Type) String() string {
 }
 
 type Metadata struct {
-	Application string `json:"application,omitempty"`
-	AgentId     string `json:"agent_id,omitempty"`
-	Type        string `json:"type,omitempty"`
+	AgentId   string `json:"agent_id,omitempty"`
+	Managed   bool   `json:"managed,omitempty"`
+	ManagedBy string `json:"managed_by,omitempty"`
+	Type      string `json:"type,omitempty"`
+}
+
+func NewMetadata(agentId string, typ Type) Metadata {
+	return Metadata{
+		AgentId:   agentId,
+		Managed:   true,
+		ManagedBy: ManagedByFleetServer,
+		Type:      typ.String(),
+	}
 }

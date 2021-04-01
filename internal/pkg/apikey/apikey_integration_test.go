@@ -40,11 +40,7 @@ func TestCreateApiKeyWithMetadata(t *testing.T) {
 	agentId := uuid.Must(uuid.NewV4()).String()
 	name := uuid.Must(uuid.NewV4()).String()
 	akey, err := Create(ctx, bulker.Client(), name, "", []byte(testFleetRoles),
-		Metadata{
-			Application: FleetAgentApplication,
-			AgentId:     agentId,
-			Type:        TypeAccess.String(),
-		})
+		NewMetadata(agentId, TypeAccess))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +51,12 @@ func TestCreateApiKeyWithMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	diff := cmp.Diff(FleetAgentApplication, aKeyMeta.Metadata.Application)
+	diff := cmp.Diff(ManagedByFleetServer, aKeyMeta.Metadata.ManagedBy)
+	if diff != "" {
+		t.Error(diff)
+	}
+
+	diff = cmp.Diff(true, aKeyMeta.Metadata.Managed)
 	if diff != "" {
 		t.Error(diff)
 	}
