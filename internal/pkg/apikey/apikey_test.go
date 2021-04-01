@@ -2,12 +2,15 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// +build !integration
+
 package apikey
 
 import (
 	"encoding/base64"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMonitorLeadership(t *testing.T) {
