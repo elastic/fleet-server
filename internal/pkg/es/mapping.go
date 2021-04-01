@@ -32,6 +32,9 @@ const (
 		},
 		"type": {
 			"type": "keyword"
+		},
+		"user_id": {
+			"type": "keyword"
 		}		
 	}
 }`
