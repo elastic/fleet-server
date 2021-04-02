@@ -53,6 +53,9 @@ type Action struct {
 
 	// The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.
 	Type string `json:"type,omitempty"`
+
+	// The ID of the user who created the action.
+	UserId string `json:"user_id,omitempty"`
 }
 
 // ActionData The opaque payload.
