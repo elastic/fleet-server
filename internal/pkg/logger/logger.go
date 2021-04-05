@@ -6,6 +6,7 @@ package logger
 
 import (
 	"context"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -117,7 +118,11 @@ func level(cfg *config.Config) zerolog.Level {
 
 func configure(cfg *config.Config) (zerolog.Logger, WriterSync, error) {
 	if cfg.Logging.ToStderr {
-		return log.Output(os.Stderr).Level(level(cfg)), os.Stderr, nil
+		out := io.Writer(os.Stderr)
+		if cfg.Logging.Pretty {
+			out = zerolog.ConsoleWriter{Out: os.Stderr}
+		}
+		return log.Output(out).Level(level(cfg)), os.Stderr, nil
 	}
 	if cfg.Logging.ToFiles {
 		files := cfg.Logging.Files
