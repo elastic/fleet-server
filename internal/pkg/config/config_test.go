@@ -60,6 +60,7 @@ func TestConfig(t *testing.T) {
 								Enabled: false,
 								Bind:    "localhost:6060",
 							},
+							CompressionLevel: 1,
 						},
 						Cache: Cache{
 							NumCounters: defaultCacheNumCounters,
@@ -122,6 +123,7 @@ func TestConfig(t *testing.T) {
 								Enabled: false,
 								Bind:    "localhost:6060",
 							},
+							CompressionLevel: 1,
 						},
 						Cache: Cache{
 							NumCounters: defaultCacheNumCounters,
@@ -182,6 +184,7 @@ func TestConfig(t *testing.T) {
 								Enabled: false,
 								Bind:    "localhost:6060",
 							},
+							CompressionLevel: 1,
 						},
 						Cache: Cache{
 							NumCounters: defaultCacheNumCounters,
@@ -242,6 +245,7 @@ func TestConfig(t *testing.T) {
 								Enabled: false,
 								Bind:    "localhost:6060",
 							},
+							CompressionLevel: 1,
 						},
 						Cache: Cache{
 							NumCounters: defaultCacheNumCounters,
