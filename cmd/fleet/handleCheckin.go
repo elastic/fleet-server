@@ -6,9 +6,12 @@ package fleet
 
 import (
 	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"reflect"
 	"time"
@@ -34,6 +37,8 @@ var (
 	kCheckinTimeout  = 30 * time.Second
 	kLongPollTimeout = 300 * time.Second // 5m
 )
+
+const kEncodingGzip = "gzip"
 
 func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	// TODO: Consider rate limit here
@@ -187,18 +192,42 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		Actions:  actions,
 	}
 
-	data, err := json.Marshal(&resp)
-	if err != nil {
-		return err
+	return ct.writeResponse(w, r, resp)
+}
+
+func (ct *CheckinT) writeResponse(w http.ResponseWriter, r *http.Request, resp CheckinResponse) error {
+	var wr io.Writer
+
+	compressionLevel := ct.cfg.Inputs[0].Server.CompressionLevel
+
+	if compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
+		log.Trace().Int("level", compressionLevel).Msg("Compressing policy response")
+
+		zipper, err := gzip.NewWriterLevel(w, compressionLevel)
+		if err != nil {
+			return err
+		}
+
+		// Must close the compression context to flush
+		defer zipper.Close()
+		wr = zipper
+
+		w.Header().Set("Content-Encoding", kEncodingGzip)
+	} else {
+		wr = w
 	}
 
-	if _, err = w.Write(data); err != nil {
-		return err
+	encoder := json.NewEncoder(wr)
+	return encoder.Encode(&resp)
+}
+
+func acceptsEncoding(r *http.Request, encoding string) bool {
+	for _, v := range r.Header.Values("Accept-Encoding") {
+		if v == encoding {
+			return true
+		}
 	}
-
-	log.Trace().RawJSON("resp", data).Msg("checkin response")
-
-	return nil
+	return false
 }
 
 // Resolve AckToken from request, fallback on the agent record

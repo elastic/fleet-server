@@ -5,6 +5,7 @@
 package config
 
 import (
+	"compress/flate"
 	"fmt"
 	"strings"
 	"time"
@@ -62,6 +63,7 @@ type Server struct {
 	MaxConnections    int               `config:"max_connections"`
 	MaxEnrollPending  int64             `config:"max_enroll_pending"`
 	Profile           ServerProfile     `config:"profile"`
+	CompressionLevel  int               `config:"compression_level"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -74,6 +76,7 @@ func (c *Server) InitDefaults() {
 	c.RateLimitInterval = 5 * time.Millisecond
 	c.MaxConnections = 0 // no limit
 	c.MaxEnrollPending = 64
+	c.CompressionLevel = flate.BestSpeed
 	c.Profile.InitDefaults()
 }
 
