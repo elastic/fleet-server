@@ -227,8 +227,8 @@ func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqN
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	return dl.FindActions(ctx, ct.bulker, dl.QueryAgentActions, map[string]interface{}{
-		dl.FieldSeqNo:      seqno.Get(0),
-		dl.FieldMaxSeqNo:   ct.gcp.GetCheckpoint(),
+		dl.FieldSeqNo:      seqno.Value(),
+		dl.FieldMaxSeqNo:   ct.gcp.GetCheckpoint().Value(),
 		dl.FieldExpiration: now,
 		dl.FieldAgents:     []string{agentId},
 	})

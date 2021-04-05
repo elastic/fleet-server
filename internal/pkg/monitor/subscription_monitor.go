@@ -6,10 +6,12 @@ package monitor
 
 import (
 	"context"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog/log"
@@ -60,8 +62,8 @@ type monitorT struct {
 }
 
 // New creates new subscription monitor
-func New(index string, cli *elasticsearch.Client, opts ...Option) (Monitor, error) {
-	sm, err := NewSimple(index, cli, opts...)
+func New(index string, esCli, monCli *elasticsearch.Client, opts ...Option) (Monitor, error) {
+	sm, err := NewSimple(index, esCli, monCli, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +77,7 @@ func New(index string, cli *elasticsearch.Client, opts ...Option) (Monitor, erro
 	return m, nil
 }
 
-func (m *monitorT) GetCheckpoint() int64 {
+func (m *monitorT) GetCheckpoint() sqn.SeqNo {
 	return m.sm.GetCheckpoint()
 }
 

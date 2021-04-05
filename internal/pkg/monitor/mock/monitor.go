@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 )
 
 var gMockIndexCounter uint64
@@ -26,7 +27,7 @@ func (s *mockSubT) Output() <-chan []es.HitT {
 }
 
 type MockIndexMonitor struct {
-	checkpoint int64
+	checkpoint sqn.SeqNo
 
 	mut  sync.RWMutex
 	subs map[uint64]*mockSubT
@@ -35,13 +36,13 @@ type MockIndexMonitor struct {
 // NewMockIndexMonitor returns a mock monitor.
 func NewMockIndexMonitor() *MockIndexMonitor {
 	return &MockIndexMonitor{
-		checkpoint: -1,
+		checkpoint: sqn.DefaultSeqNo,
 		subs:       make(map[uint64]*mockSubT),
 	}
 }
 
 // GetCheckpoint returns the current checkpoint.
-func (m *MockIndexMonitor) GetCheckpoint() int64 {
+func (m *MockIndexMonitor) GetCheckpoint() sqn.SeqNo {
 	return m.checkpoint
 }
 
@@ -85,7 +86,7 @@ func (m *MockIndexMonitor) Notify(ctx context.Context, hits []es.HitT) {
 	sz := len(hits)
 	if sz > 0 {
 		maxVal := hits[sz-1].SeqNo
-		m.checkpoint = maxVal
+		m.checkpoint = []int64{maxVal}
 
 		m.mut.RLock()
 		var wg sync.WaitGroup

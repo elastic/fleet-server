@@ -10,7 +10,6 @@ import (
 	"context"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
@@ -20,8 +19,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
-
-const testMonitorIntervalMS = 100
 
 func setupIndex(ctx context.Context, t *testing.T) (string, bulk.Bulk) {
 	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingAction)
@@ -47,7 +44,6 @@ func TestSimpleMonitorNonEmptyIndex(t *testing.T) {
 func runSimpleMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk.Bulk) {
 	readyCh := make(chan error)
 	mon, err := NewSimple(index, bulker.Client(),
-		WithCheckInterval(testMonitorIntervalMS*time.Millisecond),
 		WithReadyChan(readyCh),
 	)
 	require.NoError(t, err)

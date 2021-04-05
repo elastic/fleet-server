@@ -9,12 +9,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
@@ -22,7 +24,7 @@ import (
 )
 
 const (
-	defaultCheckInterval  = 1 * time.Second // check every second for the new action
+	defaultPollTimeout    = 5 * time.Minute // default long poll timeout
 	defaultSeqNo          = int64(-1)       // the _seq_no in elasticsearch start with 0
 	defaultWithExpiration = false
 
@@ -63,7 +65,7 @@ type HitsT struct {
 }
 
 type GlobalCheckpointProvider interface {
-	GetCheckpoint() int64
+	GetCheckpoint() sqn.SeqNo
 }
 
 // SimpleMonitor monitors for new documents in an index
@@ -83,16 +85,18 @@ type SimpleMonitor interface {
 
 // simpleMonitorT monitors for new documents in an index
 type simpleMonitorT struct {
-	cli       *elasticsearch.Client
+	esCli     *elasticsearch.Client
+	monCli    *elasticsearch.Client
 	tmplCheck *dsl.Tmpl
 	tmplQuery *dsl.Tmpl
 
 	index          string
-	checkInterval  time.Duration
+	pollTimeout    time.Duration
 	withExpiration bool
 	fetchSize      int
 
-	checkpoint int64 // index global checkpoint
+	checkpoint sqn.SeqNo    // index global checkpoint
+	mx         sync.RWMutex // checkpoint mutext
 
 	log zerolog.Logger
 
@@ -105,14 +109,16 @@ type simpleMonitorT struct {
 type Option func(SimpleMonitor)
 
 // New creates new simple monitor
-func NewSimple(index string, cli *elasticsearch.Client, opts ...Option) (SimpleMonitor, error) {
+func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option) (SimpleMonitor, error) {
+
 	m := &simpleMonitorT{
 		index:          index,
-		cli:            cli,
-		checkInterval:  defaultCheckInterval,
+		esCli:          esCli,
+		monCli:         monCli,
+		pollTimeout:    defaultPollTimeout,
 		withExpiration: defaultWithExpiration,
 		fetchSize:      defaultFetchSize,
-		checkpoint:     defaultSeqNo,
+		checkpoint:     sqn.DefaultSeqNo,
 		outCh:          make(chan []es.HitT, 1),
 	}
 
@@ -146,10 +152,10 @@ func WithFetchSize(fetchSize int) Option {
 	}
 }
 
-// WithCheckInterval sets a periodic check interval
-func WithCheckInterval(interval time.Duration) Option {
+// WithPollTimeout sets the global checkpoint polling timeout
+func WithPollTimeout(to time.Duration) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).checkInterval = interval
+		m.(*simpleMonitorT).pollTimeout = to
 	}
 }
 
@@ -173,17 +179,21 @@ func (m *simpleMonitorT) Output() <-chan []es.HitT {
 }
 
 // GetCheckpoint implements GlobalCheckpointProvider interface
-func (m *simpleMonitorT) GetCheckpoint() int64 {
+func (m *simpleMonitorT) GetCheckpoint() sqn.SeqNo {
 	return m.loadCheckpoint()
 }
 
-func (m *simpleMonitorT) storeCheckpoint(val int64) {
-	m.log.Debug().Int64("checkpoint", val).Msg("updated checkpoint")
-	atomic.StoreInt64(&m.checkpoint, val)
+func (m *simpleMonitorT) storeCheckpoint(val sqn.SeqNo) {
+	m.log.Debug().Ints64("checkpoints", val).Msg("updated checkpoint")
+	m.mx.Lock()
+	defer m.mx.Unlock()
+	m.checkpoint = val.Clone()
 }
 
-func (m *simpleMonitorT) loadCheckpoint() int64 {
-	return atomic.LoadInt64(&m.checkpoint)
+func (m *simpleMonitorT) loadCheckpoint() sqn.SeqNo {
+	m.mx.RLock()
+	defer m.mx.RUnlock()
+	return m.checkpoint.Clone()
 }
 
 // Run runs monitor.
@@ -200,10 +210,10 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 	}()
 
 	// Initialize global checkpoint from the index stats
-	var checkpoint int64
-	checkpoint, err = queryGlobalCheckpoint(ctx, m.cli, m.index)
+	var checkpoint sqn.SeqNo
+	checkpoint, err = queryGlobalCheckpoint(ctx, m.monCli, m.index)
 	if err != nil {
-		m.log.Error().Err(err).Msg("failed to initialize the global checkpoint")
+		m.log.Error().Err(err).Msg("failed to initialize the global checkpoints")
 		return err
 	}
 	m.storeCheckpoint(checkpoint)
@@ -214,29 +224,40 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		m.readyCh = nil
 	}
 
-	// Start timer loop to check for global checkpoint changes
-	t := time.NewTimer(m.checkInterval)
-	defer t.Stop()
-	for {
-		select {
-		case <-t.C:
-			interval := m.checkInterval
+	const retryDelay = time.Second
 
-			hits, err := m.check(ctx)
+	for {
+		// Wait checkpoint advance
+		newCheckpoint, err := waitCheckpointAdvance(ctx, m.monCli, m.index, checkpoint, m.pollTimeout)
+		if err != nil {
+			if errors.Is(err, es.ErrIndexNotFound) {
+				// Wait until created
+				m.log.Info().Msgf("index not found, try again in %v", retryDelay)
+			} else if errors.Is(err, es.ErrTimeout) {
+				// Timed out, wait again
+				m.log.Debug().Msg("wait global checkpoints advance, timeout, wait again")
+				continue
+			} else {
+				// Log the error and keep trying
+				m.log.Error().Err(err).Msg("failed waiting global checkpoints advance")
+			}
+
+			// Delay next attempt
+			err = sleep.WithContext(ctx, retryDelay)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Fetch up to known checkpoint
+		count := m.fetchSize
+		for count == m.fetchSize {
+			hits, err := m.fetch(ctx, newCheckpoint)
 			if err != nil {
 				m.log.Error().Err(err).Msg("failed checking new documents")
-			} else {
-				count := m.notify(ctx, hits)
-
-				// Change check interval if fetched the full page (m.fetchSize) of documents
-				if count == m.fetchSize {
-					m.log.Debug().Int("count", count).Dur("wait_next_check", interval).Msg("tight loop check")
-					interval = tightLoopCheckInterval
-				}
+				break
 			}
-			t.Reset(interval)
-		case <-ctx.Done():
-			return ctx.Err()
+			count = m.notify(ctx, hits)
 		}
 	}
 }
@@ -247,7 +268,7 @@ func (m *simpleMonitorT) notify(ctx context.Context, hits []es.HitT) int {
 		select {
 		case m.outCh <- hits:
 			maxVal := hits[sz-1].SeqNo
-			m.storeCheckpoint(maxVal)
+			m.storeCheckpoint([]int64{maxVal})
 			return sz
 		case <-ctx.Done():
 		}
@@ -255,45 +276,21 @@ func (m *simpleMonitorT) notify(ctx context.Context, hits []es.HitT) int {
 	return 0
 }
 
-func (m *simpleMonitorT) check(ctx context.Context) ([]es.HitT, error) {
+func (m *simpleMonitorT) fetch(ctx context.Context, maxCheckpoint sqn.SeqNo) ([]es.HitT, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	checkpoint := m.loadCheckpoint()
 
 	// Run check query that detects that there are new documents available
 	params := map[string]interface{}{
-		dl.FieldSeqNo: checkpoint,
+		dl.FieldSeqNo:    checkpoint.Value(),
+		dl.FieldMaxSeqNo: maxCheckpoint.Value(),
 	}
 	if m.withExpiration {
 		params[dl.FieldExpiration] = now
 	}
 
-	hits, err := m.search(ctx, m.tmplCheck, params)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(hits) == 0 {
-		return nil, nil
-	}
-
-	// New documents are detected, fetch global checkpoint
-	gcp, err := queryGlobalCheckpoint(ctx, m.cli, m.index)
-	if err != nil {
-		m.log.Error().Err(err).Msg("failed to check the global checkpoint")
-		return nil, err
-	}
-
-	// If global check point is still not greater that the current known checkpoint, return nothing
-	if gcp <= checkpoint {
-		return nil, nil
-	}
-
-	// Fetch documents capped by the global checkpoint
-	// Reusing params for the documents query
-	params[dl.FieldMaxSeqNo] = gcp
-
-	hits, err = m.search(ctx, m.tmplQuery, params)
+	hits, err := m.search(ctx, m.tmplQuery, params)
 	if err != nil {
 		return nil, err
 	}
@@ -307,10 +304,10 @@ func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[
 		return nil, err
 	}
 
-	res, err := m.cli.Search(
-		m.cli.Search.WithContext(ctx),
-		m.cli.Search.WithIndex(m.index),
-		m.cli.Search.WithBody(bytes.NewBuffer(query)),
+	res, err := m.esCli.Search(
+		m.esCli.Search.WithContext(ctx),
+		m.esCli.Search.WithIndex(m.index),
+		m.esCli.Search.WithBody(bytes.NewBuffer(query)),
 	)
 	if err != nil {
 		return nil, err
