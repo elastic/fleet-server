@@ -44,6 +44,7 @@ type Logging struct {
 	Level    string        `config:"level"`
 	ToStderr bool          `config:"to_stderr"`
 	ToFiles  bool          `config:"to_files"`
+	Pretty   bool          `config:"pretty"`
 	Files    *LoggingFiles `config:"files"`
 }
 
