@@ -16,34 +16,73 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 var ErrEventAgentIdMismatch = errors.New("event agentId mismatch")
 
-func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	id := ps.ByName("id")
+type AckT struct {
+	limit *limit.Limiter
+	bulk  bulk.Bulk
+	cache cache.Cache
+}
 
-	err := _handleAcks(w, r, id, rt.ct.bulker, rt.ct.cache)
+func NewAckT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *AckT {
+	log.Info().
+		Interface("limits", cfg.Limits.AckLimit).
+		Msg("Ack install limits")
 
-	if err != nil {
-		code := http.StatusBadRequest
-		// Don't log connection drops
-		if err != context.Canceled {
-			log.Error().Err(err).Int("code", code).Msg("Fail ACK")
-		}
-
-		http.Error(w, err.Error(), code)
+	return &AckT{
+		bulk:  bulker,
+		cache: cache,
+		limit: limit.NewLimiter(&cfg.Limits.AckLimit),
 	}
 }
 
-func _handleAcks(w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) error {
-	agent, err := authAgent(r, id, bulker, c)
+func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	id := ps.ByName("id")
+
+	err := rt.ack.handleAcks(w, r, id)
+
+	if err != nil {
+		lvl := zerolog.DebugLevel
+
+		var code int
+		switch err {
+		case limit.ErrRateLimit, limit.ErrMaxLimit:
+			code = http.StatusTooManyRequests
+		case context.Canceled:
+			code = http.StatusServiceUnavailable
+		default:
+			lvl = zerolog.InfoLevel
+			code = http.StatusBadRequest
+		}
+		// Don't log connection drops
+		log.WithLevel(lvl).
+			Err(err).
+			Int("code", code).
+			Msg("Fail ACK")
+
+		http.Error(w, "", code)
+	}
+}
+
+func (ack AckT) handleAcks(w http.ResponseWriter, r *http.Request, id string) error {
+	limitF, err := ack.limit.Acquire()
+	if err != nil {
+		return err
+	}
+	defer limitF()
+
+	agent, err := authAgent(r, id, ack.bulk, ack.cache)
 	if err != nil {
 		return err
 	}
@@ -60,7 +99,7 @@ func _handleAcks(w http.ResponseWriter, r *http.Request, id string, bulker bulk.
 
 	log.Trace().RawJSON("raw", raw).Msg("Ack request")
 
-	if err = _handleAckEvents(r.Context(), agent, req.Events, bulker, c); err != nil {
+	if err = ack.handleAckEvents(r.Context(), agent, req.Events); err != nil {
 		return err
 	}
 
@@ -78,7 +117,7 @@ func _handleAcks(w http.ResponseWriter, r *http.Request, id string, bulker bulk.
 	return nil
 }
 
-func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, bulker bulk.Bulk, c cache.Cache) error {
+func (ack *AckT) handleAckEvents(ctx context.Context, agent *model.Agent, events []Event) error {
 	var policyAcks []string
 	var unenroll bool
 	for _, ev := range events {
@@ -93,9 +132,9 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 			continue
 		}
 
-		action, ok := c.GetAction(ev.ActionId)
+		action, ok := ack.cache.GetAction(ev.ActionId)
 		if !ok {
-			actions, err := dl.FindAction(ctx, bulker, ev.ActionId)
+			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionId)
 			if err != nil {
 				return err
 			}
@@ -103,7 +142,7 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 				return errors.New("no matching action")
 			}
 			action = actions[0]
-			c.SetAction(action)
+			ack.cache.SetAction(action, time.Minute)
 		}
 
 		acr := model.ActionResult{
@@ -115,7 +154,7 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 			Data:        ev.Data,
 			Error:       ev.Error,
 		}
-		if _, err := dl.CreateActionResult(ctx, bulker, acr); err != nil {
+		if _, err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
 			return err
 		}
 
@@ -123,7 +162,7 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 			if action.Type == TypeUnenroll {
 				unenroll = true
 			} else if action.Type == TypeUpgrade {
-				if err := _handleUpgrade(ctx, bulker, agent); err != nil {
+				if err := ack.handleUpgrade(ctx, agent); err != nil {
 					return err
 				}
 			}
@@ -131,13 +170,13 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 	}
 
 	if len(policyAcks) > 0 {
-		if err := _handlePolicyChange(ctx, bulker, agent, policyAcks...); err != nil {
+		if err := ack.handlePolicyChange(ctx, agent, policyAcks...); err != nil {
 			return err
 		}
 	}
 
 	if unenroll {
-		if err := _handleUnenroll(ctx, bulker, agent); err != nil {
+		if err := ack.handleUnenroll(ctx, agent); err != nil {
 			return err
 		}
 	}
@@ -145,7 +184,7 @@ func _handleAckEvents(ctx context.Context, agent *model.Agent, events []Event, b
 	return nil
 }
 
-func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Agent, actionIds ...string) error {
+func (ack *AckT) handlePolicyChange(ctx context.Context, agent *model.Agent, actionIds ...string) error {
 	// If more than one, pick the winner;
 	// 0) Correct policy id
 	// 1) Highest revision/coordinator number
@@ -184,7 +223,7 @@ func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Age
 			Index: dl.FleetAgents,
 		})
 
-		err = bulker.MUpdate(ctx, updates, bulk.WithRefresh())
+		err = ack.bulk.MUpdate(ctx, updates, bulk.WithRefresh())
 		if err != nil {
 			return err
 		}
@@ -193,10 +232,10 @@ func _handlePolicyChange(ctx context.Context, bulker bulk.Bulk, agent *model.Age
 	return nil
 }
 
-func _handleUnenroll(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) error {
+func (ack *AckT) handleUnenroll(ctx context.Context, agent *model.Agent) error {
 	apiKeys := _getAPIKeyIDs(agent)
 	if len(apiKeys) > 0 {
-		if err := apikey.Invalidate(ctx, bulker.Client(), apiKeys...); err != nil {
+		if err := apikey.Invalidate(ctx, ack.bulk.Client(), apiKeys...); err != nil {
 			return err
 		}
 	}
@@ -222,10 +261,10 @@ func _handleUnenroll(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) 
 		Index: dl.FleetAgents,
 	})
 
-	return bulker.MUpdate(ctx, updates, bulk.WithRefresh())
+	return ack.bulk.MUpdate(ctx, updates, bulk.WithRefresh())
 }
 
-func _handleUpgrade(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) error {
+func (ack *AckT) handleUpgrade(ctx context.Context, agent *model.Agent) error {
 	updates := make([]bulk.BulkOp, 0, 1)
 	now := time.Now().UTC().Format(time.RFC3339)
 	fields := map[string]interface{}{
@@ -246,7 +285,7 @@ func _handleUpgrade(ctx context.Context, bulker bulk.Bulk, agent *model.Agent) e
 		Index: dl.FleetAgents,
 	})
 
-	return bulker.MUpdate(ctx, updates, bulk.WithRefresh())
+	return ack.bulk.MUpdate(ctx, updates, bulk.WithRefresh())
 }
 
 func _getAPIKeyIDs(agent *model.Agent) []string {
