@@ -48,14 +48,14 @@ func New(cfg Config) (Cache, error) {
 //
 // This will only cache the action ID and action Type. So `GetAction` will only
 // return a `model.Action` with `ActionId` and `Type` set.
-func (c Cache) SetAction(action model.Action) {
+func (c Cache) SetAction(action model.Action, ttl time.Duration) {
 	scopedKey := "action:" + action.ActionId
 	v := actionCache{
 		actionId:   action.ActionId,
 		actionType: action.Type,
 	}
 	cost := len(action.ActionId) + len(action.Type)
-	ok := c.cache.Set(scopedKey, v, int64(cost))
+	ok := c.cache.SetWithTTL(scopedKey, v, int64(cost), ttl)
 	log.Trace().
 		Bool("ok", ok).
 		Str("id", action.ActionId).

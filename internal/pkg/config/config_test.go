@@ -49,18 +49,41 @@ func TestConfig(t *testing.T) {
 							Host: kDefaultHost,
 							Port: kDefaultPort,
 							Timeouts: ServerTimeouts{
-								Read:  5 * time.Second,
-								Write: 60 * 10 * time.Second,
+								Read:             5 * time.Second,
+								Write:            60 * 10 * time.Second,
+								CheckinTimestamp: 30 * time.Second,
+								CheckinLongPoll:  5 * time.Minute,
 							},
-							MaxHeaderByteSize: 8192,
-							MaxEnrollPending:  64,
-							RateLimitBurst:    1024,
-							RateLimitInterval: 5 * time.Millisecond,
-							Profile: ServerProfile{
+							Profiler: ServerProfiler{
 								Enabled: false,
 								Bind:    "localhost:6060",
 							},
-							CompressionLevel: 1,
+							CompressionLevel:  1,
+							CompressionThresh: 1024,
+							Limits: ServerLimits{
+								MaxHeaderByteSize: 8192,
+								MaxConnections:    0,
+								PolicyThrottle:    5 * time.Millisecond,
+								CheckinLimit: Limit{
+									Interval: time.Millisecond,
+									Burst:    1000,
+								},
+								ArtifactLimit: Limit{
+									Interval: time.Millisecond * 5,
+									Burst:    25,
+									Max:      50,
+								},
+								EnrollLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+								},
+								AckLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+								},
+							},
 						},
 						Cache: Cache{
 							NumCounters: defaultCacheNumCounters,
@@ -112,18 +135,41 @@ func TestConfig(t *testing.T) {
 							Host: kDefaultHost,
 							Port: kDefaultPort,
 							Timeouts: ServerTimeouts{
-								Read:  5 * time.Second,
-								Write: 60 * 10 * time.Second,
+								Read:             5 * time.Second,
+								Write:            60 * 10 * time.Second,
+								CheckinTimestamp: 30 * time.Second,
+								CheckinLongPoll:  5 * time.Minute,
 							},
-							MaxHeaderByteSize: 8192,
-							MaxEnrollPending:  64,
-							RateLimitBurst:    1024,
-							RateLimitInterval: 5 * time.Millisecond,
-							Profile: ServerProfile{
+							Profiler: ServerProfiler{
 								Enabled: false,
 								Bind:    "localhost:6060",
 							},
-							CompressionLevel: 1,
+							CompressionLevel:  1,
+							CompressionThresh: 1024,
+							Limits: ServerLimits{
+								MaxHeaderByteSize: 8192,
+								MaxConnections:    0,
+								PolicyThrottle:    5 * time.Millisecond,
+								CheckinLimit: Limit{
+									Interval: time.Millisecond,
+									Burst:    1000,
+								},
+								ArtifactLimit: Limit{
+									Interval: time.Millisecond * 5,
+									Burst:    25,
+									Max:      50,
+								},
+								EnrollLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+								},
+								AckLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+								},
+							},
 						},
 						Cache: Cache{
 							NumCounters: defaultCacheNumCounters,
@@ -173,18 +219,41 @@ func TestConfig(t *testing.T) {
 							Host: kDefaultHost,
 							Port: kDefaultPort,
 							Timeouts: ServerTimeouts{
-								Read:  5 * time.Second,
-								Write: 60 * 10 * time.Second,
+								Read:             5 * time.Second,
+								Write:            60 * 10 * time.Second,
+								CheckinTimestamp: 30 * time.Second,
+								CheckinLongPoll:  5 * time.Minute,
 							},
-							MaxHeaderByteSize: 8192,
-							MaxEnrollPending:  64,
-							RateLimitBurst:    1024,
-							RateLimitInterval: 5 * time.Millisecond,
-							Profile: ServerProfile{
+							Profiler: ServerProfiler{
 								Enabled: false,
 								Bind:    "localhost:6060",
 							},
-							CompressionLevel: 1,
+							CompressionLevel:  1,
+							CompressionThresh: 1024,
+							Limits: ServerLimits{
+								MaxHeaderByteSize: 8192,
+								MaxConnections:    0,
+								PolicyThrottle:    5 * time.Millisecond,
+								CheckinLimit: Limit{
+									Interval: time.Millisecond,
+									Burst:    1000,
+								},
+								ArtifactLimit: Limit{
+									Interval: time.Millisecond * 5,
+									Burst:    25,
+									Max:      50,
+								},
+								EnrollLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+								},
+								AckLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+								},
+							},
 						},
 						Cache: Cache{
 							NumCounters: defaultCacheNumCounters,
@@ -231,21 +300,44 @@ func TestConfig(t *testing.T) {
 					{
 						Type: "fleet-server",
 						Server: Server{
-							Host: kDefaultHost,
+							Host: "localhost",
 							Port: 8888,
 							Timeouts: ServerTimeouts{
-								Read:  20 * time.Second,
-								Write: 5 * time.Second,
+								Read:             20 * time.Second,
+								Write:            5 * time.Second,
+								CheckinTimestamp: 30 * time.Second,
+								CheckinLongPoll:  5 * time.Minute,
 							},
-							MaxHeaderByteSize: 8192,
-							MaxEnrollPending:  64,
-							RateLimitBurst:    1024,
-							RateLimitInterval: 5 * time.Millisecond,
-							Profile: ServerProfile{
+							Profiler: ServerProfiler{
 								Enabled: false,
 								Bind:    "localhost:6060",
 							},
-							CompressionLevel: 1,
+							CompressionLevel:  1,
+							CompressionThresh: 1024,
+							Limits: ServerLimits{
+								MaxHeaderByteSize: 8192,
+								MaxConnections:    0,
+								PolicyThrottle:    5 * time.Millisecond,
+								CheckinLimit: Limit{
+									Interval: time.Millisecond,
+									Burst:    1000,
+								},
+								ArtifactLimit: Limit{
+									Interval: time.Millisecond * 5,
+									Burst:    25,
+									Max:      50,
+								},
+								EnrollLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+								},
+								AckLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+								},
+							},
 						},
 						Cache: Cache{
 							NumCounters: defaultCacheNumCounters,
