@@ -25,7 +25,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, _ *http.Request, _ httprout
 	if err != nil {
 		code := http.StatusInternalServerError
 		log.Error().Err(err).Int("code", code).Msg("fail status")
-		http.Error(w, err.Error(), code)
+		http.Error(w, "", code)
 		return
 	}
 
