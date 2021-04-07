@@ -7,12 +7,14 @@ package dl
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"sync"
+	"time"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"sync"
-	"time"
 )
 
 var (
@@ -48,6 +50,9 @@ func SearchPolicyLeaders(ctx context.Context, bulker bulk.Bulk, ids []string, op
 	}
 	res, err := bulker.Search(ctx, []string{o.indexName}, data)
 	if err != nil {
+		if errors.Is(err, es.ErrIndexNotFound) {
+			err = nil
+		}
 		return
 	}
 

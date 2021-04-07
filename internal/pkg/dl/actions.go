@@ -6,9 +6,11 @@ package dl
 
 import (
 	"context"
+	"errors"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
@@ -83,6 +85,9 @@ func FindActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, params m
 func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) ([]model.Action, error) {
 	res, err := Search(ctx, bulker, tmpl, index, params)
 	if err != nil {
+		if errors.Is(err, es.ErrIndexNotFound) {
+			err = nil
+		}
 		return nil, err
 	}
 
