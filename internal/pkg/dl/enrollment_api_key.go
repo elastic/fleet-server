@@ -18,22 +18,9 @@ const (
 )
 
 var (
-	QueryEnrollmentAPIKeyByID = prepareFindEnrollmentAPIKeyByID()
+	QueryEnrollmentAPIKeyByID       = prepareFindEnrollmentAPIKeyByID()
+	QueryEnrollmentAPIKeyByPolicyID = prepareFindEnrollmentAPIKeyByPolicyID()
 )
-
-// RenderAllEnrollmentAPIKeysQuery render all enrollment api keys query. For migration only.
-func RenderAllEnrollmentAPIKeysQuery(size uint64) ([]byte, error) {
-	tmpl := dsl.NewTmpl()
-
-	root := dsl.NewRoot()
-	root.Size(size)
-
-	err := tmpl.Resolve(root)
-	if err != nil {
-		return nil, err
-	}
-	return tmpl.Render(nil)
-}
 
 func prepareFindEnrollmentAPIKeyByID() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
@@ -45,12 +32,22 @@ func prepareFindEnrollmentAPIKeyByID() *dsl.Tmpl {
 	return tmpl
 }
 
-func FindEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, id string) (rec model.EnrollmentApiKey, err error) {
-	return findEnrollmentAPIKey(ctx, bulker, FleetEnrollmentAPIKeys, tmpl, id)
+func prepareFindEnrollmentAPIKeyByPolicyID() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+
+	root := dsl.NewRoot()
+	root.Query().Bool().Filter().Term(FieldPolicyId, tmpl.Bind(FieldPolicyId), nil)
+
+	tmpl.MustResolve(root)
+	return tmpl
 }
 
-func findEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, tmpl *dsl.Tmpl, id string) (rec model.EnrollmentApiKey, err error) {
-	res, err := SearchWithOneParam(ctx, bulker, tmpl, index, FieldApiKeyID, id)
+func FindEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, field string, id string) (rec model.EnrollmentApiKey, err error) {
+	return findEnrollmentAPIKey(ctx, bulker, FleetEnrollmentAPIKeys, tmpl, field, id)
+}
+
+func findEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, tmpl *dsl.Tmpl, field string, id string) (rec model.EnrollmentApiKey, err error) {
+	res, err := SearchWithOneParam(ctx, bulker, tmpl, index, field, id)
 	if err != nil {
 		return
 	}
@@ -62,4 +59,23 @@ func findEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, t
 
 	err = res.Hits[0].Unmarshal(&rec)
 	return rec, err
+}
+
+func FindEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, field string, id string) ([]model.EnrollmentApiKey, error) {
+	return findEnrollmentAPIKeys(ctx, bulker, FleetEnrollmentAPIKeys, tmpl, field, id)
+}
+
+func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, index string, tmpl *dsl.Tmpl, field string, id string) ([]model.EnrollmentApiKey, error) {
+	res, err := SearchWithOneParam(ctx, bulker, tmpl, index, field, id)
+	if err != nil {
+		return nil, err
+	}
+
+	recs := make([]model.EnrollmentApiKey, len(res.Hits))
+	for i := 0; i < len(res.Hits); i++ {
+		if err := res.Hits[i].Unmarshal(&recs[i]); err != nil {
+			return nil, err
+		}
+	}
+	return recs, nil
 }
