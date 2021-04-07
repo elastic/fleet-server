@@ -64,6 +64,7 @@ func (l *Logger) Sync() {
 func Init(cfg *config.Config) (*Logger, error) {
 	var err error
 	once.Do(func() {
+
 		var l zerolog.Logger
 		var w WriterSync
 		l, w, err = configure(cfg)
@@ -78,6 +79,11 @@ func Init(cfg *config.Config) (*Logger, error) {
 		}
 
 		zerolog.TimeFieldFormat = time.StampMicro
+
+		// override the field names for ECS
+		zerolog.TimestampFieldName = "@timestamp"
+		zerolog.LevelFieldName = "log.level"
+		zerolog.MessageFieldName = "message"
 
 		log.Info().
 			Int("pid", os.Getpid()).
