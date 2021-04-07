@@ -18,14 +18,15 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"github.com/julienschmidt/httprouter"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -37,25 +38,24 @@ const (
 
 var (
 	ErrUnknownEnrollType = errors.New("unknown enroll request type")
-	ErrServiceBusy       = errors.New("service busy")
-	ErrAgentIdFailure    = errors.New("agent persist failure")
 )
 
 type EnrollerT struct {
-	throttle *semaphore.Weighted
-	bulker   bulk.Bulk
-	cache    cache.Cache
+	bulker bulk.Bulk
+	cache  cache.Cache
+	limit  *limit.Limiter
 }
 
 func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk, c cache.Cache) (*EnrollerT, error) {
-	// This value has more to do with the throughput of elastic search than anything else
-	// if you have a large elastic search cluster, you can be more aggressive.
-	maxEnrollPending := cfg.MaxEnrollPending
+
+	log.Info().
+		Interface("limits", cfg.Limits.EnrollLimit).
+		Msg("Enroller install limits")
 
 	return &EnrollerT{
-		throttle: semaphore.NewWeighted(maxEnrollPending),
-		bulker:   bulker,
-		cache:    c,
+		limit:  limit.NewLimiter(&cfg.Limits.EnrollLimit),
+		bulker: bulker,
+		cache:  c,
 	}, nil
 
 }
@@ -72,21 +72,27 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 	data, err := rt.et.handleEnroll(r)
 
 	if err != nil {
-		code := http.StatusBadRequest
-		if err == ErrServiceBusy {
+		lvl := zerolog.DebugLevel
+
+		var code int
+		switch err {
+		case limit.ErrRateLimit, limit.ErrMaxLimit:
+			code = http.StatusTooManyRequests
+		case context.Canceled:
 			code = http.StatusServiceUnavailable
+		default:
+			lvl = zerolog.InfoLevel
+			code = http.StatusBadRequest
 		}
 
-		// Don't log connection drops
-		if err != context.Canceled {
-			log.Error().
-				Str("mod", kEnrollMod).
-				Int("code", code).
-				Err(err).Dur("tdiff", time.Since(start)).
-				Msg("Enroll fail")
-		}
+		log.WithLevel(lvl).
+			Err(err).
+			Str("mod", kEnrollMod).
+			Int("code", code).
+			Dur("tdiff", time.Since(start)).
+			Msg("Enroll fail")
 
-		http.Error(w, err.Error(), code)
+		http.Error(w, "", code)
 		return
 	}
 
@@ -102,32 +108,13 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		Msg("handleEnroll OK")
 }
 
-func (et *EnrollerT) acquireSemaphore(ctx context.Context) error {
-	start := time.Now()
-
-	// Wait a reasonable amount of time, but if busy for N seconds; ask to come back later.
-	acquireCtx, cancelF := context.WithTimeout(ctx, time.Second*10)
-	defer cancelF()
-
-	if err := et.throttle.Acquire(acquireCtx, 1); err != nil {
-		return ErrServiceBusy
-	}
-
-	log.Trace().
-		Str("mod", kEnrollMod).
-		Dur("tdiff", time.Since(start)).
-		Msg("Enroll acquire")
-
-	return nil
-}
-
 func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 
-	if err := et.acquireSemaphore(r.Context()); err != nil {
+	limitF, err := et.limit.Acquire()
+	if err != nil {
 		return nil, err
 	}
-
-	defer et.throttle.Release(1)
+	defer limitF()
 
 	key, err := authApiKey(r, et.bulker.Client(), et.cache)
 	if err != nil {

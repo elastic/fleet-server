@@ -14,7 +14,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
-	"strings"
 	"testing"
 	"time"
 
@@ -172,7 +171,7 @@ func TestServerUnauthorized(t *testing.T) {
 			}
 
 			raw, _ := ioutil.ReadAll(res.Body)
-			diff = cmp.Diff("no authorization header\n", string(raw))
+			diff = cmp.Diff("\n", string(raw))
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -181,7 +180,7 @@ func TestServerUnauthorized(t *testing.T) {
 
 	// Unauthorized, expecting error from /_security/_authenticate
 	t.Run("unauthorized", func(t *testing.T) {
-		const expectedErrResponsePrefix = `fail Auth: [401 Unauthorized]`
+
 		for _, u := range agenturls {
 			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}")))
 			require.NoError(t, err)
@@ -198,8 +197,9 @@ func TestServerUnauthorized(t *testing.T) {
 			}
 
 			raw, _ := ioutil.ReadAll(res.Body)
-			if !strings.HasPrefix(string(raw), expectedErrResponsePrefix) {
-				t.Fatalf("unexpected error: %s", string(raw))
+			diff = cmp.Diff("\n", string(raw))
+			if diff != "" {
+				t.Fatal(diff)
 			}
 		}
 	})
