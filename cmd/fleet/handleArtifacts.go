@@ -18,7 +18,9 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 
@@ -34,12 +36,32 @@ const (
 )
 
 var (
-	artThrottle       = throttle.NewThrottle(defaultMaxParallel)
 	ErrorThrottle     = errors.New("cannot acquire throttle token")
 	ErrorBadSha2      = errors.New("malformed sha256")
 	ErrorRecord       = errors.New("artifact record mismatch")
 	ErrorMismatchSha2 = errors.New("mismatched sha256")
 )
+
+type ArtifactT struct {
+	bulker     bulk.Bulk
+	cache      cache.Cache
+	esThrottle *throttle.Throttle
+	limit      *limit.Limiter
+}
+
+func NewArtifactT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *ArtifactT {
+	log.Info().
+		Interface("limits", cfg.Limits.ArtifactLimit).
+		Int("maxParallel", defaultMaxParallel).
+		Msg("Artifact install limits")
+
+	return &ArtifactT{
+		bulker:     bulker,
+		cache:      cache,
+		limit:      limit.NewLimiter(&cfg.Limits.ArtifactLimit),
+		esThrottle: throttle.NewThrottle(defaultMaxParallel),
+	}
+}
 
 func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	start := time.Now()
@@ -55,33 +77,7 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 		Str("remoteAddr", r.RemoteAddr).
 		Logger()
 
-	// Authenticate the APIKey; retrieve agent record.
-	// Note: This is going to be a bit slow even if we hit the cache on the api key.
-	// In order to validate that the agent still has that api key, we fetch the agent record from elastic.
-	agent, err := authAgent(r, "", rt.ct.bulker, rt.ct.cache)
-	if err != nil {
-		code := http.StatusUnauthorized
-		zlog.Info().
-			Err(err).
-			Int("code", code).
-			Msg("Fail auth")
-
-		http.Error(w, "", code)
-		return
-	}
-
-	zlog = zlog.With().
-		Str("APIKeyId", agent.AccessApiKeyId).
-		Str("agentId", agent.Id).
-		Logger()
-
-	ah := artHandler{
-		zlog:   zlog,
-		bulker: rt.ct.bulker,
-		c:      rt.ct.cache,
-	}
-
-	rdr, err := ah.handle(r.Context(), agent, id, sha2)
+	rdr, err := rt.at.handleArtifacts(r, zlog, id, sha2)
 
 	var nWritten int64
 	if err == nil {
@@ -94,7 +90,7 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 	}
 
 	if err != nil {
-		code, lvl := assessError(err)
+		code, lvl := rt.at.assessError(err)
 
 		zlog.WithLevel(lvl).
 			Err(err).
@@ -107,7 +103,30 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 	}
 }
 
-func assessError(err error) (int, zerolog.Level) {
+func (at ArtifactT) handleArtifacts(r *http.Request, zlog zerolog.Logger, id, sha2 string) (io.Reader, error) {
+	limitF, err := at.limit.Acquire()
+	if err != nil {
+		return nil, err
+	}
+	defer limitF()
+
+	// Authenticate the APIKey; retrieve agent record.
+	// Note: This is going to be a bit slow even if we hit the cache on the api key.
+	// In order to validate that the agent still has that api key, we fetch the agent record from elastic.
+	agent, err := authAgent(r, "", at.bulker, at.cache)
+	if err != nil {
+		return nil, err
+	}
+
+	zlog = zlog.With().
+		Str("APIKeyId", agent.AccessApiKeyId).
+		Str("agentId", agent.Id).
+		Logger()
+
+	return at.handle(r.Context(), zlog, agent, id, sha2)
+}
+
+func (at ArtifactT) assessError(err error) (int, zerolog.Level) {
 	lvl := zerolog.DebugLevel
 
 	// TODO: return a 503 on elastic timeout, connection drop
@@ -120,11 +139,12 @@ func assessError(err error) (int, zerolog.Level) {
 		// show up in the logs at a higher level than debug
 		lvl = zerolog.WarnLevel
 		code = http.StatusNotFound
-	case ErrorThrottle:
+	case ErrorThrottle, limit.ErrRateLimit, limit.ErrMaxLimit:
 		code = http.StatusTooManyRequests
 	case context.Canceled:
 		code = http.StatusServiceUnavailable
 	default:
+		lvl = zerolog.InfoLevel
 		code = http.StatusBadRequest
 	}
 
@@ -137,7 +157,7 @@ type artHandler struct {
 	c      cache.Cache
 }
 
-func (ah artHandler) handle(ctx context.Context, agent *model.Agent, id, sha2 string) (io.Reader, error) {
+func (at ArtifactT) handle(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
 
 	// Input validation
 	if err := validateSha2String(sha2); err != nil {
@@ -145,13 +165,13 @@ func (ah artHandler) handle(ctx context.Context, agent *model.Agent, id, sha2 st
 	}
 
 	// Determine whether the agent should have access to this artifact
-	if err := ah.authorizeArtifact(ctx, agent, id, sha2); err != nil {
-		ah.zlog.Warn().Err(err).Msg("Unauthorized GET on artifact")
+	if err := at.authorizeArtifact(ctx, agent, id, sha2); err != nil {
+		zlog.Warn().Err(err).Msg("Unauthorized GET on artifact")
 		return nil, err
 	}
 
 	// Grab artifact, whether from cache or elastic.
-	artifact, err := ah.getArtifact(ctx, id, sha2)
+	artifact, err := at.getArtifact(ctx, zlog, id, sha2)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +179,7 @@ func (ah artHandler) handle(ctx context.Context, agent *model.Agent, id, sha2 st
 	// Sanity check; just in case something underneath is misbehaving
 	if artifact.Identifier != id || artifact.DecodedSha256 != sha2 {
 		err = ErrorRecord
-		ah.zlog.Info().
+		zlog.Info().
 			Err(err).
 			Str("artifact_id", artifact.Identifier).
 			Str("artifact_sha2", artifact.DecodedSha256).
@@ -167,7 +187,7 @@ func (ah artHandler) handle(ctx context.Context, agent *model.Agent, id, sha2 st
 		return nil, err
 	}
 
-	ah.zlog.Debug().
+	zlog.Debug().
 		Int("sz", len(artifact.Body)).
 		Int64("decodedSz", artifact.DecodedSize).
 		Str("compression", artifact.CompressionAlgorithm).
@@ -189,31 +209,31 @@ func (ah artHandler) handle(ctx context.Context, agent *model.Agent, id, sha2 st
 //
 // Initial implementation is dependent on security by obscurity; ie.
 // it should be difficult for an attacker to guess a guid.
-func (ah artHandler) authorizeArtifact(ctx context.Context, agent *model.Agent, ident, sha2 string) error {
+func (at ArtifactT) authorizeArtifact(ctx context.Context, agent *model.Agent, ident, sha2 string) error {
 	return nil // TODO
 }
 
 // Return artifact from cache by sha2 or fetch directly from Elastic.
 // Update cache on successful retrieval from Elastic.
-func (ah artHandler) getArtifact(ctx context.Context, ident, sha2 string) (*model.Artifact, error) {
+func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident, sha2 string) (*model.Artifact, error) {
 
 	// Check the cache; return immediately if found.
-	if artifact, ok := ah.c.GetArtifact(ident, sha2); ok {
+	if artifact, ok := at.cache.GetArtifact(ident, sha2); ok {
 		return &artifact, nil
 	}
 
 	// Fetch the artifact from elastic
-	art, err := ah.fetchArtifact(ctx, ident, sha2)
+	art, err := at.fetchArtifact(ctx, zlog, ident, sha2)
 
 	if err != nil {
-		ah.zlog.Info().Err(err).Msg("Fail retrieve artifact")
+		zlog.Info().Err(err).Msg("Fail retrieve artifact")
 		return nil, err
 	}
 
 	// The 'Body' field type is Raw; extract to string.
 	var srcPayload string
 	if err = json.Unmarshal(art.Body, &srcPayload); err != nil {
-		ah.zlog.Error().Err(err).Msg("Cannot unmarshal artifact payload")
+		zlog.Error().Err(err).Msg("Cannot unmarshal artifact payload")
 		return nil, err
 	}
 
@@ -222,13 +242,13 @@ func (ah artHandler) getArtifact(ctx context.Context, ident, sha2 string) (*mode
 	// to avoid having to decode on each cache hit.
 	dstPayload, err := base64.StdEncoding.DecodeString(srcPayload)
 	if err != nil {
-		ah.zlog.Error().Err(err).Msg("Fail base64 decode artifact")
+		zlog.Error().Err(err).Msg("Fail base64 decode artifact")
 		return nil, err
 	}
 
 	// Validate the sha256 hash; this is just good hygiene.
 	if err = validateSha2Data(dstPayload, art.EncodedSha256); err != nil {
-		ah.zlog.Error().Err(err).Msg("Fail sha2 hash validation")
+		zlog.Error().Err(err).Msg("Fail sha2 hash validation")
 		return nil, err
 	}
 
@@ -236,7 +256,7 @@ func (ah artHandler) getArtifact(ctx context.Context, ident, sha2 string) (*mode
 	art.Body = dstPayload
 
 	// Update the cache.
-	ah.c.SetArtifact(*art, defaultCacheTTL)
+	at.cache.SetArtifact(*art, defaultCacheTTL)
 
 	return art, nil
 }
@@ -245,18 +265,18 @@ func (ah artHandler) getArtifact(ctx context.Context, ident, sha2 string) (*mode
 // TODO: Design a mechanism to mitigate a DDOS attack on bogus hashes.
 // Perhaps have a cache of the most recently used hashes available, and items that aren't
 // in the cache can do a lookup but throttle as below.  We could update the cache every 10m or so.
-func (ah artHandler) fetchArtifact(ctx context.Context, ident, sha2 string) (*model.Artifact, error) {
+func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, ident, sha2 string) (*model.Artifact, error) {
 	// Throttle prevents more than N outstanding requests to elastic globally and per sha2.
-	if token := artThrottle.Acquire(sha2, defaultThrottleTTL); token == nil {
+	if token := at.esThrottle.Acquire(sha2, defaultThrottleTTL); token == nil {
 		return nil, ErrorThrottle
 	} else {
 		defer token.Release()
 	}
 
 	start := time.Now()
-	artifact, err := dl.FindArtifact(ctx, ah.bulker, ident, sha2)
+	artifact, err := dl.FindArtifact(ctx, at.bulker, ident, sha2)
 
-	ah.zlog.Info().
+	zlog.Info().
 		Err(err).
 		Dur("rtt", time.Since(start)).
 		Msg("fetch artifact")

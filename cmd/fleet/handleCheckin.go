@@ -6,6 +6,8 @@ package fleet
 
 import (
 	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,6 +20,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -25,38 +28,55 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 var (
 	ErrAgentNotFound = errors.New("agent not found")
-
-	kCheckinTimeout  = 30 * time.Second
-	kLongPollTimeout = 300 * time.Second // 5m
 )
 
+const kEncodingGzip = "gzip"
+
 func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	// TODO: Consider rate limit here
 
 	id := ps.ByName("id")
 	err := rt.ct._handleCheckin(w, r, id, rt.bulker)
 
 	if err != nil {
-		code := http.StatusBadRequest
-		if err == ErrAgentNotFound {
+		lvl := zerolog.DebugLevel
+
+		var code int
+		switch err {
+		case ErrAgentNotFound:
 			code = http.StatusNotFound
+			lvl = zerolog.WarnLevel
+		case limit.ErrRateLimit:
+			code = http.StatusTooManyRequests
+		case limit.ErrMaxLimit:
+			// Log this as warn for visibility that limit has been reached.
+			// This allows customers to tune the configuration on detection of threshold.
+			code = http.StatusTooManyRequests
+			lvl = zerolog.WarnLevel
+		case context.Canceled:
+			code = http.StatusServiceUnavailable
+		default:
+			lvl = zerolog.InfoLevel
+			code = http.StatusBadRequest
 		}
 
-		// Don't log connection drops
-		if err != context.Canceled {
-			log.Error().Err(err).Str("id", id).Int("code", code).Msg("fail checkin")
-		}
-		http.Error(w, err.Error(), code)
+		log.WithLevel(lvl).
+			Err(err).
+			Str("id", id).
+			Int("code", code).
+			Msg("fail checkin")
+
+		http.Error(w, "", code)
 	}
 }
 
 type CheckinT struct {
-	cfg    *config.Config
+	cfg    *config.Server
 	cache  cache.Cache
 	bc     *BulkCheckin
 	pm     policy.Monitor
@@ -64,10 +84,11 @@ type CheckinT struct {
 	ad     *action.Dispatcher
 	tr     *action.TokenResolver
 	bulker bulk.Bulk
+	limit  *limit.Limiter
 }
 
 func NewCheckinT(
-	cfg *config.Config,
+	cfg *config.Server,
 	c cache.Cache,
 	bc *BulkCheckin,
 	pm policy.Monitor,
@@ -76,7 +97,14 @@ func NewCheckinT(
 	tr *action.TokenResolver,
 	bulker bulk.Bulk,
 ) *CheckinT {
-	return &CheckinT{
+
+	log.Info().
+		Interface("limits", cfg.Limits.CheckinLimit).
+		Dur("long_poll_timeout", cfg.Timeouts.CheckinLongPoll).
+		Dur("long_poll_timestamp", cfg.Timeouts.CheckinTimestamp).
+		Msg("Checkin install limits")
+
+	ct := &CheckinT{
 		cfg:    cfg,
 		cache:  c,
 		bc:     bc,
@@ -84,11 +112,20 @@ func NewCheckinT(
 		gcp:    gcp,
 		ad:     ad,
 		tr:     tr,
+		limit:  limit.NewLimiter(&cfg.Limits.CheckinLimit),
 		bulker: bulker,
 	}
+
+	return ct
 }
 
 func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk) error {
+
+	limitF, err := ct.limit.Acquire()
+	if err != nil {
+		return err
+	}
+	defer limitF()
 
 	agent, err := authAgent(r, id, ct.bulker, ct.cache)
 
@@ -130,11 +167,11 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	defer ct.pm.Unsubscribe(sub)
 
 	// Update check-in timestamp on timeout
-	tick := time.NewTicker(kCheckinTimeout)
+	tick := time.NewTicker(ct.cfg.Timeouts.CheckinTimestamp)
 	defer tick.Stop()
 
 	// Chill out for for a bit. Long poll.
-	longPoll := time.NewTicker(kLongPollTimeout)
+	longPoll := time.NewTicker(ct.cfg.Timeouts.CheckinLongPoll)
 	defer longPoll.Stop()
 
 	// Intial update on checkin, and any user fields that might have changed
@@ -187,18 +224,53 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		Actions:  actions,
 	}
 
-	data, err := json.Marshal(&resp)
+	return ct.writeResponse(w, r, resp)
+}
+
+func (ct *CheckinT) writeResponse(w http.ResponseWriter, r *http.Request, resp CheckinResponse) error {
+
+	payload, err := json.Marshal(&resp)
 	if err != nil {
 		return err
 	}
 
-	if _, err = w.Write(data); err != nil {
-		return err
+	compressionLevel := ct.cfg.CompressionLevel
+	compressThreshold := ct.cfg.CompressionThresh
+
+	if len(payload) > compressThreshold && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
+
+		zipper, err := gzip.NewWriterLevel(w, compressionLevel)
+		if err != nil {
+			return err
+		}
+
+		w.Header().Set("Content-Encoding", kEncodingGzip)
+
+		if _, err = zipper.Write(payload); err != nil {
+			return err
+		}
+
+		err = zipper.Close()
+
+		log.Trace().
+			Err(err).
+			Int("dataSz", len(payload)).
+			Int("lvl", compressionLevel).
+			Msg("Compressing checkin response")
+	} else {
+		_, err = w.Write(payload)
 	}
 
-	log.Trace().RawJSON("resp", data).Msg("checkin response")
+	return err
+}
 
-	return nil
+func acceptsEncoding(r *http.Request, encoding string) bool {
+	for _, v := range r.Header.Values("Accept-Encoding") {
+		if v == encoding {
+			return true
+		}
+	}
+	return false
 }
 
 // Resolve AckToken from request, fallback on the agent record
@@ -411,6 +483,7 @@ func parseMeta(agent *model.Agent, req *CheckinRequest) (fields Fields, err erro
 	}
 
 	if reqLocalMeta != nil && !reflect.DeepEqual(reqLocalMeta, agentLocalMeta) {
+		log.Trace().RawJSON("oldLocalMeta", agent.LocalMetadata).RawJSON("newLocalMeta", req.LocalMeta).Msg("Local metadata not equal")
 		log.Info().RawJSON("req.LocalMeta", req.LocalMeta).Msg("applying new local metadata")
 		fields = map[string]interface{}{
 			FieldLocalMetadata: req.LocalMeta,

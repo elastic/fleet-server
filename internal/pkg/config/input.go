@@ -5,6 +5,7 @@
 package config
 
 import (
+	"compress/flate"
 	"fmt"
 	"strings"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 )
 
-const kDefaultHost = "localhost"
+const kDefaultHost = "0.0.0.0"
 const kDefaultPort = 8220
 
 // Policy is the configuration policy to use.
@@ -22,24 +23,28 @@ type Policy struct {
 
 // ServerTimeouts is the configuration for the server timeouts
 type ServerTimeouts struct {
-	Read  time.Duration `config:"read"`
-	Write time.Duration `config:"write"`
+	Read             time.Duration `config:"read"`
+	Write            time.Duration `config:"write"`
+	CheckinTimestamp time.Duration `config:"checkin_timestamp"`
+	CheckinLongPoll  time.Duration `config:"checkin_long_poll"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *ServerTimeouts) InitDefaults() {
 	c.Read = 5 * time.Second
-	c.Write = 60 * 10 * time.Second // 10 minutes (long poll)
+	c.Write = 10 * time.Minute
+	c.CheckinTimestamp = 30 * time.Second
+	c.CheckinLongPoll = 5 * time.Minute
 }
 
-// ServerProfile is the configuration for profiling the server.
-type ServerProfile struct {
+// ServerProfiler is the configuration for profiling the server.
+type ServerProfiler struct {
 	Enabled bool   `config:"enabled"`
 	Bind    string `config:"bind"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
-func (c *ServerProfile) InitDefaults() {
+func (c *ServerProfiler) InitDefaults() {
 	c.Enabled = false
 	c.Bind = "localhost:6060"
 }
@@ -56,12 +61,10 @@ type Server struct {
 	Port              uint16            `config:"port"`
 	TLS               *tlscommon.Config `config:"ssl"`
 	Timeouts          ServerTimeouts    `config:"timeouts"`
-	MaxHeaderByteSize int               `config:"max_header_byte_size"`
-	RateLimitBurst    int               `config:"rate_limit_burst"`
-	RateLimitInterval time.Duration     `config:"rate_limit_interval"`
-	MaxConnections    int               `config:"max_connections"`
-	MaxEnrollPending  int64             `config:"max_enroll_pending"`
-	Profile           ServerProfile     `config:"profile"`
+	Profiler          ServerProfiler    `config:"profiler"`
+	CompressionLevel  int               `config:"compression_level"`
+	CompressionThresh int               `config:"compression_threshold"`
+	Limits            ServerLimits      `config:"limits"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -69,12 +72,10 @@ func (c *Server) InitDefaults() {
 	c.Host = kDefaultHost
 	c.Port = kDefaultPort
 	c.Timeouts.InitDefaults()
-	c.MaxHeaderByteSize = 8192 // 8k
-	c.RateLimitBurst = 1024
-	c.RateLimitInterval = 5 * time.Millisecond
-	c.MaxConnections = 0 // no limit
-	c.MaxEnrollPending = 64
-	c.Profile.InitDefaults()
+	c.CompressionLevel = flate.BestSpeed
+	c.CompressionThresh = 1024
+	c.Profiler.InitDefaults()
+	c.Limits.InitDefaults()
 }
 
 // BindAddress returns the binding address for the HTTP server.

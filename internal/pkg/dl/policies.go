@@ -17,12 +17,8 @@ import (
 
 var (
 	tmplQueryLatestPolicies = prepareQueryLatestPolicies()
-
-	queryPolicyByID = preparePolicyFindByID()
+	ErrMissingAggregations  = errors.New("missing expected aggregation result")
 )
-
-var ErrPolicyLeaderNotFound = errors.New("policy has no leader")
-var ErrMissingAggregations = errors.New("missing expected aggregation result")
 
 func prepareQueryLatestPolicies() []byte {
 	root := dsl.NewRoot()
@@ -35,20 +31,6 @@ func prepareQueryLatestPolicies() []byte {
 	rSort.SortOrder(FieldRevisionIdx, dsl.SortDescend)
 	rSort.SortOrder(FieldCoordinatorIdx, dsl.SortDescend)
 	return root.MustMarshalJSON()
-}
-
-func preparePolicyFindByID() *dsl.Tmpl {
-	tmpl := dsl.NewTmpl()
-	root := dsl.NewRoot()
-
-	root.Size(1)
-	root.Query().Bool().Filter().Term(FieldPolicyId, tmpl.Bind(FieldPolicyId), nil)
-	sort := root.Sort()
-	sort.SortOrder(FieldRevisionIdx, dsl.SortDescend)
-	sort.SortOrder(FieldCoordinatorIdx, dsl.SortDescend)
-
-	tmpl.MustResolve(root)
-	return tmpl
 }
 
 // QueryLatestPolices gets the latest revision for a policy
