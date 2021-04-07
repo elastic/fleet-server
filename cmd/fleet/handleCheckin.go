@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -255,12 +256,19 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentId string) ([]model.Action, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	return dl.FindActions(ctx, ct.bulker, dl.QueryAgentActions, map[string]interface{}{
+	actions, err := dl.FindActions(ctx, ct.bulker, dl.QueryAgentActions, map[string]interface{}{
 		dl.FieldSeqNo:      seqno.Get(0),
 		dl.FieldMaxSeqNo:   ct.gcp.GetCheckpoint(),
 		dl.FieldExpiration: now,
 		dl.FieldAgents:     []string{agentId},
 	})
+	if err != nil {
+		if errors.Is(err, es.ErrIndexNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return actions, nil
 }
 
 func convertActions(agentId string, actions []model.Action) ([]ActionResp, string) {
