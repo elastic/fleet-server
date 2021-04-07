@@ -12,7 +12,6 @@ import (
 	"net/http"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/rate"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 	"github.com/elastic/beats/v7/libbeat/monitoring"
@@ -34,6 +33,10 @@ func init() {
 }
 
 func diagConn(c net.Conn, s http.ConnState) {
+	if c == nil {
+		return
+	}
+
 	log.Trace().
 		Str("local", c.LocalAddr().String()).
 		Str("remote", c.RemoteAddr().String()).
@@ -53,7 +56,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	addr := cfg.BindAddress()
 	rdto := cfg.Timeouts.Read
 	wrto := cfg.Timeouts.Write
-	mhbz := cfg.MaxHeaderByteSize
+	mhbz := cfg.Limits.MaxHeaderByteSize
 	bctx := func(net.Listener) context.Context { return ctx }
 
 	log.Info().
@@ -107,7 +110,6 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 		log.Warn().Msg("exposed over insecure HTTP; enablement of TLS is strongly recommended")
 	}
 
-	ln = wrapRateLimitter(ctx, ln, cfg)
 	ln = wrapConnLimitter(ctx, ln, cfg)
 	if err := server.Serve(ln); err != nil && err != context.Canceled {
 		return err
@@ -116,26 +118,8 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	return nil
 }
 
-func wrapRateLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) net.Listener {
-	rateLimitBurst := cfg.RateLimitBurst
-	rateLimitInterval := cfg.RateLimitInterval
-
-	if rateLimitInterval != 0 {
-		log.Info().
-			Dur("interval", rateLimitInterval).
-			Int("burst", rateLimitBurst).
-			Msg("Server rate limiter installed")
-
-		ln = rate.NewRateListener(ctx, ln, rateLimitBurst, rateLimitInterval)
-	} else {
-		log.Info().Msg("server connection rate limiter disabled")
-	}
-
-	return ln
-}
-
 func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) net.Listener {
-	hardLimit := cfg.MaxConnections
+	hardLimit := cfg.Limits.MaxConnections
 
 	if hardLimit != 0 {
 		log.Info().

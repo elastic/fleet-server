@@ -37,13 +37,13 @@ func TestRunServer(t *testing.T) {
 	require.NoError(t, err)
 	bulker := ftesting.MockBulk{}
 	pim := mock.NewMockIndexMonitor()
-	pm := policy.NewMonitor(bulker, pim, kPolicyThrottle)
+	pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
 	bc := NewBulkCheckin(nil)
-	ct := NewCheckinT(nil, c, bc, pm, nil, nil, nil, nil)
+	ct := NewCheckinT(cfg, c, bc, pm, nil, nil, nil, nil)
 	et, err := NewEnrollerT(cfg, nil, c)
 	require.NoError(t, err)
 
-	router := NewRouter(bulker, ct, et, nil)
+	router := NewRouter(bulker, ct, et, nil, nil, nil)
 	errCh := make(chan error)
 
 	var wg sync.WaitGroup

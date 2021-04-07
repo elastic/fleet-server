@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
 	"sync"
-	"time"
 
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/yaml"
@@ -38,8 +38,7 @@ import (
 )
 
 const (
-	kPolicyThrottle = time.Millisecond * 5
-	kAgentMode      = "agent-mode"
+	kAgentMode = "agent-mode"
 )
 
 func installSignalHandler() context.Context {
@@ -422,12 +421,12 @@ func (f *FleetServer) Run(ctx context.Context) error {
 		}
 
 		// Restart profiler
-		if curCfg == nil || curCfg.Inputs[0].Server.Profile.Enabled != newCfg.Inputs[0].Server.Profile.Enabled || curCfg.Inputs[0].Server.Profile.Bind != newCfg.Inputs[0].Server.Profile.Bind {
+		if curCfg == nil || curCfg.Inputs[0].Server.Profiler.Enabled != newCfg.Inputs[0].Server.Profiler.Enabled || curCfg.Inputs[0].Server.Profiler.Bind != newCfg.Inputs[0].Server.Profiler.Bind {
 			stop(proCancel, proEg)
 			proEg, proCancel = nil, nil
-			if newCfg.Inputs[0].Server.Profile.Enabled {
+			if newCfg.Inputs[0].Server.Profiler.Enabled {
 				proEg, proCancel = start(ctx, func(ctx context.Context) error {
-					return profile.RunProfiler(ctx, newCfg.Inputs[0].Server.Profile.Bind)
+					return profile.RunProfiler(ctx, newCfg.Inputs[0].Server.Profiler.Bind)
 				}, ech)
 			}
 		}
@@ -471,7 +470,19 @@ func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error 
 	}
 }
 
+func initRuntime(cfg *config.Config) {
+	if cfg.Runtime.GCPercent != 0 {
+		old := debug.SetGCPercent(cfg.Runtime.GCPercent)
+
+		log.Info().
+			Int("old", old).
+			Int("new", cfg.Runtime.GCPercent).
+			Msg("SetGCPercent")
+	}
+}
+
 func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
+	initRuntime(cfg)
 
 	// The metricsServer is only enabled if http.enabled is set in the config
 	metricsServer, err := f.initMetrics(ctx, cfg)
@@ -506,7 +517,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	g.Go(loggedRunFunc(ctx, "Coordinator policy monitor", cord.Run))
 
 	// Policy monitor
-	pm := policy.NewMonitor(bulker, pim, kPolicyThrottle)
+	pm := policy.NewMonitor(bulker, pim, cfg.Inputs[0].Server.Limits.PolicyThrottle)
 	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
 
 	// Policy self monitor
@@ -534,12 +545,16 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	bc := NewBulkCheckin(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
-	ct := NewCheckinT(f.cfg, f.cache, bc, pm, am, ad, tr, bulker)
+	ct := NewCheckinT(&f.cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
 	et, err := NewEnrollerT(&f.cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
 	}
-	router := NewRouter(bulker, ct, et, sm)
+
+	at := NewArtifactT(&f.cfg.Inputs[0].Server, bulker, f.cache)
+	ack := NewAckT(&f.cfg.Inputs[0].Server, bulker, f.cache)
+
+	router := NewRouter(bulker, ct, et, at, ack, sm)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &f.cfg.Inputs[0].Server)
