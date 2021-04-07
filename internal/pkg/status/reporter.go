@@ -25,10 +25,8 @@ func NewLog() *Log {
 }
 
 // Status triggers updating the status.
-func (l *Log) Status(status proto.StateObserved_Status, message string, payload map[string]interface{}) error {
-	log.Info().Str("status", status.String()).Fields(map[string]interface{}{
-		"payload": payload,
-	}).Msg(message)
+func (l *Log) Status(status proto.StateObserved_Status, message string, _ map[string]interface{}) error {
+	log.Info().Str("status", status.String()).Msg(message)
 	return nil
 }
 

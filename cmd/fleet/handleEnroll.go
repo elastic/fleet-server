@@ -297,7 +297,7 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	}
 
 	// Pull API key record from .fleet-enrollment-api-keys
-	rec, err := dl.FindEnrollmentAPIKey(ctx, et.bulker, dl.QueryEnrollmentAPIKeyByID, id)
+	rec, err := dl.FindEnrollmentAPIKey(ctx, et.bulker, dl.QueryEnrollmentAPIKeyByID, dl.FieldApiKeyID, id)
 	if err != nil {
 		return nil, err
 	}
