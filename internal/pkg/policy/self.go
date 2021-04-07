@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/rs/zerolog"
@@ -24,6 +25,11 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 )
+
+// DefaultCheckTime is the default interval for self to check for its policy.
+const DefaultCheckTime = 5 * time.Second
+
+type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error)
 
 type SelfMonitor interface {
 	// Run runs the monitor.
@@ -46,8 +52,10 @@ type selfMonitorT struct {
 
 	policy *model.Policy
 
-	policyF       policyFetcher
-	policiesIndex string
+	policyF          policyFetcher
+	policiesIndex    string
+	enrollmentTokenF enrollmentTokenFetcher
+	checkTime        time.Duration
 }
 
 // NewSelfMonitor creates the self policy monitor.
@@ -56,15 +64,17 @@ type selfMonitorT struct {
 // has a Fleet Server input defined.
 func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monitor, policyId string, reporter status.Reporter) SelfMonitor {
 	return &selfMonitorT{
-		log:           log.With().Str("ctx", "policy self monitor").Logger(),
-		fleet:         fleet,
-		bulker:        bulker,
-		monitor:       monitor,
-		policyId:      policyId,
-		status:        proto.StateObserved_STARTING,
-		reporter:      reporter,
-		policyF:       dl.QueryLatestPolicies,
-		policiesIndex: dl.FleetPolicies,
+		log:              log.With().Str("ctx", "policy self monitor").Logger(),
+		fleet:            fleet,
+		bulker:           bulker,
+		monitor:          monitor,
+		policyId:         policyId,
+		status:           proto.StateObserved_STARTING,
+		reporter:         reporter,
+		policyF:          dl.QueryLatestPolicies,
+		policiesIndex:    dl.FleetPolicies,
+		enrollmentTokenF: findEnrollmentAPIKeys,
+		checkTime:        DefaultCheckTime,
 	}
 }
 
@@ -78,11 +88,20 @@ func (m *selfMonitorT) Run(ctx context.Context) error {
 		return err
 	}
 
+	cT := time.NewTimer(m.checkTime)
+	defer cT.Stop()
+
 LOOP:
 	for {
 		select {
 		case <-ctx.Done():
 			break LOOP
+		case <-cT.C:
+			err := m.process(ctx)
+			if err != nil {
+				return err
+			}
+			cT.Reset(m.checkTime)
 		case hits := <-s.Output():
 			policies := make([]model.Policy, len(hits))
 			for i, hit := range hits {
@@ -118,7 +137,7 @@ func (m *selfMonitorT) process(ctx context.Context) error {
 		}
 	}
 	if len(policies) == 0 {
-		m.updateStatus()
+		m.updateStatus(ctx)
 		return nil
 	}
 	return m.processPolicies(ctx, policies)
@@ -139,7 +158,7 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 			break
 		}
 	}
-	return m.updateStatus()
+	return m.updateStatus(ctx)
 }
 
 func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.Policy {
@@ -160,7 +179,7 @@ func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.P
 	return latest
 }
 
-func (m *selfMonitorT) updateStatus() error {
+func (m *selfMonitorT) updateStatus(ctx context.Context) error {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
@@ -186,15 +205,36 @@ func (m *selfMonitorT) updateStatus() error {
 
 	status := proto.StateObserved_HEALTHY
 	extendMsg := ""
+	var payload map[string]interface{}
 	if m.fleet.Agent.ID == "" {
 		status = proto.StateObserved_DEGRADED
 		extendMsg = "; missing config fleet.agent.id"
+
+		// Elastic Agent has not been enrolled; Fleet Server passes back the enrollment token so the Elastic Agent
+		// can perform enrollment.
+		tokens, err := m.enrollmentTokenF(ctx, m.bulker, m.policy.PolicyId)
+		if err != nil {
+			return err
+		}
+		tokens = filterActiveTokens(tokens)
+		if len(tokens) == 0 {
+			// no tokens created for the policy, still starting
+			if m.policyId == "" {
+				m.reporter.Status(proto.StateObserved_STARTING, "Waiting on active enrollment keys to be created in default policy with Fleet Server integration", nil)
+			} else {
+				m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", m.policyId), nil)
+			}
+			return nil
+		}
+		payload = map[string]interface{}{
+			"enrollment_token": tokens[0].ApiKey,
+		}
 	}
 	m.status = status
 	if m.policyId == "" {
-		m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), nil)
+		m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), payload)
 	} else {
-		m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyId, extendMsg), nil)
+		m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyId, extendMsg), payload)
 	}
 	return nil
 }
@@ -214,4 +254,18 @@ func (d *policyData) HasType(val string) bool {
 		}
 	}
 	return false
+}
+
+func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error) {
+	return dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyId, policyID)
+}
+
+func filterActiveTokens(tokens []model.EnrollmentApiKey) []model.EnrollmentApiKey {
+	active := make([]model.EnrollmentApiKey, 0, len(tokens))
+	for _, t := range tokens {
+		if t.Active {
+			active = append(active, t)
+		}
+	}
+	return active
 }
