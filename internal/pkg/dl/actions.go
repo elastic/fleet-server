@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -86,6 +87,7 @@ func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index st
 	res, err := Search(ctx, bulker, tmpl, index, params)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
+			log.Debug().Str("index", index).Msg(es.ErrIndexNotFound.Error())
 			err = nil
 		}
 		return nil, err
