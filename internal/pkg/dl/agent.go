@@ -6,13 +6,10 @@ package dl
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-
-	"github.com/gofrs/uuid"
 )
 
 const (
@@ -48,16 +45,4 @@ func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name strin
 
 	err = res.Hits[0].Unmarshal(&agent)
 	return agent, err
-}
-
-func IndexAgent(ctx context.Context, bulker bulk.Bulk, agent model.Agent) error {
-	if agent.Id == "" {
-		agent.Id = uuid.Must(uuid.NewV4()).String()
-	}
-	body, err := json.Marshal(agent)
-	if err != nil {
-		return err
-	}
-	_, err = bulker.Index(ctx, FleetAgents, agent.Id, body, bulk.WithRefresh())
-	return err
 }
