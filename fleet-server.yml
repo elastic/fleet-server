@@ -52,7 +52,6 @@ runtime:
 
 logging:
   to_stderr: true # Force the logging output to stderr
-  pretty: true    # Output pretty logging in stderr mode
   #level: trace
 
 # Enables the stats endpoint under http://localhost:5601 by default.
