@@ -33,7 +33,10 @@ import (
 )
 
 var (
-	ErrAgentNotFound = errors.New("agent not found")
+	ErrAgentNotFound    = errors.New("agent not found")
+	ErrNoOutputPerms    = errors.New("output permission sections not found")
+	ErrNoPolicyOutput   = errors.New("output section not found")
+	ErrFailInjectApiKey = errors.New("fail inject api key")
 )
 
 const kEncodingGzip = "gzip"
@@ -202,14 +205,14 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 				actions = append(actions, acs...)
 				break LOOP
 			case policy := <-sub.Output():
-				actionResp, err := parsePolicy(ctx, bulker, agent.Id, policy)
+				actionResp, err := processPolicy(ctx, bulker, agent.Id, policy)
 				if err != nil {
 					return err
 				}
 				actions = append(actions, *actionResp)
 				break LOOP
 			case <-longPoll.C:
-				log.Trace().Msg("Fire long poll")
+				log.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
 				ct.bc.CheckIn(agent.Id, nil, seqno)
@@ -217,7 +220,6 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		}
 	}
 
-	// For now, empty response
 	resp := CheckinResponse{
 		AckToken: ackToken,
 		Action:   "checkin",
@@ -256,7 +258,7 @@ func (ct *CheckinT) writeResponse(w http.ResponseWriter, r *http.Request, resp C
 			Err(err).
 			Int("dataSz", len(payload)).
 			Int("lvl", compressionLevel).
-			Msg("Compressing checkin response")
+			Msg("compressing checkin response")
 	} else {
 		_, err = w.Write(payload)
 	}
@@ -315,7 +317,7 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 		respList = append(respList, ActionResp{
 			AgentId:   agentId,
 			CreatedAt: action.Timestamp,
-			Data:      []byte(action.Data),
+			Data:      action.Data,
 			Id:        action.ActionId,
 			Type:      action.Type,
 			InputType: action.InputType,
@@ -329,105 +331,138 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 	return respList, ackToken
 }
 
-func parsePolicy(ctx context.Context, bulker bulk.Bulk, agentId string, p model.Policy) (*ActionResp, error) {
-	// Need to inject the default api key into the object. So:
-	// 1) Deserialize the action
-	// 2) Lookup the DefaultApiKey in the save agent (we purposefully didn't decode it before)
-	// 3) If not there, generate and persist DefaultAPIKey
-	// 4) Inject default api key into structure
-	// 5) Re-serialize and return AgentResp structure
+// A new policy exists for this agent.  Perform the following:
+//  - Generate and update default ApiKey if roles have changed.
+//  - Rewrite the policy for delivery to the agent injecting the key material.
+//
+func processPolicy(ctx context.Context, bulker bulk.Bulk, agentId string, pp *policy.ParsedPolicy) (*ActionResp, error) {
 
-	// using json.RawMessage to avoid the full json de-serialization
-	var actionObj map[string]json.RawMessage
-	if err := json.Unmarshal(p.Data, &actionObj); err != nil {
-		return nil, err
+	zlog := log.With().
+		Str("ctx", "processPolicy").
+		Str("agentId", agentId).
+		Str("policyId", pp.Policy.PolicyId).
+		Logger()
+
+	// The parsed policy object contains a map of name->role with a precalculated sha2.
+	defaultRole, ok := pp.Roles[policy.DefaultOutputName]
+	if !ok {
+		zlog.Error().Str("name", policy.DefaultOutputName).Msg("policy does not contain required output permission section")
+		return nil, ErrNoOutputPerms
 	}
 
-	// Repull and decode the agent object
-	var agent model.Agent
+	// Repull and decode the agent object.  Do not trust the cache.
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldId, agentId)
 	if err != nil {
+		zlog.Error().Err(err).Msg("fail find agent record")
 		return nil, err
 	}
 
-	// Check if need to generate a new output api key
-	var (
-		hash    string
-		needKey bool
-		roles   []byte
-	)
-
-	if agent.DefaultApiKey == "" {
-		hash, roles, err = policy.GetRoleDescriptors(actionObj[policy.OutputPermissionsProperty])
-		if err != nil {
-			return nil, err
-		}
-		needKey = true
-		log.Debug().Str("agentId", agentId).Msg("agent API key is not present")
-	} else {
-		hash, roles, needKey, err = policy.CheckOutputPermissionsChanged(agent.PolicyOutputPermissionsHash, actionObj[policy.OutputPermissionsProperty])
-		if err != nil {
-			return nil, err
-		}
-		if needKey {
-			log.Debug().Str("agentId", agentId).Msg("policy output permissions changed")
-		} else {
-			log.Debug().Str("agentId", agentId).Msg("policy output permissions are the same")
-		}
+	// Determine whether we need to generate a default output ApiKey.
+	// This is accomplished by comparing the sha2 hash stored in the agent
+	// record with the precalculated sha2 hash of the role.
+	needKey := true
+	switch {
+	case agent.DefaultApiKey == "":
+		zlog.Debug().Msg("must generate api key as default API key is not present")
+	case defaultRole.Sha2 != agent.PolicyOutputPermissionsHash:
+		zlog.Debug().Msg("must generate api key as policy output permissions changed")
+	default:
+		needKey = false
+		zlog.Debug().Msg("policy output permissions are the same")
 	}
 
 	if needKey {
-		log.Debug().Str("agentId", agentId).RawJSON("roles", roles).Str("hash", hash).Msg("generating a new API key")
-		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agent.Id, policy.DefaultOutputName, roles)
+		zlog.Debug().
+			RawJSON("roles", defaultRole.Raw).
+			Str("oldHash", agent.PolicyOutputPermissionsHash).
+			Str("newHash", defaultRole.Sha2).
+			Msg("Generating a new API key")
+
+		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agent.Id, policy.DefaultOutputName, defaultRole.Raw)
+		if err != nil {
+			zlog.Error().Err(err).Msg("fail generate output key")
+			return nil, err
+		}
+
+		zlog.Info().
+			Str("hash", defaultRole.Sha2).
+			Str("apiKeyId", defaultOutputApiKey.Id).
+			Msg("Updating agent record to pick up default output key.")
+
+		fields := map[string]interface{}{
+			dl.FieldDefaultApiKey:               defaultOutputApiKey.Agent(),
+			dl.FieldDefaultApiKeyId:             defaultOutputApiKey.Id,
+			dl.FieldPolicyOutputPermissionsHash: defaultRole.Sha2,
+		}
+
+		body, err := json.Marshal(map[string]interface{}{
+			"doc": fields,
+		})
 		if err != nil {
 			return nil, err
 		}
-		agent.DefaultApiKey = defaultOutputApiKey.Agent()
-		agent.DefaultApiKeyId = defaultOutputApiKey.Id
-		agent.PolicyOutputPermissionsHash = hash
 
-		log.Info().Str("agentId", agentId).Msg("rewriting full agent record to pick up default output key.")
-		if err = dl.IndexAgent(ctx, bulker, agent); err != nil {
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body); err != nil {
+			zlog.Error().Err(err).Msg("fail update agent record")
 			return nil, err
 		}
 	}
 
-	// Parse the outputs maps in order to inject the api key
-	const outputsProperty = "outputs"
-	outputs, err := smap.Parse(actionObj[outputsProperty])
+	rewrittenPolicy, err := rewritePolicy(pp, agent.DefaultApiKey)
 	if err != nil {
+		zlog.Error().Err(err).Msg("fail rewrite policy")
 		return nil, err
 	}
 
-	if outputs != nil {
-		if ok := setMapObj(outputs, agent.DefaultApiKey, "default", "api_key"); !ok {
-			log.Debug().Msg("cannot inject api_key into policy")
-		} else {
-			outputRaw, err := json.Marshal(outputs)
-			if err != nil {
-				return nil, err
-			}
-			actionObj[outputsProperty] = json.RawMessage(outputRaw)
-		}
-	}
-
-	dataJSON, err := json.Marshal(struct {
-		Policy map[string]json.RawMessage `json:"policy"`
-	}{actionObj})
-	if err != nil {
-		return nil, err
-	}
-
-	r := policy.RevisionFromPolicy(p)
+	r := policy.RevisionFromPolicy(pp.Policy)
 	resp := ActionResp{
 		AgentId:   agent.Id,
-		CreatedAt: p.Timestamp,
-		Data:      dataJSON,
+		CreatedAt: pp.Policy.Timestamp,
+		Data:      rewrittenPolicy,
 		Id:        r.String(),
 		Type:      TypePolicyChange,
 	}
 
 	return &resp, nil
+}
+
+// Return Serializable policy injecting the apikey into the output field.
+// This avoids reallocation of each section of the policy by duping
+// the map object and only replacing the targeted section.
+func rewritePolicy(pp *policy.ParsedPolicy, apiKey string) (interface{}, error) {
+
+	// Parse the outputs maps in order to inject the api key
+	const outputsProperty = "outputs"
+	outputs, err := smap.Parse(pp.Fields[outputsProperty])
+	if err != nil {
+		return nil, err
+	}
+
+	if outputs == nil {
+		return nil, ErrNoPolicyOutput
+	}
+
+	if ok := setMapObj(outputs, apiKey, "default", "api_key"); !ok {
+		return nil, ErrFailInjectApiKey
+	}
+
+	outputRaw, err := json.Marshal(outputs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Dupe field map; pp is immutable
+	fields := make(map[string]json.RawMessage, len(pp.Fields))
+
+	for k, v := range pp.Fields {
+		fields[k] = v
+	}
+
+	fields[outputsProperty] = json.RawMessage(outputRaw)
+
+	return struct {
+		Policy map[string]json.RawMessage `json:"policy"`
+	}{fields}, nil
 }
 
 func setMapObj(obj map[string]interface{}, val interface{}, keys ...string) bool {
@@ -483,7 +518,7 @@ func parseMeta(agent *model.Agent, req *CheckinRequest) (fields Fields, err erro
 	}
 
 	if reqLocalMeta != nil && !reflect.DeepEqual(reqLocalMeta, agentLocalMeta) {
-		log.Trace().RawJSON("oldLocalMeta", agent.LocalMetadata).RawJSON("newLocalMeta", req.LocalMeta).Msg("Local metadata not equal")
+		log.Trace().RawJSON("oldLocalMeta", agent.LocalMetadata).RawJSON("newLocalMeta", req.LocalMeta).Msg("local metadata not equal")
 		log.Info().RawJSON("req.LocalMeta", req.LocalMeta).Msg("applying new local metadata")
 		fields = map[string]interface{}{
 			FieldLocalMetadata: req.LocalMeta,

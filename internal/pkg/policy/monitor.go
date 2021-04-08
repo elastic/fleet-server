@@ -27,7 +27,7 @@ var gCounter uint64
 
 type Subscription interface {
 	// Output returns a new policy that needs to be sent based on the current subscription.
-	Output() <-chan model.Policy
+	Output() <-chan *ParsedPolicy
 }
 
 type Monitor interface {
@@ -50,12 +50,12 @@ type subT struct {
 	revIdx   int64
 	coordIdx int64
 
-	c chan model.Policy
+	c chan *ParsedPolicy
 }
 
 type policyT struct {
-	policy model.Policy
-	subs   map[uint64]subT // map sub counter to channel
+	pp   ParsedPolicy
+	subs map[uint64]subT // map sub counter to channel
 }
 
 type monitorT struct {
@@ -74,7 +74,7 @@ type monitorT struct {
 }
 
 // Output returns a new policy that needs to be sent based on the current subscription.
-func (s *subT) Output() <-chan model.Policy {
+func (s *subT) Output() <-chan *ParsedPolicy {
 	return s.c
 }
 
@@ -177,7 +177,12 @@ func (m *monitorT) groupByLatest(policies []model.Policy) map[string]model.Polic
 func (m *monitorT) rollout(ctx context.Context, policy model.Policy) error {
 	zlog := m.log.With().Str("policyId", policy.PolicyId).Logger()
 
-	subs := m.updatePolicy(policy)
+	pp, err := NewParsedPolicy(policy)
+	if err != nil {
+		return err
+	}
+
+	subs := m.updatePolicy(pp)
 	if subs == nil {
 		return nil
 	}
@@ -206,7 +211,6 @@ func (m *monitorT) rollout(ctx context.Context, policy model.Policy) error {
 		Dur("throttle", m.throttle).
 		Msg("policy rollout begin")
 
-	var err error
 LOOP:
 	for _, s := range subs {
 
@@ -220,7 +224,7 @@ LOOP:
 		}
 
 		select {
-		case s.c <- policy:
+		case s.c <- pp:
 		default:
 			// Should never block on a channel; we created a channel of size one.
 			// A block here indicates a logic error somewheres.
@@ -239,40 +243,51 @@ LOOP:
 	return err
 }
 
-func (m *monitorT) updatePolicy(policy model.Policy) []subT {
+func (m *monitorT) updatePolicy(pp *ParsedPolicy) []subT {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
-	p, ok := m.policies[policy.PolicyId]
+	newPolicy := pp.Policy
+
+	p, ok := m.policies[newPolicy.PolicyId]
 	if !ok {
 		p = policyT{
-			policy: policy,
-			subs:   make(map[uint64]subT),
+			pp:   *pp,
+			subs: make(map[uint64]subT),
 		}
-		m.policies[policy.PolicyId] = p
+		m.policies[newPolicy.PolicyId] = p
+		m.log.Info().
+			Str("policyId", newPolicy.PolicyId).
+			Int64("rev", newPolicy.RevisionIdx).
+			Int64("coord", newPolicy.CoordinatorIdx).
+			Msg("new policy")
 		return nil
 	}
 
-	p.policy = policy
-	m.policies[policy.PolicyId] = p
+	oldPolicy := p.pp.Policy
 
-	if policy.CoordinatorIdx <= 0 {
-		// don't rollout new policy that has not passed through the coordinator
-		return nil
-	}
+	p.pp = *pp
+	m.policies[newPolicy.PolicyId] = p
 
 	m.log.Info().
-		Str("policyId", policy.PolicyId).
-		Int64("orev", p.policy.RevisionIdx).
-		Int64("nrev", policy.RevisionIdx).
-		Int64("ocoord", p.policy.CoordinatorIdx).
-		Int64("ncoord", policy.CoordinatorIdx).
-		Msg("new policy")
+		Str("policyId", newPolicy.PolicyId).
+		Int64("orev", oldPolicy.RevisionIdx).
+		Int64("nrev", newPolicy.RevisionIdx).
+		Int64("ocoord", oldPolicy.CoordinatorIdx).
+		Int64("ncoord", newPolicy.CoordinatorIdx).
+		Msg("policy revised")
+
+	if newPolicy.CoordinatorIdx <= 0 {
+		m.log.Info().
+			Str("policyId", newPolicy.PolicyId).
+			Msg("Do not roll out policy that has not pass through coordinator")
+		return nil
+	}
 
 	subs := make([]subT, 0, len(p.subs))
 	for idx, sub := range p.subs {
-		if p.policy.RevisionIdx > sub.revIdx ||
-			(p.policy.RevisionIdx == sub.revIdx && p.policy.CoordinatorIdx > sub.coordIdx) {
+		if newPolicy.RevisionIdx > sub.revIdx ||
+			(newPolicy.RevisionIdx == sub.revIdx && newPolicy.CoordinatorIdx > sub.coordIdx) {
 			// These subscriptions are one shot; delete from map.
 			delete(p.subs, idx)
 			subs = append(subs, sub)
@@ -308,16 +323,20 @@ func (m *monitorT) Subscribe(agentId string, policyId string, revisionIdx int64,
 		policyId: policyId,
 		revIdx:   revisionIdx,
 		coordIdx: coordinatorIdx,
-		c:        make(chan model.Policy, 1),
+		c:        make(chan *ParsedPolicy, 1),
 	}
 
 	m.mut.Lock()
 	p, ok := m.policies[policyId]
-	if (p.policy.RevisionIdx > revisionIdx && p.policy.CoordinatorIdx > 0) ||
-		(p.policy.RevisionIdx == revisionIdx && p.policy.CoordinatorIdx > coordinatorIdx) {
+
+	pRevIdx := p.pp.Policy.RevisionIdx
+	pCoordIdx := p.pp.Policy.CoordinatorIdx
+
+	if (pRevIdx > revisionIdx && pCoordIdx > 0) ||
+		(pRevIdx == revisionIdx && pCoordIdx > coordinatorIdx) {
 		// fill the channel, clear out id; no point putting it in map as it is already fired
 		s.idx = 0
-		s.c <- p.policy
+		s.c <- &p.pp
 	} else {
 		if !ok {
 			p = policyT{subs: make(map[uint64]subT)}
