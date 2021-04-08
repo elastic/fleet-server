@@ -85,7 +85,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()
-		diff := cmp.Diff(policy, subPolicy)
+		diff := cmp.Diff(policy, subPolicy.Policy)
 		if diff != "" {
 			t.Fatal(diff)
 		}
@@ -317,7 +317,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()
-		diff := cmp.Diff(policy, subPolicy)
+		diff := cmp.Diff(policy, subPolicy.Policy)
 		if diff != "" {
 			t.Fatal(diff)
 		}
