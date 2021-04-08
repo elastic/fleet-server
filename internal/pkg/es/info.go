@@ -39,7 +39,7 @@ func FetchESVersion(ctx context.Context, esCli *elasticsearch.Client) (version s
 	}
 
 	// Check error
-	err = TranslateError(res.StatusCode, sres.Error)
+	err = TranslateError(res.StatusCode, &sres.Error)
 	if err != nil {
 		return
 	}

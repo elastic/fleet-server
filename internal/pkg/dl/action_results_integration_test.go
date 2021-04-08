@@ -104,7 +104,7 @@ func TestActionResultsStored(t *testing.T) {
 
 	index, bulker, acrs := setupActionResults(ctx, t)
 
-	res, err := bulker.Search(ctx, []string{index}, []byte("{}"))
+	res, err := bulker.Search(ctx, index, []byte("{}"))
 	if err != nil {
 		t.Fatal(err)
 	}

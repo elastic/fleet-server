@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/coordinator"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -588,7 +589,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return err
 	}
 
-	bc := NewBulkCheckin(bulker)
+	bc := checkin.NewBulkCheckin(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
 	ct := NewCheckinT(f.verCon, &f.cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
