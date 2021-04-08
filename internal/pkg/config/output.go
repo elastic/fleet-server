@@ -31,6 +31,7 @@ type Elasticsearch struct {
 	Username          string            `config:"username"`
 	Password          string            `config:"password"`
 	APIKey            string            `config:"api_key"`
+	ServiceToken      string            `config:"service_token"`
 	ProxyURL          string            `config:"proxy_url"`
 	ProxyDisable      bool              `config:"proxy_disable"`
 	TLS               *tlscommon.Config `config:"ssl"`
@@ -121,10 +122,20 @@ func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
 	// This eliminates the warning while accessing the system index
 	h.Set("X-elastic-product-origin", "fleet")
 
+	// Set the authorization header when service token is being used
+	username := c.Username
+	password := c.Password
+	if c.ServiceToken != "" {
+		// if both are provided service token overrides the user/pass
+		username = ""
+		password = ""
+		h.Set("Authorization", fmt.Sprintf("Bearer %s", c.ServiceToken))
+	}
+
 	return elasticsearch.Config{
 		Addresses:  addrs,
-		Username:   c.Username,
-		Password:   c.Password,
+		Username:   username,
+		Password:   password,
 		Header:     h,
 		Transport:  httpTransport,
 		MaxRetries: c.MaxRetries,
