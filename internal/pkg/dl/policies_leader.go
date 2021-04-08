@@ -49,7 +49,7 @@ func SearchPolicyLeaders(ctx context.Context, bulker bulk.Bulk, ids []string, op
 	if err != nil {
 		return
 	}
-	res, err := bulker.Search(ctx, []string{o.indexName}, data)
+	res, err := bulker.Search(ctx, o.indexName, data)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
 			log.Debug().Str("index", o.indexName).Msg(es.ErrIndexNotFound.Error())

@@ -5,6 +5,8 @@
 package bulk
 
 import (
+	"github.com/rs/zerolog"
+	"strconv"
 	"time"
 )
 
@@ -13,7 +15,8 @@ import (
 
 type optionsT struct {
 	Refresh         bool
-	RetryOnConflict int
+	RetryOnConflict string
+	Indices         []string
 }
 
 type Opt func(*optionsT)
@@ -26,7 +29,14 @@ func WithRefresh() Opt {
 
 func WithRetryOnConflict(n int) Opt {
 	return func(opt *optionsT) {
-		opt.RetryOnConflict = n
+		opt.RetryOnConflict = strconv.Itoa(n)
+	}
+}
+
+// Applicable to search
+func WithIndex(idx string) Opt {
+	return func(opt *optionsT) {
+		opt.Indices = append(opt.Indices, idx)
 	}
 }
 
@@ -38,7 +48,6 @@ type bulkOptT struct {
 	flushThresholdCnt int
 	flushThresholdSz  int
 	maxPending        int
-	queuePrealloc     int
 }
 
 type BulkOpt func(*bulkOptT)
@@ -57,7 +66,7 @@ func WithFlushThresholdCount(cnt int) BulkOpt {
 	}
 }
 
-// Cummulative size of pending transactions that will force flush before interval
+// Cummulative size in bytes of pending transactions that will force flush before interval
 func WithFlushThresholdSize(sz int) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.flushThresholdSz = sz
@@ -69,4 +78,11 @@ func WithMaxPending(max int) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.maxPending = max
 	}
+}
+
+func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
+	e.Dur("flushInterval", o.flushInterval)
+	e.Int("flushThresholdCnt", o.flushThresholdCnt)
+	e.Int("flushThresholdSz", o.flushThresholdSz)
+	e.Int("maxPending", o.maxPending)
 }

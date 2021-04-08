@@ -31,6 +31,8 @@ const (
 	FieldPolicyId                    = "policy_id"
 	FieldRevisionIdx                 = "revision_idx"
 	FieldCoordinatorIdx              = "coordinator_idx"
+	FieldLastCheckin                 = "last_checkin"
+	FieldLocalMetadata               = "local_metadata"
 	FieldPolicyRevisionIdx           = "policy_revision_idx"
 	FieldPolicyCoordinatorIdx        = "policy_coordinator_idx"
 	FieldDefaultApiKey               = "default_api_key"

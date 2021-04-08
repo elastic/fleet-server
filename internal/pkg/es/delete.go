@@ -26,7 +26,7 @@ func DeleteIndices(ctx context.Context, es *elasticsearch.Client, indices []stri
 		return err
 	}
 	if !ares.Acknowledged {
-		err = TranslateError(res.StatusCode, ares.Error)
+		err = TranslateError(res.StatusCode, &ares.Error)
 	}
 
 	return err
