@@ -9,6 +9,8 @@ import (
 	"fmt"
 )
 
+// TODO: Why do we have both ErrElastic and ErrorT?  Very strange.
+
 type ErrElastic struct {
 	Status int
 	Type   string
@@ -42,9 +44,14 @@ var (
 	ErrNotFound               = errors.New("not found")
 )
 
-func TranslateError(status int, e ErrorT) error {
+func TranslateError(status int, e *ErrorT) error {
 	if status == 200 || status == 201 {
 		return nil
+	}
+	if e == nil {
+		return &ErrElastic{
+			Status: status,
+		}
 	}
 
 	var err error

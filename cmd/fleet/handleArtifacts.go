@@ -94,7 +94,7 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 	if err != nil {
 		code, lvl := cntArtifacts.IncError(err)
 
-		zlog.WithLevel(lvl).
+		log.WithLevel(lvl).
 			Err(err).
 			Int("code", code).
 			Int64("nWritten", nWritten).

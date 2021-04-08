@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -39,7 +40,7 @@ func TestRunServer(t *testing.T) {
 	bulker := ftesting.MockBulk{}
 	pim := mock.NewMockIndexMonitor()
 	pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
-	bc := NewBulkCheckin(nil)
+	bc := checkin.NewBulkCheckin(nil)
 	ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
 	et, err := NewEnrollerT(verCon, cfg, nil, c)
 	require.NoError(t, err)
