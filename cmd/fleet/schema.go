@@ -96,12 +96,12 @@ type AckResponse struct {
 }
 
 type ActionResp struct {
-	AgentId   string          `json:"agent_id"`
-	CreatedAt string          `json:"created_at"`
-	Data      json.RawMessage `json:"data"`
-	Id        string          `json:"id"`
-	Type      string          `json:"type"`
-	InputType string          `json:"input_type"`
+	AgentId   string      `json:"agent_id"`
+	CreatedAt string      `json:"created_at"`
+	Data      interface{} `json:"data"`
+	Id        string      `json:"id"`
+	Type      string      `json:"type"`
+	InputType string      `json:"input_type"`
 }
 
 type Event struct {
