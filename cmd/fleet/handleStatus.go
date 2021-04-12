@@ -15,6 +15,10 @@ import (
 )
 
 func (rt Router) handleStatus(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	// Metrics; serenity now.
+	dfunc := cntStatus.IncStart()
+	defer dfunc()
+
 	status := rt.sm.Status()
 	resp := StatusResponse{
 		Name:   "fleet-server",
@@ -34,9 +38,13 @@ func (rt Router) handleStatus(w http.ResponseWriter, _ *http.Request, _ httprout
 		code = http.StatusOK
 	}
 	w.WriteHeader(code)
-	if _, err = w.Write(data); err != nil {
+
+	var nWritten int
+	if nWritten, err = w.Write(data); err != nil {
 		if err != context.Canceled {
 			log.Error().Err(err).Int("code", code).Msg("fail status")
 		}
 	}
+
+	cntStatus.bodyOut.Add(uint64(nWritten))
 }

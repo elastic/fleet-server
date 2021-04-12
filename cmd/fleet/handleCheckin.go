@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	"github.com/miolini/datacounter"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog"
@@ -47,25 +48,12 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 	err := rt.ct._handleCheckin(w, r, id, rt.bulker)
 
 	if err != nil {
-		lvl := zerolog.DebugLevel
+		code, lvl := cntCheckin.IncError(err)
 
-		var code int
-		switch err {
-		case ErrAgentNotFound:
-			code = http.StatusNotFound
+		// Log this as warn for visibility that limit has been reached.
+		// This allows customers to tune the configuration on detection of threshold.
+		if err == limit.ErrMaxLimit {
 			lvl = zerolog.WarnLevel
-		case limit.ErrRateLimit:
-			code = http.StatusTooManyRequests
-		case limit.ErrMaxLimit:
-			// Log this as warn for visibility that limit has been reached.
-			// This allows customers to tune the configuration on detection of threshold.
-			code = http.StatusTooManyRequests
-			lvl = zerolog.WarnLevel
-		case context.Canceled:
-			code = http.StatusServiceUnavailable
-		default:
-			lvl = zerolog.InfoLevel
-			code = http.StatusBadRequest
 		}
 
 		log.WithLevel(lvl).
@@ -136,14 +124,22 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		return err
 	}
 
+	// Metrics; serenity now.
+	dfunc := cntCheckin.IncStart()
+	defer dfunc()
+
 	ctx := r.Context()
 
 	// Interpret request; TODO: defend overflow, slow roll
+	readCounter := datacounter.NewReaderCounter(r.Body)
+
 	var req CheckinRequest
-	decoder := json.NewDecoder(r.Body)
+	decoder := json.NewDecoder(readCounter)
 	if err := decoder.Decode(&req); err != nil {
 		return err
 	}
+
+	cntCheckin.bodyIn.Add(readCounter.Count())
 
 	// Compare local_metadata content and update if different
 	fields, err := parseMeta(agent, &req)
@@ -241,7 +237,9 @@ func (ct *CheckinT) writeResponse(w http.ResponseWriter, r *http.Request, resp C
 
 	if len(payload) > compressThreshold && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
 
-		zipper, err := gzip.NewWriterLevel(w, compressionLevel)
+		wrCounter := datacounter.NewWriterCounter(w)
+
+		zipper, err := gzip.NewWriterLevel(wrCounter, compressionLevel)
 		if err != nil {
 			return err
 		}
@@ -254,13 +252,18 @@ func (ct *CheckinT) writeResponse(w http.ResponseWriter, r *http.Request, resp C
 
 		err = zipper.Close()
 
+		cntCheckin.bodyOut.Add(wrCounter.Count())
+
 		log.Trace().
 			Err(err).
-			Int("dataSz", len(payload)).
 			Int("lvl", compressionLevel).
+			Int("srcSz", len(payload)).
+			Uint64("dstSz", wrCounter.Count()).
 			Msg("compressing checkin response")
 	} else {
-		_, err = w.Write(payload)
+		var nWritten int
+		nWritten, err = w.Write(payload)
+		cntCheckin.bodyOut.Add(uint64(nWritten))
 	}
 
 	return err
