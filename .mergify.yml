@@ -19,9 +19,9 @@ pull_request_rules:
       - base=master
       - label=v7.13.0
     actions:
-      assignees:
-          - "{{ author }}"
       backport:
+        assignees:
+          - "{{ author }}"
         branches:
           - "7.x"
   - name: backport patches to 7.12 branch
@@ -30,9 +30,9 @@ pull_request_rules:
       - base=master
       - label=v7.12.0
     actions:
-      assignees:
-          - "{{ author }}"
       backport:
+        assignees:
+          - "{{ author }}"
         branches:
           - "7.12"
   - name: automatic merge for 7.x when CI passes
