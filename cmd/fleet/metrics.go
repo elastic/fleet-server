@@ -7,14 +7,31 @@ package fleet
 import (
 	"context"
 	"github.com/pkg/errors"
+	"net/http"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/elastic/beats/v7/libbeat/api"
 	"github.com/elastic/beats/v7/libbeat/cmd/instance/metrics"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/monitoring"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/rs/zerolog"
+)
+
+var (
+	registry *monitoring.Registry
+
+	cntHttpNew   *monitoring.Uint
+	cntHttpClose *monitoring.Uint
+
+	cntCheckin   routeStats
+	cntEnroll    routeStats
+	cntAcks      routeStats
+	cntStatus    routeStats
+	cntArtifacts artifactStats
 )
 
 func (f *FleetServer) initMetrics(ctx context.Context, cfg *config.Config) (*api.Server, error) {
@@ -41,4 +58,112 @@ func (f *FleetServer) initMetrics(ctx context.Context, cfg *config.Config) (*api
 	}
 
 	return s, err
+}
+
+type routeStats struct {
+	active    *monitoring.Uint
+	total     *monitoring.Uint
+	rateLimit *monitoring.Uint
+	maxLimit  *monitoring.Uint
+	failure   *monitoring.Uint
+	drop      *monitoring.Uint
+	bodyIn    *monitoring.Uint
+	bodyOut   *monitoring.Uint
+}
+
+func (rt *routeStats) Register(registry *monitoring.Registry) {
+	rt.active = monitoring.NewUint(registry, "active")
+	rt.total = monitoring.NewUint(registry, "total")
+	rt.rateLimit = monitoring.NewUint(registry, "limit_rate")
+	rt.maxLimit = monitoring.NewUint(registry, "limit_max")
+	rt.failure = monitoring.NewUint(registry, "fail")
+	rt.drop = monitoring.NewUint(registry, "drop")
+	rt.bodyIn = monitoring.NewUint(registry, "body_in")
+	rt.bodyOut = monitoring.NewUint(registry, "body_out")
+}
+
+func init() {
+	registry = monitoring.Default.NewRegistry("http_server")
+	cntHttpNew = monitoring.NewUint(registry, "tcp_open")
+	cntHttpClose = monitoring.NewUint(registry, "tcp_close")
+
+	routesRegistry := registry.NewRegistry("routes")
+
+	cntCheckin.Register(routesRegistry.NewRegistry("checkin"))
+	cntEnroll.Register(routesRegistry.NewRegistry("enroll"))
+	cntArtifacts.Register(routesRegistry.NewRegistry("artifacts"))
+	cntAcks.Register(routesRegistry.NewRegistry("acks"))
+	cntStatus.Register(routesRegistry.NewRegistry("status"))
+}
+
+// Increment error metric, log and return code
+func (rt *routeStats) IncError(err error) (int, zerolog.Level) {
+	lvl := zerolog.DebugLevel
+
+	incFail := true
+
+	var code int
+	switch err {
+	case ErrAgentNotFound:
+		code = http.StatusNotFound
+		lvl = zerolog.WarnLevel
+	case limit.ErrRateLimit:
+		code = http.StatusTooManyRequests
+		rt.rateLimit.Inc()
+		incFail = false
+	case limit.ErrMaxLimit:
+		code = http.StatusTooManyRequests
+		rt.maxLimit.Inc()
+		incFail = false
+	case context.Canceled:
+		code = http.StatusServiceUnavailable
+		rt.drop.Inc()
+		incFail = false
+	default:
+		lvl = zerolog.InfoLevel
+		code = http.StatusBadRequest
+	}
+
+	if incFail {
+		cntCheckin.failure.Inc()
+	}
+
+	return code, lvl
+}
+
+func (rt *routeStats) IncStart() func() {
+	rt.total.Inc()
+	rt.active.Inc()
+	return rt.active.Dec
+}
+
+type artifactStats struct {
+	routeStats
+	notFound *monitoring.Uint
+	throttle *monitoring.Uint
+}
+
+func (rt *artifactStats) Register(registry *monitoring.Registry) {
+	rt.routeStats.Register(registry)
+	rt.notFound = monitoring.NewUint(registry, "not_found")
+	rt.throttle = monitoring.NewUint(registry, "throttle")
+}
+
+func (rt *artifactStats) IncError(err error) (code int, lvl zerolog.Level) {
+	switch err {
+	case dl.ErrNotFound:
+		// Artifact not found indicates a race condition upstream
+		// or an attack on the fleet server.  Either way it should
+		// show up in the logs at a higher level than debug
+		code = http.StatusNotFound
+		rt.notFound.Inc()
+		lvl = zerolog.WarnLevel
+	case ErrorThrottle:
+		code = http.StatusTooManyRequests
+		rt.throttle.Inc()
+	default:
+		code, lvl = rt.routeStats.IncError(err)
+	}
+
+	return
 }

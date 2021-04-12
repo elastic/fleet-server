@@ -87,10 +87,12 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 			Int64("nWritten", nWritten).
 			Dur("rtt", time.Since(start)).
 			Msg("Response sent")
+
+		cntArtifacts.bodyOut.Add(uint64(nWritten))
 	}
 
 	if err != nil {
-		code, lvl := rt.at.assessError(err)
+		code, lvl := cntArtifacts.IncError(err)
 
 		zlog.WithLevel(lvl).
 			Err(err).
@@ -118,37 +120,16 @@ func (at ArtifactT) handleArtifacts(r *http.Request, zlog zerolog.Logger, id, sh
 		return nil, err
 	}
 
+	// Metrics; serenity now.
+	dfunc := cntArtifacts.IncStart()
+	defer dfunc()
+
 	zlog = zlog.With().
 		Str("APIKeyId", agent.AccessApiKeyId).
 		Str("agentId", agent.Id).
 		Logger()
 
 	return at.handle(r.Context(), zlog, agent, id, sha2)
-}
-
-func (at ArtifactT) assessError(err error) (int, zerolog.Level) {
-	lvl := zerolog.DebugLevel
-
-	// TODO: return a 503 on elastic timeout, connection drop
-
-	var code int
-	switch err {
-	case dl.ErrNotFound:
-		// Artifact not found indicates a race condition upstream
-		// or an attack on the fleet server.  Either way it should
-		// show up in the logs at a higher level than debug
-		lvl = zerolog.WarnLevel
-		code = http.StatusNotFound
-	case ErrorThrottle, limit.ErrRateLimit, limit.ErrMaxLimit:
-		code = http.StatusTooManyRequests
-	case context.Canceled:
-		code = http.StatusServiceUnavailable
-	default:
-		lvl = zerolog.InfoLevel
-		code = http.StatusBadRequest
-	}
-
-	return code, lvl
 }
 
 type artHandler struct {

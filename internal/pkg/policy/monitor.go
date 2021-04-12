@@ -94,6 +94,8 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duratio
 
 // Run runs the monitor.
 func (m *monitorT) Run(ctx context.Context) error {
+	m.log.Info().Dur("throttle", m.throttle).Msg("run policy monitor")
+
 	s := m.monitor.Subscribe()
 	defer m.monitor.Unsubscribe(s)
 
