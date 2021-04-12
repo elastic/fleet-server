@@ -24,20 +24,23 @@ var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
 // Elasticsearch is the configuration for elasticsearch.
 type Elasticsearch struct {
-	Protocol          string            `config:"protocol"`
-	Hosts             []string          `config:"hosts"`
-	Path              string            `config:"path"`
-	Headers           map[string]string `config:"headers"`
-	Username          string            `config:"username"`
-	Password          string            `config:"password"`
-	APIKey            string            `config:"api_key"`
-	ProxyURL          string            `config:"proxy_url"`
-	ProxyDisable      bool              `config:"proxy_disable"`
-	TLS               *tlscommon.Config `config:"ssl"`
-	MaxRetries        int               `config:"max_retries"`
-	MaxConnPerHost    int               `config:"max_conn_per_host"`
-	BulkFlushInterval time.Duration     `config:"bulk_flush_interval"`
-	Timeout           time.Duration     `config:"timeout"`
+	Protocol                string            `config:"protocol"`
+	Hosts                   []string          `config:"hosts"`
+	Path                    string            `config:"path"`
+	Headers                 map[string]string `config:"headers"`
+	Username                string            `config:"username"`
+	Password                string            `config:"password"`
+	APIKey                  string            `config:"api_key"`
+	ProxyURL                string            `config:"proxy_url"`
+	ProxyDisable            bool              `config:"proxy_disable"`
+	TLS                     *tlscommon.Config `config:"ssl"`
+	MaxRetries              int               `config:"max_retries"`
+	MaxConnPerHost          int               `config:"max_conn_per_host"`
+	BulkFlushInterval       time.Duration     `config:"bulk_flush_interval"`
+	BulkFlushThresholdCount int               `config:"bulk_flush_threshold_cnt"`
+	BulkFlushThresholdSize  int               `config:"bulk_flush_threshold_size"`
+	BulkFlushMaxPending     int               `config:"bulk_flush_max_pending"`
+	Timeout                 time.Duration     `config:"timeout"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -48,6 +51,9 @@ func (c *Elasticsearch) InitDefaults() {
 	c.MaxRetries = 3
 	c.MaxConnPerHost = 128
 	c.BulkFlushInterval = 250 * time.Millisecond
+	c.BulkFlushThresholdCount = 2048
+	c.BulkFlushThresholdSize = 1024 * 1024
+	c.BulkFlushMaxPending = 8
 }
 
 // Validate ensures that the configuration is valid.
