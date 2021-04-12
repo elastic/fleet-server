@@ -5,6 +5,7 @@
 package fleet
 
 import (
+	"encoding/json"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -27,6 +28,7 @@ func TestConvertActions(t *testing.T) {
 		{
 			AgentId: "agent-id",
 			Id:      "1234",
+			Data:    json.RawMessage(nil),
 		},
 	})
 	assert.Equal(t, token, "")

@@ -23,7 +23,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -53,19 +52,8 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 	err := rt.ack.handleAcks(w, r, id)
 
 	if err != nil {
-		lvl := zerolog.DebugLevel
+		code, lvl := cntAcks.IncError(err)
 
-		var code int
-		switch err {
-		case limit.ErrRateLimit, limit.ErrMaxLimit:
-			code = http.StatusTooManyRequests
-		case context.Canceled:
-			code = http.StatusServiceUnavailable
-		default:
-			lvl = zerolog.InfoLevel
-			code = http.StatusBadRequest
-		}
-		// Don't log connection drops
 		log.WithLevel(lvl).
 			Err(err).
 			Int("code", code).
@@ -87,10 +75,16 @@ func (ack AckT) handleAcks(w http.ResponseWriter, r *http.Request, id string) er
 		return err
 	}
 
+	// Metrics; serenity now.
+	dfunc := cntAcks.IncStart()
+	defer dfunc()
+
 	raw, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
+
+	cntAcks.bodyIn.Add(uint64(len(raw)))
 
 	var req AckRequest
 	if err := json.Unmarshal(raw, &req); err != nil {
@@ -110,9 +104,12 @@ func (ack AckT) handleAcks(w http.ResponseWriter, r *http.Request, id string) er
 		return err
 	}
 
-	if _, err = w.Write(data); err != nil {
+	var nWritten int
+	if nWritten, err = w.Write(data); err != nil {
 		return err
 	}
+
+	cntAcks.bodyOut.Add(uint64(nWritten))
 
 	return nil
 }

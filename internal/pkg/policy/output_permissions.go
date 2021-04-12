@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	DefaultOutputName         = "default"
-	OutputPermissionsProperty = "output_permissions"
+	DefaultOutputName      = "default"
+	FieldOutputPermissions = "output_permissions"
 )
 
 var (

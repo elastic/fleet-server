@@ -64,6 +64,7 @@ func (l *Logger) Sync() {
 func Init(cfg *config.Config) (*Logger, error) {
 	var err error
 	once.Do(func() {
+
 		var l zerolog.Logger
 		var w WriterSync
 		l, w, err = configure(cfg)
@@ -77,7 +78,14 @@ func Init(cfg *config.Config) (*Logger, error) {
 			sync: w,
 		}
 
-		zerolog.TimeFieldFormat = time.StampMicro
+		// override the field names for ECS
+		zerolog.LevelFieldName = "log.level"
+		zerolog.MessageFieldName = "message"
+		zerolog.TimeFieldFormat = "2006-01-02T15:04:05.999Z" // RFC3339 at millisecond resolution in zulu timezone
+		zerolog.TimestampFieldName = "@timestamp"
+		if !cfg.Logging.Pretty || !cfg.Logging.ToStderr {
+			zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+		}
 
 		log.Info().
 			Int("pid", os.Getpid()).
@@ -120,7 +128,7 @@ func configure(cfg *config.Config) (zerolog.Logger, WriterSync, error) {
 	if cfg.Logging.ToStderr {
 		out := io.Writer(os.Stderr)
 		if cfg.Logging.Pretty {
-			out = zerolog.ConsoleWriter{Out: os.Stderr}
+			out = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}
 		}
 		return log.Output(out).Level(level(cfg)), os.Stderr, nil
 	}

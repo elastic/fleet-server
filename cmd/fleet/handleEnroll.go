@@ -25,7 +25,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"github.com/julienschmidt/httprouter"
-	"github.com/rs/zerolog"
+	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog/log"
 )
 
@@ -72,18 +72,7 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 	data, err := rt.et.handleEnroll(r)
 
 	if err != nil {
-		lvl := zerolog.DebugLevel
-
-		var code int
-		switch err {
-		case limit.ErrRateLimit, limit.ErrMaxLimit:
-			code = http.StatusTooManyRequests
-		case context.Canceled:
-			code = http.StatusServiceUnavailable
-		default:
-			lvl = zerolog.InfoLevel
-			code = http.StatusBadRequest
-		}
+		code, lvl := cntEnroll.IncError(err)
 
 		log.WithLevel(lvl).
 			Err(err).
@@ -96,9 +85,12 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	if _, err = w.Write(data); err != nil {
+	var numWritten int
+	if numWritten, err = w.Write(data); err != nil {
 		log.Error().Err(err).Msg("Fail send enroll response")
 	}
+
+	cntEnroll.bodyOut.Add(uint64(numWritten))
 
 	log.Trace().
 		Err(err).
@@ -121,17 +113,25 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 		return nil, err
 	}
 
+	// Metrics; serenity now.
+	dfunc := cntEnroll.IncStart()
+	defer dfunc()
+
 	// Validate that an enrollment record exists for a key with this id.
 	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), key.Id)
 	if err != nil {
 		return nil, err
 	}
 
+	readCounter := datacounter.NewReaderCounter(r.Body)
+
 	// Parse the request body
-	req, err := decodeEnrollRequest(r.Body)
+	req, err := decodeEnrollRequest(readCounter)
 	if err != nil {
 		return nil, err
 	}
+
+	cntEnroll.bodyIn.Add(readCounter.Count())
 
 	resp, err := _enroll(r.Context(), et.bulker, et.cache, *req, *erec)
 	if err != nil {
@@ -297,7 +297,7 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	}
 
 	// Pull API key record from .fleet-enrollment-api-keys
-	rec, err := dl.FindEnrollmentAPIKey(ctx, et.bulker, dl.QueryEnrollmentAPIKeyByID, id)
+	rec, err := dl.FindEnrollmentAPIKey(ctx, et.bulker, dl.QueryEnrollmentAPIKeyByID, dl.FieldApiKeyID, id)
 	if err != nil {
 		return nil, err
 	}
