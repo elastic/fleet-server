@@ -92,7 +92,12 @@ func InitES(ctx context.Context, cfg *config.Config, opts ...BulkOpt) (*elastics
 		return nil, nil, err
 	}
 
-	opts = append(opts, WithFlushInterval(cfg.Output.Elasticsearch.BulkFlushInterval))
+	opts = append(opts,
+		WithFlushInterval(cfg.Output.Elasticsearch.BulkFlushInterval),
+		WithFlushThresholdCount(cfg.Output.Elasticsearch.BulkFlushThresholdCount),
+		WithFlushThresholdSize(cfg.Output.Elasticsearch.BulkFlushThresholdSize),
+		WithMaxPending(cfg.Output.Elasticsearch.BulkFlushMaxPending),
+	)
 
 	blk := NewBulker(es)
 	go func() {
