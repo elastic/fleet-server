@@ -14,23 +14,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
-	"github.com/elastic/beats/v7/libbeat/monitoring"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/netutil"
 )
-
-var (
-	registry     *monitoring.Registry
-	cntHttpNew   *monitoring.Uint
-	cntHttpClose *monitoring.Uint
-)
-
-func init() {
-	registry = monitoring.Default.NewRegistry("http_server")
-	cntHttpNew = monitoring.NewUint(registry, "tcp_open")
-	cntHttpClose = monitoring.NewUint(registry, "tcp_close")
-}
 
 func diagConn(c net.Conn, s http.ConnState) {
 	if c == nil {
