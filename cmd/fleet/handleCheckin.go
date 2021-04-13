@@ -409,6 +409,7 @@ func processPolicy(ctx context.Context, bulker bulk.Bulk, agentId string, pp *po
 			zlog.Error().Err(err).Msg("fail update agent record")
 			return nil, err
 		}
+		agent.DefaultApiKey = defaultOutputApiKey.Agent()
 	}
 
 	rewrittenPolicy, err := rewritePolicy(pp, agent.DefaultApiKey)
