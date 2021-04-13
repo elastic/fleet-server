@@ -36,8 +36,12 @@ const (
 	// One action can be split up into multiple documents up to the 1000 agents per action if needed.
 	defaultFetchSize = 1000
 
-	// Retry delay if index is not found
-	retryDelay = time.Second
+	// Retry delay on error waiting on the global checkpoint update.
+	// This is the wait time between requests to elastisearch in case if:
+	// 1. Index is not found (index is created only on the first document save)
+	// 2. Any other error waiting on global checkpoint, except timeouts.
+	// For the long poll timeout, start a new request as soon as possible.
+	retryDelay = 3 * time.Second
 )
 
 const (
