@@ -14,16 +14,17 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
-func Create(ctx context.Context, client *elasticsearch.Client, name, ttl string, roles []byte) (*ApiKey, error) {
-
+func Create(ctx context.Context, client *elasticsearch.Client, name, ttl string, roles []byte, meta interface{}) (*ApiKey, error) {
 	payload := struct {
 		Name       string          `json:"name,omitempty"`
 		Expiration string          `json:"expiration,omitempty"`
 		Roles      json.RawMessage `json:"role_descriptors,omitempty"`
+		Metadata   interface{}     `json:"metadata"`
 	}{
-		name,
-		ttl,
-		roles,
+		Name:       name,
+		Expiration: ttl,
+		Roles:      roles,
+		Metadata:   meta,
 	}
 
 	body, err := json.Marshal(&payload)
