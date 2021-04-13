@@ -36,7 +36,7 @@ func TestMonitorLeadership(t *testing.T) {
 	serversIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingServer)
 	policiesIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicy)
 	leadersIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicyLeader)
-	pim, err := monitor.New(policiesIndex, bulker.Client())
+	pim, err := monitor.New(policiesIndex, bulker.Client(), bulker.Client())
 	if err != nil {
 		t.Fatal(err)
 	}

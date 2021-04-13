@@ -37,7 +37,7 @@ func TestMonitorNonEmptyIndex(t *testing.T) {
 
 func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk.Bulk) {
 	readyCh := make(chan error)
-	mon, err := New(index, bulker.Client(),
+	mon, err := New(index, bulker.Client(), bulker.Client(),
 		WithReadyChan(readyCh),
 	)
 	require.NoError(t, err)

@@ -32,7 +32,7 @@ func TestMonitor_Integration(t *testing.T) {
 	defer cancel()
 
 	index, bulker := setupIndex(ctx, t)
-	im, err := monitor.New(index, bulker.Client())
+	im, err := monitor.New(index, bulker.Client(), bulker.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
