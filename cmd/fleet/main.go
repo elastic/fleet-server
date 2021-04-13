@@ -514,7 +514,10 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Coordinator policy monitor
-	pim, err := monitor.New(dl.FleetPolicies, esCli, monCli, monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize))
+	pim, err := monitor.New(dl.FleetPolicies, esCli, monCli,
+		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
+		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
+	)
 	if err != nil {
 		return err
 	}
@@ -536,7 +539,11 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	var ad *action.Dispatcher
 	var tr *action.TokenResolver
 
-	am, err = monitor.NewSimple(dl.FleetActions, esCli, monCli, monitor.WithExpiration(true), monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize))
+	am, err = monitor.NewSimple(dl.FleetActions, esCli, monCli,
+		monitor.WithExpiration(true),
+		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
+		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
+	)
 	if err != nil {
 		return err
 	}

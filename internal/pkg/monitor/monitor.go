@@ -36,7 +36,8 @@ const (
 	// One action can be split up into multiple documents up to the 1000 agents per action if needed.
 	defaultFetchSize = 1000
 
-	tightLoopCheckInterval = 10 * time.Millisecond // when we get a full page (fetchSize) of documents, use this interval to repeatedly poll for more records
+	// Retry delay if index is not found
+	retryDelay = time.Second
 )
 
 const (
@@ -96,7 +97,7 @@ type simpleMonitorT struct {
 	fetchSize      int
 
 	checkpoint sqn.SeqNo    // index global checkpoint
-	mx         sync.RWMutex // checkpoint mutext
+	mx         sync.RWMutex // checkpoint mutex
 
 	log zerolog.Logger
 
@@ -224,9 +225,9 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		m.readyCh = nil
 	}
 
-	const retryDelay = time.Second
-
 	for {
+		checkpoint := m.loadCheckpoint()
+
 		// Wait checkpoint advance
 		newCheckpoint, err := waitCheckpointAdvance(ctx, m.monCli, m.index, checkpoint, m.pollTimeout)
 		if err != nil {

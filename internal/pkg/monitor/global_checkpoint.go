@@ -20,13 +20,13 @@ import (
 
 var ErrGlobalCheckpoint = errors.New("global checkpoint error")
 
-// Global checkpoint reqsponse
+// Global checkpoint response
 // {"global_checkpoints":[-1]}
 
 type globalCheckpointsResponse struct {
-	GlobalCheckpoints []int64 `json:"global_checkpoints"`
-
-	Error esh.ErrorT `json:"error,omitempty"`
+	GlobalCheckpoints []int64    `json:"global_checkpoints"`
+	TimedOut          bool       `json:"timed_out"`
+	Error             esh.ErrorT `json:"error,omitempty"`
 }
 
 func queryGlobalCheckpoint(ctx context.Context, es *elasticsearch.Client, index string) (seqno sqn.SeqNo, err error) {
@@ -38,7 +38,13 @@ func queryGlobalCheckpoint(ctx context.Context, es *elasticsearch.Client, index 
 		return
 	}
 
-	return processGlobalCheckpointResponse(res)
+	seqno, err = processGlobalCheckpointResponse(res)
+	if errors.Is(err, esh.ErrIndexNotFound) {
+		seqno = sqn.DefaultSeqNo
+		err = nil
+	}
+
+	return seqno, err
 }
 
 func waitCheckpointAdvance(ctx context.Context, es *elasticsearch.Client, index string, checkpoint sqn.SeqNo, to time.Duration) (seqno sqn.SeqNo, err error) {
@@ -76,6 +82,10 @@ func processGlobalCheckpointResponse(res *esapi.Response) (seqno sqn.SeqNo, err 
 	err = esh.TranslateError(res.StatusCode, sres.Error)
 	if err != nil {
 		return nil, err
+	}
+
+	if sres.TimedOut {
+		return nil, esh.ErrTimeout
 	}
 
 	if len(sres.GlobalCheckpoints) == 0 {
