@@ -122,20 +122,11 @@ func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
 	// This eliminates the warning while accessing the system index
 	h.Set("X-elastic-product-origin", "fleet")
 
-	// Set the authorization header when service token is being used
-	username := c.Username
-	password := c.Password
-	if c.ServiceToken != "" {
-		// if both are provided service token overrides the user/pass
-		username = ""
-		password = ""
-		h.Set("Authorization", fmt.Sprintf("Bearer %s", c.ServiceToken))
-	}
-
 	return elasticsearch.Config{
 		Addresses:  addrs,
-		Username:   username,
-		Password:   password,
+		Username:   c.Username,
+		Password:   c.Password,
+		ServiceToken: c.ServiceToken,
 		Header:     h,
 		Transport:  httpTransport,
 		MaxRetries: c.MaxRetries,
