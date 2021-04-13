@@ -70,5 +70,5 @@ func CreatePolicy(ctx context.Context, bulker bulk.Bulk, policy model.Policy, op
 	if err != nil {
 		return "", err
 	}
-	return bulker.Create(ctx, o.indexName, "", data)
+	return bulker.Create(ctx, o.indexName, "", data, bulk.WithRefresh())
 }
