@@ -5,13 +5,24 @@
 package throttle
 
 import (
+	"github.com/rs/zerolog"
 	"math/rand"
 	"strconv"
 	"testing"
 	"time"
 )
 
+func disableTraceLogging() func() {
+	lvl := zerolog.GlobalLevel()
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	return func() {
+		zerolog.SetGlobalLevel(lvl)
+	}
+}
+
 func TestThrottleZero(t *testing.T) {
+	f := disableTraceLogging()
+	defer f()
 
 	// Zero max parallel means we can acquire as many as we want,
 	// but still cannot acquire existing that has not timed out
@@ -80,6 +91,8 @@ func TestThrottleZero(t *testing.T) {
 }
 
 func TestThrottleN(t *testing.T) {
+	f := disableTraceLogging()
+	defer f()
 
 	for N := 1; N < 11; N++ {
 
@@ -148,6 +161,9 @@ func TestThrottleN(t *testing.T) {
 }
 
 func TestThrottleExpireIdentity(t *testing.T) {
+	f := disableTraceLogging()
+	defer f()
+
 	throttle := NewThrottle(1)
 
 	key := "xxx"
@@ -182,6 +198,9 @@ func TestThrottleExpireIdentity(t *testing.T) {
 
 // Test that a token from a different key is expired when at max
 func TestThrottleExpireAtMax(t *testing.T) {
+	f := disableTraceLogging()
+	defer f()
+
 	throttle := NewThrottle(1)
 
 	key1 := "xxx"
