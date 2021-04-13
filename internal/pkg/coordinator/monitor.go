@@ -372,6 +372,8 @@ func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d t
 			if sleep.WithContext(ctx, d) == context.Canceled {
 				break
 			}
+		} else {
+			break
 		}
 	}
 }
