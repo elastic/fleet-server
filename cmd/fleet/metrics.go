@@ -36,7 +36,7 @@ var (
 
 func (f *FleetServer) initMetrics(ctx context.Context, cfg *config.Config) (*api.Server, error) {
 	registry := monitoring.GetNamespace("info").GetRegistry()
-	monitoring.NewString(registry, "version").Set(f.version)
+	monitoring.NewString(registry, "version").Set(f.ver)
 	monitoring.NewString(registry, "name").Set("fleet-server")
 	metrics.SetupMetrics("fleet-server")
 
