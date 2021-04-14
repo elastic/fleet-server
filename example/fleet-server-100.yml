@@ -1,0 +1,49 @@
+# This sample configuration file demonstrates tweaks to limit the resource usage 
+# of a very small (100 agent) installation.  Target is 1 CPU, 50MiB RAM.
+
+output:
+  elasticsearch:
+    hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
+    username: '${ELASTICSEARCH_USERNAME:elastic}'
+    password: '${ELASTICSEARCH_PASSWORD:changeme}'
+    bulk_flush_max_pending: 8     # Limit the number of pending ES bulk operations
+    bulk_flush_interval: 100ms    # Flush ES bulk queues on this interval.
+
+fleet:
+  agent:
+    id: 1e4954ce-af37-4731-9f4a-407b08e69e42 # Normally provided by the agent; stubbed here.
+
+runtime:
+  gc_percent: 20                # Force the GC to execute more frequently: see https://golang.org/pkg/runtime/debug/#SetGCPercent
+
+inputs:
+  - cache:
+      num_counters: 2000        # Limit the size of the hash table to rougly 10x expected number of elements
+      max_cost: 2097152         # Limit the total size of data allowed in the cache, 2 MiB in bytes.
+    server:
+      limits:
+        policy_throttle: 200ms  # Roll out a new policy every 200ms; roughly 5 per second.
+        max_connections: 200    # Hard limit on the number of connections accepted; defends TLS connection flood.
+        checkin_limit:
+          interval: 50ms        # Check in no faster than 20 per second.
+          burst: 25             # Allow burst up to 25, then fall back to interval rate.
+          max: 100              # No more than 100 long polls allowed. THIS EFFECTIVELY LIMITS MAX ENDPOINTS. 
+        artifact_limit:     
+          interval: 100ms       # Roll out 10 artifacts per second
+          burst: 10             # Small burst prevents outbound buffer explosion.
+          max: 10               # Only 10 transactions at a time max.  This should generally not be a relavent limitation as the transactions are cached.
+        ack_limit:
+          interval: 10ms        # Allow ACK only 100 per second.  ACK payload is unbounded in RAM so need to limit.
+          burst: 20             # Allow burst up to 20, then fall back to interrval rate.
+          max: 20               # Cannot have too many processing at once due to unbounded payload size.
+        enroll_limit:
+          interval: 100ms       # Enroll is both CPU and RAM intensive.  Limit to 10 per second.
+          burst: 5              # Allow intial burst, but limit to max.
+          max: 10               # Max limit.
+      ssl:
+        enabled: true
+        key: /path/to/key.pem   # To support TLS, server needs cert, key pair
+        certificate: /path/to/cert.pem 
+        
+http:
+  enabled: true                 # Enable metrics on http://localhost:5066/stats
