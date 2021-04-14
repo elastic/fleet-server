@@ -7,7 +7,7 @@ require (
 	github.com/dgraph-io/ristretto v0.0.3
 	github.com/elastic/beats/v7 v7.11.1
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20200709172729-d43b7ad5833a
-	github.com/elastic/go-elasticsearch/v8 v8.0.0-20200728144331-527225d8e836
+	github.com/elastic/go-elasticsearch/v8 v8.0.0-20210414074309-f7ffd04b8d6a
 	github.com/elastic/go-ucfg v0.8.3
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/google/go-cmp v0.4.0
