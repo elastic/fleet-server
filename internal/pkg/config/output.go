@@ -31,7 +31,7 @@ type Elasticsearch struct {
 	Username                string            `config:"username"`
 	Password                string            `config:"password"`
 	APIKey                  string            `config:"api_key"`
-  ServiceToken            string            `config:"service_token"`
+	ServiceToken            string            `config:"service_token"`
 	ProxyURL                string            `config:"proxy_url"`
 	ProxyDisable            bool              `config:"proxy_disable"`
 	TLS                     *tlscommon.Config `config:"ssl"`
@@ -129,13 +129,13 @@ func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
 	h.Set("X-elastic-product-origin", "fleet")
 
 	return elasticsearch.Config{
-		Addresses:  addrs,
-		Username:   c.Username,
-		Password:   c.Password,
+		Addresses:    addrs,
+		Username:     c.Username,
+		Password:     c.Password,
 		ServiceToken: c.ServiceToken,
-		Header:     h,
-		Transport:  httpTransport,
-		MaxRetries: c.MaxRetries,
+		Header:       h,
+		Transport:    httpTransport,
+		MaxRetries:   c.MaxRetries,
 	}, nil
 }
 
