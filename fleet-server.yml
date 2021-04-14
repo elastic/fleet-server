@@ -1,9 +1,9 @@
 output:
   elasticsearch:
     hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
-    #username: '${ELASTICSEARCH_USERNAME:elastic}'
-    #password: '${ELASTICSEARCH_PASSWORD:changeme}'
-    service_token: 'AAEAAWVsYXN0aWMvZmxlZXQtc2VydmVyL215LXRva2VuOm5jZUx2ZEFIUVFhY0VQX19lT1E1V2c'  # comment out username/password when this is set
+    username: '${ELASTICSEARCH_USERNAME:elastic}'
+    password: '${ELASTICSEARCH_PASSWORD:changeme}'
+    #service_token: 'token'  # comment out username/password when this is set
 
 fleet:
   agent:
