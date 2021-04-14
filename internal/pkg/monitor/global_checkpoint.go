@@ -51,9 +51,9 @@ func waitCheckpointAdvance(ctx context.Context, es *elasticsearch.Client, index 
 	req := esh.NewGlobalCheckpointsRequest(es.Transport)
 	res, err := req(req.WithContext(ctx),
 		req.WithIndex(index),
-		req.WithCurrentCheckpoints(checkpoint),
+		req.WithCheckpoints(checkpoint),
 		req.WithWaitForAdvance(true),
-		req.WithPollTimeout(to),
+		req.WithTimeout(to),
 	)
 
 	if err != nil {

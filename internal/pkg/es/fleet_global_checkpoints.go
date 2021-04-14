@@ -45,10 +45,10 @@ type GlobalCheckpoints func(o ...func(*GlobalCheckpointsRequest)) (*esapi.Respon
 type GlobalCheckpointsRequest struct {
 	ctx context.Context
 
-	Index              string
-	WaitForAdvance     *bool
-	CurrentCheckpoints []int64
-	PollTimeout        time.Duration
+	Index          string
+	WaitForAdvance *bool
+	Checkpoints    []int64
+	Timeout        time.Duration
 
 	Header http.Header
 }
@@ -77,13 +77,13 @@ func (r GlobalCheckpointsRequest) Do(ctx context.Context, transport esapi.Transp
 		params["wait_for_advance"] = strconv.FormatBool(*r.WaitForAdvance)
 	}
 
-	if len(r.CurrentCheckpoints) > 0 {
-		seqNo := sqn.SeqNo(r.CurrentCheckpoints)
-		params["current_checkpoints"] = seqNo.String()
+	if len(r.Checkpoints) > 0 {
+		seqNo := sqn.SeqNo(r.Checkpoints)
+		params["checkpoints"] = seqNo.String()
 	}
 
-	if r.PollTimeout != 0 {
-		params["poll_timeout"] = formatDuration(r.PollTimeout)
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
 	}
 
 	req, err := http.NewRequest(method, path.String(), nil)
@@ -151,14 +151,14 @@ func (f GlobalCheckpoints) WithWaitForAdvance(v bool) func(*GlobalCheckpointsReq
 	}
 }
 
-func (f GlobalCheckpoints) WithCurrentCheckpoints(checkpoints []int64) func(*GlobalCheckpointsRequest) {
+func (f GlobalCheckpoints) WithCheckpoints(checkpoints []int64) func(*GlobalCheckpointsRequest) {
 	return func(r *GlobalCheckpointsRequest) {
-		r.CurrentCheckpoints = checkpoints
+		r.Checkpoints = checkpoints
 	}
 }
 
-func (f GlobalCheckpoints) WithPollTimeout(to time.Duration) func(*GlobalCheckpointsRequest) {
+func (f GlobalCheckpoints) WithTimeout(to time.Duration) func(*GlobalCheckpointsRequest) {
 	return func(r *GlobalCheckpointsRequest) {
-		r.PollTimeout = to
+		r.Timeout = to
 	}
 }
