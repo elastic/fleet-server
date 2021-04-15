@@ -15,8 +15,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func NewClient(ctx context.Context, cfg *config.Config) (*elasticsearch.Client, error) {
-	escfg, err := cfg.Output.Elasticsearch.ToESConfig()
+func NewClient(ctx context.Context, cfg *config.Config, longPoll bool) (*elasticsearch.Client, error) {
+	escfg, err := cfg.Output.Elasticsearch.ToESConfig(longPoll)
 	if err != nil {
 		return nil, err
 	}

@@ -171,7 +171,7 @@ func TestToESConfig(t *testing.T) {
 			cmpopts.IgnoreUnexported(tls.Config{}),
 		}
 		t.Run(name, func(t *testing.T) {
-			res, err := test.cfg.ToESConfig()
+			res, err := test.cfg.ToESConfig(false)
 			require.NoError(t, err)
 			test.result.Header.Set("X-elastic-product-origin", "fleet")
 			if !assert.True(t, cmp.Equal(test.result, res, copts...)) {

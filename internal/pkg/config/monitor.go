@@ -4,14 +4,19 @@
 
 package config
 
+import "time"
+
 const (
-	defaultFetchSize = 1000
+	defaultFetchSize   = 1000
+	defaultPollTimeout = 5 * time.Minute
 )
 
 type Monitor struct {
-	FetchSize int `config:"fetch_size"`
+	FetchSize   int           `config:"fetch_size"`
+	PollTimeout time.Duration `config:"poll_timeout"`
 }
 
 func (m *Monitor) InitDefaults() {
 	m.FetchSize = defaultFetchSize
+	m.PollTimeout = defaultPollTimeout
 }

@@ -11,6 +11,8 @@ import (
 
 const UndefinedSeqNo = -1
 
+var DefaultSeqNo = []int64{UndefinedSeqNo}
+
 // Abstracts the array of document seq numbers
 type SeqNo []int64
 
@@ -25,9 +27,20 @@ func (s SeqNo) IsSet() bool {
 	return len(s) > 0 && s[0] >= 0
 }
 
-func (s SeqNo) Get(idx int) int64 {
-	if idx < len(s) {
-		return s[idx]
+// Returns one/first value until we get and API to get the next checkpoints on search
+func (s SeqNo) Value() int64 {
+	if len(s) == 0 {
+		return UndefinedSeqNo
 	}
-	return UndefinedSeqNo
+	return s[0]
+}
+
+func (s SeqNo) Clone() SeqNo {
+	if s == nil {
+		return nil
+	}
+
+	r := make(SeqNo, len(s))
+	copy(r, s)
+	return r
 }

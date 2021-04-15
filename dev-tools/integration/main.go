@@ -31,7 +31,7 @@ func main() {
 	checkErr(err)
 
 	ctx := context.Background()
-	es, err := es.NewClient(ctx, cfg)
+	es, err := es.NewClient(ctx, cfg, false)
 	checkErr(err)
 
 	err = esutil.EnsureESIndices(ctx, es)
