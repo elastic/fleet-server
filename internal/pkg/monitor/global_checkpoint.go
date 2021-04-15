@@ -8,73 +8,89 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"net/http"
+	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	esh "github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 var ErrGlobalCheckpoint = errors.New("global checkpoint error")
 
-type shard struct {
-	SeqNo struct {
-		GlobalCheckpoint int64 `json:"global_checkpoint"`
-	} `json:"seq_no"`
+// Global checkpoint response
+// {"global_checkpoints":[-1]}
+
+type globalCheckpointsResponse struct {
+	GlobalCheckpoints []int64    `json:"global_checkpoints"`
+	TimedOut          bool       `json:"timed_out"`
+	Error             esh.ErrorT `json:"error,omitempty"`
 }
 
-type indexStats struct {
-	Shards map[string][]shard `json:"shards"`
+func queryGlobalCheckpoint(ctx context.Context, es *elasticsearch.Client, index string) (seqno sqn.SeqNo, err error) {
+	req := esh.NewGlobalCheckpointsRequest(es.Transport)
+	res, err := req(req.WithContext(ctx),
+		req.WithIndex(index))
+
+	if err != nil {
+		return
+	}
+
+	seqno, err = processGlobalCheckpointResponse(res)
+	if errors.Is(err, esh.ErrIndexNotFound) {
+		seqno = sqn.DefaultSeqNo
+		err = nil
+	}
+
+	return seqno, err
 }
 
-type statsResponse struct {
-	IndexStats map[string]indexStats `json:"indices"`
-
-	Error es.ErrorT `json:"error,omitempty"`
-}
-
-func queryGlobalCheckpoint(ctx context.Context, es *elasticsearch.Client, index string) (seqno int64, err error) {
-	seqno = defaultSeqNo
-
-	res, err := es.Indices.Stats(
-		es.Indices.Stats.WithContext(ctx),
-		es.Indices.Stats.WithIndex(index),
-		es.Indices.Stats.WithLevel("shards"),
+func waitCheckpointAdvance(ctx context.Context, es *elasticsearch.Client, index string, checkpoint sqn.SeqNo, to time.Duration) (seqno sqn.SeqNo, err error) {
+	req := esh.NewGlobalCheckpointsRequest(es.Transport)
+	res, err := req(req.WithContext(ctx),
+		req.WithIndex(index),
+		req.WithCheckpoints(checkpoint),
+		req.WithWaitForAdvance(true),
+		req.WithTimeout(to),
 	)
 
 	if err != nil {
 		return
 	}
 
+	return processGlobalCheckpointResponse(res)
+}
+
+func processGlobalCheckpointResponse(res *esapi.Response) (seqno sqn.SeqNo, err error) {
 	defer res.Body.Close()
 
-	var sres statsResponse
+	// Don't parse the payload if timeout
+	if res.StatusCode == http.StatusGatewayTimeout {
+		return seqno, esh.ErrTimeout
+	}
+
+	// Parse payload
+	var sres globalCheckpointsResponse
 	err = json.NewDecoder(res.Body).Decode(&sres)
 	if err != nil {
 		return
 	}
 
-	if len(sres.IndexStats) > 1 {
-		indices := make([]string, 0, len(sres.IndexStats))
-		for k := range sres.IndexStats {
-			indices = append(indices, k)
-		}
-		return seqno, fmt.Errorf("more than one indices found %v, %w", indices, ErrGlobalCheckpoint)
+	// Check error
+	err = esh.TranslateError(res.StatusCode, sres.Error)
+	if err != nil {
+		return nil, err
 	}
 
-	if len(sres.IndexStats) > 0 {
-		// Grab the first and only index stats
-		var stats indexStats
-		for _, stats = range sres.IndexStats {
-			break
-		}
-
-		if shards, ok := stats.Shards["0"]; ok {
-			if len(shards) > 0 {
-				seqno = shards[0].SeqNo.GlobalCheckpoint
-			}
-		}
+	if sres.TimedOut {
+		return nil, esh.ErrTimeout
 	}
 
-	return
+	if len(sres.GlobalCheckpoints) == 0 {
+		return nil, esh.ErrNotFound
+	}
+
+	return sres.GlobalCheckpoints, nil
 }

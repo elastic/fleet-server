@@ -93,7 +93,8 @@ func TestConfig(t *testing.T) {
 							MaxCost:     defaultCacheMaxCost,
 						},
 						Monitor: Monitor{
-							FetchSize: defaultFetchSize,
+							FetchSize:   defaultFetchSize,
+							PollTimeout: defaultPollTimeout,
 						},
 					},
 				},
@@ -182,7 +183,8 @@ func TestConfig(t *testing.T) {
 							MaxCost:     defaultCacheMaxCost,
 						},
 						Monitor: Monitor{
-							FetchSize: defaultFetchSize,
+							FetchSize:   defaultFetchSize,
+							PollTimeout: defaultPollTimeout,
 						},
 					},
 				},
@@ -269,7 +271,8 @@ func TestConfig(t *testing.T) {
 							MaxCost:     defaultCacheMaxCost,
 						},
 						Monitor: Monitor{
-							FetchSize: defaultFetchSize,
+							FetchSize:   defaultFetchSize,
+							PollTimeout: defaultPollTimeout,
 						},
 					},
 				},
@@ -356,7 +359,8 @@ func TestConfig(t *testing.T) {
 							MaxCost:     defaultCacheMaxCost,
 						},
 						Monitor: Monitor{
-							FetchSize: defaultFetchSize,
+							FetchSize:   defaultFetchSize,
+							PollTimeout: defaultPollTimeout,
 						},
 					},
 				},

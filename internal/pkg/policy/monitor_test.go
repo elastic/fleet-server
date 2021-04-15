@@ -160,6 +160,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 
 	gotPolicy := false
 	tm := time.NewTimer(1 * time.Second)
+	defer tm.Stop()
 	select {
 	case <-s.Output():
 		gotPolicy = true
@@ -233,6 +234,7 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 
 	gotPolicy := false
 	tm := time.NewTimer(1 * time.Second)
+	defer tm.Stop()
 	select {
 	case <-s.Output():
 		gotPolicy = true

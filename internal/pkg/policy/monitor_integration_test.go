@@ -22,8 +22,6 @@ import (
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
-const testMonitorIntervalMS = 100
-
 func setupIndex(ctx context.Context, t *testing.T) (string, bulk.Bulk) {
 	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicy)
 	return index, bulker
@@ -34,7 +32,7 @@ func TestMonitor_Integration(t *testing.T) {
 	defer cancel()
 
 	index, bulker := setupIndex(ctx, t)
-	im, err := monitor.New(index, bulker.Client(), monitor.WithCheckInterval(testMonitorIntervalMS))
+	im, err := monitor.New(index, bulker.Client(), bulker.Client())
 	if err != nil {
 		t.Fatal(err)
 	}

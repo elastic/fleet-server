@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/coordinator"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -505,7 +506,13 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	// shutdown before the bulker is then cancelled.
 	bulkCtx, bulkCancel := context.WithCancel(context.Background())
 	defer bulkCancel()
-	es, bulker, err := bulk.InitES(bulkCtx, cfg)
+	esCli, bulker, err := bulk.InitES(bulkCtx, cfg)
+	if err != nil {
+		return err
+	}
+
+	// Monitoring es client, longer timeout, no retries
+	monCli, err := es.NewClient(ctx, cfg, true)
 	if err != nil {
 		return err
 	}
@@ -514,7 +521,10 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Coordinator policy monitor
-	pim, err := monitor.New(dl.FleetPolicies, es, monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize))
+	pim, err := monitor.New(dl.FleetPolicies, esCli, monCli,
+		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
+		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
+	)
 	if err != nil {
 		return err
 	}
@@ -536,7 +546,11 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	var ad *action.Dispatcher
 	var tr *action.TokenResolver
 
-	am, err = monitor.NewSimple(dl.FleetActions, es, monitor.WithExpiration(true), monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize))
+	am, err = monitor.NewSimple(dl.FleetActions, esCli, monCli,
+		monitor.WithExpiration(true),
+		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
+		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
+	)
 	if err != nil {
 		return err
 	}

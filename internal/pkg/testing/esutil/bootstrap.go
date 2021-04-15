@@ -22,13 +22,7 @@ type indexConfig struct {
 var indexConfigs = map[string]indexConfig{
 	// Commenting out the boostrapping for now here, just in case if it needs to be "enabled" again.
 	// Will remove all the boostrapping code completely later once all is fully integrated
-	".fleet-actions":             {mapping: es.MappingAction},
-	".fleet-actions-results":     {mapping: es.MappingActionResult, datastream: true},
-	".fleet-agents":              {mapping: es.MappingAgent},
-	".fleet-enrollment-api-keys": {mapping: es.MappingEnrollmentApiKey},
-	".fleet-policies":            {mapping: es.MappingPolicy},
-	".fleet-policies-leader":     {mapping: es.MappingPolicyLeader},
-	".fleet-servers":             {mapping: es.MappingServer},
+	".fleet-actions-results": {mapping: es.MappingActionResult, datastream: true},
 }
 
 // Bootstrap creates .fleet-actions data stream

@@ -20,6 +20,10 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 )
 
+// The timeout would be driven by the server for long poll.
+// Giving it some sane long value.
+const httpTransportLongPollTimeout = 10 * time.Minute
+
 var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
 // Elasticsearch is the configuration for elasticsearch.
@@ -77,7 +81,7 @@ func (c *Elasticsearch) Validate() error {
 }
 
 // ToESConfig converts the configuration object into the config for the elasticsearch client.
-func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
+func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) {
 	// build the addresses
 	addrs := make([]string, len(c.Hosts))
 	for i, host := range c.Hosts {
@@ -104,6 +108,17 @@ func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
 		ResponseHeaderTimeout: c.Timeout,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
+
+	disableRetry := false
+
+	if longPoll {
+		httpTransport.IdleConnTimeout = httpTransportLongPollTimeout
+		httpTransport.ResponseHeaderTimeout = httpTransportLongPollTimeout
+
+		// no retries for long poll monitoring
+		disableRetry = true
+	}
+
 	if c.TLS != nil && c.TLS.IsEnabled() {
 		tls, err := tlscommon.LoadTLSConfig(c.TLS)
 		if err != nil {
@@ -136,6 +151,7 @@ func (c *Elasticsearch) ToESConfig() (elasticsearch.Config, error) {
 		Header:       h,
 		Transport:    httpTransport,
 		MaxRetries:   c.MaxRetries,
+		DisableRetry: disableRetry,
 	}, nil
 }
 
