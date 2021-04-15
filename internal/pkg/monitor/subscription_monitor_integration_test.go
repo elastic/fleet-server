@@ -10,7 +10,6 @@ import (
 	"context"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
@@ -38,8 +37,7 @@ func TestMonitorNonEmptyIndex(t *testing.T) {
 
 func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk.Bulk) {
 	readyCh := make(chan error)
-	mon, err := New(index, bulker.Client(),
-		WithCheckInterval(testMonitorIntervalMS*time.Millisecond),
+	mon, err := New(index, bulker.Client(), bulker.Client(),
 		WithReadyChan(readyCh),
 	)
 	require.NoError(t, err)

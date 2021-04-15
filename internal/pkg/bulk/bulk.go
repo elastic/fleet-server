@@ -87,7 +87,7 @@ const (
 
 func InitES(ctx context.Context, cfg *config.Config, opts ...BulkOpt) (*elasticsearch.Client, Bulk, error) {
 
-	es, err := es.NewClient(ctx, cfg)
+	es, err := es.NewClient(ctx, cfg, false)
 	if err != nil {
 		return nil, nil, err
 	}

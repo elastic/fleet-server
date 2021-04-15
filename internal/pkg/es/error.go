@@ -22,7 +22,10 @@ type ErrElastic struct {
 func (e *ErrElastic) Unwrap() error {
 	if e.Type == "index_not_found_exception" {
 		return ErrIndexNotFound
+	} else if e.Type == "timeout_exception" {
+		return ErrTimeout
 	}
+
 	return nil
 }
 
@@ -35,6 +38,8 @@ var (
 	ErrElasticNotFound        = errors.New("elastic not found")
 	ErrInvalidBody            = errors.New("invalid body")
 	ErrIndexNotFound          = errors.New("index not found")
+	ErrTimeout                = errors.New("timeout")
+	ErrNotFound               = errors.New("not found")
 )
 
 func TranslateError(status int, e ErrorT) error {
