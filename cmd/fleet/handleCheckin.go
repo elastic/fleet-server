@@ -26,9 +26,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
-	"github.com/miolini/datacounter"
 
+	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
+	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -67,6 +68,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 type CheckinT struct {
+	verCon version.Constraints
 	cfg    *config.Server
 	cache  cache.Cache
 	bc     *BulkCheckin
@@ -79,6 +81,7 @@ type CheckinT struct {
 }
 
 func NewCheckinT(
+	verCon version.Constraints,
 	cfg *config.Server,
 	c cache.Cache,
 	bc *BulkCheckin,
@@ -96,6 +99,7 @@ func NewCheckinT(
 		Msg("Checkin install limits")
 
 	ct := &CheckinT{
+		verCon: verCon,
 		cfg:    cfg,
 		cache:  c,
 		bc:     bc,
@@ -120,6 +124,11 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 
 	agent, err := authAgent(r, id, ct.bulker, ct.cache)
 
+	if err != nil {
+		return err
+	}
+
+	err = validateUserAgent(r, ct.verCon)
 	if err != nil {
 		return err
 	}

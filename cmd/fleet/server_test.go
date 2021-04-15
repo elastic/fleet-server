@@ -33,14 +33,15 @@ func TestRunServer(t *testing.T) {
 	cfg.Host = "localhost"
 	cfg.Port = port
 
+	verCon := mustBuildConstraints("8.0.0")
 	c, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 	bulker := ftesting.MockBulk{}
 	pim := mock.NewMockIndexMonitor()
 	pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
 	bc := NewBulkCheckin(nil)
-	ct := NewCheckinT(cfg, c, bc, pm, nil, nil, nil, nil)
-	et, err := NewEnrollerT(cfg, nil, c)
+	ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
+	et, err := NewEnrollerT(verCon, cfg, nil, c)
 	require.NoError(t, err)
 
 	router := NewRouter(bulker, ct, et, nil, nil, nil)
