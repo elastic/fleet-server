@@ -12,6 +12,7 @@ require (
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/google/go-cmp v0.4.0
 	github.com/hashicorp/go-cleanhttp v0.5.1
+	github.com/hashicorp/go-version v1.3.0
 	github.com/hashicorp/golang-lru v0.5.2-0.20190520140433-59383c442f7d
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/miolini/datacounter v1.0.2
