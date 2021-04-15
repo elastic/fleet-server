@@ -24,6 +24,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
+	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog/log"
@@ -41,18 +42,20 @@ var (
 )
 
 type EnrollerT struct {
+	verCon version.Constraints
 	bulker bulk.Bulk
 	cache  cache.Cache
 	limit  *limit.Limiter
 }
 
-func NewEnrollerT(cfg *config.Server, bulker bulk.Bulk, c cache.Cache) (*EnrollerT, error) {
+func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bulk, c cache.Cache) (*EnrollerT, error) {
 
 	log.Info().
 		Interface("limits", cfg.Limits.EnrollLimit).
 		Msg("Enroller install limits")
 
 	return &EnrollerT{
+		verCon: verCon,
 		limit:  limit.NewLimiter(&cfg.Limits.EnrollLimit),
 		bulker: bulker,
 		cache:  c,
@@ -109,6 +112,11 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 	defer limitF()
 
 	key, err := authApiKey(r, et.bulker.Client(), et.cache)
+	if err != nil {
+		return nil, err
+	}
+
+	err = validateUserAgent(r, et.verCon)
 	if err != nil {
 		return nil, err
 	}

@@ -31,6 +31,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -348,7 +349,8 @@ func (a *AgentMode) OnError(err error) {
 }
 
 type FleetServer struct {
-	version  string
+	ver      string
+	verCon   version.Constraints
 	policyId string
 
 	cfg      *config.Config
@@ -358,9 +360,14 @@ type FleetServer struct {
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config, c cache.Cache, version string, reporter status.Reporter) (*FleetServer, error) {
+func NewFleetServer(cfg *config.Config, c cache.Cache, verStr string, reporter status.Reporter) (*FleetServer, error) {
+	verCon, err := buildVersionConstraint(verStr)
+	if err != nil {
+		return nil, err
+	}
 	return &FleetServer{
-		version:  version,
+		ver:      verStr,
+		verCon:   verCon,
 		cfg:      cfg,
 		cfgCh:    make(chan *config.Config, 1),
 		cache:    c,
@@ -513,7 +520,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	}
 
 	g.Go(loggedRunFunc(ctx, "Policy index monitor", pim.Run))
-	cord := coordinator.NewMonitor(cfg.Fleet, f.version, bulker, pim, coordinator.NewCoordinatorZero)
+	cord := coordinator.NewMonitor(cfg.Fleet, f.ver, bulker, pim, coordinator.NewCoordinatorZero)
 	g.Go(loggedRunFunc(ctx, "Coordinator policy monitor", cord.Run))
 
 	// Policy monitor
@@ -545,8 +552,8 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	bc := NewBulkCheckin(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
-	ct := NewCheckinT(&f.cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
-	et, err := NewEnrollerT(&f.cfg.Inputs[0].Server, bulker, f.cache)
+	ct := NewCheckinT(f.verCon, &f.cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
+	et, err := NewEnrollerT(f.verCon, &f.cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
 	}
