@@ -22,7 +22,7 @@ import (
 
 // The timeout would be driven by the server for long poll.
 // Giving it some sane long value.
-const defaultLongPollTimeout = 10 * time.Minute
+const httpTransportLongPollTimeout = 10 * time.Minute
 
 var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
@@ -112,8 +112,8 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	disableRetry := false
 
 	if longPoll {
-		httpTransport.IdleConnTimeout = defaultLongPollTimeout
-		httpTransport.ResponseHeaderTimeout = defaultLongPollTimeout
+		httpTransport.IdleConnTimeout = httpTransportLongPollTimeout
+		httpTransport.ResponseHeaderTimeout = httpTransportLongPollTimeout
 
 		// no retries for long poll monitoring
 		disableRetry = true
