@@ -7,6 +7,7 @@ package fleet
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +18,8 @@ import (
 const (
 	// MinVersion is the minimum version an Elastic Agent must be to communicate
 	MinVersion = "7.13"
+
+	userAgentPrefix = "elastic agent "
 )
 
 var (
@@ -44,7 +47,7 @@ func maximizePatch(ver *version.Version) string {
 	if len(segments) > 2 {
 		segments = segments[:2]
 	}
-	segments = append(segments, int(^uint(0)>>1)) // max int
+	segments = append(segments, math.MaxInt32)
 	segStrs := make([]string, 0, len(segments))
 	for _, segment := range segments {
 		segStrs = append(segStrs, strconv.Itoa(segment))
@@ -60,10 +63,10 @@ func validateUserAgent(r *http.Request, verConst version.Constraints) error {
 		return ErrInvalidUserAgent
 	}
 	userAgent = strings.ToLower(userAgent)
-	if !strings.HasPrefix(userAgent, "elastic agent ") {
+	if !strings.HasPrefix(userAgent, userAgentPrefix) {
 		return ErrInvalidUserAgent
 	}
-	verStr := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(userAgent, "elastic agent "), "-snapshot"))
+	verStr := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(userAgent, userAgentPrefix), "-snapshot"))
 	ver, err := version.NewVersion(verStr)
 	if err != nil {
 		return ErrInvalidUserAgent
