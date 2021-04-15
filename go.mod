@@ -14,7 +14,6 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.1
 	github.com/hashicorp/go-version v1.3.0
 	github.com/hashicorp/golang-lru v0.5.2-0.20190520140433-59383c442f7d
-	github.com/jstemmer/go-junit-report v0.9.1 // indirect
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/miolini/datacounter v1.0.2
 	github.com/pkg/errors v0.9.1
