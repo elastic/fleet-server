@@ -237,14 +237,14 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		if err != nil {
 			if errors.Is(err, es.ErrIndexNotFound) {
 				// Wait until created
-				m.log.Info().Msgf("index not found, try again in %v", retryDelay)
+				m.log.Debug().Msgf("index not found, poll again in %v", retryDelay)
 			} else if errors.Is(err, es.ErrTimeout) {
 				// Timed out, wait again
-				m.log.Debug().Msg("wait global checkpoints advance, timeout, wait again")
+				m.log.Debug().Msg("timeout on global checkpoints advance, poll again")
 				continue
 			} else {
 				// Log the error and keep trying
-				m.log.Error().Err(err).Msg("failed waiting global checkpoints advance")
+				m.log.Error().Err(err).Msg("failed on waiting for global checkpoints advance")
 			}
 
 			// Delay next attempt
