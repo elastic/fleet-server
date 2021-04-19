@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
+	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -509,6 +510,12 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	esCli, bulker, err := bulk.InitES(bulkCtx, cfg)
 	if err != nil {
 		return err
+	}
+
+	// Check version compatibility with Elasticsearch
+	err = ver.CheckCompatibility(ctx, esCli, f.ver)
+	if err != nil {
+		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
 	// Monitoring es client, longer timeout, no retries
