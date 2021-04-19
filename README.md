@@ -51,7 +51,11 @@ The above assumes you are running on OS X. Put the platform in you are running o
 KIBANA_HOST=http://localhost:5601 KIBANA_USERNAME=elastic KIBANA_PASSWORD=changeme ELASTICSEARCH_HOST=http://localhost:9200 ELASTICSEARCH_USERNAME=elastic ELASTICSEARCH_PASSWORD=changeme KIBANA_FLEET_SETUP=1 FLEET_SERVER_ENABLE=1 sudo ./elastic-agent container
 ```
 
-This will start up Elastic Agent with fleet-server and directly enroll it. In addition Fleet is setup inside of Kibana.
+This will start up Elastic Agent with fleet-server and directly enroll it. In addition Fleet is setup inside of Kibana. In case the setup is done already in Kibana manually, the following command can be used:
+
+```
+sudo ./elastic-agent enroll --fleet-server=http://elastic:changeme@localhost:9200 --fleet-server-policy={fleet-server-policy-id} --enrollment-token={policy-enrollment-token}
+```
 
 ## Running Elastic Agent with fleet-server in container
 
@@ -80,3 +84,16 @@ Replace {YOUR-IP} with the IP address of your machine.
 ## fleet-server repo
 
 By default the above will download the most recent snapshot build for fleet-server. To use your own development build, run `make release` in the fleet-server repository, go to `build/distributions` and copy the `.tar.gz` and `sha512` file to the `data/elastic-agent-{hash}/downloads` inside the elastic-agent directory. Now you run with your own build of fleet-server.
+
+
+## Compatbility and upgrades
+
+Fleet server is always on the exact same version as Elastic Agent running fleet-server. Any Elastic Agent enrolling into a fleet-server must be the same version or older. Fleet-server communicates with Elasticsearch. Elasticsearch must be on the same version or newer. For Kibana it is assumed it is on the same version as Elasticsearch. With this the compatibility looks as following:
+
+```
+Elastic Agent <= Elastic Agent with fleet-server) <= Elasticsearch / Kibana
+```
+
+There might be differences on the bugfix version.
+
+If an upgrade is done, Elasticsearch / Kibana have to be upgraded first, then Elastic Agent with fleet-server and last the Elastic Agents.
