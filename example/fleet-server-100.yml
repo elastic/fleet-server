@@ -13,9 +13,6 @@ fleet:
   agent:
     id: 1e4954ce-af37-4731-9f4a-407b08e69e42 # Normally provided by the agent; stubbed here.
 
-runtime:
-  gc_percent: 20                # Force the GC to execute more frequently: see https://golang.org/pkg/runtime/debug/#SetGCPercent
-
 inputs:
   - cache:
       num_counters: 2000        # Limit the size of the hash table to rougly 10x expected number of elements
@@ -43,7 +40,10 @@ inputs:
       ssl:
         enabled: true
         key: /path/to/key.pem   # To support TLS, server needs cert, key pair
-        certificate: /path/to/cert.pem 
+        certificate: /path/to/cert.pem
+      runtime:
+        gc_percent: 20          # Force the GC to execute more frequently: see https://golang.org/pkg/runtime/debug/#SetGCPercent
+ 
         
 http:
   enabled: true                 # Enable metrics on http://localhost:5066/stats
