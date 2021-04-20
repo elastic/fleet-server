@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -579,7 +580,7 @@ func (b *Bulker) waitBulkAction(ctx context.Context, action Action, index, id st
 	const kSlop = 64
 	buf.Grow(len(body) + kSlop)
 
-	if err := b.writeBulkMeta(&buf, action, index, id); err != nil {
+	if err := b.writeBulkMeta(&buf, action, index, id, opt); err != nil {
 		return nil, err
 	}
 
@@ -722,7 +723,7 @@ func (b *Bulker) writeMget(buf *bytes.Buffer, index, id string) error {
 	return nil
 }
 
-func (b *Bulker) writeBulkMeta(buf *bytes.Buffer, action Action, index, id string) error {
+func (b *Bulker) writeBulkMeta(buf *bytes.Buffer, action Action, index, id string, opts optionsT) error {
 	if err := b.validateMeta(index, id); err != nil {
 		return err
 	}
@@ -735,7 +736,11 @@ func (b *Bulker) writeBulkMeta(buf *bytes.Buffer, action Action, index, id strin
 		buf.WriteString(id)
 		buf.WriteString(`",`)
 	}
-
+	if opts.RetryOnConflict > 0 {
+		buf.WriteString(`"retry_on_conflict":`)
+		buf.WriteString(strconv.Itoa(opts.RetryOnConflict))
+		buf.WriteString(`,`)
+	}
 	buf.WriteString(`"_index":"`)
 	buf.WriteString(index)
 	buf.WriteString("\"}}\n")
@@ -802,4 +807,16 @@ func (b *Bulker) dispatch(ctx context.Context, action Action, opts optionsT, dat
 	}
 
 	return respT{err: ctx.Err()}
+}
+
+type UpdateFields map[string]interface{}
+
+func (u UpdateFields) Marshal() ([]byte, error) {
+	doc := struct {
+		Doc map[string]interface{} `json:"doc"`
+	}{
+		u,
+	}
+
+	return json.Marshal(doc)
 }
