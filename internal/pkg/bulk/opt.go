@@ -12,7 +12,8 @@ import (
 // Transaction options
 
 type optionsT struct {
-	Refresh bool
+	Refresh         bool
+	RetryOnConflict int
 }
 
 type Opt func(*optionsT)
@@ -20,6 +21,12 @@ type Opt func(*optionsT)
 func WithRefresh() Opt {
 	return func(opt *optionsT) {
 		opt.Refresh = true
+	}
+}
+
+func WithRetryOnConflict(n int) Opt {
+	return func(opt *optionsT) {
+		opt.RetryOnConflict = n
 	}
 }
 
