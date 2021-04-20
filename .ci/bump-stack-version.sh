@@ -20,7 +20,6 @@ fi
 echo "Update stack with version ${VERSION}"
 ${SED} -E -e "s#(ELASTICSEARCH_VERSION)=[0-9]+\.[0-9]+\.[0-9]+(-[a-f0-9]{8})?#\1=${VERSION}#g" dev-tools/integration/.env
 
-exit 0
 echo "Commit changes"
 git config user.email
 git checkout -b "update-stack-version-$(date "+%Y%m%d%H%M%S")"
