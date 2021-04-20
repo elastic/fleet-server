@@ -5,11 +5,13 @@
 package fleet
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -199,34 +201,26 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, agent *model.Agent, act
 		}
 	}
 
-	if found {
-		updates := make([]bulk.BulkOp, 0, 1)
-		fields := map[string]interface{}{
-			dl.FieldPolicyRevisionIdx:    currRev,
-			dl.FieldPolicyCoordinatorIdx: currCoord,
-		}
-		fields[dl.FieldUpdatedAt] = time.Now().UTC().Format(time.RFC3339)
-
-		source, err := json.Marshal(map[string]interface{}{
-			"doc": fields,
-		})
-		if err != nil {
-			return err
-		}
-
-		updates = append(updates, bulk.BulkOp{
-			Id:    agent.Id,
-			Body:  source,
-			Index: dl.FleetAgents,
-		})
-
-		err = ack.bulk.MUpdate(ctx, updates, bulk.WithRefresh())
-		if err != nil {
-			return err
-		}
+	if !found {
+		return nil
 	}
 
-	return nil
+	body := makeUpdatePolicyBody(
+		agent.PolicyId,
+		currRev,
+		currCoord,
+	)
+
+	err := ack.bulk.Update(
+		ctx,
+		dl.FleetAgents,
+		agent.Id,
+		body,
+		bulk.WithRefresh(),
+		bulk.WithRetryOnConflict(3),
+	)
+
+	return err
 }
 
 func (ack *AckT) handleUnenroll(ctx context.Context, agent *model.Agent) error {
@@ -237,52 +231,35 @@ func (ack *AckT) handleUnenroll(ctx context.Context, agent *model.Agent) error {
 		}
 	}
 
-	updates := make([]bulk.BulkOp, 0, 1)
 	now := time.Now().UTC().Format(time.RFC3339)
-	fields := map[string]interface{}{
+	doc := bulk.UpdateFields{
 		dl.FieldActive:       false,
 		dl.FieldUnenrolledAt: now,
 		dl.FieldUpdatedAt:    now,
 	}
 
-	source, err := json.Marshal(map[string]interface{}{
-		"doc": fields,
-	})
+	body, err := doc.Marshal()
 	if err != nil {
 		return err
 	}
 
-	updates = append(updates, bulk.BulkOp{
-		Id:    agent.Id,
-		Body:  source,
-		Index: dl.FleetAgents,
-	})
-
-	return ack.bulk.MUpdate(ctx, updates, bulk.WithRefresh())
+	return ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh())
 }
 
 func (ack *AckT) handleUpgrade(ctx context.Context, agent *model.Agent) error {
-	updates := make([]bulk.BulkOp, 0, 1)
+
 	now := time.Now().UTC().Format(time.RFC3339)
-	fields := map[string]interface{}{
-		dl.FieldUpgradedAt:       now,
+	doc := bulk.UpdateFields{
 		dl.FieldUpgradeStartedAt: nil,
+		dl.FieldUpgradedAt:       now,
 	}
 
-	source, err := json.Marshal(map[string]interface{}{
-		"doc": fields,
-	})
+	body, err := doc.Marshal()
 	if err != nil {
 		return err
 	}
 
-	updates = append(updates, bulk.BulkOp{
-		Id:    agent.Id,
-		Body:  source,
-		Index: dl.FleetAgents,
-	})
-
-	return ack.bulk.MUpdate(ctx, updates, bulk.WithRefresh())
+	return ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh())
 }
 
 func _getAPIKeyIDs(agent *model.Agent) []string {
@@ -294,4 +271,42 @@ func _getAPIKeyIDs(agent *model.Agent) []string {
 		keys = append(keys, agent.DefaultApiKeyId)
 	}
 	return keys
+}
+
+// Generate an update script that validates that the policy_id
+// has not changed underneath us by an upstream process (Kibana or otherwise).
+// We have a race condition where a user could have assigned a new policy to
+// an agent while we were busy updating the old one.  A blind update to the
+// agent record without a check could set the revision and coordIdx for the wrong
+// policy.  This script should be coupled with a "retry_on_conflict" parameter
+// to allow for *other* changes to the agent record while we running the script.
+// (For example, say the background bulk check-in timestamp update task fires)
+//
+// WARNING: This assumes the input data is sanitized.
+
+const kUpdatePolicyPrefix = `{"script":{"lang":"painless","source":"if (ctx._source.policy_id == params.id) {ctx._source.` +
+	dl.FieldPolicyRevisionIdx +
+	` = params.rev;ctx._source.` +
+	dl.FieldPolicyCoordinatorIdx +
+	`= params.coord;ctx._source.` +
+	dl.FieldUpdatedAt +
+	` = params.ts;} else {ctx.op = \"noop\";}","params": {"id":"`
+
+func makeUpdatePolicyBody(policyId string, newRev, coordIdx int64) []byte {
+
+	var buf bytes.Buffer
+	buf.Grow(384)
+
+	//  Not pretty, but fast.
+	buf.WriteString(kUpdatePolicyPrefix)
+	buf.WriteString(policyId)
+	buf.WriteString(`","rev":`)
+	buf.WriteString(strconv.FormatInt(newRev, 10))
+	buf.WriteString(`,"coord":`)
+	buf.WriteString(strconv.FormatInt(coordIdx, 10))
+	buf.WriteString(`,"ts":"`)
+	buf.WriteString(time.Now().UTC().Format(time.RFC3339))
+	buf.WriteString(`"}}}`)
+
+	return buf.Bytes()
 }
