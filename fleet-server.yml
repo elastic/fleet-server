@@ -11,9 +11,6 @@ fleet:
     logging:
       level: '${LOG_LEVEL:DEBUG}'
 
-runtime:
-  gc_percent: 100 # Overide the golang GC target percentage (see https://golang.org/pkg/runtime/debug/#SetGCPercent)
-
 # Input config provided by the Elastic Agent for the server
 #inputs:
 #  - type: fleet-server

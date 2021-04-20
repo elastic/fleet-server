@@ -65,6 +65,7 @@ type Server struct {
 	CompressionLevel  int               `config:"compression_level"`
 	CompressionThresh int               `config:"compression_threshold"`
 	Limits            ServerLimits      `config:"limits"`
+	Runtime           Runtime           `config:"runtime"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -76,6 +77,7 @@ func (c *Server) InitDefaults() {
 	c.CompressionThresh = 1024
 	c.Profiler.InitDefaults()
 	c.Limits.InitDefaults()
+	c.Runtime.InitDefaults()
 }
 
 // BindAddress returns the binding address for the HTTP server.
