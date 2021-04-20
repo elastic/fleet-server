@@ -28,7 +28,7 @@ func (b *Bulker) multiWaitBulkAction(ctx context.Context, action Action, ops []B
 		var buf bytes.Buffer
 		buf.Grow(len(op.Body) + kSlop)
 
-		if err := b.writeBulkMeta(&buf, action, op.Index, op.Id); err != nil {
+		if err := b.writeBulkMeta(&buf, action, op.Index, op.Id, opt); err != nil {
 			return nil, err
 		}
 
