@@ -480,12 +480,13 @@ func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error 
 }
 
 func initRuntime(cfg *config.Config) {
-	if cfg.Runtime.GCPercent != 0 {
-		old := debug.SetGCPercent(cfg.Runtime.GCPercent)
+	gcPercent := cfg.Inputs[0].Server.Runtime.GCPercent
+	if gcPercent != 0 {
+		old := debug.SetGCPercent(gcPercent)
 
 		log.Info().
 			Int("old", old).
-			Int("new", cfg.Runtime.GCPercent).
+			Int("new", gcPercent).
 			Msg("SetGCPercent")
 	}
 }
