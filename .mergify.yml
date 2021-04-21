@@ -53,3 +53,13 @@ pull_request_rules:
       merge:
         method: squash
         strict: smart+fasttrack
+  - name: automatic merge for master when CI passes and the file dev-tools/integration/.env is modified.
+    conditions:
+      - check-success=fleet-server/pr-merge
+      - label=automation
+      - files~=^dev-tools/integration/.env$
+      - base=master
+    actions:
+      merge:
+        method: squash
+        strict: smart+fasttrack
