@@ -24,6 +24,8 @@ pull_request_rules:
           - "{{ author }}"
         branches:
           - "7.x"
+        labels:
+          - "backport"
   - name: backport patches to 7.13 branch
     conditions:
       - merged
@@ -35,6 +37,8 @@ pull_request_rules:
           - "{{ author }}"
         branches:
           - "7.13"
+        labels:
+          - "backport"
   - name: backport patches to 7.12 branch
     conditions:
       - merged
@@ -46,11 +50,24 @@ pull_request_rules:
           - "{{ author }}"
         branches:
           - "7.12"
+        labels:
+          - "backport"
   - name: automatic merge for 7.x when CI passes
     conditions:
       - check-success=fleet-server/pr-merge
       - check-success=CLA
       - base=7.x
+      - label=backport
+    actions:
+      merge:
+        method: squash
+        strict: smart+fasttrack
+  - name: automatic merge for 7.13 when CI passes
+    conditions:
+      - check-success=fleet-server/pr-merge
+      - check-success=CLA
+      - base=7.13
+      - label=backport
     actions:
       merge:
         method: squash
@@ -60,6 +77,7 @@ pull_request_rules:
       - check-success=fleet-server/pr-merge
       - check-success=CLA
       - base=7.12
+      - label=backport
     actions:
       merge:
         method: squash
