@@ -52,31 +52,11 @@ pull_request_rules:
           - "7.12"
         labels:
           - "backport"
-  - name: automatic merge for 7.x when CI passes
+  - name: automatic merge for 7\. branches when CI passes
     conditions:
       - check-success=fleet-server/pr-merge
       - check-success=CLA
-      - base=7.x
-      - label=backport
-    actions:
-      merge:
-        method: squash
-        strict: smart+fasttrack
-  - name: automatic merge for 7.13 when CI passes
-    conditions:
-      - check-success=fleet-server/pr-merge
-      - check-success=CLA
-      - base=7.13
-      - label=backport
-    actions:
-      merge:
-        method: squash
-        strict: smart+fasttrack
-  - name: automatic merge for 7.12 when CI passes
-    conditions:
-      - check-success=fleet-server/pr-merge
-      - check-success=CLA
-      - base=7.12
+      - base~=^7\.
       - label=backport
     actions:
       merge:
