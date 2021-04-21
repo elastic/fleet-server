@@ -47,6 +47,7 @@ type GlobalCheckpointsRequest struct {
 
 	Index          string
 	WaitForAdvance *bool
+	WaitForIndex   *bool
 	Checkpoints    []int64
 	Timeout        time.Duration
 
@@ -75,6 +76,10 @@ func (r GlobalCheckpointsRequest) Do(ctx context.Context, transport esapi.Transp
 
 	if r.WaitForAdvance != nil {
 		params["wait_for_advance"] = strconv.FormatBool(*r.WaitForAdvance)
+	}
+
+	if r.WaitForIndex != nil {
+		params["wait_for_index"] = strconv.FormatBool(*r.WaitForIndex)
 	}
 
 	if len(r.Checkpoints) > 0 {
@@ -148,6 +153,12 @@ func (f GlobalCheckpoints) WithIndex(index string) func(*GlobalCheckpointsReques
 func (f GlobalCheckpoints) WithWaitForAdvance(v bool) func(*GlobalCheckpointsRequest) {
 	return func(r *GlobalCheckpointsRequest) {
 		r.WaitForAdvance = &v
+	}
+}
+
+func (f GlobalCheckpoints) WithWaitForIndex(v bool) func(*GlobalCheckpointsRequest) {
+	return func(r *GlobalCheckpointsRequest) {
+		r.WaitForIndex = &v
 	}
 }
 

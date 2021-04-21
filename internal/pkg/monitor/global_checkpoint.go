@@ -53,6 +53,7 @@ func waitCheckpointAdvance(ctx context.Context, es *elasticsearch.Client, index 
 		req.WithIndex(index),
 		req.WithCheckpoints(checkpoint),
 		req.WithWaitForAdvance(true),
+		req.WithWaitForIndex(true),
 		req.WithTimeout(to),
 	)
 
