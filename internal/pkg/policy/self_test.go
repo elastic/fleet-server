@@ -262,7 +262,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		if status != proto.StateObserved_DEGRADED {
 			return fmt.Errorf("should be reported as degraded; instead its %s", status)
 		}
-		if msg != "Running on default policy with Fleet Server integration; missing config fleet.agent.id" {
+		if msg != "Running on default policy with Fleet Server integration; missing config fleet.agent.id (expected during bootstrap process)" {
 			return fmt.Errorf("should be matching with default policy")
 		}
 		if payload == nil {
@@ -520,7 +520,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		if status != proto.StateObserved_DEGRADED {
 			return fmt.Errorf("should be reported as degraded; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s; missing config fleet.agent.id", policyId) {
+		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s; missing config fleet.agent.id (expected during bootstrap process)", policyId) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		if payload == nil {
