@@ -11,3 +11,5 @@ fleet_server
 fleet-server.dev.yml
 *.log
 *.log.*
+
+dev-tools/integration/.env.bck
