@@ -212,7 +212,7 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 	var payload map[string]interface{}
 	if m.fleet.Agent.ID == "" {
 		status = proto.StateObserved_DEGRADED
-		extendMsg = "; missing config fleet.agent.id"
+		extendMsg = "; missing config fleet.agent.id (expected during bootstrap process)"
 
 		// Elastic Agent has not been enrolled; Fleet Server passes back the enrollment token so the Elastic Agent
 		// can perform enrollment.
