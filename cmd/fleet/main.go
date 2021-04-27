@@ -11,6 +11,7 @@ import (
 	"os"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/yaml"
@@ -28,6 +29,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/profile"
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
@@ -42,6 +44,7 @@ import (
 
 const (
 	kAgentMode = "agent-mode"
+	kAgentModeRestartLoopDelay = 2 * time.Second
 )
 
 func installSignalHandler() context.Context {
@@ -228,7 +231,8 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	srvCtx, srvCancel := context.WithCancel(ctx)
 	defer srvCancel()
 	log.Info().Msg("received initial configuration starting Fleet Server")
-	srv, err := NewFleetServer(cfg.cfg, a.cache, a.version, status.NewChained(status.NewLog(), a.agent))
+	reporter := status.NewChained(status.NewLog(), a.agent)
+	srv, err := NewFleetServer(cfg.cfg, a.cache, a.version, reporter)
 	if err != nil {
 		// unblock startChan even though there was an error
 		a.startChan <- struct{}{}
@@ -245,7 +249,27 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	// trigger startChan so OnConfig can continue
 	a.startChan <- struct{}{}
 
-	return a.srv.Run(srvCtx)
+	// keep trying to restart the FleetServer on failure, reporting
+	// the status back to Elastic Agent
+	res := make(chan error)
+	go func() {
+		for {
+			err := a.srv.Run(srvCtx)
+			if err != nil && err != context.Canceled {
+				// report the status over the reporter (logs and reports)
+				reporter.Status(proto.StateObserved_FAILED, err.Error(), nil)
+				if sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay) == context.Canceled {
+					// context cancelled while sleeping
+					res <- err
+					return
+				}
+				continue
+			}
+			res <- err
+			break
+		}
+	}()
+	return <-res
 }
 
 func (a *AgentMode) OnConfig(s string) {
