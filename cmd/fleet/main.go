@@ -255,18 +255,13 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	go func() {
 		for {
 			err := a.srv.Run(srvCtx)
-			if err != nil && err != context.Canceled {
-				// report the status over the reporter (logs and reports)
-				reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error: %s", err), nil)
-				if sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay) == context.Canceled {
-					// context cancelled while sleeping
-					res <- err
-					return
-				}
-				continue
+			if err == nil || err == context.Canceled {
+				res <- err
+				return
 			}
-			res <- err
-			break
+			// report the status over the reporter (logs and reports)
+			reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error: %s", err), nil)
+			sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay)
 		}
 	}()
 	return <-res
