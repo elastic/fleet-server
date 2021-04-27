@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	kAgentMode = "agent-mode"
+	kAgentMode                 = "agent-mode"
 	kAgentModeRestartLoopDelay = 2 * time.Second
 )
 
