@@ -36,9 +36,12 @@ var (
 
 func (f *FleetServer) initMetrics(ctx context.Context, cfg *config.Config) (*api.Server, error) {
 	registry := monitoring.GetNamespace("info").GetRegistry()
-	monitoring.NewString(registry, "version").Set(f.ver)
-	monitoring.NewString(registry, "name").Set("fleet-server")
-	metrics.SetupMetrics("fleet-server")
+	if registry.Get("version") == nil {
+		monitoring.NewString(registry, "version").Set(f.ver)
+	}
+	if registry.Get("name") == nil {
+		monitoring.NewString(registry, "name").Set("fleet-server")
+	}
 
 	if !cfg.HTTP.Enabled {
 		return nil, nil
@@ -83,6 +86,7 @@ func (rt *routeStats) Register(registry *monitoring.Registry) {
 }
 
 func init() {
+	metrics.SetupMetrics("fleet-server")
 	registry = monitoring.Default.NewRegistry("http_server")
 	cntHttpNew = monitoring.NewUint(registry, "tcp_open")
 	cntHttpClose = monitoring.NewUint(registry, "tcp_close")
