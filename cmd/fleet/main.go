@@ -231,8 +231,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	srvCtx, srvCancel := context.WithCancel(ctx)
 	defer srvCancel()
 	log.Info().Msg("received initial configuration starting Fleet Server")
-	reporter := status.NewChained(status.NewLog(), a.agent)
-	srv, err := NewFleetServer(cfg.cfg, a.cache, a.version, reporter)
+	srv, err := NewFleetServer(cfg.cfg, a.cache, a.version, status.NewChained(status.NewLog(), a.agent))
 	if err != nil {
 		// unblock startChan even though there was an error
 		a.startChan <- struct{}{}
@@ -259,8 +258,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 				res <- err
 				return
 			}
-			// report the status over the reporter (logs and reports)
-			reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error: %s", err), nil)
+			// sleep some before calling Run again
 			sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay)
 		}
 	}()
@@ -471,9 +469,9 @@ func (f *FleetServer) Run(ctx context.Context) error {
 
 		select {
 		case newCfg = <-f.cfgCh:
-			log.Debug().Msg("Server configuration update")
+			log.Info().Msg("Server configuration update")
 		case err := <-ech:
-			f.reporter.Status(proto.StateObserved_FAILED, err.Error(), nil)
+			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil)
 			log.Error().Err(err).Msg("Fleet Server failed")
 			return err
 		case <-ctx.Done():
