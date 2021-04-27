@@ -10,8 +10,6 @@ import (
 	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-
-	"github.com/gofrs/uuid"
 )
 
 // Revision is a policy revision that is sent as an action ID to an agent.
@@ -37,9 +35,6 @@ func RevisionFromString(actionId string) (Revision, bool) {
 		return Revision{}, false
 	}
 	if split[0] != "policy" {
-		return Revision{}, false
-	}
-	if _, err := uuid.FromString(split[1]); err != nil {
 		return Revision{}, false
 	}
 	revIdx, err := strconv.ParseInt(split[2], 10, 64)
