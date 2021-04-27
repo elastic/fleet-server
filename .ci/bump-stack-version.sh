@@ -29,7 +29,8 @@ ${SED} -E -e "s#(ELASTICSEARCH_VERSION)=[0-9]+\.[0-9]+\.[0-9]+(-[a-f0-9]{8})?#\1
 
 echo "Commit changes"
 if [ "$CREATE_BRANCH" = "true" ]; then
-	git checkout -b "update-stack-version-$(date "+%Y%m%d%H%M%S%6N")"
+	base=$(git rev-parse --abbrev-ref HEAD | sed 's#/#-#g')
+	git checkout -b "update-stack-version-$(date "+%Y%m%d%H%M%S")-${base}"
 else
 	echo "Branch creation disabled."
 fi
