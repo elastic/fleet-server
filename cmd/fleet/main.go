@@ -45,7 +45,10 @@ import (
 )
 
 const (
+<<<<<<< HEAD
 	kServiceName               = "fleet-server"
+=======
+>>>>>>> 214e165 (Report failure running under Elastic Agent (#290))
 	kAgentMode                 = "agent-mode"
 	kAgentModeRestartLoopDelay = 2 * time.Second
 )

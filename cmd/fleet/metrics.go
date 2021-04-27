@@ -38,7 +38,11 @@ func (f *FleetServer) initMetrics(ctx context.Context, cfg *config.Config) (*api
 		monitoring.NewString(registry, "version").Set(f.ver)
 	}
 	if registry.Get("name") == nil {
+<<<<<<< HEAD
 		monitoring.NewString(registry, "name").Set(kServiceName)
+=======
+		monitoring.NewString(registry, "name").Set("fleet-server")
+>>>>>>> 214e165 (Report failure running under Elastic Agent (#290))
 	}
 
 	if !cfg.HTTP.Enabled {
@@ -84,7 +88,11 @@ func (rt *routeStats) Register(registry *monitoring.Registry) {
 }
 
 func init() {
+<<<<<<< HEAD
 	metrics.SetupMetrics(kServiceName)
+=======
+	metrics.SetupMetrics("fleet-server")
+>>>>>>> 214e165 (Report failure running under Elastic Agent (#290))
 	registry = monitoring.Default.NewRegistry("http_server")
 	cntHttpNew = monitoring.NewUint(registry, "tcp_open")
 	cntHttpClose = monitoring.NewUint(registry, "tcp_close")
