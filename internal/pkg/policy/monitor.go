@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -301,9 +300,6 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) []subT {
 
 // Subscribe creates a new subscription for a policy update.
 func (m *monitorT) Subscribe(agentId string, policyId string, revisionIdx int64, coordinatorIdx int64) (Subscription, error) {
-	if _, err := uuid.FromString(policyId); err != nil {
-		return nil, errors.New("policyId must be a UUID")
-	}
 	if revisionIdx < 0 {
 		return nil, errors.New("revisionIdx must be greater than or equal to 0")
 	}
