@@ -8,7 +8,7 @@ import "time"
 
 const (
 	defaultFetchSize   = 1000
-	defaultPollTimeout = 5 * time.Minute
+	defaultPollTimeout = 4 * time.Minute
 )
 
 type Monitor struct {
