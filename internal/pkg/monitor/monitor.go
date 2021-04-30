@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	defaultPollTimeout    = 5 * time.Minute // default long poll timeout
+	defaultPollTimeout    = 4 * time.Minute // default long poll timeout
 	defaultSeqNo          = int64(-1)       // the _seq_no in elasticsearch start with 0
 	defaultWithExpiration = false
 
@@ -244,7 +244,7 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 				continue
 			} else {
 				// Log the error and keep trying
-				m.log.Error().Err(err).Msg("failed on waiting for global checkpoints advance")
+				m.log.Info().Err(err).Msg("failed on waiting for global checkpoints advance")
 			}
 
 			// Delay next attempt
