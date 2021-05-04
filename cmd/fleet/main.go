@@ -589,7 +589,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return err
 	}
 
-	bc := checkin.NewBulkCheckin(bulker)
+	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
 	ct := NewCheckinT(f.verCon, &f.cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)

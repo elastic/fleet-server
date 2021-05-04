@@ -16,7 +16,7 @@ type Buf = danger.Buf
 type bulkT struct {
 	action actionT    // requested actions
 	flags  flagsT     // execution flags
-	idx    int32      // idx of originating requeset, used in mulitOp
+	idx    int32      // idx of originating request, used in mulitOp
 	ch     chan respT // response channel, caller is waiting synchronously
 	buf    Buf        // json payload to be sent to elastic
 	next   *bulkT     // pointer to next bulkT, used for fast internal queueing
@@ -56,7 +56,7 @@ var actionStrings = []string{
 	"search",
 }
 
-func (a actionT) Str() string {
+func (a actionT) String() string {
 	return actionStrings[a]
 }
 

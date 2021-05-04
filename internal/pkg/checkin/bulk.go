@@ -44,7 +44,7 @@ type pendingT struct {
 	extra *extraT
 }
 
-type BulkCheckin struct {
+type Bulk struct {
 	opts    optionsT
 	bulker  bulk.Bulk
 	mut     sync.Mutex
@@ -54,10 +54,10 @@ type BulkCheckin struct {
 	unix int64
 }
 
-func NewBulkCheckin(bulker bulk.Bulk, opts ...Opt) *BulkCheckin {
+func NewBulk(bulker bulk.Bulk, opts ...Opt) *Bulk {
 	parsedOpts := parseOpts(opts...)
 
-	return &BulkCheckin{
+	return &Bulk{
 		opts:    parsedOpts,
 		bulker:  bulker,
 		pending: make(map[string]pendingT),
@@ -79,7 +79,7 @@ func parseOpts(opts ...Opt) optionsT {
 
 // Generate and cache timestamp on seconds change.
 // Avoid thousands of formats of an identical string.
-func (bc *BulkCheckin) timestamp() string {
+func (bc *Bulk) timestamp() string {
 
 	// WARNING: Expects mutex locked.
 	now := time.Now()
@@ -91,9 +91,9 @@ func (bc *BulkCheckin) timestamp() string {
 	return bc.ts
 }
 
-// WARNING: BulkCheckin will take ownership of fields,
+// WARNING: Bulk will take ownership of fields,
 // so do not use after passing in.
-func (bc *BulkCheckin) CheckIn(id string, meta []byte, seqno sqn.SeqNo) error {
+func (bc *Bulk) CheckIn(id string, meta []byte, seqno sqn.SeqNo) error {
 
 	// Separate out the extra data to minimize
 	// the memory footprint of the 90% case of just
@@ -117,9 +117,10 @@ func (bc *BulkCheckin) CheckIn(id string, meta []byte, seqno sqn.SeqNo) error {
 	return nil
 }
 
-func (bc *BulkCheckin) Run(ctx context.Context) error {
+func (bc *Bulk) Run(ctx context.Context) error {
 
 	tick := time.NewTicker(bc.opts.flushInterval)
+	defer tick.Stop()
 
 	var err error
 LOOP:
@@ -140,7 +141,7 @@ LOOP:
 	return err
 }
 
-func (bc *BulkCheckin) flush(ctx context.Context) error {
+func (bc *Bulk) flush(ctx context.Context) error {
 	start := time.Now()
 
 	bc.mut.Lock()

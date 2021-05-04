@@ -40,7 +40,7 @@ func TestRunServer(t *testing.T) {
 	bulker := ftesting.MockBulk{}
 	pim := mock.NewMockIndexMonitor()
 	pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
-	bc := checkin.NewBulkCheckin(nil)
+	bc := checkin.NewBulk(nil)
 	ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
 	et, err := NewEnrollerT(verCon, cfg, nil, c)
 	require.NoError(t, err)
