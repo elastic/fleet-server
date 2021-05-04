@@ -101,33 +101,48 @@ func init() {
 }
 
 // Increment error metric, log and return code
-func (rt *routeStats) IncError(err error) (int, string, zerolog.Level) {
+func (rt *routeStats) IncError(err error) (int, string, string, zerolog.Level) {
 	lvl := zerolog.DebugLevel
 
 	incFail := true
 
 	var code int
 	var errStr string
+	var msgStr string
 	switch err {
 	case ErrAgentNotFound:
 		errStr = "AgentNotFound"
+		msgStr = "agent could not be cound"
 		code = http.StatusNotFound
 		lvl = zerolog.WarnLevel
 	case limit.ErrRateLimit:
 		errStr = "RateLimit"
+		msgStr = "exceeded the rate limit"
 		code = http.StatusTooManyRequests
 		rt.rateLimit.Inc()
 		incFail = false
 	case limit.ErrMaxLimit:
 		errStr = "MaxLimit"
+		msgStr = "exceeded the max limit"
 		code = http.StatusTooManyRequests
 		rt.maxLimit.Inc()
 		incFail = false
 	case context.Canceled:
 		errStr = "ServiceUnavailable"
+		msgStr = "server is stopping"
 		code = http.StatusServiceUnavailable
 		rt.drop.Inc()
 		incFail = false
+	case ErrInvalidUserAgent:
+		errStr = "InvalidUserAgent"
+		msgStr = "user-agent is invalid"
+		code = http.StatusBadRequest
+		lvl = zerolog.InfoLevel
+	case ErrUnsupportedVersion:
+		errStr = "UnsupportedVersion"
+		msgStr = "version is not supported"
+		code = http.StatusBadRequest
+		lvl = zerolog.InfoLevel
 	default:
 		errStr = "BadRequest"
 		lvl = zerolog.InfoLevel
@@ -138,7 +153,7 @@ func (rt *routeStats) IncError(err error) (int, string, zerolog.Level) {
 		cntCheckin.failure.Inc()
 	}
 
-	return code, errStr, lvl
+	return code, errStr, msgStr, lvl
 }
 
 func (rt *routeStats) IncStart() func() {
@@ -159,7 +174,7 @@ func (rt *artifactStats) Register(registry *monitoring.Registry) {
 	rt.throttle = monitoring.NewUint(registry, "throttle")
 }
 
-func (rt *artifactStats) IncError(err error) (code int, str string, lvl zerolog.Level) {
+func (rt *artifactStats) IncError(err error) (code int, str string, msg string, lvl zerolog.Level) {
 	switch err {
 	case dl.ErrNotFound:
 		// Artifact not found indicates a race condition upstream
@@ -167,14 +182,16 @@ func (rt *artifactStats) IncError(err error) (code int, str string, lvl zerolog.
 		// show up in the logs at a higher level than debug
 		code = http.StatusNotFound
 		str = "NotFound"
+		msg = "not found"
 		rt.notFound.Inc()
 		lvl = zerolog.WarnLevel
 	case ErrorThrottle:
 		code = http.StatusTooManyRequests
 		str = "TooManyRequests"
+		msg = "too many requests"
 		rt.throttle.Inc()
 	default:
-		code, str, lvl = rt.routeStats.IncError(err)
+		code, str, msg, lvl = rt.routeStats.IncError(err)
 	}
 
 	return
