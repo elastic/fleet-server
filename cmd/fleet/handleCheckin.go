@@ -72,7 +72,7 @@ type CheckinT struct {
 	verCon version.Constraints
 	cfg    *config.Server
 	cache  cache.Cache
-	bc     *checkin.BulkCheckin
+	bc     *checkin.Bulk
 	pm     policy.Monitor
 	gcp    monitor.GlobalCheckpointProvider
 	ad     *action.Dispatcher
@@ -85,7 +85,7 @@ func NewCheckinT(
 	verCon version.Constraints,
 	cfg *config.Server,
 	c cache.Cache,
-	bc *checkin.BulkCheckin,
+	bc *checkin.Bulk,
 	pm policy.Monitor,
 	gcp monitor.GlobalCheckpointProvider,
 	ad *action.Dispatcher,

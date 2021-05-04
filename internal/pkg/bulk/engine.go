@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	ErrNoQuotes = errors.New("Quoted literal not supported")
+	ErrNoQuotes = errors.New("quoted literal not supported")
 )
 
 type MultiOp struct {
@@ -209,11 +209,9 @@ func (b *Bulker) Run(ctx context.Context, opts ...BulkOpt) error {
 		itemCnt = 0
 		byteCnt = 0
 
-		stopTimer(timer)
 		return nil
 	}
 
-LOOP:
 	for err == nil {
 
 		select {
@@ -249,6 +247,8 @@ LOOP:
 					Msg("Flush on threshold")
 
 				err = doFlush()
+
+				stopTimer(timer)
 			}
 
 		case <-timer.C:
@@ -261,8 +261,6 @@ LOOP:
 
 		case <-ctx.Done():
 			err = ctx.Err()
-			break LOOP
-
 		}
 
 	}
@@ -398,7 +396,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 		log.Error().
 			Err(ctx.Err()).
 			Str("mod", kModBulk).
-			Str("action", blk.action.Str()).
+			Str("action", blk.action.String()).
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort queue")
@@ -411,7 +409,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 		log.Trace().
 			Err(resp.err).
 			Str("mod", kModBulk).
-			Str("action", blk.action.Str()).
+			Str("action", blk.action.String()).
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch OK")
@@ -421,7 +419,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 		log.Error().
 			Err(ctx.Err()).
 			Str("mod", kModBulk).
-			Str("action", blk.action.Str()).
+			Str("action", blk.action.String()).
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort response")

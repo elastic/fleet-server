@@ -54,7 +54,7 @@ func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id s
 	const kSlop = 64
 	blk.buf.Grow(len(body) + kSlop)
 
-	if err := b.writeBulkMeta(&blk.buf, action.Str(), index, id, opt.RetryOnConflict); err != nil {
+	if err := b.writeBulkMeta(&blk.buf, action.String(), index, id, opt.RetryOnConflict); err != nil {
 		return nil, err
 	}
 
