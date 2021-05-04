@@ -102,8 +102,6 @@ func (m *mockBulkTransport) Perform(req *http.Request) (*http.Response, error) {
 	// Write trailer
 	body.WriteString(`], "took": 1, "errors": false}`)
 
-	//ioutil.WriteFile("/tmp/dat1", body.Bytes(), 0644)
-
 	resp := &http.Response{
 		Request:    req,
 		StatusCode: 200,

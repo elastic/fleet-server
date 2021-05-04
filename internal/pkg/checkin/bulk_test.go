@@ -41,7 +41,7 @@ func TestBulkSimple(t *testing.T) {
 
 	var mockBulk CustomBulk
 
-	bc := NewBulkCheckin(&mockBulk)
+	bc := NewBulk(&mockBulk)
 
 	cases := []struct {
 		desc  string
@@ -168,7 +168,7 @@ func benchmarkBulk(n int, flush bool, b *testing.B) {
 
 	var mockBulk tst.MockBulk
 
-	bc := NewBulkCheckin(mockBulk)
+	bc := NewBulk(mockBulk)
 
 	ids := make([]string, 0, n)
 	for i := 0; i < n; i++ {

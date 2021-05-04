@@ -33,7 +33,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 	const kMaxBulk = (1 << 32) - 1
 
 	if len(ops) > kMaxBulk {
-		return nil, errors.New("Too many bulk ops")
+		return nil, errors.New("too many bulk ops")
 	}
 
 	opt := b.parseOpts(opts...)
@@ -42,7 +42,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 	// Could consider making the response channel *respT to limit memory usage.
 	ch := make(chan respT, len(ops))
 
-	actionStr := action.Str()
+	actionStr := action.String()
 
 	// O(n) Determine how much space we need
 	var byteCnt int
