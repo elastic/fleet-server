@@ -92,7 +92,7 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 	}
 
 	if err != nil {
-		code, lvl := cntArtifacts.IncError(err)
+		code, str, lvl := cntArtifacts.IncError(err)
 
 		zlog.WithLevel(lvl).
 			Err(err).
@@ -101,7 +101,9 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 			Dur("rtt", time.Since(start)).
 			Msg("Fail handle artifact")
 
-		http.Error(w, "", code)
+		if err := WriteError(w, code, str, err.Error()); err != nil {
+			log.Error().Err(err).Msg("fail writing error response")
+		}
 	}
 }
 

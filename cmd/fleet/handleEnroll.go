@@ -75,7 +75,7 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 	data, err := rt.et.handleEnroll(r)
 
 	if err != nil {
-		code, lvl := cntEnroll.IncError(err)
+		code, str, lvl := cntEnroll.IncError(err)
 
 		log.WithLevel(lvl).
 			Err(err).
@@ -84,13 +84,15 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 			Dur("tdiff", time.Since(start)).
 			Msg("Enroll fail")
 
-		http.Error(w, "", code)
+		if err := WriteError(w, code, str, err.Error()); err != nil {
+			log.Error().Err(err).Msg("fail writing error response")
+		}
 		return
 	}
 
 	var numWritten int
 	if numWritten, err = w.Write(data); err != nil {
-		log.Error().Err(err).Msg("Fail send enroll response")
+		log.Error().Err(err).Msg("fail send enroll response")
 	}
 
 	cntEnroll.bodyOut.Add(uint64(numWritten))

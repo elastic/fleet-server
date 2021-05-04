@@ -54,14 +54,16 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 	err := rt.ack.handleAcks(w, r, id)
 
 	if err != nil {
-		code, lvl := cntAcks.IncError(err)
+		code, str, lvl := cntAcks.IncError(err)
 
 		log.WithLevel(lvl).
 			Err(err).
 			Int("code", code).
 			Msg("Fail ACK")
 
-		http.Error(w, "", code)
+		if err := WriteError(w, code, str, err.Error()); err != nil {
+			log.Error().Err(err).Msg("fail writing error response")
+		}
 	}
 }
 

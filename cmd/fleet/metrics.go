@@ -101,29 +101,35 @@ func init() {
 }
 
 // Increment error metric, log and return code
-func (rt *routeStats) IncError(err error) (int, zerolog.Level) {
+func (rt *routeStats) IncError(err error) (int, string, zerolog.Level) {
 	lvl := zerolog.DebugLevel
 
 	incFail := true
 
 	var code int
+	var errStr string
 	switch err {
 	case ErrAgentNotFound:
+		errStr = "AgentNotFound"
 		code = http.StatusNotFound
 		lvl = zerolog.WarnLevel
 	case limit.ErrRateLimit:
+		errStr = "RateLimit"
 		code = http.StatusTooManyRequests
 		rt.rateLimit.Inc()
 		incFail = false
 	case limit.ErrMaxLimit:
+		errStr = "MaxLimit"
 		code = http.StatusTooManyRequests
 		rt.maxLimit.Inc()
 		incFail = false
 	case context.Canceled:
+		errStr = "ServiceUnavailable"
 		code = http.StatusServiceUnavailable
 		rt.drop.Inc()
 		incFail = false
 	default:
+		errStr = "BadRequest"
 		lvl = zerolog.InfoLevel
 		code = http.StatusBadRequest
 	}
@@ -132,7 +138,7 @@ func (rt *routeStats) IncError(err error) (int, zerolog.Level) {
 		cntCheckin.failure.Inc()
 	}
 
-	return code, lvl
+	return code, errStr, lvl
 }
 
 func (rt *routeStats) IncStart() func() {
@@ -153,20 +159,22 @@ func (rt *artifactStats) Register(registry *monitoring.Registry) {
 	rt.throttle = monitoring.NewUint(registry, "throttle")
 }
 
-func (rt *artifactStats) IncError(err error) (code int, lvl zerolog.Level) {
+func (rt *artifactStats) IncError(err error) (code int, str string, lvl zerolog.Level) {
 	switch err {
 	case dl.ErrNotFound:
 		// Artifact not found indicates a race condition upstream
 		// or an attack on the fleet server.  Either way it should
 		// show up in the logs at a higher level than debug
 		code = http.StatusNotFound
+		str = "NotFound"
 		rt.notFound.Inc()
 		lvl = zerolog.WarnLevel
 	case ErrorThrottle:
 		code = http.StatusTooManyRequests
+		str = "TooManyRequests"
 		rt.throttle.Inc()
 	default:
-		code, lvl = rt.routeStats.IncError(err)
+		code, str, lvl = rt.routeStats.IncError(err)
 	}
 
 	return
