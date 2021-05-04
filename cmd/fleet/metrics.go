@@ -112,7 +112,7 @@ func (rt *routeStats) IncError(err error) (int, string, string, zerolog.Level) {
 	switch err {
 	case ErrAgentNotFound:
 		errStr = "AgentNotFound"
-		msgStr = "agent could not be cound"
+		msgStr = "agent could not be found"
 		code = http.StatusNotFound
 		lvl = zerolog.WarnLevel
 	case limit.ErrRateLimit:
