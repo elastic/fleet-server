@@ -49,7 +49,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 	err := rt.ct._handleCheckin(w, r, id, rt.bulker)
 
 	if err != nil {
-		code, lvl := cntCheckin.IncError(err)
+		code, str, msg, lvl := cntCheckin.IncError(err)
 
 		// Log this as warn for visibility that limit has been reached.
 		// This allows customers to tune the configuration on detection of threshold.
@@ -63,7 +63,9 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 			Int("code", code).
 			Msg("fail checkin")
 
-		http.Error(w, "", code)
+		if err := WriteError(w, code, str, msg); err != nil {
+			log.Error().Err(err).Msg("fail writing error response")
+		}
 	}
 }
 
