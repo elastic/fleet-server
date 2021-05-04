@@ -9,8 +9,8 @@ package fleet
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"io/ioutil"
 	"net/http"
 	"path"
@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
+	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
@@ -171,7 +172,16 @@ func TestServerUnauthorized(t *testing.T) {
 			}
 
 			raw, _ := ioutil.ReadAll(res.Body)
-			diff = cmp.Diff("\n", string(raw))
+			var resp errResp
+			err = json.Unmarshal(raw, &resp)
+			if err != nil {
+				t.Fatal(err)
+			}
+			diff = cmp.Diff(400, resp.StatusCode)
+			if diff != "" {
+				t.Fatal(diff)
+			}
+			diff = cmp.Diff("BadRequest", resp.Error)
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -197,7 +207,16 @@ func TestServerUnauthorized(t *testing.T) {
 			}
 
 			raw, _ := ioutil.ReadAll(res.Body)
-			diff = cmp.Diff("\n", string(raw))
+			var resp errResp
+			err = json.Unmarshal(raw, &resp)
+			if err != nil {
+				t.Fatal(err)
+			}
+			diff = cmp.Diff(400, resp.StatusCode)
+			if diff != "" {
+				t.Fatal(diff)
+			}
+			diff = cmp.Diff("BadRequest", resp.Error)
 			if diff != "" {
 				t.Fatal(diff)
 			}
