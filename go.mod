@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/v7
 
-go 1.15
+go 1.16
 
 require (
 	github.com/aleksmaus/generate v0.0.0-20210326194607-c630e07a2742
