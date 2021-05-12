@@ -42,11 +42,27 @@ func (m MockBulk) Read(ctx context.Context, index, id string, opts ...bulk.Opt) 
 	return nil, nil
 }
 
-func (m MockBulk) MUpdate(ctx context.Context, ops []bulk.BulkOp, opts ...bulk.Opt) error {
+func (m MockBulk) Delete(ctx context.Context, index, id string, opts ...bulk.Opt) error {
 	return nil
 }
 
-func (m MockBulk) Search(ctx context.Context, index []string, body []byte, opts ...bulk.Opt) (*es.ResultT, error) {
+func (m MockBulk) MCreate(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
+	return nil, nil
+}
+
+func (m MockBulk) MIndex(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
+	return nil, nil
+}
+
+func (m MockBulk) MUpdate(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
+	return nil, nil
+}
+
+func (m MockBulk) MDelete(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
+	return nil, nil
+}
+
+func (m MockBulk) Search(ctx context.Context, index string, body []byte, opts ...bulk.Opt) (*es.ResultT, error) {
 	return &es.ResultT{}, nil
 }
 

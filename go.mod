@@ -3,6 +3,7 @@ module github.com/elastic/fleet-server/v7
 go 1.15
 
 require (
+	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/aleksmaus/generate v0.0.0-20210326194607-c630e07a2742
 	github.com/dgraph-io/ristretto v0.0.3
 	github.com/elastic/beats/v7 v7.11.1
@@ -15,6 +16,7 @@ require (
 	github.com/hashicorp/go-version v1.3.0
 	github.com/hashicorp/golang-lru v0.5.2-0.20190520140433-59383c442f7d
 	github.com/julienschmidt/httprouter v1.3.0
+	github.com/mailru/easyjson v0.7.7
 	github.com/miolini/datacounter v1.0.2
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1

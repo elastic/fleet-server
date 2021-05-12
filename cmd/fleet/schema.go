@@ -18,11 +18,6 @@ const (
 	TypeUpgrade      = "UPGRADE"
 )
 
-const (
-	FieldLastCheckin   = "last_checkin"
-	FieldLocalMetadata = "local_metadata"
-)
-
 const kFleetAccessRolesJSON = `
 {
 	"fleet-apikey-access": {

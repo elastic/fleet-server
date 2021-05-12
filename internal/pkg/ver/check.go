@@ -50,7 +50,11 @@ func checkCompatibility(fleetVersion, esVersion string) error {
 	}
 
 	if !verConst.Check(ver) {
-		log.Error().Err(ErrUnsupportedVersion).Msg("failed elasticsearch version check")
+		log.Error().
+			Err(ErrUnsupportedVersion).
+			Str("constraint", verConst.String()).
+			Str("reported", ver.String()).
+			Msg("failed elasticsearch version check")
 		return ErrUnsupportedVersion
 	}
 	log.Info().Str("fleet_version", fleetVersion).Str("elasticsearch_version", esVersion).Msg("versions are compatible")

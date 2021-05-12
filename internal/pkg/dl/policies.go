@@ -36,7 +36,7 @@ func prepareQueryLatestPolicies() []byte {
 // QueryLatestPolices gets the latest revision for a policy
 func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
-	res, err := bulker.Search(ctx, []string{o.indexName}, tmplQueryLatestPolicies)
+	res, err := bulker.Search(ctx, o.indexName, tmplQueryLatestPolicies)
 	if err != nil {
 		return nil, err
 	}

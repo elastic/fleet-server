@@ -80,7 +80,7 @@ func processGlobalCheckpointResponse(res *esapi.Response) (seqno sqn.SeqNo, err 
 	}
 
 	// Check error
-	err = esh.TranslateError(res.StatusCode, sres.Error)
+	err = esh.TranslateError(res.StatusCode, &sres.Error)
 	if err != nil {
 		return nil, err
 	}
