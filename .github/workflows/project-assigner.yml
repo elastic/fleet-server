@@ -15,7 +15,7 @@ jobs:
         with:
           issue-mappings: |
             [
-              {"label": "Team: Agent", "projectNumber": "478", "columnName": "Inbox", "projectScope": "org"}
+              {"label": "Team:Agent", "projectNumber": "478", "columnName": "Inbox", "projectScope": "org"}
             ]
 
           ghToken: ${{ secrets.ELASTIC_ORG_GITHUB_ACTIONS_TOKEN }}
