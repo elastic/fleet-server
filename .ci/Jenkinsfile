@@ -34,14 +34,13 @@ pipeline {
         deleteDir()
         gitCheckout(basedir: "${BASE_DIR}")
         stash allowEmpty: true, name: 'source', useDefaultExcludes: false
-        setEnvVar("GO_VERSION", readFile("${env.WORKSPACE}/${env.BASE_DIR}/.go-version").trim())
       }
     }
     stage('Check') {
       options { skipDefaultCheckout() }
       steps {
         cleanup()
-        withGoEnv(version: "${GO_VERSION}"){
+        withGoEnv(){
           dir("${BASE_DIR}"){
             sh(label: 'check',script: 'make check')
           }
@@ -52,7 +51,7 @@ pipeline {
       options { skipDefaultCheckout() }
       steps {
         cleanup()
-        withGoEnv(version: "${GO_VERSION}"){
+        withGoEnv(){
           dir("${BASE_DIR}"){
             sh(label: 'local',script: 'make local')
           }
@@ -63,7 +62,7 @@ pipeline {
       options { skipDefaultCheckout() }
       steps {
         cleanup()
-        withGoEnv(version: "${GO_VERSION}"){
+        withGoEnv(){
           dir("${BASE_DIR}"){
             retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install Docker", script: '.ci/scripts/install-docker-compose.sh') }
             sh(label: 'test', script: 'make test')
