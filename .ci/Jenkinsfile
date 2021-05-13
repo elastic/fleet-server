@@ -40,6 +40,7 @@ pipeline {
         cleanup()
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         dir("${BASE_DIR}"){
           withGoEnv(){
 =======
@@ -49,6 +50,10 @@ pipeline {
 >>>>>>> 0871589 (Revert "fix: use the right Go version in the CI")
           dir("${BASE_DIR}"){
 >>>>>>> 40e6fb3 (fix: use the right Go version in the CI)
+=======
+        dir("${BASE_DIR}"){
+          withGoEnv(){
+>>>>>>> 21328bf (fix: use WithGoEnv properly)
             sh(label: 'check',script: 'make check')
           }
         }
@@ -59,6 +64,7 @@ pipeline {
         cleanup()
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         dir("${BASE_DIR}"){
           withGoEnv(){
 =======
@@ -68,6 +74,10 @@ pipeline {
 >>>>>>> 0871589 (Revert "fix: use the right Go version in the CI")
           dir("${BASE_DIR}"){
 >>>>>>> 40e6fb3 (fix: use the right Go version in the CI)
+=======
+        dir("${BASE_DIR}"){
+          withGoEnv(){
+>>>>>>> 21328bf (fix: use WithGoEnv properly)
             sh(label: 'local',script: 'make local')
           }
         }
@@ -96,6 +106,7 @@ pipeline {
         cleanup()
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         dir("${BASE_DIR}"){
           withGoEnv(){
 =======
@@ -105,6 +116,10 @@ pipeline {
 >>>>>>> 0871589 (Revert "fix: use the right Go version in the CI")
           dir("${BASE_DIR}"){
 >>>>>>> 40e6fb3 (fix: use the right Go version in the CI)
+=======
+        dir("${BASE_DIR}"){
+          withGoEnv(){
+>>>>>>> 21328bf (fix: use WithGoEnv properly)
             retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install Docker", script: '.ci/scripts/install-docker-compose.sh') }
             sh(label: 'test', script: 'make test-int')
             sh(label: 'test', script: 'make junit-report')
