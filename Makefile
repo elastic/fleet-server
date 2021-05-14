@@ -174,7 +174,7 @@ int-docker-stop: ## - Stop docker environment for integration tests
 .PHONY: test-int
 test-int: prepare-test-context  ## - Run integration tests with full setup (slow!)
 	@$(MAKE) int-docker-start
-	@set -o pipefail; $(MAKE) test-int-set | tee build/test-init.out
+	@set -o pipefail; $(MAKE) test-int-set | tee build/test-int.out
 	@$(MAKE) int-docker-stop
 
 # Run integration tests without starting/stopping docker
