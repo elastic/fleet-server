@@ -7,6 +7,7 @@ package bulk
 import (
 	"context"
 	"errors"
+	"math"
 )
 
 func (b *Bulker) MCreate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
@@ -30,9 +31,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 		return nil, nil
 	}
 
-	const kMaxBulk = (1 << 32) - 1
-
-	if len(ops) > kMaxBulk {
+	if uint(len(ops)) > math.MaxUint32 {
 		return nil, errors.New("too many bulk ops")
 	}
 
