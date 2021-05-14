@@ -10,7 +10,7 @@ jobs:
     name: Assign labelled issues to projects
     steps:
       - name: Assign to repo and user projects
-        uses: richkuz/github-actions/project-assigner@v2.1.0
+        uses: richkuz/github-actions/project-assigner@v2.1.1
         id: project_assigner
         with:
           issue-mappings: |
