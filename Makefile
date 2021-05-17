@@ -184,5 +184,4 @@ test-int: prepare-test-context  ## - Run integration tests with full setup (slow
 .PHONY: test-int-set
 test-int-set: ## - Run integration tests without setup
 	# Initialize indices one before running all the tests
-	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go run ./dev-tools/integration/main.go
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go test -v -tags=integration -count=1 -race ./...
