@@ -591,19 +591,19 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	bc := NewBulkCheckin(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
-	ct := NewCheckinT(f.verCon, &f.cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
-	et, err := NewEnrollerT(f.verCon, &f.cfg.Inputs[0].Server, bulker, f.cache)
+	ct := NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
+	et, err := NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
 	}
 
-	at := NewArtifactT(&f.cfg.Inputs[0].Server, bulker, f.cache)
-	ack := NewAckT(&f.cfg.Inputs[0].Server, bulker, f.cache)
+	at := NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
+	ack := NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 
 	router := NewRouter(bulker, ct, et, at, ack, sm)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
-		return runServer(ctx, router, &f.cfg.Inputs[0].Server)
+		return runServer(ctx, router, &cfg.Inputs[0].Server)
 	}))
 
 	return g.Wait()
