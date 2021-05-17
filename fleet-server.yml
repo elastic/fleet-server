@@ -17,36 +17,36 @@ fleet:
 #    server:
 #      host: localhost
 #      port: 8220
+#      timeouts:
+#        checkin_long_poll: 300s # long poll timeout
+#      profiler:
+#        enabled: true # enable profiler
+#      limits:
+#        policy_throttle: 100ms
+#        max_connetions: 150
+#          checkin_limit:
+#            interval: 100ms
+#            burst: 25
+#            max: 100
+#          artifact_limit:
+#            interval: 10ms
+#            burst: 5
+#            max: 10
+#          ack_limit:
+#            interval: 10ms
+#            burst: 20
+#            max: 10
+#          enroll_limit:
+#            interval: 50ms
+#            burst: 10
+#            max: 8
+#        ssl:
+#          enabled: true
+#          certificate: /creds/cert.pem
+#          key: /creds/key.pem
 #    cache:
 #      num_counters: 500000  # 10x times expected count
 #      max_cost: 50 * 1024 * 1024  # 50MiB cache size
-#    timeouts:
-#      checkin_long_poll: 300s # long poll timeout
-#    profiler:
-#      enabled: true # enable profiler
-#    limits:
-#      policy_throttle: 100ms
-#      max_connetions: 150
-#        checkin_limit:
-#          interval: 100ms
-#          burst: 25
-#          max: 100
-#        artifact_limit:
-#          interval: 10ms
-#          burst: 5
-#          max: 10
-#        ack_limit:
-#          interval: 10ms
-#          burst: 20
-#          max: 10
-#        enroll_limit:
-#          interval: 50ms
-#          burst: 10
-#          max: 8
-#      ssl:
-#        enabled: true
-#        certificate: /creds/cert.pem
-#        key: /creds/key.pem
 
 logging:
   to_stderr: true # Force the logging output to stderr
