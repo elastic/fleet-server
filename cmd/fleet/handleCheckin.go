@@ -400,7 +400,7 @@ func processPolicy(ctx context.Context, bulker bulk.Bulk, agentId string, pp *po
 		}
 
 		zlog.Info().
-			Str("hash", defaultRole.Sha2).
+			Str("hash.sha256", defaultRole.Sha2).
 			Str("apiKeyId", defaultOutputApiKey.Id).
 			Msg("Updating agent record to pick up default output key.")
 
