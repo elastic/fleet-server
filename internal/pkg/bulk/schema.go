@@ -6,13 +6,37 @@ package bulk
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
-type BulkIndexerResponse struct {
-	Took      int                                  `json:"took"`
-	HasErrors bool                                 `json:"errors"`
-	Items     []map[string]BulkIndexerResponseItem `json:"items,omitempty"`
+type bulkStubItem struct {
+	Index  *BulkIndexerResponseItem `json:"index"`
+	Delete *BulkIndexerResponseItem `json:"delete"`
+	Create *BulkIndexerResponseItem `json:"create"`
+	Update *BulkIndexerResponseItem `json:"update"`
+}
+
+func (bi bulkStubItem) Choose() *BulkIndexerResponseItem {
+	switch {
+	case bi.Update != nil:
+		return bi.Update
+	case bi.Create != nil:
+		return bi.Create
+	case bi.Index != nil:
+		return bi.Index
+	case bi.Delete != nil:
+		return bi.Delete
+	}
+
+	return nil
+}
+
+//easyjson:json
+type bulkIndexerResponse struct {
+	Took      int            `json:"took"`
+	HasErrors bool           `json:"errors"`
+	Items     []bulkStubItem `json:"items,omitempty"`
 }
 
 // Comment out fields we don't use; no point decoding.
@@ -31,9 +55,18 @@ type BulkIndexerResponseItem struct {
 	//		Failed     int `json:"failed"`
 	//	} `json:"_shards"`
 
-	Error es.ErrorT `json:"error,omitempty"`
+	Error *es.ErrorT `json:"error,omitempty"`
 }
 
+func (b *BulkIndexerResponseItem) deriveError() error {
+	if b == nil {
+		return errors.New("Unknown bulk operator")
+	}
+
+	return es.TranslateError(b.Status, b.Error)
+}
+
+//easyjson:json
 type MgetResponse struct {
 	Items []MgetResponseItem `json:"docs"`
 }
@@ -72,16 +105,13 @@ type MsearchResponseItem struct {
 	Hits         es.HitsT                  `json:"hits"`
 	Aggregations map[string]es.Aggregation `json:"aggregations,omitempty"`
 
-	Error es.ErrorT `json:"error,omitempty"`
+	Error *es.ErrorT `json:"error,omitempty"`
 }
 
+//easyjson:json
 type MsearchResponse struct {
 	Responses []MsearchResponseItem `json:"responses"`
 	Took      int                   `json:"took"`
-}
-
-func (b *BulkIndexerResponseItem) deriveError() error {
-	return es.TranslateError(b.Status, b.Error)
 }
 
 func (b *MsearchResponseItem) deriveError() error {

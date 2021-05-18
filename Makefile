@@ -85,8 +85,8 @@ check-no-changes:
 
 .PHONY: test
 test: prepare-test-context  ## - Run all tests
-	@$(MAKE) test-unit 
-	@$(MAKE) test-int
+	@./dev-tools/run_with_go_ver $(MAKE) test-unit 
+	@./dev-tools/run_with_go_ver $(MAKE) test-int
 	@$(MAKE) junit-report
 
 .PHONY: test-unit 
@@ -173,7 +173,7 @@ int-docker-stop: ## - Stop docker environment for integration tests
 .PHONY: test-int
 test-int: prepare-test-context  ## - Run integration tests with full setup (slow!)
 	@$(MAKE) int-docker-start
-	@set -o pipefail; $(MAKE) test-int-set | tee build/test-init.out
+	@set -o pipefail; $(MAKE) test-int-set | tee build/test-int.out
 	@$(MAKE) int-docker-stop
 
 # Run integration tests without starting/stopping docker
@@ -184,5 +184,4 @@ test-int: prepare-test-context  ## - Run integration tests with full setup (slow
 .PHONY: test-int-set
 test-int-set: ## - Run integration tests without setup
 	# Initialize indices one before running all the tests
-	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go run ./dev-tools/integration/main.go
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go test -v -tags=integration -count=1 -race ./...
