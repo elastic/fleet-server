@@ -18,7 +18,8 @@ VERSION=${DEFAULT_VERSION}
 endif
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
-LDFLAGS=-w -s -X main.Version=${VERSION}
+COMMIT=$(shell git rev-parse --short HEAD)
+LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT}
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
 CMD_COLOR_OFF=\033[0m
 

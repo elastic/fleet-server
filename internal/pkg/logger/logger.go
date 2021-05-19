@@ -88,14 +88,6 @@ func Init(cfg *config.Config) (*Logger, error) {
 		if !cfg.Logging.Pretty || !cfg.Logging.ToStderr {
 			zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 		}
-
-		log.Info().
-			Int("pid", os.Getpid()).
-			Int("ppid", os.Getppid()).
-			Str("exe", os.Args[0]).
-			Strs("args", os.Args[1:]).
-			Msg("boot")
-		log.Debug().Strs("env", os.Environ()).Msg("environment")
 	})
 	return gLogger, err
 }
