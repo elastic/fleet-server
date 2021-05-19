@@ -68,7 +68,26 @@ func makeCache(cfg *config.Config) (cache.Cache, error) {
 	return cache.New(cacheCfg)
 }
 
-func getRunCommand(version string) func(cmd *cobra.Command, args []string) error {
+func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, error) {
+	l, err := logger.Init(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info().
+		Str("version", version).
+		Str("commit", commit).
+		Int("pid", os.Getpid()).
+		Int("ppid", os.Getppid()).
+		Str("exe", os.Args[0]).
+		Strs("args", os.Args[1:]).
+		Msg("boot")
+	log.Debug().Strs("env", os.Environ()).Msg("environment")
+
+	return l, err
+}
+
+func getRunCommand(version, commit string) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		cfgObject := cmd.Flags().Lookup("E").Value.(*config.Flag)
 		cliCfg := cfgObject.Config()
@@ -85,7 +104,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 			if err != nil {
 				return err
 			}
-			l, err = logger.Init(cfg)
+			l, err = initLogger(cfg, version, commit)
 			if err != nil {
 				return err
 			}
@@ -119,7 +138,7 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 				return err
 			}
 
-			l, err = logger.Init(cfg)
+			l, err = initLogger(cfg, version, commit)
 			if err != nil {
 				return err
 			}
@@ -147,11 +166,11 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 	}
 }
 
-func NewCommand(version string) *cobra.Command {
+func NewCommand(version, commit string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fleet-server",
 		Short: "Fleet Server controls a fleet of Elastic Agents",
-		RunE:  getRunCommand(version),
+		RunE:  getRunCommand(version, commit),
 	}
 	cmd.Flags().StringP("config", "c", "fleet-server.yml", "Configuration for Fleet Server")
 	cmd.Flags().Bool(kAgentMode, false, "Running under execution of the Elastic Agent")
