@@ -23,10 +23,11 @@ const defaultVersion = "8.0.0"
 
 var (
 	Version string = defaultVersion
+	Commit  string
 )
 
 func main() {
-	cmd := fleet.NewCommand(Version)
+	cmd := fleet.NewCommand(Version, Commit)
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
