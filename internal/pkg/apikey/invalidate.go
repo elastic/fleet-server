@@ -18,9 +18,11 @@ import (
 func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string) error {
 
 	payload := struct {
-		IDs []string `json:"ids,omitempty"`
+		IDs   []string `json:"ids,omitempty"`
+		Owner bool     `json:"owner"`
 	}{
 		ids,
+		true,
 	}
 
 	body, err := json.Marshal(&payload)
