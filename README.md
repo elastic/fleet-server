@@ -31,7 +31,7 @@ yarn es snapshot -E xpack.security.authc.api_key.enabled=true
 yarn start --no-base-path
 ```
 
-As soon as all is running, go to `http://localhost:5601`, enter `elastic/changeme` as credential and navigate to Fleet. Trigger the Fleet setup. As soon as this is completed, copy the `policy id` and `enrollment token` for the fleet-server policy. The policy id can be copied from the URL, the enrollment token can be found in the Enrollment Token list. 
+As soon as all is running, go to `http://localhost:5601`, enter `elastic/changeme` as credential and navigate to Fleet. Trigger the Fleet setup. As soon as this is completed, copy the `policy id` and `enrollment token` for the fleet-server policy. The policy id can be copied from the URL, the enrollment token can be found in the Enrollment Token list.
 
 NOTE: This step can be skipped if the full command below for the Elastic Agent is used.
 
@@ -97,3 +97,8 @@ Elastic Agent <= Elastic Agent with fleet-server) <= Elasticsearch / Kibana
 There might be differences on the bugfix version.
 
 If an upgrade is done, Elasticsearch / Kibana have to be upgraded first, then Elastic Agent with fleet-server and last the Elastic Agents.
+
+## MacOSX Version
+
+The [golang-crossbuild](https://github.com/elastic/golang-crossbuild) produces images used for testing/building.
+The `golang-crossbuild:1.16.4-darwin-debian10` image expects the minimum MacOSX version to be 10.14+.
