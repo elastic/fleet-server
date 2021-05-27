@@ -11,7 +11,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -21,10 +20,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -71,10 +72,13 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 		sha2 = ps.ByName("sha2") // DecodedSha256 in the artifact record
 	)
 
+	reqId := r.Header.Get(logger.HeaderRequestID)
+
 	zlog := log.With().
 		Str("id", id).
 		Str("sha2", sha2).
 		Str("remoteAddr", r.RemoteAddr).
+		Str(EcsHttpRequestId, reqId).
 		Logger()
 
 	rdr, err := rt.at.handleArtifacts(r, zlog, id, sha2)
@@ -84,25 +88,26 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 		nWritten, err = io.Copy(w, rdr)
 		zlog.Trace().
 			Err(err).
-			Int64("nWritten", nWritten).
-			Dur("rtt", time.Since(start)).
+			Int64(EcsHttpResponseBodyBytes, nWritten).
+			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("Response sent")
 
 		cntArtifacts.bodyOut.Add(uint64(nWritten))
 	}
 
 	if err != nil {
-		code, str, msg, lvl := cntArtifacts.IncError(err)
+		cntArtifacts.IncError(err)
+		resp := NewErrorResp(err)
 
-		log.WithLevel(lvl).
+		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int("code", code).
-			Int64("nWritten", nWritten).
-			Dur("rtt", time.Since(start)).
-			Msg("Fail handle artifact")
+			Int(EcsHttpResponseCode, resp.StatusCode).
+			Int64(EcsHttpResponseBodyBytes, nWritten).
+			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Msg("fail artifact")
 
-		if err := WriteError(w, code, str, msg); err != nil {
-			log.Error().Err(err).Msg("fail writing error response")
+		if err := resp.Write(w); err != nil {
+			zlog.Error().Err(err).Msg("fail writing error response")
 		}
 	}
 }
@@ -261,10 +266,10 @@ func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, iden
 
 	zlog.Info().
 		Err(err).
-		Dur("rtt", time.Since(start)).
+		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 		Msg("fetch artifact")
 
-	return artifact, err
+	return artifact, errors.Wrap(err, "fetchArtifact")
 }
 
 func validateSha2String(sha2 string) error {
@@ -283,7 +288,7 @@ func validateSha2String(sha2 string) error {
 func validateSha2Data(data []byte, sha2 string) error {
 	src, err := hex.DecodeString(sha2)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "sha2 hex decode")
 	}
 
 	sum := sha256.Sum256(data)

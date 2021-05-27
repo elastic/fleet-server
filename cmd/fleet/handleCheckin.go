@@ -10,7 +10,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"reflect"
 	"time"
@@ -22,6 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -31,6 +31,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miolini/datacounter"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -42,30 +43,38 @@ var (
 	ErrFailInjectApiKey = errors.New("fail inject api key")
 )
 
-const kEncodingGzip = "gzip"
+const (
+	kEncodingGzip = "gzip"
+)
 
 func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	start := time.Now()
 
 	id := ps.ByName("id")
 	err := rt.ct._handleCheckin(w, r, id, rt.bulker)
 
 	if err != nil {
-		code, str, msg, lvl := cntCheckin.IncError(err)
+		cntCheckin.IncError(err)
+		resp := NewErrorResp(err)
 
 		// Log this as warn for visibility that limit has been reached.
 		// This allows customers to tune the configuration on detection of threshold.
-		if err == limit.ErrMaxLimit {
-			lvl = zerolog.WarnLevel
+		if errors.Is(err, limit.ErrMaxLimit) {
+			resp.Level = zerolog.WarnLevel
 		}
 
-		log.WithLevel(lvl).
+		reqId := r.Header.Get(logger.HeaderRequestID)
+
+		log.WithLevel(resp.Level).
 			Err(err).
 			Str("id", id).
-			Int("code", code).
+			Int(EcsHttpResponseCode, resp.StatusCode).
+			Str(EcsHttpRequestId, reqId).
+			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail checkin")
 
-		if err := WriteError(w, code, str, msg); err != nil {
-			log.Error().Err(err).Msg("fail writing error response")
+		if err := resp.Write(w); err != nil {
+			log.Error().Str(EcsHttpRequestId, reqId).Err(err).Msg("fail writing error response")
 		}
 	}
 }
@@ -119,6 +128,8 @@ func NewCheckinT(
 
 func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk) error {
 
+	reqId := r.Header.Get(logger.HeaderRequestID)
+
 	limitF, err := ct.limit.Acquire()
 	if err != nil {
 		return err
@@ -154,7 +165,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	cntCheckin.bodyIn.Add(readCounter.Count())
 
 	// Compare local_metadata content and update if different
-	rawMeta, err := parseMeta(agent, &req)
+	rawMeta, err := parseMeta(agent, reqId, &req)
 	if err != nil {
 		return err
 	}
@@ -165,7 +176,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		return err
 	}
 
-	// Subsribe to actions dispatcher
+	// Subscribe to actions dispatcher
 	aSub := ct.ad.Subscribe(agent.Id, seqno)
 	defer ct.ad.Unsubscribe(aSub)
 	actCh := aSub.Ch()
@@ -173,7 +184,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	// Subscribe to policy manager for changes on PolicyId > policyRev
 	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyId, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "subscribe policy monitor")
 	}
 	defer ct.pm.Unsubscribe(sub)
 
@@ -213,14 +224,14 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 				actions = append(actions, acs...)
 				break LOOP
 			case policy := <-sub.Output():
-				actionResp, err := processPolicy(ctx, bulker, agent.Id, policy)
+				actionResp, err := processPolicy(ctx, bulker, agent.Id, reqId, policy)
 				if err != nil {
-					return err
+					return errors.Wrap(err, "processPolicy")
 				}
 				actions = append(actions, *actionResp)
 				break LOOP
 			case <-longPoll.C:
-				log.Trace().Msg("fire long poll")
+				log.Trace().Str(EcsHttpRequestId, reqId).Str("agentId", agent.Id).Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
 				ct.bc.CheckIn(agent.Id, nil, nil)
@@ -241,7 +252,7 @@ func (ct *CheckinT) writeResponse(w http.ResponseWriter, r *http.Request, resp C
 
 	payload, err := json.Marshal(&resp)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "writeResponse marshal")
 	}
 
 	compressionLevel := ct.cfg.CompressionLevel
@@ -253,16 +264,18 @@ func (ct *CheckinT) writeResponse(w http.ResponseWriter, r *http.Request, resp C
 
 		zipper, err := gzip.NewWriterLevel(wrCounter, compressionLevel)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "writeResponse new gzip")
 		}
 
 		w.Header().Set("Content-Encoding", kEncodingGzip)
 
 		if _, err = zipper.Write(payload); err != nil {
-			return err
+			return errors.Wrap(err, "writeResponse gzip write")
 		}
 
-		err = zipper.Close()
+		if err = zipper.Close(); err != nil {
+			err = errors.Wrap(err, "writeResponse gzip close")
+		}
 
 		cntCheckin.bodyOut.Add(wrCounter.Count())
 
@@ -276,6 +289,10 @@ func (ct *CheckinT) writeResponse(w http.ResponseWriter, r *http.Request, resp C
 		var nWritten int
 		nWritten, err = w.Write(payload)
 		cntCheckin.bodyOut.Add(uint64(nWritten))
+
+		if err != nil {
+			err = errors.Wrap(err, "writeResponse payload")
+		}
 	}
 
 	return err
@@ -304,6 +321,7 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("revision token not found")
 				err = nil
 			} else {
+				err = errors.Wrap(err, "resolveSeqNo")
 				return
 			}
 		}
@@ -315,12 +333,18 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentId string) ([]model.Action, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	return dl.FindActions(ctx, ct.bulker, dl.QueryAgentActions, map[string]interface{}{
+	actions, err := dl.FindActions(ctx, ct.bulker, dl.QueryAgentActions, map[string]interface{}{
 		dl.FieldSeqNo:      seqno.Value(),
 		dl.FieldMaxSeqNo:   ct.gcp.GetCheckpoint().Value(),
 		dl.FieldExpiration: now,
 		dl.FieldAgents:     []string{agentId},
 	})
+
+	if err != nil {
+		return nil, errors.Wrap(err, "fetchAgentPendingActions")
+	}
+
+	return actions, err
 }
 
 func convertActions(agentId string, actions []model.Action) ([]ActionResp, string) {
@@ -350,10 +374,11 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 //  - Generate and update default ApiKey if roles have changed.
 //  - Rewrite the policy for delivery to the agent injecting the key material.
 //
-func processPolicy(ctx context.Context, bulker bulk.Bulk, agentId string, pp *policy.ParsedPolicy) (*ActionResp, error) {
+func processPolicy(ctx context.Context, bulker bulk.Bulk, agentId, reqId string, pp *policy.ParsedPolicy) (*ActionResp, error) {
 
 	zlog := log.With().
 		Str("ctx", "processPolicy").
+		Str(EcsHttpRequestId, reqId).
 		Str("agentId", agentId).
 		Str("policyId", pp.Policy.PolicyId).
 		Logger()
@@ -506,15 +531,19 @@ func setMapObj(obj map[string]interface{}, val interface{}, keys ...string) bool
 
 func findAgentByApiKeyId(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByAssessAPIKeyID, dl.FieldAccessAPIKeyID, id)
-	if err != nil && errors.Is(err, dl.ErrNotFound) {
-		err = ErrAgentNotFound
+	if err != nil {
+		if errors.Is(err, dl.ErrNotFound) {
+			err = ErrAgentNotFound
+		} else {
+			err = errors.Wrap(err, "findAgentByApiKeyId")
+		}
 	}
 	return &agent, err
 }
 
 // parseMeta compares the agent and the request local_metadata content
 // and returns fields to update the agent record or nil
-func parseMeta(agent *model.Agent, req *CheckinRequest) ([]byte, error) {
+func parseMeta(agent *model.Agent, reqId string, req *CheckinRequest) ([]byte, error) {
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
@@ -526,7 +555,7 @@ func parseMeta(agent *model.Agent, req *CheckinRequest) ([]byte, error) {
 	// Deserialize the request metadata
 	var reqLocalMeta interface{}
 	if err := json.Unmarshal(req.LocalMeta, &reqLocalMeta); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "parseMeta request")
 	}
 
 	// If empty, don't step on existing data
@@ -537,7 +566,7 @@ func parseMeta(agent *model.Agent, req *CheckinRequest) ([]byte, error) {
 	// Deserialize the agent's metadata copy
 	var agentLocalMeta interface{}
 	if err := json.Unmarshal(agent.LocalMetadata, &agentLocalMeta); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "parseMeta local")
 	}
 
 	var outMeta []byte
@@ -547,12 +576,14 @@ func parseMeta(agent *model.Agent, req *CheckinRequest) ([]byte, error) {
 
 		log.Trace().
 			Str("agentId", agent.Id).
+			Str(EcsHttpRequestId, reqId).
 			RawJSON("oldLocalMeta", agent.LocalMetadata).
 			RawJSON("newLocalMeta", req.LocalMeta).
 			Msg("local metadata not equal")
 
 		log.Info().
 			Str("agentId", agent.Id).
+			Str(EcsHttpRequestId, reqId).
 			RawJSON("req.LocalMeta", req.LocalMeta).
 			Msg("applying new local metadata")
 

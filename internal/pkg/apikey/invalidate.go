@@ -27,7 +27,7 @@ func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string
 
 	body, err := json.Marshal(&payload)
 	if err != nil {
-		return err
+		return fmt.Errorf("InvalidateAPIKey: %w", err)
 	}
 
 	opts := []func(*esapi.SecurityInvalidateAPIKeyRequest){
@@ -40,7 +40,7 @@ func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string
 	)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("InvalidateAPIKey: %w", err)
 	}
 
 	defer res.Body.Close()
@@ -48,5 +48,6 @@ func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string
 	if res.IsError() {
 		return fmt.Errorf("fail InvalidateAPIKey: %s", res.String())
 	}
+
 	return nil
 }
