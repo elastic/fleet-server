@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -22,8 +23,10 @@ const (
 	kAPIKeyTTL = 5 * time.Second
 )
 
-var ErrApiKeyNotEnabled = errors.New("APIKey not enabled")
-var ErrAgentCorrupted = errors.New("agent record corrupted")
+var (
+	ErrApiKeyNotEnabled = errors.New("APIKey not enabled")
+	ErrAgentCorrupted   = errors.New("agent record corrupted")
+)
 
 // This authenticates that the provided API key exists and is enabled.
 // WARNING: This does not validate that the api key is valid for the Fleet Domain.
@@ -39,6 +42,8 @@ func authApiKey(r *http.Request, client *elasticsearch.Client, c cache.Cache) (*
 		return key, nil
 	}
 
+	reqId := r.Header.Get(logger.HeaderRequestID)
+
 	start := time.Now()
 
 	info, err := key.Authenticate(r.Context(), client)
@@ -47,16 +52,18 @@ func authApiKey(r *http.Request, client *elasticsearch.Client, c cache.Cache) (*
 		log.Info().
 			Err(err).
 			Str("id", key.Id).
-			Dur("rtt", time.Since(start)).
+			Str(EcsHttpRequestId, reqId).
+			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey fail authentication")
 		return nil, err
 	}
 
 	log.Trace().
 		Str("id", key.Id).
-		Dur("rtt", time.Since(start)).
-		Str("UserName", info.UserName).
-		Strs("Roles", info.Roles).
+		Str(EcsHttpRequestId, reqId).
+		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Str("userName", info.UserName).
+		Strs("roles", info.Roles).
 		Bool("enabled", info.Enabled).
 		RawJSON("meta", info.Metadata).
 		Msg("ApiKey authenticated")
@@ -68,7 +75,8 @@ func authApiKey(r *http.Request, client *elasticsearch.Client, c cache.Cache) (*
 		log.Info().
 			Err(err).
 			Str("id", key.Id).
-			Dur("rtt", time.Since(start)).
+			Str(EcsHttpRequestId, reqId).
+			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey not enabled")
 	}
 
