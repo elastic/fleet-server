@@ -29,8 +29,6 @@ type SecurityInfo struct {
 // NOTE: Bulk request currently not available.
 func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*SecurityInfo, error) {
 
-	// TODO: Escape request for safety.  Don't depend on ES.
-
 	token := fmt.Sprintf("%s%s", authPrefix, k.Token())
 
 	req := esapi.SecurityAuthenticateRequest{
@@ -40,7 +38,7 @@ func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	res, err := req.Do(ctx, es)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("apikey auth request %s: %w", k.Id, err)
 	}
 
 	if res.Body != nil {
@@ -48,13 +46,13 @@ func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	}
 
 	if res.IsError() {
-		return nil, fmt.Errorf("fail Auth: %s", res.String())
+		return nil, fmt.Errorf("apikey auth response %s: %s", k.Id, res.String())
 	}
 
 	var info SecurityInfo
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&info); err != nil {
-		return nil, fmt.Errorf("Auth: error parsing response body: %s", err) // TODO: Wrap error
+		return nil, fmt.Errorf("apikey auth parse %s: %w", k.Id, err)
 	}
 
 	return &info, nil

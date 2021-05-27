@@ -117,7 +117,6 @@ type Event struct {
 }
 
 type StatusResponse struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Status  string `json:"status"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
 }
