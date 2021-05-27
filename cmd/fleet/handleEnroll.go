@@ -7,7 +7,6 @@ package fleet
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +18,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miolini/datacounter"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -35,10 +36,15 @@ const (
 
 	kCacheAccessInitTTL = time.Second * 30 // Cache a bit longer to handle expensive initial checkin
 	kCacheEnrollmentTTL = time.Second * 30
+
+	EnrollEphemeral = "EPHEMERAL"
+	EnrollPermanent = "PERMANENT"
+	EnrollTemporary = "TEMPORARY"
 )
 
 var (
-	ErrUnknownEnrollType = errors.New("unknown enroll request type")
+	ErrUnknownEnrollType     = errors.New("unknown enroll request type")
+	ErrInactiveEnrollmentKey = errors.New("inactive enrollment key")
 )
 
 type EnrollerT struct {
@@ -74,34 +80,39 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 
 	data, err := rt.et.handleEnroll(r)
 
+	reqId := r.Header.Get(logger.HeaderRequestID)
+
 	if err != nil {
-		code, str, msg, lvl := cntEnroll.IncError(err)
+		cntEnroll.IncError(err)
+		resp := NewErrorResp(err)
 
-		log.WithLevel(lvl).
+		log.WithLevel(resp.Level).
 			Err(err).
+			Str(EcsHttpRequestId, reqId).
 			Str("mod", kEnrollMod).
-			Int("code", code).
-			Dur("tdiff", time.Since(start)).
-			Msg("Enroll fail")
+			Int(EcsHttpResponseCode, resp.StatusCode).
+			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Msg("fail enroll")
 
-		if err := WriteError(w, code, str, msg); err != nil {
-			log.Error().Err(err).Msg("fail writing error response")
+		if err := resp.Write(w); err != nil {
+			log.Error().Err(err).Str(EcsHttpRequestId, reqId).Msg("fail writing error response")
 		}
 		return
 	}
 
 	var numWritten int
 	if numWritten, err = w.Write(data); err != nil {
-		log.Error().Err(err).Msg("fail send enroll response")
+		log.Error().Err(err).Str(EcsHttpRequestId, reqId).Msg("fail send enroll response")
 	}
 
 	cntEnroll.bodyOut.Add(uint64(numWritten))
 
 	log.Trace().
 		Err(err).
+		Str(EcsHttpRequestId, reqId).
 		RawJSON("raw", data).
 		Str("mod", kEnrollMod).
-		Dur("rtt", time.Since(start)).
+		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 		Msg("handleEnroll OK")
 }
 
@@ -309,11 +320,11 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	// Pull API key record from .fleet-enrollment-api-keys
 	rec, err := dl.FindEnrollmentAPIKey(ctx, et.bulker, dl.QueryEnrollmentAPIKeyByID, dl.FieldApiKeyID, id)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "FindEnrollmentAPIKey")
 	}
 
 	if !rec.Active {
-		return nil, fmt.Errorf("record is inactive")
+		return nil, ErrInactiveEnrollmentKey
 	}
 
 	cost := int64(len(rec.ApiKey))
@@ -328,13 +339,12 @@ func decodeEnrollRequest(data io.Reader) (*EnrollRequest, error) {
 	var req EnrollRequest
 	decoder := json.NewDecoder(data)
 	if err := decoder.Decode(&req); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "decode enroll request")
 	}
 
 	// Validate
 	switch req.Type {
-	// TODO: Should these be converted to constant? Need to be kept in sync with Kibana?
-	case "EPHEMERAL", "PERMANENT", "TEMPORARY":
+	case EnrollEphemeral, EnrollPermanent, EnrollTemporary:
 	default:
 		return nil, ErrUnknownEnrollType
 	}

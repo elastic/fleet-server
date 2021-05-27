@@ -9,13 +9,15 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
 )
 
-func (rt Router) handleStatus(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	// Metrics; serenity now.
+func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+
 	dfunc := cntStatus.IncStart()
 	defer dfunc()
 
@@ -25,10 +27,12 @@ func (rt Router) handleStatus(w http.ResponseWriter, _ *http.Request, _ httprout
 		Status: status.String(),
 	}
 
+	reqId := r.Header.Get(logger.HeaderRequestID)
+
 	data, err := json.Marshal(&resp)
 	if err != nil {
 		code := http.StatusInternalServerError
-		log.Error().Err(err).Int("code", code).Msg("fail status")
+		log.Error().Err(err).Str(EcsHttpRequestId, reqId).Int(EcsHttpResponseCode, code).Msg("fail status")
 		http.Error(w, "", code)
 		return
 	}
@@ -42,7 +46,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, _ *http.Request, _ httprout
 	var nWritten int
 	if nWritten, err = w.Write(data); err != nil {
 		if err != context.Canceled {
-			log.Error().Err(err).Int("code", code).Msg("fail status")
+			log.Error().Err(err).Str(EcsHttpRequestId, reqId).Int(EcsHttpResponseCode, code).Msg("fail status")
 		}
 	}
 
