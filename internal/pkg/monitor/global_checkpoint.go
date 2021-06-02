@@ -14,8 +14,8 @@ import (
 	esh "github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
 var ErrGlobalCheckpoint = errors.New("global checkpoint error")

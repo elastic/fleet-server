@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
