@@ -192,6 +192,17 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 		return err
 	}
 
+<<<<<<< HEAD
+=======
+	log.Debug().
+		Str("agentId", id).
+		Str("reqId", reqId).
+		Str("status", req.Status).
+		Str("seqNo", seqno.String()).
+		Uint64("bodyCount", readCounter.Count()).
+		Msg("checkin start long poll")
+
+>>>>>>> ad69880 (Tweak server timeouts.  Limit body size to defend malicious agent)
 	// Subscribe to actions dispatcher
 	aSub := ct.ad.Subscribe(agent.Id, seqno)
 	defer ct.ad.Unsubscribe(aSub)

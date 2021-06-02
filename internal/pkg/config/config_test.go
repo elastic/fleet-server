@@ -30,9 +30,62 @@ func TestConfig(t *testing.T) {
 				},
 				Inputs: []Input{
 					{
+<<<<<<< HEAD
 						Type:   "fleet-server",
 						Server: defaultServer(),
 						Cache:  defaultCache(),
+=======
+						Type: "fleet-server",
+						Server: Server{
+							Host: kDefaultHost,
+							Port: kDefaultPort,
+							Timeouts: ServerTimeouts{
+								Read:             60 * time.Second,
+								ReadHeader:       5 * time.Second,
+								Idle:             30 * time.Second,
+								Write:            10 * time.Minute,
+								CheckinTimestamp: 30 * time.Second,
+								CheckinLongPoll:  5 * time.Minute,
+							},
+							Profiler: ServerProfiler{
+								Enabled: false,
+								Bind:    "localhost:6060",
+							},
+							CompressionLevel:  1,
+							CompressionThresh: 1024,
+							Limits: ServerLimits{
+								MaxHeaderByteSize: 8192,
+								MaxConnections:    0,
+								PolicyThrottle:    5 * time.Millisecond,
+								CheckinLimit: Limit{
+									Interval: time.Millisecond,
+									Burst:    1000,
+									MaxBody:  1048576,
+								},
+								ArtifactLimit: Limit{
+									Interval: time.Millisecond * 5,
+									Burst:    25,
+									Max:      50,
+								},
+								EnrollLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+									MaxBody:  524288,
+								},
+								AckLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+									MaxBody:  2097152,
+								},
+							},
+						},
+						Cache: Cache{
+							NumCounters: defaultCacheNumCounters,
+							MaxCost:     defaultCacheMaxCost,
+						},
+>>>>>>> ad69880 (Tweak server timeouts.  Limit body size to defend malicious agent)
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,
@@ -58,9 +111,62 @@ func TestConfig(t *testing.T) {
 				},
 				Inputs: []Input{
 					{
+<<<<<<< HEAD
 						Type:   "fleet-server",
 						Server: defaultServer(),
 						Cache:  defaultCache(),
+=======
+						Type: "fleet-server",
+						Server: Server{
+							Host: kDefaultHost,
+							Port: kDefaultPort,
+							Timeouts: ServerTimeouts{
+								Read:             60 * time.Second,
+								ReadHeader:       5 * time.Second,
+								Idle:             30 * time.Second,
+								Write:            10 * time.Minute,
+								CheckinTimestamp: 30 * time.Second,
+								CheckinLongPoll:  5 * time.Minute,
+							},
+							Profiler: ServerProfiler{
+								Enabled: false,
+								Bind:    "localhost:6060",
+							},
+							CompressionLevel:  1,
+							CompressionThresh: 1024,
+							Limits: ServerLimits{
+								MaxHeaderByteSize: 8192,
+								MaxConnections:    0,
+								PolicyThrottle:    5 * time.Millisecond,
+								CheckinLimit: Limit{
+									Interval: time.Millisecond,
+									Burst:    1000,
+									MaxBody:  1048576,
+								},
+								ArtifactLimit: Limit{
+									Interval: time.Millisecond * 5,
+									Burst:    25,
+									Max:      50,
+								},
+								EnrollLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+									MaxBody:  524288,
+								},
+								AckLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+									MaxBody:  2097152,
+								},
+							},
+						},
+						Cache: Cache{
+							NumCounters: defaultCacheNumCounters,
+							MaxCost:     defaultCacheMaxCost,
+						},
+>>>>>>> ad69880 (Tweak server timeouts.  Limit body size to defend malicious agent)
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,
@@ -79,9 +185,62 @@ func TestConfig(t *testing.T) {
 				},
 				Inputs: []Input{
 					{
+<<<<<<< HEAD
 						Type:   "fleet-server",
 						Server: defaultServer(),
 						Cache:  defaultCache(),
+=======
+						Type: "fleet-server",
+						Server: Server{
+							Host: kDefaultHost,
+							Port: kDefaultPort,
+							Timeouts: ServerTimeouts{
+								Read:             60 * time.Second,
+								ReadHeader:       5 * time.Second,
+								Idle:             30 * time.Second,
+								Write:            10 * time.Minute,
+								CheckinTimestamp: 30 * time.Second,
+								CheckinLongPoll:  5 * time.Minute,
+							},
+							Profiler: ServerProfiler{
+								Enabled: false,
+								Bind:    "localhost:6060",
+							},
+							CompressionLevel:  1,
+							CompressionThresh: 1024,
+							Limits: ServerLimits{
+								MaxHeaderByteSize: 8192,
+								MaxConnections:    0,
+								PolicyThrottle:    5 * time.Millisecond,
+								CheckinLimit: Limit{
+									Interval: time.Millisecond,
+									Burst:    1000,
+									MaxBody:  1048576,
+								},
+								ArtifactLimit: Limit{
+									Interval: time.Millisecond * 5,
+									Burst:    25,
+									Max:      50,
+								},
+								EnrollLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+									MaxBody:  524288,
+								},
+								AckLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+									MaxBody:  2097152,
+								},
+							},
+						},
+						Cache: Cache{
+							NumCounters: defaultCacheNumCounters,
+							MaxCost:     defaultCacheMaxCost,
+						},
+>>>>>>> ad69880 (Tweak server timeouts.  Limit body size to defend malicious agent)
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,
@@ -119,8 +278,42 @@ func TestConfig(t *testing.T) {
 							},
 							CompressionLevel:  1,
 							CompressionThresh: 1024,
+<<<<<<< HEAD
 							Limits:            defaultServerLimits(),
 							Bulk:              defaultServerBulk(),
+=======
+							Limits: ServerLimits{
+								MaxHeaderByteSize: 8192,
+								MaxConnections:    0,
+								PolicyThrottle:    5 * time.Millisecond,
+								CheckinLimit: Limit{
+									Interval: time.Millisecond,
+									Burst:    1000,
+									MaxBody:  1048576,
+								},
+								ArtifactLimit: Limit{
+									Interval: time.Millisecond * 5,
+									Burst:    25,
+									Max:      50,
+								},
+								EnrollLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+									MaxBody:  524288,
+								},
+								AckLimit: Limit{
+									Interval: time.Millisecond * 10,
+									Burst:    100,
+									Max:      50,
+									MaxBody:  2097152,
+								},
+							},
+						},
+						Cache: Cache{
+							NumCounters: defaultCacheNumCounters,
+							MaxCost:     defaultCacheMaxCost,
+>>>>>>> ad69880 (Tweak server timeouts.  Limit body size to defend malicious agent)
 						},
 						Cache: defaultCache(),
 						Monitor: Monitor{

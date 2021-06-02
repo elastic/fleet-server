@@ -123,7 +123,10 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 }
 
 func (et *EnrollerT) handleEnroll(w http.ResponseWriter, r *http.Request) (*EnrollResponse, error) {
+<<<<<<< HEAD
 
+=======
+>>>>>>> ad69880 (Tweak server timeouts.  Limit body size to defend malicious agent)
 	limitF, err := et.limit.Acquire()
 	if err != nil {
 		return nil, err
