@@ -79,11 +79,11 @@ func Init(cfg *config.Config) (*Logger, error) {
 		}
 
 		// override the field names for ECS
-		zerolog.LevelFieldName = "log.level"
-		zerolog.ErrorFieldName = "error.message"
-		zerolog.MessageFieldName = "message"
+		zerolog.LevelFieldName = EcsLogLevel
+		zerolog.ErrorFieldName = EcsErrorMessage
+		zerolog.MessageFieldName = EcsMessage
 		zerolog.TimeFieldFormat = "2006-01-02T15:04:05.999Z" // RFC3339 at millisecond resolution in zulu timezone
-		zerolog.TimestampFieldName = "@timestamp"
+		zerolog.TimestampFieldName = EcsTimestamp
 
 		if !cfg.Logging.Pretty || !cfg.Logging.ToStderr {
 			zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
