@@ -32,6 +32,7 @@ const (
 	FieldRevisionIdx                 = "revision_idx"
 	FieldCoordinatorIdx              = "coordinator_idx"
 	FieldLastCheckin                 = "last_checkin"
+	FieldLastCheckinStatus           = "last_checkin_status"
 	FieldLocalMetadata               = "local_metadata"
 	FieldPolicyRevisionIdx           = "policy_revision_idx"
 	FieldPolicyCoordinatorIdx        = "policy_coordinator_idx"

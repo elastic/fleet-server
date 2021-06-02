@@ -176,6 +176,15 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		return err
 	}
 
+	log.Debug().
+		Str("agentId", id).
+		Str("reqId", reqId).
+		Str("status", req.Status).
+		Str("seqNo", seqno.String()).
+		RawJSON("meta", rawMeta).
+		Uint64("bodyCount", readCounter.Count()).
+		Msg("checkin start long poll")
+
 	// Subscribe to actions dispatcher
 	aSub := ct.ad.Subscribe(agent.Id, seqno)
 	defer ct.ad.Unsubscribe(aSub)
@@ -197,7 +206,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	defer longPoll.Stop()
 
 	// Intial update on checkin, and any user fields that might have changed
-	ct.bc.CheckIn(agent.Id, rawMeta, seqno)
+	ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno)
 
 	// Initial fetch for pending actions
 	var (
@@ -234,7 +243,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 				log.Trace().Str(EcsHttpRequestId, reqId).Str("agentId", agent.Id).Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
-				ct.bc.CheckIn(agent.Id, nil, nil)
+				ct.bc.CheckIn(agent.Id, req.Status, nil, nil)
 			}
 		}
 	}

@@ -40,8 +40,9 @@ type extraT struct {
 // There will be 10's of thousands of items
 // in the map at any point.
 type pendingT struct {
-	ts    string
-	extra *extraT
+	ts     string
+	status string
+	extra  *extraT
 }
 
 type Bulk struct {
@@ -93,7 +94,7 @@ func (bc *Bulk) timestamp() string {
 
 // WARNING: Bulk will take ownership of fields,
 // so do not use after passing in.
-func (bc *Bulk) CheckIn(id string, meta []byte, seqno sqn.SeqNo) error {
+func (bc *Bulk) CheckIn(id string, status string, meta []byte, seqno sqn.SeqNo) error {
 
 	// Separate out the extra data to minimize
 	// the memory footprint of the 90% case of just
@@ -109,8 +110,9 @@ func (bc *Bulk) CheckIn(id string, meta []byte, seqno sqn.SeqNo) error {
 	bc.mut.Lock()
 
 	bc.pending[id] = pendingT{
-		ts:    bc.timestamp(),
-		extra: extra,
+		ts:     bc.timestamp(),
+		status: status,
+		extra:  extra,
 	}
 
 	bc.mut.Unlock()
@@ -155,7 +157,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 
 	updates := make([]bulk.MultiOp, 0, len(pending))
 
-	simpleCache := make(map[string][]byte)
+	simpleCache := make(map[pendingT][]byte)
 
 	nowTimestamp := start.UTC().Format(time.RFC3339)
 
@@ -168,23 +170,26 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		// JSON body containing just the timestamp updates.
 		var body []byte
 		if pendingData.extra == nil {
+
 			var ok bool
-			body, ok = simpleCache[pendingData.ts]
+			body, ok = simpleCache[pendingData]
 			if !ok {
 				fields := bulk.UpdateFields{
-					dl.FieldLastCheckin: pendingData.ts,
-					dl.FieldUpdatedAt:   nowTimestamp,
+					dl.FieldLastCheckin:       pendingData.ts,
+					dl.FieldUpdatedAt:         nowTimestamp,
+					dl.FieldLastCheckinStatus: pendingData.status,
 				}
 				if body, err = fields.Marshal(); err != nil {
 					return err
 				}
-				simpleCache[pendingData.ts] = body
+				simpleCache[pendingData] = body
 			}
 		} else {
 
 			fields := bulk.UpdateFields{
-				dl.FieldLastCheckin: pendingData.ts, // Set the checkin timestamp
-				dl.FieldUpdatedAt:   nowTimestamp,   // Set "updated_at" to the current timestamp
+				dl.FieldLastCheckin:       pendingData.ts,     // Set the checkin timestamp
+				dl.FieldUpdatedAt:         nowTimestamp,       // Set "updated_at" to the current timestamp
+				dl.FieldLastCheckinStatus: pendingData.status, // Set the pending status
 			}
 
 			// Update local metadata if provided
