@@ -31,6 +31,12 @@ const (
 	FieldPolicyId                    = "policy_id"
 	FieldRevisionIdx                 = "revision_idx"
 	FieldCoordinatorIdx              = "coordinator_idx"
+<<<<<<< HEAD
+=======
+	FieldLastCheckin                 = "last_checkin"
+	FieldLastCheckinStatus           = "last_checkin_status"
+	FieldLocalMetadata               = "local_metadata"
+>>>>>>> 73fcdb4 (Propagate checkin status to agent record)
 	FieldPolicyRevisionIdx           = "policy_revision_idx"
 	FieldPolicyCoordinatorIdx        = "policy_coordinator_idx"
 	FieldDefaultApiKey               = "default_api_key"

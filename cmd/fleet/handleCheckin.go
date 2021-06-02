@@ -164,7 +164,20 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		return err
 	}
 
+<<<<<<< HEAD
 	// Subsribe to actions dispatcher
+=======
+	log.Debug().
+		Str("agentId", id).
+		Str("reqId", reqId).
+		Str("status", req.Status).
+		Str("seqNo", seqno.String()).
+		RawJSON("meta", rawMeta).
+		Uint64("bodyCount", readCounter.Count()).
+		Msg("checkin start long poll")
+
+	// Subscribe to actions dispatcher
+>>>>>>> 73fcdb4 (Propagate checkin status to agent record)
 	aSub := ct.ad.Subscribe(agent.Id, seqno)
 	defer ct.ad.Unsubscribe(aSub)
 	actCh := aSub.Ch()
@@ -185,7 +198,11 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	defer longPoll.Stop()
 
 	// Intial update on checkin, and any user fields that might have changed
+<<<<<<< HEAD
 	ct.bc.CheckIn(agent.Id, fields, seqno)
+=======
+	ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno)
+>>>>>>> 73fcdb4 (Propagate checkin status to agent record)
 
 	// Initial fetch for pending actions
 	var (
@@ -222,7 +239,11 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 				log.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
+<<<<<<< HEAD
 				ct.bc.CheckIn(agent.Id, nil, seqno)
+=======
+				ct.bc.CheckIn(agent.Id, req.Status, nil, nil)
+>>>>>>> 73fcdb4 (Propagate checkin status to agent record)
 			}
 		}
 	}
