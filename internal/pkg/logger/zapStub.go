@@ -5,6 +5,8 @@
 package logger
 
 import (
+	"encoding/json"
+
 	"github.com/elastic/beats/v7/libbeat/logp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -14,16 +16,16 @@ import (
 
 func encoderConfig() zapcore.EncoderConfig {
 	return zapcore.EncoderConfig{
-		MessageKey:     "msg",
-		LevelKey:       "level",
-		NameKey:        "name",
-		TimeKey:        "ts",
-		CallerKey:      "caller",
-		StacktraceKey:  "stacktrace",
+		MessageKey:     EcsMessage,
+		LevelKey:       EcsLogLevel,
+		NameKey:        EcsLogName,
+		TimeKey:        EcsTimestamp,
+		CallerKey:      EcsLogCaller,
+		StacktraceKey:  EcsLogStackTrace,
 		LineEnding:     "\n",
 		EncodeTime:     zapcore.EpochTimeEncoder,
 		EncodeLevel:    zapcore.LowercaseLevelEncoder,
-		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeDuration: zapcore.NanosDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 }
@@ -58,7 +60,23 @@ func (z zapStub) Sync() error {
 }
 
 func (z zapStub) Write(p []byte) (n int, err error) {
-	log.Log().RawJSON("zap", p).Msg("")
+
+	// Unwrap the zap object for logging
+	m := make(map[string]interface{})
+	if err := json.Unmarshal(p, &m); err != nil {
+		return 0, err
+	}
+
+	ctx := log.Log()
+	for key, val := range m {
+
+		// Don't dupe the timestamp, use the fleet formatted timestamp.
+		if key != EcsTimestamp {
+			ctx.Interface(key, val)
+		}
+	}
+
+	ctx.Send()
 	return 0, nil
 }
 
