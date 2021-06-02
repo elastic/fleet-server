@@ -153,8 +153,14 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 
 	ctx := r.Context()
 
-	// Interpret request; TODO: defend overflow, slow roll
-	readCounter := datacounter.NewReaderCounter(r.Body)
+	body := r.Body
+
+	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
+	if ct.cfg.Limits.CheckinLimit.MaxBody > 0 {
+		body = http.MaxBytesReader(w, body, ct.cfg.Limits.CheckinLimit.MaxBody)
+	}
+
+	readCounter := datacounter.NewReaderCounter(body)
 
 	var req CheckinRequest
 	decoder := json.NewDecoder(readCounter)
@@ -181,7 +187,6 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		Str("reqId", reqId).
 		Str("status", req.Status).
 		Str("seqNo", seqno.String()).
-		RawJSON("meta", rawMeta).
 		Uint64("bodyCount", readCounter.Count()).
 		Msg("checkin start long poll")
 

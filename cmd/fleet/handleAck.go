@@ -32,6 +32,7 @@ import (
 var ErrEventAgentIdMismatch = errors.New("event agentId mismatch")
 
 type AckT struct {
+	cfg   *config.Server
 	limit *limit.Limiter
 	bulk  bulk.Bulk
 	cache cache.Cache
@@ -43,6 +44,7 @@ func NewAckT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *AckT {
 		Msg("Ack install limits")
 
 	return &AckT{
+		cfg:   cfg,
 		bulk:  bulker,
 		cache: cache,
 		limit: limit.NewLimiter(&cfg.Limits.AckLimit),
@@ -89,7 +91,14 @@ func (ack AckT) handleAcks(w http.ResponseWriter, r *http.Request, id string) er
 	dfunc := cntAcks.IncStart()
 	defer dfunc()
 
-	raw, err := ioutil.ReadAll(r.Body)
+	body := r.Body
+
+	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
+	if ack.cfg.Limits.AckLimit.MaxBody > 0 {
+		body = http.MaxBytesReader(w, body, ack.cfg.Limits.AckLimit.MaxBody)
+	}
+
+	raw, err := ioutil.ReadAll(body)
 	if err != nil {
 		return errors.Wrap(err, "handleAcks read body")
 	}
