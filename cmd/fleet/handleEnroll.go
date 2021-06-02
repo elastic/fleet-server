@@ -127,6 +127,7 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 }
 
 func (et *EnrollerT) handleEnroll(w http.ResponseWriter, r *http.Request) (*EnrollResponse, error) {
+
 	limitF, err := et.limit.Acquire()
 	if err != nil {
 		return nil, err
