@@ -49,6 +49,7 @@ var (
 
 type EnrollerT struct {
 	verCon version.Constraints
+	cfg    *config.Server
 	bulker bulk.Bulk
 	cache  cache.Cache
 	limit  *limit.Limiter
@@ -62,6 +63,7 @@ func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bu
 
 	return &EnrollerT{
 		verCon: verCon,
+		cfg:    cfg,
 		limit:  limit.NewLimiter(&cfg.Limits.EnrollLimit),
 		bulker: bulker,
 		cache:  c,
@@ -78,7 +80,7 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	enrollResponse, err := rt.et.handleEnroll(r)
+	enrollResponse, err := rt.et.handleEnroll(w, r)
 
 	var data []byte
 	if err == nil {
@@ -124,7 +126,7 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		Msg("success enroll")
 }
 
-func (et *EnrollerT) handleEnroll(r *http.Request) (*EnrollResponse, error) {
+func (et *EnrollerT) handleEnroll(w http.ResponseWriter, r *http.Request) (*EnrollResponse, error) {
 	limitF, err := et.limit.Acquire()
 	if err != nil {
 		return nil, err
@@ -151,7 +153,14 @@ func (et *EnrollerT) handleEnroll(r *http.Request) (*EnrollResponse, error) {
 		return nil, err
 	}
 
-	readCounter := datacounter.NewReaderCounter(r.Body)
+	body := r.Body
+
+	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
+	if et.cfg.Limits.EnrollLimit.MaxBody > 0 {
+		body = http.MaxBytesReader(w, body, et.cfg.Limits.EnrollLimit.MaxBody)
+	}
+
+	readCounter := datacounter.NewReaderCounter(body)
 
 	// Parse the request body
 	req, err := decodeEnrollRequest(readCounter)
@@ -337,7 +346,6 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 
 func decodeEnrollRequest(data io.Reader) (*EnrollRequest, error) {
 
-	// TODO: defend overflow, slow roll
 	var req EnrollRequest
 	decoder := json.NewDecoder(data)
 	if err := decoder.Decode(&req); err != nil {
