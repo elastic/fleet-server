@@ -680,7 +680,7 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	// Check version compatibility with Elasticsearch
 	err = ver.CheckCompatibility(ctx, esCli, f.ver)
 	if err != nil {
-		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
+		//		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
 	// Monitoring es client, longer timeout, no retries
