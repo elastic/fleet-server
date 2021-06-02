@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
@@ -117,6 +118,15 @@ func NewErrorResp(err error) errResp {
 				"TooManyRequests",
 				"too many requests",
 				zerolog.DebugLevel,
+			},
+		},
+		{
+			os.ErrDeadlineExceeded,
+			errResp{
+				http.StatusRequestTimeout,
+				"RequestTimeout",
+				"timeout on request",
+				zerolog.InfoLevel,
 			},
 		},
 	}
