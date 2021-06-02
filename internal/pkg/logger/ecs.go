@@ -6,6 +6,15 @@ package logger
 
 const (
 
+	// Basic logging
+	EcsLogLevel      = "log.level"
+	EcsLogName       = "log.logger"
+	EcsLogCaller     = "log.origin"
+	EcsLogStackTrace = "log.origin.stack_trace"
+	EcsMessage       = "message"
+	EcsTimestamp     = "@timestamp"
+	EcsErrorMessage  = "error.message"
+
 	// HTTP
 	EcsHttpVersion           = "http.version"
 	EcsHttpRequestId         = "http.request.id"
