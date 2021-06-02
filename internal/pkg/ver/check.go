@@ -13,7 +13,7 @@ import (
 
 	esh "github.com/elastic/fleet-server/v7/internal/pkg/es"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog/log"
 )
