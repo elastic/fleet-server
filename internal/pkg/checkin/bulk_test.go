@@ -44,53 +44,74 @@ func TestBulkSimple(t *testing.T) {
 	bc := NewBulk(&mockBulk)
 
 	cases := []struct {
-		desc  string
-		id    string
-		meta  []byte
-		seqno sqn.SeqNo
+		desc   string
+		id     string
+		status string
+		meta   []byte
+		seqno  sqn.SeqNo
 	}{
 		{
 			"Simple case",
 			"simpleId",
+			"online",
 			nil,
 			nil,
 		},
 		{
 			"Singled field case",
 			"singleFieldId",
+			"online",
 			[]byte(`{"hey":"now"}`),
 			nil,
 		},
 		{
 			"Multi field case",
 			"multiFieldId",
+			"online",
 			[]byte(`{"hey":"now","brown":"cow"}`),
 			nil,
 		},
 		{
 			"Multi field nested case",
 			"multiFieldNestedId",
+			"online",
 			[]byte(`{"hey":"now","wee":{"little":"doggie"}}`),
 			nil,
 		},
 		{
 			"Simple case with seqNo",
 			"simpleseqno",
+			"online",
 			nil,
 			sqn.SeqNo{1, 2, 3, 4},
 		},
 		{
 			"Field case with seqNo",
 			"simpleseqno",
+			"online",
 			[]byte(`{"uncle":"fester"}`),
 			sqn.SeqNo{5, 6, 7, 8},
+		},
+		{
+			"Unusual status",
+			"singleFieldId",
+			"unusual",
+			nil,
+			nil,
+		},
+		{
+			"Empty status",
+			"singleFieldId",
+			"",
+			nil,
+			nil,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
 
-			if err := bc.CheckIn(c.id, c.meta, c.seqno); err != nil {
+			if err := bc.CheckIn(c.id, c.status, c.meta, c.seqno); err != nil {
 				t.Fatal(err)
 			}
 
@@ -117,6 +138,7 @@ func TestBulkSimple(t *testing.T) {
 
 			type updateT struct {
 				LastCheckin string          `json:"last_checkin"`
+				Status      string          `json:"last_checkin_status"`
 				UpdatedAt   string          `json:"updated_at"`
 				Meta        json.RawMessage `json:"local_metadata"`
 				SeqNo       sqn.SeqNo       `json:"action_seq_no"`
@@ -143,6 +165,10 @@ func TestBulkSimple(t *testing.T) {
 
 			if c.meta != nil && bytes.Compare(c.meta, sub.Meta) != 0 {
 				t.Error("meta doesn't match up")
+			}
+
+			if c.status != sub.Status {
+				t.Error("status mismatch")
 			}
 
 		})
@@ -179,7 +205,7 @@ func benchmarkBulk(n int, flush bool, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 
 		for _, id := range ids {
-			err := bc.CheckIn(id, nil, nil)
+			err := bc.CheckIn(id, "", nil, nil)
 			if err != nil {
 				b.Fatal(err)
 			}
