@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
 // The wrapper for the new _fleet global_checkpoints that is not the part of the

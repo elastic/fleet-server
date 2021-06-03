@@ -7,7 +7,7 @@ package testing
 import (
 	"context"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gofrs/uuid"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
