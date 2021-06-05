@@ -15,7 +15,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 
-	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/rs/zerolog/log"
 )
 
@@ -31,7 +30,7 @@ var (
 // This authenticates that the provided API key exists and is enabled.
 // WARNING: This does not validate that the api key is valid for the Fleet Domain.
 // An additional check must be executed to validate it is not a random api key.
-func authApiKey(r *http.Request, client *elasticsearch.Client, c cache.Cache) (*apikey.ApiKey, error) {
+func authApiKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKey, error) {
 
 	key, err := apikey.ExtractAPIKey(r)
 	if err != nil {
@@ -46,7 +45,7 @@ func authApiKey(r *http.Request, client *elasticsearch.Client, c cache.Cache) (*
 
 	start := time.Now()
 
-	info, err := key.Authenticate(r.Context(), client)
+	info, err := bulker.ApiKeyAuth(r.Context(), *key)
 
 	if err != nil {
 		log.Info().
@@ -87,12 +86,20 @@ func authAgent(r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) (*mo
 	start := time.Now()
 
 	// authenticate
-	key, err := authApiKey(r, bulker.Client(), c)
+	key, err := authApiKey(r, bulker, c)
 	if err != nil {
 		return nil, err
 	}
 
 	authTime := time.Now()
+
+	if authTime.Sub(start) > time.Second {
+		log.Debug().
+			Str("agentId", id).
+			Str(EcsHttpRequestId, r.Header.Get(logger.HeaderRequestID)).
+			Int64(EcsEventDuration, authTime.Sub(start).Nanoseconds()).
+			Msg("authApiKey slow")
+	}
 
 	agent, err := findAgentByApiKeyId(r.Context(), bulker, key.Id)
 	if err != nil {
@@ -101,20 +108,10 @@ func authAgent(r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) (*mo
 
 	findTime := time.Now()
 
-	// TOOD: Remove temporary log msg to diag roundtrip speed issue on auth
-	if findTime.Sub(start) > time.Second*5 {
-		reqId := r.Header.Get(logger.HeaderRequestID)
-
-		zlog := log.With().
+	if findTime.Sub(authTime) > time.Second {
+		log.Debug().
 			Str("agentId", id).
-			Str(EcsHttpRequestId, reqId).
-			Logger()
-
-		zlog.Debug().
-			Int64(EcsEventDuration, authTime.Sub(start).Nanoseconds()).
-			Msg("authApiKey slow")
-
-		zlog.Debug().
+			Str(EcsHttpRequestId, r.Header.Get(logger.HeaderRequestID)).
 			Int64(EcsEventDuration, findTime.Sub(authTime).Nanoseconds()).
 			Msg("findAgentByApiKeyId slow")
 	}
