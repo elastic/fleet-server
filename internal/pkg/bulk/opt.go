@@ -48,6 +48,7 @@ type bulkOptT struct {
 	flushThresholdCnt int
 	flushThresholdSz  int
 	maxPending        int
+	apikeyMaxParallel int
 }
 
 type BulkOpt func(*bulkOptT)
@@ -80,9 +81,17 @@ func WithMaxPending(max int) BulkOpt {
 	}
 }
 
+// Max number of api key operations outstanding
+func WithApiKeyMaxParallel(max int) BulkOpt {
+	return func(opt *bulkOptT) {
+		opt.apikeyMaxParallel = max
+	}
+}
+
 func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Dur("flushInterval", o.flushInterval)
 	e.Int("flushThresholdCnt", o.flushThresholdCnt)
 	e.Int("flushThresholdSz", o.flushThresholdSz)
 	e.Int("maxPending", o.maxPending)
+	e.Int("apikeyMaxParallel", o.apikeyMaxParallel)
 }

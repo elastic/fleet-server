@@ -124,7 +124,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 	}
 	defer limitF()
 
-	key, err := authApiKey(r, et.bulker.Client(), et.cache)
+	key, err := authApiKey(r, et.bulker, et.cache)
 	if err != nil {
 		return nil, err
 	}

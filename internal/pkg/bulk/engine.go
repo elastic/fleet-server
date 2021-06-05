@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 
@@ -20,6 +21,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/semaphore"
 )
+
+type ApiKey = apikey.ApiKey
+type SecurityInfo = apikey.SecurityInfo
+type ApiKeyMetadata = apikey.ApiKeyMetadata
 
 var (
 	ErrNoQuotes = errors.New("quoted literal not supported")
@@ -47,6 +52,12 @@ type Bulk interface {
 	MUpdate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
 	MDelete(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
 
+	// APIKey operations
+	ApiKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*ApiKey, error)
+	ApiKeyRead(ctx context.Context, id string) (*ApiKeyMetadata, error)
+	ApiKeyAuth(ctx context.Context, key ApiKey) (*SecurityInfo, error)
+	ApiKeyInvalidate(ctx context.Context, ids ...string) error
+
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 }
@@ -54,10 +65,10 @@ type Bulk interface {
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es esapi.Transport
-	ch chan *bulkT
-
-	blkPool sync.Pool
+	es          esapi.Transport
+	ch          chan *bulkT
+	blkPool     sync.Pool
+	apikeyLimit *semaphore.Weighted
 }
 
 const (
@@ -66,6 +77,7 @@ const (
 	defaultFlushThresholdSz  = 1024 * 1024 * 10
 	defaultMaxPending        = 32
 	defaultBlockQueueSz      = 32 // Small capacity to allow multiOp to spin fast
+	defaultApiKeyMaxParallel = 32
 )
 
 func InitES(ctx context.Context, cfg *config.Config, opts ...BulkOpt) (*elasticsearch.Client, Bulk, error) {
@@ -81,6 +93,7 @@ func InitES(ctx context.Context, cfg *config.Config, opts ...BulkOpt) (*elastics
 		WithFlushThresholdCount(cfg.Output.Elasticsearch.BulkFlushThresholdCount),
 		WithFlushThresholdSize(cfg.Output.Elasticsearch.BulkFlushThresholdSize),
 		WithMaxPending(cfg.Output.Elasticsearch.BulkFlushMaxPending),
+		WithApiKeyMaxParallel(cfg.Output.Elasticsearch.MaxConnPerHost - cfg.Output.Elasticsearch.BulkFlushMaxPending),
 	}
 	nopts = append(nopts, opts...)
 
@@ -120,6 +133,7 @@ func (b *Bulker) parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		flushThresholdCnt: defaultFlushThresholdCnt,
 		flushThresholdSz:  defaultFlushThresholdSz,
 		maxPending:        defaultMaxPending,
+		apikeyMaxParallel: defaultApiKeyMaxParallel,
 	}
 
 	for _, f := range opts {
@@ -169,6 +183,8 @@ func (b *Bulker) Run(ctx context.Context, opts ...BulkOpt) error {
 	bopts := b.parseBulkOpts(opts...)
 
 	log.Info().Interface("opts", &bopts).Msg("Run bulker with options")
+
+	b.apikeyLimit = semaphore.NewWeighted(int64(bopts.apikeyMaxParallel))
 
 	// Create timer in stopped state
 	timer := time.NewTimer(bopts.flushInterval)
