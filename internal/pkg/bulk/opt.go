@@ -8,6 +8,8 @@ import (
 	"github.com/rs/zerolog"
 	"strconv"
 	"time"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
 
 //-----
@@ -48,6 +50,7 @@ type bulkOptT struct {
 	flushThresholdCnt int
 	flushThresholdSz  int
 	maxPending        int
+	blockQueueSz      int
 	apikeyMaxParallel int
 }
 
@@ -81,6 +84,13 @@ func WithMaxPending(max int) BulkOpt {
 	}
 }
 
+// Size of internal block queue (ie. channel)
+func WithBlockQueueSize(sz int) BulkOpt {
+	return func(opt *bulkOptT) {
+		opt.blockQueueSz = sz
+	}
+}
+
 // Max number of api key operations outstanding
 func WithApiKeyMaxParallel(max int) BulkOpt {
 	return func(opt *bulkOptT) {
@@ -88,10 +98,40 @@ func WithApiKeyMaxParallel(max int) BulkOpt {
 	}
 }
 
+func parseBulkOpts(opts ...BulkOpt) bulkOptT {
+	bopt := bulkOptT{
+		flushInterval:     defaultFlushInterval,
+		flushThresholdCnt: defaultFlushThresholdCnt,
+		flushThresholdSz:  defaultFlushThresholdSz,
+		maxPending:        defaultMaxPending,
+		apikeyMaxParallel: defaultApiKeyMaxParallel,
+		blockQueueSz:      defaultBlockQueueSz,
+	}
+
+	for _, f := range opts {
+		f(&bopt)
+	}
+
+	return bopt
+}
+
 func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Dur("flushInterval", o.flushInterval)
 	e.Int("flushThresholdCnt", o.flushThresholdCnt)
 	e.Int("flushThresholdSz", o.flushThresholdSz)
 	e.Int("maxPending", o.maxPending)
+	e.Int("blockQueueSz", o.blockQueueSz)
 	e.Int("apikeyMaxParallel", o.apikeyMaxParallel)
+}
+
+// Bridge to configuration subsystem
+func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
+
+	return []BulkOpt{
+		WithFlushInterval(cfg.Output.Elasticsearch.BulkFlushInterval),
+		WithFlushThresholdCount(cfg.Output.Elasticsearch.BulkFlushThresholdCount),
+		WithFlushThresholdSize(cfg.Output.Elasticsearch.BulkFlushThresholdSize),
+		WithMaxPending(cfg.Output.Elasticsearch.BulkFlushMaxPending),
+		WithApiKeyMaxParallel(cfg.Output.Elasticsearch.MaxConnPerHost - cfg.Output.Elasticsearch.BulkFlushMaxPending),
+	}
 }

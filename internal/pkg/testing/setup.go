@@ -10,11 +10,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/rs/xid"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
 )
 
@@ -41,12 +43,24 @@ func init() {
 	}
 }
 
-func SetupBulk(ctx context.Context, t *testing.T, opts ...bulk.BulkOpt) bulk.Bulk {
+func SetupES(ctx context.Context, t *testing.T) *elasticsearch.Client {
 	t.Helper()
-	_, bulker, err := bulk.InitES(ctx, &defaultCfg, opts...)
+
+	cli, err := es.NewClient(ctx, &defaultCfg, false)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	return cli
+}
+
+func SetupBulk(ctx context.Context, t *testing.T, opts ...bulk.BulkOpt) bulk.Bulk {
+	t.Helper()
+
+	cli := SetupES(ctx, t)
+	opts = append(opts, bulk.BulkOptsFromCfg(&defaultCfg)...)
+	bulker := bulk.NewBulker(cli, opts...)
+	go bulker.Run(ctx)
 	return bulker
 }
 
