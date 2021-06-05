@@ -98,7 +98,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	}
 
 	ln = wrapConnLimitter(ctx, ln, cfg)
-	if err := server.Serve(ln); err != nil && err != context.Canceled {
+	if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
 		return err
 	}
 
