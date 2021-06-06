@@ -31,9 +31,8 @@ import (
 )
 
 const (
-	defaultMaxParallel = 8              // TODO: configurable
-	defaultCacheTTL    = time.Hour * 24 // TODO: configurable
-	defaultThrottleTTL = time.Minute    // TODO: configurable
+	defaultMaxParallel = 8           // TODO: configurable
+	defaultThrottleTTL = time.Minute // TODO: configurable
 )
 
 var (
@@ -244,7 +243,7 @@ func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident,
 	art.Body = dstPayload
 
 	// Update the cache.
-	at.cache.SetArtifact(*art, defaultCacheTTL)
+	at.cache.SetArtifact(*art)
 
 	return art, nil
 }
