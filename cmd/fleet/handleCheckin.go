@@ -432,7 +432,7 @@ func processPolicy(ctx context.Context, bulker bulk.Bulk, agentId, reqId string,
 			Str("newHash", defaultRole.Sha2).
 			Msg("Generating a new API key")
 
-		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker.Client(), agent.Id, policy.DefaultOutputName, defaultRole.Raw)
+		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker, agent.Id, policy.DefaultOutputName, defaultRole.Raw)
 		if err != nil {
 			zlog.Error().Err(err).Msg("fail generate output key")
 			return nil, err
