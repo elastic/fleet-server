@@ -29,7 +29,7 @@ func (b *Bulker) ApiKeyCreate(ctx context.Context, name, ttl string, roles []byt
 	}
 	defer b.apikeyLimit.Release(1)
 
-	return apikey.Create(ctx, b.Client(), name, ttl, roles, meta)
+	return apikey.Create(ctx, b.Client(), name, ttl, "false", roles, meta)
 }
 
 func (b *Bulker) ApiKeyRead(ctx context.Context, id string) (*ApiKeyMetadata, error) {

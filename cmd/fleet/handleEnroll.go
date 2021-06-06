@@ -22,7 +22,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
-	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
@@ -33,9 +32,6 @@ import (
 
 const (
 	kEnrollMod = "enroll"
-
-	kCacheAccessInitTTL = time.Second * 30 // Cache a bit longer to handle expensive initial checkin
-	kCacheEnrollmentTTL = time.Second * 30
 
 	EnrollEphemeral = "EPHEMERAL"
 	EnrollPermanent = "PERMANENT"
@@ -195,7 +191,7 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 
 	agentId := u.String()
 
-	accessApiKey, err := generateAccessApiKey(ctx, bulker.Client(), agentId)
+	accessApiKey, err := generateAccessApiKey(ctx, bulker, agentId)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +234,7 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 	}
 
 	// We are Kool & and the Gang; cache the access key to avoid the roundtrip on impending checkin
-	c.SetApiKey(*accessApiKey, kCacheAccessInitTTL)
+	c.SetApiKey(*accessApiKey, true)
 
 	return &resp, nil
 }
@@ -312,15 +308,25 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	return nil
 }
 
-func generateAccessApiKey(ctx context.Context, client *elasticsearch.Client, agentId string) (*apikey.ApiKey, error) {
-	return apikey.Create(ctx, client, agentId, "", []byte(kFleetAccessRolesJSON),
-		apikey.NewMetadata(agentId, apikey.TypeAccess))
+func generateAccessApiKey(ctx context.Context, bulk bulk.Bulk, agentId string) (*apikey.ApiKey, error) {
+	return bulk.ApiKeyCreate(
+		ctx,
+		agentId,
+		"",
+		[]byte(kFleetAccessRolesJSON),
+		apikey.NewMetadata(agentId, apikey.TypeAccess),
+	)
 }
 
-func generateOutputApiKey(ctx context.Context, client *elasticsearch.Client, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
+func generateOutputApiKey(ctx context.Context, bulk bulk.Bulk, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
 	name := fmt.Sprintf("%s:%s", agentId, outputName)
-	return apikey.Create(ctx, client, name, "", roles,
-		apikey.NewMetadata(agentId, apikey.TypeOutput))
+	return bulk.ApiKeyCreate(
+		ctx,
+		name,
+		"",
+		roles,
+		apikey.NewMetadata(agentId, apikey.TypeOutput),
+	)
 }
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentApiKey, error) {
@@ -340,7 +346,7 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	}
 
 	cost := int64(len(rec.ApiKey))
-	et.cache.SetEnrollmentApiKey(id, rec, cost, kCacheEnrollmentTTL)
+	et.cache.SetEnrollmentApiKey(id, rec, cost)
 
 	return &rec, nil
 }

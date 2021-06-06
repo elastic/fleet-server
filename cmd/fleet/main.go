@@ -55,18 +55,23 @@ func installSignalHandler() context.Context {
 }
 
 func makeCache(cfg *config.Config) (cache.Cache, error) {
-
-	log.Info().
-		Int64("numCounters", cfg.Inputs[0].Cache.NumCounters).
-		Int64("maxCost", cfg.Inputs[0].Cache.MaxCost).
-		Msg("makeCache")
-
-	cacheCfg := cache.Config{
-		NumCounters: cfg.Inputs[0].Cache.NumCounters,
-		MaxCost:     cfg.Inputs[0].Cache.MaxCost,
-	}
-
+	cacheCfg := makeCacheConfig(cfg)
+	log.Info().Interface("cfg", cacheCfg).Msg("makeCache")
 	return cache.New(cacheCfg)
+}
+
+func makeCacheConfig(cfg *config.Config) cache.Config {
+	ccfg := cfg.Inputs[0].Cache
+
+	return cache.Config{
+		NumCounters:  ccfg.NumCounters,
+		MaxCost:      ccfg.MaxCost,
+		ActionTTL:    ccfg.ActionTTL,
+		EnrollKeyTTL: ccfg.EnrollKeyTTL,
+		ArtifactTTL:  ccfg.ArtifactTTL,
+		ApiKeyTTL:    ccfg.ApiKeyTTL,
+		ApiKeyJitter: ccfg.ApiKeyJitter,
+	}
 }
 
 func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, error) {
@@ -110,12 +115,7 @@ func getRunCommand(version, commit string) func(cmd *cobra.Command, args []strin
 				return err
 			}
 
-			c, err := makeCache(cfg)
-			if err != nil {
-				return err
-			}
-
-			agent, err := NewAgentMode(cliCfg, os.Stdin, c, version, l)
+			agent, err := NewAgentMode(cliCfg, os.Stdin, version, l)
 			if err != nil {
 				return err
 			}
@@ -144,12 +144,7 @@ func getRunCommand(version, commit string) func(cmd *cobra.Command, args []strin
 				return err
 			}
 
-			c, err := makeCache(cfg)
-			if err != nil {
-				return err
-			}
-
-			srv, err := NewFleetServer(cfg, c, version, status.NewLog())
+			srv, err := NewFleetServer(cfg, version, status.NewLog())
 			if err != nil {
 				return err
 			}
@@ -186,7 +181,6 @@ type firstCfg struct {
 
 type AgentMode struct {
 	cliCfg  *ucfg.Config
-	cache   cache.Cache
 	version string
 
 	reloadables []reload.Reloadable
@@ -201,12 +195,11 @@ type AgentMode struct {
 	startChan    chan struct{}
 }
 
-func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, c cache.Cache, version string, reloadables ...reload.Reloadable) (*AgentMode, error) {
+func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, version string, reloadables ...reload.Reloadable) (*AgentMode, error) {
 	var err error
 
 	a := &AgentMode{
 		cliCfg:      cliCfg,
-		cache:       c,
 		version:     version,
 		reloadables: reloadables,
 	}
@@ -252,7 +245,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	srvCtx, srvCancel := context.WithCancel(ctx)
 	defer srvCancel()
 	log.Info().Msg("received initial configuration starting Fleet Server")
-	srv, err := NewFleetServer(cfg.cfg, a.cache, a.version, status.NewChained(status.NewLog(), a.agent))
+	srv, err := NewFleetServer(cfg.cfg, a.version, status.NewChained(status.NewLog(), a.agent))
 	if err != nil {
 		// unblock startChan even though there was an error
 		a.startChan <- struct{}{}
@@ -400,17 +393,23 @@ type FleetServer struct {
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config, c cache.Cache, verStr string, reporter status.Reporter) (*FleetServer, error) {
+func NewFleetServer(cfg *config.Config, verStr string, reporter status.Reporter) (*FleetServer, error) {
 	verCon, err := buildVersionConstraint(verStr)
 	if err != nil {
 		return nil, err
 	}
+
+	cache, err := makeCache(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	return &FleetServer{
 		ver:      verStr,
 		verCon:   verCon,
 		cfg:      cfg,
 		cfgCh:    make(chan *config.Config, 1),
-		cache:    c,
+		cache:    cache,
 		reporter: reporter,
 	}, nil
 }
@@ -467,6 +466,16 @@ LOOP:
 		} else {
 			started = true
 			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
+		}
+
+		// Create or recreate cache
+		if configCacheChanged(curCfg, newCfg) {
+			cacheCfg := makeCacheConfig(newCfg)
+			err := f.cache.Reconfigure(cacheCfg)
+			log.Info().Err(err).Interface("cfg", cacheCfg).Msg("Reconfigure cache")
+			if err != nil {
+				return err
+			}
 		}
 
 		// Start or restart profiler
@@ -533,6 +542,13 @@ func configChangedProfiler(curCfg, newCfg *config.Config) bool {
 
 func configChangedServer(curCfg, newCfg *config.Config) bool {
 	return curCfg == nil || curCfg.Inputs[0].Server != newCfg.Inputs[0].Server
+}
+
+func configCacheChanged(curCfg, newCfg *config.Config) bool {
+	if curCfg == nil {
+		return false
+	}
+	return curCfg.Inputs[0].Cache != newCfg.Inputs[0].Cache
 }
 
 func safeWait(g *errgroup.Group, to time.Duration) (err error) {

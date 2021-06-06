@@ -18,13 +18,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const (
-	kAPIKeyTTL = 5 * time.Second
-)
-
 var (
 	ErrApiKeyNotEnabled = errors.New("APIKey not enabled")
 	ErrAgentCorrupted   = errors.New("agent record corrupted")
+	ErrAgentInactive    = errors.New("agent inactive")
 )
 
 // This authenticates that the provided API key exists and is enabled.
@@ -67,9 +64,8 @@ func authApiKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 		RawJSON("meta", info.Metadata).
 		Msg("ApiKey authenticated")
 
-	if info.Enabled {
-		c.SetApiKey(*key, kAPIKeyTTL)
-	} else {
+	c.SetApiKey(*key, info.Enabled)
+	if !info.Enabled {
 		err = ErrApiKeyNotEnabled
 		log.Info().
 			Err(err).
@@ -124,6 +120,20 @@ func authAgent(r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) (*mo
 			Str("key.Id", key.Id).
 			Msg("agent API key id mismatch agent record")
 		return nil, ErrAgentCorrupted
+	}
+
+	// validate active, an api key can be valid for an inactive agent record
+	// if it is in our cache and has not timed out.
+	if !agent.Active {
+		log.Info().
+			Err(ErrAgentInactive).
+			Str("agentId", id).
+			Str(EcsHttpRequestId, r.Header.Get(logger.HeaderRequestID)).
+			Msg("agent record inactive")
+
+		// Update the cache to mark the api key id associated with this agent as not enabled
+		c.SetApiKey(*key, false)
+		return nil, ErrAgentInactive
 	}
 
 	return agent, nil
