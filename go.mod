@@ -4,6 +4,10 @@ go 1.16
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
+<<<<<<< HEAD
+=======
+	github.com/aleksmaus/generate v0.0.0-20210326194607-c630e07a2742
+>>>>>>> aadaa4c (Drop cache if configuration changes.)
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/elastic/beats/v7 v7.11.1
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20200709172729-d43b7ad5833a

@@ -120,7 +120,10 @@ func TestConfig(t *testing.T) {
 							CompressionLevel:  1,
 							CompressionThresh: 1024,
 							Limits:            defaultServerLimits(),
+<<<<<<< HEAD
 							Bulk:              defaultServerBulk(),
+=======
+>>>>>>> aadaa4c (Drop cache if configuration changes.)
 						},
 						Cache: defaultCache(),
 						Monitor: Monitor{
@@ -191,12 +194,15 @@ func defaultServerLimits() ServerLimits {
 	return d
 }
 
+<<<<<<< HEAD
 func defaultServerBulk() ServerBulk {
 	var d ServerBulk
 	d.InitDefaults()
 	return d
 }
 
+=======
+>>>>>>> aadaa4c (Drop cache if configuration changes.)
 func defaultLogging() Logging {
 	var d Logging
 	d.InitDefaults()
@@ -220,6 +226,7 @@ func defaultFleet() Fleet {
 
 func defaultElastic() Elasticsearch {
 	return Elasticsearch{
+<<<<<<< HEAD
 		Protocol:       "http",
 		Hosts:          []string{"localhost:9200"},
 		Username:       "elastic",
@@ -227,6 +234,19 @@ func defaultElastic() Elasticsearch {
 		MaxRetries:     3,
 		MaxConnPerHost: 128,
 		Timeout:        90 * time.Second,
+=======
+		Protocol:                "http",
+		Hosts:                   []string{"localhost:9200"},
+		Username:                "elastic",
+		Password:                "changeme",
+		MaxRetries:              3,
+		MaxConnPerHost:          128,
+		BulkFlushInterval:       250 * time.Millisecond,
+		BulkFlushThresholdCount: 2048,
+		BulkFlushThresholdSize:  1048576,
+		BulkFlushMaxPending:     8,
+		Timeout:                 90 * time.Second,
+>>>>>>> aadaa4c (Drop cache if configuration changes.)
 	}
 }
 

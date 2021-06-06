@@ -62,7 +62,11 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 		return nil, err
 	}
 
+<<<<<<< HEAD
 	logger.Init(cfg, "fleet-server")
+=======
+	logger.Init(cfg)
+>>>>>>> aadaa4c (Drop cache if configuration changes.)
 
 	port, err := ftesting.FreePort()
 	if err != nil {
