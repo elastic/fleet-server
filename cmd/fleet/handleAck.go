@@ -158,7 +158,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, agent *model.Agent, events
 				return errors.New("no matching action")
 			}
 			action = actions[0]
-			ack.cache.SetAction(action, time.Minute)
+			ack.cache.SetAction(action)
 		}
 
 		acr := model.ActionResult{
