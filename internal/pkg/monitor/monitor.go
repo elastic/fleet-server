@@ -205,6 +205,9 @@ func (m *simpleMonitorT) loadCheckpoint() sqn.SeqNo {
 func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 	m.log.Info().Msg("start")
 	defer func() {
+		if err == context.Canceled {
+			err = nil
+		}
 		m.log.Info().Err(err).Msg("exited")
 	}()
 
@@ -242,6 +245,8 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 				// Timed out, wait again
 				m.log.Debug().Msg("timeout on global checkpoints advance, poll again")
 				continue
+			} else if errors.Is(err, context.Canceled) {
+				m.log.Info().Msg("context closed waiting for global checkpoints advance")
 			} else {
 				// Log the error and keep trying
 				m.log.Info().Err(err).Msg("failed on waiting for global checkpoints advance")

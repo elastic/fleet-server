@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 
 	"github.com/elastic/go-elasticsearch/v7"
@@ -20,6 +20,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/semaphore"
 )
+
+type ApiKey = apikey.ApiKey
+type SecurityInfo = apikey.SecurityInfo
+type ApiKeyMetadata = apikey.ApiKeyMetadata
 
 var (
 	ErrNoQuotes = errors.New("quoted literal not supported")
@@ -47,6 +51,12 @@ type Bulk interface {
 	MUpdate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
 	MDelete(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
 
+	// APIKey operations
+	ApiKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*ApiKey, error)
+	ApiKeyRead(ctx context.Context, id string) (*ApiKeyMetadata, error)
+	ApiKeyAuth(ctx context.Context, key ApiKey) (*SecurityInfo, error)
+	ApiKeyInvalidate(ctx context.Context, ids ...string) error
+
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 }
@@ -54,10 +64,11 @@ type Bulk interface {
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es esapi.Transport
-	ch chan *bulkT
-
-	blkPool sync.Pool
+	es          esapi.Transport
+	ch          chan *bulkT
+	opts        bulkOptT
+	blkPool     sync.Pool
+	apikeyLimit *semaphore.Weighted
 }
 
 const (
@@ -66,43 +77,23 @@ const (
 	defaultFlushThresholdSz  = 1024 * 1024 * 10
 	defaultMaxPending        = 32
 	defaultBlockQueueSz      = 32 // Small capacity to allow multiOp to spin fast
+	defaultApiKeyMaxParallel = 32
 )
 
-func InitES(ctx context.Context, cfg *config.Config, opts ...BulkOpt) (*elasticsearch.Client, Bulk, error) {
+func NewBulker(es esapi.Transport, opts ...BulkOpt) *Bulker {
 
-	es, err := es.NewClient(ctx, cfg, false)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Options specified on API should override config
-	nopts := []BulkOpt{
-		WithFlushInterval(cfg.Output.Elasticsearch.BulkFlushInterval),
-		WithFlushThresholdCount(cfg.Output.Elasticsearch.BulkFlushThresholdCount),
-		WithFlushThresholdSize(cfg.Output.Elasticsearch.BulkFlushThresholdSize),
-		WithMaxPending(cfg.Output.Elasticsearch.BulkFlushMaxPending),
-	}
-	nopts = append(nopts, opts...)
-
-	blk := NewBulker(es)
-	go func() {
-		err := blk.Run(ctx, nopts...)
-		log.Info().Err(err).Msg("Bulker exit")
-	}()
-
-	return es, blk, nil
-}
-
-func NewBulker(es esapi.Transport) *Bulker {
+	bopts := parseBulkOpts(opts...)
 
 	poolFunc := func() interface{} {
 		return &bulkT{ch: make(chan respT, 1)}
 	}
 
 	return &Bulker{
-		es:      es,
-		ch:      make(chan *bulkT, defaultBlockQueueSz),
-		blkPool: sync.Pool{New: poolFunc},
+		opts:        bopts,
+		es:          es,
+		ch:          make(chan *bulkT, bopts.blockQueueSz),
+		blkPool:     sync.Pool{New: poolFunc},
+		apikeyLimit: semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
 	}
 }
 
@@ -112,21 +103,6 @@ func (b *Bulker) Client() *elasticsearch.Client {
 		panic("Client is not an elastic search pointer")
 	}
 	return client
-}
-
-func (b *Bulker) parseBulkOpts(opts ...BulkOpt) bulkOptT {
-	bopt := bulkOptT{
-		flushInterval:     defaultFlushInterval,
-		flushThresholdCnt: defaultFlushThresholdCnt,
-		flushThresholdSz:  defaultFlushThresholdSz,
-		maxPending:        defaultMaxPending,
-	}
-
-	for _, f := range opts {
-		f(&bopt)
-	}
-
-	return bopt
 }
 
 // Stop timer, but don't stall on channel.
@@ -163,19 +139,17 @@ func blkToQueueType(blk *bulkT) queueType {
 	return queueIdx
 }
 
-func (b *Bulker) Run(ctx context.Context, opts ...BulkOpt) error {
+func (b *Bulker) Run(ctx context.Context) error {
 	var err error
 
-	bopts := b.parseBulkOpts(opts...)
-
-	log.Info().Interface("opts", &bopts).Msg("Run bulker with options")
+	log.Info().Interface("opts", &b.opts).Msg("Run bulker with options")
 
 	// Create timer in stopped state
-	timer := time.NewTimer(bopts.flushInterval)
+	timer := time.NewTimer(b.opts.flushInterval)
 	stopTimer(timer)
 	defer timer.Stop()
 
-	w := semaphore.NewWeighted(int64(bopts.maxPending))
+	w := semaphore.NewWeighted(int64(b.opts.maxPending))
 
 	var queues [kNumQueues]queueT
 
@@ -235,11 +209,11 @@ func (b *Bulker) Run(ctx context.Context, opts ...BulkOpt) error {
 
 			// Start timer on first queued item
 			if itemCnt == 1 {
-				timer.Reset(bopts.flushInterval)
+				timer.Reset(b.opts.flushInterval)
 			}
 
 			// Threshold test, short circuit timer on pending count
-			if itemCnt >= bopts.flushThresholdCnt || byteCnt >= bopts.flushThresholdSz {
+			if itemCnt >= b.opts.flushThresholdCnt || byteCnt >= b.opts.flushThresholdSz {
 				log.Trace().
 					Str("mod", kModBulk).
 					Int("itemCnt", itemCnt).

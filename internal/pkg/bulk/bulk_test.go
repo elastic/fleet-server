@@ -291,15 +291,14 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 	ctx, cancelF := context.WithCancel(context.Background())
 	defer cancelF()
 
-	bulker := NewBulker(mock)
-
 	n := len(samples)
+	bulker := NewBulker(mock, WithFlushThresholdCount(n))
 
 	var waitBulker sync.WaitGroup
 	waitBulker.Add(1)
 	go func() {
 		defer waitBulker.Done()
-		if err := bulker.Run(ctx, WithFlushThresholdCount(n)); err != context.Canceled {
+		if err := bulker.Run(ctx); err != context.Canceled {
 			b.Error(err)
 		}
 	}()
