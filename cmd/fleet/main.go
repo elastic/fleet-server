@@ -37,6 +37,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -456,6 +457,8 @@ func (f *FleetServer) Run(ctx context.Context) error {
 	)
 
 	started := false
+
+LOOP:
 	for {
 		ech := make(chan error, 2)
 
@@ -466,8 +469,8 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
 		}
 
-		// Restart profiler
-		if curCfg == nil || curCfg.Inputs[0].Server.Profiler.Enabled != newCfg.Inputs[0].Server.Profiler.Enabled || curCfg.Inputs[0].Server.Profiler.Bind != newCfg.Inputs[0].Server.Profiler.Bind {
+		// Start or restart profiler
+		if configChangedProfiler(curCfg, newCfg) {
 			stop(proCancel, proEg)
 			proEg, proCancel = nil, nil
 			if newCfg.Inputs[0].Server.Profiler.Enabled {
@@ -477,8 +480,8 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			}
 		}
 
-		// Restart server
-		if curCfg == nil || curCfg.Inputs[0].Server != newCfg.Inputs[0].Server {
+		// Start or restart server
+		if configChangedServer(curCfg, newCfg) {
 			stop(srvCancel, srvEg)
 			srvEg, srvCancel = start(ctx, func(ctx context.Context) error {
 				return f.runServer(ctx, newCfg)
@@ -496,22 +499,75 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			return err
 		case <-ctx.Done():
 			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil)
-			log.Info().Msg("Fleet Server exited")
-			return nil
+			break LOOP
 		}
 	}
+
+	// Server is coming down; wait for the server group to exit cleanly.
+	// Timeout if something is locked up.
+	err := safeWait(srvEg, time.Second)
+
+	// Eat cancel error to minimize confusion in logs
+	if errors.Is(err, context.Canceled) {
+		err = nil
+	}
+
+	log.Info().Err(err).Msg("Fleet Server exited")
+	return err
+}
+
+func configChangedProfiler(curCfg, newCfg *config.Config) bool {
+
+	changed := true
+
+	switch {
+	case curCfg == nil:
+	case curCfg.Inputs[0].Server.Profiler.Enabled != newCfg.Inputs[0].Server.Profiler.Enabled:
+	case curCfg.Inputs[0].Server.Profiler.Bind != newCfg.Inputs[0].Server.Profiler.Bind:
+	default:
+		changed = false
+	}
+
+	return changed
+}
+
+func configChangedServer(curCfg, newCfg *config.Config) bool {
+	return curCfg == nil || curCfg.Inputs[0].Server != newCfg.Inputs[0].Server
+}
+
+func safeWait(g *errgroup.Group, to time.Duration) (err error) {
+	waitCh := make(chan error)
+	go func() {
+		waitCh <- g.Wait()
+	}()
+
+	select {
+	case err = <-waitCh:
+	case <-time.After(to):
+		log.Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
+		err = errors.New("Group wait timeout")
+	}
+
+	return
 }
 
 func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error {
 	return func() error {
+
 		log.Debug().Msg(tag + " started")
+
 		err := runfn(ctx)
-		var ev *zerolog.Event
-		if err != nil {
-			log.Error().Err(err)
+
+		lvl := zerolog.DebugLevel
+		switch {
+		case err == nil:
+		case errors.Is(err, context.Canceled):
+			err = nil
+		default:
+			lvl = zerolog.ErrorLevel
 		}
-		ev = log.Debug()
-		ev.Msg(tag + " exited")
+
+		log.WithLevel(lvl).Err(err).Msg(tag + " exited")
 		return err
 	}
 }
@@ -528,6 +584,16 @@ func initRuntime(cfg *config.Config) {
 	}
 }
 
+func initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
+	es, err := es.NewClient(ctx, cfg, false)
+	if err != nil {
+		return nil, err
+	}
+
+	blk := bulk.NewBulker(es, bulk.BulkOptsFromCfg(cfg)...)
+	return blk, nil
+}
+
 func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	initRuntime(cfg)
 
@@ -540,15 +606,59 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		defer metricsServer.Stop()
 	}
 
-	// Bulker is started in its own context and managed inside of this function. This is done so
-	// when the `ctx` is cancelled every worker using the bulker can get everything written on
-	// shutdown before the bulker is then cancelled.
+	// Bulker is started in its own context and managed in the scope of this function. This is done so
+	// when the `ctx` is cancelled, the bulker will remain executing until this function exits.
+	// This allows the child subsystems to continue to write to the data store while tearing down.
 	bulkCtx, bulkCancel := context.WithCancel(context.Background())
 	defer bulkCancel()
-	esCli, bulker, err := bulk.InitES(bulkCtx, cfg)
+
+	// Create the bulker subsystem
+	bulker, err := initBulker(bulkCtx, cfg)
 	if err != nil {
 		return err
 	}
+
+	// Execute the bulker engine in a goroutine with its orphaned context.
+	// Create an error channel for the case where the bulker exits
+	// unexpectedly (ie. not cancelled by the bulkCancel context).
+	errCh := make(chan error)
+
+	go func() {
+		runFunc := loggedRunFunc(bulkCtx, "Bulker", bulker.Run)
+
+		// Emit the error from bulker.Run to the local error channel.
+		// The error group will be listening for it. (see comments below)
+		errCh <- runFunc()
+	}()
+
+	// Wrap context with an error group context to manage the lifecycle
+	// of the subsystems.  An error from any subsystem, or if the
+	// parent context is cancelled, will cancel the group.
+	// see https://pkg.go.dev/golang.org/x/sync/errgroup#Group.Go
+	g, ctx := errgroup.WithContext(ctx)
+
+	// Stub a function for inclusion in the errgroup that exits when
+	// the bulker exits.  If the bulker exits before the error group,
+	// this will tear down the error group and g.Wait() will return.
+	// Otherwise it will be a noop.
+	g.Go(func() (err error) {
+		select {
+		case err = <-errCh:
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
+		return
+	})
+
+	if err = f.runSubsystems(ctx, cfg, g, bulker); err != nil {
+		return err
+	}
+
+	return g.Wait()
+}
+
+func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk) (err error) {
+	esCli := bulker.Client()
 
 	// Check version compatibility with Elasticsearch
 	err = ver.CheckCompatibility(ctx, esCli, f.ver)
@@ -561,9 +671,6 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-
-	// Replacing to errgroup context
-	g, ctx := errgroup.WithContext(ctx)
 
 	// Coordinator policy monitor
 	pim, err := monitor.New(dl.FleetPolicies, esCli, monCli,
@@ -626,7 +733,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return runServer(ctx, router, &cfg.Inputs[0].Server)
 	}))
 
-	return g.Wait()
+	return err
 }
 
 // Reload reloads the fleet server with the latest configuration.

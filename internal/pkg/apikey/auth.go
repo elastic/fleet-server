@@ -24,9 +24,7 @@ type SecurityInfo struct {
 	LookupRealm map[string]string `json:"lookup_realm"`
 }
 
-// Kibana:
-// https://github.com/elastic/kibana/blob/master/x-pack/plugins/security/server/authentication/authenticator.ts#L308
-// NOTE: Bulk request currently not available.
+// Note: Prefer the bulk wrapper on this API
 func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*SecurityInfo, error) {
 
 	token := fmt.Sprintf("%s%s", authPrefix, k.Token())

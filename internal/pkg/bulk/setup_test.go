@@ -115,10 +115,17 @@ func init() {
 
 func SetupBulk(ctx context.Context, t testing.TB, opts ...BulkOpt) Bulk {
 	t.Helper()
-	_, bulker, err := InitES(ctx, &defaultCfg, opts...)
+
+	cli, err := es.NewClient(ctx, &defaultCfg, false)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	opts = append(opts, BulkOptsFromCfg(&defaultCfg)...)
+
+	bulker := NewBulker(cli, opts...)
+	go bulker.Run(ctx)
+
 	return bulker
 }
 
