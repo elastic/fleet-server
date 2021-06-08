@@ -52,8 +52,10 @@ func TestConfig(t *testing.T) {
 							Host: kDefaultHost,
 							Port: kDefaultPort,
 							Timeouts: ServerTimeouts{
-								Read:             5 * time.Second,
-								Write:            60 * 10 * time.Second,
+								Read:             60 * time.Second,
+								ReadHeader:       5 * time.Second,
+								Idle:             30 * time.Second,
+								Write:            10 * time.Minute,
 								CheckinTimestamp: 30 * time.Second,
 								CheckinLongPoll:  5 * time.Minute,
 							},
@@ -70,6 +72,7 @@ func TestConfig(t *testing.T) {
 								CheckinLimit: Limit{
 									Interval: time.Millisecond,
 									Burst:    1000,
+									MaxBody:  1048576,
 								},
 								ArtifactLimit: Limit{
 									Interval: time.Millisecond * 5,
@@ -80,11 +83,13 @@ func TestConfig(t *testing.T) {
 									Interval: time.Millisecond * 10,
 									Burst:    100,
 									Max:      50,
+									MaxBody:  524288,
 								},
 								AckLimit: Limit{
 									Interval: time.Millisecond * 10,
 									Burst:    100,
 									Max:      50,
+									MaxBody:  2097152,
 								},
 							},
 						},
@@ -142,8 +147,10 @@ func TestConfig(t *testing.T) {
 							Host: kDefaultHost,
 							Port: kDefaultPort,
 							Timeouts: ServerTimeouts{
-								Read:             5 * time.Second,
-								Write:            60 * 10 * time.Second,
+								Read:             60 * time.Second,
+								ReadHeader:       5 * time.Second,
+								Idle:             30 * time.Second,
+								Write:            10 * time.Minute,
 								CheckinTimestamp: 30 * time.Second,
 								CheckinLongPoll:  5 * time.Minute,
 							},
@@ -160,6 +167,7 @@ func TestConfig(t *testing.T) {
 								CheckinLimit: Limit{
 									Interval: time.Millisecond,
 									Burst:    1000,
+									MaxBody:  1048576,
 								},
 								ArtifactLimit: Limit{
 									Interval: time.Millisecond * 5,
@@ -170,11 +178,13 @@ func TestConfig(t *testing.T) {
 									Interval: time.Millisecond * 10,
 									Burst:    100,
 									Max:      50,
+									MaxBody:  524288,
 								},
 								AckLimit: Limit{
 									Interval: time.Millisecond * 10,
 									Burst:    100,
 									Max:      50,
+									MaxBody:  2097152,
 								},
 							},
 						},
@@ -230,8 +240,10 @@ func TestConfig(t *testing.T) {
 							Host: kDefaultHost,
 							Port: kDefaultPort,
 							Timeouts: ServerTimeouts{
-								Read:             5 * time.Second,
-								Write:            60 * 10 * time.Second,
+								Read:             60 * time.Second,
+								ReadHeader:       5 * time.Second,
+								Idle:             30 * time.Second,
+								Write:            10 * time.Minute,
 								CheckinTimestamp: 30 * time.Second,
 								CheckinLongPoll:  5 * time.Minute,
 							},
@@ -248,6 +260,7 @@ func TestConfig(t *testing.T) {
 								CheckinLimit: Limit{
 									Interval: time.Millisecond,
 									Burst:    1000,
+									MaxBody:  1048576,
 								},
 								ArtifactLimit: Limit{
 									Interval: time.Millisecond * 5,
@@ -258,11 +271,13 @@ func TestConfig(t *testing.T) {
 									Interval: time.Millisecond * 10,
 									Burst:    100,
 									Max:      50,
+									MaxBody:  524288,
 								},
 								AckLimit: Limit{
 									Interval: time.Millisecond * 10,
 									Burst:    100,
 									Max:      50,
+									MaxBody:  2097152,
 								},
 							},
 						},
@@ -319,6 +334,8 @@ func TestConfig(t *testing.T) {
 							Port: 8888,
 							Timeouts: ServerTimeouts{
 								Read:             20 * time.Second,
+								ReadHeader:       5 * time.Second,
+								Idle:             30 * time.Second,
 								Write:            5 * time.Second,
 								CheckinTimestamp: 30 * time.Second,
 								CheckinLongPoll:  5 * time.Minute,
@@ -336,6 +353,7 @@ func TestConfig(t *testing.T) {
 								CheckinLimit: Limit{
 									Interval: time.Millisecond,
 									Burst:    1000,
+									MaxBody:  1048576,
 								},
 								ArtifactLimit: Limit{
 									Interval: time.Millisecond * 5,
@@ -346,11 +364,13 @@ func TestConfig(t *testing.T) {
 									Interval: time.Millisecond * 10,
 									Burst:    100,
 									Max:      50,
+									MaxBody:  524288,
 								},
 								AckLimit: Limit{
 									Interval: time.Millisecond * 10,
 									Burst:    100,
 									Max:      50,
+									MaxBody:  2097152,
 								},
 							},
 						},
