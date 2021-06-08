@@ -56,7 +56,9 @@ check: ## - Run all checks
 
 .PHONY: check-headers
 check-headers:  ## - Check copyright headers
+	@go get github.com/elastic/go-licenser
 	@go install github.com/elastic/go-licenser
+	@go mod tidy
 	@go-licenser -license Elastic
 
 .PHONY: check-go
@@ -68,9 +70,10 @@ check-go: ## - Run go fmt, go vet, go mod tidy
 .PHONY: notice
 notice: ## - Generates the NOTICE.txt file.
 	@echo "Generating NOTICE.txt"
+	@go get go.elastic.co/go-licence-detector
+	@go install go.elastic.co/go-licence-detector
 	@go mod tidy
-	@go mod download
-	go list -m -json all | go run go.elastic.co/go-licence-detector \
+	go list -m -json all | go-licence-detector \
 		-includeIndirect \
 		-rules dev-tools/notice/rules.json \
 		-overrides dev-tools/notice/overrides.json \
@@ -86,11 +89,11 @@ check-no-changes:
 
 .PHONY: test
 test: prepare-test-context  ## - Run all tests
-	@./dev-tools/run_with_go_ver $(MAKE) test-unit 
+	@./dev-tools/run_with_go_ver $(MAKE) test-unit
 	@./dev-tools/run_with_go_ver $(MAKE) test-int
 	@$(MAKE) junit-report
 
-.PHONY: test-unit 
+.PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
 	set -o pipefail; go test -v -race ./... | tee build/test-unit.out
 
