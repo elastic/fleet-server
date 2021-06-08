@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"math/rand"
 	"net/http"
 	"reflect"
 	"time"
@@ -108,6 +109,7 @@ func NewCheckinT(
 		Interface("limits", cfg.Limits.CheckinLimit).
 		Dur("long_poll_timeout", cfg.Timeouts.CheckinLongPoll).
 		Dur("long_poll_timestamp", cfg.Timeouts.CheckinTimestamp).
+		Dur("long_poll_jitter", cfg.Timeouts.CheckinJitter).
 		Msg("Checkin install limits")
 
 	ct := &CheckinT{
@@ -206,8 +208,17 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	tick := time.NewTicker(ct.cfg.Timeouts.CheckinTimestamp)
 	defer tick.Stop()
 
+	pollDuration := ct.cfg.Timeouts.CheckinLongPoll
+	if ct.cfg.Timeouts.CheckinJitter != 0 {
+		jitter := time.Duration(rand.Int63n(int64(ct.cfg.Timeouts.CheckinJitter)))
+		if jitter < pollDuration {
+			pollDuration = pollDuration - jitter
+			log.Trace().Str("agentId", id).Dur("poll", pollDuration).Msg("Long poll with jitter")
+		}
+	}
+
 	// Chill out for for a bit. Long poll.
-	longPoll := time.NewTicker(ct.cfg.Timeouts.CheckinLongPoll)
+	longPoll := time.NewTicker(pollDuration)
 	defer longPoll.Stop()
 
 	// Intial update on checkin, and any user fields that might have changed
