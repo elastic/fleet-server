@@ -78,7 +78,12 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	data, err := rt.et.handleEnroll(r)
+	enrollResponse, err := rt.et.handleEnroll(r)
+
+	var data []byte
+	if err == nil {
+		data, err = json.Marshal(enrollResponse)
+	}
 
 	reqId := r.Header.Get(logger.HeaderRequestID)
 
@@ -107,17 +112,19 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 
 	cntEnroll.bodyOut.Add(uint64(numWritten))
 
-	log.Trace().
+	log.Info().
 		Err(err).
-		Str(EcsHttpRequestId, reqId).
-		RawJSON("raw", data).
 		Str("mod", kEnrollMod).
+		Str("agentId", enrollResponse.Item.ID).
+		Str("policyId", enrollResponse.Item.PolicyId).
+		Str("apiKeyId", enrollResponse.Item.AccessApiKeyId).
+		Str(EcsHttpRequestId, reqId).
+		Int(EcsHttpResponseBodyBytes, numWritten).
 		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
-		Msg("handleEnroll OK")
+		Msg("success enroll")
 }
 
-func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
-
+func (et *EnrollerT) handleEnroll(r *http.Request) (*EnrollResponse, error) {
 	limitF, err := et.limit.Acquire()
 	if err != nil {
 		return nil, err
@@ -154,12 +161,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	resp, err := _enroll(r.Context(), et.bulker, et.cache, *req, *erec)
-	if err != nil {
-		return nil, err
-	}
-
-	return json.Marshal(resp)
+	return _enroll(r.Context(), et.bulker, et.cache, *req, *erec)
 }
 
 func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollRequest, erec model.EnrollmentApiKey) (*EnrollResponse, error) {
