@@ -64,13 +64,13 @@ check-go: ## - Run go fmt, go vet, go mod tidy
 	@go fmt ./...
 	@go vet ./...
 	@go mod tidy
-	@go mod download all
 
 .PHONY: notice
 notice: ## - Generates the NOTICE.txt file.
 	@echo "Generating NOTICE.txt"
-	@go install go.elastic.co/go-licence-detector
-	go list -m -json all | go-licence-detector \
+	@go mod tidy
+	@go mod download all
+	go list -m -json all | go run go.elastic.co/go-licence-detector \
 		-includeIndirect \
 		-rules dev-tools/notice/rules.json \
 		-overrides dev-tools/notice/overrides.json \
