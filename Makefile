@@ -69,7 +69,7 @@ check-go: ## - Run go fmt, go vet, go mod tidy
 notice: ## - Generates the NOTICE.txt file.
 	@echo "Generating NOTICE.txt"
 	@go mod tidy
-	@go mod download
+	@go mod download all
 	go list -m -json all | go run go.elastic.co/go-licence-detector \
 		-includeIndirect \
 		-rules dev-tools/notice/rules.json \
@@ -86,11 +86,11 @@ check-no-changes:
 
 .PHONY: test
 test: prepare-test-context  ## - Run all tests
-	@./dev-tools/run_with_go_ver $(MAKE) test-unit 
+	@./dev-tools/run_with_go_ver $(MAKE) test-unit
 	@./dev-tools/run_with_go_ver $(MAKE) test-int
 	@$(MAKE) junit-report
 
-.PHONY: test-unit 
+.PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
 	set -o pipefail; go test -v -race ./... | tee build/test-unit.out
 
