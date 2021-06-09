@@ -100,9 +100,4 @@ If an upgrade is done, Elasticsearch / Kibana have to be upgraded first, then El
 ## MacOSX Version
 
 The [golang-crossbuild](https://github.com/elastic/golang-crossbuild) produces images used for testing/building.
-<<<<<<< HEAD
-The `golang-crossbuild:1.16.4-darwin-debian10` image expects the minimum MacOSX version to be 10.14+.
->>>>>>> 75d8242 (Update to Go version 1.16.4 (#341))
-=======
 The `golang-crossbuild:1.16.X-darwin-debian10` images expects the minimum MacOSX version to be 10.14+.
->>>>>>> b382776 (Update go-version (#436))

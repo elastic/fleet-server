@@ -86,13 +86,8 @@ check-no-changes:
 
 .PHONY: test
 test: prepare-test-context  ## - Run all tests
-<<<<<<< HEAD
-	@$(MAKE) test-unit 
+	@$(MAKE) test-unit
 	@$(MAKE) test-int
-=======
-	@./dev-tools/run_with_go_ver $(MAKE) test-unit
-	@./dev-tools/run_with_go_ver $(MAKE) test-int
->>>>>>> b382776 (Update go-version (#436))
 	@$(MAKE) junit-report
 
 .PHONY: test-unit
