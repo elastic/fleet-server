@@ -56,9 +56,7 @@ check: ## - Run all checks
 
 .PHONY: check-headers
 check-headers:  ## - Check copyright headers
-	@go get github.com/elastic/go-licenser
 	@go install github.com/elastic/go-licenser
-	@go mod tidy
 	@go-licenser -license Elastic
 
 .PHONY: check-go
@@ -66,13 +64,12 @@ check-go: ## - Run go fmt, go vet, go mod tidy
 	@go fmt ./...
 	@go vet ./...
 	@go mod tidy
+	@go mod download all
 
 .PHONY: notice
 notice: ## - Generates the NOTICE.txt file.
 	@echo "Generating NOTICE.txt"
-	@go get go.elastic.co/go-licence-detector
 	@go install go.elastic.co/go-licence-detector
-	@go mod tidy
 	go list -m -json all | go-licence-detector \
 		-includeIndirect \
 		-rules dev-tools/notice/rules.json \
