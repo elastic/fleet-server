@@ -4,17 +4,36 @@
 
 package config
 
+import (
+	"time"
+)
+
 const (
 	defaultCacheNumCounters = 500000           // 10x times expected count
 	defaultCacheMaxCost     = 50 * 1024 * 1024 // 50MiB cache size
+	defaultActionTTL        = time.Minute * 5
+	defaultEnrollKeyTTL     = time.Minute
+	defaultArtifactTTL      = time.Hour * 24
+	defaultApiKeyTTL        = time.Minute * 15 // ApiKey validation is a bottleneck.
+	defaultApiKeyJitter     = time.Minute * 5  // Jitter allows some randomness on ApiKeyTTL, zero to disable
 )
 
 type Cache struct {
-	NumCounters int64 `config:"num_counters"`
-	MaxCost     int64 `config:"max_cost"`
+	NumCounters  int64         `config:"num_counters"`
+	MaxCost      int64         `config:"max_cost"`
+	ActionTTL    time.Duration `config:"ttl_action"`
+	EnrollKeyTTL time.Duration `config:"ttl_enroll_key"`
+	ArtifactTTL  time.Duration `config:"ttl_artifact"`
+	ApiKeyTTL    time.Duration `config:"ttl_api_key"`
+	ApiKeyJitter time.Duration `config:"jitter_api_key"`
 }
 
 func (c *Cache) InitDefaults() {
 	c.NumCounters = defaultCacheNumCounters
 	c.MaxCost = defaultCacheMaxCost
+	c.ActionTTL = defaultActionTTL
+	c.EnrollKeyTTL = defaultEnrollKeyTTL
+	c.ArtifactTTL = defaultArtifactTTL
+	c.ApiKeyTTL = defaultApiKeyTTL
+	c.ApiKeyJitter = defaultApiKeyJitter
 }
