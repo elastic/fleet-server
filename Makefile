@@ -45,7 +45,7 @@ clean: ## - Clean up build artifacts
 .PHONY: generate
 generate: ## - Generate schema models
 	@printf "${CMD_COLOR_ON} Installing module for go generate\n${CMD_COLOR_OFF}"
-	env GOBIN=${GOBIN} go install github.com/aleksmaus/generate/...
+	env GOBIN=${GOBIN} go install github.com/aleksmaus/generate/cmd/schema-generate@latest
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
 	env PATH=${GOBIN}:${PATH} go generate ./...
 
