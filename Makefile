@@ -47,7 +47,11 @@ generate: ## - Generate schema models
 	@printf "${CMD_COLOR_ON} Installing module for go generate\n${CMD_COLOR_OFF}"
 	env GOBIN=${GOBIN} go install github.com/aleksmaus/generate/cmd/schema-generate@latest
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
+<<<<<<< HEAD
 	env PATH="${GOBIN}:${PATH}" go generate ./...
+=======
+	env PATH=${GOBIN}:${PATH} go generate ./...
+>>>>>>> 6f636f7 (Remove indirect build dependency on go-license-detector. (#457))
 
 .PHONY: check
 check: ## - Run all checks
@@ -60,7 +64,11 @@ check: ## - Run all checks
 .PHONY: check-headers
 check-headers:  ## - Check copyright headers
 	@env GOBIN=${GOBIN} go install github.com/elastic/go-licenser@latest
+<<<<<<< HEAD
 	@env PATH="${GOBIN}:${PATH}" go-licenser -license Elastic
+=======
+	@env PATH=${GOBIN}:${PATH} go-licenser -license Elastic
+>>>>>>> 6f636f7 (Remove indirect build dependency on go-license-detector. (#457))
 
 .PHONY: check-go
 check-go: ## - Run go fmt, go vet, go mod tidy
@@ -74,7 +82,11 @@ notice: ## - Generates the NOTICE.txt file.
 	@go mod tidy
 	@go mod download all
 	@env GOBIN=${GOBIN} go install go.elastic.co/go-licence-detector@latest
+<<<<<<< HEAD
 	go list -m -json all | env PATH="${GOBIN}:${PATH}" go-licence-detector \
+=======
+	go list -m -json all | env PATH=${GOBIN}:${PATH} go-licence-detector \
+>>>>>>> 6f636f7 (Remove indirect build dependency on go-license-detector. (#457))
 		-includeIndirect \
 		-rules dev-tools/notice/rules.json \
 		-overrides dev-tools/notice/overrides.json \
