@@ -3,8 +3,13 @@ module github.com/elastic/fleet-server/v7
 go 1.15
 
 require (
+<<<<<<< HEAD
 	github.com/aleksmaus/generate v0.0.0-20210326194607-c630e07a2742
 	github.com/dgraph-io/ristretto v0.0.3
+=======
+	github.com/Pallinder/go-randomdata v1.2.0
+	github.com/dgraph-io/ristretto v0.1.0
+>>>>>>> 6f636f7 (Remove indirect build dependency on go-license-detector. (#457))
 	github.com/elastic/beats/v7 v7.11.1
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20200709172729-d43b7ad5833a
 	github.com/elastic/go-elasticsearch/v8 v8.0.0-20210414074309-f7ffd04b8d6a
