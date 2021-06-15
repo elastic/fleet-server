@@ -34,7 +34,9 @@ done
 
 go mod tidy
 go mod download
-go list -m -json all $@ | go run go.elastic.co/go-licence-detector \
+GOPATH=`go env GOPATH`
+env GOBIN=$GOPATH/bin/ go install go.elastic.co/go-licence-detector@v0.4.0
+go list -m -json all $@ | $GOPATH/bin/go-licence-detector \
 		-includeIndirect \
 		-rules "$SRCPATH/notice/rules.json" \
 		-overrides "$SRCPATH/notice/overrides.json" \
