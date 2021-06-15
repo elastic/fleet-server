@@ -45,6 +45,10 @@ func TestMonitor_NewPolicy(t *testing.T) {
 		merr = monitor.Run(ctx)
 	}()
 
+	if err := monitor.(*monitorT).waitStart(ctx); err != nil {
+		t.Fatal(err)
+	}
+
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
 	s, err := monitor.Subscribe(agentId, policyId, 0, 0)
