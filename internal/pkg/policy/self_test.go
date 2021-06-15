@@ -53,6 +53,10 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		merr = monitor.Run(ctx)
 	}()
 
+	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+		t.Fatal(err)
+	}
+
 	// should be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
 		status, msg, _ := reporter.Current()
@@ -160,6 +164,10 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		defer mwg.Done()
 		merr = monitor.Run(ctx)
 	}()
+
+	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// should be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -312,6 +320,10 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		merr = monitor.Run(ctx)
 	}()
 
+	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+		t.Fatal(err)
+	}
+
 	// should be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
 		status, msg, _ := reporter.Current()
@@ -419,6 +431,10 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		defer mwg.Done()
 		merr = monitor.Run(ctx)
 	}()
+
+	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// should be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {

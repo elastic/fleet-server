@@ -70,6 +70,8 @@ type monitorT struct {
 	policyF       policyFetcher
 	policiesIndex string
 	throttle      time.Duration
+
+	startCh chan struct{}
 }
 
 // Output returns a new policy that needs to be sent based on the current subscription.
@@ -88,6 +90,7 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duratio
 		throttle:      throttle,
 		policyF:       dl.QueryLatestPolicies,
 		policiesIndex: dl.FleetPolicies,
+		startCh:       make(chan struct{}),
 	}
 }
 
@@ -98,6 +101,7 @@ func (m *monitorT) Run(ctx context.Context) error {
 	s := m.monitor.Subscribe()
 	defer m.monitor.Unsubscribe(s)
 
+	close(m.startCh)
 LOOP:
 	for {
 		select {
@@ -122,6 +126,15 @@ LOOP:
 	}
 
 	return nil
+}
+
+func (m *monitorT) waitStart(ctx context.Context) (err error) {
+	select {
+	case <-ctx.Done():
+		err = ctx.Err()
+	case <-m.startCh:
+	}
+	return
 }
 
 func (m *monitorT) process(ctx context.Context) error {
