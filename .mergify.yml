@@ -75,11 +75,11 @@ pull_request_rules:
       merge:
         method: squash
         strict: smart+fasttrack
-  - name: delete upstream branch after merging changes on dev-tools/integration/.env
+  - name: delete upstream branch after merging changes on dev-tools/integration/.env or .go-version
     conditions:
       - merged
       - label=automation
-      - head~=^update-stack-version
-      - files~=^dev-tools/integration/.env$
+      - head~=^update-.*-version
+      - files~=^(dev-tools/integration/.env|.go-version)$
     actions:
       delete_head_branch:
