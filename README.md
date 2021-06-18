@@ -79,9 +79,6 @@ Replace {YOUR-IP} with the IP address of your machine.
 
 ## fleet-server repo
 
-<<<<<<< HEAD
-By default the above will download the most recent snapshot build for fleet-server. To use your own development build, run `make release` in the fleet-server repository, go to `build/distributions` and copy the `.tar.gz` and `sha512` file to the `data/elastic-agent-{hash}/downloads` inside the elastic-agent directory. Now you run with your own build of fleet-server.
-=======
 By default the above will download the most recent snapshot build for fleet-server. To use your own development build, run `make release` in the fleet-server repository, go to `build/distributions` and copy the `.tar.gz` and `sha512` file to the `data/elastic-agent-{hash}/downloads` inside the elastic-agent directory. Now you run with your own build of fleet-server.
 
 
