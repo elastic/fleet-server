@@ -8,6 +8,15 @@ Please label this PR with one of the following labels, depending on the scope of
 - Docs
 -->
 
+## What is the problem this PR solves?
+
+// Please do not just reference an issue
+
+## How does this PR solve the problem?
+
+// Explain how you solved the problem in your code.
+
+
 ## What does this PR do?
 
 <!-- Mandatory
@@ -20,6 +29,7 @@ Explain here the changes you made on the PR. Please explain the WHAT: patterns u
 Explain here the WHY, or the rationale/motivation for the changes.
 -->
 
+
 ## Checklist
 
 <!-- Mandatory
@@ -28,7 +38,6 @@ Add a checklist of things that are required to be reviewed in order to have the 
 List here all the items you have verified BEFORE sending this PR. Please DO NOT remove any item, striking through those that do not apply. (Just in case, strikethrough uses two tildes. ~~Scratch this.~~)
 -->
 
-- [ ] My code follows the style guidelines of this project
 - [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I have made corresponding changes to the documentation
 - [ ] I have made corresponding change to the default configuration files
@@ -58,21 +67,7 @@ Link related issues below. Insert the issue link or reference after the word "Cl
 - Requires #123
 - Superseds #123
 -->
-- 
-
-## Use cases
-
-<!-- Recommended
-Explain here the different behaviors that this PR introduces or modifies in this project, user roles, environment configuration, etc.
-
-If you are familiar with Gherkin test scenarios, we recommend its usage: https://cucumber.io/docs/gherkin/reference/
--->
-
-## Screenshots
-
-<!-- Optional
-Add here screenshots about how the project will be changed after the PR is applied. They could be related to web pages, terminal, etc, or any other image you consider important to be shared with the team.
--->
+-
 
 ## Logs
 
