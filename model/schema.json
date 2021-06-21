@@ -293,6 +293,10 @@
         "default_fleet_server": {
           "description": "True when this policy is the default policy to start Fleet Server",
           "type": "boolean"
+        },
+        "unenroll_timeout": {
+          "description": "Timeout (seconds) that an Elastic Agent should be un-enrolled.",
+          "type": "integer"
         }
       },
       "required": [
@@ -354,6 +358,11 @@
           "description": "Date/time the Elastic Agent unenrolled",
           "type": "string",
           "format": "date-time"
+        },
+        "unenrolled_reason": {
+          "description": "Reason the Elastic Agent was unenrolled",
+          "type": "string",
+          "enum": ["manual", "timeout"]
         },
         "unenrollment_started_at": {
           "description": "Date/time the Elastic Agent unenrolled started",

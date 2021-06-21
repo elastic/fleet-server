@@ -30,6 +30,9 @@ const (
 	defaultLeaderInterval          = 30 * time.Second // become leader for at least 30 seconds
 	defaultMetadataInterval        = 5 * time.Minute  // update metadata every 5 minutes
 	defaultCoordinatorRestartDelay = 5 * time.Second  // delay in restarting coordinator on failure
+	defaultUnenrollCheckInterval   = 1 * time.Minute  // perform unenroll timeout interval check
+
+	unenrolledReasonTimeout = "timeout" // reason agent was unenrolled
 )
 
 // Monitor monitors the leader election of policies and routes managed policies to the coordinator.
@@ -39,9 +42,11 @@ type Monitor interface {
 }
 
 type policyT struct {
-	id        string
-	cord      Coordinator
-	canceller context.CancelFunc
+	id                string
+	cord              Coordinator
+	cordCanceller     context.CancelFunc
+	unenrollTimeout   time.Duration
+	unenrollCanceller context.CancelFunc
 }
 
 type monitorT struct {
@@ -56,14 +61,16 @@ type monitorT struct {
 	agentMetadata model.AgentMetadata
 	hostMetadata  model.HostMetadata
 
-	checkInterval     time.Duration
-	leaderInterval    time.Duration
-	metadataInterval  time.Duration
-	coordRestartDelay time.Duration
+	checkInterval         time.Duration
+	leaderInterval        time.Duration
+	metadataInterval      time.Duration
+	coordRestartDelay     time.Duration
+	unenrollCheckInterval time.Duration
 
 	serversIndex  string
 	policiesIndex string
 	leadersIndex  string
+	agentsIndex   string
 
 	policies map[string]policyT
 }
@@ -71,20 +78,22 @@ type monitorT struct {
 // NewMonitor creates a new coordinator policy monitor.
 func NewMonitor(fleet config.Fleet, version string, bulker bulk.Bulk, monitor monitor.Monitor, factory Factory) Monitor {
 	return &monitorT{
-		log:               log.With().Str("ctx", "policy leader manager").Logger(),
-		version:           version,
-		fleet:             fleet,
-		bulker:            bulker,
-		monitor:           monitor,
-		factory:           factory,
-		checkInterval:     defaultCheckInterval,
-		leaderInterval:    defaultLeaderInterval,
-		metadataInterval:  defaultMetadataInterval,
-		coordRestartDelay: defaultCoordinatorRestartDelay,
-		serversIndex:      dl.FleetServers,
-		policiesIndex:     dl.FleetPolicies,
-		leadersIndex:      dl.FleetPoliciesLeader,
-		policies:          make(map[string]policyT),
+		log:                   log.With().Str("ctx", "policy leader manager").Logger(),
+		version:               version,
+		fleet:                 fleet,
+		bulker:                bulker,
+		monitor:               monitor,
+		factory:               factory,
+		checkInterval:         defaultCheckInterval,
+		leaderInterval:        defaultLeaderInterval,
+		metadataInterval:      defaultMetadataInterval,
+		coordRestartDelay:     defaultCoordinatorRestartDelay,
+		unenrollCheckInterval: defaultUnenrollCheckInterval,
+		serversIndex:          dl.FleetServers,
+		policiesIndex:         dl.FleetPolicies,
+		leadersIndex:          dl.FleetPoliciesLeader,
+		agentsIndex:           dl.FleetAgents,
+		policies:              make(map[string]policyT),
 	}
 }
 
@@ -163,6 +172,7 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 					return err
 				}
 			}
+			m.rescheduleUnenroller(ctx, &p, &policy)
 		} else {
 			new = true
 		}
@@ -245,9 +255,9 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 				if pt.cord != nil {
 					pt.cord = nil
 				}
-				if pt.canceller != nil {
-					pt.canceller()
-					pt.canceller = nil
+				if pt.cordCanceller != nil {
+					pt.cordCanceller()
+					pt.cordCanceller = nil
 				}
 				return
 			}
@@ -266,13 +276,14 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 				go runCoordinator(cordCtx, cord, l, m.coordRestartDelay)
 				go runCoordinatorOutput(cordCtx, cord, m.bulker, l, m.policiesIndex)
 				pt.cord = cord
-				pt.canceller = canceller
+				pt.cordCanceller = canceller
 			} else {
 				err = pt.cord.Update(ctx, p)
 				if err != nil {
 					l.Err(err).Msg("failed to update coordinator")
 				}
 			}
+			m.rescheduleUnenroller(ctx, &pt, &p)
 		}(p, pt)
 	}
 	for range lead {
@@ -294,7 +305,7 @@ func (m *monitorT) releaseLeadership() {
 	for _, pt := range m.policies {
 		go func(pt policyT) {
 			if pt.cord != nil {
-				pt.canceller()
+				pt.cordCanceller()
 			}
 			// uses a background context, because the context for the
 			// monitor will be cancelled at this point in the code
@@ -363,6 +374,26 @@ func (m *monitorT) getIPs() ([]string, error) {
 	return ips, nil
 }
 
+func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *model.Policy) {
+	l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
+	unenrollTimeout := time.Duration(p.UnenrollTimeout) * time.Second
+	if unenrollTimeout != pt.unenrollTimeout {
+		// unenroll timeout changed
+		if pt.unenrollCanceller != nil {
+			pt.unenrollCanceller()
+			pt.unenrollCanceller = nil
+		}
+
+		if unenrollTimeout > 0 {
+			// start worker for unenrolling agents based timeout
+			unenrollCtx, canceller := context.WithCancel(ctx)
+			go runUnenroller(unenrollCtx, m.bulker, pt.id, unenrollTimeout, l, m.unenrollCheckInterval, m.agentsIndex)
+			pt.unenrollCanceller = canceller
+		}
+		pt.unenrollTimeout = unenrollTimeout
+	}
+}
+
 func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d time.Duration) {
 	for {
 		l.Info().Str("coordinator", cord.Name()).Msg("starting coordinator for policy")
@@ -388,6 +419,59 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 				l.Err(err).Msg("failed to insert a new policy revision")
 			} else {
 				s.Info().Msg("coordinator inserted a new policy revision")
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenrollTimeout time.Duration, l zerolog.Logger, checkInterval time.Duration, agentsIndex string) {
+	t := time.NewTimer(checkInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+			t.Reset(checkInterval)
+			agents, err := dl.FindOfflineAgents(ctx, bulker, policyId, unenrollTimeout, dl.WithIndexName(agentsIndex))
+			if err != nil {
+				l.Err(err).Msg("failed fetching offline agents")
+			} else {
+				now := time.Now().UTC().Format(time.RFC3339)
+				agentIds := make([]string, len(agents))
+				ops := make([]bulk.MultiOp, len(agents))
+				var body []byte
+				for i, agent := range agents {
+					fields := bulk.UpdateFields{
+						dl.FieldActive:           false,
+						dl.FieldUnenrolledAt:     now,
+						dl.FieldUnenrolledReason: unenrolledReasonTimeout,
+						dl.FieldUpdatedAt:        now,
+					}
+					body, err = fields.Marshal()
+					if err != nil {
+						l.Err(err).Msg("failed marshal for agent update")
+						break
+					}
+					agentIds[i] = agent.Id
+					ops[i] = bulk.MultiOp{
+						Id:    agent.Id,
+						Index: agentsIndex,
+						Body:  body,
+					}
+				}
+				if err != nil {
+					// hit an error; retry loop
+					continue
+				}
+				if len(agentIds) > 0 {
+					_, err = bulker.MUpdate(ctx, ops, bulk.WithRefresh())
+					if err != nil {
+						l.Err(err).Msg("failed to mark agents as unenrolled")
+						continue
+					}
+					l.Info().Strs("agents", agentIds).Msg("marked agents unenrolled due to unenroll timeout")
+				}
 			}
 		case <-ctx.Done():
 			return

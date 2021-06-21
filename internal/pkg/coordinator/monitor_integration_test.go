@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -106,6 +108,86 @@ func TestMonitorLeadership(t *testing.T) {
 	// ensure leadership was released
 	ensureLeadershipReleased(bulkCtx, t, bulker, cfg, leadersIndex, policy1Id)
 	ensureLeadershipReleased(bulkCtx, t, bulker, cfg, leadersIndex, policy2Id)
+}
+
+func TestMonitorUnenroller(t *testing.T) {
+	parentCtx := context.Background()
+	bulkCtx, bulkCn := context.WithCancel(parentCtx)
+	defer bulkCn()
+	ctx, cn := context.WithCancel(parentCtx)
+	defer cn()
+
+	// flush bulker on every operation
+	bulker := ftesting.SetupBulk(bulkCtx, t, bulk.WithFlushThresholdCount(1))
+	serversIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingServer)
+	policiesIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicy)
+	leadersIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicyLeader)
+	agentsIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingAgent)
+	pim, err := monitor.New(policiesIndex, bulker.Client(), bulker.Client())
+	require.NoError(t, err)
+	cfg := makeFleetConfig()
+	pm := NewMonitor(cfg, "1.0.0", bulker, pim, NewCoordinatorZero)
+	pm.(*monitorT).serversIndex = serversIndex
+	pm.(*monitorT).leadersIndex = leadersIndex
+	pm.(*monitorT).policiesIndex = policiesIndex
+	pm.(*monitorT).agentsIndex = agentsIndex
+	pm.(*monitorT).unenrollCheckInterval = 10 * time.Millisecond // very fast check interval for test
+
+	// add policy with unenroll timeout
+	policy1Id := uuid.Must(uuid.NewV4()).String()
+	policy1 := model.Policy{
+		PolicyId:        policy1Id,
+		CoordinatorIdx:  0,
+		Data:            []byte("{}"),
+		RevisionIdx:     1,
+		UnenrollTimeout: 300, // 5 minutes (300 seconds)
+	}
+	_, err = dl.CreatePolicy(ctx, bulker, policy1, dl.WithIndexName(policiesIndex))
+	require.NoError(t, err)
+
+	// add agent that should be unenrolled
+	agentId := uuid.Must(uuid.NewV4()).String()
+	sixAgo := time.Now().UTC().Add(-6 * time.Minute)
+	agentBody, err := json.Marshal(model.Agent{
+		Active:      true,
+		EnrolledAt:  sixAgo.Format(time.RFC3339),
+		LastCheckin: sixAgo.Format(time.RFC3339),
+		PolicyId:    policy1Id,
+		UpdatedAt:   sixAgo.Format(time.RFC3339),
+	})
+	_, err = bulker.Create(ctx, agentsIndex, agentId, agentBody)
+	require.NoError(t, err)
+
+	// start the monitors
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		err := pim.Run(ctx)
+		wg.Done()
+		if err != nil && err != context.Canceled {
+			t.Fatal(err)
+		}
+	}()
+	go func() {
+		err := pm.Run(ctx)
+		wg.Done()
+		if err != nil && err != context.Canceled {
+			t.Fatal(err)
+		}
+	}()
+
+	// wait 2s to ensure unenroller runs
+	<-time.After(2 * time.Second)
+
+	// stop the monitors
+	cn()
+	wg.Wait()
+
+	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldId, agentId, dl.WithIndexName(agentsIndex))
+	require.NoError(t, err)
+	assert.Equal(t, false, agent.Active)
+	assert.NotEmpty(t, agent.UnenrolledAt)
+	assert.Equal(t, unenrolledReasonTimeout, agent.UnenrolledReason)
 }
 
 func makeFleetConfig() config.Fleet {
