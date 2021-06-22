@@ -8,6 +8,7 @@ import (
 	"compress/flate"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 )
@@ -38,6 +39,20 @@ type ServerTLS struct {
 	Cert string `config:"cert"`
 }
 
+type ServerBulk struct {
+	FlushInterval       time.Duration `config:"flush_interval"`
+	FlushThresholdCount int           `config:"flush_threshold_cnt"`
+	FlushThresholdSize  int           `config:"flush_threshold_size"`
+	FlushMaxPending     int           `config:"flush_max_pending"`
+}
+
+func (c *ServerBulk) InitDefaults() {
+	c.FlushInterval = 250 * time.Millisecond
+	c.FlushThresholdCount = 2048
+	c.FlushThresholdSize = 1024 * 1024
+	c.FlushMaxPending = 8
+}
+
 // Server is the configuration for the server
 type Server struct {
 	Host              string            `config:"host"`
@@ -49,6 +64,7 @@ type Server struct {
 	CompressionThresh int               `config:"compression_threshold"`
 	Limits            ServerLimits      `config:"limits"`
 	Runtime           Runtime           `config:"runtime"`
+	Bulk              ServerBulk        `config:"bulk"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -61,6 +77,7 @@ func (c *Server) InitDefaults() {
 	c.Profiler.InitDefaults()
 	c.Limits.InitDefaults()
 	c.Runtime.InitDefaults()
+	c.Bulk.InitDefaults()
 }
 
 // BindAddress returns the binding address for the HTTP server.

@@ -127,11 +127,19 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 // Bridge to configuration subsystem
 func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 
+	bulkCfg := cfg.Inputs[0].Server.Bulk
+
+	// Attempt to slice the max number of connections to leave room for the bulk flush queues
+	maxKeyParallel := cfg.Output.Elasticsearch.MaxConnPerHost
+	if cfg.Output.Elasticsearch.MaxConnPerHost > bulkCfg.FlushMaxPending {
+		maxKeyParallel = cfg.Output.Elasticsearch.MaxConnPerHost - bulkCfg.FlushMaxPending
+	}
+
 	return []BulkOpt{
-		WithFlushInterval(cfg.Output.Elasticsearch.BulkFlushInterval),
-		WithFlushThresholdCount(cfg.Output.Elasticsearch.BulkFlushThresholdCount),
-		WithFlushThresholdSize(cfg.Output.Elasticsearch.BulkFlushThresholdSize),
-		WithMaxPending(cfg.Output.Elasticsearch.BulkFlushMaxPending),
-		WithApiKeyMaxParallel(cfg.Output.Elasticsearch.MaxConnPerHost - cfg.Output.Elasticsearch.BulkFlushMaxPending),
+		WithFlushInterval(bulkCfg.FlushInterval),
+		WithFlushThresholdCount(bulkCfg.FlushThresholdCount),
+		WithFlushThresholdSize(bulkCfg.FlushThresholdSize),
+		WithMaxPending(bulkCfg.FlushMaxPending),
+		WithApiKeyMaxParallel(maxKeyParallel),
 	}
 }
