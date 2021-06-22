@@ -6,8 +6,6 @@ output:
     hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
     username: '${ELASTICSEARCH_USERNAME:elastic}'
     password: '${ELASTICSEARCH_PASSWORD:changeme}'
-    bulk_flush_max_pending: 8     # Limit the number of pending ES bulk operations
-    bulk_flush_interval: 100ms    # Flush ES bulk queues on this interval.
 
 fleet:
   agent:
@@ -41,6 +39,9 @@ inputs:
         enabled: true
         key: /path/to/key.pem   # To support TLS, server needs cert, key pair
         certificate: /path/to/cert.pem
+      bulk:
+        flush_max_pending: 8    # Limit the number of pending ES bulk operations
+        flush_interval: 100ms   # Flush ES bulk queues on this interval.
       runtime:
         gc_percent: 20          # Force the GC to execute more frequently: see https://golang.org/pkg/runtime/debug/#SetGCPercent
  
