@@ -7,6 +7,7 @@ package coordinator
 import (
 	"context"
 	"errors"
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"net"
 	"os"
 	"runtime"
@@ -432,49 +433,65 @@ func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenr
 	for {
 		select {
 		case <-t.C:
-			t.Reset(checkInterval)
-			agents, err := dl.FindOfflineAgents(ctx, bulker, policyId, unenrollTimeout, dl.WithIndexName(agentsIndex))
-			if err != nil {
-				l.Err(err).Msg("failed fetching offline agents")
-			} else {
-				now := time.Now().UTC().Format(time.RFC3339)
-				agentIds := make([]string, len(agents))
-				ops := make([]bulk.MultiOp, len(agents))
-				var body []byte
-				for i, agent := range agents {
-					fields := bulk.UpdateFields{
-						dl.FieldActive:           false,
-						dl.FieldUnenrolledAt:     now,
-						dl.FieldUnenrolledReason: unenrolledReasonTimeout,
-						dl.FieldUpdatedAt:        now,
-					}
-					body, err = fields.Marshal()
-					if err != nil {
-						l.Err(err).Msg("failed marshal for agent update")
-						break
-					}
-					agentIds[i] = agent.Id
-					ops[i] = bulk.MultiOp{
-						Id:    agent.Id,
-						Index: agentsIndex,
-						Body:  body,
-					}
-				}
-				if err != nil {
-					// hit an error; retry loop
-					continue
-				}
-				if len(agentIds) > 0 {
-					_, err = bulker.MUpdate(ctx, ops, bulk.WithRefresh())
-					if err != nil {
-						l.Err(err).Msg("failed to mark agents as unenrolled")
-						continue
-					}
-					l.Info().Strs("agents", agentIds).Msg("marked agents unenrolled due to unenroll timeout")
-				}
+			if err := runUnenrollerWork(ctx, bulker, policyId, unenrollTimeout, l, agentsIndex); err != nil {
+				l.Err(err).Dur("unenroll_timeout", unenrollTimeout).Msg("failed to unenroll offline agents")
 			}
+			t.Reset(checkInterval)
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyId string, unenrollTimeout time.Duration, l zerolog.Logger, agentsIndex string) error {
+	agents, err := dl.FindOfflineAgents(ctx, bulker, policyId, unenrollTimeout, dl.WithIndexName(agentsIndex))
+	if err != nil {
+		return err
+	}
+	agentIds := make([]string, len(agents))
+	for i, agent := range agents {
+		err = unenrollAgent(ctx, bulker, &agent, agentsIndex)
+		if err != nil {
+			return err
+		}
+		agentIds[i] = agent.Id
+	}
+	if len(agentIds) > 0 {
+		l.Info().Strs("agents", agentIds).Msg("marked agents unenrolled due to unenroll timeout")
+	}
+	return nil
+}
+
+func unenrollAgent(ctx context.Context, bulker bulk.Bulk, agent *model.Agent, agentsIndex string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	fields := bulk.UpdateFields{
+		dl.FieldActive:           false,
+		dl.FieldUnenrolledAt:     now,
+		dl.FieldUnenrolledReason: unenrolledReasonTimeout,
+		dl.FieldUpdatedAt:        now,
+	}
+	body, err := fields.Marshal()
+	if err != nil {
+		return err
+	}
+	apiKeys := getAPIKeyIDs(agent)
+	if len(apiKeys) > 0 {
+		err = apikey.Invalidate(ctx, bulker.Client(), apiKeys...)
+		if err != nil {
+			return err
+		}
+	}
+	err = bulker.Update(ctx, agentsIndex, agent.Id, body, bulk.WithRefresh())
+	return err
+}
+
+func getAPIKeyIDs(agent *model.Agent) []string {
+	keys := make([]string, 0, 1)
+	if agent.AccessApiKeyId != "" {
+		keys = append(keys, agent.AccessApiKeyId)
+	}
+	if agent.DefaultApiKeyId != "" {
+		keys = append(keys, agent.DefaultApiKeyId)
+	}
+	return keys
 }
