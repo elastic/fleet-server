@@ -6,19 +6,17 @@ package fleet
 
 import (
 	"context"
-	"github.com/pkg/errors"
-	"net/http"
-
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/elastic/beats/v7/libbeat/api"
 	"github.com/elastic/beats/v7/libbeat/cmd/instance/metrics"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/monitoring"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/rs/zerolog"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -36,9 +34,12 @@ var (
 
 func (f *FleetServer) initMetrics(ctx context.Context, cfg *config.Config) (*api.Server, error) {
 	registry := monitoring.GetNamespace("info").GetRegistry()
-	monitoring.NewString(registry, "version").Set(f.ver)
-	monitoring.NewString(registry, "name").Set("fleet-server")
-	metrics.SetupMetrics("fleet-server")
+	if registry.Get("version") == nil {
+		monitoring.NewString(registry, "version").Set(f.ver)
+	}
+	if registry.Get("name") == nil {
+		monitoring.NewString(registry, "name").Set("fleet-server")
+	}
 
 	if !cfg.HTTP.Enabled {
 		return nil, nil
@@ -83,6 +84,7 @@ func (rt *routeStats) Register(registry *monitoring.Registry) {
 }
 
 func init() {
+	metrics.SetupMetrics("fleet-server")
 	registry = monitoring.Default.NewRegistry("http_server")
 	cntHttpNew = monitoring.NewUint(registry, "tcp_open")
 	cntHttpClose = monitoring.NewUint(registry, "tcp_close")
@@ -96,39 +98,18 @@ func init() {
 	cntStatus.Register(routesRegistry.NewRegistry("status"))
 }
 
-// Increment error metric, log and return code
-func (rt *routeStats) IncError(err error) (int, zerolog.Level) {
-	lvl := zerolog.DebugLevel
+func (rt *routeStats) IncError(err error) {
 
-	incFail := true
-
-	var code int
-	switch err {
-	case ErrAgentNotFound:
-		code = http.StatusNotFound
-		lvl = zerolog.WarnLevel
-	case limit.ErrRateLimit:
-		code = http.StatusTooManyRequests
+	switch {
+	case errors.Is(err, limit.ErrRateLimit):
 		rt.rateLimit.Inc()
-		incFail = false
-	case limit.ErrMaxLimit:
-		code = http.StatusTooManyRequests
+	case errors.Is(err, limit.ErrMaxLimit):
 		rt.maxLimit.Inc()
-		incFail = false
-	case context.Canceled:
-		code = http.StatusServiceUnavailable
+	case errors.Is(err, context.Canceled):
 		rt.drop.Inc()
-		incFail = false
 	default:
-		lvl = zerolog.InfoLevel
-		code = http.StatusBadRequest
+		rt.failure.Inc()
 	}
-
-	if incFail {
-		cntCheckin.failure.Inc()
-	}
-
-	return code, lvl
 }
 
 func (rt *routeStats) IncStart() func() {
@@ -149,21 +130,13 @@ func (rt *artifactStats) Register(registry *monitoring.Registry) {
 	rt.throttle = monitoring.NewUint(registry, "throttle")
 }
 
-func (rt *artifactStats) IncError(err error) (code int, lvl zerolog.Level) {
-	switch err {
-	case dl.ErrNotFound:
-		// Artifact not found indicates a race condition upstream
-		// or an attack on the fleet server.  Either way it should
-		// show up in the logs at a higher level than debug
-		code = http.StatusNotFound
+func (rt *artifactStats) IncError(err error) {
+	switch {
+	case errors.Is(err, dl.ErrNotFound):
 		rt.notFound.Inc()
-		lvl = zerolog.WarnLevel
-	case ErrorThrottle:
-		code = http.StatusTooManyRequests
+	case errors.Is(err, ErrorThrottle):
 		rt.throttle.Inc()
 	default:
-		code, lvl = rt.routeStats.IncError(err)
+		rt.routeStats.IncError(err)
 	}
-
-	return
 }

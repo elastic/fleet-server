@@ -21,22 +21,6 @@ type Policy struct {
 	ID string `config:"id"`
 }
 
-// ServerTimeouts is the configuration for the server timeouts
-type ServerTimeouts struct {
-	Read             time.Duration `config:"read"`
-	Write            time.Duration `config:"write"`
-	CheckinTimestamp time.Duration `config:"checkin_timestamp"`
-	CheckinLongPoll  time.Duration `config:"checkin_long_poll"`
-}
-
-// InitDefaults initializes the defaults for the configuration.
-func (c *ServerTimeouts) InitDefaults() {
-	c.Read = 5 * time.Second
-	c.Write = 10 * time.Minute
-	c.CheckinTimestamp = 30 * time.Second
-	c.CheckinLongPoll = 5 * time.Minute
-}
-
 // ServerProfiler is the configuration for profiling the server.
 type ServerProfiler struct {
 	Enabled bool   `config:"enabled"`
@@ -55,6 +39,20 @@ type ServerTLS struct {
 	Cert string `config:"cert"`
 }
 
+type ServerBulk struct {
+	FlushInterval       time.Duration `config:"flush_interval"`
+	FlushThresholdCount int           `config:"flush_threshold_cnt"`
+	FlushThresholdSize  int           `config:"flush_threshold_size"`
+	FlushMaxPending     int           `config:"flush_max_pending"`
+}
+
+func (c *ServerBulk) InitDefaults() {
+	c.FlushInterval = 250 * time.Millisecond
+	c.FlushThresholdCount = 2048
+	c.FlushThresholdSize = 1024 * 1024
+	c.FlushMaxPending = 8
+}
+
 // Server is the configuration for the server
 type Server struct {
 	Host              string            `config:"host"`
@@ -66,6 +64,7 @@ type Server struct {
 	CompressionThresh int               `config:"compression_threshold"`
 	Limits            ServerLimits      `config:"limits"`
 	Runtime           Runtime           `config:"runtime"`
+	Bulk              ServerBulk        `config:"bulk"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -78,6 +77,7 @@ func (c *Server) InitDefaults() {
 	c.Profiler.InitDefaults()
 	c.Limits.InitDefaults()
 	c.Runtime.InitDefaults()
+	c.Bulk.InitDefaults()
 }
 
 // BindAddress returns the binding address for the HTTP server.

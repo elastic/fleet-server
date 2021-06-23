@@ -10,22 +10,24 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
 // Invalidate invalidates the provided API keys by ID.
 func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string) error {
 
 	payload := struct {
-		IDs []string `json:"ids,omitempty"`
+		IDs   []string `json:"ids,omitempty"`
+		Owner bool     `json:"owner"`
 	}{
 		ids,
+		true,
 	}
 
 	body, err := json.Marshal(&payload)
 	if err != nil {
-		return err
+		return fmt.Errorf("InvalidateAPIKey: %w", err)
 	}
 
 	opts := []func(*esapi.SecurityInvalidateAPIKeyRequest){
@@ -38,7 +40,7 @@ func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string
 	)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("InvalidateAPIKey: %w", err)
 	}
 
 	defer res.Body.Close()
@@ -46,5 +48,6 @@ func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string
 	if res.IsError() {
 		return fmt.Errorf("fail InvalidateAPIKey: %s", res.String())
 	}
+
 	return nil
 }

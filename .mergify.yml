@@ -26,6 +26,7 @@ pull_request_rules:
           - "7.x"
         labels:
           - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
   - name: backport patches to 7.13 branch
     conditions:
       - merged
@@ -39,6 +40,7 @@ pull_request_rules:
           - "7.13"
         labels:
           - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
   - name: backport patches to 7.12 branch
     conditions:
       - merged
@@ -52,6 +54,7 @@ pull_request_rules:
           - "7.12"
         labels:
           - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
   - name: automatic merge for 7\. branches when CI passes
     conditions:
       - check-success=fleet-server/pr-merge
@@ -72,11 +75,14 @@ pull_request_rules:
       merge:
         method: squash
         strict: smart+fasttrack
-  - name: delete upstream branch after merging changes on dev-tools/integration/.env
+  - name: delete upstream branch with changes on dev-tools/integration/.env or .go-version after merging/closing it
     conditions:
-      - merged
-      - label=automation
-      - base~=^update-stack-version
-      - files~=^dev-tools/integration/.env$
+      - or:
+        - merged
+        - closed
+      - and:
+        - label=automation
+        - head~=^update-.*-version
+        - files~=^(dev-tools/integration/.env|.go-version)$
     actions:
       delete_head_branch:

@@ -13,7 +13,7 @@ import (
 
 	esh "github.com/elastic/fleet-server/v7/internal/pkg/es"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog/log"
 )
@@ -50,7 +50,11 @@ func checkCompatibility(fleetVersion, esVersion string) error {
 	}
 
 	if !verConst.Check(ver) {
-		log.Error().Err(ErrUnsupportedVersion).Msg("failed elasticsearch version check")
+		log.Error().
+			Err(ErrUnsupportedVersion).
+			Str("constraint", verConst.String()).
+			Str("reported", ver.String()).
+			Msg("failed elasticsearch version check")
 		return ErrUnsupportedVersion
 	}
 	log.Info().Str("fleet_version", fleetVersion).Str("elasticsearch_version", esVersion).Msg("versions are compatible")

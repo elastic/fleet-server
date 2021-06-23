@@ -65,7 +65,7 @@ func (d *Dispatcher) Subscribe(agentId string, seqNo sqn.SeqNo) *Sub {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Debug().Str("agentId", agentId).Int("sz", sz).Msg("Subscribed to action dispatcher")
+	log.Trace().Str("agentId", agentId).Int("sz", sz).Msg("Subscribed to action dispatcher")
 
 	return &sub
 }
@@ -80,7 +80,7 @@ func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Debug().Str("agentId", sub.agentId).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
+	log.Trace().Str("agentId", sub.agentId).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
 func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {

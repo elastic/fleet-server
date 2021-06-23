@@ -18,11 +18,6 @@ const (
 	TypeUpgrade      = "UPGRADE"
 )
 
-const (
-	FieldLastCheckin   = "last_checkin"
-	FieldLocalMetadata = "local_metadata"
-)
-
 const kFleetAccessRolesJSON = `
 {
 	"fleet-apikey-access": {
@@ -76,6 +71,7 @@ type EnrollResponse struct {
 }
 
 type CheckinRequest struct {
+	Status    string          `json:"status"`
 	AckToken  string          `json:"ack_token,omitempty"`
 	Events    []Event         `json:"events"`
 	LocalMeta json.RawMessage `json:"local_metadata"`
@@ -122,7 +118,6 @@ type Event struct {
 }
 
 type StatusResponse struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Status  string `json:"status"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
 }

@@ -10,11 +10,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
-func Create(ctx context.Context, client *elasticsearch.Client, name, ttl string, roles []byte, meta interface{}) (*ApiKey, error) {
+func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refresh string, roles []byte, meta interface{}) (*ApiKey, error) {
 	payload := struct {
 		Name       string          `json:"name,omitempty"`
 		Expiration string          `json:"expiration,omitempty"`
@@ -34,7 +34,7 @@ func Create(ctx context.Context, client *elasticsearch.Client, name, ttl string,
 
 	opts := []func(*esapi.SecurityCreateAPIKeyRequest){
 		client.Security.CreateAPIKey.WithContext(ctx),
-		client.Security.CreateAPIKey.WithRefresh("true"),
+		client.Security.CreateAPIKey.WithRefresh(refresh),
 	}
 
 	res, err := client.Security.CreateAPIKey(

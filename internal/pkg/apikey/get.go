@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
 type ApiKeyMetadata struct {
@@ -18,7 +18,7 @@ type ApiKeyMetadata struct {
 	Metadata Metadata
 }
 
-func Get(ctx context.Context, client *elasticsearch.Client, id string) (apiKey ApiKeyMetadata, err error) {
+func Read(ctx context.Context, client *elasticsearch.Client, id string) (apiKey *ApiKeyMetadata, err error) {
 
 	opts := []func(*esapi.SecurityGetAPIKeyRequest){
 		client.Security.GetAPIKey.WithContext(ctx),
@@ -36,7 +36,8 @@ func Get(ctx context.Context, client *elasticsearch.Client, id string) (apiKey A
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return apiKey, fmt.Errorf("fail GetAPIKey: %s, %w", res.String(), ErrApiKeyNotFound)
+		err = fmt.Errorf("fail GetAPIKey: %s, %w", res.String(), ErrApiKeyNotFound)
+		return
 	}
 
 	type APIKeyResponse struct {
@@ -59,8 +60,10 @@ func Get(ctx context.Context, client *elasticsearch.Client, id string) (apiKey A
 
 	first := resp.ApiKeys[0]
 
-	return ApiKeyMetadata{
+	apiKey = &ApiKeyMetadata{
 		Id:       first.Id,
 		Metadata: first.Metadata,
-	}, nil
+	}
+
+	return
 }

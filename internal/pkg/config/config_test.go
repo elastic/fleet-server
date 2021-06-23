@@ -24,90 +24,23 @@ func TestConfig(t *testing.T) {
 	}{
 		"basic": {
 			cfg: &Config{
-				Fleet: Fleet{
-					Agent: Agent{
-						ID:      "1e4954ce-af37-4731-9f4a-407b08e69e42",
-						Logging: AgentLogging{},
-					},
-				},
+				Fleet: defaultFleet(),
 				Output: Output{
-					Elasticsearch: Elasticsearch{
-						Protocol:                "http",
-						Hosts:                   []string{"localhost:9200"},
-						Username:                "elastic",
-						Password:                "changeme",
-						MaxRetries:              3,
-						MaxConnPerHost:          128,
-						BulkFlushInterval:       250 * time.Millisecond,
-						BulkFlushThresholdCount: 2048,
-						BulkFlushThresholdSize:  1048576,
-						BulkFlushMaxPending:     8,
-						Timeout:                 90 * time.Second,
-					},
+					Elasticsearch: defaultElastic(),
 				},
 				Inputs: []Input{
 					{
-						Type: "fleet-server",
-						Server: Server{
-							Host: kDefaultHost,
-							Port: kDefaultPort,
-							Timeouts: ServerTimeouts{
-								Read:             5 * time.Second,
-								Write:            60 * 10 * time.Second,
-								CheckinTimestamp: 30 * time.Second,
-								CheckinLongPoll:  5 * time.Minute,
-							},
-							Profiler: ServerProfiler{
-								Enabled: false,
-								Bind:    "localhost:6060",
-							},
-							CompressionLevel:  1,
-							CompressionThresh: 1024,
-							Limits: ServerLimits{
-								MaxHeaderByteSize: 8192,
-								MaxConnections:    0,
-								PolicyThrottle:    5 * time.Millisecond,
-								CheckinLimit: Limit{
-									Interval: time.Millisecond,
-									Burst:    1000,
-								},
-								ArtifactLimit: Limit{
-									Interval: time.Millisecond * 5,
-									Burst:    25,
-									Max:      50,
-								},
-								EnrollLimit: Limit{
-									Interval: time.Millisecond * 10,
-									Burst:    100,
-									Max:      50,
-								},
-								AckLimit: Limit{
-									Interval: time.Millisecond * 10,
-									Burst:    100,
-									Max:      50,
-								},
-							},
-						},
-						Cache: Cache{
-							NumCounters: defaultCacheNumCounters,
-							MaxCost:     defaultCacheMaxCost,
-						},
+						Type:   "fleet-server",
+						Server: defaultServer(),
+						Cache:  defaultCache(),
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,
 						},
 					},
 				},
-				Logging: Logging{
-					Level:    "info",
-					ToStderr: false,
-					ToFiles:  true,
-					Files:    nil,
-				},
-				HTTP: HTTP{
-					Host: kDefaultHTTPHost,
-					Port: kDefaultHTTPPort,
-				},
+				Logging: defaultLogging(),
+				HTTP:    defaultHTTP(),
 			},
 		},
 		"fleet-logging": {
@@ -121,195 +54,49 @@ func TestConfig(t *testing.T) {
 					},
 				},
 				Output: Output{
-					Elasticsearch: Elasticsearch{
-						Protocol:                "http",
-						Hosts:                   []string{"localhost:9200"},
-						Username:                "elastic",
-						Password:                "changeme",
-						MaxRetries:              3,
-						MaxConnPerHost:          128,
-						BulkFlushInterval:       250 * time.Millisecond,
-						BulkFlushThresholdCount: 2048,
-						BulkFlushThresholdSize:  1048576,
-						BulkFlushMaxPending:     8,
-						Timeout:                 90 * time.Second,
-					},
+					Elasticsearch: defaultElastic(),
 				},
 				Inputs: []Input{
 					{
-						Type: "fleet-server",
-						Server: Server{
-							Host: kDefaultHost,
-							Port: kDefaultPort,
-							Timeouts: ServerTimeouts{
-								Read:             5 * time.Second,
-								Write:            60 * 10 * time.Second,
-								CheckinTimestamp: 30 * time.Second,
-								CheckinLongPoll:  5 * time.Minute,
-							},
-							Profiler: ServerProfiler{
-								Enabled: false,
-								Bind:    "localhost:6060",
-							},
-							CompressionLevel:  1,
-							CompressionThresh: 1024,
-							Limits: ServerLimits{
-								MaxHeaderByteSize: 8192,
-								MaxConnections:    0,
-								PolicyThrottle:    5 * time.Millisecond,
-								CheckinLimit: Limit{
-									Interval: time.Millisecond,
-									Burst:    1000,
-								},
-								ArtifactLimit: Limit{
-									Interval: time.Millisecond * 5,
-									Burst:    25,
-									Max:      50,
-								},
-								EnrollLimit: Limit{
-									Interval: time.Millisecond * 10,
-									Burst:    100,
-									Max:      50,
-								},
-								AckLimit: Limit{
-									Interval: time.Millisecond * 10,
-									Burst:    100,
-									Max:      50,
-								},
-							},
-						},
-						Cache: Cache{
-							NumCounters: defaultCacheNumCounters,
-							MaxCost:     defaultCacheMaxCost,
-						},
+						Type:   "fleet-server",
+						Server: defaultServer(),
+						Cache:  defaultCache(),
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,
 						},
 					},
 				},
-				Logging: Logging{
-					Level:    "info",
-					ToStderr: false,
-					ToFiles:  true,
-					Files:    nil,
-				},
-				HTTP: HTTP{
-					Host: kDefaultHTTPHost,
-					Port: kDefaultHTTPPort,
-				},
+				Logging: defaultLogging(),
+				HTTP:    defaultHTTP(),
 			},
 		},
 		"input": {
 			cfg: &Config{
-				Fleet: Fleet{
-					Agent: Agent{
-						ID:      "1e4954ce-af37-4731-9f4a-407b08e69e42",
-						Logging: AgentLogging{},
-					},
-				},
+				Fleet: defaultFleet(),
 				Output: Output{
-					Elasticsearch: Elasticsearch{
-						Protocol:                "http",
-						Hosts:                   []string{"localhost:9200"},
-						Username:                "elastic",
-						Password:                "changeme",
-						MaxRetries:              3,
-						MaxConnPerHost:          128,
-						BulkFlushInterval:       250 * time.Millisecond,
-						BulkFlushThresholdCount: 2048,
-						BulkFlushThresholdSize:  1048576,
-						BulkFlushMaxPending:     8,
-						Timeout:                 90 * time.Second,
-					},
+					Elasticsearch: defaultElastic(),
 				},
 				Inputs: []Input{
 					{
-						Type: "fleet-server",
-						Server: Server{
-							Host: kDefaultHost,
-							Port: kDefaultPort,
-							Timeouts: ServerTimeouts{
-								Read:             5 * time.Second,
-								Write:            60 * 10 * time.Second,
-								CheckinTimestamp: 30 * time.Second,
-								CheckinLongPoll:  5 * time.Minute,
-							},
-							Profiler: ServerProfiler{
-								Enabled: false,
-								Bind:    "localhost:6060",
-							},
-							CompressionLevel:  1,
-							CompressionThresh: 1024,
-							Limits: ServerLimits{
-								MaxHeaderByteSize: 8192,
-								MaxConnections:    0,
-								PolicyThrottle:    5 * time.Millisecond,
-								CheckinLimit: Limit{
-									Interval: time.Millisecond,
-									Burst:    1000,
-								},
-								ArtifactLimit: Limit{
-									Interval: time.Millisecond * 5,
-									Burst:    25,
-									Max:      50,
-								},
-								EnrollLimit: Limit{
-									Interval: time.Millisecond * 10,
-									Burst:    100,
-									Max:      50,
-								},
-								AckLimit: Limit{
-									Interval: time.Millisecond * 10,
-									Burst:    100,
-									Max:      50,
-								},
-							},
-						},
-						Cache: Cache{
-							NumCounters: defaultCacheNumCounters,
-							MaxCost:     defaultCacheMaxCost,
-						},
+						Type:   "fleet-server",
+						Server: defaultServer(),
+						Cache:  defaultCache(),
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,
 						},
 					},
 				},
-				Logging: Logging{
-					Level:    "info",
-					ToStderr: false,
-					ToFiles:  true,
-					Files:    nil,
-				},
-				HTTP: HTTP{
-					Host: kDefaultHTTPHost,
-					Port: kDefaultHTTPPort,
-				},
+				Logging: defaultLogging(),
+				HTTP:    defaultHTTP(),
 			},
 		},
 		"input-config": {
 			cfg: &Config{
-				Fleet: Fleet{
-					Agent: Agent{
-						ID:      "1e4954ce-af37-4731-9f4a-407b08e69e42",
-						Logging: AgentLogging{},
-					},
-				},
+				Fleet: defaultFleet(),
 				Output: Output{
-					Elasticsearch: Elasticsearch{
-						Protocol:                "http",
-						Hosts:                   []string{"localhost:9200"},
-						Username:                "elastic",
-						Password:                "changeme",
-						MaxRetries:              3,
-						MaxConnPerHost:          128,
-						BulkFlushInterval:       250 * time.Millisecond,
-						BulkFlushThresholdCount: 2048,
-						BulkFlushThresholdSize:  1048576,
-						BulkFlushMaxPending:     8,
-						Timeout:                 90 * time.Second,
-					},
+					Elasticsearch: defaultElastic(),
 				},
 				Inputs: []Input{
 					{
@@ -319,9 +106,12 @@ func TestConfig(t *testing.T) {
 							Port: 8888,
 							Timeouts: ServerTimeouts{
 								Read:             20 * time.Second,
+								ReadHeader:       5 * time.Second,
+								Idle:             30 * time.Second,
 								Write:            5 * time.Second,
 								CheckinTimestamp: 30 * time.Second,
 								CheckinLongPoll:  5 * time.Minute,
+								CheckinJitter:    30 * time.Second,
 							},
 							Profiler: ServerProfiler{
 								Enabled: false,
@@ -329,51 +119,18 @@ func TestConfig(t *testing.T) {
 							},
 							CompressionLevel:  1,
 							CompressionThresh: 1024,
-							Limits: ServerLimits{
-								MaxHeaderByteSize: 8192,
-								MaxConnections:    0,
-								PolicyThrottle:    5 * time.Millisecond,
-								CheckinLimit: Limit{
-									Interval: time.Millisecond,
-									Burst:    1000,
-								},
-								ArtifactLimit: Limit{
-									Interval: time.Millisecond * 5,
-									Burst:    25,
-									Max:      50,
-								},
-								EnrollLimit: Limit{
-									Interval: time.Millisecond * 10,
-									Burst:    100,
-									Max:      50,
-								},
-								AckLimit: Limit{
-									Interval: time.Millisecond * 10,
-									Burst:    100,
-									Max:      50,
-								},
-							},
+							Limits:            defaultServerLimits(),
+							Bulk:              defaultServerBulk(),
 						},
-						Cache: Cache{
-							NumCounters: defaultCacheNumCounters,
-							MaxCost:     defaultCacheMaxCost,
-						},
+						Cache: defaultCache(),
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,
 						},
 					},
 				},
-				Logging: Logging{
-					Level:    "info",
-					ToStderr: false,
-					ToFiles:  true,
-					Files:    nil,
-				},
-				HTTP: HTTP{
-					Host: kDefaultHTTPHost,
-					Port: kDefaultHTTPPort,
-				},
+				Logging: defaultLogging(),
+				HTTP:    defaultHTTP(),
 			},
 		},
 		"bad-input": {
@@ -412,4 +169,69 @@ func TestConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Stub out the defaults so that the above is easier to maintain
+
+func defaultCache() Cache {
+	var d Cache
+	d.InitDefaults()
+	return d
+}
+
+func defaultServerTimeouts() ServerTimeouts {
+	var d ServerTimeouts
+	d.InitDefaults()
+	return d
+}
+
+func defaultServerLimits() ServerLimits {
+	var d ServerLimits
+	d.InitDefaults()
+	return d
+}
+
+func defaultServerBulk() ServerBulk {
+	var d ServerBulk
+	d.InitDefaults()
+	return d
+}
+
+func defaultLogging() Logging {
+	var d Logging
+	d.InitDefaults()
+	return d
+}
+
+func defaultHTTP() HTTP {
+	var d HTTP
+	d.InitDefaults()
+	return d
+}
+
+func defaultFleet() Fleet {
+	return Fleet{
+		Agent: Agent{
+			ID:      "1e4954ce-af37-4731-9f4a-407b08e69e42",
+			Logging: AgentLogging{},
+		},
+	}
+}
+
+func defaultElastic() Elasticsearch {
+	return Elasticsearch{
+		Protocol:       "http",
+		Hosts:          []string{"localhost:9200"},
+		Username:       "elastic",
+		Password:       "changeme",
+		MaxRetries:     3,
+		MaxConnPerHost: 128,
+		Timeout:        90 * time.Second,
+	}
+}
+
+func defaultServer() Server {
+	var d Server
+	d.InitDefaults()
+	return d
 }

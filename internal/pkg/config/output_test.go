@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
@@ -27,14 +27,13 @@ func TestToESConfig(t *testing.T) {
 	}{
 		"http": {
 			cfg: Elasticsearch{
-				Protocol:          "http",
-				Hosts:             []string{"localhost:9200"},
-				Username:          "elastic",
-				Password:          "changeme",
-				MaxRetries:        3,
-				MaxConnPerHost:    128,
-				BulkFlushInterval: 250 * time.Millisecond,
-				Timeout:           90 * time.Second,
+				Protocol:       "http",
+				Hosts:          []string{"localhost:9200"},
+				Username:       "elastic",
+				Password:       "changeme",
+				MaxRetries:     3,
+				MaxConnPerHost: 128,
+				Timeout:        90 * time.Second,
 			},
 			result: elasticsearch.Config{
 				Addresses:  []string{"http://localhost:9200"},
@@ -62,10 +61,9 @@ func TestToESConfig(t *testing.T) {
 				Headers: map[string]string{
 					"X-Custom-Header": "Header-Value",
 				},
-				MaxRetries:        6,
-				MaxConnPerHost:    256,
-				BulkFlushInterval: 250 * time.Millisecond,
-				Timeout:           120 * time.Second,
+				MaxRetries:     6,
+				MaxConnPerHost: 256,
+				Timeout:        120 * time.Second,
 			},
 			result: elasticsearch.Config{
 				Addresses:  []string{"http://localhost:9200", "http://other-host:9200"},
@@ -93,10 +91,9 @@ func TestToESConfig(t *testing.T) {
 				Headers: map[string]string{
 					"X-Custom-Header": "Header-Value",
 				},
-				MaxRetries:        6,
-				MaxConnPerHost:    256,
-				BulkFlushInterval: 250 * time.Millisecond,
-				Timeout:           120 * time.Second,
+				MaxRetries:     6,
+				MaxConnPerHost: 256,
+				Timeout:        120 * time.Second,
 				TLS: &tlscommon.Config{
 					VerificationMode: tlscommon.VerifyNone,
 				},
@@ -132,10 +129,9 @@ func TestToESConfig(t *testing.T) {
 				Headers: map[string]string{
 					"X-Custom-Header": "Header-Value",
 				},
-				MaxRetries:        6,
-				MaxConnPerHost:    256,
-				BulkFlushInterval: 250 * time.Millisecond,
-				Timeout:           120 * time.Second,
+				MaxRetries:     6,
+				MaxConnPerHost: 256,
+				Timeout:        120 * time.Second,
 				TLS: &tlscommon.Config{
 					VerificationMode: tlscommon.VerifyNone,
 				},

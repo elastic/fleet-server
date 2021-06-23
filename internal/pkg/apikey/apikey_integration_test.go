@@ -11,8 +11,7 @@ import (
 	"errors"
 	"testing"
 
-	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
-
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 )
@@ -34,19 +33,27 @@ func TestCreateApiKeyWithMetadata(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	bulker := ftesting.SetupBulk(ctx, t)
+	cfg := elasticsearch.Config{
+		Username: "elastic",
+		Password: "changeme",
+	}
+
+	es, err := elasticsearch.NewClient(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create the key
 	agentId := uuid.Must(uuid.NewV4()).String()
 	name := uuid.Must(uuid.NewV4()).String()
-	akey, err := Create(ctx, bulker.Client(), name, "", []byte(testFleetRoles),
+	akey, err := Create(ctx, es, name, "", "true", []byte(testFleetRoles),
 		NewMetadata(agentId, TypeAccess))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Get the key and verify that metadata was saved correctly
-	aKeyMeta, err := Get(ctx, bulker.Client(), akey.Id)
+	aKeyMeta, err := Read(ctx, es, akey.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +79,7 @@ func TestCreateApiKeyWithMetadata(t *testing.T) {
 	}
 
 	// Try to get the key that doesn't exists, expect ErrApiKeyNotFound
-	aKeyMeta, err = Get(ctx, bulker.Client(), "0000000000000")
+	aKeyMeta, err = Read(ctx, es, "0000000000000")
 	if !errors.Is(err, ErrApiKeyNotFound) {
 		t.Errorf("Unexpected error type: %v", err)
 	}

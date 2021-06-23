@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v7"
 )
 
 type versionInfo struct {
@@ -39,7 +39,7 @@ func FetchESVersion(ctx context.Context, esCli *elasticsearch.Client) (version s
 	}
 
 	// Check error
-	err = TranslateError(res.StatusCode, sres.Error)
+	err = TranslateError(res.StatusCode, &sres.Error)
 	if err != nil {
 		return
 	}

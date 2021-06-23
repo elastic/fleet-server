@@ -5,9 +5,13 @@
 package fleet
 
 import (
+	"net/http"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/julienschmidt/httprouter"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -16,9 +20,6 @@ const (
 	ROUTE_CHECKIN   = "/api/fleet/agents/:id/checkin"
 	ROUTE_ACKS      = "/api/fleet/agents/:id/acks"
 	ROUTE_ARTIFACTS = "/api/fleet/artifacts/:id/:sha2"
-
-	// Support previous relative path exposed in Kibana until all feature flags are flipped
-	ROUTE_ARTIFACTS_DEPRECATED = "/api/endpoint/artifacts/download/:id/:sha2"
 )
 
 type Router struct {
@@ -42,15 +43,53 @@ func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack
 		ack:    ack,
 	}
 
-	router := httprouter.New()
-	router.GET(ROUTE_STATUS, r.handleStatus)
-	router.POST(ROUTE_ENROLL, r.handleEnroll)
-	router.POST(ROUTE_CHECKIN, r.handleCheckin)
-	router.POST(ROUTE_ACKS, r.handleAcks)
-	router.GET(ROUTE_ARTIFACTS, r.handleArtifacts)
+	routes := []struct {
+		method  string
+		path    string
+		handler httprouter.Handle
+	}{
+		{
+			http.MethodGet,
+			ROUTE_STATUS,
+			r.handleStatus,
+		},
+		{
+			http.MethodPost,
+			ROUTE_ENROLL,
+			r.handleEnroll,
+		},
+		{
+			http.MethodPost,
+			ROUTE_CHECKIN,
+			r.handleCheckin,
+		},
+		{
+			http.MethodPost,
+			ROUTE_ACKS,
+			r.handleAcks,
+		},
+		{
+			http.MethodGet,
+			ROUTE_ARTIFACTS,
+			r.handleArtifacts,
+		},
+	}
 
-	// deprecated: TODO: remove
-	router.GET(ROUTE_ARTIFACTS_DEPRECATED, r.handleArtifacts)
+	router := httprouter.New()
+
+	// Install routes
+	for _, rte := range routes {
+		log.Info().
+			Str("method", rte.method).
+			Str("path", rte.path).
+			Msg("Server install route")
+
+		router.Handle(
+			rte.method,
+			rte.path,
+			logger.HttpHandler(rte.handler),
+		)
+	}
 
 	return router
 }

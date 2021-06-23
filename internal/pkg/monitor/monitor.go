@@ -18,13 +18,13 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 const (
-	defaultPollTimeout    = 5 * time.Minute // default long poll timeout
+	defaultPollTimeout    = 4 * time.Minute // default long poll timeout
 	defaultSeqNo          = int64(-1)       // the _seq_no in elasticsearch start with 0
 	defaultWithExpiration = false
 
@@ -205,6 +205,9 @@ func (m *simpleMonitorT) loadCheckpoint() sqn.SeqNo {
 func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 	m.log.Info().Msg("start")
 	defer func() {
+		if err == context.Canceled {
+			err = nil
+		}
 		m.log.Info().Err(err).Msg("exited")
 	}()
 
@@ -242,9 +245,11 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 				// Timed out, wait again
 				m.log.Debug().Msg("timeout on global checkpoints advance, poll again")
 				continue
+			} else if errors.Is(err, context.Canceled) {
+				m.log.Info().Msg("context closed waiting for global checkpoints advance")
 			} else {
 				// Log the error and keep trying
-				m.log.Error().Err(err).Msg("failed on waiting for global checkpoints advance")
+				m.log.Info().Err(err).Msg("failed on waiting for global checkpoints advance")
 			}
 
 			// Delay next attempt
@@ -325,7 +330,7 @@ func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[
 	}
 
 	if res.IsError() {
-		err = es.TranslateError(res.StatusCode, esres.Error)
+		err = es.TranslateError(res.StatusCode, &esres.Error)
 	}
 
 	if err != nil {

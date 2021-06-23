@@ -7,7 +7,6 @@ package fleet
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,30 +18,34 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miolini/datacounter"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
 const (
 	kEnrollMod = "enroll"
 
-	kCacheAccessInitTTL = time.Second * 30 // Cache a bit longer to handle expensive initial checkin
-	kCacheEnrollmentTTL = time.Second * 30
+	EnrollEphemeral = "EPHEMERAL"
+	EnrollPermanent = "PERMANENT"
+	EnrollTemporary = "TEMPORARY"
 )
 
 var (
-	ErrUnknownEnrollType = errors.New("unknown enroll request type")
+	ErrUnknownEnrollType     = errors.New("unknown enroll request type")
+	ErrInactiveEnrollmentKey = errors.New("inactive enrollment key")
 )
 
 type EnrollerT struct {
 	verCon version.Constraints
+	cfg    *config.Server
 	bulker bulk.Bulk
 	cache  cache.Cache
 	limit  *limit.Limiter
@@ -56,6 +59,7 @@ func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bu
 
 	return &EnrollerT{
 		verCon: verCon,
+		cfg:    cfg,
 		limit:  limit.NewLimiter(&cfg.Limits.EnrollLimit),
 		bulker: bulker,
 		cache:  c,
@@ -72,38 +76,53 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	data, err := rt.et.handleEnroll(r)
+	enrollResponse, err := rt.et.handleEnroll(w, r)
+
+	var data []byte
+	if err == nil {
+		data, err = json.Marshal(enrollResponse)
+	}
+
+	reqId := r.Header.Get(logger.HeaderRequestID)
 
 	if err != nil {
-		code, lvl := cntEnroll.IncError(err)
+		cntEnroll.IncError(err)
+		resp := NewErrorResp(err)
 
-		log.WithLevel(lvl).
+		log.WithLevel(resp.Level).
 			Err(err).
+			Str(EcsHttpRequestId, reqId).
 			Str("mod", kEnrollMod).
-			Int("code", code).
-			Dur("tdiff", time.Since(start)).
-			Msg("Enroll fail")
+			Int(EcsHttpResponseCode, resp.StatusCode).
+			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Msg("fail enroll")
 
-		http.Error(w, "", code)
+		if err := resp.Write(w); err != nil {
+			log.Error().Err(err).Str(EcsHttpRequestId, reqId).Msg("fail writing error response")
+		}
 		return
 	}
 
 	var numWritten int
 	if numWritten, err = w.Write(data); err != nil {
-		log.Error().Err(err).Msg("Fail send enroll response")
+		log.Error().Err(err).Str(EcsHttpRequestId, reqId).Msg("fail send enroll response")
 	}
 
 	cntEnroll.bodyOut.Add(uint64(numWritten))
 
-	log.Trace().
+	log.Info().
 		Err(err).
-		RawJSON("raw", data).
 		Str("mod", kEnrollMod).
-		Dur("rtt", time.Since(start)).
-		Msg("handleEnroll OK")
+		Str("agentId", enrollResponse.Item.ID).
+		Str("policyId", enrollResponse.Item.PolicyId).
+		Str("apiKeyId", enrollResponse.Item.AccessApiKeyId).
+		Str(EcsHttpRequestId, reqId).
+		Int(EcsHttpResponseBodyBytes, numWritten).
+		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Msg("success enroll")
 }
 
-func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
+func (et *EnrollerT) handleEnroll(w http.ResponseWriter, r *http.Request) (*EnrollResponse, error) {
 
 	limitF, err := et.limit.Acquire()
 	if err != nil {
@@ -111,7 +130,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 	}
 	defer limitF()
 
-	key, err := authApiKey(r, et.bulker.Client(), et.cache)
+	key, err := authApiKey(r, et.bulker, et.cache)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +150,14 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 		return nil, err
 	}
 
-	readCounter := datacounter.NewReaderCounter(r.Body)
+	body := r.Body
+
+	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
+	if et.cfg.Limits.EnrollLimit.MaxBody > 0 {
+		body = http.MaxBytesReader(w, body, et.cfg.Limits.EnrollLimit.MaxBody)
+	}
+
+	readCounter := datacounter.NewReaderCounter(body)
 
 	// Parse the request body
 	req, err := decodeEnrollRequest(readCounter)
@@ -141,12 +167,7 @@ func (et *EnrollerT) handleEnroll(r *http.Request) ([]byte, error) {
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	resp, err := _enroll(r.Context(), et.bulker, et.cache, *req, *erec)
-	if err != nil {
-		return nil, err
-	}
-
-	return json.Marshal(resp)
+	return _enroll(r.Context(), et.bulker, et.cache, *req, *erec)
 }
 
 func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollRequest, erec model.EnrollmentApiKey) (*EnrollResponse, error) {
@@ -170,7 +191,7 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 
 	agentId := u.String()
 
-	accessApiKey, err := generateAccessApiKey(ctx, bulker.Client(), agentId)
+	accessApiKey, err := generateAccessApiKey(ctx, bulker, agentId)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +234,7 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 	}
 
 	// We are Kool & and the Gang; cache the access key to avoid the roundtrip on impending checkin
-	c.SetApiKey(*accessApiKey, kCacheAccessInitTTL)
+	c.SetApiKey(*accessApiKey, true)
 
 	return &resp, nil
 }
@@ -287,15 +308,25 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	return nil
 }
 
-func generateAccessApiKey(ctx context.Context, client *elasticsearch.Client, agentId string) (*apikey.ApiKey, error) {
-	return apikey.Create(ctx, client, agentId, "", []byte(kFleetAccessRolesJSON),
-		apikey.NewMetadata(agentId, apikey.TypeAccess))
+func generateAccessApiKey(ctx context.Context, bulk bulk.Bulk, agentId string) (*apikey.ApiKey, error) {
+	return bulk.ApiKeyCreate(
+		ctx,
+		agentId,
+		"",
+		[]byte(kFleetAccessRolesJSON),
+		apikey.NewMetadata(agentId, apikey.TypeAccess),
+	)
 }
 
-func generateOutputApiKey(ctx context.Context, client *elasticsearch.Client, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
+func generateOutputApiKey(ctx context.Context, bulk bulk.Bulk, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
 	name := fmt.Sprintf("%s:%s", agentId, outputName)
-	return apikey.Create(ctx, client, name, "", roles,
-		apikey.NewMetadata(agentId, apikey.TypeOutput))
+	return bulk.ApiKeyCreate(
+		ctx,
+		name,
+		"",
+		roles,
+		apikey.NewMetadata(agentId, apikey.TypeOutput),
+	)
 }
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentApiKey, error) {
@@ -307,32 +338,30 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	// Pull API key record from .fleet-enrollment-api-keys
 	rec, err := dl.FindEnrollmentAPIKey(ctx, et.bulker, dl.QueryEnrollmentAPIKeyByID, dl.FieldApiKeyID, id)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "FindEnrollmentAPIKey")
 	}
 
 	if !rec.Active {
-		return nil, fmt.Errorf("record is inactive")
+		return nil, ErrInactiveEnrollmentKey
 	}
 
 	cost := int64(len(rec.ApiKey))
-	et.cache.SetEnrollmentApiKey(id, rec, cost, kCacheEnrollmentTTL)
+	et.cache.SetEnrollmentApiKey(id, rec, cost)
 
 	return &rec, nil
 }
 
 func decodeEnrollRequest(data io.Reader) (*EnrollRequest, error) {
 
-	// TODO: defend overflow, slow roll
 	var req EnrollRequest
 	decoder := json.NewDecoder(data)
 	if err := decoder.Decode(&req); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "decode enroll request")
 	}
 
 	// Validate
 	switch req.Type {
-	// TODO: Should these be converted to constant? Need to be kept in sync with Kibana?
-	case "EPHEMERAL", "PERMANENT", "TEMPORARY":
+	case EnrollEphemeral, EnrollPermanent, EnrollTemporary:
 	default:
 		return nil, ErrUnknownEnrollType
 	}

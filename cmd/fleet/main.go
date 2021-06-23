@@ -11,6 +11,7 @@ import (
 	"os"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/yaml"
@@ -18,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/coordinator"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -28,12 +30,14 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/profile"
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -41,7 +45,8 @@ import (
 )
 
 const (
-	kAgentMode = "agent-mode"
+	kAgentMode                 = "agent-mode"
+	kAgentModeRestartLoopDelay = 2 * time.Second
 )
 
 func installSignalHandler() context.Context {
@@ -50,21 +55,45 @@ func installSignalHandler() context.Context {
 }
 
 func makeCache(cfg *config.Config) (cache.Cache, error) {
-
-	log.Info().
-		Int64("numCounters", cfg.Inputs[0].Cache.NumCounters).
-		Int64("maxCost", cfg.Inputs[0].Cache.MaxCost).
-		Msg("makeCache")
-
-	cacheCfg := cache.Config{
-		NumCounters: cfg.Inputs[0].Cache.NumCounters,
-		MaxCost:     cfg.Inputs[0].Cache.MaxCost,
-	}
-
+	cacheCfg := makeCacheConfig(cfg)
+	log.Info().Interface("cfg", cacheCfg).Msg("makeCache")
 	return cache.New(cacheCfg)
 }
 
-func getRunCommand(version string) func(cmd *cobra.Command, args []string) error {
+func makeCacheConfig(cfg *config.Config) cache.Config {
+	ccfg := cfg.Inputs[0].Cache
+
+	return cache.Config{
+		NumCounters:  ccfg.NumCounters,
+		MaxCost:      ccfg.MaxCost,
+		ActionTTL:    ccfg.ActionTTL,
+		EnrollKeyTTL: ccfg.EnrollKeyTTL,
+		ArtifactTTL:  ccfg.ArtifactTTL,
+		ApiKeyTTL:    ccfg.ApiKeyTTL,
+		ApiKeyJitter: ccfg.ApiKeyJitter,
+	}
+}
+
+func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, error) {
+	l, err := logger.Init(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info().
+		Str("version", version).
+		Str("commit", commit).
+		Int("pid", os.Getpid()).
+		Int("ppid", os.Getppid()).
+		Str("exe", os.Args[0]).
+		Strs("args", os.Args[1:]).
+		Msg("boot")
+	log.Debug().Strs("env", os.Environ()).Msg("environment")
+
+	return l, err
+}
+
+func getRunCommand(version, commit string) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		cfgObject := cmd.Flags().Lookup("E").Value.(*config.Flag)
 		cliCfg := cfgObject.Config()
@@ -81,17 +110,12 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 			if err != nil {
 				return err
 			}
-			l, err = logger.Init(cfg)
+			l, err = initLogger(cfg, version, commit)
 			if err != nil {
 				return err
 			}
 
-			c, err := makeCache(cfg)
-			if err != nil {
-				return err
-			}
-
-			agent, err := NewAgentMode(cliCfg, os.Stdin, c, version, l)
+			agent, err := NewAgentMode(cliCfg, os.Stdin, version, l)
 			if err != nil {
 				return err
 			}
@@ -115,17 +139,12 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 				return err
 			}
 
-			l, err = logger.Init(cfg)
+			l, err = initLogger(cfg, version, commit)
 			if err != nil {
 				return err
 			}
 
-			c, err := makeCache(cfg)
-			if err != nil {
-				return err
-			}
-
-			srv, err := NewFleetServer(cfg, c, version, status.NewLog())
+			srv, err := NewFleetServer(cfg, version, status.NewLog())
 			if err != nil {
 				return err
 			}
@@ -143,11 +162,11 @@ func getRunCommand(version string) func(cmd *cobra.Command, args []string) error
 	}
 }
 
-func NewCommand(version string) *cobra.Command {
+func NewCommand(version, commit string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fleet-server",
 		Short: "Fleet Server controls a fleet of Elastic Agents",
-		RunE:  getRunCommand(version),
+		RunE:  getRunCommand(version, commit),
 	}
 	cmd.Flags().StringP("config", "c", "fleet-server.yml", "Configuration for Fleet Server")
 	cmd.Flags().Bool(kAgentMode, false, "Running under execution of the Elastic Agent")
@@ -162,7 +181,6 @@ type firstCfg struct {
 
 type AgentMode struct {
 	cliCfg  *ucfg.Config
-	cache   cache.Cache
 	version string
 
 	reloadables []reload.Reloadable
@@ -177,12 +195,11 @@ type AgentMode struct {
 	startChan    chan struct{}
 }
 
-func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, c cache.Cache, version string, reloadables ...reload.Reloadable) (*AgentMode, error) {
+func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, version string, reloadables ...reload.Reloadable) (*AgentMode, error) {
 	var err error
 
 	a := &AgentMode{
 		cliCfg:      cliCfg,
-		cache:       c,
 		version:     version,
 		reloadables: reloadables,
 	}
@@ -228,7 +245,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	srvCtx, srvCancel := context.WithCancel(ctx)
 	defer srvCancel()
 	log.Info().Msg("received initial configuration starting Fleet Server")
-	srv, err := NewFleetServer(cfg.cfg, a.cache, a.version, status.NewChained(status.NewLog(), a.agent))
+	srv, err := NewFleetServer(cfg.cfg, a.version, status.NewChained(status.NewLog(), a.agent))
 	if err != nil {
 		// unblock startChan even though there was an error
 		a.startChan <- struct{}{}
@@ -245,7 +262,21 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	// trigger startChan so OnConfig can continue
 	a.startChan <- struct{}{}
 
-	return a.srv.Run(srvCtx)
+	// keep trying to restart the FleetServer on failure, reporting
+	// the status back to Elastic Agent
+	res := make(chan error)
+	go func() {
+		for {
+			err := a.srv.Run(srvCtx)
+			if err == nil || err == context.Canceled {
+				res <- err
+				return
+			}
+			// sleep some before calling Run again
+			sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay)
+		}
+	}()
+	return <-res
 }
 
 func (a *AgentMode) OnConfig(s string) {
@@ -362,17 +393,23 @@ type FleetServer struct {
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config, c cache.Cache, verStr string, reporter status.Reporter) (*FleetServer, error) {
+func NewFleetServer(cfg *config.Config, verStr string, reporter status.Reporter) (*FleetServer, error) {
 	verCon, err := buildVersionConstraint(verStr)
 	if err != nil {
 		return nil, err
 	}
+
+	cache, err := makeCache(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	return &FleetServer{
 		ver:      verStr,
 		verCon:   verCon,
 		cfg:      cfg,
 		cfgCh:    make(chan *config.Config, 1),
-		cache:    c,
+		cache:    cache,
 		reporter: reporter,
 	}, nil
 }
@@ -419,6 +456,8 @@ func (f *FleetServer) Run(ctx context.Context) error {
 	)
 
 	started := false
+
+LOOP:
 	for {
 		ech := make(chan error, 2)
 
@@ -429,8 +468,18 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
 		}
 
-		// Restart profiler
-		if curCfg == nil || curCfg.Inputs[0].Server.Profiler.Enabled != newCfg.Inputs[0].Server.Profiler.Enabled || curCfg.Inputs[0].Server.Profiler.Bind != newCfg.Inputs[0].Server.Profiler.Bind {
+		// Create or recreate cache
+		if configCacheChanged(curCfg, newCfg) {
+			cacheCfg := makeCacheConfig(newCfg)
+			err := f.cache.Reconfigure(cacheCfg)
+			log.Info().Err(err).Interface("cfg", cacheCfg).Msg("Reconfigure cache")
+			if err != nil {
+				return err
+			}
+		}
+
+		// Start or restart profiler
+		if configChangedProfiler(curCfg, newCfg) {
 			stop(proCancel, proEg)
 			proEg, proCancel = nil, nil
 			if newCfg.Inputs[0].Server.Profiler.Enabled {
@@ -440,8 +489,8 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			}
 		}
 
-		// Restart server
-		if curCfg == nil || curCfg.Inputs[0].Server != newCfg.Inputs[0].Server {
+		// Start or restart server
+		if configChangedServer(curCfg, newCfg) {
 			stop(srvCancel, srvEg)
 			srvEg, srvCancel = start(ctx, func(ctx context.Context) error {
 				return f.runServer(ctx, newCfg)
@@ -452,29 +501,89 @@ func (f *FleetServer) Run(ctx context.Context) error {
 
 		select {
 		case newCfg = <-f.cfgCh:
-			log.Debug().Msg("Server configuration update")
+			log.Info().Msg("Server configuration update")
 		case err := <-ech:
-			f.reporter.Status(proto.StateObserved_FAILED, err.Error(), nil)
+			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil)
 			log.Error().Err(err).Msg("Fleet Server failed")
 			return err
 		case <-ctx.Done():
 			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil)
-			log.Info().Msg("Fleet Server exited")
-			return nil
+			break LOOP
 		}
 	}
+
+	// Server is coming down; wait for the server group to exit cleanly.
+	// Timeout if something is locked up.
+	err := safeWait(srvEg, time.Second)
+
+	// Eat cancel error to minimize confusion in logs
+	if errors.Is(err, context.Canceled) {
+		err = nil
+	}
+
+	log.Info().Err(err).Msg("Fleet Server exited")
+	return err
+}
+
+func configChangedProfiler(curCfg, newCfg *config.Config) bool {
+
+	changed := true
+
+	switch {
+	case curCfg == nil:
+	case curCfg.Inputs[0].Server.Profiler.Enabled != newCfg.Inputs[0].Server.Profiler.Enabled:
+	case curCfg.Inputs[0].Server.Profiler.Bind != newCfg.Inputs[0].Server.Profiler.Bind:
+	default:
+		changed = false
+	}
+
+	return changed
+}
+
+func configChangedServer(curCfg, newCfg *config.Config) bool {
+	return curCfg == nil || curCfg.Inputs[0].Server != newCfg.Inputs[0].Server
+}
+
+func configCacheChanged(curCfg, newCfg *config.Config) bool {
+	if curCfg == nil {
+		return false
+	}
+	return curCfg.Inputs[0].Cache != newCfg.Inputs[0].Cache
+}
+
+func safeWait(g *errgroup.Group, to time.Duration) (err error) {
+	waitCh := make(chan error)
+	go func() {
+		waitCh <- g.Wait()
+	}()
+
+	select {
+	case err = <-waitCh:
+	case <-time.After(to):
+		log.Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
+		err = errors.New("Group wait timeout")
+	}
+
+	return
 }
 
 func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error {
 	return func() error {
+
 		log.Debug().Msg(tag + " started")
+
 		err := runfn(ctx)
-		var ev *zerolog.Event
-		if err != nil {
-			log.Error().Err(err)
+
+		lvl := zerolog.DebugLevel
+		switch {
+		case err == nil:
+		case errors.Is(err, context.Canceled):
+			err = nil
+		default:
+			lvl = zerolog.ErrorLevel
 		}
-		ev = log.Debug()
-		ev.Msg(tag + " exited")
+
+		log.WithLevel(lvl).Err(err).Msg(tag + " exited")
 		return err
 	}
 }
@@ -491,6 +600,16 @@ func initRuntime(cfg *config.Config) {
 	}
 }
 
+func initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
+	es, err := es.NewClient(ctx, cfg, false)
+	if err != nil {
+		return nil, err
+	}
+
+	blk := bulk.NewBulker(es, bulk.BulkOptsFromCfg(cfg)...)
+	return blk, nil
+}
+
 func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	initRuntime(cfg)
 
@@ -503,15 +622,59 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		defer metricsServer.Stop()
 	}
 
-	// Bulker is started in its own context and managed inside of this function. This is done so
-	// when the `ctx` is cancelled every worker using the bulker can get everything written on
-	// shutdown before the bulker is then cancelled.
+	// Bulker is started in its own context and managed in the scope of this function. This is done so
+	// when the `ctx` is cancelled, the bulker will remain executing until this function exits.
+	// This allows the child subsystems to continue to write to the data store while tearing down.
 	bulkCtx, bulkCancel := context.WithCancel(context.Background())
 	defer bulkCancel()
-	esCli, bulker, err := bulk.InitES(bulkCtx, cfg)
+
+	// Create the bulker subsystem
+	bulker, err := initBulker(bulkCtx, cfg)
 	if err != nil {
 		return err
 	}
+
+	// Execute the bulker engine in a goroutine with its orphaned context.
+	// Create an error channel for the case where the bulker exits
+	// unexpectedly (ie. not cancelled by the bulkCancel context).
+	errCh := make(chan error)
+
+	go func() {
+		runFunc := loggedRunFunc(bulkCtx, "Bulker", bulker.Run)
+
+		// Emit the error from bulker.Run to the local error channel.
+		// The error group will be listening for it. (see comments below)
+		errCh <- runFunc()
+	}()
+
+	// Wrap context with an error group context to manage the lifecycle
+	// of the subsystems.  An error from any subsystem, or if the
+	// parent context is cancelled, will cancel the group.
+	// see https://pkg.go.dev/golang.org/x/sync/errgroup#Group.Go
+	g, ctx := errgroup.WithContext(ctx)
+
+	// Stub a function for inclusion in the errgroup that exits when
+	// the bulker exits.  If the bulker exits before the error group,
+	// this will tear down the error group and g.Wait() will return.
+	// Otherwise it will be a noop.
+	g.Go(func() (err error) {
+		select {
+		case err = <-errCh:
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
+		return
+	})
+
+	if err = f.runSubsystems(ctx, cfg, g, bulker); err != nil {
+		return err
+	}
+
+	return g.Wait()
+}
+
+func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk) (err error) {
+	esCli := bulker.Client()
 
 	// Check version compatibility with Elasticsearch
 	err = ver.CheckCompatibility(ctx, esCli, f.ver)
@@ -524,9 +687,6 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-
-	// Replacing to errgroup context
-	g, ctx := errgroup.WithContext(ctx)
 
 	// Coordinator policy monitor
 	pim, err := monitor.New(dl.FleetPolicies, esCli, monCli,
@@ -571,25 +731,25 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return err
 	}
 
-	bc := NewBulkCheckin(bulker)
+	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
-	ct := NewCheckinT(f.verCon, &f.cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
-	et, err := NewEnrollerT(f.verCon, &f.cfg.Inputs[0].Server, bulker, f.cache)
+	ct := NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
+	et, err := NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
 	}
 
-	at := NewArtifactT(&f.cfg.Inputs[0].Server, bulker, f.cache)
-	ack := NewAckT(&f.cfg.Inputs[0].Server, bulker, f.cache)
+	at := NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
+	ack := NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 
 	router := NewRouter(bulker, ct, et, at, ack, sm)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
-		return runServer(ctx, router, &f.cfg.Inputs[0].Server)
+		return runServer(ctx, router, &cfg.Inputs[0].Server)
 	}))
 
-	return g.Wait()
+	return err
 }
 
 // Reload reloads the fleet server with the latest configuration.

@@ -43,6 +43,8 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	addr := cfg.BindAddress()
 	rdto := cfg.Timeouts.Read
 	wrto := cfg.Timeouts.Write
+	idle := cfg.Timeouts.Idle
+	rdhr := cfg.Timeouts.ReadHeader
 	mhbz := cfg.Limits.MaxHeaderByteSize
 	bctx := func(net.Listener) context.Context { return ctx }
 
@@ -53,14 +55,16 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 		Msg("server listening")
 
 	server := http.Server{
-		Addr:           addr,
-		ReadTimeout:    rdto,
-		WriteTimeout:   wrto,
-		Handler:        router,
-		BaseContext:    bctx,
-		ConnState:      diagConn,
-		MaxHeaderBytes: mhbz,
-		ErrorLog:       errLogger(),
+		Addr:              addr,
+		ReadTimeout:       rdto,
+		WriteTimeout:      wrto,
+		IdleTimeout:       idle,
+		ReadHeaderTimeout: rdhr,
+		Handler:           router,
+		BaseContext:       bctx,
+		ConnState:         diagConn,
+		MaxHeaderBytes:    mhbz,
+		ErrorLog:          errLogger(),
 	}
 
 	forceCh := make(chan struct{})
@@ -98,7 +102,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	}
 
 	ln = wrapConnLimitter(ctx, ln, cfg)
-	if err := server.Serve(ln); err != nil && err != context.Canceled {
+	if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
 		return err
 	}
 

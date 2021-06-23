@@ -18,9 +18,13 @@ VERSION=${DEFAULT_VERSION}
 endif
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
-LDFLAGS=-w -s -X main.Version=${VERSION}
+COMMIT=$(shell git rev-parse --short HEAD)
+LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT}
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
 CMD_COLOR_OFF=\033[0m
+
+# Directory to dump build tools into
+GOBIN=$(shell go env GOPATH)/bin/
 
 .PHONY: help
 help: ## - Show help message
@@ -41,9 +45,9 @@ clean: ## - Clean up build artifacts
 .PHONY: generate
 generate: ## - Generate schema models
 	@printf "${CMD_COLOR_ON} Installing module for go generate\n${CMD_COLOR_OFF}"
-	go install github.com/aleksmaus/generate/...
+	env GOBIN=${GOBIN} go install github.com/aleksmaus/generate/cmd/schema-generate@latest
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
-	go generate ./...
+	env PATH="${GOBIN}:${PATH}" go generate ./...
 
 .PHONY: check
 check: ## - Run all checks
@@ -55,8 +59,8 @@ check: ## - Run all checks
 
 .PHONY: check-headers
 check-headers:  ## - Check copyright headers
-	@go install github.com/elastic/go-licenser
-	@go-licenser -license Elastic
+	@env GOBIN=${GOBIN} go install github.com/elastic/go-licenser@latest
+	@env PATH="${GOBIN}:${PATH}" go-licenser -license Elastic
 
 .PHONY: check-go
 check-go: ## - Run go fmt, go vet, go mod tidy
@@ -68,8 +72,9 @@ check-go: ## - Run go fmt, go vet, go mod tidy
 notice: ## - Generates the NOTICE.txt file.
 	@echo "Generating NOTICE.txt"
 	@go mod tidy
-	@go mod download
-	go list -m -json all | go run go.elastic.co/go-licence-detector \
+	@go mod download all
+	@env GOBIN=${GOBIN} go install go.elastic.co/go-licence-detector@latest
+	go list -m -json all | env PATH="${GOBIN}:${PATH}" go-licence-detector \
 		-includeIndirect \
 		-rules dev-tools/notice/rules.json \
 		-overrides dev-tools/notice/overrides.json \
@@ -85,11 +90,11 @@ check-no-changes:
 
 .PHONY: test
 test: prepare-test-context  ## - Run all tests
-	@$(MAKE) test-unit 
-	@$(MAKE) test-int
+	@./dev-tools/run_with_go_ver $(MAKE) test-unit
+	@./dev-tools/run_with_go_ver $(MAKE) test-int
 	@$(MAKE) junit-report
 
-.PHONY: test-unit 
+.PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
 	set -o pipefail; go test -v -race ./... | tee build/test-unit.out
 
@@ -173,7 +178,7 @@ int-docker-stop: ## - Stop docker environment for integration tests
 .PHONY: test-int
 test-int: prepare-test-context  ## - Run integration tests with full setup (slow!)
 	@$(MAKE) int-docker-start
-	@set -o pipefail; $(MAKE) test-int-set | tee build/test-init.out
+	@set -o pipefail; $(MAKE) test-int-set | tee build/test-int.out
 	@$(MAKE) int-docker-stop
 
 # Run integration tests without starting/stopping docker
@@ -184,5 +189,4 @@ test-int: prepare-test-context  ## - Run integration tests with full setup (slow
 .PHONY: test-int-set
 test-int-set: ## - Run integration tests without setup
 	# Initialize indices one before running all the tests
-	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go run ./dev-tools/integration/main.go
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go test -v -tags=integration -count=1 -race ./...

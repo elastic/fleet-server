@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
 type SecurityInfo struct {
@@ -24,12 +24,8 @@ type SecurityInfo struct {
 	LookupRealm map[string]string `json:"lookup_realm"`
 }
 
-// Kibana:
-// https://github.com/elastic/kibana/blob/master/x-pack/plugins/security/server/authentication/authenticator.ts#L308
-// NOTE: Bulk request currently not available.
+// Note: Prefer the bulk wrapper on this API
 func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*SecurityInfo, error) {
-
-	// TODO: Escape request for safety.  Don't depend on ES.
 
 	token := fmt.Sprintf("%s%s", authPrefix, k.Token())
 
@@ -40,7 +36,7 @@ func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	res, err := req.Do(ctx, es)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("apikey auth request %s: %w", k.Id, err)
 	}
 
 	if res.Body != nil {
@@ -48,13 +44,13 @@ func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	}
 
 	if res.IsError() {
-		return nil, fmt.Errorf("fail Auth: %s", res.String())
+		return nil, fmt.Errorf("apikey auth response %s: %s", k.Id, res.String())
 	}
 
 	var info SecurityInfo
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&info); err != nil {
-		return nil, fmt.Errorf("Auth: error parsing response body: %s", err) // TODO: Wrap error
+		return nil, fmt.Errorf("apikey auth parse %s: %w", k.Id, err)
 	}
 
 	return &info, nil

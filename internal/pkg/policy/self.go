@@ -55,6 +55,8 @@ type selfMonitorT struct {
 	policiesIndex    string
 	enrollmentTokenF enrollmentTokenFetcher
 	checkTime        time.Duration
+
+	startCh chan struct{}
 }
 
 // NewSelfMonitor creates the self policy monitor.
@@ -74,6 +76,7 @@ func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monito
 		policiesIndex:    dl.FleetPolicies,
 		enrollmentTokenF: findEnrollmentAPIKeys,
 		checkTime:        DefaultCheckTime,
+		startCh:          make(chan struct{}),
 	}
 }
 
@@ -89,6 +92,8 @@ func (m *selfMonitorT) Run(ctx context.Context) error {
 
 	cT := time.NewTimer(m.checkTime)
 	defer cT.Stop()
+
+	close(m.startCh)
 
 LOOP:
 	for {
@@ -131,6 +136,15 @@ func (m *selfMonitorT) Status() proto.StateObserved_Status {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 	return m.status
+}
+
+func (m *selfMonitorT) waitStart(ctx context.Context) (err error) {
+	select {
+	case <-ctx.Done():
+		err = ctx.Err()
+	case <-m.startCh:
+	}
+	return
 }
 
 func (m *selfMonitorT) process(ctx context.Context) (proto.StateObserved_Status, error) {

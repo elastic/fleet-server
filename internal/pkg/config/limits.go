@@ -12,6 +12,7 @@ type Limit struct {
 	Interval time.Duration `config:"interval"`
 	Burst    int           `config:"burst"`
 	Max      int64         `config:"max"`
+	MaxBody  int64         `config:"max_body_byte_size"`
 }
 
 type ServerLimits struct {
@@ -35,6 +36,7 @@ func (c *ServerLimits) InitDefaults() {
 	c.CheckinLimit = Limit{
 		Interval: time.Millisecond,
 		Burst:    1000,
+		MaxBody:  1024 * 1024,
 	}
 	c.ArtifactLimit = Limit{
 		Interval: time.Millisecond * 5,
@@ -45,10 +47,12 @@ func (c *ServerLimits) InitDefaults() {
 		Interval: time.Millisecond * 10,
 		Burst:    100,
 		Max:      50,
+		MaxBody:  1024 * 512,
 	}
 	c.AckLimit = Limit{
 		Interval: time.Millisecond * 10,
 		Burst:    100,
 		Max:      50,
+		MaxBody:  1024 * 1024 * 2,
 	}
 }
