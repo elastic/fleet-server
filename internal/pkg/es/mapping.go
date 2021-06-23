@@ -146,6 +146,9 @@ const (
 		"unenrolled_at": {
 			"type": "date"
 		},
+		"unenrolled_reason": {
+			"type": "keyword"
+		},
 		"unenrollment_started_at": {
 			"type": "date"
 		},
@@ -304,6 +307,9 @@ const (
 		},
 		"@timestamp": {
 			"type": "date"
+		},
+		"unenroll_timeout": {
+			"type": "integer"
 		}		
 	}
 }`

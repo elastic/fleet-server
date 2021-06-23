@@ -150,6 +150,9 @@ type Agent struct {
 	// Date/time the Elastic Agent unenrolled
 	UnenrolledAt string `json:"unenrolled_at,omitempty"`
 
+	// Reason the Elastic Agent was unenrolled
+	UnenrolledReason string `json:"unenrolled_reason,omitempty"`
+
 	// Date/time the Elastic Agent unenrolled started
 	UnenrollmentStartedAt string `json:"unenrollment_started_at,omitempty"`
 
@@ -281,6 +284,9 @@ type Policy struct {
 
 	// Date/time the policy revision was created
 	Timestamp string `json:"@timestamp,omitempty"`
+
+	// Timeout (seconds) that an Elastic Agent should be un-enrolled.
+	UnenrollTimeout int64 `json:"unenroll_timeout,omitempty"`
 }
 
 // PolicyLeader The current leader Fleet Server for a policy
