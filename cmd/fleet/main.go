@@ -45,6 +45,7 @@ import (
 )
 
 const (
+	kServiceName               = "fleet-server"
 	kAgentMode                 = "agent-mode"
 	kAgentModeRestartLoopDelay = 2 * time.Second
 )
@@ -75,7 +76,7 @@ func makeCacheConfig(cfg *config.Config) cache.Config {
 }
 
 func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, error) {
-	l, err := logger.Init(cfg)
+	l, err := logger.Init(cfg, kServiceName)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +165,7 @@ func getRunCommand(version, commit string) func(cmd *cobra.Command, args []strin
 
 func NewCommand(version, commit string) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "fleet-server",
+		Use:   kServiceName,
 		Short: "Fleet Server controls a fleet of Elastic Agents",
 		RunE:  getRunCommand(version, commit),
 	}

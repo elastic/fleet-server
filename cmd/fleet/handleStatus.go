@@ -23,7 +23,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 
 	status := rt.sm.Status()
 	resp := StatusResponse{
-		Name:   "fleet-server",
+		Name:   kServiceName,
 		Status: status.String(),
 	}
 
