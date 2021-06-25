@@ -52,7 +52,15 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 	start := time.Now()
 
 	id := ps.ByName("id")
-	err := rt.ct._handleCheckin(w, r, id, rt.bulker)
+
+	reqId := r.Header.Get(logger.HeaderRequestID)
+
+	zlog := log.With().
+		Str("agentId", id).
+		Str(EcsHttpRequestId, reqId).
+		Logger()
+
+	err := rt.ct._handleCheckin(zlog, w, r, id, rt.bulker)
 
 	if err != nil {
 		cntCheckin.IncError(err)
@@ -128,9 +136,9 @@ func NewCheckinT(
 	return ct
 }
 
-func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk) error {
+func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk) error {
 
-	reqId := r.Header.Get(logger.HeaderRequestID)
+	start := time.Now()
 
 	limitF, err := ct.limit.Acquire()
 	if err != nil {
@@ -173,7 +181,7 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	cntCheckin.bodyIn.Add(readCounter.Count())
 
 	// Compare local_metadata content and update if different
-	rawMeta, err := parseMeta(agent, reqId, &req)
+	rawMeta, err := parseMeta(zlog, agent, &req)
 	if err != nil {
 		return err
 	}
@@ -183,14 +191,6 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	if err != nil {
 		return err
 	}
-
-	log.Debug().
-		Str("agentId", id).
-		Str("reqId", reqId).
-		Str("status", req.Status).
-		Str("seqNo", seqno.String()).
-		Uint64("bodyCount", readCounter.Count()).
-		Msg("checkin start long poll")
 
 	// Subscribe to actions dispatcher
 	aSub := ct.ad.Subscribe(agent.Id, seqno)
@@ -208,14 +208,17 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 	tick := time.NewTicker(ct.cfg.Timeouts.CheckinTimestamp)
 	defer tick.Stop()
 
-	pollDuration := ct.cfg.Timeouts.CheckinLongPoll
-	if ct.cfg.Timeouts.CheckinJitter != 0 {
-		jitter := time.Duration(rand.Int63n(int64(ct.cfg.Timeouts.CheckinJitter)))
-		if jitter < pollDuration {
-			pollDuration = pollDuration - jitter
-			log.Trace().Str("agentId", id).Dur("poll", pollDuration).Msg("Long poll with jitter")
-		}
-	}
+	setupDuration := time.Since(start)
+	pollDuration, jitter := calcPollDuration(zlog, ct.cfg, setupDuration)
+
+	zlog.Debug().
+		Str("status", req.Status).
+		Str("seqNo", seqno.String()).
+		Dur("setupDuration", setupDuration).
+		Dur("jitter", jitter).
+		Dur("pollDuration", pollDuration).
+		Uint64("bodyCount", readCounter.Count()).
+		Msg("checkin start long poll")
 
 	// Chill out for for a bit. Long poll.
 	longPoll := time.NewTicker(pollDuration)
@@ -249,14 +252,14 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 				actions = append(actions, acs...)
 				break LOOP
 			case policy := <-sub.Output():
-				actionResp, err := processPolicy(ctx, bulker, agent.Id, reqId, policy)
+				actionResp, err := processPolicy(ctx, zlog, bulker, agent.Id, policy)
 				if err != nil {
 					return errors.Wrap(err, "processPolicy")
 				}
 				actions = append(actions, *actionResp)
 				break LOOP
 			case <-longPoll.C:
-				log.Trace().Str(EcsHttpRequestId, reqId).Str("agentId", agent.Id).Msg("fire long poll")
+				zlog.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
 				ct.bc.CheckIn(agent.Id, req.Status, nil, nil)
@@ -270,10 +273,10 @@ func (ct *CheckinT) _handleCheckin(w http.ResponseWriter, r *http.Request, id st
 		Actions:  actions,
 	}
 
-	return ct.writeResponse(w, r, resp)
+	return ct.writeResponse(zlog, w, r, resp)
 }
 
-func (ct *CheckinT) writeResponse(w http.ResponseWriter, r *http.Request, resp CheckinResponse) error {
+func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, resp CheckinResponse) error {
 
 	payload, err := json.Marshal(&resp)
 	if err != nil {
@@ -304,7 +307,7 @@ func (ct *CheckinT) writeResponse(w http.ResponseWriter, r *http.Request, resp C
 
 		cntCheckin.bodyOut.Add(wrCounter.Count())
 
-		log.Trace().
+		zlog.Trace().
 			Err(err).
 			Int("lvl", compressionLevel).
 			Int("srcSz", len(payload)).
@@ -399,12 +402,10 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 //  - Generate and update default ApiKey if roles have changed.
 //  - Rewrite the policy for delivery to the agent injecting the key material.
 //
-func processPolicy(ctx context.Context, bulker bulk.Bulk, agentId, reqId string, pp *policy.ParsedPolicy) (*ActionResp, error) {
+func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentId string, pp *policy.ParsedPolicy) (*ActionResp, error) {
 
-	zlog := log.With().
+	zlog = zlog.With().
 		Str("ctx", "processPolicy").
-		Str(EcsHttpRequestId, reqId).
-		Str("agentId", agentId).
 		Str("policyId", pp.Policy.PolicyId).
 		Logger()
 
@@ -568,7 +569,7 @@ func findAgentByApiKeyId(ctx context.Context, bulker bulk.Bulk, id string) (*mod
 
 // parseMeta compares the agent and the request local_metadata content
 // and returns fields to update the agent record or nil
-func parseMeta(agent *model.Agent, reqId string, req *CheckinRequest) ([]byte, error) {
+func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
@@ -599,16 +600,12 @@ func parseMeta(agent *model.Agent, reqId string, req *CheckinRequest) ([]byte, e
 	// Compare the deserialized meta structures and return the bytes to update if different
 	if !reflect.DeepEqual(reqLocalMeta, agentLocalMeta) {
 
-		log.Trace().
-			Str("agentId", agent.Id).
-			Str(EcsHttpRequestId, reqId).
+		zlog.Trace().
 			RawJSON("oldLocalMeta", agent.LocalMetadata).
 			RawJSON("newLocalMeta", req.LocalMeta).
 			Msg("local metadata not equal")
 
-		log.Info().
-			Str("agentId", agent.Id).
-			Str(EcsHttpRequestId, reqId).
+		zlog.Info().
 			RawJSON("req.LocalMeta", req.LocalMeta).
 			Msg("applying new local metadata")
 
@@ -616,4 +613,42 @@ func parseMeta(agent *model.Agent, reqId string, req *CheckinRequest) ([]byte, e
 	}
 
 	return outMeta, nil
+}
+
+func calcPollDuration(zlog zerolog.Logger, cfg *config.Server, setupDuration time.Duration) (time.Duration, time.Duration) {
+
+	pollDuration := cfg.Timeouts.CheckinLongPoll
+
+	// Under heavy load, elastic may take along time to authorize the api key, many seconds to minutes.
+	// Short circuit the long poll to take the setup delay into account.  This is particularly necessary
+	// in cloud where the proxy will time us out after 5m20s causing unnecessary errors.
+
+	if setupDuration >= pollDuration {
+		// We took so long to setup that we need to exit immediately
+		pollDuration = 0
+		zlog.Warn().
+			Dur("setupDuration", setupDuration).
+			Dur("pollDuration", cfg.Timeouts.CheckinLongPoll).
+			Msg("excessive setup duration short cicuit long poll")
+
+	} else {
+		pollDuration -= setupDuration
+		if setupDuration > (time.Second * 10) {
+			zlog.Warn().
+				Dur("setupDuration", setupDuration).
+				Dur("pollDuration", pollDuration).
+				Msg("checking poll duration decreased due to slow setup")
+		}
+	}
+
+	var jitter time.Duration
+	if cfg.Timeouts.CheckinJitter != 0 {
+		jitter = time.Duration(rand.Int63n(int64(cfg.Timeouts.CheckinJitter)))
+		if jitter < pollDuration {
+			pollDuration = pollDuration - jitter
+			zlog.Trace().Dur("poll", pollDuration).Msg("Long poll with jitter")
+		}
+	}
+
+	return pollDuration, jitter
 }

@@ -33,6 +33,7 @@ type WriterSync interface {
 type Logger struct {
 	cfg  *config.Config
 	sync WriterSync
+	name string
 }
 
 // Reload reloads the logger configuration.
@@ -42,7 +43,7 @@ func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 		l.Sync()
 
 		// reload the logger
-		logger, w, err := configure(cfg)
+		logger, w, err := configure(cfg, l.name)
 		if err != nil {
 			return err
 		}
@@ -61,13 +62,13 @@ func (l *Logger) Sync() {
 }
 
 // Init initializes the logger.
-func Init(cfg *config.Config) (*Logger, error) {
+func Init(cfg *config.Config, svcName string) (*Logger, error) {
 	var err error
 	once.Do(func() {
 
 		var l zerolog.Logger
 		var w WriterSync
-		l, w, err = configure(cfg)
+		l, w, err = configure(cfg, svcName)
 		if err != nil {
 			return
 		}
@@ -76,6 +77,7 @@ func Init(cfg *config.Config) (*Logger, error) {
 		gLogger = &Logger{
 			cfg:  cfg,
 			sync: w,
+			name: svcName,
 		}
 
 		// override the field names for ECS
@@ -118,35 +120,55 @@ func level(cfg *config.Config) zerolog.Level {
 	return cfg.Logging.LogLevel()
 }
 
-func configure(cfg *config.Config) (zerolog.Logger, WriterSync, error) {
-	if cfg.Logging.ToStderr {
-		out := io.Writer(os.Stderr)
-		if cfg.Logging.Pretty {
-			out = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}
-		}
-		return log.Output(out).Level(level(cfg)), os.Stderr, nil
+func configureStderrLogger(cfg *config.Config) (zerolog.Logger, WriterSync) {
+
+	out := io.Writer(os.Stderr)
+	if cfg.Logging.Pretty {
+		out = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}
 	}
-	if cfg.Logging.ToFiles {
-		files := cfg.Logging.Files
-		if files == nil {
-			files = &config.LoggingFiles{}
-			files.InitDefaults()
-		}
-		filename := filepath.Join(files.Path, files.Name)
-		rotator, err := file.NewFileRotator(filename,
-			file.MaxSizeBytes(files.MaxSize),
-			file.MaxBackups(files.MaxBackups),
-			file.Permissions(os.FileMode(files.Permissions)),
-			file.Interval(files.Interval),
-			file.RotateOnStartup(files.RotateOnStartup),
-			file.RedirectStderr(files.RedirectStderr),
-		)
-		if err != nil {
-			return zerolog.Logger{}, nil, err
-		}
-		return log.Output(rotator).Level(level(cfg)), rotator, nil
+
+	return log.Output(out).Level(level(cfg)), os.Stderr
+}
+
+func configureFileRotatorLogger(cfg *config.Config) (zerolog.Logger, WriterSync, error) {
+
+	files := cfg.Logging.Files
+	if files == nil {
+		files = &config.LoggingFiles{}
+		files.InitDefaults()
 	}
-	return log.Output(ioutil.Discard).Level(level(cfg)), &nopSync{}, nil
+	filename := filepath.Join(files.Path, files.Name)
+	rotator, err := file.NewFileRotator(filename,
+		file.MaxSizeBytes(files.MaxSize),
+		file.MaxBackups(files.MaxBackups),
+		file.Permissions(os.FileMode(files.Permissions)),
+		file.Interval(files.Interval),
+		file.RotateOnStartup(files.RotateOnStartup),
+		file.RedirectStderr(files.RedirectStderr),
+	)
+	if err != nil {
+		return zerolog.Logger{}, nil, err
+	}
+	return log.Output(rotator).Level(level(cfg)), rotator, nil
+}
+
+func configure(cfg *config.Config, svcName string) (lg zerolog.Logger, wr WriterSync, err error) {
+
+	switch {
+	case cfg.Logging.ToStderr:
+		lg, wr = configureStderrLogger(cfg)
+	case cfg.Logging.ToFiles:
+		lg, wr, err = configureFileRotatorLogger(cfg)
+	default:
+		lg = log.Output(ioutil.Discard).Level(level(cfg))
+		wr = &nopSync{}
+	}
+
+	if svcName != "" {
+		lg = lg.With().Str(EcsServiceName, svcName).Logger()
+	}
+
+	return
 }
 
 type nopSync struct {
