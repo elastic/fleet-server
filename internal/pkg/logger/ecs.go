@@ -38,4 +38,7 @@ const (
 
 	// Event
 	EcsEventDuration = "event.duration"
+
+	// Service
+	EcsServiceName = "service.name"
 )
