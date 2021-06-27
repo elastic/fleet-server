@@ -38,6 +38,7 @@ type Elasticsearch struct {
 	ServiceToken   string            `config:"service_token"`
 	ProxyURL       string            `config:"proxy_url"`
 	ProxyDisable   bool              `config:"proxy_disable"`
+	ProxyHeaders   map[string]string `config:"proxy_headers"`
 	TLS            *tlscommon.Config `config:"ssl"`
 	MaxRetries     int               `config:"max_retries"`
 	MaxConnPerHost int               `config:"max_conn_per_host"`
@@ -124,6 +125,15 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 			return elasticsearch.Config{}, err
 		}
 		httpTransport.Proxy = http.ProxyURL(proxyUrl)
+
+		var headers http.Header
+		if len(c.ProxyHeaders) > 0 {
+			headers = make(http.Header, len(c.ProxyHeaders))
+			for k, v := range c.ProxyHeaders {
+				headers.Add(k, v)
+			}
+		}
+		httpTransport.ProxyConnectHeader = headers
 	}
 
 	h := http.Header{}
