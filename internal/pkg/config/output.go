@@ -119,21 +119,26 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 		}
 		httpTransport.TLSClientConfig = tls.ToConfig()
 	}
-	if c.ProxyURL != "" && !c.ProxyDisable {
-		proxyUrl, err := common.ParseURL(c.ProxyURL)
-		if err != nil {
-			return elasticsearch.Config{}, err
-		}
-		httpTransport.Proxy = http.ProxyURL(proxyUrl)
 
-		var headers http.Header
+	if !c.ProxyDisable {
+		if c.ProxyURL != "" {
+			proxyUrl, err := common.ParseURL(c.ProxyURL)
+			if err != nil {
+				return elasticsearch.Config{}, err
+			}
+			httpTransport.Proxy = http.ProxyURL(proxyUrl)
+		} else {
+			httpTransport.Proxy = http.ProxyFromEnvironment
+		}
+
+		var proxyHeaders http.Header
 		if len(c.ProxyHeaders) > 0 {
-			headers = make(http.Header, len(c.ProxyHeaders))
+			proxyHeaders = make(http.Header, len(c.ProxyHeaders))
 			for k, v := range c.ProxyHeaders {
-				headers.Add(k, v)
+				proxyHeaders.Add(k, v)
 			}
 		}
-		httpTransport.ProxyConnectHeader = headers
+		httpTransport.ProxyConnectHeader = proxyHeaders
 	}
 
 	h := http.Header{}
