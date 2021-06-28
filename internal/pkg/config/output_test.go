@@ -9,6 +9,7 @@ package config
 import (
 	"crypto/tls"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -169,6 +170,10 @@ func TestToESConfig(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			res, err := test.cfg.ToESConfig(false)
 			require.NoError(t, err)
+
+			// cmp.Diff can't handle function pointers.
+			res.Transport.(*http.Transport).Proxy = nil
+
 			test.result.Header.Set("X-elastic-product-origin", "fleet")
 			if !assert.True(t, cmp.Equal(test.result, res, copts...)) {
 				diff := cmp.Diff(test.result, res, copts...)
@@ -177,5 +182,104 @@ func TestToESConfig(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestESProxyConfig(t *testing.T) {
+	testcases := map[string]struct {
+		cfg     Elasticsearch
+		url     string
+		want    string
+		headers map[string]string
+		env     map[string]string
+	}{
+		"no proxy": {
+			cfg: Elasticsearch{ProxyDisable: true},
+		},
+		"proxy url set": {
+			cfg: Elasticsearch{
+				ProxyURL: "http://proxy.com",
+			},
+			url:  "http://test.com",
+			want: "http://proxy.com",
+		},
+		"with headers": {
+			cfg: Elasticsearch{
+				ProxyURL: "http://proxy.com",
+				ProxyHeaders: map[string]string{
+					"TestProxyHeader": "Custom Value",
+				},
+			},
+			url:  "http://test.com",
+			want: "http://proxy.com",
+			headers: map[string]string{
+				"TestProxyHeader": "Custom Value",
+			},
+		},
+		"proxy from env by default": {
+			cfg:  Elasticsearch{},
+			url:  "http://test.com",
+			want: "http://proxy.com",
+			env: map[string]string{
+				"HTTP_PROXY": "http://proxy.com",
+			},
+		},
+	}
+
+	for name, test := range testcases {
+		t.Run(name, func(t *testing.T) {
+			setTestEnv(t, test.env)
+
+			res, err := test.cfg.ToESConfig(false)
+			require.NoError(t, err)
+
+			transport := res.Transport.(*http.Transport)
+			if test.want == "" {
+				require.Nil(t, transport.Proxy)
+				return
+			}
+			require.NotNil(t, transport.Proxy)
+
+			req, err := http.NewRequest("GET", test.url, nil)
+			require.NoError(t, err)
+
+			got, err := transport.Proxy(req)
+			require.NoError(t, err)
+
+			if len(test.headers) == 0 {
+				require.Len(t, transport.ProxyConnectHeader, 0)
+			} else {
+				headers := http.Header{}
+				for k, v := range test.headers {
+					headers.Add(k, v)
+				}
+				require.Equal(t, headers, transport.ProxyConnectHeader)
+			}
+
+			require.Equal(t, test.want, got.String())
+		})
+	}
+}
+
+func setTestEnv(t *testing.T, env map[string]string) {
+	var oldEnv map[string]string
+	for k := range env {
+		if v := os.Getenv(k); v != "" {
+			oldEnv[k] = v
+		}
+	}
+
+	t.Cleanup(func() {
+		for k := range env {
+			if v := oldEnv[k]; v != v {
+				os.Setenv(k, v)
+			} else {
+				os.Unsetenv(k)
+			}
+		}
+	})
+
+	for k, v := range env {
+		os.Setenv(k, v)
 	}
 }
