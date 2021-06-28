@@ -38,7 +38,7 @@ func (f *FleetServer) initMetrics(ctx context.Context, cfg *config.Config) (*api
 		monitoring.NewString(registry, "version").Set(f.ver)
 	}
 	if registry.Get("name") == nil {
-		monitoring.NewString(registry, "name").Set("fleet-server")
+		monitoring.NewString(registry, "name").Set(kServiceName)
 	}
 
 	if !cfg.HTTP.Enabled {
@@ -84,7 +84,7 @@ func (rt *routeStats) Register(registry *monitoring.Registry) {
 }
 
 func init() {
-	metrics.SetupMetrics("fleet-server")
+	metrics.SetupMetrics(kServiceName)
 	registry = monitoring.Default.NewRegistry("http_server")
 	cntHttpNew = monitoring.NewUint(registry, "tcp_open")
 	cntHttpClose = monitoring.NewUint(registry, "tcp_close")
