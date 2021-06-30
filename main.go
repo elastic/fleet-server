@@ -16,7 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/cmd/fleet"
 )
 
-const defaultVersion = "7.14.0"
+const defaultVersion = "7.15.0"
 
 var (
 	Version string = defaultVersion
