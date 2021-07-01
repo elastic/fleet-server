@@ -12,12 +12,12 @@ import (
 	"net/http"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/net/netutil"
 )
 
 func diagConn(c net.Conn, s http.ConnState) {
@@ -131,7 +131,7 @@ func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) 
 			Int("hardConnLimit", hardLimit).
 			Msg("server hard connection limiter installed")
 
-		ln = netutil.LimitListener(ln, hardLimit)
+		ln = limit.Listener(ln, hardLimit)
 	} else {
 		log.Info().Msg("server hard connection limiter disabled")
 	}
