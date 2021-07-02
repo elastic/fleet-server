@@ -88,20 +88,33 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 		return err
 	}
 
-	defer ln.Close()
+	// Bind the deferred Close() to the stack variable to handle case where 'ln' is wrapped
+	defer func() { ln.Close() }()
+
+	// Conn Limiter must be before the TLS handshake in the stack;
+	// The server should not eat the cost of the handshake if there
+	// is no capacity to service the connection.
+	// Also, it appears the HTTP2 implementation depends on the tls.Listener
+	// being at the top of the stack.
+	ln = wrapConnLimitter(ctx, ln, cfg)
 
 	if cfg.TLS != nil && cfg.TLS.IsEnabled() {
-		tlsCfg, err := tlscommon.LoadTLSConfig(cfg.TLS)
+		commonTlsCfg, err := tlscommon.LoadTLSConfig(cfg.TLS)
 		if err != nil {
 			return err
 		}
-		server.TLSConfig = tlsCfg.ToConfig()
+		server.TLSConfig = commonTlsCfg.ToConfig()
+
+		// Must enable http/2 in the configuration explicitly.
+		// (see https://golang.org/pkg/net/http/#Server.Serve)
+		server.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
+
 		ln = tls.NewListener(ln, server.TLSConfig)
+
 	} else {
 		log.Warn().Msg("exposed over insecure HTTP; enablement of TLS is strongly recommended")
 	}
 
-	ln = wrapConnLimitter(ctx, ln, cfg)
 	if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
 		return err
 	}
