@@ -38,6 +38,7 @@ type Elasticsearch struct {
 	ServiceToken   string            `config:"service_token"`
 	ProxyURL       string            `config:"proxy_url"`
 	ProxyDisable   bool              `config:"proxy_disable"`
+	ProxyHeaders   map[string]string `config:"proxy_headers"`
 	TLS            *tlscommon.Config `config:"ssl"`
 	MaxRetries     int               `config:"max_retries"`
 	MaxConnPerHost int               `config:"max_conn_per_host"`
@@ -118,12 +119,26 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 		}
 		httpTransport.TLSClientConfig = tls.ToConfig()
 	}
-	if c.ProxyURL != "" && !c.ProxyDisable {
-		proxyUrl, err := common.ParseURL(c.ProxyURL)
-		if err != nil {
-			return elasticsearch.Config{}, err
+
+	if !c.ProxyDisable {
+		if c.ProxyURL != "" {
+			proxyUrl, err := common.ParseURL(c.ProxyURL)
+			if err != nil {
+				return elasticsearch.Config{}, err
+			}
+			httpTransport.Proxy = http.ProxyURL(proxyUrl)
+		} else {
+			httpTransport.Proxy = http.ProxyFromEnvironment
 		}
-		httpTransport.Proxy = http.ProxyURL(proxyUrl)
+
+		var proxyHeaders http.Header
+		if len(c.ProxyHeaders) > 0 {
+			proxyHeaders = make(http.Header, len(c.ProxyHeaders))
+			for k, v := range c.ProxyHeaders {
+				proxyHeaders.Add(k, v)
+			}
+		}
+		httpTransport.ProxyConnectHeader = proxyHeaders
 	}
 
 	h := http.Header{}
