@@ -145,10 +145,11 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 				select {
 				case s.c <- hits:
 				case <-lc.Done():
-					err := ctx.Err()
-					if err == context.DeadlineExceeded {
-						log.Err(err).Str("ctx", "subscription monitor").Dur("timeout", m.subTimeout).Msg("dropped notification")
-					}
+					log.Error().
+						Err(lc.Err()).
+						Str("ctx", "subscription monitor").
+						Dur("timeout", m.subTimeout).
+						Msg("dropped notification")
 				}
 			}(s)
 		}
