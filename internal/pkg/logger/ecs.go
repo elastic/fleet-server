@@ -33,6 +33,9 @@ const (
 	EcsClientIp      = "client.ip"
 	EcsClientPort    = "client.port"
 
+	// Server
+	EcsServerAddress = "server.address"
+
 	// TLS
 	EcsTlsEstablished = "tls.established"
 
