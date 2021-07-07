@@ -101,6 +101,13 @@ func (m *monitorT) Run(ctx context.Context) error {
 	s := m.monitor.Subscribe()
 	defer m.monitor.Unsubscribe(s)
 
+	// The output from m.monitor times out if we don't pull data off quickly enough.
+	// Rollout can take a while; append upates here until we can attend to it.
+	// TODO: This is a workaround for 7.14.  Rollout strategy will be reconsidered for 7.15.
+	subCtx, cfunc := context.WithCancel(ctx)
+	defer cfunc()
+	outputCh := m.monitorOutputChannel(subCtx, s.Output())
+
 	close(m.startCh)
 LOOP:
 	for {
@@ -111,7 +118,7 @@ LOOP:
 			if err := m.process(ctx); err != nil {
 				return err
 			}
-		case hits := <-s.Output():
+		case hits := <-outputCh:
 			policies := make([]model.Policy, len(hits))
 			for i, hit := range hits {
 				err := hit.Unmarshal(&policies[i])
@@ -126,6 +133,35 @@ LOOP:
 	}
 
 	return nil
+}
+
+// Aggegates changes from the output channel until the main loop can process.
+func (m *monitorT) monitorOutputChannel(ctx context.Context, outputCh <-chan []es.HitT) chan []es.HitT {
+	localOutputCh := make(chan []es.HitT)
+
+	go func() {
+
+		var hits []es.HitT
+		var outCh chan []es.HitT
+
+		for {
+			select {
+			case <-ctx.Done():
+				m.log.Info().Msg("Exit policy monitor local")
+				return
+			case nHits := <-outputCh:
+				m.log.Info().Int("nHits", len(nHits)).Msg("Received hits on local monitor")
+				hits = append(hits, nHits...)
+				outCh = localOutputCh
+			case outCh <- hits:
+				m.log.Info().Int("nHits", len(hits)).Msg("Hits dispatched to main loop")
+				outCh = nil
+				hits = nil
+			}
+		}
+	}()
+
+	return localOutputCh
 }
 
 func (m *monitorT) waitStart(ctx context.Context) (err error) {
@@ -189,7 +225,11 @@ func (m *monitorT) groupByLatest(policies []model.Policy) map[string]model.Polic
 }
 
 func (m *monitorT) rollout(ctx context.Context, policy model.Policy) error {
-	zlog := m.log.With().Str("policyId", policy.PolicyId).Logger()
+	zlog := m.log.With().
+		Str("policyId", policy.PolicyId).
+		Int64("revisionIdx", policy.RevisionIdx).
+		Int64("coordinatorIdx", policy.CoordinatorIdx).
+		Logger()
 
 	pp, err := NewParsedPolicy(policy)
 	if err != nil {
