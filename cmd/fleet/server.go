@@ -12,6 +12,7 @@ import (
 	"net/http"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 	"github.com/julienschmidt/httprouter"
@@ -142,7 +143,7 @@ type stubLogger struct {
 }
 
 func (s *stubLogger) Write(p []byte) (n int, err error) {
-	log.Error().Bytes("msg", p).Send()
+	log.Error().Bytes(logger.EcsMessage, p).Send()
 	return len(p), nil
 }
 
