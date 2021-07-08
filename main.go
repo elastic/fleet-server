@@ -13,9 +13,6 @@ import (
 	"fmt"
 	"os"
 
-	// Needed for the generator not to be nuked by go tidy. Fails make check otherwise.
-	_ "github.com/aleksmaus/generate"
-
 	"github.com/elastic/fleet-server/v7/cmd/fleet"
 )
 
