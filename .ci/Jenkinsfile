@@ -38,8 +38,8 @@ pipeline {
     stage('Check') {
       steps {
         cleanup()
-        withGoEnv(){
-          dir("${BASE_DIR}"){
+        dir("${BASE_DIR}"){
+          withGoEnv(){
             sh(label: 'check',script: 'make check')
           }
         }
@@ -48,8 +48,8 @@ pipeline {
     stage('Local') {
       steps {
         cleanup()
-        withGoEnv(){
-          dir("${BASE_DIR}"){
+        dir("${BASE_DIR}"){
+          withGoEnv(){
             sh(label: 'local',script: 'make local')
           }
         }
@@ -58,8 +58,8 @@ pipeline {
     stage('Test') {
       steps {
         cleanup()
-        withGoEnv(){
-          dir("${BASE_DIR}"){
+        dir("${BASE_DIR}"){
+          withGoEnv(){
             retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install Docker", script: '.ci/scripts/install-docker-compose.sh') }
             sh(label: 'test', script: 'make test')
           }
