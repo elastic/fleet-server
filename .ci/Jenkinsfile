@@ -55,9 +55,6 @@ pipeline {
         }
       }
     }
-<<<<<<< HEAD
-    stage('Test') {
-=======
     stage('Unit Test') {
       options { skipDefaultCheckout() }
       steps {
@@ -77,7 +74,6 @@ pipeline {
     }
     stage('Integration Test') {
       options { skipDefaultCheckout() }
->>>>>>> ffb8bfe (chore: separate unit from integration tests in pipeline)
       steps {
         cleanup()
         dir("${BASE_DIR}"){
