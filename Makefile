@@ -85,8 +85,8 @@ check-no-changes:
 
 .PHONY: test
 test: prepare-test-context  ## - Run all tests
-	@$(MAKE) test-unit 
-	@$(MAKE) test-int
+	@./dev-tools/run_with_go_ver $(MAKE) test-unit 
+	@./dev-tools/run_with_go_ver $(MAKE) test-int
 	@$(MAKE) junit-report
 
 .PHONY: test-unit 
