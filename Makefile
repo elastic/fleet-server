@@ -17,6 +17,10 @@ else
 VERSION=${DEFAULT_VERSION}
 endif
 
+ifdef VERSION_QUALIFIER
+VERSION:=${VERSION}-${VERSION_QUALIFIER}
+endif
+
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
 COMMIT=$(shell git rev-parse --short HEAD)
 LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT}
