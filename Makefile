@@ -11,6 +11,11 @@ BUILDMODE_windows_amd64=-buildmode=pie
 BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
+
+ifdef VERSION_QUALIFIER
+DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
+endif
+
 ifeq ($(SNAPSHOT),true)
 VERSION=${DEFAULT_VERSION}-SNAPSHOT
 else
