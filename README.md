@@ -82,7 +82,7 @@ Replace {YOUR-IP} with the IP address of your machine.
 By default the above will download the most recent snapshot build for fleet-server. To use your own development build, run `make release` in the fleet-server repository, go to `build/distributions` and copy the `.tar.gz` and `sha512` file to the `data/elastic-agent-{hash}/downloads` inside the elastic-agent directory. Now you run with your own build of fleet-server.
 
 
-## Compatbility and upgrades
+## Compatibility and upgrades
 
 Fleet server is always on the exact same version as Elastic Agent running fleet-server. Any Elastic Agent enrolling into a fleet-server must be the same version or older. Fleet-server communicates with Elasticsearch. Elasticsearch must be on the same version or newer. For Kibana it is assumed it is on the same version as Elasticsearch. With this the compatibility looks as following:
 
@@ -93,8 +93,11 @@ Elastic Agent <= Elastic Agent with fleet-server) <= Elasticsearch / Kibana
 There might be differences on the bugfix version.
 
 If an upgrade is done, Elasticsearch / Kibana have to be upgraded first, then Elastic Agent with fleet-server and last the Elastic Agents.
+<<<<<<< HEAD
 
 ## MacOSX Version
 
 The [golang-crossbuild](https://github.com/elastic/golang-crossbuild) produces images used for testing/building.
 The `golang-crossbuild:1.16.X-darwin-debian10` images expects the minimum MacOSX version to be 10.14+.
+=======
+>>>>>>> 60c9b46 (Update README.md)
