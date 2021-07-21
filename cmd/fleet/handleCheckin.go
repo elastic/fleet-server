@@ -388,6 +388,7 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 			Id:        action.ActionId,
 			Type:      action.Type,
 			InputType: action.InputType,
+			Timeout:   action.Timeout,
 		})
 	}
 

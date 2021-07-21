@@ -98,6 +98,7 @@ type ActionResp struct {
 	Id        string      `json:"id"`
 	Type      string      `json:"type"`
 	InputType string      `json:"input_type"`
+	Timeout   int64       `json:"timeout,omitempty"`
 }
 
 type Event struct {

@@ -38,6 +38,10 @@
           "description": "The input type the actions should be routed to.",
           "type": "string"
         },
+        "timeout": {
+          "description": "The optional action timeout in seconds",
+          "type": "integer"
+        },
         "user_id": {
           "description": "The ID of the user who created the action.",
           "type": "string"
