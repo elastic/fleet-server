@@ -27,6 +27,9 @@ const (
 		"input_type": {
 			"type": "keyword"
 		},
+		"timeout": {
+			"type": "integer"
+		},
 		"@timestamp": {
 			"type": "date"
 		},

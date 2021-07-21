@@ -48,6 +48,9 @@ type Action struct {
 	// The input type the actions should be routed to.
 	InputType string `json:"input_type,omitempty"`
 
+	// The optional action timeout in seconds
+	Timeout int64 `json:"timeout,omitempty"`
+
 	// Date/time the action was created
 	Timestamp string `json:"@timestamp,omitempty"`
 
