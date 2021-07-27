@@ -6,7 +6,7 @@ require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/elastic/beats/v7 v7.11.1
-	github.com/elastic/elastic-agent-client/v7 v7.0.0-20200709172729-d43b7ad5833a
+	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6
 	github.com/elastic/go-elasticsearch/v7 v7.13.1
 	github.com/elastic/go-ucfg v0.8.3
 	github.com/gofrs/uuid v3.3.0+incompatible
