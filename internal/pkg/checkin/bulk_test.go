@@ -43,12 +43,14 @@ func TestBulkSimple(t *testing.T) {
 
 	bc := NewBulk(&mockBulk)
 
+	const ver = "8.0.0"
 	cases := []struct {
 		desc   string
 		id     string
 		status string
 		meta   []byte
 		seqno  sqn.SeqNo
+		ver    string
 	}{
 		{
 			"Simple case",
@@ -56,6 +58,7 @@ func TestBulkSimple(t *testing.T) {
 			"online",
 			nil,
 			nil,
+			"",
 		},
 		{
 			"Singled field case",
@@ -63,6 +66,7 @@ func TestBulkSimple(t *testing.T) {
 			"online",
 			[]byte(`{"hey":"now"}`),
 			nil,
+			"",
 		},
 		{
 			"Multi field case",
@@ -70,6 +74,7 @@ func TestBulkSimple(t *testing.T) {
 			"online",
 			[]byte(`{"hey":"now","brown":"cow"}`),
 			nil,
+			ver,
 		},
 		{
 			"Multi field nested case",
@@ -77,6 +82,7 @@ func TestBulkSimple(t *testing.T) {
 			"online",
 			[]byte(`{"hey":"now","wee":{"little":"doggie"}}`),
 			nil,
+			"",
 		},
 		{
 			"Simple case with seqNo",
@@ -84,6 +90,7 @@ func TestBulkSimple(t *testing.T) {
 			"online",
 			nil,
 			sqn.SeqNo{1, 2, 3, 4},
+			ver,
 		},
 		{
 			"Field case with seqNo",
@@ -91,6 +98,7 @@ func TestBulkSimple(t *testing.T) {
 			"online",
 			[]byte(`{"uncle":"fester"}`),
 			sqn.SeqNo{5, 6, 7, 8},
+			ver,
 		},
 		{
 			"Unusual status",
@@ -98,6 +106,7 @@ func TestBulkSimple(t *testing.T) {
 			"unusual",
 			nil,
 			nil,
+			"",
 		},
 		{
 			"Empty status",
@@ -105,13 +114,14 @@ func TestBulkSimple(t *testing.T) {
 			"",
 			nil,
 			nil,
+			"",
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
 
-			if err := bc.CheckIn(c.id, c.status, c.meta, c.seqno); err != nil {
+			if err := bc.CheckIn(c.id, c.status, c.meta, c.seqno, c.ver); err != nil {
 				t.Fatal(err)
 			}
 
@@ -205,7 +215,7 @@ func benchmarkBulk(n int, flush bool, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 
 		for _, id := range ids {
-			err := bc.CheckIn(id, "", nil, nil)
+			err := bc.CheckIn(id, "", nil, nil, "")
 			if err != nil {
 				b.Fatal(err)
 			}

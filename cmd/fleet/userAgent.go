@@ -57,22 +57,22 @@ func maximizePatch(ver *version.Version) string {
 
 // validateUserAgent validates that the User-Agent of the connecting Elastic Agent is valid and that the version is
 // supported for this Fleet Server.
-func validateUserAgent(r *http.Request, verConst version.Constraints) error {
+func validateUserAgent(r *http.Request, verConst version.Constraints) (string, error) {
 	userAgent := r.Header.Get("User-Agent")
 	if userAgent == "" {
-		return ErrInvalidUserAgent
+		return "", ErrInvalidUserAgent
 	}
 	userAgent = strings.ToLower(userAgent)
 	if !strings.HasPrefix(userAgent, userAgentPrefix) {
-		return ErrInvalidUserAgent
+		return "", ErrInvalidUserAgent
 	}
 	verStr := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(userAgent, userAgentPrefix), "-snapshot"))
 	ver, err := version.NewVersion(verStr)
 	if err != nil {
-		return ErrInvalidUserAgent
+		return "", ErrInvalidUserAgent
 	}
 	if !verConst.Check(ver) {
-		return ErrUnsupportedVersion
+		return "", ErrUnsupportedVersion
 	}
-	return nil
+	return strings.TrimPrefix(verStr, "v"), nil
 }

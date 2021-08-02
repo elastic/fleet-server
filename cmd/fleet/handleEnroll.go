@@ -135,7 +135,7 @@ func (et *EnrollerT) handleEnroll(w http.ResponseWriter, r *http.Request) (*Enro
 		return nil, err
 	}
 
-	err = validateUserAgent(r, et.verCon)
+	ver, err := validateUserAgent(r, et.verCon)
 	if err != nil {
 		return nil, err
 	}
@@ -167,10 +167,10 @@ func (et *EnrollerT) handleEnroll(w http.ResponseWriter, r *http.Request) (*Enro
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	return _enroll(r.Context(), et.bulker, et.cache, *req, *erec)
+	return _enroll(r.Context(), et.bulker, et.cache, *req, *erec, ver)
 }
 
-func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollRequest, erec model.EnrollmentApiKey) (*EnrollResponse, error) {
+func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollRequest, erec model.EnrollmentApiKey, ver string) (*EnrollResponse, error) {
 
 	if req.SharedId != "" {
 		// TODO: Support pre-existing install
@@ -210,6 +210,10 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		LocalMetadata:  localMeta,
 		AccessApiKeyId: accessApiKey.Id,
 		ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
+		Agent: &model.AgentMetadata{
+			Id:      agentId,
+			Version: ver,
+		},
 	}
 
 	err = createFleetAgent(ctx, bulker, agentId, agentData)
