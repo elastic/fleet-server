@@ -66,7 +66,14 @@ func validateUserAgent(r *http.Request, verConst version.Constraints) (string, e
 	if !strings.HasPrefix(userAgent, userAgentPrefix) {
 		return "", ErrInvalidUserAgent
 	}
-	verStr := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(userAgent, userAgentPrefix), "-snapshot"))
+
+	// Trim "elastic agent " prefix
+	s := strings.TrimPrefix(userAgent, userAgentPrefix)
+	// Trim "-snapshot" suffix
+	s = strings.TrimSuffix(s, "-snapshot")
+	// Trim leading and traling spaces
+	verStr := strings.TrimSpace(s)
+
 	ver, err := version.NewVersion(verStr)
 	if err != nil {
 		return "", ErrInvalidUserAgent
@@ -74,5 +81,5 @@ func validateUserAgent(r *http.Request, verConst version.Constraints) (string, e
 	if !verConst.Check(ver) {
 		return "", ErrUnsupportedVersion
 	}
-	return strings.TrimPrefix(verStr, "v"), nil
+	return ver.String(), nil
 }
