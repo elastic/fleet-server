@@ -66,8 +66,8 @@ func validateUserAgent(r *http.Request, verConst version.Constraints) error {
 	if !strings.HasPrefix(userAgent, userAgentPrefix) {
 		return ErrInvalidUserAgent
 	}
-	verStr := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(userAgent, userAgentPrefix), "-snapshot"))
-	ver, err := version.NewVersion(verStr)
+	verSep := strings.Split(strings.TrimPrefix(userAgent, userAgentPrefix), "-")
+	ver, err := version.NewVersion(verSep[0])
 	if err != nil {
 		return ErrInvalidUserAgent
 	}
