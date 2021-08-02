@@ -83,7 +83,7 @@ func minimizePatch(ver *version.Version) string {
 }
 
 func parseVersion(sver string) (*version.Version, error) {
-	ver, err := version.NewVersion(sver)
+	ver, err := version.NewVersion(strings.Split(sver, "-")[0])
 	if err != nil {
 		return nil, fmt.Errorf("%v: %w", err, ErrMalformedVersion)
 	}
