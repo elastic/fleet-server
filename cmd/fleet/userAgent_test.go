@@ -112,7 +112,7 @@ func TestValidateUserAgent(t *testing.T) {
 		t.Run(tr.userAgent, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set("User-Agent", tr.userAgent)
-			res := validateUserAgent(req, tr.verCon)
+			_, res := validateUserAgent(req, tr.verCon)
 			if tr.err != res {
 				t.Fatalf("err mismatch: %v != %v", tr.err, res)
 			}
