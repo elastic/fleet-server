@@ -73,7 +73,10 @@ func validateUserAgent(r *http.Request, verConst version.Constraints) (string, e
 	// Split the version to accommodate versions with suffixes such as v8.0.0-snapshot v8.0.0-alpha1
 	verSep := strings.Split(s, "-")
 
-	ver, err := version.NewVersion(verSep[0])
+	// Trim leading and traling spaces
+	verStr := strings.TrimSpace(verSep[0])
+
+	ver, err := version.NewVersion(verStr)
 	if err != nil {
 		return "", ErrInvalidUserAgent
 	}
