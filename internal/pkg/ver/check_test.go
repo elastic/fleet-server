@@ -70,6 +70,18 @@ func TestCheckCompatibilityInternal(t *testing.T) {
 			esVersion:    "7.18.0",
 			err:          ErrUnsupportedVersion,
 		},
+		{
+			name:         "supported elasticsearch 800a1",
+			fleetVersion: "8.0.0-alpha1",
+			esVersion:    "8.0.0-alpha1",
+			err:          nil,
+		},
+		{
+			name:         "supported elasticsearch 715-800a1",
+			fleetVersion: "7.15.2",
+			esVersion:    "8.0.0-alpha1",
+			err:          nil,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

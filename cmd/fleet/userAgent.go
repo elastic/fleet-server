@@ -69,12 +69,11 @@ func validateUserAgent(r *http.Request, verConst version.Constraints) (string, e
 
 	// Trim "elastic agent " prefix
 	s := strings.TrimPrefix(userAgent, userAgentPrefix)
-	// Trim "-snapshot" suffix
-	s = strings.TrimSuffix(s, "-snapshot")
-	// Trim leading and traling spaces
-	verStr := strings.TrimSpace(s)
 
-	ver, err := version.NewVersion(verStr)
+	// Split the version to accommodate versions with suffixes such as v8.0.0-snapshot v8.0.0-alpha1
+	verSep := strings.Split(s, "-")
+
+	ver, err := version.NewVersion(verSep[0])
 	if err != nil {
 		return "", ErrInvalidUserAgent
 	}
