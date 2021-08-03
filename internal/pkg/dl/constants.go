@@ -40,6 +40,7 @@ const (
 	FieldDefaultApiKeyId             = "default_api_key_id"
 	FieldPolicyOutputPermissionsHash = "policy_output_permissions_hash"
 	FieldUnenrolledReason            = "unenrolled_reason"
+	FieldAgentVersion                = "agent.version"
 
 	FieldActive           = "active"
 	FieldUpdatedAt        = "updated_at"

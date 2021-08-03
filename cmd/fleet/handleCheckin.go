@@ -152,9 +152,14 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 		return err
 	}
 
-	err = validateUserAgent(r, ct.verCon)
+	ver, err := validateUserAgent(r, ct.verCon)
 	if err != nil {
 		return err
+	}
+
+	var newVer string
+	if ver != agent.Agent.Version {
+		newVer = ver
 	}
 
 	// Metrics; serenity now.
@@ -225,7 +230,7 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer longPoll.Stop()
 
 	// Intial update on checkin, and any user fields that might have changed
-	ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno)
+	ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno, newVer)
 
 	// Initial fetch for pending actions
 	var (
@@ -262,7 +267,7 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 				zlog.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
-				ct.bc.CheckIn(agent.Id, req.Status, nil, nil)
+				ct.bc.CheckIn(agent.Id, req.Status, nil, nil, newVer)
 			}
 		}
 	}
