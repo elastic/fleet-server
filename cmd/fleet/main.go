@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -471,9 +472,10 @@ LOOP:
 
 		// Create or recreate cache
 		if configCacheChanged(curCfg, newCfg) {
+			log.Info().Msg("reconfigure cache on configuration change")
 			cacheCfg := makeCacheConfig(newCfg)
 			err := f.cache.Reconfigure(cacheCfg)
-			log.Info().Err(err).Interface("cfg", cacheCfg).Msg("Reconfigure cache")
+			log.Info().Err(err).Interface("cfg", cacheCfg).Msg("reconfigure cache complete")
 			if err != nil {
 				return err
 			}
@@ -481,9 +483,13 @@ LOOP:
 
 		// Start or restart profiler
 		if configChangedProfiler(curCfg, newCfg) {
-			stop(proCancel, proEg)
+			if proCancel != nil {
+				log.Info().Msg("stopping profiler on configuration change")
+				stop(proCancel, proEg)
+			}
 			proEg, proCancel = nil, nil
 			if newCfg.Inputs[0].Server.Profiler.Enabled {
+				log.Info().Msg("starting profiler on configuration change")
 				proEg, proCancel = start(ctx, func(ctx context.Context) error {
 					return profile.RunProfiler(ctx, newCfg.Inputs[0].Server.Profiler.Bind)
 				}, ech)
@@ -492,7 +498,11 @@ LOOP:
 
 		// Start or restart server
 		if configChangedServer(curCfg, newCfg) {
-			stop(srvCancel, srvEg)
+			if srvCancel != nil {
+				log.Info().Msg("stopping server on configuration change")
+				stop(srvCancel, srvEg)
+			}
+			log.Info().Msg("starting server on configuration change")
 			srvEg, srvCancel = start(ctx, func(ctx context.Context) error {
 				return f.runServer(ctx, newCfg)
 			}, ech)
@@ -541,8 +551,43 @@ func configChangedProfiler(curCfg, newCfg *config.Config) bool {
 	return changed
 }
 
+func redactServerCfg(cfg *config.Config) config.Server {
+	const kRedacted = "[redacted]"
+	redacted := cfg.Inputs[0].Server
+
+	if redacted.TLS != nil {
+		newTLS := *redacted.TLS
+
+		if newTLS.Certificate.Key != "" {
+			newTLS.Certificate.Key = kRedacted
+		}
+		if newTLS.Certificate.Passphrase != "" {
+			newTLS.Certificate.Passphrase = kRedacted
+		}
+
+		redacted.TLS = &newTLS
+	}
+
+	return redacted
+}
+
 func configChangedServer(curCfg, newCfg *config.Config) bool {
-	return curCfg == nil || curCfg.Inputs[0].Server != newCfg.Inputs[0].Server
+
+	zlog := log.With().Interface("new", redactServerCfg(newCfg)).Logger()
+
+	changed := true
+	switch {
+	case curCfg == nil:
+		zlog.Info().Msg("initial server configuration")
+	case !reflect.DeepEqual(curCfg.Inputs[0].Server, newCfg.Inputs[0].Server):
+		zlog.Info().
+			Interface("old", redactServerCfg(curCfg)).
+			Msg("server configuration has changed")
+	default:
+		changed = false
+	}
+
+	return changed
 }
 
 func configCacheChanged(curCfg, newCfg *config.Config) bool {
