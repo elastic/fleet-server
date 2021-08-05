@@ -272,6 +272,17 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 		}
 	}
 
+	for _, action := range actions {
+		zlog.Info().
+			Str("ackToken", ackToken).
+			Str("createdAt", action.CreatedAt).
+			Str("id", action.Id).
+			Str("type", action.Type).
+			Str("inputType", action.InputType).
+			Int64("timeout", action.Timeout).
+			Msg("Action delivered to agent on checkin")
+	}
+
 	resp := CheckinResponse{
 		AckToken: ackToken,
 		Action:   "checkin",
