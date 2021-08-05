@@ -396,8 +396,9 @@ func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *mod
 }
 
 func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d time.Duration) {
+	cnt := 0
 	for {
-		l.Info().Str("coordinator", cord.Name()).Msg("starting coordinator for policy")
+		l.Info().Int("count", cnt).Str("coordinator", cord.Name()).Msg("starting coordinator for policy")
 		err := cord.Run(ctx)
 		if err != context.Canceled {
 			l.Err(err).Msg("coordinator failed")
@@ -407,6 +408,7 @@ func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d t
 		} else {
 			break
 		}
+		cnt += 1
 	}
 }
 
