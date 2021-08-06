@@ -423,6 +423,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 
 	zlog = zlog.With().
 		Str("ctx", "processPolicy").
+		Int64("policyRevision", pp.Policy.RevisionIdx).
+		Int64("policyCoordinator", pp.Policy.CoordinatorIdx).
 		Str("policyId", pp.Policy.PolicyId).
 		Logger()
 
