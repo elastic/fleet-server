@@ -237,6 +237,13 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, agent *model.Agent, act
 		bulk.WithRetryOnConflict(3),
 	)
 
+	log.Info().Err(err).
+		Str("agentId", agent.Id).
+		Str("policyId", agent.PolicyId).
+		Int64("policyRevision", currRev).
+		Int64("policyCoordinator", currCoord).
+		Msg("Policy ACK")
+
 	return errors.Wrap(err, "handlePolicyChange update")
 }
 
