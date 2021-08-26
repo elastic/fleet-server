@@ -270,14 +270,14 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		// Fetch up to known checkpoint
 		count := m.fetchSize
 		for count == m.fetchSize {
-			hits, err := m.fetch(ctx, newCheckpoint)
+			hits, err := m.fetch(ctx, checkpoint, newCheckpoint)
 			if err != nil {
 				m.log.Error().Err(err).Msg("failed checking new documents")
 				break
 			}
 
 			// Check if the list of hits has holes
-			if hasHoles(hits) {
+			if hasHoles(checkpoint, hits) {
 				m.log.Debug().Msg("hits list has holes, refresh index")
 				err = m.refresh(ctx)
 				if err != nil {
@@ -286,31 +286,50 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 				}
 
 				// Refetch
-				hits, err = m.fetch(ctx, newCheckpoint)
+				hits, err = m.fetch(ctx, checkpoint, newCheckpoint)
 				if err != nil {
 					m.log.Error().Err(err).Msg("failed checking new documents after refresh")
 					break
 				}
 			}
 
+			// Notify call updates checkpoint
 			count = m.notify(ctx, hits)
+
+			// Get the latest checkpoint for the next fetch iteration
+			if count == m.fetchSize {
+				checkpoint = m.loadCheckpoint()
+			}
 		}
 	}
 }
 
-func hasHoles(hits []es.HitT) bool {
+func hasHoles(checkpoint sqn.SeqNo, hits []es.HitT) bool {
 	sz := len(hits)
+	if sz == 0 {
+		return false
+	}
+
+	// Check if the hole is in the beginning of hits
+	seqNo := checkpoint.Value()
+	if seqNo != sqn.UndefinedSeqNo && (hits[0].SeqNo-seqNo) > 1 {
+		return true
+	}
+
+	// No holes in the beginning, check if size <= 1 then there is no holes
 	if sz <= 1 {
 		return false
 	}
 
-	seqNo := hits[sz-1].SeqNo
+	// Set initial seqNo value from the last hit in the array
+	seqNo = hits[sz-1].SeqNo
 
-	// Iterate from the end since where it most likely can have holes
+	// Iterate from the end since that's where it more likely to have holes
 	for i := sz - 2; i >= 0; i-- {
 		if (seqNo - hits[i].SeqNo) > 1 {
 			return true
 		}
+		seqNo = hits[i].SeqNo
 	}
 	return false
 }
@@ -329,10 +348,8 @@ func (m *simpleMonitorT) notify(ctx context.Context, hits []es.HitT) int {
 	return 0
 }
 
-func (m *simpleMonitorT) fetch(ctx context.Context, maxCheckpoint sqn.SeqNo) ([]es.HitT, error) {
+func (m *simpleMonitorT) fetch(ctx context.Context, checkpoint, maxCheckpoint sqn.SeqNo) ([]es.HitT, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
-
-	checkpoint := m.loadCheckpoint()
 
 	// Run check query that detects that there are new documents available
 	params := map[string]interface{}{

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -18,6 +19,7 @@ func TestHashHoles(t *testing.T) {
 
 	tests := []struct {
 		Name     string
+		SeqNo    sqn.SeqNo
 		Hits     []es.HitT
 		HasHoles bool
 	}{
@@ -30,16 +32,17 @@ func TestHashHoles(t *testing.T) {
 			Hits: genHitsSequence([]int64{}),
 		},
 		{
-			Name: "one",
-			Hits: genHitsSequence([]int64{1}),
+			Name:  "one",
+			SeqNo: sqn.SeqNo([]int64{2}),
+			Hits:  genHitsSequence([]int64{3}),
 		},
 		{
 			Name: "two",
-			Hits: genHitsSequence([]int64{1, 2}),
+			Hits: genHitsSequence([]int64{2, 3}),
 		},
 		{
 			Name:     "two with hole",
-			Hits:     genHitsSequence([]int64{1, 3}),
+			Hits:     genHitsSequence([]int64{2, 4}),
 			HasHoles: true,
 		},
 		{
@@ -47,11 +50,22 @@ func TestHashHoles(t *testing.T) {
 			Hits:     genHitsSequence([]int64{2, 3, 4, 6}),
 			HasHoles: true,
 		},
+		{
+			Name:     "hole in the beginning",
+			SeqNo:    sqn.SeqNo([]int64{1}),
+			Hits:     genHitsSequence([]int64{3, 4, 5}),
+			HasHoles: true,
+		},
+		{
+			Name:  "four no holes",
+			SeqNo: sqn.SeqNo([]int64{1}),
+			Hits:  genHitsSequence([]int64{2, 3, 4, 5}),
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			diff := cmp.Diff(tc.HasHoles, hasHoles(tc.Hits))
+			diff := cmp.Diff(tc.HasHoles, hasHoles(tc.SeqNo, tc.Hits))
 			if diff != "" {
 				t.Fatal(diff)
 			}
