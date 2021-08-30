@@ -369,7 +369,7 @@ func (m *simpleMonitorT) fetch(ctx context.Context, checkpoint, maxCheckpoint sq
 }
 
 // Refreshes index. This is temporary code
-// TODO: Remove this when the refresh is properly imlemented on Eleasticsearch side
+// TODO: Remove this when the refresh is properly implemented on Eleasticsearch side
 func (m *simpleMonitorT) refresh(ctx context.Context) error {
 	res, err := m.esCli.Indices.Refresh(
 		m.esCli.Indices.Refresh.WithContext(ctx),
