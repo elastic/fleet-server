@@ -370,6 +370,8 @@ func (m *simpleMonitorT) fetch(ctx context.Context, checkpoint, maxCheckpoint sq
 
 // Refreshes index. This is temporary code
 // TODO: Remove this when the refresh is properly implemented on Eleasticsearch side
+// The issue for "refresh" falls under phase 2 of https://github.com/elastic/elasticsearch/issues/71449.
+// Once the phase 2 is complete we can remove the refreshes from fleet-server.
 func (m *simpleMonitorT) refresh(ctx context.Context) error {
 	res, err := m.esCli.Indices.Refresh(
 		m.esCli.Indices.Refresh.WithContext(ctx),
