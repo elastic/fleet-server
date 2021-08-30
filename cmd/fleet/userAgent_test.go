@@ -77,12 +77,42 @@ func TestValidateUserAgent(t *testing.T) {
 			verCon:    mustBuildConstraints("8.0.0"),
 			err:       nil,
 		},
+		{
+			userAgent: "eLaStIc AGeNt v7.13.0",
+			verCon:    mustBuildConstraints("8.0.0-alpha1"),
+			err:       nil,
+		},
+		{
+			userAgent: "eLaStIc AGeNt v8.0.0-alpha1",
+			verCon:    mustBuildConstraints("8.0.0-alpha1"),
+			err:       nil,
+		},
+		{
+			userAgent: "eLaStIc AGeNt v8.0.0-alpha1",
+			verCon:    mustBuildConstraints("8.0.0"),
+			err:       nil,
+		},
+		{
+			userAgent: "eLaStIc AGeNt v8.0.0-anything",
+			verCon:    mustBuildConstraints("8.0.0"),
+			err:       nil,
+		},
+		{
+			userAgent: "eLaStIc AGeNt v7.15.0-anything",
+			verCon:    mustBuildConstraints("8.0.0"),
+			err:       nil,
+		},
+		{
+			userAgent: "eLaStIc AGeNt v7.15.0-anything",
+			verCon:    mustBuildConstraints("8.0.0-beta1"),
+			err:       nil,
+		},
 	}
 	for _, tr := range tests {
 		t.Run(tr.userAgent, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set("User-Agent", tr.userAgent)
-			res := validateUserAgent(req, tr.verCon)
+			_, res := validateUserAgent(req, tr.verCon)
 			if tr.err != res {
 				t.Fatalf("err mismatch: %v != %v", tr.err, res)
 			}

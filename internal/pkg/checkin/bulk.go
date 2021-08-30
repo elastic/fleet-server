@@ -34,6 +34,7 @@ func WithFlushInterval(d time.Duration) Opt {
 type extraT struct {
 	meta  []byte
 	seqNo sqn.SeqNo
+	ver   string
 }
 
 // Minimize the size of this structure.
@@ -94,16 +95,17 @@ func (bc *Bulk) timestamp() string {
 
 // WARNING: Bulk will take ownership of fields,
 // so do not use after passing in.
-func (bc *Bulk) CheckIn(id string, status string, meta []byte, seqno sqn.SeqNo) error {
+func (bc *Bulk) CheckIn(id string, status string, meta []byte, seqno sqn.SeqNo, newVer string) error {
 
 	// Separate out the extra data to minimize
 	// the memory footprint of the 90% case of just
 	// updating the timestamp.
 	var extra *extraT
-	if meta != nil || seqno.IsSet() {
+	if meta != nil || seqno.IsSet() || newVer != "" {
 		extra = &extraT{
 			meta:  meta,
 			seqNo: seqno,
+			ver:   newVer,
 		}
 	}
 
@@ -190,6 +192,12 @@ func (bc *Bulk) flush(ctx context.Context) error {
 				dl.FieldLastCheckin:       pendingData.ts,     // Set the checkin timestamp
 				dl.FieldUpdatedAt:         nowTimestamp,       // Set "updated_at" to the current timestamp
 				dl.FieldLastCheckinStatus: pendingData.status, // Set the pending status
+			}
+
+			// If the agent version is not empty it needs to be updated
+			// Assuming the agent can by upgraded keeping the same id, but incrementing the version
+			if pendingData.extra.ver != "" {
+				fields[dl.FieldAgentVersion] = pendingData.extra.ver
 			}
 
 			// Update local metadata if provided
