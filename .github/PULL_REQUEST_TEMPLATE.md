@@ -34,9 +34,6 @@ This checklist is to help creators of PRs to find parts which might not be direc
 - [ ] I have made corresponding change to the default configuration files
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] I have added an entry in `CHANGELOG.next.asciidoc` or `CHANGELOG-developer.next.asciidoc`.
-- [ ] Documentations added / updated for the change.
-
-
 
 
 ## Related issues
