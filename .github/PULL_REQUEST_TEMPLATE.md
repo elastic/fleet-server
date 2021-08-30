@@ -10,32 +10,23 @@ Please label this PR with one of the following labels, depending on the scope of
 
 ## What is the problem this PR solves?
 
-// Please do not just reference an issue
+// Please do not just reference an issue. Explain WHAT the problem this PR solves here.
 
 ## How does this PR solve the problem?
 
-// Explain how you solved the problem in your code.
+// Explain HOW you solved the problem in your code. It is possible that during PR reviews this changes and then this section should be updated.
 
 
-## What does this PR do?
+## How to test this PR locally
 
-<!-- Mandatory
-Explain here the changes you made on the PR. Please explain the WHAT: patterns used, algorithms implemented, design architecture, message processing, etc.
+<!-- Recommended
+Explain here how this PR will be tested by the reviewer if anything special is needed for manual testing: commands, dependencies, steps, etc.
 -->
-
-## Why is it important?
-
-<!-- Mandatory
-Explain here the WHY, or the rationale/motivation for the changes.
--->
-
 
 ## Checklist
 
 <!-- Mandatory
-Add a checklist of things that are required to be reviewed in order to have the PR approved
-
-List here all the items you have verified BEFORE sending this PR. Please DO NOT remove any item, striking through those that do not apply. (Just in case, strikethrough uses two tildes. ~~Scratch this.~~)
+This checklist is to help creators of PRs to find parts which might not be directly related to code change but still need to be addressed. Anything that does not apply to the PR should be removed from the checklist.
 -->
 
 - [ ] I have commented my code, particularly in hard-to-understand areas
@@ -43,19 +34,10 @@ List here all the items you have verified BEFORE sending this PR. Please DO NOT 
 - [ ] I have made corresponding change to the default configuration files
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] I have added an entry in `CHANGELOG.next.asciidoc` or `CHANGELOG-developer.next.asciidoc`.
+- [ ] Documentations added / updated for the change.
 
-## Author's Checklist
 
-<!-- Recommended
-Add a checklist of things that are required to be reviewed in order to have the PR approved
--->
-- [ ]
 
-## How to test this PR locally
-
-<!-- Recommended
-Explain here how this PR will be tested by the reviewer: commands, dependencies, steps, etc.
--->
 
 ## Related issues
 
@@ -66,11 +48,4 @@ Link related issues below. Insert the issue link or reference after the word "Cl
 - Relates #123
 - Requires #123
 - Superseds #123
--->
--
-
-## Logs
-
-<!-- Recommended
-Paste here output logs discovered while creating this PR, such as stack traces or integration logs, or any other output you consider important to be shared with the team.
 -->
