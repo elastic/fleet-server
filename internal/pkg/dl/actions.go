@@ -7,11 +7,13 @@ package dl
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/rs/zerolog/log"
 )
 
@@ -83,7 +85,35 @@ func FindActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, params m
 	return findActions(ctx, bulker, tmpl, FleetActions, params)
 }
 
-func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) ([]model.Action, error) {
+func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo sqn.SeqNo, agentId string) ([]model.Action, error) {
+	const index = FleetActions
+	params := map[string]interface{}{
+		FieldSeqNo:      minSeqNo.Value(),
+		FieldMaxSeqNo:   maxSeqNo.Value(),
+		FieldExpiration: time.Now().UTC().Format(time.RFC3339),
+		FieldAgents:     []string{agentId},
+	}
+
+	res, err := findActionsHits(ctx, bulker, QueryAgentActions, index, params)
+	if err != nil || res == nil {
+		return nil, err
+	}
+
+	if es.HasHoles(minSeqNo, res.Hits) {
+		err = es.Refresh(ctx, bulker.Client(), index)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to refresh index")
+		}
+		res, err := findActionsHits(ctx, bulker, QueryAgentActions, index, params)
+		if err != nil || res == nil {
+			return nil, err
+		}
+	}
+
+	return hitsToActions(res.Hits)
+}
+
+func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) (*es.HitsT, error) {
 	res, err := Search(ctx, bulker, tmpl, index, params)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
@@ -92,10 +122,22 @@ func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index st
 		}
 		return nil, err
 	}
+	return res, nil
+}
 
-	actions := make([]model.Action, 0, len(res.Hits))
+func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) ([]model.Action, error) {
+	res, err := findActionsHits(ctx, bulker, tmpl, index, params)
+	if err != nil || res == nil {
+		return nil, err
+	}
 
-	for _, hit := range res.Hits {
+	return hitsToActions(res.Hits)
+}
+
+func hitsToActions(hits []es.HitT) ([]model.Action, error) {
+	actions := make([]model.Action, 0, len(hits))
+
+	for _, hit := range hits {
 		var action model.Action
 		err := hit.Unmarshal(&action)
 		if err != nil {
@@ -103,5 +145,5 @@ func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index st
 		}
 		actions = append(actions, action)
 	}
-	return actions, err
+	return actions, nil
 }

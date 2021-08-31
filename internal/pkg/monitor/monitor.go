@@ -260,9 +260,9 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			}
 
 			// Check if the list of hits has holes
-			if hasHoles(checkpoint, hits) {
+			if es.HasHoles(checkpoint, hits) {
 				m.log.Debug().Msg("hits list has holes, refresh index")
-				err = m.refresh(ctx)
+				err = es.Refresh(ctx, m.esCli, m.index)
 				if err != nil {
 					m.log.Error().Err(err).Msg("failed to refresh index")
 					break
@@ -285,36 +285,6 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			}
 		}
 	}
-}
-
-func hasHoles(checkpoint sqn.SeqNo, hits []es.HitT) bool {
-	sz := len(hits)
-	if sz == 0 {
-		return false
-	}
-
-	// Check if the hole is in the beginning of hits
-	seqNo := checkpoint.Value()
-	if seqNo != sqn.UndefinedSeqNo && (hits[0].SeqNo-seqNo) > 1 {
-		return true
-	}
-
-	// No holes in the beginning, check if size <= 1 then there is no holes
-	if sz <= 1 {
-		return false
-	}
-
-	// Set initial seqNo value from the last hit in the array
-	seqNo = hits[sz-1].SeqNo
-
-	// Iterate from the end since that's where it more likely to have holes
-	for i := sz - 2; i >= 0; i-- {
-		if (seqNo - hits[i].SeqNo) > 1 {
-			return true
-		}
-		seqNo = hits[i].SeqNo
-	}
-	return false
 }
 
 func (m *simpleMonitorT) notify(ctx context.Context, hits []es.HitT) int {
@@ -349,39 +319,6 @@ func (m *simpleMonitorT) fetch(ctx context.Context, checkpoint, maxCheckpoint sq
 	}
 
 	return hits, nil
-}
-
-// Refreshes index. This is temporary code
-// TODO: Remove this when the refresh is properly implemented on Eleasticsearch side
-// The issue for "refresh" falls under phase 2 of https://github.com/elastic/elasticsearch/issues/71449.
-// Once the phase 2 is complete we can remove the refreshes from fleet-server.
-func (m *simpleMonitorT) refresh(ctx context.Context) error {
-	res, err := m.esCli.Indices.Refresh(
-		m.esCli.Indices.Refresh.WithContext(ctx),
-		m.esCli.Indices.Refresh.WithIndex(m.index),
-	)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	var esres es.Response
-	err = json.NewDecoder(res.Body).Decode(&esres)
-	if err != nil {
-		return err
-	}
-
-	if res.IsError() {
-		err = es.TranslateError(res.StatusCode, &esres.Error)
-	}
-
-	if err != nil {
-		if errors.Is(err, es.ErrIndexNotFound) {
-			m.log.Debug().Msg(es.ErrIndexNotFound.Error())
-			return nil
-		}
-		return err
-	}
-	return nil
 }
 
 func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[string]interface{}) ([]es.HitT, error) {
