@@ -158,7 +158,7 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 	}
 
 	var newVer string
-	if ver != agent.Agent.Version {
+	if agent.Agent == nil || ver != agent.Agent.Version {
 		newVer = ver
 	}
 
