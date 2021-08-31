@@ -52,23 +52,6 @@ const (
 	fieldExpiration = "expiration"
 )
 
-type HitT struct {
-	Id     string          `json:"_id"`
-	SeqNo  int64           `json:"_seq_no"`
-	Index  string          `json:"_index"`
-	Source json.RawMessage `json:"_source"`
-	Score  *float64        `json:"_score"`
-}
-
-type HitsT struct {
-	Hits  []HitT `json:"hits"`
-	Total struct {
-		Relation string `json:"relation"`
-		Value    uint64 `json:"value"`
-	} `json:"total"`
-	MaxScore *float64 `json:"max_score"`
-}
-
 type GlobalCheckpointProvider interface {
 	GetCheckpoint() sqn.SeqNo
 }
