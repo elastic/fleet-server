@@ -32,10 +32,9 @@ func (m *Agent) GetNewVersion(ver string) string {
 		return ""
 	}
 
-	var newVer string
 	if m.Agent == nil || ver != m.Agent.Version {
-		newVer = ver
+		return ver
 	}
 
-	return newVer
+	return ""
 }
