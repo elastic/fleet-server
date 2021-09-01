@@ -157,10 +157,8 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 		return err
 	}
 
-	var newVer string
-	if agent.Agent == nil || ver != agent.Agent.Version {
-		newVer = ver
-	}
+	// Safely check if the agent version is different, return empty string otherwise
+	newVer := agent.CheckDifferentVersion(ver)
 
 	// Metrics; serenity now.
 	dfunc := cntCheckin.IncStart()
