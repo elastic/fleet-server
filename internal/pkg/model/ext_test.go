@@ -76,7 +76,7 @@ func TestAgentGetNewVersion(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			newVer := tc.Agent.GetNewVersion(tc.Ver)
+			newVer := tc.Agent.CheckDifferentVersion(tc.Ver)
 			diff := cmp.Diff(tc.WantVer, newVer)
 			if diff != "" {
 				t.Error(diff)

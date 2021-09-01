@@ -26,8 +26,8 @@ func (m *Server) SetTime(t time.Time) {
 	m.Timestamp = t.Format(time.RFC3339Nano)
 }
 
-// GetNewVersion returns Agent version if it is different from ver, otherwise return empty string
-func (m *Agent) GetNewVersion(ver string) string {
+// CheckDifferentVersion returns Agent version if it is different from ver, otherwise return empty string
+func (m *Agent) CheckDifferentVersion(ver string) string {
 	if m == nil {
 		return ""
 	}
