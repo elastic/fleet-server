@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/go-ucfg/yaml"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
@@ -49,6 +50,8 @@ const (
 	kServiceName               = "fleet-server"
 	kAgentMode                 = "agent-mode"
 	kAgentModeRestartLoopDelay = 2 * time.Second
+
+	kUAFleetServer = "Fleet-Server"
 )
 
 func installSignalHandler() context.Context {
@@ -95,7 +98,7 @@ func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, err
 	return l, err
 }
 
-func getRunCommand(version, commit string) func(cmd *cobra.Command, args []string) error {
+func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		cfgObject := cmd.Flags().Lookup("E").Value.(*config.Flag)
 		cliCfg := cfgObject.Config()
@@ -112,12 +115,12 @@ func getRunCommand(version, commit string) func(cmd *cobra.Command, args []strin
 			if err != nil {
 				return err
 			}
-			l, err = initLogger(cfg, version, commit)
+			l, err = initLogger(cfg, bi.Version, bi.Commit)
 			if err != nil {
 				return err
 			}
 
-			agent, err := NewAgentMode(cliCfg, os.Stdin, version, l)
+			agent, err := NewAgentMode(cliCfg, os.Stdin, bi, l)
 			if err != nil {
 				return err
 			}
@@ -141,12 +144,12 @@ func getRunCommand(version, commit string) func(cmd *cobra.Command, args []strin
 				return err
 			}
 
-			l, err = initLogger(cfg, version, commit)
+			l, err = initLogger(cfg, bi.Version, bi.Commit)
 			if err != nil {
 				return err
 			}
 
-			srv, err := NewFleetServer(cfg, version, status.NewLog())
+			srv, err := NewFleetServer(cfg, bi, status.NewLog())
 			if err != nil {
 				return err
 			}
@@ -164,11 +167,11 @@ func getRunCommand(version, commit string) func(cmd *cobra.Command, args []strin
 	}
 }
 
-func NewCommand(version, commit string) *cobra.Command {
+func NewCommand(bi build.Info) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   kServiceName,
 		Short: "Fleet Server controls a fleet of Elastic Agents",
-		RunE:  getRunCommand(version, commit),
+		RunE:  getRunCommand(bi),
 	}
 	cmd.Flags().StringP("config", "c", "fleet-server.yml", "Configuration for Fleet Server")
 	cmd.Flags().Bool(kAgentMode, false, "Running under execution of the Elastic Agent")
@@ -182,9 +185,8 @@ type firstCfg struct {
 }
 
 type AgentMode struct {
-	cliCfg  *ucfg.Config
-	version string
-
+	cliCfg      *ucfg.Config
+	bi          build.Info
 	reloadables []reload.Reloadable
 
 	agent client.Client
@@ -197,12 +199,12 @@ type AgentMode struct {
 	startChan    chan struct{}
 }
 
-func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, version string, reloadables ...reload.Reloadable) (*AgentMode, error) {
+func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables ...reload.Reloadable) (*AgentMode, error) {
 	var err error
 
 	a := &AgentMode{
 		cliCfg:      cliCfg,
-		version:     version,
+		bi:          bi,
 		reloadables: reloadables,
 	}
 	a.agent, err = client.NewFromReader(reader, a)
@@ -247,7 +249,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	srvCtx, srvCancel := context.WithCancel(ctx)
 	defer srvCancel()
 	log.Info().Msg("received initial configuration starting Fleet Server")
-	srv, err := NewFleetServer(cfg.cfg, a.version, status.NewChained(status.NewLog(), a.agent))
+	srv, err := NewFleetServer(cfg.cfg, a.bi, status.NewChained(status.NewLog(), a.agent))
 	if err != nil {
 		// unblock startChan even though there was an error
 		a.startChan <- struct{}{}
@@ -384,7 +386,7 @@ func (a *AgentMode) OnError(err error) {
 }
 
 type FleetServer struct {
-	ver      string
+	bi       build.Info
 	verCon   version.Constraints
 	policyId string
 
@@ -395,8 +397,8 @@ type FleetServer struct {
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config, verStr string, reporter status.Reporter) (*FleetServer, error) {
-	verCon, err := buildVersionConstraint(verStr)
+func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter) (*FleetServer, error) {
+	verCon, err := buildVersionConstraint(bi.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +409,7 @@ func NewFleetServer(cfg *config.Config, verStr string, reporter status.Reporter)
 	}
 
 	return &FleetServer{
-		ver:      verStr,
+		bi:       bi,
 		verCon:   verCon,
 		cfg:      cfg,
 		cfgCh:    make(chan *config.Config, 1),
@@ -646,8 +648,8 @@ func initRuntime(cfg *config.Config) {
 	}
 }
 
-func initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
-	es, err := es.NewClient(ctx, cfg, false)
+func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
+	es, err := es.NewClient(ctx, cfg, false, es.WithUserAgent(kUAFleetServer, f.bi))
 	if err != nil {
 		return nil, err
 	}
@@ -675,7 +677,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	defer bulkCancel()
 
 	// Create the bulker subsystem
-	bulker, err := initBulker(bulkCtx, cfg)
+	bulker, err := f.initBulker(bulkCtx, cfg)
 	if err != nil {
 		return err
 	}
@@ -723,13 +725,13 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	esCli := bulker.Client()
 
 	// Check version compatibility with Elasticsearch
-	err = ver.CheckCompatibility(ctx, esCli, f.ver)
+	err = ver.CheckCompatibility(ctx, esCli, f.bi.Version)
 	if err != nil {
 		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
 	// Monitoring es client, longer timeout, no retries
-	monCli, err := es.NewClient(ctx, cfg, true)
+	monCli, err := es.NewClient(ctx, cfg, true, es.WithUserAgent(kUAFleetServer, f.bi))
 	if err != nil {
 		return err
 	}
@@ -744,7 +746,7 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	}
 
 	g.Go(loggedRunFunc(ctx, "Policy index monitor", pim.Run))
-	cord := coordinator.NewMonitor(cfg.Fleet, f.ver, bulker, pim, coordinator.NewCoordinatorZero)
+	cord := coordinator.NewMonitor(cfg.Fleet, f.bi.Version, bulker, pim, coordinator.NewCoordinatorZero)
 	g.Go(loggedRunFunc(ctx, "Coordinator policy monitor", cord.Run))
 
 	// Policy monitor

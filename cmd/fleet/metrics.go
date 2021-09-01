@@ -35,7 +35,7 @@ var (
 func (f *FleetServer) initMetrics(ctx context.Context, cfg *config.Config) (*api.Server, error) {
 	registry := monitoring.GetNamespace("info").GetRegistry()
 	if registry.Get("version") == nil {
-		monitoring.NewString(registry, "version").Set(f.ver)
+		monitoring.NewString(registry, "version").Set(f.bi.Version)
 	}
 	if registry.Get("name") == nil {
 		monitoring.NewString(registry, "name").Set(kServiceName)
