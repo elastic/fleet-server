@@ -8,14 +8,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"runtime"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/rs/zerolog/log"
 )
 
-func NewClient(ctx context.Context, cfg *config.Config, longPoll bool) (*elasticsearch.Client, error) {
+type ConfigOption func(config elasticsearch.Config)
+
+func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...ConfigOption) (*elasticsearch.Client, error) {
 	escfg, err := cfg.Output.Elasticsearch.ToESConfig(longPoll)
 	if err != nil {
 		return nil, err
@@ -23,6 +28,11 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool) (*elastic
 	addr := cfg.Output.Elasticsearch.Hosts
 	user := cfg.Output.Elasticsearch.Username
 	mcph := cfg.Output.Elasticsearch.MaxConnPerHost
+
+	// Apply configuration options
+	for _, opt := range opts {
+		opt(escfg)
+	}
 
 	log.Debug().
 		Strs("addr", addr).
@@ -48,6 +58,24 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool) (*elastic
 		Msg("Cluster Info")
 
 	return es, nil
+}
+
+func WithUserAgent(name string, bi build.Info) func(config elasticsearch.Config) {
+	return func(config elasticsearch.Config) {
+		ua := userAgent(name, bi)
+		// Set User-Agent header
+		if config.Header == nil {
+			config.Header = http.Header{}
+		}
+		config.Header.Set("User-Agent", ua)
+	}
+}
+
+func userAgent(name string, bi build.Info) string {
+	return fmt.Sprintf("Elastic-%s/%s (%s; %s; %s; %s)",
+		name,
+		bi.Version, runtime.GOOS, runtime.GOARCH,
+		bi.Commit, bi.BuildTime)
 }
 
 type InfoResponse struct {

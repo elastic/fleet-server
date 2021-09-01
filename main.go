@@ -14,17 +14,23 @@ import (
 	"os"
 
 	"github.com/elastic/fleet-server/v7/cmd/fleet"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 )
 
 const defaultVersion = "8.0.0"
 
 var (
-	Version string = defaultVersion
-	Commit  string
+	Version   string = defaultVersion
+	Commit    string
+	BuildTime string
 )
 
 func main() {
-	cmd := fleet.NewCommand(Version, Commit)
+	cmd := fleet.NewCommand(build.Info{
+		Version:   Version,
+		Commit:    Commit,
+		BuildTime: build.Time(BuildTime),
+	})
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

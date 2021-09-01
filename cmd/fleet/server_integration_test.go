@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
@@ -76,7 +77,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
 
-	srv, err := NewFleetServer(cfg, serverVersion, status.NewLog())
+	srv, err := NewFleetServer(cfg, build.Info{Version: serverVersion}, status.NewLog())
 	if err != nil {
 		return nil, err
 	}
