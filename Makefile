@@ -19,7 +19,8 @@ endif
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
 COMMIT=$(shell git rev-parse --short HEAD)
-LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT}
+NOW=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=$(NOW) 
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
 CMD_COLOR_OFF=\033[0m
 
