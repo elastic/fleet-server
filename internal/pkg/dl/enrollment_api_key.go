@@ -6,6 +6,7 @@ package dl
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -78,4 +79,14 @@ func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, index string, 
 		}
 	}
 	return recs, nil
+}
+
+// CreateEnrollmentAPIKey creates a new enrollment API key
+func CreateEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, key model.EnrollmentApiKey, opt ...Option) (string, error) {
+	o := newOption(FleetEnrollmentAPIKeys, opt...)
+	data, err := json.Marshal(&key)
+	if err != nil {
+		return "", err
+	}
+	return bulker.Create(ctx, o.indexName, "", data, bulk.WithRefresh())
 }
