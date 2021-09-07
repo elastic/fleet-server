@@ -23,17 +23,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/suite"
 )
-
-var biInfo = build.Info{
-	Version: "1.0.0",
-	Commit:  "integration",
-}
 
 var policyData = []byte(`
 {
@@ -117,7 +111,7 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		agent, err := NewAgentMode(ucfg.New(), r, biInfo)
+		agent, err := NewAgentMode(ucfg.New(), r, "1.0.0")
 		require.NoError(t, err)
 		err = agent.Run(ctx)
 		assert.NoError(t, err)
