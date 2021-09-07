@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func newCache(_ Config) (CacheImpl, error) {
+func newCache(_ Config) (Cacher, error) {
 	return &NoCache{}, nil
 }
 

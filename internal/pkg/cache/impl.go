@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type CacheImpl interface {
+type Cacher interface {
 	Get(key interface{}) (interface{}, bool)
 	Set(key, value interface{}, cost int64) bool
 	SetWithTTL(key, value interface{}, cost int64, ttl time.Duration) bool

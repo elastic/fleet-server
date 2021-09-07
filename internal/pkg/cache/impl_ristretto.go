@@ -10,7 +10,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-func newCache(cfg Config) (CacheImpl, error) {
+func newCache(cfg Config) (Cacher, error) {
 	rcfg := &ristretto.Config{
 		NumCounters: cfg.NumCounters,
 		MaxCost:     cfg.MaxCost,

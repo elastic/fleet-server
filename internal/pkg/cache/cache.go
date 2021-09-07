@@ -37,7 +37,7 @@ type ApiKey = apikey.ApiKey
 type SecurityInfo = apikey.SecurityInfo
 
 type CacheT struct {
-	cache CacheImpl
+	cache Cacher
 	cfg   Config
 	mut   sync.RWMutex
 }
