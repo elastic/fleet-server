@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgraph-io/ristretto"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -38,7 +37,7 @@ type ApiKey = apikey.ApiKey
 type SecurityInfo = apikey.SecurityInfo
 
 type CacheT struct {
-	cache *ristretto.Cache
+	cache Cacher
 	cfg   Config
 	mut   sync.RWMutex
 }
@@ -81,16 +80,6 @@ func New(cfg Config) (*CacheT, error) {
 	}
 
 	return &c, nil
-}
-
-func newCache(cfg Config) (*ristretto.Cache, error) {
-	rcfg := &ristretto.Config{
-		NumCounters: cfg.NumCounters,
-		MaxCost:     cfg.MaxCost,
-		BufferItems: 64,
-	}
-
-	return ristretto.NewCache(rcfg)
 }
 
 // Reconfigure will drop cache
