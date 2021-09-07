@@ -36,7 +36,7 @@ type RunningSuite struct {
 func (s *RunningSuite) SetupSuite() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c := ftesting.SetupBulk(ctx, s.T())
+	c := ftesting.SetupES(ctx, s.T())
 	for index, mapping := range prepareIndexes {
 		err := esutil.EnsureIndex(ctx, c, index, mapping)
 		require.NoError(s.T(), err)
@@ -46,7 +46,7 @@ func (s *RunningSuite) SetupSuite() {
 func (s *RunningSuite) TearDownSuite() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c := ftesting.SetupBulk(ctx, s.T())
+	c := ftesting.SetupES(ctx, s.T())
 	names := make([]string, 0, len(prepareIndexes))
 	for index, _ := range prepareIndexes {
 		names = append(names, index)
