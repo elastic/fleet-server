@@ -45,3 +45,31 @@ func CreateIndex(ctx context.Context, cli *elasticsearch.Client, name string) er
 
 	return nil
 }
+
+func DeleteIndices(ctx context.Context, cli *elasticsearch.Client, names ...string) error {
+	res, err := cli.Indices.Delete(names,
+		cli.Indices.Delete.WithContext(ctx),
+	)
+
+	if err != nil {
+		return err
+	}
+
+	defer res.Body.Close()
+
+	err = checkResponseError(res)
+	if err != nil {
+		return err
+	}
+
+	var r AckResponse
+	err = json.NewDecoder(res.Body).Decode(&r)
+	if err != nil {
+		return fmt.Errorf("failed to parse delete indices response: %v, err: %v", names, err)
+	}
+	if !r.Acknowledged {
+		return fmt.Errorf("failed to receive acknowledgment for delete indices request: %v", names)
+	}
+
+	return nil
+}
