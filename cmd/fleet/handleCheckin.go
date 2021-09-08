@@ -373,14 +373,8 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 }
 
 func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentId string) ([]model.Action, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
 
-	actions, err := dl.FindActions(ctx, ct.bulker, dl.QueryAgentActions, map[string]interface{}{
-		dl.FieldSeqNo:      seqno.Value(),
-		dl.FieldMaxSeqNo:   ct.gcp.GetCheckpoint().Value(),
-		dl.FieldExpiration: now,
-		dl.FieldAgents:     []string{agentId},
-	})
+	actions, err := dl.FindAgentActions(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentId)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "fetchAgentPendingActions")

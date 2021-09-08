@@ -4,12 +4,11 @@
 
 // +build !integration
 
-package monitor
+package es
 
 import (
 	"testing"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/google/go-cmp/cmp"
 )
@@ -20,7 +19,7 @@ func TestHashHoles(t *testing.T) {
 	tests := []struct {
 		Name     string
 		SeqNo    sqn.SeqNo
-		Hits     []es.HitT
+		Hits     []HitT
 		HasHoles bool
 	}{
 		{
@@ -65,7 +64,7 @@ func TestHashHoles(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			diff := cmp.Diff(tc.HasHoles, hasHoles(tc.SeqNo, tc.Hits))
+			diff := cmp.Diff(tc.HasHoles, HasHoles(tc.SeqNo, tc.Hits))
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -73,14 +72,14 @@ func TestHashHoles(t *testing.T) {
 	}
 }
 
-func genHitsSequence(seq []int64) []es.HitT {
+func genHitsSequence(seq []int64) []HitT {
 	if seq == nil {
 		return nil
 	}
 
-	hits := make([]es.HitT, 0, len(seq))
+	hits := make([]HitT, 0, len(seq))
 	for _, s := range seq {
-		hits = append(hits, es.HitT{
+		hits = append(hits, HitT{
 			SeqNo: s,
 		})
 	}
