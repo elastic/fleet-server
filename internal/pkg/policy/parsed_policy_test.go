@@ -20,7 +20,23 @@ const testPolicy = `
          "type": "elasticsearch",
          "hosts": [
             "https://5a8bb94bfbe0401a909e1496a9e884c2.us-central1.gcp.foundit.no:443"
+         ],
+         "fleet_server": {}
+      },
+      "remote_not_es": {
+         "type": "logstash",
+         "hosts": [
+            "https://5a8bb94bfbe0401a909e1496a9e884c2.us-central1.gcp.foundit.no:443"
          ]
+      },
+      "remote_with_token": {
+         "type": "elasticsearch",
+         "hosts": [
+            "https://5a8bb94bfbe0401a909e1496a9e884c2.us-central1.gcp.foundit.no:443"
+         ],
+         "fleet_server": {
+            "service_token": "abc123"
+         }
       }
    },
    "output_permissions": {

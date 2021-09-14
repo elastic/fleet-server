@@ -15,6 +15,7 @@ import (
 const (
 	FieldOutputs            = "outputs"
 	FieldOutputType         = "type"
+	FieldOutputFleetServer  = "fleet_server"
 	FieldOutputServiceToken = "service_token"
 	FieldOutputPermissions  = "output_permissions"
 
@@ -136,9 +137,18 @@ func findDefaultOutputName(outputsRaw json.RawMessage) (string, error) {
 
 		if v != nil {
 			outputType := v.GetString(FieldOutputType)
-			serviceToken := v.GetString(FieldOutputServiceToken)
-			if outputType == OutputTypeElasticsearch && serviceToken == "" {
+			if outputType != OutputTypeElasticsearch {
+				continue
+			}
+			fleetServer := v.GetMap(FieldOutputFleetServer)
+			if fleetServer == nil {
 				defaults = append(defaults, k)
+				continue
+			}
+			serviceToken := fleetServer.GetString(FieldOutputServiceToken)
+			if serviceToken == "" {
+				defaults = append(defaults, k)
+				continue
 			}
 		}
 	}
