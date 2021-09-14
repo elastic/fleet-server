@@ -16,7 +16,7 @@ const testPolicy = `
    "id": "63f4e6d0-9626-11eb-b486-6de1529a4151",
    "revision": 33,
    "outputs": {
-      "default": {
+      "other": {
          "type": "elasticsearch",
          "hosts": [
             "https://5a8bb94bfbe0401a909e1496a9e884c2.us-central1.gcp.foundit.no:443"
@@ -24,7 +24,7 @@ const testPolicy = `
       }
    },
    "output_permissions": {
-      "default": {
+      "other": {
          "_fallback": {
             "cluster": [
                "monitor"
@@ -49,7 +49,7 @@ const testPolicy = `
    "agent": {
       "monitoring": {
          "enabled": true,
-         "use_output": "default",
+         "use_output": "other",
          "logs": true,
          "metrics": true
       }
@@ -60,7 +60,7 @@ const testPolicy = `
          "name": "system-1",
          "revision": 2,
          "type": "logfile",
-         "use_output": "default",
+         "use_output": "other",
          "meta": {
             "package": {
                "name": "system",
@@ -140,7 +140,7 @@ const testPolicy = `
          "name": "system-1",
          "revision": 2,
          "type": "system/metrics",
-         "use_output": "default",
+         "use_output": "other",
          "meta": {
             "package": {
                "name": "system",
@@ -308,7 +308,7 @@ const testPolicy = `
          "name": "Endgame",
          "revision": 28,
          "type": "endpoint",
-         "use_output": "default",
+         "use_output": "other",
          "meta": {
             "package": {
                "name": "endpoint",
@@ -494,14 +494,17 @@ func TestNewParsedPolicy(t *testing.T) {
 			t.Error("Only expected one role")
 		}
 
-		r, ok := pp.Roles["default"]
-		if !ok {
-			t.Fatal("Missing default role")
+		// Validate that default was found
+		if pp.Default.Name != "other" {
+			t.Error("other output should be identified as default")
+		}
+		if pp.Default.Role == nil {
+			t.Error("other output role should be identified")
 		}
 
 		expectedSha2 := "d4d0840fe28ca4900129a749b56cee729562c0a88c935192c659252b5b0d762a"
-		if r.Sha2 != expectedSha2 {
-			t.Fatal(fmt.Sprintf("Expected sha2: '%s', got '%s'.", expectedSha2, r.Sha2))
+		if pp.Default.Role.Sha2 != expectedSha2 {
+			t.Fatal(fmt.Sprintf("Expected sha2: '%s', got '%s'.", expectedSha2, pp.Default.Role.Sha2))
 		}
 	}
 }
