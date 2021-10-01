@@ -1,4 +1,5 @@
 SHELL=/bin/bash
+GO_VERSION=$(shell cat '.go-version')
 DEFAULT_VERSION=$(shell awk '/const defaultVersion/{print $$NF}' main.go | tr -d '"')
 TARGET_ARCH_386=x86
 TARGET_ARCH_amd64=x86_64
@@ -11,6 +12,7 @@ BUILDMODE_windows_amd64=-buildmode=pie
 BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
+BUILDER_IMAGE=docker.elastic.co/observability-ci/fleet-server-builder:latest
 
 ifdef VERSION_QUALIFIER
 DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
@@ -139,6 +141,13 @@ else
 	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz fleet-server-$(VERSION)-$(OS)-$(ARCH)
 	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz > fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz.sha512
 endif
+
+build-releaser: ## - Build a Docker image to run make package including all build tools
+	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) .
+
+.PHONY: docker-release
+docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
+	docker run --rm -it --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE)
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
