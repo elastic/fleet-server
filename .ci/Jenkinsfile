@@ -102,7 +102,9 @@ pipeline {
       }
       post {
         always {
-          sh(label: 'Check release artifacts', script: 'make test-release')
+          dir("${BASE_DIR}"){
+            sh(label: 'Check release artifacts', script: 'make test-release')
+          }
         }
       }
     }
