@@ -102,6 +102,10 @@ test: prepare-test-context  ## - Run all tests
 	@./dev-tools/run_with_go_ver $(MAKE) test-int
 	@$(MAKE) junit-report
 
+.PHONY: test-release
+test-release:  ## - Check that all release binaries are created
+	./.ci/scripts/test-release.sh $(DEFAULT_VERSION)
+
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
 	set -o pipefail; go test -v -race ./... | tee build/test-unit.out
