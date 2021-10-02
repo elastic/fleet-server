@@ -4,7 +4,7 @@ set -euo pipefail
 
 FLEET_SERVER_VERSION=${1:?"Fleet Server version is needed"}
 
-PLATFORM_FILES=(windows-arm12 darwin-arm64.tar.gz darwin-x86_64.tar.gz linux-arm64.tar.gz linux-x86_64.tar.gz linux-x86.tar.gz windows-x86_64.zip windows-x86.zip)
+PLATFORM_FILES=(darwin-arm64.tar.gz darwin-x86_64.tar.gz linux-arm64.tar.gz linux-x86_64.tar.gz linux-x86.tar.gz windows-x86_64.zip windows-x86.zip)
 
 #make release
 
