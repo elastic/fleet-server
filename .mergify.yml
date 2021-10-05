@@ -71,6 +71,13 @@ pull_request_rules:
       label:
         add:
           - backport-skip
+  - name: remove backport-skip label
+    conditions:
+      - label~=^v\d
+    actions:
+      label:
+        remove:
+          - backport-skip
   - name: automatic merge for 7\. branches when CI passes
     conditions:
       - check-success=fleet-server/pr-merge
