@@ -181,7 +181,7 @@ func loadLimitsForRam(currentRAM int) *envLimits {
 
 	for _, l := range defaults {
 		// get max possible config for current env
-		if currentRAM < l.MaxRAM || (lastLimits != nil && l.MaxRAM > 0 && lastLimits.MaxRAM < l.MaxRAM) {
+		if currentRAM > l.MaxRAM || (lastLimits != nil && l.MaxRAM > 0 && lastLimits.MaxRAM < l.MaxRAM) {
 			continue
 		}
 		lastLimits = l
