@@ -128,7 +128,7 @@ func init() {
 	// internal/pkg/config/defaults/512_limits.yml
 	// internal/pkg/config/defaults/8192_limits.yml
 	// internal/pkg/config/defaults/max_limits.yml
-	unpacked := packer.MustUnpack("eJzclluP4jYUx9/7Mea56sSGoKXSPhgCIVnZCBRye6niZHCSdS5aArlU/e6VuXVmkgkwarVSHzHR3+fyO//jP5+itHj5kXr8Of/Onv0s3UbsOXjZente7J6BBId/8CiJit1vdcKffn+i1nxoD/SQGhnDBqoJymPHIplrjneeBfJggUfTCDGamoUNySGwZMm19WYZoRorqMQoY5oKwpf5OKYDIp3Ovw+wsakxyhvX1qFr61uq8sKz182SZUxbTA5U5fGLOZa8hX4IFuuda2SMGJPCL1/pQXnvWkTyrPHebzJGmst9JHMt8sOz5LPu6hijNp3kNF1zP3VDqmSMWKA5n0eBrTeBODNQeT4rHJuNNGVTYmX2TZtOQj9d524yj4P5OXclY5/XnZVYQUKX01Q/ULW6xqqJHKaIeadaQscqR5qildTG38S5purAT4+1BPj8rejTMkLVWTN0YNGfu3p3jF+ffu2nBkrDLz3UxEha3k+N9AE14LPU4BvUYANdOhF7qhl7kO9tWOXU4tJRt9UJ/aQ3RcxJzdofrF51E53uEdVsNiVeiXvndaDyxLGIdNWNLt/yfaCadZDMd2IyOjosOvquK9qD5My6yKnex4vj0z2ORX78G/kLPYy+3qRnKI1HH9NDFCQTdjc9ww/oqbCyGhLDhyJKH4qKm/UlS7/JRDVLCqvcGfBtoIY1Hawlqm5GmmL20xM/Ss+8o3pau3pHKh/zHdzhO6cuvPEI6UKUa8k1hdXuBpUV7vAK3PIK7Vz3eeyBa5ydeh001m3KV3d5jwxgDzzGrJ4mJHRgyN81ex9YYOvAMTgVEL8eq8KxQ/HfpYAyaWYAswdtJ0bnsbvq7WlixoHKD/R43+yxZXWxsbfggJZho4csp8JKl+6stQgeAqZTc/Me8LsWFe7OuwXfLVC+gHEPKUtlJuP7baYi/4x9Ny3CTFMisuA+f6vnq+I3ke3BOvOTsRSoFRcLrp8WfB0RQbMDi5zy3jEDWJmAduVWHVajgYefOAYqg/YYS+0xZj95WW1KvDDbTx2lZYvH1XGLosSrel46979y/guA6p8H0CfeyP9XgP765e8AAAD//7vBgJ4=")
+	unpacked := packer.MustUnpack("eJzElt2PqjgYxu/3z5jrzQ6tYo6bnIsqinDSGg3ydbOhMIJM+ciI8rHZ/31TFXdmYBBONjmXVvK0fZ/f+7z9++kQZy9vscOe01f/2U3i/cF/9l72zollx2cgwPFf7BAdsuMfZcSe/nyixnJsjtSAaomPNVQSlIaWQRJbnx4dA6TeCk/mB+TTWM9MSM6eIQq2qVbrAyqxhHKMEl+RQfCynIZ0RITr+usIa7sSo7SyTRXaprqnMsscc1ut/cRXVrMzlVn4ok8FZ6WevdX2aGuJT7RZ5ubv9KB4sg0iOMb05FaJT6p6P5LYBnlzDPGmu7mcUZnPUhpvmRvbAZUSnxiguq0fPFOtPL6mofy2llmmP1GkXY6lxQ9lPgvceJva0TL0lre7S4n/87qLHEuI6zIaq2cqF/ezKvwOc+Q711pCy8gniqTk1MQ/+Loiq8CNL7UE+PYt92l9QMVNM7Bg1n13ufcZvz/93k0NFMbfOqgJkbDuT43wBTXgZ6nBD6jBGqqdCB1ZDx3ITiYsUmow4aLbcEK96s2Rb8V66Y4279xE1314Natdjjd832XpySyyDCLcdQ/1t+zkyXrpRcsj74wWh7mjn1xRBpKzaCOn+HxeHF73sQzy9n/cn+th9P0hPWNhOvmaHiIhkfi96Rl/QU+Bpc2YaC7kp3Qhr7he1rd0q4RXM6ewSK0R23tyUNLRVqDybqJIejc94VB6li3VU5rVu1A5LHdwS+5cXfiQEUJNlG2IJYXF8QGVBW7JCtzICuVW92XogPs5W/VaaCyblG96ZY8IYAc82qKcRySwYMA+mX3yDLC34BRcC4jft1VmmQH/ry6gSKoFwP7A2AnRre3ueica6aEnszO97LcYNqzqGPsIDmgENhoUOQWW2nQXjUEwCJhWzd1nwHsNKtx+7wZ8j0D5BqYdpKylhYj7x0xB/mv7dlp4mMaE34K57KOeK/PfRDRH28SNpoInF4wPuG5a8L1FOM0WzFLKOtsMYGkGmpXbtESNAgY/cTSUe802Fppt7P/iYbXL8UpvPnWkRixeRscjiiKn6HofuwWpXsckfC3W0uaHBZd8JnyMC1kEVOdzSb+YdX2BWHlduIseJOca8zXX1Hi2Doyf6JrZtR6NRGaNtimFIge4us+F3vHT1/AFwBIqLuaYquAYdmCNtg9MH2bSL5xdvZtqLd1eP//89m8AAAD//28oht4=")
 
 	for f, v := range unpacked {
 		cfg, err := yaml.NewConfig(v, DefaultOptions...)
@@ -155,7 +155,7 @@ func loadLimitsForRam(currentRAM int) *envLimits {
 
 	for _, l := range defaults {
 		// get max possible config for current env
-		if currentRAM < l.MaxRAM || (lastLimits != nil && l.MaxRAM > 0 && lastLimits.MaxRAM < l.MaxRAM) {
+		if currentRAM > l.MaxRAM || (lastLimits != nil && l.MaxRAM > 0 && lastLimits.MaxRAM < l.MaxRAM) {
 			continue
 		}
 		lastLimits = l
