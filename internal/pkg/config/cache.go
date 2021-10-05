@@ -9,13 +9,11 @@ import (
 )
 
 const (
-	defaultCacheNumCounters = 500000           // 10x times expected count
-	defaultCacheMaxCost     = 50 * 1024 * 1024 // 50MiB cache size
-	defaultActionTTL        = time.Minute * 5
-	defaultEnrollKeyTTL     = time.Minute
-	defaultArtifactTTL      = time.Hour * 24
-	defaultApiKeyTTL        = time.Minute * 15 // ApiKey validation is a bottleneck.
-	defaultApiKeyJitter     = time.Minute * 5  // Jitter allows some randomness on ApiKeyTTL, zero to disable
+	defaultActionTTL    = time.Minute * 5
+	defaultEnrollKeyTTL = time.Minute
+	defaultArtifactTTL  = time.Hour * 24
+	defaultApiKeyTTL    = time.Minute * 15 // ApiKey validation is a bottleneck.
+	defaultApiKeyJitter = time.Minute * 5  // Jitter allows some randomness on ApiKeyTTL, zero to disable
 )
 
 type Cache struct {
@@ -29,8 +27,10 @@ type Cache struct {
 }
 
 func (c *Cache) InitDefaults() {
-	c.NumCounters = defaultCacheNumCounters
-	c.MaxCost = defaultCacheMaxCost
+	l := loadLimits().Cache
+
+	c.NumCounters = l.NumCounters
+	c.MaxCost = l.MaxCost
 	c.ActionTTL = defaultActionTTL
 	c.EnrollKeyTTL = defaultEnrollKeyTTL
 	c.ArtifactTTL = defaultArtifactTTL
