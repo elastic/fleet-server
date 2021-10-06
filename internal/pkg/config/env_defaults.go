@@ -43,17 +43,23 @@ const (
 	defaultAckMaxBody  = 1024 * 1024 * 2
 )
 
+type valueRange struct {
+	Min int `config:"min"`
+	Max int `config:"max"`
+}
+
 type envLimits struct {
-	MinRAM int                  `config:"min_ram"`
-	MaxRAM int                  `config:"max_ram"`
+	RAM    valueRange           `config:"ram"`
 	Server *serverLimitDefaults `config:"server_limits"`
 	Cache  *cacheLimits         `config:"cache_limits"`
 }
 
 func defaultEnvLimits() *envLimits {
 	return &envLimits{
-		MinRAM: 0,
-		MaxRAM: 17179869184,
+		RAM: valueRange{
+			Min: 0,
+			Max: 17179869184,
+		},
 		Server: defaultserverLimitDefaults(),
 		Cache:  defaultCacheLimits(),
 	}
@@ -130,7 +136,7 @@ func init() {
 	// internal/pkg/config/defaults/8192_limits.yml
 	// internal/pkg/config/defaults/base_limits.yml
 	// internal/pkg/config/defaults/max_limits.yml
-	unpacked := packer.MustUnpack("eJzElluPqkgQx9/3Y8zzZgdaMcdNzkMrgjjpJhqH28uGBkWY5pIR5bLZ775p0DlHQYGTTfZR0v67uupX/6q/X/wo3X1GNn1NPrxXJ472vvfq7vb2iabHV54D47+oH/rp8Y8ipC9/vhCdnozR6kC2sYe2sMAwSU3jsHdCKVV9WCBxPZ6H+GCCAzVAnhCdck4Zvynz2cnV+b0JpjyJNtSJ0EQRlQyJMJv70CO6NDYAPjujdfVd3To53irZPMLUiSzq0OnR1vnEXaIJO+/I7DcWjNEmdsIp58o5VX3II5kvf9YjoUDN0SYhQChVH46u97H4TJAm5Korshihp8j05Mpa4YbSkekRA12+r3gnwlx1hwgv3/jDTow9vIUZWseeIkuFK9PQ1DF3fbvqw1/WRUwXMl3t5ITTI5G+YvXYG5T5LKlzaR0IOx/MUieLPaZhRlpR5/I9u5xNTcObKOLioikFNv/07Vz/GL9/f/n9OUmAG397QlIAOfWWJA6JH6A/SesHJL3/Kkl5B0k5u6/OJI4tHX/aurAnMk1tYz1prU5Y6ynzme8aq9L9ucLz+h5GKN7CvCLUWHG2bh3M0eZLV7mctXWBs4wVMPVsooirlqovskalgoE0bdtoWtzHW9T3zA4mSP+L9zO9rIumMTedPKYJi1DA3g1NY7T9KPrT5D2gaZFh0eNxaWYIJiWrgGWsLq/elKoXe8pydiYyDXbalLOXq7O73BwtFpP+lKZiME16SzaDRjZrSod5U97S98U1Hz98ZH0hbEZJtDoTOe+gdJG16OZtlFb06/jzK06vTU9qoVNpUI/Ffv70jZ+Cx0Sp4kJAt0TlOEBjDJPA1HFsabeeQiItZVV264jL+jy8ZqzSMcH0WjUBlwu+evnAaVdn9EvvREItcGV6JhXFqBg67ZA445tZXTe9ZKvwSFxUfe9Em8QKpcDt8BM2Jd0mAVyTLO9/Jus9Q0ut0V1YbHTXuI9XEfu4uydLGt/tUH0pKjr2pTcHsGpqxZ3HZQTkiTmie1c+FGS04Yj8XvdL95Rj/w9sWQtsQE9dmWvzDrxueNIgctiUaK3wvdcNmm6tmvz9rtSPmFYCi8Zk6+FDoZ0/W7jNUhXXbyaQWEFuB48s8ESbBmSkVS3tlNX5zgV76CC7jvEHwJQ/1ox+g6y/LSzY8jlwNRrWyuycpQsFAfmxa0heG+d+nbmNWem7bPe2XvU60P757d8AAAD//xSynYM=")
+	unpacked := packer.MustUnpack("eJzsll9vqkgYxu/3Y/R6swUUc9zkXIyOIDQzRoP8u9kwYBEO/1KxMGz2u28GwbZCFZtNerOXTvCZd97nN887fz8ESb57SZzoMfvlP7pp8hz4j97u2TlG+eGR54TxX1EQB/nhDxpHD38+uLGUr/zUV2Q+I2HqIw1QDOrf+x1MfRQCbgWy0DJwauvTg2PwmbdEk3kAfJLouSngV88QOdtUq1UAKIKgQO3/pWlIRpg7rf8aIW1LEcgq21QF21SfiRzljrmp6v2Xs1ciR+FOn3LOUn31lpuDraU+1ma5W7zTE8SjbWDOMaZHt0p9XLX74dQ28ItjiI3uuq5Rmc8ykmwiN7H3BKY+NviqWQ88U608tqaBolnLLdOfKHBbILh4UuazvZtsMjuWQk9qzg5T/+u6iwJBwHQjkqivRC7PtSrsDHPgO6deCpZRTBSoFMRET2xdkVXeTepe8qj5lhjSeBWAstHcW0J+/ezy4Bp/Pvx+nSSBG/+4QVJNzhtJGAIR+4NJ4j4hif8qSegGSUgDrTuhI+uhI0RHUygzYkRcrdtxRz3pzYFvJTp1R+t3DoO3c1fbAq3ZvhL15Ci2DMyddYP22+joyTr1YunAbkuP68zlC6eUO2la9NFUXtaLwtM+loFf/ovzMz0Eft4kasxNJ9eJOhH0RtQKLkQ0nKjxJ0SVCK7HWHMFVrkrMBd02p7crVLW4YIIZWaNomdP3lMy2nBE3k4UqF8nKryXKKmno0q3ozWp9+UT6smnkzMfsoRrKbMNkRKhPNwgtUQ9mYI6maI0fZdChz/X2avXQyjtkr8elFE/+KlwnagTQe+mnWZVK7h+sgSJOfYxV2SRJzqjRq8rPmWGVbTVsQ4y4lrXVppbYo2d/M6J1zjV6pFYjKzRJiOCyCiuzq4NnXgaKLxuV7luVxcUa6Cs776pco5h763R5kambAu01LtTBXbIGn8zWTyCM757u9ad27WCw/KKOIfdp3S195TiO99OV0i6M5uUou3gJySV92XTtm96ULzuf4sMziUN9E+lyzdO7bJ+dOPpgXxNk7985wybcr1Tk17UR4cQEzvlrcf398cPir8tfngE/4+fc/z889u/AQAA///e0qUb")
 
 	for f, v := range unpacked {
 		cfg, err := yaml.NewConfig(v, DefaultOptions...)
@@ -155,7 +161,7 @@ func loadLimits() *envLimits {
 func loadLimitsForRam(currentRAM int) *envLimits {
 	for _, l := range defaults {
 		// get max possible config for current env
-		if l.MinRAM < currentRAM && currentRAM <= l.MaxRAM {
+		if l.RAM.Min < currentRAM && currentRAM <= l.RAM.Max {
 			return l
 		}
 	}

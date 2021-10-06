@@ -72,17 +72,23 @@ const (
 	defaultAckMaxBody  = 1024 * 1024 * 2
 )
 
+type valueRange struct {
+	Min int ` + "`config:\"min\"`" + `
+	Max int ` + "`config:\"max\"`" + `
+}
+
 type envLimits struct {
-	MinRAM int                  ` + "`config:\"min_ram\"`" + `
-	MaxRAM int                  ` + "`config:\"max_ram\"`" + `
+	RAM    valueRange           ` + "`config:\"ram\"`" + `
 	Server *serverLimitDefaults ` + "`config:\"server_limits\"`" + `
 	Cache  *cacheLimits         ` + "`config:\"cache_limits\"`" + `
 }
 
 func defaultEnvLimits() *envLimits {
 	return &envLimits{
-		MinRAM: 0,
-		MaxRAM: 17179869184,
+		RAM: valueRange{
+			Min: 0,
+			Max: 17179869184,
+		},
 		Server: defaultserverLimitDefaults(),
 		Cache:  defaultCacheLimits(),
 	}
@@ -181,7 +187,7 @@ func loadLimits() *envLimits {
 func loadLimitsForRam(currentRAM int) *envLimits {
 	for _, l := range defaults {
 		// get max possible config for current env
-		if l.MinRAM < currentRAM && currentRAM <= l.MaxRAM {
+		if l.RAM.Min < currentRAM && currentRAM <= l.RAM.Max {
 			return l
 		}
 	}

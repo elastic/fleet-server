@@ -30,7 +30,7 @@ func TestLoadLimits(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			l := loadLimitsForRam(tc.CurrentRAM)
 
-			require.Equal(t, tc.ExpectedMaxRAM, l.MaxRAM)
+			require.Equal(t, tc.ExpectedMaxRAM, l.RAM.Max)
 		})
 	}
 }
