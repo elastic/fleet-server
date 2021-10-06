@@ -1,5 +1,6 @@
-min_ram: 8192
-max_ram: 16384
+ram:
+  min: 8192
+  max: 16384
 cache_limits:
   num_counters: 160000
   max_cost: 209715200
