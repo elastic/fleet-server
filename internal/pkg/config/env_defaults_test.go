@@ -18,12 +18,12 @@ func TestLoadLimits(t *testing.T) {
 		CurrentRAM     int
 		ExpectedMaxRAM int
 	}{
-		{"low ram", 128, 512},
-		{"precise", 512, 512},
-		{"in the middle", 650, 1024},
+		{"low ram", 128, 1024},
+		{"512", 512, 1024},
+		{"precise", 1024, 1024},
 		{"2-to-4", 2650, 4096},
-		{"close to max", 8000, 8192},
-		{"above max", 9203, 17179869184},
+		{"close to max", 16383, 16384},
+		{"above max", 16385, 17179869184},
 	}
 
 	for _, tc := range testCases {
