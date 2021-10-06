@@ -73,6 +73,7 @@ const (
 )
 
 type envLimits struct {
+	MinRAM int                  ` + "`config:\"min_ram\"`" + `
 	MaxRAM int                  ` + "`config:\"max_ram\"`" + `
 	Server *serverLimitDefaults ` + "`config:\"server_limits\"`" + `
 	Cache  *cacheLimits         ` + "`config:\"cache_limits\"`" + `
@@ -80,7 +81,8 @@ type envLimits struct {
 
 func defaultEnvLimits() *envLimits {
 	return &envLimits{
-		MaxRAM: 0,
+		MinRAM: 0,
+		MaxRAM: 17179869184,
 		Server: defaultserverLimitDefaults(),
 		Cache:  defaultCacheLimits(),
 	}
@@ -177,20 +179,14 @@ func loadLimits() *envLimits {
 }
 
 func loadLimitsForRam(currentRAM int) *envLimits {
-	var lastLimits *envLimits
-
 	for _, l := range defaults {
 		// get max possible config for current env
-		if currentRAM > l.MaxRAM || (lastLimits != nil && l.MaxRAM > 0 && lastLimits.MaxRAM < l.MaxRAM) {
-			continue
+		if l.MinRAM < currentRAM && currentRAM <= l.MaxRAM {
+			return l
 		}
-		lastLimits = l
 	}
 
-	if lastLimits == nil {
-		return defaultEnvLimits()
-	}
-	return lastLimits
+	return defaultEnvLimits()
 }
 
 `))
