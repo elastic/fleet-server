@@ -65,11 +65,18 @@ pull_request_rules:
           This pull request does not have a backport label. Could you fix it @{{author}}? 🙏
           To fixup this pull request, you need to add the backport labels for the needed
           branches, such as:
-          * `v./d./d./d` is the label to automatically backport to the `7./d` branch. `/d` is the digit
+          * `v/d./d./d` is the label to automatically backport to the `7./d` branch. `/d` is the digit
 
           **NOTE**: `backport-skip` has been added to this pull request.
       label:
         add:
+          - backport-skip
+  - name: remove backport-skip label
+    conditions:
+      - label~=^v\d
+    actions:
+      label:
+        remove:
           - backport-skip
   - name: automatic merge for 7\. branches when CI passes
     conditions:
