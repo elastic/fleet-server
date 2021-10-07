@@ -6,9 +6,27 @@ package policy
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
+)
+
+const (
+	FieldOutputs            = "outputs"
+	FieldOutputType         = "type"
+	FieldOutputFleetServer  = "fleet_server"
+	FieldOutputServiceToken = "service_token"
+	FieldOutputPermissions  = "output_permissions"
+
+	OutputTypeElasticsearch = "elasticsearch"
+)
+
+var (
+	ErrOutputsNotFound             = errors.New("outputs not found")
+	ErrDefaultOutputNotFound       = errors.New("default output not found")
+	ErrMultipleDefaultOutputsFound = errors.New("multiple default outputs found")
+	ErrInvalidPermissionsFormat    = errors.New("invalid permissions format")
 )
 
 type RoleT struct {
@@ -18,10 +36,16 @@ type RoleT struct {
 
 type RoleMapT map[string]RoleT
 
+type ParsedPolicyDefaults struct {
+	Name string
+	Role *RoleT
+}
+
 type ParsedPolicy struct {
-	Policy model.Policy
-	Fields map[string]json.RawMessage
-	Roles  RoleMapT
+	Policy  model.Policy
+	Fields  map[string]json.RawMessage
+	Roles   RoleMapT
+	Default ParsedPolicyDefaults
 }
 
 func NewParsedPolicy(p model.Policy) (*ParsedPolicy, error) {
@@ -34,10 +58,24 @@ func NewParsedPolicy(p model.Policy) (*ParsedPolicy, error) {
 
 	// Interpret the output permissions if available
 	var roles map[string]RoleT
-	if perms := fields[FieldOutputPermissions]; len(perms) != 0 {
+	if perms, _ := fields[FieldOutputPermissions]; len(perms) != 0 {
 		if roles, err = parsePerms(perms); err != nil {
 			return nil, err
 		}
+	}
+
+	// Find the default role.
+	outputs, ok := fields[FieldOutputs]
+	if !ok {
+		return nil, ErrOutputsNotFound
+	}
+	defaultName, err := findDefaultOutputName(outputs)
+	if err != nil {
+		return nil, err
+	}
+	var roleP *RoleT
+	if role, ok := roles[defaultName]; ok {
+		roleP = &role
 	}
 
 	// We are cool and the gang
@@ -45,6 +83,10 @@ func NewParsedPolicy(p model.Policy) (*ParsedPolicy, error) {
 		Policy: p,
 		Fields: fields,
 		Roles:  roles,
+		Default: ParsedPolicyDefaults{
+			Name: defaultName,
+			Role: roleP,
+		},
 	}
 
 	return pp, nil
@@ -79,4 +121,43 @@ func parsePerms(permsRaw json.RawMessage) (RoleMapT, error) {
 	}
 
 	return m, nil
+}
+
+func findDefaultOutputName(outputsRaw json.RawMessage) (string, error) {
+	outputsMap, err := smap.Parse(outputsRaw)
+	if err != nil {
+		return "", err
+	}
+
+	// iterate across the keys finding the defaults
+	var defaults []string
+	for k := range outputsMap {
+
+		v := outputsMap.GetMap(k)
+
+		if v != nil {
+			outputType := v.GetString(FieldOutputType)
+			if outputType != OutputTypeElasticsearch {
+				continue
+			}
+			fleetServer := v.GetMap(FieldOutputFleetServer)
+			if fleetServer == nil {
+				defaults = append(defaults, k)
+				continue
+			}
+			serviceToken := fleetServer.GetString(FieldOutputServiceToken)
+			if serviceToken == "" {
+				defaults = append(defaults, k)
+				continue
+			}
+		}
+	}
+
+	if len(defaults) == 0 {
+		return "", ErrDefaultOutputNotFound
+	}
+	if len(defaults) == 1 {
+		return defaults[0], nil
+	}
+	return "", ErrMultipleDefaultOutputsFound
 }

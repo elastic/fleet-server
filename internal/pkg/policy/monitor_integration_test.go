@@ -23,6 +23,8 @@ import (
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
+var policyBytes = []byte(`{"outputs":{"default":{"type":"elasticsearch"}}}`)
+
 func setupIndex(ctx context.Context, t *testing.T) (string, bulk.Bulk) {
 	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicy)
 	return index, bulker
@@ -76,7 +78,7 @@ func TestMonitor_Integration(t *testing.T) {
 	policy := model.Policy{
 		PolicyId:       policyId,
 		CoordinatorIdx: 1,
-		Data:           []byte("{}"),
+		Data:           policyBytes,
 		RevisionIdx:    1,
 	}
 	go func() {

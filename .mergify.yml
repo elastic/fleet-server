@@ -55,34 +55,29 @@ pull_request_rules:
         labels:
           - "backport"
         title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
-  - name: backport patches to 7.13 branch
+  - name: notify the backport policy
     conditions:
-      - merged
+      - -label~=(^v\d|backport-skip)
       - base=master
-      - label=v7.13.0
     actions:
-      backport:
-        assignees:
-          - "{{ author }}"
-        branches:
-          - "7.13"
-        labels:
-          - "backport"
-        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
-  - name: backport patches to 7.12 branch
+      comment:
+        message: |
+          This pull request does not have a backport label. Could you fix it @{{author}}? 🙏
+          To fixup this pull request, you need to add the backport labels for the needed
+          branches, such as:
+          * `v/d./d./d` is the label to automatically backport to the `7./d` branch. `/d` is the digit
+
+          **NOTE**: `backport-skip` has been added to this pull request.
+      label:
+        add:
+          - backport-skip
+  - name: remove backport-skip label
     conditions:
-      - merged
-      - base=master
-      - label=v7.12.0
+      - label~=^v\d
     actions:
-      backport:
-        assignees:
-          - "{{ author }}"
-        branches:
-          - "7.12"
-        labels:
-          - "backport"
-        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
+      label:
+        remove:
+          - backport-skip
   - name: automatic merge for 7\. branches when CI passes
     conditions:
       - check-success=fleet-server/pr-merge

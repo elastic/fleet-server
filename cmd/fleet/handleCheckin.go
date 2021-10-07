@@ -421,9 +421,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Logger()
 
 	// The parsed policy object contains a map of name->role with a precalculated sha2.
-	defaultRole, ok := pp.Roles[policy.DefaultOutputName]
-	if !ok {
-		zlog.Error().Str("name", policy.DefaultOutputName).Msg("policy does not contain required output permission section")
+	if pp.Default.Role == nil {
+		zlog.Error().Str("name", pp.Default.Name).Msg("policy does not contain required output permission section")
 		return nil, ErrNoOutputPerms
 	}
 
@@ -441,7 +440,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	switch {
 	case agent.DefaultApiKey == "":
 		zlog.Debug().Msg("must generate api key as default API key is not present")
-	case defaultRole.Sha2 != agent.PolicyOutputPermissionsHash:
+	case pp.Default.Role.Sha2 != agent.PolicyOutputPermissionsHash:
 		zlog.Debug().Msg("must generate api key as policy output permissions changed")
 	default:
 		needKey = false
@@ -450,26 +449,26 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 
 	if needKey {
 		zlog.Debug().
-			RawJSON("roles", defaultRole.Raw).
+			RawJSON("roles", pp.Default.Role.Raw).
 			Str("oldHash", agent.PolicyOutputPermissionsHash).
-			Str("newHash", defaultRole.Sha2).
+			Str("newHash", pp.Default.Role.Sha2).
 			Msg("Generating a new API key")
 
-		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker, agent.Id, policy.DefaultOutputName, defaultRole.Raw)
+		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker, agent.Id, pp.Default.Name, pp.Default.Role.Raw)
 		if err != nil {
 			zlog.Error().Err(err).Msg("fail generate output key")
 			return nil, err
 		}
 
 		zlog.Info().
-			Str("hash.sha256", defaultRole.Sha2).
+			Str("hash.sha256", pp.Default.Role.Sha2).
 			Str("apiKeyId", defaultOutputApiKey.Id).
 			Msg("Updating agent record to pick up default output key.")
 
 		fields := map[string]interface{}{
 			dl.FieldDefaultApiKey:               defaultOutputApiKey.Agent(),
 			dl.FieldDefaultApiKeyId:             defaultOutputApiKey.Id,
-			dl.FieldPolicyOutputPermissionsHash: defaultRole.Sha2,
+			dl.FieldPolicyOutputPermissionsHash: pp.Default.Role.Sha2,
 		}
 
 		body, err := json.Marshal(map[string]interface{}{
@@ -520,7 +519,7 @@ func rewritePolicy(pp *policy.ParsedPolicy, apiKey string) (interface{}, error) 
 		return nil, ErrNoPolicyOutput
 	}
 
-	if ok := setMapObj(outputs, apiKey, "default", "api_key"); !ok {
+	if ok := setMapObj(outputs, apiKey, pp.Default.Name, "api_key"); !ok {
 		return nil, ErrFailInjectApiKey
 	}
 

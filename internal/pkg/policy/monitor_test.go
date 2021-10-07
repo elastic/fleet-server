@@ -26,6 +26,8 @@ import (
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
+var policyBytes = []byte(`{"outputs":{"default":{"type":"elasticsearch"}}}`)
+
 func TestMonitor_NewPolicy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -67,7 +69,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 		},
 		PolicyId:       policyId,
 		CoordinatorIdx: 1,
-		Data:           []byte("{}"),
+		Data:           policyBytes,
 		RevisionIdx:    1,
 	}
 	policyData, err := json.Marshal(&policy)
@@ -145,7 +147,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 		},
 		PolicyId:       policyId,
 		CoordinatorIdx: 1,
-		Data:           []byte("{}"),
+		Data:           policyBytes,
 		RevisionIdx:    1,
 	}
 	policyData, err := json.Marshal(&policy)
@@ -219,7 +221,7 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 		},
 		PolicyId:       policyId,
 		CoordinatorIdx: 0,
-		Data:           []byte("{}"),
+		Data:           policyBytes,
 		RevisionIdx:    2,
 	}
 	policyData, err := json.Marshal(&policy)
@@ -296,7 +298,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 		},
 		PolicyId:       policyId,
 		CoordinatorIdx: 1,
-		Data:           []byte("{}"),
+		Data:           policyBytes,
 		RevisionIdx:    2,
 	}
 
