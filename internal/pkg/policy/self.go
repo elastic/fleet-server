@@ -218,7 +218,14 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 		return proto.StateObserved_FAILED, err
 	}
 	if !data.HasType("fleet-server") {
-		return proto.StateObserved_FAILED, errors.New("assigned policy does not have fleet-server input")
+		// no fleet-server input
+		m.status = proto.StateObserved_STARTING
+		if m.policyId == "" {
+			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on fleet-server input to be added to default policy", nil)
+		} else {
+			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", m.policyId), nil)
+		}
+		return proto.StateObserved_STARTING, nil
 	}
 
 	status := proto.StateObserved_HEALTHY
