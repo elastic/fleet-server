@@ -93,6 +93,24 @@ pipeline {
         }
       }
     }
+    stage('Release Test') {
+      options { skipDefaultCheckout() }
+      steps {
+        cleanup()
+        dir("${BASE_DIR}"){
+          withGoEnv(){
+            sh(label: 'Create release artifacts', script: 'make docker-release')
+          }
+        }
+      }
+      post {
+        success {
+          dir("${BASE_DIR}"){
+            sh(label: 'Check release artifacts', script: 'make test-release')
+          }
+        }
+      }
+    }
   }
   post {
     cleanup {
