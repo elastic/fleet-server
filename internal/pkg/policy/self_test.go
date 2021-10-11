@@ -72,11 +72,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	policyId := uuid.Must(uuid.NewV4()).String()
 	rId := xid.New().String()
-	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{
-		{
-			Type: "fleet-server",
-		},
-	}})
+	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +88,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
 	}
-	policyData, err := json.Marshal(&policy)
+	pData, err := json.Marshal(&policy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +98,55 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 				Id:      rId,
 				SeqNo:   1,
 				Version: 1,
-				Source:  policyData,
+				Source:  pData,
+			},
+		})
+	}()
+
+	// should still be set to starting
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		status, msg, _ := reporter.Current()
+		if status != proto.StateObserved_STARTING {
+			return fmt.Errorf("should be reported as starting; instead its %s", status)
+		}
+		if msg != "Waiting on fleet-server input to be added to default policy" {
+			return fmt.Errorf("should be matching with default policy")
+		}
+		return nil
+	})
+
+	rId = xid.New().String()
+	policyContents, err = json.Marshal(&policyData{Inputs: []policyInput{
+		{
+			Type: "fleet-server",
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy = model.Policy{
+		ESDocument: model.ESDocument{
+			Id:      rId,
+			Version: 1,
+			SeqNo:   1,
+		},
+		PolicyId:           policyId,
+		CoordinatorIdx:     1,
+		Data:               policyContents,
+		RevisionIdx:        2,
+		DefaultFleetServer: true,
+	}
+	pData, err = json.Marshal(&policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		mm.Notify(ctx, []es.HitT{
+			{
+				Id:      rId,
+				SeqNo:   2,
+				Version: 1,
+				Source:  pData,
 			},
 		})
 	}()
@@ -338,11 +382,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	rId := xid.New().String()
-	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{
-		{
-			Type: "fleet-server",
-		},
-	}})
+	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,10 +395,10 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		PolicyId:           policyId,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
-		RevisionIdx:        1,
+		RevisionIdx:        2,
 		DefaultFleetServer: true,
 	}
-	policyData, err := json.Marshal(&policy)
+	pData, err := json.Marshal(&policy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,7 +408,55 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 				Id:      rId,
 				SeqNo:   1,
 				Version: 1,
-				Source:  policyData,
+				Source:  pData,
+			},
+		})
+	}()
+
+	// should still be set to starting
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		status, msg, _ := reporter.Current()
+		if status != proto.StateObserved_STARTING {
+			return fmt.Errorf("should be reported as starting; instead its %s", status)
+		}
+		if msg != fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", policyId) {
+			return fmt.Errorf("should be matching with specific policy")
+		}
+		return nil
+	}, ftesting.RetrySleep(1*time.Second))
+
+	rId = xid.New().String()
+	policyContents, err = json.Marshal(&policyData{Inputs: []policyInput{
+		{
+			Type: "fleet-server",
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy = model.Policy{
+		ESDocument: model.ESDocument{
+			Id:      rId,
+			Version: 1,
+			SeqNo:   2,
+		},
+		PolicyId:           policyId,
+		CoordinatorIdx:     1,
+		Data:               policyContents,
+		RevisionIdx:        1,
+		DefaultFleetServer: true,
+	}
+	pData, err = json.Marshal(&policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		mm.Notify(ctx, []es.HitT{
+			{
+				Id:      rId,
+				SeqNo:   2,
+				Version: 1,
+				Source:  pData,
 			},
 		})
 	}()
