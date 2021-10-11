@@ -104,7 +104,7 @@ pipeline {
         }
       }
       post {
-        always {
+        success {
           dir("${BASE_DIR}"){
             sh(label: 'Check release artifacts', script: 'make test-release')
           }
