@@ -52,6 +52,7 @@ generate: ## - Generate schema models
 .PHONY: check
 check: ## - Run all checks
 	@$(MAKE) generate
+	@$(MAKE) defaults
 	@$(MAKE) check-headers
 	@$(MAKE) check-go
 	@$(MAKE) notice
@@ -81,6 +82,11 @@ notice: ## - Generates the NOTICE.txt file.
 		-noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
 		-noticeOut NOTICE.txt \
 		-depsOut ""
+
+.PHONY: defaults
+defaults: ## -Generate defaults based on limits files.
+	@echo "Generating env_defaults.go"
+	@go run dev-tools/buildlimits/buildlimits.go --in "internal/pkg/config/defaults/*.yml" --out internal/pkg/config/env_defaults.go
 
 .PHONY: check-no-changes
 check-no-changes:

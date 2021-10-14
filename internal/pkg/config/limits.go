@@ -28,31 +28,34 @@ type ServerLimits struct {
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *ServerLimits) InitDefaults() {
+	l := loadLimits().Server
 
 	c.MaxHeaderByteSize = 8192 // 8k
-	c.MaxConnections = 0       // no limit
-	c.PolicyThrottle = time.Millisecond * 5
+	c.MaxConnections = l.MaxConnections
+	c.PolicyThrottle = l.PolicyThrottle
 
 	c.CheckinLimit = Limit{
-		Interval: time.Millisecond,
-		Burst:    1000,
-		MaxBody:  1024 * 1024,
+		Interval: l.CheckinLimit.Interval,
+		Burst:    l.CheckinLimit.Burst,
+		Max:      l.CheckinLimit.Max,
+		MaxBody:  l.CheckinLimit.MaxBody,
 	}
 	c.ArtifactLimit = Limit{
-		Interval: time.Millisecond * 5,
-		Burst:    25,
-		Max:      50,
+		Interval: l.ArtifactLimit.Interval,
+		Burst:    l.ArtifactLimit.Burst,
+		Max:      l.ArtifactLimit.Max,
+		MaxBody:  l.ArtifactLimit.MaxBody,
 	}
 	c.EnrollLimit = Limit{
-		Interval: time.Millisecond * 10,
-		Burst:    100,
-		Max:      50,
-		MaxBody:  1024 * 512,
+		Interval: l.EnrollLimit.Interval,
+		Burst:    l.EnrollLimit.Burst,
+		Max:      l.EnrollLimit.Max,
+		MaxBody:  l.EnrollLimit.MaxBody,
 	}
 	c.AckLimit = Limit{
-		Interval: time.Millisecond * 10,
-		Burst:    100,
-		Max:      50,
-		MaxBody:  1024 * 1024 * 2,
+		Interval: l.AckLimit.Interval,
+		Burst:    l.AckLimit.Burst,
+		Max:      l.AckLimit.Max,
+		MaxBody:  l.AckLimit.MaxBody,
 	}
 }
