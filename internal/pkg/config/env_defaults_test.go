@@ -18,7 +18,7 @@ import (
 func TestLoadLimits(t *testing.T) {
 	maxInt := math.MaxInt32
 	if strings.HasSuffix(runtime.GOARCH, "64") {
-		maxInt = 17179869184
+		maxInt = math.MaxInt64
 	}
 
 	testCases := []struct {
