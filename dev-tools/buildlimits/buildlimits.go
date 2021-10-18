@@ -87,15 +87,10 @@ type envLimits struct {
 }
 
 func defaultEnvLimits() *envLimits {
-	maxInt := math.MaxInt32
-	if strings.HasSuffix(runtime.GOARCH, "64") {
-		maxInt = math.MaxInt64
-	}
-
 	return &envLimits{
 		RAM: valueRange{
 			Min: 0,
-			Max: maxInt,
+			Max: int(getMaxInt()),
 		},
 		Server: defaultserverLimitDefaults(),
 		Cache:  defaultCacheLimits(),
@@ -201,6 +196,13 @@ func loadLimitsForRam(currentRAM int) *envLimits {
 	}
 
 	return defaultEnvLimits()
+}
+
+func getMaxInt() int64 {
+	if strings.HasSuffix(runtime.GOARCH, "64") {
+		return math.MaxInt64
+	}
+	return math.MaxInt32
 }
 
 `))

@@ -7,20 +7,12 @@
 package config
 
 import (
-	"math"
-	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestLoadLimits(t *testing.T) {
-	maxInt := math.MaxInt32
-	if strings.HasSuffix(runtime.GOARCH, "64") {
-		maxInt = math.MaxInt64
-	}
-
 	testCases := []struct {
 		Name           string
 		CurrentRAM     int
@@ -31,7 +23,7 @@ func TestLoadLimits(t *testing.T) {
 		{"precise", 1024, 1024},
 		{"2-to-4", 2650, 4096},
 		{"close to max", 16383, 16384},
-		{"above max", 16385, maxInt},
+		{"above max", 16385, int(getMaxInt())},
 	}
 
 	for _, tc := range testCases {
