@@ -7,6 +7,9 @@
 package config
 
 import (
+	"math"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
@@ -55,10 +58,15 @@ type envLimits struct {
 }
 
 func defaultEnvLimits() *envLimits {
+	maxInt := math.MaxInt32
+	if strings.HasSuffix(runtime.GOARCH, "64") {
+		maxInt = 17179869184
+	}
+
 	return &envLimits{
 		RAM: valueRange{
 			Min: 0,
-			Max: 17179869184,
+			Max: maxInt,
 		},
 		Server: defaultserverLimitDefaults(),
 		Cache:  defaultCacheLimits(),
