@@ -7,6 +7,9 @@
 package config
 
 import (
+	"math"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
@@ -58,7 +61,7 @@ func defaultEnvLimits() *envLimits {
 	return &envLimits{
 		RAM: valueRange{
 			Min: 0,
-			Max: 17179869184,
+			Max: int(getMaxInt()),
 		},
 		Server: defaultserverLimitDefaults(),
 		Cache:  defaultCacheLimits(),
@@ -167,4 +170,11 @@ func loadLimitsForRam(currentRAM int) *envLimits {
 	}
 
 	return defaultEnvLimits()
+}
+
+func getMaxInt() int64 {
+	if strings.HasSuffix(runtime.GOARCH, "64") {
+		return math.MaxInt64
+	}
+	return math.MaxInt32
 }
