@@ -24,28 +24,45 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool) (*elastic
 	user := cfg.Output.Elasticsearch.Username
 	mcph := cfg.Output.Elasticsearch.MaxConnPerHost
 
+<<<<<<< HEAD
 	log.Debug().
 		Strs("addr", addr).
 		Str("user", user).
 		Int("maxConnsPersHost", mcph).
 		Msg("init es")
+=======
+	// Apply configuration options
+	for _, opt := range opts {
+		opt(escfg)
+	}
+
+	zlog := log.With().
+		Strs("cluster.addr", addr).
+		Str("cluster.user", user).
+		Int("cluster.maxConnsPersHost", mcph).
+		Logger()
+
+	zlog.Debug().Msg("init es")
+>>>>>>> 8a4855b (Normalize logging)
 
 	es, err := elasticsearch.NewClient(escfg)
 	if err != nil {
+		zlog.Error().Err(err).Msg("fail elasticsearch init")
 		return nil, err
 	}
 
 	// Validate connection
 	resp, err := info(ctx, es)
 	if err != nil {
+		zlog.Error().Err(err).Msg("fail elasticsearch info")
 		return nil, err
 	}
 
-	log.Info().
-		Str("name", resp.ClusterName).
-		Str("uuid", resp.ClusterUUID).
-		Str("vers", resp.Version.Number).
-		Msg("Cluster Info")
+	zlog.Info().
+		Str("cluster.name", resp.ClusterName).
+		Str("cluster.uuid", resp.ClusterUUID).
+		Str("cluster.version", resp.Version.Number).
+		Msg("elasticsearch cluster info")
 
 	return es, nil
 }

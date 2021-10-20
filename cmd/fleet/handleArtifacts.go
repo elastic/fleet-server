@@ -74,13 +74,17 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 	reqId := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
+<<<<<<< HEAD
 		Str("id", id).
+=======
+		Str(LogAgentId, id).
+		Str(EcsHttpRequestId, reqId).
+>>>>>>> 8a4855b (Normalize logging)
 		Str("sha2", sha2).
 		Str("remoteAddr", r.RemoteAddr).
-		Str(EcsHttpRequestId, reqId).
 		Logger()
 
-	rdr, err := rt.at.handleArtifacts(r, zlog, id, sha2)
+	rdr, err := rt.at.handleArtifacts(&zlog, r, id, sha2)
 
 	var nWritten int64
 	if err == nil {
@@ -111,7 +115,7 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 	}
 }
 
-func (at ArtifactT) handleArtifacts(r *http.Request, zlog zerolog.Logger, id, sha2 string) (io.Reader, error) {
+func (at ArtifactT) handleArtifacts(zlog *zerolog.Logger, r *http.Request, id, sha2 string) (io.Reader, error) {
 	limitF, err := at.limit.Acquire()
 	if err != nil {
 		return nil, err
@@ -121,21 +125,21 @@ func (at ArtifactT) handleArtifacts(r *http.Request, zlog zerolog.Logger, id, sh
 	// Authenticate the APIKey; retrieve agent record.
 	// Note: This is going to be a bit slow even if we hit the cache on the api key.
 	// In order to validate that the agent still has that api key, we fetch the agent record from elastic.
-	agent, err := authAgent(r, "", at.bulker, at.cache)
+	agent, err := authAgent(r, nil, at.bulker, at.cache)
 	if err != nil {
 		return nil, err
 	}
+
+	// Pointer is passed in to allow UpdateContext by child function
+	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
+		return ctx.Str(LogAccessApiKeyId, agent.AccessApiKeyId)
+	})
 
 	// Metrics; serenity now.
 	dfunc := cntArtifacts.IncStart()
 	defer dfunc()
 
-	zlog = zlog.With().
-		Str("APIKeyId", agent.AccessApiKeyId).
-		Str("agentId", agent.Id).
-		Logger()
-
-	return at.handle(r.Context(), zlog, agent, id, sha2)
+	return at.processRequest(r.Context(), *zlog, agent, id, sha2)
 }
 
 type artHandler struct {
@@ -144,7 +148,7 @@ type artHandler struct {
 	c      cache.Cache
 }
 
-func (at ArtifactT) handle(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
+func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
 
 	// Input validation
 	if err := validateSha2String(sha2); err != nil {

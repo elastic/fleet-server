@@ -18,12 +18,19 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Alias useful ECS headers
+// Alias logger constants
 const (
 	EcsHttpRequestId         = logger.EcsHttpRequestId
 	EcsEventDuration         = logger.EcsEventDuration
 	EcsHttpResponseCode      = logger.EcsHttpResponseCode
 	EcsHttpResponseBodyBytes = logger.EcsHttpResponseBodyBytes
+
+	LogApiKeyId              = logger.ApiKeyId
+	LogPolicyId              = logger.PolicyId
+	LogAgentId               = logger.AgentId
+	LogEnrollApiKeyId        = logger.EnrollApiKeyId
+	LogAccessApiKeyId        = logger.AccessApiKeyId
+	LogDefaultOutputApiKeyId = logger.DefaultOutputApiKeyId
 )
 
 type errResp struct {

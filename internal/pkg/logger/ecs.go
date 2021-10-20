@@ -37,11 +37,32 @@ const (
 	EcsServerAddress = "server.address"
 
 	// TLS
-	EcsTlsEstablished = "tls.established"
+	EcsTlsEstablished        = "tls.established"
+	EcsTlsResumed            = "tls.resumed"
+	EcsTlsVersion            = "tls.version"
+	EcsTlsClientServerName   = "tls.client.server_name"
+	EcsTlsCipher             = "tls.cipher"
+	EcsTlsClientIssuer       = "tls.client.issuer"
+	EcsTlsClientSubject      = "tls.client.subject"
+	EcsTlsClientNotBefore    = "tls.client.not_before"
+	EcsTlsClientNotAfter     = "tls.client.not_after"
+	EcsTlsClientSerialNumber = "tls.client.x509.serial_number"
+	EcsTlsClientTimeFormat   = "2006-01-02T15:04:05.999Z"
 
 	// Event
 	EcsEventDuration = "event.duration"
 
 	// Service
 	EcsServiceName = "service.name"
+)
+
+// Non ECS compliant contants used in logging
+
+const (
+	ApiKeyId              = "fleet.apikey.id"
+	PolicyId              = "fleet.policy.id"
+	AgentId               = "fleet.agent.id"
+	EnrollApiKeyId        = "fleet.enroll.apikey.id"
+	AccessApiKeyId        = "fleet.access.apikey.id"
+	DefaultOutputApiKeyId = "fleet.default.apikey.id"
 )

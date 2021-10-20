@@ -22,6 +22,7 @@ var (
 	ErrApiKeyNotEnabled = errors.New("APIKey not enabled")
 	ErrAgentCorrupted   = errors.New("agent record corrupted")
 	ErrAgentInactive    = errors.New("agent inactive")
+	ErrAgentIdentity    = errors.New("agent header contains wrong identifier")
 )
 
 // This authenticates that the provided API key exists and is enabled.
@@ -47,7 +48,7 @@ func authApiKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 	if err != nil {
 		log.Info().
 			Err(err).
-			Str("id", key.Id).
+			Str(LogApiKeyId, key.Id).
 			Str(EcsHttpRequestId, reqId).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey fail authentication")
@@ -78,7 +79,7 @@ func authApiKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 	return key, err
 }
 
-func authAgent(r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
+func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
 	start := time.Now()
 
 	// authenticate
@@ -87,12 +88,20 @@ func authAgent(r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) (*mo
 		return nil, err
 	}
 
+	w := log.With().
+		Str(LogAccessApiKeyId, key.Id).
+		Str(EcsHttpRequestId, r.Header.Get(logger.HeaderRequestID))
+
+	if id != nil {
+		w = w.Str(LogAgentId, *id)
+	}
+
+	zlog := w.Logger()
+
 	authTime := time.Now()
 
 	if authTime.Sub(start) > time.Second {
-		log.Debug().
-			Str("agentId", id).
-			Str(EcsHttpRequestId, r.Header.Get(logger.HeaderRequestID)).
+		zlog.Debug().
 			Int64(EcsEventDuration, authTime.Sub(start).Nanoseconds()).
 			Msg("authApiKey slow")
 	}
@@ -102,33 +111,45 @@ func authAgent(r *http.Request, id string, bulker bulk.Bulk, c cache.Cache) (*mo
 		return nil, err
 	}
 
+	if agent.Agent == nil {
+		zlog.Warn().
+			Err(ErrAgentCorrupted).
+			Msg("agent record does not contain required metadata section")
+		return nil, ErrAgentCorrupted
+	}
+
 	findTime := time.Now()
 
 	if findTime.Sub(authTime) > time.Second {
-		log.Debug().
-			Str("agentId", id).
-			Str(EcsHttpRequestId, r.Header.Get(logger.HeaderRequestID)).
+		zlog.Debug().
 			Int64(EcsEventDuration, findTime.Sub(authTime).Nanoseconds()).
 			Msg("findAgentByApiKeyId slow")
 	}
 
-	// validate key alignment
+	// validate that the Access ApiKey identifier stored in the agent's record
+	// is in alignment when the authenticated key provided on this transaction
 	if agent.AccessApiKeyId != key.Id {
-		log.Info().
+		zlog.Warn().
 			Err(ErrAgentCorrupted).
-			Interface("agent", &agent).
-			Str("key.Id", key.Id).
-			Msg("agent API key id mismatch agent record")
+			Str("agent.AccessApiKeyId", agent.AccessApiKeyId).
+			Msg("agent access ApiKey id mismatch agent record")
 		return nil, ErrAgentCorrupted
+	}
+
+	// validate that the id in the header is equal to the agent id record
+	if id != nil && *id != agent.Agent.Id {
+		zlog.Warn().
+			Err(ErrAgentIdentity).
+			Str("agent.Agent.Id", agent.Agent.Id).
+			Msg("agent id mismatch against http header")
+		return nil, ErrAgentIdentity
 	}
 
 	// validate active, an api key can be valid for an inactive agent record
 	// if it is in our cache and has not timed out.
 	if !agent.Active {
-		log.Info().
+		zlog.Info().
 			Err(ErrAgentInactive).
-			Str("agentId", id).
-			Str(EcsHttpRequestId, r.Header.Get(logger.HeaderRequestID)).
 			Msg("agent record inactive")
 
 		// Update the cache to mark the api key id associated with this agent as not enabled
