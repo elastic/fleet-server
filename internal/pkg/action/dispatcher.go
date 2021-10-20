@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
@@ -65,7 +66,7 @@ func (d *Dispatcher) Subscribe(agentId string, seqNo sqn.SeqNo) *Sub {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str("agentId", agentId).Int("sz", sz).Msg("Subscribed to action dispatcher")
+	log.Trace().Str(logger.AgentId, agentId).Int("sz", sz).Msg("Subscribed to action dispatcher")
 
 	return &sub
 }
@@ -80,7 +81,7 @@ func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str("agentId", sub.agentId).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
+	log.Trace().Str(logger.AgentId, sub.agentId).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
 func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
@@ -119,7 +120,7 @@ func (d *Dispatcher) getSub(agentId string) (Sub, bool) {
 func (d *Dispatcher) dispatch(ctx context.Context, agentId string, acdocs []model.Action) {
 	sub, ok := d.getSub(agentId)
 	if !ok {
-		log.Debug().Str("agent_id", agentId).Msg("Agent is not currently connected. Not dispatching actions.")
+		log.Debug().Str(logger.AgentId, agentId).Msg("Agent is not currently connected. Not dispatching actions.")
 		return
 	}
 	select {
