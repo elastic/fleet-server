@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-version"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -57,13 +58,24 @@ func maximizePatch(ver *version.Version) string {
 
 // validateUserAgent validates that the User-Agent of the connecting Elastic Agent is valid and that the version is
 // supported for this Fleet Server.
-func validateUserAgent(r *http.Request, verConst version.Constraints) (string, error) {
+func validateUserAgent(zlog zerolog.Logger, r *http.Request, verConst version.Constraints) (string, error) {
 	userAgent := r.Header.Get("User-Agent")
+
+	zlog = zlog.With().Str("userAgent", userAgent).Logger()
+
 	if userAgent == "" {
+		zlog.Info().
+			Err(ErrInvalidUserAgent).
+			Msg("empty User-Agent")
 		return "", ErrInvalidUserAgent
 	}
+
 	userAgent = strings.ToLower(userAgent)
 	if !strings.HasPrefix(userAgent, userAgentPrefix) {
+		zlog.Info().
+			Err(ErrInvalidUserAgent).
+			Str("targetPrefix", userAgentPrefix).
+			Msg("invalid user agent prefix")
 		return "", ErrInvalidUserAgent
 	}
 
@@ -78,10 +90,20 @@ func validateUserAgent(r *http.Request, verConst version.Constraints) (string, e
 
 	ver, err := version.NewVersion(verStr)
 	if err != nil {
+		zlog.Info().
+			Err(err).
+			Str("verStr", verStr).
+			Msg("invalid user agent version string")
 		return "", ErrInvalidUserAgent
 	}
 	if !verConst.Check(ver) {
+		zlog.Info().
+			Err(ErrUnsupportedVersion).
+			Str("verStr", verStr).
+			Str("constraints", verConst.String()).
+			Msg("unsuported user agent version")
 		return "", ErrUnsupportedVersion
 	}
+
 	return ver.String(), nil
 }

@@ -55,16 +55,16 @@ func (c *ServerBulk) InitDefaults() {
 
 // Server is the configuration for the server
 type Server struct {
-	Host              string            `config:"host"`
-	Port              uint16            `config:"port"`
-	TLS               *tlscommon.Config `config:"ssl"`
-	Timeouts          ServerTimeouts    `config:"timeouts"`
-	Profiler          ServerProfiler    `config:"profiler"`
-	CompressionLevel  int               `config:"compression_level"`
-	CompressionThresh int               `config:"compression_threshold"`
-	Limits            ServerLimits      `config:"limits"`
-	Runtime           Runtime           `config:"runtime"`
-	Bulk              ServerBulk        `config:"bulk"`
+	Host              string                  `config:"host"`
+	Port              uint16                  `config:"port"`
+	TLS               *tlscommon.ServerConfig `config:"ssl"`
+	Timeouts          ServerTimeouts          `config:"timeouts"`
+	Profiler          ServerProfiler          `config:"profiler"`
+	CompressionLevel  int                     `config:"compression_level"`
+	CompressionThresh int                     `config:"compression_threshold"`
+	Limits            ServerLimits            `config:"limits"`
+	Runtime           Runtime                 `config:"runtime"`
+	Bulk              ServerBulk              `config:"bulk"`
 }
 
 // InitDefaults initializes the defaults for the configuration.

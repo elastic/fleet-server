@@ -7,7 +7,6 @@ package coordinator
 import (
 	"context"
 	"errors"
-	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"net"
 	"os"
 	"runtime"
@@ -21,6 +20,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
@@ -419,7 +419,7 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 			s := l.With().Int64(dl.FieldRevisionIdx, p.RevisionIdx).Int64(dl.FieldCoordinatorIdx, p.CoordinatorIdx).Logger()
 			_, err := dl.CreatePolicy(ctx, bulker, p, dl.WithIndexName(policiesIndex))
 			if err != nil {
-				l.Err(err).Msg("failed to insert a new policy revision")
+				s.Err(err).Msg("failed to insert a new policy revision")
 			} else {
 				s.Info().Msg("coordinator inserted a new policy revision")
 			}
@@ -430,8 +430,15 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 }
 
 func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenrollTimeout time.Duration, l zerolog.Logger, checkInterval time.Duration, agentsIndex string) {
+	l.Info().
+		Dur("checkInterval", checkInterval).
+		Dur("unenrollTimeout", unenrollTimeout).
+		Msg("unenroll monitor start")
+	defer l.Info().Msg("unenroll monitor exit")
+
 	t := time.NewTimer(checkInterval)
 	defer t.Stop()
+
 	for {
 		select {
 		case <-t.C:
@@ -445,26 +452,32 @@ func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenr
 	}
 }
 
-func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyId string, unenrollTimeout time.Duration, l zerolog.Logger, agentsIndex string) error {
+func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyId string, unenrollTimeout time.Duration, zlog zerolog.Logger, agentsIndex string) error {
 	agents, err := dl.FindOfflineAgents(ctx, bulker, policyId, unenrollTimeout, dl.WithIndexName(agentsIndex))
-	if err != nil {
+	if err != nil || len(agents) == 0 {
 		return err
 	}
+
+	zlog = zlog.With().Dur("timeout", unenrollTimeout).Logger()
+
 	agentIds := make([]string, len(agents))
+
 	for i, agent := range agents {
-		err = unenrollAgent(ctx, bulker, &agent, agentsIndex)
+		err = unenrollAgent(ctx, zlog, bulker, &agent, agentsIndex)
 		if err != nil {
 			return err
 		}
 		agentIds[i] = agent.Id
 	}
-	if len(agentIds) > 0 {
-		l.Info().Strs("agents", agentIds).Msg("marked agents unenrolled due to unenroll timeout")
-	}
+
+	zlog.Info().
+		Strs(logger.ApiKeyId, agentIds).
+		Msg("marked agents unenrolled due to unenroll timeout")
+
 	return nil
 }
 
-func unenrollAgent(ctx context.Context, bulker bulk.Bulk, agent *model.Agent, agentsIndex string) error {
+func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, agentsIndex string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	fields := bulk.UpdateFields{
 		dl.FieldActive:           false,
@@ -477,13 +490,25 @@ func unenrollAgent(ctx context.Context, bulker bulk.Bulk, agent *model.Agent, ag
 		return err
 	}
 	apiKeys := getAPIKeyIDs(agent)
+
+	zlog = zlog.With().
+		Str(logger.AgentId, agent.Id).
+		Strs(logger.ApiKeyId, apiKeys).
+		Logger()
+
+	zlog.Info().Msg("unenrollAgent due to unenroll timeout")
+
 	if len(apiKeys) > 0 {
-		err = apikey.Invalidate(ctx, bulker.Client(), apiKeys...)
+		err = bulker.ApiKeyInvalidate(ctx, apiKeys...)
 		if err != nil {
+			zlog.Error().Err(err).Msg("Fail apiKey invalidate")
 			return err
 		}
 	}
-	err = bulker.Update(ctx, agentsIndex, agent.Id, body, bulk.WithRefresh())
+	if err = bulker.Update(ctx, agentsIndex, agent.Id, body, bulk.WithRefresh()); err != nil {
+		zlog.Error().Err(err).Msg("Fail unenrollAgent record update")
+	}
+
 	return err
 }
 

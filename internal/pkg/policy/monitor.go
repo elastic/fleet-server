@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 )
@@ -217,7 +218,7 @@ func (m *monitorT) dispatchPending() bool {
 	policy, ok := m.policies[s.policyId]
 	if !ok {
 		m.log.Warn().
-			Str(dl.FieldPolicyId, s.policyId).
+			Str(logger.PolicyId, s.policyId).
 			Msg("logic error: policy missing on dispatch")
 		return done
 	}
@@ -225,8 +226,8 @@ func (m *monitorT) dispatchPending() bool {
 	select {
 	case s.ch <- &policy.pp:
 		m.log.Debug().
-			Str("agent_id", s.agentId).
-			Str(dl.FieldPolicyId, s.policyId).
+			Str(logger.AgentId, s.agentId).
+			Str(logger.PolicyId, s.policyId).
 			Int64("rev", s.revIdx).
 			Int64("coord", s.coordIdx).
 			Msg("dispatch")
@@ -234,8 +235,8 @@ func (m *monitorT) dispatchPending() bool {
 		// Should never block on a channel; we created a channel of size one.
 		// A block here indicates a logic error somewheres.
 		m.log.Error().
-			Str(dl.FieldPolicyId, s.policyId).
-			Str("agent_id", s.agentId).
+			Str(logger.PolicyId, s.policyId).
+			Str(logger.AgentId, s.agentId).
 			Msg("logic error: should never block on policy channel")
 	}
 
@@ -299,7 +300,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 	newPolicy := pp.Policy
 
 	zlog := m.log.With().
-		Str(dl.FieldPolicyId, newPolicy.PolicyId).
+		Str(logger.PolicyId, newPolicy.PolicyId).
 		Int64("rev", newPolicy.RevisionIdx).
 		Int64("coord", newPolicy.CoordinatorIdx).
 		Logger()
@@ -351,7 +352,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 			}
 
 			zlog.Debug().
-				Str("agent_id", sub.agentId).
+				Str(logger.AgentId, sub.agentId).
 				Msg("scheduled pendingQ on policy revision")
 
 			nQueued += 1
@@ -394,8 +395,8 @@ func (m *monitorT) Subscribe(agentId string, policyId string, revisionIdx int64,
 	}
 
 	m.log.Debug().
-		Str("agent_id", agentId).
-		Str(dl.FieldPolicyId, policyId).
+		Str(logger.AgentId, agentId).
+		Str(logger.PolicyId, policyId).
 		Int64("rev", revisionIdx).
 		Int64("coord", coordinatorIdx).
 		Msg("subscribed to policy monitor")
@@ -415,7 +416,7 @@ func (m *monitorT) Subscribe(agentId string, policyId string, revisionIdx int64,
 	case !ok:
 		// We've not seen this policy before, force load.
 		m.log.Info().
-			Str(dl.FieldPolicyId, policyId).
+			Str(logger.PolicyId, policyId).
 			Msg("force load on unknown policyId")
 		p = policyT{head: makeHead()}
 		p.head.pushBack(s)
@@ -425,7 +426,7 @@ func (m *monitorT) Subscribe(agentId string, policyId string, revisionIdx int64,
 		empty := m.pendingQ.isEmpty()
 		m.pendingQ.pushBack(s)
 		m.log.Debug().
-			Str("agent_id", s.agentId).
+			Str(logger.AgentId, s.agentId).
 			Msg("scheduled pending on subscribe")
 		if empty {
 			m.kickDeploy()
@@ -449,8 +450,8 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 	m.mut.Unlock()
 
 	m.log.Debug().
-		Str("agent_id", s.agentId).
-		Str(dl.FieldPolicyId, s.policyId).
+		Str(logger.AgentId, s.agentId).
+		Str(logger.PolicyId, s.policyId).
 		Int64("rev", s.revIdx).
 		Int64("coord", s.coordIdx).
 		Msg("unsubscribe")
