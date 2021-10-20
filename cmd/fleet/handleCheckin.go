@@ -56,11 +56,11 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 	reqId := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str("agentId", id).
+		Str(LogAgentId, id).
 		Str(EcsHttpRequestId, reqId).
 		Logger()
 
-	err := rt.ct._handleCheckin(zlog, w, r, id, rt.bulker)
+	err := rt.ct.handleCheckin(&zlog, w, r, id)
 
 	if err != nil {
 		cntCheckin.IncError(err)
@@ -72,8 +72,6 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 			resp.Level = zerolog.WarnLevel
 		}
 
-		reqId := r.Header.Get(logger.HeaderRequestID)
-
 		zlog.WithLevel(resp.Level).
 			Err(err).
 			Int(EcsHttpResponseCode, resp.StatusCode).
@@ -81,7 +79,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 			Msg("fail checkin")
 
 		if err := resp.Write(w); err != nil {
-			log.Error().Str(EcsHttpRequestId, reqId).Err(err).Msg("fail writing error response")
+			zlog.Error().Err(err).Msg("fail writing error response")
 		}
 	}
 }
@@ -134,7 +132,7 @@ func NewCheckinT(
 	return ct
 }
 
-func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, id string, bulker bulk.Bulk) error {
+func (ct *CheckinT) handleCheckin(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, id string) error {
 
 	start := time.Now()
 
@@ -144,13 +142,18 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 	}
 	defer limitF()
 
-	agent, err := authAgent(r, id, ct.bulker, ct.cache)
+	agent, err := authAgent(r, &id, ct.bulker, ct.cache)
 
 	if err != nil {
 		return err
 	}
 
-	ver, err := validateUserAgent(r, ct.verCon)
+	// Pointer is passed in to allow UpdateContext by child function
+	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
+		return ctx.Str(LogAccessApiKeyId, agent.AccessApiKeyId)
+	})
+
+	ver, err := validateUserAgent(*zlog, r, ct.verCon)
 	if err != nil {
 		return err
 	}
@@ -161,6 +164,11 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 	// Metrics; serenity now.
 	dfunc := cntCheckin.IncStart()
 	defer dfunc()
+
+	return ct.processRequest(*zlog, w, r, start, agent, newVer)
+}
+
+func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
 
 	ctx := r.Context()
 
@@ -176,7 +184,7 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 	var req CheckinRequest
 	decoder := json.NewDecoder(readCounter)
 	if err := decoder.Decode(&req); err != nil {
-		return err
+		return errors.Wrap(err, "decode checkin request")
 	}
 
 	cntCheckin.bodyIn.Add(readCounter.Count())
@@ -188,7 +196,7 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 	}
 
 	// Resolve AckToken from request, fallback on the agent record
-	seqno, err := ct.resolveSeqNo(ctx, req, agent)
+	seqno, err := ct.resolveSeqNo(ctx, zlog, req, agent)
 	if err != nil {
 		return err
 	}
@@ -226,7 +234,7 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer longPoll.Stop()
 
 	// Intial update on checkin, and any user fields that might have changed
-	ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno, newVer)
+	ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno, ver)
 
 	// Initial fetch for pending actions
 	var (
@@ -253,7 +261,7 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 				actions = append(actions, acs...)
 				break LOOP
 			case policy := <-sub.Output():
-				actionResp, err := processPolicy(ctx, zlog, bulker, agent.Id, policy)
+				actionResp, err := processPolicy(ctx, zlog, ct.bulker, agent.Id, policy)
 				if err != nil {
 					return errors.Wrap(err, "processPolicy")
 				}
@@ -263,7 +271,7 @@ func (ct *CheckinT) _handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r
 				zlog.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
-				ct.bc.CheckIn(agent.Id, req.Status, nil, nil, newVer)
+				ct.bc.CheckIn(agent.Id, req.Status, nil, nil, ver)
 			}
 		}
 	}
@@ -348,7 +356,7 @@ func acceptsEncoding(r *http.Request, encoding string) bool {
 }
 
 // Resolve AckToken from request, fallback on the agent record
-func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent *model.Agent) (seqno sqn.SeqNo, err error) {
+func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req CheckinRequest, agent *model.Agent) (seqno sqn.SeqNo, err error) {
 	// Resolve AckToken from request, fallback on the agent record
 	ackToken := req.AckToken
 	seqno = agent.ActionSeqNo
@@ -358,7 +366,7 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, req CheckinRequest, agent 
 		sn, err = ct.tr.Resolve(ctx, ackToken)
 		if err != nil {
 			if errors.Is(err, dl.ErrNotFound) {
-				log.Debug().Str("token", ackToken).Str("agent_id", agent.Id).Msg("revision token not found")
+				zlog.Debug().Str("token", ackToken).Msg("revision token not found")
 				err = nil
 			} else {
 				err = errors.Wrap(err, "resolveSeqNo")
@@ -415,7 +423,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Str("ctx", "processPolicy").
 		Int64("policyRevision", pp.Policy.RevisionIdx).
 		Int64("policyCoordinator", pp.Policy.CoordinatorIdx).
-		Str("policyId", pp.Policy.PolicyId).
+		Str(LogPolicyId, pp.Policy.PolicyId).
 		Logger()
 
 	// The parsed policy object contains a map of name->role with a precalculated sha2.
@@ -460,7 +468,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 
 		zlog.Info().
 			Str("hash.sha256", pp.Default.Role.Sha2).
-			Str("apiKeyId", defaultOutputApiKey.Id).
+			Str(LogDefaultOutputApiKeyId, defaultOutputApiKey.Id).
 			Msg("Updating agent record to pick up default output key.")
 
 		fields := map[string]interface{}{
@@ -582,7 +590,7 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
 	if bytes.Equal(req.LocalMeta, agent.LocalMetadata) {
-		log.Trace().Msg("quick comparing local metadata is equal")
+		zlog.Trace().Msg("quick comparing local metadata is equal")
 		return nil, nil
 	}
 

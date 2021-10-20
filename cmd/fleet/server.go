@@ -100,7 +100,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	ln = wrapConnLimitter(ctx, ln, cfg)
 
 	if cfg.TLS != nil && cfg.TLS.IsEnabled() {
-		commonTlsCfg, err := tlscommon.LoadTLSConfig(cfg.TLS)
+		commonTlsCfg, err := tlscommon.LoadTLSServerConfig(cfg.TLS)
 		if err != nil {
 			return err
 		}

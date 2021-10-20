@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -26,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -55,42 +55,57 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 	start := time.Now()
 
 	id := ps.ByName("id")
-	err := rt.ack.handleAcks(w, r, id)
+
+	reqId := r.Header.Get(logger.HeaderRequestID)
+
+	zlog := log.With().
+		Str(LogAgentId, id).
+		Str(EcsHttpRequestId, reqId).
+		Logger()
+
+	err := rt.ack.handleAcks(&zlog, w, r, id)
 
 	if err != nil {
 		cntAcks.IncError(err)
 		resp := NewErrorResp(err)
-		reqId := r.Header.Get(logger.HeaderRequestID)
 
-		log.WithLevel(resp.Level).
+		zlog.WithLevel(resp.Level).
 			Err(err).
-			Str("agentId", id).
-			Str(EcsHttpRequestId, reqId).
 			Int(EcsHttpResponseCode, resp.StatusCode).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail ACK")
 
 		if err := resp.Write(w); err != nil {
-			log.Error().Err(err).Str(EcsHttpRequestId, reqId).Msg("fail writing error response")
+			zlog.Error().Err(err).Msg("fail writing error response")
 		}
 	}
 }
 
-func (ack AckT) handleAcks(w http.ResponseWriter, r *http.Request, id string) error {
+func (ack *AckT) handleAcks(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, id string) error {
 	limitF, err := ack.limit.Acquire()
 	if err != nil {
 		return err
 	}
 	defer limitF()
 
-	agent, err := authAgent(r, id, ack.bulk, ack.cache)
+	agent, err := authAgent(r, &id, ack.bulk, ack.cache)
 	if err != nil {
 		return err
 	}
 
+	// Pointer is passed in to allow UpdateContext by child function
+	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
+		return ctx.Str(LogAccessApiKeyId, agent.AccessApiKeyId)
+	})
+
 	// Metrics; serenity now.
 	dfunc := cntAcks.IncStart()
 	defer dfunc()
+
+	return ack.processRequest(*zlog, w, r, agent)
+}
+
+func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent) error {
 
 	body := r.Body
 
@@ -111,9 +126,11 @@ func (ack AckT) handleAcks(w http.ResponseWriter, r *http.Request, id string) er
 		return errors.Wrap(err, "handleAcks unmarshal")
 	}
 
-	log.Trace().RawJSON("raw", raw).Msg("Ack request")
+	zlog.Trace().RawJSON("raw", raw).Msg("Ack request")
 
-	if err = ack.handleAckEvents(r.Context(), agent, req.Events); err != nil {
+	zlog = zlog.With().Int("nEvents", len(req.Events)).Logger()
+
+	if err = ack.handleAckEvents(r.Context(), zlog, agent, req.Events); err != nil {
 		return err
 	}
 
@@ -134,10 +151,18 @@ func (ack AckT) handleAcks(w http.ResponseWriter, r *http.Request, id string) er
 	return nil
 }
 
-func (ack *AckT) handleAckEvents(ctx context.Context, agent *model.Agent, events []Event) error {
+func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) error {
 	var policyAcks []string
 	var unenroll bool
-	for _, ev := range events {
+	for n, ev := range events {
+		zlog.Info().
+			Str("actionType", ev.Type).
+			Str("actionSubType", ev.SubType).
+			Str("actionId", ev.ActionId).
+			Str("timestamp", ev.Timestamp).
+			Int("n", n).
+			Msg("ack event")
+
 		if ev.AgentId != "" && ev.AgentId != agent.Id {
 			return ErrEventAgentIdMismatch
 		}
@@ -180,7 +205,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, agent *model.Agent, events
 			if action.Type == TypeUnenroll {
 				unenroll = true
 			} else if action.Type == TypeUpgrade {
-				if err := ack.handleUpgrade(ctx, agent); err != nil {
+				if err := ack.handleUpgrade(ctx, zlog, agent); err != nil {
 					return err
 				}
 			}
@@ -188,13 +213,13 @@ func (ack *AckT) handleAckEvents(ctx context.Context, agent *model.Agent, events
 	}
 
 	if len(policyAcks) > 0 {
-		if err := ack.handlePolicyChange(ctx, agent, policyAcks...); err != nil {
+		if err := ack.handlePolicyChange(ctx, zlog, agent, policyAcks...); err != nil {
 			return err
 		}
 	}
 
 	if unenroll {
-		if err := ack.handleUnenroll(ctx, agent); err != nil {
+		if err := ack.handleUnenroll(ctx, zlog, agent); err != nil {
 			return err
 		}
 	}
@@ -202,7 +227,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, agent *model.Agent, events
 	return nil
 }
 
-func (ack *AckT) handlePolicyChange(ctx context.Context, agent *model.Agent, actionIds ...string) error {
+func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, actionIds ...string) error {
 	// If more than one, pick the winner;
 	// 0) Correct policy id
 	// 1) Highest revision/coordinator number
@@ -212,6 +237,16 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, agent *model.Agent, act
 	currCoord := agent.PolicyCoordinatorIdx
 	for _, a := range actionIds {
 		rev, ok := policy.RevisionFromString(a)
+
+		zlog.Debug().
+			Str("agent.policyId", agent.PolicyId).
+			Int64("agent.revisionIdx", currRev).
+			Int64("agent.coordinatorIdx", currCoord).
+			Str("rev.policyId", rev.PolicyId).
+			Int64("rev.revisionIdx", rev.RevisionIdx).
+			Int64("rev.coordinatorIdx", rev.CoordinatorIdx).
+			Msg("ack policy revision")
+
 		if ok && rev.PolicyId == agent.PolicyId && (rev.RevisionIdx > currRev ||
 			(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
 			found = true
@@ -239,20 +274,21 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, agent *model.Agent, act
 		bulk.WithRetryOnConflict(3),
 	)
 
-	log.Info().Err(err).
-		Str("agentId", agent.Id).
-		Str("policyId", agent.PolicyId).
+	zlog.Info().Err(err).
+		Str(LogPolicyId, agent.PolicyId).
 		Int64("policyRevision", currRev).
 		Int64("policyCoordinator", currCoord).
-		Msg("Policy ACK")
+		Msg("ack policy")
 
 	return errors.Wrap(err, "handlePolicyChange update")
 }
 
-func (ack *AckT) handleUnenroll(ctx context.Context, agent *model.Agent) error {
+func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
 	apiKeys := _getAPIKeyIDs(agent)
 	if len(apiKeys) > 0 {
-		if err := apikey.Invalidate(ctx, ack.bulk.Client(), apiKeys...); err != nil {
+		zlog = zlog.With().Strs(LogApiKeyId, apiKeys).Logger()
+
+		if err := ack.bulk.ApiKeyInvalidate(ctx, apiKeys...); err != nil {
 			return errors.Wrap(err, "handleUnenroll invalidate apikey")
 		}
 	}
@@ -269,11 +305,15 @@ func (ack *AckT) handleUnenroll(ctx context.Context, agent *model.Agent) error {
 		return errors.Wrap(err, "handleUnenroll marshal")
 	}
 
-	err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh())
-	return errors.Wrap(err, "handleUnenroll update")
+	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh()); err != nil {
+		return errors.Wrap(err, "handleUnenroll update")
+	}
+
+	zlog.Info().Msg("ack unenroll")
+	return nil
 }
 
-func (ack *AckT) handleUpgrade(ctx context.Context, agent *model.Agent) error {
+func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
@@ -286,8 +326,16 @@ func (ack *AckT) handleUpgrade(ctx context.Context, agent *model.Agent) error {
 		return errors.Wrap(err, "handleUpgrade marshal")
 	}
 
-	err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh())
-	return errors.Wrap(err, "handleUpgrade update")
+	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh()); err != nil {
+		return errors.Wrap(err, "handleUpgrade update")
+	}
+
+	zlog.Info().
+		Str("lastReportedVersion", agent.Agent.Version).
+		Str("upgradedAt", now).
+		Msg("ack upgrade")
+
+	return nil
 }
 
 func _getAPIKeyIDs(agent *model.Agent) []string {

@@ -27,6 +27,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/miolini/datacounter"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -76,53 +77,44 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	enrollResponse, err := rt.et.handleEnroll(w, r)
-
-	var data []byte
-	if err == nil {
-		data, err = json.Marshal(enrollResponse)
-	}
-
 	reqId := r.Header.Get(logger.HeaderRequestID)
+
+	zlog := log.With().
+		Str(EcsHttpRequestId, reqId).
+		Str("mod", kEnrollMod).
+		Logger()
+
+	resp, err := rt.et.handleEnroll(&zlog, w, r)
 
 	if err != nil {
 		cntEnroll.IncError(err)
 		resp := NewErrorResp(err)
 
-		log.WithLevel(resp.Level).
+		zlog.WithLevel(resp.Level).
 			Err(err).
-			Str(EcsHttpRequestId, reqId).
-			Str("mod", kEnrollMod).
 			Int(EcsHttpResponseCode, resp.StatusCode).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail enroll")
 
 		if err := resp.Write(w); err != nil {
-			log.Error().Err(err).Str(EcsHttpRequestId, reqId).Msg("fail writing error response")
+			zlog.Error().Err(err).Msg("fail writing error response")
 		}
 		return
 	}
 
-	var numWritten int
-	if numWritten, err = w.Write(data); err != nil {
-		log.Error().Err(err).Str(EcsHttpRequestId, reqId).Msg("fail send enroll response")
+	if err = writeResponse(zlog, w, resp, start); err != nil {
+		cntEnroll.IncError(err)
+		zlog.Error().
+			Err(err).
+			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Msg("fail write response")
+
+		// Remove ghost artifacts; agent will never receive the paylod
+		rt.et.wipeGhosts(r.Context(), zlog, resp)
 	}
-
-	cntEnroll.bodyOut.Add(uint64(numWritten))
-
-	log.Info().
-		Err(err).
-		Str("mod", kEnrollMod).
-		Str("agentId", enrollResponse.Item.ID).
-		Str("policyId", enrollResponse.Item.PolicyId).
-		Str("apiKeyId", enrollResponse.Item.AccessApiKeyId).
-		Str(EcsHttpRequestId, reqId).
-		Int(EcsHttpResponseBodyBytes, numWritten).
-		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
-		Msg("success enroll")
 }
 
-func (et *EnrollerT) handleEnroll(w http.ResponseWriter, r *http.Request) (*EnrollResponse, error) {
+func (et *EnrollerT) handleEnroll(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request) (*EnrollResponse, error) {
 
 	limitF, err := et.limit.Acquire()
 	if err != nil {
@@ -135,7 +127,12 @@ func (et *EnrollerT) handleEnroll(w http.ResponseWriter, r *http.Request) (*Enro
 		return nil, err
 	}
 
-	ver, err := validateUserAgent(r, et.verCon)
+	// Pointer is passed in to allow UpdateContext by child function
+	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
+		return ctx.Str(LogEnrollApiKeyId, key.Id)
+	})
+
+	ver, err := validateUserAgent(*zlog, r, et.verCon)
 	if err != nil {
 		return nil, err
 	}
@@ -144,8 +141,13 @@ func (et *EnrollerT) handleEnroll(w http.ResponseWriter, r *http.Request) (*Enro
 	dfunc := cntEnroll.IncStart()
 	defer dfunc()
 
+	return et.processRequest(*zlog, w, r, key.Id, ver)
+}
+
+func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, enrollmentApiKeyId, ver string) (*EnrollResponse, error) {
+
 	// Validate that an enrollment record exists for a key with this id.
-	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), key.Id)
+	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentApiKeyId)
 	if err != nil {
 		return nil, err
 	}
@@ -167,10 +169,10 @@ func (et *EnrollerT) handleEnroll(w http.ResponseWriter, r *http.Request) (*Enro
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	return _enroll(r.Context(), et.bulker, et.cache, *req, *erec, ver)
+	return et._enroll(r.Context(), zlog, req, erec.PolicyId, ver)
 }
 
-func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollRequest, erec model.EnrollmentApiKey, ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) _enroll(ctx context.Context, zlog zerolog.Logger, req *EnrollRequest, policyId, ver string) (*EnrollResponse, error) {
 
 	if req.SharedId != "" {
 		// TODO: Support pre-existing install
@@ -185,16 +187,7 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		return nil, err
 	}
 
-	// TODO: Cleanup after ourselves on failure:
-	// Revoke generated keys.
-	// Remove agent record.
-
 	agentId := u.String()
-
-	accessApiKey, err := generateAccessApiKey(ctx, bulker, agentId)
-	if err != nil {
-		return nil, err
-	}
 
 	// Update the local metadata agent id
 	localMeta, err := updateLocalMetaAgentId(req.Meta.Local, agentId)
@@ -202,9 +195,15 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		return nil, err
 	}
 
+	// Generate the Fleet Agent access api key
+	accessApiKey, err := generateAccessApiKey(ctx, et.bulker, agentId)
+	if err != nil {
+		return nil, err
+	}
+
 	agentData := model.Agent{
 		Active:         true,
-		PolicyId:       erec.PolicyId,
+		PolicyId:       policyId,
 		Type:           req.Type,
 		EnrolledAt:     now.UTC().Format(time.RFC3339),
 		LocalMetadata:  localMeta,
@@ -216,8 +215,9 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 		},
 	}
 
-	err = createFleetAgent(ctx, bulker, agentId, agentData)
+	err = createFleetAgent(ctx, et.bulker, agentId, agentData)
 	if err != nil {
+		invalidateApiKey(ctx, zlog, et.bulker, accessApiKey.Id)
 		return nil, err
 	}
 
@@ -238,9 +238,94 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 	}
 
 	// We are Kool & and the Gang; cache the access key to avoid the roundtrip on impending checkin
-	c.SetApiKey(*accessApiKey, true)
+	et.cache.SetApiKey(*accessApiKey, true)
 
 	return &resp, nil
+}
+
+// Remove the ghost artifacts from Elastic; the agent record and the accessApiKey.
+func (et *EnrollerT) wipeGhosts(ctx context.Context, zlog zerolog.Logger, resp *EnrollResponse) {
+	zlog = zlog.With().Str(LogAgentId, resp.Item.ID).Logger()
+
+	if err := et.bulker.Delete(ctx, dl.FleetAgents, resp.Item.ID); err != nil {
+		zlog.Error().Err(err).Msg("ghost agent record failed to delete")
+	} else {
+		zlog.Info().Msg("ghost agent record deleted")
+	}
+
+	invalidateApiKey(ctx, zlog, et.bulker, resp.Item.AccessApiKeyId)
+}
+
+func invalidateApiKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, apikeyId string) error {
+
+	// hack-a-rama:  We purposely do not force a "refresh:true" on the Apikey creation
+	// because doing so causes the api call to slow down at scale.  It is already very slow.
+	// So we have to wait for the key to become visible until we can invalidate it.
+
+	zlog = zlog.With().Str(LogApiKeyId, apikeyId).Logger()
+
+	start := time.Now()
+
+LOOP:
+	for {
+
+		_, err := bulker.ApiKeyRead(ctx, apikeyId)
+
+		switch {
+		case err == nil:
+			break LOOP
+		case !errors.Is(err, apikey.ErrApiKeyNotFound):
+			zlog.Error().Err(err).Msg("Fail ApiKeyRead")
+			return err
+		case time.Since(start) > time.Minute:
+			err := errors.New("Apikey index failed to refresh")
+			zlog.Error().Err(err).Msg("Abort query attempt on apikey")
+			return err
+		}
+
+		select {
+		case <-ctx.Done():
+			zlog.Error().
+				Err(ctx.Err()).
+				Str("apikeyId", apikeyId).
+				Msg("Failed to invalidate apiKey on ctx done during hack sleep")
+			return ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+
+	if err := bulker.ApiKeyInvalidate(ctx, apikeyId); err != nil {
+		zlog.Error().Err(err).Msg("fail invalidate apiKey")
+		return err
+	}
+
+	zlog.Info().Dur("dur", time.Since(start)).Msg("invalidated apiKey")
+	return nil
+}
+
+func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, start time.Time) error {
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return errors.Wrap(err, "marshal enrollResponse")
+	}
+
+	numWritten, err := w.Write(data)
+	cntEnroll.bodyOut.Add(uint64(numWritten))
+
+	if err != nil {
+		return errors.Wrap(err, "fail send enroll response")
+	}
+
+	zlog.Info().
+		Str(LogAgentId, resp.Item.ID).
+		Str(LogPolicyId, resp.Item.PolicyId).
+		Str(LogAccessApiKeyId, resp.Item.AccessApiKeyId).
+		Int(EcsHttpResponseBodyBytes, numWritten).
+		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Msg("success enroll")
+
+	return nil
 }
 
 // updateMetaLocalAgentId updates the agent id in the local metadata if exists
