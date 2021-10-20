@@ -49,6 +49,13 @@ const (
 	}
 }`
 
+	// ActionResponse The custom action response payload.
+	MappingActionResponse = `{
+	"properties": {
+		
+	}
+}`
+
 	// ActionResult An Elastic Agent action results
 	MappingActionResult = `{
 	"properties": {
@@ -58,6 +65,10 @@ const (
 		},
 		"action_id": {
 			"type": "keyword"
+		},
+		"action_response": {
+			"enabled" : false,
+			"type": "object"
 		},
 		"agent_id": {
 			"type": "keyword"
