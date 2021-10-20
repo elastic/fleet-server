@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
@@ -26,7 +27,7 @@ type coordinatorZeroT struct {
 // NewCoordinatorZero creates a V0 coordinator.
 func NewCoordinatorZero(policy model.Policy) (Coordinator, error) {
 	return &coordinatorZeroT{
-		log:    log.With().Str("ctx", "coordinator v0").Str("policyId", policy.PolicyId).Logger(),
+		log:    log.With().Str("ctx", "coordinator v0").Str(logger.PolicyId, policy.PolicyId).Logger(),
 		policy: policy,
 		in:     make(chan model.Policy),
 		out:    make(chan model.Policy),
