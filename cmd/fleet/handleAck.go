@@ -64,6 +64,7 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 
 		log.WithLevel(resp.Level).
 			Err(err).
+			Str("agentId", id).
 			Str(EcsHttpRequestId, reqId).
 			Int(EcsHttpResponseCode, resp.StatusCode).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).

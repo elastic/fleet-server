@@ -74,11 +74,9 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 
 		reqId := r.Header.Get(logger.HeaderRequestID)
 
-		log.WithLevel(resp.Level).
+		zlog.WithLevel(resp.Level).
 			Err(err).
-			Str("id", id).
 			Int(EcsHttpResponseCode, resp.StatusCode).
-			Str(EcsHttpRequestId, reqId).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail checkin")
 

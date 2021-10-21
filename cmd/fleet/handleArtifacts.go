@@ -74,7 +74,7 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 	reqId := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str("id", id).
+		Str("agentId", id).
 		Str("sha2", sha2).
 		Str("remoteAddr", r.RemoteAddr).
 		Str(EcsHttpRequestId, reqId).
