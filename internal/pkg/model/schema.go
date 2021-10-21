@@ -65,6 +65,10 @@ type Action struct {
 type ActionData struct {
 }
 
+// ActionResponse The custom action response payload.
+type ActionResponse struct {
+}
+
 // ActionResult An Elastic Agent action results
 type ActionResult struct {
 	ESDocument
@@ -74,6 +78,9 @@ type ActionResult struct {
 
 	// The action id.
 	ActionId string `json:"action_id,omitempty"`
+
+	// The custom action response payload.
+	ActionResponse json.RawMessage `json:"action_response,omitempty"`
 
 	// The agent id.
 	AgentId string `json:"agent_id,omitempty"`

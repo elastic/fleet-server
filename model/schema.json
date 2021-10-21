@@ -97,6 +97,11 @@
           "type": "object",
           "format": "raw"
         },
+        "action_response": {
+          "description": "The custom action response payload.",
+          "type": "object",
+          "format": "raw"
+        },
         "error": {
           "description": "The action error message.",
           "type": "string"
