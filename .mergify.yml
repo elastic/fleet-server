@@ -13,6 +13,20 @@ pull_request_rules:
             git merge upstream/{{base}}
             git push upstream {{head}}
             ```
+  - name: backport patches to 8.0 branch
+    conditions:
+      - merged
+      - base=master
+      - label=v8.0.0
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "8.0"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
   - name: backport patches to 7.x branch
     conditions:
       - merged
