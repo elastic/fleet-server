@@ -9,10 +9,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/mailru/easyjson"
 	"github.com/rs/zerolog/log"
@@ -61,6 +61,8 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, 
 		return err
 	}
 
+	needComma := true
+
 	buf.WriteString("{")
 
 	if len(moreIndices) > 0 {
@@ -77,16 +79,21 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, 
 		} else {
 			buf.Write(d)
 		}
-	} else {
+	} else if index != "" {
 		buf.WriteString(`"index": "`)
 		buf.WriteString(index)
 		buf.WriteString("\"")
+	} else {
+		needComma = false
 	}
 
 	if len(checkpoints) > 0 {
-		buf.WriteString(`, "wait_for_checkpoints": `)
+		if needComma {
+			buf.WriteString(`,`)
+		}
+		buf.WriteString(` "wait_for_checkpoints": `)
 		// Write array as string, example: [1,2,3]
-		buf.WriteString(strings.ReplaceAll(fmt.Sprint([]int64(checkpoints)), " ", ","))
+		buf.WriteString(sqn.SeqNo(checkpoints).JSONString())
 	}
 
 	buf.WriteString("}\n")
@@ -128,6 +135,8 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 	)
 
 	if queue.ty == kQueueFleetSearch {
+		// Using custom _fleet/_fleet_msearch, possibly temporary
+		// Replace with regular _msearch if _fleet/_fleet_msearch implementation merges with _msearch
 		req := es.FleetMsearchRequest{
 			Body: bytes.NewReader(buf.Bytes()),
 		}
