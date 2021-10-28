@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -23,13 +24,19 @@ func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...
 		opt = b.parseOpts(opts...)
 	}
 
-	blk := b.newBlk(ActionSearch, opt)
+	action := ActionSearch
+
+	// Use /_fleet/_fleet_msearch fleet plugin endpoint if need to wait for checkpoints
+	if len(opt.WaitForCheckpoints) > 0 {
+		action = ActionFleetSearch
+	}
+	blk := b.newBlk(action, opt)
 
 	// Serialize request
 	const kSlop = 64
 	blk.buf.Grow(len(body) + kSlop)
 
-	if err := b.writeMsearchMeta(&blk.buf, index, opt.Indices); err != nil {
+	if err := b.writeMsearchMeta(&blk.buf, index, opt.Indices, opt.WaitForCheckpoints); err != nil {
 		return nil, err
 	}
 
@@ -49,10 +56,12 @@ func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...
 	return &es.ResultT{HitsT: r.Hits, Aggregations: r.Aggregations}, nil
 }
 
-func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string) error {
+func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, checkpoints []int64) error {
 	if err := b.validateIndex(index); err != nil {
 		return err
 	}
+
+	buf.WriteString("{")
 
 	if len(moreIndices) > 0 {
 		if err := b.validateIndices(moreIndices); err != nil {
@@ -62,20 +71,25 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string) 
 		indices := []string{index}
 		indices = append(indices, moreIndices...)
 
-		buf.WriteString(`{"index": `)
+		buf.WriteString(`"index": `)
 		if d, err := json.Marshal(indices); err != nil {
 			return err
 		} else {
 			buf.Write(d)
 		}
-		buf.WriteString("}\n")
-	} else if len(index) == 0 {
-		buf.WriteString("{ }\n")
 	} else {
-		buf.WriteString(`{"index": "`)
+		buf.WriteString(`"index": "`)
 		buf.WriteString(index)
-		buf.WriteString("\"}\n")
+		buf.WriteString("\"")
 	}
+
+	if len(checkpoints) > 0 {
+		buf.WriteString(`, "wait_for_checkpoints": `)
+		// Write array as string, example: [1,2,3]
+		buf.WriteString(strings.ReplaceAll(fmt.Sprint([]int64(checkpoints)), " ", ","))
+	}
+
+	buf.WriteString("}\n")
 
 	return nil
 }
@@ -108,10 +122,22 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 	}
 
 	// Do actual bulk request; and send response on chan
-	req := esapi.MsearchRequest{
-		Body: bytes.NewReader(buf.Bytes()),
+	var (
+		res *esapi.Response
+		err error
+	)
+
+	if queue.ty == kQueueFleetSearch {
+		req := es.FleetMsearchRequest{
+			Body: bytes.NewReader(buf.Bytes()),
+		}
+		res, err = req.Do(ctx, b.es)
+	} else {
+		req := esapi.MsearchRequest{
+			Body: bytes.NewReader(buf.Bytes()),
+		}
+		res, err = req.Do(ctx, b.es)
 	}
-	res, err := req.Do(ctx, b.es)
 
 	if err != nil {
 		return err

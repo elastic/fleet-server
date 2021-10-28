@@ -17,6 +17,7 @@ const (
 	kQueueBulk queueType = iota
 	kQueueRead
 	kQueueSearch
+	kQueueFleetSearch
 	kQueueRefreshBulk
 	kQueueRefreshRead
 	kNumQueues
@@ -30,6 +31,8 @@ func (q queueT) Type() string {
 		return "read"
 	case kQueueSearch:
 		return "search"
+	case kQueueFleetSearch:
+		return "fleetSearch"
 	case kQueueRefreshBulk:
 		return "refreshBulk"
 	case kQueueRefreshRead:

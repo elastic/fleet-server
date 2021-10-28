@@ -31,7 +31,7 @@ func TestSearchActionsQuery(t *testing.T) {
 			FieldSeqNo:      -1,
 			FieldMaxSeqNo:   len(actions),
 			FieldExpiration: now,
-		})
+		}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

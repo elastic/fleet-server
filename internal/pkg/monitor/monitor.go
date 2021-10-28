@@ -259,23 +259,6 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 				break
 			}
 
-			// Check if the list of hits has holes
-			if es.HasHoles(checkpoint, hits) {
-				m.log.Debug().Msg("hits list has holes, refresh index")
-				err = es.Refresh(ctx, m.esCli, m.index)
-				if err != nil {
-					m.log.Error().Err(err).Msg("failed to refresh index")
-					break
-				}
-
-				// Refetch
-				hits, err = m.fetch(ctx, checkpoint, newCheckpoint)
-				if err != nil {
-					m.log.Error().Err(err).Msg("failed checking new documents after refresh")
-					break
-				}
-			}
-
 			// Notify call updates checkpoint
 			count = m.notify(ctx, hits)
 
@@ -313,7 +296,7 @@ func (m *simpleMonitorT) fetch(ctx context.Context, checkpoint, maxCheckpoint sq
 		params[dl.FieldExpiration] = now
 	}
 
-	hits, err := m.search(ctx, m.tmplQuery, params)
+	hits, err := m.search(ctx, m.tmplQuery, params, maxCheckpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -321,17 +304,19 @@ func (m *simpleMonitorT) fetch(ctx context.Context, checkpoint, maxCheckpoint sq
 	return hits, nil
 }
 
-func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[string]interface{}) ([]es.HitT, error) {
+func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[string]interface{}, seqNos []int64) ([]es.HitT, error) {
 	query, err := tmpl.Render(params)
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := m.esCli.Search(
-		m.esCli.Search.WithContext(ctx),
-		m.esCli.Search.WithIndex(m.index),
-		m.esCli.Search.WithBody(bytes.NewBuffer(query)),
-	)
+	req := es.FleetSearchRequest{
+		Index:              []string{m.index},
+		Body:               bytes.NewBuffer(query),
+		WaitForCheckpoints: seqNos,
+	}
+	res, err := req.Do(ctx, m.esCli)
+
 	if err != nil {
 		return nil, err
 	}
