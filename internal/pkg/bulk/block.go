@@ -45,6 +45,7 @@ const (
 	ActionUpdate
 	ActionRead
 	ActionSearch
+	ActionFleetSearch
 )
 
 var actionStrings = []string{
@@ -54,6 +55,7 @@ var actionStrings = []string{
 	"update",
 	"read",
 	"search",
+	"fleet_search",
 }
 
 func (a actionT) String() string {

@@ -12,13 +12,13 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
-func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) (*es.HitsT, error) {
+func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}, opts ...bulk.Opt) (*es.HitsT, error) {
 	query, err := tmpl.Render(params)
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := bulker.Search(ctx, index, query)
+	res, err := bulker.Search(ctx, index, query, opts...)
 	if err != nil {
 		return nil, err
 	}

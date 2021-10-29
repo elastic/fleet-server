@@ -78,11 +78,7 @@ func FindAction(ctx context.Context, bulker bulk.Bulk, id string, opts ...Option
 	o := newOption(FleetActions, opts...)
 	return findActions(ctx, bulker, QueryAction, o.indexName, map[string]interface{}{
 		FieldActionId: id,
-	})
-}
-
-func FindActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, params map[string]interface{}) ([]model.Action, error) {
-	return findActions(ctx, bulker, tmpl, FleetActions, params)
+	}, nil)
 }
 
 func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo sqn.SeqNo, agentId string) ([]model.Action, error) {
@@ -94,27 +90,20 @@ func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo 
 		FieldAgents:     []string{agentId},
 	}
 
-	res, err := findActionsHits(ctx, bulker, QueryAgentActions, index, params)
+	res, err := findActionsHits(ctx, bulker, QueryAgentActions, index, params, maxSeqNo)
 	if err != nil || res == nil {
 		return nil, err
-	}
-
-	if es.HasHoles(minSeqNo, res.Hits) {
-		err = es.Refresh(ctx, bulker.Client(), index)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to refresh index")
-		}
-		res, err := findActionsHits(ctx, bulker, QueryAgentActions, index, params)
-		if err != nil || res == nil {
-			return nil, err
-		}
 	}
 
 	return hitsToActions(res.Hits)
 }
 
-func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) (*es.HitsT, error) {
-	res, err := Search(ctx, bulker, tmpl, index, params)
+func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}, seqNos []int64) (*es.HitsT, error) {
+	var ops []bulk.Opt
+	if len(seqNos) > 0 {
+		ops = append(ops, bulk.WithWaitForCheckpoints(seqNos))
+	}
+	res, err := Search(ctx, bulker, tmpl, index, params, ops...)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
 			log.Debug().Str("index", index).Msg(es.ErrIndexNotFound.Error())
@@ -125,8 +114,8 @@ func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, inde
 	return res, nil
 }
 
-func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}) ([]model.Action, error) {
-	res, err := findActionsHits(ctx, bulker, tmpl, index, params)
+func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}, seqNos []int64) ([]model.Action, error) {
+	res, err := findActionsHits(ctx, bulker, tmpl, index, params, seqNos)
 	if err != nil || res == nil {
 		return nil, err
 	}
