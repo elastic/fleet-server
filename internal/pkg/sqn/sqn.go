@@ -5,7 +5,7 @@
 package sqn
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -16,11 +16,39 @@ var DefaultSeqNo = []int64{UndefinedSeqNo}
 // Abstracts the array of document seq numbers
 type SeqNo []int64
 
+func (s SeqNo) JSONString() string {
+	return s.toString(true)
+}
+
 func (s SeqNo) String() string {
+	return s.toString(false)
+}
+
+func (s SeqNo) toString(withBrackets bool) string {
 	if len(s) == 0 {
-		return ""
+		if withBrackets {
+			return "[]"
+		} else {
+			return ""
+		}
 	}
-	return strings.Join(strings.Fields(strings.Trim(fmt.Sprint([]int64(s)), "[]")), ",")
+	var b strings.Builder
+
+	first := strconv.FormatInt(s[0], 10)
+	b.Grow(len(first)*len(s) + 2 + len(s))
+
+	if withBrackets {
+		b.WriteString("[")
+	}
+	b.WriteString(first)
+	for i := 1; i < len(s); i++ {
+		b.WriteString(",")
+		b.WriteString(strconv.FormatInt(s[i], 10))
+	}
+	if withBrackets {
+		b.WriteString("]")
+	}
+	return b.String()
 }
 
 func (s SeqNo) IsSet() bool {
