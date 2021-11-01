@@ -111,13 +111,6 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 		return nil, err
 	}
 
-	if agent.Agent == nil {
-		zlog.Warn().
-			Err(ErrAgentCorrupted).
-			Msg("agent record does not contain required metadata section")
-		return nil, ErrAgentCorrupted
-	}
-
 	findTime := time.Now()
 
 	if findTime.Sub(authTime) > time.Second {
@@ -137,10 +130,10 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 	}
 
 	// validate that the id in the header is equal to the agent id record
-	if id != nil && *id != agent.Agent.Id {
+	if id != nil && *id != agent.Id {
 		zlog.Warn().
 			Err(ErrAgentIdentity).
-			Str("agent.Agent.Id", agent.Agent.Id).
+			Str("agent.Id", agent.Id).
 			Msg("agent id mismatch against http header")
 		return nil, ErrAgentIdentity
 	}
