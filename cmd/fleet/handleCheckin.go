@@ -153,6 +153,10 @@ func (ct *CheckinT) handleCheckin(zlog *zerolog.Logger, w http.ResponseWriter, r
 		return ctx.Str(LogAccessApiKeyId, agent.AccessApiKeyId)
 	})
 
+	if err = dl.MigrateAgent(r.Context(), *zlog, ct.bulker, agent); err != nil {
+		return err
+	}
+
 	ver, err := validateUserAgent(*zlog, r, ct.verCon)
 	if err != nil {
 		return err

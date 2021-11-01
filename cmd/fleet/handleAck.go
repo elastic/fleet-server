@@ -98,6 +98,10 @@ func (ack *AckT) handleAcks(zlog *zerolog.Logger, w http.ResponseWriter, r *http
 		return ctx.Str(LogAccessApiKeyId, agent.AccessApiKeyId)
 	})
 
+	if err = dl.MigrateAgent(r.Context(), *zlog, ack.bulk, agent); err != nil {
+		return err
+	}
+
 	// Metrics; serenity now.
 	dfunc := cntAcks.IncStart()
 	defer dfunc()

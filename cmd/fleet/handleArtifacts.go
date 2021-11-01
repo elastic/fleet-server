@@ -131,6 +131,10 @@ func (at ArtifactT) handleArtifacts(zlog *zerolog.Logger, r *http.Request, id, s
 		return ctx.Str(LogAccessApiKeyId, agent.AccessApiKeyId)
 	})
 
+	if err = dl.MigrateAgent(r.Context(), *zlog, at.bulker, agent); err != nil {
+		return nil, err
+	}
+
 	// Metrics; serenity now.
 	dfunc := cntArtifacts.IncStart()
 	defer dfunc()
