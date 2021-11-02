@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -84,6 +85,11 @@ func updateAgentMetadata(ctx context.Context, bulker bulk.Bulk, body []byte) (in
 	}
 
 	if res.IsError() {
+		if res.StatusCode == http.StatusNotFound {
+			// Ignore index not created yet; nothing to upgrade
+			return 0, nil
+		}
+
 		return 0, fmt.Errorf("Migrate UpdateByQuery %s", res.String())
 	}
 
