@@ -398,10 +398,10 @@ func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *mod
 func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d time.Duration) {
 	cnt := 0
 	for {
-		l.Info().Int("count", cnt).Str("coordinator", cord.Name()).Msg("starting coordinator for policy")
+		l.Info().Int("count", cnt).Str("coordinator", cord.Name()).Msg("Starting policy coordinator")
 		err := cord.Run(ctx)
 		if err != context.Canceled {
-			l.Err(err).Msg("coordinator failed")
+			l.Err(err).Msg("Policy coordinator failed and stopped")
 			if sleep.WithContext(ctx, d) == context.Canceled {
 				break
 			}
@@ -419,9 +419,9 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 			s := l.With().Int64(dl.FieldRevisionIdx, p.RevisionIdx).Int64(dl.FieldCoordinatorIdx, p.CoordinatorIdx).Logger()
 			_, err := dl.CreatePolicy(ctx, bulker, p, dl.WithIndexName(policiesIndex))
 			if err != nil {
-				s.Err(err).Msg("failed to insert a new policy revision")
+				s.Err(err).Msg("Policy coordinator failed to add a new policy revision")
 			} else {
-				s.Info().Msg("coordinator inserted a new policy revision")
+				s.Info().Msg("Policy coordinator added a new policy revision")
 			}
 		case <-ctx.Done():
 			return
@@ -434,7 +434,7 @@ func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenr
 		Dur("checkInterval", checkInterval).
 		Dur("unenrollTimeout", unenrollTimeout).
 		Msg("unenroll monitor start")
-	defer l.Info().Msg("unenroll monitor exit")
+	defer l.Info().Msg("Unenroll monitor exit")
 
 	t := time.NewTimer(checkInterval)
 	defer t.Stop()

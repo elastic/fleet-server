@@ -61,7 +61,7 @@ func installSignalHandler() context.Context {
 
 func makeCache(cfg *config.Config) (cache.Cache, error) {
 	cacheCfg := makeCacheConfig(cfg)
-	log.Info().Interface("cfg", cacheCfg).Msg("makeCache")
+	log.Info().Interface("cfg", cacheCfg).Msg("Setting cache config options")
 	return cache.New(cacheCfg)
 }
 
@@ -92,7 +92,7 @@ func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, err
 		Int("ppid", os.Getppid()).
 		Str("exe", os.Args[0]).
 		Strs("args", os.Args[1:]).
-		Msg("boot")
+		Msg("Fleet server logger initialised")
 	log.Debug().Strs("env", os.Environ()).Msg("environment")
 
 	return l, err
