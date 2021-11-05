@@ -35,7 +35,7 @@ func parseError(res *esapi.Response) error {
 	decoder := json.NewDecoder(res.Body)
 
 	if err := decoder.Decode(&e); err != nil {
-		log.Error().Err(err).Msg("Cannot decode error body")
+		log.Error().Err(err).Msg("Cannot decode Elasticsearch error body")
 		return err
 	}
 
