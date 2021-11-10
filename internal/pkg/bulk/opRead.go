@@ -86,7 +86,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	res, err := req.Do(ctx, b.es)
 
 	if err != nil {
-		log.Error().Err(err).Str("mod", kModBulk).Msg("Error sending Mget request to Elasticsearch")
+		log.Error().Err(err).Str("mod", kModBulk).Msg("Error sending mget request to Elasticsearch")
 		return err
 	}
 
