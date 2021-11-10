@@ -79,10 +79,10 @@ func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack
 
 	// Install routes
 	for _, rte := range routes {
-		log.Debug().
+		log.Info().
 			Str("method", rte.method).
 			Str("path", rte.path).
-			Msg("Server install route")
+			Msg("fleet-server route added")
 
 		router.Handle(
 			rte.method,

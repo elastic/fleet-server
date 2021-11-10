@@ -92,7 +92,7 @@ func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, err
 		Int("ppid", os.Getppid()).
 		Str("exe", os.Args[0]).
 		Strs("args", os.Args[1:]).
-		Msg("Fleet server logger initialised")
+		Msg("Boot fleet-server")
 	log.Debug().Strs("env", os.Environ()).Msg("environment")
 
 	return l, err

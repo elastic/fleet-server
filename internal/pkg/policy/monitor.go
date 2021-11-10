@@ -306,7 +306,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 		Logger()
 
 	if newPolicy.CoordinatorIdx <= 0 {
-		zlog.Info().Str(logger.PolicyId, newPolicy.PolicyId).Msg("ignore policy that has not passed through coordinator")
+		zlog.Info().Str(logger.PolicyId, newPolicy.PolicyId).Msg("Ignore policy that has not passed through coordinator")
 		return false
 	}
 
