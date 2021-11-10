@@ -17,7 +17,7 @@ pull_request_rules:
     conditions:
       - merged
       - base=master
-      - label=v8.0.0
+      - label=backport-v8.0.0
     actions:
       backport:
         assignees:
@@ -31,7 +31,7 @@ pull_request_rules:
     conditions:
       - merged
       - base=master
-      - label=v7.16.0
+      - label=backport-v7.16.0
     actions:
       backport:
         assignees:
@@ -45,7 +45,7 @@ pull_request_rules:
     conditions:
       - merged
       - base=master
-      - label=v7.15.0
+      - label=backport-v7.15.0
     actions:
       backport:
         assignees:
@@ -55,23 +55,9 @@ pull_request_rules:
         labels:
           - "backport"
         title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
-  - name: backport patches to 7.14 branch
-    conditions:
-      - merged
-      - base=master
-      - label=v7.14.0
-    actions:
-      backport:
-        assignees:
-          - "{{ author }}"
-        branches:
-          - "7.14"
-        labels:
-          - "backport"
-        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
   - name: notify the backport policy
     conditions:
-      - -label~=(^v\d|backport-skip)
+      - -label~=^backport
       - base=master
     actions:
       comment:
@@ -79,7 +65,7 @@ pull_request_rules:
           This pull request does not have a backport label. Could you fix it @{{author}}? 🙏
           To fixup this pull request, you need to add the backport labels for the needed
           branches, such as:
-          * `v/d./d./d` is the label to automatically backport to the `7./d` branch. `/d` is the digit
+          * `backport-v/d./d./d` is the label to automatically backport to the `7./d` branch. `/d` is the digit
 
           **NOTE**: `backport-skip` has been added to this pull request.
       label:
@@ -87,16 +73,16 @@ pull_request_rules:
           - backport-skip
   - name: remove backport-skip label
     conditions:
-      - label~=^v\d
+      - label~=backport-v
     actions:
       label:
         remove:
           - backport-skip
-  - name: automatic merge for 7\. branches when CI passes
+  - name: automatic merge for 7\. or 8\. branches when CI passes
     conditions:
       - check-success=fleet-server/pr-merge
       - check-success=CLA
-      - base~=^7\.
+      - base~=^(7|8)\.
       - label=backport
       - author=mergify[bot]
     actions:
