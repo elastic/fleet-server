@@ -6,7 +6,8 @@ package es
 
 import (
 	"errors"
-	"fmt"
+	"strconv"
+	"strings"
 )
 
 // TODO: Why do we have both ErrElastic and ErrorT?  Very strange.
@@ -32,7 +33,22 @@ func (e *ErrElastic) Unwrap() error {
 }
 
 func (e ErrElastic) Error() string {
-	return fmt.Sprintf("elastic fail %d:%s:%s", e.Status, e.Type, e.Reason)
+	// Improved error string to account on missing empty e.Type and e.Reason
+	// Otherwise were getting: "elastic fail 404::"
+	msg := "elastic fail "
+	var b strings.Builder
+	b.Grow(len(msg) + 5 + len(e.Type) + len(e.Reason))
+	b.WriteString(msg)
+	b.WriteString(strconv.Itoa(e.Status))
+	if e.Type != "" {
+		b.WriteString(":")
+		b.WriteString(e.Type)
+	}
+	if e.Reason != "" {
+		b.WriteString(":")
+		b.WriteString(e.Reason)
+	}
+	return b.String()
 }
 
 var (
