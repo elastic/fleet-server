@@ -96,19 +96,26 @@ func cleanupActions(ctx context.Context, index string, bulker bulk.Bulk, opts ..
 		}
 
 		log.Debug().Int("count", len(hits)).Msg("delete expired actions")
-		for _, hit := range hits {
-			err = bulker.Delete(ctx, index, hit.Id)
+		if len(hits) > 0 {
+			ops := make([]bulk.MultiOp, len(hits))
+			for i := 0; i < len(hits); i++ {
+				ops[i] = bulk.MultiOp{Index: index, Id: hits[i].Id}
+			}
+
+			res, err := bulker.MDelete(ctx, ops)
 			if err != nil {
 				// The error is logged
-				log.Debug().Err(err).Str("action_id", hit.Id).Msg("failed to delete action")
-				if eserr, ok := err.(*es.ErrElastic); ok {
-					// The document could be missing, deleted by the other fleet server instance GC, which is ok
-					if eserr.Status == http.StatusNotFound {
-						err = nil
+				log.Debug().Err(err).Msg("failed to delete actions")
+			}
+			for i, r := range res {
+				if r.Error != nil {
+					err = es.TranslateError(r.Status, r.Error)
+					if err != nil {
+						log.Debug().Err(err).Str("action_id", hits[i].Id).Msg("failed to delete action")
+						if r.Status == http.StatusNotFound {
+							err = nil
+						}
 					}
-				}
-				if err != nil {
-					return err
 				}
 			}
 		}
