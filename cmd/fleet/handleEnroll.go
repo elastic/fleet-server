@@ -56,7 +56,7 @@ func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bu
 
 	log.Info().
 		Interface("limits", cfg.Limits.EnrollLimit).
-		Msg("Enroller install limits")
+		Msg("Setting config enroll_limit")
 
 	return &EnrollerT{
 		verCon: verCon,
@@ -323,7 +323,7 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 		Str(LogAccessApiKeyId, resp.Item.AccessApiKeyId).
 		Int(EcsHttpResponseBodyBytes, numWritten).
 		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
-		Msg("success enroll")
+		Msg("Elastic Agent successfully enrolled")
 
 	return nil
 }

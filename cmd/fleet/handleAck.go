@@ -41,7 +41,7 @@ type AckT struct {
 func NewAckT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *AckT {
 	log.Info().
 		Interface("limits", cfg.Limits.AckLimit).
-		Msg("Ack install limits")
+		Msg("Setting config ack_limits")
 
 	return &AckT{
 		cfg:   cfg,
