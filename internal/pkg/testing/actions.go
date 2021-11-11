@@ -158,7 +158,7 @@ func StoreActions(ctx context.Context, bulker bulk.Bulk, index string, actions [
 		if err != nil {
 			return err
 		}
-		_, err = bulker.Create(ctx, index, action.Id, body)
+		_, err = bulker.Create(ctx, index, action.Id, body, bulk.WithRefresh())
 		if err != nil {
 			return err
 		}
