@@ -124,6 +124,8 @@ func blkToQueueType(blk *bulkT) queueType {
 	switch blk.action {
 	case ActionSearch:
 		queueIdx = kQueueSearch
+	case ActionFleetSearch:
+		queueIdx = kQueueFleetSearch
 	case ActionRead:
 		if forceRefresh {
 			queueIdx = kQueueRefreshRead
@@ -272,7 +274,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		switch queue.ty {
 		case kQueueRead, kQueueRefreshRead:
 			err = b.flushRead(ctx, queue)
-		case kQueueSearch:
+		case kQueueSearch, kQueueFleetSearch:
 			err = b.flushSearch(ctx, queue)
 		default:
 			err = b.flushBulk(ctx, queue)

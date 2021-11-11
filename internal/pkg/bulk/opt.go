@@ -5,9 +5,10 @@
 package bulk
 
 import (
-	"github.com/rs/zerolog"
 	"strconv"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
@@ -16,9 +17,10 @@ import (
 // Transaction options
 
 type optionsT struct {
-	Refresh         bool
-	RetryOnConflict string
-	Indices         []string
+	Refresh            bool
+	RetryOnConflict    string
+	Indices            []string
+	WaitForCheckpoints []int64
 }
 
 type Opt func(*optionsT)
@@ -39,6 +41,13 @@ func WithRetryOnConflict(n int) Opt {
 func WithIndex(idx string) Opt {
 	return func(opt *optionsT) {
 		opt.Indices = append(opt.Indices, idx)
+	}
+}
+
+// Applicable to _fleet_msearch, wait_for_checkpoints parameters
+func WithWaitForCheckpoints(checkpoints []int64) Opt {
+	return func(opt *optionsT) {
+		opt.WaitForCheckpoints = checkpoints
 	}
 }
 
