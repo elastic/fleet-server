@@ -767,6 +767,11 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
+	// Run migrations; current safe to do in background.  That may change in the future.
+	g.Go(loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
+		return dl.Migrate(ctx, bulker)
+	}))
+
 	// Monitoring es client, longer timeout, no retries
 	monCli, err := es.NewClient(ctx, cfg, true, es.WithUserAgent(kUAFleetServer, f.bi))
 	if err != nil {

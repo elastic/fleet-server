@@ -197,7 +197,9 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			// If the agent version is not empty it needs to be updated
 			// Assuming the agent can by upgraded keeping the same id, but incrementing the version
 			if pendingData.extra.ver != "" {
-				fields[dl.FieldAgentVersion] = pendingData.extra.ver
+				fields[dl.FieldAgent] = map[string]interface{}{
+					dl.FieldAgentVersion: pendingData.extra.ver,
+				}
 			}
 
 			// Update local metadata if provided
