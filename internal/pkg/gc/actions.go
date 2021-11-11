@@ -106,14 +106,22 @@ func cleanupActions(ctx context.Context, index string, bulker bulk.Bulk, opts ..
 			if err != nil {
 				// The error is logged
 				log.Debug().Err(err).Msg("failed to delete actions")
+				if eserr, ok := err.(*es.ErrElastic); ok {
+					if eserr.Status == http.StatusNotFound {
+						err = nil
+					}
+				}
+				if err != nil {
+					return err
+				}
 			}
 			for i, r := range res {
 				if r.Error != nil {
 					err = es.TranslateError(r.Status, r.Error)
 					if err != nil {
 						log.Debug().Err(err).Str("action_id", hits[i].Id).Msg("failed to delete action")
-						if r.Status == http.StatusNotFound {
-							err = nil
+						if r.Status != http.StatusNotFound {
+							return err
 						}
 					}
 				}
