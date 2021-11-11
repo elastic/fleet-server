@@ -53,10 +53,16 @@ func (c *ServerBulk) InitDefaults() {
 	c.FlushMaxPending = 8
 }
 
+type Endpoint struct {
+	Host string `config:"host"`
+	Port uint16 `config:"port"`
+}
+
 // Server is the configuration for the server
 type Server struct {
-	Host              string                  `config:"host"`
-	Port              uint16                  `config:"port"`
+	Host              string                  `config:"host"` // TODO: deprecated use Endpoints
+	Port              uint16                  `config:"port"` // TODO: deprecated use Endpoints
+	Endpoints         []Endpoint              `config:"endpoints"`
 	TLS               *tlscommon.ServerConfig `config:"ssl"`
 	Timeouts          ServerTimeouts          `config:"timeouts"`
 	Profiler          ServerProfiler          `config:"profiler"`
@@ -80,13 +86,37 @@ func (c *Server) InitDefaults() {
 	c.Bulk.InitDefaults()
 }
 
+// BindEndpoints returns the binding address for the all HTTP server listeners.
+func (c *Server) BindEndpoints() []string {
+	endpoints := map[string]bool{
+		c.BindAddress(): true,
+	}
+
+	// add each of the endpoints to collection,
+	for _, ep := range c.Endpoints {
+		e := bindAddress(ep.Host, ep.Port)
+		endpoints[e] = true
+	}
+
+	// we need to get rid of duplicates so we dont have port collision
+	uniqueEndpoints := make([]string, 0, len(endpoints))
+	for ep := range endpoints {
+		uniqueEndpoints = append(uniqueEndpoints, ep)
+	}
+
+	return uniqueEndpoints
+}
+
 // BindAddress returns the binding address for the HTTP server.
 func (c *Server) BindAddress() string {
-	host := c.Host
+	return bindAddress(c.Host, c.Port)
+}
+
+func bindAddress(host string, port uint16) string {
 	if strings.Count(host, ":") > 1 && strings.Count(host, "]") == 0 {
 		host = "[" + host + "]"
 	}
-	return fmt.Sprintf("%s:%d", host, c.Port)
+	return fmt.Sprintf("%s:%d", host, port)
 }
 
 // Input is the input defined by Agent to run Fleet Server.

@@ -40,8 +40,8 @@ func diagConn(c net.Conn, s http.ConnState) {
 }
 
 func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Server) error {
+	listeners := cfg.BindEndpoints()
 
-	addr := cfg.BindAddress()
 	rdto := cfg.Timeouts.Read
 	wrto := cfg.Timeouts.Write
 	idle := cfg.Timeouts.Idle
@@ -49,75 +49,77 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	mhbz := cfg.Limits.MaxHeaderByteSize
 	bctx := func(net.Listener) context.Context { return ctx }
 
-	log.Info().
-		Str("bind", addr).
-		Dur("rdTimeout", rdto).
-		Dur("wrTimeout", wrto).
-		Msg("server listening")
+	for _, addr := range listeners {
+		log.Info().
+			Str("bind", addr).
+			Dur("rdTimeout", rdto).
+			Dur("wrTimeout", wrto).
+			Msg("server listening")
 
-	server := http.Server{
-		Addr:              addr,
-		ReadTimeout:       rdto,
-		WriteTimeout:      wrto,
-		IdleTimeout:       idle,
-		ReadHeaderTimeout: rdhr,
-		Handler:           router,
-		BaseContext:       bctx,
-		ConnState:         diagConn,
-		MaxHeaderBytes:    mhbz,
-		ErrorLog:          errLogger(),
-	}
-
-	forceCh := make(chan struct{})
-	defer close(forceCh)
-
-	// handler to close server
-	go func() {
-		select {
-		case <-ctx.Done():
-			log.Debug().Msg("force server close on ctx.Done()")
-			server.Close()
-		case <-forceCh:
-			log.Debug().Msg("go routine forced closed on exit")
+		server := http.Server{
+			Addr:              addr,
+			ReadTimeout:       rdto,
+			WriteTimeout:      wrto,
+			IdleTimeout:       idle,
+			ReadHeaderTimeout: rdhr,
+			Handler:           router,
+			BaseContext:       bctx,
+			ConnState:         diagConn,
+			MaxHeaderBytes:    mhbz,
+			ErrorLog:          errLogger(),
 		}
-	}()
 
-	var listenCfg net.ListenConfig
+		forceCh := make(chan struct{})
+		defer close(forceCh)
 
-	ln, err := listenCfg.Listen(ctx, "tcp", addr)
-	if err != nil {
-		return err
-	}
+		// handler to close server
+		go func() {
+			select {
+			case <-ctx.Done():
+				log.Debug().Msg("force server close on ctx.Done()")
+				server.Close()
+			case <-forceCh:
+				log.Debug().Msg("go routine forced closed on exit")
+			}
+		}()
 
-	// Bind the deferred Close() to the stack variable to handle case where 'ln' is wrapped
-	defer func() { ln.Close() }()
+		var listenCfg net.ListenConfig
 
-	// Conn Limiter must be before the TLS handshake in the stack;
-	// The server should not eat the cost of the handshake if there
-	// is no capacity to service the connection.
-	// Also, it appears the HTTP2 implementation depends on the tls.Listener
-	// being at the top of the stack.
-	ln = wrapConnLimitter(ctx, ln, cfg)
-
-	if cfg.TLS != nil && cfg.TLS.IsEnabled() {
-		commonTlsCfg, err := tlscommon.LoadTLSServerConfig(cfg.TLS)
+		ln, err := listenCfg.Listen(ctx, "tcp", addr)
 		if err != nil {
 			return err
 		}
-		server.TLSConfig = commonTlsCfg.ToConfig()
 
-		// Must enable http/2 in the configuration explicitly.
-		// (see https://golang.org/pkg/net/http/#Server.Serve)
-		server.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
+		// Bind the deferred Close() to the stack variable to handle case where 'ln' is wrapped
+		defer func() { ln.Close() }()
 
-		ln = tls.NewListener(ln, server.TLSConfig)
+		// Conn Limiter must be before the TLS handshake in the stack;
+		// The server should not eat the cost of the handshake if there
+		// is no capacity to service the connection.
+		// Also, it appears the HTTP2 implementation depends on the tls.Listener
+		// being at the top of the stack.
+		ln = wrapConnLimitter(ctx, ln, cfg)
 
-	} else {
-		log.Warn().Msg("exposed over insecure HTTP; enablement of TLS is strongly recommended")
-	}
+		if cfg.TLS != nil && cfg.TLS.IsEnabled() {
+			commonTlsCfg, err := tlscommon.LoadTLSServerConfig(cfg.TLS)
+			if err != nil {
+				return err
+			}
+			server.TLSConfig = commonTlsCfg.ToConfig()
 
-	if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
-		return err
+			// Must enable http/2 in the configuration explicitly.
+			// (see https://golang.org/pkg/net/http/#Server.Serve)
+			server.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
+
+			ln = tls.NewListener(ln, server.TLSConfig)
+
+		} else {
+			log.Warn().Msg("exposed over insecure HTTP; enablement of TLS is strongly recommended")
+		}
+
+		if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
+			return err
+		}
 	}
 
 	return nil
