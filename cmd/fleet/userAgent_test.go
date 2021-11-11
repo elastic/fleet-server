@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
+	"github.com/rs/zerolog/log"
 )
 
 func TestValidateUserAgent(t *testing.T) {
@@ -112,7 +113,7 @@ func TestValidateUserAgent(t *testing.T) {
 		t.Run(tr.userAgent, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set("User-Agent", tr.userAgent)
-			_, res := validateUserAgent(req, tr.verCon)
+			_, res := validateUserAgent(log.Logger, req, tr.verCon)
 			if tr.err != res {
 				t.Fatalf("err mismatch: %v != %v", tr.err, res)
 			}
