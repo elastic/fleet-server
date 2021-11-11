@@ -55,7 +55,7 @@ func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bu
 
 	log.Info().
 		Interface("limits", cfg.Limits.EnrollLimit).
-		Msg("Enroller install limits")
+		Msg("Setting config enroll_limit")
 
 	return &EnrollerT{
 		verCon: verCon,
@@ -243,6 +243,94 @@ func _enroll(ctx context.Context, bulker bulk.Bulk, c cache.Cache, req EnrollReq
 	return &resp, nil
 }
 
+<<<<<<< HEAD
+=======
+// Remove the ghost artifacts from Elastic; the agent record and the accessApiKey.
+func (et *EnrollerT) wipeGhosts(ctx context.Context, zlog zerolog.Logger, resp *EnrollResponse) {
+	zlog = zlog.With().Str(LogAgentId, resp.Item.ID).Logger()
+
+	if err := et.bulker.Delete(ctx, dl.FleetAgents, resp.Item.ID); err != nil {
+		zlog.Error().Err(err).Msg("ghost agent record failed to delete")
+	} else {
+		zlog.Info().Msg("ghost agent record deleted")
+	}
+
+	invalidateApiKey(ctx, zlog, et.bulker, resp.Item.AccessApiKeyId)
+}
+
+func invalidateApiKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, apikeyId string) error {
+
+	// hack-a-rama:  We purposely do not force a "refresh:true" on the Apikey creation
+	// because doing so causes the api call to slow down at scale.  It is already very slow.
+	// So we have to wait for the key to become visible until we can invalidate it.
+
+	zlog = zlog.With().Str(LogApiKeyId, apikeyId).Logger()
+
+	start := time.Now()
+
+LOOP:
+	for {
+
+		_, err := bulker.ApiKeyRead(ctx, apikeyId)
+
+		switch {
+		case err == nil:
+			break LOOP
+		case !errors.Is(err, apikey.ErrApiKeyNotFound):
+			zlog.Error().Err(err).Msg("Fail ApiKeyRead")
+			return err
+		case time.Since(start) > time.Minute:
+			err := errors.New("Apikey index failed to refresh")
+			zlog.Error().Err(err).Msg("Abort query attempt on apikey")
+			return err
+		}
+
+		select {
+		case <-ctx.Done():
+			zlog.Error().
+				Err(ctx.Err()).
+				Str("apikeyId", apikeyId).
+				Msg("Failed to invalidate apiKey on ctx done during hack sleep")
+			return ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+
+	if err := bulker.ApiKeyInvalidate(ctx, apikeyId); err != nil {
+		zlog.Error().Err(err).Msg("fail invalidate apiKey")
+		return err
+	}
+
+	zlog.Info().Dur("dur", time.Since(start)).Msg("invalidated apiKey")
+	return nil
+}
+
+func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, start time.Time) error {
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return errors.Wrap(err, "marshal enrollResponse")
+	}
+
+	numWritten, err := w.Write(data)
+	cntEnroll.bodyOut.Add(uint64(numWritten))
+
+	if err != nil {
+		return errors.Wrap(err, "fail send enroll response")
+	}
+
+	zlog.Info().
+		Str(LogAgentId, resp.Item.ID).
+		Str(LogPolicyId, resp.Item.PolicyId).
+		Str(LogAccessApiKeyId, resp.Item.AccessApiKeyId).
+		Int(EcsHttpResponseBodyBytes, numWritten).
+		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Msg("Elastic Agent successfully enrolled")
+
+	return nil
+}
+
+>>>>>>> 978711a (Improve some of the log message (#844))
 // updateMetaLocalAgentId updates the agent id in the local metadata if exists
 // At the time of writing the local metadata blob looks something like this
 // {

@@ -305,7 +305,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 		Logger()
 
 	if newPolicy.CoordinatorIdx <= 0 {
-		zlog.Info().Msg("ignore policy that has not pass through coordinator")
+		zlog.Info().Str(logger.PolicyId, newPolicy.PolicyId).Msg("Ignore policy that has not passed through coordinator")
 		return false
 	}
 
@@ -319,7 +319,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 			head: makeHead(),
 		}
 		m.policies[newPolicy.PolicyId] = p
-		zlog.Info().Msg("new policy added on update")
+		zlog.Info().Str(logger.PolicyId, newPolicy.PolicyId).Msg("New policy found on update and added")
 		return false
 	}
 
@@ -362,7 +362,8 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 		Int64("oldRev", oldPolicy.RevisionIdx).
 		Int64("oldCoord", oldPolicy.CoordinatorIdx).
 		Int("nQueued", nQueued).
-		Msg("revised policy")
+		Str(logger.PolicyId, newPolicy.PolicyId).
+		Msg("New revision of policy received and added to the queue")
 
 	return true
 }
