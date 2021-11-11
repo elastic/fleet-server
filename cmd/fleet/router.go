@@ -82,7 +82,7 @@ func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack
 		log.Info().
 			Str("method", rte.method).
 			Str("path", rte.path).
-			Msg("Server install route")
+			Msg("fleet-server route added")
 
 		router.Handle(
 			rte.method,
@@ -90,6 +90,8 @@ func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack
 			logger.HttpHandler(rte.handler),
 		)
 	}
+
+	log.Info().Msg("fleet-server routes set up")
 
 	return router
 }
