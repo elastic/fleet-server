@@ -7,10 +7,10 @@ package apikey
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/pkg/errors"
 )
 
 type ApiKeyMetadata struct {
@@ -36,7 +36,7 @@ func Read(ctx context.Context, client *elasticsearch.Client, id string) (apiKey 
 	defer res.Body.Close()
 
 	if res.IsError() {
-		err = fmt.Errorf("fail GetAPIKey: %s, %w", res.String(), ErrApiKeyNotFound)
+		err = errors.Wrap(ErrApiKeyNotFound, res.String())
 		return
 	}
 
