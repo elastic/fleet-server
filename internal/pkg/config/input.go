@@ -60,9 +60,10 @@ type Endpoint struct {
 
 // Server is the configuration for the server
 type Server struct {
-	Host              string                  `config:"host"` // TODO: deprecated use Endpoints
-	Port              uint16                  `config:"port"` // TODO: deprecated use Endpoints
-	Endpoints         []Endpoint              `config:"endpoints"`
+	Host              string                  `config:"host"`
+	Port              uint16                  `config:"port"`
+	InternalHost      string                  `config:"internal_host"`
+	InternalPort      uint16                  `config:"internal_port"`
 	TLS               *tlscommon.ServerConfig `config:"ssl"`
 	Timeouts          ServerTimeouts          `config:"timeouts"`
 	Profiler          ServerProfiler          `config:"profiler"`
@@ -88,28 +89,29 @@ func (c *Server) InitDefaults() {
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.
 func (c *Server) BindEndpoints() []string {
-	endpoints := map[string]bool{
-		c.BindAddress(): true,
+	primaryAddress := c.BindAddress()
+	endpoints := make([]string, 0, 2)
+	endpoints = append(endpoints, primaryAddress)
+
+	if internalAddress := c.BindInternalAddress(); internalAddress != "" && internalAddress != primaryAddress {
+		endpoints = append(endpoints, internalAddress)
 	}
 
-	// add each of the endpoints to collection,
-	for _, ep := range c.Endpoints {
-		e := bindAddress(ep.Host, ep.Port)
-		endpoints[e] = true
-	}
-
-	// we need to get rid of duplicates so we dont have port collision
-	uniqueEndpoints := make([]string, 0, len(endpoints))
-	for ep := range endpoints {
-		uniqueEndpoints = append(uniqueEndpoints, ep)
-	}
-
-	return uniqueEndpoints
+	return endpoints
 }
 
 // BindAddress returns the binding address for the HTTP server.
 func (c *Server) BindAddress() string {
 	return bindAddress(c.Host, c.Port)
+}
+
+// BindInternalAddress returns the binding address for the internal HTTP server.
+func (c *Server) BindInternalAddress() string {
+	if c.InternalPort <= 0 {
+		return ""
+	}
+
+	return bindAddress(c.InternalHost, c.InternalPort)
 }
 
 func bindAddress(host string, port uint16) string {
