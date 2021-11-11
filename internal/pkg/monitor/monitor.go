@@ -186,12 +186,12 @@ func (m *simpleMonitorT) loadCheckpoint() sqn.SeqNo {
 
 // Run runs monitor.
 func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
-	m.log.Info().Msg("start")
+	m.log.Info().Msg("Starting index monitor")
 	defer func() {
 		if err == context.Canceled {
 			err = nil
 		}
-		m.log.Info().Err(err).Msg("exited")
+		m.log.Info().Err(err).Msg("Index monitor exited")
 	}()
 
 	defer func() {
