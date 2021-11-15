@@ -20,6 +20,7 @@ import (
 const (
 	FieldAgents     = "agents"
 	FieldExpiration = "expiration"
+	FieldSize       = "size"
 
 	maxAgentActionsFetchSize = 100
 )
@@ -28,6 +29,9 @@ var (
 	QueryAction          = prepareFindAction()
 	QueryAllAgentActions = prepareFindAllAgentsActions()
 	QueryAgentActions    = prepareFindAgentActions()
+
+	// Query for expired actions GC
+	QueryExpiredActions = prepareFindExpiredAction()
 )
 
 func prepareFindAllAgentsActions() *dsl.Tmpl {
@@ -42,6 +46,18 @@ func prepareFindAction() *dsl.Tmpl {
 	filter := root.Query().Bool().Filter()
 	filter.Term(FieldActionId, tmpl.Bind(FieldActionId), nil)
 	root.Source().Excludes(FieldAgents)
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
+func prepareFindExpiredAction() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	filter := root.Query().Bool().Filter()
+	filter.Range(FieldExpiration, dsl.WithRangeLTE(tmpl.Bind(FieldExpiration)))
+	// Select only acton ids for deletion
+	root.Source().Includes("_id")
+	root.WithSize(tmpl.Bind(FieldSize))
 	tmpl.MustResolve(root)
 	return tmpl
 }
@@ -96,6 +112,23 @@ func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo 
 	}
 
 	return hitsToActions(res.Hits)
+}
+
+func FindExpiredAtionsHits(ctx context.Context, bulker bulk.Bulk, expiredBefore time.Time, size int) ([]es.HitT, error) {
+	return FindExpiredActionsHitsForIndex(ctx, FleetActions, bulker, expiredBefore, size)
+}
+
+func FindExpiredActionsHitsForIndex(ctx context.Context, index string, bulker bulk.Bulk, expiredBefore time.Time, size int) ([]es.HitT, error) {
+	params := map[string]interface{}{
+		FieldExpiration: expiredBefore.UTC().Format(time.RFC3339),
+		FieldSize:       size,
+	}
+
+	res, err := findActionsHits(ctx, bulker, QueryExpiredActions, index, params, nil)
+	if err != nil {
+		return nil, err
+	}
+	return res.Hits, nil
 }
 
 func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}, seqNos []int64) (*es.HitsT, error) {
