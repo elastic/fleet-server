@@ -8,3 +8,8 @@ func (n *Node) Size(sz uint64) {
 	childNode := n.findOrCreateChildByName(kKeywordSize)
 	childNode.leaf = sz
 }
+
+// WithSize allows to parameterize the size
+func (n *Node) WithSize(v interface{}) {
+	n.nodeMap[kKeywordSize] = &Node{leaf: v}
+}

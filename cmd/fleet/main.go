@@ -26,11 +26,13 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/coordinator"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/gc"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/profile"
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
+	"github.com/elastic/fleet-server/v7/internal/pkg/scheduler"
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
@@ -771,6 +773,14 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	g.Go(loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
 		return dl.Migrate(ctx, bulker)
 	}))
+
+	// Run schduler for periodic GC/cleanup
+	gcCfg := cfg.Inputs[0].Server.GC
+	sched, err := scheduler.New(gc.Schedules(bulker, gcCfg.ScheduleInterval, gcCfg.CleanupBeforeInteval))
+	if err != nil {
+		return fmt.Errorf("failed to create elasticsearch GC: %w", err)
+	}
+	g.Go(loggedRunFunc(ctx, "Elasticsearch GC", sched.Run))
 
 	// Monitoring es client, longer timeout, no retries
 	monCli, err := es.NewClient(ctx, cfg, true, es.WithUserAgent(kUAFleetServer, f.bi))
