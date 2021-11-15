@@ -122,6 +122,7 @@ func TestConfig(t *testing.T) {
 							CompressionThresh: 1024,
 							Limits:            defaultServerLimits(),
 							Bulk:              defaultServerBulk(),
+							GC:                defaultServerGC(),
 						},
 						Cache: defaultCache(),
 						Monitor: Monitor{
@@ -194,6 +195,12 @@ func defaultServerLimits() ServerLimits {
 
 func defaultServerBulk() ServerBulk {
 	var d ServerBulk
+	d.InitDefaults()
+	return d
+}
+
+func defaultServerGC() GC {
+	var d GC
 	d.InitDefaults()
 	return d
 }
