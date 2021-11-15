@@ -93,7 +93,8 @@ func (c *Server) BindEndpoints() []string {
 	endpoints := make([]string, 0, 2)
 	endpoints = append(endpoints, primaryAddress)
 
-	if internalAddress := c.BindInternalAddress(); internalAddress != "" && internalAddress != primaryAddress {
+	if internalAddress := c.BindInternalAddress(); internalAddress != "" && internalAddress != ":0" && internalAddress != primaryAddress {
+
 		endpoints = append(endpoints, internalAddress)
 	}
 

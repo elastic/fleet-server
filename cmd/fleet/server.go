@@ -49,6 +49,10 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 	mhbz := cfg.Limits.MaxHeaderByteSize
 	bctx := func(net.Listener) context.Context { return ctx }
 
+	errChan := make(chan error)
+	cancelCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	for _, addr := range listeners {
 		log.Info().
 			Str("bind", addr).
@@ -117,9 +121,22 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 			log.Warn().Msg("exposed over insecure HTTP; enablement of TLS is strongly recommended")
 		}
 
-		if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
+		log.Debug().Msgf("Listening on %s", addr)
+
+		go func(ctx context.Context, errChan chan error, ln net.Listener) {
+			if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
+				errChan <- err
+			}
+		}(cancelCtx, errChan, ln)
+
+	}
+
+	select {
+	case err := <-errChan:
+		if err != context.Canceled {
 			return err
 		}
+	case <-cancelCtx.Done():
 	}
 
 	return nil
