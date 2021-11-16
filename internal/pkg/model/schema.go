@@ -118,6 +118,9 @@ type Agent struct {
 	// API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultApiKey string `json:"default_api_key,omitempty"`
 
+	// Default API Key History
+	DefaultApiKeyHistory []DefaultApiKeyHistoryItems `json:"default_api_key_history,omitempty"`
+
 	// ID of the API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultApiKeyId string `json:"default_api_key_id,omitempty"`
 
@@ -230,6 +233,19 @@ type Body struct {
 
 // Data The opaque payload.
 type Data struct {
+}
+
+// DefaultApiKeyHistoryItems
+type DefaultApiKeyHistoryItems struct {
+
+	// API Key
+	ApiKey string `json:"api_key,omitempty"`
+
+	// API Key identifier
+	Id string `json:"id,omitempty"`
+
+	// Date/time the API key was retired
+	RetiredAt string `json:"retired_at,omitempty"`
 }
 
 // EnrollmentApiKey An Elastic Agent enrollment API key
