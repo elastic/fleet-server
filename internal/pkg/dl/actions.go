@@ -128,7 +128,10 @@ func FindExpiredActionsHitsForIndex(ctx context.Context, index string, bulker bu
 	if err != nil {
 		return nil, err
 	}
-	return res.Hits, nil
+	if res != nil {
+		return res.Hits, nil
+	}
+	return nil, nil
 }
 
 func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}, seqNos []int64) (*es.HitsT, error) {
