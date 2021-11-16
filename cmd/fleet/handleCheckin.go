@@ -10,9 +10,11 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
@@ -476,10 +478,17 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 			dl.FieldDefaultApiKeyId:             defaultOutputApiKey.Id,
 			dl.FieldPolicyOutputPermissionsHash: pp.Default.Role.Sha2,
 		}
+		if agent.DefaultApiKeyId != "" {
+			fields[dl.FieldDefaultApiKeyHistory] = model.DefaultApiKeyHistoryItems{
+				ApiKey:    agent.DefaultApiKey,
+				Id:        agent.DefaultApiKeyId,
+				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+			}
+		}
 
-		body, err := json.Marshal(map[string]interface{}{
-			"doc": fields,
-		})
+		// Using painless script to append the old keys to the history
+		body, err := renderUpdatePainlessScript(fields)
+
 		if err != nil {
 			return nil, err
 		}
@@ -507,6 +516,27 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	return &resp, nil
+}
+
+func renderUpdatePainlessScript(fields map[string]interface{}) ([]byte, error) {
+	var source strings.Builder
+	for field := range fields {
+		if field == dl.FieldDefaultApiKeyHistory {
+			source.WriteString(fmt.Sprint("if (ctx._source.", field, "==null) {ctx._source.", field, "=new ArrayList();} ctx._source.", field, ".add(params.", field, ");"))
+		} else {
+			source.WriteString(fmt.Sprint("ctx._source.", field, "=", "params.", field, ";"))
+		}
+	}
+
+	body, err := json.Marshal(map[string]interface{}{
+		"script": map[string]interface{}{
+			"lang":   "painless",
+			"source": source.String(),
+			"params": fields,
+		},
+	})
+
+	return body, err
 }
 
 // Return Serializable policy injecting the apikey into the output field.
