@@ -12,16 +12,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/xid"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 func TestCleanupActions(t *testing.T) {
 	tests := []struct {
-		name       string
-		selectSize int
+		name                    string
+		skipIndexInitialization bool
+		selectSize              int
 	}{
+		{
+			name:                    "index not found",
+			skipIndexInitialization: true,
+			selectSize:              5,
+		},
 		{
 			name:       "one loop pass",
 			selectSize: 1000,
@@ -33,50 +43,59 @@ func TestCleanupActions(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			testCleanupActionsWithSelectSize(t, tc.selectSize)
+			testCleanupActionsWithSelectSize(t, tc.skipIndexInitialization, tc.selectSize)
 		})
 	}
 }
 
-func testCleanupActionsWithSelectSize(t *testing.T, selectSize int) {
+func testCleanupActionsWithSelectSize(t *testing.T, skipIndexInitialization bool, selectSize int) {
 	const (
 		thirtyDays        = 24 * 30 * time.Hour
 		thirtyDaysAndHour = thirtyDays + time.Hour
 	)
+	var (
+		index                             string
+		bulker                            bulk.Bulk
+		expiredActions, nonExpiredActions []model.Action
+		err                               error
+	)
 
 	ctx := context.Background()
-	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingAction)
 
-	_ = index
+	if skipIndexInitialization {
+		index = xid.New().String()
+		bulker = ftesting.SetupBulk(ctx, t)
+	} else {
+		index, bulker = ftesting.SetupIndexWithBulk(ctx, t, es.MappingAction)
+		expiredActions, err = ftesting.CreateRandomActions(
+			ftesting.CreateActionsWithMinAgentsCount(3),
+			ftesting.CreateActionsWithMaxAgentsCount(7),
+			ftesting.CreateActionsWithMinActionsCount(7),
+			ftesting.CreateActionsWithMaxActionsCount(15),
+			ftesting.CreateActionsWithTimestampOffset(-thirtyDaysAndHour),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	expiredActions, err := ftesting.CreateRandomActions(
-		ftesting.CreateActionsWithMinAgentsCount(3),
-		ftesting.CreateActionsWithMaxAgentsCount(7),
-		ftesting.CreateActionsWithMinActionsCount(7),
-		ftesting.CreateActionsWithMaxActionsCount(15),
-		ftesting.CreateActionsWithTimestampOffset(-thirtyDaysAndHour),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+		nonExpiredActions, err = ftesting.CreateRandomActions(
+			ftesting.CreateActionsWithMinAgentsCount(3),
+			ftesting.CreateActionsWithMaxAgentsCount(7),
+			ftesting.CreateActionsWithMinActionsCount(7),
+			ftesting.CreateActionsWithMaxActionsCount(15),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	nonExpiredActions, err := ftesting.CreateRandomActions(
-		ftesting.CreateActionsWithMinAgentsCount(3),
-		ftesting.CreateActionsWithMaxAgentsCount(7),
-		ftesting.CreateActionsWithMinActionsCount(7),
-		ftesting.CreateActionsWithMaxActionsCount(15),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+		err = ftesting.StoreActions(ctx, bulker, index, append(expiredActions, nonExpiredActions...))
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	err = ftesting.StoreActions(ctx, bulker, index, append(expiredActions, nonExpiredActions...))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err != nil {
-		t.Fatal(err)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	err = cleanupActions(ctx, index, bulker,
