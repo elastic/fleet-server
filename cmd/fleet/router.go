@@ -5,6 +5,7 @@
 package fleet
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -23,6 +24,7 @@ const (
 )
 
 type Router struct {
+	ctx    context.Context
 	bulker bulk.Bulk
 	ver    string
 	ct     *CheckinT
@@ -32,9 +34,10 @@ type Router struct {
 	sm     policy.SelfMonitor
 }
 
-func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, sm policy.SelfMonitor) *httprouter.Router {
+func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, sm policy.SelfMonitor) *httprouter.Router {
 
 	r := Router{
+		ctx:    ctx,
 		bulker: bulker,
 		ct:     ct,
 		et:     et,
