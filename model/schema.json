@@ -452,10 +452,6 @@
                 "description": "API Key identifier",
                 "type": "string"
               },
-              "api_key": {
-                "description": "API Key",
-                "type": "string"
-              },
               "retired_at": {
                 "description": "Date/time the API key was retired",
                 "type": "string",

@@ -480,7 +480,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		}
 		if agent.DefaultApiKeyId != "" {
 			fields[dl.FieldDefaultApiKeyHistory] = model.DefaultApiKeyHistoryItems{
-				ApiKey:    agent.DefaultApiKey,
 				Id:        agent.DefaultApiKeyId,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 			}

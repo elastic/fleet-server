@@ -238,9 +238,6 @@ type Data struct {
 // DefaultApiKeyHistoryItems
 type DefaultApiKeyHistoryItems struct {
 
-	// API Key
-	ApiKey string `json:"api_key,omitempty"`
-
 	// API Key identifier
 	Id string `json:"id,omitempty"`
 

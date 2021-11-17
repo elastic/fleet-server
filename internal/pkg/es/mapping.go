@@ -119,9 +119,6 @@ const (
 		},
 		"default_api_key_history": {
 			"properties": {
-				"api_key": {
-					"type": "keyword"
-				},
 				"id": {
 					"type": "keyword"
 				},
@@ -261,9 +258,6 @@ const (
 	// DefaultApiKeyHistoryItems
 	MappingDefaultApiKeyHistoryItems = `{
 	"properties": {
-		"api_key": {
-			"type": "keyword"
-		},
 		"id": {
 			"type": "keyword"
 		},
