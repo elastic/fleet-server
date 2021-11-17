@@ -20,13 +20,15 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
-	github.com/rs/zerolog v1.19.0
+	github.com/rs/zerolog v1.22.0
 	github.com/spf13/cobra v0.0.5
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.14.0
-	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
 )
+
+require go.elastic.co/ecszerolog v0.1.0
 
 require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
@@ -46,7 +48,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/magefile/mage v1.10.0 // indirect
+	github.com/magefile/mage v1.11.0 // indirect
 	github.com/mattn/go-colorable v0.0.8 // indirect
 	github.com/mattn/go-isatty v0.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -62,10 +64,10 @@ require (
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
 	golang.org/x/lint v0.0.0-20200130185559-910be7a94367 // indirect
 	golang.org/x/mod v0.3.0 // indirect
-	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
-	golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f // indirect
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
+	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4 // indirect
 	golang.org/x/text v0.3.3 // indirect
-	golang.org/x/tools v0.0.0-20200904185747-39188db58858 // indirect
+	golang.org/x/tools v0.1.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
 	google.golang.org/grpc v1.29.1 // indirect
