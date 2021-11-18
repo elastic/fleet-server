@@ -38,6 +38,7 @@ const (
 	FieldPolicyCoordinatorIdx        = "policy_coordinator_idx"
 	FieldDefaultApiKey               = "default_api_key"
 	FieldDefaultApiKeyId             = "default_api_key_id"
+	FieldDefaultApiKeyHistory        = "default_api_key_history"
 	FieldPolicyOutputPermissionsHash = "policy_output_permissions_hash"
 	FieldUnenrolledReason            = "unenrolled_reason"
 	FieldAgentVersion                = "version"
