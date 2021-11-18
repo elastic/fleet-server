@@ -15,6 +15,8 @@ import (
 
 const kDefaultHost = "0.0.0.0"
 const kDefaultPort = 8220
+const kDefaultInternalHost = "localhost"
+const kDefaultInternalPort = 8221
 
 // Policy is the configuration policy to use.
 type Policy struct {
@@ -53,16 +55,10 @@ func (c *ServerBulk) InitDefaults() {
 	c.FlushMaxPending = 8
 }
 
-type Endpoint struct {
-	Host string `config:"host"`
-	Port uint16 `config:"port"`
-}
-
 // Server is the configuration for the server
 type Server struct {
 	Host              string                  `config:"host"`
 	Port              uint16                  `config:"port"`
-	InternalHost      string                  `config:"internal_host"`
 	InternalPort      uint16                  `config:"internal_port"`
 	TLS               *tlscommon.ServerConfig `config:"ssl"`
 	Timeouts          ServerTimeouts          `config:"timeouts"`
@@ -78,6 +74,7 @@ type Server struct {
 func (c *Server) InitDefaults() {
 	c.Host = kDefaultHost
 	c.Port = kDefaultPort
+	c.InternalPort = kDefaultInternalPort
 	c.Timeouts.InitDefaults()
 	c.CompressionLevel = flate.BestSpeed
 	c.CompressionThresh = 1024
@@ -94,7 +91,6 @@ func (c *Server) BindEndpoints() []string {
 	endpoints = append(endpoints, primaryAddress)
 
 	if internalAddress := c.BindInternalAddress(); internalAddress != "" && internalAddress != ":0" && internalAddress != primaryAddress {
-
 		endpoints = append(endpoints, internalAddress)
 	}
 
@@ -109,10 +105,10 @@ func (c *Server) BindAddress() string {
 // BindInternalAddress returns the binding address for the internal HTTP server.
 func (c *Server) BindInternalAddress() string {
 	if c.InternalPort <= 0 {
-		return ""
+		return bindAddress(kDefaultInternalHost, kDefaultInternalPort)
 	}
 
-	return bindAddress(c.InternalHost, c.InternalPort)
+	return bindAddress(kDefaultInternalHost, c.InternalPort)
 }
 
 func bindAddress(host string, port uint16) string {
