@@ -117,6 +117,16 @@ const (
 		"default_api_key": {
 			"type": "keyword"
 		},
+		"default_api_key_history": {
+			"properties": {
+				"id": {
+					"type": "keyword"
+				},
+				"retired_at": {
+					"type": "date"
+				}				
+			}
+		},
 		"default_api_key_id": {
 			"type": "keyword"
 		},
@@ -242,6 +252,18 @@ const (
 	MappingData = `{
 	"properties": {
 		
+	}
+}`
+
+	// DefaultApiKeyHistoryItems
+	MappingDefaultApiKeyHistoryItems = `{
+	"properties": {
+		"id": {
+			"type": "keyword"
+		},
+		"retired_at": {
+			"type": "date"
+		}		
 	}
 }`
 
