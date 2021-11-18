@@ -843,7 +843,7 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	at := NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 
-	router := NewRouter(bulker, ct, et, at, ack, sm)
+	router := NewRouter(ctx, bulker, ct, et, at, ack, sm)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &cfg.Inputs[0].Server)
