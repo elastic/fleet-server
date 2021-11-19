@@ -698,11 +698,10 @@ func initRuntime(cfg *config.Config) {
 }
 
 func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
-	options := []es.ConfigOption{es.WithUserAgent(kUAFleetServer, f.bi)}
-	if cfg.Inputs[0].Server.Instrumentation.Enabled {
-		options = append(options, es.InstrumentRoundTripper())
-	}
-	es, err := es.NewClient(ctx, cfg, false, options...)
+	es, err := es.NewClient(ctx, cfg, false, elasticsearchOptions(
+		cfg.Inputs[0].Server.Instrumentation.Enabled,
+		kUAFleetServer, f.bi,
+	)...)
 	if err != nil {
 		return nil, err
 	}
@@ -802,11 +801,10 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	g.Go(loggedRunFunc(ctx, "Elasticsearch GC", sched.Run))
 
 	// Monitoring es client, longer timeout, no retries
-	options := []es.ConfigOption{es.WithUserAgent(kUAFleetServer, f.bi)}
-	if cfg.Inputs[0].Server.Instrumentation.Enabled {
-		options = append(options, es.InstrumentRoundTripper())
-	}
-	monCli, err := es.NewClient(ctx, cfg, true, options...)
+	monCli, err := es.NewClient(ctx, cfg, true, elasticsearchOptions(
+		cfg.Inputs[0].Server.Instrumentation.Enabled,
+		kUAFleetServer, f.bi,
+	)...)
 	if err != nil {
 		return err
 	}
@@ -899,23 +897,21 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) error {
 		return err
 	}
 
-	if cfg.Hosts != nil {
-		if len(cfg.Hosts) > 0 {
-			hosts := make([]*url.URL, 0, len(cfg.Hosts))
-			for _, host := range cfg.Hosts {
-				u, err := url.Parse(host)
-				if err != nil {
-					return fmt.Errorf("failed parsing %s: %w", host, err)
-				}
-				hosts = append(hosts, u)
+	if len(cfg.Hosts) > 0 {
+		hosts := make([]*url.URL, 0, len(cfg.Hosts))
+		for _, host := range cfg.Hosts {
+			u, err := url.Parse(host)
+			if err != nil {
+				return fmt.Errorf("failed parsing %s: %w", host, err)
 			}
-			transport.SetServerURL(hosts...)
+			hosts = append(hosts, u)
 		}
-		if cfg.APIKey != "" {
-			transport.SetAPIKey(cfg.APIKey)
-		} else {
-			transport.SetSecretToken(cfg.SecretToken)
-		}
+		transport.SetServerURL(hosts...)
+	}
+	if cfg.APIKey != "" {
+		transport.SetAPIKey(cfg.APIKey)
+	} else {
+		transport.SetSecretToken(cfg.SecretToken)
 	}
 	tracer, err := apm.NewTracerOptions(apm.TracerOptions{
 		ServiceName:        "fleet-server",
@@ -936,4 +932,12 @@ func (f *FleetServer) flushTracer() {
 		f.tracer.Close()
 		f.tracer = nil
 	}
+}
+
+func elasticsearchOptions(instumented bool, uaName string, bi build.Info) []es.ConfigOption {
+	options := []es.ConfigOption{es.WithUserAgent(kUAFleetServer, f.bi)}
+	if instumented {
+		options = append(options, es.InstrumentRoundTripper())
+	}
+	return options
 }
