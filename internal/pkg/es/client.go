@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"go.elastic.co/apm/module/apmelasticsearch"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/rs/zerolog/log"
@@ -72,6 +73,14 @@ func WithUserAgent(name string, bi build.Info) func(config elasticsearch.Config)
 			config.Header = http.Header{}
 		}
 		config.Header.Set("User-Agent", ua)
+	}
+}
+
+func InstrumentRoundTripper() func(config elasticsearch.Config) {
+	return func(config elasticsearch.Config) {
+		config.Transport = apmelasticsearch.WrapRoundTripper(
+			config.Transport,
+		)
 	}
 }
 

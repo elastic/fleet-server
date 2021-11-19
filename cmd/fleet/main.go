@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"runtime/debug"
@@ -16,6 +18,9 @@ import (
 
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/yaml"
+	"go.elastic.co/apm"
+	"go.elastic.co/apm/module/apmhttp"
+	apmtransport "go.elastic.co/apm/transport"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
@@ -396,6 +401,7 @@ type FleetServer struct {
 	cfgCh    chan *config.Config
 	cache    cache.Cache
 	reporter status.Reporter
+	tracer   *apm.Tracer
 }
 
 // NewFleetServer creates the actual fleet server service.
@@ -505,6 +511,7 @@ LOOP:
 			if srvCancel != nil {
 				log.Info().Msg("stopping server on configuration change")
 				stop(srvCancel, srvEg)
+				f.flushTracer()
 			}
 			log.Info().Msg("starting server on configuration change")
 			srvEg, srvCancel = start(ctx, func(ctx context.Context) error {
@@ -688,7 +695,11 @@ func initRuntime(cfg *config.Config) {
 }
 
 func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
-	es, err := es.NewClient(ctx, cfg, false, es.WithUserAgent(kUAFleetServer, f.bi))
+	options := []es.ConfigOption{es.WithUserAgent(kUAFleetServer, f.bi)}
+	if cfg.Inputs[0].Server.Instrumentation.Enabled {
+		options = append(options, es.InstrumentRoundTripper())
+	}
+	es, err := es.NewClient(ctx, cfg, false, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -718,6 +729,11 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	// Create the bulker subsystem
 	bulker, err := f.initBulker(bulkCtx, cfg)
 	if err != nil {
+		return err
+	}
+
+	// Create the APM tracer.
+	if err := f.initTracer(cfg.Inputs[0].Server.Instrumentation); err != nil {
 		return err
 	}
 
@@ -783,7 +799,11 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	g.Go(loggedRunFunc(ctx, "Elasticsearch GC", sched.Run))
 
 	// Monitoring es client, longer timeout, no retries
-	monCli, err := es.NewClient(ctx, cfg, true, es.WithUserAgent(kUAFleetServer, f.bi))
+	options := []es.ConfigOption{es.WithUserAgent(kUAFleetServer, f.bi)}
+	if cfg.Inputs[0].Server.Instrumentation.Enabled {
+		options = append(options, es.InstrumentRoundTripper())
+	}
+	monCli, err := es.NewClient(ctx, cfg, true, options...)
 	if err != nil {
 		return err
 	}
@@ -846,6 +866,10 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	router := NewRouter(ctx, bulker, ct, et, at, ack, sm)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
+		var router http.Handler = router
+		if f.tracer != nil {
+			router = apmhttp.Wrap(router, apmhttp.WithTracer(f.tracer))
+		}
 		return runServer(ctx, router, &cfg.Inputs[0].Server)
 	}))
 
@@ -859,4 +883,58 @@ func (f *FleetServer) Reload(ctx context.Context, cfg *config.Config) error {
 	case <-ctx.Done():
 	}
 	return nil
+}
+
+func (f *FleetServer) initTracer(cfg config.Instrumentation) error {
+	// TODO(marclop) is there an APM Go agent environment variable that could
+	// be set? If so, we could use that when cfg.Enabled == false and has not
+	// been specified in the config.
+	if !cfg.Enabled {
+		return nil
+	}
+
+	log.Info().Msg("fleet-server instrumentation is enabled")
+	apm.DefaultTracer.Close()
+
+	transport, err := apmtransport.NewHTTPTransport()
+	if err != nil {
+		return err
+	}
+
+	if cfg.Hosts != nil {
+		if len(cfg.Hosts) > 0 {
+			hosts := make([]*url.URL, 0, len(cfg.Hosts))
+			for _, host := range cfg.Hosts {
+				u, err := url.Parse(host)
+				if err != nil {
+					return fmt.Errorf("failed parsing %s: %w", host, err)
+				}
+				hosts = append(hosts, u)
+			}
+			transport.SetServerURL(hosts...)
+		}
+		if cfg.APIKey != "" {
+			transport.SetAPIKey(cfg.APIKey)
+		} else {
+			transport.SetSecretToken(cfg.SecretToken)
+		}
+	}
+	tracer, err := apm.NewTracerOptions(apm.TracerOptions{
+		ServiceName:    "fleet-server",
+		ServiceVersion: f.bi.Version,
+		Transport:      transport,
+	})
+	if tracer != nil {
+		f.tracer = tracer
+	}
+	return err
+}
+
+func (f *FleetServer) flushTracer() {
+	if f.tracer != nil {
+		log.Info().Msg("flushing instrumentation tracer...")
+		f.tracer.Flush(nil)
+		f.tracer.Close()
+		f.tracer = nil
+	}
 }
