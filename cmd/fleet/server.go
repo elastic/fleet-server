@@ -118,7 +118,7 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 			ln = tls.NewListener(ln, server.TLSConfig)
 
 		} else {
-			log.Warn().Msg("exposed over insecure HTTP; enablement of TLS is strongly recommended")
+			log.Warn().Msg("Exposed over insecure HTTP; enablement of TLS is strongly recommended")
 		}
 
 		log.Debug().Msgf("Listening on %s", addr)
