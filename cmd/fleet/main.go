@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"reflect"
@@ -19,7 +18,6 @@ import (
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/yaml"
 	"go.elastic.co/apm"
-	"go.elastic.co/apm/module/apmhttp"
 	apmtransport "go.elastic.co/apm/transport"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
@@ -60,6 +58,11 @@ const (
 
 	kUAFleetServer = "Fleet-Server"
 )
+
+func init() {
+	// Close default apm tracer.
+	apm.DefaultTracer.Close()
+}
 
 func installSignalHandler() context.Context {
 	rootCtx := context.Background()
@@ -863,13 +866,9 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	at := NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 
-	router := NewRouter(ctx, bulker, ct, et, at, ack, sm)
+	router := NewRouter(ctx, bulker, ct, et, at, ack, sm, f.tracer)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
-		var router http.Handler = router
-		if f.tracer != nil {
-			router = apmhttp.Wrap(router, apmhttp.WithTracer(f.tracer))
-		}
 		return runServer(ctx, router, &cfg.Inputs[0].Server)
 	}))
 
@@ -894,7 +893,6 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) error {
 	}
 
 	log.Info().Msg("fleet-server instrumentation is enabled")
-	apm.DefaultTracer.Close()
 
 	transport, err := apmtransport.NewHTTPTransport()
 	if err != nil {
@@ -920,9 +918,10 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) error {
 		}
 	}
 	tracer, err := apm.NewTracerOptions(apm.TracerOptions{
-		ServiceName:    "fleet-server",
-		ServiceVersion: f.bi.Version,
-		Transport:      transport,
+		ServiceName:        "fleet-server",
+		ServiceVersion:     f.bi.Version,
+		ServiceEnvironment: cfg.Environment,
+		Transport:          transport,
 	})
 	if tracer != nil {
 		f.tracer = tracer

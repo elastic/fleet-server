@@ -13,6 +13,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm"
+	"go.elastic.co/apm/module/apmhttprouter"
 )
 
 const (
@@ -34,7 +36,7 @@ type Router struct {
 	sm     policy.SelfMonitor
 }
 
-func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, sm policy.SelfMonitor) *httprouter.Router {
+func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, sm policy.SelfMonitor, tracer *apm.Tracer) *httprouter.Router {
 
 	r := Router{
 		ctx:    ctx,
@@ -87,10 +89,16 @@ func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *Enroller
 			Str("path", rte.path).
 			Msg("fleet-server route added")
 
+		handler := rte.handler
+		if tracer != nil {
+			handler = apmhttprouter.Wrap(
+				rte.handler, rte.path, apmhttprouter.WithTracer(tracer),
+			)
+		}
 		router.Handle(
 			rte.method,
 			rte.path,
-			logger.HttpHandler(rte.handler),
+			logger.HttpHandler(handler),
 		)
 	}
 

@@ -512,6 +512,8 @@ go.elastic.co/apm/module/apmelasticsearch v1.14.0/go.mod h1:WJRQvN5v8YkigaqT2ss4
 go.elastic.co/apm/module/apmhttp v1.7.2/go.mod h1:sTFWiWejnhSdZv6+dMgxGec2Nxe/ZKfHfz/xtRM+cRY=
 go.elastic.co/apm/module/apmhttp v1.14.0 h1:uDSIPr1BJOt1A/T5J9Beq9VtMtQHqOdqQUXCPRQF4C4=
 go.elastic.co/apm/module/apmhttp v1.14.0/go.mod h1:PY8hyV0X3eKqXYYoN0pyu1pWcvFCwGmh5eUFuS39Zmo=
+go.elastic.co/apm/module/apmhttprouter v1.14.0 h1:qKZusgyH/5iIjYSk1ekYKrswBm5pe+vB/+GC8G5yw0c=
+go.elastic.co/apm/module/apmhttprouter v1.14.0/go.mod h1:MEDP369R6lIrSl3g2djo8spz4bFmfF4wklLUrSl87t0=
 go.elastic.co/ecszap v0.3.0 h1:Zo/Y4sJLqbWDlqCHI4F4Lzeg0Fs4+n5ldVis4h9xV8w=
 go.elastic.co/ecszap v0.3.0/go.mod h1:HTUi+QRmr3EuZMqxPX+5fyOdMNfUu5iPebgfhgsTJYQ=
 go.elastic.co/ecszerolog v0.1.0 h1:oNjqYwytG+jt6Lrz/GQlt53oh5KTBi81q0ebmQvHTGY=

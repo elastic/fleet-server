@@ -25,7 +25,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/apm v1.14.0
 	go.elastic.co/apm/module/apmelasticsearch v1.14.0
-	go.elastic.co/apm/module/apmhttp v1.14.0
+	go.elastic.co/apm/module/apmhttp v1.14.0 // indirect
 	go.uber.org/zap v1.14.0
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
@@ -60,6 +60,7 @@ require (
 	github.com/prometheus/procfs v0.0.11 // indirect
 	github.com/santhosh-tekuri/jsonschema v1.2.4 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	go.elastic.co/apm/module/apmhttprouter v1.14.0
 	go.elastic.co/ecszap v0.3.0 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
 	go.uber.org/atomic v1.5.0 // indirect
