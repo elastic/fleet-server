@@ -404,7 +404,6 @@ type FleetServer struct {
 	cfgCh    chan *config.Config
 	cache    cache.Cache
 	reporter status.Reporter
-	tracer   *apm.Tracer
 }
 
 // NewFleetServer creates the actual fleet server service.
@@ -514,7 +513,6 @@ LOOP:
 			if srvCancel != nil {
 				log.Info().Msg("stopping server on configuration change")
 				stop(srvCancel, srvEg)
-				f.flushTracer()
 			}
 			log.Info().Msg("starting server on configuration change")
 			srvEg, srvCancel = start(ctx, func(ctx context.Context) error {
@@ -734,8 +732,17 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	}
 
 	// Create the APM tracer.
-	if err := f.initTracer(cfg.Inputs[0].Server.Instrumentation); err != nil {
+	tracer, err := f.initTracer(cfg.Inputs[0].Server.Instrumentation)
+	if err != nil {
 		return err
+	}
+	if tracer != nil {
+		go func() {
+			<-ctx.Done()
+			log.Info().Msg("flushing instrumentation tracer...")
+			tracer.Flush(nil)
+			tracer.Close()
+		}()
 	}
 
 	// Execute the bulker engine in a goroutine with its orphaned context.
@@ -770,14 +777,14 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return
 	})
 
-	if err = f.runSubsystems(ctx, cfg, g, bulker); err != nil {
+	if err = f.runSubsystems(ctx, cfg, g, bulker, tracer); err != nil {
 		return err
 	}
 
 	return g.Wait()
 }
 
-func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk) (err error) {
+func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk, tracer *apm.Tracer) (err error) {
 	esCli := bulker.Client()
 
 	// Check version compatibility with Elasticsearch
@@ -862,7 +869,7 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	at := NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 
-	router := NewRouter(ctx, bulker, ct, et, at, ack, sm, f.tracer)
+	router := NewRouter(ctx, bulker, ct, et, at, ack, sm, tracer)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &cfg.Inputs[0].Server)
@@ -880,19 +887,16 @@ func (f *FleetServer) Reload(ctx context.Context, cfg *config.Config) error {
 	return nil
 }
 
-func (f *FleetServer) initTracer(cfg config.Instrumentation) error {
-	// TODO(marclop) is there an APM Go agent environment variable that could
-	// be set? If so, we could use that when cfg.Enabled == false and has not
-	// been specified in the config.
+func (f *FleetServer) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
 	if !cfg.Enabled {
-		return nil
+		return nil, nil
 	}
 
 	log.Info().Msg("fleet-server instrumentation is enabled")
 
 	transport, err := apmtransport.NewHTTPTransport()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(cfg.Hosts) > 0 {
@@ -900,7 +904,7 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) error {
 		for _, host := range cfg.Hosts {
 			u, err := url.Parse(host)
 			if err != nil {
-				return fmt.Errorf("failed parsing %s: %w", host, err)
+				return nil, fmt.Errorf("failed parsing %s: %w", host, err)
 			}
 			hosts = append(hosts, u)
 		}
@@ -911,25 +915,12 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) error {
 	} else {
 		transport.SetSecretToken(cfg.SecretToken)
 	}
-	tracer, err := apm.NewTracerOptions(apm.TracerOptions{
+	return apm.NewTracerOptions(apm.TracerOptions{
 		ServiceName:        "fleet-server",
 		ServiceVersion:     f.bi.Version,
 		ServiceEnvironment: cfg.Environment,
 		Transport:          transport,
 	})
-	if tracer != nil {
-		f.tracer = tracer
-	}
-	return err
-}
-
-func (f *FleetServer) flushTracer() {
-	if f.tracer != nil {
-		log.Info().Msg("flushing instrumentation tracer...")
-		f.tracer.Flush(nil)
-		f.tracer.Close()
-		f.tracer = nil
-	}
 }
 
 func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
