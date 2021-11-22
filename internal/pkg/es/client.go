@@ -19,7 +19,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type ConfigOption func(config elasticsearch.Config)
+type ConfigOption func(config *elasticsearch.Config)
 
 func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...ConfigOption) (*elasticsearch.Client, error) {
 	escfg, err := cfg.Output.Elasticsearch.ToESConfig(longPoll)
@@ -32,7 +32,7 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 
 	// Apply configuration options
 	for _, opt := range opts {
-		opt(escfg)
+		opt(&escfg)
 	}
 
 	zlog := log.With().
@@ -65,8 +65,8 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 	return es, nil
 }
 
-func WithUserAgent(name string, bi build.Info) func(config elasticsearch.Config) {
-	return func(config elasticsearch.Config) {
+func WithUserAgent(name string, bi build.Info) ConfigOption {
+	return func(config *elasticsearch.Config) {
 		ua := userAgent(name, bi)
 		// Set User-Agent header
 		if config.Header == nil {
@@ -76,8 +76,8 @@ func WithUserAgent(name string, bi build.Info) func(config elasticsearch.Config)
 	}
 }
 
-func InstrumentRoundTripper() func(config elasticsearch.Config) {
-	return func(config elasticsearch.Config) {
+func InstrumentRoundTripper() ConfigOption {
+	return func(config *elasticsearch.Config) {
 		config.Transport = apmelasticsearch.WrapRoundTripper(
 			config.Transport,
 		)

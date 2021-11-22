@@ -699,8 +699,7 @@ func initRuntime(cfg *config.Config) {
 
 func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
 	es, err := es.NewClient(ctx, cfg, false, elasticsearchOptions(
-		cfg.Inputs[0].Server.Instrumentation.Enabled,
-		kUAFleetServer, f.bi,
+		cfg.Inputs[0].Server.Instrumentation.Enabled, f.bi,
 	)...)
 	if err != nil {
 		return nil, err
@@ -802,8 +801,7 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 
 	// Monitoring es client, longer timeout, no retries
 	monCli, err := es.NewClient(ctx, cfg, true, elasticsearchOptions(
-		cfg.Inputs[0].Server.Instrumentation.Enabled,
-		kUAFleetServer, f.bi,
+		cfg.Inputs[0].Server.Instrumentation.Enabled, f.bi,
 	)...)
 	if err != nil {
 		return err
@@ -934,8 +932,8 @@ func (f *FleetServer) flushTracer() {
 	}
 }
 
-func elasticsearchOptions(instumented bool, uaName string, bi build.Info) []es.ConfigOption {
-	options := []es.ConfigOption{es.WithUserAgent(kUAFleetServer, f.bi)}
+func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
+	options := []es.ConfigOption{es.WithUserAgent(kUAFleetServer, bi)}
 	if instumented {
 		options = append(options, es.InstrumentRoundTripper())
 	}
