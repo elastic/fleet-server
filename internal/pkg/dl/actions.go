@@ -5,7 +5,9 @@
 package dl
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -31,7 +33,8 @@ var (
 	QueryAgentActions    = prepareFindAgentActions()
 
 	// Query for expired actions GC
-	QueryExpiredActions = prepareFindExpiredAction()
+	QueryDeleteExpiredActions = prepareDeleteExpiredAction()
+	QueryFindExpiredActions   = prepareFindExpiredAction()
 )
 
 func prepareFindAllAgentsActions() *dsl.Tmpl {
@@ -46,6 +49,15 @@ func prepareFindAction() *dsl.Tmpl {
 	filter := root.Query().Bool().Filter()
 	filter.Term(FieldActionId, tmpl.Bind(FieldActionId), nil)
 	root.Source().Excludes(FieldAgents)
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
+func prepareDeleteExpiredAction() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	filter := root.Query().Bool().Filter()
+	filter.Range(FieldExpiration, dsl.WithRangeLTE(tmpl.Bind(FieldExpiration)))
 	tmpl.MustResolve(root)
 	return tmpl
 }
@@ -114,8 +126,43 @@ func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo 
 	return hitsToActions(res.Hits)
 }
 
-func FindExpiredAtionsHits(ctx context.Context, bulker bulk.Bulk, expiredBefore time.Time, size int) ([]es.HitT, error) {
-	return FindExpiredActionsHitsForIndex(ctx, FleetActions, bulker, expiredBefore, size)
+func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, cleanupIntervalAfterExpired string) (count int64, err error) {
+	params := map[string]interface{}{
+		FieldExpiration: "now-" + cleanupIntervalAfterExpired,
+	}
+
+	query, err := QueryDeleteExpiredActions.Render(params)
+	if err != nil {
+		return
+	}
+
+	res, err := bulker.Client().API.DeleteByQuery([]string{index}, bytes.NewReader(query),
+		bulker.Client().API.DeleteByQuery.WithContext(ctx))
+
+	if err != nil {
+		return
+	}
+
+	defer res.Body.Close()
+	var esres es.DeleteByQueryResponse
+
+	err = json.NewDecoder(res.Body).Decode(&esres)
+	if err != nil {
+		return
+	}
+
+	if res.IsError() {
+		err = es.TranslateError(res.StatusCode, &esres.Error)
+		if err != nil {
+			if errors.Is(err, es.ErrIndexNotFound) {
+				log.Debug().Str("index", index).Msg(es.ErrIndexNotFound.Error())
+				err = nil
+			}
+			return
+		}
+	}
+
+	return esres.Deleted, nil
 }
 
 func FindExpiredActionsHitsForIndex(ctx context.Context, index string, bulker bulk.Bulk, expiredBefore time.Time, size int) ([]es.HitT, error) {
@@ -124,7 +171,7 @@ func FindExpiredActionsHitsForIndex(ctx context.Context, index string, bulker bu
 		FieldSize:       size,
 	}
 
-	res, err := findActionsHits(ctx, bulker, QueryExpiredActions, index, params, nil)
+	res, err := findActionsHits(ctx, bulker, QueryFindExpiredActions, index, params, nil)
 	if err != nil {
 		return nil, err
 	}

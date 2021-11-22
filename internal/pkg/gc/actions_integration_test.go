@@ -50,8 +50,8 @@ func TestCleanupActions(t *testing.T) {
 
 func testCleanupActionsWithSelectSize(t *testing.T, skipIndexInitialization bool, selectSize int) {
 	const (
-		thirtyDays        = 24 * 30 * time.Hour
-		thirtyDaysAndHour = thirtyDays + time.Hour
+		thirtyDays        = "720h"
+		thirtyDaysAndHour = "721h"
 	)
 	var (
 		index                             string
@@ -72,7 +72,7 @@ func testCleanupActionsWithSelectSize(t *testing.T, skipIndexInitialization bool
 			ftesting.CreateActionsWithMaxAgentsCount(7),
 			ftesting.CreateActionsWithMinActionsCount(7),
 			ftesting.CreateActionsWithMaxActionsCount(15),
-			ftesting.CreateActionsWithTimestampOffset(-thirtyDaysAndHour),
+			ftesting.CreateActionsWithTimestampOffset(-((24*30)+1)*time.Hour),
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -99,9 +99,7 @@ func testCleanupActionsWithSelectSize(t *testing.T, skipIndexInitialization bool
 	}
 
 	err = cleanupActions(ctx, index, bulker,
-		WithActionCleanupBeforeInterval(thirtyDays),
-		WithActionSelectSize(selectSize), // smaller size test few loop passes
-		WithMaxWaitInCleanupLoop(0))
+		WithCleanupIntervalAfterExpired(thirtyDays))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +107,7 @@ func testCleanupActionsWithSelectSize(t *testing.T, skipIndexInitialization bool
 	time.Sleep(time.Second)
 
 	// Check that all expired actions where deleted
-	hits, err := dl.FindExpiredActionsHitsForIndex(ctx, index, bulker, time.Now().Add(-thirtyDays), 100)
+	hits, err := dl.FindExpiredActionsHitsForIndex(ctx, index, bulker, time.Now().Add(-24*30*time.Hour), 100)
 	if err != nil {
 		t.Fatal(err)
 	}

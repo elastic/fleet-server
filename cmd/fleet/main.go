@@ -776,7 +776,7 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 
 	// Run schduler for periodic GC/cleanup
 	gcCfg := cfg.Inputs[0].Server.GC
-	sched, err := scheduler.New(gc.Schedules(bulker, gcCfg.ScheduleInterval, gcCfg.CleanupBeforeInteval))
+	sched, err := scheduler.New(gc.Schedules(bulker, gcCfg.ScheduleInterval, gcCfg.CleanupAfterExpiredInteval))
 	if err != nil {
 		return fmt.Errorf("failed to create elasticsearch GC: %w", err)
 	}
