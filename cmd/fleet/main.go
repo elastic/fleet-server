@@ -736,14 +736,6 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	if err != nil {
 		return err
 	}
-	if tracer != nil {
-		go func() {
-			<-ctx.Done()
-			log.Info().Msg("flushing instrumentation tracer...")
-			tracer.Flush(nil)
-			tracer.Close()
-		}()
-	}
 
 	// Execute the bulker engine in a goroutine with its orphaned context.
 	// Create an error channel for the case where the bulker exits
@@ -776,6 +768,15 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		}
 		return
 	})
+
+	if tracer != nil {
+		go func() {
+			<-ctx.Done()
+			log.Info().Msg("flushing instrumentation tracer...")
+			tracer.Flush(nil)
+			tracer.Close()
+		}()
+	}
 
 	if err = f.runSubsystems(ctx, cfg, g, bulker, tracer); err != nil {
 		return err
