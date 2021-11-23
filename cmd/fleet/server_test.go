@@ -46,7 +46,7 @@ func TestRunServer(t *testing.T) {
 	et, err := NewEnrollerT(verCon, cfg, nil, c)
 	require.NoError(t, err)
 
-	router := NewRouter(ctx, bulker, ct, et, nil, nil, nil)
+	router := NewRouter(ctx, bulker, ct, et, nil, nil, nil, nil)
 	errCh := make(chan error)
 
 	var wg sync.WaitGroup
