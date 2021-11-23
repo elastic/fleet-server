@@ -12,8 +12,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"path"
 	"testing"
 	"time"
@@ -42,6 +44,7 @@ const (
 type tserver struct {
 	cfg *config.Config
 	g   *errgroup.Group
+	srv *FleetServer
 }
 
 func (s *tserver) baseUrl() string {
@@ -89,7 +92,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 		return srv.Run(ctx)
 	})
 
-	tsrv := &tserver{cfg, g}
+	tsrv := &tserver{cfg: cfg, g: g, srv: srv}
 	err = tsrv.waitServerUp(ctx, testWaitServerUp)
 	if err != nil {
 		return nil, err
@@ -222,4 +225,96 @@ func TestServerUnauthorized(t *testing.T) {
 	// Stop test server
 	cancel()
 	srv.waitExit()
+}
+
+func TestServerInstrumentation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tracerConnected := make(chan struct{}, 1)
+	tracerDisconnected := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/intake/v2/events" {
+			return
+		}
+		tracerConnected <- struct{}{}
+		io.Copy(io.Discard, req.Body)
+		tracerDisconnected <- struct{}{}
+	}))
+	defer server.Close()
+
+	// Start test server
+	srv, err := startTestServer(ctx)
+	require.NoError(t, err)
+
+	newInstrumentationCfg := func(cfg config.Config, instr config.Instrumentation) {
+		cfg.Inputs[0] = cfg.Inputs[0]
+		cfg.Inputs[0].Server.Instrumentation = instr
+
+		newCfg, err := srv.cfg.Merge(&cfg)
+		require.NoError(t, err)
+
+		require.NoError(t, srv.srv.Reload(ctx, newCfg))
+	}
+
+	// Enable instrumentation
+	newInstrumentationCfg(*srv.cfg, config.Instrumentation{
+		Enabled: true,
+		Hosts:   []string{server.URL},
+	})
+
+	stopClient := make(chan struct{})
+	cli := cleanhttp.DefaultClient()
+	callCheckinFunc := func() {
+		for {
+			agentId := "1e4954ce-af37-4731-9f4a-407b08e69e42"
+			cli.Post(srv.buildUrl(agentId, "checkin"), "application/json", bytes.NewBuffer([]byte("{}")))
+			require.NoError(t, err)
+			select {
+			case <-ctx.Done():
+				return
+			case <-stopClient:
+				return
+			case <-time.After(time.Second):
+			}
+		}
+	}
+	go callCheckinFunc()
+
+	// Verify the APM tracer connects to the mocked APM Server.
+	// Errors if the tracer doesn't establish a connection within 5 seconds.
+	select {
+	case <-tracerConnected:
+		stopClient <- struct{}{}
+	case <-time.After(5 * time.Second):
+		t.Error("did not receive any data from the instrumented fleet-server")
+	}
+
+	// Turn instrumentation off
+	newInstrumentationCfg(*srv.cfg, config.Instrumentation{
+		Enabled: false,
+		Hosts:   []string{server.URL},
+	})
+
+	// Verify the APM Tracer closes the connection to the mocked APM Server.
+	// Errors if the hasn't closed the connection after 5 seconds.
+	select {
+	case <-tracerDisconnected:
+	case <-time.After(5 * time.Second):
+		t.Error("APM tracer still connected after server restart, bug in the tracing code")
+	}
+
+	go callCheckinFunc()
+
+	// Verify the APM Tracer doesn't connect to the mocked APM Server.
+	select {
+	case <-tracerConnected:
+		t.Error("APM Tracer connected to APM Server, bug in the tracing code")
+	case <-time.After(5 * time.Second):
+	}
+
+	stopClient <- struct{}{}
+	close(stopClient)
+	cancel()
+	require.NoError(t, srv.waitExit())
 }

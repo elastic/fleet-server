@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"reflect"
 	"runtime/debug"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/yaml"
+	"go.elastic.co/apm"
+	apmtransport "go.elastic.co/apm/transport"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
@@ -55,6 +58,11 @@ const (
 
 	kUAFleetServer = "Fleet-Server"
 )
+
+func init() {
+	// Close default apm tracer.
+	apm.DefaultTracer.Close()
+}
 
 func installSignalHandler() context.Context {
 	rootCtx := context.Background()
@@ -688,7 +696,9 @@ func initRuntime(cfg *config.Config) {
 }
 
 func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
-	es, err := es.NewClient(ctx, cfg, false, es.WithUserAgent(kUAFleetServer, f.bi))
+	es, err := es.NewClient(ctx, cfg, false, elasticsearchOptions(
+		cfg.Inputs[0].Server.Instrumentation.Enabled, f.bi,
+	)...)
 	if err != nil {
 		return nil, err
 	}
@@ -717,6 +727,12 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 
 	// Create the bulker subsystem
 	bulker, err := f.initBulker(bulkCtx, cfg)
+	if err != nil {
+		return err
+	}
+
+	// Create the APM tracer.
+	tracer, err := f.initTracer(cfg.Inputs[0].Server.Instrumentation)
 	if err != nil {
 		return err
 	}
@@ -753,14 +769,23 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 		return
 	})
 
-	if err = f.runSubsystems(ctx, cfg, g, bulker); err != nil {
+	if tracer != nil {
+		go func() {
+			<-ctx.Done()
+			log.Info().Msg("flushing instrumentation tracer...")
+			tracer.Flush(nil)
+			tracer.Close()
+		}()
+	}
+
+	if err = f.runSubsystems(ctx, cfg, g, bulker, tracer); err != nil {
 		return err
 	}
 
 	return g.Wait()
 }
 
-func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk) (err error) {
+func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk, tracer *apm.Tracer) (err error) {
 	esCli := bulker.Client()
 
 	// Check version compatibility with Elasticsearch
@@ -783,7 +808,9 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	g.Go(loggedRunFunc(ctx, "Elasticsearch GC", sched.Run))
 
 	// Monitoring es client, longer timeout, no retries
-	monCli, err := es.NewClient(ctx, cfg, true, es.WithUserAgent(kUAFleetServer, f.bi))
+	monCli, err := es.NewClient(ctx, cfg, true, elasticsearchOptions(
+		cfg.Inputs[0].Server.Instrumentation.Enabled, f.bi,
+	)...)
 	if err != nil {
 		return err
 	}
@@ -843,7 +870,7 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	at := NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 
-	router := NewRouter(ctx, bulker, ct, et, at, ack, sm)
+	router := NewRouter(ctx, bulker, ct, et, at, ack, sm, tracer)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &cfg.Inputs[0].Server)
@@ -859,4 +886,48 @@ func (f *FleetServer) Reload(ctx context.Context, cfg *config.Config) error {
 	case <-ctx.Done():
 	}
 	return nil
+}
+
+func (f *FleetServer) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
+	if !cfg.Enabled {
+		return nil, nil
+	}
+
+	log.Info().Msg("fleet-server instrumentation is enabled")
+
+	transport, err := apmtransport.NewHTTPTransport()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cfg.Hosts) > 0 {
+		hosts := make([]*url.URL, 0, len(cfg.Hosts))
+		for _, host := range cfg.Hosts {
+			u, err := url.Parse(host)
+			if err != nil {
+				return nil, fmt.Errorf("failed parsing %s: %w", host, err)
+			}
+			hosts = append(hosts, u)
+		}
+		transport.SetServerURL(hosts...)
+	}
+	if cfg.APIKey != "" {
+		transport.SetAPIKey(cfg.APIKey)
+	} else {
+		transport.SetSecretToken(cfg.SecretToken)
+	}
+	return apm.NewTracerOptions(apm.TracerOptions{
+		ServiceName:        "fleet-server",
+		ServiceVersion:     f.bi.Version,
+		ServiceEnvironment: cfg.Environment,
+		Transport:          transport,
+	})
+}
+
+func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
+	options := []es.ConfigOption{es.WithUserAgent(kUAFleetServer, bi)}
+	if instumented {
+		options = append(options, es.InstrumentRoundTripper())
+	}
+	return options
 }

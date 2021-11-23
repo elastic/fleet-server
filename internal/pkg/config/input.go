@@ -66,6 +66,7 @@ type Server struct {
 	Runtime           Runtime                 `config:"runtime"`
 	Bulk              ServerBulk              `config:"bulk"`
 	GC                GC                      `config:"gc"`
+	Instrumentation   Instrumentation         `config:"instrumentation"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
