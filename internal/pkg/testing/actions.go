@@ -22,16 +22,75 @@ import (
 	"github.com/rs/xid"
 )
 
-func CreateRandomActions(min, max int) ([]model.Action, error) {
+type CreateActionsConfig struct {
+	minAgentsCount   int
+	maxAgentsCount   int
+	minActionsCount  int
+	maxActionsCount  int
+	timestampOffset  time.Duration // offset for the action timestamp from the current time
+	expirationOffset time.Duration // expiration offset since the action creation
+}
+
+type CreateActionsOpt func(c *CreateActionsConfig)
+
+func CreateActionsWithMinAgentsCount(count int) CreateActionsOpt {
+	return func(c *CreateActionsConfig) {
+		c.minAgentsCount = count
+	}
+}
+
+func CreateActionsWithMaxAgentsCount(count int) CreateActionsOpt {
+	return func(c *CreateActionsConfig) {
+		c.maxAgentsCount = count
+	}
+}
+
+func CreateActionsWithMinActionsCount(count int) CreateActionsOpt {
+	return func(c *CreateActionsConfig) {
+		c.minActionsCount = count
+	}
+}
+
+func CreateActionsWithMaxActionsCount(count int) CreateActionsOpt {
+	return func(c *CreateActionsConfig) {
+		c.maxActionsCount = count
+	}
+}
+
+func CreateActionsWithTimestampOffset(timestampOffset time.Duration) CreateActionsOpt {
+	return func(c *CreateActionsConfig) {
+		c.timestampOffset = timestampOffset
+	}
+}
+
+func CreateActionsWithExpirationOffset(expirationOffset time.Duration) CreateActionsOpt {
+	return func(c *CreateActionsConfig) {
+		c.expirationOffset = expirationOffset
+	}
+}
+
+func CreateRandomActions(opts ...CreateActionsOpt) ([]model.Action, error) {
+	c := CreateActionsConfig{
+		minAgentsCount:   1,
+		maxAgentsCount:   1,
+		minActionsCount:  4,               // previously hardcoded, using as default
+		maxActionsCount:  9,               // previously hardcoded, using as default
+		expirationOffset: 5 * time.Minute, // default expiration of the action since the action timestamp
+	}
+
+	for _, opt := range opts {
+		opt(&c)
+	}
+
 	r := rnd.New()
 
-	sz := r.Int(min, max)
+	sz := r.Int(c.minAgentsCount, c.maxAgentsCount)
 	agentIds := make([]string, sz)
 	for i := 0; i < sz; i++ {
 		agentIds[i] = uuid.Must(uuid.NewV4()).String()
 	}
 
-	sz = r.Int(4, 9)
+	sz = r.Int(c.minActionsCount, c.maxActionsCount)
 
 	now := time.Now().UTC()
 
@@ -54,13 +113,21 @@ func CreateRandomActions(min, max int) ([]model.Action, error) {
 		if len(aid) == 0 {
 			aid = nil
 		}
+
+		timestamp := r.Time(now, 1, 3, time.Second, rnd.TimeBefore)
+		if c.timestampOffset != 0 {
+			timestamp = timestamp.Add(c.timestampOffset)
+		}
+
+		expiration := timestamp.Add(c.expirationOffset)
+
 		action := model.Action{
 			ESDocument: model.ESDocument{
 				Id: xid.New().String(),
 			},
 			ActionId:   uuid.Must(uuid.NewV4()).String(),
-			Timestamp:  r.Time(now, 2, 5, time.Second, rnd.TimeBefore).Format(time.RFC3339),
-			Expiration: r.Time(now, 12, 25, time.Minute, rnd.TimeAfter).Format(time.RFC3339),
+			Timestamp:  timestamp.Format(time.RFC3339),
+			Expiration: expiration.Format(time.RFC3339),
 			Type:       "APP_ACTION",
 			InputType:  "osquery",
 			Agents:     aid,
@@ -70,25 +137,33 @@ func CreateRandomActions(min, max int) ([]model.Action, error) {
 		actions[i] = action
 	}
 	return actions, nil
+
 }
 
 func StoreRandomActions(ctx context.Context, bulker bulk.Bulk, index string, min, max int) ([]model.Action, error) {
-	actions, err := CreateRandomActions(min, max)
+	actions, err := CreateRandomActions(
+		CreateActionsWithMinAgentsCount(min),
+		CreateActionsWithMaxAgentsCount(max),
+	)
 	if err != nil {
 		return nil, err
 	}
 
+	return actions, StoreActions(ctx, bulker, index, actions)
+}
+
+func StoreActions(ctx context.Context, bulker bulk.Bulk, index string, actions []model.Action) error {
 	for _, action := range actions {
 		body, err := json.Marshal(action)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		_, err = bulker.Create(ctx, index, action.Id, body, bulk.WithRefresh())
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return actions, err
+	return nil
 }
 
 func SetupActions(ctx context.Context, t *testing.T, min, max int) (string, bulk.Bulk, []model.Action) {

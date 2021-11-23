@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/gofrs/uuid"
@@ -56,7 +57,7 @@ func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bu
 
 	log.Info().
 		Interface("limits", cfg.Limits.EnrollLimit).
-		Msg("Enroller install limits")
+		Msg("Setting config enroll_limit")
 
 	return &EnrollerT{
 		verCon: verCon,
@@ -84,7 +85,25 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		Str("mod", kEnrollMod).
 		Logger()
 
-	resp, err := rt.et.handleEnroll(&zlog, w, r)
+	// Error in the scope for deferred rolback function check
+	var err error
+
+	// Initialize rollback/cleanup for enrollment
+	// This deletes all the artifacts that were created during enrollment
+	rb := rollback.New(zlog)
+	defer func() {
+		if err != nil {
+			zlog.Error().Err(err).Msg("perform rollback on enrollment failure")
+			// Using the router context for the rollback
+			err = rb.Rollback(rt.ctx)
+			if err != nil {
+				zlog.Error().Err(err).Msg("rollback error on enrollment failure")
+			}
+		}
+	}()
+
+	var resp *EnrollResponse
+	resp, err = rt.et.handleEnroll(rb, &zlog, w, r)
 
 	if err != nil {
 		cntEnroll.IncError(err)
@@ -96,8 +115,8 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail enroll")
 
-		if err := resp.Write(w); err != nil {
-			zlog.Error().Err(err).Msg("fail writing error response")
+		if rerr := resp.Write(w); rerr != nil {
+			zlog.Error().Err(rerr).Msg("fail writing error response")
 		}
 		return
 	}
@@ -108,13 +127,10 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 			Err(err).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail write response")
-
-		// Remove ghost artifacts; agent will never receive the paylod
-		rt.et.wipeGhosts(r.Context(), zlog, resp)
 	}
 }
 
-func (et *EnrollerT) handleEnroll(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request) (*EnrollResponse, error) {
+func (et *EnrollerT) handleEnroll(rb *rollback.Rollback, zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request) (*EnrollResponse, error) {
 
 	limitF, err := et.limit.Acquire()
 	if err != nil {
@@ -141,10 +157,10 @@ func (et *EnrollerT) handleEnroll(zlog *zerolog.Logger, w http.ResponseWriter, r
 	dfunc := cntEnroll.IncStart()
 	defer dfunc()
 
-	return et.processRequest(*zlog, w, r, key.Id, ver)
+	return et.processRequest(rb, *zlog, w, r, key.Id, ver)
 }
 
-func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, enrollmentApiKeyId, ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) processRequest(rb *rollback.Rollback, zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, enrollmentApiKeyId, ver string) (*EnrollResponse, error) {
 
 	// Validate that an enrollment record exists for a key with this id.
 	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentApiKeyId)
@@ -169,10 +185,10 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	return et._enroll(r.Context(), zlog, req, erec.PolicyId, ver)
+	return et._enroll(r.Context(), rb, zlog, req, erec.PolicyId, ver)
 }
 
-func (et *EnrollerT) _enroll(ctx context.Context, zlog zerolog.Logger, req *EnrollRequest, policyId, ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog zerolog.Logger, req *EnrollRequest, policyId, ver string) (*EnrollResponse, error) {
 
 	if req.SharedId != "" {
 		// TODO: Support pre-existing install
@@ -201,6 +217,11 @@ func (et *EnrollerT) _enroll(ctx context.Context, zlog zerolog.Logger, req *Enro
 		return nil, err
 	}
 
+	// Register invalidate API key function for enrollment error rollback
+	rb.Register("invalidate API key", func(ctx context.Context) error {
+		return invalidateApiKey(ctx, zlog, et.bulker, accessApiKey.Id)
+	})
+
 	agentData := model.Agent{
 		Active:         true,
 		PolicyId:       policyId,
@@ -217,9 +238,13 @@ func (et *EnrollerT) _enroll(ctx context.Context, zlog zerolog.Logger, req *Enro
 
 	err = createFleetAgent(ctx, et.bulker, agentId, agentData)
 	if err != nil {
-		invalidateApiKey(ctx, zlog, et.bulker, accessApiKey.Id)
 		return nil, err
 	}
+
+	// Register delete fleet agent for enrollment error rollback
+	rb.Register("delete agent", func(ctx context.Context) error {
+		return deleteAgent(ctx, zlog, et.bulker, agentId)
+	})
 
 	resp := EnrollResponse{
 		Action: "created",
@@ -243,17 +268,15 @@ func (et *EnrollerT) _enroll(ctx context.Context, zlog zerolog.Logger, req *Enro
 	return &resp, nil
 }
 
-// Remove the ghost artifacts from Elastic; the agent record and the accessApiKey.
-func (et *EnrollerT) wipeGhosts(ctx context.Context, zlog zerolog.Logger, resp *EnrollResponse) {
-	zlog = zlog.With().Str(LogAgentId, resp.Item.ID).Logger()
+func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string) error {
+	zlog = zlog.With().Str(LogAgentId, agentID).Logger()
 
-	if err := et.bulker.Delete(ctx, dl.FleetAgents, resp.Item.ID); err != nil {
-		zlog.Error().Err(err).Msg("ghost agent record failed to delete")
-	} else {
-		zlog.Info().Msg("ghost agent record deleted")
+	if err := bulker.Delete(ctx, dl.FleetAgents, agentID); err != nil {
+		zlog.Error().Err(err).Msg("agent record failed to delete")
+		return err
 	}
-
-	invalidateApiKey(ctx, zlog, et.bulker, resp.Item.AccessApiKeyId)
+	zlog.Info().Msg("agent record deleted")
+	return nil
 }
 
 func invalidateApiKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, apikeyId string) error {
@@ -323,7 +346,7 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 		Str(LogAccessApiKeyId, resp.Item.AccessApiKeyId).
 		Int(EcsHttpResponseBodyBytes, numWritten).
 		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
-		Msg("success enroll")
+		Msg("Elastic Agent successfully enrolled")
 
 	return nil
 }

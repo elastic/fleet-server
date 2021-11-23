@@ -6,9 +6,10 @@ package fleet
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestConvertActionsEmpty(t *testing.T) {

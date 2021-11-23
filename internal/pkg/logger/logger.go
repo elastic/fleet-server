@@ -11,7 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
+
+	"go.elastic.co/ecszerolog"
 
 	"github.com/elastic/beats/v7/libbeat/common/file"
 	"github.com/rs/zerolog"
@@ -79,17 +80,6 @@ func Init(cfg *config.Config, svcName string) (*Logger, error) {
 			sync: w,
 			name: svcName,
 		}
-
-		// override the field names for ECS
-		zerolog.LevelFieldName = EcsLogLevel
-		zerolog.ErrorFieldName = EcsErrorMessage
-		zerolog.MessageFieldName = EcsMessage
-		zerolog.TimeFieldFormat = "2006-01-02T15:04:05.999Z" // RFC3339 at millisecond resolution in zulu timezone
-		zerolog.TimestampFieldName = EcsTimestamp
-
-		if !cfg.Logging.Pretty || !cfg.Logging.ToStderr {
-			zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-		}
 	})
 	return gLogger, err
 }
@@ -127,7 +117,7 @@ func configureStderrLogger(cfg *config.Config) (zerolog.Logger, WriterSync) {
 		out = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}
 	}
 
-	return log.Output(out).Level(level(cfg)), os.Stderr
+	return ecszerolog.New(out).Level(level(cfg)), os.Stderr
 }
 
 func configureFileRotatorLogger(cfg *config.Config) (zerolog.Logger, WriterSync, error) {
@@ -149,7 +139,7 @@ func configureFileRotatorLogger(cfg *config.Config) (zerolog.Logger, WriterSync,
 	if err != nil {
 		return zerolog.Logger{}, nil, err
 	}
-	return log.Output(rotator).Level(level(cfg)), rotator, nil
+	return ecszerolog.New(rotator).Level(level(cfg)), rotator, nil
 }
 
 func configure(cfg *config.Config, svcName string) (lg zerolog.Logger, wr WriterSync, err error) {
@@ -160,7 +150,7 @@ func configure(cfg *config.Config, svcName string) (lg zerolog.Logger, wr Writer
 	case cfg.Logging.ToFiles:
 		lg, wr, err = configureFileRotatorLogger(cfg)
 	default:
-		lg = log.Output(ioutil.Discard).Level(level(cfg))
+		lg = ecszerolog.New(ioutil.Discard).Level(level(cfg))
 		wr = &nopSync{}
 	}
 

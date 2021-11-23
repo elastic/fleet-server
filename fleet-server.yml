@@ -19,6 +19,9 @@ fleet:
 #      port: 8220
 #      timeouts:
 #        checkin_long_poll: 300s # long poll timeout
+#      instrumentation:
+#        enabled: false
+#        hosts: ["localhost:8200"]
 #      profiler:
 #        enabled: true # enable profiler
 #      limits:

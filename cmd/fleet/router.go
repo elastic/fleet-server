@@ -5,6 +5,7 @@
 package fleet
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -12,6 +13,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm"
+	"go.elastic.co/apm/module/apmhttprouter"
 )
 
 const (
@@ -23,6 +26,7 @@ const (
 )
 
 type Router struct {
+	ctx    context.Context
 	bulker bulk.Bulk
 	ver    string
 	ct     *CheckinT
@@ -32,9 +36,10 @@ type Router struct {
 	sm     policy.SelfMonitor
 }
 
-func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, sm policy.SelfMonitor) *httprouter.Router {
+func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, sm policy.SelfMonitor, tracer *apm.Tracer) *httprouter.Router {
 
 	r := Router{
+		ctx:    ctx,
 		bulker: bulker,
 		ct:     ct,
 		et:     et,
@@ -82,14 +87,22 @@ func NewRouter(bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack
 		log.Info().
 			Str("method", rte.method).
 			Str("path", rte.path).
-			Msg("Server install route")
+			Msg("fleet-server route added")
 
+		handler := rte.handler
+		if tracer != nil {
+			handler = apmhttprouter.Wrap(
+				rte.handler, rte.path, apmhttprouter.WithTracer(tracer),
+			)
+		}
 		router.Handle(
 			rte.method,
 			rte.path,
-			logger.HttpHandler(rte.handler),
+			logger.HttpHandler(handler),
 		)
 	}
+
+	log.Info().Msg("fleet-server routes set up")
 
 	return router
 }

@@ -41,7 +41,7 @@ type AckT struct {
 func NewAckT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *AckT {
 	log.Info().
 		Interface("limits", cfg.Limits.AckLimit).
-		Msg("Ack install limits")
+		Msg("Setting config ack_limits")
 
 	return &AckT{
 		cfg:   cfg,
@@ -259,6 +259,18 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
+	sz := len(agent.DefaultApiKeyHistory)
+	if sz > 0 {
+		ids := make([]string, sz)
+		for i := 0; i < sz; i++ {
+			ids[i] = agent.DefaultApiKeyHistory[i].Id
+		}
+		log.Info().Strs("ids", ids).Msg("Invalidate old API keys")
+		if err := ack.bulk.ApiKeyInvalidate(ctx, ids...); err != nil {
+			log.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+		}
+	}
+
 	body := makeUpdatePolicyBody(
 		agent.PolicyId,
 		currRev,
@@ -360,7 +372,7 @@ func _getAPIKeyIDs(agent *model.Agent) []string {
 //
 // WARNING: This assumes the input data is sanitized.
 
-const kUpdatePolicyPrefix = `{"script":{"lang":"painless","source":"if (ctx._source.policy_id == params.id) {ctx._source.` +
+const kUpdatePolicyPrefix = `{"script":{"lang":"painless","source":"if (ctx._source.policy_id == params.id) {ctx._source.remove('default_api_key_history');ctx._source.` +
 	dl.FieldPolicyRevisionIdx +
 	` = params.rev;ctx._source.` +
 	dl.FieldPolicyCoordinatorIdx +
@@ -371,7 +383,7 @@ const kUpdatePolicyPrefix = `{"script":{"lang":"painless","source":"if (ctx._sou
 func makeUpdatePolicyBody(policyId string, newRev, coordIdx int64) []byte {
 
 	var buf bytes.Buffer
-	buf.Grow(384)
+	buf.Grow(410)
 
 	//  Not pretty, but fast.
 	buf.WriteString(kUpdatePolicyPrefix)

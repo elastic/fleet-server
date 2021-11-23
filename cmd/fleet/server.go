@@ -16,7 +16,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
-	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
 )
 
@@ -39,9 +38,8 @@ func diagConn(c net.Conn, s http.ConnState) {
 	}
 }
 
-func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Server) error {
+func runServer(ctx context.Context, router http.Handler, cfg *config.Server) error {
 	listeners := cfg.BindEndpoints()
-
 	rdto := cfg.Timeouts.Read
 	wrto := cfg.Timeouts.Write
 	idle := cfg.Timeouts.Idle

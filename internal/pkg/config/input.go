@@ -68,6 +68,8 @@ type Server struct {
 	Limits            ServerLimits            `config:"limits"`
 	Runtime           Runtime                 `config:"runtime"`
 	Bulk              ServerBulk              `config:"bulk"`
+	GC                GC                      `config:"gc"`
+	Instrumentation   Instrumentation         `config:"instrumentation"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -82,6 +84,7 @@ func (c *Server) InitDefaults() {
 	c.Limits.InitDefaults()
 	c.Runtime.InitDefaults()
 	c.Bulk.InitDefaults()
+	c.GC.InitDefaults()
 }
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.

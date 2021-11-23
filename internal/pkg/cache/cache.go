@@ -164,10 +164,10 @@ func (c *CacheT) SetApiKey(key ApiKey, enabled bool) {
 		val = ""
 	}
 
-	// If enabled, jitter allows us to randomize the expirtion of the artifact
+	// If enabled, jitter allows us to randomize the expiration of the artifact
 	// across time, which is helpful if a bunch of agents came on at the same time,
-	// say during a network restoration.  With some jitter, we avoid having to
-	// revalidate  the API Keys all at the same time, which we know causes load on Elastic.
+	// say during a network restoration. With some jitter, we avoid having to
+	// revalidate the API Keys all at the same time, which we know causes load on Elastic.
 	ttl := c.cfg.ApiKeyTTL
 	if c.cfg.ApiKeyJitter != 0 {
 		jitter := time.Duration(rand.Int63n(int64(c.cfg.ApiKeyJitter)))
