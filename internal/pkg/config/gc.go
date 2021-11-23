@@ -7,18 +7,18 @@ package config
 import "time"
 
 const (
-	defaultScheduleInterval      = time.Hour
-	defaultCleanupBeforeInterval = 30 * 24 * time.Hour // cleanup expired actions with expiration time older than 30 days from now
+	defaultScheduleInterval            = time.Hour
+	defaultCleanupIntervalAfterExpired = "30d" // cleanup expired actions with expiration time older than 30 days from now
 )
 
 // GC is the configuration for the Fleet Server data garbage collection.
 // Currently manages the expired actions cleanup
 type GC struct {
-	ScheduleInterval     time.Duration `config:"schedule_interval"`
-	CleanupBeforeInteval time.Duration `config:"cleanup_before_interval"`
+	ScheduleInterval            time.Duration `config:"schedule_interval"`
+	CleanupAfterExpiredInterval string        `config:"cleanup_after_expired_interval"`
 }
 
 func (g *GC) InitDefaults() {
 	g.ScheduleInterval = defaultScheduleInterval
-	g.CleanupBeforeInteval = defaultCleanupBeforeInterval
+	g.CleanupAfterExpiredInterval = defaultCleanupIntervalAfterExpired
 }

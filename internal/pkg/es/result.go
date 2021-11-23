@@ -6,6 +6,7 @@ package es
 
 import (
 	"encoding/json"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
@@ -124,6 +125,15 @@ type Response struct {
 	} `json:"_shards"`
 	Hits         HitsT                  `json:"hits"`
 	Aggregations map[string]Aggregation `json:"aggregations,omitempty"`
+
+	Error ErrorT `json:"error,omitempty"`
+}
+
+type DeleteByQueryResponse struct {
+	Status   int    `json:"status"`
+	Took     uint64 `json:"took"`
+	TimedOut bool   `json:"timed_out"`
+	Deleted  int64  `json:"deleted"`
 
 	Error ErrorT `json:"error,omitempty"`
 }
