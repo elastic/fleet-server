@@ -12,24 +12,24 @@ import (
 )
 
 const (
-	defaultScheduleInterval      = time.Hour
-	defaultCleanupBeforeInterval = 30 * 24 * time.Hour // cleanup with expiration older than 30 days from now
+	defaultScheduleInterval            = time.Hour
+	defaultCleanupIntervalAfterExpired = "30d" // cleanup with expiration older than 30 days from now
 )
 
 // Schedules returns the GC schedules
-func Schedules(bulker bulk.Bulk, scheduleInterval, cleanupBeforeInterval time.Duration) []scheduler.Schedule {
+func Schedules(bulker bulk.Bulk, scheduleInterval time.Duration, cleanupIntervalAfterExpired string) []scheduler.Schedule {
 	if scheduleInterval == 0 {
 		scheduleInterval = defaultScheduleInterval
 	}
-	if cleanupBeforeInterval == 0 {
-		cleanupBeforeInterval = defaultCleanupBeforeInterval
+	if cleanupIntervalAfterExpired == "" {
+		cleanupIntervalAfterExpired = defaultCleanupIntervalAfterExpired
 	}
 
 	return []scheduler.Schedule{
 		{
 			Name:     "fleet actions cleanup",
 			Interval: scheduleInterval,
-			WorkFn:   getActionsGCFunc(bulker, cleanupBeforeInterval),
+			WorkFn:   getActionsGCFunc(bulker, cleanupIntervalAfterExpired),
 		},
 	}
 }
