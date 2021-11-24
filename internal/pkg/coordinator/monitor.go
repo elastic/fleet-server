@@ -9,7 +9,6 @@ import (
 	"errors"
 	"net"
 	"os"
-	"regexp"
 	"runtime"
 	"sync"
 	"time"
@@ -189,31 +188,15 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 	return nil
 }
 
-func isAvailabilityError(e error) bool {
-	if e == nil {
-		return false
-	}
-	match, err := regexp.MatchString("connect: connection refused$|net/http: timeout awaiting response headers$", e.Error())
-	if err != nil {
-		log.Warn().Err(err).Msg("Error occured while parsing error message")
-		return false
-	}
-	return match
-}
-
 // ensureLeadership ensures leadership is held or needs to be taken over.
 func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	m.log.Debug().Msg("ensuring leadership of policies")
 	err := dl.EnsureServer(ctx, m.bulker, m.version, m.agentMetadata, m.hostMetadata, dl.WithIndexName(m.serversIndex))
 
-	// If we are doing a read on an unavailable ES instance ignore it and we will check back later.
-	if isAvailabilityError(err) {
-		log.Info().Err(err).Msgf("Encountered availability error while attempting ES read; continuing to retry.")
-		return nil
-	}
-
+	// If we run into problems communicating with our ES instance, ignore it and we will check back later.
 	if err != nil {
-		return err
+		log.Info().Err(err).Msgf("Encountered an error while trying to commnuicate with Elasticsearch host %s; continuing to retry.", m.hostMetadata.Name)
+		return nil
 	}
 
 	// fetch current policies and leaders
