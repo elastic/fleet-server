@@ -7,6 +7,7 @@ package coordinator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"runtime"
@@ -139,7 +140,6 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 			mT.Reset(m.metadataInterval)
 		case <-lT.C:
 			err = m.ensureLeadership(ctx)
-			// If we run into problems communicating with our ES instance, ignore it and we will check back later.
 			if err != nil {
 				m.log.Info().Err(err).Msgf("Encountered an error while checking/assigning policy leaders; continuing to retry.")
 			}
@@ -197,8 +197,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	err := dl.EnsureServer(ctx, m.bulker, m.version, m.agentMetadata, m.hostMetadata, dl.WithIndexName(m.serversIndex))
 
 	if err != nil {
-		m.log.Debug().Err(err).Str("eshost", m.hostMetadata.Name).Msg("Failed to ")
-		return err
+		return errors.New(fmt.Sprintf("Failed to check server status on Elasticsearch (%s): %s", m.hostMetadata.Name, err.Error()))
 	}
 
 	// fetch current policies and leaders
@@ -209,8 +208,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 			m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
 			return nil
 		}
-		m.log.Debug().Err(err).Msg("Encountered error while querying policies")
-		return err
+		return errors.New(fmt.Sprintf("Encountered error while querying policies: %s", err.Error()))
 	}
 	if len(policies) > 0 {
 		ids := make([]string, len(policies))
@@ -220,8 +218,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		leaders, err = dl.SearchPolicyLeaders(ctx, m.bulker, ids, dl.WithIndexName(m.leadersIndex))
 		if err != nil {
 			if !errors.Is(err, es.ErrIndexNotFound) {
-				m.log.Debug().Err(err).Msg("Encountered error while fetching policy leaders")
-				return err
+				return errors.New(fmt.Sprintf("Encountered error while fetching policy leaders: %s", err.Error()))
 			}
 		}
 	}
