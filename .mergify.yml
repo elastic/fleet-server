@@ -1,3 +1,8 @@
+queue_rules:
+  - name: default
+    conditions:
+      - check-success=fleet-server/pr-merge
+
 pull_request_rules:
   - name: ask to resolve conflict
     conditions:
@@ -98,18 +103,18 @@ pull_request_rules:
       - label=backport
       - author=mergify[bot]
     actions:
-      merge:
+      queue:
         method: squash
-        strict: smart+fasttrack
+        name: default
   - name: automatic merge when CI passes and the file dev-tools/integration/.env is modified.
     conditions:
       - check-success=fleet-server/pr-merge
       - label=automation
       - files~=^dev-tools/integration/.env$
     actions:
-      merge:
+      queue:
         method: squash
-        strict: smart+fasttrack
+        name: default
   - name: delete upstream branch with changes on dev-tools/integration/.env or .go-version after merging/closing it
     conditions:
       - or:
