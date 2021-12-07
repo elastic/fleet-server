@@ -895,6 +895,26 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) (*apm.Tracer, error
 
 	log.Info().Msg("fleet-server instrumentation is enabled")
 
+	// TODO(marclop): Ideally, we'd use apmtransport.NewHTTPTransportOptions()
+	// but it doesn't exist today. Update this code once we have something
+	// available via the APM Go agent.
+	const (
+		envVerifyServerCert = "ELASTIC_APM_VERIFY_SERVER_CERT"
+		envServerCert       = "ELASTIC_APM_SERVER_CERT"
+		envCACert           = "ELASTIC_APM_SERVER_CA_CERT_FILE"
+	)
+	if cfg.TLS.SkipVerify {
+		os.Setenv(envVerifyServerCert, "false")
+		defer os.Unsetenv(envVerifyServerCert)
+	}
+	if cfg.TLS.ServerCertificate != "" {
+		os.Setenv(envServerCert, cfg.TLS.ServerCertificate)
+		defer os.Unsetenv(envServerCert)
+	}
+	if cfg.TLS.ServerCA != "" {
+		os.Setenv(envCACert, cfg.TLS.ServerCA)
+		defer os.Unsetenv(envCACert)
+	}
 	transport, err := apmtransport.NewHTTPTransport()
 	if err != nil {
 		return nil, err
