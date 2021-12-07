@@ -103,8 +103,9 @@ func TestConfig(t *testing.T) {
 					{
 						Type: "fleet-server",
 						Server: Server{
-							Host: "localhost",
-							Port: 8888,
+							Host:         "localhost",
+							Port:         8888,
+							InternalPort: 8221,
 							Timeouts: ServerTimeouts{
 								Read:             20 * time.Second,
 								ReadHeader:       5 * time.Second,
