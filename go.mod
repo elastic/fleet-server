@@ -17,7 +17,6 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mailru/easyjson v0.7.7
 	github.com/miolini/datacounter v1.0.2
-	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
 	github.com/rs/zerolog v1.22.0

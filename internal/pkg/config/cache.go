@@ -27,7 +27,11 @@ type Cache struct {
 }
 
 func (c *Cache) InitDefaults() {
-	l := loadLimits().Cache
+	c.LoadLimits(initLimits())
+}
+
+func (c *Cache) LoadLimits(limits *envLimits) {
+	l := limits.Cache
 
 	c.NumCounters = l.NumCounters
 	c.MaxCost = l.MaxCost

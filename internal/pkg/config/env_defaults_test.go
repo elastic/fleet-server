@@ -14,23 +14,23 @@ import (
 
 func TestLoadLimits(t *testing.T) {
 	testCases := []struct {
-		Name           string
-		CurrentRAM     int
-		ExpectedMaxRAM int
+		Name                 string
+		ConfiguredAgentLimit int
+		ExpectedAgentLimit   int
 	}{
-		{"low ram", 128, 1024},
-		{"512", 512, 1024},
-		{"precise", 1024, 1024},
-		{"2-to-4", 2650, 4096},
-		{"close to max", 16383, 16384},
-		{"above max", 16385, int(getMaxInt())},
+		{"few agents", 5, 50},
+		{"512", 512, 5000},
+		{"precise", 7500, 7500},
+		{"10k", 10050, 12500},
+		{"close to max", 13000, 30000},
+		{"above max", 30001, int(getMaxInt())},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			l := loadLimitsForRam(tc.CurrentRAM)
+			l := loadLimitsForAgents(tc.ConfiguredAgentLimit)
 
-			require.Equal(t, tc.ExpectedMaxRAM, l.RAM.Max)
+			require.Equal(t, tc.ExpectedAgentLimit, l.Agents.Max)
 		})
 	}
 }

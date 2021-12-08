@@ -121,11 +121,11 @@ func TestConfig(t *testing.T) {
 							},
 							CompressionLevel:  1,
 							CompressionThresh: 1024,
-							Limits:            defaultServerLimits(),
+							Limits:            generateServerLimits(12500),
 							Bulk:              defaultServerBulk(),
 							GC:                defaultServerGC(),
 						},
-						Cache: defaultCache(),
+						Cache: generateCache(12500),
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,
@@ -163,6 +163,8 @@ func TestConfig(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
+				err = cfg.LoadServerLimits()
+				require.NoError(t, err)
 				if !assert.True(t, cmp.Equal(test.cfg, cfg)) {
 					diff := cmp.Diff(test.cfg, cfg)
 					if diff != "" {
@@ -182,13 +184,26 @@ func defaultCache() Cache {
 	return d
 }
 
+func generateCache(maxAgents int) Cache {
+	var d Cache
+	d.LoadLimits(loadLimits(maxAgents))
+	return d
+}
+
 func defaultServerTimeouts() ServerTimeouts {
 	var d ServerTimeouts
 	d.InitDefaults()
 	return d
 }
 
-func defaultServerLimits() ServerLimits {
+func generateServerLimits(maxAgents int) ServerLimits {
+	var d ServerLimits
+	d.MaxAgents = maxAgents
+	d.LoadLimits(loadLimits(maxAgents))
+	return d
+}
+
+func defaultServerLimits(maxAgents int) ServerLimits {
 	var d ServerLimits
 	d.InitDefaults()
 	return d

@@ -47,6 +47,22 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+func (c *Config) LoadServerLimits() error {
+	// LoadServerLimits should be called after initialization, so we may access the user defined
+	// agent limit setting.
+	err := c.Validate()
+	if err != nil {
+		return err
+	}
+
+	fleetInput := &c.Inputs[0]
+	agentLimits := loadLimits(fleetInput.Server.Limits.MaxAgents)
+	fleetInput.Cache.LoadLimits(agentLimits)
+	fleetInput.Server.Limits.LoadLimits(agentLimits)
+
+	return nil
+}
+
 // Merge merges two configurations together.
 func (c *Config) Merge(other *Config) (*Config, error) {
 	repr, err := ucfg.NewFrom(c, DefaultOptions...)

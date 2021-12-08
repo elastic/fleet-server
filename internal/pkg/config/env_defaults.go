@@ -14,7 +14,6 @@ import (
 
 	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
 	"github.com/elastic/go-ucfg/yaml"
-	"github.com/pbnjay/memory"
 	"github.com/pkg/errors"
 )
 
@@ -52,14 +51,14 @@ type valueRange struct {
 }
 
 type envLimits struct {
-	RAM    valueRange           `config:"ram"`
+	Agents valueRange           `config:"num_agents"`
 	Server *serverLimitDefaults `config:"server_limits"`
 	Cache  *cacheLimits         `config:"cache_limits"`
 }
 
 func defaultEnvLimits() *envLimits {
 	return &envLimits{
-		RAM: valueRange{
+		Agents: valueRange{
 			Min: 0,
 			Max: int(getMaxInt()),
 		},
@@ -133,13 +132,14 @@ var defaults []*envLimits
 
 func init() {
 	// Packed Files
-	// internal/pkg/config/defaults/1024_limits.yml
-	// internal/pkg/config/defaults/2048_limits.yml
-	// internal/pkg/config/defaults/4096_limits.yml
-	// internal/pkg/config/defaults/8192_limits.yml
-	// internal/pkg/config/defaults/base_limits.yml
+	// internal/pkg/config/defaults/gte10000_limits.yml
+	// internal/pkg/config/defaults/gte12500_limits.yml
+	// internal/pkg/config/defaults/gte5000_limits.yml
+	// internal/pkg/config/defaults/gte50_limits.yml
+	// internal/pkg/config/defaults/gte7500_limits.yml
+	// internal/pkg/config/defaults/lt50_limits.yml
 	// internal/pkg/config/defaults/max_limits.yml
-	unpacked := packer.MustUnpack("eJzsll9vqkgYxu/3Y/R6swUUc9zkXIyOIDQzRoP8u9kwYBEO/1KxMGz2u28GwbZCFZtNerOXTvCZd97nN887fz8ESb57SZzoMfvlP7pp8hz4j97u2TlG+eGR54TxX1EQB/nhDxpHD38+uLGUr/zUV2Q+I2HqIw1QDOrf+x1MfRQCbgWy0DJwauvTg2PwmbdEk3kAfJLouSngV88QOdtUq1UAKIKgQO3/pWlIRpg7rf8aIW1LEcgq21QF21SfiRzljrmp6v2Xs1ciR+FOn3LOUn31lpuDraU+1ma5W7zTE8SjbWDOMaZHt0p9XLX74dQ28ItjiI3uuq5Rmc8ykmwiN7H3BKY+NviqWQ88U608tqaBolnLLdOfKHBbILh4UuazvZtsMjuWQk9qzg5T/+u6iwJBwHQjkqivRC7PtSrsDHPgO6deCpZRTBSoFMRET2xdkVXeTepe8qj5lhjSeBWAstHcW0J+/ezy4Bp/Pvx+nSSBG/+4QVJNzhtJGAIR+4NJ4j4hif8qSegGSUgDrTuhI+uhI0RHUygzYkRcrdtxRz3pzYFvJTp1R+t3DoO3c1fbAq3ZvhL15Ci2DMyddYP22+joyTr1YunAbkuP68zlC6eUO2la9NFUXtaLwtM+loFf/ovzMz0Eft4kasxNJ9eJOhH0RtQKLkQ0nKjxJ0SVCK7HWHMFVrkrMBd02p7crVLW4YIIZWaNomdP3lMy2nBE3k4UqF8nKryXKKmno0q3ozWp9+UT6smnkzMfsoRrKbMNkRKhPNwgtUQ9mYI6maI0fZdChz/X2avXQyjtkr8elFE/+KlwnagTQe+mnWZVK7h+sgSJOfYxV2SRJzqjRq8rPmWGVbTVsQ4y4lrXVppbYo2d/M6J1zjV6pFYjKzRJiOCyCiuzq4NnXgaKLxuV7luVxcUa6Cs776pco5h763R5kambAu01LtTBXbIGn8zWTyCM757u9ad27WCw/KKOIfdp3S195TiO99OV0i6M5uUou3gJySV92XTtm96ULzuf4sMziUN9E+lyzdO7bJ+dOPpgXxNk7985wybcr1Tk17UR4cQEzvlrcf398cPir8tfngE/4+fc/z889u/AQAA///e0qUb")
+	unpacked := packer.MustUnpack("eJzsl0uPqkgUx/fzMVxPpilsnDhJL7BRxJsqoxEK2EwoUIRbPNKiPCbz3SfFw7EFrzC5SW9mScB/nTrnd/7n+NfIC5P9R2jRl/i7+2JH4cFzX5z9wTrT5PTiJnvAcRz3J/UCLzn9lgd09MeIhFqi84vQxAJnF9E35X2WWPh1okjzFEpi+u6JLsGL17UnZtBXUyjGvoFRZGrTk4VB7CzhpPym1EEXBwucqa8K9j3yRaZRahr68WDw08KRIhf6ooCKOYC+mL6HiNqhSW36Wc+W2TMS9PE2soMp58gZXXsiIDq81TuTQPMdmV5ICCeKBPMmZoM/UoNPYtLoSuxuoqvI9OzIWu4EixPTg9IM2GnksndGqOX2eDNRpE0dN/seHPcs5p0CoDRnZx/tcBubwcJ3Fldtl52pvM9iEm7ZfY5Eily0E1OnjJfprIAdIm7tiVwTY3UPd6JIbpMnSsLVhcjZgcg0sfTNRBGr2Kwqr7yB07I2pK2btWL261xg9KHzWUww5dZul56awqVW1DF5jr4q64QkMYX1+TUDryz20a/PSeOFAaTlLFM3pBWwPPlLScu/jjQ1/Z+03qQJAyxNvYGEJcMG7NngF74la3UitkUZuCwAok19MtbKItpFHWQHZGh3heybzbOCa3mThPr8lPBZbIzpwZGPORlvOSKrN8l9BNm/FtwTsvxBse4gsAdbGQxAq2hw1yratSlMLOSEz05XGDyxK94Myt26n+NVqnPkhW+Bn3F/heX1rRdc/dG68S9QHhmgIyvbHQpnBwNWalClFzbhXH/PvK3yBiVd7+wM7ZTBU7JJa6NHAoEa421MeIH55Xiod3WkFdx7APMguCnLlDsyDQyMuCfl76V7xUzWznYwPZFnqPqzpO2z6h0C875Icf1jfOuD1O8DBqMNPvtV7Qe9wXIfgDVPkeQCVBhsyBbMnE199dn/lrMLkam/16actVxdnOX2ZO4iF+EfgpXDxshlFJkYfVhYuA6YzmLhjv73W75S9vBAuLKOwuVtL9h88UBcdMCqtJaCakA+B4wmfSyrurk61KIer1fuMIpYdp5OvgEUoV1XyyvgQcv3JghKXbrzlpUMmnidmuq9nZTT2eCTH3dP971b0+4ZNYGV9bUkONCC4I0lgON+wVaqphW/j+FOZe8Hrk1adelGjxfOJkachadntqbB4gorW+t8i6fnn7ST5v9lxvXd+9fSwDnXWfx510rWC6aB/yHeRn//8k8AAAD//8exhc0=")
 
 	for f, v := range unpacked {
 		cfg, err := yaml.NewConfig(v, DefaultOptions...)
@@ -156,15 +156,18 @@ func init() {
 	}
 }
 
-func loadLimits() *envLimits {
-	ramSize := int(memory.TotalMemory() / 1024 / 1024)
-	return loadLimitsForRam(ramSize)
+func initLimits() *envLimits {
+	return loadLimits(0)
 }
 
-func loadLimitsForRam(currentRAM int) *envLimits {
+func loadLimits(agentLimit int) *envLimits {
+	return loadLimitsForAgents(agentLimit)
+}
+
+func loadLimitsForAgents(agentLimit int) *envLimits {
 	for _, l := range defaults {
-		// get max possible config for current env
-		if l.RAM.Min < currentRAM && currentRAM <= l.RAM.Max {
+		// get nearest limits for configured agent numbers
+		if l.Agents.Min < agentLimit && agentLimit <= l.Agents.Max {
 			return l
 		}
 	}
