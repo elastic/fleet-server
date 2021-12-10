@@ -107,7 +107,7 @@ func runServer(ctx context.Context, router http.Handler, cfg *config.Server) err
 			if err != nil {
 				return err
 			}
-			server.TLSConfig = commonTlsCfg.ToConfig()
+			server.TLSConfig = commonTlsCfg.BuildServerConfig(cfg.Host)
 
 			// Must enable http/2 in the configuration explicitly.
 			// (see https://golang.org/pkg/net/http/#Server.Serve)
