@@ -10,3 +10,7 @@
 {"name": "github.com/xeipuuv/gojsonpointer", "licenceType": "Apache-2.0"}
 {"name": "github.com/xeipuuv/gojsonreference", "licenceType": "Apache-2.0"}
 {"name": "github.com/xeipuuv/gojsonschema", "licenceType": "Apache-2.0"}
+{"name": "github.com/hashicorp/cronexpr", "licenceType": "Apache-2.0"}
+{"name": "gopkg.in/yaml.v1", "licenceType": "Apache-2.0"}
+{"name": "kernel.org/pub/linux/libs/security/libcap/cap", "licenceType": "BSD-3-Clause", "note": "dual licensed as GPL-v2 and BSD"}
+{"name": "kernel.org/pub/linux/libs/security/libcap/psx", "licenceType": "BSD-3-Clause", "note": "dual licensed as GPL-v2 and BSD"}
