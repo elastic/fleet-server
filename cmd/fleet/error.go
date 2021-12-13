@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
@@ -141,6 +142,17 @@ func NewErrorResp(err error) errResp {
 	for _, e := range errTable {
 		if errors.Is(err, e.target) {
 			return e.meta
+		}
+	}
+
+	// Check if we have encountered a connectivity error
+	// Predicate taken from https://github.com/golang/go/blob/master/src/net/dial_test.go#L810
+	if strings.Contains(err.Error(), "connection refused") {
+		return errResp{
+			http.StatusServiceUnavailable,
+			"ServiceUnavailable",
+			"Fleet server unable to communicate with Elasticsearch",
+			zerolog.InfoLevel,
 		}
 	}
 
