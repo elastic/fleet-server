@@ -231,8 +231,6 @@ func defaultElastic() Elasticsearch {
 	return Elasticsearch{
 		Protocol:       "http",
 		Hosts:          []string{"localhost:9200"},
-		Username:       "elastic",
-		Password:       "changeme",
 		MaxRetries:     3,
 		MaxConnPerHost: 128,
 		Timeout:        90 * time.Second,

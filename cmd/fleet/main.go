@@ -568,10 +568,6 @@ func redactOutputCfg(cfg *config.Config) config.Output {
 	const kRedacted = "[redacted]"
 	redacted := cfg.Output
 
-	if redacted.Elasticsearch.Password != "" {
-		redacted.Elasticsearch.Password = kRedacted
-	}
-
 	if redacted.Elasticsearch.APIKey != "" {
 		redacted.Elasticsearch.APIKey = kRedacted
 	}
