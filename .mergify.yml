@@ -32,6 +32,20 @@ pull_request_rules:
         labels:
           - "backport"
         title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
+  - name: backport patches to 7.17 branch
+    conditions:
+      - merged
+      - base=master
+      - label=backport-v7.17.0
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "7.16"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
   - name: backport patches to 7.16 branch
     conditions:
       - merged
