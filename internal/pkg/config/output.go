@@ -55,7 +55,7 @@ func (c *Elasticsearch) InitDefaults() {
 // Validate ensures that the configuration is valid.
 func (c *Elasticsearch) Validate() error {
 	if c.APIKey != "" {
-		return fmt.Errorf("cannot connect to elasticsearch with api_key; must use username/password")
+		return fmt.Errorf("cannot connect to elasticsearch with api_key; must use service_token")
 	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
 		if _, err := common.ParseURL(c.ProxyURL); err != nil {

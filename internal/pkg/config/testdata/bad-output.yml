@@ -1,8 +1,7 @@
 output:
   elasticsearch:
     hosts: ["localhost:9200"]
-    username: "elastic"
-    password: "changeme"
+    service_token: "test-token"
   error:
     bad: "should not be here"
 fleet:
