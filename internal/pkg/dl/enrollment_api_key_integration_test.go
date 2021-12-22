@@ -54,6 +54,7 @@ func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index st
 }
 
 func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -84,6 +85,7 @@ func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
 }
 
 func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
