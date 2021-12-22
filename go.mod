@@ -29,7 +29,10 @@ require (
 	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6
 )
 
-require go.elastic.co/ecszerolog v0.1.0
+require (
+	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
+	go.elastic.co/ecszerolog v0.1.0
+)
 
 require (
 	github.com/Microsoft/go-winio v0.5.1 // indirect

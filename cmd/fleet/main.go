@@ -154,16 +154,15 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
-			err = cfg.LoadServerLimits()
-			if err != nil {
-				return err
-			}
-
 			l, err = initLogger(cfg, bi.Version, bi.Commit)
 			if err != nil {
 				return err
 			}
 
+			err = cfg.LoadServerLimits()
+			if err != nil {
+				return err
+			}
 			srv, err := NewFleetServer(cfg, bi, status.NewLog())
 			if err != nil {
 				return err
