@@ -32,8 +32,6 @@ type Elasticsearch struct {
 	Hosts          []string          `config:"hosts"`
 	Path           string            `config:"path"`
 	Headers        map[string]string `config:"headers"`
-	Username       string            `config:"username"`
-	Password       string            `config:"password"`
 	APIKey         string            `config:"api_key"`
 	ServiceToken   string            `config:"service_token"`
 	ProxyURL       string            `config:"proxy_url"`
@@ -57,7 +55,7 @@ func (c *Elasticsearch) InitDefaults() {
 // Validate ensures that the configuration is valid.
 func (c *Elasticsearch) Validate() error {
 	if c.APIKey != "" {
-		return fmt.Errorf("cannot connect to elasticsearch with api_key; must use username/password")
+		return fmt.Errorf("cannot connect to elasticsearch with api_key; must use service_token")
 	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
 		if _, err := common.ParseURL(c.ProxyURL); err != nil {
@@ -152,8 +150,6 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 
 	return elasticsearch.Config{
 		Addresses:    addrs,
-		Username:     c.Username,
-		Password:     c.Password,
 		ServiceToken: c.ServiceToken,
 		Header:       h,
 		Transport:    httpTransport,

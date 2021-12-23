@@ -1,11 +1,10 @@
-# This sample configuration file demonstrates tweaks to limit the resource usage 
+# This sample configuration file demonstrates tweaks to limit the resource usage
 # of a very small (100 agent) installation.  Target is 1 CPU, 50MiB RAM.
 
 output:
   elasticsearch:
     hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
-    username: '${ELASTICSEARCH_USERNAME:elastic}'
-    password: '${ELASTICSEARCH_PASSWORD:changeme}'
+    service_token: '${ELASTICSEARCH_SERVICE_TOKEN}'
 
 fleet:
   agent:
@@ -22,8 +21,8 @@ inputs:
         checkin_limit:
           interval: 50ms        # Check in no faster than 20 per second.
           burst: 25             # Allow burst up to 25, then fall back to interval rate.
-          max: 100              # No more than 100 long polls allowed. THIS EFFECTIVELY LIMITS MAX ENDPOINTS. 
-        artifact_limit:     
+          max: 100              # No more than 100 long polls allowed. THIS EFFECTIVELY LIMITS MAX ENDPOINTS.
+        artifact_limit:
           interval: 100ms       # Roll out 10 artifacts per second
           burst: 10             # Small burst prevents outbound buffer explosion.
           max: 10               # Only 10 transactions at a time max.  This should generally not be a relavent limitation as the transactions are cached.
@@ -44,7 +43,7 @@ inputs:
         flush_interval: 100ms   # Flush ES bulk queues on this interval.
       runtime:
         gc_percent: 20          # Force the GC to execute more frequently: see https://golang.org/pkg/runtime/debug/#SetGCPercent
- 
-        
+
+
 http:
   enabled: true                 # Enable metrics on http://localhost:5066/stats

@@ -21,6 +21,7 @@ import (
 )
 
 func TestSearchPolicyLeaders(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -54,6 +55,7 @@ func TestSearchPolicyLeaders(t *testing.T) {
 }
 
 func TestTakePolicyLeadership(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -89,6 +91,7 @@ func TestTakePolicyLeadership(t *testing.T) {
 }
 
 func TestReleasePolicyLeadership(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -129,6 +132,7 @@ func TestReleasePolicyLeadership(t *testing.T) {
 }
 
 func TestReleasePolicyLeadership_NothingIfNotLeader(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 

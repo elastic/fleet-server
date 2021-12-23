@@ -31,18 +31,16 @@ func TestToESConfig(t *testing.T) {
 			cfg: Elasticsearch{
 				Protocol:       "http",
 				Hosts:          []string{"localhost:9200"},
-				Username:       "elastic",
-				Password:       "changeme",
+				ServiceToken:   "test-token",
 				MaxRetries:     3,
 				MaxConnPerHost: 128,
 				Timeout:        90 * time.Second,
 			},
 			result: elasticsearch.Config{
-				Addresses:  []string{"http://localhost:9200"},
-				Username:   "elastic",
-				Password:   "changeme",
-				Header:     http.Header{},
-				MaxRetries: 3,
+				Addresses:    []string{"http://localhost:9200"},
+				ServiceToken: "test-token",
+				Header:       http.Header{},
+				MaxRetries:   3,
 				Transport: &http.Transport{
 					TLSHandshakeTimeout:   10 * time.Second,
 					MaxIdleConns:          100,
@@ -56,10 +54,9 @@ func TestToESConfig(t *testing.T) {
 		},
 		"multi-http": {
 			cfg: Elasticsearch{
-				Protocol: "http",
-				Hosts:    []string{"localhost:9200", "other-host:9200"},
-				Username: "other",
-				Password: "pass",
+				Protocol:     "http",
+				Hosts:        []string{"localhost:9200", "other-host:9200"},
+				ServiceToken: "test-token",
 				Headers: map[string]string{
 					"X-Custom-Header": "Header-Value",
 				},
@@ -68,11 +65,10 @@ func TestToESConfig(t *testing.T) {
 				Timeout:        120 * time.Second,
 			},
 			result: elasticsearch.Config{
-				Addresses:  []string{"http://localhost:9200", "http://other-host:9200"},
-				Username:   "other",
-				Password:   "pass",
-				Header:     http.Header{"X-Custom-Header": {"Header-Value"}},
-				MaxRetries: 6,
+				Addresses:    []string{"http://localhost:9200", "http://other-host:9200"},
+				ServiceToken: "test-token",
+				Header:       http.Header{"X-Custom-Header": {"Header-Value"}},
+				MaxRetries:   6,
 				Transport: &http.Transport{
 					TLSHandshakeTimeout:   10 * time.Second,
 					MaxIdleConns:          100,
@@ -86,10 +82,9 @@ func TestToESConfig(t *testing.T) {
 		},
 		"https": {
 			cfg: Elasticsearch{
-				Protocol: "https",
-				Hosts:    []string{"localhost:9200", "other-host:9200"},
-				Username: "other",
-				Password: "pass",
+				Protocol:     "https",
+				Hosts:        []string{"localhost:9200", "other-host:9200"},
+				ServiceToken: "test-token",
 				Headers: map[string]string{
 					"X-Custom-Header": "Header-Value",
 				},
@@ -101,11 +96,10 @@ func TestToESConfig(t *testing.T) {
 				},
 			},
 			result: elasticsearch.Config{
-				Addresses:  []string{"https://localhost:9200", "https://other-host:9200"},
-				Username:   "other",
-				Password:   "pass",
-				Header:     http.Header{"X-Custom-Header": {"Header-Value"}},
-				MaxRetries: 6,
+				Addresses:    []string{"https://localhost:9200", "https://other-host:9200"},
+				ServiceToken: "test-token",
+				Header:       http.Header{"X-Custom-Header": {"Header-Value"}},
+				MaxRetries:   6,
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
 						InsecureSkipVerify: true,
@@ -124,10 +118,9 @@ func TestToESConfig(t *testing.T) {
 		},
 		"mixed-https": {
 			cfg: Elasticsearch{
-				Protocol: "http",
-				Hosts:    []string{"localhost:9200", "https://other-host:9200"},
-				Username: "other",
-				Password: "pass",
+				Protocol:     "http",
+				Hosts:        []string{"localhost:9200", "https://other-host:9200"},
+				ServiceToken: "test-token",
 				Headers: map[string]string{
 					"X-Custom-Header": "Header-Value",
 				},
@@ -139,11 +132,10 @@ func TestToESConfig(t *testing.T) {
 				},
 			},
 			result: elasticsearch.Config{
-				Addresses:  []string{"http://localhost:9200", "https://other-host:9200"},
-				Username:   "other",
-				Password:   "pass",
-				Header:     http.Header{"X-Custom-Header": {"Header-Value"}},
-				MaxRetries: 6,
+				Addresses:    []string{"http://localhost:9200", "https://other-host:9200"},
+				ServiceToken: "test-token",
+				Header:       http.Header{"X-Custom-Header": {"Header-Value"}},
+				MaxRetries:   6,
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
 						InsecureSkipVerify: true,
