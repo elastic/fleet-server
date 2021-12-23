@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 
+	"github.com/elastic/beats/v7/libbeat/common/cfgwarn"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/rs/zerolog/log"
 )
@@ -22,6 +23,9 @@ type ConfigOption func(config elasticsearch.Config)
 
 func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...ConfigOption) (*elasticsearch.Client, error) {
 	escfg, err := cfg.Output.Elasticsearch.ToESConfig(longPoll)
+	if escfg.Password != "" {
+		cfgwarn.Deprecate("8.0.0", "Basic authentication (username:password) is deprecated. Please use api_key.")
+	}
 	if err != nil {
 		return nil, err
 	}

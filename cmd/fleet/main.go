@@ -36,6 +36,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
+	"github.com/elastic/beats/v7/libbeat/common/cfgwarn"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/hashicorp/go-version"
@@ -559,6 +560,7 @@ func redactOutputCfg(cfg *config.Config) config.Output {
 	redacted := cfg.Output
 
 	if redacted.Elasticsearch.Password != "" {
+		cfgwarn.Deprecate("8.0.0", "Basic authentication (username:password) is deprecated. Please use api_key.")
 		redacted.Elasticsearch.Password = kRedacted
 	}
 
