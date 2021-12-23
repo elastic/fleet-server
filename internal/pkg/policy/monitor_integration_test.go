@@ -31,6 +31,7 @@ func setupIndex(ctx context.Context, t *testing.T) (string, bulk.Bulk) {
 }
 
 func TestMonitor_Integration(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
