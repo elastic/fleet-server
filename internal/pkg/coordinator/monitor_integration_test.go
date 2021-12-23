@@ -30,6 +30,7 @@ import (
 )
 
 func TestMonitorLeadership(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	parentCtx := context.Background()
 	bulkCtx, bulkCn := context.WithCancel(parentCtx)
 	defer bulkCn()
@@ -114,6 +115,7 @@ func TestMonitorLeadership(t *testing.T) {
 }
 
 func TestMonitorUnenroller(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	parentCtx := context.Background()
 	bulkCtx, bulkCn := context.WithCancel(parentCtx)
 	defer bulkCn()

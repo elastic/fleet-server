@@ -26,8 +26,7 @@ var defaultCfgData = []byte(`
 output:
   elasticsearch:
     hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
-    username: '${ELASTICSEARCH_USERNAME:elastic}'
-    password: '${ELASTICSEARCH_PASSWORD:changeme}'
+    service_token: '${ELASTICSEARCH_SERVICE_TOKEN}'
 fleet:
   agent:
     id: 1e4954ce-af37-4731-9f4a-407b08e69e42

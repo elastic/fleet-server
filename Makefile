@@ -27,7 +27,7 @@ endif
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
 COMMIT=$(shell git rev-parse --short HEAD)
 NOW=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
-LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=$(NOW) 
+LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=$(NOW)
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
 CMD_COLOR_OFF=\033[0m
 
@@ -214,4 +214,4 @@ test-int: prepare-test-context  ## - Run integration tests with full setup (slow
 .PHONY: test-int-set
 test-int-set: ## - Run integration tests without setup
 	# Initialize indices one before running all the tests
-	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go test -v -tags=integration -count=1 -race ./...
+	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go test -v -tags=integration -count=1 -race ./...

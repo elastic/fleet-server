@@ -47,6 +47,7 @@ func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string) (mod
 }
 
 func TestQueryLatestPolicies(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -76,6 +77,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 }
 
 func TestCreatePolicy(t *testing.T) {
+	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 

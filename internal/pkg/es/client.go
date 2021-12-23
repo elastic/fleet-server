@@ -27,7 +27,6 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 		return nil, err
 	}
 	addr := cfg.Output.Elasticsearch.Hosts
-	user := cfg.Output.Elasticsearch.Username
 	mcph := cfg.Output.Elasticsearch.MaxConnPerHost
 
 	// Apply configuration options
@@ -37,7 +36,6 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 
 	zlog := log.With().
 		Strs("cluster.addr", addr).
-		Str("cluster.user", user).
 		Int("cluster.maxConnsPersHost", mcph).
 		Logger()
 
