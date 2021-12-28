@@ -74,7 +74,6 @@ func updateAgentMetadata(ctx context.Context, bulker bulk.Bulk, body []byte) (in
 	opts := []func(*esapi.UpdateByQueryRequest){
 		client.UpdateByQuery.WithBody(reader),
 		client.UpdateByQuery.WithContext(ctx),
-		client.UpdateByQuery.WithRefresh(true),
 		client.UpdateByQuery.WithConflicts("proceed"),
 	}
 

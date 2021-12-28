@@ -8,7 +8,10 @@
 package testing
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/elastic/go-elasticsearch/v7"
@@ -17,8 +20,10 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testutil"
 )
 
 var defaultCfg config.Config
@@ -79,4 +84,68 @@ func SetupIndexWithBulk(ctx context.Context, t *testing.T, mapping string, opts 
 	bulker := SetupBulk(ctx, t, opts...)
 	index := SetupIndex(ctx, t, bulker, mapping)
 	return index, bulker
+}
+
+func SetupCleanIndex(ctx context.Context, t *testing.T, index string, opts ...bulk.BulkOpt) (string, bulk.Bulk) {
+	CleanIndex(ctx, t, index)
+
+	bulker := SetupBulk(ctx, t, opts...)
+	return index, bulker
+}
+
+func CleanIndex(ctx context.Context, t *testing.T, index string) string {
+	t.Helper()
+	e := testutil.GetEnvironment()
+
+	// Elevated ES client for cleanup permissions
+	cli, err := es.NewClient(ctx, &defaultCfg, false, es.WithUsrPwd(e.Username, e.Password))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	DeleteAll(ctx, t, cli, index)
+	return index
+}
+
+func DeleteAll(ctx context.Context, t *testing.T, cli *elasticsearch.Client, index string) {
+	t.Helper()
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	root.Query().MatchAll()
+	q := tmpl.MustResolve(root)
+
+	query, err := q.Render(make(map[string]interface{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := cli.API.DeleteByQuery([]string{index}, bytes.NewReader(query),
+		cli.API.DeleteByQuery.WithContext(ctx),
+		cli.API.DeleteByQuery.WithRefresh(true),
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer res.Body.Close()
+	var esres es.DeleteByQueryResponse
+
+	err = json.NewDecoder(res.Body).Decode(&esres)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.IsError() {
+		err = es.TranslateError(res.StatusCode, &esres.Error)
+		if err != nil {
+			if errors.Is(err, es.ErrIndexNotFound) {
+				err = nil
+			}
+		}
+	}
+
+	if err != nil {
+		t.Fatal(err)
+	}
 }
