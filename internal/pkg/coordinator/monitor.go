@@ -128,11 +128,17 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 	// Start timer loop to ensure leadership
 	lT := time.NewTimer(m.checkInterval)
 	defer lT.Stop()
+
+	// Keep track of errored statuses
+	erroredOnLastRequest := false
+	numFailedRequests := 0
 	for {
 		select {
 		case hits := <-s.Output():
 			err = m.handlePolicies(ctx, hits)
 			if err != nil {
+				erroredOnLastRequest = true
+				numFailedRequests++
 				m.log.Warn().Err(err).Msgf("Encountered an error while policy leadership changes; continuing to retry.")
 			}
 		case <-mT.C:
@@ -141,12 +147,19 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 		case <-lT.C:
 			err = m.ensureLeadership(ctx)
 			if err != nil {
+				erroredOnLastRequest = true
+				numFailedRequests++
 				m.log.Warn().Err(err).Msgf("Encountered an error while checking/assigning policy leaders; continuing to retry.")
 			}
 			lT.Reset(m.checkInterval)
 		case <-ctx.Done():
 			m.releaseLeadership()
 			return ctx.Err()
+		}
+		if err == nil && erroredOnLastRequest {
+			erroredOnLastRequest = false
+			m.log.Info().Msgf("Policy leader monitor successfully recovered after %d attempts", numFailedRequests)
+			numFailedRequests = 0
 		}
 	}
 }
