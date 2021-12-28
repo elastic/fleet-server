@@ -146,7 +146,7 @@ func NewErrorResp(err error) errResp {
 	}
 
 	// Check if we have encountered a connectivity error
-	// Predicate taken from https://github.com/golang/go/blob/master/src/net/dial_test.go#L810
+	// Predicate taken from https://github.com/golang/go/blob/go1.17.5/src/net/dial_test.go#L798
 	if strings.Contains(err.Error(), "connection refused") {
 		return errResp{
 			http.StatusServiceUnavailable,
