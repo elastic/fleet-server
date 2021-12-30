@@ -23,7 +23,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
-	"github.com/elastic/fleet-server/v7/internal/pkg/testutil"
 )
 
 var defaultCfg config.Config
@@ -87,27 +86,16 @@ func SetupIndexWithBulk(ctx context.Context, t *testing.T, mapping string, opts 
 }
 
 func SetupCleanIndex(ctx context.Context, t *testing.T, index string, opts ...bulk.BulkOpt) (string, bulk.Bulk) {
-	CleanIndex(ctx, t, index)
 
 	bulker := SetupBulk(ctx, t, opts...)
+
+	CleanIndex(ctx, t, bulker, index)
+
 	return index, bulker
 }
 
-func CleanIndex(ctx context.Context, t *testing.T, index string) string {
+func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index string) string {
 	t.Helper()
-	e := testutil.GetEnvironment()
-
-	// Elevated ES client for cleanup permissions
-	cli, err := es.NewClient(ctx, &defaultCfg, false, es.WithUsrPwd(e.Username, e.Password))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	DeleteAll(ctx, t, cli, index)
-	return index
-}
-
-func DeleteAll(ctx context.Context, t *testing.T, cli *elasticsearch.Client, index string) {
 	t.Helper()
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
@@ -119,6 +107,7 @@ func DeleteAll(ctx context.Context, t *testing.T, cli *elasticsearch.Client, ind
 		t.Fatal(err)
 	}
 
+	cli := bulker.Client()
 	res, err := cli.API.DeleteByQuery([]string{index}, bytes.NewReader(query),
 		cli.API.DeleteByQuery.WithContext(ctx),
 		cli.API.DeleteByQuery.WithRefresh(true),
@@ -148,4 +137,5 @@ func DeleteAll(ctx context.Context, t *testing.T, cli *elasticsearch.Client, ind
 	if err != nil {
 		t.Fatal(err)
 	}
+	return index
 }

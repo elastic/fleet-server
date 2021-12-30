@@ -38,9 +38,9 @@ func TestMonitorLeadership(t *testing.T) {
 	// flush bulker on every operation
 	bulker := ftesting.SetupBulk(bulkCtx, t, bulk.WithFlushThresholdCount(1))
 
-	serversIndex := ftesting.CleanIndex(ctx, t, dl.FleetServers)
-	policiesIndex := ftesting.CleanIndex(ctx, t, dl.FleetPolicies)
-	leadersIndex := ftesting.CleanIndex(ctx, t, dl.FleetPoliciesLeader)
+	serversIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetServers)
+	policiesIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetPolicies)
+	leadersIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetPoliciesLeader)
 
 	pim, err := monitor.New(policiesIndex, bulker.Client(), bulker.Client())
 	if err != nil {
@@ -124,10 +124,10 @@ func TestMonitorUnenroller(t *testing.T) {
 	// flush bulker on every operation
 	bulker := ftesting.SetupBulk(bulkCtx, t, bulk.WithFlushThresholdCount(1))
 
-	serversIndex := ftesting.CleanIndex(ctx, t, dl.FleetServers)
-	policiesIndex := ftesting.CleanIndex(ctx, t, dl.FleetPolicies)
-	leadersIndex := ftesting.CleanIndex(ctx, t, dl.FleetPoliciesLeader)
-	agentsIndex := ftesting.CleanIndex(ctx, t, dl.FleetAgents)
+	serversIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetServers)
+	policiesIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetPolicies)
+	leadersIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetPoliciesLeader)
+	agentsIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetAgents)
 
 	pim, err := monitor.New(policiesIndex, bulker.Client(), bulker.Client())
 	require.NoError(t, err)
