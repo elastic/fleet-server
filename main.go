@@ -4,8 +4,6 @@
 
 //go:generate schema-generate -esdoc -s -o internal/pkg/model/schema.go -p model model/schema.json
 //go:generate go fmt internal/pkg/model/schema.go
-//go:generate schema-generate -m es -o internal/pkg/es/mapping.go -p es model/schema.json
-//go:generate go fmt internal/pkg/es/mapping.go
 
 package main
 

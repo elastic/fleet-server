@@ -14,12 +14,13 @@ import (
 
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/rs/xid"
+	"github.com/rs/zerolog"
 
 	"github.com/Pallinder/go-randomdata"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
-	"github.com/rs/zerolog"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testutil"
 )
 
 var defaultCfg config.Config
@@ -115,7 +116,9 @@ func init() {
 func SetupBulk(ctx context.Context, t testing.TB, opts ...BulkOpt) Bulk {
 	t.Helper()
 
-	cli, err := es.NewClient(ctx, &defaultCfg, false)
+	// Set up the client with username and password since this test is generic for any index and uses it's own index/mapping
+	e := testutil.GetEnvironment()
+	cli, err := es.NewClient(ctx, &defaultCfg, false, es.WithUsrPwd(e.Username, e.Password))
 	if err != nil {
 		t.Fatal(err)
 	}

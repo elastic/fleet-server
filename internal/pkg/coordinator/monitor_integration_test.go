@@ -23,14 +23,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 func TestMonitorLeadership(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	parentCtx := context.Background()
 	bulkCtx, bulkCn := context.WithCancel(parentCtx)
 	defer bulkCn()
@@ -39,9 +37,11 @@ func TestMonitorLeadership(t *testing.T) {
 
 	// flush bulker on every operation
 	bulker := ftesting.SetupBulk(bulkCtx, t, bulk.WithFlushThresholdCount(1))
-	serversIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingServer)
-	policiesIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicy)
-	leadersIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicyLeader)
+
+	serversIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetServers)
+	policiesIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetPolicies)
+	leadersIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetPoliciesLeader)
+
 	pim, err := monitor.New(policiesIndex, bulker.Client(), bulker.Client())
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +115,6 @@ func TestMonitorLeadership(t *testing.T) {
 }
 
 func TestMonitorUnenroller(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	parentCtx := context.Background()
 	bulkCtx, bulkCn := context.WithCancel(parentCtx)
 	defer bulkCn()
@@ -124,10 +123,12 @@ func TestMonitorUnenroller(t *testing.T) {
 
 	// flush bulker on every operation
 	bulker := ftesting.SetupBulk(bulkCtx, t, bulk.WithFlushThresholdCount(1))
-	serversIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingServer)
-	policiesIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicy)
-	leadersIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicyLeader)
-	agentsIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingAgent)
+
+	serversIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetServers)
+	policiesIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetPolicies)
+	leadersIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetPoliciesLeader)
+	agentsIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetAgents)
+
 	pim, err := monitor.New(policiesIndex, bulker.Client(), bulker.Client())
 	require.NoError(t, err)
 	cfg := makeFleetConfig()
