@@ -18,7 +18,6 @@ import (
 	"github.com/rs/xid"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
@@ -54,11 +53,11 @@ func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index st
 }
 
 func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingEnrollmentApiKey)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetEnrollmentAPIKeys)
+
 	rec, err := storeRandomEnrollmentAPIKey(ctx, bulker, index, uuid.Must(uuid.NewV4()).String())
 	if err != nil {
 		t.Fatal(err)
@@ -85,11 +84,10 @@ func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
 }
 
 func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingEnrollmentApiKey)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetEnrollmentAPIKeys)
 
 	policyID := uuid.Must(uuid.NewV4()).String()
 	rec1, err := storeRandomEnrollmentAPIKey(ctx, bulker, index, policyID)

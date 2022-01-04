@@ -16,21 +16,20 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 func TestMonitorEmptyIndex(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	index, bulker := setupIndex(ctx, t)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetActions)
 	runMonitorTest(t, ctx, index, bulker)
 }
 
 func TestMonitorNonEmptyIndex(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 

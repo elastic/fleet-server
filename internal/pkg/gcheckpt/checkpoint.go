@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package monitor
+package gcheckpt
 
 import (
 	"context"
@@ -29,7 +29,7 @@ type globalCheckpointsResponse struct {
 	Error             esh.ErrorT `json:"error,omitempty"`
 }
 
-func queryGlobalCheckpoint(ctx context.Context, es *elasticsearch.Client, index string) (seqno sqn.SeqNo, err error) {
+func Query(ctx context.Context, es *elasticsearch.Client, index string) (seqno sqn.SeqNo, err error) {
 	req := esh.NewGlobalCheckpointsRequest(es.Transport)
 	res, err := req(req.WithContext(ctx),
 		req.WithIndex(index))
@@ -47,7 +47,7 @@ func queryGlobalCheckpoint(ctx context.Context, es *elasticsearch.Client, index 
 	return seqno, err
 }
 
-func waitCheckpointAdvance(ctx context.Context, es *elasticsearch.Client, index string, checkpoint sqn.SeqNo, to time.Duration) (seqno sqn.SeqNo, err error) {
+func WaitAdvance(ctx context.Context, es *elasticsearch.Client, index string, checkpoint sqn.SeqNo, to time.Duration) (seqno sqn.SeqNo, err error) {
 	req := esh.NewGlobalCheckpointsRequest(es.Transport)
 	res, err := req(req.WithContext(ctx),
 		req.WithIndex(index),

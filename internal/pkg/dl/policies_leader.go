@@ -101,13 +101,13 @@ func TakePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, serve
 		if err != nil {
 			return err
 		}
-		err = bulker.Update(ctx, o.indexName, policyId, data)
+		err = bulker.Update(ctx, o.indexName, policyId, data, bulk.WithRefresh())
 	} else {
 		data, err = json.Marshal(&l)
 		if err != nil {
 			return err
 		}
-		_, err = bulker.Create(ctx, o.indexName, policyId, data)
+		_, err = bulker.Create(ctx, o.indexName, policyId, data, bulk.WithRefresh())
 	}
 	if err != nil {
 		return err
@@ -145,7 +145,7 @@ func ReleasePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, se
 	if err != nil {
 		return err
 	}
-	err = bulker.Update(ctx, o.indexName, policyId, data)
+	err = bulker.Update(ctx, o.indexName, policyId, data, bulk.WithRefresh())
 	if err == es.ErrElasticVersionConflict {
 		// another leader took over; nothing to worry about
 		return nil

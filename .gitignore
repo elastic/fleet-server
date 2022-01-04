@@ -13,3 +13,5 @@ fleet-server.dev.yml
 *.log.*
 
 dev-tools/integration/.env.bck
+
+.service_token

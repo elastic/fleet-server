@@ -8,7 +8,10 @@
 package testing
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/elastic/go-elasticsearch/v7"
@@ -17,6 +20,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
 )
@@ -79,4 +83,59 @@ func SetupIndexWithBulk(ctx context.Context, t *testing.T, mapping string, opts 
 	bulker := SetupBulk(ctx, t, opts...)
 	index := SetupIndex(ctx, t, bulker, mapping)
 	return index, bulker
+}
+
+func SetupCleanIndex(ctx context.Context, t *testing.T, index string, opts ...bulk.BulkOpt) (string, bulk.Bulk) {
+
+	bulker := SetupBulk(ctx, t, opts...)
+
+	CleanIndex(ctx, t, bulker, index)
+
+	return index, bulker
+}
+
+func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index string) string {
+	t.Helper()
+	t.Helper()
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	root.Query().MatchAll()
+	q := tmpl.MustResolve(root)
+
+	query, err := q.Render(make(map[string]interface{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cli := bulker.Client()
+	res, err := cli.API.DeleteByQuery([]string{index}, bytes.NewReader(query),
+		cli.API.DeleteByQuery.WithContext(ctx),
+		cli.API.DeleteByQuery.WithRefresh(true),
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer res.Body.Close()
+	var esres es.DeleteByQueryResponse
+
+	err = json.NewDecoder(res.Body).Decode(&esres)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.IsError() {
+		err = es.TranslateError(res.StatusCode, &esres.Error)
+		if err != nil {
+			if errors.Is(err, es.ErrIndexNotFound) {
+				err = nil
+			}
+		}
+	}
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	return index
 }

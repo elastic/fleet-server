@@ -49,6 +49,7 @@ local: ## - Build local binary for local environment (bin/fleet-server)
 clean: ## - Clean up build artifacts
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
 	rm -rf ./bin/ ./build/
+	rm .service_token
 
 .PHONY: generate
 generate: ## - Generate schema models
@@ -214,4 +215,6 @@ test-int: prepare-test-context  ## - Run integration tests with full setup (slow
 .PHONY: test-int-set
 test-int-set: ## - Run integration tests without setup
 	# Initialize indices one before running all the tests
-	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} go test -v -tags=integration -count=1 -race ./...
+	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
+	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
+	go test -v -tags=integration -count=1 -race -p 1 ./...
