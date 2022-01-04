@@ -16,7 +16,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
@@ -47,11 +46,11 @@ func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string) (mod
 }
 
 func TestQueryLatestPolicies(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicy)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
+
 	recs := map[string]model.Policy{}
 	for i := 0; i < 0; i++ {
 		rec, err := storeRandomPolicy(ctx, bulker, index)
@@ -77,11 +76,11 @@ func TestQueryLatestPolicies(t *testing.T) {
 }
 
 func TestCreatePolicy(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicy)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
+
 	policyId := uuid.Must(uuid.NewV4()).String()
 	p := createRandomPolicy(policyId, 1)
 	id, err := CreatePolicy(ctx, bulker, p, WithIndexName(index))

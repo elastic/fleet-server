@@ -18,17 +18,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 func TestFindOfflineAgents(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingAgent)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
 
 	now := time.Now().UTC()
 	nowStr := now.Format(time.RFC3339)
