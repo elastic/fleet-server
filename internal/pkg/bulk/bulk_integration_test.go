@@ -22,7 +22,6 @@ import (
 )
 
 func TestBulkCreate(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -125,7 +124,6 @@ func TestBulkCreate(t *testing.T) {
 }
 
 func TestBulkCreateBody(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -179,7 +177,6 @@ func TestBulkCreateBody(t *testing.T) {
 }
 
 func TestBulkIndex(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -203,7 +200,6 @@ func TestBulkIndex(t *testing.T) {
 }
 
 func TestBulkUpdate(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -242,7 +238,6 @@ func TestBulkUpdate(t *testing.T) {
 }
 
 func TestBulkSearch(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -285,7 +280,6 @@ func TestBulkSearch(t *testing.T) {
 }
 
 func TestBulkDelete(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 

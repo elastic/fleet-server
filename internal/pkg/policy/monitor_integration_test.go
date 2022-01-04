@@ -15,9 +15,7 @@ import (
 
 	"github.com/gofrs/uuid"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
@@ -25,17 +23,12 @@ import (
 
 var policyBytes = []byte(`{"outputs":{"default":{"type":"elasticsearch"}}}`)
 
-func setupIndex(ctx context.Context, t *testing.T) (string, bulk.Bulk) {
-	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicy)
-	return index, bulker
-}
-
 func TestMonitor_Integration(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	index, bulker := setupIndex(ctx, t)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetPolicies)
+
 	im, err := monitor.New(index, bulker.Client(), bulker.Client())
 	if err != nil {
 		t.Fatal(err)

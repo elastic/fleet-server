@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/gcheckpt"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
@@ -202,7 +203,7 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 
 	// Initialize global checkpoint from the index stats
 	var checkpoint sqn.SeqNo
-	checkpoint, err = queryGlobalCheckpoint(ctx, m.monCli, m.index)
+	checkpoint, err = gcheckpt.Query(ctx, m.monCli, m.index)
 	if err != nil {
 		m.log.Error().Err(err).Msg("failed to initialize the global checkpoints")
 		return err
@@ -219,7 +220,7 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		checkpoint := m.loadCheckpoint()
 
 		// Wait checkpoint advance
-		newCheckpoint, err := waitCheckpointAdvance(ctx, m.monCli, m.index, checkpoint, m.pollTimeout)
+		newCheckpoint, err := gcheckpt.WaitAdvance(ctx, m.monCli, m.index, checkpoint, m.pollTimeout)
 		if err != nil {
 			if errors.Is(err, es.ErrIndexNotFound) {
 				// Wait until created

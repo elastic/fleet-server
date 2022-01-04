@@ -15,17 +15,16 @@ import (
 
 	"github.com/gofrs/uuid"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 func TestEnsureServer(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingPolicy)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetServers)
+
 	agentId := uuid.Must(uuid.NewV4()).String()
 	agent := model.AgentMetadata{
 		Id:      agentId,
@@ -37,6 +36,7 @@ func TestEnsureServer(t *testing.T) {
 		Ip:           []string{"::1"},
 		Name:         "testing-host",
 	}
+
 	err := EnsureServer(ctx, bulker, "1.0.0", agent, host, WithIndexName(index))
 	if err != nil {
 		t.Fatal(err)

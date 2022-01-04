@@ -18,7 +18,6 @@ import (
 	"github.com/rs/xid"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rnd"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
@@ -79,7 +78,8 @@ func storeRandomActionResults(ctx context.Context, bulker bulk.Bulk, index strin
 }
 
 func setupActionResults(ctx context.Context, t *testing.T) (string, bulk.Bulk, []model.ActionResult) {
-	index, bulker := ftesting.SetupIndexWithBulk(ctx, t, es.MappingActionResult)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetEnrollmentAPIKeys)
+
 	results, err := storeRandomActionResults(ctx, bulker, index)
 	if err != nil {
 		t.Fatal(err)
@@ -99,8 +99,7 @@ func (acrs ActionsResults) find(ar model.ActionResult) *model.ActionResult {
 	return nil
 }
 
-func TestActionResultsStored(t *testing.T) {
-	t.Skip("Skipping broken integration test as template creation does not work with a service token.")
+func TestActionsResultsStored(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 

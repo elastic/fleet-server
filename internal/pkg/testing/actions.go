@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rnd"
 
@@ -167,7 +166,11 @@ func StoreActions(ctx context.Context, bulker bulk.Bulk, index string, actions [
 }
 
 func SetupActions(ctx context.Context, t *testing.T, min, max int) (string, bulk.Bulk, []model.Action) {
-	index, bulker := SetupIndexWithBulk(ctx, t, es.MappingAction)
+	// Could not use dl.FleetActions here because that would introduce
+	// cirucular dependency between "testing" and "dl" packages
+	// TODO(AM): Address later as cleanup
+	index, bulker := SetupCleanIndex(ctx, t, ".fleet-actions")
+
 	actions, err := StoreRandomActions(ctx, bulker, index, min, max)
 	if err != nil {
 		t.Fatal(err)
