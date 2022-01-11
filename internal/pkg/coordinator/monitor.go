@@ -45,11 +45,10 @@ type Monitor interface {
 }
 
 type policyT struct {
-	id                string
-	cord              Coordinator
-	cordCanceller     context.CancelFunc
-	unenrollTimeout   time.Duration
-	unenrollCanceller context.CancelFunc
+	id              string
+	cord            Coordinator
+	cordCanceller   context.CancelFunc
+	unenrollTimeout time.Duration
 }
 
 type monitorT struct {
@@ -75,8 +74,8 @@ type monitorT struct {
 	leadersIndex  string
 	agentsIndex   string
 
-	policies     map[string]policyT
-	policiesLock map[string]*sync.Mutex
+	policies          map[string]policyT
+	policiesCanceller map[string]context.CancelFunc
 }
 
 // NewMonitor creates a new coordinator policy monitor.
@@ -98,7 +97,7 @@ func NewMonitor(fleet config.Fleet, version string, bulker bulk.Bulk, monitor mo
 		leadersIndex:          dl.FleetPoliciesLeader,
 		agentsIndex:           dl.FleetAgents,
 		policies:              make(map[string]policyT),
-		policiesLock:          make(map[string]*sync.Mutex),
+		policiesCanceller:     make(map[string]context.CancelFunc),
 	}
 }
 
@@ -312,10 +311,9 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		if r.cord == nil {
 			// either failed to take leadership or lost leadership
 			delete(m.policies, r.id)
-			delete(m.policiesLock, r.id)
+			delete(m.policiesCanceller, r.id)
 		} else {
 			m.policies[r.id] = r
-			m.policiesLock[r.id] = &sync.Mutex{}
 		}
 	}
 	return nil
@@ -403,19 +401,19 @@ func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *mod
 	unenrollTimeout := time.Duration(p.UnenrollTimeout) * time.Second
 	if unenrollTimeout != pt.unenrollTimeout {
 		// unenroll timeout changed
-		if pt.unenrollCanceller != nil {
-			l.Debug().Msg("cancelling unenrollment monitor")
-			pt.unenrollCanceller()
-			pt.unenrollCanceller = nil
+		if c, ok := m.policiesCanceller[pt.id]; ok {
+			l.Info().Msg("cancelling unenrollment monitor")
+			c()
+			delete(m.policiesCanceller, pt.id)
+		} else {
+			l.Info().Msg("cancller not found.")
 		}
 
 		if unenrollTimeout > 0 {
 			// start worker for unenrolling agents based timeout
 			unenrollCtx, canceller := context.WithCancel(ctx)
-			lock := m.policiesLock[pt.id]
-			lock.Lock()
-			go runUnenroller(unenrollCtx, m.bulker, pt.id, unenrollTimeout, l, m.unenrollCheckInterval, m.agentsIndex, lock)
-			pt.unenrollCanceller = canceller
+			m.policiesCanceller[pt.id] = canceller
+			go runUnenroller(unenrollCtx, m.bulker, pt.id, unenrollTimeout, l, m.unenrollCheckInterval, m.agentsIndex)
 		}
 		l.Debug().Dur("unenroll_timeout", unenrollTimeout).Msg("setting unenrollment timeout")
 		pt.unenrollTimeout = unenrollTimeout
@@ -456,13 +454,12 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 	}
 }
 
-func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenrollTimeout time.Duration, l zerolog.Logger, checkInterval time.Duration, agentsIndex string, lock *sync.Mutex) {
+func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenrollTimeout time.Duration, l zerolog.Logger, checkInterval time.Duration, agentsIndex string) {
 	l.Info().
 		Dur("checkInterval", checkInterval).
 		Dur("unenrollTimeout", unenrollTimeout).
 		Msg("unenroll monitor start")
 	defer l.Info().Msg("Unenroll monitor exit")
-	defer lock.Unlock()
 
 	t := time.NewTimer(checkInterval)
 	defer t.Stop()
