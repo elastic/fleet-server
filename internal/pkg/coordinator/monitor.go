@@ -402,11 +402,9 @@ func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *mod
 	if unenrollTimeout != pt.unenrollTimeout {
 		// unenroll timeout changed
 		if c, ok := m.policiesCanceller[pt.id]; ok {
-			l.Info().Msg("cancelling unenrollment monitor")
+			l.Debug().Msg("cancelling unenrollment monitor")
 			c()
 			delete(m.policiesCanceller, pt.id)
-		} else {
-			l.Info().Msg("cancller not found.")
 		}
 
 		if unenrollTimeout > 0 {
