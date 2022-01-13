@@ -10,6 +10,7 @@ import (
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/flag"
 	"github.com/elastic/go-ucfg/yaml"
+	"github.com/rs/zerolog/log"
 )
 
 // DefaultOptions defaults options used to read the configuration
@@ -52,6 +53,7 @@ func (c *Config) LoadServerLimits() error {
 	// agent limit setting.
 	err := c.Validate()
 	if err != nil {
+		log.Warn().Msgf("failed to validate while calculating limits, %s", err.Error())
 		return err
 	}
 
@@ -59,7 +61,6 @@ func (c *Config) LoadServerLimits() error {
 	agentLimits := loadLimits(fleetInput.Server.Limits.MaxAgents)
 	fleetInput.Cache.LoadLimits(agentLimits)
 	fleetInput.Server.Limits.LoadLimits(agentLimits)
-
 	return nil
 }
 

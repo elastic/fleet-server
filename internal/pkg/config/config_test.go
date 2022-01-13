@@ -163,8 +163,7 @@ func TestConfig(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
-				err = cfg.LoadServerLimits()
-				require.NoError(t, err)
+				cfg.LoadServerLimits()
 				if !assert.True(t, cmp.Equal(test.cfg, cfg)) {
 					diff := cmp.Diff(test.cfg, cfg)
 					if diff != "" {

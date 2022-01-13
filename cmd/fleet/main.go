@@ -159,10 +159,6 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
-			err = cfg.LoadServerLimits()
-			if err != nil {
-				return err
-			}
 			srv, err := NewFleetServer(cfg, bi, status.NewLog())
 			if err != nil {
 				return err
@@ -417,6 +413,10 @@ func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter)
 		return nil, err
 	}
 
+	err = cfg.LoadServerLimits()
+	if err != nil {
+		return nil, err
+	}
 	cache, err := makeCache(cfg)
 	if err != nil {
 		return nil, err
@@ -484,6 +484,10 @@ LOOP:
 		} else {
 			started = true
 			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
+		}
+		err := newCfg.LoadServerLimits()
+		if err != nil {
+			return err
 		}
 
 		// Create or recreate cache
@@ -683,7 +687,7 @@ func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error 
 	}
 }
 
-func initRuntime(cfg *config.Config) {
+func initRuntime(cfg *config.Config) error {
 	gcPercent := cfg.Inputs[0].Server.Runtime.GCPercent
 	if gcPercent != 0 {
 		old := debug.SetGCPercent(gcPercent)
@@ -693,6 +697,7 @@ func initRuntime(cfg *config.Config) {
 			Int("new", gcPercent).
 			Msg("SetGCPercent")
 	}
+	return nil
 }
 
 func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
@@ -708,7 +713,10 @@ func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk
 }
 
 func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
-	initRuntime(cfg)
+	err = initRuntime(cfg)
+	if err != nil {
+		return err
+	}
 
 	// The metricsServer is only enabled if http.enabled is set in the config
 	metricsServer, err := f.initMetrics(ctx, cfg)
