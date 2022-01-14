@@ -88,11 +88,17 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 
 	g, ctx := errgroup.WithContext(ctx)
 
+	readyCh := make(chan struct{})
 	g.Go(func() error {
-		return srv.Run(ctx)
+		return srv.RunWithReadyChannel(ctx, readyCh)
 	})
 
 	tsrv := &tserver{cfg: cfg, g: g, srv: srv}
+	<-readyCh
+	go func() {
+		for range readyCh {
+		}
+	}()
 	err = tsrv.waitServerUp(ctx, testWaitServerUp)
 	if err != nil {
 		return nil, err
