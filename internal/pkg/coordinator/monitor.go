@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -44,11 +45,10 @@ type Monitor interface {
 }
 
 type policyT struct {
-	id                string
-	cord              Coordinator
-	cordCanceller     context.CancelFunc
-	unenrollTimeout   time.Duration
-	unenrollCanceller context.CancelFunc
+	id              string
+	cord            Coordinator
+	cordCanceller   context.CancelFunc
+	unenrollTimeout time.Duration
 }
 
 type monitorT struct {
@@ -74,7 +74,8 @@ type monitorT struct {
 	leadersIndex  string
 	agentsIndex   string
 
-	policies map[string]policyT
+	policies          map[string]policyT
+	policiesCanceller map[string]context.CancelFunc
 }
 
 // NewMonitor creates a new coordinator policy monitor.
@@ -96,6 +97,7 @@ func NewMonitor(fleet config.Fleet, version string, bulker bulk.Bulk, monitor mo
 		leadersIndex:          dl.FleetPoliciesLeader,
 		agentsIndex:           dl.FleetAgents,
 		policies:              make(map[string]policyT),
+		policiesCanceller:     make(map[string]context.CancelFunc),
 	}
 }
 
@@ -296,6 +298,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		if r.cord == nil {
 			// either failed to take leadership or lost leadership
 			delete(m.policies, r.id)
+			delete(m.policiesCanceller, r.id)
 		} else {
 			m.policies[r.id] = r
 		}
@@ -380,21 +383,24 @@ func (m *monitorT) getIPs() ([]string, error) {
 }
 
 func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *model.Policy) {
-	l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
+	u := uuid.Must(uuid.NewV4())
+	l := m.log.With().Str(dl.FieldPolicyId, pt.id).Str("unenroller_uuid", u.String()).Logger()
 	unenrollTimeout := time.Duration(p.UnenrollTimeout) * time.Second
 	if unenrollTimeout != pt.unenrollTimeout {
 		// unenroll timeout changed
-		if pt.unenrollCanceller != nil {
-			pt.unenrollCanceller()
-			pt.unenrollCanceller = nil
+		if c, ok := m.policiesCanceller[pt.id]; ok {
+			l.Debug().Dur("unenroll_timeout", unenrollTimeout).Msg("cancelling unenrollment monitor")
+			c()
+			delete(m.policiesCanceller, pt.id)
 		}
 
 		if unenrollTimeout > 0 {
 			// start worker for unenrolling agents based timeout
 			unenrollCtx, canceller := context.WithCancel(ctx)
+			m.policiesCanceller[pt.id] = canceller
 			go runUnenroller(unenrollCtx, m.bulker, pt.id, unenrollTimeout, l, m.unenrollCheckInterval, m.agentsIndex)
-			pt.unenrollCanceller = canceller
 		}
+		l.Debug().Dur("unenroll_timeout", unenrollTimeout).Msg("setting unenrollment timeout")
 		pt.unenrollTimeout = unenrollTimeout
 	}
 }
@@ -446,6 +452,7 @@ func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenr
 	for {
 		select {
 		case <-t.C:
+			l.Debug().Msg("running unenroller")
 			if err := runUnenrollerWork(ctx, bulker, policyId, unenrollTimeout, l, agentsIndex); err != nil {
 				l.Err(err).Dur("unenroll_timeout", unenrollTimeout).Msg("failed to unenroll offline agents")
 			}
