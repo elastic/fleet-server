@@ -239,12 +239,10 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 
 	// flush bulker on every operation
 	bulker := ftesting.SetupBulk(bulkCtx, t, bulk.WithFlushThresholdCount(1))
-
-	serversIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetServers)
-	policiesIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetPolicies)
-	leadersIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetPoliciesLeader)
-	agentsIndex := ftesting.CleanIndex(ctx, t, bulker, dl.FleetAgents)
-
+	serversIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingServer)
+	policiesIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicy)
+	leadersIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicyLeader)
+	agentsIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingAgent)
 	pim, err := monitor.New(policiesIndex, bulker.Client(), bulker.Client())
 	require.NoError(t, err)
 	cfg := makeFleetConfig()
