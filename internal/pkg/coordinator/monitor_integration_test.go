@@ -338,7 +338,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 	err = g.Wait()
 	require.NoError(t, err)
 
-	// check other fields now we know its marked unactive
+	// check other fields now we know its marked inactive
 	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldId, agentId, dl.WithIndexName(agentsIndex))
 	require.NoError(t, err)
 	assert.True(t, agent.Active)
