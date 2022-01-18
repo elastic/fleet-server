@@ -220,12 +220,127 @@ func TestMonitorUnenroller(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, agent.UnenrolledAt)
 	assert.Equal(t, unenrolledReasonTimeout, agent.UnenrolledReason)
+	assert.Len(t, pm.(*monitorT).policies, 1)
+	assert.Len(t, pm.(*monitorT).policiesCanceller, 1)
 
 	// should error as they are now invalidated
 	_, err = bulker.ApiKeyAuth(bulkCtx, *accessKey)
 	assert.Error(t, err)
 	_, err = bulker.ApiKeyAuth(bulkCtx, *outputKey)
 	assert.Error(t, err)
+}
+
+func TestMonitorUnenrollerSetAndClear(t *testing.T) {
+	parentCtx := context.Background()
+	bulkCtx, bulkCn := context.WithCancel(parentCtx)
+	defer bulkCn()
+	ctx, cn := context.WithCancel(parentCtx)
+	defer cn()
+
+	// flush bulker on every operation
+	bulker := ftesting.SetupBulk(bulkCtx, t, bulk.WithFlushThresholdCount(1))
+	serversIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingServer)
+	policiesIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicy)
+	leadersIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingPolicyLeader)
+	agentsIndex := ftesting.SetupIndex(bulkCtx, t, bulker, es.MappingAgent)
+	pim, err := monitor.New(policiesIndex, bulker.Client(), bulker.Client())
+	require.NoError(t, err)
+	cfg := makeFleetConfig()
+	pm := NewMonitor(cfg, "1.0.0", bulker, pim, NewCoordinatorZero)
+	pm.(*monitorT).serversIndex = serversIndex
+	pm.(*monitorT).leadersIndex = leadersIndex
+	pm.(*monitorT).policiesIndex = policiesIndex
+	pm.(*monitorT).agentsIndex = agentsIndex
+	pm.(*monitorT).unenrollCheckInterval = 10 * time.Millisecond // very fast check interval for test
+
+	// add policy with unenroll timeout
+	policy1Id := uuid.Must(uuid.NewV4()).String()
+	policy1 := model.Policy{
+		PolicyId:        policy1Id,
+		CoordinatorIdx:  0,
+		Data:            []byte("{}"),
+		RevisionIdx:     1,
+		UnenrollTimeout: 300, // 5 minutes (300 seconds)
+	}
+	_, err = dl.CreatePolicy(ctx, bulker, policy1, dl.WithIndexName(policiesIndex))
+	require.NoError(t, err)
+
+	// start the monitors
+	g, _ := errgroup.WithContext(context.Background())
+	g.Go(func() error {
+		err := pim.Run(ctx)
+		if err != nil && err != context.Canceled {
+			return err
+		}
+		return nil
+	})
+	g.Go(func() error {
+		err := pm.Run(ctx)
+		if err != nil && err != context.Canceled {
+			return err
+		}
+		return nil
+	})
+
+	// update policy to clear timeout
+	policy2 := model.Policy{
+		PolicyId:       policy1Id,
+		CoordinatorIdx: 0,
+		Data:           []byte("{}"),
+		RevisionIdx:    2,
+	}
+	_, err = dl.CreatePolicy(ctx, bulker, policy2, dl.WithIndexName(policiesIndex))
+	require.NoError(t, err)
+
+	// create apikeys that should be invalidated
+	agentId := uuid.Must(uuid.NewV4()).String()
+	accessKey, err := bulker.ApiKeyCreate(
+		ctx,
+		agentId,
+		"",
+		[]byte(""),
+		apikey.NewMetadata(agentId, apikey.TypeAccess),
+	)
+	require.NoError(t, err)
+	outputKey, err := bulker.ApiKeyCreate(
+		ctx,
+		agentId,
+		"",
+		[]byte(""),
+		apikey.NewMetadata(agentId, apikey.TypeAccess),
+	)
+	require.NoError(t, err)
+
+	// add agent that should be unenrolled
+	sixAgo := time.Now().UTC().Add(-6 * time.Minute)
+	agentBody, err := json.Marshal(model.Agent{
+		AccessApiKeyId:  accessKey.Id,
+		DefaultApiKeyId: outputKey.Id,
+		Active:          true,
+		EnrolledAt:      sixAgo.Format(time.RFC3339),
+		LastCheckin:     sixAgo.Format(time.RFC3339),
+		PolicyId:        policy1Id,
+		UpdatedAt:       sixAgo.Format(time.RFC3339),
+	})
+	_, err = bulker.Create(ctx, agentsIndex, agentId, agentBody)
+	require.NoError(t, err)
+
+	// Sleep to allow monitors to run
+	time.Sleep(5 * time.Second)
+
+	// stop the monitors
+	cn()
+	err = g.Wait()
+	require.NoError(t, err)
+
+	// check other fields now we know its marked inactive
+	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldId, agentId, dl.WithIndexName(agentsIndex))
+	require.NoError(t, err)
+	assert.True(t, agent.Active)
+	// Make sure canceller is no longer there
+	assert.Len(t, pm.(*monitorT).policies, 1)
+	assert.Len(t, pm.(*monitorT).policiesCanceller, 0)
+
 }
 
 func makeFleetConfig() config.Fleet {
