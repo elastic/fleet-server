@@ -23,7 +23,7 @@ const kFleetAccessRolesJSON = `
 	"fleet-apikey-access": {
 		"cluster": [],
 		"applications": [{
-			"application": ".fleet",
+			"application": "fleet",
 			"privileges": ["no-privileges"],
 			"resources": ["*"]
 		}]
