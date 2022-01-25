@@ -5,7 +5,6 @@ go 1.17
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.0
-	go.elastic.co/ecszerolog v0.1.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20211207150041-4641f759226c
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210922110810-e6f1f402a9ed
 	github.com/elastic/go-elasticsearch/v7 v7.15.1
@@ -26,6 +25,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/apm v1.14.0
 	go.elastic.co/apm/module/apmelasticsearch v1.14.0
+	go.elastic.co/ecszerolog v0.1.0
 	go.uber.org/zap v1.19.1
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6
