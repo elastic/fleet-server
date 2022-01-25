@@ -6,6 +6,7 @@ package config
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/flag"
@@ -28,6 +29,7 @@ type Config struct {
 	Inputs  []Input `config:"inputs"`
 	Logging Logging `config:"logging"`
 	HTTP    HTTP    `config:"http"`
+	m       sync.Mutex
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -35,6 +37,15 @@ func (c *Config) InitDefaults() {
 	c.Inputs = make([]Input, 1)
 	c.Inputs[0].InitDefaults()
 	c.HTTP.InitDefaults()
+}
+
+func (c *Config) GetFleetInput() (Input, error) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if err := c.Validate(); err != nil {
+		return Input{}, err
+	}
+	return c.Inputs[0], nil
 }
 
 // Validate ensures that the configuration is valid.
@@ -49,6 +60,8 @@ func (c *Config) Validate() error {
 }
 
 func (c *Config) LoadServerLimits() error {
+	c.m.Lock()
+	defer c.m.Unlock()
 	// LoadServerLimits should be called after initialization, so we may access the user defined
 	// agent limit setting.
 	err := c.Validate()
@@ -66,6 +79,12 @@ func (c *Config) LoadServerLimits() error {
 
 // Merge merges two configurations together.
 func (c *Config) Merge(other *Config) (*Config, error) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	other.m.Lock()
+	defer other.m.Unlock()
+
 	repr, err := ucfg.NewFrom(c, DefaultOptions...)
 	if err != nil {
 		return nil, err

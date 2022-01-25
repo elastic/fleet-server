@@ -48,7 +48,7 @@ type tserver struct {
 }
 
 func (s *tserver) baseUrl() string {
-	input := s.cfg.Inputs[0]
+	input, _ := s.cfg.GetFleetInput()
 	tls := input.Server.TLS
 	schema := "http"
 	if tls != nil && tls.IsEnabled() {
@@ -88,17 +88,11 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	readyCh := make(chan struct{})
 	g.Go(func() error {
-		return srv.RunWithReadyChannel(ctx, readyCh)
+		return srv.Run(ctx)
 	})
 
 	tsrv := &tserver{cfg: cfg, g: g, srv: srv}
-	<-readyCh
-	go func() {
-		for range readyCh {
-		}
-	}()
 	err = tsrv.waitServerUp(ctx, testWaitServerUp)
 	if err != nil {
 		return nil, err

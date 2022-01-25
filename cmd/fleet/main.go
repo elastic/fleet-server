@@ -436,19 +436,6 @@ type runFunc func(context.Context) error
 
 // Run runs the fleet server
 func (f *FleetServer) Run(ctx context.Context) error {
-	// Set up a noop consumer for the ready signal
-	c := make(chan struct{})
-	go func() {
-		for range c {
-		}
-	}()
-	return f.RunWithReadyChannel(ctx, c)
-}
-
-// RunWithReadyChannel runs the fleet server with a ready signal channel
-func (f *FleetServer) RunWithReadyChannel(ctx context.Context, readyCh chan struct{}) error {
-	defer close(readyCh)
-
 	var curCfg *config.Config
 	newCfg := f.cfg
 
@@ -537,7 +524,6 @@ LOOP:
 			}
 			log.Info().Msg("starting server on configuration change")
 			srvEg, srvCancel = start(ctx, func(ctx context.Context) error {
-				readyCh <- struct{}{}
 				return f.runServer(ctx, newCfg)
 			}, ech)
 		}
