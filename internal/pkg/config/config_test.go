@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/go-ucfg"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -164,8 +165,9 @@ func TestConfig(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				cfg.LoadServerLimits()
-				if !assert.True(t, cmp.Equal(test.cfg, cfg)) {
-					diff := cmp.Diff(test.cfg, cfg)
+				skipUnexported := cmpopts.IgnoreUnexported(Config{})
+				if !assert.True(t, cmp.Equal(test.cfg, cfg, skipUnexported)) {
+					diff := cmp.Diff(test.cfg, cfg, skipUnexported)
 					if diff != "" {
 						t.Errorf("%s mismatch (-want +got):\n%s", name, diff)
 					}
