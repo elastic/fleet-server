@@ -184,7 +184,7 @@ func httpDebug(r *http.Request, e *zerolog.Event) {
 	}
 }
 
-// HttpHandler returns an httprouter' Handle that wrap request with an ECS logger and
+// HttpHandler returns an httprouter.Handle that wraps the request with an ECS logger and
 // captures metrics for the current request.
 func HttpHandler(next httprouter.Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
