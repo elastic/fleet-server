@@ -120,6 +120,9 @@ type Event struct {
 }
 
 type StatusResponse struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
+	Name      string `json:"name"`
+	Number    string `json:"number,omitempty"`
+	BuildHash string `json:"build_hash,omitempty"`
+	BuildTime string `json:"build_time,omitempty"`
+	Status    string `json:"status"`
 }

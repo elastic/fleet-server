@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
@@ -23,8 +24,11 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 
 	status := rt.sm.Status()
 	resp := StatusResponse{
-		Name:   kServiceName,
-		Status: status.String(),
+		Name:      kServiceName,
+		Status:    status.String(),
+		Number:    rt.bi.Version,
+		BuildHash: rt.bi.Commit,
+		BuildTime: rt.bi.BuildTime.Format(time.RFC3339),
 	}
 
 	reqId := r.Header.Get(logger.HeaderRequestID)
