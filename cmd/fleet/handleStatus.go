@@ -58,7 +58,7 @@ func NewStatusT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache, opts ..
 	return st
 }
 
-func WithAuthFunc(authfn AuthFunc) OptFunc {
+func withAuthFunc(authfn AuthFunc) OptFunc {
 	return func(st *StatusT) {
 		if authfn != nil {
 			st.authfn = authfn

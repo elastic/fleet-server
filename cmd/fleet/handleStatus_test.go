@@ -74,7 +74,7 @@ func TestHandleStatus(t *testing.T) {
 					status := proto.StateObserved_Status(k)
 					r := Router{
 						ctx: ctx,
-						st:  NewStatusT(cfg, nil, c, WithAuthFunc(tc.AuthFn)),
+						st:  NewStatusT(cfg, nil, c, withAuthFunc(tc.AuthFn)),
 						sm:  &mockPolicyMonitor{status},
 						bi: fbuild.Info{
 							Version:   "8.1.0",
