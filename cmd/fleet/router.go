@@ -34,11 +34,12 @@ type Router struct {
 	et     *EnrollerT
 	at     *ArtifactT
 	ack    *AckT
+	st     *StatusT
 	sm     policy.SelfMonitor
 	bi     build.Info
 }
 
-func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, sm policy.SelfMonitor, tracer *apm.Tracer, bi build.Info) *httprouter.Router {
+func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, sm policy.SelfMonitor, tracer *apm.Tracer, bi build.Info) *httprouter.Router {
 
 	r := Router{
 		ctx:    ctx,
@@ -48,6 +49,7 @@ func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *Enroller
 		sm:     sm,
 		at:     at,
 		ack:    ack,
+		st:     st,
 		bi:     bi,
 	}
 
