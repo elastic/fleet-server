@@ -72,7 +72,7 @@ func (st StatusT) authenticate(r *http.Request) (*apikey.ApiKey, error) {
 
 func (st StatusT) handleStatus(zlog *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, status proto.StateObserved_Status, err error) {
 	limitF, err := st.limit.Acquire()
-	// If failed to aquire limiter send error response
+	// When failing to acquire a limiter send an error response.
 	if err != nil {
 		return
 	}
