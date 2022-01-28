@@ -67,6 +67,10 @@ func withAuthFunc(authfn AuthFunc) OptFunc {
 }
 
 func (st StatusT) authenticate(r *http.Request) (*apikey.ApiKey, error) {
+	// This authenticates that the provided API key exists and is enabled.
+	// WARNING: This does not validate that the api key is valid for the Fleet Domain.
+	// An additional check must be executed to validate it is not a random api key.
+	// This check is sufficient for the purposes of this API
 	return authApiKey(r, st.bulk, st.cache)
 }
 
