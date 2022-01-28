@@ -15,10 +15,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 )
 
 const (
@@ -183,9 +184,9 @@ func httpDebug(r *http.Request, e *zerolog.Event) {
 	}
 }
 
-// ECS HTTP log wrapper
+// HttpHandler returns an httprouter.Handle that wraps the request with an ECS logger and
+// captures metrics for the current request.
 func HttpHandler(next httprouter.Handle) httprouter.Handle {
-
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		e := log.Info()
 
@@ -212,13 +213,15 @@ func HttpHandler(next httprouter.Handle) httprouter.Handle {
 
 		httpMeta(r, e)
 
-		// Data on response
-		e.Uint64(EcsHttpRequestBodyBytes, rdCounter.Count())
-		e.Uint64(EcsHttpResponseBodyBytes, wrCounter.Count())
-		e.Int(EcsHttpResponseCode, wrCounter.statusCode)
-		e.Int64(EcsEventDuration, time.Since(start).Nanoseconds())
+		// Only logs non 2xx errors unless we are debugging.
+		if log.Debug().Enabled() || (wrCounter.statusCode < 200 && wrCounter.statusCode >= 300) {
+			e.Uint64(EcsHttpRequestBodyBytes, rdCounter.Count())
+			e.Uint64(EcsHttpResponseBodyBytes, wrCounter.Count())
+			e.Int(EcsHttpResponseCode, wrCounter.statusCode)
+			e.Int64(EcsEventDuration, time.Since(start).Nanoseconds())
 
-		e.Msg("HTTP done")
+			e.Msgf("%d HTTP Request", wrCounter.statusCode)
+		}
 	}
 }
 
