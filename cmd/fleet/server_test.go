@@ -16,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	fbuild "github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -46,7 +47,7 @@ func TestRunServer(t *testing.T) {
 	et, err := NewEnrollerT(verCon, cfg, nil, c)
 	require.NoError(t, err)
 
-	router := NewRouter(ctx, bulker, ct, et, nil, nil, nil, nil)
+	router := NewRouter(ctx, bulker, ct, et, nil, nil, nil, nil, nil, fbuild.Info{})
 	errCh := make(chan error)
 
 	var wg sync.WaitGroup

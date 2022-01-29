@@ -119,7 +119,14 @@ type Event struct {
 	Error          string          `json:"error,omitempty"`
 }
 
+type StatusResponseVersion struct {
+	Number    string `json:"number,omitempty"`
+	BuildHash string `json:"build_hash,omitempty"`
+	BuildTime string `json:"build_time,omitempty"`
+}
+
 type StatusResponse struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
+	Name    string                 `json:"name"`
+	Status  string                 `json:"status"`
+	Version *StatusResponseVersion `json:"version,omitempty"`
 }

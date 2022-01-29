@@ -44,6 +44,11 @@ const (
 	defaultAckBurst    = 100
 	defaultAckMax      = 50
 	defaultAckMaxBody  = 1024 * 1024 * 2
+
+	defaultStatusInterval = time.Millisecond * 5
+	defaultStatusBurst    = 25
+	defaultStatusMax      = 50
+	defaultStatusMaxBody  = 0
 )
 
 type valueRange struct {
@@ -95,6 +100,7 @@ type serverLimitDefaults struct {
 	ArtifactLimit limit `config:"artifact_limit"`
 	EnrollLimit   limit `config:"enroll_limit"`
 	AckLimit      limit `config:"ack_limit"`
+	StatusLimit   limit `config:"status_limit"`
 }
 
 func defaultserverLimitDefaults() *serverLimitDefaults {
@@ -125,6 +131,12 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Burst:    defaultAckBurst,
 			Max:      defaultAckMax,
 			MaxBody:  defaultAckMaxBody,
+		},
+		StatusLimit: limit{
+			Interval: defaultStatusInterval,
+			Burst:    defaultStatusBurst,
+			Max:      defaultStatusMax,
+			MaxBody:  defaultStatusMaxBody,
 		},
 	}
 }

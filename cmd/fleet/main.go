@@ -865,8 +865,9 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 
 	at := NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
+	st := NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
 
-	router := NewRouter(ctx, bulker, ct, et, at, ack, sm, tracer)
+	router := NewRouter(ctx, bulker, ct, et, at, ack, st, sm, tracer, f.bi)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &cfg.Inputs[0].Server)
