@@ -16,8 +16,55 @@ pull_request_rules:
   - name: backport patches to 7.x branch
     conditions:
       - merged
+<<<<<<< HEAD
       - base=master
       - label=v7.16.0
+=======
+      - base=main
+      - label=backport-v8.0.0
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "8.0"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
+  - name: backport patches to 8.1 branch
+    conditions:
+      - merged
+      - base=master
+      - label=backport-v8.1.0
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "8.1"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
+  - name: backport patches to 7.17 branch
+    conditions:
+      - merged
+      - base=main
+      - label=backport-v7.17.0
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "7.17"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
+  - name: backport patches to 7.16 branch
+    conditions:
+      - merged
+      - base=main
+      - label=backport-v7.16.0
+>>>>>>> 9af3b21 (update main references (#1112))
     actions:
       backport:
         assignees:
@@ -30,8 +77,13 @@ pull_request_rules:
   - name: backport patches to 7.15 branch
     conditions:
       - merged
+<<<<<<< HEAD
       - base=master
       - label=v7.15.0
+=======
+      - base=main
+      - label=backport-v7.15.0
+>>>>>>> 9af3b21 (update main references (#1112))
     actions:
       backport:
         assignees:
@@ -57,8 +109,13 @@ pull_request_rules:
         title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
   - name: notify the backport policy
     conditions:
+<<<<<<< HEAD
       - -label~=(^v\d|backport-skip)
       - base=master
+=======
+      - -label~=^backport
+      - base=main
+>>>>>>> 9af3b21 (update main references (#1112))
     actions:
       comment:
         message: |
