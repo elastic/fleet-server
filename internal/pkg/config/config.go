@@ -32,6 +32,10 @@ type Config struct {
 	m       sync.Mutex
 }
 
+var deprecatedConfigOptions = map[string]string{
+	"inputs[0].limits.max_connections": "max_connections has been deprecated and will be removed in a future release. Please configure server limits using max_agents instead.",
+}
+
 // InitDefaults initializes the defaults for the configuration.
 func (c *Config) InitDefaults() {
 	c.Inputs = make([]Input, 1)
@@ -101,8 +105,19 @@ func (c *Config) Merge(other *Config) (*Config, error) {
 	return cfg, nil
 }
 
+func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
+	log.Warn().Msg("hi lol")
+	for opt, message := range deprecatedOpts {
+		if c.HasField(opt) {
+			log.Warn().Msg(message)
+		}
+	}
+}
+
 // FromConfig returns Config from the ucfg.Config.
 func FromConfig(c *ucfg.Config) (*Config, error) {
+	log.Warn().Msg("no?")
+	checkDeprecatedOptions(deprecatedConfigOptions, c)
 	cfg := &Config{}
 	err := c.Unpack(cfg, DefaultOptions...)
 	if err != nil {
