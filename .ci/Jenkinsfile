@@ -103,7 +103,7 @@ pipeline {
           withGoEnv(){
             sh(label: 'Create release artifacts', script: 'make docker-release')
             sh(label: 'List files for debugging purposes', script: 'ls -l build/binaries/**')
-            uploadPackagesToGoogleBucket(pattern: 'build/binaries/**')
+            uploadPackagesToGoogleBucket(pattern: 'build/binaries')
           }
         }
       }
