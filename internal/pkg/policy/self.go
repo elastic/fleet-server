@@ -45,9 +45,10 @@ type selfMonitorT struct {
 	bulker  bulk.Bulk
 	monitor monitor.Monitor
 
-	policyId string
-	status   proto.StateObserved_Status
-	reporter status.Reporter
+	policyId        string
+	defaultPolicyId string
+	status          proto.StateObserved_Status
+	reporter        status.Reporter
 
 	policy *model.Policy
 
@@ -70,6 +71,7 @@ func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monito
 		bulker:           bulker,
 		monitor:          monitor,
 		policyId:         policyId,
+		defaultPolicyId:  fleet.DefaultPolicyId,
 		status:           proto.StateObserved_STARTING,
 		reporter:         reporter,
 		policyF:          dl.QueryLatestPolicies,
@@ -171,7 +173,7 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 		if m.policyId != "" && policy.PolicyId == m.policyId {
 			m.policy = &policy
 			break
-		} else if m.policyId == "" && policy.DefaultFleetServer {
+		} else if m.policyId == "" && policy.PolicyId == m.defaultPolicyId {
 			m.policy = &policy
 			break
 		}

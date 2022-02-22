@@ -34,6 +34,7 @@ func (c *Config) InitDefaults() {
 	c.Inputs = make([]Input, 1)
 	c.Inputs[0].InitDefaults()
 	c.HTTP.InitDefaults()
+	c.Fleet.DefaultPolicyId = "fleet-server-policy"
 }
 
 // Validate ensures that the configuration is valid.

@@ -11,10 +11,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/gofrs/uuid"
@@ -33,6 +34,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	defer cancel()
 
 	cfg := config.Fleet{
+		DefaultPolicyId: "fleet-server-policy",
 		Agent: config.Agent{
 			ID: "agent-id",
 		},
@@ -70,7 +72,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		return nil
 	}, ftesting.RetrySleep(1*time.Second))
 
-	policyId := uuid.Must(uuid.NewV4()).String()
+	policyId := "fleet-server-policy"
 	rId := xid.New().String()
 	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{}})
 	if err != nil {
@@ -82,11 +84,10 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
-		CoordinatorIdx:     1,
-		Data:               policyContents,
-		RevisionIdx:        1,
-		DefaultFleetServer: true,
+		PolicyId:       policyId,
+		CoordinatorIdx: 1,
+		Data:           policyContents,
+		RevisionIdx:    1,
 	}
 	pData, err := json.Marshal(&policy)
 	if err != nil {
@@ -130,11 +131,10 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
-		CoordinatorIdx:     1,
-		Data:               policyContents,
-		RevisionIdx:        2,
-		DefaultFleetServer: true,
+		PolicyId:       policyId,
+		CoordinatorIdx: 1,
+		Data:           policyContents,
+		RevisionIdx:    2,
 	}
 	pData, err = json.Marshal(&policy)
 	if err != nil {
@@ -175,6 +175,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	defer cancel()
 
 	cfg := config.Fleet{
+		DefaultPolicyId: "fleet-server-policy",
 		Agent: config.Agent{
 			ID: "",
 		},
@@ -226,7 +227,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		return nil
 	}, ftesting.RetrySleep(1*time.Second))
 
-	policyId := uuid.Must(uuid.NewV4()).String()
+	policyId := "fleet-server-policy"
 	rId := xid.New().String()
 	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{
 		{
@@ -242,11 +243,10 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
-		CoordinatorIdx:     1,
-		Data:               policyContents,
-		RevisionIdx:        1,
-		DefaultFleetServer: true,
+		PolicyId:       policyId,
+		CoordinatorIdx: 1,
+		Data:           policyContents,
+		RevisionIdx:    1,
 	}
 	policyData, err := json.Marshal(&policy)
 	if err != nil {
@@ -392,11 +392,10 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
-		CoordinatorIdx:     1,
-		Data:               policyContents,
-		RevisionIdx:        2,
-		DefaultFleetServer: true,
+		PolicyId:       policyId,
+		CoordinatorIdx: 1,
+		Data:           policyContents,
+		RevisionIdx:    2,
 	}
 	pData, err := json.Marshal(&policy)
 	if err != nil {
@@ -440,11 +439,10 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   2,
 		},
-		PolicyId:           policyId,
-		CoordinatorIdx:     1,
-		Data:               policyContents,
-		RevisionIdx:        1,
-		DefaultFleetServer: true,
+		PolicyId:       policyId,
+		CoordinatorIdx: 1,
+		Data:           policyContents,
+		RevisionIdx:    1,
 	}
 	pData, err = json.Marshal(&policy)
 	if err != nil {
@@ -552,11 +550,10 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
-		CoordinatorIdx:     1,
-		Data:               policyContents,
-		RevisionIdx:        1,
-		DefaultFleetServer: true,
+		PolicyId:       policyId,
+		CoordinatorIdx: 1,
+		Data:           policyContents,
+		RevisionIdx:    1,
 	}
 	policyData, err := json.Marshal(&policy)
 	if err != nil {

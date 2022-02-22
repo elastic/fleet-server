@@ -86,10 +86,9 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	// add a real default fleet server policy
 	policyId := uuid.Must(uuid.NewV4()).String()
 	_, err := dl.CreatePolicy(ctx, bulker, model.Policy{
-		PolicyId:           policyId,
-		RevisionIdx:        1,
-		DefaultFleetServer: true,
-		Data:               policyData,
+		PolicyId:    policyId,
+		RevisionIdx: 1,
+		Data:        policyData,
 	})
 	require.NoError(t, err)
 

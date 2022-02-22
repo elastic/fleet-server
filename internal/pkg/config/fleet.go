@@ -50,8 +50,9 @@ type Host struct {
 
 // Fleet is the configuration of Agent running inside of Fleet.
 type Fleet struct {
-	Agent Agent `config:"agent"`
-	Host  Host  `config:"host"`
+	DefaultPolicyId string `config:"default_policy_id"`
+	Agent           Agent  `config:"agent"`
+	Host            Host   `config:"host"`
 }
 
 func strToLevel(s string) (zerolog.Level, error) {
