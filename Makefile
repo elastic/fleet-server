@@ -1,7 +1,11 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 SHELL=/bin/bash
 =======
 SHELL=env bash
+=======
+SHELL=/usr/bin/env bash
+>>>>>>> ae975b5 (abs path)
 GO_VERSION=$(shell cat '.go-version')
 >>>>>>> bfe2ea4 (update-make-check-go)
 DEFAULT_VERSION=$(shell awk '/const defaultVersion/{print $$NF}' main.go | tr -d '"')
