@@ -37,10 +37,19 @@ pipeline {
     }
     stage('Check') {
       steps {
+<<<<<<< HEAD
         cleanup()
         dir("${BASE_DIR}"){
           withGoEnv(){
             sh(label: 'check',script: 'make check')
+=======
+        withGithubNotify(context: "Check") {
+          cleanup()
+          dir("${BASE_DIR}"){
+            withGoEnv(){
+              sh(label: 'check',script: 'make check-ci')
+            }
+>>>>>>> 3a13ce6 (use check-ci as the job in the jenkinsfile)
           }
         }
       }
