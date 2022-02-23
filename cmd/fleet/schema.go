@@ -103,6 +103,7 @@ type ActionResp struct {
 
 type Event struct {
 	Type           string          `json:"type"`
+	InputType      string          `json:"input_type"`
 	SubType        string          `json:"subtype"`
 	AgentId        string          `json:"agent_id"`
 	ActionId       string          `json:"action_id"`

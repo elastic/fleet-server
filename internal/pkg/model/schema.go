@@ -94,6 +94,9 @@ type ActionResult struct {
 	// The action error message.
 	Error string `json:"error,omitempty"`
 
+	// The input type of the original action.
+	InputType string `json:"input_type,omitempty"`
+
 	// Date/time the action was started
 	StartedAt string `json:"started_at,omitempty"`
 

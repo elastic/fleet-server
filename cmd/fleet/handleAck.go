@@ -190,6 +190,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		acr := model.ActionResult{
 			ActionId:       ev.ActionId,
 			AgentId:        agent.Id,
+			InputType:      ev.InputType,
 			StartedAt:      ev.StartedAt,
 			CompletedAt:    ev.CompletedAt,
 			ActionData:     ev.ActionData,

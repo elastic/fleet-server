@@ -82,6 +82,10 @@
           "description": "The action id.",
           "type": "string"
         },
+        "input_type": {
+          "description": "The input type of the original action.",
+          "type": "string"
+        },
         "started_at": {
           "description": "Date/time the action was started",
           "type": "string",
