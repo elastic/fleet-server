@@ -68,12 +68,8 @@ check-ci: ## - Run all check of the ci without golint, the linter is run through
 
 .PHONY: check
 check: ## - Run all checks
-	@$(MAKE) generate
-	@$(MAKE) defaults
-	@$(MAKE) check-headers
-	@$(MAKE) notice
+	@$(MAKE) check-ci
 	@$(MAKE) check-go
-	@$(MAKE) check-no-changes
 
 .PHONY: check-headers
 check-headers:  ## - Check copyright headers
