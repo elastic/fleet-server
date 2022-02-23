@@ -1,4 +1,4 @@
-SHELL=env bash
+SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
 DEFAULT_VERSION=$(shell awk '/const defaultVersion/{print $$NF}' main.go | tr -d '"')
 TARGET_ARCH_386=x86
