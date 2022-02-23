@@ -72,7 +72,6 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/jcchavezs/porto v0.4.0 // indirect
-	github.com/jstemmer/go-junit-report v0.9.1 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	go.elastic.co/apm/module/apmhttprouter v1.14.0
