@@ -59,7 +59,7 @@ generate: ## - Generate schema models
 	env PATH="${GOBIN}:${PATH}" go generate ./...
 
 .PHONY: check-ci
-check-ci: ## - Run all check of the ci without linting, the linter is run through github action to have comments in the pull-request.
+check-ci: ## - Run all checks of the ci without linting, the linter is run through github action to have comments in the pull-request.
 	@$(MAKE) generate
 	@$(MAKE) defaults
 	@$(MAKE) check-headers
