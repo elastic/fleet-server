@@ -79,6 +79,9 @@ type ActionResult struct {
 	// The action id.
 	ActionId string `json:"action_id,omitempty"`
 
+	// The input type of the original action.
+	ActionInputType string `json:"action_input_type,omitempty"`
+
 	// The custom action response payload.
 	ActionResponse json.RawMessage `json:"action_response,omitempty"`
 
@@ -93,9 +96,6 @@ type ActionResult struct {
 
 	// The action error message.
 	Error string `json:"error,omitempty"`
-
-	// The input type of the original action.
-	InputType string `json:"input_type,omitempty"`
 
 	// Date/time the action was started
 	StartedAt string `json:"started_at,omitempty"`

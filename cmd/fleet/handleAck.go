@@ -151,6 +151,20 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 	return nil
 }
 
+func eventToActionResult(agentId string, ev Event) (acr model.ActionResult) {
+	return model.ActionResult{
+		ActionId:        ev.ActionId,
+		AgentId:         agentId,
+		ActionInputType: ev.ActionInputType,
+		StartedAt:       ev.StartedAt,
+		CompletedAt:     ev.CompletedAt,
+		ActionData:      ev.ActionData,
+		ActionResponse:  ev.ActionResponse,
+		Data:            ev.Data,
+		Error:           ev.Error,
+	}
+}
+
 func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) error {
 	var policyAcks []string
 	var unenroll bool
@@ -187,17 +201,8 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			ack.cache.SetAction(action)
 		}
 
-		acr := model.ActionResult{
-			ActionId:       ev.ActionId,
-			AgentId:        agent.Id,
-			InputType:      ev.InputType,
-			StartedAt:      ev.StartedAt,
-			CompletedAt:    ev.CompletedAt,
-			ActionData:     ev.ActionData,
-			ActionResponse: ev.ActionResponse,
-			Data:           ev.Data,
-			Error:          ev.Error,
-		}
+		acr := eventToActionResult(agent.Id, ev)
+
 		if _, err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
 			return errors.Wrap(err, "create action result")
 		}

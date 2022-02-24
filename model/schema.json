@@ -82,7 +82,7 @@
           "description": "The action id.",
           "type": "string"
         },
-        "input_type": {
+        "action_input_type": {
           "description": "The input type of the original action.",
           "type": "string"
         },
