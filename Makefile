@@ -1,4 +1,4 @@
-SHELL=/bin/bash
+SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
 DEFAULT_VERSION=$(shell awk '/const defaultVersion/{print $$NF}' main.go | tr -d '"')
 TARGET_ARCH_386=x86
@@ -58,14 +58,18 @@ generate: ## - Generate schema models
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
 	env PATH="${GOBIN}:${PATH}" go generate ./...
 
-.PHONY: check
-check: ## - Run all checks
+.PHONY: check-ci
+check-ci: ## - Run all checks of the ci without linting, the linter is run through github action to have comments in the pull-request.
 	@$(MAKE) generate
 	@$(MAKE) defaults
 	@$(MAKE) check-headers
-	@$(MAKE) check-go
 	@$(MAKE) notice
 	@$(MAKE) check-no-changes
+
+.PHONY: check
+check: ## - Run all checks
+	@$(MAKE) check-ci
+	@$(MAKE) check-go
 
 .PHONY: check-headers
 check-headers:  ## - Check copyright headers
@@ -73,10 +77,9 @@ check-headers:  ## - Check copyright headers
 	@env PATH="${GOBIN}:${PATH}" go-licenser -license Elastic
 
 .PHONY: check-go
-check-go: ## - Run go fmt, go vet, go mod tidy
-	@go fmt ./...
-	@go vet ./...
-	@go mod tidy
+check-go: ## - Run golangci-lint
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.44.2
+	@./bin/golangci-lint run -v
 
 .PHONY: notice
 notice: ## - Generates the NOTICE.txt file.

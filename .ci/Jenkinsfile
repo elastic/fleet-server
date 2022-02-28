@@ -45,7 +45,7 @@ pipeline {
           cleanup()
           dir("${BASE_DIR}"){
             withGoEnv(){
-              sh(label: 'check',script: 'make check')
+              sh(label: 'check',script: 'make check-ci')
             }
           }
         }
