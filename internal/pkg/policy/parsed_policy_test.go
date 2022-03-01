@@ -438,15 +438,6 @@ const testPolicy = `
          "hosts": [
             "https://5a8bb94bfbe0401a909e1496a9e884c2.us-central1.gcp.foundit.no:443"
          ]
-      },
-      "remote_with_token": {
-         "type": "elasticsearch",
-         "hosts": [
-            "https://5a8bb94bfbe0401a909e1496a9e884c2.us-central1.gcp.foundit.no:443"
-         ],
-         "fleet_server": {
-            "service_token": "abc123"
-         }
       }
    },
    "output_permissions": {
@@ -925,13 +916,14 @@ func TestNewParsedPolicy(t *testing.T) {
 		if pp.Default.Name != "other" {
 			t.Error("other output should be identified as default")
 		}
-		if pp.Default.Role == nil {
+		defaultOutput := pp.Outputs[pp.Default.Name]
+		if defaultOutput.Role == nil {
 			t.Error("other output role should be identified")
 		}
 
 		expectedSha2 := "d4d0840fe28ca4900129a749b56cee729562c0a88c935192c659252b5b0d762a"
-		if pp.Default.Role.Sha2 != expectedSha2 {
-			t.Fatal(fmt.Sprintf("Expected sha2: '%s', got '%s'.", expectedSha2, pp.Default.Role.Sha2))
+		if defaultOutput.Role.Sha2 != expectedSha2 {
+			t.Fatal(fmt.Sprintf("Expected sha2: '%s', got '%s'.", expectedSha2, defaultOutput.Role.Sha2))
 		}
 	}
 }
