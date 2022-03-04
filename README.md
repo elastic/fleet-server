@@ -1,4 +1,4 @@
-[![Build Status](https://beats-ci.elastic.co/job/Ingest-manager/job/fleet-server/job/main/badge/icon)](https://beats-ci.elastic.co/job/Ingest-manager/job/fleet-server/job/main/)
+[![Build Status](https://fleet-ci.elastic.co/job/Ingest-manager/job/fleet-server/job/main/badge/icon)](https://fleet-ci.elastic.co/job/Ingest-manager/job/fleet-server/job/main/)
 
 # Fleet Server implementation
 
