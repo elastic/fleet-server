@@ -58,7 +58,7 @@ func NewParsedPolicy(p model.Policy) (*ParsedPolicy, error) {
 
 	// Interpret the output permissions if available
 	var roles map[string]RoleT
-	if perms, _ := fields[FieldOutputPermissions]; len(perms) != 0 {
+	if perms := fields[FieldOutputPermissions]; len(perms) != 0 {
 		if roles, err = parsePerms(perms); err != nil {
 			return nil, err
 		}

@@ -261,7 +261,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	// take/keep leadership and start new coordinators
 	res := make(chan policyT)
 	for _, p := range lead {
-		pt, _ := m.policies[p.PolicyId]
+		pt := m.policies[p.PolicyId]
 		pt.id = p.PolicyId
 		go func(p model.Policy, pt policyT) {
 			defer func() {

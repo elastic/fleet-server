@@ -173,7 +173,7 @@ func TestBulkSimple(t *testing.T) {
 				}
 			}
 
-			if c.meta != nil && bytes.Compare(c.meta, sub.Meta) != 0 {
+			if c.meta != nil && !bytes.Equal(c.meta, sub.Meta) {
 				t.Error("meta doesn't match up")
 			}
 

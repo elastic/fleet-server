@@ -244,7 +244,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	// up the stack will fail.
 
 	n := queue.head
-	for i, _ := range blk.Items {
+	for i := range blk.Items {
 		next := n.next // 'n' is invalid immediately on channel send
 
 		item := blk.Items[i].Choose()
