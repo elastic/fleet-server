@@ -1,4 +1,3 @@
-// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
@@ -20,23 +19,11 @@ import (
 )
 
 // TODO:
-// WithREfresh() options
+// WithRefresh() options
 // Delete not found?
-
-type stubTransport struct {
-	cb func(*http.Request) (*http.Response, error)
-}
-
-func (s *stubTransport) Perform(req *http.Request) (*http.Response, error) {
-	return s.cb(req)
-}
-
-type mockBulkTransport struct {
-	b *testing.B
-}
+type mockBulkTransport struct {}
 
 func (m *mockBulkTransport) Perform(req *http.Request) (*http.Response, error) {
-
 	type mockFrameT struct {
 		Index  json.RawMessage `json:"index,omitempty"`
 		Delete json.RawMessage `json:"delete,omitempty"`

@@ -11,10 +11,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 )
 
-const (
-	maxSeqNo = "max_seq_no"
-)
-
 var (
 	QuerySeqNoByDocID = prepareFindSeqNoByDocID()
 )

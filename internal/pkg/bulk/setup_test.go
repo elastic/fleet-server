@@ -66,18 +66,6 @@ func (ts testT) marshal(t testing.TB) []byte {
 	return data
 }
 
-func (ts *testT) read(t testing.TB, bulker Bulk, ctx context.Context, index, id string) {
-	data, err := bulker.Read(ctx, index, id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = json.Unmarshal(data, ts)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func init() {
 	c, err := yaml.NewConfig(defaultCfgData, config.DefaultOptions...)
 	if err != nil {
