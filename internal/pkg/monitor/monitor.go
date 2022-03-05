@@ -26,7 +26,6 @@ import (
 
 const (
 	defaultPollTimeout    = 4 * time.Minute // default long poll timeout
-	defaultSeqNo          = int64(-1)       // the _seq_no in elasticsearch start with 0
 	defaultWithExpiration = false
 
 	// Making the default fetch size larger, in order to increase the throughput of the monitor.
