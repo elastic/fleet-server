@@ -73,6 +73,7 @@ func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id s
 	return r, nil
 }
 
+// nolint:errcheck // Need to verify if error can really happen with the in memory buffer.
 func (b *Bulker) writeMget(buf *Buf, index, id string) error {
 	if err := b.validateMeta(index, id); err != nil {
 		return err
@@ -86,6 +87,7 @@ func (b *Bulker) writeMget(buf *Buf, index, id string) error {
 	return nil
 }
 
+// nolint:errcheck // Need to verify if error can really happen with the in memory buffer.
 func (b *Bulker) writeBulkMeta(buf *Buf, action, index, id, retry string) error {
 	if err := b.validateMeta(index, id); err != nil {
 		return err
@@ -112,6 +114,7 @@ func (b *Bulker) writeBulkMeta(buf *Buf, action, index, id, retry string) error 
 	return nil
 }
 
+// nolint:errcheck // Need to verify if error can really happen with the in memory buffer.
 func (b *Bulker) writeBulkBody(buf *Buf, action actionT, body []byte) error {
 	if len(body) == 0 {
 		if action == ActionDelete {
