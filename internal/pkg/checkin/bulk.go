@@ -95,7 +95,7 @@ func (bc *Bulk) timestamp() string {
 
 // WARNING: Bulk will take ownership of fields,
 // so do not use after passing in.
-func (bc *Bulk) CheckIn(id string, status string, meta []byte, seqno sqn.SeqNo, newVer string) error {
+func (bc *Bulk) CheckIn(id string, status string, meta []byte, seqno sqn.SeqNo, newVer string) {
 
 	// Separate out the extra data to minimize
 	// the memory footprint of the 90% case of just
@@ -118,7 +118,7 @@ func (bc *Bulk) CheckIn(id string, status string, meta []byte, seqno sqn.SeqNo, 
 	}
 
 	bc.mut.Unlock()
-	return nil
+	return
 }
 
 func (bc *Bulk) Run(ctx context.Context) error {
