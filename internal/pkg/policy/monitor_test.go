@@ -138,11 +138,11 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
 	s, err := monitor.Subscribe(agentId, policyId, 1, 1)
-	defer funct() {
+	defer func() {
 		if err:=	monitor.Unsubscribe(s); err != nil {
 			t.Fatal(err)
 		}
-	}
+	}()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,11 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
 	s, err := monitor.Subscribe(agentId, policyId, 1, 1)
-	defer monitor.Unsubscribe(s)
+	defer func() {
+		if err := monitor.Unsubscribe(s); err != nil {
+			t.Fatal(err)
+		}
+	}()
 	if err != nil {
 		t.Fatal(err)
 	}

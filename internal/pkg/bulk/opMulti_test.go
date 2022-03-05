@@ -8,8 +8,6 @@ import (
 	"context"
 	"strconv"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 const payload = `{"_id" : "1", "_index" : "test"}`
@@ -54,9 +52,9 @@ func BenchmarkMultiUpdateMock(b *testing.B) {
 		b.Run(strconv.Itoa(n), func(b *testing.B) {
 			b.ReportAllocs()
 			ctx := context.Background()
-			for i := 0; i < b.N; i++ {
+			for i := 0; i < b.N; i++ { // nolint:staticcheck // Sorry but this is a a valid loop and the i is incremented.
 				_, err := bulker.MUpdate(ctx, ops[:n])
-				b.Fatalf("error while doing multi op on elasticsearch", err)
+				b.Fatalf("error while doing multi op on elasticsearch: %+v", err)
 			}
 		})
 	}

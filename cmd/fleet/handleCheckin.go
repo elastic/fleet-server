@@ -213,7 +213,11 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	if err != nil {
 		return errors.Wrap(err, "subscribe policy monitor")
 	}
-	defer ct.pm.Unsubscribe(sub)
+	defer func() {
+		if err := ct.pm.Unsubscribe(sub); err != nil {
+			log.Error().Err(err).Msg("could not unsubscribe the policy monitor")
+		}
+	)()
 
 	// Update check-in timestamp on timeout
 	tick := time.NewTicker(ct.cfg.Timeouts.CheckinTimestamp)
@@ -299,7 +303,6 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 }
 
 func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, resp CheckinResponse) error {
-
 	payload, err := json.Marshal(&resp)
 	if err != nil {
 		return errors.Wrap(err, "writeResponse marshal")
