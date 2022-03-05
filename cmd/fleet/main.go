@@ -479,13 +479,13 @@ LOOP:
 		if started {
 			err := f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil)
 			if err != nil {
-				log.Error().Err(err).Msg("Fleet server could not report 'Re-configuring' state to Agent")
+				log.Error().Err(err).Msg("Fleet server could not report 'CONFIGURING' state to Agent")
 			}
 		} else {
 			started = true
 			err := f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
 			if err != nil {
-				log.Error().Err(err).Msg("Fleet server could not report 'Starting' state to Agent")
+				log.Error().Err(err).Msg("Fleet server could not report 'STARTING' state to Agent")
 			}
 		}
 
@@ -536,12 +536,12 @@ LOOP:
 		case err := <-ech:
 			er := f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil)
 			if er != nil {
-				log.Error().Err(er).Msg("Fleet server could not report 'Failed' state to Agent")
+				log.Error().Err(er).Msg("Fleet server could not report 'FAILED' state to Agent")
 			}
 			log.Error().Err(err).Msg("Fleet Server failed")
 			return err
 		case <-ctx.Done():
-			err := f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil)
+			err := f.reporter.Status(proto.StateObserved_STOPPING, "STOPPING", nil)
 			if err != nil {
 				log.Error().Err(err).Msg("Fleet server could not report 'Stopping' state to Agent")
 			}

@@ -221,9 +221,15 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 		// no fleet-server input
 		m.status = proto.StateObserved_STARTING
 		if m.policyId == "" {
-			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on fleet-server input to be added to default policy", nil)
+			err := m.reporter.Status(proto.StateObserved_STARTING, "Waiting on fleet-server input to be added to default policy", nil)
+			if err != nil {
+				log.Error().Err(err).Msg("Fleet server could not report 'STARTING' state to Agent")
+			}
 		} else {
-			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", m.policyId), nil)
+			err := m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", m.policyId), nil)
+			if err != nil {
+				log.Error().Err(err).Msg("Fleet server could not report 'STARTING' state to Agent")
+			}
 		}
 		return proto.StateObserved_STARTING, nil
 	}
@@ -245,9 +251,15 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 		if len(tokens) == 0 {
 			// no tokens created for the policy, still starting
 			if m.policyId == "" {
-				m.reporter.Status(proto.StateObserved_STARTING, "Waiting on active enrollment keys to be created in default policy with Fleet Server integration", nil)
+				err := m.reporter.Status(proto.StateObserved_STARTING, "Waiting on active enrollment keys to be created in default policy with Fleet Server integration", nil)
+				if err != nil {
+					log.Error().Err(err).Msg("Fleet server could not report 'STARTING' state to Agent")
+				}
 			} else {
-				m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", m.policyId), nil)
+				err := m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", m.policyId), nil)
+				if err != nil {
+					log.Error().Err(err).Msg("Fleet server could not report 'STARTING' state to Agent")
+				}
 			}
 			return proto.StateObserved_STARTING, nil
 		}
@@ -257,9 +269,15 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 	}
 	m.status = status
 	if m.policyId == "" {
-		m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), payload)
+		err := m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), payload)
+		if err != nil {
+			log.Error().Err(err).Msgf("Fleet server could not report '%s' state to Agent", status)
+		}
 	} else {
-		m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyId, extendMsg), payload)
+		err := m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyId, extendMsg), payload)
+		if err != nil {
+			log.Error().Err(err).Msgf("Fleet server could not report '%s' state to Agent", status)
+		}
 	}
 	return status, nil
 }

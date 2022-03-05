@@ -15,6 +15,7 @@ import (
 
 	"github.com/elastic/beats/v7/licenses"
 	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -244,7 +245,9 @@ func main() {
 		os.Stdout.Write(data)
 		return
 	} else {
-		ioutil.WriteFile(output, data, 0640)
+		if err  := ioutil.WriteFile(output, data, 0640); err != nil {
+			fmt.Fprintf(os.Stderr, "Error while writing the file, err: %+v\n", err)
+		}
 	}
 
 	return
@@ -257,7 +260,7 @@ func gen(path string, l string) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	tmpl.Execute(&buf, struct {
+	err = tmpl.Execute(&buf, struct {
 		Pack    string
 		Files   []string
 		License string
@@ -266,6 +269,10 @@ func gen(path string, l string) ([]byte, error) {
 		Files:   files,
 		License: l,
 	})
+
+	if err != nil {
+		return nil, errors.Wrap(err, "could not render the template")
+	}
 
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {
