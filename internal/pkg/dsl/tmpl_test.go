@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // Emulate agent_id saved object query
@@ -36,7 +38,6 @@ func makeQuery2(leaf1 interface{}, leaf2 interface{}) *Node {
 }
 
 func BenchmarkRenderOne(b *testing.B) {
-
 	const kName = "api_key"
 	tmpl := NewTmpl()
 	token := tmpl.Bind(kName)
@@ -49,12 +50,12 @@ func BenchmarkRenderOne(b *testing.B) {
 
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
-		tmpl.RenderOne(kName, "2Ye0F3UByTc0c1e9OeMO")
+		_, err := tmpl.RenderOne(kName, "2Ye0F3UByTc0c1e9OeMO")
+		require.NoError(b, err)
 	}
 }
 
 func BenchmarkRender(b *testing.B) {
-
 	const kName = "api_key"
 	tmpl := NewTmpl()
 	token := tmpl.Bind(kName)
