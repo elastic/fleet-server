@@ -217,7 +217,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		if err := ct.pm.Unsubscribe(sub); err != nil {
 			log.Error().Err(err).Msg("could not unsubscribe the policy monitor")
 		}
-	)()
+	}()
 
 	// Update check-in timestamp on timeout
 	tick := time.NewTicker(ct.cfg.Timeouts.CheckinTimestamp)

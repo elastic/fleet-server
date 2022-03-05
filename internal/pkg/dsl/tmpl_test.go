@@ -70,9 +70,13 @@ func BenchmarkRender(b *testing.B) {
 
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
-		tmpl.Render(map[string]interface{}{
+		_, err := tmpl.Render(map[string]interface{}{
 			kName: v,
 		})
+
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
