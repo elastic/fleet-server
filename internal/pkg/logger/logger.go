@@ -41,7 +41,9 @@ type Logger struct {
 func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 	if changed(l.cfg, cfg) {
 		// sync before reload
-		l.Sync()
+		if err := l.Sync(); err != nil {
+			return err
+		}
 
 		// reload the logger
 		logger, w, err := configure(cfg, l.name)
@@ -56,10 +58,11 @@ func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 }
 
 // Sync syncs the logger to its output.
-func (l *Logger) Sync() {
+func (l *Logger) Sync() err error {
 	if l.sync != nil {
-		l.sync.Sync()
+		err = l.sync.Sync()
 	}
+	return err
 }
 
 // Init initializes the logger.
@@ -161,8 +164,7 @@ func configure(cfg *config.Config, svcName string) (lg zerolog.Logger, wr Writer
 	return
 }
 
-type nopSync struct {
-}
+type nopSync struct {}
 
 // Sync does nothing.
 func (*nopSync) Sync() error {
