@@ -9,5 +9,5 @@ type Runtime struct {
 }
 
 func (r Runtime) InitDefaults() {
-	r.GCPercent = 0 //nolint:staticcheck
+	r.GCPercent = 0 //nolint:staticcheck // can be used to reset the value to the defaults.
 }
