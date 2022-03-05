@@ -398,7 +398,6 @@ func (a *AgentMode) OnError(err error) {
 type FleetServer struct {
 	bi       build.Info
 	verCon   version.Constraints
-	policyId string
 
 	cfg      *config.Config
 	cfgCh    chan *config.Config
