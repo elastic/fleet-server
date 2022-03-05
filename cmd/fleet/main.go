@@ -169,11 +169,10 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 
 		if runErr != nil && runErr != context.Canceled {
 			log.Error().Err(runErr).Msg("Exiting")
-			l.Sync()
+			l.Sync() // nolint:errcheck // we are in the process of shutting down and we can't recover if there is a sync log issue.
 			return runErr
 		}
-		l.Sync()
-		return nil
+		return l.Sync()
 	}
 }
 
@@ -287,7 +286,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 				return
 			}
 			// sleep some before calling Run again
-			sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay)
+			sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay) // nolint:errcheck // we are currently in a tight loop and retrying to reach the agent, there is enough logging.
 		}
 	}()
 	return <-res
@@ -445,7 +444,10 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			cn()
 		}
 		if g != nil {
-			g.Wait()
+			err := g.Wait()
+			if err != nil {
+				log.Error().Err(err).Msg("error occurred while stopping the server")
+			}
 		}
 	}
 
@@ -475,10 +477,16 @@ LOOP:
 		ech := make(chan error, 2)
 
 		if started {
-			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil)
+			err := f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil)
+			if err != nil {
+				log.Error().Err(err).Msg("Fleet server could not report 'Re-configuring' state to Agent")
+			}
 		} else {
 			started = true
-			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
+			err := f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
+			if err != nil {
+				log.Error().Err(err).Msg("Fleet server could not report 'Starting' state to Agent")
+			}
 		}
 
 		// Create or recreate cache
@@ -524,13 +532,19 @@ LOOP:
 
 		select {
 		case newCfg = <-f.cfgCh:
-			log.Info().Msg("Server configuration update")
+			log.Info().Msg("server configuration update")
 		case err := <-ech:
-			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil)
+			er := f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil)
+			if er != nil {
+				log.Error().Err(er).Msg("Fleet server could not report 'Failed' state to Agent")
+			}
 			log.Error().Err(err).Msg("Fleet Server failed")
 			return err
 		case <-ctx.Done():
-			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil)
+			err := f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil)
+			if err != nil {
+				log.Error().Err(err).Msg("Fleet server could not report 'Stopping' state to Agent")
+			}
 			break LOOP
 		}
 	}
@@ -711,7 +725,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	case err != nil:
 		return err
 	case metricsServer != nil:
-		defer metricsServer.Stop()
+		defer metricsServer.Stop() // nolint:errcheck // We are curently shutting down.
 	}
 
 	// Bulker is started in its own context and managed in the scope of this function. This is done so

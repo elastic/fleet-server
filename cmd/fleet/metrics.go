@@ -84,7 +84,7 @@ func (rt *routeStats) Register(registry *monitoring.Registry) {
 }
 
 func init() {
-	metrics.SetupMetrics(kServiceName)
+	metrics.SetupMetrics(kServiceName) // nolint:errcheck // Assumes that metrics from beats does the right thing.
 	registry = monitoring.Default.NewRegistry("http_server")
 	cntHttpNew = monitoring.NewUint(registry, "tcp_open")
 	cntHttpClose = monitoring.NewUint(registry, "tcp_close")
