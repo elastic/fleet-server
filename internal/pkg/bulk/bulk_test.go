@@ -21,7 +21,7 @@ import (
 // TODO:
 // WithRefresh() options
 // Delete not found?
-type mockBulkTransport struct {}
+type mockBulkTransport struct{}
 
 func (m *mockBulkTransport) Perform(req *http.Request) (*http.Response, error) {
 	type mockFrameT struct {

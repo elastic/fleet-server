@@ -164,7 +164,7 @@ func configure(cfg *config.Config, svcName string) (lg zerolog.Logger, wr Writer
 	return
 }
 
-type nopSync struct {}
+type nopSync struct{}
 
 // Sync does nothing.
 func (*nopSync) Sync() error {
