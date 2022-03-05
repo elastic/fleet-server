@@ -34,29 +34,6 @@ fleet:
     id: 1e4954ce-af37-4731-9f4a-407b08e69e42
 `)
 
-const testPolicy = `{
-	"properties": {
-		"intval": {
-			"type": "integer"
-		},
-		"objval": {
-			"type": "object"
-		},
-		"boolval": {
-			"type": "boolean"
-		},
-		"kwval": {
-			"type": "keyword"
-		},
-		"binaryval": {
-			"type": "binary"
-		},
-		"dateval": {
-			"type": "date"
-		}
-	}
-}`
-
 type subT struct {
 	SubString string `json:"substring"`
 }
@@ -71,7 +48,6 @@ type testT struct {
 }
 
 func NewRandomSample() testT {
-
 	return testT{
 		IntVal:    int(rand.Int31()),
 		ObjVal:    subT{SubString: randomdata.SillyName()},
