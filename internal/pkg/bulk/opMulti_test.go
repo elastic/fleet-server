@@ -8,6 +8,8 @@ import (
 	"context"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const payload = `{"_id" : "1", "_index" : "test"}`
@@ -53,7 +55,8 @@ func BenchmarkMultiUpdateMock(b *testing.B) {
 			b.ReportAllocs()
 			ctx := context.Background()
 			for i := 0; i < b.N; i++ {
-				bulker.MUpdate(ctx, ops[:n])
+				_, err := bulker.MUpdate(ctx, ops[:n])
+				b.Fatalf("error while doing multi op on elasticsearch", err)
 			}
 		})
 	}
