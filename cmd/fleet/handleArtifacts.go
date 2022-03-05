@@ -138,12 +138,6 @@ func (at ArtifactT) handleArtifacts(zlog *zerolog.Logger, r *http.Request, id, s
 	return at.processRequest(r.Context(), *zlog, agent, id, sha2)
 }
 
-type artHandler struct {
-	zlog   zerolog.Logger
-	bulker bulk.Bulk
-	c      cache.Cache
-}
-
 func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
 
 	// Input validation
