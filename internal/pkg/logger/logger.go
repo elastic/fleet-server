@@ -58,11 +58,11 @@ func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 }
 
 // Sync syncs the logger to its output.
-func (l *Logger) Sync() err error {
+func (l *Logger) Sync() error {
 	if l.sync != nil {
-		err = l.sync.Sync()
+		return l.sync.Sync()
 	}
-	return err
+	return nil
 }
 
 // Init initializes the logger.
