@@ -56,6 +56,7 @@ func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...
 	return &es.ResultT{HitsT: r.Hits, Aggregations: r.Aggregations}, nil
 }
 
+//nolint:errcheck // we are using a in memory buffer, so it reduce the risk.
 func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, checkpoints []int64) error {
 	if err := b.validateIndex(index); err != nil {
 		return err
@@ -101,6 +102,7 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, 
 	return nil
 }
 
+//nolint:errcheck // we are using a in memory buffer, so it reduce the risk.
 func (b *Bulker) writeMsearchBody(buf *Buf, body []byte) error {
 	buf.Write(body)
 	buf.WriteRune('\n')

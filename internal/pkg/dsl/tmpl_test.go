@@ -81,20 +81,23 @@ func BenchmarkRender(b *testing.B) {
 }
 
 func BenchmarkMarshalNode(b *testing.B) {
-
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
 		query := makeQuery("2Ye0F3UByTc0c1e9OeMO")
-		json.Marshal(query)
+		if _, err := json.Marshal(query); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
 func BenchmarkMarshalNode2(b *testing.B) {
-
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
 		query := makeQuery2("27e58fc0-09a2-11eb-a8cd-57e98f140de5", 3)
-		json.Marshal(query)
+		_, err := json.Marshal(query)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -114,7 +117,6 @@ func BenchmarkSprintf(b *testing.B) {
 }
 
 func BenchmarkRender2(b *testing.B) {
-
 	const kName1 = "policyId"
 	const kName2 = "policyRev"
 
@@ -135,6 +137,9 @@ func BenchmarkRender2(b *testing.B) {
 			kName2: 3,
 		}
 
-		tmpl.Render(m)
+		_, err := tmpl.Render(m)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }

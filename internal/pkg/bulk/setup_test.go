@@ -90,7 +90,11 @@ func SetupBulk(ctx context.Context, t testing.TB, opts ...BulkOpt) Bulk {
 	opts = append(opts, BulkOptsFromCfg(&defaultCfg)...)
 
 	bulker := NewBulker(cli, opts...)
-	go bulker.Run(ctx)
+	go func() {
+		if err := bulker.Run(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	return bulker
 }
