@@ -245,7 +245,7 @@ func main() {
 		os.Stdout.Write(data)
 		return
 	} else {
-		if err := ioutil.WriteFile(output, data, 0640); err != nil {
+		if err := ioutil.WriteFile(output, data, 0640); err != nil { //nolint:gosec // I need to investigate more this part of the code.
 			fmt.Fprintf(os.Stderr, "Error while writing the file, err: %+v\n", err)
 		}
 	}
