@@ -205,9 +205,15 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 		// no policy found
 		m.status = proto.StateObserved_STARTING
 		if m.policyId == "" {
-			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on default policy with Fleet Server integration", nil)
+			err := m.reporter.Status(proto.StateObserved_STARTING, "Waiting on default policy with Fleet Server integration", nil)
+			if err != nil {
+				log.Error().Err(err).Msg("Fleet server could not report 'STARTING' state to Agent")
+			}
 		} else {
-			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", m.policyId), nil)
+			err := m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", m.policyId), nil)
+			if err != nil {
+				log.Error().Err(err).Msg("Fleet server could not report 'STARTING' state to Agent")
+			}
 		}
 		return proto.StateObserved_STARTING, nil
 	}
