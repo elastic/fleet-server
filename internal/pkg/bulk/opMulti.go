@@ -53,7 +53,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 	// This decreases pressure on the heap. If we calculculate wrong,
 	// the Buf objectect has the property that previously cached slices
 	// are still valid.  However, underestimating the buffer size
-	// can lead to mulitple copies, which undermines the optimization.
+	// can lead to multiple copies, which undermines the optimization.
 	var bulkBuf Buf
 	bulkBuf.Grow(byteCnt)
 

@@ -24,7 +24,7 @@ import (
 const cloudPolicyId = "policy-elastic-agent-on-cloud"
 
 /*
-Design should have the following properites
+Design should have the following properties
 
 Policy rollout scheduling should...
 1) be fair; delivered in first come first server order.

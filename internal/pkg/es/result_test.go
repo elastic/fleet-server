@@ -33,7 +33,7 @@ func TestHitUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Unmarshall action iwth json and check that ES properties are not set
+	// Unmarshall action with json and check that ES properties are not set
 	var a model.Action
 	err = json.Unmarshal(body, &a)
 	if err != nil {

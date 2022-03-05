@@ -66,7 +66,7 @@ func TestHandleStatus(t *testing.T) {
 		},
 	}
 
-	// Test table, with inner loop on all avaiable statuses
+	// Test table, with inner loop on all available statuses
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 			for k, v := range proto.StateObserved_Status_name {

@@ -235,7 +235,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	longPoll := time.NewTicker(pollDuration)
 	defer longPoll.Stop()
 
-	// Intial update on checkin, and any user fields that might have changed
+	// Initial update on checkin, and any user fields that might have changed
 	ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno, ver)
 
 	// Initial fetch for pending actions
