@@ -175,15 +175,8 @@ func TestConfig(t *testing.T) {
 }
 
 // Stub out the defaults so that the above is easier to maintain
-
 func defaultCache() Cache {
 	var d Cache
-	d.InitDefaults()
-	return d
-}
-
-func defaultServerTimeouts() ServerTimeouts {
-	var d ServerTimeouts
 	d.InitDefaults()
 	return d
 }
