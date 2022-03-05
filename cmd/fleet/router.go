@@ -29,7 +29,6 @@ const (
 type Router struct {
 	ctx    context.Context
 	bulker bulk.Bulk
-	ver    string
 	ct     *CheckinT
 	et     *EnrollerT
 	at     *ArtifactT
