@@ -120,10 +120,7 @@ func TestBulkSimple(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-
-			if err := bc.CheckIn(c.id, c.status, c.meta, c.seqno, c.ver); err != nil {
-				t.Fatal(err)
-			}
+			bc.CheckIn(c.id, c.status, c.meta, c.seqno, c.ver)
 
 			if err := bc.flush(context.Background()); err != nil {
 				t.Fatal(err)
@@ -215,10 +212,7 @@ func benchmarkBulk(n int, flush bool, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 
 		for _, id := range ids {
-			err := bc.CheckIn(id, "", nil, nil, "")
-			if err != nil {
-				b.Fatal(err)
-			}
+			bc.CheckIn(id, "", nil, nil, "")
 		}
 
 		if flush {
