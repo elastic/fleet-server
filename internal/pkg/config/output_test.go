@@ -263,8 +263,8 @@ func setTestEnv(t *testing.T, env map[string]string) {
 	}
 
 	t.Cleanup(func() {
-		for k := range env {
-			if v := oldEnv[k]; v != v {
+		for k, v := range env {
+			if oldV := oldEnv[k]; oldV != v {
 				os.Setenv(k, v)
 			} else {
 				os.Unsetenv(k)

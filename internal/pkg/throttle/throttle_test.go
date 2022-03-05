@@ -181,12 +181,14 @@ func TestThrottleExpireIdentity(t *testing.T) {
 	token3 := throttle.Acquire(key, time.Hour)
 	if token3 == nil {
 		t.Error("Expected third acquire to succeed")
+		return
 	}
 
 	// Original token should fail release
 	found := token.Release()
 	if found {
 		t.Error("Expected token to have expired")
+		return
 	}
 
 	// However, third token should release fine
@@ -211,6 +213,7 @@ func TestThrottleExpireAtMax(t *testing.T) {
 	token2 := throttle.Acquire(key2, time.Hour)
 	if token2 != nil {
 		t.Error("Expected second acquire to fail on max")
+		return
 	}
 
 	time.Sleep(time.Second)
@@ -219,12 +222,14 @@ func TestThrottleExpireAtMax(t *testing.T) {
 	token2 = throttle.Acquire(key2, time.Hour)
 	if token2 == nil {
 		t.Error("Expected third acquire to succeed")
+		return
 	}
 
 	// Original token should fail release
 	found := token1.Release()
 	if found {
 		t.Error("Expected token to have expired")
+		return
 	}
 
 	// However, third token should release fine
