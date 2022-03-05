@@ -62,7 +62,7 @@ func TestScheduler(t *testing.T) {
 	})
 
 	g.Go(func() error {
-		wait.WithContext(ctx, 500*time.Millisecond)
+		wait.WithContext(ctx, 500*time.Millisecond) // nolint:errcheck // Err can be ignore in the test helper.
 		// return some error here to cause exit error group wait
 		return errTest
 	})
