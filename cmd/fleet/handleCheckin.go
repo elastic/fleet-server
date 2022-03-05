@@ -369,10 +369,9 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req C
 		if err != nil {
 			if errors.Is(err, dl.ErrNotFound) {
 				zlog.Debug().Str("token", ackToken).Msg("revision token not found")
-				err = nil
 			} else {
 				err = errors.Wrap(err, "resolveSeqNo")
-				return
+				return seqno, err
 			}
 		}
 		seqno = []int64{sn}
