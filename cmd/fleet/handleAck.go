@@ -29,8 +29,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var ErrEventAgentIdMismatch = errors.New("event agentId mismatch")
-
 type AckT struct {
 	cfg   *config.Server
 	limit *limit.Limiter
@@ -130,11 +128,7 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 
 	zlog = zlog.With().Int("nEvents", len(req.Events)).Logger()
 
-	if err = ack.handleAckEvents(r.Context(), zlog, agent, req.Events); err != nil {
-		return err
-	}
-
-	resp := AckResponse{"acks"}
+	resp := ack.handleAckEvents(r.Context(), zlog, agent, req.Events)
 
 	data, err := json.Marshal(&resp)
 	if err != nil {
@@ -165,72 +159,115 @@ func eventToActionResult(agentId string, ev Event) (acr model.ActionResult) {
 	}
 }
 
-func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) error {
+func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) AckResponse {
 	var policyAcks []string
-	var unenroll bool
+
+	var policyIdxs []int
+	var unenrollIdxs []int
+
+	res := NewAckResponse(len(events))
+
 	for n, ev := range events {
-		zlog.Info().
+		log := zlog.With().
 			Str("actionType", ev.Type).
 			Str("actionSubType", ev.SubType).
 			Str("actionId", ev.ActionId).
+			Str("agentId", ev.AgentId).
 			Str("timestamp", ev.Timestamp).
-			Int("n", n).
-			Msg("ack event")
+			Int("n", n).Logger()
 
+		log.Info().Msg("ack event")
+
+		// Check agent id mismatch
 		if ev.AgentId != "" && ev.AgentId != agent.Id {
-			return ErrEventAgentIdMismatch
+			log.Error().Msg("agent id mismatch")
+			res.SetResult(n, http.StatusBadRequest)
+			continue
 		}
+
+		// Check if this is the policy change ack
+		// The policy change acks are handled after actions
 		if strings.HasPrefix(ev.ActionId, "policy:") {
 			if ev.Error == "" {
 				// only added if no error on action
 				policyAcks = append(policyAcks, ev.ActionId)
+				policyIdxs = append(policyIdxs, n)
 			}
+			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
+			res.SetResult(n, http.StatusOK)
 			continue
 		}
 
+		// Process non-policy change actions
+		// Find matching action by action ID
 		action, ok := ack.cache.GetAction(ev.ActionId)
 		if !ok {
+			// Find action by ID
 			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionId)
 			if err != nil {
-				return errors.Wrap(err, "find actions")
+				log.Error().Err(err).Msg("find action")
+				res.SetError(n, err)
+				continue
 			}
+
+			// Set 404 if action is not found. The agent can retry it later.
 			if len(actions) == 0 {
-				return errors.New("no matching action")
+				log.Error().Msg("no matching action")
+				res.SetResult(n, http.StatusNotFound)
+				continue
 			}
 			action = actions[0]
 			ack.cache.SetAction(action)
 		}
 
+		// Convert ack event to action result document
 		acr := eventToActionResult(agent.Id, ev)
 
+		// Save action result document
 		if _, err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
-			return errors.Wrap(err, "create action result")
+			res.SetError(n, err)
+			log.Error().Err(err).Msg("create action result")
+			continue
 		}
+
+		// Set OK result
+		// The unenroll and upgrade acks might overwrite it later
+		res.SetResult(n, http.StatusOK)
 
 		if ev.Error == "" {
 			if action.Type == TypeUnenroll {
-				unenroll = true
+				unenrollIdxs = append(unenrollIdxs, n)
 			} else if action.Type == TypeUpgrade {
 				if err := ack.handleUpgrade(ctx, zlog, agent); err != nil {
-					return err
+					res.SetError(n, err)
+					log.Error().Err(err).Msg("handle upgrade event")
+					continue
 				}
 			}
 		}
 	}
 
+	// Process policy acks
 	if len(policyAcks) > 0 {
 		if err := ack.handlePolicyChange(ctx, zlog, agent, policyAcks...); err != nil {
-			return err
+			for _, idx := range policyIdxs {
+				res.SetError(idx, err)
+			}
 		}
 	}
 
-	if unenroll {
+	// Process unenroll acks
+	if len(unenrollIdxs) > 0 {
 		if err := ack.handleUnenroll(ctx, zlog, agent); err != nil {
-			return err
+			log.Error().Err(err).Msg("handle unenroll event")
+			// Set errors for each unenroll event
+			for _, idx := range unenrollIdxs {
+				res.SetError(idx, err)
+			}
 		}
 	}
 
-	return nil
+	return res
 }
 
 func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, actionIds ...string) error {
