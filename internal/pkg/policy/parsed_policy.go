@@ -156,11 +156,17 @@ func findDefaultOutputName(outputsRaw json.RawMessage) (string, error) {
 
 	// iterate across the keys finding the defaults
 	var defaults []string
+	var ESdefaults []string
 	for k := range outputsMap {
 
 		v := outputsMap.GetMap(k)
 
 		if v != nil {
+			outputType := v.GetString(FieldOutputType)
+			if outputType == OutputTypeElasticsearch {
+				ESdefaults = append(ESdefaults, k)
+				continue
+			}
 			fleetServer := v.GetMap(FieldOutputFleetServer)
 			if fleetServer == nil {
 				defaults = append(defaults, k)
@@ -173,6 +179,8 @@ func findDefaultOutputName(outputsRaw json.RawMessage) (string, error) {
 			}
 		}
 	}
+	// Prefer ES outputs over other types
+	defaults = append(ESdefaults, defaults...)
 
 	// Note: When updating this logic to support multiple outputs, this logic
 	// should change to not be order dependent.

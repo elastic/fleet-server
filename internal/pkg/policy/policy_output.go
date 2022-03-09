@@ -26,12 +26,7 @@ const (
 	OutputTypeLogstash      = "logstash"
 )
 
-var (
-	ErrAgentNotFound    = errors.New("agent not found")
-	ErrNoOutputPerms    = errors.New("output permission sections not found")
-	ErrNoPolicyOutput   = errors.New("output section not found")
-	ErrFailInjectApiKey = errors.New("fail inject api key")
-)
+var ErrFailInjectApiKey = errors.New("fail inject api key")
 
 type PolicyOutput struct {
 	Name string

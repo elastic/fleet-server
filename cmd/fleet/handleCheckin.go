@@ -426,14 +426,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Str(LogPolicyId, pp.Policy.PolicyId).
 		Logger()
 
-	defaultOutput := pp.Outputs[pp.Default.Name]
-
-	// The parsed policy object contains a map of name->role with a precalculated sha2.
-	if defaultOutput.Role == nil {
-		zlog.Error().Str("name", pp.Default.Name).Msg("policy does not contain required output permission section")
-		return nil, ErrNoOutputPerms
-	}
-
 	// Repull and decode the agent object.  Do not trust the cache.
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldId, agentId)
 	if err != nil {
