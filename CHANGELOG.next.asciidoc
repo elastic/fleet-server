@@ -1,0 +1,3 @@
+==== Bugfixes
+
+- Return a better error on enrolling and the Elasticsearch version is incompatible. {pull}1211[1211]
