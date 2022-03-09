@@ -13,9 +13,10 @@ import (
 
 	esh "github.com/elastic/fleet-server/v7/internal/pkg/es"
 
-	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog/log"
+
+	"github.com/elastic/go-elasticsearch/v7"
 )
 
 var (
@@ -23,18 +24,18 @@ var (
 	ErrMalformedVersion   = errors.New("malformed version")
 )
 
-func CheckCompatibility(ctx context.Context, esCli *elasticsearch.Client, fleetVersion string) error {
+func CheckCompatibility(ctx context.Context, esCli *elasticsearch.Client, fleetVersion string) (string, error) {
 	log.Debug().Str("fleet_version", fleetVersion).Msg("check version compatibility with elasticsearch")
 
 	esVersion, err := esh.FetchESVersion(ctx, esCli)
 
 	if err != nil {
 		log.Error().Err(err).Msg("failed to fetch elasticsearch version")
-		return err
+		return "", err
 	}
 	log.Debug().Str("elasticsearch_version", esVersion).Msg("fetched elasticsearch version")
 
-	return checkCompatibility(fleetVersion, esVersion)
+	return esVersion, checkCompatibility(fleetVersion, esVersion)
 }
 
 func checkCompatibility(fleetVersion, esVersion string) error {

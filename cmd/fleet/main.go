@@ -14,6 +14,14 @@ import (
 	"sync"
 	"time"
 
+<<<<<<< HEAD
+	"github.com/elastic/go-ucfg"
+	"github.com/elastic/go-ucfg/yaml"
+=======
+	"go.elastic.co/apm"
+	apmtransport "go.elastic.co/apm/transport"
+>>>>>>> 7d5b7e1 (Report back the detected version of the remote Elasticsearch)
+
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/yaml"
 
@@ -36,15 +44,21 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
+<<<<<<< HEAD
 	"github.com/elastic/beats/v7/libbeat/common/cfgwarn"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+=======
+>>>>>>> 7d5b7e1 (Report back the detected version of the remote Elasticsearch)
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 const (
@@ -764,8 +778,11 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	esCli := bulker.Client()
 
 	// Check version compatibility with Elasticsearch
-	err = ver.CheckCompatibility(ctx, esCli, f.bi.Version)
+	remoteVersion, err := ver.CheckCompatibility(ctx, esCli, f.bi.Version)
 	if err != nil {
+		if len(remoteVersion) != 0 {
+			return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w", f.bi.Version, remoteVersion, err)
+		}
 		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
