@@ -57,7 +57,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/jstemmer/go-junit-report v1.0.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/magefile/mage v1.11.0 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
