@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/gofrs/uuid"
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -214,6 +215,7 @@ func TestHandleAckEvents(t *testing.T) {
 		name   string
 		events []Event
 		res    AckResponse
+		err    error
 		bulker bulk.Bulk
 	}{
 		{
@@ -234,6 +236,7 @@ func TestHandleAckEvents(t *testing.T) {
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusBadRequest)}),
+			err: &HTTPError{Status: http.StatusBadRequest},
 		},
 		{
 			name: "action empty agent id",
@@ -243,6 +246,7 @@ func TestHandleAckEvents(t *testing.T) {
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusNotFound)}),
+			err: &HTTPError{Status: http.StatusNotFound},
 		},
 		{
 			name: "action find error",
@@ -253,6 +257,7 @@ func TestHandleAckEvents(t *testing.T) {
 			},
 			res:    newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
 			bulker: mockBulk{searchErr: errors.New("network error")},
+			err:    &HTTPError{Status: http.StatusInternalServerError},
 		},
 		{
 			name: "policy action",
@@ -295,6 +300,7 @@ func TestHandleAckEvents(t *testing.T) {
 				},
 				createErr: errors.New("network error"),
 			},
+			err: &HTTPError{Status: http.StatusInternalServerError},
 		},
 		{
 			name: "action found, create result elasticsearch error",
@@ -310,6 +316,7 @@ func TestHandleAckEvents(t *testing.T) {
 				},
 				createErr: &es.ErrElastic{Status: http.StatusServiceUnavailable, Reason: http.StatusText(http.StatusServiceUnavailable)},
 			},
+			err: &HTTPError{Status: http.StatusServiceUnavailable},
 		},
 		{
 			name: "upgrade action found, update agent error",
@@ -329,6 +336,7 @@ func TestHandleAckEvents(t *testing.T) {
 				},
 				updateErr: &es.ErrElastic{Status: http.StatusServiceUnavailable, Reason: http.StatusText(http.StatusServiceUnavailable)},
 			},
+			err: &HTTPError{Status: http.StatusServiceUnavailable},
 		},
 		{
 			name: "mixed actions found",
@@ -388,6 +396,7 @@ func TestHandleAckEvents(t *testing.T) {
 				{ActionId: "ab12dcd8-bde0-4045-92dc-c4b27668d73a", Type: "UPGRADE"},
 				{ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
 			}},
+			err: &HTTPError{Status: http.StatusNotFound},
 		},
 	}
 
@@ -404,8 +413,23 @@ func TestHandleAckEvents(t *testing.T) {
 			}
 			ack := NewAckT(cfg, b, cache)
 
-			res := ack.handleAckEvents(ctx, log.Logger, agent, tc.events)
+			res, err := ack.handleAckEvents(ctx, log.Logger, agent, tc.events)
 			assert.Equal(t, tc.res, res)
+
+			if err != nil {
+				if tc.err != nil {
+					diff := cmp.Diff(err, tc.err)
+					if diff != "" {
+						t.Fatal(diff)
+					}
+				} else {
+					t.Fatalf("expected err: nil, got: %v", err)
+				}
+			} else {
+				if tc.err != nil {
+					t.Fatalf("expected err: %v, got: nil", tc.err)
+				}
+			}
 		})
 	}
 }

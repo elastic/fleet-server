@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -18,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
@@ -28,6 +30,14 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
+
+type HTTPError struct {
+	Status int
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("%d: %s", e.Status, http.StatusText(e.Status))
+}
 
 type AckT struct {
 	cfg   *config.Server
@@ -128,8 +138,18 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 
 	zlog = zlog.With().Int("nEvents", len(req.Events)).Logger()
 
-	resp := ack.handleAckEvents(r.Context(), zlog, agent, req.Events)
+	resp, err := ack.handleAckEvents(r.Context(), zlog, agent, req.Events)
+	if err != nil {
+		var herr *HTTPError
+		if errors.As(err, &herr) {
+			w.WriteHeader(herr.Status)
+		} else {
+			// Non-HTTP error will be handled at higher level
+			return err
+		}
+	}
 
+	// Always write response body even if the error HTTP status code was set
 	data, err := json.Marshal(&resp)
 	if err != nil {
 		return errors.Wrap(err, "handleAcks marshal response")
@@ -159,13 +179,36 @@ func eventToActionResult(agentId string, ev Event) (acr model.ActionResult) {
 	}
 }
 
-func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) AckResponse {
+// handleAckEvents can return:
+// 1. AckResponse and nil error, when the whole request is successful
+// 2. AckResponse and non-nil error, when the request items had errors
+func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) (AckResponse, error) {
 	var policyAcks []string
 
 	var policyIdxs []int
 	var unenrollIdxs []int
 
 	res := NewAckResponse(len(events))
+
+	// Error collects the largest error HTTP Status code from all acked events
+	httpErr := HTTPError{http.StatusOK}
+
+	setResult := func(pos, status int) {
+		if status > httpErr.Status {
+			httpErr.Status = status
+		}
+		res.SetResult(pos, status)
+	}
+
+	setError := func(pos int, err error) {
+		var esErr *es.ErrElastic
+		if errors.As(err, &esErr) {
+			setResult(pos, esErr.Status)
+		} else {
+			setResult(pos, http.StatusInternalServerError)
+		}
+		res.SetError(pos, err)
+	}
 
 	for n, ev := range events {
 		log := zlog.With().
@@ -181,7 +224,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		// Check agent id mismatch
 		if ev.AgentId != "" && ev.AgentId != agent.Id {
 			log.Error().Msg("agent id mismatch")
-			res.SetResult(n, http.StatusBadRequest)
+			setResult(n, http.StatusBadRequest)
 			continue
 		}
 
@@ -194,7 +237,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 				policyIdxs = append(policyIdxs, n)
 			}
 			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
-			res.SetResult(n, http.StatusOK)
+			setResult(n, http.StatusOK)
 			continue
 		}
 
@@ -206,14 +249,14 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionId)
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
-				res.SetError(n, err)
+				setError(n, err)
 				continue
 			}
 
 			// Set 404 if action is not found. The agent can retry it later.
 			if len(actions) == 0 {
 				log.Error().Msg("no matching action")
-				res.SetResult(n, http.StatusNotFound)
+				setResult(n, http.StatusNotFound)
 				continue
 			}
 			action = actions[0]
@@ -225,21 +268,21 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 		// Save action result document
 		if _, err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
-			res.SetError(n, err)
+			setError(n, err)
 			log.Error().Err(err).Msg("create action result")
 			continue
 		}
 
 		// Set OK result
 		// The unenroll and upgrade acks might overwrite it later
-		res.SetResult(n, http.StatusOK)
+		setResult(n, http.StatusOK)
 
 		if ev.Error == "" {
 			if action.Type == TypeUnenroll {
 				unenrollIdxs = append(unenrollIdxs, n)
 			} else if action.Type == TypeUpgrade {
 				if err := ack.handleUpgrade(ctx, zlog, agent); err != nil {
-					res.SetError(n, err)
+					setError(n, err)
 					log.Error().Err(err).Msg("handle upgrade event")
 					continue
 				}
@@ -251,7 +294,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	if len(policyAcks) > 0 {
 		if err := ack.handlePolicyChange(ctx, zlog, agent, policyAcks...); err != nil {
 			for _, idx := range policyIdxs {
-				res.SetError(idx, err)
+				setError(idx, err)
 			}
 		}
 	}
@@ -262,12 +305,16 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			log.Error().Err(err).Msg("handle unenroll event")
 			// Set errors for each unenroll event
 			for _, idx := range unenrollIdxs {
-				res.SetError(idx, err)
+				setError(idx, err)
 			}
 		}
 	}
 
-	return res
+	// Return both the data and error code
+	if httpErr.Status > http.StatusOK {
+		return res, &httpErr
+	}
+	return res, nil
 }
 
 func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, actionIds ...string) error {
