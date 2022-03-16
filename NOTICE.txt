@@ -13177,11 +13177,11 @@ Apache License
 
 --------------------------------------------------------------------------------
 Dependency : github.com/docker/docker
-Version: v1.4.2-0.20190924003213-a8608b5b67c7
+Version: v20.10.7+incompatible
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/docker/docker@v1.4.2-0.20190924003213-a8608b5b67c7/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/docker/docker@v20.10.7+incompatible/LICENSE:
 
 
                                  Apache License

@@ -10,6 +10,8 @@ pipeline {
     DOCKER_COMPOSE_VERSION = '1.25.5'
     JOB_GIT_CREDENTIALS = "f6c7695a-671e-4f4f-a331-acdce44ff9ba"
     PIPELINE_LOG_LEVEL='INFO'
+    JOB_GCS_BUCKET = 'beats-ci-artifacts'
+    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin-file-credentials'
   }
   options {
     timeout(time: 1, unit: 'HOURS')
@@ -43,7 +45,7 @@ pipeline {
           cleanup()
           dir("${BASE_DIR}"){
             withGoEnv(){
-              sh(label: 'check',script: 'make check')
+              sh(label: 'check',script: 'make check-ci')
             }
           }
         }
@@ -109,6 +111,7 @@ pipeline {
           dir("${BASE_DIR}"){
             withGoEnv(){
               sh(label: 'Create release artifacts', script: 'make docker-release')
+              uploadPackagesToGoogleBucket(pattern: 'build/binaries/')
             }
           }
         }
