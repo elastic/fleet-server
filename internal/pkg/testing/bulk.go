@@ -16,6 +16,26 @@ import (
 
 // MockBulk is a mock bulk interface.
 type MockBulk struct {
+	MockedAPIKey *bulk.ApiKey
+	ArgumentData *InterfaceCapture
+}
+
+func NewMockBulk(apiKey *bulk.ApiKey) MockBulk {
+	return MockBulk{
+		MockedAPIKey: apiKey,
+		ArgumentData: &InterfaceCapture{},
+	}
+}
+
+type InterfaceCapture struct {
+	Update []UpdateCapture
+}
+
+type UpdateCapture struct {
+	index string
+	id    string
+	body  []byte
+	opts  []bulk.Opt
 }
 
 func (m MockBulk) Create(ctx context.Context, index, id string, body []byte, opts ...bulk.Opt) (string, error) {
@@ -35,6 +55,12 @@ func (m MockBulk) Index(ctx context.Context, index, id string, body []byte, opts
 }
 
 func (m MockBulk) Update(ctx context.Context, index, id string, body []byte, opts ...bulk.Opt) error {
+	m.ArgumentData.Update = append(m.ArgumentData.Update, UpdateCapture{
+		index: index,
+		id:    id,
+		body:  body,
+		opts:  opts,
+	})
 	return nil
 }
 
@@ -71,7 +97,7 @@ func (m MockBulk) Client() *elasticsearch.Client {
 }
 
 func (m MockBulk) ApiKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*bulk.ApiKey, error) {
-	return nil, nil
+	return m.MockedAPIKey, nil
 }
 
 func (m MockBulk) ApiKeyRead(ctx context.Context, id string) (*bulk.ApiKeyMetadata, error) {

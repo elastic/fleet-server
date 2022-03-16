@@ -26,7 +26,10 @@ const (
 	OutputTypeLogstash      = "logstash"
 )
 
-var ErrFailInjectApiKey = errors.New("fail inject api key")
+var (
+	ErrNoOutputPerms    = errors.New("output permission sections not found")
+	ErrFailInjectApiKey = errors.New("fail inject api key")
+)
 
 type PolicyOutput struct {
 	Name string
@@ -38,6 +41,13 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 	switch p.Type {
 	case OutputTypeElasticsearch:
 		zlog.Debug().Msg("preparing elasticsearch output")
+
+		// The role is required to do api key management
+		if p.Role == nil {
+			zlog.Error().Str("name", p.Name).Msg("policy does not contain required output permission section")
+			return ErrNoOutputPerms
+		}
+
 		// Determine whether we need to generate an output ApiKey.
 		// This is accomplished by comparing the sha2 hash stored in the agent
 		// record with the precalculated sha2 hash of the role.
