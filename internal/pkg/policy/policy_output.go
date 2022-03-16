@@ -144,14 +144,14 @@ func renderUpdatePainlessScript(fields map[string]interface{}) ([]byte, error) {
 	return body, err
 }
 
-func generateOutputAPIKey(ctx context.Context, bulk bulk.Bulk, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
-	name := fmt.Sprintf("%s:%s", agentId, outputName)
+func generateOutputAPIKey(ctx context.Context, bulk bulk.Bulk, agentID, outputName string, roles []byte) (*apikey.ApiKey, error) {
+	name := fmt.Sprintf("%s:%s", agentID, outputName)
 	return bulk.ApiKeyCreate(
 		ctx,
 		name,
 		"",
 		roles,
-		apikey.NewMetadata(agentId, apikey.TypeOutput),
+		apikey.NewMetadata(agentID, apikey.TypeOutput),
 	)
 }
 
