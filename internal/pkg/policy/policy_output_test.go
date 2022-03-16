@@ -115,7 +115,12 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		t.Error("expected prepare to pass", err)
 	}
 
-	updatedKey := policyMap.GetMap("test output")["api_key"].(*bulk.ApiKey)
+	updatedKey, ok := policyMap.GetMap("test output")["api_key"].(*bulk.ApiKey)
+
+	if !ok {
+		t.Errorf("unable to cast api key")
+	}
+
 	if updatedKey.Key != bulker.MockedAPIKey.Key {
 		t.Errorf("api key should be updated. wanted: %s, got: %s", bulker.MockedAPIKey.Key, updatedKey.Key)
 	}
@@ -150,13 +155,20 @@ func TestPolicyOutputDefaultESPrepare(t *testing.T) {
 		t.Error("expected prepare to pass", err)
 	}
 
-	updatedKey := policyMap.GetMap("test output")["api_key"].(*bulk.ApiKey)
+	updatedKey, ok := policyMap.GetMap("test output")["api_key"].(*bulk.ApiKey)
+
+	if !ok {
+		t.Errorf("unable to cast api key")
+	}
+
 	if updatedKey.Key != bulker.MockedAPIKey.Key {
 		t.Errorf("api key should be updated. wanted: %s, got: %s", bulker.MockedAPIKey.Key, updatedKey.Key)
 	}
+
 	if updatedKey.Id != bulker.MockedAPIKey.Id {
 		t.Errorf("api key ID should be updated. wanted: %s, got: %s", bulker.MockedAPIKey.Id, updatedKey.Id)
 	}
+
 	if len(bulker.ArgumentData.Update) != 1 {
 		t.Error("update should be called")
 	}

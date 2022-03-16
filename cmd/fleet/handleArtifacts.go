@@ -74,7 +74,7 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 	reqId := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str(LogAgentId, id).
+		Str(LogAgentID, id).
 		Str(EcsHttpRequestId, reqId).
 		Str("sha2", sha2).
 		Str("remoteAddr", r.RemoteAddr).
@@ -128,7 +128,7 @@ func (at ArtifactT) handleArtifacts(zlog *zerolog.Logger, r *http.Request, id, s
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessApiKeyId, agent.AccessApiKeyId)
+		return ctx.Str(LogAccessAPIKeyID, agent.AccessApiKeyId)
 	})
 
 	// Metrics; serenity now.

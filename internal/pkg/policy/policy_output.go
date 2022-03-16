@@ -28,7 +28,7 @@ const (
 
 var (
 	ErrNoOutputPerms    = errors.New("output permission sections not found")
-	ErrFailInjectApiKey = errors.New("fail inject api key")
+	ErrFailInjectAPIKey = errors.New("fail inject api key")
 )
 
 type PolicyOutput struct {
@@ -72,25 +72,25 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 				Str("newHash", p.Role.Sha2).
 				Msg("Generating a new API key")
 
-			outputApiKey, err := generateOutputApiKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw)
+			outputAPIKey, err := generateOutputAPIKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw)
 			if err != nil {
 				zlog.Error().Err(err).Msg("fail generate output key")
 				return err
 			}
 
-			if ok := setMapObj(outputMap, outputApiKey, p.Name, "api_key"); !ok {
-				return ErrFailInjectApiKey
+			if ok := setMapObj(outputMap, outputAPIKey, p.Name, "api_key"); !ok {
+				return ErrFailInjectAPIKey
 			}
 
 			if isDefault {
 				zlog.Info().
 					Str("hash.sha256", p.Role.Sha2).
-					Str(logger.DefaultOutputApiKeyId, outputApiKey.Id).
+					Str(logger.DefaultOutputApiKeyId, outputAPIKey.Id).
 					Msg("Updating agent record to pick up default output key.")
 
 				fields := map[string]interface{}{
-					dl.FieldDefaultApiKey:               outputApiKey.Agent(),
-					dl.FieldDefaultApiKeyId:             outputApiKey.Id,
+					dl.FieldDefaultApiKey:               outputAPIKey.Agent(),
+					dl.FieldDefaultApiKeyId:             outputAPIKey.Id,
 					dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 				}
 				if agent.DefaultApiKeyId != "" {
@@ -111,7 +111,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 					zlog.Error().Err(err).Msg("fail update agent record")
 					return err
 				}
-				agent.DefaultApiKey = outputApiKey.Agent()
+				agent.DefaultApiKey = outputAPIKey.Agent()
 			}
 		}
 	case OutputTypeLogstash:
@@ -144,7 +144,7 @@ func renderUpdatePainlessScript(fields map[string]interface{}) ([]byte, error) {
 	return body, err
 }
 
-func generateOutputApiKey(ctx context.Context, bulk bulk.Bulk, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
+func generateOutputAPIKey(ctx context.Context, bulk bulk.Bulk, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
 	name := fmt.Sprintf("%s:%s", agentId, outputName)
 	return bulk.ApiKeyCreate(
 		ctx,

@@ -55,7 +55,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 	reqId := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str(LogAgentId, id).
+		Str(LogAgentID, id).
 		Str(EcsHttpRequestId, reqId).
 		Logger()
 
@@ -149,7 +149,7 @@ func (ct *CheckinT) handleCheckin(zlog *zerolog.Logger, w http.ResponseWriter, r
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessApiKeyId, agent.AccessApiKeyId)
+		return ctx.Str(LogAccessAPIKeyID, agent.AccessApiKeyId)
 	})
 
 	ver, err := validateUserAgent(*zlog, r, ct.verCon)
@@ -422,7 +422,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Str("ctx", "processPolicy").
 		Int64("policyRevision", pp.Policy.RevisionIdx).
 		Int64("policyCoordinator", pp.Policy.CoordinatorIdx).
-		Str(LogPolicyId, pp.Policy.PolicyId).
+		Str(LogPolicyID, pp.Policy.PolicyId).
 		Logger()
 
 	// Repull and decode the agent object.  Do not trust the cache.
