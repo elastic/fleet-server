@@ -166,7 +166,7 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
 
-build/dependencies.csv:
+build/dependencies.csv: build/distributions
 	./dev-tools/run_with_go_ver dev-tools/dependencies-report --csv $@
 
 .PHONY: release-manager-snapshot
