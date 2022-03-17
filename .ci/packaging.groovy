@@ -92,7 +92,9 @@ pipeline {
                   unstash 'source'
                   dir("${BASE_DIR}"){
                     withMageEnv() {
-											sh(label: 'make build/dependencies.csv', script: 'make build/dependencies.csv')
+                      whenFalse(isArm()) {
+                        sh(label: 'make build/dependencies.csv', script: 'make build/dependencies.csv')
+                      }
                       sh(label: 'make release-manager-snapshot', script: 'make release-manager-snapshot')
                     }
                   }
