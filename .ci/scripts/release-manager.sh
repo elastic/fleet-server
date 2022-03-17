@@ -27,7 +27,7 @@ docker run --rm \
   "$IMAGE" \
     cli collect \
       --project fleet-server \
-      --branch "$BRANCH_NAME" \
+      --branch "main" \
       --commit "$(git rev-parse HEAD)" \
       --workflow "snapshot" \
       --artifact-set main
