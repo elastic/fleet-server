@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 )
 
 var TestPayload []byte
@@ -32,9 +33,7 @@ func TestPolicyLogstashOutputPrepare(t *testing.T) {
 	}
 
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{}, false)
-	if err != nil {
-		t.Error("expected prepare to pass")
-	}
+	require.Nil(t, err, "expected prepare to pass")
 }
 func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 	bulker := ftesting.NewMockBulk(&bulk.ApiKey{
@@ -49,9 +48,7 @@ func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{}, false)
 	// No permissions are required by logstash currently
-	if err != nil {
-		t.Error("expected prepare to pass")
-	}
+	require.Nil(t, err, "expected prepare to pass")
 }
 
 func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
@@ -69,9 +66,7 @@ func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 	}
 
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{}, true)
-	if err != nil {
-		t.Error("expected prepare to pass")
-	}
+	require.Nil(t, err, "expected prepare to pass")
 }
 
 func TestPolicyESOutputPrepareNoRole(t *testing.T) {
@@ -86,9 +81,7 @@ func TestPolicyESOutputPrepareNoRole(t *testing.T) {
 	}
 
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{}, false)
-	if err == nil {
-		t.Error("expected error to be raised")
-	}
+	require.NotNil(t, err, "expected prepare to error")
 }
 
 func TestPolicyOutputESPrepare(t *testing.T) {
@@ -111,26 +104,14 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 	}
 
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, policyMap, false)
-	if err != nil {
-		t.Error("expected prepare to pass", err)
-	}
+	require.Nil(t, err, "expected prepare to pass")
 
 	updatedKey, ok := policyMap.GetMap("test output")["api_key"].(*bulk.ApiKey)
 
-	if !ok {
-		t.Errorf("unable to cast api key")
-	}
-
-	if updatedKey.Key != bulker.MockedAPIKey.Key {
-		t.Errorf("api key should be updated. wanted: %s, got: %s", bulker.MockedAPIKey.Key, updatedKey.Key)
-	}
-	if updatedKey.Id != bulker.MockedAPIKey.Id {
-		t.Errorf("api key ID should be updated. wanted: %s, got: %s", bulker.MockedAPIKey.Id, updatedKey.Id)
-	}
-
-	if len(bulker.ArgumentData.Update) > 0 {
-		t.Error("update should not be called")
-	}
+	require.True(t, ok, "unable to case api key")
+	require.Equal(t, updatedKey.Key, bulker.MockedAPIKey.Key)
+	require.Equal(t, updatedKey.Id, bulker.MockedAPIKey.Id)
+	require.Equal(t, len(bulker.ArgumentData.Update), 0, "update should not be called")
 }
 
 func TestPolicyOutputDefaultESPrepare(t *testing.T) {
@@ -151,25 +132,12 @@ func TestPolicyOutputDefaultESPrepare(t *testing.T) {
 	}
 	testAgent := &model.Agent{}
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap, true)
-	if err != nil {
-		t.Error("expected prepare to pass", err)
-	}
+	require.Nil(t, err, "expected prepare to pass")
 
 	updatedKey, ok := policyMap.GetMap("test output")["api_key"].(*bulk.ApiKey)
 
-	if !ok {
-		t.Errorf("unable to cast api key")
-	}
-
-	if updatedKey.Key != bulker.MockedAPIKey.Key {
-		t.Errorf("api key should be updated. wanted: %s, got: %s", bulker.MockedAPIKey.Key, updatedKey.Key)
-	}
-
-	if updatedKey.Id != bulker.MockedAPIKey.Id {
-		t.Errorf("api key ID should be updated. wanted: %s, got: %s", bulker.MockedAPIKey.Id, updatedKey.Id)
-	}
-
-	if len(bulker.ArgumentData.Update) != 1 {
-		t.Error("update should be called")
-	}
+	require.True(t, ok, "unable to case api key")
+	require.Equal(t, updatedKey.Key, bulker.MockedAPIKey.Key)
+	require.Equal(t, updatedKey.Id, bulker.MockedAPIKey.Id)
+	require.Greater(t, len(bulker.ArgumentData.Update), 0, "update should be called")
 }

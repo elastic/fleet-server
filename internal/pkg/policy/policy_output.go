@@ -53,7 +53,8 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		// record with the precalculated sha2 hash of the role.
 
 		// Note: This will need to be updated when doing multi-cluster elasticsearch support
-		// There will need to be multiple api keys tracked on the agent model
+		// Currently, we only have access to the token for the elasticsearch instance fleet-server
+		// is monitors. When updating for multiple ES instances we need to tie the token to the output.
 		needKey := true
 		switch {
 		case agent.DefaultApiKey == "":
@@ -99,9 +100,9 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 						RetiredAt: time.Now().UTC().Format(time.RFC3339),
 					}
 				}
-				body, err := renderUpdatePainlessScript(fields)
 
 				// Using painless script to append the old keys to the history
+				body, err := renderUpdatePainlessScript(fields)
 
 				if err != nil {
 					return err
@@ -118,7 +119,8 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		zlog.Debug().Msg("preparing logstash output")
 		zlog.Info().Msg("no actions required for logstash output preparation")
 	default:
-		zlog.Debug().Msgf("unknown output type: %s; skipping preparation", p.Type)
+		zlog.Error().Msgf("unknown output type: %s; skipping preparation", p.Type)
+		return fmt.Errorf("encountered unexpected output type while preparing outputs: %s", p.Type)
 	}
 	return nil
 }
