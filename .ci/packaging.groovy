@@ -28,7 +28,7 @@ pipeline {
   }
   stages {
     stage('Filter build') {
-      agent { label 'ubuntu-18 && immutable' }
+      agent { label 'ubuntu-20 && immutable' }
       when {
         beforeAgent true
         anyOf {
@@ -78,7 +78,7 @@ pipeline {
             axes {
               axis {
                 name 'PLATFORM'
-                values 'ubuntu-18 && immutable', 'arm'
+                values 'ubuntu-20 && immutable', 'arm'
               }
             }
             stages {
