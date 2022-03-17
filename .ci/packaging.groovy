@@ -78,7 +78,7 @@ pipeline {
             axes {
               axis {
                 name 'PLATFORM'
-                values 'linux && immutable', 'arm'
+                values 'ubuntu-18 && immutable', 'arm'
               }
             }
             stages {
