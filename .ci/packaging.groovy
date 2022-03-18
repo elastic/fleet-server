@@ -78,7 +78,7 @@ pipeline {
             axes {
               axis {
                 name 'PLATFORM'
-                values 'ubuntu-20 && immutable', 'arm'
+                values 'ubuntu-20 && immutable && gobld/image:family/elastic-beats-ci-ubuntu-2004-lts-nocache', 'arm'
               }
             }
             stages {
