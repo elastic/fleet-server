@@ -12,8 +12,8 @@ set -uexo pipefail
 source /usr/local/bin/bash_standard_lib.sh
 
 # set required permissions on artifacts and directory
-chmod -R a+r build/distributions/*
-chmod -R a+w build/distributions
+chmod -R a+r build/*
+chmod -R a+w build
 
 # ensure the latest image has been pulled
 IMAGE=docker.elastic.co/infra/release-manager:latest
