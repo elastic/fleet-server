@@ -113,7 +113,7 @@ pipeline {
                     showInline: true)
                   // Copy the dependencies files if no ARM
                   whenFalse(isArm()) {
-                    stash(name: 'dependencies', includes: "${BASE_DIR}/build/reports/dependencies*.csv")
+                    stash(name: 'dependencies', includes: "${BASE_DIR}/build/reports/*")
                   }
                 }
               }
