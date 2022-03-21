@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# This script is executed by the release snapshot stage.
+# This script is executed by the daily release artifact stage.
 # It requires the below environment variables:
 # - BRANCH_NAME
 # - VAULT_ADDR
@@ -9,13 +9,16 @@
 #
 set -uexo pipefail
 
+source /usr/local/bin/bash_standard_lib.sh
+
 # set required permissions on artifacts and directory
 chmod -R a+r build/distributions/*
 chmod -R a+w build/distributions
 
 # ensure the latest image has been pulled
 IMAGE=docker.elastic.co/infra/release-manager:latest
-docker pull --quiet $IMAGE
+(retry 3 docker pull --quiet "${IMAGE}") || echo "Error pulling ${IMAGE} Docker image, we continue"
+docker images --filter=reference=$IMAGE
 
 # Generate checksum files and upload to GCS
 docker run --rm \
