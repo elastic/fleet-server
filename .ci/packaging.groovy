@@ -146,7 +146,7 @@ pipeline {
   }
   post {
     cleanup {
-      notifyBuildResult()
+      notifyBuildResult(prComment: false)
     }
     failure {
       echo 'disabled'
