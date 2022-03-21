@@ -6,6 +6,10 @@ package fleet
 
 import (
 	"encoding/json"
+	"errors"
+	"net/http"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 const (
@@ -87,8 +91,43 @@ type AckRequest struct {
 	Events []Event `json:"events"`
 }
 
+type AckResponseItem struct {
+	Status  int    `json:"status"`
+	Message string `json:"message,omitempty"`
+}
+
 type AckResponse struct {
-	Action string `json:"action"`
+	Action string            `json:"action"`
+	Errors bool              `json:"errors,omitempty"` // indicates that some of the events in the ack request failed
+	Items  []AckResponseItem `json:"items,omitempty"`
+}
+
+func NewAckResponse(size int) AckResponse {
+	return AckResponse{
+		Action: "acks",
+		Items:  make([]AckResponseItem, size),
+	}
+}
+
+func (a *AckResponse) setMessage(pos int, status int, message string) {
+	if status != http.StatusOK {
+		a.Errors = true
+	}
+	a.Items[pos].Status = status
+	a.Items[pos].Message = message
+}
+
+func (a *AckResponse) SetResult(pos int, status int) {
+	a.setMessage(pos, status, http.StatusText(status))
+}
+
+func (a *AckResponse) SetError(pos int, err error) {
+	var esErr *es.ErrElastic
+	if errors.As(err, &esErr) {
+		a.setMessage(pos, esErr.Status, esErr.Reason)
+	} else {
+		a.SetResult(pos, http.StatusInternalServerError)
+	}
 }
 
 type ActionResp struct {
