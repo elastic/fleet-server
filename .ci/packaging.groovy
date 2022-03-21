@@ -113,12 +113,7 @@ pipeline {
                     showInline: true)
                   // Copy the dependencies files if no ARM
                   whenFalse(isArm()) {
-                    googleStorageUpload(bucket: "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}",
-                      credentialsId: "${JOB_GCS_CREDENTIALS}",
-                      pathPrefix: "${BASE_DIR}/build/",
-                      pattern: "${BASE_DIR}/build/reports/dependencies*.csv",
-                      sharedPublicly: true,
-                      showInline: true)
+                    stash(name: 'dependencies', includes: "${BASE_DIR}/build/reports/dependencies*.csv")
                   }
                 }
               }
@@ -131,10 +126,8 @@ pipeline {
                                   credentialsId: "${JOB_GCS_CREDENTIALS}",
                                   localDirectory: "${BASE_DIR}/build/distributions",
                                   pathPrefix: env.PATH_PREFIX)
+            unstash 'dependencies'
             dir("${BASE_DIR}") {
-              dir("build/distributions") {
-                sh(label: 'copy dependencies', script: 'cp -rf reports ../')
-              }
               dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
               script {
                 getVaultSecret.readSecretWrapper {
