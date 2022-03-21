@@ -132,6 +132,9 @@ pipeline {
                                   localDirectory: "${BASE_DIR}/build/distributions",
                                   pathPrefix: env.PATH_PREFIX)
             dir("${BASE_DIR}") {
+              dir("build/distributions") {
+                sh(label: 'copy dependencies', script: 'cp -rf reports ../')
+              }
               dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
               script {
                 getVaultSecret.readSecretWrapper {
