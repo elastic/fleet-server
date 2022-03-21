@@ -116,7 +116,7 @@ pipeline {
                     googleStorageUpload(bucket: "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}",
                       credentialsId: "${JOB_GCS_CREDENTIALS}",
                       pathPrefix: "${BASE_DIR}/build/",
-                      pattern: "${BASE_DIR}/build/dependencies.csv",
+                      pattern: "${BASE_DIR}/build/reports/dependencies.csv",
                       sharedPublicly: true,
                       showInline: true)
                   }
