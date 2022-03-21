@@ -168,7 +168,7 @@ release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with 
 
 build/reports/dependencies.csv: ## - Prepares the dependencies file.
 	@mkdir -p build/reports
-	./dev-tools/run_with_go_ver dev-tools/dependencies-report --csv build/reports/dependencies-$(DEFAULT_VERSION).csv
+	./dev-tools/run_with_go_ver dev-tools/dependencies-report --csv build/reports/dependencies-$(VERSION).csv
 
 .PHONY: release-manager-snapshot
 release-manager-snapshot: ## - Builds a snapshot release. The Go version defined in .go-version will be installed and used for the build.

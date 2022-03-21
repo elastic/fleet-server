@@ -87,6 +87,7 @@ pipeline {
                 environment {
                   PLATFORMS = "${isArm() ? 'linux/arm64' : ''}"
                   PACKAGES = "${isArm() ? 'docker' : ''}"
+                  SNAPSHOT = 'true'
                 }
                 steps {
                   deleteDir()
