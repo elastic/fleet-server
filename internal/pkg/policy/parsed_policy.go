@@ -18,6 +18,8 @@ const (
 	FieldOutputFleetServer  = "fleet_server"
 	FieldOutputServiceToken = "service_token"
 	FieldOutputPermissions  = "output_permissions"
+
+	OutputTypeElasticsearch = "elasticsearch"
 )
 
 var (
@@ -36,13 +38,13 @@ type RoleMapT map[string]RoleT
 
 type ParsedPolicyDefaults struct {
 	Name string
+	Role *RoleT
 }
 
 type ParsedPolicy struct {
 	Policy  model.Policy
 	Fields  map[string]json.RawMessage
 	Roles   RoleMapT
-	Outputs map[string]PolicyOutput
 	Default ParsedPolicyDefaults
 }
 
@@ -67,54 +69,27 @@ func NewParsedPolicy(p model.Policy) (*ParsedPolicy, error) {
 	if !ok {
 		return nil, ErrOutputsNotFound
 	}
-
-	policyOutputs, err := constructPolicyOutputs(outputs, roles)
-	if err != nil {
-		return nil, err
-	}
 	defaultName, err := findDefaultOutputName(outputs)
 	if err != nil {
 		return nil, err
 	}
+	var roleP *RoleT
+	if role, ok := roles[defaultName]; ok {
+		roleP = &role
+	}
 
 	// We are cool and the gang
 	pp := &ParsedPolicy{
-		Policy:  p,
-		Fields:  fields,
-		Roles:   roles,
-		Outputs: policyOutputs,
+		Policy: p,
+		Fields: fields,
+		Roles:  roles,
 		Default: ParsedPolicyDefaults{
 			Name: defaultName,
+			Role: roleP,
 		},
 	}
 
 	return pp, nil
-}
-
-func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) (map[string]PolicyOutput, error) {
-	result := make(map[string]PolicyOutput)
-
-	outputsMap, err := smap.Parse(outputsRaw)
-	if err != nil {
-		return result, err
-	}
-
-	for k := range outputsMap {
-		v := outputsMap.GetMap(k)
-
-		p := PolicyOutput{
-			Name: k,
-			Type: v.GetString(FieldOutputType),
-		}
-
-		if role, ok := roles[k]; ok {
-			p.Role = &role
-		}
-
-		result[k] = p
-	}
-
-	return result, nil
 }
 
 func parsePerms(permsRaw json.RawMessage) (RoleMapT, error) {
@@ -156,15 +131,13 @@ func findDefaultOutputName(outputsRaw json.RawMessage) (string, error) {
 
 	// iterate across the keys finding the defaults
 	var defaults []string
-	var ESdefaults []string
 	for k := range outputsMap {
 
 		v := outputsMap.GetMap(k)
 
 		if v != nil {
 			outputType := v.GetString(FieldOutputType)
-			if outputType == OutputTypeElasticsearch {
-				ESdefaults = append(ESdefaults, k)
+			if outputType != OutputTypeElasticsearch {
 				continue
 			}
 			fleetServer := v.GetMap(FieldOutputFleetServer)
@@ -179,14 +152,12 @@ func findDefaultOutputName(outputsRaw json.RawMessage) (string, error) {
 			}
 		}
 	}
-	// Prefer ES outputs over other types
-	defaults = append(ESdefaults, defaults...)
 
-	// Note: When updating this logic to support multiple outputs, this logic
-	// should change to not be order dependent.
-	if len(defaults) > 0 {
+	if len(defaults) == 0 {
+		return "", ErrDefaultOutputNotFound
+	}
+	if len(defaults) == 1 {
 		return defaults[0], nil
 	}
-
-	return "", ErrDefaultOutputNotFound
+	return "", ErrMultipleDefaultOutputsFound
 }

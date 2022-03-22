@@ -1,7 +1,3 @@
 ==== Bugfixes
 
 - Return a better error on enrolling and the Elasticsearch version is incompatible. {pull}1211[1211]
-
-==== New Features
-
-- Fleet server now supports Logstash type outputs for managed agents. {pull}1188[1188]

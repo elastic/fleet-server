@@ -48,7 +48,7 @@ func authApiKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 	if err != nil {
 		log.Info().
 			Err(err).
-			Str(LogAPIKeyID, key.Id).
+			Str(LogApiKeyId, key.Id).
 			Str(EcsHttpRequestId, reqId).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey fail authentication")
@@ -89,11 +89,11 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 	}
 
 	w := log.With().
-		Str(LogAccessAPIKeyID, key.Id).
+		Str(LogAccessApiKeyId, key.Id).
 		Str(EcsHttpRequestId, r.Header.Get(logger.HeaderRequestID))
 
 	if id != nil {
-		w = w.Str(LogAgentID, *id)
+		w = w.Str(LogAgentId, *id)
 	}
 
 	zlog := w.Logger()
