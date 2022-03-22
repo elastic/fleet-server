@@ -425,7 +425,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Str("ctx", "processPolicy").
 		Int64("policyRevision", pp.Policy.RevisionIdx).
 		Int64("policyCoordinator", pp.Policy.CoordinatorIdx).
-		Str(LogPolicyId, pp.Policy.PolicyId).
+		Str(LogPolicyId, pp.Policy.PolicyID).
 		Logger()
 
 	// The parsed policy object contains a map of name->role with a precalculated sha2.

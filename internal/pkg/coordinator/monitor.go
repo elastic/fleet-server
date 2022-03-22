@@ -180,7 +180,7 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 			// policy revision was inserted by coordinator so this monitor ignores it
 			continue
 		}
-		p, ok := m.policies[policy.PolicyId]
+		p, ok := m.policies[policy.PolicyID]
 		if ok {
 			// not a new policy
 			if p.cord != nil {
@@ -228,7 +228,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	if len(policies) > 0 {
 		ids := make([]string, len(policies))
 		for i, p := range policies {
-			ids[i] = p.PolicyId
+			ids[i] = p.PolicyID
 		}
 		leaders, err = dl.SearchPolicyLeaders(ctx, m.bulker, ids, dl.WithIndexName(m.leadersIndex))
 		if err != nil {
@@ -242,7 +242,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	var lead []model.Policy
 	now := time.Now().UTC()
 	for _, policy := range policies {
-		leader, ok := leaders[policy.PolicyId]
+		leader, ok := leaders[policy.PolicyID]
 		if !ok {
 			// new policy want to try to take leadership
 			lead = append(lead, policy)
@@ -261,8 +261,8 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	// take/keep leadership and start new coordinators
 	res := make(chan policyT)
 	for _, p := range lead {
-		pt, _ := m.policies[p.PolicyId]
-		pt.id = p.PolicyId
+		pt, _ := m.policies[p.PolicyID]
+		pt.id = p.PolicyID
 		go func(p model.Policy, pt policyT) {
 			defer func() {
 				res <- pt

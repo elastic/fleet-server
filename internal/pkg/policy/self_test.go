@@ -29,12 +29,14 @@ import (
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
+const defaultPolicyID = "fleet-server-policy"
+
 func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	cfg := config.Fleet{
-		DefaultPolicyId: "fleet-server-policy",
+		DefaultPolicyID: defaultPolicyID,
 		Agent: config.Agent{
 			ID: "agent-id",
 		},
@@ -72,7 +74,6 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		return nil
 	}, ftesting.RetrySleep(1*time.Second))
 
-	policyId := "fleet-server-policy"
 	rId := xid.New().String()
 	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{}})
 	if err != nil {
@@ -84,7 +85,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:       policyId,
+		PolicyID:       defaultPolicyID,
 		CoordinatorIdx: 1,
 		Data:           policyContents,
 		RevisionIdx:    1,
@@ -131,7 +132,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:       policyId,
+		PolicyID:       defaultPolicyID,
 		CoordinatorIdx: 1,
 		Data:           policyContents,
 		RevisionIdx:    2,
@@ -175,7 +176,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	defer cancel()
 
 	cfg := config.Fleet{
-		DefaultPolicyId: "fleet-server-policy",
+		DefaultPolicyID: "fleet-server-policy",
 		Agent: config.Agent{
 			ID: "",
 		},
@@ -243,7 +244,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:       policyId,
+		PolicyID:       policyId,
 		CoordinatorIdx: 1,
 		Data:           policyContents,
 		RevisionIdx:    1,
@@ -392,7 +393,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:       policyId,
+		PolicyID:       policyId,
 		CoordinatorIdx: 1,
 		Data:           policyContents,
 		RevisionIdx:    2,
@@ -439,7 +440,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   2,
 		},
-		PolicyId:       policyId,
+		PolicyID:       policyId,
 		CoordinatorIdx: 1,
 		Data:           policyContents,
 		RevisionIdx:    1,
@@ -550,7 +551,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:       policyId,
+		PolicyID:       policyId,
 		CoordinatorIdx: 1,
 		Data:           policyContents,
 		RevisionIdx:    1,

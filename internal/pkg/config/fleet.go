@@ -50,7 +50,7 @@ type Host struct {
 
 // Fleet is the configuration of Agent running inside of Fleet.
 type Fleet struct {
-	DefaultPolicyId string `config:"default_policy_id"`
+	DefaultPolicyID string `config:"default_policy_id"`
 	Agent           Agent  `config:"agent"`
 	Host            Host   `config:"host"`
 }
