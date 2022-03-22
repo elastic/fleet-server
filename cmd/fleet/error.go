@@ -26,11 +26,12 @@ const (
 	EcsHttpResponseCode      = logger.EcsHttpResponseCode
 	EcsHttpResponseBodyBytes = logger.EcsHttpResponseBodyBytes
 
-	LogAPIKeyID       = logger.ApiKeyId
-	LogPolicyID       = logger.PolicyId
-	LogAgentID        = logger.AgentId
-	LogEnrollAPIKeyID = logger.EnrollApiKeyId
-	LogAccessAPIKeyID = logger.AccessApiKeyId
+	LogApiKeyId              = logger.ApiKeyId
+	LogPolicyId              = logger.PolicyId
+	LogAgentId               = logger.AgentId
+	LogEnrollApiKeyId        = logger.EnrollApiKeyId
+	LogAccessApiKeyId        = logger.AccessApiKeyId
+	LogDefaultOutputApiKeyId = logger.DefaultOutputApiKeyId
 )
 
 type errResp struct {

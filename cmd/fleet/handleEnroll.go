@@ -7,6 +7,7 @@ package fleet
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -144,7 +145,7 @@ func (et *EnrollerT) handleEnroll(rb *rollback.Rollback, zlog *zerolog.Logger, w
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogEnrollAPIKeyID, key.Id)
+		return ctx.Str(LogEnrollApiKeyId, key.Id)
 	})
 
 	ver, err := validateUserAgent(*zlog, r, et.verCon)
@@ -268,7 +269,7 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 }
 
 func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string) error {
-	zlog = zlog.With().Str(LogAgentID, agentID).Logger()
+	zlog = zlog.With().Str(LogAgentId, agentID).Logger()
 
 	if err := bulker.Delete(ctx, dl.FleetAgents, agentID); err != nil {
 		zlog.Error().Err(err).Msg("agent record failed to delete")
@@ -284,7 +285,7 @@ func invalidateApiKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk
 	// because doing so causes the api call to slow down at scale.  It is already very slow.
 	// So we have to wait for the key to become visible until we can invalidate it.
 
-	zlog = zlog.With().Str(LogAPIKeyID, apikeyId).Logger()
+	zlog = zlog.With().Str(LogApiKeyId, apikeyId).Logger()
 
 	start := time.Now()
 
@@ -340,9 +341,9 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 	}
 
 	zlog.Info().
-		Str(LogAgentID, resp.Item.ID).
-		Str(LogPolicyID, resp.Item.PolicyId).
-		Str(LogAccessAPIKeyID, resp.Item.AccessApiKeyId).
+		Str(LogAgentId, resp.Item.ID).
+		Str(LogPolicyId, resp.Item.PolicyId).
+		Str(LogAccessApiKeyId, resp.Item.AccessApiKeyId).
 		Int(EcsHttpResponseBodyBytes, numWritten).
 		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 		Msg("Elastic Agent successfully enrolled")
@@ -426,6 +427,17 @@ func generateAccessApiKey(ctx context.Context, bulk bulk.Bulk, agentId string) (
 		"",
 		[]byte(kFleetAccessRolesJSON),
 		apikey.NewMetadata(agentId, apikey.TypeAccess),
+	)
+}
+
+func generateOutputApiKey(ctx context.Context, bulk bulk.Bulk, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
+	name := fmt.Sprintf("%s:%s", agentId, outputName)
+	return bulk.ApiKeyCreate(
+		ctx,
+		name,
+		"",
+		roles,
+		apikey.NewMetadata(agentId, apikey.TypeOutput),
 	)
 }
 
