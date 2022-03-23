@@ -12,8 +12,8 @@ set -uexo pipefail
 source /usr/local/bin/bash_standard_lib.sh
 
 # set required permissions on artifacts and directory
-chmod -R a+r build/*
-chmod -R a+w build
+chmod -R a+r build/distributions/*
+chmod -R a+w build/distributions
 
 # get the current version (without the snapshot)
 VERSION=$(make get-version)

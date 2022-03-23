@@ -96,7 +96,7 @@ pipeline {
                   dir("${BASE_DIR}"){
                     withMageEnv() {
                       whenFalse(isArm()) {
-                        sh(label: 'make build/reports/dependencies.csv', script: 'make build/reports/dependencies.csv')
+                        sh(label: 'make build/distributions/dependencies.csv', script: 'make build/distributions/dependencies.csv')
                       }
                       sh(label: 'make release-manager-snapshot', script: 'make release-manager-snapshot')
                     }
@@ -112,10 +112,6 @@ pipeline {
                     pattern: "${BASE_DIR}/build/distributions/**/*",
                     sharedPublicly: true,
                     showInline: true)
-                  // Copy the dependencies files if no ARM
-                  whenFalse(isArm()) {
-                    stash(name: 'dependencies', includes: "${BASE_DIR}/build/reports/*")
-                  }
                 }
               }
             }
@@ -133,7 +129,6 @@ pipeline {
                                   credentialsId: "${JOB_GCS_CREDENTIALS}",
                                   localDirectory: "${BASE_DIR}/build/distributions",
                                   pathPrefix: env.PATH_PREFIX)
-            unstash 'dependencies'
             dir("${BASE_DIR}") {
               dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
               script {
