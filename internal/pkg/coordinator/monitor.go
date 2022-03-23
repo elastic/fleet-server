@@ -491,7 +491,7 @@ func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyId string, u
 		if err != nil {
 			return err
 		}
-		agentIds[i] = agent.ID
+		agentIds[i] = agent.Id
 	}
 
 	zlog.Info().
@@ -516,7 +516,7 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	apiKeys := getAPIKeyIDs(agent)
 
 	zlog = zlog.With().
-		Str(logger.AgentId, agent.ID).
+		Str(logger.AgentId, agent.Id).
 		Strs(logger.ApiKeyId, apiKeys).
 		Logger()
 
@@ -529,7 +529,7 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 			return err
 		}
 	}
-	if err = bulker.Update(ctx, agentsIndex, agent.ID, body, bulk.WithRefresh()); err != nil {
+	if err = bulker.Update(ctx, agentsIndex, agent.Id, body, bulk.WithRefresh()); err != nil {
 		zlog.Error().Err(err).Msg("Fail unenrollAgent record update")
 	}
 
