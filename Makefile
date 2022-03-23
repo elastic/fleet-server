@@ -179,6 +179,11 @@ release-manager-snapshot: ## - Builds a snapshot release. The Go version defined
 release-manager-release: ## - Builds a snapshot release. The Go version defined in .go-version will be installed and used for the build.
 	./dev-tools/run_with_go_ver $(MAKE) release
 
+## get-version : Get the Fleet server version
+.PHONY: get-version
+get-version:
+	@echo $(DEFAULT_VERSION)
+
 ##################################################
 # Integration testing targets
 ##################################################

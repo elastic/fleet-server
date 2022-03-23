@@ -15,6 +15,9 @@ source /usr/local/bin/bash_standard_lib.sh
 chmod -R a+r build/*
 chmod -R a+w build
 
+# get the current version (without the snapshot)
+VERSION=$(make get-version)
+
 # ensure the latest image has been pulled
 IMAGE=docker.elastic.co/infra/release-manager:latest
 (retry 3 docker pull --quiet "${IMAGE}") || echo "Error pulling ${IMAGE} Docker image, we continue"
@@ -33,4 +36,5 @@ docker run --rm \
       --branch "main" \
       --commit "$(git rev-parse HEAD)" \
       --workflow "snapshot" \
-      --artifact-set main
+      --artifact-set main \
+      --version "${VERSION}"
