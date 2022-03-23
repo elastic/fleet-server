@@ -23,8 +23,8 @@ type Cache interface {
 	SetAction(model.Action)
 	GetAction(id string) (model.Action, bool)
 
-	SetApiKey(key APIKey, enabled bool)
-	ValidApiKey(key APIKey) bool
+	SetApiKey(key ApiKey, enabled bool)
+	ValidApiKey(key ApiKey) bool
 
 	SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, cost int64)
 	GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool)
@@ -33,7 +33,7 @@ type Cache interface {
 	GetArtifact(ident, sha2 string) (model.Artifact, bool)
 }
 
-type APIKey = apikey.ApiKey
+type ApiKey = apikey.ApiKey
 type SecurityInfo = apikey.SecurityInfo
 
 type CacheT struct {
@@ -151,7 +151,7 @@ func (c *CacheT) GetAction(id string) (model.Action, bool) {
 }
 
 // SetApiKey sets the API key in the cache.
-func (c *CacheT) SetApiKey(key APIKey, enabled bool) {
+func (c *CacheT) SetApiKey(key ApiKey, enabled bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
@@ -188,7 +188,7 @@ func (c *CacheT) SetApiKey(key APIKey, enabled bool) {
 }
 
 // ValidApiKey returns true if the ApiKey is valid (aka. also present in cache).
-func (c *CacheT) ValidApiKey(key APIKey) bool {
+func (c *CacheT) ValidApiKey(key ApiKey) bool {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 

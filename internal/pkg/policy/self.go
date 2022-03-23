@@ -203,19 +203,20 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
+	var err error
 	if m.policy == nil {
 		// no policy found
 		m.status = proto.StateObserved_STARTING
 		if m.policyID == "" {
-			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on default policy with Fleet Server integration", nil)
+			err = m.reporter.Status(proto.StateObserved_STARTING, "Waiting on default policy with Fleet Server integration", nil)
 		} else {
-			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", m.policyID), nil)
+			err = m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", m.policyID), nil)
 		}
-		return proto.StateObserved_STARTING, nil
+		return proto.StateObserved_STARTING, err
 	}
 
 	var data policyData
-	err := json.Unmarshal(m.policy.Data, &data)
+	err = json.Unmarshal(m.policy.Data, &data)
 	if err != nil {
 		return proto.StateObserved_FAILED, err
 	}
