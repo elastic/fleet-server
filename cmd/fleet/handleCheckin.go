@@ -152,7 +152,7 @@ func (ct *CheckinT) handleCheckin(zlog *zerolog.Logger, w http.ResponseWriter, r
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessApiKeyId, agent.AccessApiKeyId)
+		return ctx.Str(LogAccessApiKeyId, agent.AccessAPIKeyID)
 	})
 
 	ver, err := validateUserAgent(*zlog, r, ct.verCon)
@@ -209,7 +209,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actCh := aSub.Ch()
 
 	// Subscribe to policy manager for changes on PolicyId > policyRev
-	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyId, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
+	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
 	if err != nil {
 		return errors.Wrap(err, "subscribe policy monitor")
 	}
@@ -401,7 +401,7 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 			AgentId:   agentId,
 			CreatedAt: action.Timestamp,
 			Data:      action.Data,
-			Id:        action.ActionId,
+			Id:        action.ActionID,
 			Type:      action.Type,
 			InputType: action.InputType,
 			Timeout:   action.Timeout,
@@ -446,7 +446,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// record with the precalculated sha2 hash of the role.
 	needKey := true
 	switch {
-	case agent.DefaultApiKey == "":
+	case agent.DefaultAPIKey == "":
 		zlog.Debug().Msg("must generate api key as default API key is not present")
 	case pp.Default.Role.Sha2 != agent.PolicyOutputPermissionsHash:
 		zlog.Debug().Msg("must generate api key as policy output permissions changed")
@@ -478,9 +478,9 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 			dl.FieldDefaultApiKeyId:             defaultOutputApiKey.Id,
 			dl.FieldPolicyOutputPermissionsHash: pp.Default.Role.Sha2,
 		}
-		if agent.DefaultApiKeyId != "" {
-			fields[dl.FieldDefaultApiKeyHistory] = model.DefaultApiKeyHistoryItems{
-				Id:        agent.DefaultApiKeyId,
+		if agent.DefaultAPIKeyID != "" {
+			fields[dl.FieldDefaultApiKeyHistory] = model.DefaultAPIKeyHistoryItems{
+				ID:        agent.DefaultAPIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 			}
 		}
@@ -496,10 +496,10 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 			zlog.Error().Err(err).Msg("fail update agent record")
 			return nil, err
 		}
-		agent.DefaultApiKey = defaultOutputApiKey.Agent()
+		agent.DefaultAPIKey = defaultOutputApiKey.Agent()
 	}
 
-	rewrittenPolicy, err := rewritePolicy(pp, agent.DefaultApiKey)
+	rewrittenPolicy, err := rewritePolicy(pp, agent.DefaultAPIKey)
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail rewrite policy")
 		return nil, err

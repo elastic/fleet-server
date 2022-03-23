@@ -107,7 +107,7 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 	// has not enrolled. The Fleet Server cannot become a leader until the
 	// Agent it is running under has been enrolled.
 	m.calcMetadata()
-	if m.agentMetadata.Id == "" {
+	if m.agentMetadata.ID == "" {
 		m.log.Warn().Msg("missing config fleet.agent.id; acceptable until Elastic Agent has enrolled")
 		<-ctx.Done()
 		return ctx.Err()
@@ -252,7 +252,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if now.Sub(t) > m.leaderInterval || leader.Server.Id == m.agentMetadata.Id {
+		if now.Sub(t) > m.leaderInterval || leader.Server.ID == m.agentMetadata.ID {
 			// policy needs a new leader or already leader
 			lead = append(lead, policy)
 		}
@@ -269,7 +269,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 			}()
 
 			l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
-			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.version, dl.WithIndexName(m.leadersIndex))
+			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.version, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l.Err(err).Msg("failed to take ownership")
 				if pt.cord != nil {
@@ -285,7 +285,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 				cord, err := m.factory(p)
 				if err != nil {
 					l.Err(err).Msg("failed to start coordinator")
-					err = dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
+					err = dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 					if err != nil {
 						l.Err(err).Msg("failed to release policy leadership")
 					}
@@ -332,7 +332,7 @@ func (m *monitorT) releaseLeadership() {
 			// monitor will be cancelled at this point in the code
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			err := dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
+			err := dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
 				l.Err(err).Msg("failed to release leadership")
@@ -345,7 +345,7 @@ func (m *monitorT) releaseLeadership() {
 
 func (m *monitorT) calcMetadata() {
 	m.agentMetadata = model.AgentMetadata{
-		Id:      m.fleet.Agent.ID,
+		ID:      m.fleet.Agent.ID,
 		Version: m.fleet.Agent.Version,
 	}
 	hostname := m.fleet.Host.Name
@@ -361,7 +361,7 @@ func (m *monitorT) calcMetadata() {
 		m.log.Err(err).Msg("failed to get ip addresses")
 	}
 	m.hostMetadata = model.HostMetadata{
-		Id:           m.fleet.Host.ID,
+		ID:           m.fleet.Host.ID,
 		Name:         hostname,
 		Architecture: runtime.GOOS,
 		Ip:           ips,
@@ -491,7 +491,7 @@ func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyId string, u
 		if err != nil {
 			return err
 		}
-		agentIds[i] = agent.Id
+		agentIds[i] = agent.ID
 	}
 
 	zlog.Info().
@@ -516,7 +516,7 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	apiKeys := getAPIKeyIDs(agent)
 
 	zlog = zlog.With().
-		Str(logger.AgentId, agent.Id).
+		Str(logger.AgentId, agent.ID).
 		Strs(logger.ApiKeyId, apiKeys).
 		Logger()
 
@@ -529,7 +529,7 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 			return err
 		}
 	}
-	if err = bulker.Update(ctx, agentsIndex, agent.Id, body, bulk.WithRefresh()); err != nil {
+	if err = bulker.Update(ctx, agentsIndex, agent.ID, body, bulk.WithRefresh()); err != nil {
 		zlog.Error().Err(err).Msg("Fail unenrollAgent record update")
 	}
 
@@ -538,11 +538,11 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 
 func getAPIKeyIDs(agent *model.Agent) []string {
 	keys := make([]string, 0, 1)
-	if agent.AccessApiKeyId != "" {
-		keys = append(keys, agent.AccessApiKeyId)
+	if agent.AccessAPIKeyID != "" {
+		keys = append(keys, agent.AccessAPIKeyID)
 	}
-	if agent.DefaultApiKeyId != "" {
-		keys = append(keys, agent.DefaultApiKeyId)
+	if agent.DefaultAPIKeyID != "" {
+		keys = append(keys, agent.DefaultAPIKeyID)
 	}
 	return keys
 }

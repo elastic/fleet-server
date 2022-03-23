@@ -197,8 +197,8 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}
 
 	var tokenLock sync.Mutex
-	var tokenResult []model.EnrollmentApiKey
-	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error) {
+	var tokenResult []model.EnrollmentAPIKey
+	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 		tokenLock.Lock()
 		defer tokenLock.Unlock()
 		return tokenResult, nil
@@ -255,15 +255,15 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}
 
 	// add inactive token that should be filtered out
-	inactiveToken := model.EnrollmentApiKey{
+	inactiveToken := model.EnrollmentAPIKey{
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
 		Active:   false,
-		ApiKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
-		ApiKeyId: xid.New().String(),
+		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
+		APIKeyID: xid.New().String(),
 		Name:     "Inactive",
-		PolicyId: policyId,
+		PolicyID: policyId,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, inactiveToken)
@@ -296,15 +296,15 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-	activeToken := model.EnrollmentApiKey{
+	activeToken := model.EnrollmentAPIKey{
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
 		Active:   true,
-		ApiKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
-		ApiKeyId: xid.New().String(),
+		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
+		APIKeyID: xid.New().String(),
 		Name:     "Active",
-		PolicyId: policyId,
+		PolicyID: policyId,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, activeToken)
@@ -326,7 +326,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		if !set {
 			return fmt.Errorf("payload should have enrollment-token set")
 		}
-		if token != activeToken.ApiKey {
+		if token != activeToken.APIKey {
 			return fmt.Errorf("enrollment_token value is incorrect")
 		}
 		return nil
@@ -505,8 +505,8 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}
 
 	var tokenLock sync.Mutex
-	var tokenResult []model.EnrollmentApiKey
-	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error) {
+	var tokenResult []model.EnrollmentAPIKey
+	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 		tokenLock.Lock()
 		defer tokenLock.Unlock()
 		return tokenResult, nil
@@ -562,15 +562,15 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}
 
 	// add inactive token that should be filtered out
-	inactiveToken := model.EnrollmentApiKey{
+	inactiveToken := model.EnrollmentAPIKey{
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
 		Active:   false,
-		ApiKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
-		ApiKeyId: xid.New().String(),
+		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
+		APIKeyID: xid.New().String(),
 		Name:     "Inactive",
-		PolicyId: policyId,
+		PolicyID: policyId,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, inactiveToken)
@@ -603,15 +603,15 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-	activeToken := model.EnrollmentApiKey{
+	activeToken := model.EnrollmentAPIKey{
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
 		Active:   true,
-		ApiKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
-		ApiKeyId: xid.New().String(),
+		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
+		APIKeyID: xid.New().String(),
 		Name:     "Active",
-		PolicyId: policyId,
+		PolicyID: policyId,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, activeToken)
@@ -633,7 +633,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		if !set {
 			return fmt.Errorf("payload should have enrollment-token set")
 		}
-		if token != activeToken.ApiKey {
+		if token != activeToken.APIKey {
 			return fmt.Errorf("enrollment_token value is incorrect")
 		}
 		return nil

@@ -18,7 +18,7 @@ import (
 func EnsureServer(ctx context.Context, bulker bulk.Bulk, version string, agent model.AgentMetadata, host model.HostMetadata, opts ...Option) error {
 	var server model.Server
 	o := newOption(FleetServers, opts...)
-	data, err := bulker.Read(ctx, o.indexName, agent.Id)
+	data, err := bulker.Read(ctx, o.indexName, agent.ID)
 	if err != nil && err != es.ErrElasticNotFound {
 		return err
 	}
@@ -26,7 +26,7 @@ func EnsureServer(ctx context.Context, bulker bulk.Bulk, version string, agent m
 		server.Agent = &agent
 		server.Host = &host
 		server.Server = &model.ServerMetadata{
-			Id:      agent.Id,
+			ID:      agent.ID,
 			Version: version,
 		}
 		server.SetTime(time.Now().UTC())
@@ -34,7 +34,7 @@ func EnsureServer(ctx context.Context, bulker bulk.Bulk, version string, agent m
 		if err != nil {
 			return err
 		}
-		_, err = bulker.Create(ctx, o.indexName, agent.Id, data)
+		_, err = bulker.Create(ctx, o.indexName, agent.ID, data)
 		return err
 	}
 	err = json.Unmarshal(data, &server)
@@ -44,7 +44,7 @@ func EnsureServer(ctx context.Context, bulker bulk.Bulk, version string, agent m
 	server.Agent = &agent
 	server.Host = &host
 	server.Server = &model.ServerMetadata{
-		Id:      agent.Id,
+		ID:      agent.ID,
 		Version: version,
 	}
 	server.SetTime(time.Now().UTC())
@@ -54,5 +54,5 @@ func EnsureServer(ctx context.Context, bulker bulk.Bulk, version string, agent m
 	if err != nil {
 		return err
 	}
-	return bulker.Update(ctx, o.indexName, agent.Id, data)
+	return bulker.Update(ctx, o.indexName, agent.ID, data)
 }

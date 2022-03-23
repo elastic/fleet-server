@@ -89,8 +89,8 @@ func TestEventToActionResult(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			acr := eventToActionResult(agentId, tc.ev)
-			assert.Equal(t, agentId, acr.AgentId)
-			assert.Equal(t, tc.ev.ActionId, acr.ActionId)
+			assert.Equal(t, agentId, acr.AgentID)
+			assert.Equal(t, tc.ev.ActionId, acr.ActionID)
 			assert.Equal(t, tc.ev.ActionInputType, acr.ActionInputType)
 			assert.Equal(t, tc.ev.StartedAt, acr.StartedAt)
 			assert.Equal(t, tc.ev.CompletedAt, acr.CompletedAt)

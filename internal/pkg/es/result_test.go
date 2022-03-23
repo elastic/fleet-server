@@ -25,7 +25,7 @@ func TestHitUnmarshal(t *testing.T) {
 			SeqNo:   2,
 			Version: 1,
 		},
-		ActionId: uuid.Must(uuid.NewV4()).String(),
+		ActionID: uuid.Must(uuid.NewV4()).String(),
 	}
 
 	body, err := json.Marshal(action)
