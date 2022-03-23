@@ -24,7 +24,7 @@ func TestConvertActionsEmpty(t *testing.T) {
 func TestConvertActions(t *testing.T) {
 	actions := []model.Action{
 		{
-			ActionId: "1234",
+			ActionID: "1234",
 		},
 	}
 	resp, token := convertActions("agent-id", actions)

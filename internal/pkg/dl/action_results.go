@@ -25,5 +25,5 @@ func createActionResult(ctx context.Context, bulker bulk.Bulk, index string, acr
 		return "", nil
 	}
 
-	return bulker.Create(ctx, index, acr.Id, body, bulk.WithRefresh())
+	return bulker.Create(ctx, index, acr.ID, body, bulk.WithRefresh())
 }

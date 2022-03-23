@@ -28,7 +28,7 @@ import (
 // DefaultCheckTime is the default interval for self to check for its policy.
 const DefaultCheckTime = 5 * time.Second
 
-type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error)
+type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error)
 
 type SelfMonitor interface {
 	// Run runs the monitor.
@@ -252,7 +252,7 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 			return proto.StateObserved_STARTING, nil
 		}
 		payload = map[string]interface{}{
-			"enrollment_token": tokens[0].ApiKey,
+			"enrollment_token": tokens[0].APIKey,
 		}
 	}
 	m.status = status
@@ -281,12 +281,12 @@ func (d *policyData) HasType(val string) bool {
 	return false
 }
 
-func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error) {
+func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 	return dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyId, policyID)
 }
 
-func filterActiveTokens(tokens []model.EnrollmentApiKey) []model.EnrollmentApiKey {
-	active := make([]model.EnrollmentApiKey, 0, len(tokens))
+func filterActiveTokens(tokens []model.EnrollmentAPIKey) []model.EnrollmentAPIKey {
+	active := make([]model.EnrollmentAPIKey, 0, len(tokens))
 	for _, t := range tokens {
 		if t.Active {
 			active = append(active, t)
