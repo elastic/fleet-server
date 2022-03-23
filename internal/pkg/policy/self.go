@@ -223,11 +223,11 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 		// no fleet-server input
 		m.status = proto.StateObserved_STARTING
 		if m.policyID == "" {
-			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on fleet-server input to be added to default policy", nil)
+			err = m.reporter.Status(proto.StateObserved_STARTING, "Waiting on fleet-server input to be added to default policy", nil)
 		} else {
-			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", m.policyID), nil)
+			err = m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", m.policyID), nil)
 		}
-		return proto.StateObserved_STARTING, nil
+		return proto.StateObserved_STARTING, err
 	}
 
 	status := proto.StateObserved_HEALTHY
@@ -247,11 +247,11 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 		if len(tokens) == 0 {
 			// no tokens created for the policy, still starting
 			if m.policyID == "" {
-				m.reporter.Status(proto.StateObserved_STARTING, "Waiting on active enrollment keys to be created in default policy with Fleet Server integration", nil)
+				err = m.reporter.Status(proto.StateObserved_STARTING, "Waiting on active enrollment keys to be created in default policy with Fleet Server integration", nil)
 			} else {
-				m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", m.policyID), nil)
+				err = m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", m.policyID), nil)
 			}
-			return proto.StateObserved_STARTING, nil
+			return proto.StateObserved_STARTING, err
 		}
 		payload = map[string]interface{}{
 			"enrollment_token": tokens[0].APIKey,
@@ -259,11 +259,11 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 	}
 	m.status = status
 	if m.policyID == "" {
-		m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), payload)
+		err = m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), payload)
 	} else {
-		m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyID, extendMsg), payload)
+		err = m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyID, extendMsg), payload)
 	}
-	return status, nil
+	return status, err
 }
 
 type policyData struct {

@@ -23,17 +23,17 @@ type Cache interface {
 	SetAction(model.Action)
 	GetAction(id string) (model.Action, bool)
 
-	SetApiKey(key ApiKey, enabled bool)
-	ValidApiKey(key ApiKey) bool
+	SetApiKey(key APIKey, enabled bool)
+	ValidApiKey(key APIKey) bool
 
-	SetEnrollmentApiKey(id string, key model.EnrollmentAPIKey, cost int64)
-	GetEnrollmentApiKey(id string) (model.EnrollmentAPIKey, bool)
+	SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, cost int64)
+	GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool)
 
 	SetArtifact(artifact model.Artifact)
 	GetArtifact(ident, sha2 string) (model.Artifact, bool)
 }
 
-type ApiKey = apikey.ApiKey
+type APIKey = apikey.ApiKey
 type SecurityInfo = apikey.SecurityInfo
 
 type CacheT struct {
@@ -151,7 +151,7 @@ func (c *CacheT) GetAction(id string) (model.Action, bool) {
 }
 
 // SetApiKey sets the API key in the cache.
-func (c *CacheT) SetApiKey(key ApiKey, enabled bool) {
+func (c *CacheT) SetApiKey(key APIKey, enabled bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
@@ -188,7 +188,7 @@ func (c *CacheT) SetApiKey(key ApiKey, enabled bool) {
 }
 
 // ValidApiKey returns true if the ApiKey is valid (aka. also present in cache).
-func (c *CacheT) ValidApiKey(key ApiKey) bool {
+func (c *CacheT) ValidApiKey(key APIKey) bool {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
@@ -210,8 +210,8 @@ func (c *CacheT) ValidApiKey(key ApiKey) bool {
 	return ok
 }
 
-// GetEnrollmentApiKey returns the enrollment API key by ID.
-func (c *CacheT) GetEnrollmentApiKey(id string) (model.EnrollmentAPIKey, bool) {
+// GetEnrollmentAPIKey returns the enrollment API key by ID.
+func (c *CacheT) GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
@@ -231,8 +231,8 @@ func (c *CacheT) GetEnrollmentApiKey(id string) (model.EnrollmentAPIKey, bool) {
 	return model.EnrollmentAPIKey{}, false
 }
 
-// SetEnrollmentApiKey adds the enrollment API key into the cache.
-func (c *CacheT) SetEnrollmentApiKey(id string, key model.EnrollmentAPIKey, cost int64) {
+// SetEnrollmentAPIKey adds the enrollment API key into the cache.
+func (c *CacheT) SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, cost int64) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 

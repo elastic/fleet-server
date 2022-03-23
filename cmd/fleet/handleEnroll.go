@@ -443,7 +443,7 @@ func generateOutputApiKey(ctx context.Context, bulk bulk.Bulk, agentId, outputNa
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentAPIKey, error) {
 
-	if key, ok := et.cache.GetEnrollmentApiKey(id); ok {
+	if key, ok := et.cache.GetEnrollmentAPIKey(id); ok {
 		return &key, nil
 	}
 
@@ -458,7 +458,7 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	}
 
 	cost := int64(len(rec.APIKey))
-	et.cache.SetEnrollmentApiKey(id, rec, cost)
+	et.cache.SetEnrollmentAPIKey(id, rec, cost)
 
 	return &rec, nil
 }
