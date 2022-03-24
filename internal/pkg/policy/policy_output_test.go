@@ -106,11 +106,10 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, policyMap, false)
 	require.Nil(t, err, "expected prepare to pass")
 
-	updatedKey, ok := policyMap.GetMap("test output")["api_key"].(*bulk.ApiKey)
+	updatedKey, ok := policyMap.GetMap("test output")["api_key"].(string)
 
 	require.True(t, ok, "unable to case api key")
-	require.Equal(t, updatedKey.Key, bulker.MockedAPIKey.Key)
-	require.Equal(t, updatedKey.Id, bulker.MockedAPIKey.Id)
+	require.Equal(t, updatedKey, bulker.MockedAPIKey.Agent())
 	require.Equal(t, len(bulker.ArgumentData.Update), 0, "update should not be called")
 }
 
@@ -134,10 +133,9 @@ func TestPolicyOutputDefaultESPrepare(t *testing.T) {
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap, true)
 	require.Nil(t, err, "expected prepare to pass")
 
-	updatedKey, ok := policyMap.GetMap("test output")["api_key"].(*bulk.ApiKey)
+	updatedKey, ok := policyMap.GetMap("test output")["api_key"].(string)
 
 	require.True(t, ok, "unable to case api key")
-	require.Equal(t, updatedKey.Key, bulker.MockedAPIKey.Key)
-	require.Equal(t, updatedKey.Id, bulker.MockedAPIKey.Id)
+	require.Equal(t, updatedKey, bulker.MockedAPIKey.Agent())
 	require.Greater(t, len(bulker.ArgumentData.Update), 0, "update should be called")
 }

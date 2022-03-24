@@ -79,7 +79,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 				return err
 			}
 
-			if ok := setMapObj(outputMap, outputAPIKey, p.Name, "api_key"); !ok {
+			if ok := setMapObj(outputMap, outputAPIKey.Agent(), p.Name, "api_key"); !ok {
 				return ErrFailInjectAPIKey
 			}
 
