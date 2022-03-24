@@ -166,10 +166,10 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
 
-build/distributions/dependencies.csv: ## - Prepares the dependencies file.
-	@mkdir -p build/distributions
-	./dev-tools/run_with_go_ver dev-tools/dependencies-report --csv build/distributions/dependencies-$(VERSION).csv
-	@cd build/distributions && shasum -a 512 dependencies-$(VERSION).csv > dependencies-$(VERSION).csv.sha512
+build/distributions/reports/dependencies.csv: ## - Prepares the dependencies file.
+	@mkdir -p build/distributions/reports
+	./dev-tools/run_with_go_ver dev-tools/dependencies-report --csv build/distributions/reports/dependencies-$(VERSION).csv
+	@cd build/distributions/reports && shasum -a 512 dependencies-$(VERSION).csv > dependencies-$(VERSION).csv.sha512
 
 .PHONY: release-manager-snapshot
 release-manager-snapshot: ## - Builds a snapshot release. The Go version defined in .go-version will be installed and used for the build.

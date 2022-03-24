@@ -98,7 +98,7 @@ pipeline {
                   dir("${BASE_DIR}"){
                     withMageEnv() {
                       whenFalse(isArm()) {
-                        sh(label: 'make build/distributions/dependencies.csv', script: 'make build/distributions/dependencies.csv')
+                        sh(label: 'make build/distributions/reports/dependencies.csv', script: 'make build/distributions/reports/dependencies.csv')
                       }
                       sh(label: 'make release-manager-snapshot', script: 'make release-manager-snapshot')
                     }
