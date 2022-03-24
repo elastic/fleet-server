@@ -68,9 +68,7 @@ pipeline {
             setEnvVar('URI_SUFFIX', "commits/${env.GIT_BASE_COMMIT}")
             // JOB_GCS_BUCKET contains the bucket and some folders, let's build the folder structure
             setEnvVar('PATH_PREFIX', "${JOB_GCS_BUCKET.contains('/') ? JOB_GCS_BUCKET.substring(JOB_GCS_BUCKET.indexOf('/') + 1) + '/' + env.URI_SUFFIX : env.URI_SUFFIX}")
-            //TODO : uncomment
-            //setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
-            setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable('main'))
+            setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
           }
         }
         stage('Package') {
@@ -149,8 +147,7 @@ pipeline {
       notifyBuildResult(prComment: false)
     }
     failure {
-      echo 'disabled'
-    // notifyStatus(slackStatus: 'danger', subject: "[${env.REPO}@${env.BRANCH_NAME}] DRA failed", body: "Build: (<${env.RUN_DISPLAY_URL}|here>)")
+      notifyStatus(slackStatus: 'danger', subject: "[${env.REPO}@${env.BRANCH_NAME}] DRA failed", body: "Build: (<${env.RUN_DISPLAY_URL}|here>)")
     }
   }
 }
