@@ -97,9 +97,6 @@ pipeline {
                   unstash 'source'
                   dir("${BASE_DIR}"){
                     withMageEnv() {
-                      whenFalse(isArm()) {
-                        sh(label: 'make build/distributions/reports/dependencies.csv', script: 'make build/distributions/reports/dependencies.csv')
-                      }
                       sh(label: 'make release-manager-snapshot', script: 'make release-manager-snapshot')
                     }
                   }
@@ -132,6 +129,9 @@ pipeline {
                                   localDirectory: "${BASE_DIR}/build/distributions",
                                   pathPrefix: env.PATH_PREFIX)
             dir("${BASE_DIR}") {
+              withMageEnv() {
+                sh(label: 'create dependencies file', script: 'make release-manager-dependencies')
+              }
               dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
               script {
                 getVaultSecret.readSecretWrapper {
