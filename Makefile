@@ -171,6 +171,14 @@ release-manager-dependencies: ## - Prepares the dependencies file.
 	./dev-tools/run_with_go_ver dev-tools/dependencies-report --csv build/distributions/reports/dependencies-$(VERSION).csv
 	@cd build/distributions/reports && shasum -a 512 dependencies-$(VERSION).csv > dependencies-$(VERSION).csv.sha512
 
+.PHONY: release-manager-dependencies-snapshot
+release-manager-dependencies-snapshot: ## - Prepares the dependencies file for a snapshot.
+	@$(MAKE) SNAPSHOT=true release-manager-dependencies
+
+.PHONY: release-manager-dependencies-release
+release-manager-dependencies-release: ## - Prepares the dependencies file for a release.
+	@$(MAKE) release-manager-dependencies
+
 .PHONY: release-manager-snapshot
 release-manager-snapshot: ## - Builds a snapshot release. The Go version defined in .go-version will be installed and used for the build.
 	@$(MAKE) SNAPSHOT=true release-manager-release

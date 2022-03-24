@@ -130,7 +130,7 @@ pipeline {
                                   pathPrefix: env.PATH_PREFIX)
             dir("${BASE_DIR}") {
               withMageEnv() {
-                sh(label: 'create dependencies file', script: 'make release-manager-dependencies')
+                sh(label: 'create dependencies file', script: 'make release-manager-dependencies-snapshot')
               }
               dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
               script {
