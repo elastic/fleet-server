@@ -25,6 +25,7 @@ type ServerLimits struct {
 	ArtifactLimit Limit `config:"artifact_limit"`
 	EnrollLimit   Limit `config:"enroll_limit"`
 	AckLimit      Limit `config:"ack_limit"`
+	StatusLimit   Limit `config:"status_limit"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -62,5 +63,11 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 		Burst:    l.AckLimit.Burst,
 		Max:      l.AckLimit.Max,
 		MaxBody:  l.AckLimit.MaxBody,
+	}
+	c.StatusLimit = Limit{
+		Interval: l.StatusLimit.Interval,
+		Burst:    l.StatusLimit.Burst,
+		Max:      l.StatusLimit.Max,
+		MaxBody:  l.StatusLimit.MaxBody,
 	}
 }

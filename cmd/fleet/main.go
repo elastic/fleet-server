@@ -15,10 +15,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/go-ucfg"
-	"github.com/elastic/go-ucfg/yaml"
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
+
+	"github.com/elastic/go-ucfg"
+	"github.com/elastic/go-ucfg/yaml"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
@@ -41,14 +42,15 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 const (
@@ -797,8 +799,11 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	esCli := bulker.Client()
 
 	// Check version compatibility with Elasticsearch
-	err = ver.CheckCompatibility(ctx, esCli, f.bi.Version)
+	remoteVersion, err := ver.CheckCompatibility(ctx, esCli, f.bi.Version)
 	if err != nil {
+		if len(remoteVersion) != 0 {
+			return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w", f.bi.Version, remoteVersion, err)
+		}
 		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
@@ -877,8 +882,9 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 
 	at := NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
+	st := NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
 
-	router := NewRouter(ctx, bulker, ct, et, at, ack, sm, tracer)
+	router := NewRouter(ctx, bulker, ct, et, at, ack, st, sm, tracer, f.bi)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return runServer(ctx, router, &cfg.Inputs[0].Server)

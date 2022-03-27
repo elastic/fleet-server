@@ -69,7 +69,7 @@ func TestBulkCreate(t *testing.T) {
 			Name:  "Invalid utf-8",
 			Index: string([]byte{0xfe, 0xfe, 0xff, 0xff}),
 			Err: es.ErrElastic{
-				Status: 400,
+				Status: 500,
 				Type:   "json_parse_exception",
 			},
 		},

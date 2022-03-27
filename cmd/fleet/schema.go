@@ -6,6 +6,10 @@ package fleet
 
 import (
 	"encoding/json"
+	"errors"
+	"net/http"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 const (
@@ -23,7 +27,7 @@ const kFleetAccessRolesJSON = `
 	"fleet-apikey-access": {
 		"cluster": [],
 		"applications": [{
-			"application": ".fleet",
+			"application": "fleet",
 			"privileges": ["no-privileges"],
 			"resources": ["*"]
 		}]
@@ -87,8 +91,43 @@ type AckRequest struct {
 	Events []Event `json:"events"`
 }
 
+type AckResponseItem struct {
+	Status  int    `json:"status"`
+	Message string `json:"message,omitempty"`
+}
+
 type AckResponse struct {
-	Action string `json:"action"`
+	Action string            `json:"action"`
+	Errors bool              `json:"errors,omitempty"` // indicates that some of the events in the ack request failed
+	Items  []AckResponseItem `json:"items,omitempty"`
+}
+
+func NewAckResponse(size int) AckResponse {
+	return AckResponse{
+		Action: "acks",
+		Items:  make([]AckResponseItem, size),
+	}
+}
+
+func (a *AckResponse) setMessage(pos int, status int, message string) {
+	if status != http.StatusOK {
+		a.Errors = true
+	}
+	a.Items[pos].Status = status
+	a.Items[pos].Message = message
+}
+
+func (a *AckResponse) SetResult(pos int, status int) {
+	a.setMessage(pos, status, http.StatusText(status))
+}
+
+func (a *AckResponse) SetError(pos int, err error) {
+	var esErr *es.ErrElastic
+	if errors.As(err, &esErr) {
+		a.setMessage(pos, esErr.Status, esErr.Reason)
+	} else {
+		a.SetResult(pos, http.StatusInternalServerError)
+	}
 }
 
 type ActionResp struct {
@@ -102,24 +141,32 @@ type ActionResp struct {
 }
 
 type Event struct {
-	Type           string          `json:"type"`
-	SubType        string          `json:"subtype"`
-	AgentId        string          `json:"agent_id"`
-	ActionId       string          `json:"action_id"`
-	PolicyId       string          `json:"policy_id"`
-	StreamId       string          `json:"stream_id"`
-	Timestamp      string          `json:"timestamp"`
-	Message        string          `json:"message"`
-	Payload        json.RawMessage `json:"payload,omitempty"`
-	StartedAt      string          `json:"started_at"`
-	CompletedAt    string          `json:"completed_at"`
-	ActionData     json.RawMessage `json:"action_data,omitempty"`
-	ActionResponse json.RawMessage `json:"action_response,omitempty"`
-	Data           json.RawMessage `json:"data,omitempty"`
-	Error          string          `json:"error,omitempty"`
+	Type            string          `json:"type"`
+	SubType         string          `json:"subtype"`
+	AgentId         string          `json:"agent_id"`
+	ActionId        string          `json:"action_id"`
+	ActionInputType string          `json:"action_input_type"`
+	PolicyId        string          `json:"policy_id"`
+	StreamId        string          `json:"stream_id"`
+	Timestamp       string          `json:"timestamp"`
+	Message         string          `json:"message"`
+	Payload         json.RawMessage `json:"payload,omitempty"`
+	StartedAt       string          `json:"started_at"`
+	CompletedAt     string          `json:"completed_at"`
+	ActionData      json.RawMessage `json:"action_data,omitempty"`
+	ActionResponse  json.RawMessage `json:"action_response,omitempty"`
+	Data            json.RawMessage `json:"data,omitempty"`
+	Error           string          `json:"error,omitempty"`
+}
+
+type StatusResponseVersion struct {
+	Number    string `json:"number,omitempty"`
+	BuildHash string `json:"build_hash,omitempty"`
+	BuildTime string `json:"build_time,omitempty"`
 }
 
 type StatusResponse struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
+	Name    string                 `json:"name"`
+	Status  string                 `json:"status"`
+	Version *StatusResponseVersion `json:"version,omitempty"`
 }
