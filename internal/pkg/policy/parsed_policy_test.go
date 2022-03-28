@@ -79,11 +79,11 @@ func TestNewParsedPolicy(t *testing.T) {
 func TestNewParsedPolicyNoES(t *testing.T) {
 	// Load the model into the policy object
 	var m model.Policy
-	if err := json.Unmarshal([]byte(noESOutputPolicy), &m); err != nil {
+	if err := json.Unmarshal([]byte(logstashOutputPolicy), &m); err != nil {
 		t.Fatal(err)
 	}
 
-	m.Data = json.RawMessage(noESOutputPolicy)
+	m.Data = json.RawMessage(logstashOutputPolicy)
 
 	pp, err := NewParsedPolicy(m)
 	if err != nil {
