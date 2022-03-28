@@ -7,7 +7,7 @@ pipeline {
     REPO = 'fleet-server'
     BASE_DIR = "src/github.com/elastic/${env.REPO}"
     SLACK_CHANNEL = '#fleet-server'
-    NOTIFY_TO = 'package+fleet-server@elastic.co'
+    NOTIFY_TO = 'fleet-server+build-package@elastic.co'
     JOB_GCS_BUCKET = credentials('gcs-bucket')
     JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
     DOCKER_SECRET = 'secret/observability-team/ci/docker-registry/prod'
