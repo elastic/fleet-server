@@ -417,7 +417,7 @@ func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter)
 
 	err = cfg.LoadServerLimits()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("encountered error while loading server limits: %w", err)
 	}
 	cache, err := makeCache(cfg)
 	if err != nil {
@@ -480,16 +480,21 @@ func (f *FleetServer) Run(ctx context.Context) error {
 LOOP:
 	for {
 		ech := make(chan error, 2)
-
+		var err error
 		if started {
-			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil)
+			err = f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil)
 		} else {
 			started = true
-			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
+			err = f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
 		}
-		err := newCfg.LoadServerLimits()
+
 		if err != nil {
-			return err
+			return fmt.Errorf("error computing status: %w", err)
+		}
+
+		err = newCfg.LoadServerLimits()
+		if err != nil {
+			return fmt.Errorf("encountered error while loading server limits: %w", err)
 		}
 
 		// Create or recreate cache
@@ -689,7 +694,7 @@ func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error 
 	}
 }
 
-func initRuntime(cfg *config.Config) error {
+func initRuntime(cfg *config.Config) {
 	gcPercent := cfg.Inputs[0].Server.Runtime.GCPercent
 	if gcPercent != 0 {
 		old := debug.SetGCPercent(gcPercent)
@@ -699,7 +704,6 @@ func initRuntime(cfg *config.Config) error {
 			Int("new", gcPercent).
 			Msg("SetGCPercent")
 	}
-	return nil
 }
 
 func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
@@ -715,10 +719,7 @@ func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk
 }
 
 func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err error) {
-	err = initRuntime(cfg)
-	if err != nil {
-		return err
-	}
+	initRuntime(cfg)
 
 	// The metricsServer is only enabled if http.enabled is set in the config
 	metricsServer, err := f.initMetrics(ctx, cfg)

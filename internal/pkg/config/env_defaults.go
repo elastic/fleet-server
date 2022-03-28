@@ -171,10 +171,6 @@ func init() {
 	}
 }
 
-func initLimits() *envLimits {
-	return loadLimits(0)
-}
-
 func loadLimits(agentLimit int) *envLimits {
 	return loadLimitsForAgents(agentLimit)
 }

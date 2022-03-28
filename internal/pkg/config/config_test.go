@@ -164,7 +164,8 @@ func TestConfig(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
-				cfg.LoadServerLimits()
+				err = cfg.LoadServerLimits()
+				require.NoError(t, err)
 				skipUnexported := cmpopts.IgnoreUnexported(Config{})
 				if !assert.True(t, cmp.Equal(test.cfg, cfg, skipUnexported)) {
 					diff := cmp.Diff(test.cfg, cfg, skipUnexported)
@@ -201,12 +202,6 @@ func generateServerLimits(maxAgents int) ServerLimits {
 	var d ServerLimits
 	d.MaxAgents = maxAgents
 	d.LoadLimits(loadLimits(maxAgents))
-	return d
-}
-
-func defaultServerLimits(maxAgents int) ServerLimits {
-	var d ServerLimits
-	d.InitDefaults()
 	return d
 }
 

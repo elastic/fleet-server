@@ -63,11 +63,11 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// LoadServerLimits should be called after initialization, so we may access the user defined
+// agent limit setting.
 func (c *Config) LoadServerLimits() error {
 	c.m.Lock()
 	defer c.m.Unlock()
-	// LoadServerLimits should be called after initialization, so we may access the user defined
-	// agent limit setting.
 	err := c.Validate()
 	if err != nil {
 		log.Warn().Msgf("failed to validate while calculating limits, %s", err.Error())

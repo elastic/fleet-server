@@ -27,7 +27,7 @@ type Cache struct {
 }
 
 func (c *Cache) InitDefaults() {
-	c.LoadLimits(initLimits())
+	c.LoadLimits(loadLimits(0))
 }
 
 func (c *Cache) LoadLimits(limits *envLimits) {

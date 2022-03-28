@@ -30,7 +30,7 @@ type ServerLimits struct {
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *ServerLimits) InitDefaults() {
-	c.LoadLimits(initLimits())
+	c.LoadLimits(loadLimits(0))
 }
 
 func (c *ServerLimits) LoadLimits(limits *envLimits) {
