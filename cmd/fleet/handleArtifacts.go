@@ -128,7 +128,7 @@ func (at ArtifactT) handleArtifacts(zlog *zerolog.Logger, r *http.Request, id, s
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessAPIKeyID, agent.AccessApiKeyId)
+		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
 	})
 
 	// Metrics; serenity now.

@@ -26,8 +26,8 @@ type Cache interface {
 	SetApiKey(key ApiKey, enabled bool)
 	ValidApiKey(key ApiKey) bool
 
-	SetEnrollmentApiKey(id string, key model.EnrollmentApiKey, cost int64)
-	GetEnrollmentApiKey(id string) (model.EnrollmentApiKey, bool)
+	SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, cost int64)
+	GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool)
 
 	SetArtifact(artifact model.Artifact)
 	GetArtifact(ident, sha2 string) (model.Artifact, bool)
@@ -109,17 +109,17 @@ func (c *CacheT) SetAction(action model.Action) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
-	scopedKey := "action:" + action.ActionId
+	scopedKey := "action:" + action.ActionID
 	v := actionCache{
-		actionId:   action.ActionId,
+		actionId:   action.ActionID,
 		actionType: action.Type,
 	}
-	cost := len(action.ActionId) + len(action.Type)
+	cost := len(action.ActionID) + len(action.Type)
 	ttl := c.cfg.ActionTTL
 	ok := c.cache.SetWithTTL(scopedKey, v, int64(cost), ttl)
 	log.Trace().
 		Bool("ok", ok).
-		Str("id", action.ActionId).
+		Str("id", action.ActionID).
 		Int("cost", cost).
 		Msg("Action cache SET")
 }
@@ -141,7 +141,7 @@ func (c *CacheT) GetAction(id string) (model.Action, bool) {
 			return model.Action{}, false
 		}
 		return model.Action{
-			ActionId: action.actionId,
+			ActionID: action.actionId,
 			Type:     action.actionType,
 		}, ok
 	}
@@ -210,29 +210,29 @@ func (c *CacheT) ValidApiKey(key ApiKey) bool {
 	return ok
 }
 
-// GetEnrollmentApiKey returns the enrollment API key by ID.
-func (c *CacheT) GetEnrollmentApiKey(id string) (model.EnrollmentApiKey, bool) {
+// GetEnrollmentAPIKey returns the enrollment API key by ID.
+func (c *CacheT) GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
 	scopedKey := "record:" + id
 	if v, ok := c.cache.Get(scopedKey); ok {
 		log.Trace().Str("id", id).Msg("Enrollment cache HIT")
-		key, ok := v.(model.EnrollmentApiKey)
+		key, ok := v.(model.EnrollmentAPIKey)
 
 		if !ok {
 			log.Error().Str("id", id).Msg("Enrollment cache cast fail")
-			return model.EnrollmentApiKey{}, false
+			return model.EnrollmentAPIKey{}, false
 		}
 		return key, ok
 	}
 
 	log.Trace().Str("id", id).Msg("EnrollmentApiKey cache MISS")
-	return model.EnrollmentApiKey{}, false
+	return model.EnrollmentAPIKey{}, false
 }
 
-// SetEnrollmentApiKey adds the enrollment API key into the cache.
-func (c *CacheT) SetEnrollmentApiKey(id string, key model.EnrollmentApiKey, cost int64) {
+// SetEnrollmentAPIKey adds the enrollment API key into the cache.
+func (c *CacheT) SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, cost int64) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 

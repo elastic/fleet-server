@@ -2,6 +2,10 @@
 
 - Return a better error on enrolling and the Elasticsearch version is incompatible. {pull}1211[1211]
 
+==== Breaking changes
+
+- Removed the reliance on the default fleet policy flag; added the `fleet.default_policy_id` configuration option, used to define the ID of the default policy fleet server will subscribe to. {pull}1157[1157]
+
 ==== New Features
 
 - Fleet server now supports Logstash type outputs for managed agents. {pull}1188[1188]

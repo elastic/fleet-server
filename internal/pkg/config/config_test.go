@@ -47,6 +47,7 @@ func TestConfig(t *testing.T) {
 		"fleet-logging": {
 			cfg: &Config{
 				Fleet: Fleet{
+					DefaultPolicyID: "fleet-server-policy",
 					Agent: Agent{
 						ID: "1e4954ce-af37-4731-9f4a-407b08e69e42",
 						Logging: AgentLogging{
@@ -220,6 +221,7 @@ func defaultHTTP() HTTP {
 
 func defaultFleet() Fleet {
 	return Fleet{
+		DefaultPolicyID: "fleet-server-policy",
 		Agent: Agent{
 			ID:      "1e4954ce-af37-4731-9f4a-407b08e69e42",
 			Logging: AgentLogging{},

@@ -107,7 +107,7 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 	// has not enrolled. The Fleet Server cannot become a leader until the
 	// Agent it is running under has been enrolled.
 	m.calcMetadata()
-	if m.agentMetadata.Id == "" {
+	if m.agentMetadata.ID == "" {
 		m.log.Warn().Msg("missing config fleet.agent.id; acceptable until Elastic Agent has enrolled")
 		<-ctx.Done()
 		return ctx.Err()
@@ -180,7 +180,7 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 			// policy revision was inserted by coordinator so this monitor ignores it
 			continue
 		}
-		p, ok := m.policies[policy.PolicyId]
+		p, ok := m.policies[policy.PolicyID]
 		if ok {
 			// not a new policy
 			if p.cord != nil {
@@ -228,7 +228,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	if len(policies) > 0 {
 		ids := make([]string, len(policies))
 		for i, p := range policies {
-			ids[i] = p.PolicyId
+			ids[i] = p.PolicyID
 		}
 		leaders, err = dl.SearchPolicyLeaders(ctx, m.bulker, ids, dl.WithIndexName(m.leadersIndex))
 		if err != nil {
@@ -242,7 +242,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	var lead []model.Policy
 	now := time.Now().UTC()
 	for _, policy := range policies {
-		leader, ok := leaders[policy.PolicyId]
+		leader, ok := leaders[policy.PolicyID]
 		if !ok {
 			// new policy want to try to take leadership
 			lead = append(lead, policy)
@@ -252,7 +252,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if now.Sub(t) > m.leaderInterval || leader.Server.Id == m.agentMetadata.Id {
+		if now.Sub(t) > m.leaderInterval || leader.Server.ID == m.agentMetadata.ID {
 			// policy needs a new leader or already leader
 			lead = append(lead, policy)
 		}
@@ -261,15 +261,15 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	// take/keep leadership and start new coordinators
 	res := make(chan policyT)
 	for _, p := range lead {
-		pt, _ := m.policies[p.PolicyId]
-		pt.id = p.PolicyId
+		pt := m.policies[p.PolicyID]
+		pt.id = p.PolicyID
 		go func(p model.Policy, pt policyT) {
 			defer func() {
 				res <- pt
 			}()
 
 			l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
-			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.version, dl.WithIndexName(m.leadersIndex))
+			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.version, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l.Err(err).Msg("failed to take ownership")
 				if pt.cord != nil {
@@ -285,7 +285,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 				cord, err := m.factory(p)
 				if err != nil {
 					l.Err(err).Msg("failed to start coordinator")
-					err = dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
+					err = dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 					if err != nil {
 						l.Err(err).Msg("failed to release policy leadership")
 					}
@@ -332,7 +332,7 @@ func (m *monitorT) releaseLeadership() {
 			// monitor will be cancelled at this point in the code
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			err := dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.Id, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
+			err := dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
 				l.Err(err).Msg("failed to release leadership")
@@ -345,7 +345,7 @@ func (m *monitorT) releaseLeadership() {
 
 func (m *monitorT) calcMetadata() {
 	m.agentMetadata = model.AgentMetadata{
-		Id:      m.fleet.Agent.ID,
+		ID:      m.fleet.Agent.ID,
 		Version: m.fleet.Agent.Version,
 	}
 	hostname := m.fleet.Host.Name
@@ -361,7 +361,7 @@ func (m *monitorT) calcMetadata() {
 		m.log.Err(err).Msg("failed to get ip addresses")
 	}
 	m.hostMetadata = model.HostMetadata{
-		Id:           m.fleet.Host.ID,
+		ID:           m.fleet.Host.ID,
 		Name:         hostname,
 		Architecture: runtime.GOOS,
 		Ip:           ips,
@@ -538,11 +538,11 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 
 func getAPIKeyIDs(agent *model.Agent) []string {
 	keys := make([]string, 0, 1)
-	if agent.AccessApiKeyId != "" {
-		keys = append(keys, agent.AccessApiKeyId)
+	if agent.AccessAPIKeyID != "" {
+		keys = append(keys, agent.AccessAPIKeyID)
 	}
-	if agent.DefaultApiKeyId != "" {
-		keys = append(keys, agent.DefaultApiKeyId)
+	if agent.DefaultAPIKeyID != "" {
+		keys = append(keys, agent.DefaultAPIKeyID)
 	}
 	return keys
 }

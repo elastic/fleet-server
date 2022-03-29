@@ -89,7 +89,7 @@ func TakePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, serve
 	if l.Server == nil {
 		l.Server = &model.ServerMetadata{}
 	}
-	l.Server.Id = serverId
+	l.Server.ID = serverId
 	l.Server.Version = version
 	l.SetTime(time.Now().UTC())
 	if found {
@@ -131,7 +131,7 @@ func ReleasePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, se
 	if err != nil {
 		return err
 	}
-	if l.Server.Id != serverId {
+	if l.Server.ID != serverId {
 		// not leader anymore; nothing to do
 		return nil
 	}

@@ -303,10 +303,6 @@
           "type": "object",
           "format": "raw"
         },
-        "default_fleet_server": {
-          "description": "True when this policy is the default policy to start Fleet Server",
-          "type": "boolean"
-        },
         "unenroll_timeout": {
           "description": "Timeout (seconds) that an Elastic Agent should be un-enrolled.",
           "type": "integer"
@@ -316,8 +312,7 @@
         "policy_id",
         "revision_idx",
         "coordinator_idx",
-        "data",
-        "default_fleet_server"
+        "data"
       ]
     },
     "policy-leader": {
