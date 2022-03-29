@@ -7,7 +7,6 @@ package fleet
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -145,7 +144,7 @@ func (et *EnrollerT) handleEnroll(rb *rollback.Rollback, zlog *zerolog.Logger, w
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogEnrollApiKeyId, key.Id)
+		return ctx.Str(LogEnrollAPIKeyID, key.Id)
 	})
 
 	ver, err := validateUserAgent(*zlog, r, et.verCon)
@@ -185,7 +184,7 @@ func (et *EnrollerT) processRequest(rb *rollback.Rollback, zlog zerolog.Logger, 
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	return et._enroll(r.Context(), rb, zlog, req, erec.PolicyId, ver)
+	return et._enroll(r.Context(), rb, zlog, req, erec.PolicyID, ver)
 }
 
 func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog zerolog.Logger, req *EnrollRequest, policyId, ver string) (*EnrollResponse, error) {
@@ -224,14 +223,14 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 
 	agentData := model.Agent{
 		Active:         true,
-		PolicyId:       policyId,
+		PolicyID:       policyId,
 		Type:           req.Type,
 		EnrolledAt:     now.UTC().Format(time.RFC3339),
 		LocalMetadata:  localMeta,
-		AccessApiKeyId: accessApiKey.Id,
+		AccessAPIKeyID: accessApiKey.Id,
 		ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
 		Agent: &model.AgentMetadata{
-			Id:      agentId,
+			ID:      agentId,
 			Version: ver,
 		},
 	}
@@ -251,12 +250,12 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 		Item: EnrollResponseItem{
 			ID:             agentId,
 			Active:         agentData.Active,
-			PolicyId:       agentData.PolicyId,
+			PolicyId:       agentData.PolicyID,
 			Type:           agentData.Type,
 			EnrolledAt:     agentData.EnrolledAt,
 			UserMeta:       agentData.UserProvidedMetadata,
 			LocalMeta:      agentData.LocalMetadata,
-			AccessApiKeyId: agentData.AccessApiKeyId,
+			AccessApiKeyId: agentData.AccessAPIKeyID,
 			AccessAPIKey:   accessApiKey.Token(),
 			Status:         "online",
 		},
@@ -269,7 +268,7 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 }
 
 func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string) error {
-	zlog = zlog.With().Str(LogAgentId, agentID).Logger()
+	zlog = zlog.With().Str(LogAgentID, agentID).Logger()
 
 	if err := bulker.Delete(ctx, dl.FleetAgents, agentID); err != nil {
 		zlog.Error().Err(err).Msg("agent record failed to delete")
@@ -285,7 +284,7 @@ func invalidateApiKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk
 	// because doing so causes the api call to slow down at scale.  It is already very slow.
 	// So we have to wait for the key to become visible until we can invalidate it.
 
-	zlog = zlog.With().Str(LogApiKeyId, apikeyId).Logger()
+	zlog = zlog.With().Str(LogAPIKeyID, apikeyId).Logger()
 
 	start := time.Now()
 
@@ -341,9 +340,9 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 	}
 
 	zlog.Info().
-		Str(LogAgentId, resp.Item.ID).
-		Str(LogPolicyId, resp.Item.PolicyId).
-		Str(LogAccessApiKeyId, resp.Item.AccessApiKeyId).
+		Str(LogAgentID, resp.Item.ID).
+		Str(LogPolicyID, resp.Item.PolicyId).
+		Str(LogAccessAPIKeyID, resp.Item.AccessApiKeyId).
 		Int(EcsHttpResponseBodyBytes, numWritten).
 		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 		Msg("Elastic Agent successfully enrolled")
@@ -430,20 +429,9 @@ func generateAccessApiKey(ctx context.Context, bulk bulk.Bulk, agentId string) (
 	)
 }
 
-func generateOutputApiKey(ctx context.Context, bulk bulk.Bulk, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
-	name := fmt.Sprintf("%s:%s", agentId, outputName)
-	return bulk.ApiKeyCreate(
-		ctx,
-		name,
-		"",
-		roles,
-		apikey.NewMetadata(agentId, apikey.TypeOutput),
-	)
-}
+func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentAPIKey, error) {
 
-func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentApiKey, error) {
-
-	if key, ok := et.cache.GetEnrollmentApiKey(id); ok {
+	if key, ok := et.cache.GetEnrollmentAPIKey(id); ok {
 		return &key, nil
 	}
 
@@ -457,8 +445,8 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 		return nil, ErrInactiveEnrollmentKey
 	}
 
-	cost := int64(len(rec.ApiKey))
-	et.cache.SetEnrollmentApiKey(id, rec, cost)
+	cost := int64(len(rec.APIKey))
+	et.cache.SetEnrollmentAPIKey(id, rec, cost)
 
 	return &rec, nil
 }

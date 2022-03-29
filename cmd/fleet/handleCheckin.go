@@ -10,11 +10,9 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"net/http"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
@@ -41,7 +39,6 @@ import (
 
 var (
 	ErrAgentNotFound    = errors.New("agent not found")
-	ErrNoOutputPerms    = errors.New("output permission sections not found")
 	ErrNoPolicyOutput   = errors.New("output section not found")
 	ErrFailInjectApiKey = errors.New("fail inject api key")
 )
@@ -58,7 +55,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 	reqId := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str(LogAgentId, id).
+		Str(LogAgentID, id).
 		Str(EcsHttpRequestId, reqId).
 		Logger()
 
@@ -152,7 +149,7 @@ func (ct *CheckinT) handleCheckin(zlog *zerolog.Logger, w http.ResponseWriter, r
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessApiKeyId, agent.AccessApiKeyId)
+		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
 	})
 
 	ver, err := validateUserAgent(*zlog, r, ct.verCon)
@@ -209,7 +206,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actCh := aSub.Ch()
 
 	// Subscribe to policy manager for changes on PolicyId > policyRev
-	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyId, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
+	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
 	if err != nil {
 		return errors.Wrap(err, "subscribe policy monitor")
 	}
@@ -401,7 +398,7 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 			AgentId:   agentId,
 			CreatedAt: action.Timestamp,
 			Data:      action.Data,
-			Id:        action.ActionId,
+			Id:        action.ActionID,
 			Type:      action.Type,
 			InputType: action.InputType,
 			Timeout:   action.Timeout,
@@ -425,14 +422,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Str("ctx", "processPolicy").
 		Int64("policyRevision", pp.Policy.RevisionIdx).
 		Int64("policyCoordinator", pp.Policy.CoordinatorIdx).
-		Str(LogPolicyId, pp.Policy.PolicyId).
+		Str(LogPolicyID, pp.Policy.PolicyID).
 		Logger()
-
-	// The parsed policy object contains a map of name->role with a precalculated sha2.
-	if pp.Default.Role == nil {
-		zlog.Error().Str("name", pp.Default.Name).Msg("policy does not contain required output permission section")
-		return nil, ErrNoOutputPerms
-	}
 
 	// Repull and decode the agent object.  Do not trust the cache.
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldId, agentId)
@@ -441,111 +432,10 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, err
 	}
 
-	// Determine whether we need to generate a default output ApiKey.
-	// This is accomplished by comparing the sha2 hash stored in the agent
-	// record with the precalculated sha2 hash of the role.
-	needKey := true
-	switch {
-	case agent.DefaultApiKey == "":
-		zlog.Debug().Msg("must generate api key as default API key is not present")
-	case pp.Default.Role.Sha2 != agent.PolicyOutputPermissionsHash:
-		zlog.Debug().Msg("must generate api key as policy output permissions changed")
-	default:
-		needKey = false
-		zlog.Debug().Msg("policy output permissions are the same")
-	}
-
-	if needKey {
-		zlog.Debug().
-			RawJSON("roles", pp.Default.Role.Raw).
-			Str("oldHash", agent.PolicyOutputPermissionsHash).
-			Str("newHash", pp.Default.Role.Sha2).
-			Msg("Generating a new API key")
-
-		defaultOutputApiKey, err := generateOutputApiKey(ctx, bulker, agent.Id, pp.Default.Name, pp.Default.Role.Raw)
-		if err != nil {
-			zlog.Error().Err(err).Msg("fail generate output key")
-			return nil, err
-		}
-
-		zlog.Info().
-			Str("hash.sha256", pp.Default.Role.Sha2).
-			Str(LogDefaultOutputApiKeyId, defaultOutputApiKey.Id).
-			Msg("Updating agent record to pick up default output key.")
-
-		fields := map[string]interface{}{
-			dl.FieldDefaultApiKey:               defaultOutputApiKey.Agent(),
-			dl.FieldDefaultApiKeyId:             defaultOutputApiKey.Id,
-			dl.FieldPolicyOutputPermissionsHash: pp.Default.Role.Sha2,
-		}
-		if agent.DefaultApiKeyId != "" {
-			fields[dl.FieldDefaultApiKeyHistory] = model.DefaultApiKeyHistoryItems{
-				Id:        agent.DefaultApiKeyId,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-			}
-		}
-
-		// Using painless script to append the old keys to the history
-		body, err := renderUpdatePainlessScript(fields)
-
-		if err != nil {
-			return nil, err
-		}
-
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return nil, err
-		}
-		agent.DefaultApiKey = defaultOutputApiKey.Agent()
-	}
-
-	rewrittenPolicy, err := rewritePolicy(pp, agent.DefaultApiKey)
-	if err != nil {
-		zlog.Error().Err(err).Msg("fail rewrite policy")
-		return nil, err
-	}
-
-	r := policy.RevisionFromPolicy(pp.Policy)
-	resp := ActionResp{
-		AgentId:   agent.Id,
-		CreatedAt: pp.Policy.Timestamp,
-		Data:      rewrittenPolicy,
-		Id:        r.String(),
-		Type:      TypePolicyChange,
-	}
-
-	return &resp, nil
-}
-
-func renderUpdatePainlessScript(fields map[string]interface{}) ([]byte, error) {
-	var source strings.Builder
-	for field := range fields {
-		if field == dl.FieldDefaultApiKeyHistory {
-			source.WriteString(fmt.Sprint("if (ctx._source.", field, "==null) {ctx._source.", field, "=new ArrayList();} ctx._source.", field, ".add(params.", field, ");"))
-		} else {
-			source.WriteString(fmt.Sprint("ctx._source.", field, "=", "params.", field, ";"))
-		}
-	}
-
-	body, err := json.Marshal(map[string]interface{}{
-		"script": map[string]interface{}{
-			"lang":   "painless",
-			"source": source.String(),
-			"params": fields,
-		},
-	})
-
-	return body, err
-}
-
-// Return Serializable policy injecting the apikey into the output field.
-// This avoids reallocation of each section of the policy by duping
-// the map object and only replacing the targeted section.
-func rewritePolicy(pp *policy.ParsedPolicy, apiKey string) (interface{}, error) {
-
-	// Parse the outputs maps in order to inject the api key
+	// Parse the outputs maps in order to prepare the outputs
 	const outputsProperty = "outputs"
 	outputs, err := smap.Parse(pp.Fields[outputsProperty])
+
 	if err != nil {
 		return nil, err
 	}
@@ -554,8 +444,13 @@ func rewritePolicy(pp *policy.ParsedPolicy, apiKey string) (interface{}, error) 
 		return nil, ErrNoPolicyOutput
 	}
 
-	if ok := setMapObj(outputs, apiKey, pp.Default.Name, "api_key"); !ok {
-		return nil, ErrFailInjectApiKey
+	// Iterate through the policy outputs and prepare them
+	for name, policyOutput := range pp.Outputs {
+		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, outputs, name == pp.Default.Name)
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	outputRaw, err := json.Marshal(outputs)
@@ -570,34 +465,23 @@ func rewritePolicy(pp *policy.ParsedPolicy, apiKey string) (interface{}, error) 
 		fields[k] = v
 	}
 
+	// Update only the output fields to avoid duping the whole map
 	fields[outputsProperty] = json.RawMessage(outputRaw)
 
-	return struct {
+	rewrittenPolicy := struct {
 		Policy map[string]json.RawMessage `json:"policy"`
-	}{fields}, nil
-}
+	}{fields}
 
-func setMapObj(obj map[string]interface{}, val interface{}, keys ...string) bool {
-	if len(keys) == 0 {
-		return false
+	r := policy.RevisionFromPolicy(pp.Policy)
+	resp := ActionResp{
+		AgentId:   agent.Id,
+		CreatedAt: pp.Policy.Timestamp,
+		Data:      rewrittenPolicy,
+		Id:        r.String(),
+		Type:      TypePolicyChange,
 	}
 
-	for _, k := range keys[:len(keys)-1] {
-		v, ok := obj[k]
-		if !ok {
-			return false
-		}
-
-		obj, ok = v.(map[string]interface{})
-		if !ok {
-			return false
-		}
-	}
-
-	k := keys[len(keys)-1]
-	obj[k] = val
-
-	return true
+	return &resp, nil
 }
 
 func findAgentByApiKeyId(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {

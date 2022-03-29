@@ -23,12 +23,11 @@ import (
 func createRandomPolicy(id string, revisionIdx int) model.Policy {
 	now := time.Now().UTC()
 	return model.Policy{
-		PolicyId:           id,
-		RevisionIdx:        int64(revisionIdx),
-		CoordinatorIdx:     0,
-		Data:               []byte("{}"),
-		DefaultFleetServer: false,
-		Timestamp:          now.Format(time.RFC3339),
+		PolicyID:       id,
+		RevisionIdx:    int64(revisionIdx),
+		CoordinatorIdx: 0,
+		Data:           []byte("{}"),
+		Timestamp:      now.Format(time.RFC3339),
 	}
 }
 
@@ -57,7 +56,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		recs[rec.PolicyId] = rec
+		recs[rec.PolicyID] = rec
 	}
 
 	policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
@@ -66,7 +65,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 	}
 	byID := map[string]model.Policy{}
 	for _, policy := range policies {
-		byID[policy.PolicyId] = policy
+		byID[policy.PolicyID] = policy
 	}
 
 	diff := cmp.Diff(recs, byID)

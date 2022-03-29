@@ -48,7 +48,7 @@ func authApiKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 	if err != nil {
 		log.Info().
 			Err(err).
-			Str(LogApiKeyId, key.Id).
+			Str(LogAPIKeyID, key.Id).
 			Str(EcsHttpRequestId, reqId).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey fail authentication")
@@ -89,11 +89,11 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 	}
 
 	w := log.With().
-		Str(LogAccessApiKeyId, key.Id).
+		Str(LogAccessAPIKeyID, key.Id).
 		Str(EcsHttpRequestId, r.Header.Get(logger.HeaderRequestID))
 
 	if id != nil {
-		w = w.Str(LogAgentId, *id)
+		w = w.Str(LogAgentID, *id)
 	}
 
 	zlog := w.Logger()
@@ -128,10 +128,10 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 
 	// validate that the Access ApiKey identifier stored in the agent's record
 	// is in alignment when the authenticated key provided on this transaction
-	if agent.AccessApiKeyId != key.Id {
+	if agent.AccessAPIKeyID != key.Id {
 		zlog.Warn().
 			Err(ErrAgentCorrupted).
-			Str("agent.AccessApiKeyId", agent.AccessApiKeyId).
+			Str("agent.AccessApiKeyId", agent.AccessAPIKeyID).
 			Msg("agent access ApiKey id mismatch agent record")
 		return nil, ErrAgentCorrupted
 	}
