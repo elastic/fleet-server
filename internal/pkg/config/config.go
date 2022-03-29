@@ -107,7 +107,6 @@ func (c *Config) Merge(other *Config) (*Config, error) {
 }
 
 func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
-	log.Warn().Msg("hi lol")
 	for opt, message := range deprecatedOpts {
 		if c.HasField(opt) {
 			log.Warn().Msg(message)
@@ -117,7 +116,6 @@ func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
 
 // FromConfig returns Config from the ucfg.Config.
 func FromConfig(c *ucfg.Config) (*Config, error) {
-	log.Warn().Msg("no?")
 	checkDeprecatedOptions(deprecatedConfigOptions, c)
 	cfg := &Config{}
 	err := c.Unpack(cfg, DefaultOptions...)
