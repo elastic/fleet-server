@@ -212,7 +212,12 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 		} else {
 			err = m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", m.policyID), nil)
 		}
-		return proto.StateObserved_STARTING, err
+
+		if err != nil {
+			return proto.StateObserved_FAILED, err
+		}
+
+		return proto.StateObserved_STARTING, nil
 	}
 
 	var data policyData
@@ -220,6 +225,7 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 	if err != nil {
 		return proto.StateObserved_FAILED, err
 	}
+
 	if !data.HasType("fleet-server") {
 		// no fleet-server input
 		m.status = proto.StateObserved_STARTING
@@ -228,7 +234,12 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 		} else {
 			err = m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", m.policyID), nil)
 		}
-		return proto.StateObserved_STARTING, err
+
+		if err != nil {
+			return proto.StateObserved_FAILED, err
+		}
+
+		return proto.StateObserved_STARTING, nil
 	}
 
 	status := proto.StateObserved_HEALTHY
@@ -241,9 +252,11 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 		// Elastic Agent has not been enrolled; Fleet Server passes back the enrollment token so the Elastic Agent
 		// can perform enrollment.
 		tokens, err := m.enrollmentTokenF(ctx, m.bulker, m.policy.PolicyID)
+
 		if err != nil {
 			return proto.StateObserved_FAILED, err
 		}
+
 		tokens = filterActiveTokens(tokens)
 		if len(tokens) == 0 {
 			// no tokens created for the policy, still starting
@@ -252,8 +265,14 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 			} else {
 				err = m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", m.policyID), nil)
 			}
-			return proto.StateObserved_STARTING, err
+
+			if err != nil {
+				return proto.StateObserved_FAILED, err
+			}
+
+			return proto.StateObserved_STARTING, nil
 		}
+
 		payload = map[string]interface{}{
 			"enrollment_token": tokens[0].APIKey,
 		}
@@ -264,7 +283,12 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 	} else {
 		err = m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyID, extendMsg), payload)
 	}
-	return status, err
+
+	if err != nil {
+		return proto.StateObserved_FAILED, err
+	}
+
+	return status, nil
 }
 
 type policyData struct {
