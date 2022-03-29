@@ -67,7 +67,7 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 	reqId := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str(LogAgentId, id).
+		Str(LogAgentID, id).
 		Str(EcsHttpRequestId, reqId).
 		Logger()
 
@@ -103,7 +103,7 @@ func (ack *AckT) handleAcks(zlog *zerolog.Logger, w http.ResponseWriter, r *http
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessApiKeyId, agent.AccessAPIKeyID)
+		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
 	})
 
 	// Metrics; serenity now.
@@ -377,7 +377,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	)
 
 	zlog.Info().Err(err).
-		Str(LogPolicyId, agent.PolicyID).
+		Str(LogPolicyID, agent.PolicyID).
 		Int64("policyRevision", currRev).
 		Int64("policyCoordinator", currCoord).
 		Msg("ack policy")
@@ -388,7 +388,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
 	apiKeys := _getAPIKeyIDs(agent)
 	if len(apiKeys) > 0 {
-		zlog = zlog.With().Strs(LogApiKeyId, apiKeys).Logger()
+		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
 
 		if err := ack.bulk.ApiKeyInvalidate(ctx, apiKeys...); err != nil {
 			return errors.Wrap(err, "handleUnenroll invalidate apikey")
