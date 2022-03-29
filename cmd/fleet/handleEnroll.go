@@ -7,7 +7,6 @@ package fleet
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -427,17 +426,6 @@ func generateAccessApiKey(ctx context.Context, bulk bulk.Bulk, agentId string) (
 		"",
 		[]byte(kFleetAccessRolesJSON),
 		apikey.NewMetadata(agentId, apikey.TypeAccess),
-	)
-}
-
-func generateOutputApiKey(ctx context.Context, bulk bulk.Bulk, agentId, outputName string, roles []byte) (*apikey.ApiKey, error) {
-	name := fmt.Sprintf("%s:%s", agentId, outputName)
-	return bulk.ApiKeyCreate(
-		ctx,
-		name,
-		"",
-		roles,
-		apikey.NewMetadata(agentId, apikey.TypeOutput),
 	)
 }
 
