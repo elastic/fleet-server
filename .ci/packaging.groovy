@@ -67,17 +67,20 @@ pipeline {
             stash allowEmpty: true, name: 'source', useDefaultExcludes: false
             // set environment variables globally since they are used afterwards but GIT_BASE_COMMIT won't
             // be available until gitCheckout is executed.
-            setEnvVar('URI_SUFFIX', "commits/${env.GIT_BASE_COMMIT}")
+            // TODO: test purposes
+            //setEnvVar('URI_SUFFIX', "commits/${env.GIT_BASE_COMMIT}")
+            setEnvVar('URI_SUFFIX', "commits/aaedad4521895f8d0f5b8fb9ac5ad78ee11f3cca")
             // JOB_GCS_BUCKET contains the bucket and some folders, let's build the folder structure
             setEnvVar('PATH_PREFIX', "${JOB_GCS_BUCKET.contains('/') ? JOB_GCS_BUCKET.substring(JOB_GCS_BUCKET.indexOf('/') + 1) + '/' + env.URI_SUFFIX : env.URI_SUFFIX}")
             // TODO: test purposes
             //setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
             setEnvVar('IS_BRANCH_AVAILABLE', true)
-            setEnvVar('VERSION', sh(label: 'Get version', script: "make -C ${BASE_DIR} get-version", returnStdout: true)?.trim())
           }
         }
         stage('Package') {
           options { skipDefaultCheckout() }
+          // TODO: test purposes
+          when { expression { return false } }
           matrix {
             agent {
               label "${PLATFORM}"
