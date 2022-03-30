@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.0
-	github.com/elastic/beats/v7 v7.17.1
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220329173557-e40223c86864
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210922110810-e6f1f402a9ed
 	github.com/elastic/go-elasticsearch/v7 v7.15.1
 	github.com/elastic/go-ucfg v0.8.4
@@ -34,26 +34,35 @@ require go.elastic.co/ecszerolog v0.1.0
 
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
+	github.com/akavel/rsrc v0.8.0 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dlclark/regexp2 v1.1.7-0.20171009020623-7632a260cbaf // indirect
 	github.com/docker/docker v20.10.7+incompatible // indirect
+	github.com/dop251/goja v0.0.0-20200831102558-9af81ddcf0e1 // indirect
+	github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/elastic/elastic-agent-libs v0.1.1 // indirect
 	github.com/elastic/go-licenser v0.4.0 // indirect
 	github.com/elastic/go-structform v0.0.9 // indirect
 	github.com/elastic/go-sysinfo v1.7.1 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
+	github.com/go-sourcemap/sourcemap v2.1.2+incompatible // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
+	github.com/josephspurrier/goversioninfo v0.0.0-20190209210621-63e6d1acd3dd // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/magefile/mage v1.12.1 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mitchellh/hashstructure v0.0.0-20170116052023-ab25296c0f51 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/santhosh-tekuri/jsonschema v1.2.4 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.elastic.co/apm/module/apmhttp v1.14.0 // indirect
