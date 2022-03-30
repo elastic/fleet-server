@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-@Library('apm@test/releaseManager') _
+@Library('apm@current') _
 
 pipeline {
   agent none
