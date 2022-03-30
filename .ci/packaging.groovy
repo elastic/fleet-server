@@ -66,6 +66,7 @@ pipeline {
             // JOB_GCS_BUCKET contains the bucket and some folders, let's build the folder structure
             setEnvVar('PATH_PREFIX', "${JOB_GCS_BUCKET.contains('/') ? JOB_GCS_BUCKET.substring(JOB_GCS_BUCKET.indexOf('/') + 1) + '/' + env.URI_SUFFIX : env.URI_SUFFIX}")
             setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
+            setEnvVar('VERSION', sh(label: 'Get version', script: "make -C ${BASE_DIR} get-version", returnStdout: true)?.trim())
           }
         }
         stage('Package') {
@@ -140,11 +141,11 @@ pipeline {
                 sh(label: 'create dependencies file', script: 'make release-manager-dependencies-snapshot')
               }
               dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
-              script {
-                getVaultSecret.readSecretWrapper {
-                  sh(label: 'release-manager.sh', script: ".ci/scripts/release-manager.sh | tee ${env.DRA_OUTPUT}")
-                }
-              }
+              releaseManager(project: 'fleet-server',
+                             version: env.VERSION,
+                             type: 'snapshot',
+                             artifactsFolder: 'build/distributions',
+                             outputFile: env.DRA_OUTPUT)
             }
           }
           post {
