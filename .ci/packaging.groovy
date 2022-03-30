@@ -1,13 +1,16 @@
 #!/usr/bin/env groovy
-@Library('apm@current') _
+@Library('apm@test/releaseManager') _
 
 pipeline {
   agent none
   environment {
     REPO = 'fleet-server'
     BASE_DIR = "src/github.com/elastic/${env.REPO}"
-    SLACK_CHANNEL = '#fleet-server'
-    NOTIFY_TO = 'fleet-server+build-package@elastic.co'
+    // TODO: test purposes
+    //SLACK_CHANNEL = '#fleet-server'
+    //NOTIFY_TO = 'fleet-server+build-package@elastic.co'
+    SLACK_CHANNEL = 'UJ2J1AZV2'
+    NOTIFY_TO = 'victor.martinez+build-package@elastic.co'
     JOB_GCS_BUCKET = credentials('gcs-bucket')
     JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
     DOCKER_SECRET = 'secret/observability-team/ci/docker-registry/prod'
@@ -36,6 +39,8 @@ pipeline {
         anyOf {
           triggeredBy cause: "IssueCommentCause"
           expression {
+            // TODO: test purposes
+            return true
             def ret = isUserTrigger() || isUpstreamTrigger()
             if(!ret){
               currentBuild.result = 'NOT_BUILT'
@@ -65,7 +70,9 @@ pipeline {
             setEnvVar('URI_SUFFIX', "commits/${env.GIT_BASE_COMMIT}")
             // JOB_GCS_BUCKET contains the bucket and some folders, let's build the folder structure
             setEnvVar('PATH_PREFIX', "${JOB_GCS_BUCKET.contains('/') ? JOB_GCS_BUCKET.substring(JOB_GCS_BUCKET.indexOf('/') + 1) + '/' + env.URI_SUFFIX : env.URI_SUFFIX}")
-            setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
+            // TODO: test purposes
+            //setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
+            setEnvVar('IS_BRANCH_AVAILABLE', true)
             setEnvVar('VERSION', sh(label: 'Get version', script: "make -C ${BASE_DIR} get-version", returnStdout: true)?.trim())
           }
         }
@@ -141,11 +148,14 @@ pipeline {
                 sh(label: 'create dependencies file', script: 'make release-manager-dependencies-snapshot')
               }
               dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
+              //TODO: for testing purposes
+              withEnv(["BRANCH_NAME=main"]){
               releaseManager(project: 'fleet-server',
                              version: env.VERSION,
                              type: 'snapshot',
                              artifactsFolder: 'build/distributions',
                              outputFile: env.DRA_OUTPUT)
+              }
             }
           }
           post {
