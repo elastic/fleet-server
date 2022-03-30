@@ -142,7 +142,7 @@ pipeline {
             expression { return env.IS_BRANCH_AVAILABLE == "true" }
           }
           environment {
-            DRA_OUTPUT = 'release-manager-report.txt'
+            DRA_OUTPUT = 'release-manager.out'
           }
           steps {
             googleStorageDownload(bucketUri: "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}/*",
