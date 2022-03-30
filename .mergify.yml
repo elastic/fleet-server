@@ -76,20 +76,6 @@ pull_request_rules:
         labels:
           - "backport"
         title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
-  - name: backport patches to 8.3 branch
-    conditions:
-      - merged
-      - base=master
-      - label=backport-v8.3.0
-    actions:
-      backport:
-        assignees:
-          - "{{ author }}"
-        branches:
-          - "main"
-        labels:
-          - "backport"
-        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
   - name: backport patches to 7.17 branch
     conditions:
       - merged
