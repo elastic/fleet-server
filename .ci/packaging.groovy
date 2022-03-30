@@ -29,6 +29,7 @@ pipeline {
   }
   stages {
     stage('Filter build') {
+      options { skipDefaultCheckout() }
       agent { label 'ubuntu-20 && immutable' }
       when {
         beforeAgent true
@@ -81,6 +82,7 @@ pipeline {
             }
             stages {
               stage('Package') {
+                options { skipDefaultCheckout() }
                 environment {
                   PLATFORMS = "${isArm() ? 'linux/arm64' : ''}"
                   PACKAGES = "${isArm() ? 'docker' : ''}"
@@ -97,6 +99,7 @@ pipeline {
                 }
               }
               stage('Publish') {
+                options { skipDefaultCheckout() }
                 steps {
                   // Copy those files to another location with the sha commit to test them afterward.
                   googleStorageUpload(bucket: "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}",
@@ -109,13 +112,23 @@ pipeline {
               }
             }
           }
+          post {
+            failure {
+              notifyStatus(subject: "[${env.REPO}@${env.BRANCH_NAME}] package failed.",
+                           body: 'Contact the Productivity team if you need further assistance.')
+            }
+          }
         }
         stage('DRA') {
+          options { skipDefaultCheckout() }
           // The Unified Release process keeps moving branches as soon as a new
           // minor version is created, therefore old release branches won't be able
           // to use the release manager as their definition is removed.
           when {
             expression { return env.IS_BRANCH_AVAILABLE == "true" }
+          }
+          environment {
+            DRA_OUTPUT = 'release-manager-report.out'
           }
           steps {
             googleStorageDownload(bucketUri: "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}/*",
@@ -129,9 +142,17 @@ pipeline {
               dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
               script {
                 getVaultSecret.readSecretWrapper {
-                  sh(label: 'release-manager.sh', script: '.ci/scripts/release-manager.sh')
+                  sh(label: 'release-manager.sh', script: ".ci/scripts/release-manager.sh | tee ${env.DRA_OUTPUT}")
                 }
               }
+            }
+          }
+          post {
+            failure {
+              notifyStatus(analyse: true,
+                           file: "${BASE_DIR}/${env.DRA_OUTPUT}",
+                           subject: "[${env.REPO}@${env.BRANCH_NAME}] DRA failed.",
+                           body: 'Contact the Release Platform team.')
             }
           }
         }
@@ -142,17 +163,20 @@ pipeline {
     cleanup {
       notifyBuildResult(prComment: false)
     }
-    failure {
-      notifyStatus(slackStatus: 'danger', subject: "[${env.REPO}@${env.BRANCH_NAME}] DRA failed", body: "Build: (<${env.RUN_DISPLAY_URL}|here>)")
-    }
   }
 }
 
 def notifyStatus(def args = [:]) {
-  releaseNotification(slackChannel: "${env.SLACK_CHANNEL}",
-                      slackColor: args.slackStatus,
-                      slackCredentialsId: 'jenkins-slack-integration-token',
-                      to: "${env.NOTIFY_TO}",
-                      subject: args.subject,
-                      body: args.body)
+  def releaseManagerFile = args.get('file', '')
+  def analyse = args.get('analyse', false)
+  def subject = args.get('subject', '')
+  def body = args.get('body', '')
+  releaseManagerNotification(file: releaseManagerFile,
+                             analyse: analyse,
+                             slackChannel: "${env.SLACK_CHANNEL}",
+                             slackColor: 'danger',
+                             slackCredentialsId: 'jenkins-slack-integration-token',
+                             to: "${env.NOTIFY_TO}",
+                             subject: subject,
+                             body: "Build: (<${env.RUN_DISPLAY_URL}|here>).\n ${body}")
 }
