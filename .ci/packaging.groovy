@@ -6,7 +6,11 @@ pipeline {
   environment {
     REPO = 'fleet-server'
     BASE_DIR = "src/github.com/elastic/${env.REPO}"
+<<<<<<< HEAD
     SLACK_CHANNEL = '#elastic-agent-control-plane'
+=======
+    SLACK_CHANNEL = '#fleet-server'
+>>>>>>> 5ed1cf1 (ci: packaging pipeline for the snapshots (#1234))
     NOTIFY_TO = 'fleet-server+build-package@elastic.co'
     JOB_GCS_BUCKET = credentials('gcs-bucket')
     JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
@@ -29,7 +33,10 @@ pipeline {
   }
   stages {
     stage('Filter build') {
+<<<<<<< HEAD
       options { skipDefaultCheckout() }
+=======
+>>>>>>> 5ed1cf1 (ci: packaging pipeline for the snapshots (#1234))
       agent { label 'ubuntu-20 && immutable' }
       when {
         beforeAgent true
@@ -66,9 +73,12 @@ pipeline {
             // JOB_GCS_BUCKET contains the bucket and some folders, let's build the folder structure
             setEnvVar('PATH_PREFIX', "${JOB_GCS_BUCKET.contains('/') ? JOB_GCS_BUCKET.substring(JOB_GCS_BUCKET.indexOf('/') + 1) + '/' + env.URI_SUFFIX : env.URI_SUFFIX}")
             setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
+<<<<<<< HEAD
             dir("${BASE_DIR}") {
               setEnvVar('VERSION', sh(label: 'Get version', script: 'make get-version', returnStdout: true)?.trim())
             }
+=======
+>>>>>>> 5ed1cf1 (ci: packaging pipeline for the snapshots (#1234))
           }
         }
         stage('Package') {
@@ -85,7 +95,10 @@ pipeline {
             }
             stages {
               stage('Package') {
+<<<<<<< HEAD
                 options { skipDefaultCheckout() }
+=======
+>>>>>>> 5ed1cf1 (ci: packaging pipeline for the snapshots (#1234))
                 environment {
                   PLATFORMS = "${isArm() ? 'linux/arm64' : ''}"
                   PACKAGES = "${isArm() ? 'docker' : ''}"
@@ -102,7 +115,10 @@ pipeline {
                 }
               }
               stage('Publish') {
+<<<<<<< HEAD
                 options { skipDefaultCheckout() }
+=======
+>>>>>>> 5ed1cf1 (ci: packaging pipeline for the snapshots (#1234))
                 steps {
                   // Copy those files to another location with the sha commit to test them afterward.
                   googleStorageUpload(bucket: "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}",
@@ -115,6 +131,7 @@ pipeline {
               }
             }
           }
+<<<<<<< HEAD
           post {
             failure {
               notifyStatus(subject: "[${env.REPO}@${env.BRANCH_NAME}] package failed.",
@@ -124,15 +141,22 @@ pipeline {
         }
         stage('DRA') {
           options { skipDefaultCheckout() }
+=======
+        }
+        stage('DRA') {
+>>>>>>> 5ed1cf1 (ci: packaging pipeline for the snapshots (#1234))
           // The Unified Release process keeps moving branches as soon as a new
           // minor version is created, therefore old release branches won't be able
           // to use the release manager as their definition is removed.
           when {
             expression { return env.IS_BRANCH_AVAILABLE == "true" }
           }
+<<<<<<< HEAD
           environment {
             DRA_OUTPUT = 'release-manager.out'
           }
+=======
+>>>>>>> 5ed1cf1 (ci: packaging pipeline for the snapshots (#1234))
           steps {
             googleStorageDownload(bucketUri: "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}/*",
                                   credentialsId: "${JOB_GCS_CREDENTIALS}",
@@ -143,6 +167,7 @@ pipeline {
                 sh(label: 'create dependencies file', script: 'make release-manager-dependencies-snapshot')
               }
               dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
+<<<<<<< HEAD
               releaseManager(project: 'fleet-server',
                              version: env.VERSION,
                              type: 'snapshot',
@@ -156,6 +181,13 @@ pipeline {
                            file: "${BASE_DIR}/${env.DRA_OUTPUT}",
                            subject: "[${env.REPO}@${env.BRANCH_NAME}] The Daily releasable artifact failed.",
                            body: 'Contact the Release Platform team [#platform-release].')
+=======
+              script {
+                getVaultSecret.readSecretWrapper {
+                  sh(label: 'release-manager.sh', script: '.ci/scripts/release-manager.sh')
+                }
+              }
+>>>>>>> 5ed1cf1 (ci: packaging pipeline for the snapshots (#1234))
             }
           }
         }
@@ -166,10 +198,17 @@ pipeline {
     cleanup {
       notifyBuildResult(prComment: false)
     }
+<<<<<<< HEAD
+=======
+    failure {
+      notifyStatus(slackStatus: 'danger', subject: "[${env.REPO}@${env.BRANCH_NAME}] DRA failed", body: "Build: (<${env.RUN_DISPLAY_URL}|here>)")
+    }
+>>>>>>> 5ed1cf1 (ci: packaging pipeline for the snapshots (#1234))
   }
 }
 
 def notifyStatus(def args = [:]) {
+<<<<<<< HEAD
   def releaseManagerFile = args.get('file', '')
   def analyse = args.get('analyse', false)
   def subject = args.get('subject', '')
@@ -182,4 +221,12 @@ def notifyStatus(def args = [:]) {
                              to: "${env.NOTIFY_TO}",
                              subject: subject,
                              body: "Build: (<${env.RUN_DISPLAY_URL}|here>).\n ${body}")
+=======
+  releaseNotification(slackChannel: "${env.SLACK_CHANNEL}",
+                      slackColor: args.slackStatus,
+                      slackCredentialsId: 'jenkins-slack-integration-token',
+                      to: "${env.NOTIFY_TO}",
+                      subject: args.subject,
+                      body: args.body)
+>>>>>>> 5ed1cf1 (ci: packaging pipeline for the snapshots (#1234))
 }
