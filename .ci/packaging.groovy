@@ -75,6 +75,9 @@ pipeline {
             // TODO: test purposes
             //setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
             setEnvVar('IS_BRANCH_AVAILABLE', true)
+            dir("${BASE_DIR}") {
+              setEnvVar('VERSION', sh(label: 'Get version', script: 'make get-version', returnStdout: true)?.trim())
+            }
           }
         }
         stage('Package') {
