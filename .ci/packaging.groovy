@@ -158,11 +158,7 @@ pipeline {
 }
 
 def runPackage(def args = [:]) {
-  def type = args.type
-  def makeGoal = 'release-manager-snapshot'
-  if (type.equals('staging')) {
-    makeGoal = 'release-manager-release'
-  }
+  def makeGoal = args.type.equals('staging') ? 'release-manager-release' : 'release-manager-snapshot'
   deleteDir()
   unstash 'source'
   dir("${BASE_DIR}"){
@@ -183,28 +179,29 @@ def publishArtifacts(def args = [:]) {
     showInline: true)
 }
 
+def getBucketLocation(type) {
+  return "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}/${type}"
+}
+
 def runReleaseManager(def args = [:]) {
   deleteDir()
   unstash 'source'
-  googleStorageDownload(bucketUri: "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}/*",
+  def bucketLocation = getBucketLocation(args.type)
+  googleStorageDownload(bucketUri: "${bucketLocation}/*",
                         credentialsId: "${JOB_GCS_CREDENTIALS}",
                         localDirectory: "${BASE_DIR}/build/distributions",
                         pathPrefix: env.PATH_PREFIX)
   dir("${BASE_DIR}") {
-    def type = args.type
-    def makeGoal = 'release-manager-dependencies-snapshot'
-    if (type.equals('staging')) {
-      makeGoal = 'release-manager-dependencies-release'
-    }
+    def makeGoal = args.type.equals('staging') ? 'release-manager-dependencies-release' : 'release-manager-dependencies-snapshot'
     withMageEnv() {
       sh(label: 'create dependencies file', script: "make ${goal}")
     }
     dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
     releaseManager(project: 'fleet-server',
                    version: env.VERSION,
-                   type: 'snapshot',
+                   type: args.type,
                    artifactsFolder: 'build/distributions',
-                   outputFile: env.DRA_OUTPUT)
+                   outputFile: args.outputFile)
   }
 }
 
