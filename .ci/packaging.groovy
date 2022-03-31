@@ -192,7 +192,7 @@ def runReleaseManager(def args = [:]) {
   dir("${BASE_DIR}") {
     def makeGoal = args.type.equals('staging') ? 'release-manager-dependencies-release' : 'release-manager-dependencies-snapshot'
     withMageEnv() {
-      sh(label: 'create dependencies file', script: "make ${goal}")
+      sh(label: 'create dependencies file', script: "make ${makeGoal}")
     }
     dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
     releaseManager(project: 'fleet-server',
