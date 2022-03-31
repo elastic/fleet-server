@@ -62,13 +62,6 @@ pipeline {
             gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: false,
                         shallow: false, reference: "/var/lib/jenkins/.git-references/${REPO}.git")
             stash allowEmpty: true, name: 'source', useDefaultExcludes: false
-            // set environment variables globally since they are used afterwards but GIT_BASE_COMMIT won't
-            // be available until gitCheckout is executed.
-            //TODO
-            //setEnvVar('URI_SUFFIX', "commits/${env.GIT_BASE_COMMIT}")
-            setEnvVar('URI_SUFFIX', "commits/4a0ecbe90f9d1b3214aa1bd7d852ab6aaa0acc1c")
-            // JOB_GCS_BUCKET contains the bucket and some folders, let's build the folder structure
-            setEnvVar('PATH_PREFIX', "${JOB_GCS_BUCKET.contains('/') ? JOB_GCS_BUCKET.substring(JOB_GCS_BUCKET.indexOf('/') + 1) + '/' + env.URI_SUFFIX : env.URI_SUFFIX}")
             //TODO
             //setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
             setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable('main'))
@@ -183,7 +176,22 @@ def publishArtifacts(def args = [:]) {
 }
 
 def getBucketLocation(type) {
-  return "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}/${type}"
+  return "gs://${JOB_GCS_BUCKET}/${getBucketRelativeLocation(type)}"
+}
+
+def getBucketRelativeLocation(type) {
+  def folder = type.equals('snapshot') ? 'commit' : type
+  return "${folder}/${env.GIT_BASE_COMMIT}"
+}
+
+def getBucketPathPrefix(type) {
+  // JOB_GCS_BUCKET contains the bucket and some folders,
+  // let's build up the folder structure without the parent folder
+  def relative = getBucketRelativeLocation(type)
+  if (JOB_GCS_BUCKET.contains('/')) {
+    return JOB_GCS_BUCKET.substring(JOB_GCS_BUCKET.indexOf('/') + 1) + '/' + relative
+  }
+  return relative
 }
 
 def runReleaseManager(def args = [:]) {
@@ -192,7 +200,7 @@ def runReleaseManager(def args = [:]) {
   googleStorageDownload(bucketUri: "${getBucketLocation(args.type)}/*",
                         credentialsId: "${JOB_GCS_CREDENTIALS}",
                         localDirectory: "${BASE_DIR}/build/distributions",
-                        pathPrefix: env.PATH_PREFIX)
+                        pathPrefix: getBucketPathPrefix(args.type))
   dir("${BASE_DIR}") {
     def makeGoal = args.type.equals('staging') ? 'release-manager-dependencies-release' : 'release-manager-dependencies-snapshot'
     withMageEnv() {
