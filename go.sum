@@ -650,6 +650,8 @@ github.com/edsrzf/mmap-go v1.0.0/go.mod h1:YO35OhQPt3KJa3ryjFM5Bs14WD66h8eGKpfaB
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220303073437-a28c413604b8/go.mod h1:deRXxthy5Roatme8Gj9Udv+oOGGy7y0ay6QV2+6ITXA=
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220329173557-e40223c86864 h1:/uhvSNEtsM4M6rhmWwaxzHW2ELVxIj8P8soclynnyKw=
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220329173557-e40223c86864/go.mod h1:H2Jt5nsNzIEQS/VJPp6LJbcOfJIoExrFkbaKEApbsEE=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220331164621-376a87f3bbd8 h1:LLE7LRPR0leOyQOg0hYbR94U3vWqXtsPNVpr2/RVDHA=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220331164621-376a87f3bbd8/go.mod h1:H2Jt5nsNzIEQS/VJPp6LJbcOfJIoExrFkbaKEApbsEE=
 github.com/elastic/beats/v7 v7.17.1 h1:sSVCOs+aBhPSFhSAyAQmIoiTkAACn25wLmayiuOYXMI=
 github.com/elastic/beats/v7 v7.17.1/go.mod h1:nFsbsraCRGlck/aOwtfEJFKEyVBiDqxGvZ3ZES6sMn4=
 github.com/elastic/e2e-testing v1.99.2-0.20220117192005-d3365c99b9c4 h1:uYT+Krd8dsvnhnLK9pe/JHZkYtXEGPfbV4Wt1JPPol0=
