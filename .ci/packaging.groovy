@@ -72,6 +72,8 @@ pipeline {
         }
         stage('Package') {
           options { skipDefaultCheckout() }
+          //TODO
+          when { expression { return false } }
           matrix {
             agent {
               label "${PLATFORM}"
@@ -179,7 +181,8 @@ def getBucketLocation(type) {
 
 def getBucketRelativeLocation(type) {
   def folder = type.equals('snapshot') ? 'commit' : type
-  return "${folder}/${env.GIT_BASE_COMMIT}"
+  //TODO return "${folder}/${env.GIT_BASE_COMMIT}"
+  return "${folder}/8950ae0d9edfa086e43f50a756a6caa87e88b09a"
 }
 
 def getBucketPathPrefix(type) {
@@ -205,11 +208,15 @@ def runReleaseManager(def args = [:]) {
       sh(label: 'create dependencies file', script: "make ${makeGoal}")
     }
     dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
+    // TODO
+    withEnv(["BRANCH_NAME=main"]) {
     releaseManager(project: 'fleet-server',
                    version: env.VERSION,
                    type: args.type,
                    artifactsFolder: 'build/distributions',
                    outputFile: args.outputFile)
+    //TODO
+    }
   }
 }
 
