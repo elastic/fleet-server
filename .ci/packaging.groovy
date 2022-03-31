@@ -169,9 +169,8 @@ def runPackage(def args = [:]) {
 }
 
 def publishArtifacts(def args = [:]) {
-  def bucketLocation = getBucketLocation(args.type)
   // Copy those files to another location with the sha commit to test them afterward.
-  googleStorageUpload(bucket: "gs://${JOB_GCS_BUCKET}/${URI_SUFFIX}",
+  googleStorageUpload(bucket: getBucketLocation(args.type),
     credentialsId: "${JOB_GCS_CREDENTIALS}",
     pathPrefix: "${BASE_DIR}/build/distributions/",
     pattern: "${BASE_DIR}/build/distributions/**/*",
@@ -186,8 +185,7 @@ def getBucketLocation(type) {
 def runReleaseManager(def args = [:]) {
   deleteDir()
   unstash 'source'
-  def bucketLocation = getBucketLocation(args.type)
-  googleStorageDownload(bucketUri: "${bucketLocation}/*",
+  googleStorageDownload(bucketUri: "${getBucketLocation(args.type)}/*",
                         credentialsId: "${JOB_GCS_CREDENTIALS}",
                         localDirectory: "${BASE_DIR}/build/distributions",
                         pathPrefix: env.PATH_PREFIX)
