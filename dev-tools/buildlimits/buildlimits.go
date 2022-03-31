@@ -14,7 +14,7 @@ import (
 	"text/template"
 
 	"github.com/elastic/beats/v7/licenses"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
+	"github.com/elastic/elastic-agent/pkg/packer"
 )
 
 var (
@@ -41,7 +41,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
+	"github.com/elastic/elastic-agent/pkg/packer"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/pbnjay/memory"
 	"github.com/pkg/errors"

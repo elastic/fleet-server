@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/logp"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/server"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 	"github.com/elastic/go-ucfg"
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
