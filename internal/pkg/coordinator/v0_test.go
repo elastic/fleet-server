@@ -21,7 +21,7 @@ func TestCoordinatorZero(t *testing.T) {
 
 	policyId := uuid.Must(uuid.NewV4()).String()
 	policy := model.Policy{
-		PolicyID:       policyId,
+		PolicyId:       policyId,
 		CoordinatorIdx: 0,
 		Data:           []byte("{}"),
 		RevisionIdx:    1,
@@ -53,7 +53,7 @@ func TestCoordinatorZero(t *testing.T) {
 
 	// send a new policy revision; should get a new policy
 	policy = model.Policy{
-		PolicyID:       policyId,
+		PolicyId:       policyId,
 		CoordinatorIdx: 0,
 		Data:           []byte("{}"),
 		RevisionIdx:    2,
@@ -75,7 +75,7 @@ func TestCoordinatorZero(t *testing.T) {
 
 	// send policy with already set coordinator_idx, v0 does nothing
 	policy = model.Policy{
-		PolicyID:       policyId,
+		PolicyId:       policyId,
 		CoordinatorIdx: 1,
 		Data:           []byte("{}"),
 		RevisionIdx:    2,

@@ -55,7 +55,7 @@ func TestMonitorLeadership(t *testing.T) {
 	// start with 1 initial policy
 	policy1Id := uuid.Must(uuid.NewV4()).String()
 	policy1 := model.Policy{
-		PolicyID:       policy1Id,
+		PolicyId:       policy1Id,
 		CoordinatorIdx: 0,
 		Data:           []byte("{}"),
 		RevisionIdx:    1,
@@ -86,7 +86,7 @@ func TestMonitorLeadership(t *testing.T) {
 	<-time.After(500 * time.Millisecond)
 	policy2Id := uuid.Must(uuid.NewV4()).String()
 	policy2 := model.Policy{
-		PolicyID:       policy2Id,
+		PolicyId:       policy2Id,
 		CoordinatorIdx: 0,
 		Data:           []byte("{}"),
 		RevisionIdx:    1,
@@ -142,7 +142,7 @@ func TestMonitorUnenroller(t *testing.T) {
 	// add policy with unenroll timeout
 	policy1Id := uuid.Must(uuid.NewV4()).String()
 	policy1 := model.Policy{
-		PolicyID:        policy1Id,
+		PolicyId:        policy1Id,
 		CoordinatorIdx:  0,
 		Data:            []byte("{}"),
 		RevisionIdx:     1,
@@ -173,12 +173,12 @@ func TestMonitorUnenroller(t *testing.T) {
 	// add agent that should be unenrolled
 	sixAgo := time.Now().UTC().Add(-6 * time.Minute)
 	agentBody, err := json.Marshal(model.Agent{
-		AccessAPIKeyID:  accessKey.Id,
-		DefaultAPIKeyID: outputKey.Id,
+		AccessApiKeyId:  accessKey.Id,
+		DefaultApiKeyId: outputKey.Id,
 		Active:          true,
 		EnrolledAt:      sixAgo.Format(time.RFC3339),
 		LastCheckin:     sixAgo.Format(time.RFC3339),
-		PolicyID:        policy1Id,
+		PolicyId:        policy1Id,
 		UpdatedAt:       sixAgo.Format(time.RFC3339),
 	})
 	_, err = bulker.Create(ctx, agentsIndex, agentId, agentBody)
@@ -261,7 +261,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 	// add policy with unenroll timeout
 	policy1Id := uuid.Must(uuid.NewV4()).String()
 	policy1 := model.Policy{
-		PolicyID:        policy1Id,
+		PolicyId:        policy1Id,
 		CoordinatorIdx:  0,
 		Data:            []byte("{}"),
 		RevisionIdx:     1,
@@ -289,7 +289,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 
 	// update policy to clear timeout
 	policy2 := model.Policy{
-		PolicyID:       policy1Id,
+		PolicyId:       policy1Id,
 		CoordinatorIdx: 0,
 		Data:           []byte("{}"),
 		RevisionIdx:    2,
@@ -319,12 +319,12 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 	// add agent that should be unenrolled
 	sixAgo := time.Now().UTC().Add(-6 * time.Minute)
 	agentBody, err := json.Marshal(model.Agent{
-		AccessAPIKeyID:  accessKey.Id,
-		DefaultAPIKeyID: outputKey.Id,
+		AccessApiKeyId:  accessKey.Id,
+		DefaultApiKeyId: outputKey.Id,
 		Active:          true,
 		EnrolledAt:      sixAgo.Format(time.RFC3339),
 		LastCheckin:     sixAgo.Format(time.RFC3339),
-		PolicyID:        policy1Id,
+		PolicyId:        policy1Id,
 		UpdatedAt:       sixAgo.Format(time.RFC3339),
 	})
 	_, err = bulker.Create(ctx, agentsIndex, agentId, agentBody)
@@ -372,7 +372,7 @@ func ensureServer(ctx context.Context, t *testing.T, bulker bulk.Bulk, cfg confi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if srv.Agent.ID != cfg.Agent.ID {
+	if srv.Agent.Id != cfg.Agent.ID {
 		t.Fatal("agent.id should match from configuration")
 	}
 }
@@ -388,7 +388,7 @@ func ensureLeadership(ctx context.Context, t *testing.T, bulker bulk.Bulk, cfg c
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leader.Server.ID != cfg.Agent.ID {
+	if leader.Server.Id != cfg.Agent.ID {
 		t.Fatal("server.id should match from configuration")
 	}
 	lt, err := leader.Time()
@@ -408,7 +408,7 @@ func ensurePolicy(ctx context.Context, t *testing.T, bulker bulk.Bulk, index str
 	}
 	var found *model.Policy
 	for _, p := range policies {
-	if p.PolicyID == policyId {
+		if p.PolicyId == policyId {
 			found = &p
 			break
 		}
@@ -435,7 +435,7 @@ func ensureLeadershipReleased(ctx context.Context, t *testing.T, bulker bulk.Bul
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leader.Server.ID != cfg.Agent.ID {
+	if leader.Server.Id != cfg.Agent.ID {
 		t.Fatal("server.id should match from configuration")
 	}
 	lt, err := leader.Time()

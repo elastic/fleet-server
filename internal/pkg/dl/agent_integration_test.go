@@ -35,7 +35,7 @@ func TestFindOfflineAgents(t *testing.T) {
 	dayOld := now.Add(-24 * time.Hour).Format(time.RFC3339)
 	dayOldID := uuid.Must(uuid.NewV4()).String()
 	body, err := json.Marshal(model.Agent{
-		PolicyID:          policyID,
+		PolicyId:          policyID,
 		Active:            true,
 		LastCheckin:       dayOld,
 		LastCheckinStatus: "",
@@ -49,7 +49,7 @@ func TestFindOfflineAgents(t *testing.T) {
 	twoDayOld := now.Add(-48 * time.Hour).Format(time.RFC3339)
 	twoDayOldID := uuid.Must(uuid.NewV4()).String()
 	body, err = json.Marshal(model.Agent{
-		PolicyID:          policyID,
+		PolicyId:          policyID,
 		Active:            true,
 		LastCheckin:       twoDayOld,
 		LastCheckinStatus: "",
@@ -63,7 +63,7 @@ func TestFindOfflineAgents(t *testing.T) {
 	// not active (should not be included)
 	notActiveID := uuid.Must(uuid.NewV4()).String()
 	body, err = json.Marshal(model.Agent{
-		PolicyID:          policyID,
+		PolicyId:          policyID,
 		Active:            false,
 		LastCheckin:       twoDayOld,
 		LastCheckinStatus: "",
@@ -77,7 +77,7 @@ func TestFindOfflineAgents(t *testing.T) {
 	threeDayOld := now.Add(-48 * time.Hour).Format(time.RFC3339)
 	threeDayOldID := uuid.Must(uuid.NewV4()).String()
 	body, err = json.Marshal(model.Agent{
-		PolicyID:          policyID,
+		PolicyId:          policyID,
 		Active:            true,
 		LastCheckin:       threeDayOld,
 		LastCheckinStatus: "",
@@ -92,7 +92,7 @@ func TestFindOfflineAgents(t *testing.T) {
 	otherPolicyID := uuid.Must(uuid.NewV4()).String()
 	otherID := uuid.Must(uuid.NewV4()).String()
 	body, err = json.Marshal(model.Agent{
-		PolicyID:          otherPolicyID,
+		PolicyId:          otherPolicyID,
 		Active:            true,
 		LastCheckin:       threeDayOld,
 		LastCheckinStatus: "",
