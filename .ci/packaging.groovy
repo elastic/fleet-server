@@ -206,7 +206,6 @@ def runReleaseManager(def args = [:]) {
                    type: args.type,
                    artifactsFolder: 'build/distributions',
                    outputFile: args.outputFile)
-    }
   }
 }
 
