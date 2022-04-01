@@ -149,7 +149,7 @@ func (ct *CheckinT) handleCheckin(zlog *zerolog.Logger, w http.ResponseWriter, r
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
+		return ctx.Str(LogAccessAPIKeyID, agent.AccessApiKeyId)
 	})
 
 	ver, err := validateUserAgent(*zlog, r, ct.verCon)
@@ -206,7 +206,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actCh := aSub.Ch()
 
 	// Subscribe to policy manager for changes on PolicyId > policyRev
-	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
+	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyId, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
 	if err != nil {
 		return errors.Wrap(err, "subscribe policy monitor")
 	}
@@ -398,7 +398,7 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 			AgentId:   agentId,
 			CreatedAt: action.Timestamp,
 			Data:      action.Data,
-			Id:        action.ActionID,
+			Id:        action.ActionId,
 			Type:      action.Type,
 			InputType: action.InputType,
 			Timeout:   action.Timeout,
@@ -422,7 +422,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Str("ctx", "processPolicy").
 		Int64("policyRevision", pp.Policy.RevisionIdx).
 		Int64("policyCoordinator", pp.Policy.CoordinatorIdx).
-		Str(LogPolicyID, pp.Policy.PolicyID).
+		Str(LogPolicyID, pp.Policy.PolicyId).
 		Logger()
 
 	// Repull and decode the agent object.  Do not trust the cache.
