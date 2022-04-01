@@ -57,7 +57,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		// is monitors. When updating for multiple ES instances we need to tie the token to the output.
 		needKey := true
 		switch {
-		case agent.DefaultAPIKey == "":
+		case agent.DefaultApiKey == "":
 			zlog.Debug().Msg("must generate api key as default API key is not present")
 		case p.Role.Sha2 != agent.PolicyOutputPermissionsHash:
 			zlog.Debug().Msg("must generate api key as policy output permissions changed")
@@ -94,9 +94,9 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 					dl.FieldDefaultApiKeyId:             outputAPIKey.Id,
 					dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 				}
-				if agent.DefaultAPIKeyID != "" {
-					fields[dl.FieldDefaultApiKeyHistory] = model.DefaultAPIKeyHistoryItems{
-						ID:        agent.DefaultAPIKeyID,
+				if agent.DefaultApiKeyId != "" {
+					fields[dl.FieldDefaultApiKeyHistory] = model.DefaultApiKeyHistoryItems{
+						Id:        agent.DefaultApiKeyId,
 						RetiredAt: time.Now().UTC().Format(time.RFC3339),
 					}
 				}
@@ -112,7 +112,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 					zlog.Error().Err(err).Msg("fail update agent record")
 					return err
 				}
-				agent.DefaultAPIKey = outputAPIKey.Agent()
+				agent.DefaultApiKey = outputAPIKey.Agent()
 			}
 		}
 	case OutputTypeLogstash:

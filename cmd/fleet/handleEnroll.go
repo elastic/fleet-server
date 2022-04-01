@@ -184,7 +184,7 @@ func (et *EnrollerT) processRequest(rb *rollback.Rollback, zlog zerolog.Logger, 
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	return et._enroll(r.Context(), rb, zlog, req, erec.PolicyID, ver)
+	return et._enroll(r.Context(), rb, zlog, req, erec.PolicyId, ver)
 }
 
 func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog zerolog.Logger, req *EnrollRequest, policyId, ver string) (*EnrollResponse, error) {
@@ -223,14 +223,14 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 
 	agentData := model.Agent{
 		Active:         true,
-		PolicyID:       policyId,
+		PolicyId:       policyId,
 		Type:           req.Type,
 		EnrolledAt:     now.UTC().Format(time.RFC3339),
 		LocalMetadata:  localMeta,
-		AccessAPIKeyID: accessApiKey.Id,
+		AccessApiKeyId: accessApiKey.Id,
 		ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
 		Agent: &model.AgentMetadata{
-			ID:      agentId,
+			Id:      agentId,
 			Version: ver,
 		},
 	}
@@ -250,12 +250,12 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 		Item: EnrollResponseItem{
 			ID:             agentId,
 			Active:         agentData.Active,
-			PolicyId:       agentData.PolicyID,
+			PolicyId:       agentData.PolicyId,
 			Type:           agentData.Type,
 			EnrolledAt:     agentData.EnrolledAt,
 			UserMeta:       agentData.UserProvidedMetadata,
 			LocalMeta:      agentData.LocalMetadata,
-			AccessApiKeyId: agentData.AccessAPIKeyID,
+			AccessApiKeyId: agentData.AccessApiKeyId,
 			AccessAPIKey:   accessApiKey.Token(),
 			Status:         "online",
 		},
@@ -429,9 +429,9 @@ func generateAccessApiKey(ctx context.Context, bulk bulk.Bulk, agentId string) (
 	)
 }
 
-func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentAPIKey, error) {
+func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentApiKey, error) {
 
-	if key, ok := et.cache.GetEnrollmentAPIKey(id); ok {
+	if key, ok := et.cache.GetEnrollmentApiKey(id); ok {
 		return &key, nil
 	}
 
@@ -445,8 +445,8 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 		return nil, ErrInactiveEnrollmentKey
 	}
 
-	cost := int64(len(rec.APIKey))
-	et.cache.SetEnrollmentAPIKey(id, rec, cost)
+	cost := int64(len(rec.ApiKey))
+	et.cache.SetEnrollmentApiKey(id, rec, cost)
 
 	return &rec, nil
 }

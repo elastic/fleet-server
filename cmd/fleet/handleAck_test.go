@@ -89,8 +89,8 @@ func TestEventToActionResult(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			acr := eventToActionResult(agentId, tc.ev)
-			assert.Equal(t, agentId, acr.AgentID)
-			assert.Equal(t, tc.ev.ActionId, acr.ActionID)
+			assert.Equal(t, agentId, acr.AgentId)
+			assert.Equal(t, tc.ev.ActionId, acr.ActionId)
 			assert.Equal(t, tc.ev.ActionInputType, acr.ActionInputType)
 			assert.Equal(t, tc.ev.StartedAt, acr.StartedAt)
 			assert.Equal(t, tc.ev.CompletedAt, acr.CompletedAt)
@@ -141,7 +141,7 @@ func (m mockBulk) Search(ctx context.Context, index string, body []byte, opts ..
 			ok     bool
 		)
 		for _, a := range m.actions {
-			if a.ActionID == req.Query.Bool.Filter[0].Term.ActionID {
+			if a.ActionId == req.Query.Bool.Filter[0].Term.ActionID {
 				action = a
 				ok = true
 			}
@@ -151,7 +151,7 @@ func (m mockBulk) Search(ctx context.Context, index string, body []byte, opts ..
 				HitsT: es.HitsT{
 					Hits: []es.HitT{
 						{
-							Source: []byte(`{"action_id":"` + action.ActionID + `","type":"` + action.Type + `"}`),
+							Source: []byte(`{"action_id":"` + action.ActionId + `","type":"` + action.Type + `"}`),
 						},
 					},
 				},
@@ -283,7 +283,7 @@ func TestHandleAckEvents(t *testing.T) {
 				Message: http.StatusText(http.StatusOK),
 			}}),
 			bulker: mockBulk{actions: []model.Action{
-				{ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
+				{ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
 			}},
 		},
 		{
@@ -296,7 +296,7 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
 			bulker: mockBulk{
 				actions: []model.Action{
-					{ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
+					{ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
 				},
 				createErr: errors.New("network error"),
 			},
@@ -312,7 +312,7 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusServiceUnavailable)}),
 			bulker: mockBulk{
 				actions: []model.Action{
-					{ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
+					{ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
 				},
 				createErr: &es.ErrElastic{Status: http.StatusServiceUnavailable, Reason: http.StatusText(http.StatusServiceUnavailable)},
 			},
@@ -332,7 +332,7 @@ func TestHandleAckEvents(t *testing.T) {
 			}}),
 			bulker: mockBulk{
 				actions: []model.Action{
-					{ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733", Type: "UPGRADE"},
+					{ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733", Type: "UPGRADE"},
 				},
 				updateErr: &es.ErrElastic{Status: http.StatusServiceUnavailable, Reason: http.StatusText(http.StatusServiceUnavailable)},
 			},
@@ -391,10 +391,10 @@ func TestHandleAckEvents(t *testing.T) {
 				},
 			}),
 			bulker: mockBulk{actions: []model.Action{
-				{ActionID: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:1"},
-				{ActionID: "1b12dcd8-bde0-4045-92dc-c4b27668d731", Type: "UNENROLL"},
-				{ActionID: "ab12dcd8-bde0-4045-92dc-c4b27668d73a", Type: "UPGRADE"},
-				{ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
+				{ActionId: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:1"},
+				{ActionId: "1b12dcd8-bde0-4045-92dc-c4b27668d731", Type: "UNENROLL"},
+				{ActionId: "ab12dcd8-bde0-4045-92dc-c4b27668d73a", Type: "UPGRADE"},
+				{ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
 			}},
 			err: &HTTPError{Status: http.StatusNotFound},
 		},
