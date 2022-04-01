@@ -175,7 +175,7 @@ def getBucketLocation(type) {
 
 def getBucketRelativeLocation(type) {
   def folder = type.equals('snapshot') ? 'commits' : type
-  TODO return "${folder}/${env.GIT_BASE_COMMIT}"
+  return "${folder}/${env.GIT_BASE_COMMIT}"
 }
 
 def getBucketPathPrefix(type) {
