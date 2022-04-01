@@ -128,10 +128,10 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 
 	// validate that the Access ApiKey identifier stored in the agent's record
 	// is in alignment when the authenticated key provided on this transaction
-	if agent.AccessAPIKeyID != key.Id {
+	if agent.AccessApiKeyId != key.Id {
 		zlog.Warn().
 			Err(ErrAgentCorrupted).
-			Str("agent.AccessApiKeyId", agent.AccessAPIKeyID).
+			Str("agent.AccessApiKeyId", agent.AccessApiKeyId).
 			Msg("agent access ApiKey id mismatch agent record")
 		return nil, ErrAgentCorrupted
 	}
