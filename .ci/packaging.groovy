@@ -6,8 +6,8 @@ pipeline {
   environment {
     REPO = 'fleet-server'
     BASE_DIR = "src/github.com/elastic/${env.REPO}"
-    SLACK_CHANNEL = 'UJ2J1AZV2'
-    NOTIFY_TO = 'victor.martinez+build-package@elastic.co'
+    SLACK_CHANNEL = '#elastic-agent-control-plane'
+    NOTIFY_TO = 'fleet-server+build-package@elastic.co'
     JOB_GCS_BUCKET = credentials('gcs-bucket')
     JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
     DOCKER_SECRET = 'secret/observability-team/ci/docker-registry/prod'
@@ -36,8 +36,6 @@ pipeline {
         anyOf {
           triggeredBy cause: "IssueCommentCause"
           expression {
-            //TODO
-            return true
             def ret = isUserTrigger() || isUpstreamTrigger()
             if(!ret){
               currentBuild.result = 'NOT_BUILT'
@@ -62,9 +60,7 @@ pipeline {
             gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: false,
                         shallow: false, reference: "/var/lib/jenkins/.git-references/${REPO}.git")
             stash allowEmpty: true, name: 'source', useDefaultExcludes: false
-            //TODO
-            //setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
-            setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable('main'))
+            setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
             dir("${BASE_DIR}") {
               setEnvVar('VERSION', sh(label: 'Get version', script: 'make get-version', returnStdout: true)?.trim())
             }
@@ -178,9 +174,8 @@ def getBucketLocation(type) {
 }
 
 def getBucketRelativeLocation(type) {
-  def folder = type.equals('snapshot') ? 'commit' : type
-  //TODO return "${folder}/${env.GIT_BASE_COMMIT}"
-  return "${folder}/8950ae0d9edfa086e43f50a756a6caa87e88b09a"
+  def folder = type.equals('snapshot') ? 'commits' : type
+  TODO return "${folder}/${env.GIT_BASE_COMMIT}"
 }
 
 def getBucketPathPrefix(type) {
@@ -206,14 +201,11 @@ def runReleaseManager(def args = [:]) {
       sh(label: 'create dependencies file', script: "make ${makeGoal}")
     }
     dockerLogin(secret: env.DOCKER_SECRET, registry: env.DOCKER_REGISTRY)
-    // TODO
-    withEnv(["BRANCH_NAME=main"]) {
     releaseManager(project: 'fleet-server',
                    version: env.VERSION,
                    type: args.type,
                    artifactsFolder: 'build/distributions',
                    outputFile: args.outputFile)
-    //TODO
     }
   }
 }
