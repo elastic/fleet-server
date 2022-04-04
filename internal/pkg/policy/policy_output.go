@@ -38,7 +38,7 @@ type PolicyOutput struct {
 	Role *RoleT
 }
 
-func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map, isDefault bool) error {
+func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
 	switch p.Type {
 	case OutputTypeElasticsearch:
 		zlog.Debug().Msg("preparing elasticsearch output")
@@ -116,7 +116,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		}
 
 		// Always insert the `api_key` as part of the output block, this is required
-		// because only fleet server know the api key for the specific agent, if we don't
+		// because only fleet server knows the api key for the specific agent, if we don't
 		// add it the agent will not receive the `api_key` and will not be able to connect
 		// to Elasticsearch.
 		//

@@ -33,7 +33,7 @@ func TestPolicyLogstashOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{}, false)
+	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{})
 	require.Nil(t, err, "expected prepare to pass")
 }
 func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
@@ -47,7 +47,7 @@ func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 
-	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{}, false)
+	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{})
 	// No permissions are required by logstash currently
 	require.Nil(t, err, "expected prepare to pass")
 }
@@ -66,7 +66,7 @@ func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{}, true)
+	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{})
 	require.Nil(t, err, "expected prepare to pass")
 }
 
@@ -81,7 +81,7 @@ func TestPolicyESOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 
-	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{}, false)
+	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{})
 	require.NotNil(t, err, "expected prepare to error")
 }
 
@@ -107,7 +107,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			PolicyOutputPermissionsHash: hashPerm,
 		}
 
-		err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap, false)
+		err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
 		key, ok := policyMap.GetMap("test output")["api_key"].(string)
@@ -141,7 +141,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			PolicyOutputPermissionsHash: "old-HASH",
 		}
 
-		err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap, false)
+		err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
 		key, ok := policyMap.GetMap("test output")["api_key"].(string)
@@ -172,7 +172,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		testAgent := &model.Agent{}
 
-		err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap, false)
+		err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
 		key, ok := policyMap.GetMap("test output")["api_key"].(string)
