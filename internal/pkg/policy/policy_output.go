@@ -12,13 +12,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
-	"github.com/rs/zerolog"
 )
 
 const (
@@ -37,7 +38,7 @@ type PolicyOutput struct {
 	Role *RoleT
 }
 
-func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map, isDefault bool) error {
+func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
 	switch p.Type {
 	case OutputTypeElasticsearch:
 		zlog.Debug().Msg("preparing elasticsearch output")
@@ -55,18 +56,18 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		// Note: This will need to be updated when doing multi-cluster elasticsearch support
 		// Currently, we only have access to the token for the elasticsearch instance fleet-server
 		// is monitors. When updating for multiple ES instances we need to tie the token to the output.
-		needKey := true
+		needNewKey := true
 		switch {
 		case agent.DefaultApiKey == "":
 			zlog.Debug().Msg("must generate api key as default API key is not present")
 		case p.Role.Sha2 != agent.PolicyOutputPermissionsHash:
 			zlog.Debug().Msg("must generate api key as policy output permissions changed")
 		default:
-			needKey = false
+			needNewKey = false
 			zlog.Debug().Msg("policy output permissions are the same")
 		}
 
-		if needKey {
+		if needNewKey {
 			zlog.Debug().
 				RawJSON("roles", p.Role.Raw).
 				Str("oldHash", agent.PolicyOutputPermissionsHash).
@@ -79,41 +80,52 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 				return err
 			}
 
-			if ok := setMapObj(outputMap, outputAPIKey.Agent(), p.Name, "api_key"); !ok {
-				return ErrFailInjectAPIKey
+			agent.DefaultApiKey = outputAPIKey.Agent()
+
+			// When a new keys is generated we need to update the Agent record,
+			// this will need to be updated when multiples Elasticsearch output
+			// are used.
+			zlog.Info().
+				Str("hash.sha256", p.Role.Sha2).
+				Str(logger.DefaultOutputApiKeyId, outputAPIKey.Id).
+				Msg("Updating agent record to pick up default output key.")
+
+			fields := map[string]interface{}{
+				dl.FieldDefaultApiKey:               outputAPIKey.Agent(),
+				dl.FieldDefaultApiKeyId:             outputAPIKey.Id,
+				dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
+			}
+			if agent.DefaultApiKeyId != "" {
+				fields[dl.FieldDefaultApiKeyHistory] = model.DefaultApiKeyHistoryItems{
+					Id:        agent.DefaultApiKeyId,
+					RetiredAt: time.Now().UTC().Format(time.RFC3339),
+				}
 			}
 
-			if isDefault {
-				zlog.Info().
-					Str("hash.sha256", p.Role.Sha2).
-					Str(logger.DefaultOutputApiKeyId, outputAPIKey.Id).
-					Msg("Updating agent record to pick up default output key.")
+			// Using painless script to append the old keys to the history
+			body, err := renderUpdatePainlessScript(fields)
 
-				fields := map[string]interface{}{
-					dl.FieldDefaultApiKey:               outputAPIKey.Agent(),
-					dl.FieldDefaultApiKeyId:             outputAPIKey.Id,
-					dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
-				}
-				if agent.DefaultApiKeyId != "" {
-					fields[dl.FieldDefaultApiKeyHistory] = model.DefaultApiKeyHistoryItems{
-						Id:        agent.DefaultApiKeyId,
-						RetiredAt: time.Now().UTC().Format(time.RFC3339),
-					}
-				}
-
-				// Using painless script to append the old keys to the history
-				body, err := renderUpdatePainlessScript(fields)
-
-				if err != nil {
-					return err
-				}
-
-				if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body); err != nil {
-					zlog.Error().Err(err).Msg("fail update agent record")
-					return err
-				}
-				agent.DefaultApiKey = outputAPIKey.Agent()
+			if err != nil {
+				return err
 			}
+
+			if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body); err != nil {
+				zlog.Error().Err(err).Msg("fail update agent record")
+				return err
+			}
+		}
+
+		// Always insert the `api_key` as part of the output block, this is required
+		// because only fleet server knows the api key for the specific agent, if we don't
+		// add it the agent will not receive the `api_key` and will not be able to connect
+		// to Elasticsearch.
+		//
+		// We need to investigate allocation with the new LS output, we had optimization
+		// in place to reduce number of agent policy allocation when sending the updated
+		// agent policy to multiple agents.
+		// See: https://github.com/elastic/fleet-server/issues/1301
+		if ok := setMapObj(outputMap, agent.DefaultApiKey, p.Name, "api_key"); !ok {
+			return ErrFailInjectAPIKey
 		}
 	case OutputTypeLogstash:
 		zlog.Debug().Msg("preparing logstash output")
