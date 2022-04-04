@@ -6,6 +6,7 @@ package policy
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -85,57 +86,100 @@ func TestPolicyESOutputPrepareNoRole(t *testing.T) {
 }
 
 func TestPolicyOutputESPrepare(t *testing.T) {
-	bulker := ftesting.NewMockBulk(&bulk.ApiKey{
-		Id:  "test id",
-		Key: "test key",
+	t.Run("Permission hash == Agent Permission Hash no need to regenerate the key", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk(&bulk.ApiKey{})
+		hashPerm := "abc123"
+		po := PolicyOutput{
+			Type: OutputTypeElasticsearch,
+			Name: "test output",
+			Role: &RoleT{
+				Sha2: hashPerm,
+				Raw:  TestPayload,
+			},
+		}
+
+		policyMap := smap.Map{
+			"test output": map[string]interface{}{},
+		}
+
+		testAgent := &model.Agent{
+			DefaultApiKey:               "test_id:EXISTING-KEY",
+			PolicyOutputPermissionsHash: hashPerm,
+		}
+
+		err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap, false)
+		require.NoError(t, err, "expected prepare to pass")
+
+		key, ok := policyMap.GetMap("test output")["api_key"].(string)
+
+		fmt.Println(policyMap)
+		require.True(t, ok, "unable to case api key")
+		require.Equal(t, testAgent.DefaultApiKey, key)
+		require.Equal(t, len(bulker.ArgumentData.Update), 0, "update should not be called")
 	})
-	po := PolicyOutput{
-		Type: OutputTypeElasticsearch,
-		Name: "test output",
-		Role: &RoleT{
-			Sha2: "fake sha",
-			Raw:  TestPayload,
-		},
-	}
-	policyMap := smap.Map{
-		"test output": map[string]interface{}{
-			"api_key": "",
-		},
-	}
 
-	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, policyMap, false)
-	require.Nil(t, err, "expected prepare to pass")
+	t.Run("Permission hash != Agent Permission Hash need to regenerate the key", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk(&bulk.ApiKey{
+			Id:  "abc",
+			Key: "new-key",
+		})
 
-	updatedKey, ok := policyMap.GetMap("test output")["api_key"].(string)
+		po := PolicyOutput{
+			Type: OutputTypeElasticsearch,
+			Name: "test output",
+			Role: &RoleT{
+				Sha2: "new-hash",
+				Raw:  TestPayload,
+			},
+		}
 
-	require.True(t, ok, "unable to case api key")
-	require.Equal(t, updatedKey, bulker.MockedAPIKey.Agent())
-	require.Equal(t, len(bulker.ArgumentData.Update), 0, "update should not be called")
-}
+		policyMap := smap.Map{
+			"test output": map[string]interface{}{},
+		}
 
-func TestPolicyOutputDefaultESPrepare(t *testing.T) {
-	bulker := ftesting.NewMockBulk(&bulk.ApiKey{
-		Id:  "test id",
-		Key: "test key",
+		testAgent := &model.Agent{
+			DefaultApiKey:               "test_id:EXISTING-KEY",
+			PolicyOutputPermissionsHash: "old-HASH",
+		}
+
+		err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap, false)
+		require.NoError(t, err, "expected prepare to pass")
+
+		key, ok := policyMap.GetMap("test output")["api_key"].(string)
+
+		require.True(t, ok, "unable to case api key")
+		require.Equal(t, "abc:new-key", key)
+		require.Equal(t, len(bulker.ArgumentData.Update), 1, "update should be called")
 	})
-	po := PolicyOutput{
-		Type: OutputTypeElasticsearch,
-		Name: "test output",
-		Role: &RoleT{
-			Sha2: "fake sha",
-			Raw:  TestPayload,
-		},
-	}
-	policyMap := smap.Map{
-		"test output": map[string]interface{}{},
-	}
-	testAgent := &model.Agent{}
-	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap, true)
-	require.Nil(t, err, "expected prepare to pass")
 
-	updatedKey, ok := policyMap.GetMap("test output")["api_key"].(string)
+	t.Run("Generate API Key on new Agent", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk(&bulk.ApiKey{
+			Id:  "abc",
+			Key: "new-key",
+		})
 
-	require.True(t, ok, "unable to case api key")
-	require.Equal(t, updatedKey, bulker.MockedAPIKey.Agent())
-	require.Greater(t, len(bulker.ArgumentData.Update), 0, "update should be called")
+		po := PolicyOutput{
+			Type: OutputTypeElasticsearch,
+			Name: "test output",
+			Role: &RoleT{
+				Sha2: "new-hash",
+				Raw:  TestPayload,
+			},
+		}
+
+		policyMap := smap.Map{
+			"test output": map[string]interface{}{},
+		}
+
+		testAgent := &model.Agent{}
+
+		err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, testAgent, policyMap, false)
+		require.NoError(t, err, "expected prepare to pass")
+
+		key, ok := policyMap.GetMap("test output")["api_key"].(string)
+
+		require.True(t, ok, "unable to case api key")
+		require.Equal(t, "abc:new-key", key)
+		require.Equal(t, len(bulker.ArgumentData.Update), 1, "update should be called")
+	})
 }
