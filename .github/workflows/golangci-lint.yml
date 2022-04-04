@@ -15,9 +15,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - GOOS: windows
           - GOOS: linux
-          - GOOS: darwin
+          #- GOOS: windows
+          #- GOOS: darwin
     name: lint
     runs-on: ubuntu-latest
     steps:
