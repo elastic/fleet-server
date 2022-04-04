@@ -417,7 +417,6 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 //  - Rewrite the policy for delivery to the agent injecting the key material.
 //
 func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentId string, pp *policy.ParsedPolicy) (*ActionResp, error) {
-
 	zlog = zlog.With().
 		Str("ctx", "processPolicy").
 		Int64("policyRevision", pp.Policy.RevisionIdx).
@@ -445,8 +444,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	// Iterate through the policy outputs and prepare them
-	for name, policyOutput := range pp.Outputs {
-		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, outputs, name == pp.Default.Name)
+	for _, policyOutput := range pp.Outputs {
+		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, outputs)
 
 		if err != nil {
 			return nil, err
