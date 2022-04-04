@@ -6,15 +6,15 @@ package policy
 
 import (
 	"context"
-	"fmt"
 	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 )
 
 var TestPayload []byte
@@ -112,7 +112,6 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		key, ok := policyMap.GetMap("test output")["api_key"].(string)
 
-		fmt.Println(policyMap)
 		require.True(t, ok, "unable to case api key")
 		require.Equal(t, testAgent.DefaultApiKey, key)
 		require.Equal(t, len(bulker.ArgumentData.Update), 0, "update should not be called")

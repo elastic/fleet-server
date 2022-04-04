@@ -12,13 +12,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
-	"github.com/rs/zerolog"
 )
 
 const (
@@ -60,7 +61,6 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		case agent.DefaultApiKey == "":
 			zlog.Debug().Msg("must generate api key as default API key is not present")
 		case p.Role.Sha2 != agent.PolicyOutputPermissionsHash:
-			fmt.Println("!= hash?")
 			zlog.Debug().Msg("must generate api key as policy output permissions changed")
 		default:
 			needNewKey = false
