@@ -84,6 +84,7 @@ func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
 }
 
 func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
+	t.Skip("Flaky test see https://github.com/elastic/fleet-server/issues/1289")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
