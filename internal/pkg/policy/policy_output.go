@@ -120,9 +120,10 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		// add it the agent will not receive the `api_key` and will not be able to connect
 		// to Elasticsearch.
 		//
-		// TODO(ph) Investigate allocation with the new LS output, we had optimization
+		// We need to investigate allocation with the new LS output, we had optimization
 		// in place to reduce number of agent policy allocation when sending the updated
 		// agent policy to multiple agents.
+		// See: https://github.com/elastic/fleet-server/issues/1301
 		if ok := setMapObj(outputMap, agent.DefaultApiKey, p.Name, "api_key"); !ok {
 			return ErrFailInjectAPIKey
 		}
