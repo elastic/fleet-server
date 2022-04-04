@@ -121,8 +121,8 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		// to Elasticsearch.
 		//
 		// TODO(ph) Investigate allocation with the new LS output, we had optimization
-		// in place to reduce number of agent policy allocation when distribution the updated
-		// keys to multiples agents.
+		// in place to reduce number of agent policy allocation when sending the updated
+		// agent policy to multiple agents.
 		if ok := setMapObj(outputMap, agent.DefaultApiKey, p.Name, "api_key"); !ok {
 			return ErrFailInjectAPIKey
 		}
