@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/go-ucfg/yaml"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
+	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -54,7 +55,6 @@ import (
 )
 
 const (
-	kServiceName               = "fleet-server"
 	kAgentMode                 = "agent-mode"
 	kAgentModeRestartLoopDelay = 2 * time.Second
 
@@ -92,7 +92,7 @@ func makeCacheConfig(cfg *config.Config) cache.Config {
 }
 
 func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, error) {
-	l, err := logger.Init(cfg, kServiceName)
+	l, err := logger.Init(cfg, build.ServiceName)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 
 func NewCommand(bi build.Info) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   kServiceName,
+		Use:   build.ServiceName,
 		Short: "Fleet Server controls a fleet of Elastic Agents",
 		RunE:  getRunCommand(bi),
 	}
@@ -410,7 +410,7 @@ type FleetServer struct {
 
 // NewFleetServer creates the actual fleet server service.
 func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter) (*FleetServer, error) {
-	verCon, err := buildVersionConstraint(bi.Version)
+	verCon, err := api.BuildVersionConstraint(bi.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -709,7 +709,7 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	initRuntime(cfg)
 
 	// The metricsServer is only enabled if http.enabled is set in the config
-	metricsServer, err := f.initMetrics(ctx, cfg)
+	metricsServer, err := api.InitMetrics(ctx, cfg, f.bi)
 	switch {
 	case err != nil:
 		return err
@@ -862,20 +862,20 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
-	ct := NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
-	et, err := NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
+	ct := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
+	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
 	}
 
-	at := NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
-	ack := NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
-	st := NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
+	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
+	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
+	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
 
-	router := NewRouter(ctx, bulker, ct, et, at, ack, st, sm, tracer, f.bi)
+	router := api.NewRouter(ctx, bulker, ct, et, at, ack, st, sm, tracer, f.bi)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
-		return runServer(ctx, router, &cfg.Inputs[0].Server)
+		return api.Run(ctx, router, &cfg.Inputs[0].Server)
 	}))
 
 	return err

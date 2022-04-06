@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package api
 
 import (
 	"context"
@@ -38,7 +38,8 @@ func diagConn(c net.Conn, s http.ConnState) {
 	}
 }
 
-func runServer(ctx context.Context, router http.Handler, cfg *config.Server) error {
+// Run runst the passed router with the config.
+func Run(ctx context.Context, router http.Handler, cfg *config.Server) error {
 	listeners := cfg.BindEndpoints()
 	rdto := cfg.Timeouts.Read
 	wrto := cfg.Timeouts.Write

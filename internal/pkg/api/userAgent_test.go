@@ -5,7 +5,7 @@
 //go:build !integration
 // +build !integration
 
-package fleet
+package api
 
 import (
 	"net/http/httptest"
@@ -125,7 +125,7 @@ func TestValidateUserAgent(t *testing.T) {
 }
 
 func mustBuildConstraints(verStr string) version.Constraints {
-	con, err := buildVersionConstraint(verStr)
+	con, err := BuildVersionConstraint(verStr)
 	if err != nil {
 		panic(err)
 	}

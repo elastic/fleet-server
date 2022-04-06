@@ -5,7 +5,7 @@
 //go:build !integration
 // +build !integration
 
-package fleet
+package api
 
 import (
 	"context"

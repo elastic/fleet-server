@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package api
 
 import (
 	"errors"
@@ -28,9 +28,9 @@ var (
 	ErrUnsupportedVersion = errors.New("version is not supported")
 )
 
-// buildVersionConstraint turns the version into a constraint to ensure that the connecting Elastic Agent's are
+// BuildVersionConstraint turns the version into a constraint to ensure that the connecting Elastic Agent's are
 // a supported version.
-func buildVersionConstraint(verStr string) (version.Constraints, error) {
+func BuildVersionConstraint(verStr string) (version.Constraints, error) {
 	ver, err := version.NewVersion(verStr)
 	if err != nil {
 		return nil, err

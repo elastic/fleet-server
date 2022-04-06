@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package api
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -90,7 +91,7 @@ func (st StatusT) handleStatus(zlog *zerolog.Logger, r *http.Request, rt *Router
 
 	status = rt.sm.Status()
 	resp = StatusResponse{
-		Name:   kServiceName,
+		Name:   build.ServiceName,
 		Status: status.String(),
 	}
 
