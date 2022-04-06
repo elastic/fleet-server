@@ -7,6 +7,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -72,10 +73,10 @@ func (st StatusT) authenticate(r *http.Request) (*apikey.ApiKey, error) {
 	// WARNING: This does not validate that the api key is valid for the Fleet Domain.
 	// An additional check must be executed to validate it is not a random api key.
 	// This check is sufficient for the purposes of this API
-	return authApiKey(r, st.bulk, st.cache)
+	return authAPIKey(r, st.bulk, st.cache)
 }
 
-func (st StatusT) handleStatus(zlog *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, status proto.StateObserved_Status, err error) {
+func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, status proto.StateObserved_Status, err error) {
 	limitF, err := st.limit.Acquire()
 	// When failing to acquire a limiter send an error response.
 	if err != nil {
@@ -113,10 +114,10 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 	dfunc := cntStatus.IncStart()
 	defer dfunc()
 
-	reqId := r.Header.Get(logger.HeaderRequestID)
+	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str(EcsHttpRequestId, reqId).
+		Str(EcsHTTPRequestID, reqID).
 		Str("mod", kStatusMod).
 		Logger()
 
@@ -127,7 +128,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHttpResponseCode, resp.StatusCode).
+			Int(EcsHTTPResponseCode, resp.StatusCode).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail status")
 
@@ -140,7 +141,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 	data, err := json.Marshal(&resp)
 	if err != nil {
 		code := http.StatusInternalServerError
-		zlog.Error().Err(err).Int(EcsHttpResponseCode, code).
+		zlog.Error().Err(err).Int(EcsHTTPResponseCode, code).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
 		http.Error(w, "", code)
 		return
@@ -154,15 +155,15 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 
 	var nWritten int
 	if nWritten, err = w.Write(data); err != nil {
-		if err != context.Canceled {
-			zlog.Error().Err(err).Int(EcsHttpResponseCode, code).
+		if errors.Is(err, context.Canceled) {
+			zlog.Error().Err(err).Int(EcsHTTPResponseCode, code).
 				Int64(EcsEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
 		}
 	}
 
 	cntStatus.bodyOut.Add(uint64(nWritten))
 	zlog.Debug().
-		Int(EcsHttpResponseBodyBytes, nWritten).
+		Int(EcsHTTPResponseBodyBytes, nWritten).
 		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 		Msg("ok status")
 }

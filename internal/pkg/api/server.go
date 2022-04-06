@@ -7,6 +7,7 @@ package api
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	slog "log"
 	"net"
 	"net/http"
@@ -32,9 +33,9 @@ func diagConn(c net.Conn, s http.ConnState) {
 
 	switch s {
 	case http.StateNew:
-		cntHttpNew.Inc()
+		cntHTTPNew.Inc()
 	case http.StateClosed:
-		cntHttpClose.Inc()
+		cntHTTPClose.Inc()
 	}
 }
 
@@ -80,7 +81,10 @@ func Run(ctx context.Context, router http.Handler, cfg *config.Server) error {
 			select {
 			case <-ctx.Done():
 				log.Debug().Msg("force server close on ctx.Done()")
-				server.Close()
+				err := server.Close()
+				if err != nil {
+					log.Error().Err(err).Msg("error while closing server")
+				}
 			case <-forceCh:
 				log.Debug().Msg("go routine forced closed on exit")
 			}
@@ -94,7 +98,12 @@ func Run(ctx context.Context, router http.Handler, cfg *config.Server) error {
 		}
 
 		// Bind the deferred Close() to the stack variable to handle case where 'ln' is wrapped
-		defer func() { ln.Close() }()
+		defer func() {
+			err := ln.Close()
+			if err != nil {
+				log.Error().Err(err).Msg("error while closing listener.")
+			}
+		}()
 
 		// Conn Limiter must be before the TLS handshake in the stack;
 		// The server should not eat the cost of the handshake if there
@@ -104,11 +113,11 @@ func Run(ctx context.Context, router http.Handler, cfg *config.Server) error {
 		ln = wrapConnLimitter(ctx, ln, cfg)
 
 		if cfg.TLS != nil && cfg.TLS.IsEnabled() {
-			commonTlsCfg, err := tlscommon.LoadTLSServerConfig(cfg.TLS)
+			commonTLSCfg, err := tlscommon.LoadTLSServerConfig(cfg.TLS)
 			if err != nil {
 				return err
 			}
-			server.TLSConfig = commonTlsCfg.BuildServerConfig(cfg.Host)
+			server.TLSConfig = commonTLSCfg.BuildServerConfig(cfg.Host)
 
 			// Must enable http/2 in the configuration explicitly.
 			// (see https://golang.org/pkg/net/http/#Server.Serve)
@@ -122,8 +131,8 @@ func Run(ctx context.Context, router http.Handler, cfg *config.Server) error {
 
 		log.Debug().Msgf("Listening on %s", addr)
 
-		go func(ctx context.Context, errChan chan error, ln net.Listener) {
-			if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
+		go func(_ context.Context, errChan chan error, ln net.Listener) {
+			if err := server.Serve(ln); err != nil && errors.Is(err, http.ErrServerClosed) {
 				errChan <- err
 			}
 		}(cancelCtx, errChan, ln)
@@ -132,7 +141,7 @@ func Run(ctx context.Context, router http.Handler, cfg *config.Server) error {
 
 	select {
 	case err := <-errChan:
-		if err != context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			return err
 		}
 	case <-cancelCtx.Done():
@@ -141,7 +150,7 @@ func Run(ctx context.Context, router http.Handler, cfg *config.Server) error {
 	return nil
 }
 
-func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) net.Listener {
+func wrapConnLimitter(_ context.Context, ln net.Listener, cfg *config.Server) net.Listener {
 	hardLimit := cfg.Limits.MaxConnections
 
 	if hardLimit != 0 {

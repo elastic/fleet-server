@@ -9,6 +9,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 	"testing"
@@ -66,7 +67,7 @@ func TestRun(t *testing.T) {
 	cancel()
 	wg.Wait()
 	require.NoError(t, errFromChan)
-	if err != http.ErrServerClosed {
+	if errors.Is(err, http.ErrServerClosed) {
 		require.NoError(t, err)
 	}
 }

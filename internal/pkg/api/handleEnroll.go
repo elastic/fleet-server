@@ -77,10 +77,10 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	reqId := r.Header.Get(logger.HeaderRequestID)
+	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str(EcsHttpRequestId, reqId).
+		Str(EcsHTTPRequestID, reqID).
 		Str("mod", kEnrollMod).
 		Logger()
 
@@ -110,7 +110,7 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHttpResponseCode, resp.StatusCode).
+			Int(EcsHTTPResponseCode, resp.StatusCode).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail enroll")
 
@@ -137,7 +137,7 @@ func (et *EnrollerT) handleEnroll(rb *rollback.Rollback, zlog *zerolog.Logger, w
 	}
 	defer limitF()
 
-	key, err := authApiKey(r, et.bulker, et.cache)
+	key, err := authAPIKey(r, et.bulker, et.cache)
 	if err != nil {
 		return nil, err
 	}
@@ -159,10 +159,10 @@ func (et *EnrollerT) handleEnroll(rb *rollback.Rollback, zlog *zerolog.Logger, w
 	return et.processRequest(rb, *zlog, w, r, key.Id, ver)
 }
 
-func (et *EnrollerT) processRequest(rb *rollback.Rollback, zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, enrollmentApiKeyId, ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) processRequest(rb *rollback.Rollback, zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, enrollmentAPIKeyID, ver string) (*EnrollResponse, error) {
 
 	// Validate that an enrollment record exists for a key with this id.
-	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentApiKeyId)
+	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentAPIKeyID)
 	if err != nil {
 		return nil, err
 	}
@@ -187,9 +187,9 @@ func (et *EnrollerT) processRequest(rb *rollback.Rollback, zlog zerolog.Logger, 
 	return et._enroll(r.Context(), rb, zlog, req, erec.PolicyId, ver)
 }
 
-func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog zerolog.Logger, req *EnrollRequest, policyId, ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog zerolog.Logger, req *EnrollRequest, policyID, ver string) (*EnrollResponse, error) {
 
-	if req.SharedId != "" {
+	if req.SharedID != "" {
 		// TODO: Support pre-existing install
 		return nil, errors.New("preexisting install not yet supported")
 	}
@@ -202,67 +202,67 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 		return nil, err
 	}
 
-	agentId := u.String()
+	agentID := u.String()
 
 	// Update the local metadata agent id
-	localMeta, err := updateLocalMetaAgentId(req.Meta.Local, agentId)
+	localMeta, err := updateLocalMetaAgentID(req.Meta.Local, agentID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Generate the Fleet Agent access api key
-	accessApiKey, err := generateAccessApiKey(ctx, et.bulker, agentId)
+	accessAPIKey, err := generateAccessAPIKey(ctx, et.bulker, agentID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Register invalidate API key function for enrollment error rollback
 	rb.Register("invalidate API key", func(ctx context.Context) error {
-		return invalidateApiKey(ctx, zlog, et.bulker, accessApiKey.Id)
+		return invalidateAPIKey(ctx, zlog, et.bulker, accessAPIKey.Id)
 	})
 
 	agentData := model.Agent{
 		Active:         true,
-		PolicyId:       policyId,
+		PolicyId:       policyID,
 		Type:           req.Type,
 		EnrolledAt:     now.UTC().Format(time.RFC3339),
 		LocalMetadata:  localMeta,
-		AccessApiKeyId: accessApiKey.Id,
+		AccessApiKeyId: accessAPIKey.Id,
 		ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
 		Agent: &model.AgentMetadata{
-			Id:      agentId,
+			Id:      agentID,
 			Version: ver,
 		},
 	}
 
-	err = createFleetAgent(ctx, et.bulker, agentId, agentData)
+	err = createFleetAgent(ctx, et.bulker, agentID, agentData)
 	if err != nil {
 		return nil, err
 	}
 
 	// Register delete fleet agent for enrollment error rollback
 	rb.Register("delete agent", func(ctx context.Context) error {
-		return deleteAgent(ctx, zlog, et.bulker, agentId)
+		return deleteAgent(ctx, zlog, et.bulker, agentID)
 	})
 
 	resp := EnrollResponse{
 		Action: "created",
 		Item: EnrollResponseItem{
-			ID:             agentId,
+			ID:             agentID,
 			Active:         agentData.Active,
-			PolicyId:       agentData.PolicyId,
+			PolicyID:       agentData.PolicyId,
 			Type:           agentData.Type,
 			EnrolledAt:     agentData.EnrolledAt,
 			UserMeta:       agentData.UserProvidedMetadata,
 			LocalMeta:      agentData.LocalMetadata,
-			AccessApiKeyId: agentData.AccessApiKeyId,
-			AccessAPIKey:   accessApiKey.Token(),
+			AccessAPIKeyID: agentData.AccessApiKeyId,
+			AccessAPIKey:   accessAPIKey.Token(),
 			Status:         "online",
 		},
 	}
 
 	// We are Kool & and the Gang; cache the access key to avoid the roundtrip on impending checkin
-	et.cache.SetApiKey(*accessApiKey, true)
+	et.cache.SetApiKey(*accessAPIKey, true)
 
 	return &resp, nil
 }
@@ -278,20 +278,20 @@ func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, age
 	return nil
 }
 
-func invalidateApiKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, apikeyId string) error {
+func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, apikeyID string) error {
 
 	// hack-a-rama:  We purposely do not force a "refresh:true" on the Apikey creation
 	// because doing so causes the api call to slow down at scale.  It is already very slow.
 	// So we have to wait for the key to become visible until we can invalidate it.
 
-	zlog = zlog.With().Str(LogAPIKeyID, apikeyId).Logger()
+	zlog = zlog.With().Str(LogAPIKeyID, apikeyID).Logger()
 
 	start := time.Now()
 
 LOOP:
 	for {
 
-		_, err := bulker.ApiKeyRead(ctx, apikeyId)
+		_, err := bulker.ApiKeyRead(ctx, apikeyID)
 
 		switch {
 		case err == nil:
@@ -309,14 +309,14 @@ LOOP:
 		case <-ctx.Done():
 			zlog.Error().
 				Err(ctx.Err()).
-				Str("apikeyId", apikeyId).
+				Str("apikeyId", apikeyID).
 				Msg("Failed to invalidate apiKey on ctx done during hack sleep")
 			return ctx.Err()
 		case <-time.After(time.Second):
 		}
 	}
 
-	if err := bulker.ApiKeyInvalidate(ctx, apikeyId); err != nil {
+	if err := bulker.ApiKeyInvalidate(ctx, apikeyID); err != nil {
 		zlog.Error().Err(err).Msg("fail invalidate apiKey")
 		return err
 	}
@@ -341,9 +341,9 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 
 	zlog.Info().
 		Str(LogAgentID, resp.Item.ID).
-		Str(LogPolicyID, resp.Item.PolicyId).
-		Str(LogAccessAPIKeyID, resp.Item.AccessApiKeyId).
-		Int(EcsHttpResponseBodyBytes, numWritten).
+		Str(LogPolicyID, resp.Item.PolicyID).
+		Str(LogAccessAPIKeyID, resp.Item.AccessAPIKeyID).
+		Int(EcsHTTPResponseBodyBytes, numWritten).
 		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 		Msg("Elastic Agent successfully enrolled")
 
@@ -376,7 +376,7 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 //         "full": "Mac OS X(10.15.7)"
 //     }
 // }
-func updateLocalMetaAgentId(data []byte, agentId string) ([]byte, error) {
+func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 	if data == nil {
 		return data, nil
 	}
@@ -392,7 +392,7 @@ func updateLocalMetaAgentId(data []byte, agentId string) ([]byte, error) {
 			if v, ok = sm["agent"]; ok {
 				if sm, ok = v.(map[string]interface{}); ok {
 					if _, ok = sm["id"]; ok {
-						sm["id"] = agentId
+						sm["id"] = agentID
 						data, err = json.Marshal(m)
 						if err != nil {
 							return nil, err
@@ -419,13 +419,13 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	return nil
 }
 
-func generateAccessApiKey(ctx context.Context, bulk bulk.Bulk, agentId string) (*apikey.ApiKey, error) {
+func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (*apikey.ApiKey, error) {
 	return bulk.ApiKeyCreate(
 		ctx,
-		agentId,
+		agentID,
 		"",
 		[]byte(kFleetAccessRolesJSON),
-		apikey.NewMetadata(agentId, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, apikey.TypeAccess),
 	)
 }
 

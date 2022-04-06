@@ -2,10 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package fleet is the main entry point for fleet-server.
 package fleet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -44,7 +46,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
 	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -112,7 +113,7 @@ func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, err
 
 func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		cfgObject := cmd.Flags().Lookup("E").Value.(*config.Flag)
+		cfgObject, _ := cmd.Flags().Lookup("E").Value.(*config.Flag)
 		cliCfg := cfgObject.Config()
 
 		agentMode, err := cmd.Flags().GetBool(kAgentMode)
@@ -169,7 +170,7 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 			runErr = srv.Run(installSignalHandler())
 		}
 
-		if runErr != nil && runErr != context.Canceled {
+		if runErr != nil && errors.Is(runErr, context.Canceled) {
 			log.Error().Err(runErr).Msg("Exiting")
 			l.Sync()
 			return runErr
@@ -284,12 +285,12 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	go func() {
 		for {
 			err := a.srv.Run(srvCtx)
-			if err == nil || err == context.Canceled {
+			if err == nil || errors.Is(err, context.Canceled) {
 				res <- err
 				return
 			}
 			// sleep some before calling Run again
-			sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay)
+			_ = sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay)
 		}
 	}()
 	return <-res
@@ -398,9 +399,8 @@ func (a *AgentMode) OnError(err error) {
 }
 
 type FleetServer struct {
-	bi       build.Info
-	verCon   version.Constraints
-	policyId string
+	bi     build.Info
+	verCon version.Constraints
 
 	cfg      *config.Config
 	cfgCh    chan *config.Config
@@ -448,7 +448,10 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			cn()
 		}
 		if g != nil {
-			g.Wait()
+			err := g.Wait()
+			if err != nil {
+				log.Error().Err(err).Msg("error encountered while stopping server")
+			}
 		}
 	}
 
@@ -478,10 +481,10 @@ LOOP:
 		ech := make(chan error, 2)
 
 		if started {
-			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil)
+			_ = f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil)
 		} else {
 			started = true
-			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
+			_ = f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
 		}
 
 		// Create or recreate cache
@@ -529,11 +532,11 @@ LOOP:
 		case newCfg = <-f.cfgCh:
 			log.Info().Msg("Server configuration update")
 		case err := <-ech:
-			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil)
+			_ = f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil)
 			log.Error().Err(err).Msg("Fleet Server failed")
 			return err
 		case <-ctx.Done():
-			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil)
+			_ = f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil)
 			break LOOP
 		}
 	}
@@ -644,7 +647,8 @@ func configCacheChanged(curCfg, newCfg *config.Config) bool {
 	return curCfg.Inputs[0].Cache != newCfg.Inputs[0].Cache
 }
 
-func safeWait(g *errgroup.Group, to time.Duration) (err error) {
+func safeWait(g *errgroup.Group, to time.Duration) error {
+	var err error
 	waitCh := make(chan error)
 	go func() {
 		waitCh <- g.Wait()
@@ -654,10 +658,10 @@ func safeWait(g *errgroup.Group, to time.Duration) (err error) {
 	case err = <-waitCh:
 	case <-time.After(to):
 		log.Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
-		err = errors.New("Group wait timeout")
+		err = errors.New("group wait timeout")
 	}
 
-	return
+	return err
 }
 
 func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error {
@@ -714,7 +718,9 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	case err != nil:
 		return err
 	case metricsServer != nil:
-		defer metricsServer.Stop()
+		defer func() {
+			_ = metricsServer.Stop()
+		}()
 	}
 
 	// Bulker is started in its own context and managed in the scope of this function. This is done so
@@ -906,16 +912,22 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) (*apm.Tracer, error
 		envCACert           = "ELASTIC_APM_SERVER_CA_CERT_FILE"
 	)
 	if cfg.TLS.SkipVerify {
-		os.Setenv(envVerifyServerCert, "false")
-		defer os.Unsetenv(envVerifyServerCert)
+		_ = os.Setenv(envVerifyServerCert, "false")
+		defer func() {
+			_ = os.Unsetenv(envVerifyServerCert)
+		}()
 	}
 	if cfg.TLS.ServerCertificate != "" {
-		os.Setenv(envServerCert, cfg.TLS.ServerCertificate)
-		defer os.Unsetenv(envServerCert)
+		_ = os.Setenv(envServerCert, cfg.TLS.ServerCertificate)
+		defer func() {
+			_ = os.Unsetenv(envServerCert)
+		}()
 	}
 	if cfg.TLS.ServerCA != "" {
-		os.Setenv(envCACert, cfg.TLS.ServerCA)
-		defer os.Unsetenv(envCACert)
+		_ = os.Setenv(envCACert, cfg.TLS.ServerCA)
+		defer func() {
+			_ = os.Unsetenv(envCACert)
+		}()
 	}
 	transport, err := apmtransport.NewHTTPTransport()
 	if err != nil {

@@ -71,11 +71,11 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 		sha2 = ps.ByName("sha2") // DecodedSha256 in the artifact record
 	)
 
-	reqId := r.Header.Get(logger.HeaderRequestID)
+	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
 		Str(LogAgentID, id).
-		Str(EcsHttpRequestId, reqId).
+		Str(EcsHTTPRequestID, reqID).
 		Str("sha2", sha2).
 		Str("remoteAddr", r.RemoteAddr).
 		Logger()
@@ -87,7 +87,7 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 		nWritten, err = io.Copy(w, rdr)
 		zlog.Trace().
 			Err(err).
-			Int64(EcsHttpResponseBodyBytes, nWritten).
+			Int64(EcsHTTPResponseBodyBytes, nWritten).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("Response sent")
 
@@ -100,8 +100,8 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHttpResponseCode, resp.StatusCode).
-			Int64(EcsHttpResponseBodyBytes, nWritten).
+			Int(EcsHTTPResponseCode, resp.StatusCode).
+			Int64(EcsHTTPResponseBodyBytes, nWritten).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail artifact")
 
@@ -136,12 +136,6 @@ func (at ArtifactT) handleArtifacts(zlog *zerolog.Logger, r *http.Request, id, s
 	defer dfunc()
 
 	return at.processRequest(r.Context(), *zlog, agent, id, sha2)
-}
-
-type artHandler struct {
-	zlog   zerolog.Logger
-	bulker bulk.Bulk
-	c      cache.Cache
 }
 
 func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {

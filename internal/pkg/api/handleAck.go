@@ -64,11 +64,11 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 
 	id := ps.ByName("id")
 
-	reqId := r.Header.Get(logger.HeaderRequestID)
+	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
 		Str(LogAgentID, id).
-		Str(EcsHttpRequestId, reqId).
+		Str(EcsHTTPRequestID, reqID).
 		Logger()
 
 	err := rt.ack.handleAcks(&zlog, w, r, id)
@@ -79,7 +79,7 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHttpResponseCode, resp.StatusCode).
+			Int(EcsHTTPResponseCode, resp.StatusCode).
 			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail ACK")
 
@@ -165,10 +165,10 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 	return nil
 }
 
-func eventToActionResult(agentId string, ev Event) (acr model.ActionResult) {
+func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
 	return model.ActionResult{
-		ActionId:        ev.ActionId,
-		AgentId:         agentId,
+		ActionId:        ev.ActionID,
+		AgentId:         agentID,
 		ActionInputType: ev.ActionInputType,
 		StartedAt:       ev.StartedAt,
 		CompletedAt:     ev.CompletedAt,
@@ -214,15 +214,15 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		log := zlog.With().
 			Str("actionType", ev.Type).
 			Str("actionSubType", ev.SubType).
-			Str("actionId", ev.ActionId).
-			Str("agentId", ev.AgentId).
+			Str("actionId", ev.ActionID).
+			Str("agentId", ev.AgentID).
 			Str("timestamp", ev.Timestamp).
 			Int("n", n).Logger()
 
 		log.Info().Msg("ack event")
 
 		// Check agent id mismatch
-		if ev.AgentId != "" && ev.AgentId != agent.Id {
+		if ev.AgentID != "" && ev.AgentID != agent.Id {
 			log.Error().Msg("agent id mismatch")
 			setResult(n, http.StatusBadRequest)
 			continue
@@ -230,10 +230,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 		// Check if this is the policy change ack
 		// The policy change acks are handled after actions
-		if strings.HasPrefix(ev.ActionId, "policy:") {
+		if strings.HasPrefix(ev.ActionID, "policy:") {
 			if ev.Error == "" {
 				// only added if no error on action
-				policyAcks = append(policyAcks, ev.ActionId)
+				policyAcks = append(policyAcks, ev.ActionID)
 				policyIdxs = append(policyIdxs, n)
 			}
 			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
@@ -243,10 +243,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 		// Process non-policy change actions
 		// Find matching action by action ID
-		action, ok := ack.cache.GetAction(ev.ActionId)
+		action, ok := ack.cache.GetAction(ev.ActionID)
 		if !ok {
 			// Find action by ID
-			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionId)
+			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionID)
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
 				setError(n, err)
@@ -470,14 +470,14 @@ const kUpdatePolicyPrefix = `{"script":{"lang":"painless","source":"if (ctx._sou
 	dl.FieldUpdatedAt +
 	` = params.ts;} else {ctx.op = \"noop\";}","params": {"id":"`
 
-func makeUpdatePolicyBody(policyId string, newRev, coordIdx int64) []byte {
+func makeUpdatePolicyBody(policyID string, newRev, coordIdx int64) []byte {
 
 	var buf bytes.Buffer
 	buf.Grow(410)
 
 	//  Not pretty, but fast.
 	buf.WriteString(kUpdatePolicyPrefix)
-	buf.WriteString(policyId)
+	buf.WriteString(policyID)
 	buf.WriteString(`","rev":`)
 	buf.WriteString(strconv.FormatInt(newRev, 10))
 	buf.WriteString(`,"coord":`)

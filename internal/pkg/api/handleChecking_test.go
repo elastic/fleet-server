@@ -30,8 +30,8 @@ func TestConvertActions(t *testing.T) {
 	resp, token := convertActions("agent-id", actions)
 	assert.Equal(t, resp, []ActionResp{
 		{
-			AgentId: "agent-id",
-			Id:      "1234",
+			AgentID: "agent-id",
+			ID:      "1234",
 			Data:    json.RawMessage(nil),
 		},
 	})

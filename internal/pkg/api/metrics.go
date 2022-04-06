@@ -18,13 +18,14 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 var (
 	registry *monitoring.Registry
 
-	cntHttpNew   *monitoring.Uint
-	cntHttpClose *monitoring.Uint
+	cntHTTPNew   *monitoring.Uint
+	cntHTTPClose *monitoring.Uint
 
 	cntCheckin   routeStats
 	cntEnroll    routeStats
@@ -85,10 +86,14 @@ func (rt *routeStats) Register(registry *monitoring.Registry) {
 }
 
 func init() {
-	metrics.SetupMetrics(build.ServiceName)
+	err := metrics.SetupMetrics(build.ServiceName)
+	if err != nil {
+		log.Error().Err(err).Msg("unable to initialize metrics")
+	}
+
 	registry = monitoring.Default.NewRegistry("http_server")
-	cntHttpNew = monitoring.NewUint(registry, "tcp_open")
-	cntHttpClose = monitoring.NewUint(registry, "tcp_close")
+	cntHTTPNew = monitoring.NewUint(registry, "tcp_open")
+	cntHTTPClose = monitoring.NewUint(registry, "tcp_close")
 
 	routesRegistry := registry.NewRegistry("routes")
 

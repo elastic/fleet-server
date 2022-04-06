@@ -21,10 +21,10 @@ import (
 
 // Alias logger constants
 const (
-	EcsHttpRequestId         = logger.EcsHttpRequestId
+	EcsHTTPRequestID         = logger.EcsHttpRequestId
 	EcsEventDuration         = logger.EcsEventDuration
-	EcsHttpResponseCode      = logger.EcsHttpResponseCode
-	EcsHttpResponseBodyBytes = logger.EcsHttpResponseBodyBytes
+	EcsHTTPResponseCode      = logger.EcsHttpResponseCode
+	EcsHTTPResponseBodyBytes = logger.EcsHttpResponseBodyBytes
 
 	LogAPIKeyID       = logger.ApiKeyId
 	LogPolicyID       = logger.PolicyId
@@ -74,7 +74,7 @@ func NewErrorResp(err error) errResp {
 			},
 		},
 		{
-			ErrApiKeyNotEnabled,
+			ErrAPIKeyNotEnabled,
 			errResp{
 				http.StatusUnauthorized,
 				"Unauthorized",

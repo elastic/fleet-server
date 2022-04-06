@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	AGENT_ACTION_SAVED_OBJECT_TYPE = "fleet-agent-actions"
+	AgentActionSavedObjectType = "fleet-agent-actions"
 )
 
 const (
@@ -35,11 +35,12 @@ const kFleetAccessRolesJSON = `
 }
 `
 
+// AgentAction details agent action payload
 // Wrong: no AAD;
 // This defeats the signature check;
 // can copy from one to another and will dispatch.
 type AgentAction struct {
-	AgentId   string `json:"agent_id"`
+	AgentID   string `json:"agent_id"`
 	Type      string `json:"type"`
 	SentAt    string `json:"sent_at"`
 	CreatedAt string `json:"created_at"`
@@ -48,7 +49,7 @@ type AgentAction struct {
 
 type EnrollRequest struct {
 	Type     string `json:"type"`
-	SharedId string `json:"shared_id"`
+	SharedID string `json:"shared_id"`
 	Meta     struct {
 		User  json.RawMessage `json:"user_provided"`
 		Local json.RawMessage `json:"local"`
@@ -58,13 +59,13 @@ type EnrollRequest struct {
 type EnrollResponseItem struct {
 	ID             string          `json:"id"`
 	Active         bool            `json:"active"`
-	PolicyId       string          `json:"policy_id"`
+	PolicyID       string          `json:"policy_id"`
 	Type           string          `json:"type"`
 	EnrolledAt     string          `json:"enrolled_at"`
 	UserMeta       json.RawMessage `json:"user_provided_metadata"`
 	LocalMeta      json.RawMessage `json:"local_metadata"`
 	Actions        []interface{}   `json:"actions"`
-	AccessApiKeyId string          `json:"access_api_key_id"`
+	AccessAPIKeyID string          `json:"access_api_key_id"`
 	AccessAPIKey   string          `json:"access_api_key"`
 	Status         string          `json:"status"`
 }
@@ -131,10 +132,10 @@ func (a *AckResponse) SetError(pos int, err error) {
 }
 
 type ActionResp struct {
-	AgentId   string      `json:"agent_id"`
+	AgentID   string      `json:"agent_id"`
 	CreatedAt string      `json:"created_at"`
 	Data      interface{} `json:"data"`
-	Id        string      `json:"id"`
+	ID        string      `json:"id"`
 	Type      string      `json:"type"`
 	InputType string      `json:"input_type"`
 	Timeout   int64       `json:"timeout,omitempty"`
@@ -143,11 +144,11 @@ type ActionResp struct {
 type Event struct {
 	Type            string          `json:"type"`
 	SubType         string          `json:"subtype"`
-	AgentId         string          `json:"agent_id"`
-	ActionId        string          `json:"action_id"`
+	AgentID         string          `json:"agent_id"`
+	ActionID        string          `json:"action_id"`
 	ActionInputType string          `json:"action_input_type"`
-	PolicyId        string          `json:"policy_id"`
-	StreamId        string          `json:"stream_id"`
+	PolicyID        string          `json:"policy_id"`
+	StreamID        string          `json:"stream_id"`
 	Timestamp       string          `json:"timestamp"`
 	Message         string          `json:"message"`
 	Payload         json.RawMessage `json:"payload,omitempty"`
