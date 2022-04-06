@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/logp"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/server"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/server"
 	"github.com/elastic/go-ucfg"
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
@@ -193,7 +193,7 @@ func newDebugLogger(t *testing.T) *logger.Logger {
 
 func createAndStartControlServer(t *testing.T, handler server.Handler, extraConfigs ...func(*server.Server)) *server.Server {
 	t.Helper()
-	srv, err := server.New(newDebugLogger(t), "localhost:0", handler)
+	srv, err := server.New(newDebugLogger(t), "localhost:0", handler, nil)
 	require.NoError(t, err)
 	for _, extra := range extraConfigs {
 		extra(srv)
