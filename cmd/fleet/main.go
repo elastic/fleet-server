@@ -481,10 +481,10 @@ LOOP:
 		ech := make(chan error, 2)
 
 		if started {
-			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil) //nolint:errcheck,gosec // unclear on what should we do if updating the status fails?
+			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		} else {
 			started = true
-			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil) //nolint:errcheck,gosec // unclear on what should we do if updating the status fails?
+			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		}
 
 		// Create or recreate cache
@@ -532,11 +532,11 @@ LOOP:
 		case newCfg = <-f.cfgCh:
 			log.Info().Msg("Server configuration update")
 		case err := <-ech:
-			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck,gosec // unclear on what should we do if updating the status fails?
+			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			log.Error().Err(err).Msg("Fleet Server failed")
 			return err
 		case <-ctx.Done():
-			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil) //nolint:errcheck,gosec // unclear on what should we do if updating the status fails?
+			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			break LOOP
 		}
 	}
@@ -912,16 +912,16 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) (*apm.Tracer, error
 		envCACert           = "ELASTIC_APM_SERVER_CA_CERT_FILE"
 	)
 	if cfg.TLS.SkipVerify {
-		os.Setenv(envVerifyServerCert, "false") //nolint:errcheck,gosec // what do we do if env var operation fail
-		defer os.Unsetenv(envVerifyServerCert)  //nolint:errcheck // what do we do if env var operation fail
+		os.Setenv(envVerifyServerCert, "false")
+		defer os.Unsetenv(envVerifyServerCert)
 	}
 	if cfg.TLS.ServerCertificate != "" {
-		os.Setenv(envServerCert, cfg.TLS.ServerCertificate) //nolint:errcheck,gosec // what do we do if env var operation fail
-		defer os.Unsetenv(envServerCert)                    //nolint:errcheck // what do we do if env var operation fail
+		os.Setenv(envServerCert, cfg.TLS.ServerCertificate)
+		defer os.Unsetenv(envServerCert)
 	}
 	if cfg.TLS.ServerCA != "" {
-		os.Setenv(envCACert, cfg.TLS.ServerCA) //nolint:errcheck,gosec // what do we do if env var operation fail
-		defer os.Unsetenv(envCACert)           //nolint:errcheck // what do we do if env var operation fail
+		os.Setenv(envCACert, cfg.TLS.ServerCA)
+		defer os.Unsetenv(envCACert)
 	}
 	transport, err := apmtransport.NewHTTPTransport()
 	if err != nil {
