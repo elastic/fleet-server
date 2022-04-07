@@ -117,7 +117,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str(EcsHTTPRequestID, reqID).
+		Str(ECSHTTPRequestID, reqID).
 		Str("mod", kStatusMod).
 		Logger()
 
@@ -128,8 +128,8 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHTTPResponseCode, resp.StatusCode).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int(ECSHTTPResponseCode, resp.StatusCode).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail status")
 
 		if rerr := resp.Write(w); rerr != nil {
@@ -141,8 +141,8 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 	data, err := json.Marshal(&resp)
 	if err != nil {
 		code := http.StatusInternalServerError
-		zlog.Error().Err(err).Int(EcsHTTPResponseCode, code).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
+		zlog.Error().Err(err).Int(ECSHTTPResponseCode, code).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
 		http.Error(w, "", code)
 		return
 	}
@@ -156,14 +156,14 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 	var nWritten int
 	if nWritten, err = w.Write(data); err != nil {
 		if !errors.Is(err, context.Canceled) {
-			zlog.Error().Err(err).Int(EcsHTTPResponseCode, code).
-				Int64(EcsEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
+			zlog.Error().Err(err).Int(ECSHTTPResponseCode, code).
+				Int64(ECSEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
 		}
 	}
 
 	cntStatus.bodyOut.Add(uint64(nWritten))
 	zlog.Debug().
-		Int(EcsHTTPResponseBodyBytes, nWritten).
-		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Int(ECSHTTPResponseBodyBytes, nWritten).
+		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("ok status")
 }

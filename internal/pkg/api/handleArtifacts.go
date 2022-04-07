@@ -75,7 +75,7 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 
 	zlog := log.With().
 		Str(LogAgentID, id).
-		Str(EcsHTTPRequestID, reqID).
+		Str(ECSHTTPRequestID, reqID).
 		Str("sha2", sha2).
 		Str("remoteAddr", r.RemoteAddr).
 		Logger()
@@ -87,8 +87,8 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 		nWritten, err = io.Copy(w, rdr)
 		zlog.Trace().
 			Err(err).
-			Int64(EcsHTTPResponseBodyBytes, nWritten).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int64(ECSHTTPResponseBodyBytes, nWritten).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("Response sent")
 
 		cntArtifacts.bodyOut.Add(uint64(nWritten))
@@ -100,9 +100,9 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHTTPResponseCode, resp.StatusCode).
-			Int64(EcsHTTPResponseBodyBytes, nWritten).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int(ECSHTTPResponseCode, resp.StatusCode).
+			Int64(ECSHTTPResponseBodyBytes, nWritten).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail artifact")
 
 		if err := resp.Write(w); err != nil {
@@ -259,7 +259,7 @@ func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, iden
 
 	zlog.Info().
 		Err(err).
-		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("fetch artifact")
 
 	return artifact, errors.Wrap(err, "fetchArtifact")

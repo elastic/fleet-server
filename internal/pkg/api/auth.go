@@ -50,16 +50,16 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 		log.Info().
 			Err(err).
 			Str(LogAPIKeyID, key.Id).
-			Str(EcsHTTPRequestID, reqID).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Str(ECSHTTPRequestID, reqID).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey fail authentication")
 		return nil, err
 	}
 
 	log.Trace().
 		Str("id", key.Id).
-		Str(EcsHTTPRequestID, reqID).
-		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Str(ECSHTTPRequestID, reqID).
+		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Str("userName", info.UserName).
 		Strs("roles", info.Roles).
 		Bool("enabled", info.Enabled).
@@ -72,8 +72,8 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 		log.Info().
 			Err(err).
 			Str("id", key.Id).
-			Str(EcsHTTPRequestID, reqID).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Str(ECSHTTPRequestID, reqID).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey not enabled")
 	}
 
@@ -91,7 +91,7 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 
 	w := log.With().
 		Str(LogAccessAPIKeyID, key.Id).
-		Str(EcsHTTPRequestID, r.Header.Get(logger.HeaderRequestID))
+		Str(ECSHTTPRequestID, r.Header.Get(logger.HeaderRequestID))
 
 	if id != nil {
 		w = w.Str(LogAgentID, *id)
@@ -103,7 +103,7 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 
 	if authTime.Sub(start) > time.Second {
 		zlog.Debug().
-			Int64(EcsEventDuration, authTime.Sub(start).Nanoseconds()).
+			Int64(ECSEventDuration, authTime.Sub(start).Nanoseconds()).
 			Msg("authApiKey slow")
 	}
 
@@ -123,7 +123,7 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 
 	if findTime.Sub(authTime) > time.Second {
 		zlog.Debug().
-			Int64(EcsEventDuration, findTime.Sub(authTime).Nanoseconds()).
+			Int64(ECSEventDuration, findTime.Sub(authTime).Nanoseconds()).
 			Msg("findAgentByApiKeyId slow")
 	}
 

@@ -56,7 +56,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 
 	zlog := log.With().
 		Str(LogAgentID, id).
-		Str(EcsHTTPRequestID, reqID).
+		Str(ECSHTTPRequestID, reqID).
 		Logger()
 
 	err := rt.ct.handleCheckin(&zlog, w, r, id)
@@ -73,8 +73,8 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHTTPResponseCode, resp.StatusCode).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int(ECSHTTPResponseCode, resp.StatusCode).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail checkin")
 
 		if err := resp.Write(w); err != nil {

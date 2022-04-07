@@ -80,7 +80,7 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str(EcsHTTPRequestID, reqID).
+		Str(ECSHTTPRequestID, reqID).
 		Str("mod", kEnrollMod).
 		Logger()
 
@@ -110,8 +110,8 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHTTPResponseCode, resp.StatusCode).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int(ECSHTTPResponseCode, resp.StatusCode).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail enroll")
 
 		if rerr := resp.Write(w); rerr != nil {
@@ -124,7 +124,7 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 		cntEnroll.IncError(err)
 		zlog.Error().
 			Err(err).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail write response")
 	}
 }
@@ -343,8 +343,8 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 		Str(LogAgentID, resp.Item.ID).
 		Str(LogPolicyID, resp.Item.PolicyID).
 		Str(LogAccessAPIKeyID, resp.Item.AccessAPIKeyID).
-		Int(EcsHTTPResponseBodyBytes, numWritten).
-		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Int(ECSHTTPResponseBodyBytes, numWritten).
+		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("Elastic Agent successfully enrolled")
 
 	return nil
