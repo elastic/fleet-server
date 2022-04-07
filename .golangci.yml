@@ -60,7 +60,6 @@ linters:
     - noctx # noctx finds sending http request without context.Context
     - unconvert # Remove unnecessary type conversions
     - wastedassign # wastedassign finds wasted assignment statements.
-    - godox # tool for detection of FIXME, TODO and other comment keywords
 
 # all available settings of specific linters
 linters-settings:

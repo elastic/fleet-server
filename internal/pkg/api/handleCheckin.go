@@ -582,7 +582,7 @@ func calcPollDuration(zlog zerolog.Logger, cfg *config.Server, setupDuration tim
 
 	var jitter time.Duration
 	if cfg.Timeouts.CheckinJitter != 0 {
-		jitter = time.Duration(rand.Int63n(int64(cfg.Timeouts.CheckinJitter)))
+		jitter = time.Duration(rand.Int63n(int64(cfg.Timeouts.CheckinJitter))) //nolint:gosec // jitter time does not need to by generated from a crypto secure source
 		if jitter < pollDuration {
 			pollDuration = pollDuration - jitter
 			zlog.Trace().Dur("poll", pollDuration).Msg("Long poll with jitter")
