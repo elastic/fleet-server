@@ -67,7 +67,7 @@ func TestRun(t *testing.T) {
 	cancel()
 	wg.Wait()
 	require.NoError(t, errFromChan)
-	if errors.Is(err, http.ErrServerClosed) {
+	if !errors.Is(err, http.ErrServerClosed) {
 		require.NoError(t, err)
 	}
 }

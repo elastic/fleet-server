@@ -155,7 +155,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 
 	var nWritten int
 	if nWritten, err = w.Write(data); err != nil {
-		if errors.Is(err, context.Canceled) {
+		if !errors.Is(err, context.Canceled) {
 			zlog.Error().Err(err).Int(EcsHTTPResponseCode, code).
 				Int64(EcsEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
 		}

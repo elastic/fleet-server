@@ -132,7 +132,7 @@ func Run(ctx context.Context, router http.Handler, cfg *config.Server) error {
 		log.Debug().Msgf("Listening on %s", addr)
 
 		go func(_ context.Context, errChan chan error, ln net.Listener) {
-			if err := server.Serve(ln); err != nil && errors.Is(err, http.ErrServerClosed) {
+			if err := server.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				errChan <- err
 			}
 		}(cancelCtx, errChan, ln)
@@ -141,7 +141,7 @@ func Run(ctx context.Context, router http.Handler, cfg *config.Server) error {
 
 	select {
 	case err := <-errChan:
-		if errors.Is(err, context.Canceled) {
+		if !errors.Is(err, context.Canceled) {
 			return err
 		}
 	case <-cancelCtx.Done():

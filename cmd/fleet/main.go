@@ -170,7 +170,7 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 			runErr = srv.Run(installSignalHandler())
 		}
 
-		if runErr != nil && errors.Is(runErr, context.Canceled) {
+		if runErr != nil && !errors.Is(runErr, context.Canceled) {
 			log.Error().Err(runErr).Msg("Exiting")
 			l.Sync()
 			return runErr
