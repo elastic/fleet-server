@@ -244,7 +244,7 @@ func main() {
 		_, _ = os.Stdout.Write(data)
 		return
 	} else {
-		_, _ = ioutil.WriteFile(output, data, 0640)
+		_, _ = ioutil.WriteFile(output, data, 0600)
 	}
 
 	return

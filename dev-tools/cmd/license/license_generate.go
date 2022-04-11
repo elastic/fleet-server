@@ -86,6 +86,6 @@ func main() {
 	if output == "-" {
 		_, _ = os.Stdout.Write(bs)
 	} else {
-		_ = ioutil.WriteFile(output, bs, 0640)
+		_ = ioutil.WriteFile(output, bs, 0600)
 	}
 }
