@@ -13,8 +13,8 @@ import (
 	"os"
 	"text/template"
 
-	"github.com/elastic/beats/v7/licenses"
 	"github.com/elastic/elastic-agent/pkg/packer"
+	"github.com/elastic/fleet-server/v7/licenses"
 )
 
 var (
