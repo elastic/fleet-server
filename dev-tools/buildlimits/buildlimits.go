@@ -241,7 +241,7 @@ func main() {
 	}
 
 	if output == "-" {
-		_ = os.Stdout.Write(data)
+		_, _ = os.Stdout.Write(data)
 		return
 	} else {
 		_, _ = ioutil.WriteFile(output, data, 0640)
