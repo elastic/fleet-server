@@ -73,7 +73,7 @@ func main() {
 	Headers["Elasticv2"] = string(content)
 
 	var buf bytes.Buffer
-	Template.Execute(&buf, data{
+	_ = Template.Execute(&buf, data{
 		License:  Headers["ASL2"],
 		Licenses: Headers,
 	})
@@ -84,8 +84,8 @@ func main() {
 	}
 
 	if output == "-" {
-		os.Stdout.Write(bs)
+		_, _ = os.Stdout.Write(bs)
 	} else {
-		ioutil.WriteFile(output, bs, 0640)
+		_ = ioutil.WriteFile(output, bs, 0640)
 	}
 }

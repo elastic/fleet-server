@@ -241,23 +241,23 @@ func main() {
 	}
 
 	if output == "-" {
-		os.Stdout.Write(data)
+		_ = os.Stdout.Write(data)
 		return
 	} else {
-		ioutil.WriteFile(output, data, 0640)
+		_, _ = ioutil.WriteFile(output, data, 0640)
 	}
 
 	return
 }
 
-func gen(path string, l string) ([]byte, error) {
+func gen(_ string, l string) ([]byte, error) {
 	pack, files, err := packer.Pack(input)
 	if err != nil {
 		return nil, err
 	}
 
 	var buf bytes.Buffer
-	tmpl.Execute(&buf, struct {
+	_ = tmpl.Execute(&buf, struct {
 		Pack    string
 		Files   []string
 		License string
