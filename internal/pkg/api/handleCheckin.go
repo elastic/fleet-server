@@ -40,7 +40,7 @@ import (
 var (
 	ErrAgentNotFound    = errors.New("agent not found")
 	ErrNoPolicyOutput   = errors.New("output section not found")
-	ErrFailInjectAPIKey = errors.New("fail inject api key")
+	ErrFailInjectAPIKey = errors.New("failure to inject api key")
 )
 
 const (
@@ -63,7 +63,7 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 
 	if err != nil {
 		cntCheckin.IncError(err)
-		resp := NewErrorResp(err)
+		resp := NewHTTPErrResp(err)
 
 		// Log this as warn for visibility that limit has been reached.
 		// This allows customers to tune the configuration on detection of threshold.
@@ -213,7 +213,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer func() {
 		err := ct.pm.Unsubscribe(sub)
 		if err != nil {
-			zlog.Error().Err(err).Str("policy_id", agent.PolicyId).Msg("unable to unsubscribe")
+			zlog.Error().Err(err).Str("policy_id", agent.PolicyId).Msg("unable to unsubscribe from policy")
 		}
 	}()
 

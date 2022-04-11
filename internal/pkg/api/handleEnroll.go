@@ -106,7 +106,7 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 
 	if err != nil {
 		cntEnroll.IncError(err)
-		resp := NewErrorResp(err)
+		resp := NewHTTPErrResp(err)
 
 		zlog.WithLevel(resp.Level).
 			Err(err).

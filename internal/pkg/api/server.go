@@ -39,7 +39,7 @@ func diagConn(c net.Conn, s http.ConnState) {
 	}
 }
 
-// Run runst the passed router with the config.
+// Run runs the passed router with the config.
 func Run(ctx context.Context, router http.Handler, cfg *config.Server) error {
 	listeners := cfg.BindEndpoints()
 	rdto := cfg.Timeouts.Read

@@ -33,24 +33,24 @@ const (
 	LogAccessAPIKeyID = logger.AccessApiKeyId
 )
 
-// ErrResp is an HTTP error response
-type ErrResp struct {
+// HTTPErrResp is an HTTP error response
+type HTTPErrResp struct {
 	StatusCode int           `json:"statusCode"`
 	Error      string        `json:"error"`
 	Message    string        `json:"message,omitempty"`
 	Level      zerolog.Level `json:"-"`
 }
 
-// NewErrorResp creates an ErrResp from a go error
-func NewErrorResp(err error) ErrResp {
+// NewHTTPErrResp creates an ErrResp from a go error
+func NewHTTPErrResp(err error) HTTPErrResp {
 
 	errTable := []struct {
 		target error
-		meta   ErrResp
+		meta   HTTPErrResp
 	}{
 		{
 			ErrAgentNotFound,
-			ErrResp{
+			HTTPErrResp{
 				http.StatusNotFound,
 				"AgentNotFound",
 				"agent could not be found",
@@ -59,7 +59,7 @@ func NewErrorResp(err error) ErrResp {
 		},
 		{
 			limit.ErrRateLimit,
-			ErrResp{
+			HTTPErrResp{
 				http.StatusTooManyRequests,
 				"RateLimit",
 				"exceeded the rate limit",
@@ -68,7 +68,7 @@ func NewErrorResp(err error) ErrResp {
 		},
 		{
 			limit.ErrMaxLimit,
-			ErrResp{
+			HTTPErrResp{
 				http.StatusTooManyRequests,
 				"MaxLimit",
 				"exceeded the max limit",
@@ -77,7 +77,7 @@ func NewErrorResp(err error) ErrResp {
 		},
 		{
 			ErrAPIKeyNotEnabled,
-			ErrResp{
+			HTTPErrResp{
 				http.StatusUnauthorized,
 				"Unauthorized",
 				"ApiKey not enabled",
@@ -86,7 +86,7 @@ func NewErrorResp(err error) ErrResp {
 		},
 		{
 			context.Canceled,
-			ErrResp{
+			HTTPErrResp{
 				http.StatusServiceUnavailable,
 				"ServiceUnavailable",
 				"server is stopping",
@@ -95,7 +95,7 @@ func NewErrorResp(err error) ErrResp {
 		},
 		{
 			ErrInvalidUserAgent,
-			ErrResp{
+			HTTPErrResp{
 				http.StatusBadRequest,
 				"InvalidUserAgent",
 				"user-agent is invalid",
@@ -104,7 +104,7 @@ func NewErrorResp(err error) ErrResp {
 		},
 		{
 			ErrUnsupportedVersion,
-			ErrResp{
+			HTTPErrResp{
 				http.StatusBadRequest,
 				"UnsupportedVersion",
 				"version is not supported",
@@ -113,7 +113,7 @@ func NewErrorResp(err error) ErrResp {
 		},
 		{
 			dl.ErrNotFound,
-			ErrResp{
+			HTTPErrResp{
 				http.StatusNotFound,
 				"NotFound",
 				"not found",
@@ -122,7 +122,7 @@ func NewErrorResp(err error) ErrResp {
 		},
 		{
 			ErrorThrottle,
-			ErrResp{
+			HTTPErrResp{
 				http.StatusTooManyRequests,
 				"TooManyRequests",
 				"too many requests",
@@ -131,7 +131,7 @@ func NewErrorResp(err error) ErrResp {
 		},
 		{
 			os.ErrDeadlineExceeded,
-			ErrResp{
+			HTTPErrResp{
 				http.StatusRequestTimeout,
 				"RequestTimeout",
 				"timeout on request",
@@ -149,7 +149,7 @@ func NewErrorResp(err error) ErrResp {
 	// Check if we have encountered a connectivity error
 	// Predicate taken from https://github.com/golang/go/blob/go1.17.5/src/net/dial_test.go#L798
 	if strings.Contains(err.Error(), "connection refused") {
-		return ErrResp{
+		return HTTPErrResp{
 			http.StatusServiceUnavailable,
 			"ServiceUnavailable",
 			"Fleet server unable to communicate with Elasticsearch",
@@ -158,7 +158,7 @@ func NewErrorResp(err error) ErrResp {
 	}
 
 	// Default
-	return ErrResp{
+	return HTTPErrResp{
 		StatusCode: http.StatusBadRequest,
 		Error:      "BadRequest",
 		Level:      zerolog.InfoLevel,
@@ -166,7 +166,7 @@ func NewErrorResp(err error) ErrResp {
 }
 
 // Write will serialize the ErrResp to an http response and include the proper headers.
-func (er ErrResp) Write(w http.ResponseWriter) error {
+func (er HTTPErrResp) Write(w http.ResponseWriter) error {
 	data, err := json.Marshal(&er)
 	if err != nil {
 		return err

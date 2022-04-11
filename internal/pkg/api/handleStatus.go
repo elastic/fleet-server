@@ -124,7 +124,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 	resp, status, err := rt.st.handleStatus(&zlog, r, &rt)
 	if err != nil {
 		cntStatus.IncError(err)
-		resp := NewErrorResp(err)
+		resp := NewHTTPErrResp(err)
 
 		zlog.WithLevel(resp.Level).
 			Err(err).

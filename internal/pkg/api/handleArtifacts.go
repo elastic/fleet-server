@@ -96,7 +96,7 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 
 	if err != nil {
 		cntArtifacts.IncError(err)
-		resp := NewErrorResp(err)
+		resp := NewHTTPErrResp(err)
 
 		zlog.WithLevel(resp.Level).
 			Err(err).

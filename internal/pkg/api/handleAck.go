@@ -75,7 +75,7 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 
 	if err != nil {
 		cntAcks.IncError(err)
-		resp := NewErrorResp(err)
+		resp := NewHTTPErrResp(err)
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
