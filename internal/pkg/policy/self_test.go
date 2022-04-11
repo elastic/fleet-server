@@ -71,7 +71,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		return nil
 	}, ftesting.RetrySleep(1*time.Second))
 
-	PolicyID := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 	rId := xid.New().String()
 	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{}})
 	if err != nil {
@@ -83,7 +83,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyID:           PolicyID,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        1,
@@ -131,7 +131,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyID:           PolicyID,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        2,
@@ -227,7 +227,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		return nil
 	}, ftesting.RetrySleep(1*time.Second))
 
-	PolicyID := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 	rId := xid.New().String()
 	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{
 		{
@@ -243,7 +243,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyID:           PolicyID,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        1,
@@ -263,7 +263,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID: xid.New().String(),
 		Name:     "Inactive",
-		PolicyID: PolicyID,
+		PolicyID: policyID,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, inactiveToken)
@@ -304,7 +304,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID: xid.New().String(),
 		Name:     "Active",
-		PolicyID: PolicyID,
+		PolicyID: policyID,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, activeToken)
@@ -348,11 +348,11 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			ID: "agent-id",
 		},
 	}
-	PolicyID := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 	reporter := &FakeReporter{}
 	bulker := ftesting.MockBulk{}
 	mm := mock.NewMockIndexMonitor()
-	monitor := NewSelfMonitor(cfg, bulker, mm, PolicyID, reporter)
+	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
@@ -376,7 +376,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		if status != proto.StateObserved_STARTING {
 			return fmt.Errorf("should be reported as starting; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", PolicyID) {
+		if msg != fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		return nil
@@ -393,7 +393,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyID:           PolicyID,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        2,
@@ -420,7 +420,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		if status != proto.StateObserved_STARTING {
 			return fmt.Errorf("should be reported as starting; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", PolicyID) {
+		if msg != fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		return nil
@@ -441,7 +441,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   2,
 		},
-		PolicyID:           PolicyID,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        1,
@@ -468,7 +468,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		if status != proto.StateObserved_HEALTHY {
 			return fmt.Errorf("should be reported as healthy; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s", PolicyID) {
+		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		return nil
@@ -490,11 +490,11 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 			ID: "",
 		},
 	}
-	PolicyID := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 	reporter := &FakeReporter{}
 	bulker := ftesting.MockBulk{}
 	mm := mock.NewMockIndexMonitor()
-	monitor := NewSelfMonitor(cfg, bulker, mm, PolicyID, reporter)
+	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.checkTime = 100 * time.Millisecond
 
@@ -532,7 +532,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		if status != proto.StateObserved_STARTING {
 			return fmt.Errorf("should be reported as starting; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", PolicyID) {
+		if msg != fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		return nil
@@ -553,7 +553,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyID:           PolicyID,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        1,
@@ -573,7 +573,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID: xid.New().String(),
 		Name:     "Inactive",
-		PolicyID: PolicyID,
+		PolicyID: policyID,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, inactiveToken)
@@ -599,7 +599,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		if status != proto.StateObserved_STARTING {
 			return fmt.Errorf("should be reported as starting; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", PolicyID) {
+		if msg != fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		return nil
@@ -614,7 +614,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID: xid.New().String(),
 		Name:     "Active",
-		PolicyID: PolicyID,
+		PolicyID: policyID,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, activeToken)
@@ -626,7 +626,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		if status != proto.StateObserved_DEGRADED {
 			return fmt.Errorf("should be reported as degraded; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s; missing config fleet.agent.id (expected during bootstrap process)", PolicyID) {
+		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s; missing config fleet.agent.id (expected during bootstrap process)", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		if payload == nil {

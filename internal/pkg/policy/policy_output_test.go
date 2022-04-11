@@ -103,7 +103,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		}
 
 		testAgent := &model.Agent{
-			DefaultApiKey:               "test_id:EXISTING-KEY",
+			DefaultAPIKey:               "test_id:EXISTING-KEY",
 			PolicyOutputPermissionsHash: hashPerm,
 		}
 
@@ -113,7 +113,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		key, ok := policyMap.GetMap("test output")["api_key"].(string)
 
 		require.True(t, ok, "unable to case api key")
-		require.Equal(t, testAgent.DefaultApiKey, key)
+		require.Equal(t, testAgent.DefaultAPIKey, key)
 		require.Equal(t, len(bulker.ArgumentData.Update), 0, "update should not be called")
 	})
 
@@ -137,7 +137,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		}
 
 		testAgent := &model.Agent{
-			DefaultApiKey:               "test_id:EXISTING-KEY",
+			DefaultAPIKey:               "test_id:EXISTING-KEY",
 			PolicyOutputPermissionsHash: "old-HASH",
 		}
 

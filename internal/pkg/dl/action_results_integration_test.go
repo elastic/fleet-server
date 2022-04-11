@@ -51,8 +51,8 @@ func createRandomActionResults() ([]model.ActionResult, error) {
 				Id: xid.New().String(),
 			},
 			Timestamp: r.Time(now, 2, 5, time.Second, rnd.TimeBefore).Format(time.RFC3339),
-			AgentId:   uuid.Must(uuid.NewV4()).String(),
-			ActionId:  uuid.Must(uuid.NewV4()).String(),
+			AgentID:   uuid.Must(uuid.NewV4()).String(),
+			ActionID:  uuid.Must(uuid.NewV4()).String(),
 			Error:     errmsg,
 			Data:      data,
 		}
@@ -92,7 +92,7 @@ type ActionsResults []model.ActionResult
 
 func (acrs ActionsResults) find(ar model.ActionResult) *model.ActionResult {
 	for _, acr := range acrs {
-		if acr.ActionId == ar.ActionId {
+		if acr.ActionID == ar.ActionID {
 			return &acr
 		}
 	}

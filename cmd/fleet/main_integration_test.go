@@ -86,7 +86,7 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	// add a real default fleet server policy
 	policyId := uuid.Must(uuid.NewV4()).String()
 	_, err := dl.CreatePolicy(ctx, bulker, model.Policy{
-		PolicyId:           policyId,
+		PolicyID:           policyId,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
 		Data:               policyData,
@@ -94,11 +94,11 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	require.NoError(t, err)
 
 	// add entry for enrollment key (doesn't have to be a real key)
-	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentApiKey{
+	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentAPIKey{
 		Name:     "Default",
-		ApiKey:   "keyvalue",
-		ApiKeyId: "keyid",
-		PolicyId: policyId,
+		APIKey:   "keyvalue",
+		APIKeyID: "keyid",
+		PolicyID: policyId,
 		Active:   true,
 	})
 	require.NoError(t, err)

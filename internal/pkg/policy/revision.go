@@ -22,7 +22,7 @@ type Revision struct {
 // RevisionFromPolicy creates the revision from the policy.
 func RevisionFromPolicy(policy model.Policy) Revision {
 	return Revision{
-		PolicyId:       policy.PolicyId,
+		PolicyId:       policy.PolicyID,
 		RevisionIdx:    policy.RevisionIdx,
 		CoordinatorIdx: policy.CoordinatorIdx,
 	}

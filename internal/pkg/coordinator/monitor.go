@@ -180,7 +180,7 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 			// policy revision was inserted by coordinator so this monitor ignores it
 			continue
 		}
-		p, ok := m.policies[policy.PolicyId]
+		p, ok := m.policies[policy.PolicyID]
 		if ok {
 			// not a new policy
 			if p.cord != nil {
@@ -228,7 +228,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	if len(policies) > 0 {
 		ids := make([]string, len(policies))
 		for i, p := range policies {
-			ids[i] = p.PolicyId
+			ids[i] = p.PolicyID
 		}
 		leaders, err = dl.SearchPolicyLeaders(ctx, m.bulker, ids, dl.WithIndexName(m.leadersIndex))
 		if err != nil {
@@ -242,7 +242,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	var lead []model.Policy
 	now := time.Now().UTC()
 	for _, policy := range policies {
-		leader, ok := leaders[policy.PolicyId]
+		leader, ok := leaders[policy.PolicyID]
 		if !ok {
 			// new policy want to try to take leadership
 			lead = append(lead, policy)
@@ -261,14 +261,14 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	// take/keep leadership and start new coordinators
 	res := make(chan policyT)
 	for _, p := range lead {
-		pt, _ := m.policies[p.PolicyId]
-		pt.id = p.PolicyId
+		pt, _ := m.policies[p.PolicyID]
+		pt.id = p.PolicyID
 		go func(p model.Policy, pt policyT) {
 			defer func() {
 				res <- pt
 			}()
 
-			l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
+			l := m.log.With().Str(dl.FieldPolicyID, pt.id).Logger()
 			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.version, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l.Err(err).Msg("failed to take ownership")
@@ -334,7 +334,7 @@ func (m *monitorT) releaseLeadership() {
 			defer cancel()
 			err := dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
-				l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
+				l := m.log.With().Str(dl.FieldPolicyID, pt.id).Logger()
 				l.Err(err).Msg("failed to release leadership")
 			}
 			wg.Done()
@@ -397,7 +397,7 @@ func (m *monitorT) getIPs() ([]string, error) {
 
 func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *model.Policy) {
 	u := uuid.Must(uuid.NewV4())
-	l := m.log.With().Str(dl.FieldPolicyId, pt.id).Str("unenroller_uuid", u.String()).Logger()
+	l := m.log.With().Str(dl.FieldPolicyID, pt.id).Str("unenroller_uuid", u.String()).Logger()
 	unenrollTimeout := time.Duration(p.UnenrollTimeout) * time.Second
 	if unenrollTimeout != pt.unenrollTimeout {
 		// unenroll timeout changed
@@ -491,7 +491,7 @@ func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyId string, u
 		if err != nil {
 			return err
 		}
-		agentIds[i] = agent.ID
+		agentIds[i] = agent.Id
 	}
 
 	zlog.Info().
@@ -516,7 +516,7 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	apiKeys := getAPIKeyIDs(agent)
 
 	zlog = zlog.With().
-		Str(logger.AgentId, agent.ID).
+		Str(logger.AgentId, agent.Id).
 		Strs(logger.ApiKeyId, apiKeys).
 		Logger()
 
@@ -529,7 +529,7 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 			return err
 		}
 	}
-	if err = bulker.Update(ctx, agentsIndex, agent.ID, body, bulk.WithRefresh()); err != nil {
+	if err = bulker.Update(ctx, agentsIndex, agent.Id, body, bulk.WithRefresh()); err != nil {
 		zlog.Error().Err(err).Msg("Fail unenrollAgent record update")
 	}
 

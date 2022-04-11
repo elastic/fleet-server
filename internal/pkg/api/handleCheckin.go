@@ -436,7 +436,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Logger()
 
 	// Repull and decode the agent object.  Do not trust the cache.
-	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldId, agentID)
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail find agent record")
 		return nil, err
