@@ -5,10 +5,11 @@
 //go:build !integration
 // +build !integration
 
-package fleet
+package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 	"testing"
@@ -25,7 +26,7 @@ import (
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
-func TestRunServer(t *testing.T) {
+func TestRun(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -53,7 +54,7 @@ func TestRunServer(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		err = runServer(ctx, router, cfg)
+		err = Run(ctx, router, cfg)
 		wg.Done()
 	}()
 	var errFromChan error
@@ -66,7 +67,7 @@ func TestRunServer(t *testing.T) {
 	cancel()
 	wg.Wait()
 	require.NoError(t, errFromChan)
-	if err != http.ErrServerClosed {
+	if !errors.Is(err, http.ErrServerClosed) {
 		require.NoError(t, err)
 	}
 }

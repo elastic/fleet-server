@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package api
 
 import (
 	"context"
@@ -11,19 +11,21 @@ import (
 	"github.com/elastic/beats/v7/libbeat/cmd/instance/metrics"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/monitoring"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 var (
 	registry *monitoring.Registry
 
-	cntHttpNew   *monitoring.Uint
-	cntHttpClose *monitoring.Uint
+	cntHTTPNew   *monitoring.Uint
+	cntHTTPClose *monitoring.Uint
 
 	cntCheckin   routeStats
 	cntEnroll    routeStats
@@ -32,13 +34,13 @@ var (
 	cntArtifacts artifactStats
 )
 
-func (f *FleetServer) initMetrics(ctx context.Context, cfg *config.Config) (*api.Server, error) {
+func InitMetrics(ctx context.Context, cfg *config.Config, bi build.Info) (*api.Server, error) {
 	registry := monitoring.GetNamespace("info").GetRegistry()
 	if registry.Get("version") == nil {
-		monitoring.NewString(registry, "version").Set(f.bi.Version)
+		monitoring.NewString(registry, "version").Set(bi.Version)
 	}
 	if registry.Get("name") == nil {
-		monitoring.NewString(registry, "name").Set(kServiceName)
+		monitoring.NewString(registry, "name").Set(build.ServiceName)
 	}
 
 	if !cfg.HTTP.Enabled {
@@ -84,10 +86,14 @@ func (rt *routeStats) Register(registry *monitoring.Registry) {
 }
 
 func init() {
-	metrics.SetupMetrics(kServiceName)
+	err := metrics.SetupMetrics(build.ServiceName)
+	if err != nil {
+		log.Error().Err(err).Msg("unable to initialize metrics")
+	}
+
 	registry = monitoring.Default.NewRegistry("http_server")
-	cntHttpNew = monitoring.NewUint(registry, "tcp_open")
-	cntHttpClose = monitoring.NewUint(registry, "tcp_close")
+	cntHTTPNew = monitoring.NewUint(registry, "tcp_open")
+	cntHTTPClose = monitoring.NewUint(registry, "tcp_close")
 
 	routesRegistry := registry.NewRegistry("routes")
 

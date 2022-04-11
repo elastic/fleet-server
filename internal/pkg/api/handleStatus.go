@@ -2,15 +2,17 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package api
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -71,10 +73,10 @@ func (st StatusT) authenticate(r *http.Request) (*apikey.ApiKey, error) {
 	// WARNING: This does not validate that the api key is valid for the Fleet Domain.
 	// An additional check must be executed to validate it is not a random api key.
 	// This check is sufficient for the purposes of this API
-	return authApiKey(r, st.bulk, st.cache)
+	return authAPIKey(r, st.bulk, st.cache)
 }
 
-func (st StatusT) handleStatus(zlog *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, status proto.StateObserved_Status, err error) {
+func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, status proto.StateObserved_Status, err error) {
 	limitF, err := st.limit.Acquire()
 	// When failing to acquire a limiter send an error response.
 	if err != nil {
@@ -90,7 +92,7 @@ func (st StatusT) handleStatus(zlog *zerolog.Logger, r *http.Request, rt *Router
 
 	status = rt.sm.Status()
 	resp = StatusResponse{
-		Name:   kServiceName,
+		Name:   build.ServiceName,
 		Status: status.String(),
 	}
 
@@ -112,22 +114,22 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 	dfunc := cntStatus.IncStart()
 	defer dfunc()
 
-	reqId := r.Header.Get(logger.HeaderRequestID)
+	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
-		Str(EcsHttpRequestId, reqId).
+		Str(ECSHTTPRequestID, reqID).
 		Str("mod", kStatusMod).
 		Logger()
 
 	resp, status, err := rt.st.handleStatus(&zlog, r, &rt)
 	if err != nil {
 		cntStatus.IncError(err)
-		resp := NewErrorResp(err)
+		resp := NewHTTPErrResp(err)
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHttpResponseCode, resp.StatusCode).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int(ECSHTTPResponseCode, resp.StatusCode).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail status")
 
 		if rerr := resp.Write(w); rerr != nil {
@@ -139,8 +141,8 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 	data, err := json.Marshal(&resp)
 	if err != nil {
 		code := http.StatusInternalServerError
-		zlog.Error().Err(err).Int(EcsHttpResponseCode, code).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
+		zlog.Error().Err(err).Int(ECSHTTPResponseCode, code).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
 		http.Error(w, "", code)
 		return
 	}
@@ -153,15 +155,15 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 
 	var nWritten int
 	if nWritten, err = w.Write(data); err != nil {
-		if err != context.Canceled {
-			zlog.Error().Err(err).Int(EcsHttpResponseCode, code).
-				Int64(EcsEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
+		if !errors.Is(err, context.Canceled) {
+			zlog.Error().Err(err).Int(ECSHTTPResponseCode, code).
+				Int64(ECSEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
 		}
 	}
 
 	cntStatus.bodyOut.Add(uint64(nWritten))
 	zlog.Debug().
-		Int(EcsHttpResponseBodyBytes, nWritten).
-		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Int(ECSHTTPResponseBodyBytes, nWritten).
+		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("ok status")
 }

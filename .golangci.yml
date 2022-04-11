@@ -60,7 +60,8 @@ linters:
     - noctx # noctx finds sending http request without context.Context
     - unconvert # Remove unnecessary type conversions
     - wastedassign # wastedassign finds wasted assignment statements.
-    - godox # tool for detection of FIXME, TODO and other comment keywords
+    #- godox # tool for detection of FIXME, TODO and other comment keywords
+
 
 # all available settings of specific linters
 linters-settings:
@@ -140,6 +141,8 @@ linters-settings:
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
     go: "1.17"
+    initialisms: ["ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS", "ECS"]
+
 
   unparam:
     # Inspect exported functions, default is false. Set to true if no external program/library imports your code.

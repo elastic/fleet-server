@@ -5,7 +5,7 @@
 //go:build !integration
 // +build !integration
 
-package fleet
+package api
 
 import (
 	"context"
@@ -30,22 +30,22 @@ import (
 func BenchmarkMakeUpdatePolicyBody(b *testing.B) {
 	b.ReportAllocs()
 
-	const policyId = "ed110be4-c2a0-42b8-adc0-94c2f0569207"
+	const policyID = "ed110be4-c2a0-42b8-adc0-94c2f0569207"
 	const newRev = 2
 	const coord = 1
 
 	for n := 0; n < b.N; n++ {
-		makeUpdatePolicyBody(policyId, newRev, coord)
+		makeUpdatePolicyBody(policyID, newRev, coord)
 	}
 }
 
 func TestMakeUpdatePolicyBody(t *testing.T) {
 
-	const policyId = "ed110be4-c2a0-42b8-adc0-94c2f0569207"
+	const policyID = "ed110be4-c2a0-42b8-adc0-94c2f0569207"
 	const newRev = 2
 	const coord = 1
 
-	data := makeUpdatePolicyBody(policyId, newRev, coord)
+	data := makeUpdatePolicyBody(policyID, newRev, coord)
 
 	var i interface{}
 	err := json.Unmarshal(data, &i)
@@ -56,7 +56,7 @@ func TestMakeUpdatePolicyBody(t *testing.T) {
 }
 
 func TestEventToActionResult(t *testing.T) {
-	agentId := "6e9b6655-8cfe-4eb6-9b2f-c10aefae7517"
+	agentID := "6e9b6655-8cfe-4eb6-9b2f-c10aefae7517"
 
 	tests := []struct {
 		name string
@@ -65,7 +65,7 @@ func TestEventToActionResult(t *testing.T) {
 		{
 			name: "success",
 			ev: Event{
-				ActionId:        "1b12dcd8-bde0-4045-92dc-c4b27668d733",
+				ActionID:        "1b12dcd8-bde0-4045-92dc-c4b27668d733",
 				ActionInputType: "osquery",
 				StartedAt:       "2022-02-23T18:26:08.506128Z",
 				CompletedAt:     "2022-02-23T18:26:08.507593Z",
@@ -76,7 +76,7 @@ func TestEventToActionResult(t *testing.T) {
 		{
 			name: "error",
 			ev: Event{
-				ActionId:        "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+				ActionID:        "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				ActionInputType: "osquery",
 				StartedAt:       "2022-02-24T18:26:08.506128Z",
 				CompletedAt:     "2022-02-24T18:26:08.507593Z",
@@ -88,9 +88,9 @@ func TestEventToActionResult(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			acr := eventToActionResult(agentId, tc.ev)
-			assert.Equal(t, agentId, acr.AgentId)
-			assert.Equal(t, tc.ev.ActionId, acr.ActionId)
+			acr := eventToActionResult(agentID, tc.ev)
+			assert.Equal(t, agentID, acr.AgentId)
+			assert.Equal(t, tc.ev.ActionID, acr.ActionId)
 			assert.Equal(t, tc.ev.ActionInputType, acr.ActionInputType)
 			assert.Equal(t, tc.ev.StartedAt, acr.StartedAt)
 			assert.Equal(t, tc.ev.CompletedAt, acr.CompletedAt)
@@ -231,8 +231,8 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action agentID mismatch",
 			events: []Event{
 				{
-					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
-					AgentId:  "ab12dcd8-bde0-4045-92dc-c4b27668d737",
+					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					AgentID:  "ab12dcd8-bde0-4045-92dc-c4b27668d737",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusBadRequest)}),
@@ -242,7 +242,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action empty agent id",
 			events: []Event{
 				{
-					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusNotFound)}),
@@ -252,7 +252,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action find error",
 			events: []Event{
 				{
-					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res:    newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
@@ -263,7 +263,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "policy action",
 			events: []Event{
 				{
-					ActionId: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionID: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(false, []AckResponseItem{{
@@ -275,7 +275,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action found",
 			events: []Event{
 				{
-					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(false, []AckResponseItem{{
@@ -290,7 +290,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action found, create result general error",
 			events: []Event{
 				{
-					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
@@ -306,7 +306,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action found, create result elasticsearch error",
 			events: []Event{
 				{
-					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusServiceUnavailable)}),
@@ -322,7 +322,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "upgrade action found, update agent error",
 			events: []Event{
 				{
-					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 					Type:     "UPGRADE",
 				},
 			},
@@ -342,25 +342,25 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "mixed actions found",
 			events: []Event{
 				{
-					ActionId: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:1",
+					ActionID: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:1",
 					Type:     "POLICY_CHANGE",
 				},
 				{
-					ActionId: "1b12dcd8-bde0-4045-92dc-c4b27668d731",
+					ActionID: "1b12dcd8-bde0-4045-92dc-c4b27668d731",
 					Type:     "UNENROLL",
 				},
 				{
-					ActionId: "1b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionID: "1b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 				{
-					ActionId: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
+					ActionID: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
 					Type:     "UPGRADE",
 				},
 				{
-					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 				{
-					ActionId: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:2",
+					ActionID: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:2",
 					Type:     "POLICY_CHANGE",
 				},
 			},

@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package api
 
 import (
 	"bytes"
@@ -40,7 +40,7 @@ import (
 var (
 	ErrAgentNotFound    = errors.New("agent not found")
 	ErrNoPolicyOutput   = errors.New("output section not found")
-	ErrFailInjectApiKey = errors.New("fail inject api key")
+	ErrFailInjectAPIKey = errors.New("failure to inject api key")
 )
 
 const (
@@ -52,18 +52,18 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 
 	id := ps.ByName("id")
 
-	reqId := r.Header.Get(logger.HeaderRequestID)
+	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
 		Str(LogAgentID, id).
-		Str(EcsHttpRequestId, reqId).
+		Str(ECSHTTPRequestID, reqID).
 		Logger()
 
 	err := rt.ct.handleCheckin(&zlog, w, r, id)
 
 	if err != nil {
 		cntCheckin.IncError(err)
-		resp := NewErrorResp(err)
+		resp := NewHTTPErrResp(err)
 
 		// Log this as warn for visibility that limit has been reached.
 		// This allows customers to tune the configuration on detection of threshold.
@@ -73,8 +73,8 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHttpResponseCode, resp.StatusCode).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int(ECSHTTPResponseCode, resp.StatusCode).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail checkin")
 
 		if err := resp.Write(w); err != nil {
@@ -210,7 +210,12 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	if err != nil {
 		return errors.Wrap(err, "subscribe policy monitor")
 	}
-	defer ct.pm.Unsubscribe(sub)
+	defer func() {
+		err := ct.pm.Unsubscribe(sub)
+		if err != nil {
+			zlog.Error().Err(err).Str("policy_id", agent.PolicyId).Msg("unable to unsubscribe from policy")
+		}
+	}()
 
 	// Update check-in timestamp on timeout
 	tick := time.NewTicker(ct.cfg.Timeouts.CheckinTimestamp)
@@ -232,8 +237,11 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	longPoll := time.NewTicker(pollDuration)
 	defer longPoll.Stop()
 
-	// Intial update on checkin, and any user fields that might have changed
-	ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno, ver)
+	// Initial update on checkin, and any user fields that might have changed
+	err = ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno, ver)
+	if err != nil {
+		zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
+	}
 
 	// Initial fetch for pending actions
 	var (
@@ -270,7 +278,10 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				zlog.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
-				ct.bc.CheckIn(agent.Id, req.Status, nil, nil, ver)
+				err := ct.bc.CheckIn(agent.Id, req.Status, nil, nil, ver)
+				if err != nil {
+					zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
+				}
 			}
 		}
 	}
@@ -279,7 +290,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		zlog.Info().
 			Str("ackToken", ackToken).
 			Str("createdAt", action.CreatedAt).
-			Str("id", action.Id).
+			Str("id", action.ID).
 			Str("type", action.Type).
 			Str("inputType", action.InputType).
 			Int64("timeout", action.Timeout).
@@ -355,10 +366,11 @@ func acceptsEncoding(r *http.Request, encoding string) bool {
 }
 
 // Resolve AckToken from request, fallback on the agent record
-func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req CheckinRequest, agent *model.Agent) (seqno sqn.SeqNo, err error) {
+func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req CheckinRequest, agent *model.Agent) (sqn.SeqNo, error) {
+	var err error
 	// Resolve AckToken from request, fallback on the agent record
 	ackToken := req.AckToken
-	seqno = agent.ActionSeqNo
+	var seqno sqn.SeqNo = agent.ActionSeqNo
 
 	if ct.tr != nil && ackToken != "" {
 		var sn int64
@@ -368,18 +380,17 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req C
 				zlog.Debug().Str("token", ackToken).Msg("revision token not found")
 				err = nil
 			} else {
-				err = errors.Wrap(err, "resolveSeqNo")
-				return
+				return seqno, errors.Wrap(err, "resolveSeqNo")
 			}
 		}
 		seqno = []int64{sn}
 	}
-	return seqno, nil
+	return seqno, err
 }
 
-func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentId string) ([]model.Action, error) {
+func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentID string) ([]model.Action, error) {
 
-	actions, err := dl.FindAgentActions(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentId)
+	actions, err := dl.FindAgentActions(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentID)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "fetchAgentPendingActions")
@@ -388,17 +399,17 @@ func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqN
 	return actions, err
 }
 
-func convertActions(agentId string, actions []model.Action) ([]ActionResp, string) {
+func convertActions(agentID string, actions []model.Action) ([]ActionResp, string) {
 	var ackToken string
 	sz := len(actions)
 
 	respList := make([]ActionResp, 0, sz)
 	for _, action := range actions {
 		respList = append(respList, ActionResp{
-			AgentId:   agentId,
+			AgentID:   agentID,
 			CreatedAt: action.Timestamp,
 			Data:      action.Data,
-			Id:        action.ActionId,
+			ID:        action.ActionId,
 			Type:      action.Type,
 			InputType: action.InputType,
 			Timeout:   action.Timeout,
@@ -416,7 +427,7 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 //  - Generate and update default ApiKey if roles have changed.
 //  - Rewrite the policy for delivery to the agent injecting the key material.
 //
-func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentId string, pp *policy.ParsedPolicy) (*ActionResp, error) {
+func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string, pp *policy.ParsedPolicy) (*ActionResp, error) {
 	zlog = zlog.With().
 		Str("ctx", "processPolicy").
 		Int64("policyRevision", pp.Policy.RevisionIdx).
@@ -425,7 +436,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Logger()
 
 	// Repull and decode the agent object.  Do not trust the cache.
-	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldId, agentId)
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldId, agentID)
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail find agent record")
 		return nil, err
@@ -473,17 +484,17 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 
 	r := policy.RevisionFromPolicy(pp.Policy)
 	resp := ActionResp{
-		AgentId:   agent.Id,
+		AgentID:   agent.Id,
 		CreatedAt: pp.Policy.Timestamp,
 		Data:      rewrittenPolicy,
-		Id:        r.String(),
+		ID:        r.String(),
 		Type:      TypePolicyChange,
 	}
 
 	return &resp, nil
 }
 
-func findAgentByApiKeyId(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {
+func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByAssessAPIKeyID, dl.FieldAccessAPIKeyID, id)
 	if err != nil {
 		if errors.Is(err, dl.ErrNotFound) {
@@ -571,7 +582,7 @@ func calcPollDuration(zlog zerolog.Logger, cfg *config.Server, setupDuration tim
 
 	var jitter time.Duration
 	if cfg.Timeouts.CheckinJitter != 0 {
-		jitter = time.Duration(rand.Int63n(int64(cfg.Timeouts.CheckinJitter)))
+		jitter = time.Duration(rand.Int63n(int64(cfg.Timeouts.CheckinJitter))) //nolint:gosec // jitter time does not need to by generated from a crypto secure source
 		if jitter < pollDuration {
 			pollDuration = pollDuration - jitter
 			zlog.Trace().Dur("poll", pollDuration).Msg("Long poll with jitter")
