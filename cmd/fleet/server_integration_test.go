@@ -172,7 +172,7 @@ func TestServerUnauthorized(t *testing.T) {
 			}
 
 			raw, _ := ioutil.ReadAll(res.Body)
-			var resp api.ErrResp
+			var resp api.HTTPErrResp
 			err = json.Unmarshal(raw, &resp)
 			if err != nil {
 				t.Fatal(err)
@@ -207,7 +207,7 @@ func TestServerUnauthorized(t *testing.T) {
 			}
 
 			raw, _ := ioutil.ReadAll(res.Body)
-			var resp api.ErrResp
+			var resp api.HTTPErrResp
 			err = json.Unmarshal(raw, &resp)
 			if err != nil {
 				t.Fatal(err)
