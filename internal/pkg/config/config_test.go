@@ -8,6 +8,7 @@
 package config
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -124,6 +125,7 @@ func TestConfig(t *testing.T) {
 							Limits:            defaultServerLimits(),
 							Bulk:              defaultServerBulk(),
 							GC:                defaultServerGC(),
+							PackageCache:      defaultPackageCache(),
 						},
 						Cache: defaultCache(),
 						Monitor: Monitor{
@@ -158,8 +160,11 @@ func TestConfig(t *testing.T) {
 				if err == nil {
 					t.Error("no error was reported")
 				} else {
-					cfgErr := err.(ucfg.Error)
-					require.Equal(t, test.err, cfgErr.Reason().Error())
+					var uErr ucfg.Error
+					if !errors.As(err, &uErr) {
+						t.Fatalf("error is not type ufcg.Error: %v", err)
+					}
+					require.Equal(t, test.err, uErr.Reason().Error())
 				}
 			} else {
 				require.NoError(t, err)
@@ -178,12 +183,6 @@ func TestConfig(t *testing.T) {
 
 func defaultCache() Cache {
 	var d Cache
-	d.InitDefaults()
-	return d
-}
-
-func defaultServerTimeouts() ServerTimeouts {
-	var d ServerTimeouts
 	d.InitDefaults()
 	return d
 }
@@ -242,4 +241,10 @@ func defaultServer() Server {
 	var d Server
 	d.InitDefaults()
 	return d
+}
+
+func defaultPackageCache() PackageCache {
+	var p PackageCache
+	p.InitDefaults()
+	return p
 }

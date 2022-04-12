@@ -17,6 +17,7 @@ const kDefaultHost = "0.0.0.0"
 const kDefaultPort = 8220
 const kDefaultInternalHost = "localhost"
 const kDefaultInternalPort = 8221
+const fleetType = "fleet-server"
 
 // Policy is the configuration policy to use.
 type Policy struct {
@@ -70,6 +71,7 @@ type Server struct {
 	Bulk              ServerBulk              `config:"bulk"`
 	GC                GC                      `config:"gc"`
 	Instrumentation   Instrumentation         `config:"instrumentation"`
+	PackageCache      PackageCache            `config:"package_cache"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -85,6 +87,7 @@ func (c *Server) InitDefaults() {
 	c.Runtime.InitDefaults()
 	c.Bulk.InitDefaults()
 	c.GC.InitDefaults()
+	c.PackageCache.InitDefaults()
 }
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.
@@ -132,7 +135,7 @@ type Input struct {
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *Input) InitDefaults() {
-	c.Type = "fleet-server"
+	c.Type = fleetType
 	c.Server.InitDefaults()
 	c.Cache.InitDefaults()
 	c.Monitor.InitDefaults()
@@ -140,7 +143,7 @@ func (c *Input) InitDefaults() {
 
 // Validate ensures that the configuration is valid.
 func (c *Input) Validate() error {
-	if c.Type != "fleet-server" {
+	if c.Type != fleetType {
 		return fmt.Errorf("input type must be fleet-server")
 	}
 	return nil

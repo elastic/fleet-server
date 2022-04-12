@@ -20,6 +20,13 @@ fleet:
 #      instrumentation:
 #        enabled: false
 #        hosts: ["localhost:8200"]
+#      package_cache:
+#        enabled: false
+#        cache: /tmp/fleet-package-cache
+#        retention_period: -1
+#        upstreamURI: https://artifacts.elastic.co/downloads
+#        bandwidth_limit: -1
+#        concurrent_limit: -1
 #      profiler:
 #        enabled: true # enable profiler
 #      limits:

@@ -138,6 +138,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		{
+			ErrDisabled,
+			HTTPErrResp{
+				http.StatusNotFound,
+				"EndpointDisabled",
+				"endpoint is disabled",
+				zerolog.DebugLevel,
+			},
+		},
 	}
 
 	for _, e := range errTable {
@@ -154,6 +163,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			"ServiceUnavailable",
 			"Fleet server unable to communicate with Elasticsearch",
 			zerolog.InfoLevel,
+		}
+	}
+	var retErr *RetrievalError
+	if errors.As(err, &retErr) {
+		return HTTPErrResp{
+			http.StatusServiceUnavailable,
+			"RetrievalFailed",
+			"fleet server unable to retrieve requested package from upstream source",
+			zerolog.ErrorLevel,
 		}
 	}
 
