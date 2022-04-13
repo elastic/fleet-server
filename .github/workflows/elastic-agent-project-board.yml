@@ -21,7 +21,7 @@ jobs:
              }
           projectid: "PRO_kwDOAGc3Zs4AzG8z"
           contentid: ${{ github.event.issue.node_id }}
-          GITHUB_TOKEN: ${{ secrets.ELASTIC_AGENT_PROJECT_BOARD_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ELASTIC_ORG_GITHUB_ACTIONS_TOKEN }}
   add_to_control_plane-project:
     runs-on: ubuntu-latest
     if: |
@@ -39,4 +39,4 @@ jobs:
             }
           projectid: "PRO_kwDOAGc3Zs4AzG9E"
           contentid: ${{ github.event.issue.node_id }}
-          GITHUB_TOKEN: ${{ secrets.ELASTIC_AGENT_PROJECT_BOARD_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ELASTIC_ORG_GITHUB_ACTIONS_TOKEN }}
