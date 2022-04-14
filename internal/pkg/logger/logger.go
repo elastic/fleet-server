@@ -16,10 +16,10 @@ import (
 
 	"go.elastic.co/ecszerolog"
 
-	"github.com/elastic/beats/v7/libbeat/common/file"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
 

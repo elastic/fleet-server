@@ -45,6 +45,7 @@ linters:
     - unparam # reports unused function parameters
     - unused # checks Go code for unused constants, variables, functions and types
 
+    - gomodguard
     - govet # Vet examines Go source code and reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
     - ineffassign # detects when assignments to existing variables are not used
     - structcheck # finds unused struct fields
@@ -99,6 +100,17 @@ linters-settings:
   gomoddirectives:
     # Allow local `replace` directives. Default is false.
     replace-local: false
+    replace-allow-list:
+      - github.com/Shopify/sarama
+      - github.com/dop251/goja
+      - github.com/fsnotify/fsevents
+
+  gomodguard:
+    blocked:
+      # List of blocked modules.
+      modules:
+        - github.com/elastic/beats/v7:
+            reason: "There must be no Beats dependency, use elastic-agent-libs instead."
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.

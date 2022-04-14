@@ -10,9 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
+const kDefaultInputType = "fleet-server"
 const kDefaultHost = "0.0.0.0"
 const kDefaultPort = 8220
 const kDefaultInternalHost = "localhost"
