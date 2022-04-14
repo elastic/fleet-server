@@ -233,7 +233,7 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 			Id:      agentID,
 			Version: ver,
 		},
-		//Tags: req.Meta
+		Tags: req.Meta.Tags,
 	}
 
 	err = createFleetAgent(ctx, et.bulker, agentID, agentData)

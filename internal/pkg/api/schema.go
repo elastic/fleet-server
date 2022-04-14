@@ -53,6 +53,7 @@ type EnrollRequest struct {
 	Meta     struct {
 		User  json.RawMessage `json:"user_provided"`
 		Local json.RawMessage `json:"local"`
+		Tags  []string        `json:"tags"`
 	} `json:"metadata"`
 }
 
