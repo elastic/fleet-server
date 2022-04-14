@@ -183,6 +183,9 @@ type Agent struct {
 
 	// User provided metadata information for the Elastic Agent
 	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata,omitempty"`
+
+	// User provided tags for the Elastic Agent
+	Tags []string `json:"tags,omitempty"`
 }
 
 // AgentMetadata An Elastic Agent metadata

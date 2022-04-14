@@ -67,6 +67,7 @@ type EnrollResponseItem struct {
 	AccessApiKeyId string          `json:"access_api_key_id"`
 	AccessAPIKey   string          `json:"access_api_key"`
 	Status         string          `json:"status"`
+	Tags           []string        `json:"tags"`
 }
 
 type EnrollResponse struct {

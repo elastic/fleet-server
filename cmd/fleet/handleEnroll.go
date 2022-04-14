@@ -233,6 +233,7 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 			ID:      agentId,
 			Version: ver,
 		},
+		//Tags: req.Meta
 	}
 
 	err = createFleetAgent(ctx, et.bulker, agentId, agentData)
@@ -258,6 +259,7 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 			AccessApiKeyId: agentData.AccessAPIKeyID,
 			AccessAPIKey:   accessApiKey.Token(),
 			Status:         "online",
+			Tags:           agentData.Tags,
 		},
 	}
 
@@ -407,6 +409,7 @@ func updateLocalMetaAgentId(data []byte, agentId string) ([]byte, error) {
 }
 
 func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent) error {
+	agent.Tags = append(agent.Tags, "jsfjsjkf")
 	data, err := json.Marshal(agent)
 	if err != nil {
 		return err
