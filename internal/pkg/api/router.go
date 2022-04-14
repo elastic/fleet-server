@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package api
 
 import (
 	"context"
@@ -19,17 +19,16 @@ import (
 )
 
 const (
-	ROUTE_STATUS    = "/api/status"
-	ROUTE_ENROLL    = "/api/fleet/agents/:id"
-	ROUTE_CHECKIN   = "/api/fleet/agents/:id/checkin"
-	ROUTE_ACKS      = "/api/fleet/agents/:id/acks"
-	ROUTE_ARTIFACTS = "/api/fleet/artifacts/:id/:sha2"
+	RouteStatus    = "/api/status"
+	RouteEnroll    = "/api/fleet/agents/:id"
+	RouteCheckin   = "/api/fleet/agents/:id/checkin"
+	RouteAcks      = "/api/fleet/agents/:id/acks"
+	RouteArtifacts = "/api/fleet/artifacts/:id/:sha2"
 )
 
 type Router struct {
 	ctx    context.Context
 	bulker bulk.Bulk
-	ver    string
 	ct     *CheckinT
 	et     *EnrollerT
 	at     *ArtifactT
@@ -40,7 +39,6 @@ type Router struct {
 }
 
 func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, sm policy.SelfMonitor, tracer *apm.Tracer, bi build.Info) *httprouter.Router {
-
 	r := Router{
 		ctx:    ctx,
 		bulker: bulker,
@@ -60,27 +58,27 @@ func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *Enroller
 	}{
 		{
 			http.MethodGet,
-			ROUTE_STATUS,
+			RouteStatus,
 			r.handleStatus,
 		},
 		{
 			http.MethodPost,
-			ROUTE_ENROLL,
+			RouteEnroll,
 			r.handleEnroll,
 		},
 		{
 			http.MethodPost,
-			ROUTE_CHECKIN,
+			RouteCheckin,
 			r.handleCheckin,
 		},
 		{
 			http.MethodPost,
-			ROUTE_ACKS,
+			RouteAcks,
 			r.handleAcks,
 		},
 		{
 			http.MethodGet,
-			ROUTE_ARTIFACTS,
+			RouteArtifacts,
 			r.handleArtifacts,
 		},
 	}

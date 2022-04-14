@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package api
 
 import (
 	"bytes"
@@ -64,23 +64,23 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 
 	id := ps.ByName("id")
 
-	reqId := r.Header.Get(logger.HeaderRequestID)
+	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
 		Str(LogAgentID, id).
-		Str(EcsHttpRequestId, reqId).
+		Str(ECSHTTPRequestID, reqID).
 		Logger()
 
 	err := rt.ack.handleAcks(&zlog, w, r, id)
 
 	if err != nil {
 		cntAcks.IncError(err)
-		resp := NewErrorResp(err)
+		resp := NewHTTPErrResp(err)
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHttpResponseCode, resp.StatusCode).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int(ECSHTTPResponseCode, resp.StatusCode).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail ACK")
 
 		if err := resp.Write(w); err != nil {
@@ -103,7 +103,7 @@ func (ack *AckT) handleAcks(zlog *zerolog.Logger, w http.ResponseWriter, r *http
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
+		return ctx.Str(LogAccessAPIKeyID, agent.AccessApiKeyId)
 	})
 
 	// Metrics; serenity now.
@@ -165,10 +165,10 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 	return nil
 }
 
-func eventToActionResult(agentId string, ev Event) (acr model.ActionResult) {
+func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
 	return model.ActionResult{
-		ActionID:        ev.ActionId,
-		AgentID:         agentId,
+		ActionId:        ev.ActionID,
+		AgentId:         agentID,
 		ActionInputType: ev.ActionInputType,
 		StartedAt:       ev.StartedAt,
 		CompletedAt:     ev.CompletedAt,
@@ -214,15 +214,15 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		log := zlog.With().
 			Str("actionType", ev.Type).
 			Str("actionSubType", ev.SubType).
-			Str("actionId", ev.ActionId).
-			Str("agentId", ev.AgentId).
+			Str("actionId", ev.ActionID).
+			Str("agentId", ev.AgentID).
 			Str("timestamp", ev.Timestamp).
 			Int("n", n).Logger()
 
 		log.Info().Msg("ack event")
 
 		// Check agent id mismatch
-		if ev.AgentId != "" && ev.AgentId != agent.Id {
+		if ev.AgentID != "" && ev.AgentID != agent.Id {
 			log.Error().Msg("agent id mismatch")
 			setResult(n, http.StatusBadRequest)
 			continue
@@ -230,10 +230,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 		// Check if this is the policy change ack
 		// The policy change acks are handled after actions
-		if strings.HasPrefix(ev.ActionId, "policy:") {
+		if strings.HasPrefix(ev.ActionID, "policy:") {
 			if ev.Error == "" {
 				// only added if no error on action
-				policyAcks = append(policyAcks, ev.ActionId)
+				policyAcks = append(policyAcks, ev.ActionID)
 				policyIdxs = append(policyIdxs, n)
 			}
 			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
@@ -243,10 +243,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 		// Process non-policy change actions
 		// Find matching action by action ID
-		action, ok := ack.cache.GetAction(ev.ActionId)
+		action, ok := ack.cache.GetAction(ev.ActionID)
 		if !ok {
 			// Find action by ID
-			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionId)
+			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionID)
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
 				setError(n, err)
@@ -329,7 +329,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		rev, ok := policy.RevisionFromString(a)
 
 		zlog.Debug().
-			Str("agent.policyId", agent.PolicyID).
+			Str("agent.policyId", agent.PolicyId).
 			Int64("agent.revisionIdx", currRev).
 			Int64("agent.coordinatorIdx", currCoord).
 			Str("rev.policyId", rev.PolicyId).
@@ -337,7 +337,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 			Int64("rev.coordinatorIdx", rev.CoordinatorIdx).
 			Msg("ack policy revision")
 
-		if ok && rev.PolicyId == agent.PolicyID && (rev.RevisionIdx > currRev ||
+		if ok && rev.PolicyId == agent.PolicyId && (rev.RevisionIdx > currRev ||
 			(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
 			found = true
 			currRev = rev.RevisionIdx
@@ -349,11 +349,11 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
-	sz := len(agent.DefaultAPIKeyHistory)
+	sz := len(agent.DefaultApiKeyHistory)
 	if sz > 0 {
 		ids := make([]string, sz)
 		for i := 0; i < sz; i++ {
-			ids[i] = agent.DefaultAPIKeyHistory[i].ID
+			ids[i] = agent.DefaultApiKeyHistory[i].Id
 		}
 		log.Info().Strs("ids", ids).Msg("Invalidate old API keys")
 		if err := ack.bulk.ApiKeyInvalidate(ctx, ids...); err != nil {
@@ -362,7 +362,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	body := makeUpdatePolicyBody(
-		agent.PolicyID,
+		agent.PolicyId,
 		currRev,
 		currCoord,
 	)
@@ -377,7 +377,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	)
 
 	zlog.Info().Err(err).
-		Str(LogPolicyID, agent.PolicyID).
+		Str(LogPolicyID, agent.PolicyId).
 		Int64("policyRevision", currRev).
 		Int64("policyCoordinator", currCoord).
 		Msg("ack policy")
@@ -442,11 +442,11 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 
 func _getAPIKeyIDs(agent *model.Agent) []string {
 	keys := make([]string, 0, 1)
-	if agent.AccessAPIKeyID != "" {
-		keys = append(keys, agent.AccessAPIKeyID)
+	if agent.AccessApiKeyId != "" {
+		keys = append(keys, agent.AccessApiKeyId)
 	}
-	if agent.DefaultAPIKeyID != "" {
-		keys = append(keys, agent.DefaultAPIKeyID)
+	if agent.DefaultApiKeyId != "" {
+		keys = append(keys, agent.DefaultApiKeyId)
 	}
 	return keys
 }
@@ -470,14 +470,14 @@ const kUpdatePolicyPrefix = `{"script":{"lang":"painless","source":"if (ctx._sou
 	dl.FieldUpdatedAt +
 	` = params.ts;} else {ctx.op = \"noop\";}","params": {"id":"`
 
-func makeUpdatePolicyBody(policyId string, newRev, coordIdx int64) []byte {
+func makeUpdatePolicyBody(policyID string, newRev, coordIdx int64) []byte {
 
 	var buf bytes.Buffer
 	buf.Grow(410)
 
 	//  Not pretty, but fast.
 	buf.WriteString(kUpdatePolicyPrefix)
-	buf.WriteString(policyId)
+	buf.WriteString(policyID)
 	buf.WriteString(`","rev":`)
 	buf.WriteString(strconv.FormatInt(newRev, 10))
 	buf.WriteString(`,"coord":`)

@@ -5,7 +5,7 @@
 //go:build !integration
 // +build !integration
 
-package fleet
+package api
 
 import (
 	"encoding/json"
@@ -24,14 +24,14 @@ func TestConvertActionsEmpty(t *testing.T) {
 func TestConvertActions(t *testing.T) {
 	actions := []model.Action{
 		{
-			ActionID: "1234",
+			ActionId: "1234",
 		},
 	}
 	resp, token := convertActions("agent-id", actions)
 	assert.Equal(t, resp, []ActionResp{
 		{
-			AgentId: "agent-id",
-			Id:      "1234",
+			AgentID: "agent-id",
+			ID:      "1234",
 			Data:    json.RawMessage(nil),
 		},
 	})

@@ -34,7 +34,7 @@ type Action struct {
 	ESDocument
 
 	// The unique identifier for the Elastic Agent action. There could be multiple documents with the same action_id if the action is split into two separate documents.
-	ActionID string `json:"action_id,omitempty"`
+	ActionId string `json:"action_id,omitempty"`
 
 	// The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids
 	Agents []string `json:"agents,omitempty"`
@@ -58,7 +58,7 @@ type Action struct {
 	Type string `json:"type,omitempty"`
 
 	// The ID of the user who created the action.
-	UserID string `json:"user_id,omitempty"`
+	UserId string `json:"user_id,omitempty"`
 }
 
 // ActionData The opaque payload.
@@ -77,7 +77,7 @@ type ActionResult struct {
 	ActionData json.RawMessage `json:"action_data,omitempty"`
 
 	// The action id.
-	ActionID string `json:"action_id,omitempty"`
+	ActionId string `json:"action_id,omitempty"`
 
 	// The input type of the original action.
 	ActionInputType string `json:"action_input_type,omitempty"`
@@ -86,7 +86,7 @@ type ActionResult struct {
 	ActionResponse json.RawMessage `json:"action_response,omitempty"`
 
 	// The agent id.
-	AgentID string `json:"agent_id,omitempty"`
+	AgentId string `json:"agent_id,omitempty"`
 
 	// Date/time the action was completed
 	CompletedAt string `json:"completed_at,omitempty"`
@@ -109,7 +109,7 @@ type Agent struct {
 	ESDocument
 
 	// ID of the API key the Elastic Agent must used to contact Fleet Server
-	AccessAPIKeyID string `json:"access_api_key_id,omitempty"`
+	AccessApiKeyId string `json:"access_api_key_id,omitempty"`
 
 	// The last acknowledged action sequence number for the Elastic Agent
 	ActionSeqNo []int64 `json:"action_seq_no,omitempty"`
@@ -119,13 +119,13 @@ type Agent struct {
 	Agent  *AgentMetadata `json:"agent,omitempty"`
 
 	// API key the Elastic Agent uses to authenticate with elasticsearch
-	DefaultAPIKey string `json:"default_api_key,omitempty"`
+	DefaultApiKey string `json:"default_api_key,omitempty"`
 
 	// Default API Key History
-	DefaultAPIKeyHistory []DefaultAPIKeyHistoryItems `json:"default_api_key_history,omitempty"`
+	DefaultApiKeyHistory []DefaultApiKeyHistoryItems `json:"default_api_key_history,omitempty"`
 
 	// ID of the API key the Elastic Agent uses to authenticate with elasticsearch
-	DefaultAPIKeyID string `json:"default_api_key_id,omitempty"`
+	DefaultApiKeyId string `json:"default_api_key_id,omitempty"`
 
 	// Date/time the Elastic Agent enrolled
 	EnrolledAt string `json:"enrolled_at"`
@@ -149,7 +149,7 @@ type Agent struct {
 	PolicyCoordinatorIdx int64 `json:"policy_coordinator_idx,omitempty"`
 
 	// The policy ID for the Elastic Agent
-	PolicyID string `json:"policy_id,omitempty"`
+	PolicyId string `json:"policy_id,omitempty"`
 
 	// The policy output permissions hash
 	PolicyOutputPermissionsHash string `json:"policy_output_permissions_hash,omitempty"`
@@ -158,7 +158,7 @@ type Agent struct {
 	PolicyRevisionIdx int64 `json:"policy_revision_idx,omitempty"`
 
 	// Shared ID
-	SharedID string `json:"shared_id,omitempty"`
+	SharedId string `json:"shared_id,omitempty"`
 
 	// Type
 	Type string `json:"type"`
@@ -192,7 +192,7 @@ type Agent struct {
 type AgentMetadata struct {
 
 	// The unique identifier for the Elastic Agent
-	ID string `json:"id"`
+	Id string `json:"id"`
 
 	// The version of the Elastic Agent
 	Version string `json:"version"`
@@ -241,34 +241,34 @@ type Body struct {
 type Data struct {
 }
 
-// DefaultAPIKeyHistoryItems
-type DefaultAPIKeyHistoryItems struct {
+// DefaultApiKeyHistoryItems
+type DefaultApiKeyHistoryItems struct {
 
 	// API Key identifier
-	ID string `json:"id,omitempty"`
+	Id string `json:"id,omitempty"`
 
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`
 }
 
-// EnrollmentAPIKey An Elastic Agent enrollment API key
-type EnrollmentAPIKey struct {
+// EnrollmentApiKey An Elastic Agent enrollment API key
+type EnrollmentApiKey struct {
 	ESDocument
 
+	// True when the key is active
+	Active bool `json:"active,omitempty"`
+
 	// Api key
-	APIKey string `json:"api_key"`
+	ApiKey string `json:"api_key"`
 
 	// The unique identifier for the enrollment key, currently xid
-	APIKeyID string `json:"api_key_id"`
-
-	// True when the key is active
-	Active    bool   `json:"active,omitempty"`
+	ApiKeyId  string `json:"api_key_id"`
 	CreatedAt string `json:"created_at,omitempty"`
 	ExpireAt  string `json:"expire_at,omitempty"`
 
 	// Enrollment key name
 	Name      string `json:"name,omitempty"`
-	PolicyID  string `json:"policy_id,omitempty"`
+	PolicyId  string `json:"policy_id,omitempty"`
 	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
@@ -279,7 +279,7 @@ type HostMetadata struct {
 	Architecture string `json:"architecture"`
 
 	// The ID of the host
-	ID string `json:"id"`
+	Id string `json:"id"`
 
 	// The IP addresses of the Elastic Agent
 	Ip []string `json:"ip,omitempty"`
@@ -302,8 +302,11 @@ type Policy struct {
 	// The opaque payload.
 	Data json.RawMessage `json:"data"`
 
+	// True when this policy is the default policy to start Fleet Server
+	DefaultFleetServer bool `json:"default_fleet_server"`
+
 	// The ID of the policy
-	PolicyID string `json:"policy_id"`
+	PolicyId string `json:"policy_id"`
 
 	// The revision index of the policy
 	RevisionIdx int64 `json:"revision_idx"`
@@ -339,7 +342,7 @@ type Server struct {
 type ServerMetadata struct {
 
 	// The unique identifier for the Fleet Server
-	ID string `json:"id"`
+	Id string `json:"id"`
 
 	// The version of the Fleet Server
 	Version string `json:"version"`

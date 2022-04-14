@@ -5,7 +5,7 @@
 //go:build !integration
 // +build !integration
 
-package fleet
+package api
 
 import (
 	"context"
@@ -69,7 +69,7 @@ func TestHandleStatus(t *testing.T) {
 		},
 	}
 
-	// Test table, with inner loop on all avaiable statuses
+	// Test table, with inner loop on all available statuses
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 			for k, v := range proto.StateObserved_Status_name {
@@ -87,10 +87,10 @@ func TestHandleStatus(t *testing.T) {
 					}
 
 					hr := httprouter.New()
-					hr.Handle(http.MethodGet, ROUTE_STATUS, r.handleStatus)
+					hr.Handle(http.MethodGet, RouteStatus, r.handleStatus)
 
 					w := httptest.NewRecorder()
-					req, _ := http.NewRequest(http.MethodGet, ROUTE_STATUS, nil)
+					req, _ := http.NewRequestWithContext(ctx, http.MethodGet, RouteStatus, nil)
 					hr.ServeHTTP(w, req)
 
 					expectedCode := http.StatusServiceUnavailable
