@@ -18,12 +18,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
+	tst "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/sync/semaphore"
 )
+
+type mockBulker struct {
+	tst.MockBulk
+	apiErr error
+}
+
+func (m *mockBulker) ApiKeyAuth(ctx context.Context, key bulk.ApiKey) (*bulk.SecurityInfo, error) { //nolint:stylecheck // is a bulk.Bulk interface method
+	return &bulk.SecurityInfo{Enabled: true}, m.apiErr
+}
 
 type mockVerifier struct {
 	mock.Mock
@@ -90,7 +102,7 @@ func TestNewDownloader(t *testing.T) {
 				BandwidthLimit:  float64(100),
 				ConcurrentLimit: int64(100),
 			},
-		})
+		}, nil, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, d.bandwidthLimit)
 		assert.NotNil(t, d.concurrentLimit)
@@ -109,7 +121,7 @@ func TestNewDownloader(t *testing.T) {
 				BandwidthLimit:  float64(-1),
 				ConcurrentLimit: int64(-1),
 			},
-		})
+		}, nil, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, d.bandwidthLimit)
 		assert.Nil(t, d.concurrentLimit)
@@ -133,7 +145,7 @@ func TestNewDownloader(t *testing.T) {
 				BandwidthLimit:  float64(-1),
 				ConcurrentLimit: int64(-1),
 			},
-		})
+		}, nil, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, d.bandwidthLimit)
 		assert.Nil(t, d.concurrentLimit)
@@ -173,10 +185,39 @@ func Test_Downloader_serve(t *testing.T) {
 		assert.ErrorIs(t, err, limit.ErrRateLimit)
 	})
 
+	t.Run("not authorized", func(t *testing.T) {
+		cache, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b := &mockBulker{apiErr: ErrAPIKeyNotEnabled}
+
+		d := &Downloader{
+			enabled:         true,
+			cache:           cache,
+			bulker:          b,
+			concurrentLimit: semaphore.NewWeighted(1),
+		}
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "http://example.com/api/downloads/artifact/package", nil)
+		req.Header.Set("Authorization", "ApiKey aWQ6a2V5")
+
+		err = d.serve(w, req, "artifact/package")
+		assert.ErrorIs(t, err, ErrAPIKeyNotEnabled)
+	})
+
 	t.Run("package exists", func(t *testing.T) {
+		cache, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b := &mockBulker{}
+
 		dir := prepDownloadsDir(t)
 		d := &Downloader{
 			enabled:         true,
+			cache:           cache,
+			bulker:          b,
 			fs:              os.DirFS(dir),
 			root:            dir,
 			lock:            &sync.RWMutex{},
@@ -184,8 +225,9 @@ func Test_Downloader_serve(t *testing.T) {
 		}
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "http://example.com/api/downloads/artifact/package", nil)
+		req.Header.Set("Authorization", "ApiKey aWQ6a2V5")
 
-		err := d.serve(w, req, "artifact/package")
+		err = d.serve(w, req, "artifact/package")
 		assert.NoError(t, err)
 
 		res := w.Result()
@@ -198,6 +240,12 @@ func Test_Downloader_serve(t *testing.T) {
 	})
 
 	t.Run("package does not exist", func(t *testing.T) {
+		cache, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b := &mockBulker{}
+
 		dir := prepDownloadsDir(t)
 		path := filepath.Join(dir, "artifact", "test")
 
@@ -213,6 +261,8 @@ func Test_Downloader_serve(t *testing.T) {
 
 		d := &Downloader{
 			enabled:         true,
+			cache:           cache,
+			bulker:          b,
 			ctx:             context.Background(),
 			upstreamURI:     url,
 			fs:              os.DirFS(dir),
@@ -223,6 +273,7 @@ func Test_Downloader_serve(t *testing.T) {
 		}
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "http://example.com/api/downloads/artifact/test", nil)
+		req.Header.Set("Authorization", "ApiKey aWQ6a2V5")
 
 		err = d.serve(w, req, "artifact/test")
 		assert.NoError(t, err)
@@ -245,6 +296,12 @@ func Test_Downloader_serve(t *testing.T) {
 	})
 
 	t.Run("package does not exist complex path", func(t *testing.T) {
+		cache, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b := &mockBulker{}
+
 		dir := prepDownloadsDir(t)
 		path := filepath.Join(dir, "complex", "path", "to", "artifact", "test")
 
@@ -260,6 +317,8 @@ func Test_Downloader_serve(t *testing.T) {
 
 		d := &Downloader{
 			enabled:         true,
+			cache:           cache,
+			bulker:          b,
 			ctx:             context.Background(),
 			upstreamURI:     url,
 			fs:              os.DirFS(dir),
@@ -270,6 +329,7 @@ func Test_Downloader_serve(t *testing.T) {
 		}
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "http://example.com/api/downloads/complex/path/to/artifact/test", nil)
+		req.Header.Set("Authorization", "ApiKey aWQ6a2V5")
 
 		err = d.serve(w, req, "complex/path/to/artifact/test")
 		assert.NoError(t, err)
@@ -292,6 +352,12 @@ func Test_Downloader_serve(t *testing.T) {
 	})
 
 	t.Run("package retrieval fails", func(t *testing.T) {
+		cache, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b := &mockBulker{}
+
 		dir := prepDownloadsDir(t)
 		path := filepath.Join(dir, "test", "test")
 
@@ -304,6 +370,8 @@ func Test_Downloader_serve(t *testing.T) {
 
 		d := &Downloader{
 			enabled:         true,
+			cache:           cache,
+			bulker:          b,
 			ctx:             context.Background(),
 			upstreamURI:     url,
 			fs:              os.DirFS(dir),
@@ -313,6 +381,7 @@ func Test_Downloader_serve(t *testing.T) {
 		}
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "http://example.com/api/downloads/test/test", nil)
+		req.Header.Set("Authorization", "ApiKey aWQ6a2V5")
 
 		err = d.serve(w, req, "test/test")
 		var retErr *RetrievalError

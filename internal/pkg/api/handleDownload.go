@@ -24,6 +24,8 @@ import (
 	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -53,7 +55,10 @@ func (e RetrievalError) Unwrap() error {
 // agents that download may take more time as a result.
 // If a concurrent access limit is set, the server will return a 429 if there are too many concurrent requests.
 type Downloader struct {
-	enabled     bool
+	enabled bool
+	bulker  bulk.Bulk
+	cache   cache.Cache
+
 	ctx         context.Context
 	cancel      context.CancelFunc
 	upstreamURI *url.URL
@@ -69,7 +74,7 @@ type Downloader struct {
 }
 
 // NewDownloader create a new downloader from config.
-func NewDownloader(cfg *config.Server) (*Downloader, error) {
+func NewDownloader(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) (*Downloader, error) {
 	var err error
 	d := &Downloader{}
 	if !cfg.PackageCache.Enabled {
@@ -77,6 +82,9 @@ func NewDownloader(cfg *config.Server) (*Downloader, error) {
 	}
 
 	d.enabled = true
+	d.bulker = bulker
+	d.cache = cache
+
 	d.ctx, d.cancel = context.WithCancel(context.Background())
 	d.upstreamURI, err = url.Parse(cfg.PackageCache.UpstreamURI)
 	if err != nil {
@@ -194,6 +202,15 @@ func (d *Downloader) serve(w http.ResponseWriter, r *http.Request, requestPath s
 			return limit.ErrRateLimit // return a 429
 		}
 		defer d.concurrentLimit.Release(1)
+	}
+
+	// This authenticates that the provided API key exists and is enabled.
+	// WARNING: This does not validate that the api key is valid for the Fleet Domain.
+	// An additional check must be executed to validate it is not a random api key.
+	// This check is sufficient for the purposes of this API
+	_, err := authAPIKey(r, d.bulker, d.cache)
+	if err != nil {
+		return err
 	}
 
 	// check if file exists

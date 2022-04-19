@@ -877,7 +877,7 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
-	downloader, err := api.NewDownloader(&cfg.Inputs[0].Server)
+	downloader, err := api.NewDownloader(&cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return fmt.Errorf("unable to configure package cache: %w", err)
 	}
