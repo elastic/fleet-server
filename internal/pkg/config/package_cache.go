@@ -30,7 +30,7 @@ func (d *PackageCache) InitDefaults() {
 	d.Enabled = false
 	d.Cache = filepath.Join(cwd, "fleet-package-cache")
 	d.RetentionPeriod = time.Duration(-1)
-	d.UpstreamURI = "https://artifacts.elastic.co/downloads"
+	d.UpstreamURI = "https://artifacts.elastic.co"
 	d.BandwidthLimit = -1
 	d.ConcurrentLimit = -1
 }

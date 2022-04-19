@@ -165,16 +165,13 @@ func (d *Downloader) Stop() {
 func (rt Router) handleDownload(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	reqID := r.Header.Get(logger.HeaderRequestID)
 	//start := time.Now()
-	var (
-		aName = ps.ByName("artifact")
-		pName = ps.ByName("package")
-	)
+	requestPath := ps.ByName("path")
 	zlog := log.With().
 		Str(ECSHTTPRequestID, reqID).
 		Str("remoteAddr", r.RemoteAddr).
 		Logger()
 
-	err := rt.dl.serve(w, r, aName, pName)
+	err := rt.dl.serve(w, r, requestPath)
 	if err != nil {
 		resp := NewHTTPErrResp(err)
 		zlog.WithLevel(resp.Level).Err(err).
@@ -186,7 +183,7 @@ func (rt Router) handleDownload(w http.ResponseWriter, r *http.Request, ps httpr
 }
 
 // serve will serve packages using go's fileserver implementation using the enabled limiters.
-func (d *Downloader) serve(w http.ResponseWriter, r *http.Request, aName, pName string) error {
+func (d *Downloader) serve(w http.ResponseWriter, r *http.Request, requestPath string) error {
 	if !d.enabled {
 		return ErrDisabled // return a 404
 	}
@@ -200,9 +197,9 @@ func (d *Downloader) serve(w http.ResponseWriter, r *http.Request, aName, pName 
 	}
 
 	// check if file exists
-	if err := d.packageExists(aName, pName); err != nil {
+	if err := d.packageExists(requestPath); err != nil {
 		//get packages
-		if err := d.getPackage(aName, pName); err != nil {
+		if err := d.getPackage(requestPath); err != nil {
 			return err // return 503
 		}
 	}
@@ -217,17 +214,17 @@ func (d *Downloader) serve(w http.ResponseWriter, r *http.Request, aName, pName 
 }
 
 // packageExists will return an error if the requested package does not exist in the cache, or if the cached package has a size of 0
-func (d *Downloader) packageExists(aName, pName string) error {
+func (d *Downloader) packageExists(requestPath string) error {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	// fs.Stat will reject any attempts to stat a path with ..
 	// this is good as it prevents requests attempting to gather non-cached files
-	fi, err := fs.Stat(d.fs, filepath.Join(aName, pName))
+	fi, err := fs.Stat(d.fs, requestPath)
 	if err != nil {
 		return err
 	}
 	if fi.Size() < 1 {
-		return fmt.Errorf("package %q has length 0", filepath.Join(aName, pName))
+		return fmt.Errorf("package %q has length 0", requestPath)
 	}
 	return nil
 }
@@ -235,16 +232,16 @@ func (d *Downloader) packageExists(aName, pName string) error {
 // getPackage will cache the requested package using the upstreamURI as a source.
 // if the requested package is not an ".asc" or ".sha512" file then the associated files are downloaded and the package is verified.
 // All files are removed if an error is encountered.
-func (d *Downloader) getPackage(aName, pName string) error {
+func (d *Downloader) getPackage(requestPath string) error {
 	// sanity check file path
-	filePath := filepath.Clean(filepath.Join(d.root, aName, pName))
+	filePath := filepath.Clean(filepath.Join(d.root, requestPath))
 	if !strings.HasPrefix(filePath, d.root) {
 		return fmt.Errorf("filepath invalid %q is not in package cache %q", filePath, d.root)
 	}
 
-	url, err := d.upstreamURI.Parse(path.Join(aName, pName))
+	url, err := d.upstreamURI.Parse(path.Join("downloads", requestPath))
 	if err != nil {
-		return fmt.Errorf("unable to build url from %q: %w", path.Join(aName, pName), err)
+		return fmt.Errorf("unable to build url from %q: %w", requestPath, err)
 	}
 
 	err = d.getFile(url.String(), filePath)
@@ -253,17 +250,15 @@ func (d *Downloader) getPackage(aName, pName string) error {
 	}
 
 	// verify download (using sha and asc)
-	if !strings.HasSuffix(pName, ".asc") && !strings.HasSuffix(pName, ".sha512") {
-		url, _ = d.upstreamURI.Parse(path.Join(aName, pName+".asc"))
-		err = d.getFile(url.String(), filePath+".asc")
+	if !strings.HasSuffix(requestPath, ".asc") && !strings.HasSuffix(requestPath, ".sha512") {
+		err = d.getFile(url.String()+".asc", filePath+".asc")
 		if err != nil {
 			if rErr := d.removeFile(filePath); rErr != nil {
 				log.Error().Err(rErr).Msg("unable to remove file")
 			}
 			return err
 		}
-		url, _ = d.upstreamURI.Parse(path.Join(aName, pName+".sha512"))
-		err = d.getFile(url.String(), filePath+".sha512")
+		err = d.getFile(url.String()+".sha512", filePath+".sha512")
 		if err != nil {
 			if rErr := d.removeFile(filePath); rErr != nil {
 				log.Error().Err(rErr).Msg("unable to remove file")

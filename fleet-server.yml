@@ -24,7 +24,7 @@ fleet:
 #        enabled: false
 #        cache: /tmp/fleet-package-cache
 #        retention_period: -1
-#        upstreamURI: https://artifacts.elastic.co/downloads
+#        upstreamURI: https://artifacts.elastic.co
 #        bandwidth_limit: -1
 #        concurrent_limit: -1
 #      profiler:

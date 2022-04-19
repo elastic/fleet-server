@@ -24,7 +24,7 @@ const (
 	RouteCheckin   = "/api/fleet/agents/:id/checkin"
 	RouteAcks      = "/api/fleet/agents/:id/acks"
 	RouteArtifacts = "/api/fleet/artifacts/:id/:sha2"
-	RouteDownloads = "/api/downloads/:artifact/:package"
+	RouteDownloads = "/api/downloads/*path"
 )
 
 type Router struct {

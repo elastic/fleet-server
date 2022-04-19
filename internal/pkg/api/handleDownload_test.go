@@ -61,17 +61,22 @@ func prepDownloadsDir(t *testing.T) string {
 	return dir
 }
 
-// return a test server that responds with a 200 and a message if the path contains artifact
+// return a test server that responds for downloads/artifact/test and downloads/complex/path/to/artifact/test
 func testUpstreamServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if !strings.Contains(req.URL.Path, "artifact") {
-			w.WriteHeader(500)
-			t.Logf("request status: 500 path: %s", req.URL.Path)
+		if strings.HasPrefix(req.URL.Path, "/downloads/artifact/test") {
+			t.Logf("request status: 200 path: %s", req.URL.Path)
+			_, _ = w.Write([]byte("Hello, World!"))
 			return
 		}
-		t.Logf("request status: 200 path: %s", req.URL.Path)
-		_, _ = w.Write([]byte("Hello, World!"))
+		if strings.HasPrefix(req.URL.Path, "/downloads/complex/path/to/artifact/test") {
+			t.Logf("request status: 200 path: %s", req.URL.Path)
+			_, _ = w.Write([]byte("hello, world!"))
+			return
+		}
+		w.WriteHeader(500)
+		t.Logf("request status: 500 path: %s", req.URL.Path)
 	}))
 }
 
@@ -146,9 +151,9 @@ func Test_Downloader_serve(t *testing.T) {
 	t.Run("downloader disabled", func(t *testing.T) {
 		d := &Downloader{enabled: false}
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "http://example.com/api/download/artifact/package", nil)
+		req := httptest.NewRequest("GET", "http://example.com/api/downloads/artifact/package", nil)
 
-		err := d.serve(w, req, "artifact", "package")
+		err := d.serve(w, req, "artifact/package")
 		assert.ErrorIs(t, err, ErrDisabled)
 	})
 
@@ -162,9 +167,9 @@ func Test_Downloader_serve(t *testing.T) {
 			concurrentLimit: l,
 		}
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "http://example.com/api/download/artifact/package", nil)
+		req := httptest.NewRequest("GET", "http://example.com/api/downloads/artifact/package", nil)
 
-		err := d.serve(w, req, "artifact", "package")
+		err := d.serve(w, req, "artifact/package")
 		assert.ErrorIs(t, err, limit.ErrRateLimit)
 	})
 
@@ -180,7 +185,7 @@ func Test_Downloader_serve(t *testing.T) {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "http://example.com/api/downloads/artifact/package", nil)
 
-		err := d.serve(w, req, "artifact", "package")
+		err := d.serve(w, req, "artifact/package")
 		assert.NoError(t, err)
 
 		res := w.Result()
@@ -219,8 +224,9 @@ func Test_Downloader_serve(t *testing.T) {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "http://example.com/api/downloads/artifact/test", nil)
 
-		err = d.serve(w, req, "artifact", "test")
+		err = d.serve(w, req, "artifact/test")
 		assert.NoError(t, err)
+		v.AssertExpectations(t)
 
 		res := w.Result()
 		assert.Equal(t, 200, res.StatusCode)
@@ -228,6 +234,53 @@ func Test_Downloader_serve(t *testing.T) {
 		p, err := io.ReadAll(res.Body)
 		assert.NoError(t, err)
 		assert.Equal(t, []byte("Hello, World!"), p)
+		assert.NoError(t, res.Body.Close())
+
+		_, err = os.Stat(path)
+		assert.NoError(t, err)
+		_, err = os.Stat(path + ".asc")
+		assert.NoError(t, err)
+		_, err = os.Stat(path + ".sha512")
+		assert.NoError(t, err)
+	})
+
+	t.Run("package does not exist complex path", func(t *testing.T) {
+		dir := prepDownloadsDir(t)
+		path := filepath.Join(dir, "complex", "path", "to", "artifact", "test")
+
+		server := testUpstreamServer(t)
+		defer server.Close()
+		url, err := url.Parse(server.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		v := &mockVerifier{}
+		v.On("Verify", path).Return(nil)
+
+		d := &Downloader{
+			enabled:         true,
+			ctx:             context.Background(),
+			upstreamURI:     url,
+			fs:              os.DirFS(dir),
+			root:            dir,
+			lock:            &sync.RWMutex{},
+			concurrentLimit: semaphore.NewWeighted(1),
+			verifier:        v,
+		}
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "http://example.com/api/downloads/complex/path/to/artifact/test", nil)
+
+		err = d.serve(w, req, "complex/path/to/artifact/test")
+		assert.NoError(t, err)
+		v.AssertExpectations(t)
+
+		res := w.Result()
+		assert.Equal(t, 200, res.StatusCode)
+
+		p, err := io.ReadAll(res.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("hello, world!"), p)
 		assert.NoError(t, res.Body.Close())
 
 		_, err = os.Stat(path)
@@ -261,7 +314,7 @@ func Test_Downloader_serve(t *testing.T) {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "http://example.com/api/downloads/test/test", nil)
 
-		err = d.serve(w, req, "test", "test")
+		err = d.serve(w, req, "test/test")
 		var retErr *RetrievalError
 		assert.ErrorAs(t, err, &retErr)
 
@@ -283,7 +336,7 @@ func Test_Downloader_packageExists(t *testing.T) {
 			root: dir,
 			lock: &sync.RWMutex{},
 		}
-		err := d.packageExists("artifact", "package")
+		err := d.packageExists("artifact/package")
 		assert.NoError(t, err)
 	})
 
@@ -295,7 +348,7 @@ func Test_Downloader_packageExists(t *testing.T) {
 			root: dir,
 			lock: &sync.RWMutex{},
 		}
-		err := d.packageExists("artifact", "test")
+		err := d.packageExists("artifact/test")
 		assert.ErrorIs(t, err, fs.ErrNotExist)
 	})
 
@@ -311,7 +364,7 @@ func Test_Downloader_packageExists(t *testing.T) {
 			root: dir,
 			lock: &sync.RWMutex{},
 		}
-		err = d.packageExists("artifact", "test")
+		err = d.packageExists("artifact/test")
 		assert.ErrorContains(t, err, "has length 0")
 	})
 }
@@ -339,7 +392,7 @@ func Test_Downloader_getPackage(t *testing.T) {
 			lock:        &sync.RWMutex{},
 			verifier:    v,
 		}
-		err = d.getPackage("artifact", "test")
+		err = d.getPackage("artifact/test")
 		assert.NoError(t, err)
 		v.AssertExpectations(t)
 
@@ -373,7 +426,7 @@ func Test_Downloader_getPackage(t *testing.T) {
 			lock:        &sync.RWMutex{},
 			verifier:    v,
 		}
-		err = d.getPackage("artifact", "test")
+		err = d.getPackage("artifact/test")
 		assert.ErrorIs(t, err, ErrChecksumMismatch)
 		v.AssertExpectations(t)
 
@@ -406,7 +459,7 @@ func Test_Downloader_getPackage(t *testing.T) {
 			lock:        &sync.RWMutex{},
 			verifier:    v,
 		}
-		err = d.getPackage("test", "test")
+		err = d.getPackage("test/test")
 		var retErr *RetrievalError
 		assert.ErrorAs(t, err, &retErr)
 		v.AssertNotCalled(t, "Verify")
