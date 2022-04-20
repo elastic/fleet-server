@@ -23,8 +23,8 @@ var (
 func prepareQueryLatestPolicies() []byte {
 	root := dsl.NewRoot()
 	root.Size(0)
-	policyId := root.Aggs().Agg(FieldPolicyId)
-	policyId.Terms("field", FieldPolicyId, nil).Size(10000)
+	policyId := root.Aggs().Agg(FieldPolicyID)
+	policyId.Terms("field", FieldPolicyID, nil).Size(10000)
 	revisionIdx := policyId.Aggs().Agg(FieldRevisionIdx).TopHits()
 	revisionIdx.Size(1)
 	rSort := revisionIdx.Sort()
@@ -41,7 +41,7 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 		return nil, err
 	}
 
-	policyId, ok := res.Aggregations[FieldPolicyId]
+	policyId, ok := res.Aggregations[FieldPolicyID]
 	if !ok {
 		return nil, ErrMissingAggregations
 	}

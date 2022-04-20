@@ -27,12 +27,12 @@ func TestEnsureServer(t *testing.T) {
 
 	agentId := uuid.Must(uuid.NewV4()).String()
 	agent := model.AgentMetadata{
-		Id:      agentId,
+		ID:      agentId,
 		Version: "1.0.0",
 	}
 	host := model.HostMetadata{
 		Architecture: runtime.GOOS,
-		Id:           agentId,
+		ID:           agentId,
 		Ip:           []string{"::1"},
 		Name:         "testing-host",
 	}
@@ -51,7 +51,7 @@ func TestEnsureServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if srv.Agent.Id != agentId {
+	if srv.Agent.ID != agentId {
 		t.Fatal("agent.id should match agentId")
 	}
 }

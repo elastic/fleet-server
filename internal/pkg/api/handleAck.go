@@ -103,7 +103,7 @@ func (ack *AckT) handleAcks(zlog *zerolog.Logger, w http.ResponseWriter, r *http
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessAPIKeyID, agent.AccessApiKeyId)
+		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
 	})
 
 	// Metrics; serenity now.
@@ -167,8 +167,8 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 
 func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
 	return model.ActionResult{
-		ActionId:        ev.ActionID,
-		AgentId:         agentID,
+		ActionID:        ev.ActionID,
+		AgentID:         agentID,
 		ActionInputType: ev.ActionInputType,
 		StartedAt:       ev.StartedAt,
 		CompletedAt:     ev.CompletedAt,
@@ -329,7 +329,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		rev, ok := policy.RevisionFromString(a)
 
 		zlog.Debug().
-			Str("agent.policyId", agent.PolicyId).
+			Str("agent.policyId", agent.PolicyID).
 			Int64("agent.revisionIdx", currRev).
 			Int64("agent.coordinatorIdx", currCoord).
 			Str("rev.policyId", rev.PolicyId).
@@ -337,7 +337,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 			Int64("rev.coordinatorIdx", rev.CoordinatorIdx).
 			Msg("ack policy revision")
 
-		if ok && rev.PolicyId == agent.PolicyId && (rev.RevisionIdx > currRev ||
+		if ok && rev.PolicyId == agent.PolicyID && (rev.RevisionIdx > currRev ||
 			(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
 			found = true
 			currRev = rev.RevisionIdx
@@ -349,11 +349,11 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
-	sz := len(agent.DefaultApiKeyHistory)
+	sz := len(agent.DefaultAPIKeyHistory)
 	if sz > 0 {
 		ids := make([]string, sz)
 		for i := 0; i < sz; i++ {
-			ids[i] = agent.DefaultApiKeyHistory[i].Id
+			ids[i] = agent.DefaultAPIKeyHistory[i].ID
 		}
 		log.Info().Strs("ids", ids).Msg("Invalidate old API keys")
 		if err := ack.bulk.ApiKeyInvalidate(ctx, ids...); err != nil {
@@ -362,7 +362,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	body := makeUpdatePolicyBody(
-		agent.PolicyId,
+		agent.PolicyID,
 		currRev,
 		currCoord,
 	)
@@ -377,7 +377,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	)
 
 	zlog.Info().Err(err).
-		Str(LogPolicyID, agent.PolicyId).
+		Str(LogPolicyID, agent.PolicyID).
 		Int64("policyRevision", currRev).
 		Int64("policyCoordinator", currCoord).
 		Msg("ack policy")
@@ -442,11 +442,11 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 
 func _getAPIKeyIDs(agent *model.Agent) []string {
 	keys := make([]string, 0, 1)
-	if agent.AccessApiKeyId != "" {
-		keys = append(keys, agent.AccessApiKeyId)
+	if agent.AccessAPIKeyID != "" {
+		keys = append(keys, agent.AccessAPIKeyID)
 	}
-	if agent.DefaultApiKeyId != "" {
-		keys = append(keys, agent.DefaultApiKeyId)
+	if agent.DefaultAPIKeyID != "" {
+		keys = append(keys, agent.DefaultAPIKeyID)
 	}
 	return keys
 }
