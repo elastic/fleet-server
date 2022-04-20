@@ -58,7 +58,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		// is monitors. When updating for multiple ES instances we need to tie the token to the output.
 		needNewKey := true
 		switch {
-		case agent.DefaultApiKey == "":
+		case agent.DefaultAPIKey == "":
 			zlog.Debug().Msg("must generate api key as default API key is not present")
 		case p.Role.Sha2 != agent.PolicyOutputPermissionsHash:
 			zlog.Debug().Msg("must generate api key as policy output permissions changed")
@@ -80,7 +80,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 				return err
 			}
 
-			agent.DefaultApiKey = outputAPIKey.Agent()
+			agent.DefaultAPIKey = outputAPIKey.Agent()
 
 			// When a new keys is generated we need to update the Agent record,
 			// this will need to be updated when multiples Elasticsearch output
@@ -91,13 +91,13 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 				Msg("Updating agent record to pick up default output key.")
 
 			fields := map[string]interface{}{
-				dl.FieldDefaultApiKey:               outputAPIKey.Agent(),
-				dl.FieldDefaultApiKeyId:             outputAPIKey.Id,
+				dl.FieldDefaultAPIKey:               outputAPIKey.Agent(),
+				dl.FieldDefaultAPIKeyID:             outputAPIKey.Id,
 				dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 			}
-			if agent.DefaultApiKeyId != "" {
-				fields[dl.FieldDefaultApiKeyHistory] = model.DefaultApiKeyHistoryItems{
-					Id:        agent.DefaultApiKeyId,
+			if agent.DefaultAPIKeyID != "" {
+				fields[dl.FieldDefaultAPIKeyHistory] = model.DefaultAPIKeyHistoryItems{
+					ID:        agent.DefaultAPIKeyID,
 					RetiredAt: time.Now().UTC().Format(time.RFC3339),
 				}
 			}
@@ -124,7 +124,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		// in place to reduce number of agent policy allocation when sending the updated
 		// agent policy to multiple agents.
 		// See: https://github.com/elastic/fleet-server/issues/1301
-		if ok := setMapObj(outputMap, agent.DefaultApiKey, p.Name, "api_key"); !ok {
+		if ok := setMapObj(outputMap, agent.DefaultAPIKey, p.Name, "api_key"); !ok {
 			return ErrFailInjectAPIKey
 		}
 	case OutputTypeLogstash:
@@ -140,7 +140,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 func renderUpdatePainlessScript(fields map[string]interface{}) ([]byte, error) {
 	var source strings.Builder
 	for field := range fields {
-		if field == dl.FieldDefaultApiKeyHistory {
+		if field == dl.FieldDefaultAPIKeyHistory {
 			source.WriteString(fmt.Sprint("if (ctx._source.", field, "==null) {ctx._source.", field, "=new ArrayList();} ctx._source.", field, ".add(params.", field, ");"))
 		} else {
 			source.WriteString(fmt.Sprint("ctx._source.", field, "=", "params.", field, ";"))

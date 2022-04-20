@@ -47,7 +47,7 @@ func prepareFindAction() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
 	filter := root.Query().Bool().Filter()
-	filter.Term(FieldActionId, tmpl.Bind(FieldActionId), nil)
+	filter.Term(FieldActionID, tmpl.Bind(FieldActionID), nil)
 	root.Source().Excludes(FieldAgents)
 	tmpl.MustResolve(root)
 	return tmpl
@@ -105,7 +105,7 @@ func createBaseActionsQuery() (tmpl *dsl.Tmpl, root, filter *dsl.Node) {
 func FindAction(ctx context.Context, bulker bulk.Bulk, id string, opts ...Option) ([]model.Action, error) {
 	o := newOption(FleetActions, opts...)
 	return findActions(ctx, bulker, QueryAction, o.indexName, map[string]interface{}{
-		FieldActionId: id,
+		FieldActionID: id,
 	}, nil)
 }
 

@@ -75,7 +75,7 @@ func TestTakePolicyLeadership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leader.Server.Id != serverId || leader.Server.Version != version {
+	if leader.Server.ID != serverId || leader.Server.Version != version {
 		t.Fatal("server.id and server.version should match")
 	}
 	lt, err := leader.Time()
@@ -114,7 +114,7 @@ func TestReleasePolicyLeadership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leader.Server.Id != serverId || leader.Server.Version != version {
+	if leader.Server.ID != serverId || leader.Server.Version != version {
 		t.Fatal("server.id and server.version should match")
 	}
 	lt, err := leader.Time()
@@ -155,7 +155,7 @@ func TestReleasePolicyLeadership_NothingIfNotLeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leader.Server.Id != serverId || leader.Server.Version != version {
+	if leader.Server.ID != serverId || leader.Server.Version != version {
 		t.Fatal("server.id and server.version should match")
 	}
 	lt, err := leader.Time()

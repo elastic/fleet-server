@@ -281,16 +281,16 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 func (m *monitorT) groupByLatest(policies []model.Policy) map[string]model.Policy {
 	latest := make(map[string]model.Policy)
 	for _, policy := range policies {
-		curr, ok := latest[policy.PolicyId]
+		curr, ok := latest[policy.PolicyID]
 		if !ok {
-			latest[policy.PolicyId] = policy
+			latest[policy.PolicyID] = policy
 			continue
 		}
 		if policy.RevisionIdx > curr.RevisionIdx {
-			latest[policy.PolicyId] = policy
+			latest[policy.PolicyID] = policy
 			continue
 		} else if policy.RevisionIdx == curr.RevisionIdx && policy.CoordinatorIdx > curr.CoordinatorIdx {
-			latest[policy.PolicyId] = policy
+			latest[policy.PolicyID] = policy
 		}
 	}
 	return latest
@@ -300,27 +300,27 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 	newPolicy := pp.Policy
 
 	zlog := m.log.With().
-		Str(logger.PolicyId, newPolicy.PolicyId).
+		Str(logger.PolicyId, newPolicy.PolicyID).
 		Int64("rev", newPolicy.RevisionIdx).
 		Int64("coord", newPolicy.CoordinatorIdx).
 		Logger()
 
 	if newPolicy.CoordinatorIdx <= 0 {
-		zlog.Info().Str(logger.PolicyId, newPolicy.PolicyId).Msg("Ignore policy that has not passed through coordinator")
+		zlog.Info().Str(logger.PolicyId, newPolicy.PolicyID).Msg("Ignore policy that has not passed through coordinator")
 		return false
 	}
 
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
-	p, ok := m.policies[newPolicy.PolicyId]
+	p, ok := m.policies[newPolicy.PolicyID]
 	if !ok {
 		p = policyT{
 			pp:   *pp,
 			head: makeHead(),
 		}
-		m.policies[newPolicy.PolicyId] = p
-		zlog.Info().Str(logger.PolicyId, newPolicy.PolicyId).Msg("New policy found on update and added")
+		m.policies[newPolicy.PolicyID] = p
+		zlog.Info().Str(logger.PolicyId, newPolicy.PolicyID).Msg("New policy found on update and added")
 		return false
 	}
 
@@ -329,7 +329,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 
 	// Update the policy in our data structure
 	p.pp = *pp
-	m.policies[newPolicy.PolicyId] = p
+	m.policies[newPolicy.PolicyID] = p
 
 	// Iterate through the subscriptions on this policy;
 	// schedule any subscription for delivery that requires an update.
@@ -345,7 +345,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 			// Push the node onto the pendingQ
 			// HACK: if update is for cloud agent, put on front of queue
 			// not at the end for immediate delivery.
-			if newPolicy.PolicyId == cloudPolicyId {
+			if newPolicy.PolicyID == cloudPolicyId {
 				m.pendingQ.pushFront(sub)
 			} else {
 				m.pendingQ.pushBack(sub)
@@ -363,7 +363,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 		Int64("oldRev", oldPolicy.RevisionIdx).
 		Int64("oldCoord", oldPolicy.CoordinatorIdx).
 		Int("nQueued", nQueued).
-		Str(logger.PolicyId, newPolicy.PolicyId).
+		Str(logger.PolicyId, newPolicy.PolicyID).
 		Msg("New revision of policy received and added to the queue")
 
 	return true
