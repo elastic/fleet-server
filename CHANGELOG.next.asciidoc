@@ -6,3 +6,4 @@
 
 - Fleet server now supports Logstash type outputs for managed agents. {pull}1188[1188]
 - Use the darwin-aarch64 as the suffix for Darwin Arm64 release {pull}1267[1267]
+- Add start_time and minimum_execution_duration to actions to allow fleet-server to schedule agent actions. {pull}1381[1381]
