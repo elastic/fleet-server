@@ -24,7 +24,7 @@ var (
 )
 
 func prepareAgentFindByID() *dsl.Tmpl {
-	return prepareAgentFindByField(FieldId)
+	return prepareAgentFindByField(FieldID)
 }
 
 func prepareAgentFindByAccessAPIKeyID() *dsl.Tmpl {
@@ -41,7 +41,7 @@ func prepareOfflineAgentsByPolicyID() *dsl.Tmpl {
 	root := dsl.NewRoot()
 	filter := root.Query().Bool().Filter()
 	filter.Term(FieldActive, true, nil)
-	filter.Term(FieldPolicyId, tmpl.Bind(FieldPolicyId), nil)
+	filter.Term(FieldPolicyID, tmpl.Bind(FieldPolicyID), nil)
 	filter.Range(FieldLastCheckin, dsl.WithRangeLTE(tmpl.Bind(FieldLastCheckin)))
 
 	tmpl.MustResolve(root)
@@ -67,7 +67,7 @@ func FindOfflineAgents(ctx context.Context, bulker bulk.Bulk, policyId string, u
 	o := newOption(FleetAgents, opt...)
 	past := time.Now().UTC().Add(-unenrollTimeout).Format(time.RFC3339)
 	res, err := Search(ctx, bulker, QueryOfflineAgentsByPolicyID, o.indexName, map[string]interface{}{
-		FieldPolicyId:    policyId,
+		FieldPolicyID:    policyId,
 		FieldLastCheckin: past,
 	})
 	if err != nil {

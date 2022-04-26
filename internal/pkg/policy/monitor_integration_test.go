@@ -70,7 +70,7 @@ func TestMonitor_Integration(t *testing.T) {
 	}
 
 	policy := model.Policy{
-		PolicyId:       policyId,
+		PolicyID:       policyId,
 		CoordinatorIdx: 1,
 		Data:           policyBytes,
 		RevisionIdx:    1,
@@ -87,7 +87,7 @@ func TestMonitor_Integration(t *testing.T) {
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()
-		if subPolicy.Policy.PolicyId != policyId && subPolicy.Policy.RevisionIdx != 1 && subPolicy.Policy.CoordinatorIdx != 1 {
+		if subPolicy.Policy.PolicyID != policyId && subPolicy.Policy.RevisionIdx != 1 && subPolicy.Policy.CoordinatorIdx != 1 {
 			t.Fatal("failed to get the expected updated policy")
 		}
 	case <-tm.C:

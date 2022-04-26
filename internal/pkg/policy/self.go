@@ -28,7 +28,7 @@ import (
 // DefaultCheckTime is the default interval for self to check for its policy.
 const DefaultCheckTime = 5 * time.Second
 
-type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error)
+type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error)
 
 type SelfMonitor interface {
 	// Run runs the monitor.
@@ -168,7 +168,7 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 	}
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
-		if m.policyId != "" && policy.PolicyId == m.policyId {
+		if m.policyId != "" && policy.PolicyID == m.policyId {
 			m.policy = &policy
 			break
 		} else if m.policyId == "" && policy.DefaultFleetServer {
@@ -182,16 +182,16 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.Policy {
 	latest := make(map[string]model.Policy)
 	for _, policy := range policies {
-		curr, ok := latest[policy.PolicyId]
+		curr, ok := latest[policy.PolicyID]
 		if !ok {
-			latest[policy.PolicyId] = policy
+			latest[policy.PolicyID] = policy
 			continue
 		}
 		if policy.RevisionIdx > curr.RevisionIdx {
-			latest[policy.PolicyId] = policy
+			latest[policy.PolicyID] = policy
 			continue
 		} else if policy.RevisionIdx == curr.RevisionIdx && policy.CoordinatorIdx > curr.CoordinatorIdx {
-			latest[policy.PolicyId] = policy
+			latest[policy.PolicyID] = policy
 		}
 	}
 	return latest
@@ -237,7 +237,7 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 
 		// Elastic Agent has not been enrolled; Fleet Server passes back the enrollment token so the Elastic Agent
 		// can perform enrollment.
-		tokens, err := m.enrollmentTokenF(ctx, m.bulker, m.policy.PolicyId)
+		tokens, err := m.enrollmentTokenF(ctx, m.bulker, m.policy.PolicyID)
 		if err != nil {
 			return proto.StateObserved_FAILED, err
 		}
@@ -252,7 +252,7 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 			return proto.StateObserved_STARTING, nil
 		}
 		payload = map[string]interface{}{
-			"enrollment_token": tokens[0].ApiKey,
+			"enrollment_token": tokens[0].APIKey,
 		}
 	}
 	m.status = status
@@ -281,12 +281,12 @@ func (d *policyData) HasType(val string) bool {
 	return false
 }
 
-func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error) {
-	return dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyId, policyID)
+func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
+	return dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyID, policyID)
 }
 
-func filterActiveTokens(tokens []model.EnrollmentApiKey) []model.EnrollmentApiKey {
-	active := make([]model.EnrollmentApiKey, 0, len(tokens))
+func filterActiveTokens(tokens []model.EnrollmentAPIKey) []model.EnrollmentAPIKey {
+	active := make([]model.EnrollmentAPIKey, 0, len(tokens))
 	for _, t := range tokens {
 		if t.Active {
 			active = append(active, t)

@@ -26,7 +26,7 @@ var (
 func prepareSearchPolicyLeaders() (*dsl.Tmpl, error) {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
-	root.Query().Terms(FieldId, tmpl.Bind(FieldId), nil)
+	root.Query().Terms(FieldID, tmpl.Bind(FieldID), nil)
 
 	err := tmpl.Resolve(root)
 	if err != nil {
@@ -45,7 +45,7 @@ func SearchPolicyLeaders(ctx context.Context, bulker bulk.Bulk, ids []string, op
 	})
 
 	o := newOption(FleetPoliciesLeader, opt...)
-	data, err := tmplSearchPolicyLeaders.RenderOne(FieldId, ids)
+	data, err := tmplSearchPolicyLeaders.RenderOne(FieldID, ids)
 	if err != nil {
 		return
 	}
@@ -89,7 +89,7 @@ func TakePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, serve
 	if l.Server == nil {
 		l.Server = &model.ServerMetadata{}
 	}
-	l.Server.Id = serverId
+	l.Server.ID = serverId
 	l.Server.Version = version
 	l.SetTime(time.Now().UTC())
 	if found {
@@ -131,7 +131,7 @@ func ReleasePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, se
 	if err != nil {
 		return err
 	}
-	if l.Server.Id != serverId {
+	if l.Server.ID != serverId {
 		// not leader anymore; nothing to do
 		return nil
 	}
