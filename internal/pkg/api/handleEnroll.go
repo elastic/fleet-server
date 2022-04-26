@@ -409,7 +409,6 @@ func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 }
 
 func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent) error {
-	agent.Tags = append(agent.Tags, "jsfjsjkf")
 	data, err := json.Marshal(agent)
 	if err != nil {
 		return err
