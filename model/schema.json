@@ -36,9 +36,8 @@
           "format": "date-time"
         },
         "minimum_execution_duration": {
-          "description": "The minimum time provided for an action execution when scheduled by fleet-server.",
-          "type": "string",
-          "format": "duration"
+          "description": "The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.",
+          "type": "integer"
         },
         "type": {
           "description": "The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",

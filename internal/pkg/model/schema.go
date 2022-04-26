@@ -48,8 +48,8 @@ type Action struct {
 	// The input type the actions should be routed to.
 	InputType string `json:"input_type,omitempty"`
 
-	// The minimum time provided for an action execution when scheduled by fleet-server.
-	MinimumExecutionDuration string `json:"minimum_execution_duration,omitempty"`
+	// The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.
+	MinimumExecutionDuration int64 `json:"minimum_execution_duration,omitempty"`
 
 	// The action start date/time
 	StartTime string `json:"start_time,omitempty"`

@@ -116,7 +116,8 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 // offsetStartTime will return a new start time between start:end-dur based on index i and the total number of agents
 // An empty string will be returned if start or exp are empty or if there is an error parsing inputs
 // As we expect i < total  the latest return time will always be < exp-dur
-func offsetStartTime(start, exp, dur string, i, total int) string {
+func offsetStartTime(start, exp string, dur int64, i, total int) string {
+
 	if start == "" || exp == "" {
 		return ""
 	}
@@ -130,14 +131,7 @@ func offsetStartTime(start, exp, dur string, i, total int) string {
 		log.Error().Err(err).Msg("unable to parse expiration string")
 		return ""
 	}
-	var d time.Duration
-	if dur != "" {
-		d, err = time.ParseDuration(dur)
-		if err != nil {
-			log.Error().Err(err).Msg("unable to parse minimum_execution_period string")
-			return ""
-		}
-	}
+	d := time.Second * time.Duration(dur)
 	d = expTS.Add(-1 * d).Sub(startTS)                                   // the valid scheduling range is: d = exp - dur - start
 	startTS = startTS.Add((d * time.Duration(i)) / time.Duration(total)) // adjust start to a position within the range
 	return startTS.Format(time.RFC3339)

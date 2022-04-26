@@ -133,7 +133,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 			ch := make(chan []es.HitT)
 			go func() {
 				ch <- []es.HitT{es.HitT{
-					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","minimum_execution_duration":"10m","start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
+					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","minimum_execution_duration":600,"start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
 				}}
 			}()
 			var rch <-chan []es.HitT = ch
@@ -146,7 +146,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				Agents:                   nil,
 				Data:                     json.RawMessage(`{"key":"value"}`),
 				Expiration:               "2022-01-02T13:00:00Z",
-				MinimumExecutionDuration: "10m",
+				MinimumExecutionDuration: 600,
 				StartTime:                "2022-01-02T12:00:00Z",
 				Type:                     "upgrade",
 			}},
@@ -158,7 +158,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 			ch := make(chan []es.HitT)
 			go func() {
 				ch <- []es.HitT{es.HitT{
-					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1","agent2","agent3"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","minimum_execution_duration":"10m","start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
+					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1","agent2","agent3"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","minimum_execution_duration":600,"start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
 				}}
 			}()
 			var rch <-chan []es.HitT = ch
@@ -171,7 +171,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				Agents:                   nil,
 				Data:                     json.RawMessage(`{"key":"value"}`),
 				Expiration:               "2022-01-02T13:00:00Z",
-				MinimumExecutionDuration: "10m",
+				MinimumExecutionDuration: 600,
 				StartTime:                "2022-01-02T12:00:00Z",
 				Type:                     "upgrade",
 			}},
@@ -180,7 +180,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				Agents:                   nil,
 				Data:                     json.RawMessage(`{"key":"value"}`),
 				Expiration:               "2022-01-02T13:00:00Z",
-				MinimumExecutionDuration: "10m",
+				MinimumExecutionDuration: 600,
 				StartTime:                "2022-01-02T12:16:40Z",
 				Type:                     "upgrade",
 			}},
@@ -189,7 +189,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				Agents:                   nil,
 				Data:                     json.RawMessage(`{"key":"value"}`),
 				Expiration:               "2022-01-02T13:00:00Z",
-				MinimumExecutionDuration: "10m",
+				MinimumExecutionDuration: 600,
 				StartTime:                "2022-01-02T12:33:20Z",
 				Type:                     "upgrade",
 			}},
@@ -259,7 +259,7 @@ func Test_offsetStartTime(t *testing.T) {
 		name   string
 		start  string
 		end    string
-		dur    string
+		dur    int64
 		i      int
 		total  int
 		result string
@@ -295,7 +295,7 @@ func Test_offsetStartTime(t *testing.T) {
 		name:   "first agent 10m dur",
 		start:  "2022-01-02T12:00:00Z",
 		end:    "2022-01-02T13:00:00Z",
-		dur:    "10m",
+		dur:    600,
 		i:      0,
 		total:  10,
 		result: "2022-01-02T12:00:00Z",
@@ -303,7 +303,7 @@ func Test_offsetStartTime(t *testing.T) {
 		name:   "mid agent 10m dur",
 		start:  "2022-01-02T12:00:00Z",
 		end:    "2022-01-02T13:00:00Z",
-		dur:    "10m",
+		dur:    600,
 		i:      4,
 		total:  10,
 		result: "2022-01-02T12:20:00Z",
@@ -311,7 +311,7 @@ func Test_offsetStartTime(t *testing.T) {
 		name:   "last agent 10m dur",
 		start:  "2022-01-02T12:00:00Z",
 		end:    "2022-01-02T13:00:00Z",
-		dur:    "10m",
+		dur:    600,
 		i:      9,
 		total:  10,
 		result: "2022-01-02T12:45:00Z",
