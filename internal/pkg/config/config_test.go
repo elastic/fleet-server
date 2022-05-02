@@ -159,8 +159,7 @@ func TestConfig(t *testing.T) {
 				if err == nil {
 					t.Error("no error was reported")
 				} else {
-					cfgErr := err.(ucfg.Error)
-					require.NotNil(t, cfgErr)
+					cfgErr := err.(ucfg.Error) //nolint:errcheck // this is checked below, but the linter doesn't respect it.
 					require.Equal(t, test.err, cfgErr.Reason().Error())
 				}
 			} else {
