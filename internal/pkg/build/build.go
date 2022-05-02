@@ -6,6 +6,8 @@ package build
 
 import "time"
 
+const ServiceName = "fleet-server"
+
 type Info struct {
 	Version, Commit string
 	BuildTime       time.Time

@@ -1,6 +1,8 @@
 {"name": "github.com/chzyer/logex", "licenceType": "MIT"}
 {"name": "github.com/elastic/beats/v7", "licenceType": "Elastic"}
+{"name": "github.com/elastic/elastic-agent", "licenceType": "Elastic"}
 {"name": "github.com/elastic/elastic-agent-client/v7", "licenceType": "Elastic"}
+{"name": "github.com/elastic/e2e-testing", "licenceType": "Elastic"}
 {"name": "github.com/gorhill/cronexpr", "licenceType": "Apache-2.0"}
 {"name": "github.com/kr/logfmt", "licenceType": "MIT"}
 {"name": "github.com/miekg/dns", "licenceType": "BSD-3-Clause"}
@@ -14,3 +16,5 @@
 {"name": "gopkg.in/yaml.v1", "licenceType": "Apache-2.0"}
 {"name": "kernel.org/pub/linux/libs/security/libcap/cap", "licenceType": "BSD-3-Clause", "note": "dual licensed as GPL-v2 and BSD"}
 {"name": "kernel.org/pub/linux/libs/security/libcap/psx", "licenceType": "BSD-3-Clause", "note": "dual licensed as GPL-v2 and BSD"}
+{"name": "github.com/awslabs/kinesis-aggregation/go", "licenceType": "Apache-2.0", "url": "https://github.com/awslabs/kinesis-aggregation/blob/master/LICENSE.txt"}
+{"name": "github.com/pascaldekloe/goe", "licenceType": "CC0", "url": "https://github.com/pascaldekloe/goe/blob/v0.1.0/LICENSE" }

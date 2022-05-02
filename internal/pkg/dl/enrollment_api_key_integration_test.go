@@ -62,7 +62,7 @@ func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	foundRec, err := findEnrollmentAPIKey(ctx, bulker, index, QueryEnrollmentAPIKeyByID, FieldApiKeyID, rec.APIKeyID)
+	foundRec, err := findEnrollmentAPIKey(ctx, bulker, index, QueryEnrollmentAPIKeyByID, FieldAPIKeyID, rec.APIKeyID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
 		t.Fatal(diff)
 	}
 
-	foundRec, err = findEnrollmentAPIKey(ctx, bulker, index, QueryEnrollmentAPIKeyByID, FieldApiKeyID, xid.New().String())
+	foundRec, err = findEnrollmentAPIKey(ctx, bulker, index, QueryEnrollmentAPIKeyByID, FieldAPIKeyID, xid.New().String())
 	if err == nil {
 		t.Fatal("expected error")
 	} else {
@@ -84,6 +84,7 @@ func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
 }
 
 func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
+	t.Skip("Flaky test see https://github.com/elastic/fleet-server/issues/1289")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -103,7 +104,7 @@ func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	foundRecs, err := findEnrollmentAPIKeys(ctx, bulker, index, QueryEnrollmentAPIKeyByPolicyID, FieldPolicyId, policyID)
+	foundRecs, err := findEnrollmentAPIKeys(ctx, bulker, index, QueryEnrollmentAPIKeyByPolicyID, FieldPolicyID, policyID)
 	if err != nil {
 		t.Fatal(err)
 	}

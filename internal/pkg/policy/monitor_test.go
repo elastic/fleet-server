@@ -53,8 +53,8 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	}
 
 	agentId := uuid.Must(uuid.NewV4()).String()
-	policyId := uuid.Must(uuid.NewV4()).String()
-	s, err := monitor.Subscribe(agentId, policyId, 0, 0)
+	policyID := uuid.Must(uuid.NewV4()).String()
+	s, err := monitor.Subscribe(agentId, policyID, 0, 0)
 	defer monitor.Unsubscribe(s)
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +67,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyID:       policyId,
+		PolicyID:       policyID,
 		CoordinatorIdx: 1,
 		Data:           policyBytes,
 		RevisionIdx:    1,

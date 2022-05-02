@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -171,7 +172,7 @@ func TestServerUnauthorized(t *testing.T) {
 			}
 
 			raw, _ := ioutil.ReadAll(res.Body)
-			var resp errResp
+			var resp api.HTTPErrResp
 			err = json.Unmarshal(raw, &resp)
 			if err != nil {
 				t.Fatal(err)
@@ -206,7 +207,7 @@ func TestServerUnauthorized(t *testing.T) {
 			}
 
 			raw, _ := ioutil.ReadAll(res.Body)
-			var resp errResp
+			var resp api.HTTPErrResp
 			err = json.Unmarshal(raw, &resp)
 			if err != nil {
 				t.Fatal(err)

@@ -2,7 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+// Package api exposes fleet-server's API to agents.
+package api
 
 import (
 	"errors"
@@ -19,7 +20,7 @@ import (
 )
 
 var (
-	ErrApiKeyNotEnabled = errors.New("APIKey not enabled")
+	ErrAPIKeyNotEnabled = errors.New("APIKey not enabled")
 	ErrAgentCorrupted   = errors.New("agent record corrupted")
 	ErrAgentInactive    = errors.New("agent inactive")
 	ErrAgentIdentity    = errors.New("agent header contains wrong identifier")
@@ -28,7 +29,7 @@ var (
 // This authenticates that the provided API key exists and is enabled.
 // WARNING: This does not validate that the api key is valid for the Fleet Domain.
 // An additional check must be executed to validate it is not a random api key.
-func authApiKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKey, error) {
+func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKey, error) {
 
 	key, err := apikey.ExtractAPIKey(r)
 	if err != nil {
@@ -39,7 +40,7 @@ func authApiKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 		return key, nil
 	}
 
-	reqId := r.Header.Get(logger.HeaderRequestID)
+	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	start := time.Now()
 
@@ -49,16 +50,16 @@ func authApiKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 		log.Info().
 			Err(err).
 			Str(LogAPIKeyID, key.Id).
-			Str(EcsHttpRequestId, reqId).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Str(ECSHTTPRequestID, reqID).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey fail authentication")
 		return nil, err
 	}
 
 	log.Trace().
 		Str("id", key.Id).
-		Str(EcsHttpRequestId, reqId).
-		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Str(ECSHTTPRequestID, reqID).
+		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Str("userName", info.UserName).
 		Strs("roles", info.Roles).
 		Bool("enabled", info.Enabled).
@@ -67,12 +68,12 @@ func authApiKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 
 	c.SetApiKey(*key, info.Enabled)
 	if !info.Enabled {
-		err = ErrApiKeyNotEnabled
+		err = ErrAPIKeyNotEnabled
 		log.Info().
 			Err(err).
 			Str("id", key.Id).
-			Str(EcsHttpRequestId, reqId).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Str(ECSHTTPRequestID, reqID).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey not enabled")
 	}
 
@@ -83,14 +84,14 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 	start := time.Now()
 
 	// authenticate
-	key, err := authApiKey(r, bulker, c)
+	key, err := authAPIKey(r, bulker, c)
 	if err != nil {
 		return nil, err
 	}
 
 	w := log.With().
 		Str(LogAccessAPIKeyID, key.Id).
-		Str(EcsHttpRequestId, r.Header.Get(logger.HeaderRequestID))
+		Str(ECSHTTPRequestID, r.Header.Get(logger.HeaderRequestID))
 
 	if id != nil {
 		w = w.Str(LogAgentID, *id)
@@ -102,11 +103,11 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 
 	if authTime.Sub(start) > time.Second {
 		zlog.Debug().
-			Int64(EcsEventDuration, authTime.Sub(start).Nanoseconds()).
+			Int64(ECSEventDuration, authTime.Sub(start).Nanoseconds()).
 			Msg("authApiKey slow")
 	}
 
-	agent, err := findAgentByApiKeyId(r.Context(), bulker, key.Id)
+	agent, err := findAgentByAPIKeyID(r.Context(), bulker, key.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +123,7 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 
 	if findTime.Sub(authTime) > time.Second {
 		zlog.Debug().
-			Int64(EcsEventDuration, findTime.Sub(authTime).Nanoseconds()).
+			Int64(ECSEventDuration, findTime.Sub(authTime).Nanoseconds()).
 			Msg("findAgentByApiKeyId slow")
 	}
 

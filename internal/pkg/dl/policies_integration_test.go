@@ -23,11 +23,12 @@ import (
 func createRandomPolicy(id string, revisionIdx int) model.Policy {
 	now := time.Now().UTC()
 	return model.Policy{
-		PolicyID:       id,
-		RevisionIdx:    int64(revisionIdx),
-		CoordinatorIdx: 0,
-		Data:           []byte("{}"),
-		Timestamp:      now.Format(time.RFC3339),
+		PolicyID:           id,
+		RevisionIdx:        int64(revisionIdx),
+		CoordinatorIdx:     0,
+		Data:               []byte("{}"),
+		DefaultFleetServer: false,
+		Timestamp:          now.Format(time.RFC3339),
 	}
 }
 

@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package fleet
+package api
 
 import (
 	"bytes"
@@ -71,11 +71,11 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 		sha2 = ps.ByName("sha2") // DecodedSha256 in the artifact record
 	)
 
-	reqId := r.Header.Get(logger.HeaderRequestID)
+	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
 		Str(LogAgentID, id).
-		Str(EcsHttpRequestId, reqId).
+		Str(ECSHTTPRequestID, reqID).
 		Str("sha2", sha2).
 		Str("remoteAddr", r.RemoteAddr).
 		Logger()
@@ -87,8 +87,8 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 		nWritten, err = io.Copy(w, rdr)
 		zlog.Trace().
 			Err(err).
-			Int64(EcsHttpResponseBodyBytes, nWritten).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int64(ECSHTTPResponseBodyBytes, nWritten).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("Response sent")
 
 		cntArtifacts.bodyOut.Add(uint64(nWritten))
@@ -96,13 +96,13 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 
 	if err != nil {
 		cntArtifacts.IncError(err)
-		resp := NewErrorResp(err)
+		resp := NewHTTPErrResp(err)
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
-			Int(EcsHttpResponseCode, resp.StatusCode).
-			Int64(EcsHttpResponseBodyBytes, nWritten).
-			Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+			Int(ECSHTTPResponseCode, resp.StatusCode).
+			Int64(ECSHTTPResponseBodyBytes, nWritten).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("fail artifact")
 
 		if err := resp.Write(w); err != nil {
@@ -136,12 +136,6 @@ func (at ArtifactT) handleArtifacts(zlog *zerolog.Logger, r *http.Request, id, s
 	defer dfunc()
 
 	return at.processRequest(r.Context(), *zlog, agent, id, sha2)
-}
-
-type artHandler struct {
-	zlog   zerolog.Logger
-	bulker bulk.Bulk
-	c      cache.Cache
 }
 
 func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
@@ -265,7 +259,7 @@ func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, iden
 
 	zlog.Info().
 		Err(err).
-		Int64(EcsEventDuration, time.Since(start).Nanoseconds()).
+		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("fetch artifact")
 
 	return artifact, errors.Wrap(err, "fetchArtifact")

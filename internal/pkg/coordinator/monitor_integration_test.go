@@ -203,7 +203,7 @@ func TestMonitorUnenroller(t *testing.T) {
 
 	// should set the agent to not active (aka. unenrolled)
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldId, agentId, dl.WithIndexName(agentsIndex))
+		agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldID, agentId, dl.WithIndexName(agentsIndex))
 		if err != nil {
 			return err
 		}
@@ -219,7 +219,7 @@ func TestMonitorUnenroller(t *testing.T) {
 	require.NoError(t, err)
 
 	// check other fields now we know its marked unactive
-	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldId, agentId, dl.WithIndexName(agentsIndex))
+	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldID, agentId, dl.WithIndexName(agentsIndex))
 	require.NoError(t, err)
 	assert.NotEmpty(t, agent.UnenrolledAt)
 	assert.Equal(t, unenrolledReasonTimeout, agent.UnenrolledReason)
@@ -339,7 +339,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 	require.NoError(t, err)
 
 	// check other fields now we know its marked inactive
-	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldId, agentId, dl.WithIndexName(agentsIndex))
+	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldID, agentId, dl.WithIndexName(agentsIndex))
 	require.NoError(t, err)
 	assert.True(t, agent.Active)
 	// Make sure canceller is no longer there
@@ -408,7 +408,7 @@ func ensurePolicy(ctx context.Context, t *testing.T, bulker bulk.Bulk, index str
 	}
 	var found *model.Policy
 	for _, p := range policies {
-	if p.PolicyID == policyId {
+		if p.PolicyID == policyId {
 			found = &p
 			break
 		}

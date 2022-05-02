@@ -5,9 +5,10 @@
 //go:build !integration
 // +build !integration
 
-package fleet
+package api
 
 import (
+	"errors"
 	"net/http/httptest"
 	"testing"
 
@@ -117,7 +118,7 @@ func TestValidateUserAgent(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set("User-Agent", tr.userAgent)
 			_, res := validateUserAgent(log.Logger, req, tr.verCon)
-			if tr.err != res {
+			if !errors.Is(tr.err, res) {
 				t.Fatalf("err mismatch: %v != %v", tr.err, res)
 			}
 		})
@@ -125,7 +126,7 @@ func TestValidateUserAgent(t *testing.T) {
 }
 
 func mustBuildConstraints(verStr string) version.Constraints {
-	con, err := buildVersionConstraint(verStr)
+	con, err := BuildVersionConstraint(verStr)
 	if err != nil {
 		panic(err)
 	}

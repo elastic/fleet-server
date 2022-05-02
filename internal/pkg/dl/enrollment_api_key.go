@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	FieldApiKeyID = "api_key_id"
+	FieldAPIKeyID = "api_key_id"
 )
 
 var (
@@ -27,7 +27,7 @@ func prepareFindEnrollmentAPIKeyByID() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 
 	root := dsl.NewRoot()
-	root.Query().Bool().Filter().Term(FieldApiKeyID, tmpl.Bind(FieldApiKeyID), nil)
+	root.Query().Bool().Filter().Term(FieldAPIKeyID, tmpl.Bind(FieldAPIKeyID), nil)
 
 	tmpl.MustResolve(root)
 	return tmpl
@@ -37,7 +37,7 @@ func prepareFindEnrollmentAPIKeyByPolicyID() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 
 	root := dsl.NewRoot()
-	root.Query().Bool().Filter().Term(FieldPolicyId, tmpl.Bind(FieldPolicyId), nil)
+	root.Query().Bool().Filter().Term(FieldPolicyID, tmpl.Bind(FieldPolicyID), nil)
 
 	tmpl.MustResolve(root)
 	return tmpl

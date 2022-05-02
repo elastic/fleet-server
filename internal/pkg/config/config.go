@@ -41,7 +41,6 @@ func (c *Config) InitDefaults() {
 	c.Inputs = make([]Input, 1)
 	c.Inputs[0].InitDefaults()
 	c.HTTP.InitDefaults()
-	c.Fleet.DefaultPolicyID = "fleet-server-policy"
 }
 
 func (c *Config) GetFleetInput() (Input, error) {

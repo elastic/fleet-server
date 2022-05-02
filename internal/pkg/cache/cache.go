@@ -26,8 +26,8 @@ type Cache interface {
 	SetApiKey(key ApiKey, enabled bool)
 	ValidApiKey(key ApiKey) bool
 
-	SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, cost int64)
-	GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool)
+	SetEnrollmentApiKey(id string, key model.EnrollmentAPIKey, cost int64)
+	GetEnrollmentApiKey(id string) (model.EnrollmentAPIKey, bool)
 
 	SetArtifact(artifact model.Artifact)
 	GetArtifact(ident, sha2 string) (model.Artifact, bool)
@@ -210,8 +210,8 @@ func (c *CacheT) ValidApiKey(key ApiKey) bool {
 	return ok
 }
 
-// GetEnrollmentAPIKey returns the enrollment API key by ID.
-func (c *CacheT) GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool) {
+// GetEnrollmentApiKey returns the enrollment API key by ID.
+func (c *CacheT) GetEnrollmentApiKey(id string) (model.EnrollmentAPIKey, bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
@@ -231,8 +231,8 @@ func (c *CacheT) GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool) {
 	return model.EnrollmentAPIKey{}, false
 }
 
-// SetEnrollmentAPIKey adds the enrollment API key into the cache.
-func (c *CacheT) SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, cost int64) {
+// SetEnrollmentApiKey adds the enrollment API key into the cache.
+func (c *CacheT) SetEnrollmentApiKey(id string, key model.EnrollmentAPIKey, cost int64) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 

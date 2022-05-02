@@ -299,6 +299,9 @@ type Policy struct {
 	// The opaque payload.
 	Data json.RawMessage `json:"data"`
 
+	// True when this policy is the default policy to start Fleet Server
+	DefaultFleetServer bool `json:"default_fleet_server"`
+
 	// The ID of the policy
 	PolicyID string `json:"policy_id"`
 

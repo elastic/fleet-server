@@ -45,10 +45,9 @@ type selfMonitorT struct {
 	bulker  bulk.Bulk
 	monitor monitor.Monitor
 
-	policyID        string
-	defaultPolicyID string
-	status          proto.StateObserved_Status
-	reporter        status.Reporter
+	policyId string
+	status   proto.StateObserved_Status
+	reporter status.Reporter
 
 	policy *model.Policy
 
@@ -70,8 +69,7 @@ func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monito
 		fleet:            fleet,
 		bulker:           bulker,
 		monitor:          monitor,
-		policyID:         policyId,
-		defaultPolicyID:  fleet.DefaultPolicyID,
+		policyId:         policyId,
 		status:           proto.StateObserved_STARTING,
 		reporter:         reporter,
 		policyF:          dl.QueryLatestPolicies,
@@ -170,10 +168,10 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 	}
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
-		if m.policyID != "" && policy.PolicyID == m.policyID {
+		if m.policyId != "" && policy.PolicyID == m.policyId {
 			m.policy = &policy
 			break
-		} else if m.policyID == "" && policy.PolicyID == m.defaultPolicyID {
+		} else if m.policyId == "" && policy.DefaultFleetServer {
 			m.policy = &policy
 			break
 		}
@@ -203,42 +201,30 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
-	var err error
 	if m.policy == nil {
 		// no policy found
 		m.status = proto.StateObserved_STARTING
-		if m.policyID == "" {
-			err = m.reporter.Status(proto.StateObserved_STARTING, "Waiting on default policy with Fleet Server integration", nil)
+		if m.policyId == "" {
+			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on default policy with Fleet Server integration", nil)
 		} else {
-			err = m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", m.policyID), nil)
+			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", m.policyId), nil)
 		}
-
-		if err != nil {
-			return proto.StateObserved_FAILED, err
-		}
-
 		return proto.StateObserved_STARTING, nil
 	}
 
 	var data policyData
-	err = json.Unmarshal(m.policy.Data, &data)
+	err := json.Unmarshal(m.policy.Data, &data)
 	if err != nil {
 		return proto.StateObserved_FAILED, err
 	}
-
 	if !data.HasType("fleet-server") {
 		// no fleet-server input
 		m.status = proto.StateObserved_STARTING
-		if m.policyID == "" {
-			err = m.reporter.Status(proto.StateObserved_STARTING, "Waiting on fleet-server input to be added to default policy", nil)
+		if m.policyId == "" {
+			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on fleet-server input to be added to default policy", nil)
 		} else {
-			err = m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", m.policyID), nil)
+			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", m.policyId), nil)
 		}
-
-		if err != nil {
-			return proto.StateObserved_FAILED, err
-		}
-
 		return proto.StateObserved_STARTING, nil
 	}
 
@@ -252,42 +238,29 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 		// Elastic Agent has not been enrolled; Fleet Server passes back the enrollment token so the Elastic Agent
 		// can perform enrollment.
 		tokens, err := m.enrollmentTokenF(ctx, m.bulker, m.policy.PolicyID)
-
 		if err != nil {
 			return proto.StateObserved_FAILED, err
 		}
-
 		tokens = filterActiveTokens(tokens)
 		if len(tokens) == 0 {
 			// no tokens created for the policy, still starting
-			if m.policyID == "" {
-				err = m.reporter.Status(proto.StateObserved_STARTING, "Waiting on active enrollment keys to be created in default policy with Fleet Server integration", nil)
+			if m.policyId == "" {
+				m.reporter.Status(proto.StateObserved_STARTING, "Waiting on active enrollment keys to be created in default policy with Fleet Server integration", nil)
 			} else {
-				err = m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", m.policyID), nil)
+				m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", m.policyId), nil)
 			}
-
-			if err != nil {
-				return proto.StateObserved_FAILED, err
-			}
-
 			return proto.StateObserved_STARTING, nil
 		}
-
 		payload = map[string]interface{}{
 			"enrollment_token": tokens[0].APIKey,
 		}
 	}
 	m.status = status
-	if m.policyID == "" {
-		err = m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), payload)
+	if m.policyId == "" {
+		m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), payload)
 	} else {
-		err = m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyID, extendMsg), payload)
+		m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyId, extendMsg), payload)
 	}
-
-	if err != nil {
-		return proto.StateObserved_FAILED, err
-	}
-
 	return status, nil
 }
 
@@ -309,7 +282,7 @@ func (d *policyData) HasType(val string) bool {
 }
 
 func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
-	return dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyId, policyID)
+	return dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyID, policyID)
 }
 
 func filterActiveTokens(tokens []model.EnrollmentAPIKey) []model.EnrollmentAPIKey {

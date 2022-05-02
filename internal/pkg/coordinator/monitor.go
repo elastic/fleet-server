@@ -261,14 +261,14 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	// take/keep leadership and start new coordinators
 	res := make(chan policyT)
 	for _, p := range lead {
-		pt := m.policies[p.PolicyID]
+		pt, _ := m.policies[p.PolicyID]
 		pt.id = p.PolicyID
 		go func(p model.Policy, pt policyT) {
 			defer func() {
 				res <- pt
 			}()
 
-			l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
+			l := m.log.With().Str(dl.FieldPolicyID, pt.id).Logger()
 			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.version, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l.Err(err).Msg("failed to take ownership")
@@ -334,7 +334,7 @@ func (m *monitorT) releaseLeadership() {
 			defer cancel()
 			err := dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
-				l := m.log.With().Str(dl.FieldPolicyId, pt.id).Logger()
+				l := m.log.With().Str(dl.FieldPolicyID, pt.id).Logger()
 				l.Err(err).Msg("failed to release leadership")
 			}
 			wg.Done()
@@ -397,7 +397,7 @@ func (m *monitorT) getIPs() ([]string, error) {
 
 func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *model.Policy) {
 	u := uuid.Must(uuid.NewV4())
-	l := m.log.With().Str(dl.FieldPolicyId, pt.id).Str("unenroller_uuid", u.String()).Logger()
+	l := m.log.With().Str(dl.FieldPolicyID, pt.id).Str("unenroller_uuid", u.String()).Logger()
 	unenrollTimeout := time.Duration(p.UnenrollTimeout) * time.Second
 	if unenrollTimeout != pt.unenrollTimeout {
 		// unenroll timeout changed

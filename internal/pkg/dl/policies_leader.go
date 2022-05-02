@@ -26,7 +26,7 @@ var (
 func prepareSearchPolicyLeaders() (*dsl.Tmpl, error) {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
-	root.Query().Terms(FieldId, tmpl.Bind(FieldId), nil)
+	root.Query().Terms(FieldID, tmpl.Bind(FieldID), nil)
 
 	err := tmpl.Resolve(root)
 	if err != nil {
@@ -45,7 +45,7 @@ func SearchPolicyLeaders(ctx context.Context, bulker bulk.Bulk, ids []string, op
 	})
 
 	o := newOption(FleetPoliciesLeader, opt...)
-	data, err := tmplSearchPolicyLeaders.RenderOne(FieldId, ids)
+	data, err := tmplSearchPolicyLeaders.RenderOne(FieldID, ids)
 	if err != nil {
 		return
 	}
