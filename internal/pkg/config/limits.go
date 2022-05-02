@@ -16,6 +16,7 @@ type Limit struct {
 }
 
 type ServerLimits struct {
+	MaxAgents         int           `config:"max_agents"`
 	PolicyThrottle    time.Duration `config:"policy_throttle"`
 	MaxHeaderByteSize int           `config:"max_header_byte_size"`
 	MaxConnections    int           `config:"max_connections"`
@@ -29,7 +30,11 @@ type ServerLimits struct {
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *ServerLimits) InitDefaults() {
-	l := loadLimits().Server
+	c.LoadLimits(loadLimits(0))
+}
+
+func (c *ServerLimits) LoadLimits(limits *envLimits) {
+	l := limits.Server
 
 	c.MaxHeaderByteSize = 8192 // 8k
 	c.MaxConnections = l.MaxConnections

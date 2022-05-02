@@ -49,7 +49,7 @@ type tserver struct {
 }
 
 func (s *tserver) baseUrl() string {
-	input := s.cfg.Inputs[0]
+	input, _ := s.cfg.GetFleetInput()
 	tls := input.Server.TLS
 	schema := "http"
 	if tls != nil && tls.IsEnabled() {

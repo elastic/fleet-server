@@ -25,12 +25,11 @@ require (
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/apm v1.15.0
 	go.elastic.co/apm/module/apmelasticsearch v1.14.0
+	go.elastic.co/ecszerolog v0.1.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 )
-
-require go.elastic.co/ecszerolog v0.1.0
 
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect

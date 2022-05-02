@@ -87,8 +87,8 @@ func makeCacheConfig(cfg *config.Config) cache.Config {
 		ActionTTL:    ccfg.ActionTTL,
 		EnrollKeyTTL: ccfg.EnrollKeyTTL,
 		ArtifactTTL:  ccfg.ArtifactTTL,
-		ApiKeyTTL:    ccfg.ApiKeyTTL,
-		ApiKeyJitter: ccfg.ApiKeyJitter,
+		ApiKeyTTL:    ccfg.APIKeyTTL,
+		ApiKeyJitter: ccfg.APIKeyJitter,
 	}
 }
 
@@ -415,6 +415,10 @@ func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter)
 		return nil, err
 	}
 
+	err = cfg.LoadServerLimits()
+	if err != nil {
+		return nil, fmt.Errorf("encountered error while loading server limits: %w", err)
+	}
 	cache, err := makeCache(cfg)
 	if err != nil {
 		return nil, err
@@ -432,7 +436,7 @@ func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter)
 
 type runFunc func(context.Context) error
 
-// Run runs the fleet server.
+// Run runs the fleet server
 func (f *FleetServer) Run(ctx context.Context) error {
 	var curCfg *config.Config
 	newCfg := f.cfg
@@ -479,12 +483,16 @@ func (f *FleetServer) Run(ctx context.Context) error {
 LOOP:
 	for {
 		ech := make(chan error, 2)
-
 		if started {
 			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		} else {
 			started = true
 			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
+		}
+
+		err := newCfg.LoadServerLimits()
+		if err != nil {
+			return fmt.Errorf("encountered error while loading server limits: %w", err)
 		}
 
 		// Create or recreate cache
