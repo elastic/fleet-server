@@ -160,6 +160,7 @@ func TestConfig(t *testing.T) {
 					t.Error("no error was reported")
 				} else {
 					cfgErr := err.(ucfg.Error)
+					require.NotNil(t, cfgErr)
 					require.Equal(t, test.err, cfgErr.Reason().Error())
 				}
 			} else {
@@ -189,12 +190,6 @@ func defaultCache() Cache {
 func generateCache(maxAgents int) Cache {
 	var d Cache
 	d.LoadLimits(loadLimits(maxAgents))
-	return d
-}
-
-func defaultServerTimeouts() ServerTimeouts {
-	var d ServerTimeouts
-	d.InitDefaults()
 	return d
 }
 

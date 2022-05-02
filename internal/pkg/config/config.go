@@ -70,7 +70,7 @@ func (c *Config) LoadServerLimits() error {
 	defer c.m.Unlock()
 	err := c.Validate()
 	if err != nil {
-		log.Warn().Msgf("failed to validate while calculating limits, %s", err.Error())
+		log.Error().Msgf("failed to validate while calculating limits, %s", err.Error())
 		return err
 	}
 
