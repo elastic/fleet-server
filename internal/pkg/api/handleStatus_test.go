@@ -26,6 +26,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func withAuthFunc(authfn AuthFunc) OptFunc {
+	return func(st *StatusT) {
+		if authfn != nil {
+			st.authfn = authfn
+		}
+	}
+}
+
 type mockPolicyMonitor struct {
 	status proto.StateObserved_Status
 }
@@ -46,10 +54,10 @@ func TestHandleStatus(t *testing.T) {
 	c, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 
-	authfnOk := func(r *http.Request) (*apikey.ApiKey, error) {
+	authfnOk := func(r *http.Request) (*apikey.APIKey, error) {
 		return nil, nil
 	}
-	authfnFail := func(r *http.Request) (*apikey.ApiKey, error) {
+	authfnFail := func(r *http.Request) (*apikey.APIKey, error) {
 		return nil, apikey.ErrNoAuthHeader
 	}
 

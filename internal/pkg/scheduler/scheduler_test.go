@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/wait"
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sync/errgroup"
 )
@@ -62,9 +61,14 @@ func TestScheduler(t *testing.T) {
 	})
 
 	g.Go(func() error {
-		wait.WithContext(ctx, 500*time.Millisecond)
-		// return some error here to cause exit error group wait
-		return errTest
+		timer := time.NewTimer(500 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return errTest
+		}
 	})
 
 	// Wait for result

@@ -71,15 +71,15 @@ func SearchPolicyLeaders(ctx context.Context, bulker bulk.Bulk, ids []string, op
 }
 
 // TakePolicyLeadership tries to take leadership of a policy
-func TakePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, serverId, version string, opt ...Option) error {
+func TakePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyID, serverID, version string, opt ...Option) error {
 	o := newOption(FleetPoliciesLeader, opt...)
-	data, err := bulker.Read(ctx, o.indexName, policyId, bulk.WithRefresh())
-	if err != nil && err != es.ErrElasticNotFound {
+	data, err := bulker.Read(ctx, o.indexName, policyID, bulk.WithRefresh())
+	if err != nil && !errors.Is(err, es.ErrElasticNotFound) {
 		return err
 	}
 	var l model.PolicyLeader
 	found := false
-	if err != es.ErrElasticNotFound {
+	if !errors.Is(err, es.ErrElasticNotFound) {
 		found = true
 		err = json.Unmarshal(data, &l)
 		if err != nil {
@@ -89,7 +89,7 @@ func TakePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, serve
 	if l.Server == nil {
 		l.Server = &model.ServerMetadata{}
 	}
-	l.Server.ID = serverId
+	l.Server.ID = serverID
 	l.Server.Version = version
 	l.SetTime(time.Now().UTC())
 	if found {
@@ -101,13 +101,13 @@ func TakePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, serve
 		if err != nil {
 			return err
 		}
-		err = bulker.Update(ctx, o.indexName, policyId, data, bulk.WithRefresh())
+		err = bulker.Update(ctx, o.indexName, policyID, data, bulk.WithRefresh())
 	} else {
 		data, err = json.Marshal(&l)
 		if err != nil {
 			return err
 		}
-		_, err = bulker.Create(ctx, o.indexName, policyId, data, bulk.WithRefresh())
+		_, err = bulker.Create(ctx, o.indexName, policyID, data, bulk.WithRefresh())
 	}
 	if err != nil {
 		return err
@@ -116,10 +116,10 @@ func TakePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, serve
 }
 
 // ReleasePolicyLeadership releases leadership of a policy
-func ReleasePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, serverId string, releaseInterval time.Duration, opt ...Option) error {
+func ReleasePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyID, serverID string, releaseInterval time.Duration, opt ...Option) error {
 	o := newOption(FleetPoliciesLeader, opt...)
-	data, err := bulker.Read(ctx, o.indexName, policyId, bulk.WithRefresh())
-	if err == es.ErrElasticNotFound {
+	data, err := bulker.Read(ctx, o.indexName, policyID, bulk.WithRefresh())
+	if errors.Is(err, es.ErrElasticNotFound) {
 		// nothing to do
 		return nil
 	}
@@ -131,7 +131,7 @@ func ReleasePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, se
 	if err != nil {
 		return err
 	}
-	if l.Server.ID != serverId {
+	if l.Server.ID != serverID {
 		// not leader anymore; nothing to do
 		return nil
 	}
@@ -145,8 +145,8 @@ func ReleasePolicyLeadership(ctx context.Context, bulker bulk.Bulk, policyId, se
 	if err != nil {
 		return err
 	}
-	err = bulker.Update(ctx, o.indexName, policyId, data, bulk.WithRefresh())
-	if err == es.ErrElasticVersionConflict {
+	err = bulker.Update(ctx, o.indexName, policyID, data, bulk.WithRefresh())
+	if errors.Is(err, es.ErrElasticVersionConflict) {
 		// another leader took over; nothing to worry about
 		return nil
 	}

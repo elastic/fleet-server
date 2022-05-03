@@ -5,9 +5,10 @@
 package config
 
 import (
-	"github.com/rs/zerolog"
 	"os"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 // LoggingFiles configuration for the logging file output.
@@ -50,7 +51,7 @@ type Logging struct {
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *Logging) InitDefaults() {
-	c.Level = "info"
+	c.Level = defaultLevel
 	c.ToFiles = true
 }
 

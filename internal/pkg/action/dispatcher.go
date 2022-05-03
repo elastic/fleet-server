@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package action is used to dispatch actions read from elasticsearch to elastic-agents
 package action
 
 import (
@@ -18,7 +19,7 @@ import (
 )
 
 type Sub struct {
-	agentId string
+	agentID string
 	seqNo   sqn.SeqNo
 	ch      chan []model.Action
 }
@@ -52,21 +53,21 @@ func (d *Dispatcher) Run(ctx context.Context) (err error) {
 	}
 }
 
-func (d *Dispatcher) Subscribe(agentId string, seqNo sqn.SeqNo) *Sub {
+func (d *Dispatcher) Subscribe(agentID string, seqNo sqn.SeqNo) *Sub {
 	cbCh := make(chan []model.Action, 1)
 
 	sub := Sub{
-		agentId: agentId,
+		agentID: agentID,
 		seqNo:   seqNo,
 		ch:      cbCh,
 	}
 
 	d.mx.Lock()
-	d.subs[agentId] = sub
+	d.subs[agentID] = sub
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentId, agentId).Int("sz", sz).Msg("Subscribed to action dispatcher")
+	log.Trace().Str(logger.AgentId, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
 
 	return &sub
 }
@@ -77,11 +78,11 @@ func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	}
 
 	d.mx.Lock()
-	delete(d.subs, sub.agentId)
+	delete(d.subs, sub.agentID)
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentId, sub.agentId).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
+	log.Trace().Str(logger.AgentId, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
 func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
@@ -96,31 +97,31 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 			log.Error().Err(err).Msg("Failed to unmarshal action document")
 			break
 		}
-		for _, agentId := range action.Agents {
-			arr := agentActions[agentId]
+		for _, agentID := range action.Agents {
+			arr := agentActions[agentID]
 			actionNoAgents := action
 			actionNoAgents.Agents = nil
 			arr = append(arr, actionNoAgents)
-			agentActions[agentId] = arr
+			agentActions[agentID] = arr
 		}
 	}
 
-	for agentId, actions := range agentActions {
-		d.dispatch(ctx, agentId, actions)
+	for agentID, actions := range agentActions {
+		d.dispatch(ctx, agentID, actions)
 	}
 }
 
-func (d *Dispatcher) getSub(agentId string) (Sub, bool) {
+func (d *Dispatcher) getSub(agentID string) (Sub, bool) {
 	d.mx.RLock()
-	sub, ok := d.subs[agentId]
+	sub, ok := d.subs[agentID]
 	d.mx.RUnlock()
 	return sub, ok
 }
 
-func (d *Dispatcher) dispatch(ctx context.Context, agentId string, acdocs []model.Action) {
-	sub, ok := d.getSub(agentId)
+func (d *Dispatcher) dispatch(_ context.Context, agentID string, acdocs []model.Action) {
+	sub, ok := d.getSub(agentID)
 	if !ok {
-		log.Debug().Str(logger.AgentId, agentId).Msg("Agent is not currently connected. Not dispatching actions.")
+		log.Debug().Str(logger.AgentId, agentID).Msg("Agent is not currently connected. Not dispatching actions.")
 		return
 	}
 	select {

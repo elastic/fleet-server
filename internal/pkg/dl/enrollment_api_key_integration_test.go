@@ -72,7 +72,7 @@ func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
 		t.Fatal(diff)
 	}
 
-	foundRec, err = findEnrollmentAPIKey(ctx, bulker, index, QueryEnrollmentAPIKeyByID, FieldAPIKeyID, xid.New().String())
+	_, err = findEnrollmentAPIKey(ctx, bulker, index, QueryEnrollmentAPIKeyByID, FieldAPIKeyID, xid.New().String())
 	if err == nil {
 		t.Fatal("expected error")
 	} else {

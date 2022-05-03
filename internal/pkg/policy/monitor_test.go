@@ -32,7 +32,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bulker := ftesting.MockBulk{}
+	bulker := ftesting.NewMockBulk()
 	mm := mock.NewMockIndexMonitor()
 	monitor := NewMonitor(bulker, mm, 0)
 	pm := monitor.(*monitorT)
@@ -114,7 +114,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bulker := ftesting.MockBulk{}
+	bulker := ftesting.NewMockBulk()
 	mm := mock.NewMockIndexMonitor()
 	monitor := NewMonitor(bulker, mm, 0)
 	pm := monitor.(*monitorT)
@@ -188,7 +188,7 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bulker := ftesting.MockBulk{}
+	bulker := ftesting.NewMockBulk()
 	mm := mock.NewMockIndexMonitor()
 	monitor := NewMonitor(bulker, mm, 0)
 	pm := monitor.(*monitorT)
@@ -282,7 +282,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bulker := ftesting.MockBulk{}
+	bulker := ftesting.NewMockBulk()
 	mm := mock.NewMockIndexMonitor()
 	monitor := NewMonitor(bulker, mm, 0)
 	pm := monitor.(*monitorT)

@@ -44,7 +44,10 @@ func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byt
 	b.freeBlk(blk)
 
 	// Interpret response, looking for generated id
-	r := resp.data.(*MgetResponseItem)
+	r, ok := resp.data.(*MgetResponseItem)
+	if !ok {
+		return nil, fmt.Errorf("unable to cast response to *MgetResponseItem, detected type: %T", resp.data)
+	}
 	return r.Source, nil
 }
 
@@ -91,7 +94,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	}
 
 	if res.Body != nil {
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 	}
 
 	if res.IsError() {
@@ -127,7 +130,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 		Msg("flushRead")
 
 	if len(blk.Items) != queueCnt {
-		return fmt.Errorf("Mget queue length mismatch")
+		return fmt.Errorf("queue length mismatch for Mget")
 	}
 
 	// WARNING: Once we start pushing items to

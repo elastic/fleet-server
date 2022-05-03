@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/elastic/go-ucfg"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -138,7 +140,7 @@ func TestConfig(t *testing.T) {
 			},
 		},
 		"bad-input": {
-			err: "input type must be fleet-server",
+			err: "input type must be \"fleet-server\"",
 		},
 		"bad-input-many": {
 			err: "only 1 fleet-server input can be defined",
@@ -153,6 +155,7 @@ func TestConfig(t *testing.T) {
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
+			_ = testlog.SetLogger(t)
 			path := filepath.Join("testdata", name+".yml")
 			cfg, err := LoadFile(path)
 			if test.err != "" {

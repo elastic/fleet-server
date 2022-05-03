@@ -99,7 +99,7 @@ func createBaseActionsQuery() (tmpl *dsl.Tmpl, root, filter *dsl.Node) {
 	filter.Range(FieldExpiration, dsl.WithRangeGT(tmpl.Bind(FieldExpiration)))
 
 	root.Sort().SortOrder(FieldSeqNo, dsl.SortAscend)
-	return
+	return //nolint:nakedret // simple function
 }
 
 func FindAction(ctx context.Context, bulker bulk.Bulk, id string, opts ...Option) ([]model.Action, error) {
@@ -109,13 +109,13 @@ func FindAction(ctx context.Context, bulker bulk.Bulk, id string, opts ...Option
 	}, nil)
 }
 
-func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo sqn.SeqNo, agentId string) ([]model.Action, error) {
+func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo sqn.SeqNo, agentID string) ([]model.Action, error) {
 	const index = FleetActions
 	params := map[string]interface{}{
 		FieldSeqNo:      minSeqNo.Value(),
 		FieldMaxSeqNo:   maxSeqNo.Value(),
 		FieldExpiration: time.Now().UTC().Format(time.RFC3339),
-		FieldAgents:     []string{agentId},
+		FieldAgents:     []string{agentID},
 	}
 
 	res, err := findActionsHits(ctx, bulker, QueryAgentActions, index, params, maxSeqNo)
@@ -143,7 +143,7 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 		return
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	var esres es.DeleteByQueryResponse
 
 	err = json.NewDecoder(res.Body).Decode(&esres)

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -20,10 +21,7 @@ import (
 var TestPayload []byte
 
 func TestPolicyLogstashOutputPrepare(t *testing.T) {
-	bulker := ftesting.NewMockBulk(&bulk.ApiKey{
-		Id:  "test id",
-		Key: "test key",
-	})
+	bulker := ftesting.NewMockBulk()
 	po := PolicyOutput{
 		Type: OutputTypeLogstash,
 		Name: "test output",
@@ -35,12 +33,10 @@ func TestPolicyLogstashOutputPrepare(t *testing.T) {
 
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{})
 	require.Nil(t, err, "expected prepare to pass")
+	bulker.AssertExpectations(t)
 }
 func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
-	bulker := ftesting.NewMockBulk(&bulk.ApiKey{
-		Id:  "test id",
-		Key: "test key",
-	})
+	bulker := ftesting.NewMockBulk()
 	po := PolicyOutput{
 		Type: OutputTypeLogstash,
 		Name: "test output",
@@ -50,13 +46,11 @@ func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{})
 	// No permissions are required by logstash currently
 	require.Nil(t, err, "expected prepare to pass")
+	bulker.AssertExpectations(t)
 }
 
 func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
-	bulker := ftesting.NewMockBulk(&bulk.ApiKey{
-		Id:  "test id",
-		Key: "test key",
-	})
+	bulker := ftesting.NewMockBulk()
 	po := PolicyOutput{
 		Type: OutputTypeLogstash,
 		Name: "test output",
@@ -68,13 +62,11 @@ func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{})
 	require.Nil(t, err, "expected prepare to pass")
+	bulker.AssertExpectations(t)
 }
 
 func TestPolicyESOutputPrepareNoRole(t *testing.T) {
-	bulker := ftesting.NewMockBulk(&bulk.ApiKey{
-		Id:  "test id",
-		Key: "test key",
-	})
+	bulker := ftesting.NewMockBulk()
 	po := PolicyOutput{
 		Type: OutputTypeElasticsearch,
 		Name: "test output",
@@ -83,11 +75,12 @@ func TestPolicyESOutputPrepareNoRole(t *testing.T) {
 
 	err := po.Prepare(context.Background(), zerolog.Logger{}, bulker, &model.Agent{}, smap.Map{})
 	require.NotNil(t, err, "expected prepare to error")
+	bulker.AssertExpectations(t)
 }
 
 func TestPolicyOutputESPrepare(t *testing.T) {
 	t.Run("Permission hash == Agent Permission Hash no need to regenerate the key", func(t *testing.T) {
-		bulker := ftesting.NewMockBulk(&bulk.ApiKey{})
+		bulker := ftesting.NewMockBulk()
 		hashPerm := "abc123"
 		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,
@@ -114,14 +107,15 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		require.True(t, ok, "unable to case api key")
 		require.Equal(t, testAgent.DefaultAPIKey, key)
-		require.Equal(t, len(bulker.ArgumentData.Update), 0, "update should not be called")
+		bulker.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		bulker.AssertNotCalled(t, "ApiKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		bulker.AssertExpectations(t)
 	})
 
 	t.Run("Permission hash != Agent Permission Hash need to regenerate the key", func(t *testing.T) {
-		bulker := ftesting.NewMockBulk(&bulk.ApiKey{
-			Id:  "abc",
-			Key: "new-key",
-		})
+		bulker := ftesting.NewMockBulk()
+		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		bulker.On("ApiKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once()
 
 		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,
@@ -148,14 +142,13 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		require.True(t, ok, "unable to case api key")
 		require.Equal(t, "abc:new-key", key)
-		require.Equal(t, len(bulker.ArgumentData.Update), 1, "update should be called")
+		bulker.AssertExpectations(t)
 	})
 
 	t.Run("Generate API Key on new Agent", func(t *testing.T) {
-		bulker := ftesting.NewMockBulk(&bulk.ApiKey{
-			Id:  "abc",
-			Key: "new-key",
-		})
+		bulker := ftesting.NewMockBulk()
+		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		bulker.On("ApiKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once()
 
 		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,
@@ -179,6 +172,6 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		require.True(t, ok, "unable to case api key")
 		require.Equal(t, "abc:new-key", key)
-		require.Equal(t, len(bulker.ArgumentData.Update), 1, "update should be called")
+		bulker.AssertExpectations(t)
 	})
 }

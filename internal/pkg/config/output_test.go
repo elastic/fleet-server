@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/google/go-cmp/cmp"
@@ -161,6 +163,7 @@ func TestToESConfig(t *testing.T) {
 			cmpopts.IgnoreUnexported(tls.Config{}),
 		}
 		t.Run(name, func(t *testing.T) {
+			_ = testlog.SetLogger(t)
 			res, err := test.cfg.ToESConfig(false)
 			require.NoError(t, err)
 
@@ -221,6 +224,7 @@ func TestESProxyConfig(t *testing.T) {
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
+			_ = testlog.SetLogger(t)
 			setTestEnv(t, test.env)
 
 			res, err := test.cfg.ToESConfig(false)

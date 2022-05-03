@@ -10,15 +10,16 @@ package bulk
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/rs/zerolog/log"
 )
 
 func TestBulkCreate(t *testing.T) {
@@ -30,7 +31,7 @@ func TestBulkCreate(t *testing.T) {
 	tests := []struct {
 		Name  string
 		Index string
-		Id    string
+		ID    string
 		Err   error
 	}{
 		{
@@ -40,17 +41,17 @@ func TestBulkCreate(t *testing.T) {
 		{
 			Name:  "Simple Id",
 			Index: index,
-			Id:    "elastic",
+			ID:    "elastic",
 		},
 		{
 			Name:  "Single quoted Id",
 			Index: index,
-			Id:    `'singlequotes'`,
+			ID:    `'singlequotes'`,
 		},
 		{
 			Name:  "Double quoted Id",
 			Index: index,
-			Id:    `"doublequotes"`,
+			ID:    `"doublequotes"`,
 			Err:   ErrNoQuotes,
 		},
 		{
@@ -98,7 +99,7 @@ func TestBulkCreate(t *testing.T) {
 			sampleData := sample.marshal(t)
 
 			// Create
-			id, err := bulker.Create(ctx, test.Index, test.Id, sampleData)
+			id, err := bulker.Create(ctx, test.Index, test.ID, sampleData)
 			if !EqualElastic(test.Err, err) {
 				t.Fatal(err)
 			}
@@ -106,7 +107,7 @@ func TestBulkCreate(t *testing.T) {
 				return
 			}
 
-			if test.Id != "" && id != test.Id {
+			if test.ID != "" && id != test.ID {
 				t.Error("Expected specified id")
 			} else if id == "" {
 				t.Error("Expected non-empty id")
@@ -300,29 +301,30 @@ func TestBulkDelete(t *testing.T) {
 	}
 
 	data, err := bulker.Read(ctx, index, id)
-	if err != es.ErrElasticNotFound || data != nil {
+	if !errors.Is(err, es.ErrElasticNotFound) || data != nil {
 		t.Fatal(err)
 	}
 
 	// Attempt to delete again, should not be found
 	err = bulker.Delete(ctx, index, id)
-	if e, ok := err.(*es.ErrElastic); !ok || e.Status != 404 {
+	var esErr *es.ErrElastic
+	if !errors.As(err, esErr) || esErr.Status != 404 {
 		t.Fatal(err)
 	}
 }
 
 // This runs a series of CRUD operations through elastic.
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
-
 func benchmarkCreate(n int, b *testing.B) {
+	_ = testlog.SetLogger(b)
 	b.ReportAllocs()
-	defer (QuietLogger())()
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
 	index, bulker := SetupIndexWithBulk(ctx, b, testPolicy, WithFlushThresholdCount(n))
 
+	ch := make(chan error, n)
 	var wait sync.WaitGroup
 	wait.Add(n)
 	for i := 0; i < n; i++ {
@@ -338,13 +340,17 @@ func benchmarkCreate(n int, b *testing.B) {
 				// Create
 				_, err := bulker.Create(ctx, index, "", sampleData)
 				if err != nil {
-					b.Fatal(err)
+					ch <- err
 				}
 			}
 		}()
 	}
-
 	wait.Wait()
+	select {
+	case err := <-ch:
+		b.Fatal(err)
+	default:
+	}
 }
 
 func BenchmarkCreate(b *testing.B) {
@@ -366,8 +372,8 @@ func BenchmarkCreate(b *testing.B) {
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
 
 func benchmarkCRUD(n int, b *testing.B) {
+	_ = testlog.SetLogger(b)
 	b.ReportAllocs()
-	defer (QuietLogger())()
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
@@ -380,6 +386,7 @@ func benchmarkCRUD(n int, b *testing.B) {
 		b.Fatal(err)
 	}
 
+	ch := make(chan error, n)
 	var wait sync.WaitGroup
 	wait.Add(n)
 	for i := 0; i < n; i++ {
@@ -395,32 +402,41 @@ func benchmarkCRUD(n int, b *testing.B) {
 				// Create
 				id, err := bulker.Create(ctx, index, "", sampleData)
 				if err != nil {
-					b.Fatal(err)
+					ch <- err
+					return
 				}
 
 				// Read
 				_, err = bulker.Read(ctx, index, id)
 				if err != nil {
-					b.Fatal(err)
+					ch <- err
+					return
 				}
 
 				// Update
 				err = bulker.Update(ctx, index, id, fieldData)
 				if err != nil {
-					b.Fatal(err)
+					ch <- err
+					return
 				}
 
 				// Delete
 				err = bulker.Delete(ctx, index, id)
 				if err != nil {
-					log.Info().Str("index", index).Str("id", id).Msg("dlete fail")
-					b.Fatal(err)
+					b.Logf("Delete faile index: %s id: %s err: %v", index, id, err)
+					ch <- err
+					return
 				}
 			}
 		}()
 	}
 
 	wait.Wait()
+	select {
+	case err := <-ch:
+		b.Fatal(err)
+	default:
+	}
 }
 
 func BenchmarkCRUD(b *testing.B) {

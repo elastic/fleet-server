@@ -87,12 +87,12 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 			// are used.
 			zlog.Info().
 				Str("hash.sha256", p.Role.Sha2).
-				Str(logger.DefaultOutputApiKeyId, outputAPIKey.Id).
+				Str(logger.DefaultOutputApiKeyId, outputAPIKey.ID).
 				Msg("Updating agent record to pick up default output key.")
 
 			fields := map[string]interface{}{
 				dl.FieldDefaultAPIKey:               outputAPIKey.Agent(),
-				dl.FieldDefaultAPIKeyID:             outputAPIKey.Id,
+				dl.FieldDefaultAPIKeyID:             outputAPIKey.ID,
 				dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 			}
 			if agent.DefaultAPIKeyID != "" {
@@ -158,9 +158,9 @@ func renderUpdatePainlessScript(fields map[string]interface{}) ([]byte, error) {
 	return body, err
 }
 
-func generateOutputAPIKey(ctx context.Context, bulk bulk.Bulk, agentID, outputName string, roles []byte) (*apikey.ApiKey, error) {
+func generateOutputAPIKey(ctx context.Context, bulk bulk.Bulk, agentID, outputName string, roles []byte) (*apikey.APIKey, error) {
 	name := fmt.Sprintf("%s:%s", agentID, outputName)
-	return bulk.ApiKeyCreate(
+	return bulk.APIKeyCreate(
 		ctx,
 		name,
 		"",

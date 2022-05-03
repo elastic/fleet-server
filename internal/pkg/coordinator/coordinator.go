@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package coordinator will keep elastic-agent policies uo to date // TODO is this correct?
 package coordinator
 
 import (

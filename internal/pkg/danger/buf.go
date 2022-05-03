@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package danger implements a bytes buffer // TODO why do we need this one instead of bytes.Buffer?
 package danger
 
 // Effectively golang's string builder with a Reset option

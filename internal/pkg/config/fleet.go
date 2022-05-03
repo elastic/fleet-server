@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const defaultLevel = "info"
+
 // AgentLogging is the log level set on the Agent.
 type AgentLogging struct {
 	Level string `config:"level"`
@@ -63,7 +65,7 @@ func strToLevel(s string) (zerolog.Level, error) {
 		l = zerolog.TraceLevel
 	case "debug":
 		l = zerolog.DebugLevel
-	case "info":
+	case defaultLevel:
 		l = zerolog.InfoLevel
 	case "warning":
 		l = zerolog.WarnLevel

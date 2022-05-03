@@ -2,12 +2,5 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package config
-
-type Runtime struct {
-	GCPercent int `config:"gc_percent"`
-}
-
-func (r Runtime) InitDefaults() {
-	//r.GCPercent = 0 // go will default it to zero
-}
+// Package testing contains mocks and helper functions to assist with testing.
+package testing

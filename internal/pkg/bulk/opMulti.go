@@ -26,7 +26,7 @@ func (b *Bulker) MDelete(ctx context.Context, ops []MultiOp, opts ...Opt) ([]Bul
 	return b.multiWaitBulkOp(ctx, ActionDelete, ops)
 }
 
-func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
+func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) { //nolint:unparam // better to keep consistency with other methods
 	if len(ops) == 0 {
 		return nil, nil
 	}
@@ -46,14 +46,14 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 	// O(n) Determine how much space we need
 	var byteCnt int
 	for _, op := range ops {
-		byteCnt += b.calcBulkSz(actionStr, op.Index, op.Id, opt.RetryOnConflict, op.Body)
+		byteCnt += b.calcBulkSz(actionStr, op.Index, op.ID, opt.RetryOnConflict, op.Body)
 	}
 
 	// Create one bulk buffer to serialize each piece.
 	// This decreases pressure on the heap. If we calculculate wrong,
 	// the Buf objectect has the property that previously cached slices
 	// are still valid.  However, underestimating the buffer size
-	// can lead to mulitple copies, which undermines the optimization.
+	// can lead to multiple copies, which undermines the optimization.
 	var bulkBuf Buf
 	bulkBuf.Grow(byteCnt)
 
@@ -65,7 +65,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 
 		op := &ops[i]
 
-		if err := b.writeBulkMeta(&bulkBuf, actionStr, op.Index, op.Id, opt.RetryOnConflict); err != nil {
+		if err := b.writeBulkMeta(&bulkBuf, actionStr, op.Index, op.ID, opt.RetryOnConflict); err != nil {
 			return nil, err
 		}
 

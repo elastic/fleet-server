@@ -13,12 +13,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ApiKeyMetadata struct {
-	Id       string
+type APIKeyMetadata struct {
+	ID       string
 	Metadata Metadata
 }
 
-func Read(ctx context.Context, client *elasticsearch.Client, id string) (apiKey *ApiKeyMetadata, err error) {
+func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKeyMetadata, error) {
 
 	opts := []func(*esapi.SecurityGetAPIKeyRequest){
 		client.Security.GetAPIKey.WithContext(ctx),
@@ -30,40 +30,40 @@ func Read(ctx context.Context, client *elasticsearch.Client, id string) (apiKey 
 	)
 
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.IsError() {
-		err = errors.Wrap(ErrApiKeyNotFound, res.String())
-		return
+		err = errors.Wrap(ErrAPIKeyNotFound, res.String())
+		return nil, err
 	}
 
 	type APIKeyResponse struct {
-		Id       string   `json:"id"`
+		ID       string   `json:"id"`
 		Metadata Metadata `json:"metadata"`
 	}
 	type GetAPIKeyResponse struct {
-		ApiKeys []APIKeyResponse `json:"api_keys"`
+		APIKeys []APIKeyResponse `json:"api_keys"`
 	}
 
 	var resp GetAPIKeyResponse
 	d := json.NewDecoder(res.Body)
 	if err = d.Decode(&resp); err != nil {
-		return
+		return nil, err
 	}
 
-	if len(resp.ApiKeys) == 0 {
-		return apiKey, ErrApiKeyNotFound
+	if len(resp.APIKeys) == 0 {
+		return nil, ErrAPIKeyNotFound
 	}
 
-	first := resp.ApiKeys[0]
+	first := resp.APIKeys[0]
 
-	apiKey = &ApiKeyMetadata{
-		Id:       first.Id,
+	return &APIKeyMetadata{
+		ID:       first.ID,
 		Metadata: first.Metadata,
-	}
-
-	return
+	}, nil
 }

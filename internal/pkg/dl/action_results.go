@@ -23,7 +23,7 @@ func createActionResult(ctx context.Context, bulker bulk.Bulk, index string, acr
 	}
 	body, err := json.Marshal(acr)
 	if err != nil {
-		return "", nil
+		return "", err // TODO was there a good reason this returned nil?
 	}
 
 	return bulker.Create(ctx, index, acr.Id, body, bulk.WithRefresh())

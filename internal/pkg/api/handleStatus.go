@@ -29,7 +29,7 @@ const (
 	kStatusMod = "status"
 )
 
-type AuthFunc func(*http.Request) (*apikey.ApiKey, error)
+type AuthFunc func(*http.Request) (*apikey.APIKey, error)
 
 type StatusT struct {
 	cfg    *config.Server
@@ -60,15 +60,7 @@ func NewStatusT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache, opts ..
 	return st
 }
 
-func withAuthFunc(authfn AuthFunc) OptFunc {
-	return func(st *StatusT) {
-		if authfn != nil {
-			st.authfn = authfn
-		}
-	}
-}
-
-func (st StatusT) authenticate(r *http.Request) (*apikey.ApiKey, error) {
+func (st StatusT) authenticate(r *http.Request) (*apikey.APIKey, error) {
 	// This authenticates that the provided API key exists and is enabled.
 	// WARNING: This does not validate that the api key is valid for the Fleet Domain.
 	// An additional check must be executed to validate it is not a random api key.

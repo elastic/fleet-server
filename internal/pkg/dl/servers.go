@@ -7,6 +7,7 @@ package dl
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -19,10 +20,10 @@ func EnsureServer(ctx context.Context, bulker bulk.Bulk, version string, agent m
 	var server model.Server
 	o := newOption(FleetServers, opts...)
 	data, err := bulker.Read(ctx, o.indexName, agent.ID)
-	if err != nil && err != es.ErrElasticNotFound {
+	if err != nil && !errors.Is(err, es.ErrElasticNotFound) {
 		return err
 	}
-	if err == es.ErrElasticNotFound {
+	if errors.Is(err, es.ErrElasticNotFound) {
 		server.Agent = &agent
 		server.Host = &host
 		server.Server = &model.ServerMetadata{

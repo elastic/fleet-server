@@ -14,44 +14,84 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/google/go-cmp/cmp"
-
-	tst "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/rs/xid"
-	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 )
-
-type CustomBulk struct {
-	tst.MockBulk
-
-	ops []bulk.MultiOp
-}
-
-func (m *CustomBulk) MUpdate(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
-	m.ops = append(m.ops, ops...)
-	return nil, nil
-}
 
 // Test simple,
 // Test with fields
 // Test with seq no
 
+// matchOp is used with mock.MatchedBy to match and validate the operation
+func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) bool {
+	return func(ops []bulk.MultiOp) bool {
+		if len(ops) != 1 {
+			return false
+		}
+		if ops[0].ID != c.id {
+			return false
+		}
+		if ops[0].Index != dl.FleetAgents {
+			return false
+		}
+		tb.Log("Operation match! validating details...")
+
+		// Decode and match operation
+		// NOTE putting the extra validation here seems strange, maybe we should read the args in the test body intstead?
+		type updateT struct {
+			LastCheckin string          `json:"last_checkin"`
+			Status      string          `json:"last_checkin_status"`
+			UpdatedAt   string          `json:"updated_at"`
+			Meta        json.RawMessage `json:"local_metadata"`
+			SeqNo       sqn.SeqNo       `json:"action_seq_no"`
+		}
+
+		m := make(map[string]updateT)
+		if err := json.Unmarshal(ops[0].Body, &m); err != nil {
+			tb.Fatalf("unable to validate operation: %v", err)
+		}
+
+		sub, ok := m["doc"]
+		if !ok {
+			tb.Fatal("unable to validate operation: expected doc")
+		}
+		validateTimestamp(tb, ts.Truncate(time.Second), sub.LastCheckin)
+		validateTimestamp(tb, ts.Truncate(time.Second), sub.UpdatedAt)
+		if c.seqno != nil {
+			if cdiff := cmp.Diff(c.seqno, sub.SeqNo); cdiff != "" {
+				tb.Error(cdiff)
+			}
+		}
+
+		if c.meta != nil && !bytes.Equal(c.meta, sub.Meta) {
+			tb.Error("meta doesn't match up")
+		}
+
+		if c.status != sub.Status {
+			tb.Error("status mismatch")
+		}
+		return true
+	}
+}
+
+type bulkcase struct {
+	desc   string
+	id     string
+	status string
+	meta   []byte
+	seqno  sqn.SeqNo
+	ver    string
+}
+
 func TestBulkSimple(t *testing.T) {
 	start := time.Now()
 
-	var mockBulk CustomBulk
-
-	bc := NewBulk(&mockBulk)
-
 	const ver = "8.0.0"
-	cases := []struct {
-		desc   string
-		id     string
-		status string
-		meta   []byte
-		seqno  sqn.SeqNo
-		ver    string
-	}{
+	cases := []bulkcase{
 		{
 			"Simple case",
 			"simpleId",
@@ -120,6 +160,10 @@ func TestBulkSimple(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
+			_ = testlog.SetLogger(t)
+			mockBulk := ftesting.NewMockBulk()
+			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
+			bc := NewBulk(mockBulk)
 
 			if err := bc.CheckIn(c.id, c.status, c.meta, c.seqno, c.ver); err != nil {
 				t.Fatal(err)
@@ -129,80 +173,24 @@ func TestBulkSimple(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if len(mockBulk.ops) != 1 {
-				t.Fatal("Expected one op")
-			}
-
-			op := mockBulk.ops[0]
-
-			mockBulk.ops = nil
-
-			// deserialize the response
-			if op.Id != c.id {
-				t.Error("Wrong id")
-			}
-
-			if op.Index != dl.FleetAgents {
-				t.Error("Wrong index")
-			}
-
-			type updateT struct {
-				LastCheckin string          `json:"last_checkin"`
-				Status      string          `json:"last_checkin_status"`
-				UpdatedAt   string          `json:"updated_at"`
-				Meta        json.RawMessage `json:"local_metadata"`
-				SeqNo       sqn.SeqNo       `json:"action_seq_no"`
-			}
-
-			m := make(map[string]updateT)
-			if err := json.Unmarshal(op.Body, &m); err != nil {
-				t.Error(err)
-			}
-
-			sub, ok := m["doc"]
-			if !ok {
-				t.Fatal("expected doc")
-			}
-
-			validateTimestamp(t, start.Truncate(time.Second), sub.LastCheckin)
-			validateTimestamp(t, start.Truncate(time.Second), sub.UpdatedAt)
-
-			if c.seqno != nil {
-				if cdiff := cmp.Diff(c.seqno, sub.SeqNo); cdiff != "" {
-					t.Error(cdiff)
-				}
-			}
-
-			if c.meta != nil && bytes.Compare(c.meta, sub.Meta) != 0 {
-				t.Error("meta doesn't match up")
-			}
-
-			if c.status != sub.Status {
-				t.Error("status mismatch")
-			}
-
+			mockBulk.AssertExpectations(t)
 		})
 	}
 }
 
-func validateTimestamp(t *testing.T, start time.Time, ts string) {
-
+func validateTimestamp(tb testing.TB, start time.Time, ts string) {
 	if t1, err := time.Parse(time.RFC3339, ts); err != nil {
-		t.Error("expected rfc3999")
+		tb.Error("expected rfc3999")
 	} else if start.After(t1) {
-		t.Error("timestamp in the past")
+		tb.Error("timestamp in the past")
 	}
 }
 
 func benchmarkBulk(n int, flush bool, b *testing.B) {
+	_ = testlog.SetLogger(b)
 	b.ReportAllocs()
 
-	l := zerolog.GlobalLevel()
-	defer zerolog.SetGlobalLevel(l)
-
-	zerolog.SetGlobalLevel(zerolog.ErrorLevel)
-
-	var mockBulk tst.MockBulk
+	mockBulk := ftesting.NewMockBulk()
 
 	bc := NewBulk(mockBulk)
 

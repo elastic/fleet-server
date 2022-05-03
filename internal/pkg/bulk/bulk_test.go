@@ -16,23 +16,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog/log"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 // TODO:
 // WithREfresh() options
 // Delete not found?
 
-type stubTransport struct {
-	cb func(*http.Request) (*http.Response, error)
-}
-
-func (s *stubTransport) Perform(req *http.Request) (*http.Response, error) {
-	return s.cb(req)
-}
-
 type mockBulkTransport struct {
-	b *testing.B
 }
 
 func (m *mockBulkTransport) Perform(req *http.Request) (*http.Response, error) {
@@ -119,7 +110,6 @@ func (m *mockBulkTransport) Perform(req *http.Request) (*http.Response, error) {
 // Note: In the real world, the transaction may already be in flight,
 // cancelling a call does not mean the transaction did not occur.
 func TestCancelCtx(t *testing.T) {
-
 	// create a bulker, but don't bother running it
 	bulker := NewBulker(nil)
 
@@ -136,7 +126,7 @@ func TestCancelCtx(t *testing.T) {
 					t.Error("Expected empty id on context cancel:", id)
 				}
 
-				if err != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
 				}
 			},
@@ -150,7 +140,7 @@ func TestCancelCtx(t *testing.T) {
 					t.Error("Expected empty data on context cancel:", data)
 				}
 
-				if err != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
 				}
 			},
@@ -160,7 +150,7 @@ func TestCancelCtx(t *testing.T) {
 			func(t *testing.T, ctx context.Context) {
 				err := bulker.Update(ctx, "testidx", "11", []byte(`{"now":"hey"}`))
 
-				if err != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
 				}
 			},
@@ -170,7 +160,7 @@ func TestCancelCtx(t *testing.T) {
 			func(t *testing.T, ctx context.Context) {
 				err := bulker.Delete(ctx, "testidx", "11")
 
-				if err != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
 				}
 			},
@@ -184,7 +174,7 @@ func TestCancelCtx(t *testing.T) {
 					t.Error("Expected empty id on context cancel:", id)
 				}
 
-				if err != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
 				}
 			},
@@ -198,7 +188,7 @@ func TestCancelCtx(t *testing.T) {
 					t.Error("Expected empty result on context cancel:", res)
 				}
 
-				if err != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
 				}
 			},
@@ -212,7 +202,7 @@ func TestCancelCtx(t *testing.T) {
 					t.Error("Expected empty result on context cancel:", res)
 				}
 
-				if err != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
 				}
 			},
@@ -226,7 +216,7 @@ func TestCancelCtx(t *testing.T) {
 					t.Error("Expected empty result on context cancel:", res)
 				}
 
-				if err != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
 				}
 			},
@@ -234,13 +224,13 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"mupdate",
 			func(t *testing.T, ctx context.Context) {
-				res, err := bulker.MUpdate(ctx, []MultiOp{{Index: "testidx", Id: "umm", Body: []byte(`{"hey":"now"}`)}})
+				res, err := bulker.MUpdate(ctx, []MultiOp{{Index: "testidx", ID: "umm", Body: []byte(`{"hey":"now"}`)}})
 
 				if res != nil {
 					t.Error("Expected empty result on context cancel:", res)
 				}
 
-				if err != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
 				}
 			},
@@ -248,13 +238,13 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"mdelete",
 			func(t *testing.T, ctx context.Context) {
-				res, err := bulker.MDelete(ctx, []MultiOp{{Index: "testidx", Id: "myid"}})
+				res, err := bulker.MDelete(ctx, []MultiOp{{Index: "testidx", ID: "myid"}})
 
 				if res != nil {
 					t.Error("Expected empty result on context cancel:", res)
 				}
 
-				if err != context.Canceled {
+				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
 				}
 			},
@@ -263,7 +253,7 @@ func TestCancelCtx(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
+			_ = testlog.SetLogger(t)
 			ctx, cancelF := context.WithCancel(context.Background())
 
 			var wg sync.WaitGroup
@@ -284,7 +274,7 @@ func TestCancelCtx(t *testing.T) {
 
 func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 	b.ReportAllocs()
-	defer (QuietLogger())()
+	_ = testlog.SetLogger(b)
 
 	mock := &mockBulkTransport{}
 
@@ -298,7 +288,7 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 	waitBulker.Add(1)
 	go func() {
 		defer waitBulker.Done()
-		if err := bulker.Run(ctx); err != context.Canceled {
+		if err := bulker.Run(ctx); !errors.Is(err, context.Canceled) {
 			b.Error(err)
 		}
 	}()
@@ -339,7 +329,7 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 				// Delete
 				err = bulker.Delete(ctx, index, id)
 				if err != nil {
-					log.Info().Str("index", index).Str("id", id).Msg("delete fail")
+					b.Logf("Delete failed index: %s id: %s", index, id)
 					b.Error(err)
 				}
 			}

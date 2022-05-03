@@ -5,6 +5,7 @@
 //go:build integration
 // +build integration
 
+// Pacakge suite wraps a testify/suite.Suite
 package suite
 
 import (

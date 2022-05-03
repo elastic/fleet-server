@@ -12,8 +12,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/hashicorp/go-version"
-	"github.com/rs/zerolog/log"
 )
 
 func TestValidateUserAgent(t *testing.T) {
@@ -115,9 +116,10 @@ func TestValidateUserAgent(t *testing.T) {
 	}
 	for _, tr := range tests {
 		t.Run(tr.userAgent, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set("User-Agent", tr.userAgent)
-			_, res := validateUserAgent(log.Logger, req, tr.verCon)
+			_, res := validateUserAgent(logger, req, tr.verCon)
 			if !errors.Is(tr.err, res) {
 				t.Fatalf("err mismatch: %v != %v", tr.err, res)
 			}

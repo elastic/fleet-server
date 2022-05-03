@@ -64,7 +64,9 @@ func SetupBulk(ctx context.Context, t *testing.T, opts ...bulk.BulkOpt) bulk.Bul
 	cli := SetupES(ctx, t)
 	opts = append(opts, bulk.BulkOptsFromCfg(&defaultCfg)...)
 	bulker := bulk.NewBulker(cli, opts...)
-	go bulker.Run(ctx)
+	go func() {
+		_ = bulker.Run(ctx)
+	}()
 	return bulker
 }
 
@@ -117,7 +119,9 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 		t.Fatal(err)
 	}
 
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 	var esres es.DeleteByQueryResponse
 
 	err = json.NewDecoder(res.Body).Decode(&esres)

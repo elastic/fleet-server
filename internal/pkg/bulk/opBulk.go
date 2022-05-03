@@ -69,7 +69,10 @@ func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id s
 	}
 	b.freeBlk(blk)
 
-	r := resp.data.(*BulkIndexerResponseItem)
+	r, ok := resp.data.(*BulkIndexerResponseItem)
+	if !ok {
+		return nil, fmt.Errorf("unable to cast to *BulkIndexerResponseItem, detected type %T", resp.data)
+	}
 	return r, nil
 }
 
@@ -78,11 +81,11 @@ func (b *Bulker) writeMget(buf *Buf, index, id string) error {
 		return err
 	}
 
-	buf.WriteString(`{"_index":"`)
-	buf.WriteString(index)
-	buf.WriteString(`","_id":"`)
-	buf.WriteString(id)
-	buf.WriteString(`"},`)
+	_, _ = buf.WriteString(`{"_index":"`)
+	_, _ = buf.WriteString(index)
+	_, _ = buf.WriteString(`","_id":"`)
+	_, _ = buf.WriteString(id)
+	_, _ = buf.WriteString(`"},`)
 	return nil
 }
 
@@ -91,23 +94,23 @@ func (b *Bulker) writeBulkMeta(buf *Buf, action, index, id, retry string) error 
 		return err
 	}
 
-	buf.WriteString(`{"`)
-	buf.WriteString(action)
-	buf.WriteString(`":{`)
+	_, _ = buf.WriteString(`{"`)
+	_, _ = buf.WriteString(action)
+	_, _ = buf.WriteString(`":{`)
 	if id != "" {
-		buf.WriteString(`"_id":"`)
-		buf.WriteString(id)
-		buf.WriteString(`",`)
+		_, _ = buf.WriteString(`"_id":"`)
+		_, _ = buf.WriteString(id)
+		_, _ = buf.WriteString(`",`)
 	}
 	if retry != "" {
-		buf.WriteString(`"retry_on_conflict":`)
-		buf.WriteString(retry)
-		buf.WriteString(`,`)
+		_, _ = buf.WriteString(`"retry_on_conflict":`)
+		_, _ = buf.WriteString(retry)
+		_, _ = buf.WriteString(`,`)
 	}
 
-	buf.WriteString(`"_index":"`)
-	buf.WriteString(index)
-	buf.WriteString("\"}}\n")
+	_, _ = buf.WriteString(`"_index":"`)
+	_, _ = buf.WriteString(index)
+	_, _ = buf.WriteString("\"}}\n")
 
 	return nil
 }
@@ -119,7 +122,7 @@ func (b *Bulker) writeBulkBody(buf *Buf, action actionT, body []byte) error {
 		}
 
 		// Weird to index, create, or update empty, but will allow
-		buf.WriteString("{}\n")
+		_, _ = buf.WriteString("{}\n")
 		return nil
 	}
 
@@ -127,8 +130,8 @@ func (b *Bulker) writeBulkBody(buf *Buf, action actionT, body []byte) error {
 		return err
 	}
 
-	buf.Write(body)
-	buf.WriteRune('\n')
+	_, _ = buf.Write(body)
+	_, _ = buf.WriteRune('\n')
 	return nil
 }
 
@@ -142,8 +145,8 @@ func (b *Bulker) calcBulkSz(action, idx, id, retry string, body []byte) int {
 
 	var idSz int
 	if id != "" {
-		const kIdFraming = 9
-		idSz = kIdFraming + len(id)
+		const kIDFraming = 9
+		idSz = kIDFraming + len(id)
 	}
 
 	var bodySz int
@@ -191,7 +194,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	}
 
 	if res.Body != nil {
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 	}
 
 	if res.IsError() {
@@ -244,7 +247,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	// up the stack will fail.
 
 	n := queue.head
-	for i, _ := range blk.Items {
+	for i := range blk.Items {
 		next := n.next // 'n' is invalid immediately on channel send
 
 		item := blk.Items[i].Choose()

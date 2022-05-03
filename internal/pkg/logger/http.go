@@ -141,7 +141,7 @@ func httpMeta(r *http.Request, e *zerolog.Event) {
 
 	// ApiKey
 	if apiKey, err := apikey.ExtractAPIKey(r); err == nil {
-		e.Str(ApiKeyId, apiKey.Id)
+		e.Str(ApiKeyId, apiKey.ID)
 	}
 
 	// Client info

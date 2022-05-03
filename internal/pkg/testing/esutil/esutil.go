@@ -49,8 +49,6 @@ type errorResponse struct {
 		Reason string `json:"reason"`
 	} `json:"error,omitempty"`
 	Status int `json:"status,omitempty"`
-
-	err error // Wrapped error
 }
 
 func checkResponseError(res *esapi.Response) error {
