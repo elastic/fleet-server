@@ -108,14 +108,14 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		require.True(t, ok, "unable to case api key")
 		require.Equal(t, testAgent.DefaultAPIKey, key)
 		bulker.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		bulker.AssertNotCalled(t, "ApiKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		bulker.AssertNotCalled(t, "APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		bulker.AssertExpectations(t)
 	})
 
 	t.Run("Permission hash != Agent Permission Hash need to regenerate the key", func(t *testing.T) {
 		bulker := ftesting.NewMockBulk()
 		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		bulker.On("ApiKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once()
+		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once()
 
 		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,
@@ -148,7 +148,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 	t.Run("Generate API Key on new Agent", func(t *testing.T) {
 		bulker := ftesting.NewMockBulk()
 		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		bulker.On("ApiKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once()
+		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once()
 
 		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,

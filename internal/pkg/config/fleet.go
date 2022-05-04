@@ -65,7 +65,7 @@ func strToLevel(s string) (zerolog.Level, error) {
 		l = zerolog.TraceLevel
 	case "debug":
 		l = zerolog.DebugLevel
-	case defaultLevel:
+	case "info":
 		l = zerolog.InfoLevel
 	case "warning":
 		l = zerolog.WarnLevel

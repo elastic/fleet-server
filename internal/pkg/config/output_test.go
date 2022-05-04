@@ -5,6 +5,7 @@
 //go:build !integration
 // +build !integration
 
+//nolint:dupl // duplicated lines used for test cases
 package config
 
 import (
@@ -104,7 +105,7 @@ func TestToESConfig(t *testing.T) {
 				MaxRetries:   6,
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
+						InsecureSkipVerify: true, //nolint:gosec // test case
 						MinVersion:         tls.VersionTLS11,
 						MaxVersion:         tls.VersionTLS13,
 					},
@@ -140,7 +141,7 @@ func TestToESConfig(t *testing.T) {
 				MaxRetries:   6,
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
+						InsecureSkipVerify: true, //nolint:gosec // test case
 						MinVersion:         tls.VersionTLS11,
 						MaxVersion:         tls.VersionTLS13,
 					},
