@@ -61,14 +61,9 @@ func TestScheduler(t *testing.T) {
 	})
 
 	g.Go(func() error {
-		timer := time.NewTimer(500 * time.Millisecond)
-		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timer.C:
-			return errTest
-		}
+		sleep.WithContext(ctx, 500*time.Millisecond)
+		// return some error here to cause exit error group wait
+		return errTest
 	})
 
 	// Wait for result
