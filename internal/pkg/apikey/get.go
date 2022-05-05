@@ -32,7 +32,7 @@ func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKey
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close() //nolint:errcheck // defered close
+	defer res.Body.Close()
 
 	if res.IsError() {
 		err = errors.Wrap(ErrAPIKeyNotFound, res.String())

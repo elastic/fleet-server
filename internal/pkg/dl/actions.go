@@ -142,7 +142,7 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 	if err != nil {
 		return
 	}
-	defer res.Body.Close() //nolint:errcheck // defered close
+	defer res.Body.Close()
 
 	var esres es.DeleteByQueryResponse
 

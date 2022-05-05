@@ -23,7 +23,7 @@ import (
 // The timeout would be driven by the server for long poll.
 // Giving it some sane long value.
 const httpTransportLongPollTimeout = 10 * time.Minute
-const defaultProtocol = "http"
+const schemeHTTP = "http"
 
 var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
@@ -46,7 +46,7 @@ type Elasticsearch struct {
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *Elasticsearch) InitDefaults() {
-	c.Protocol = defaultProtocol
+	c.Protocol = schemeHTTP
 	c.Hosts = []string{"localhost:9200"}
 	c.Timeout = 90 * time.Second
 	c.MaxRetries = 3
@@ -181,7 +181,7 @@ func (c *Output) Validate() error {
 
 func makeURL(defaultScheme string, defaultPath string, rawURL string, defaultPort int) (string, error) {
 	if defaultScheme == "" {
-		defaultScheme = defaultProtocol
+		defaultScheme = schemeHTTP
 	}
 	if !hasScheme.MatchString(rawURL) {
 		rawURL = fmt.Sprintf("%v://%v", defaultScheme, rawURL)

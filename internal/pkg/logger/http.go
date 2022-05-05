@@ -84,16 +84,14 @@ func (rc *ResponseCounter) Count() uint64 {
 }
 
 func splitAddr(addr string) (host string, port int) {
-
 	host, portS, err := net.SplitHostPort(addr)
-
 	if err == nil {
 		if v, err := strconv.Atoi(portS); err == nil {
 			port = v
 		}
 	}
 
-	return
+	return //nolint:nakedret // short function
 }
 
 // Expects HTTP version in form of HTTP/x.y
@@ -103,7 +101,7 @@ func stripHTTP(h string) string {
 	case "HTTP/2.0":
 		return "2.0"
 	case "HTTP/1.1":
-		return "1.1"
+		return "1.1" //nolint:goconst // 1.1 is used by http and tls
 	default:
 		if strings.HasPrefix(h, httpSlashPrefix) {
 			return h[len(httpSlashPrefix):]

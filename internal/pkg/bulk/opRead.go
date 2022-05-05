@@ -94,7 +94,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	}
 
 	if res.Body != nil {
-		defer res.Body.Close() //nolint:errcheck // defered close
+		defer res.Body.Close()
 	}
 
 	if res.IsError() {

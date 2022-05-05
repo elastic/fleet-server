@@ -45,7 +45,7 @@ func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refres
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close() //nolint:errcheck // defered close
+	defer res.Body.Close()
 
 	if res.IsError() {
 		return nil, fmt.Errorf("fail CreateAPIKey: %s", res.String())

@@ -41,7 +41,7 @@ func (k APIKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	}
 
 	if res.Body != nil {
-		defer res.Body.Close() //nolint:errcheck // defered close
+		defer res.Body.Close()
 	}
 
 	if res.IsError() {

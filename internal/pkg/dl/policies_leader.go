@@ -65,7 +65,7 @@ func SearchPolicyLeaders(ctx context.Context, bulker bulk.Bulk, ids []string, op
 		if err != nil {
 			return
 		}
-		leaders[hit.Id] = l
+		leaders[hit.ID] = l
 	}
 	return leaders, nil
 }

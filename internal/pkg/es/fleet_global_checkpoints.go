@@ -124,6 +124,7 @@ func (r GlobalCheckpointsRequest) Do(ctx context.Context, transport esapi.Transp
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	response := esapi.Response{
 		StatusCode: res.StatusCode,
