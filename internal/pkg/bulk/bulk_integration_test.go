@@ -17,10 +17,11 @@ import (
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/google/go-cmp/cmp"
 )
+
+// NOTE attempting to use testing/log here will cause the race detector to fail
 
 func TestBulkCreate(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
@@ -94,7 +95,6 @@ func TestBulkCreate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-
 			sample := NewRandomSample()
 			sampleData := sample.marshal(t)
 
@@ -165,7 +165,6 @@ func TestBulkCreateBody(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-
 			_, err := bulker.Create(ctx, index, "", test.Body)
 			if !EqualElastic(test.Err, err) {
 				t.Fatal(err)
@@ -308,7 +307,7 @@ func TestBulkDelete(t *testing.T) {
 	// Attempt to delete again, should not be found
 	err = bulker.Delete(ctx, index, id)
 	var esErr *es.ErrElastic
-	if !errors.As(err, esErr) || esErr.Status != 404 {
+	if !errors.As(err, &esErr) || esErr.Status != 404 {
 		t.Fatal(err)
 	}
 }
@@ -316,7 +315,6 @@ func TestBulkDelete(t *testing.T) {
 // This runs a series of CRUD operations through elastic.
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
 func benchmarkCreate(n int, b *testing.B) {
-	_ = testlog.SetLogger(b)
 	b.ReportAllocs()
 
 	ctx, cn := context.WithCancel(context.Background())
@@ -372,7 +370,6 @@ func BenchmarkCreate(b *testing.B) {
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
 
 func benchmarkCRUD(n int, b *testing.B) {
-	_ = testlog.SetLogger(b)
 	b.ReportAllocs()
 
 	ctx, cn := context.WithCancel(context.Background())

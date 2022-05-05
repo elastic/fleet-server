@@ -65,14 +65,14 @@ func (s *tserver) waitExit() error {
 func startTestServer(ctx context.Context) (*tserver, error) {
 	cfg, err := config.LoadFile("../../fleet-server.yml")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("config load error: %w", err)
 	}
 
 	logger.Init(cfg, "fleet-server") //nolint:errcheck // test logging setup
 
 	port, err := ftesting.FreePort()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to find port: %w", err)
 	}
 
 	srvcfg := &config.Server{}
@@ -84,7 +84,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 
 	srv, err := NewFleetServer(cfg, build.Info{Version: serverVersion}, status.NewLog())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to create server: %w", err)
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -96,7 +96,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 	tsrv := &tserver{cfg: cfg, g: g, srv: srv}
 	err = tsrv.waitServerUp(ctx, testWaitServerUp)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to start server: %w", err)
 	}
 	return tsrv, nil
 }
@@ -190,7 +190,6 @@ func TestServerUnauthorized(t *testing.T) {
 
 	// Unauthorized, expecting error from /_security/_authenticate
 	t.Run("unauthorized", func(t *testing.T) {
-
 		for _, u := range agenturls {
 			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}"))) //nolint:noctx // test case
 			require.NoError(t, err)

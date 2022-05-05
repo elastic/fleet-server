@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Pallinder/go-randomdata"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/rs/xid"
 
-	"github.com/Pallinder/go-randomdata"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
@@ -174,9 +174,9 @@ func EqualElastic(werr, gerr error) bool {
 	}
 
 	var gotErr *es.ErrElastic
-	ok2 := errors.As(gerr, gotErr)
+	ok2 := errors.As(gerr, &gotErr)
 	if !ok2 {
-		ok2 = errors.As(gerr, &gotErr)
+		ok2 = errors.As(gerr, gotErr)
 	}
 
 	return (ok2 && wantErr.Status == gotErr.Status && wantErr.Type == gotErr.Type)
