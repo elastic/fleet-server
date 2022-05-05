@@ -21,16 +21,16 @@ import (
 
 // Alias logger constants
 const (
-	ECSHTTPRequestID         = logger.EcsHttpRequestId
-	ECSEventDuration         = logger.EcsEventDuration
-	ECSHTTPResponseCode      = logger.EcsHttpResponseCode
-	ECSHTTPResponseBodyBytes = logger.EcsHttpResponseBodyBytes
+	ECSHTTPRequestID         = logger.ECSHTTPRequestID
+	ECSEventDuration         = logger.ECSEventDuration
+	ECSHTTPResponseCode      = logger.ECSHTTPResponseCode
+	ECSHTTPResponseBodyBytes = logger.ECSHTTPResponseBodyBytes
 
-	LogAPIKeyID       = logger.ApiKeyId
-	LogPolicyID       = logger.PolicyId
-	LogAgentID        = logger.AgentId
-	LogEnrollAPIKeyID = logger.EnrollApiKeyId
-	LogAccessAPIKeyID = logger.AccessApiKeyId
+	LogAPIKeyID       = logger.APIKeyID
+	LogPolicyID       = logger.PolicyID
+	LogAgentID        = logger.AgentID
+	LogEnrollAPIKeyID = logger.EnrollAPIKeyID
+	LogAccessAPIKeyID = logger.AccessAPIKeyID
 )
 
 // HTTPErrResp is an HTTP error response

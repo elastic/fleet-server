@@ -16,7 +16,7 @@ func FreePort() (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer l.Close() //nolint:errcheck // defered close
+	defer l.Close()
 
 	return uint16(l.Addr().(*net.TCPAddr).Port), nil
 }

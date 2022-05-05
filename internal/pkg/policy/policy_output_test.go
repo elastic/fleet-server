@@ -115,7 +115,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 	t.Run("Permission hash != Agent Permission Hash need to regenerate the key", func(t *testing.T) {
 		bulker := ftesting.NewMockBulk()
 		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once()
+		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once() //nolint:govet // test case
 
 		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,
@@ -148,7 +148,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 	t.Run("Generate API Key on new Agent", func(t *testing.T) {
 		bulker := ftesting.NewMockBulk()
 		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once()
+		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once() //nolint:govet // test case
 
 		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,

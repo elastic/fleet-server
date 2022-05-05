@@ -63,7 +63,7 @@ func New(schedules []Schedule, opts ...OptFunc) (*Scheduler, error) {
 		log:           log.With().Str("ctx", "elasticsearch CG scheduler").Logger(),
 		splayPercent:  defaultSplayPercent,
 		firstRunDelay: defaultFirstRunDelay,
-		rand:          rand.New(rand.NewSource(time.Now().UnixNano())),
+		rand:          rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec // used for timing offsets
 		schedules:     schedules,
 	}
 

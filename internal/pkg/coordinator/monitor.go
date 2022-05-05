@@ -496,7 +496,7 @@ func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyID string, u
 	}
 
 	zlog.Info().
-		Strs(logger.ApiKeyId, agentIds).
+		Strs(logger.APIKeyID, agentIds).
 		Msg("marked agents unenrolled due to unenroll timeout")
 
 	return nil
@@ -517,8 +517,8 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	apiKeys := getAPIKeyIDs(agent)
 
 	zlog = zlog.With().
-		Str(logger.AgentId, agent.Id).
-		Strs(logger.ApiKeyId, apiKeys).
+		Str(logger.AgentID, agent.Id).
+		Strs(logger.APIKeyID, apiKeys).
 		Logger()
 
 	zlog.Info().Msg("unenrollAgent due to unenroll timeout")

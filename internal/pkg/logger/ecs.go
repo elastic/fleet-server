@@ -7,62 +7,62 @@ package logger
 const (
 
 	// Basic logging
-	EcsLogLevel      = "log.level"
-	EcsLogName       = "log.logger"
-	EcsLogCaller     = "log.origin"
-	EcsLogStackTrace = "log.origin.stack_trace"
-	EcsMessage       = "message"
-	EcsTimestamp     = "@timestamp"
-	EcsErrorMessage  = "error.message"
+	ECSLogLevel      = "log.level"
+	ECSLogName       = "log.logger"
+	ECSLogCaller     = "log.origin"
+	ECSLogStackTrace = "log.origin.stack_trace"
+	ECSMessage       = "message"
+	ECSTimestamp     = "@timestamp"
+	ECSErrorMessage  = "error.message"
 
 	// HTTP
-	EcsHttpVersion           = "http.version"
-	EcsHttpRequestId         = "http.request.id"
-	EcsHttpRequestMethod     = "http.request.method"
-	EcsHttpRequestBodyBytes  = "http.request.body.bytes"
-	EcsHttpResponseCode      = "http.response.status_code"
-	EcsHttpResponseBodyBytes = "http.response.body.bytes"
+	ECSHTTPVersion           = "http.version"
+	ECSHTTPRequestID         = "http.request.id"
+	ECSHTTPRequestMethod     = "http.request.method"
+	ECSHTTPRequestBodyBytes  = "http.request.body.bytes"
+	ECSHTTPResponseCode      = "http.response.status_code"
+	ECSHTTPResponseBodyBytes = "http.response.body.bytes"
 
 	// URL
-	EcsUrlFull   = "url.full"
-	EcsUrlDomain = "url.domain"
-	EcsUrlPort   = "url.port"
+	ECSURLFull   = "url.full"
+	ECSURLDomain = "url.domain"
+	ECSURLPort   = "url.port"
 
 	// Client
-	EcsClientAddress = "client.address"
-	EcsClientIp      = "client.ip"
-	EcsClientPort    = "client.port"
+	ECSClientAddress = "client.address"
+	ECSClientIP      = "client.ip"
+	ECSClientPort    = "client.port"
 
 	// Server
-	EcsServerAddress = "server.address"
+	ECSServerAddress = "server.address"
 
 	// TLS
-	EcsTlsEstablished        = "tls.established"
-	EcsTlsResumed            = "tls.resumed"
-	EcsTlsVersion            = "tls.version"
-	EcsTlsClientServerName   = "tls.client.server_name"
-	EcsTlsCipher             = "tls.cipher"
-	EcsTlsClientIssuer       = "tls.client.issuer"
-	EcsTlsClientSubject      = "tls.client.subject"
-	EcsTlsClientNotBefore    = "tls.client.not_before"
-	EcsTlsClientNotAfter     = "tls.client.not_after"
-	EcsTlsClientSerialNumber = "tls.client.x509.serial_number"
-	EcsTlsClientTimeFormat   = "2006-01-02T15:04:05.999Z"
+	ECSTLSEstablished        = "tls.established"
+	ECSTLSsResumed           = "tls.resumed"
+	ECSTLSVersion            = "tls.version"
+	ECSTLSClientServerName   = "tls.client.server_name"
+	ECSTLSCipher             = "tls.cipher"
+	ECSTLSClientIssuer       = "tls.client.issuer"
+	ECSTLSClientSubject      = "tls.client.subject"
+	ECSTLSClientNotBefore    = "tls.client.not_before"
+	ECSTLSClientNotAfter     = "tls.client.not_after"
+	ECSTLSClientSerialNumber = "tls.client.x509.serial_number"
+	ECSTLSClientTimeFormat   = "2006-01-02T15:04:05.999Z"
 
 	// Event
-	EcsEventDuration = "event.duration"
+	ECSEventDuration = "event.duration"
 
 	// Service
-	EcsServiceName = "service.name"
+	ECSServiceName = "service.name"
 )
 
 // Non ECS compliant contants used in logging
 
 const (
-	ApiKeyId              = "fleet.apikey.id"
-	PolicyId              = "fleet.policy.id"
-	AgentId               = "fleet.agent.id"
-	EnrollApiKeyId        = "fleet.enroll.apikey.id"
-	AccessApiKeyId        = "fleet.access.apikey.id"
-	DefaultOutputApiKeyId = "fleet.default.apikey.id"
+	APIKeyID              = "fleet.apikey.id" //nolint:gosec // key name
+	PolicyID              = "fleet.policy.id"
+	AgentID               = "fleet.agent.id"
+	EnrollAPIKeyID        = "fleet.enroll.apikey.id"
+	AccessAPIKeyID        = "fleet.access.apikey.id"
+	DefaultOutputAPIKeyID = "fleet.default.apikey.id"
 )

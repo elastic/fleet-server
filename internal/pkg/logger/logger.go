@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package logger provides logging utilities for fleet-server.
+// Currently it wraps rs/zerolog
 package logger
 
 import (
@@ -58,7 +60,7 @@ func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 // Sync syncs the logger to its output.
 func (l *Logger) Sync() {
 	if l.sync != nil {
-		l.sync.Sync()
+		l.sync.Sync() //nolint: errcheck // nowhere to report an error
 	}
 }
 
@@ -155,10 +157,10 @@ func configure(cfg *config.Config, svcName string) (lg zerolog.Logger, wr Writer
 	}
 
 	if svcName != "" {
-		lg = lg.With().Str(EcsServiceName, svcName).Logger()
+		lg = lg.With().Str(ECSServiceName, svcName).Logger()
 	}
 
-	return
+	return //nolint:nakedret // short function
 }
 
 type nopSync struct {

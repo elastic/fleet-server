@@ -87,7 +87,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 			// are used.
 			zlog.Info().
 				Str("hash.sha256", p.Role.Sha2).
-				Str(logger.DefaultOutputApiKeyId, outputAPIKey.ID).
+				Str(logger.DefaultOutputAPIKeyID, outputAPIKey.ID).
 				Msg("Updating agent record to pick up default output key.")
 
 			fields := map[string]interface{}{

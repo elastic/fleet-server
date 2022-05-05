@@ -67,7 +67,7 @@ func (d *Dispatcher) Subscribe(agentID string, seqNo sqn.SeqNo) *Sub {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentId, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
+	log.Trace().Str(logger.AgentID, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
 
 	return &sub
 }
@@ -82,7 +82,7 @@ func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentId, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
+	log.Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
 func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
@@ -121,7 +121,7 @@ func (d *Dispatcher) getSub(agentID string) (Sub, bool) {
 func (d *Dispatcher) dispatch(_ context.Context, agentID string, acdocs []model.Action) {
 	sub, ok := d.getSub(agentID)
 	if !ok {
-		log.Debug().Str(logger.AgentId, agentID).Msg("Agent is not currently connected. Not dispatching actions.")
+		log.Debug().Str(logger.AgentID, agentID).Msg("Agent is not currently connected. Not dispatching actions.")
 		return
 	}
 	select {

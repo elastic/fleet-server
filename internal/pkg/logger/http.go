@@ -114,77 +114,77 @@ func stripHTTP(h string) string {
 func httpMeta(r *http.Request, e *zerolog.Event) {
 	// Look for request id
 	if reqID := r.Header.Get(HeaderRequestID); reqID != "" {
-		e.Str(EcsHttpRequestId, reqID)
+		e.Str(ECSHTTPRequestID, reqID)
 	}
 
 	oldForce := r.URL.ForceQuery
 	r.URL.ForceQuery = false
-	e.Str(EcsUrlFull, r.URL.String())
+	e.Str(ECSURLFull, r.URL.String())
 	r.URL.ForceQuery = oldForce
 
 	if domain := r.URL.Hostname(); domain != "" {
-		e.Str(EcsUrlDomain, domain)
+		e.Str(ECSURLDomain, domain)
 	}
 
 	port := r.URL.Port()
 	if port != "" {
 		if v, err := strconv.Atoi(port); err == nil {
-			e.Int(EcsUrlPort, v)
+			e.Int(ECSURLPort, v)
 		}
 	}
 
 	// HTTP info
-	e.Str(EcsHttpVersion, stripHTTP(r.Proto))
-	e.Str(EcsHttpRequestMethod, r.Method)
+	e.Str(ECSHTTPVersion, stripHTTP(r.Proto))
+	e.Str(ECSHTTPRequestMethod, r.Method)
 
 	// ApiKey
 	if apiKey, err := apikey.ExtractAPIKey(r); err == nil {
-		e.Str(ApiKeyId, apiKey.ID)
+		e.Str(APIKeyID, apiKey.ID)
 	}
 
 	// Client info
 	if r.RemoteAddr != "" {
-		e.Str(EcsClientAddress, r.RemoteAddr)
+		e.Str(ECSClientAddress, r.RemoteAddr)
 	}
 
 	// TLS info
-	e.Bool(EcsTlsEstablished, r.TLS != nil)
+	e.Bool(ECSTLSEstablished, r.TLS != nil)
 }
 
 func httpDebug(r *http.Request, e *zerolog.Event) {
 	// Client info
 	if r.RemoteAddr != "" {
 		remoteIP, remotePort := splitAddr(r.RemoteAddr)
-		e.Str(EcsClientIp, remoteIP)
-		e.Int(EcsClientPort, remotePort)
+		e.Str(ECSClientIP, remoteIP)
+		e.Int(ECSClientPort, remotePort)
 	}
 
 	if r.TLS != nil {
 
-		e.Str(EcsTlsVersion, TlsVersionToString(r.TLS.Version))
-		e.Str(EcsTlsCipher, tls.CipherSuiteName(r.TLS.CipherSuite))
-		e.Bool(EcsTlsResumed, r.TLS.DidResume)
+		e.Str(ECSTLSVersion, TLSVersionToString(r.TLS.Version))
+		e.Str(ECSTLSCipher, tls.CipherSuiteName(r.TLS.CipherSuite))
+		e.Bool(ECSTLSsResumed, r.TLS.DidResume)
 
 		if r.TLS.ServerName != "" {
-			e.Str(EcsTlsClientServerName, r.TLS.ServerName)
+			e.Str(ECSTLSClientServerName, r.TLS.ServerName)
 		}
 
 		if len(r.TLS.PeerCertificates) > 0 && r.TLS.PeerCertificates[0] != nil {
 			leaf := r.TLS.PeerCertificates[0]
 			if leaf.SerialNumber != nil {
-				e.Str(EcsTlsClientSerialNumber, leaf.SerialNumber.String())
+				e.Str(ECSTLSClientSerialNumber, leaf.SerialNumber.String())
 			}
-			e.Str(EcsTlsClientIssuer, leaf.Issuer.String())
-			e.Str(EcsTlsClientSubject, leaf.Subject.String())
-			e.Str(EcsTlsClientNotBefore, leaf.NotBefore.UTC().Format(EcsTlsClientTimeFormat))
-			e.Str(EcsTlsClientNotAfter, leaf.NotAfter.UTC().Format(EcsTlsClientTimeFormat))
+			e.Str(ECSTLSClientIssuer, leaf.Issuer.String())
+			e.Str(ECSTLSClientSubject, leaf.Subject.String())
+			e.Str(ECSTLSClientNotBefore, leaf.NotBefore.UTC().Format(ECSTLSClientTimeFormat))
+			e.Str(ECSTLSClientNotAfter, leaf.NotAfter.UTC().Format(ECSTLSClientTimeFormat))
 		}
 	}
 }
 
-// HttpHandler returns an httprouter.Handle that wraps the request with an ECS logger and
+// HTTPHandler returns an httprouter.Handle that wraps the request with an ECS logger and
 // captures metrics for the current request.
-func HttpHandler(next httprouter.Handle) httprouter.Handle {
+func HTTPHandler(next httprouter.Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		e := log.Info()
 
@@ -213,17 +213,17 @@ func HttpHandler(next httprouter.Handle) httprouter.Handle {
 
 		// Only logs non 2xx errors unless we are debugging.
 		if log.Debug().Enabled() || (wrCounter.statusCode < 200 && wrCounter.statusCode >= 300) {
-			e.Uint64(EcsHttpRequestBodyBytes, rdCounter.Count())
-			e.Uint64(EcsHttpResponseBodyBytes, wrCounter.Count())
-			e.Int(EcsHttpResponseCode, wrCounter.statusCode)
-			e.Int64(EcsEventDuration, time.Since(start).Nanoseconds())
+			e.Uint64(ECSHTTPRequestBodyBytes, rdCounter.Count())
+			e.Uint64(ECSHTTPResponseBodyBytes, wrCounter.Count())
+			e.Int(ECSHTTPResponseCode, wrCounter.statusCode)
+			e.Int64(ECSEventDuration, time.Since(start).Nanoseconds())
 
 			e.Msgf("%d HTTP Request", wrCounter.statusCode)
 		}
 	}
 }
 
-func TlsVersionToString(vers uint16) string {
+func TLSVersionToString(vers uint16) string {
 	switch vers {
 	case tls.VersionTLS10:
 		return "1.0"

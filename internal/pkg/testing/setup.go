@@ -118,7 +118,7 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close() //nolint:errcheck // defered close
+	defer res.Body.Close()
 
 	var esres es.DeleteByQueryResponse
 

@@ -48,7 +48,7 @@ type tserver struct {
 	srv *FleetServer
 }
 
-func (s *tserver) baseUrl() string {
+func (s *tserver) baseURL() string {
 	input, _ := s.cfg.GetFleetInput()
 	tls := input.Server.TLS
 	schema := "http"
@@ -68,7 +68,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 		return nil, err
 	}
 
-	logger.Init(cfg, "fleet-server")
+	logger.Init(cfg, "fleet-server") //nolint:errcheck // test logging setup
 
 	port, err := ftesting.FreePort()
 	if err != nil {
@@ -105,7 +105,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 	start := time.Now()
 	cli := cleanhttp.DefaultClient()
 	for {
-		res, err := cli.Get(s.baseUrl() + "/api/status")
+		res, err := cli.Get(s.baseURL() + "/api/status") //nolint:noctx // test setup
 		if err != nil {
 			if time.Since(start) > dur {
 				return err
@@ -123,7 +123,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 
 }
 
-func (s *tserver) buildUrl(id string, cmd string) string {
+func (s *tserver) buildURL(id string, cmd string) string {
 	ur := "/api/fleet/agents"
 	if id != "" {
 		ur = path.Join(ur, id)
@@ -132,7 +132,7 @@ func (s *tserver) buildUrl(id string, cmd string) string {
 		ur = path.Join(ur, cmd)
 	}
 
-	return s.baseUrl() + ur
+	return s.baseURL() + ur
 }
 
 func TestServerUnauthorized(t *testing.T) {
@@ -143,16 +143,16 @@ func TestServerUnauthorized(t *testing.T) {
 	srv, err := startTestServer(ctx)
 	require.NoError(t, err)
 
-	agentId := uuid.Must(uuid.NewV4()).String()
+	agentID := uuid.Must(uuid.NewV4()).String()
 	cli := cleanhttp.DefaultClient()
 
 	agenturls := []string{
-		srv.buildUrl(agentId, "checkin"),
-		srv.buildUrl(agentId, "acks"),
+		srv.buildURL(agentID, "checkin"),
+		srv.buildURL(agentID, "acks"),
 	}
 
 	allurls := []string{
-		srv.buildUrl("", "enroll"),
+		srv.buildURL("", "enroll"),
 	}
 	allurls = append(allurls, agenturls...)
 
@@ -161,7 +161,7 @@ func TestServerUnauthorized(t *testing.T) {
 	// TODO: revisit error response format
 	t.Run("no auth header", func(t *testing.T) {
 		for _, u := range allurls {
-			res, err := cli.Post(u, "application/json", bytes.NewBuffer([]byte("{}")))
+			res, err := cli.Post(u, "application/json", bytes.NewBuffer([]byte("{}"))) //nolint:noctx // test case
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -192,7 +192,7 @@ func TestServerUnauthorized(t *testing.T) {
 	t.Run("unauthorized", func(t *testing.T) {
 
 		for _, u := range agenturls {
-			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}")))
+			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}"))) //nolint:noctx // test case
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "ApiKey ZExqY1hYWUJJUVVxWDVia2JvVGM6M05XaUt5aHBRYk9YSTRQWDg4YWp0UQ==")
@@ -225,7 +225,7 @@ func TestServerUnauthorized(t *testing.T) {
 
 	// Stop test server
 	cancel()
-	srv.waitExit()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func TestServerInstrumentation(t *testing.T) {
@@ -239,7 +239,7 @@ func TestServerInstrumentation(t *testing.T) {
 			return
 		}
 		tracerConnected <- struct{}{}
-		io.Copy(io.Discard, req.Body)
+		io.Copy(io.Discard, req.Body) //nolint:errcheck // test case
 		tracerDisconnected <- struct{}{}
 	}))
 	defer server.Close()
@@ -248,8 +248,7 @@ func TestServerInstrumentation(t *testing.T) {
 	srv, err := startTestServer(ctx)
 	require.NoError(t, err)
 
-	newInstrumentationCfg := func(cfg config.Config, instr config.Instrumentation) {
-		cfg.Inputs[0] = cfg.Inputs[0]
+	newInstrumentationCfg := func(cfg config.Config, instr config.Instrumentation) { //nolint:govet // mutex should not be copied in operation (hopefully)
 		cfg.Inputs[0].Server.Instrumentation = instr
 
 		newCfg, err := srv.cfg.Merge(&cfg)
@@ -259,7 +258,7 @@ func TestServerInstrumentation(t *testing.T) {
 	}
 
 	// Enable instrumentation
-	newInstrumentationCfg(*srv.cfg, config.Instrumentation{
+	newInstrumentationCfg(*srv.cfg, config.Instrumentation{ //nolint:govet // mutex should not be copied in operation (hopefully)
 		Enabled: true,
 		Hosts:   []string{server.URL},
 	})
@@ -268,9 +267,10 @@ func TestServerInstrumentation(t *testing.T) {
 	cli := cleanhttp.DefaultClient()
 	callCheckinFunc := func() {
 		for {
-			agentId := "1e4954ce-af37-4731-9f4a-407b08e69e42"
-			cli.Post(srv.buildUrl(agentId, "checkin"), "application/json", bytes.NewBuffer([]byte("{}")))
+			agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
+			res, err := cli.Post(srv.buildURL(agentID, "checkin"), "application/json", bytes.NewBuffer([]byte("{}"))) //nolint:noctx // test case
 			require.NoError(t, err)
+			defer res.Body.Close()
 			select {
 			case <-ctx.Done():
 				return
@@ -292,7 +292,7 @@ func TestServerInstrumentation(t *testing.T) {
 	}
 
 	// Turn instrumentation off
-	newInstrumentationCfg(*srv.cfg, config.Instrumentation{
+	newInstrumentationCfg(*srv.cfg, config.Instrumentation{ //nolint:govet // mutex should not be copied in operation (hopefully)
 		Enabled: false,
 		Hosts:   []string{server.URL},
 	})

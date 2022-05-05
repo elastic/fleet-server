@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package gcheckpt handles the fleet API's global_checkpoints operations
+// TODO describe what global checkpoints are
 package gcheckpt
 
 import (

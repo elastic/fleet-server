@@ -46,5 +46,5 @@ func (r *Rollback) Rollback(ctx context.Context) (err error) {
 			log.Debug().Msg("rollback function succeeded")
 		}
 	}
-	return
+	return //nolint:nakedret // short function
 }
