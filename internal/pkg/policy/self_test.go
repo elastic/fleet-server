@@ -96,7 +96,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  pData,
@@ -144,7 +144,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   2,
 				Version: 1,
 				Source:  pData,
@@ -272,7 +272,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  policyData,
@@ -406,7 +406,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  pData,
@@ -454,7 +454,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   2,
 				Version: 1,
 				Source:  pData,
@@ -582,7 +582,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  policyData,

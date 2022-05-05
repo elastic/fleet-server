@@ -24,11 +24,13 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 var policyBytes = []byte(`{"outputs":{"default":{"type":"elasticsearch"}}}`)
 
 func TestMonitor_NewPolicy(t *testing.T) {
+	_ = testlog.SetLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -79,7 +81,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  policyData,
@@ -111,6 +113,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 }
 
 func TestMonitor_SamePolicy(t *testing.T) {
+	_ = testlog.SetLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -157,7 +160,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  policyData,
@@ -185,6 +188,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 }
 
 func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
+	_ = testlog.SetLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -231,7 +235,7 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  policyData,
@@ -273,6 +277,7 @@ func TestMonitor_NewPolicyExists(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			_ = testlog.SetLogger(t)
 			runTestMonitor_NewPolicyExists(t, tc.delay)
 		})
 	}

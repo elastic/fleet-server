@@ -13,6 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sync/errgroup"
 )
@@ -31,7 +34,7 @@ func (s *scheduleTester) Run(ctx context.Context) error {
 }
 
 func TestScheduler(t *testing.T) {
-
+	_ = testlog.SetLogger(t)
 	const (
 		scheduleInterval       = 200 * time.Millisecond
 		scheduleCancelInterval = 500 * time.Millisecond

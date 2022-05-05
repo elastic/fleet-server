@@ -11,7 +11,6 @@ package config
 import (
 	"crypto/tls"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 

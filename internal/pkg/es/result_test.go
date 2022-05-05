@@ -55,7 +55,7 @@ func TestHitUnmarshal(t *testing.T) {
 	}
 
 	hit := HitT{
-		Id:      action.Id,
+		ID:      action.Id,
 		SeqNo:   action.SeqNo,
 		Version: action.Version,
 		Source:  body,

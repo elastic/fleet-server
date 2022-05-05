@@ -49,8 +49,8 @@ func TestSub_PushBackN(t *testing.T) {
 		j := 0
 		iter := NewIterator(head)
 		for sub := iter.Next(); sub != nil; sub = iter.Next() {
-			if sub.policyId != nodes[j].policyId {
-				t.Error(j, ": misaligned unlink", sub.policyId, nodes[j].policyId)
+			if sub.policyID != nodes[j].policyID {
+				t.Error(j, ": misaligned unlink", sub.policyID, nodes[j].policyID)
 			}
 			j = j + 1
 		}
@@ -58,7 +58,7 @@ func TestSub_PushBackN(t *testing.T) {
 		for i := 0; i < n; i++ {
 
 			sub := head.popFront()
-			if sub.policyId != nodes[i].policyId {
+			if sub.policyID != nodes[i].policyID {
 				t.Error("misalign on popFront")
 			}
 		}
@@ -96,8 +96,8 @@ func TestSub_PushFrontN(t *testing.T) {
 		j := n - 1
 		iter := NewIterator(head)
 		for sub := iter.Next(); sub != nil; sub = iter.Next() {
-			if sub.policyId != nodes[j].policyId {
-				t.Error(j, ": misaligned unlink", sub.policyId, nodes[j].policyId)
+			if sub.policyID != nodes[j].policyID {
+				t.Error(j, ": misaligned unlink", sub.policyID, nodes[j].policyID)
 			}
 			j = j - 1
 		}
@@ -105,7 +105,7 @@ func TestSub_PushFrontN(t *testing.T) {
 		for i := 0; i < n; i++ {
 
 			sub := head.popFront()
-			if sub.policyId != nodes[n-i-1].policyId {
+			if sub.policyID != nodes[n-i-1].policyID {
 				t.Error("misalign on popFront")
 			}
 		}
@@ -145,8 +145,8 @@ func TestSub_PushRandom(t *testing.T) {
 	j := 0
 	iter := NewIterator(head)
 	for sub := iter.Next(); sub != nil; sub = iter.Next() {
-		if sub.policyId != nodes[j].policyId {
-			t.Error(j, ": misaligned unlink", sub.policyId, nodes[j].policyId)
+		if sub.policyID != nodes[j].policyID {
+			t.Error(j, ": misaligned unlink", sub.policyID, nodes[j].policyID)
 		}
 		j = j + 1
 	}
@@ -181,8 +181,8 @@ func TestSub_UnlinkRandomN(t *testing.T) {
 		j := 0
 		iter := NewIterator(head)
 		for sub = iter.Next(); sub != nil; sub = iter.Next() {
-			if sub.policyId != nodes[j].policyId {
-				t.Error(j, ": misaligned unlink", sub.policyId, nodes[j].policyId)
+			if sub.policyID != nodes[j].policyID {
+				t.Error(j, ": misaligned unlink", sub.policyID, nodes[j].policyID)
 			}
 			j = j + 1
 		}
