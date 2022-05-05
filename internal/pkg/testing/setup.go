@@ -118,10 +118,8 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer res.Body.Close() //nolint:errcheck // defered close
 
-	defer func() {
-		_ = res.Body.Close()
-	}()
 	var esres es.DeleteByQueryResponse
 
 	err = json.NewDecoder(res.Body).Decode(&esres)

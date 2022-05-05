@@ -142,8 +142,8 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 	if err != nil {
 		return
 	}
+	defer res.Body.Close() //nolint:errcheck // defered close
 
-	defer func() { _ = res.Body.Close() }()
 	var esres es.DeleteByQueryResponse
 
 	err = json.NewDecoder(res.Body).Decode(&esres)

@@ -161,7 +161,7 @@ func TestToESConfig(t *testing.T) {
 		copts := cmp.Options{
 			cmpopts.IgnoreUnexported(http.Transport{}),
 			cmpopts.IgnoreFields(http.Transport{}, "DialContext"),
-			cmpopts.IgnoreUnexported(tls.Config{}),
+			cmpopts.IgnoreUnexported(tls.Config{}), //nolint:gosec //test case
 		}
 		t.Run(name, func(t *testing.T) {
 			_ = testlog.SetLogger(t)
@@ -231,14 +231,14 @@ func TestESProxyConfig(t *testing.T) {
 			res, err := test.cfg.ToESConfig(false)
 			require.NoError(t, err)
 
-			transport := res.Transport.(*http.Transport)
+			transport := res.Transport.(*http.Transport) //nolint:errcheck // test case
 			if test.want == "" {
 				require.Nil(t, transport.Proxy)
 				return
 			}
 			require.NotNil(t, transport.Proxy)
 
-			req, err := http.NewRequest("GET", test.url, nil)
+			req, err := http.NewRequest("GET", test.url, nil) //nolint:noctx // test case
 			require.NoError(t, err)
 
 			got, err := transport.Proxy(req)
@@ -260,24 +260,8 @@ func TestESProxyConfig(t *testing.T) {
 }
 
 func setTestEnv(t *testing.T, env map[string]string) {
-	var oldEnv map[string]string
-	for k := range env {
-		if v := os.Getenv(k); v != "" {
-			oldEnv[k] = v
-		}
-	}
-
-	t.Cleanup(func() {
-		for k := range env {
-			if v := oldEnv[k]; v != v {
-				os.Setenv(k, v)
-			} else {
-				os.Unsetenv(k)
-			}
-		}
-	})
-
+	t.Helper()
 	for k, v := range env {
-		os.Setenv(k, v)
+		t.Setenv(k, v)
 	}
 }
