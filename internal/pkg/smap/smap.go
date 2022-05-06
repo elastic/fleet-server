@@ -2,7 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// Package smap provides a string-map // TODO what is this used for?
+// Package smap provides a string-map
+// the string map will only fail on encoding errors
 // TODO this may be a good candidate for generics when we update to go 1.18+
 package smap
 

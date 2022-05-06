@@ -123,7 +123,7 @@ func (bc *Bulk) CheckIn(id string, status string, meta []byte, seqno sqn.SeqNo, 
 	return nil
 }
 
-// Run will start the flush timer amnd exit only when the context is cancelled.
+// Run starts the flush timer and exit only when the context is cancelled.
 func (bc *Bulk) Run(ctx context.Context) error {
 
 	tick := time.NewTicker(bc.opts.flushInterval)
@@ -147,7 +147,7 @@ LOOP:
 	return err
 }
 
-// flush will send the minium data needed to update records in elasticsearch.
+// flush sends the minium data needed to update records in elasticsearch.
 func (bc *Bulk) flush(ctx context.Context) error {
 	start := time.Now()
 
