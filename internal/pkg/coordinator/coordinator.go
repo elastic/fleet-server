@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// Package coordinator will keep elastic-agent policies uo to date // TODO is this correct?
+// Package coordinator handles the deployment of Elastic Agent policies between Fleet Server node.
 package coordinator
 
 import (
