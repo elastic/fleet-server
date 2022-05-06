@@ -9,5 +9,5 @@ type Runtime struct {
 }
 
 func (r Runtime) InitDefaults() {
-	r.GCPercent = 0
+	//r.GCPercent = 0 // go will default it to zero
 }

@@ -144,7 +144,7 @@ func (et *EnrollerT) handleEnroll(rb *rollback.Rollback, zlog *zerolog.Logger, w
 
 	// Pointer is passed in to allow UpdateContext by child function
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogEnrollAPIKeyID, key.Id)
+		return ctx.Str(LogEnrollAPIKeyID, key.ID)
 	})
 
 	ver, err := validateUserAgent(*zlog, r, et.verCon)
@@ -156,7 +156,7 @@ func (et *EnrollerT) handleEnroll(rb *rollback.Rollback, zlog *zerolog.Logger, w
 	dfunc := cntEnroll.IncStart()
 	defer dfunc()
 
-	return et.processRequest(rb, *zlog, w, r, key.Id, ver)
+	return et.processRequest(rb, *zlog, w, r, key.ID, ver)
 }
 
 func (et *EnrollerT) processRequest(rb *rollback.Rollback, zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, enrollmentAPIKeyID, ver string) (*EnrollResponse, error) {
@@ -218,7 +218,7 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 
 	// Register invalidate API key function for enrollment error rollback
 	rb.Register("invalidate API key", func(ctx context.Context) error {
-		return invalidateAPIKey(ctx, zlog, et.bulker, accessAPIKey.Id)
+		return invalidateAPIKey(ctx, zlog, et.bulker, accessAPIKey.ID)
 	})
 
 	agentData := model.Agent{
@@ -227,7 +227,7 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 		Type:           req.Type,
 		EnrolledAt:     now.UTC().Format(time.RFC3339),
 		LocalMetadata:  localMeta,
-		AccessAPIKeyID: accessAPIKey.Id,
+		AccessAPIKeyID: accessAPIKey.ID,
 		ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
 		Agent: &model.AgentMetadata{
 			ID:      agentID,
@@ -262,7 +262,7 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 	}
 
 	// We are Kool & and the Gang; cache the access key to avoid the roundtrip on impending checkin
-	et.cache.SetApiKey(*accessAPIKey, true)
+	et.cache.SetAPIKey(*accessAPIKey, true)
 
 	return &resp, nil
 }
@@ -291,12 +291,12 @@ func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk
 LOOP:
 	for {
 
-		_, err := bulker.ApiKeyRead(ctx, apikeyID)
+		_, err := bulker.APIKeyRead(ctx, apikeyID)
 
 		switch {
 		case err == nil:
 			break LOOP
-		case !errors.Is(err, apikey.ErrApiKeyNotFound):
+		case !errors.Is(err, apikey.ErrAPIKeyNotFound):
 			zlog.Error().Err(err).Msg("Fail ApiKeyRead")
 			return err
 		case time.Since(start) > time.Minute:
@@ -316,7 +316,7 @@ LOOP:
 		}
 	}
 
-	if err := bulker.ApiKeyInvalidate(ctx, apikeyID); err != nil {
+	if err := bulker.APIKeyInvalidate(ctx, apikeyID); err != nil {
 		zlog.Error().Err(err).Msg("fail invalidate apiKey")
 		return err
 	}
@@ -419,8 +419,8 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	return nil
 }
 
-func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (*apikey.ApiKey, error) {
-	return bulk.ApiKeyCreate(
+func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (*apikey.APIKey, error) {
+	return bulk.APIKeyCreate(
 		ctx,
 		agentID,
 		"",
@@ -431,7 +431,7 @@ func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentAPIKey, error) {
 
-	if key, ok := et.cache.GetEnrollmentApiKey(id); ok {
+	if key, ok := et.cache.GetEnrollmentAPIKey(id); ok {
 		return &key, nil
 	}
 
@@ -446,7 +446,7 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	}
 
 	cost := int64(len(rec.APIKey))
-	et.cache.SetEnrollmentApiKey(id, rec, cost)
+	et.cache.SetEnrollmentAPIKey(id, rec, cost)
 
 	return &rec, nil
 }

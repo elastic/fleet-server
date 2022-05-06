@@ -101,7 +101,7 @@ func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *Enroller
 		router.Handle(
 			rte.method,
 			rte.path,
-			logger.HttpHandler(handler),
+			logger.HTTPHandler(handler),
 		)
 	}
 

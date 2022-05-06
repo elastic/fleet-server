@@ -19,6 +19,8 @@ import (
 	"github.com/gofrs/uuid"
 )
 
+const testVer = "1.0.0"
+
 func TestSearchPolicyLeaders(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
@@ -26,16 +28,16 @@ func TestSearchPolicyLeaders(t *testing.T) {
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPoliciesLeader)
 
 	// insert a policy leaders to search for
-	serverId := uuid.Must(uuid.NewV4()).String()
+	serverID := uuid.Must(uuid.NewV4()).String()
 	policyIds := make([]string, 3)
 	for i := 0; i < 3; i++ {
-		policyId := uuid.Must(uuid.NewV4()).String()
-		version := "1.0.0"
-		err := TakePolicyLeadership(ctx, bulker, policyId, serverId, version, WithIndexName(index))
+		policyID := uuid.Must(uuid.NewV4()).String()
+		version := testVer
+		err := TakePolicyLeadership(ctx, bulker, policyID, serverID, version, WithIndexName(index))
 		if err != nil {
 			t.Fatal(err)
 		}
-		policyIds[i] = policyId
+		policyIds[i] = policyID
 	}
 
 	// possible that a search will not produce 3 directly after write
@@ -58,15 +60,15 @@ func TestTakePolicyLeadership(t *testing.T) {
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPoliciesLeader)
 
-	serverId := uuid.Must(uuid.NewV4()).String()
-	policyId := uuid.Must(uuid.NewV4()).String()
-	version := "1.0.0"
-	err := TakePolicyLeadership(ctx, bulker, policyId, serverId, version, WithIndexName(index))
+	serverID := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
+	version := testVer
+	err := TakePolicyLeadership(ctx, bulker, policyID, serverID, version, WithIndexName(index))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	data, err := bulker.Read(ctx, index, policyId)
+	data, err := bulker.Read(ctx, index, policyID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +77,7 @@ func TestTakePolicyLeadership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leader.Server.ID != serverId || leader.Server.Version != version {
+	if leader.Server.ID != serverID || leader.Server.Version != version {
 		t.Fatal("server.id and server.version should match")
 	}
 	lt, err := leader.Time()
@@ -93,19 +95,19 @@ func TestReleasePolicyLeadership(t *testing.T) {
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPoliciesLeader)
 
-	serverId := uuid.Must(uuid.NewV4()).String()
-	policyId := uuid.Must(uuid.NewV4()).String()
-	version := "1.0.0"
-	err := TakePolicyLeadership(ctx, bulker, policyId, serverId, version, WithIndexName(index))
+	serverID := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
+	version := testVer
+	err := TakePolicyLeadership(ctx, bulker, policyID, serverID, version, WithIndexName(index))
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ReleasePolicyLeadership(ctx, bulker, policyId, serverId, 30*time.Second, WithIndexName(index))
+	err = ReleasePolicyLeadership(ctx, bulker, policyID, serverID, 30*time.Second, WithIndexName(index))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	data, err := bulker.Read(ctx, index, policyId)
+	data, err := bulker.Read(ctx, index, policyID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +116,7 @@ func TestReleasePolicyLeadership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leader.Server.ID != serverId || leader.Server.Version != version {
+	if leader.Server.ID != serverID || leader.Server.Version != version {
 		t.Fatal("server.id and server.version should match")
 	}
 	lt, err := leader.Time()
@@ -133,20 +135,20 @@ func TestReleasePolicyLeadership_NothingIfNotLeader(t *testing.T) {
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPoliciesLeader)
 
-	serverId := uuid.Must(uuid.NewV4()).String()
-	policyId := uuid.Must(uuid.NewV4()).String()
-	version := "1.0.0"
-	err := TakePolicyLeadership(ctx, bulker, policyId, serverId, version, WithIndexName(index))
+	serverID := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
+	version := testVer
+	err := TakePolicyLeadership(ctx, bulker, policyID, serverID, version, WithIndexName(index))
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherServerId := uuid.Must(uuid.NewV4()).String()
-	err = ReleasePolicyLeadership(ctx, bulker, policyId, otherServerId, 30*time.Second, WithIndexName(index))
+	otherServerID := uuid.Must(uuid.NewV4()).String()
+	err = ReleasePolicyLeadership(ctx, bulker, policyID, otherServerID, 30*time.Second, WithIndexName(index))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	data, err := bulker.Read(ctx, index, policyId)
+	data, err := bulker.Read(ctx, index, policyID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +157,7 @@ func TestReleasePolicyLeadership_NothingIfNotLeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leader.Server.ID != serverId || leader.Server.Version != version {
+	if leader.Server.ID != serverID || leader.Server.Version != version {
 		t.Fatal("server.id and server.version should match")
 	}
 	lt, err := leader.Time()

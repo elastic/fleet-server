@@ -7,6 +7,7 @@ package bulk
 import (
 	"encoding/json"
 	"errors"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
@@ -39,6 +40,8 @@ type bulkIndexerResponse struct {
 	Items     []bulkStubItem `json:"items,omitempty"`
 }
 
+// BulkIndexerResponseItem has a subset of attributes from the response from Elasticsearch
+//
 // Comment out fields we don't use; no point decoding.
 type BulkIndexerResponseItem struct {
 	//	Index      string `json:"_index"`
@@ -60,7 +63,7 @@ type BulkIndexerResponseItem struct {
 
 func (b *BulkIndexerResponseItem) deriveError() error {
 	if b == nil {
-		return errors.New("Unknown bulk operator")
+		return errors.New("unknown bulk operator")
 	}
 
 	return es.TranslateError(b.Status, b.Error)
@@ -71,6 +74,8 @@ type MgetResponse struct {
 	Items []MgetResponseItem `json:"docs"`
 }
 
+// MgetResponseItem has the found and _source attributes from Elasticsearch's response
+//
 // Comment out fields we don't use; no point decoding.
 type MgetResponseItem struct {
 	//	Index      string          `json:"_index"`

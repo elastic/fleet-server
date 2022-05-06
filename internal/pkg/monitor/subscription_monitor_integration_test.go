@@ -9,6 +9,7 @@ package monitor
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -52,7 +53,7 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 	go func() {
 		defer wg.Done()
 		merr = mon.Run(mctx)
-		if merr == context.Canceled {
+		if errors.Is(merr, context.Canceled) {
 			merr = nil
 		}
 	}()

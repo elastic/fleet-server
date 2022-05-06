@@ -39,7 +39,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		},
 	}
 	reporter := &FakeReporter{}
-	bulker := ftesting.MockBulk{}
+	bulker := ftesting.NewMockBulk()
 	mm := mock.NewMockIndexMonitor()
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
@@ -96,7 +96,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  pData,
@@ -144,7 +144,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   2,
 				Version: 1,
 				Source:  pData,
@@ -181,7 +181,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		},
 	}
 	reporter := &FakeReporter{}
-	bulker := ftesting.MockBulk{}
+	bulker := ftesting.NewMockBulk()
 	mm := mock.NewMockIndexMonitor()
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
@@ -272,7 +272,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  policyData,
@@ -350,7 +350,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	}
 	policyID := uuid.Must(uuid.NewV4()).String()
 	reporter := &FakeReporter{}
-	bulker := ftesting.MockBulk{}
+	bulker := ftesting.NewMockBulk()
 	mm := mock.NewMockIndexMonitor()
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
@@ -406,7 +406,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  pData,
@@ -454,7 +454,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   2,
 				Version: 1,
 				Source:  pData,
@@ -492,7 +492,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}
 	policyID := uuid.Must(uuid.NewV4()).String()
 	reporter := &FakeReporter{}
-	bulker := ftesting.MockBulk{}
+	bulker := ftesting.NewMockBulk()
 	mm := mock.NewMockIndexMonitor()
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
@@ -582,7 +582,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	go func() {
 		mm.Notify(ctx, []es.HitT{
 			{
-				Id:      rId,
+				ID:      rId,
 				SeqNo:   1,
 				Version: 1,
 				Source:  policyData,

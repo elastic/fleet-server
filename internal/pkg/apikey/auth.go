@@ -24,8 +24,9 @@ type SecurityInfo struct {
 	LookupRealm map[string]string `json:"lookup_realm"`
 }
 
+// Authenticate will return the SecurityInfo associated with the APIKey (retrieved from Elasticsearch).
 // Note: Prefer the bulk wrapper on this API
-func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*SecurityInfo, error) {
+func (k APIKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*SecurityInfo, error) {
 
 	token := fmt.Sprintf("%s%s", authPrefix, k.Token())
 
@@ -36,7 +37,7 @@ func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	res, err := req.Do(ctx, es)
 
 	if err != nil {
-		return nil, fmt.Errorf("apikey auth request %s: %w", k.Id, err)
+		return nil, fmt.Errorf("apikey auth request %s: %w", k.ID, err)
 	}
 
 	if res.Body != nil {
@@ -44,13 +45,13 @@ func (k ApiKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	}
 
 	if res.IsError() {
-		return nil, fmt.Errorf("apikey auth response %s: %s", k.Id, res.String())
+		return nil, fmt.Errorf("apikey auth response %s: %s", k.ID, res.String())
 	}
 
 	var info SecurityInfo
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&info); err != nil {
-		return nil, fmt.Errorf("apikey auth parse %s: %w", k.Id, err)
+		return nil, fmt.Errorf("apikey auth parse %s: %w", k.ID, err)
 	}
 
 	return &info, nil

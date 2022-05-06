@@ -37,8 +37,8 @@ const (
 	FieldPolicyRevisionIdx           = "policy_revision_idx"
 	FieldPolicyCoordinatorIdx        = "policy_coordinator_idx"
 	FieldDefaultAPIKey               = "default_api_key"
-	FieldDefaultAPIKeyID             = "default_api_key_id"
-	FieldDefaultAPIKeyHistory        = "default_api_key_history"
+	FieldDefaultAPIKeyID             = "default_api_key_id"      //nolint:gosec // field name
+	FieldDefaultAPIKeyHistory        = "default_api_key_history" //nolint:gosec // field name
 	FieldPolicyOutputPermissionsHash = "policy_output_permissions_hash"
 	FieldUnenrolledReason            = "unenrolled_reason"
 	FieldAgentVersion                = "version"

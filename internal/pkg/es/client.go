@@ -106,7 +106,7 @@ type InfoResponse struct {
 	} `json:"version"`
 }
 
-func info(ctx context.Context, es *elasticsearch.Client) (*InfoResponse, error) {
+func info(_ context.Context, es *elasticsearch.Client) (*InfoResponse, error) {
 	// Validate the connection
 	res, err := es.Info()
 

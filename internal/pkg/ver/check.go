@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package ver will ensure fleet-server and Elasticsearch are running compatible versions.
+// Versions are compatible when Elasticsearch's version is greater then or equal to fleet-server's version
 package ver
 
 import (
@@ -19,11 +21,14 @@ import (
 	"github.com/elastic/go-elasticsearch/v7"
 )
 
+// Variables to define errors when comparing versions.
 var (
 	ErrUnsupportedVersion = errors.New("unsupported version")
 	ErrMalformedVersion   = errors.New("malformed version")
 )
 
+// CheckCompatiblility will check the remote Elasticsearch version retrieved by the Elasticsearch client with the passed fleet version.
+// Versions are compatible when Elasticsearch's version is greater then or equal to fleet-server's version
 func CheckCompatibility(ctx context.Context, esCli *elasticsearch.Client, fleetVersion string) (string, error) {
 	log.Debug().Str("fleet_version", fleetVersion).Msg("check version compatibility with elasticsearch")
 

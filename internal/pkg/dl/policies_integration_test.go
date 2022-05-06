@@ -81,8 +81,8 @@ func TestCreatePolicy(t *testing.T) {
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
-	policyId := uuid.Must(uuid.NewV4()).String()
-	p := createRandomPolicy(policyId, 1)
+	policyID := uuid.Must(uuid.NewV4()).String()
+	p := createRandomPolicy(policyID, 1)
 	id, err := CreatePolicy(ctx, bulker, p, WithIndexName(index))
 	if err != nil {
 		t.Fatal(err)

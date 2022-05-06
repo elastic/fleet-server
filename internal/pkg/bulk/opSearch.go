@@ -52,7 +52,10 @@ func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...
 	b.freeBlk(blk)
 
 	// Interpret response
-	r := resp.data.(*MsearchResponseItem)
+	r, ok := resp.data.(*MsearchResponseItem)
+	if !ok {
+		return nil, fmt.Errorf("unable to cast response as type *MsearchResponseItem, detected type: %T", resp.data)
+	}
 	return &es.ResultT{HitsT: r.Hits, Aggregations: r.Aggregations}, nil
 }
 
@@ -63,7 +66,7 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, 
 
 	needComma := true
 
-	buf.WriteString("{")
+	_, _ = buf.WriteString("{")
 
 	if len(moreIndices) > 0 {
 		if err := b.validateIndices(moreIndices); err != nil {
@@ -73,37 +76,37 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, 
 		indices := []string{index}
 		indices = append(indices, moreIndices...)
 
-		buf.WriteString(`"index": `)
+		_, _ = buf.WriteString(`"index": `)
 		if d, err := json.Marshal(indices); err != nil {
 			return err
 		} else {
-			buf.Write(d)
+			_, _ = buf.Write(d)
 		}
 	} else if index != "" {
-		buf.WriteString(`"index": "`)
-		buf.WriteString(index)
-		buf.WriteString("\"")
+		_, _ = buf.WriteString(`"index": "`)
+		_, _ = buf.WriteString(index)
+		_, _ = buf.WriteString("\"")
 	} else {
 		needComma = false
 	}
 
 	if len(checkpoints) > 0 {
 		if needComma {
-			buf.WriteString(`,`)
+			_, _ = buf.WriteString(`,`)
 		}
-		buf.WriteString(` "wait_for_checkpoints": `)
+		_, _ = buf.WriteString(` "wait_for_checkpoints": `)
 		// Write array as string, example: [1,2,3]
-		buf.WriteString(sqn.SeqNo(checkpoints).JSONString())
+		_, _ = buf.WriteString(sqn.SeqNo(checkpoints).JSONString())
 	}
 
-	buf.WriteString("}\n")
+	_, _ = buf.WriteString("}\n")
 
 	return nil
 }
 
 func (b *Bulker) writeMsearchBody(buf *Buf, body []byte) error {
-	buf.Write(body)
-	buf.WriteRune('\n')
+	_, _ = buf.Write(body)
+	_, _ = buf.WriteRune('\n')
 
 	return b.validateBody(body)
 }

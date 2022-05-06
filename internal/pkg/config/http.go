@@ -7,7 +7,7 @@ package config
 const kDefaultHTTPHost = "localhost"
 const kDefaultHTTPPort = 5066
 
-// Http is the configuration for the API endpoint.
+// HTTP is the configuration for the API endpoint.
 type HTTP struct {
 	Enabled            bool   `config:"enabled"`
 	Host               string `config:"host"`

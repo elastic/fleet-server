@@ -17,8 +17,8 @@ import (
 func TestMonitorLeadership(t *testing.T) {
 	rawToken := " foo:bar"
 	token := base64.StdEncoding.EncodeToString([]byte(rawToken))
-	apiKey, err := NewApiKeyFromToken(token)
+	apiKey, err := NewAPIKeyFromToken(token)
 	assert.NoError(t, err)
-	assert.Equal(t, *apiKey, ApiKey{" foo", "bar"})
+	assert.Equal(t, *apiKey, APIKey{" foo", "bar"})
 	assert.Equal(t, token, apiKey.Token())
 }

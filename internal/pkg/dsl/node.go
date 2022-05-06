@@ -2,13 +2,13 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package dsl implements an incomplete elasticsearch DSL query builder.
+// WARNING: Grossly incomplete and probably broken.
 package dsl
 
 import (
 	"encoding/json"
 )
-
-// Very basic elastic DSL query builder; grossly incomplete; probably broken.
 
 type nodeMapT map[string]*Node
 type nodeListT []*Node
@@ -64,22 +64,22 @@ func (n *Node) findOrCreateChildByName(keyword string) *Node {
 }
 
 // Create child node and add to nodeList if exists, or add fallback to nodeMap.
-func (q *Node) appendOrSetChildNode(keyword string) *Node {
+func (n *Node) appendOrSetChildNode(keyword string) *Node {
 	childNode := &Node{}
 
 	switch {
-	case q.leaf != nil:
+	case n.leaf != nil:
 		panic("Cannot add child to leaf node")
-	case q.nodeList != nil:
+	case n.nodeList != nil:
 		parentNode := Node{
 			nodeMap: nodeMapT{keyword: childNode},
 		}
-		q.nodeList = append(q.nodeList, &parentNode)
+		n.nodeList = append(n.nodeList, &parentNode)
 	default:
-		if q.nodeMap == nil {
-			q.nodeMap = nodeMapT{keyword: childNode}
+		if n.nodeMap == nil {
+			n.nodeMap = nodeMapT{keyword: childNode}
 		} else {
-			q.nodeMap[keyword] = childNode
+			n.nodeMap[keyword] = childNode
 		}
 	}
 

@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package status wraps elastic-agent-client's Status rpc calls.
+// The Status calls update fleet-server's status (RUNNING, ERROR, etc) elastic-agent.
 package status
 
 import (
@@ -16,10 +18,10 @@ type Reporter interface {
 	Status(status proto.StateObserved_Status, message string, payload map[string]interface{}) error
 }
 
-// Log logs the reported status.
+// Log will write status' to log.
 type Log struct{}
 
-// NewLog creates a LogStatus.
+// NewLog creates a Log.
 func NewLog() *Log {
 	return &Log{}
 }

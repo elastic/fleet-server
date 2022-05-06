@@ -63,11 +63,11 @@ func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name strin
 	return agent, err
 }
 
-func FindOfflineAgents(ctx context.Context, bulker bulk.Bulk, policyId string, unenrollTimeout time.Duration, opt ...Option) ([]model.Agent, error) {
+func FindOfflineAgents(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, opt ...Option) ([]model.Agent, error) {
 	o := newOption(FleetAgents, opt...)
 	past := time.Now().UTC().Add(-unenrollTimeout).Format(time.RFC3339)
 	res, err := Search(ctx, bulker, QueryOfflineAgentsByPolicyID, o.indexName, map[string]interface{}{
-		FieldPolicyID:    policyId,
+		FieldPolicyID:    policyID,
 		FieldLastCheckin: past,
 	})
 	if err != nil {

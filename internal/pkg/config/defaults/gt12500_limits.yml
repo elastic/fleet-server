@@ -1,16 +1,17 @@
-ram:
-  min: 8192
-  max: 16384
+num_agents:
+  min: 12500
+  max: 30000
+recommended_min_ram: 16384
 cache_limits:
   num_counters: 160000
   max_cost: 209715200
 server_limits:
-  policy_throttle: 5ms
+  policy_throttle: 2ms
   max_connections: 32000
   checkin_limit:
     interval: 500us
     burst: 4000
-    max: 12501
+    max: 15001
   artifact_limit: 
     interval: 500us
     burst: 4000

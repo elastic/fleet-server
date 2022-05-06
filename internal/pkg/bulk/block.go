@@ -70,12 +70,6 @@ func (blk *bulkT) reset() {
 	blk.next = nil
 }
 
-func newBlk() interface{} {
-	return &bulkT{
-		ch: make(chan respT, 1),
-	}
-}
-
 type respT struct {
 	err  error
 	idx  int32

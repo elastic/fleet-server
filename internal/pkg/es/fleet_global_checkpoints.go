@@ -120,7 +120,10 @@ func (r GlobalCheckpointsRequest) Do(ctx context.Context, transport esapi.Transp
 		req = req.WithContext(ctx)
 	}
 
-	res, err := transport.Perform(req)
+	// NOTE do not close the response body here, it's handled further along (gcheckpts)
+	// Closing the body within this method will cause operations that use checkpoints to fail
+	// a lot of operations use checkpoints
+	res, err := transport.Perform(req) //nolint:bodyclose // :(
 	if err != nil {
 		return nil, err
 	}

@@ -44,12 +44,14 @@ func BenchmarkRenderOne(b *testing.B) {
 	query := makeQuery(token)
 
 	if err := tmpl.Resolve(query); err != nil {
-		panic(err)
+		b.Fatal(err)
 	}
 
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
-		tmpl.RenderOne(kName, "2Ye0F3UByTc0c1e9OeMO")
+		if _, err := tmpl.RenderOne(kName, "2Ye0F3UByTc0c1e9OeMO"); err != nil {
+			b.Error(err)
+		}
 	}
 }
 
@@ -62,16 +64,18 @@ func BenchmarkRender(b *testing.B) {
 	query := makeQuery(token)
 
 	if err := tmpl.Resolve(query); err != nil {
-		panic(err)
+		b.Fatal(err)
 	}
 
 	v := "2Ye0F3UByTc0c1e9OeMO"
 
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
-		tmpl.Render(map[string]interface{}{
+		if _, err := tmpl.Render(map[string]interface{}{
 			kName: v,
-		})
+		}); err != nil {
+			b.Error(err)
+		}
 	}
 }
 
@@ -80,7 +84,7 @@ func BenchmarkMarshalNode(b *testing.B) {
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
 		query := makeQuery("2Ye0F3UByTc0c1e9OeMO")
-		json.Marshal(query)
+		_, _ = json.Marshal(query)
 	}
 }
 
@@ -89,7 +93,7 @@ func BenchmarkMarshalNode2(b *testing.B) {
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
 		query := makeQuery2("27e58fc0-09a2-11eb-a8cd-57e98f140de5", 3)
-		json.Marshal(query)
+		_, _ = json.Marshal(query)
 	}
 }
 
@@ -98,12 +102,12 @@ var ssprintres string
 func BenchmarkSprintf(b *testing.B) {
 	queryTmpl := `{"size": 1,"sort": [{"fleet-agent-actions.created_at": {"order": "DESC"}}],"query": {"bool": {"must": [{"term": {"type": "fleet-agent-actions"}},{"term": {"fleet-agent-actions.policy_id": "%s"}},{"range": {"fleet-agent-actions.policy_revision": {"gt": %d}}}]}}}`
 
-	policyId := "27e58fc0-09a2-11eb-a8cd-57e98f140de5"
+	policyID := "27e58fc0-09a2-11eb-a8cd-57e98f140de5"
 	policyRev := 3
 
 	var s string
 	for n := 0; n < b.N; n++ {
-		s = fmt.Sprintf(queryTmpl, policyId, policyRev)
+		s = fmt.Sprintf(queryTmpl, policyID, policyRev)
 	}
 	ssprintres = s
 }
@@ -120,7 +124,7 @@ func BenchmarkRender2(b *testing.B) {
 	query := makeQuery2(token1, token2)
 
 	if err := tmpl.Resolve(query); err != nil {
-		panic(err)
+		b.Fatal(err)
 	}
 
 	// run the RenderOne function b.N times
@@ -130,6 +134,8 @@ func BenchmarkRender2(b *testing.B) {
 			kName2: 3,
 		}
 
-		tmpl.Render(m)
+		if _, err := tmpl.Render(m); err != nil {
+			b.Error(err)
+		}
 	}
 }

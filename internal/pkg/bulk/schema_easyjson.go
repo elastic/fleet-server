@@ -966,7 +966,7 @@ func easyjsonCef4e921DecodeGithubComElasticFleetServerV7InternalPkgEs4(in *jlexe
 		}
 		switch key {
 		case "_id":
-			out.Id = string(in.String())
+			out.ID = string(in.String())
 		case "_seq_no":
 			out.SeqNo = int64(in.Int64())
 		case "version":
@@ -1004,7 +1004,7 @@ func easyjsonCef4e921EncodeGithubComElasticFleetServerV7InternalPkgEs4(out *jwri
 	{
 		const prefix string = ",\"_id\":"
 		out.RawString(prefix[1:])
-		out.String(string(in.Id))
+		out.String(string(in.ID))
 	}
 	{
 		const prefix string = ",\"_seq_no\":"

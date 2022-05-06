@@ -37,13 +37,14 @@ func WithRetryOnConflict(n int) Opt {
 	}
 }
 
-// Applicable to search
+// WithIndex sets the index when searching
 func WithIndex(idx string) Opt {
 	return func(opt *optionsT) {
 		opt.Indices = append(opt.Indices, idx)
 	}
 }
 
+// WithWaitForCheckpoints will set the checkpoints parameters
 // Applicable to _fleet_msearch, wait_for_checkpoints parameters
 func WithWaitForCheckpoints(checkpoints []int64) Opt {
 	return func(opt *optionsT) {
@@ -65,43 +66,43 @@ type bulkOptT struct {
 
 type BulkOpt func(*bulkOptT)
 
-// Interval on which any pending transactions will be flushed to bulker
+// WithFlushInterval sets the interval on which any pending transactions will be flushed to bulker
 func WithFlushInterval(d time.Duration) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.flushInterval = d
 	}
 }
 
-// Cnt of pending transactions that will force flush before interval
+// WithFlushThresholdCount sets count of pending transactions that will force flush before interval
 func WithFlushThresholdCount(cnt int) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.flushThresholdCnt = cnt
 	}
 }
 
-// Cummulative size in bytes of pending transactions that will force flush before interval
+// WithFlushThresholdSize sets the cummulative size in bytes of pending transactions that will force flush before interval
 func WithFlushThresholdSize(sz int) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.flushThresholdSz = sz
 	}
 }
 
-// Max number of elastic transactions pending response
+// WithMaxPending sets the number of elastic transactions pending response
 func WithMaxPending(max int) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.maxPending = max
 	}
 }
 
-// Size of internal block queue (ie. channel)
+// WithBlockQueueSize sets the size of the internal block queue (ie. channel)
 func WithBlockQueueSize(sz int) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.blockQueueSz = sz
 	}
 }
 
-// Max number of api key operations outstanding
-func WithApiKeyMaxParallel(max int) BulkOpt {
+// WithAPIKeyMaxParallel sets the number of api key operations outstanding
+func WithAPIKeyMaxParallel(max int) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.apikeyMaxParallel = max
 	}
@@ -113,7 +114,7 @@ func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		flushThresholdCnt: defaultFlushThresholdCnt,
 		flushThresholdSz:  defaultFlushThresholdSz,
 		maxPending:        defaultMaxPending,
-		apikeyMaxParallel: defaultApiKeyMaxParallel,
+		apikeyMaxParallel: defaultAPIKeyMaxParallel,
 		blockQueueSz:      defaultBlockQueueSz,
 	}
 
@@ -133,7 +134,8 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Int("apikeyMaxParallel", o.apikeyMaxParallel)
 }
 
-// Bridge to configuration subsystem
+// BulkOptsFromCfg transforms config to a slize of BulkOpt
+// used to bridge to configuration subsystem
 func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 
 	bulkCfg := cfg.Inputs[0].Server.Bulk
@@ -149,6 +151,6 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 		WithFlushThresholdCount(bulkCfg.FlushThresholdCount),
 		WithFlushThresholdSize(bulkCfg.FlushThresholdSize),
 		WithMaxPending(bulkCfg.FlushMaxPending),
-		WithApiKeyMaxParallel(maxKeyParallel),
+		WithAPIKeyMaxParallel(maxKeyParallel),
 	}
 }

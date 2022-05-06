@@ -6,6 +6,7 @@ package action
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -33,22 +34,25 @@ func NewTokenResolver(bulker bulk.Bulk) (*TokenResolver, error) {
 	}, nil
 }
 
-func (r *TokenResolver) Resolve(ctx context.Context, token string) (seqno int64, err error) {
+func (r *TokenResolver) Resolve(ctx context.Context, token string) (int64, error) {
 	if token == "" {
-		return seqno, dl.ErrNotFound
+		return 0, dl.ErrNotFound
 	}
 	if v, ok := r.cache.Get(token); ok {
-		seqno = v.(int64)
+		seqno, ok := v.(int64)
+		if !ok {
+			return seqno, fmt.Errorf("unable to cast %v as type int64, detected type is: %T", v, v)
+		}
 		log.Debug().Str("token", token).Int64("seqno", seqno).Msg("Found token cached")
-		return
+		return seqno, nil
 	}
 
-	seqno, err = dl.FindSeqNoByDocID(ctx, r.bulker, dl.QuerySeqNoByDocID, dl.FleetActions, token)
+	seqno, err := dl.FindSeqNoByDocID(ctx, r.bulker, dl.QuerySeqNoByDocID, dl.FleetActions, token)
 	if err != nil {
-		return
+		return seqno, err
 	}
 
 	r.cache.Add(token, seqno)
 
-	return
+	return seqno, nil
 }

@@ -13,7 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/wait"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sync/errgroup"
 )
@@ -32,7 +34,7 @@ func (s *scheduleTester) Run(ctx context.Context) error {
 }
 
 func TestScheduler(t *testing.T) {
-
+	_ = testlog.SetLogger(t)
 	const (
 		scheduleInterval       = 200 * time.Millisecond
 		scheduleCancelInterval = 500 * time.Millisecond
@@ -62,7 +64,7 @@ func TestScheduler(t *testing.T) {
 	})
 
 	g.Go(func() error {
-		wait.WithContext(ctx, 500*time.Millisecond)
+		sleep.WithContext(ctx, 500*time.Millisecond)
 		// return some error here to cause exit error group wait
 		return errTest
 	})

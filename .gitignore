@@ -14,4 +14,9 @@ fleet-server.dev.yml
 
 dev-tools/integration/.env.bck
 
+# editor swap files
+*.swp
+*.swo
+*.swn
+
 .service_token

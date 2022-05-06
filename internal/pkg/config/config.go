@@ -2,14 +2,17 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package config handles fleet-server configuration.
 package config
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/flag"
 	"github.com/elastic/go-ucfg/yaml"
+	"github.com/rs/zerolog/log"
 )
 
 // DefaultOptions defaults options used to read the configuration
@@ -27,6 +30,11 @@ type Config struct {
 	Inputs  []Input `config:"inputs"`
 	Logging Logging `config:"logging"`
 	HTTP    HTTP    `config:"http"`
+	m       sync.Mutex
+}
+
+var deprecatedConfigOptions = map[string]string{
+	"inputs[0].limits.max_connections": "max_connections has been deprecated and will be removed in a future release. Please configure server limits using max_agents instead.",
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -34,6 +42,15 @@ func (c *Config) InitDefaults() {
 	c.Inputs = make([]Input, 1)
 	c.Inputs[0].InitDefaults()
 	c.HTTP.InitDefaults()
+}
+
+func (c *Config) GetFleetInput() (Input, error) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if err := c.Validate(); err != nil {
+		return Input{}, err
+	}
+	return c.Inputs[0], nil
 }
 
 // Validate ensures that the configuration is valid.
@@ -47,8 +64,32 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// LoadServerLimits should be called after initialization, so we may access the user defined
+// agent limit setting.
+func (c *Config) LoadServerLimits() error {
+	c.m.Lock()
+	defer c.m.Unlock()
+	err := c.Validate()
+	if err != nil {
+		log.Error().Msgf("failed to validate while calculating limits, %s", err.Error())
+		return err
+	}
+
+	fleetInput := &c.Inputs[0]
+	agentLimits := loadLimits(fleetInput.Server.Limits.MaxAgents)
+	fleetInput.Cache.LoadLimits(agentLimits)
+	fleetInput.Server.Limits.LoadLimits(agentLimits)
+	return nil
+}
+
 // Merge merges two configurations together.
 func (c *Config) Merge(other *Config) (*Config, error) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	other.m.Lock()
+	defer other.m.Unlock()
+
 	repr, err := ucfg.NewFrom(c, DefaultOptions...)
 	if err != nil {
 		return nil, err
@@ -65,8 +106,17 @@ func (c *Config) Merge(other *Config) (*Config, error) {
 	return cfg, nil
 }
 
+func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
+	for opt, message := range deprecatedOpts {
+		if c.HasField(opt) {
+			log.Warn().Msg(message)
+		}
+	}
+}
+
 // FromConfig returns Config from the ucfg.Config.
 func FromConfig(c *ucfg.Config) (*Config, error) {
+	checkDeprecatedOptions(deprecatedConfigOptions, c)
 	cfg := &Config{}
 	err := c.Unpack(cfg, DefaultOptions...)
 	if err != nil {

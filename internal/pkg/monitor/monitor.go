@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package monitor provides a way to track new/updated documents in an Elasticsearch index.
 package monitor
 
 import (
@@ -26,7 +27,7 @@ import (
 
 const (
 	defaultPollTimeout    = 4 * time.Minute // default long poll timeout
-	defaultSeqNo          = int64(-1)       // the _seq_no in elasticsearch start with 0
+	defaultSeqNo          = int64(-1)       //nolint:deadcode,varcheck // the _seq_no in elasticsearch start with 0
 	defaultWithExpiration = false
 
 	// Making the default fetch size larger, in order to increase the throughput of the monitor.
@@ -189,7 +190,7 @@ func (m *simpleMonitorT) loadCheckpoint() sqn.SeqNo {
 func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 	m.log.Info().Msg("Starting index monitor")
 	defer func() {
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			err = nil
 		}
 		m.log.Info().Err(err).Msg("Index monitor exited")
@@ -344,7 +345,7 @@ func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[
 }
 
 // Prepares minimal query to do the quick check without reading all matches full documents
-func (m *simpleMonitorT) prepareCheckQuery() (tmpl *dsl.Tmpl, err error) {
+func (m *simpleMonitorT) prepareCheckQuery() (*dsl.Tmpl, error) {
 	tmpl, root := m.prepareCommon(false)
 
 	root.Source().Includes(dl.FieldSeqNo)
@@ -353,11 +354,11 @@ func (m *simpleMonitorT) prepareCheckQuery() (tmpl *dsl.Tmpl, err error) {
 	if err := tmpl.Resolve(root); err != nil {
 		return nil, err
 	}
-	return
+	return tmpl, nil
 }
 
 // Prepares full documents query
-func (m *simpleMonitorT) prepareQuery() (tmpl *dsl.Tmpl, err error) {
+func (m *simpleMonitorT) prepareQuery() (*dsl.Tmpl, error) {
 	tmpl, root := m.prepareCommon(true)
 	root.Size(uint64(m.fetchSize))
 	root.Sort().SortOrder(fieldSeqNo, dsl.SortAscend)
@@ -365,7 +366,7 @@ func (m *simpleMonitorT) prepareQuery() (tmpl *dsl.Tmpl, err error) {
 	if err := tmpl.Resolve(root); err != nil {
 		return nil, err
 	}
-	return
+	return tmpl, nil
 }
 
 func (m *simpleMonitorT) prepareCommon(limitMax bool) (*dsl.Tmpl, *dsl.Node) {

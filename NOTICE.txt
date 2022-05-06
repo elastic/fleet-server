@@ -2344,11 +2344,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/rs/xid
-Version: v1.2.1
+Version: v1.3.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/rs/xid@v1.2.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/rs/xid@v1.3.0/LICENSE:
 
 Copyright (c) 2015 Olivier Poitrey <rs@dailymotion.com>
 
@@ -2373,11 +2373,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/rs/zerolog
-Version: v1.22.0
+Version: v1.26.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/rs/zerolog@v1.22.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/rs/zerolog@v1.26.1/LICENSE:
 
 MIT License
 
@@ -41763,11 +41763,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/crypto
-Version: v0.0.0-20211202192323-5770296d904e
+Version: v0.0.0-20211215165025-cf75a172585e
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/crypto@v0.0.0-20211202192323-5770296d904e/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/crypto@v0.0.0-20211215165025-cf75a172585e/LICENSE:
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 

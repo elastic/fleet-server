@@ -29,14 +29,14 @@ var (
 // This authenticates that the provided API key exists and is enabled.
 // WARNING: This does not validate that the api key is valid for the Fleet Domain.
 // An additional check must be executed to validate it is not a random api key.
-func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKey, error) {
+func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKey, error) {
 
 	key, err := apikey.ExtractAPIKey(r)
 	if err != nil {
 		return nil, err
 	}
 
-	if c.ValidApiKey(*key) {
+	if c.ValidAPIKey(*key) {
 		return key, nil
 	}
 
@@ -44,12 +44,12 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 
 	start := time.Now()
 
-	info, err := bulker.ApiKeyAuth(r.Context(), *key)
+	info, err := bulker.APIKeyAuth(r.Context(), *key)
 
 	if err != nil {
 		log.Info().
 			Err(err).
-			Str(LogAPIKeyID, key.Id).
+			Str(LogAPIKeyID, key.ID).
 			Str(ECSHTTPRequestID, reqID).
 			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey fail authentication")
@@ -57,7 +57,7 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 	}
 
 	log.Trace().
-		Str("id", key.Id).
+		Str("id", key.ID).
 		Str(ECSHTTPRequestID, reqID).
 		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Str("userName", info.UserName).
@@ -66,12 +66,12 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.ApiKe
 		RawJSON("meta", info.Metadata).
 		Msg("ApiKey authenticated")
 
-	c.SetApiKey(*key, info.Enabled)
+	c.SetAPIKey(*key, info.Enabled)
 	if !info.Enabled {
 		err = ErrAPIKeyNotEnabled
 		log.Info().
 			Err(err).
-			Str("id", key.Id).
+			Str("id", key.ID).
 			Str(ECSHTTPRequestID, reqID).
 			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey not enabled")
@@ -90,7 +90,7 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 	}
 
 	w := log.With().
-		Str(LogAccessAPIKeyID, key.Id).
+		Str(LogAccessAPIKeyID, key.ID).
 		Str(ECSHTTPRequestID, r.Header.Get(logger.HeaderRequestID))
 
 	if id != nil {
@@ -107,7 +107,7 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 			Msg("authApiKey slow")
 	}
 
-	agent, err := findAgentByAPIKeyID(r.Context(), bulker, key.Id)
+	agent, err := findAgentByAPIKeyID(r.Context(), bulker, key.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 
 	// validate that the Access ApiKey identifier stored in the agent's record
 	// is in alignment when the authenticated key provided on this transaction
-	if agent.AccessAPIKeyID != key.Id {
+	if agent.AccessAPIKeyID != key.ID {
 		zlog.Warn().
 			Err(ErrAgentCorrupted).
 			Str("agent.AccessApiKeyId", agent.AccessAPIKeyID).
@@ -154,7 +154,7 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 			Msg("agent record inactive")
 
 		// Update the cache to mark the api key id associated with this agent as not enabled
-		c.SetApiKey(*key, false)
+		c.SetAPIKey(*key, false)
 		return nil, ErrAgentInactive
 	}
 

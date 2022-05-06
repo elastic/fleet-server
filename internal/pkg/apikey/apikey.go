@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package apikey handles operations dealing with elasticsearch's API keys
 package apikey
 
 import (
@@ -22,17 +23,17 @@ var (
 	ErrMalformedHeader = errors.New("malformed authorization header")
 	ErrMalformedToken  = errors.New("malformed token")
 	ErrInvalidToken    = errors.New("token not valid utf8")
-	ErrApiKeyNotFound  = errors.New("api key not found")
+	ErrAPIKeyNotFound  = errors.New("api key not found")
 )
 
 var AuthKey = http.CanonicalHeaderKey("Authorization")
 
-type ApiKey struct {
-	Id  string
+type APIKey struct {
+	ID  string
 	Key string
 }
 
-func NewApiKeyFromToken(token string) (*ApiKey, error) {
+func NewAPIKeyFromToken(token string) (*APIKey, error) {
 	d, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
 		return nil, err
@@ -46,24 +47,24 @@ func NewApiKeyFromToken(token string) (*ApiKey, error) {
 	}
 
 	// interpret id:key
-	apiKey := ApiKey{
-		Id:  s[0],
+	apiKey := APIKey{
+		ID:  s[0],
 		Key: s[1],
 	}
 
 	return &apiKey, nil
 }
 
-func (k ApiKey) Token() string {
-	s := fmt.Sprintf("%s:%s", k.Id, k.Key)
+func (k APIKey) Token() string {
+	s := fmt.Sprintf("%s:%s", k.ID, k.Key)
 	return base64.StdEncoding.EncodeToString([]byte(s))
 }
 
-func (k ApiKey) Agent() string {
-	return fmt.Sprintf("%s:%s", k.Id, k.Key)
+func (k APIKey) Agent() string {
+	return fmt.Sprintf("%s:%s", k.ID, k.Key)
 }
 
-func ExtractAPIKey(r *http.Request) (*ApiKey, error) {
+func ExtractAPIKey(r *http.Request) (*APIKey, error) {
 	s, ok := r.Header[AuthKey]
 	if !ok {
 		return nil, ErrNoAuthHeader
@@ -74,5 +75,5 @@ func ExtractAPIKey(r *http.Request) (*ApiKey, error) {
 
 	apiKeyStr := s[0][len(authPrefix):]
 	apiKeyStr = strings.TrimSpace(apiKeyStr)
-	return NewApiKeyFromToken(apiKeyStr)
+	return NewAPIKeyFromToken(apiKeyStr)
 }

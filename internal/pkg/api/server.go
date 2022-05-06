@@ -170,7 +170,7 @@ type stubLogger struct {
 }
 
 func (s *stubLogger) Write(p []byte) (n int, err error) {
-	log.Error().Bytes(logger.EcsMessage, p).Send()
+	log.Error().Bytes(logger.ECSMessage, p).Send()
 	return len(p), nil
 }
 
