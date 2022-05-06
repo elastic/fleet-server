@@ -3,7 +3,7 @@
 // you may not use this file except in compliance with the Elastic License.
 
 // Package gcheckpt handles the fleet API's global_checkpoints operations
-// checkpoints are used to track which actions, agetnc (docs in general) have been read based on the seqno recieved.
+// checkpoints are used to track which actions, agetnc (docs in general) have been read based on the seqno received.
 package gcheckpt
 
 import (
