@@ -40,7 +40,7 @@ func TestRun(t *testing.T) {
 	verCon := mustBuildConstraints("8.0.0")
 	c, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
-	bulker := ftesting.MockBulk{}
+	bulker := ftesting.NewMockBulk()
 	pim := mock.NewMockIndexMonitor()
 	pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
 	bc := checkin.NewBulk(nil)

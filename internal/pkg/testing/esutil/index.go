@@ -37,10 +37,10 @@ func CreateIndex(ctx context.Context, cli *elasticsearch.Client, name string) er
 	var r AckResponse
 	err = json.NewDecoder(res.Body).Decode(&r)
 	if err != nil {
-		return fmt.Errorf("failed to parse create index response: %v, err: %v", name, err)
+		return fmt.Errorf("failed to parse create index response: %s, err: %w", name, err)
 	}
 	if !r.Acknowledged {
-		return fmt.Errorf("failed to receive acknowledgment for create index request: %v", name)
+		return fmt.Errorf("failed to receive acknowledgment for create index request: %s", name)
 	}
 
 	return nil
@@ -65,7 +65,7 @@ func DeleteIndices(ctx context.Context, cli *elasticsearch.Client, names ...stri
 	var r AckResponse
 	err = json.NewDecoder(res.Body).Decode(&r)
 	if err != nil {
-		return fmt.Errorf("failed to parse delete indices response: %v, err: %v", names, err)
+		return fmt.Errorf("failed to parse delete indices response: %v, err: %w", names, err)
 	}
 	if !r.Acknowledged {
 		return fmt.Errorf("failed to receive acknowledgment for delete indices request: %v", names)

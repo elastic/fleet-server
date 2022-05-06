@@ -13,20 +13,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 // This runs a series of CRUD operations through elastic.
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
 
 func benchmarkMultiUpdate(n int, b *testing.B) {
+	_ = testlog.SetLogger(b)
 	b.ReportAllocs()
-	defer (QuietLogger())()
-
-	l := zerolog.GlobalLevel()
-	defer zerolog.SetGlobalLevel(l)
-
-	zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
@@ -59,7 +54,7 @@ func benchmarkMultiUpdate(n int, b *testing.B) {
 		}
 
 		for i := range ops {
-			ops[i].Id = items[i].DocumentID
+			ops[i].ID = items[i].DocumentID
 			ops[i].Body = body
 		}
 

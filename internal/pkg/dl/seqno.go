@@ -11,10 +11,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 )
 
-const (
-	maxSeqNo = "max_seq_no"
-)
-
 var (
 	QuerySeqNoByDocID = prepareFindSeqNoByDocID()
 )
@@ -31,10 +27,10 @@ func prepareFindSeqNoByDocID() *dsl.Tmpl {
 	return tmpl
 }
 
-func FindSeqNoByDocID(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index, docId string) (seqno int64, err error) {
+func FindSeqNoByDocID(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index, docID string) (seqno int64, err error) {
 	seqno = defaultSeqNo
 
-	res, err := SearchWithOneParam(ctx, bulker, tmpl, index, FieldID, docId)
+	res, err := SearchWithOneParam(ctx, bulker, tmpl, index, FieldID, docID)
 	if err != nil {
 		return seqno, err
 	}

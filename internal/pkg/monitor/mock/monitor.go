@@ -6,6 +6,7 @@ package mock
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -100,7 +101,7 @@ func (m *MockIndexMonitor) Notify(ctx context.Context, hits []es.HitT) {
 				case s.c <- hits:
 				case <-lc.Done():
 					err := ctx.Err()
-					if err == context.DeadlineExceeded {
+					if errors.Is(err, context.DeadlineExceeded) {
 						panic(err)
 					}
 				}

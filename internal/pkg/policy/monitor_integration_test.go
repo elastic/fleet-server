@@ -9,6 +9,7 @@ package policy
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -41,13 +42,16 @@ func TestMonitor_Integration(t *testing.T) {
 	go func() {
 		defer imwg.Done()
 		imerr = im.Run(ctx)
-		if imerr == context.Canceled {
+		if errors.Is(imerr, context.Canceled) {
 			imerr = nil
 		}
 	}()
 
 	m := NewMonitor(bulker, im, 0)
-	pm := m.(*monitorT)
+	pm, ok := m.(*monitorT)
+	if !ok {
+		t.Fatalf("unable to cast monitor m (type %T) as *monitorT", m)
+	}
 	pm.policiesIndex = index
 
 	var merr error
@@ -56,29 +60,30 @@ func TestMonitor_Integration(t *testing.T) {
 	go func() {
 		defer mwg.Done()
 		merr = m.Run(ctx)
-		if merr == context.Canceled {
+		if errors.Is(merr, context.Canceled) {
 			merr = nil
 		}
 	}()
 
-	agentId := uuid.Must(uuid.NewV4()).String()
-	policyId := uuid.Must(uuid.NewV4()).String()
-	s, err := m.Subscribe(agentId, policyId, 0, 0)
-	defer m.Unsubscribe(s)
+	agentID := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
+	s, err := m.Subscribe(agentID, policyID, 0, 0)
+	defer m.Unsubscribe(s) //nolint:errcheck // defered function
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	policy := model.Policy{
-		PolicyID:       policyId,
+		PolicyID:       policyID,
 		CoordinatorIdx: 1,
 		Data:           policyBytes,
 		RevisionIdx:    1,
 	}
+	ch := make(chan error, 1)
 	go func() {
 		_, err := dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
 		if err != nil {
-			t.Fatal(err)
+			ch <- err
 		}
 	}()
 
@@ -87,7 +92,7 @@ func TestMonitor_Integration(t *testing.T) {
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()
-		if subPolicy.Policy.PolicyID != policyId && subPolicy.Policy.RevisionIdx != 1 && subPolicy.Policy.CoordinatorIdx != 1 {
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 1 && subPolicy.Policy.CoordinatorIdx != 1 {
 			t.Fatal("failed to get the expected updated policy")
 		}
 	case <-tm.C:
@@ -105,5 +110,10 @@ func TestMonitor_Integration(t *testing.T) {
 	}
 	if timedout {
 		t.Fatal("never got policy update; timed out after 3s")
+	}
+	select {
+	case err := <-ch:
+		t.Fatalf("error creating policy: %v", err)
+	default:
 	}
 }

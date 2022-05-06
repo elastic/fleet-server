@@ -212,7 +212,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	err := dl.EnsureServer(ctx, m.bulker, m.version, m.agentMetadata, m.hostMetadata, dl.WithIndexName(m.serversIndex))
 
 	if err != nil {
-		return fmt.Errorf("Failed to check server status on Elasticsearch (%s): %w", m.hostMetadata.Name, err)
+		return fmt.Errorf("failed to check server status on Elasticsearch (%s): %w", m.hostMetadata.Name, err)
 	}
 
 	// fetch current policies and leaders
@@ -223,7 +223,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 			m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
 			return nil
 		}
-		return fmt.Errorf("Encountered error while querying policies: %w", err)
+		return fmt.Errorf("encountered error while querying policies: %w", err)
 	}
 	if len(policies) > 0 {
 		ids := make([]string, len(policies))
@@ -233,7 +233,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		leaders, err = dl.SearchPolicyLeaders(ctx, m.bulker, ids, dl.WithIndexName(m.leadersIndex))
 		if err != nil {
 			if !errors.Is(err, es.ErrIndexNotFound) {
-				return fmt.Errorf("Encountered error while fetching policy leaders: %w", err)
+				return fmt.Errorf("encountered error while fetching policy leaders: %w", err)
 			}
 		}
 	}
@@ -261,7 +261,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	// take/keep leadership and start new coordinators
 	res := make(chan policyT)
 	for _, p := range lead {
-		pt, _ := m.policies[p.PolicyID]
+		pt := m.policies[p.PolicyID]
 		pt.id = p.PolicyID
 		go func(p model.Policy, pt policyT) {
 			defer func() {
@@ -423,9 +423,9 @@ func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d t
 	for {
 		l.Info().Int("count", cnt).Str("coordinator", cord.Name()).Msg("Starting policy coordinator")
 		err := cord.Run(ctx)
-		if err != context.Canceled {
+		if !errors.Is(err, context.Canceled) {
 			l.Err(err).Msg("Policy coordinator failed and stopped")
-			if sleep.WithContext(ctx, d) == context.Canceled {
+			if errors.Is(sleep.WithContext(ctx, d), context.Canceled) {
 				break
 			}
 		} else {
@@ -452,7 +452,7 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 	}
 }
 
-func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenrollTimeout time.Duration, l zerolog.Logger, checkInterval time.Duration, agentsIndex string) {
+func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, l zerolog.Logger, checkInterval time.Duration, agentsIndex string) {
 	l.Info().
 		Dur("checkInterval", checkInterval).
 		Dur("unenrollTimeout", unenrollTimeout).
@@ -466,7 +466,7 @@ func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenr
 		select {
 		case <-t.C:
 			l.Debug().Msg("running unenroller")
-			if err := runUnenrollerWork(ctx, bulker, policyId, unenrollTimeout, l, agentsIndex); err != nil {
+			if err := runUnenrollerWork(ctx, bulker, policyID, unenrollTimeout, l, agentsIndex); err != nil {
 				l.Err(err).Dur("unenroll_timeout", unenrollTimeout).Msg("failed to unenroll offline agents")
 			}
 			t.Reset(checkInterval)
@@ -476,8 +476,8 @@ func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyId string, unenr
 	}
 }
 
-func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyId string, unenrollTimeout time.Duration, zlog zerolog.Logger, agentsIndex string) error {
-	agents, err := dl.FindOfflineAgents(ctx, bulker, policyId, unenrollTimeout, dl.WithIndexName(agentsIndex))
+func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, zlog zerolog.Logger, agentsIndex string) error {
+	agents, err := dl.FindOfflineAgents(ctx, bulker, policyID, unenrollTimeout, dl.WithIndexName(agentsIndex))
 	if err != nil || len(agents) == 0 {
 		return err
 	}
@@ -486,7 +486,8 @@ func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyId string, u
 
 	agentIds := make([]string, len(agents))
 
-	for i, agent := range agents {
+	for i := range agents {
+		agent := agents[i]
 		err = unenrollAgent(ctx, zlog, bulker, &agent, agentsIndex)
 		if err != nil {
 			return err
@@ -495,7 +496,7 @@ func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyId string, u
 	}
 
 	zlog.Info().
-		Strs(logger.ApiKeyId, agentIds).
+		Strs(logger.APIKeyID, agentIds).
 		Msg("marked agents unenrolled due to unenroll timeout")
 
 	return nil
@@ -516,14 +517,14 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	apiKeys := getAPIKeyIDs(agent)
 
 	zlog = zlog.With().
-		Str(logger.AgentId, agent.Id).
-		Strs(logger.ApiKeyId, apiKeys).
+		Str(logger.AgentID, agent.Id).
+		Strs(logger.APIKeyID, apiKeys).
 		Logger()
 
 	zlog.Info().Msg("unenrollAgent due to unenroll timeout")
 
 	if len(apiKeys) > 0 {
-		err = bulker.ApiKeyInvalidate(ctx, apiKeys...)
+		err = bulker.APIKeyInvalidate(ctx, apiKeys...)
 		if err != nil {
 			zlog.Error().Err(err).Msg("Fail apiKey invalidate")
 			return err

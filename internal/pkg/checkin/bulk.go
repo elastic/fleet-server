@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package checkin handles agent check ins.
 package checkin
 
 import (
@@ -46,6 +47,7 @@ type pendingT struct {
 	extra  *extraT
 }
 
+// Bulk will batch pending checkins and update elasticsearch at a set interval.
 type Bulk struct {
 	opts    optionsT
 	bulker  bulk.Bulk
@@ -93,10 +95,10 @@ func (bc *Bulk) timestamp() string {
 	return bc.ts
 }
 
-// WARNING: Bulk will take ownership of fields,
-// so do not use after passing in.
+// CheckIn will add the agent (identified by id) to the pending set.
+// The pending agents are sent to elasticsearch as a bulk update at each flush interval.
+// WARNING: Bulk will take ownership of fields, so do not use after passing in.
 func (bc *Bulk) CheckIn(id string, status string, meta []byte, seqno sqn.SeqNo, newVer string) error {
-
 	// Separate out the extra data to minimize
 	// the memory footprint of the 90% case of just
 	// updating the timestamp.
@@ -121,6 +123,7 @@ func (bc *Bulk) CheckIn(id string, status string, meta []byte, seqno sqn.SeqNo, 
 	return nil
 }
 
+// Run starts the flush timer and exit only when the context is cancelled.
 func (bc *Bulk) Run(ctx context.Context) error {
 
 	tick := time.NewTicker(bc.opts.flushInterval)
@@ -133,7 +136,6 @@ LOOP:
 		case <-tick.C:
 			if err = bc.flush(ctx); err != nil {
 				log.Error().Err(err).Msg("Eat bulk checkin error; Keep on truckin'")
-				err = nil
 			}
 
 		case <-ctx.Done():
@@ -145,6 +147,7 @@ LOOP:
 	return err
 }
 
+// flush sends the minium data needed to update records in elasticsearch.
 func (bc *Bulk) flush(ctx context.Context) error {
 	start := time.Now()
 
@@ -224,7 +227,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		}
 
 		updates = append(updates, bulk.MultiOp{
-			Id:    id,
+			ID:    id,
 			Body:  body,
 			Index: dl.FleetAgents,
 		})

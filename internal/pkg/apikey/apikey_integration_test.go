@@ -30,7 +30,7 @@ const testFleetRoles = `
 }
 `
 
-func TestCreateApiKeyWithMetadata(t *testing.T) {
+func TestCreateAPIKeyWithMetadata(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
@@ -45,16 +45,16 @@ func TestCreateApiKeyWithMetadata(t *testing.T) {
 	}
 
 	// Create the key
-	agentId := uuid.Must(uuid.NewV4()).String()
+	agentID := uuid.Must(uuid.NewV4()).String()
 	name := uuid.Must(uuid.NewV4()).String()
 	akey, err := Create(ctx, es, name, "", "true", []byte(testFleetRoles),
-		NewMetadata(agentId, TypeAccess))
+		NewMetadata(agentID, TypeAccess))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Get the key and verify that metadata was saved correctly
-	aKeyMeta, err := Read(ctx, es, akey.Id)
+	aKeyMeta, err := Read(ctx, es, akey.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestCreateApiKeyWithMetadata(t *testing.T) {
 		t.Error(diff)
 	}
 
-	diff = cmp.Diff(agentId, aKeyMeta.Metadata.AgentId)
+	diff = cmp.Diff(agentID, aKeyMeta.Metadata.AgentID)
 	if diff != "" {
 		t.Error(diff)
 	}
@@ -80,8 +80,8 @@ func TestCreateApiKeyWithMetadata(t *testing.T) {
 	}
 
 	// Try to get the key that doesn't exists, expect ErrApiKeyNotFound
-	aKeyMeta, err = Read(ctx, es, "0000000000000")
-	if !errors.Is(err, ErrApiKeyNotFound) {
+	_, err = Read(ctx, es, "0000000000000")
+	if !errors.Is(err, ErrAPIKeyNotFound) {
 		t.Errorf("Unexpected error type: %v", err)
 	}
 }

@@ -5,6 +5,7 @@
 //go:build !integration
 // +build !integration
 
+//nolint:dupl // test cases have some duplication
 package api
 
 import (
@@ -14,17 +15,16 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
-	"github.com/gofrs/uuid"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func BenchmarkMakeUpdatePolicyBody(b *testing.B) {
@@ -101,15 +101,6 @@ func TestEventToActionResult(t *testing.T) {
 	}
 }
 
-// Mock bulker
-type mockBulk struct {
-	ftesting.MockBulk
-	searchErr error
-	createErr error
-	updateErr error
-	actions   []model.Action
-}
-
 type searchRequestFilter struct {
 	Term struct {
 		ActionID string `json:"action_id"`
@@ -124,61 +115,18 @@ type searchRequest struct {
 	} `json:"query"`
 }
 
-func (m mockBulk) Search(ctx context.Context, index string, body []byte, opts ...bulk.Opt) (*es.ResultT, error) {
-	if m.searchErr != nil {
-		return nil, m.searchErr
-	}
-
-	if m.actions != nil {
+// matchAction will decode a response body and attempt to match the query ID with the provided value
+// It is meant to be wrapped by mock.MatchedBy for example:
+// m.On("Search", mock.Anything, "some-index", mock.MatchedBy(matchAction(t, "actionID)), mock.Anything)
+func matchAction(tb testing.TB, actionID string) func(body []byte) bool {
+	return func(body []byte) bool {
+		tb.Helper()
 		var req searchRequest
-		err := json.Unmarshal(body, &req)
-		if err != nil {
-			return nil, err
+		if err := json.Unmarshal(body, &req); err != nil {
+			tb.Fatal(err)
 		}
-
-		var (
-			action model.Action
-			ok     bool
-		)
-		for _, a := range m.actions {
-			if a.ActionID == req.Query.Bool.Filter[0].Term.ActionID {
-				action = a
-				ok = true
-			}
-		}
-		if ok {
-			return &es.ResultT{
-				HitsT: es.HitsT{
-					Hits: []es.HitT{
-						{
-							Source: []byte(`{"action_id":"` + action.ActionID + `","type":"` + action.Type + `"}`),
-						},
-					},
-				},
-			}, nil
-		}
+		return actionID == req.Query.Bool.Filter[0].Term.ActionID
 	}
-
-	return &es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{},
-		},
-	}, nil
-}
-
-func (m mockBulk) Create(ctx context.Context, index, id string, body []byte, opts ...bulk.Opt) (string, error) {
-	if m.createErr != nil {
-		return "", m.createErr
-	}
-	i, err := uuid.NewV4()
-	if err != nil {
-		return "", err
-	}
-	return i.String(), nil
-}
-
-func (m mockBulk) Update(ctx context.Context, index, id string, body []byte, opts ...bulk.Opt) error {
-	return m.updateErr
 }
 
 func TestHandleAckEvents(t *testing.T) {
@@ -186,9 +134,6 @@ func TestHandleAckEvents(t *testing.T) {
 	cfg := &config.Server{
 		Limits: config.ServerLimits{},
 	}
-
-	// Default mock bulker
-	bulker := &mockBulk{}
 
 	agent := &model.Agent{
 		ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
@@ -216,16 +161,22 @@ func TestHandleAckEvents(t *testing.T) {
 		events []Event
 		res    AckResponse
 		err    error
-		bulker bulk.Bulk
+		bulker func(t *testing.T) *ftesting.MockBulk
 	}{
 		{
 			name: "nil",
 			res:  newAckResponse(false, []AckResponseItem{}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				return ftesting.NewMockBulk()
+			},
 		},
 		{
 			name:   "empty",
 			events: []Event{},
 			res:    newAckResponse(false, []AckResponseItem{}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				return ftesting.NewMockBulk()
+			},
 		},
 		{
 			name: "action agentID mismatch",
@@ -237,6 +188,9 @@ func TestHandleAckEvents(t *testing.T) {
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusBadRequest)}),
 			err: &HTTPError{Status: http.StatusBadRequest},
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				return ftesting.NewMockBulk()
+			},
 		},
 		{
 			name: "action empty agent id",
@@ -247,6 +201,11 @@ func TestHandleAckEvents(t *testing.T) {
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusNotFound)}),
 			err: &HTTPError{Status: http.StatusNotFound},
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{}, nil)
+				return m
+			},
 		},
 		{
 			name: "action find error",
@@ -255,9 +214,13 @@ func TestHandleAckEvents(t *testing.T) {
 					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
-			res:    newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
-			bulker: mockBulk{searchErr: errors.New("network error")},
-			err:    &HTTPError{Status: http.StatusInternalServerError},
+			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{}, errors.New("network error"))
+				return m
+			},
+			err: &HTTPError{Status: http.StatusInternalServerError},
 		},
 		{
 			name: "policy action",
@@ -270,6 +233,9 @@ func TestHandleAckEvents(t *testing.T) {
 				Status:  http.StatusOK,
 				Message: http.StatusText(http.StatusOK),
 			}}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				return ftesting.NewMockBulk()
+			},
 		},
 		{
 			name: "action found",
@@ -282,9 +248,17 @@ func TestHandleAckEvents(t *testing.T) {
 				Status:  http.StatusOK,
 				Message: http.StatusText(http.StatusOK),
 			}}),
-			bulker: mockBulk{actions: []model.Action{
-				{ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
-			}},
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UPGRADE"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				return m
+			},
 		},
 		{
 			name: "action found, create result general error",
@@ -294,11 +268,15 @@ func TestHandleAckEvents(t *testing.T) {
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
-			bulker: mockBulk{
-				actions: []model.Action{
-					{ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
-				},
-				createErr: errors.New("network error"),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UPGRADE"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errors.New("network error"))
+				return m
 			},
 			err: &HTTPError{Status: http.StatusInternalServerError},
 		},
@@ -310,11 +288,15 @@ func TestHandleAckEvents(t *testing.T) {
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusServiceUnavailable)}),
-			bulker: mockBulk{
-				actions: []model.Action{
-					{ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
-				},
-				createErr: &es.ErrElastic{Status: http.StatusServiceUnavailable, Reason: http.StatusText(http.StatusServiceUnavailable)},
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UPGRADE"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", &es.ErrElastic{Status: http.StatusServiceUnavailable, Reason: http.StatusText(http.StatusServiceUnavailable)})
+				return m
 			},
 			err: &HTTPError{Status: http.StatusServiceUnavailable},
 		},
@@ -330,11 +312,15 @@ func TestHandleAckEvents(t *testing.T) {
 				Status:  http.StatusServiceUnavailable,
 				Message: http.StatusText(http.StatusServiceUnavailable),
 			}}),
-			bulker: mockBulk{
-				actions: []model.Action{
-					{ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733", Type: "UPGRADE"},
-				},
-				updateErr: &es.ErrElastic{Status: http.StatusServiceUnavailable, Reason: http.StatusText(http.StatusServiceUnavailable)},
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UPGRADE"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", &es.ErrElastic{Status: http.StatusServiceUnavailable, Reason: http.StatusText(http.StatusServiceUnavailable)})
+				return m
 			},
 			err: &HTTPError{Status: http.StatusServiceUnavailable},
 		},
@@ -390,30 +376,49 @@ func TestHandleAckEvents(t *testing.T) {
 					Message: http.StatusText(http.StatusOK),
 				},
 			}),
-			bulker: mockBulk{actions: []model.Action{
-				{ActionID: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:1"},
-				{ActionID: "1b12dcd8-bde0-4045-92dc-c4b27668d731", Type: "UNENROLL"},
-				{ActionID: "ab12dcd8-bde0-4045-92dc-c4b27668d73a", Type: "UPGRADE"},
-				{ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733"},
-			}},
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"POLICY_CHANGE"}`),
+					}},
+				}}, nil)
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "1b12dcd8-bde0-4045-92dc-c4b27668d731")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"1b12dcd8-bde0-4045-92dc-c4b27668d731","type":"UNENROLL"}`),
+					}},
+				}}, nil)
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "1b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{}, nil)
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"ab12dcd8-bde0-4045-92dc-c4b27668d73a","type":"UPGRADE"}`),
+					}},
+				}}, nil)
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				return m
+			},
 			err: &HTTPError{Status: http.StatusNotFound},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
 			cache, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			b := tc.bulker
-			if b == nil {
-				b = bulker
-			}
-			ack := NewAckT(cfg, b, cache)
+			bulker := tc.bulker(t)
+			ack := NewAckT(cfg, bulker, cache)
 
-			res, err := ack.handleAckEvents(ctx, log.Logger, agent, tc.events)
+			res, err := ack.handleAckEvents(ctx, logger, agent, tc.events)
 			assert.Equal(t, tc.res, res)
 
 			if err != nil {
@@ -430,6 +435,7 @@ func TestHandleAckEvents(t *testing.T) {
 					t.Fatalf("expected err: %v, got: nil", tc.err)
 				}
 			}
+			bulker.AssertExpectations(t)
 		})
 	}
 }

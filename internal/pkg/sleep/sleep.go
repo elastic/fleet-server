@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package sleep provides a sleep/wait mechanism that can be cancelled.
 package sleep
 
 import (

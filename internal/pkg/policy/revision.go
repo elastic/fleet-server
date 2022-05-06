@@ -14,7 +14,7 @@ import (
 
 // Revision is a policy revision that is sent as an action ID to an agent.
 type Revision struct {
-	PolicyId       string
+	PolicyID       string
 	RevisionIdx    int64
 	CoordinatorIdx int64
 }
@@ -22,15 +22,15 @@ type Revision struct {
 // RevisionFromPolicy creates the revision from the policy.
 func RevisionFromPolicy(policy model.Policy) Revision {
 	return Revision{
-		PolicyId:       policy.PolicyID,
+		PolicyID:       policy.PolicyID,
 		RevisionIdx:    policy.RevisionIdx,
 		CoordinatorIdx: policy.CoordinatorIdx,
 	}
 }
 
 // RevisionFromString converts the string to a policy revision.
-func RevisionFromString(actionId string) (Revision, bool) {
-	split := strings.Split(actionId, ":")
+func RevisionFromString(actionID string) (Revision, bool) {
+	split := strings.Split(actionID, ":")
 	if len(split) != 4 {
 		return Revision{}, false
 	}
@@ -46,7 +46,7 @@ func RevisionFromString(actionId string) (Revision, bool) {
 		return Revision{}, false
 	}
 	return Revision{
-		PolicyId:       split[1],
+		PolicyID:       split[1],
 		RevisionIdx:    revIdx,
 		CoordinatorIdx: coordIdx,
 	}, true
@@ -54,5 +54,5 @@ func RevisionFromString(actionId string) (Revision, bool) {
 
 // String returns the ID string for the policy revision.
 func (a *Revision) String() string {
-	return fmt.Sprintf("policy:%s:%d:%d", a.PolicyId, a.RevisionIdx, a.CoordinatorIdx)
+	return fmt.Sprintf("policy:%s:%d:%d", a.PolicyID, a.RevisionIdx, a.CoordinatorIdx)
 }

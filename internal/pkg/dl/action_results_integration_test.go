@@ -19,8 +19,8 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/rnd"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/rnd"
 )
 
 func createRandomActionResults() ([]model.ActionResult, error) {

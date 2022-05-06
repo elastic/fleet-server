@@ -15,7 +15,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/rnd"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/rnd"
 
 	"github.com/gofrs/uuid"
 	"github.com/rs/xid"

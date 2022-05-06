@@ -5,6 +5,7 @@
 //go:build integration
 // +build integration
 
+//nolint:unused // some unused code may be added to more tests
 package fleet
 
 import (
@@ -53,7 +54,7 @@ output:
     service_token: '${ELASTICSEARCH_SERVICE_TOKEN}'
 `
 
-var agentIdCfgData = `
+var agentIDCfgData = `
 output:
   elasticsearch:
     hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
@@ -84,9 +85,9 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	bulker := ftesting.SetupBulk(ctx, t)
 
 	// add a real default fleet server policy
-	policyId := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 	_, err := dl.CreatePolicy(ctx, bulker, model.Policy{
-		PolicyID:           policyId,
+		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
 		Data:               policyData,
@@ -98,7 +99,7 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 		Name:     "Default",
 		APIKey:   "keyvalue",
 		APIKeyID: "keyid",
-		PolicyID: policyId,
+		PolicyID: policyID,
 		Active:   true,
 	})
 	require.NoError(t, err)
@@ -134,7 +135,7 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
 
 	// reconfigure with agent ID set
-	err = appState.UpdateConfig(agentIdCfgData)
+	err = appState.UpdateConfig(agentIDCfgData)
 	require.NoError(t, err)
 
 	// wait for fleet-server to report as healthy
@@ -160,7 +161,7 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
 
 	// reconfigure to good config
-	err = appState.UpdateConfig(agentIdCfgData)
+	err = appState.UpdateConfig(agentIDCfgData)
 	require.NoError(t, err)
 
 	// wait for fleet-server to report as healthy

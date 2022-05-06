@@ -87,8 +87,8 @@ func makeCacheConfig(cfg *config.Config) cache.Config {
 		ActionTTL:    ccfg.ActionTTL,
 		EnrollKeyTTL: ccfg.EnrollKeyTTL,
 		ArtifactTTL:  ccfg.ArtifactTTL,
-		ApiKeyTTL:    ccfg.APIKeyTTL,
-		ApiKeyJitter: ccfg.APIKeyJitter,
+		APIKeyTTL:    ccfg.APIKeyTTL,
+		APIKeyJitter: ccfg.APIKeyJitter,
 	}
 }
 

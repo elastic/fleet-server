@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package rollback provides callback function registration that can be used to trigger a rollback.
 package rollback
 
 import (
@@ -46,5 +47,5 @@ func (r *Rollback) Rollback(ctx context.Context) (err error) {
 			log.Debug().Msg("rollback function succeeded")
 		}
 	}
-	return
+	return //nolint:nakedret // short function
 }

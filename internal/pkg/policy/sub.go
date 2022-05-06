@@ -9,8 +9,8 @@ import (
 )
 
 type subT struct {
-	policyId string
-	agentId  string // not logically necessary; cached for logging
+	policyID string
+	agentID  string // not logically necessary; cached for logging
 	revIdx   int64
 	coordIdx int64
 
@@ -20,10 +20,10 @@ type subT struct {
 	ch chan *ParsedPolicy
 }
 
-func NewSub(policyId, agentId string, revIdx, coordIdx int64) *subT {
+func NewSub(policyID, agentID string, revIdx, coordIdx int64) *subT {
 	return &subT{
-		policyId: policyId,
-		agentId:  agentId,
+		policyID: policyID,
+		agentID:  agentID,
 		revIdx:   revIdx,
 		coordIdx: coordIdx,
 		ch:       make(chan *ParsedPolicy, 1),
@@ -60,7 +60,7 @@ func (n *subT) popFront() *subT {
 	return s
 }
 
-func (n *subT) unlink() bool {
+func (n *subT) unlink() bool { //nolint:unparam // useful to return this if we ever test
 	if n.next == nil || n.prev == nil {
 		return false
 	}
@@ -76,17 +76,17 @@ func (n *subT) isEmpty() bool {
 	return n.next == n
 }
 
-func (s *subT) isUpdate(policy *model.Policy) bool {
+func (n *subT) isUpdate(policy *model.Policy) bool {
 
 	pRevIdx := policy.RevisionIdx
 	pCoordIdx := policy.CoordinatorIdx
 
-	return (pRevIdx > s.revIdx && pCoordIdx > 0) || (pRevIdx == s.revIdx && pCoordIdx > s.coordIdx)
+	return (pRevIdx > n.revIdx && pCoordIdx > 0) || (pRevIdx == n.revIdx && pCoordIdx > n.coordIdx)
 }
 
 // Output returns a new policy that needs to be sent based on the current subscription.
-func (sub *subT) Output() <-chan *ParsedPolicy {
-	return sub.ch
+func (n *subT) Output() <-chan *ParsedPolicy {
+	return n.ch
 }
 
 type subIterT struct {

@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package scheduler provides the ability to run functions on a schedule
 package scheduler
 
 import (
@@ -63,7 +64,7 @@ func New(schedules []Schedule, opts ...OptFunc) (*Scheduler, error) {
 		log:           log.With().Str("ctx", "elasticsearch CG scheduler").Logger(),
 		splayPercent:  defaultSplayPercent,
 		firstRunDelay: defaultFirstRunDelay,
-		rand:          rand.New(rand.NewSource(time.Now().UnixNano())),
+		rand:          rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec // used for timing offsets
 		schedules:     schedules,
 	}
 

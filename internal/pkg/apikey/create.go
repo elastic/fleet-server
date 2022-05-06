@@ -14,7 +14,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
-func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refresh string, roles []byte, meta interface{}) (*ApiKey, error) {
+func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refresh string, roles []byte, meta interface{}) (*APIKey, error) {
 	payload := struct {
 		Name       string          `json:"name,omitempty"`
 		Expiration string          `json:"expiration,omitempty"`
@@ -45,7 +45,6 @@ func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refres
 	if err != nil {
 		return nil, err
 	}
-
 	defer res.Body.Close()
 
 	if res.IsError() {
@@ -53,10 +52,10 @@ func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refres
 	}
 
 	type APIKeyResponse struct {
-		Id         string `json:"id"`
+		ID         string `json:"id"`
 		Name       string `json:"name"`
 		Expiration uint64 `json:"expiration"`
-		ApiKey     string `json:"api_key"`
+		APIKey     string `json:"api_key"`
 	}
 
 	var resp APIKeyResponse
@@ -65,9 +64,9 @@ func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refres
 		return nil, err
 	}
 
-	key := ApiKey{
-		Id:  resp.Id,
-		Key: resp.ApiKey,
+	key := APIKey{
+		ID:  resp.ID,
+		Key: resp.APIKey,
 	}
 
 	return &key, err

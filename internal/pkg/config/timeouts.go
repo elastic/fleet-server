@@ -30,7 +30,7 @@ func (c *ServerTimeouts) InitDefaults() {
 	// *before* reading the body.  This is purposeful to avoid streaming data from an unauthenticated
 	// connection. However, the downside is that if the roundtrip to Elastic is slow, we may
 	// end up hitting the Read timeout before actually reading any data off the socket.
-	// Use a large timeout to accomodate the authentication lag.  Add a ReadHeader timeout
+	// Use a large timeout to accommodate the authentication lag.  Add a ReadHeader timeout
 	// below to handle preAuth.
 	c.Read = 60 * time.Second
 

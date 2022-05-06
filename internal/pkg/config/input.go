@@ -17,6 +17,7 @@ const kDefaultHost = "0.0.0.0"
 const kDefaultPort = 8220
 const kDefaultInternalHost = "localhost"
 const kDefaultInternalPort = 8221
+const fleetInputType = "fleet-server"
 
 // Policy is the configuration policy to use.
 type Policy struct {
@@ -132,7 +133,7 @@ type Input struct {
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *Input) InitDefaults() {
-	c.Type = "fleet-server"
+	c.Type = fleetInputType
 	c.Server.InitDefaults()
 	c.Cache.InitDefaults()
 	c.Monitor.InitDefaults()
@@ -140,8 +141,8 @@ func (c *Input) InitDefaults() {
 
 // Validate ensures that the configuration is valid.
 func (c *Input) Validate() error {
-	if c.Type != "fleet-server" {
-		return fmt.Errorf("input type must be fleet-server")
+	if c.Type != fleetInputType {
+		return fmt.Errorf("input type must be %q", fleetInputType)
 	}
 	return nil
 }

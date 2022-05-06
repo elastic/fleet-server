@@ -10,6 +10,8 @@ package config
 import (
 	"testing"
 
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 )
@@ -37,6 +39,7 @@ func TestBindAddress(t *testing.T) {
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
+			_ = testlog.SetLogger(t)
 			res := test.cfg.BindAddress()
 			if !assert.True(t, cmp.Equal(test.result, res)) {
 				diff := cmp.Diff(test.result, res)

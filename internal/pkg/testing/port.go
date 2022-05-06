@@ -6,7 +6,7 @@ package testing
 
 import "net"
 
-// FreePort find a free port on the system.
+// FreePort finds a free port on the system.
 func FreePort() (uint16, error) {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {

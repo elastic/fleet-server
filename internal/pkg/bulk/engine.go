@@ -21,16 +21,16 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-type ApiKey = apikey.ApiKey
+type APIKey = apikey.APIKey
 type SecurityInfo = apikey.SecurityInfo
-type ApiKeyMetadata = apikey.ApiKeyMetadata
+type APIKeyMetadata = apikey.APIKeyMetadata
 
 var (
 	ErrNoQuotes = errors.New("quoted literal not supported")
 )
 
 type MultiOp struct {
-	Id    string
+	ID    string
 	Index string
 	Body  []byte
 }
@@ -52,10 +52,10 @@ type Bulk interface {
 	MDelete(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
 
 	// APIKey operations
-	ApiKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*ApiKey, error)
-	ApiKeyRead(ctx context.Context, id string) (*ApiKeyMetadata, error)
-	ApiKeyAuth(ctx context.Context, key ApiKey) (*SecurityInfo, error)
-	ApiKeyInvalidate(ctx context.Context, ids ...string) error
+	APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*APIKey, error)
+	APIKeyRead(ctx context.Context, id string) (*APIKeyMetadata, error)
+	APIKeyAuth(ctx context.Context, key APIKey) (*SecurityInfo, error)
+	APIKeyInvalidate(ctx context.Context, ids ...string) error
 
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
@@ -77,7 +77,7 @@ const (
 	defaultFlushThresholdSz  = 1024 * 1024 * 10
 	defaultMaxPending        = 32
 	defaultBlockQueueSz      = 32 // Small capacity to allow multiOp to spin fast
-	defaultApiKeyMaxParallel = 32
+	defaultAPIKeyMaxParallel = 32
 )
 
 func NewBulker(es esapi.Transport, opts ...BulkOpt) *Bulker {
@@ -317,7 +317,7 @@ func (b *Bulker) parseOpts(opts ...Opt) optionsT {
 }
 
 func (b *Bulker) newBlk(action actionT, opts optionsT) *bulkT {
-	blk := b.blkPool.Get().(*bulkT)
+	blk := b.blkPool.Get().(*bulkT) //nolint:errcheck // we control what is placed in the pool
 	blk.action = action
 	if opts.Refresh {
 		blk.flags.Set(flagRefresh)
