@@ -265,11 +265,15 @@ func TestServerInstrumentation(t *testing.T) {
 	stopClient := make(chan struct{})
 	cli := cleanhttp.DefaultClient()
 	callCheckinFunc := func() {
+		var Err error
+		defer require.NoError(t, Err)
 		for {
 			agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
-			res, err := cli.Post(srv.buildURL(agentID, "checkin"), "application/json", bytes.NewBuffer([]byte("{}"))) //nolint:noctx // test case
-			require.NoError(t, err)
-			defer res.Body.Close()
+			res, err := cli.Post(srv.buildURL(agentID, "checkin"), "application/json", bytes.NewBuffer([]byte("{}"))) //nolint:noctx,staticcheck // test case
+			if res != nil && res.Body != nil {
+				res.Body.Close()
+			}
+			Err = err //nolint:ineffassign,staticcheck,wastedassign // ugly work around for error checking
 			select {
 			case <-ctx.Done():
 				return
