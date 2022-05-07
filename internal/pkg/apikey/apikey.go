@@ -28,11 +28,13 @@ var (
 
 var AuthKey = http.CanonicalHeaderKey("Authorization")
 
+// APIKey is used to represent an Elasticsearch API Key.
 type APIKey struct {
 	ID  string
 	Key string
 }
 
+// NewAPIKeyFromToken generates an APIKey from the given b64 encoded token.
 func NewAPIKeyFromToken(token string) (*APIKey, error) {
 	d, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
@@ -55,15 +57,18 @@ func NewAPIKeyFromToken(token string) (*APIKey, error) {
 	return &apiKey, nil
 }
 
+// Token returns the b64 encoded token of the APIKey
 func (k APIKey) Token() string {
 	s := fmt.Sprintf("%s:%s", k.ID, k.Key)
 	return base64.StdEncoding.EncodeToString([]byte(s))
 }
 
+// Agent provides a string consisting of "ID:Key"
 func (k APIKey) Agent() string {
 	return fmt.Sprintf("%s:%s", k.ID, k.Key)
 }
 
+// ExtractAPIKey gathers to APIKey associated with the request.
 func ExtractAPIKey(r *http.Request) (*APIKey, error) {
 	s, ok := r.Header[AuthKey]
 	if !ok {

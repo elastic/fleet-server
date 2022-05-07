@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// RollbackFunc is a function that is called in order to perform a rollback.
 type RollbackFunc func(ctx context.Context) error
 
 type rollbackInfo struct {
@@ -18,23 +19,26 @@ type rollbackInfo struct {
 	fn   RollbackFunc
 }
 
+// Rollback is used to track RollbackFuncs
 type Rollback struct {
 	log zerolog.Logger
 	rbi []rollbackInfo
 }
 
+// New returns a new Rollback.
 func New(log zerolog.Logger) *Rollback {
 	return &Rollback{
 		log: log,
 	}
 }
 
+// Register adds the named function to Rollback
 func (r *Rollback) Register(name string, fn RollbackFunc) {
 	r.rbi = append(r.rbi, rollbackInfo{name, fn})
 }
 
+// Rollback execute all rollback functions, log errors, and return the first error afterwards.
 func (r *Rollback) Rollback(ctx context.Context) (err error) {
-	// Execute all rollback functions, log errors, return the first error
 	for _, rb := range r.rbi {
 		log := r.log.With().Str("name", rb.name).Logger()
 		log.Debug().Msg("rollback function called")

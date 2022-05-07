@@ -9,11 +9,13 @@ import "time"
 
 const ServiceName = "fleet-server"
 
+// Info contains build information.
 type Info struct {
 	Version, Commit string
 	BuildTime       time.Time
 }
 
+// Time parses the given string using RFC3339, or returns an empty time.Time
 func Time(stime string) time.Time {
 	t, err := time.Parse(time.RFC3339, stime)
 	if err != nil {

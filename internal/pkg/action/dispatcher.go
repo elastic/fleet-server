@@ -18,16 +18,19 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Sub is an action subscription that will give a single agent all of it's actions.
 type Sub struct {
 	agentID string
 	seqNo   sqn.SeqNo
 	ch      chan []model.Action
 }
 
+// Ch returns the emitter channel for actions.
 func (s Sub) Ch() chan []model.Action {
 	return s.ch
 }
 
+// Dispatcher tracks agent subscriptions and emits actions to the Sub(s).
 type Dispatcher struct {
 	am monitor.SimpleMonitor
 
@@ -35,6 +38,7 @@ type Dispatcher struct {
 	subs map[string]Sub
 }
 
+// NewDispatcher creates a Dispatcher using the provided monitor.
 func NewDispatcher(am monitor.SimpleMonitor) *Dispatcher {
 	return &Dispatcher{
 		am:   am,
@@ -42,6 +46,9 @@ func NewDispatcher(am monitor.SimpleMonitor) *Dispatcher {
 	}
 }
 
+// Run starts the Dispatcher (as a blocking operation).
+// After the Dispatcher is started Subs may receive actions.
+// Subscribe may be called before or after Run.
 func (d *Dispatcher) Run(ctx context.Context) (err error) {
 	for {
 		select {
@@ -53,6 +60,8 @@ func (d *Dispatcher) Run(ctx context.Context) (err error) {
 	}
 }
 
+// Subscribe generates a new subscription with the Dispatceher using the provided agentID and seqNo.
+// There is no check to ensure that the agentID has not been used; using the same one twice results in undefined behaviour.
 func (d *Dispatcher) Subscribe(agentID string, seqNo sqn.SeqNo) *Sub {
 	cbCh := make(chan []model.Action, 1)
 
@@ -72,6 +81,8 @@ func (d *Dispatcher) Subscribe(agentID string, seqNo sqn.SeqNo) *Sub {
 	return &sub
 }
 
+// Unsubscribe removes the given subscription from the dispatcher.
+// Note that the channel sub.Ch() provides is not closed in this event.
 func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	if sub == nil {
 		return
@@ -85,6 +96,7 @@ func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	log.Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
+// process gathers actions from the monitor and dispatches them to the corresponding Subs
 func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	// Parse hits into map of agent -> actions
 	// Actions are ordered by sequence
@@ -111,6 +123,7 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	}
 }
 
+// getSub returns the subscription (if any) for the specified agentID
 func (d *Dispatcher) getSub(agentID string) (Sub, bool) {
 	d.mx.RLock()
 	sub, ok := d.subs[agentID]
@@ -118,6 +131,8 @@ func (d *Dispatcher) getSub(agentID string) (Sub, bool) {
 	return sub, ok
 }
 
+// dispatch passes the actions into the subscription channel as a non-blocking operation.
+// It may drop actions that will be re-sent to the agent on its next check in.
 func (d *Dispatcher) dispatch(_ context.Context, agentID string, acdocs []model.Action) {
 	sub, ok := d.getSub(agentID)
 	if !ok {

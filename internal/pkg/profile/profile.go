@@ -14,6 +14,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// RunProfiler exposes /debug/pprof on the passed address.
+// It is a blocking operation.
 func RunProfiler(ctx context.Context, addr string) error {
 
 	if addr == "" {

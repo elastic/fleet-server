@@ -30,7 +30,7 @@ type Subscription interface {
 	Output() <-chan []es.HitT
 }
 
-// Monitor monitors for new documents in an index
+// Monitor monitors for new documents in an index and sends them to its subscriptions.
 type Monitor interface {
 	// The BaseMonitor methods
 	BaseMonitor
@@ -42,7 +42,7 @@ type Monitor interface {
 	Unsubscribe(sub Subscription)
 }
 
-// Subscription is a subscription to get notified for new documents
+// subT is a subscription to get notified for new documents
 type subT struct {
 	idx uint64
 	c   chan []es.HitT
@@ -77,11 +77,12 @@ func New(index string, esCli, monCli *elasticsearch.Client, opts ...Option) (Mon
 	return m, nil
 }
 
+// GetCheckpoint implements the GlobalCheckpointProvider interface.
 func (m *monitorT) GetCheckpoint() sqn.SeqNo {
 	return m.sm.GetCheckpoint()
 }
 
-// Subscribe to get notified of documents
+// Subscribe returns a Subscription that is used to get notified of documents
 func (m *monitorT) Subscribe() Subscription {
 	idx := atomic.AddUint64(&gCounter, 1)
 
@@ -96,7 +97,8 @@ func (m *monitorT) Subscribe() Subscription {
 	return s
 }
 
-// Unsubscribe from getting notifications on documents
+// Unsubscribe removes a subscription from the Monitor.
+// The Subscription channel is not closed by Unsubscribe.
 func (m *monitorT) Unsubscribe(sub Subscription) {
 	s, ok := sub.(*subT)
 	if !ok {
@@ -111,6 +113,7 @@ func (m *monitorT) Unsubscribe(sub Subscription) {
 	m.mut.Unlock()
 }
 
+// Run starts the Monitor as a blocking operation.
 func (m *monitorT) Run(ctx context.Context) (err error) {
 	g, gctx := errgroup.WithContext(ctx)
 
