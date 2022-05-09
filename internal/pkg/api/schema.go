@@ -53,6 +53,7 @@ type EnrollRequest struct {
 	Meta     struct {
 		User  json.RawMessage `json:"user_provided"`
 		Local json.RawMessage `json:"local"`
+		Tags  []string        `json:"tags"`
 	} `json:"metadata"`
 }
 
@@ -68,6 +69,7 @@ type EnrollResponseItem struct {
 	AccessAPIKeyID string          `json:"access_api_key_id"`
 	AccessAPIKey   string          `json:"access_api_key"`
 	Status         string          `json:"status"`
+	Tags           []string        `json:"tags"`
 }
 
 type EnrollResponse struct {
