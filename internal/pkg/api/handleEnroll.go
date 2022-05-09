@@ -233,6 +233,7 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 			ID:      agentID,
 			Version: ver,
 		},
+		Tags: req.Meta.Tags,
 	}
 
 	err = createFleetAgent(ctx, et.bulker, agentID, agentData)
@@ -258,6 +259,7 @@ func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog ze
 			AccessAPIKeyID: agentData.AccessAPIKeyID,
 			AccessAPIKey:   accessAPIKey.Token(),
 			Status:         "online",
+			Tags:           agentData.Tags,
 		},
 	}
 
