@@ -411,6 +411,13 @@
           "type": "object",
           "format": "raw"
         },
+        "tags": {
+          "description": "User provided tags for the Elastic Agent",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "local_metadata": {
           "description": "Local metadata information for the Elastic Agent",
           "type": "object",
