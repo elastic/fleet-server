@@ -7,11 +7,12 @@ package logger
 import (
 	"encoding/json"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 func encoderConfig() zapcore.EncoderConfig {
