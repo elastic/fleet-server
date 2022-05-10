@@ -13,11 +13,6 @@ BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
 BUILDER_IMAGE=docker.elastic.co/observability-ci/fleet-server-builder:latest
-
-ifdef VERSION_QUALIFIER
-DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
-endif
-
 ifeq ($(SNAPSHOT),true)
 VERSION=${DEFAULT_VERSION}-SNAPSHOT
 else
