@@ -95,12 +95,6 @@ pipeline {
     stage('Release Test') {
       options { skipDefaultCheckout() }
       steps {
-<<<<<<< HEAD
-        cleanup()
-        dir("${BASE_DIR}"){
-          withGoEnv(){
-            sh(label: 'Create release artifacts', script: 'make docker-release')
-=======
         withGithubNotify(context: "Release Test") {
           cleanup()
           dir("${BASE_DIR}"){
@@ -108,7 +102,6 @@ pipeline {
               sh(label: 'Create release artifacts', script: 'make docker-release')
               uploadPackagesToGoogleBucket(pattern: 'build/binaries/')
             }
->>>>>>> 65681a3 (ci: enable upload artifacts (#1147))
           }
         }
       }
