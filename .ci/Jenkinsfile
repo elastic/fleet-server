@@ -90,8 +90,6 @@ pipeline {
         }
       }
     }
-<<<<<<< HEAD
-=======
     stage('Release Test') {
       options { skipDefaultCheckout() }
       steps {
@@ -125,7 +123,6 @@ pipeline {
               parameters: [string(name: 'COMMIT', value: "${env.GIT_BASE_COMMIT}")])
       }
     }
->>>>>>> 9b2c061 (ci: use downstream pattern (#1439))
   }
   post {
     cleanup {
