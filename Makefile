@@ -100,7 +100,7 @@ check-no-changes:
 
 .PHONY: test
 test: prepare-test-context  ## - Run all tests
-	@./dev-tools/run_with_go_ver $(MAKE) test-unit
+	@./dev-tools/run_with_go_ver $(MAKE) test-unit 
 	@./dev-tools/run_with_go_ver $(MAKE) test-int
 	@$(MAKE) junit-report
 
