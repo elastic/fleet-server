@@ -1,0 +1,8 @@
+ARG GO_VERSION
+FROM golang:${GO_VERSION}-stretch
+
+RUN apt-get update && apt-get install -y zip
+
+WORKDIR /go/src/github.com/elastic/fleet-server
+
+ENTRYPOINT [ "make", "release" ]
