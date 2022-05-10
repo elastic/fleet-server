@@ -242,7 +242,6 @@ func TestESProxyConfig(t *testing.T) {
 				return
 			}
 			require.NotNil(t, transport.Proxy)
-			require.True(t, ok)
 
 			req, err := http.NewRequest("GET", test.url, nil) //nolint:noctx // test case
 			require.NoError(t, err)
