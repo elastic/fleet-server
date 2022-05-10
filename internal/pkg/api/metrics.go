@@ -16,7 +16,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/elastic/fleet-server/v7/version"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -87,7 +86,7 @@ func (rt *routeStats) Register(registry *monitoring.Registry) {
 }
 
 func init() {
-	err := report.SetupMetrics(logger.NewZapStub("beats-metrics"), build.ServiceName, version.DefaultVersion)
+	err := report.SetupMetrics(logger.NewZapStub("beats-metrics"), build.ServiceName)
 	if err != nil {
 		log.Error().Err(err).Msg("unable to initialize metrics")
 	}
@@ -103,7 +102,6 @@ func init() {
 	cntArtifacts.Register(routesRegistry.NewRegistry("artifacts"))
 	cntAcks.Register(routesRegistry.NewRegistry("acks"))
 	cntStatus.Register(routesRegistry.NewRegistry("status"))
-
 }
 
 func (rt *routeStats) IncError(err error) {

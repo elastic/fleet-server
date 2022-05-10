@@ -7,7 +7,7 @@ require (
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210922110810-e6f1f402a9ed
 	github.com/elastic/elastic-agent-libs v0.2.3
-	github.com/elastic/elastic-agent-system-metrics v0.2.1
+	github.com/elastic/elastic-agent-system-metrics v0.2.2-0.20220510171430-e1f7fa0db117
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
 	github.com/elastic/go-ucfg v0.8.4
 	github.com/gofrs/uuid v4.2.0+incompatible
