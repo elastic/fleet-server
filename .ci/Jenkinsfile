@@ -106,7 +106,6 @@ pipeline {
           dir("${BASE_DIR}"){
             withGoEnv(){
               sh(label: 'Create release artifacts', script: 'make docker-release')
-              uploadPackagesToGoogleBucket(pattern: 'build/distributions/')
             }
           }
         }
