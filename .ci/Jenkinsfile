@@ -37,20 +37,24 @@ pipeline {
     }
     stage('Check') {
       steps {
-        cleanup()
-        dir("${BASE_DIR}"){
-          withGoEnv(){
-            sh(label: 'check',script: 'make check')
+        withGithubNotify(context: "Check") {
+          cleanup()
+          dir("${BASE_DIR}"){
+            withGoEnv(){
+              sh(label: 'check',script: 'make check')
+            }
           }
         }
       }
     }
     stage('Local') {
       steps {
-        cleanup()
-        dir("${BASE_DIR}"){
-          withGoEnv(){
-            sh(label: 'local',script: 'make local')
+        withGithubNotify(context: "Local") {
+          cleanup()
+          dir("${BASE_DIR}"){
+            withGoEnv(){
+              sh(label: 'local',script: 'make local')
+            }
           }
         }
       }
@@ -58,11 +62,13 @@ pipeline {
     stage('Unit Test') {
       options { skipDefaultCheckout() }
       steps {
-        cleanup()
-        dir("${BASE_DIR}"){
-          withGoEnv(){
-            sh(label: 'test', script: 'make test-unit')
-            sh(label: 'test', script: 'make junit-report')
+        withGithubNotify(context: "Unit Test", tab: 'tests') {
+          cleanup()
+          dir("${BASE_DIR}"){
+            withGoEnv(){
+              sh(label: 'test', script: 'make test-unit')
+              sh(label: 'test', script: 'make junit-report')
+            }
           }
         }
       }
@@ -75,12 +81,14 @@ pipeline {
     stage('Integration Test') {
       options { skipDefaultCheckout() }
       steps {
-        cleanup()
-        dir("${BASE_DIR}"){
-          withGoEnv(){
-            retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install Docker", script: '.ci/scripts/install-docker-compose.sh') }
-            sh(label: 'test', script: 'make test-int')
-            sh(label: 'test', script: 'make junit-report')
+        withGithubNotify(context: "Integration Test", tab: 'tests') {
+          cleanup()
+          dir("${BASE_DIR}"){
+            withGoEnv(){
+              retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install Docker", script: '.ci/scripts/install-docker-compose.sh') }
+              sh(label: 'test', script: 'make test-int')
+              sh(label: 'test', script: 'make junit-report')
+            }
           }
         }
       }
@@ -93,10 +101,12 @@ pipeline {
     stage('Release Test') {
       options { skipDefaultCheckout() }
       steps {
-        cleanup()
-        dir("${BASE_DIR}"){
-          withGoEnv(){
-            sh(label: 'Create release artifacts', script: 'make docker-release')
+        withGithubNotify(context: "Release Test") {
+          cleanup()
+          dir("${BASE_DIR}"){
+            withGoEnv(){
+              sh(label: 'Create release artifacts', script: 'make docker-release')
+            }
           }
         }
       }
