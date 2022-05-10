@@ -876,17 +876,21 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
+	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
+	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
+	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
+
 	ct := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
+	ws, err := api.NewAgentWS(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, ack, bulker)
+	if err != nil {
+		return err
+	}
 	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
 	}
 
-	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
-	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
-	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
-
-	router := api.NewRouter(ctx, bulker, ct, et, at, ack, st, sm, tracer, f.bi)
+	router := api.NewRouter(ctx, bulker, ct, ws, et, at, ack, st, sm, tracer, f.bi)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return api.Run(ctx, router, &cfg.Inputs[0].Server)

@@ -22,6 +22,7 @@ const (
 	RouteStatus    = "/api/status"
 	RouteEnroll    = "/api/fleet/agents/:id"
 	RouteCheckin   = "/api/fleet/agents/:id/checkin"
+	RouteWebsocket = "/api/fleet/agents/:id/ws"
 	RouteAcks      = "/api/fleet/agents/:id/acks"
 	RouteArtifacts = "/api/fleet/artifacts/:id/:sha2"
 )
@@ -30,6 +31,7 @@ type Router struct {
 	ctx    context.Context
 	bulker bulk.Bulk
 	ct     *CheckinT
+	ws     *AgentWS
 	et     *EnrollerT
 	at     *ArtifactT
 	ack    *AckT
@@ -38,11 +40,12 @@ type Router struct {
 	bi     build.Info
 }
 
-func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, sm policy.SelfMonitor, tracer *apm.Tracer, bi build.Info) *httprouter.Router {
+func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, ws *AgentWS, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, sm policy.SelfMonitor, tracer *apm.Tracer, bi build.Info) *httprouter.Router {
 	r := Router{
 		ctx:    ctx,
 		bulker: bulker,
 		ct:     ct,
+		ws:     ws,
 		et:     et,
 		sm:     sm,
 		at:     at,
@@ -70,6 +73,11 @@ func NewRouter(ctx context.Context, bulker bulk.Bulk, ct *CheckinT, et *Enroller
 			http.MethodPost,
 			RouteCheckin,
 			r.handleCheckin,
+		},
+		{
+			http.MethodGet,
+			RouteWebsocket,
+			r.handleWS,
 		},
 		{
 			http.MethodPost,

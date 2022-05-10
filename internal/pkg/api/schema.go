@@ -171,3 +171,13 @@ type StatusResponse struct {
 	Status  string                 `json:"status"`
 	Version *StatusResponseVersion `json:"version,omitempty"`
 }
+
+type WebsocketRequest struct {
+	Checkin *CheckinRequest `json:"checkin"`
+	Ack *AckRequest `json:"ack"`
+}
+
+type WebsocketResponse struct {
+	Checkin *CheckinResponse `json:"checkin"`
+	Ack *AckResponse `json:"ack"`
+}

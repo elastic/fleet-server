@@ -30,6 +30,8 @@ const (
 	defaultCheckinBurst    = 1000
 	defaultCheckinMax      = 0
 	defaultCheckinMaxBody  = 1024 * 1024
+	defaultCheckinWebsocketReadConcurrency = 50
+	defaultCheckinWebsocketWriteConcurrency = 50
 
 	defaultArtifactInterval = time.Millisecond * 5
 	defaultArtifactBurst    = 25
@@ -87,22 +89,15 @@ func defaultCacheLimits() *cacheLimits {
 	}
 }
 
-type limit struct {
-	Interval time.Duration `config:"interval"`
-	Burst    int           `config:"burst"`
-	Max      int64         `config:"max"`
-	MaxBody  int64         `config:"max_body_byte_size"`
-}
-
 type serverLimitDefaults struct {
 	PolicyThrottle time.Duration `config:"policy_throttle"`
 	MaxConnections int           `config:"max_connections"`
 
-	CheckinLimit  limit `config:"checkin_limit"`
-	ArtifactLimit limit `config:"artifact_limit"`
-	EnrollLimit   limit `config:"enroll_limit"`
-	AckLimit      limit `config:"ack_limit"`
-	StatusLimit   limit `config:"status_limit"`
+	CheckinLimit  WebsocketLimit `config:"checkin_limit"`
+	ArtifactLimit Limit `config:"artifact_limit"`
+	EnrollLimit   Limit `config:"enroll_limit"`
+	AckLimit      Limit `config:"ack_limit"`
+	StatusLimit   Limit `config:"status_limit"`
 }
 
 func defaultserverLimitDefaults() *serverLimitDefaults {
@@ -110,31 +105,35 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 		PolicyThrottle: defaultCacheNumCounters,
 		MaxConnections: defaultCacheMaxCost,
 
-		CheckinLimit: limit{
-			Interval: defaultCheckinInterval,
-			Burst:    defaultCheckinBurst,
-			Max:      defaultCheckinMax,
-			MaxBody:  defaultCheckinMaxBody,
+		CheckinLimit: WebsocketLimit{
+			Limit: Limit{
+				Interval: defaultCheckinInterval,
+				Burst:    defaultCheckinBurst,
+				Max:      defaultCheckinMax,
+				MaxBody:  defaultCheckinMaxBody,
+			},
+			ReadConcurrency: defaultCheckinWebsocketReadConcurrency,
+			WriteConcurrency: defaultCheckinWebsocketWriteConcurrency,
 		},
-		ArtifactLimit: limit{
+		ArtifactLimit: Limit{
 			Interval: defaultArtifactInterval,
 			Burst:    defaultArtifactBurst,
 			Max:      defaultArtifactMax,
 			MaxBody:  defaultArtifactMaxBody,
 		},
-		EnrollLimit: limit{
+		EnrollLimit: Limit{
 			Interval: defaultEnrollInterval,
 			Burst:    defaultEnrollBurst,
 			Max:      defaultEnrollMax,
 			MaxBody:  defaultEnrollMaxBody,
 		},
-		AckLimit: limit{
+		AckLimit: Limit{
 			Interval: defaultAckInterval,
 			Burst:    defaultAckBurst,
 			Max:      defaultAckMax,
 			MaxBody:  defaultAckMaxBody,
 		},
-		StatusLimit: limit{
+		StatusLimit: Limit{
 			Interval: defaultStatusInterval,
 			Burst:    defaultStatusBurst,
 			Max:      defaultStatusMax,

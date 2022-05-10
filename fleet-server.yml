@@ -1,7 +1,7 @@
 output:
   elasticsearch:
     hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
-    service_token: '${ELASTICSEARCH_SERVICE_TOKEN}'
+    service_token: 'AAEAAWVsYXN0aWMvZmxlZXQtc2VydmVyL3Rva2VuLTE2NTE2NzQ4NTY5Mzk6Wi1fSWtIVWVSLUd3Zjl3ZVFPcmd0UQ'
 
 fleet:
   agent:

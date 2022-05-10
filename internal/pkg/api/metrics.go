@@ -28,6 +28,7 @@ var (
 	cntHTTPClose *monitoring.Uint
 
 	cntCheckin   routeStats
+	cntWebsocket routeStats
 	cntEnroll    routeStats
 	cntAcks      routeStats
 	cntStatus    routeStats
@@ -98,6 +99,7 @@ func init() {
 	routesRegistry := registry.NewRegistry("routes")
 
 	cntCheckin.Register(routesRegistry.NewRegistry("checkin"))
+	cntWebsocket.Register(routesRegistry.NewRegistry("websocket"))
 	cntEnroll.Register(routesRegistry.NewRegistry("enroll"))
 	cntArtifacts.Register(routesRegistry.NewRegistry("artifacts"))
 	cntAcks.Register(routesRegistry.NewRegistry("acks"))

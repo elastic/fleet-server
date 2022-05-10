@@ -15,13 +15,20 @@ type Limit struct {
 	MaxBody  int64         `config:"max_body_byte_size"`
 }
 
+type WebsocketLimit struct {
+	Limit `config:",inline"`
+
+	ReadConcurrency int `config:"websocket_read_concurrency"`
+	WriteConcurrency int `config:"websocket_write_concurrency"`
+}
+
 type ServerLimits struct {
 	MaxAgents         int           `config:"max_agents"`
 	PolicyThrottle    time.Duration `config:"policy_throttle"`
 	MaxHeaderByteSize int           `config:"max_header_byte_size"`
 	MaxConnections    int           `config:"max_connections"`
 
-	CheckinLimit  Limit `config:"checkin_limit"`
+	CheckinLimit  WebsocketLimit `config:"checkin_limit"`
 	ArtifactLimit Limit `config:"artifact_limit"`
 	EnrollLimit   Limit `config:"enroll_limit"`
 	AckLimit      Limit `config:"ack_limit"`
@@ -40,11 +47,15 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	c.MaxConnections = l.MaxConnections
 	c.PolicyThrottle = l.PolicyThrottle
 
-	c.CheckinLimit = Limit{
-		Interval: l.CheckinLimit.Interval,
-		Burst:    l.CheckinLimit.Burst,
-		Max:      l.CheckinLimit.Max,
-		MaxBody:  l.CheckinLimit.MaxBody,
+	c.CheckinLimit = WebsocketLimit{
+		Limit: Limit{
+			Interval: l.CheckinLimit.Interval,
+			Burst:    l.CheckinLimit.Burst,
+			Max:      l.CheckinLimit.Max,
+			MaxBody:  l.CheckinLimit.MaxBody,
+		},
+		ReadConcurrency: l.CheckinLimit.ReadConcurrency,
+		WriteConcurrency: l.CheckinLimit.WriteConcurrency,
 	}
 	c.ArtifactLimit = Limit{
 		Interval: l.ArtifactLimit.Interval,

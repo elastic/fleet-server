@@ -124,7 +124,7 @@ func NewCheckinT(
 		gcp:    gcp,
 		ad:     ad,
 		tr:     tr,
-		limit:  limit.NewLimiter(&cfg.Limits.CheckinLimit),
+		limit:  limit.NewLimiter(&cfg.Limits.CheckinLimit.Limit),
 		bulker: bulker,
 	}
 
@@ -195,7 +195,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	}
 
 	// Resolve AckToken from request, fallback on the agent record
-	seqno, err := ct.resolveSeqNo(ctx, zlog, req, agent)
+	seqno, err := resolveSeqNo(ctx, zlog, ct.tr, req, agent)
 	if err != nil {
 		return err
 	}
@@ -250,7 +250,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	)
 
 	// Check agent pending actions first
-	pendingActions, err := ct.fetchAgentPendingActions(ctx, seqno, agent.Id)
+	pendingActions, err := fetchAgentPendingActions(ctx, ct.bulker, seqno, ct.gcp, agent.Id)
 	if err != nil {
 		return err
 	}
@@ -272,7 +272,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				if err != nil {
 					return errors.Wrap(err, "processPolicy")
 				}
-				actions = append(actions, *actionResp)
+				actions = append(actions, actionResp)
 				break LOOP
 			case <-longPoll.C:
 				zlog.Trace().Msg("fire long poll")
@@ -366,15 +366,15 @@ func acceptsEncoding(r *http.Request, encoding string) bool {
 }
 
 // Resolve AckToken from request, fallback on the agent record
-func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req CheckinRequest, agent *model.Agent) (sqn.SeqNo, error) {
+func resolveSeqNo(ctx context.Context, zlog zerolog.Logger, resolver *action.TokenResolver, req CheckinRequest, agent *model.Agent) (sqn.SeqNo, error) {
 	var err error
 	// Resolve AckToken from request, fallback on the agent record
 	ackToken := req.AckToken
 	var seqno sqn.SeqNo = agent.ActionSeqNo
 
-	if ct.tr != nil && ackToken != "" {
+	if resolver != nil && ackToken != "" {
 		var sn int64
-		sn, err = ct.tr.Resolve(ctx, ackToken)
+		sn, err = resolver.Resolve(ctx, ackToken)
 		if err != nil {
 			if errors.Is(err, dl.ErrNotFound) {
 				zlog.Debug().Str("token", ackToken).Msg("revision token not found")
@@ -388,9 +388,9 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req C
 	return seqno, err
 }
 
-func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentID string) ([]model.Action, error) {
+func fetchAgentPendingActions(ctx context.Context, bulker bulk.Bulk, seqno sqn.SeqNo, gcp monitor.GlobalCheckpointProvider, agentID string) ([]model.Action, error) {
 
-	actions, err := dl.FindAgentActions(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentID)
+	actions, err := dl.FindAgentActions(ctx, bulker, seqno, gcp.GetCheckpoint(), agentID)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "fetchAgentPendingActions")
@@ -427,7 +427,7 @@ func convertActions(agentID string, actions []model.Action) ([]ActionResp, strin
 //  - Generate and update default ApiKey if roles have changed.
 //  - Rewrite the policy for delivery to the agent injecting the key material.
 //
-func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string, pp *policy.ParsedPolicy) (*ActionResp, error) {
+func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string, pp *policy.ParsedPolicy) (ActionResp, error) {
 	zlog = zlog.With().
 		Str("ctx", "processPolicy").
 		Int64("policyRevision", pp.Policy.RevisionIdx).
@@ -439,7 +439,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail find agent record")
-		return nil, err
+		return ActionResp{}, err
 	}
 
 	// Parse the outputs maps in order to prepare the outputs
@@ -447,11 +447,11 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	outputs, err := smap.Parse(pp.Fields[outputsProperty])
 
 	if err != nil {
-		return nil, err
+		return ActionResp{}, err
 	}
 
 	if outputs == nil {
-		return nil, ErrNoPolicyOutput
+		return ActionResp{}, ErrNoPolicyOutput
 	}
 
 	// Iterate through the policy outputs and prepare them
@@ -459,13 +459,13 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, outputs)
 
 		if err != nil {
-			return nil, err
+			return ActionResp{}, err
 		}
 	}
 
 	outputRaw, err := json.Marshal(outputs)
 	if err != nil {
-		return nil, err
+		return ActionResp{}, err
 	}
 
 	// Dupe field map; pp is immutable
@@ -491,7 +491,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Type:      TypePolicyChange,
 	}
 
-	return &resp, nil
+	return resp, nil
 }
 
 func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {
