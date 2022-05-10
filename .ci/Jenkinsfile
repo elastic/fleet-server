@@ -90,6 +90,42 @@ pipeline {
         }
       }
     }
+<<<<<<< HEAD
+=======
+    stage('Release Test') {
+      options { skipDefaultCheckout() }
+      steps {
+        withGithubNotify(context: "Release Test") {
+          cleanup()
+          dir("${BASE_DIR}"){
+            withGoEnv(){
+              sh(label: 'Create release artifacts', script: 'make docker-release')
+              uploadPackagesToGoogleBucket(pattern: 'build/distributions/')
+            }
+          }
+        }
+      }
+      post {
+        success {
+          dir("${BASE_DIR}"){
+            sh(label: 'Check release artifacts', script: 'make test-release')
+          }
+        }
+      }
+    }
+    stage('Downstream - Package') {
+      options { skipDefaultCheckout() }
+      when {
+        not { changeRequest() }
+      }
+      steps {
+        build(job: "Ingest-manager/fleet-server-package-mbp/${env.JOB_BASE_NAME}",
+              propagate: false,
+              wait: false,
+              parameters: [string(name: 'COMMIT', value: "${env.GIT_BASE_COMMIT}")])
+      }
+    }
+>>>>>>> 9b2c061 (ci: use downstream pattern (#1439))
   }
   post {
     cleanup {
