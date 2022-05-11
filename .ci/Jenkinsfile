@@ -111,15 +111,13 @@ pipeline {
           dir("${BASE_DIR}"){
             withGoEnv(){
               sh(label: 'Create release artifacts', script: 'make docker-release')
+<<<<<<< HEAD
               uploadPackagesToGoogleBucket(pattern: 'build/binaries/')
+=======
+              uploadPackagesToGoogleBucket(pattern: 'build/distributions/')
+              sh(label: 'Check release artifacts', script: 'make test-release')
+>>>>>>> ca79684 (ci: use post-builds for reporting only (#1449))
             }
-          }
-        }
-      }
-      post {
-        success {
-          dir("${BASE_DIR}"){
-            sh(label: 'Check release artifacts', script: 'make test-release')
           }
         }
       }
