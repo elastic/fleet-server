@@ -17,8 +17,9 @@ import (
 
 const cacheSize = 5000
 
-// TokenResolver is an LRU cache for seqno on agent check-in
-// TODO what are the "tokens" agentID?
+// TokenResolver is an LRU cache for seqno on agent check-in.
+// A token is the elasticsearch document_id (not a SeqNo). It is used
+// by fleet-server to send state information to the agent.
 type TokenResolver struct {
 	bulker bulk.Bulk
 	cache  *lru.Cache
@@ -37,7 +38,7 @@ func NewTokenResolver(bulker bulk.Bulk) (*TokenResolver, error) {
 	}, nil
 }
 
-// Resolve will return the seqno from the cache or retireive and cache it using its bulk.Bulk.
+// Resolve will return the seqno from the cache or retreive and cache it using its bulk.Bulk.
 func (r *TokenResolver) Resolve(ctx context.Context, token string) (int64, error) {
 	if token == "" {
 		return 0, dl.ErrNotFound

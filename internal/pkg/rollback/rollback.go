@@ -19,7 +19,7 @@ type rollbackInfo struct {
 	fn   RollbackFunc
 }
 
-// Rollback is used to track RollbackFuncs
+// Rollback is used to track RollbackFuncs.
 type Rollback struct {
 	log zerolog.Logger
 	rbi []rollbackInfo
@@ -32,7 +32,7 @@ func New(log zerolog.Logger) *Rollback {
 	}
 }
 
-// Register adds the named function to Rollback
+// Register adds the named function to Rollback.
 func (r *Rollback) Register(name string, fn RollbackFunc) {
 	r.rbi = append(r.rbi, rollbackInfo{name, fn})
 }

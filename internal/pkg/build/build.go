@@ -15,7 +15,7 @@ type Info struct {
 	BuildTime       time.Time
 }
 
-// Time parses the given string using RFC3339, or returns an empty time.Time
+// Time parses the given string using RFC3339, or returns an empty time.Time.
 func Time(stime string) time.Time {
 	t, err := time.Parse(time.RFC3339, stime)
 	if err != nil {

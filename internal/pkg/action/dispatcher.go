@@ -30,7 +30,7 @@ func (s Sub) Ch() chan []model.Action {
 	return s.ch
 }
 
-// Dispatcher tracks agent subscriptions and emits actions to the Sub(s).
+// Dispatcher tracks agent subscriptions and emits actions to the subscriptions.
 type Dispatcher struct {
 	am monitor.SimpleMonitor
 
@@ -46,8 +46,8 @@ func NewDispatcher(am monitor.SimpleMonitor) *Dispatcher {
 	}
 }
 
-// Run starts the Dispatcher (as a blocking operation).
-// After the Dispatcher is started Subs may receive actions.
+// Run starts the Dispatcher.
+// After the Dispatcher is started subscriptions may receive actions.
 // Subscribe may be called before or after Run.
 func (d *Dispatcher) Run(ctx context.Context) (err error) {
 	for {
@@ -60,7 +60,7 @@ func (d *Dispatcher) Run(ctx context.Context) (err error) {
 	}
 }
 
-// Subscribe generates a new subscription with the Dispatceher using the provided agentID and seqNo.
+// Subscribe generates a new subscription with the Dispatcher using the provided agentID and seqNo.
 // There is no check to ensure that the agentID has not been used; using the same one twice results in undefined behaviour.
 func (d *Dispatcher) Subscribe(agentID string, seqNo sqn.SeqNo) *Sub {
 	cbCh := make(chan []model.Action, 1)
@@ -96,7 +96,7 @@ func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	log.Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
-// process gathers actions from the monitor and dispatches them to the corresponding Subs
+// process gathers actions from the monitor and dispatches them to the corresponding subscriptions.
 func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	// Parse hits into map of agent -> actions
 	// Actions are ordered by sequence
@@ -123,7 +123,7 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	}
 }
 
-// getSub returns the subscription (if any) for the specified agentID
+// getSub returns the subscription (if any) for the specified agentID.
 func (d *Dispatcher) getSub(agentID string) (Sub, bool) {
 	d.mx.RLock()
 	sub, ok := d.subs[agentID]

@@ -57,7 +57,7 @@ func NewAPIKeyFromToken(token string) (*APIKey, error) {
 	return &apiKey, nil
 }
 
-// Token returns the b64 encoded token of the APIKey
+// Token returns the b64 encoded token of the APIKey.
 func (k APIKey) Token() string {
 	s := fmt.Sprintf("%s:%s", k.ID, k.Key)
 	return base64.StdEncoding.EncodeToString([]byte(s))

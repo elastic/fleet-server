@@ -24,7 +24,7 @@ const (
 
 var gCounter uint64
 
-// Subscription is a subscription to get notified for new documents
+// Subscription is a subscription to get notified for new documents.
 type Subscription interface {
 	// Output is the channel the monitor send new documents to
 	Output() <-chan []es.HitT
@@ -42,18 +42,18 @@ type Monitor interface {
 	Unsubscribe(sub Subscription)
 }
 
-// subT is a subscription to get notified for new documents
+// subT is a subscription to get notified for new documents.
 type subT struct {
 	idx uint64
 	c   chan []es.HitT
 }
 
-// subT is the channel the monitor send new documents to
+// Output returns the subscription channel.
 func (s *subT) Output() <-chan []es.HitT {
 	return s.c
 }
 
-// monitorT monitors for new documents in an index
+// monitorT monitors for new documents in an index.
 type monitorT struct {
 	sm         SimpleMonitor
 	mut        sync.RWMutex
@@ -61,7 +61,7 @@ type monitorT struct {
 	subTimeout time.Duration
 }
 
-// New creates new subscription monitor
+// New creates new subscription monitor.
 func New(index string, esCli, monCli *elasticsearch.Client, opts ...Option) (Monitor, error) {
 	sm, err := NewSimple(index, esCli, monCli, opts...)
 	if err != nil {
@@ -82,7 +82,7 @@ func (m *monitorT) GetCheckpoint() sqn.SeqNo {
 	return m.sm.GetCheckpoint()
 }
 
-// Subscribe returns a Subscription that is used to get notified of documents
+// Subscribe returns a Subscription that is used to get notified of documents.
 func (m *monitorT) Subscribe() Subscription {
 	idx := atomic.AddUint64(&gCounter, 1)
 
@@ -113,7 +113,7 @@ func (m *monitorT) Unsubscribe(sub Subscription) {
 	m.mut.Unlock()
 }
 
-// Run starts the Monitor as a blocking operation.
+// Run starts the Monitor.
 func (m *monitorT) Run(ctx context.Context) (err error) {
 	g, gctx := errgroup.WithContext(ctx)
 

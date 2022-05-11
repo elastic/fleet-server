@@ -22,10 +22,10 @@ const (
 	defaultFirstRunDelay = 10 * time.Second
 )
 
-// WorkFunc is the type of function a Scheduler can run
+// WorkFunc is the type of function a Scheduler can run.
 type WorkFunc func(ctx context.Context) error
 
-// Schedule tracks when to execute a WorkFunc
+// Schedule tracks when to execute a WorkFunc.
 type Schedule struct {
 	Name     string
 	Interval time.Duration // Time between executions
@@ -43,7 +43,7 @@ type Scheduler struct {
 	schedules []Schedule
 }
 
-// OptFunc is a functional option used to configure a scheduler
+// OptFunc is a functional option used to configure a scheduler.
 type OptFunc func(*Scheduler) error
 
 // WithSplayPercent sets the splay value as a percentage.
@@ -88,8 +88,7 @@ func New(schedules []Schedule, opts ...OptFunc) (*Scheduler, error) {
 }
 
 // Run executes all scheduled function according to their schedules.
-// Schedule Interval times are garunteed minium values (if a execution takes a very long time, the scheduler will wait Interval before running the function again).
-// It is a blocking operation.
+// Schedule Interval times are guaranteed minium values (if the execution takes a very long time, the scheduler will wait Interval before running the function again).
 func (s *Scheduler) Run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 

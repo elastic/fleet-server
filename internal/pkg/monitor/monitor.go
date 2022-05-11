@@ -54,12 +54,12 @@ const (
 	fieldExpiration = "expiration"
 )
 
-// GlobalCheckpointProvides provides SeqNo
+// GlobalCheckpointProvides provides SeqNo.
 type GlobalCheckpointProvider interface {
 	GetCheckpoint() sqn.SeqNo
 }
 
-// BaseMonitor monitors tracks changes in Checkpoints.
+// BaseMonitor is the monitor's interface implemented by SimpleMonitor and Monitor
 type BaseMonitor interface {
 	GlobalCheckpointProvider
 
@@ -99,7 +99,7 @@ type simpleMonitorT struct {
 // Option is a functional configuration option.
 type Option func(SimpleMonitor)
 
-// NewSimple creates new SimpleMonitor
+// NewSimple creates new SimpleMonitor.
 func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option) (SimpleMonitor, error) {
 
 	m := &simpleMonitorT{
@@ -150,26 +150,26 @@ func WithPollTimeout(to time.Duration) Option {
 	}
 }
 
-// WithExpiration adds the expiration field to the monitor query
+// WithExpiration adds the expiration field to the monitor query.
 func WithExpiration(withExpiration bool) Option {
 	return func(m SimpleMonitor) {
 		m.(*simpleMonitorT).withExpiration = withExpiration
 	}
 }
 
-// WithReadyChan allows to pass the channel that will signal when monitor is ready
+// WithReadyChan allows to pass the channel that will signal when monitor is ready.
 func WithReadyChan(readyCh chan error) Option {
 	return func(m SimpleMonitor) {
 		m.(*simpleMonitorT).readyCh = readyCh
 	}
 }
 
-// Output provides the output channel for the monitor
+// Output returns the output channel for the monitor.
 func (m *simpleMonitorT) Output() <-chan []es.HitT {
 	return m.outCh
 }
 
-// GetCheckpoint implements GlobalCheckpointProvider interface
+// GetCheckpoint implements GlobalCheckpointProvider interface.
 func (m *simpleMonitorT) GetCheckpoint() sqn.SeqNo {
 	return m.loadCheckpoint()
 }
@@ -187,7 +187,7 @@ func (m *simpleMonitorT) loadCheckpoint() sqn.SeqNo {
 	return m.checkpoint.Clone()
 }
 
-// Run runs monitor as a blocking operation.
+// Run runs monitor.
 func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 	m.log.Info().Msg("Starting index monitor")
 	defer func() {

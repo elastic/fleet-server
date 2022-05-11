@@ -17,7 +17,7 @@ func (t Type) String() string {
 	return []string{"access", "output"}[t]
 }
 
-// Metadata is additional information associated with an APIKey
+// Metadata is additional information associated with an APIKey.
 type Metadata struct {
 	AgentID   string `json:"agent_id,omitempty"`
 	Managed   bool   `json:"managed,omitempty"`
