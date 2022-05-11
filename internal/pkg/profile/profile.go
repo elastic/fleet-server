@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// RunProfiler exposes /debug/pprof on the passed address by staringa server.
 func RunProfiler(ctx context.Context, addr string) error {
 
 	if addr == "" {

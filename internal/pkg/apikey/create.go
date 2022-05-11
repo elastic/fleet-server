@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
+// Create generates a new APIKey in Elasticsearch using the given client.
 func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refresh string, roles []byte, meta interface{}) (*APIKey, error) {
 	payload := struct {
 		Name       string          `json:"name,omitempty"`
