@@ -160,6 +160,9 @@ type Agent struct {
 	// Shared ID
 	SharedID string `json:"shared_id,omitempty"`
 
+	// User provided tags for the Elastic Agent
+	Tags []string `json:"tags,omitempty"`
+
 	// Type
 	Type string `json:"type"`
 
