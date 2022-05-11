@@ -38,7 +38,7 @@ func NewTokenResolver(bulker bulk.Bulk) (*TokenResolver, error) {
 	}, nil
 }
 
-// Resolve will return the seqno from the cache or retreive and cache it using its bulk.Bulk.
+// Resolve will return the seqno from the cache or retrieve and cache it using its bulk.Bulk.
 func (r *TokenResolver) Resolve(ctx context.Context, token string) (int64, error) {
 	if token == "" {
 		return 0, dl.ErrNotFound
