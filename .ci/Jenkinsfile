@@ -112,10 +112,7 @@ pipeline {
             withGoEnv(){
               sh(label: 'Create release artifacts', script: 'make docker-release')
               uploadPackagesToGoogleBucket(pattern: 'build/distributions/')
-<<<<<<< HEAD
               sh(label: 'Check release artifacts', script: 'make test-release')
-=======
->>>>>>> f579995 (ci: store build/distributions (#1238))
             }
           }
         }
