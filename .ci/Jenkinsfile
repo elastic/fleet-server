@@ -118,6 +118,21 @@ pipeline {
         }
       }
     }
+    stage('Deploy - Package Registry') {
+      options { skipDefaultCheckout() }
+      when { expression { isTag() }
+      steps {
+        build(job: "deploy-package-registry",
+              propagate: false,
+              wait: false,
+              parameters: [
+                string(name: 'BUILD_VERSION', value: "${env.GIT_BASE_COMMIT}"),
+                string(name: 'BUILD_BRANCH', value: "${env.TAG_NAME}"),
+                string(name: 'PUSH_IMAGES', value: "true")
+              ]
+            )
+      }
+    }
     stage('Downstream - Package') {
       options { skipDefaultCheckout() }
       when {
