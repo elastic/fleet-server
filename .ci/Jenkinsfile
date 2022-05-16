@@ -120,7 +120,7 @@ pipeline {
     }
     stage('Deploy - Package Registry') {
       options { skipDefaultCheckout() }
-      when { expression { isTag() }
+      when { expression { isTag() } }
       steps {
         build(job: "deploy-package-registry",
               propagate: false,
