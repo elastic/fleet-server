@@ -126,9 +126,7 @@ pipeline {
               propagate: false,
               wait: false,
               parameters: [
-                string(name: 'BUILD_VERSION', value: "${env.GIT_BASE_COMMIT}"),
-                string(name: 'BUILD_BRANCH', value: "${env.TAG_NAME}"),
-                string(name: 'PUSH_IMAGES', value: "true")
+                string(name: 'DOCKER_TAG', value: "${env.TAG_NAME}")
               ]
             )
       }
