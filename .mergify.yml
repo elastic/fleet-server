@@ -145,6 +145,9 @@ pull_request_rules:
       - label=backport
       - author=mergify[bot]
     actions:
+      review:
+        type: APPROVE
+        message: Automatically approving mergify
       queue:
         method: squash
         name: default
@@ -154,6 +157,9 @@ pull_request_rules:
       - label=automation
       - files~=^dev-tools/integration/.env$
     actions:
+      review:
+        type: APPROVE
+        message: Automatically approving mergify
       queue:
         method: squash
         name: default
