@@ -13,11 +13,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+// APIKetMetadata tracks Metadata associated with an APIKey.
 type APIKeyMetadata struct {
 	ID       string
 	Metadata Metadata
 }
 
+// Read gathers APIKeyMetadata from Elasticsearch using the given client.
 func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKeyMetadata, error) {
 
 	opts := []func(*esapi.SecurityGetAPIKeyRequest){

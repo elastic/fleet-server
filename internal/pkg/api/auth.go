@@ -26,7 +26,7 @@ var (
 	ErrAgentIdentity    = errors.New("agent header contains wrong identifier")
 )
 
-// This authenticates that the provided API key exists and is enabled.
+// authAPIKey authenticates the provided API key, it checks that the key exists and is enabled.
 // WARNING: This does not validate that the api key is valid for the Fleet Domain.
 // An additional check must be executed to validate it is not a random api key.
 func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKey, error) {
@@ -80,6 +80,7 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 	return key, err
 }
 
+// authAgent ensures that the requested API-Key is associated with the correct agent.
 func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
 	start := time.Now()
 
