@@ -112,16 +112,22 @@ pipeline {
             withGoEnv(){
               sh(label: 'Create release artifacts', script: 'make docker-release')
               uploadPackagesToGoogleBucket(pattern: 'build/distributions/')
+              sh(label: 'Check release artifacts', script: 'make test-release')
             }
           }
         }
       }
-      post {
-        success {
-          dir("${BASE_DIR}"){
-            sh(label: 'Check release artifacts', script: 'make test-release')
-          }
-        }
+    }
+    stage('Downstream - Package') {
+      options { skipDefaultCheckout() }
+      when {
+        not { changeRequest() }
+      }
+      steps {
+        build(job: "Ingest-manager/fleet-server-package-mbp/${env.JOB_BASE_NAME}",
+              propagate: false,
+              wait: false,
+              parameters: [string(name: 'COMMIT', value: "${env.GIT_BASE_COMMIT}")])
       }
     }
   }

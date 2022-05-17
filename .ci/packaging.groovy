@@ -12,6 +12,9 @@ pipeline {
     JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
     DOCKER_SECRET = 'secret/observability-team/ci/docker-registry/prod'
     DOCKER_REGISTRY = 'docker.elastic.co'
+    DRA_OUTPUT = 'release-manager.out'
+    COMMIT = "${params?.COMMIT}"
+    JOB_GIT_CREDENTIALS = "f6c7695a-671e-4f4f-a331-acdce44ff9ba"
   }
   options {
     timeout(time: 2, unit: 'HOURS')
@@ -23,9 +26,8 @@ pipeline {
     rateLimitBuilds(throttle: [count: 60, durationName: 'hour', userBoost: true])
     quietPeriod(10)
   }
-  triggers {
-    // disable upstream trigger on a PR basis
-    upstream("Ingest-manager/fleet-server/${ env.JOB_BASE_NAME.startsWith('PR-') ? 'none' : env.JOB_BASE_NAME }")
+  parameters {
+    string(name: 'COMMIT', defaultValue: '', description: 'The Git commit to be used (empty will checkout the latest commit)')
   }
   stages {
     stage('Filter build') {
@@ -57,9 +59,8 @@ pipeline {
           steps {
             pipelineManager([ cancelPreviousRunningBuilds: [ when: 'PR' ] ])
             deleteDir()
-            gitCheckout(basedir: "${BASE_DIR}", githubNotifyFirstTimeContributor: false,
-                        shallow: false, reference: "/var/lib/jenkins/.git-references/${REPO}.git")
-            stash allowEmpty: true, name: 'source', useDefaultExcludes: false
+            smartGitCheckout()
+            stash(allowEmpty: true, name: 'source', useDefaultExcludes: false)
             setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
             dir("${BASE_DIR}") {
               setEnvVar('VERSION', sh(label: 'Get version', script: 'make get-version', returnStdout: true)?.trim())
@@ -112,7 +113,7 @@ pipeline {
             }
           }
         }
-        stage('DRA') {
+        stage('DRA Snapshot') {
           options { skipDefaultCheckout() }
           // The Unified Release process keeps moving branches as soon as a new
           // minor version is created, therefore old release branches won't be able
@@ -120,14 +121,31 @@ pipeline {
           when {
             expression { return env.IS_BRANCH_AVAILABLE == "true" }
           }
-          environment {
-            DRA_OUTPUT = 'release-manager.out'
-          }
           steps {
             runReleaseManager(type: 'snapshot', outputFile: env.DRA_OUTPUT)
-            whenFalse(env.BRANCH_NAME.equals('main')) {
-              runReleaseManager(type: 'staging', outputFile: env.DRA_OUTPUT)
+          }
+          post {
+            failure {
+              notifyStatus(analyse: true,
+                           file: "${BASE_DIR}/${env.DRA_OUTPUT}",
+                           subject: "[${env.REPO}@${env.BRANCH_NAME}] The Daily releasable artifact failed.",
+                           body: 'Contact the Release Platform team [#platform-release].')
             }
+          }
+        }
+        stage('DRA Staging') {
+          options { skipDefaultCheckout() }
+          when {
+            allOf {
+              // The Unified Release process keeps moving branches as soon as a new
+              // minor version is created, therefore old release branches won't be able
+              // to use the release manager as their definition is removed.
+              expression { return env.IS_BRANCH_AVAILABLE == "true" }
+              not { branch 'main' }
+            }
+          }
+          steps {
+            runReleaseManager(type: 'staging', outputFile: env.DRA_OUTPUT)
           }
           post {
             failure {
@@ -229,5 +247,20 @@ def runIfNoMainAndNoStaging(Closure body) {
     echo 'INFO: staging artifacts for the main branch are not required.'
   } else {
     body()
+  }
+}
+
+def smartGitCheckout() {
+  // Checkout the given commit
+  if (env.COMMIT?.trim()) {
+    gitCheckout(basedir: "${BASE_DIR}",
+                branch: "${env.COMMIT}",
+                credentialsId: "${JOB_GIT_CREDENTIALS}",
+                repo: "https://github.com/elastic/${REPO}.git")
+  } else {
+    gitCheckout(basedir: "${BASE_DIR}",
+                githubNotifyFirstTimeContributor: false,
+                shallow: false,
+                reference: "/var/lib/jenkins/.git-references/${REPO}.git")
   }
 }
