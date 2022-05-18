@@ -134,7 +134,7 @@ func offsetStartTime(start, exp string, dur int64, i, total int) string {
 	if start == "" || exp == "" {
 		return ""
 	}
-	startTS, err := time.Parse(time.RFC3339, start) // TODO what format does a date-time string use?
+	startTS, err := time.Parse(time.RFC3339, start)
 	if err != nil {
 		log.Error().Err(err).Msg("unable to parse start_time string")
 		return ""
