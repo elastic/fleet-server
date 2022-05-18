@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// WithContext will sleep for the passed duration or return early if the context was cancelled.
 func WithContext(ctx context.Context, dur time.Duration) error {
 	t := time.NewTimer(dur)
 	defer t.Stop()

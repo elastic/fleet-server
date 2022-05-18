@@ -15,6 +15,7 @@ import (
 
 type Map map[string]interface{}
 
+// GetMap will return the value for k as a Map or a nil.
 func (m Map) GetMap(k string) Map {
 	if m == nil {
 		return m
@@ -29,6 +30,7 @@ func (m Map) GetMap(k string) Map {
 	return nil
 }
 
+// GetString will return the value for k as a string or "".
 func (m Map) GetString(k string) string {
 	if m == nil {
 		return ""
@@ -41,6 +43,7 @@ func (m Map) GetString(k string) string {
 	return ""
 }
 
+// Hash generates the SHA256 hash for the map.
 func (m Map) Hash() (string, error) {
 	if m == nil {
 		return "", nil
@@ -57,6 +60,8 @@ func (m Map) Hash() (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+// Marshal encodes the Map as a json object.
+// TODO Should we consider renaming this to MarshalJSON?
 func (m Map) Marshal() ([]byte, error) {
 	if m == nil {
 		return nil, nil
@@ -64,6 +69,9 @@ func (m Map) Marshal() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// Parse generates a Map from the passed data.
+// data is assumed to be a json object.
+// TODO Should we refactor this to UnmarshalJSON?
 func Parse(data []byte) (Map, error) {
 	if len(data) == 0 {
 		return nil, nil
