@@ -118,10 +118,10 @@ pipeline {
         }
       }
     }
-    # Package registry is decoupled from the unified release, but we provide versioned distribution
-    # images with a "snapshot" of the packages available in epr.elastic.co. We decided to trigger the
-    # build of this snapshot from a project coupled to the unified release. It is now in fleet-server, but
-    # it could be in other projects.
+    // Package registry is decoupled from the unified release, but we provide versioned distribution
+    // images with a "snapshot" of the packages available in epr.elastic.co. We decided to trigger the
+    // build of this snapshot from a project coupled to the unified release. It is now in fleet-server, but
+    // it could be in other projects.
     stage('Release - Package Registry Distribution') {
       options { skipDefaultCheckout() }
       when { expression { isTag() } }
