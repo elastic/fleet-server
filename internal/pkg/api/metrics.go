@@ -7,10 +7,10 @@ package api
 import (
 	"context"
 
-	"github.com/elastic/beats/v7/libbeat/api"
 	"github.com/elastic/beats/v7/libbeat/cmd/instance/metrics"
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/monitoring"
+	"github.com/elastic/elastic-agent-libs/api"
+	cfglib "github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -49,7 +49,7 @@ func InitMetrics(ctx context.Context, cfg *config.Config, bi build.Info) (*api.S
 
 	// Start local api server; largely for metics.
 	zapStub := logger.NewZapStub("fleet-metrics")
-	cfgStub, err := common.NewConfigFrom(&cfg.HTTP)
+	cfgStub, err := cfglib.NewConfigFrom(&cfg.HTTP)
 	if err != nil {
 		return nil, err
 	}

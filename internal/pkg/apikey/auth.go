@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
+// SecurityInfo contains all related information about an APIKey that Elasticsearch tracks.
 type SecurityInfo struct {
 	UserName    string            `json:"username"`
 	Roles       []string          `json:"roles"`

@@ -7,6 +7,7 @@ require (
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20220331164621-376a87f3bbd8
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210922110810-e6f1f402a9ed
+	github.com/elastic/elastic-agent-libs v0.2.3
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
 	github.com/elastic/go-ucfg v0.8.4
 	github.com/gofrs/uuid v4.2.0+incompatible
@@ -37,7 +38,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
-	github.com/elastic/elastic-agent-libs v0.1.1 // indirect
 	github.com/elastic/go-licenser v0.4.0 // indirect
 	github.com/elastic/go-structform v0.0.9 // indirect
 	github.com/elastic/go-sysinfo v1.7.1 // indirect
@@ -72,7 +72,7 @@ require (
 )
 
 require (
-	github.com/elastic/elastic-agent v0.0.0-20220331132956-07a476d59135
+	github.com/elastic/elastic-agent v0.0.0-20220510120738-63b682fefc61
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -80,13 +80,13 @@ require (
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	go.elastic.co/apm/module/apmhttprouter v1.14.0
-	go.elastic.co/ecszap v1.0.0 // indirect
+	go.elastic.co/ecszap v1.0.1 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.7.0 // indirect
+	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e // indirect
-	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f // indirect
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
-	golang.org/x/tools v0.1.8 // indirect
+	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
+	golang.org/x/sys v0.0.0-20220405052023-b1e9470b6e64 // indirect
+	golang.org/x/tools v0.1.9 // indirect
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
 	google.golang.org/grpc v1.43.0 // indirect
 	howett.net/plist v1.0.0 // indirect
