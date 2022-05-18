@@ -126,7 +126,7 @@ pipeline {
       options { skipDefaultCheckout() }
       when { expression { isTag() } }
       steps {
-        build(job: "deploy-package-registry",
+        build(job: "release-package-registry-distribution",
               propagate: false,
               wait: false,
               parameters: [
