@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
-DEFAULT_VERSION=$(shell awk '/const defaultVersion/{print $$NF}' main.go | tr -d '"')
+DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
 TARGET_ARCH_386=x86
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
