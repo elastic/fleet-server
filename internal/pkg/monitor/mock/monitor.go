@@ -6,108 +6,69 @@ package mock
 
 import (
 	"context"
-	"errors"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+
+	"github.com/stretchr/testify/mock"
 )
 
-var gMockIndexCounter uint64
-
-type mockSubT struct {
-	idx uint64
-	c   chan []es.HitT
+// MockSubscription implements monitor.Subscription
+type MockSubscription struct {
+	mock.Mock
 }
 
-func (s *mockSubT) Output() <-chan []es.HitT {
-	return s.c
+func NewMockSubscription() *MockSubscription {
+	return &MockSubscription{}
 }
 
-type MockIndexMonitor struct {
-	checkpoint sqn.SeqNo
-
-	mut  sync.RWMutex
-	subs map[uint64]*mockSubT
-}
-
-// NewMockIndexMonitor returns a mock monitor.
-func NewMockIndexMonitor() *MockIndexMonitor {
-	return &MockIndexMonitor{
-		checkpoint: sqn.DefaultSeqNo,
-		subs:       make(map[uint64]*mockSubT),
+func (m *MockSubscription) Output() <-chan []es.HitT {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
 	}
+	return args.Get(0).(<-chan []es.HitT)
 }
 
-// GetCheckpoint returns the current checkpoint.
-func (m *MockIndexMonitor) GetCheckpoint() sqn.SeqNo {
-	return m.checkpoint
+// MockMonitor implements monitor.SimpleMonitor and monitor.Monitor
+type MockMonitor struct {
+	mock.Mock
 }
 
-// Run does nothing as its not really running.
-func (m *MockIndexMonitor) Run(ctx context.Context) error {
-	return nil
+func NewMockMonitor() *MockMonitor {
+	return &MockMonitor{}
 }
 
-// Subscribe to get notified of documents
-func (m *MockIndexMonitor) Subscribe() monitor.Subscription {
-	idx := atomic.AddUint64(&gMockIndexCounter, 1)
-
-	s := &mockSubT{
-		idx: idx,
-		c:   make(chan []es.HitT),
+func (m *MockMonitor) Subscribe() monitor.Subscription {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
 	}
-
-	m.mut.Lock()
-	m.subs[idx] = s
-	m.mut.Unlock()
-	return s
+	return args.Get(0).(monitor.Subscription)
 }
 
-// Unsubscribe from getting notifications on documents
-func (m *MockIndexMonitor) Unsubscribe(sub monitor.Subscription) {
-	s, ok := sub.(*mockSubT)
-	if !ok {
-		return
-	}
-
-	m.mut.Lock()
-	_, ok = m.subs[s.idx]
-	if ok {
-		delete(m.subs, s.idx)
-	}
-	m.mut.Unlock()
+func (m *MockMonitor) Unsubscribe(s monitor.Subscription) {
+	m.Called(s)
 }
 
-// Notify performs a mock notification to the subscribers
-func (m *MockIndexMonitor) Notify(ctx context.Context, hits []es.HitT) {
-	sz := len(hits)
-	if sz > 0 {
-		maxVal := hits[sz-1].SeqNo
-		m.checkpoint = []int64{maxVal}
+func (m *MockMonitor) Run(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
 
-		m.mut.RLock()
-		var wg sync.WaitGroup
-		wg.Add(len(m.subs))
-		for _, s := range m.subs {
-			go func(s *mockSubT) {
-				defer wg.Done()
-				lc, cn := context.WithTimeout(ctx, 5*time.Second)
-				defer cn()
-				select {
-				case s.c <- hits:
-				case <-lc.Done():
-					err := ctx.Err()
-					if errors.Is(err, context.DeadlineExceeded) {
-						panic(err)
-					}
-				}
-			}(s)
-		}
-		m.mut.RUnlock()
-		wg.Wait()
+func (m *MockMonitor) GetCheckpoint() sqn.SeqNo {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
 	}
+	return args.Get(0).(sqn.SeqNo)
+}
+
+func (m *MockMonitor) Output() <-chan []es.HitT {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).(<-chan []es.HitT)
 }
