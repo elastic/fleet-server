@@ -7,15 +7,16 @@ package api
 import (
 	"context"
 
-	"github.com/elastic/beats/v7/libbeat/cmd/instance/metrics"
 	"github.com/elastic/elastic-agent-libs/api"
 	cfglib "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/monitoring"
+	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/version"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -86,7 +87,7 @@ func (rt *routeStats) Register(registry *monitoring.Registry) {
 }
 
 func init() {
-	err := metrics.SetupMetrics(build.ServiceName)
+	err := report.SetupMetrics(logger.NewZapStub("instance-metrics"), build.ServiceName, version.DefaultVersion)
 	if err != nil {
 		log.Error().Err(err).Msg("unable to initialize metrics")
 	}

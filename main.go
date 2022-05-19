@@ -13,12 +13,11 @@ import (
 
 	"github.com/elastic/fleet-server/v7/cmd/fleet"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
+	"github.com/elastic/fleet-server/v7/version"
 )
 
-const defaultVersion = "8.3.0"
-
 var (
-	Version   string = defaultVersion
+	Version   string = version.DefaultVersion
 	Commit    string
 	BuildTime string
 )

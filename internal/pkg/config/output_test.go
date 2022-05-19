@@ -16,12 +16,14 @@ import (
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
-	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/go-elasticsearch/v7"
+
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
 func TestToESConfig(t *testing.T) {
@@ -107,6 +109,8 @@ func TestToESConfig(t *testing.T) {
 						InsecureSkipVerify: true, //nolint:gosec // test case
 						MinVersion:         tls.VersionTLS11,
 						MaxVersion:         tls.VersionTLS13,
+						Certificates:       []tls.Certificate{},
+						CurvePreferences:   []tls.CurveID{},
 					},
 					TLSHandshakeTimeout:   10 * time.Second,
 					MaxIdleConns:          100,
@@ -143,6 +147,8 @@ func TestToESConfig(t *testing.T) {
 						InsecureSkipVerify: true, //nolint:gosec // test case
 						MinVersion:         tls.VersionTLS11,
 						MaxVersion:         tls.VersionTLS13,
+						Certificates:       []tls.Certificate{},
+						CurvePreferences:   []tls.CurveID{},
 					},
 					TLSHandshakeTimeout:   10 * time.Second,
 					MaxIdleConns:          100,
