@@ -41,7 +41,7 @@ func TestRun(t *testing.T) {
 	c, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 	bulker := ftesting.NewMockBulk()
-	pim := mock.NewMockIndexMonitor()
+	pim := mock.NewMockMonitor()
 	pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
 	bc := checkin.NewBulk(nil)
 	ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)

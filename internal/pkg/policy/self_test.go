@@ -15,17 +15,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/gofrs/uuid"
 	"github.com/rs/xid"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
+	mmock "github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
@@ -39,8 +39,16 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		},
 	}
 	reporter := &FakeReporter{}
+
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
-	mm := mock.NewMockIndexMonitor()
+
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
@@ -93,16 +101,12 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				ID:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  pData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   1,
+		Version: 1,
+		Source:  pData,
+	}}
 
 	// should still be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -141,16 +145,12 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				ID:      rId,
-				SeqNo:   2,
-				Version: 1,
-				Source:  pData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   2,
+		Version: 1,
+		Source:  pData,
+	}}
 
 	// should now be set to healthy
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -181,8 +181,16 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		},
 	}
 	reporter := &FakeReporter{}
+
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
-	mm := mock.NewMockIndexMonitor()
+
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.checkTime = 100 * time.Millisecond
@@ -270,14 +278,12 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	tokenLock.Unlock()
 
 	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				ID:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  policyData,
-			},
-		})
+		chHitT <- []es.HitT{{
+			ID:      rId,
+			SeqNo:   1,
+			Version: 1,
+			Source:  policyData,
+		}}
 		policyLock.Lock()
 		defer policyLock.Unlock()
 		policyResult = append(policyResult, policy)
@@ -350,8 +356,16 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	}
 	policyID := uuid.Must(uuid.NewV4()).String()
 	reporter := &FakeReporter{}
+
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
-	mm := mock.NewMockIndexMonitor()
+
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
@@ -403,16 +417,12 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				ID:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  pData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   1,
+		Version: 1,
+		Source:  pData,
+	}}
 
 	// should still be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -451,16 +461,12 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				ID:      rId,
-				SeqNo:   2,
-				Version: 1,
-				Source:  pData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   2,
+		Version: 1,
+		Source:  pData,
+	}}
 
 	// should now be set to healthy
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -492,8 +498,16 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}
 	policyID := uuid.Must(uuid.NewV4()).String()
 	reporter := &FakeReporter{}
+
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
-	mm := mock.NewMockIndexMonitor()
+
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.checkTime = 100 * time.Millisecond
@@ -580,14 +594,12 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	tokenLock.Unlock()
 
 	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				ID:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  policyData,
-			},
-		})
+		chHitT <- []es.HitT{{
+			ID:      rId,
+			SeqNo:   1,
+			Version: 1,
+			Source:  policyData,
+		}}
 		policyLock.Lock()
 		defer policyLock.Unlock()
 		policyResult = append(policyResult, policy)
