@@ -87,7 +87,7 @@ func (rt *routeStats) Register(registry *monitoring.Registry) {
 }
 
 func init() {
-	err := report.SetupMetrics(logger.NewZapStub("beats-metrics"), build.ServiceName, version.DefaultVersion)
+	err := report.SetupMetrics(logger.NewZapStub("instance-metrics"), build.ServiceName, version.DefaultVersion)
 	if err != nil {
 		log.Error().Err(err).Msg("unable to initialize metrics")
 	}
