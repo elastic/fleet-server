@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
 const kDefaultHost = "0.0.0.0"

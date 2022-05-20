@@ -14,10 +14,9 @@ import (
 	"strings"
 	"time"
 
+	urlutil "github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/go-elasticsearch/v7"
-
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 )
 
 // The timeout would be driven by the server for long poll.
@@ -59,7 +58,7 @@ func (c *Elasticsearch) Validate() error {
 		return fmt.Errorf("cannot connect to elasticsearch with api_key; must use service_token")
 	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
-		if _, err := common.ParseURL(c.ProxyURL); err != nil {
+		if _, err := urlutil.ParseURL(c.ProxyURL); err != nil {
 			return err
 		}
 	}
@@ -121,7 +120,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 
 	if !c.ProxyDisable {
 		if c.ProxyURL != "" {
-			proxyURL, err := common.ParseURL(c.ProxyURL)
+			proxyURL, err := urlutil.ParseURL(c.ProxyURL)
 			if err != nil {
 				return elasticsearch.Config{}, err
 			}
