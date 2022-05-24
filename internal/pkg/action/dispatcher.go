@@ -8,6 +8,7 @@ package action
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -109,9 +110,11 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 			log.Error().Err(err).Msg("Failed to unmarshal action document")
 			break
 		}
-		for _, agentID := range action.Agents {
+		numAgents := len(action.Agents)
+		for i, agentID := range action.Agents {
 			arr := agentActions[agentID]
 			actionNoAgents := action
+			actionNoAgents.StartTime = offsetStartTime(action.StartTime, action.Expiration, action.MinimumExecutionDuration, i, numAgents)
 			actionNoAgents.Agents = nil
 			arr = append(arr, actionNoAgents)
 			agentActions[agentID] = arr
@@ -121,6 +124,30 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	for agentID, actions := range agentActions {
 		d.dispatch(ctx, agentID, actions)
 	}
+}
+
+// offsetStartTime will return a new start time between start:end-dur based on index i and the total number of agents
+// An empty string will be returned if start or exp are empty or if there is an error parsing inputs
+// As we expect i < total  the latest return time will always be < exp-dur
+func offsetStartTime(start, exp string, dur int64, i, total int) string {
+
+	if start == "" || exp == "" {
+		return ""
+	}
+	startTS, err := time.Parse(time.RFC3339, start)
+	if err != nil {
+		log.Error().Err(err).Msg("unable to parse start_time string")
+		return ""
+	}
+	expTS, err := time.Parse(time.RFC3339, exp)
+	if err != nil {
+		log.Error().Err(err).Msg("unable to parse expiration string")
+		return ""
+	}
+	d := time.Second * time.Duration(dur)
+	d = expTS.Add(-1 * d).Sub(startTS)                                   // the valid scheduling range is: d = exp - dur - start
+	startTS = startTS.Add((d * time.Duration(i)) / time.Duration(total)) // adjust start to a position within the range
+	return startTS.Format(time.RFC3339)
 }
 
 // getSub returns the subscription (if any) for the specified agentID.

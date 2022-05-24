@@ -30,6 +30,15 @@
           "type": "string",
           "format": "date-time"
         },
+        "start_time": {
+          "description": "The action start date/time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "minimum_execution_duration": {
+          "description": "The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.",
+          "type": "integer"
+        },
         "type": {
           "description": "The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",
           "type": "string"
@@ -203,7 +212,7 @@
         "body"
       ]
     },
-  
+
     "host-metadata": {
       "title": "Host Metadata",
       "description": "The host metadata for the Elastic Agent",
@@ -453,7 +462,7 @@
           "description": "API key the Elastic Agent uses to authenticate with elasticsearch",
           "type": "string"
         },
-        "default_api_key_history": { 
+        "default_api_key_history": {
           "description": "Default API Key History",
           "type": "array",
           "items": {

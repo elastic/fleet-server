@@ -406,13 +406,15 @@ func convertActions(agentID string, actions []model.Action) ([]ActionResp, strin
 	respList := make([]ActionResp, 0, sz)
 	for _, action := range actions {
 		respList = append(respList, ActionResp{
-			AgentID:   agentID,
-			CreatedAt: action.Timestamp,
-			Data:      action.Data,
-			ID:        action.ActionID,
-			Type:      action.Type,
-			InputType: action.InputType,
-			Timeout:   action.Timeout,
+			AgentID:    agentID,
+			CreatedAt:  action.Timestamp,
+			StartTime:  action.StartTime,
+			Expiration: action.Expiration,
+			Data:       action.Data,
+			ID:         action.ActionID,
+			Type:       action.Type,
+			InputType:  action.InputType,
+			Timeout:    action.Timeout,
 		})
 	}
 
