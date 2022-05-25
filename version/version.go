@@ -4,4 +4,6 @@
 
 package version
 
-const DefaultVersion = "8.3.0"
+// DefaultVersion is the current release version of Fleet-server, this version must match the
+// Elastic Agent version.
+const DefaultVersion = "8.4.0"
