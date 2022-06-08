@@ -34,10 +34,11 @@ Use `https://192.168.56.43:8220` as fleet-server host.
 
 For detailed instructions, check the [Elastic-Agent](https://github.com/elastic/elastic-agent) repo.
 ```shell
-cd elastic-agent
-SNAPSHOT=true EXTERNAL=true PLATFORMS="linux/amd64" PACKAGES="docker" mage -v dev:package
+cd YOUR_ELASTIC_AGENT_FOLDER
+SNAPSHOT=true EXTERNAL=true PLATFORMS="linux/amd64" PACKAGES="tar.gz" mage -v dev:package # adjust PLATFORMS and PACKAGES to your system and needs.
 ```
-### Build andPackage
+
+### Build and Package
 
 Change `release-linux/amd64` to `release-YOUR_OS/platform`. Run `make list-platforms` to check
 out the possible values.
@@ -49,12 +50,12 @@ vagrant up
 vagrant ssh
 ```
 
-For the Elastic-Agent to use your build of the fleet-server, unpack it and add your fleet-server tar.gz and sha512 to
+For the Elastic-Agent to use your build of the fleet-server, unpack the elastic agent and add your fleet-server tar.gz and sha512 to
 `elastic-agent-8.Y.Z-SNAPSHOT-OS-ARCH/data/elastic-agent-*/downloads/`. 
 
-Then go to Kibana > Fleet and follow the instructions there.
+Then go to `Kibana > Managment > Fleet` and follow the instructions there.
 
-tl;dr/example:
+#### tl;dr/example:
 ```shell
 cp /vagrant/elastic-agent/build/distributions/elastic-agent-8.4.0-SNAPSHOT-linux-x86_64.tar.gz* ./
 tar xzvf elastic-agent-8.4.0-SNAPSHOT-linux-x86_64.tar.gz
@@ -109,7 +110,7 @@ The above assumes you are running on OS X. Set `PLATFORMS` to the one in you are
 KIBANA_HOST=http://localhost:5601 KIBANA_USERNAME=elastic KIBANA_PASSWORD=changeme ELASTICSEARCH_HOST=http://localhost:9200 ELASTICSEARCH_USERNAME=elastic ELASTICSEARCH_PASSWORD=changeme KIBANA_FLEET_SETUP=1 FLEET_SERVER_ENABLE=1 sudo ./elastic-agent container
 ```
 
-This will start up Elastic Agent with fleet-server and directly enroll it. In addition Fleet is setup inside of Kibana. In case the setup is done already in Kibana manually, the following command can be used:
+This will start up Elastic Agent with fleet-server and directly enroll it. In addition, Fleet is set up inside Kibana. In case the setup is done already in Kibana manually, the following command can be used:
 
 ```
 sudo ./elastic-agent enroll --fleet-server=http://elastic:changeme@localhost:9200 --fleet-server-policy={fleet-server-policy-id} --enrollment-token={policy-enrollment-token}
