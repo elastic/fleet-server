@@ -402,7 +402,7 @@
           "format": "date-time"
         },
         "access_api_key_id": {
-          "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
+          "description": "ID of the API key the Elastic Agent must use to contact Fleet Server",
           "type": "string"
         },
         "agent": { "$ref": "#/definitions/agent-metadata" },
