@@ -34,7 +34,7 @@ CMD_COLOR_OFF=\033[0m
 LDFLAGS=-X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=$(NOW)
 ifeq ($(strip $(DEV)),)
 GCFLAGS ?=
-LDFLAGS="-s -w ${LDFLAGS}"
+LDFLAGS:=-s -w ${LDFLAGS}
 else
 GCFLAGS ?= all=-N -l
 endif
@@ -54,14 +54,13 @@ list-platforms: ## - Show the possible PLATFORMS
 .PHONY: local
 local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
-	go build -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
+	go build -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
-	rm -rf ./bin/ ./build/
-	rm .service_token
+	rm -rf .service_token ./bin/ ./build/
 
 .PHONY: generate
 generate: ## - Generate schema models
