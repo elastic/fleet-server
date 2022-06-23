@@ -148,8 +148,6 @@ pipeline {
       }
     }
   }
-
-
   post {
     cleanup {
       notifyBuildResult(prComment: true,
