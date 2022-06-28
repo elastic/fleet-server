@@ -4,4 +4,4 @@
 
 package version
 
-const DefaultVersion = "8.3.0"
+const DefaultVersion = "8.3.1"
