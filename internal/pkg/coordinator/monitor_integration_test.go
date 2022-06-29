@@ -147,7 +147,7 @@ func TestMonitorUnenroller(t *testing.T) {
 		CoordinatorIdx:  0,
 		Data:            []byte("{}"),
 		RevisionIdx:     1,
-		UnenrollTimeout: 300, // 5 minutes (300 seconds)
+		UnenrollTimeout: 5,
 	}
 	_, err = dl.CreatePolicy(ctx, bulker, policy1, dl.WithIndexName(policiesIndex))
 	require.NoError(t, err)
@@ -213,7 +213,7 @@ func TestMonitorUnenroller(t *testing.T) {
 			return fmt.Errorf("agent %s is still active", agentID)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(50))
+	}, ftesting.RetrySleep(5*time.Second), ftesting.RetryCount(50))
 
 	// stop the monitors
 	cn()
