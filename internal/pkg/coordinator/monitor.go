@@ -463,15 +463,9 @@ func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyID string, unenr
 		Dur("unenrollTimeout", unenrollTimeout).
 		Msg("giving a grace period to Elastic Agent before enforcing unenrollTimeout monitor")
 
-	grace := time.NewTimer(unenrollTimeout)
-
-	select {
-	case <-grace.C:
-		grace.Stop()
-		// skip to the next loop.
-	case <-ctx.Done():
-		grace.Stop()
-		return
+	if err := waitWithContext(ctx, unenrollTimeout); err != nil {
+		l.Err(err).Dur("unenroll_timeout", unenrollTimeout).
+			Msg("failed to delay the unenroller monitor startup")
 	}
 
 	l.Info().
@@ -567,4 +561,15 @@ func getAPIKeyIDs(agent *model.Agent) []string {
 		keys = append(keys, agent.DefaultAPIKeyID)
 	}
 	return keys
+}
+
+func waitWithContext(ctx context.Context, to time.Duration) error {
+	t := time.NewTimer(to)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+	}
+	return nil
 }
