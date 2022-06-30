@@ -54,7 +54,7 @@ const (
 	fieldExpiration = "expiration"
 )
 
-// GlobalCheckpointProvides provides SeqNo.
+// GlobalCheckpointProvider provides SeqNo.
 type GlobalCheckpointProvider interface {
 	GetCheckpoint() sqn.SeqNo
 }

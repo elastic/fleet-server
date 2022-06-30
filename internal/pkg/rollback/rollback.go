@@ -40,15 +40,15 @@ func (r *Rollback) Register(name string, fn RollbackFunc) {
 // Rollback execute all rollback functions, log errors, and return the first error afterwards.
 func (r *Rollback) Rollback(ctx context.Context) (err error) {
 	for _, rb := range r.rbi {
-		log := r.log.With().Str("name", rb.name).Logger()
+		log := r.log.With().Str("rollback_fn_name", rb.name).Logger()
 		log.Debug().Msg("rollback function called")
 		if rerr := rb.fn(ctx); rerr != nil {
-			log.Error().Err(rerr).Msg("rollback function failed")
+			log.Error().Err(rerr).Msgf("rollback function \"%s\" failed", rb.name)
 			if err == nil {
 				err = rerr
 			}
 		} else {
-			log.Debug().Msg("rollback function succeeded")
+			log.Debug().Msgf("rollback function \"%s\" succeeded", rb.name)
 		}
 	}
 	return //nolint:nakedret // short function
