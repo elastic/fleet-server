@@ -453,20 +453,24 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 }
 
 func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, l zerolog.Logger, checkInterval time.Duration, agentsIndex string) {
-	// When fleet-server is offline for a long period and finally recover, it means that the connected
+	// When fleet-server is offline for a long period and finally recovers, it means that the connected
 	// agent will be offline for a long period of time since their last checkin and fleet server will
 	// start unenrolling every Elastic Agent from the system. Instead on boot the Elastic Agent
-	// should wait at least the unenrolltimeout period before actively unenrolling agents in the system.
-	// This give a grace period to the Elastic Agent to connect back to the system.
+	// should wait at least the unenrollTimeout period before actively unenrolling agents in the system.
+	// This gives a grace period to the Elastic Agent to connect back to the system.
 	l.Info().
 		Dur("checkInterval", checkInterval).
 		Dur("unenrollTimeout", unenrollTimeout).
 		Msg("giving a grace period to Elastic Agent before enforcing unenrollTimeout monitor")
 
+	grace := time.NewTimer(unenrollTimeout)
+
 	select {
-	case <-time.After(unenrollTimeout):
+	case <-grace.C:
+		grace.Stop()
 		// skip to the next loop.
 	case <-ctx.Done():
+		grace.Stop()
 		return
 	}
 
