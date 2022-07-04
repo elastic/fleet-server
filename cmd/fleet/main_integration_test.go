@@ -5,6 +5,7 @@
 //go:build integration
 // +build integration
 
+//nolint:unused // some unused code may be added to more tests
 package fleet
 
 import (
@@ -15,14 +16,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/logger"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/core/server"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/go-ucfg"
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/server"
+	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -53,7 +55,7 @@ output:
     service_token: '${ELASTICSEARCH_SERVICE_TOKEN}'
 `
 
-var agentIdCfgData = `
+var agentIDCfgData = `
 output:
   elasticsearch:
     hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
@@ -84,9 +86,9 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	bulker := ftesting.SetupBulk(ctx, t)
 
 	// add a real default fleet server policy
-	policyId := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 	_, err := dl.CreatePolicy(ctx, bulker, model.Policy{
-		PolicyId:           policyId,
+		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
 		Data:               policyData,
@@ -94,11 +96,11 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	require.NoError(t, err)
 
 	// add entry for enrollment key (doesn't have to be a real key)
-	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentApiKey{
+	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentAPIKey{
 		Name:     "Default",
-		ApiKey:   "keyvalue",
-		ApiKeyId: "keyid",
-		PolicyId: policyId,
+		APIKey:   "keyvalue",
+		APIKeyID: "keyid",
+		PolicyID: policyID,
 		Active:   true,
 	})
 	require.NoError(t, err)
@@ -134,7 +136,7 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
 
 	// reconfigure with agent ID set
-	err = appState.UpdateConfig(agentIdCfgData)
+	err = appState.UpdateConfig(agentIDCfgData)
 	require.NoError(t, err)
 
 	// wait for fleet-server to report as healthy
@@ -160,7 +162,7 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
 
 	// reconfigure to good config
-	err = appState.UpdateConfig(agentIdCfgData)
+	err = appState.UpdateConfig(agentIDCfgData)
 	require.NoError(t, err)
 
 	// wait for fleet-server to report as healthy
@@ -193,7 +195,7 @@ func newDebugLogger(t *testing.T) *logger.Logger {
 
 func createAndStartControlServer(t *testing.T, handler server.Handler, extraConfigs ...func(*server.Server)) *server.Server {
 	t.Helper()
-	srv, err := server.New(newDebugLogger(t), "localhost:0", handler)
+	srv, err := server.New(newDebugLogger(t), "localhost:0", handler, nil)
 	require.NoError(t, err)
 	for _, extra := range extraConfigs {
 		extra(srv)

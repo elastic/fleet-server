@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:generate schema-generate -esdoc -s -o internal/pkg/model/schema.go -p model model/schema.json
+//go:generate schema-generate -esdoc -s -cm "{\"Api\": \"API\", \"Id\": \"ID\"}" -o internal/pkg/model/schema.go -p model model/schema.json
 //go:generate go fmt internal/pkg/model/schema.go
 
 package main
@@ -13,12 +13,11 @@ import (
 
 	"github.com/elastic/fleet-server/v7/cmd/fleet"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
+	"github.com/elastic/fleet-server/v7/version"
 )
 
-const defaultVersion = "8.2.0"
-
 var (
-	Version   string = defaultVersion
+	Version   string = version.DefaultVersion
 	Commit    string
 	BuildTime string
 )

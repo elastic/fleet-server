@@ -11,9 +11,10 @@ import (
 	"net/http"
 	"runtime"
 
+	"go.elastic.co/apm/module/apmelasticsearch"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"go.elastic.co/apm/module/apmelasticsearch"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/rs/zerolog/log"
@@ -74,7 +75,7 @@ func WithUserAgent(name string, bi build.Info) ConfigOption {
 	}
 }
 
-// Use for integration tests ONLY!
+// WithUsrPwd is intended to be used by integration tests ONLY!
 func WithUsrPwd(usr, pwd string) ConfigOption {
 	return func(config *elasticsearch.Config) {
 		config.ServiceToken = "" // reset service token
@@ -106,7 +107,7 @@ type InfoResponse struct {
 	} `json:"version"`
 }
 
-func info(ctx context.Context, es *elasticsearch.Client) (*InfoResponse, error) {
+func info(_ context.Context, es *elasticsearch.Client) (*InfoResponse, error) {
 	// Validate the connection
 	res, err := es.Info()
 

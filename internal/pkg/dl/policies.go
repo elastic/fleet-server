@@ -23,9 +23,9 @@ var (
 func prepareQueryLatestPolicies() []byte {
 	root := dsl.NewRoot()
 	root.Size(0)
-	policyId := root.Aggs().Agg(FieldPolicyId)
-	policyId.Terms("field", FieldPolicyId, nil).Size(10000)
-	revisionIdx := policyId.Aggs().Agg(FieldRevisionIdx).TopHits()
+	policyID := root.Aggs().Agg(FieldPolicyID)
+	policyID.Terms("field", FieldPolicyID, nil).Size(10000)
+	revisionIdx := policyID.Aggs().Agg(FieldRevisionIdx).TopHits()
 	revisionIdx.Size(1)
 	rSort := revisionIdx.Sort()
 	rSort.SortOrder(FieldRevisionIdx, dsl.SortDescend)
@@ -33,7 +33,7 @@ func prepareQueryLatestPolicies() []byte {
 	return root.MustMarshalJSON()
 }
 
-// QueryLatestPolices gets the latest revision for a policy
+// QueryLatestPolicies gets the latest revision for a policy
 func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
 	res, err := bulker.Search(ctx, o.indexName, tmplQueryLatestPolicies)
@@ -41,15 +41,15 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 		return nil, err
 	}
 
-	policyId, ok := res.Aggregations[FieldPolicyId]
+	policyID, ok := res.Aggregations[FieldPolicyID]
 	if !ok {
 		return nil, ErrMissingAggregations
 	}
-	if len(policyId.Buckets) == 0 {
+	if len(policyID.Buckets) == 0 {
 		return []model.Policy{}, nil
 	}
-	policies := make([]model.Policy, len(policyId.Buckets))
-	for i, bucket := range policyId.Buckets {
+	policies := make([]model.Policy, len(policyID.Buckets))
+	for i, bucket := range policyID.Buckets {
 		revisionIdx, ok := bucket.Aggregations[FieldRevisionIdx]
 		if !ok || len(revisionIdx.Hits) != 1 {
 			return nil, ErrMissingAggregations

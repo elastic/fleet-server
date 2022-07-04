@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package monitor provides a way to track new/updated documents in an Elasticsearch index.
 package monitor
 
 import (
@@ -26,7 +27,7 @@ import (
 
 const (
 	defaultPollTimeout    = 4 * time.Minute // default long poll timeout
-	defaultSeqNo          = int64(-1)       // the _seq_no in elasticsearch start with 0
+	defaultSeqNo          = int64(-1)       //nolint:deadcode,varcheck // the _seq_no in elasticsearch start with 0
 	defaultWithExpiration = false
 
 	// Making the default fetch size larger, in order to increase the throughput of the monitor.
@@ -53,11 +54,12 @@ const (
 	fieldExpiration = "expiration"
 )
 
+// GlobalCheckpointProvider provides SeqNo.
 type GlobalCheckpointProvider interface {
 	GetCheckpoint() sqn.SeqNo
 }
 
-// SimpleMonitor monitors for new documents in an index
+// BaseMonitor is the monitor's interface implemented by SimpleMonitor and Monitor
 type BaseMonitor interface {
 	GlobalCheckpointProvider
 
@@ -65,7 +67,7 @@ type BaseMonitor interface {
 	Run(ctx context.Context) error
 }
 
-// SimpleMonitor monitors for new documents in an index
+// SimpleMonitor monitors for new documents in an index.
 type SimpleMonitor interface {
 	BaseMonitor
 	// Output is the channel the monitor send new documents to
@@ -94,10 +96,10 @@ type simpleMonitorT struct {
 	readyCh chan error
 }
 
-// Option monitor functional option
+// Option is a functional configuration option.
 type Option func(SimpleMonitor)
 
-// New creates new simple monitor
+// NewSimple creates new SimpleMonitor.
 func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option) (SimpleMonitor, error) {
 
 	m := &simpleMonitorT{
@@ -132,7 +134,7 @@ func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option
 	return m, nil
 }
 
-// WithCheckInterval sets a periodic check interval
+// WithFetchSize sets the fetch size of the monitor.
 func WithFetchSize(fetchSize int) Option {
 	return func(m SimpleMonitor) {
 		if fetchSize > 0 {
@@ -148,26 +150,26 @@ func WithPollTimeout(to time.Duration) Option {
 	}
 }
 
-// WithExpiration sets adds the expiration field to the monitor query
+// WithExpiration adds the expiration field to the monitor query.
 func WithExpiration(withExpiration bool) Option {
 	return func(m SimpleMonitor) {
 		m.(*simpleMonitorT).withExpiration = withExpiration
 	}
 }
 
-// WithReadyChan allows to pass the channel that will signal when monitor is ready
+// WithReadyChan allows to pass the channel that will signal when monitor is ready.
 func WithReadyChan(readyCh chan error) Option {
 	return func(m SimpleMonitor) {
 		m.(*simpleMonitorT).readyCh = readyCh
 	}
 }
 
-// Output output channel for the monitor
+// Output returns the output channel for the monitor.
 func (m *simpleMonitorT) Output() <-chan []es.HitT {
 	return m.outCh
 }
 
-// GetCheckpoint implements GlobalCheckpointProvider interface
+// GetCheckpoint implements GlobalCheckpointProvider interface.
 func (m *simpleMonitorT) GetCheckpoint() sqn.SeqNo {
 	return m.loadCheckpoint()
 }
@@ -189,7 +191,7 @@ func (m *simpleMonitorT) loadCheckpoint() sqn.SeqNo {
 func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 	m.log.Info().Msg("Starting index monitor")
 	defer func() {
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			err = nil
 		}
 		m.log.Info().Err(err).Msg("Index monitor exited")
@@ -344,7 +346,7 @@ func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[
 }
 
 // Prepares minimal query to do the quick check without reading all matches full documents
-func (m *simpleMonitorT) prepareCheckQuery() (tmpl *dsl.Tmpl, err error) {
+func (m *simpleMonitorT) prepareCheckQuery() (*dsl.Tmpl, error) {
 	tmpl, root := m.prepareCommon(false)
 
 	root.Source().Includes(dl.FieldSeqNo)
@@ -353,11 +355,11 @@ func (m *simpleMonitorT) prepareCheckQuery() (tmpl *dsl.Tmpl, err error) {
 	if err := tmpl.Resolve(root); err != nil {
 		return nil, err
 	}
-	return
+	return tmpl, nil
 }
 
 // Prepares full documents query
-func (m *simpleMonitorT) prepareQuery() (tmpl *dsl.Tmpl, err error) {
+func (m *simpleMonitorT) prepareQuery() (*dsl.Tmpl, error) {
 	tmpl, root := m.prepareCommon(true)
 	root.Size(uint64(m.fetchSize))
 	root.Sort().SortOrder(fieldSeqNo, dsl.SortAscend)
@@ -365,7 +367,7 @@ func (m *simpleMonitorT) prepareQuery() (tmpl *dsl.Tmpl, err error) {
 	if err := tmpl.Resolve(root); err != nil {
 		return nil, err
 	}
-	return
+	return tmpl, nil
 }
 
 func (m *simpleMonitorT) prepareCommon(limitMax bool) (*dsl.Tmpl, *dsl.Node) {

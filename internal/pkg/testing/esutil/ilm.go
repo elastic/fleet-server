@@ -162,10 +162,6 @@ func createILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 }
 
 func GetILMPolicyName(name string) string {
-	return nameWithSuffix(name, ilmPolicySuffix)
-}
-
-func nameWithSuffix(name, suffix string) string {
 	return name + "-" + ilmPolicySuffix
 }
 

@@ -7,9 +7,10 @@ package dl
 import (
 	"context"
 	"encoding/json"
+	"time"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"time"
 )
 
 func CreateActionResult(ctx context.Context, bulker bulk.Bulk, acr model.ActionResult) (string, error) {
@@ -22,7 +23,7 @@ func createActionResult(ctx context.Context, bulker bulk.Bulk, index string, acr
 	}
 	body, err := json.Marshal(acr)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return bulker.Create(ctx, index, acr.Id, body, bulk.WithRefresh())

@@ -25,7 +25,7 @@ func TestHitUnmarshal(t *testing.T) {
 			SeqNo:   2,
 			Version: 1,
 		},
-		ActionId: uuid.Must(uuid.NewV4()).String(),
+		ActionID: uuid.Must(uuid.NewV4()).String(),
 	}
 
 	body, err := json.Marshal(action)
@@ -55,7 +55,7 @@ func TestHitUnmarshal(t *testing.T) {
 	}
 
 	hit := HitT{
-		Id:      action.Id,
+		ID:      action.Id,
 		SeqNo:   action.SeqNo,
 		Version: action.Version,
 		Source:  body,

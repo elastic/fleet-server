@@ -15,7 +15,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/rnd"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/rnd"
 
 	"github.com/gofrs/uuid"
 	"github.com/rs/xid"
@@ -124,7 +124,7 @@ func CreateRandomActions(opts ...CreateActionsOpt) ([]model.Action, error) {
 			ESDocument: model.ESDocument{
 				Id: xid.New().String(),
 			},
-			ActionId:   uuid.Must(uuid.NewV4()).String(),
+			ActionID:   uuid.Must(uuid.NewV4()).String(),
 			Timestamp:  timestamp.Format(time.RFC3339),
 			Expiration: expiration.Format(time.RFC3339),
 			Type:       "APP_ACTION",

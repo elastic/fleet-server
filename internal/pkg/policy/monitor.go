@@ -21,10 +21,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 )
 
-const cloudPolicyId = "policy-elastic-agent-on-cloud"
+const cloudPolicyID = "policy-elastic-agent-on-cloud"
 
 /*
-Design should have the following properites
+Design should have the following properties
 
 Policy rollout scheduling should...
 1) be fair; delivered in first come first server order.
@@ -56,7 +56,7 @@ type Monitor interface {
 	Run(ctx context.Context) error
 
 	// Subscribe creates a new subscription for a policy update.
-	Subscribe(agentId string, policyId string, revisionIdx int64, coordinatorIdx int64) (Subscription, error)
+	Subscribe(agentID string, policyID string, revisionIdx int64, coordinatorIdx int64) (Subscription, error)
 
 	// Unsubscribe removes the current subscription.
 	Unsubscribe(sub Subscription) error
@@ -194,13 +194,13 @@ func (m *monitorT) processHits(ctx context.Context, hits []es.HitT) error {
 	return m.processPolicies(ctx, policies)
 }
 
-func (m *monitorT) waitStart(ctx context.Context) (err error) {
+func (m *monitorT) waitStart(ctx context.Context) error { //nolint:unused // not sure if this is used in tests
 	select {
 	case <-ctx.Done():
-		err = ctx.Err()
+		return ctx.Err()
 	case <-m.startCh:
 	}
-	return
+	return nil
 }
 
 func (m *monitorT) dispatchPending() bool {
@@ -215,10 +215,10 @@ func (m *monitorT) dispatchPending() bool {
 	done := m.pendingQ.isEmpty()
 
 	// Lookup the latest policy for this subscription
-	policy, ok := m.policies[s.policyId]
+	policy, ok := m.policies[s.policyID]
 	if !ok {
 		m.log.Warn().
-			Str(logger.PolicyId, s.policyId).
+			Str(logger.PolicyID, s.policyID).
 			Msg("logic error: policy missing on dispatch")
 		return done
 	}
@@ -226,8 +226,8 @@ func (m *monitorT) dispatchPending() bool {
 	select {
 	case s.ch <- &policy.pp:
 		m.log.Debug().
-			Str(logger.AgentId, s.agentId).
-			Str(logger.PolicyId, s.policyId).
+			Str(logger.AgentID, s.agentID).
+			Str(logger.PolicyID, s.policyID).
 			Int64("rev", s.revIdx).
 			Int64("coord", s.coordIdx).
 			Msg("dispatch")
@@ -235,8 +235,8 @@ func (m *monitorT) dispatchPending() bool {
 		// Should never block on a channel; we created a channel of size one.
 		// A block here indicates a logic error somewheres.
 		m.log.Error().
-			Str(logger.PolicyId, s.policyId).
-			Str(logger.AgentId, s.agentId).
+			Str(logger.PolicyID, s.policyID).
+			Str(logger.AgentID, s.agentID).
 			Msg("logic error: should never block on policy channel")
 	}
 
@@ -261,7 +261,7 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 	return m.processPolicies(ctx, policies)
 }
 
-func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy) error {
+func (m *monitorT) processPolicies(_ context.Context, policies []model.Policy) error {
 	if len(policies) == 0 {
 		return nil
 	}
@@ -278,49 +278,53 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 	return nil
 }
 
-func (m *monitorT) groupByLatest(policies []model.Policy) map[string]model.Policy {
+func groupByLatest(policies []model.Policy) map[string]model.Policy {
 	latest := make(map[string]model.Policy)
 	for _, policy := range policies {
-		curr, ok := latest[policy.PolicyId]
+		curr, ok := latest[policy.PolicyID]
 		if !ok {
-			latest[policy.PolicyId] = policy
+			latest[policy.PolicyID] = policy
 			continue
 		}
 		if policy.RevisionIdx > curr.RevisionIdx {
-			latest[policy.PolicyId] = policy
+			latest[policy.PolicyID] = policy
 			continue
 		} else if policy.RevisionIdx == curr.RevisionIdx && policy.CoordinatorIdx > curr.CoordinatorIdx {
-			latest[policy.PolicyId] = policy
+			latest[policy.PolicyID] = policy
 		}
 	}
 	return latest
+}
+
+func (m *monitorT) groupByLatest(policies []model.Policy) map[string]model.Policy {
+	return groupByLatest(policies)
 }
 
 func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 	newPolicy := pp.Policy
 
 	zlog := m.log.With().
-		Str(logger.PolicyId, newPolicy.PolicyId).
+		Str(logger.PolicyID, newPolicy.PolicyID).
 		Int64("rev", newPolicy.RevisionIdx).
 		Int64("coord", newPolicy.CoordinatorIdx).
 		Logger()
 
 	if newPolicy.CoordinatorIdx <= 0 {
-		zlog.Info().Str(logger.PolicyId, newPolicy.PolicyId).Msg("Ignore policy that has not passed through coordinator")
+		zlog.Info().Str(logger.PolicyID, newPolicy.PolicyID).Msg("Ignore policy that has not passed through coordinator")
 		return false
 	}
 
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
-	p, ok := m.policies[newPolicy.PolicyId]
+	p, ok := m.policies[newPolicy.PolicyID]
 	if !ok {
 		p = policyT{
 			pp:   *pp,
 			head: makeHead(),
 		}
-		m.policies[newPolicy.PolicyId] = p
-		zlog.Info().Str(logger.PolicyId, newPolicy.PolicyId).Msg("New policy found on update and added")
+		m.policies[newPolicy.PolicyID] = p
+		zlog.Info().Str(logger.PolicyID, newPolicy.PolicyID).Msg("New policy found on update and added")
 		return false
 	}
 
@@ -329,7 +333,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 
 	// Update the policy in our data structure
 	p.pp = *pp
-	m.policies[newPolicy.PolicyId] = p
+	m.policies[newPolicy.PolicyID] = p
 
 	// Iterate through the subscriptions on this policy;
 	// schedule any subscription for delivery that requires an update.
@@ -345,14 +349,14 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 			// Push the node onto the pendingQ
 			// HACK: if update is for cloud agent, put on front of queue
 			// not at the end for immediate delivery.
-			if newPolicy.PolicyId == cloudPolicyId {
+			if newPolicy.PolicyID == cloudPolicyID {
 				m.pendingQ.pushFront(sub)
 			} else {
 				m.pendingQ.pushBack(sub)
 			}
 
 			zlog.Debug().
-				Str(logger.AgentId, sub.agentId).
+				Str(logger.AgentID, sub.agentID).
 				Msg("scheduled pendingQ on policy revision")
 
 			nQueued += 1
@@ -363,7 +367,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 		Int64("oldRev", oldPolicy.RevisionIdx).
 		Int64("oldCoord", oldPolicy.CoordinatorIdx).
 		Int("nQueued", nQueued).
-		Str(logger.PolicyId, newPolicy.PolicyId).
+		Str(logger.PolicyID, newPolicy.PolicyID).
 		Msg("New revision of policy received and added to the queue")
 
 	return true
@@ -387,7 +391,7 @@ func (m *monitorT) kickDeploy() {
 }
 
 // Subscribe creates a new subscription for a policy update.
-func (m *monitorT) Subscribe(agentId string, policyId string, revisionIdx int64, coordinatorIdx int64) (Subscription, error) {
+func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64, coordinatorIdx int64) (Subscription, error) {
 	if revisionIdx < 0 {
 		return nil, errors.New("revisionIdx must be greater than or equal to 0")
 	}
@@ -396,38 +400,38 @@ func (m *monitorT) Subscribe(agentId string, policyId string, revisionIdx int64,
 	}
 
 	m.log.Debug().
-		Str(logger.AgentId, agentId).
-		Str(logger.PolicyId, policyId).
+		Str(logger.AgentID, agentID).
+		Str(logger.PolicyID, policyID).
 		Int64("rev", revisionIdx).
 		Int64("coord", coordinatorIdx).
 		Msg("subscribed to policy monitor")
 
 	s := NewSub(
-		policyId,
-		agentId,
+		policyID,
+		agentID,
 		revisionIdx,
 		coordinatorIdx,
 	)
 
 	m.mut.Lock()
 	defer m.mut.Unlock()
-	p, ok := m.policies[policyId]
+	p, ok := m.policies[policyID]
 
 	switch {
 	case !ok:
 		// We've not seen this policy before, force load.
 		m.log.Info().
-			Str(logger.PolicyId, policyId).
+			Str(logger.PolicyID, policyID).
 			Msg("force load on unknown policyId")
 		p = policyT{head: makeHead()}
 		p.head.pushBack(s)
-		m.policies[policyId] = p
+		m.policies[policyID] = p
 		m.kickLoad()
 	case s.isUpdate(&p.pp.Policy):
 		empty := m.pendingQ.isEmpty()
 		m.pendingQ.pushBack(s)
 		m.log.Debug().
-			Str(logger.AgentId, s.agentId).
+			Str(logger.AgentID, s.agentID).
 			Msg("scheduled pending on subscribe")
 		if empty {
 			m.kickDeploy()
@@ -451,8 +455,8 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 	m.mut.Unlock()
 
 	m.log.Debug().
-		Str(logger.AgentId, s.agentId).
-		Str(logger.PolicyId, s.policyId).
+		Str(logger.AgentID, s.agentID).
+		Str(logger.PolicyID, s.policyID).
 		Int64("rev", s.revIdx).
 		Int64("coord", s.coordIdx).
 		Msg("unsubscribe")

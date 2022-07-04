@@ -6,9 +6,10 @@ package testing
 
 import (
 	"context"
-	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"testing"
 	"time"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 )
 
 type retryOptionT struct {
@@ -52,7 +53,7 @@ func Retry(t *testing.T, ctx context.Context, f RetryFunc, opts ...RetryOption) 
 		if err == nil {
 			return
 		}
-		sleep.WithContext(ctx, o.sleep)
+		_ = sleep.WithContext(ctx, o.sleep)
 	}
 	t.Fatal(err)
 }

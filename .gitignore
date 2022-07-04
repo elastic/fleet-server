@@ -2,6 +2,7 @@
 
 .idea/
 .vscode/
+.vagrant/
 
 bin/
 /build/
@@ -13,5 +14,10 @@ fleet-server.dev.yml
 *.log.*
 
 dev-tools/integration/.env.bck
+
+# editor swap files
+*.swp
+*.swo
+*.swn
 
 .service_token

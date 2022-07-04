@@ -8,7 +8,7 @@ type SortOrderT string
 
 const (
 	SortAscend  SortOrderT = "asc"
-	SortDescend            = "desc"
+	SortDescend SortOrderT = "desc"
 )
 
 func (n *Node) Sort() *Node {

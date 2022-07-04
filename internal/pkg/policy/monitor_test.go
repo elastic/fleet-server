@@ -17,23 +17,33 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
+	mmock "github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 var policyBytes = []byte(`{"outputs":{"default":{"type":"elasticsearch"}}}`)
 
 func TestMonitor_NewPolicy(t *testing.T) {
+	_ = testlog.SetLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bulker := ftesting.MockBulk{}
-	mm := mock.NewMockIndexMonitor()
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
 	monitor := NewMonitor(bulker, mm, 0)
 	pm := monitor.(*monitorT)
 	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
@@ -53,8 +63,8 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	}
 
 	agentId := uuid.Must(uuid.NewV4()).String()
-	policyId := uuid.Must(uuid.NewV4()).String()
-	s, err := monitor.Subscribe(agentId, policyId, 0, 0)
+	policyID := uuid.Must(uuid.NewV4()).String()
+	s, err := monitor.Subscribe(agentId, policyID, 0, 0)
 	defer monitor.Unsubscribe(s)
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +77,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:       policyId,
+		PolicyID:       policyID,
 		CoordinatorIdx: 1,
 		Data:           policyBytes,
 		RevisionIdx:    1,
@@ -76,16 +86,12 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				Id:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  policyData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   1,
+		Version: 1,
+		Source:  policyData,
+	}}
 
 	timedout := false
 	tm := time.NewTimer(2 * time.Second)
@@ -108,14 +114,24 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	if timedout {
 		t.Fatal("never got policy update; timed out after 2s")
 	}
+	ms.AssertExpectations(t)
+	mm.AssertExpectations(t)
 }
 
 func TestMonitor_SamePolicy(t *testing.T) {
+	_ = testlog.SetLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bulker := ftesting.MockBulk{}
-	mm := mock.NewMockIndexMonitor()
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
 	monitor := NewMonitor(bulker, mm, 0)
 	pm := monitor.(*monitorT)
 	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
@@ -145,7 +161,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:       policyId,
+		PolicyID:       policyId,
 		CoordinatorIdx: 1,
 		Data:           policyBytes,
 		RevisionIdx:    1,
@@ -154,16 +170,12 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				Id:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  policyData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   1,
+		Version: 1,
+		Source:  policyData,
+	}}
 
 	gotPolicy := false
 	tm := time.NewTimer(1 * time.Second)
@@ -182,14 +194,24 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	if gotPolicy {
 		t.Fatal("got policy update when it was the same rev/coord idx")
 	}
+	ms.AssertExpectations(t)
+	mm.AssertExpectations(t)
 }
 
 func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
+	_ = testlog.SetLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bulker := ftesting.MockBulk{}
-	mm := mock.NewMockIndexMonitor()
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
 	monitor := NewMonitor(bulker, mm, 0)
 	pm := monitor.(*monitorT)
 	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
@@ -219,7 +241,7 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:       policyId,
+		PolicyID:       policyId,
 		CoordinatorIdx: 0,
 		Data:           policyBytes,
 		RevisionIdx:    2,
@@ -228,16 +250,12 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				Id:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  policyData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   1,
+		Version: 1,
+		Source:  policyData,
+	}}
 
 	gotPolicy := false
 	tm := time.NewTimer(1 * time.Second)
@@ -256,6 +274,8 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 	if gotPolicy {
 		t.Fatal("got policy update when it had coordinator_idx set to 0")
 	}
+	ms.AssertExpectations(t)
+	mm.AssertExpectations(t)
 }
 
 func TestMonitor_NewPolicyExists(t *testing.T) {
@@ -273,6 +293,7 @@ func TestMonitor_NewPolicyExists(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			_ = testlog.SetLogger(t)
 			runTestMonitor_NewPolicyExists(t, tc.delay)
 		})
 	}
@@ -282,8 +303,15 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	bulker := ftesting.MockBulk{}
-	mm := mock.NewMockIndexMonitor()
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
 	monitor := NewMonitor(bulker, mm, 0)
 	pm := monitor.(*monitorT)
 
@@ -296,7 +324,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:       policyId,
+		PolicyID:       policyId,
 		CoordinatorIdx: 1,
 		Data:           policyBytes,
 		RevisionIdx:    2,

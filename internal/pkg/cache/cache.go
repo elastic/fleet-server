@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package cache implements an in-memory cache used to track API keys, actions, and artifacts.
 package cache
 
 import (
@@ -23,17 +24,17 @@ type Cache interface {
 	SetAction(model.Action)
 	GetAction(id string) (model.Action, bool)
 
-	SetApiKey(key ApiKey, enabled bool)
-	ValidApiKey(key ApiKey) bool
+	SetAPIKey(key APIKey, enabled bool)
+	ValidAPIKey(key APIKey) bool
 
-	SetEnrollmentApiKey(id string, key model.EnrollmentApiKey, cost int64)
-	GetEnrollmentApiKey(id string) (model.EnrollmentApiKey, bool)
+	SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, cost int64)
+	GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool)
 
 	SetArtifact(artifact model.Artifact)
 	GetArtifact(ident, sha2 string) (model.Artifact, bool)
 }
 
-type ApiKey = apikey.ApiKey
+type APIKey = apikey.APIKey
 type SecurityInfo = apikey.SecurityInfo
 
 type CacheT struct {
@@ -46,10 +47,10 @@ type Config struct {
 	NumCounters  int64 // number of keys to track frequency of
 	MaxCost      int64 // maximum cost of cache in 'cost' units
 	ActionTTL    time.Duration
-	ApiKeyTTL    time.Duration
+	APIKeyTTL    time.Duration
 	EnrollKeyTTL time.Duration
 	ArtifactTTL  time.Duration
-	ApiKeyJitter time.Duration
+	APIKeyJitter time.Duration
 }
 
 func (c *Config) MarshalZerologObject(e *zerolog.Event) {
@@ -58,12 +59,12 @@ func (c *Config) MarshalZerologObject(e *zerolog.Event) {
 	e.Dur("actionTTL", c.ActionTTL)
 	e.Dur("enrollTTL", c.EnrollKeyTTL)
 	e.Dur("artifactTTL", c.ArtifactTTL)
-	e.Dur("apiKeyTTL", c.ApiKeyTTL)
-	e.Dur("apiKeyJitter", c.ApiKeyJitter)
+	e.Dur("apiKeyTTL", c.APIKeyTTL)
+	e.Dur("apiKeyJitter", c.APIKeyJitter)
 }
 
 type actionCache struct {
-	actionId   string
+	actionID   string
 	actionType string
 }
 
@@ -109,17 +110,17 @@ func (c *CacheT) SetAction(action model.Action) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
-	scopedKey := "action:" + action.ActionId
+	scopedKey := "action:" + action.ActionID
 	v := actionCache{
-		actionId:   action.ActionId,
+		actionID:   action.ActionID,
 		actionType: action.Type,
 	}
-	cost := len(action.ActionId) + len(action.Type)
+	cost := len(action.ActionID) + len(action.Type)
 	ttl := c.cfg.ActionTTL
 	ok := c.cache.SetWithTTL(scopedKey, v, int64(cost), ttl)
 	log.Trace().
 		Bool("ok", ok).
-		Str("id", action.ActionId).
+		Str("id", action.ActionID).
 		Int("cost", cost).
 		Msg("Action cache SET")
 }
@@ -141,7 +142,7 @@ func (c *CacheT) GetAction(id string) (model.Action, bool) {
 			return model.Action{}, false
 		}
 		return model.Action{
-			ActionId: action.actionId,
+			ActionID: action.actionID,
 			Type:     action.actionType,
 		}, ok
 	}
@@ -150,12 +151,12 @@ func (c *CacheT) GetAction(id string) (model.Action, bool) {
 	return model.Action{}, false
 }
 
-// SetApiKey sets the API key in the cache.
-func (c *CacheT) SetApiKey(key ApiKey, enabled bool) {
+// SetAPIKey sets the API key in the cache.
+func (c *CacheT) SetAPIKey(key APIKey, enabled bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
-	scopedKey := "api:" + key.Id
+	scopedKey := "api:" + key.ID
 
 	// Use the valid key as the payload of the record;
 	// If caller has marked key as not enabled, use empty string.
@@ -168,9 +169,9 @@ func (c *CacheT) SetApiKey(key ApiKey, enabled bool) {
 	// across time, which is helpful if a bunch of agents came on at the same time,
 	// say during a network restoration. With some jitter, we avoid having to
 	// revalidate the API Keys all at the same time, which we know causes load on Elastic.
-	ttl := c.cfg.ApiKeyTTL
-	if c.cfg.ApiKeyJitter != 0 {
-		jitter := time.Duration(rand.Int63n(int64(c.cfg.ApiKeyJitter)))
+	ttl := c.cfg.APIKeyTTL
+	if c.cfg.APIKeyJitter != 0 {
+		jitter := time.Duration(rand.Int63n(int64(c.cfg.APIKeyJitter))) //nolint:gosec // used to generate a jitter offset value
 		if jitter < ttl {
 			ttl = ttl - jitter
 		}
@@ -181,58 +182,58 @@ func (c *CacheT) SetApiKey(key ApiKey, enabled bool) {
 	log.Trace().
 		Bool("ok", ok).
 		Bool("enabled", enabled).
-		Str("key", key.Id).
+		Str("key", key.ID).
 		Dur("ttl", ttl).
 		Int("cost", cost).
 		Msg("ApiKey cache SET")
 }
 
-// ValidApiKey returns true if the ApiKey is valid (aka. also present in cache).
-func (c *CacheT) ValidApiKey(key ApiKey) bool {
+// ValidAPIKey returns true if the ApiKey is valid (aka. also present in cache).
+func (c *CacheT) ValidAPIKey(key APIKey) bool {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
-	scopedKey := "api:" + key.Id
+	scopedKey := "api:" + key.ID
 	v, ok := c.cache.Get(scopedKey)
 	if ok {
 		switch v {
 		case "":
-			log.Trace().Str("id", key.Id).Msg("ApiKey cache HIT on disabled KEY")
+			log.Trace().Str("id", key.ID).Msg("ApiKey cache HIT on disabled KEY")
 		case key.Key:
-			log.Trace().Str("id", key.Id).Msg("ApiKey cache HIT")
+			log.Trace().Str("id", key.ID).Msg("ApiKey cache HIT")
 		default:
-			log.Trace().Str("id", key.Id).Msg("ApiKey cache MISMATCH")
+			log.Trace().Str("id", key.ID).Msg("ApiKey cache MISMATCH")
 			ok = false
 		}
 	} else {
-		log.Trace().Str("id", key.Id).Msg("ApiKey cache MISS")
+		log.Trace().Str("id", key.ID).Msg("ApiKey cache MISS")
 	}
 	return ok
 }
 
-// GetEnrollmentApiKey returns the enrollment API key by ID.
-func (c *CacheT) GetEnrollmentApiKey(id string) (model.EnrollmentApiKey, bool) {
+// GetEnrollmentAPIKey returns the enrollment API key by ID.
+func (c *CacheT) GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
 	scopedKey := "record:" + id
 	if v, ok := c.cache.Get(scopedKey); ok {
 		log.Trace().Str("id", id).Msg("Enrollment cache HIT")
-		key, ok := v.(model.EnrollmentApiKey)
+		key, ok := v.(model.EnrollmentAPIKey)
 
 		if !ok {
 			log.Error().Str("id", id).Msg("Enrollment cache cast fail")
-			return model.EnrollmentApiKey{}, false
+			return model.EnrollmentAPIKey{}, false
 		}
 		return key, ok
 	}
 
 	log.Trace().Str("id", id).Msg("EnrollmentApiKey cache MISS")
-	return model.EnrollmentApiKey{}, false
+	return model.EnrollmentAPIKey{}, false
 }
 
-// SetEnrollmentApiKey adds the enrollment API key into the cache.
-func (c *CacheT) SetEnrollmentApiKey(id string, key model.EnrollmentApiKey, cost int64) {
+// SetEnrollmentAPIKey adds the enrollment API key into the cache.
+func (c *CacheT) SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, cost int64) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
@@ -271,6 +272,7 @@ func (c *CacheT) GetArtifact(ident, sha2 string) (model.Artifact, bool) {
 	return model.Artifact{}, false
 }
 
+// SetArtifact will set the cached artifact
 // TODO: strip body and spool to on disk cache if larger than a size threshold
 func (c *CacheT) SetArtifact(artifact model.Artifact) {
 	c.mut.RLock()

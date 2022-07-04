@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"sync"
 	"testing"
 	"time"
@@ -19,12 +18,14 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/gofrs/uuid"
 	"github.com/rs/xid"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
+	mmock "github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
@@ -38,8 +39,16 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		},
 	}
 	reporter := &FakeReporter{}
-	bulker := ftesting.MockBulk{}
-	mm := mock.NewMockIndexMonitor()
+
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
@@ -70,7 +79,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		return nil
 	}, ftesting.RetrySleep(1*time.Second))
 
-	policyId := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 	rId := xid.New().String()
 	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{}})
 	if err != nil {
@@ -82,7 +91,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        1,
@@ -92,16 +101,12 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				Id:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  pData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   1,
+		Version: 1,
+		Source:  pData,
+	}}
 
 	// should still be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -130,7 +135,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        2,
@@ -140,16 +145,12 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				Id:      rId,
-				SeqNo:   2,
-				Version: 1,
-				Source:  pData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   2,
+		Version: 1,
+		Source:  pData,
+	}}
 
 	// should now be set to healthy
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -180,8 +181,16 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		},
 	}
 	reporter := &FakeReporter{}
-	bulker := ftesting.MockBulk{}
-	mm := mock.NewMockIndexMonitor()
+
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.checkTime = 100 * time.Millisecond
@@ -195,8 +204,8 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}
 
 	var tokenLock sync.Mutex
-	var tokenResult []model.EnrollmentApiKey
-	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error) {
+	var tokenResult []model.EnrollmentAPIKey
+	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 		tokenLock.Lock()
 		defer tokenLock.Unlock()
 		return tokenResult, nil
@@ -226,7 +235,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		return nil
 	}, ftesting.RetrySleep(1*time.Second))
 
-	policyId := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 	rId := xid.New().String()
 	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{
 		{
@@ -242,7 +251,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        1,
@@ -254,29 +263,27 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}
 
 	// add inactive token that should be filtered out
-	inactiveToken := model.EnrollmentApiKey{
+	inactiveToken := model.EnrollmentAPIKey{
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
 		Active:   false,
-		ApiKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
-		ApiKeyId: xid.New().String(),
+		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
+		APIKeyID: xid.New().String(),
 		Name:     "Inactive",
-		PolicyId: policyId,
+		PolicyID: policyID,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, inactiveToken)
 	tokenLock.Unlock()
 
 	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				Id:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  policyData,
-			},
-		})
+		chHitT <- []es.HitT{{
+			ID:      rId,
+			SeqNo:   1,
+			Version: 1,
+			Source:  policyData,
+		}}
 		policyLock.Lock()
 		defer policyLock.Unlock()
 		policyResult = append(policyResult, policy)
@@ -295,15 +302,15 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-	activeToken := model.EnrollmentApiKey{
+	activeToken := model.EnrollmentAPIKey{
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
 		Active:   true,
-		ApiKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
-		ApiKeyId: xid.New().String(),
+		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
+		APIKeyID: xid.New().String(),
 		Name:     "Active",
-		PolicyId: policyId,
+		PolicyID: policyID,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, activeToken)
@@ -325,7 +332,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		if !set {
 			return fmt.Errorf("payload should have enrollment-token set")
 		}
-		if token != activeToken.ApiKey {
+		if token != activeToken.APIKey {
 			return fmt.Errorf("enrollment_token value is incorrect")
 		}
 		return nil
@@ -347,11 +354,19 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			ID: "agent-id",
 		},
 	}
-	policyId := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 	reporter := &FakeReporter{}
-	bulker := ftesting.MockBulk{}
-	mm := mock.NewMockIndexMonitor()
-	monitor := NewSelfMonitor(cfg, bulker, mm, policyId, reporter)
+
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
+	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
@@ -375,7 +390,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		if status != proto.StateObserved_STARTING {
 			return fmt.Errorf("should be reported as starting; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", policyId) {
+		if msg != fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		return nil
@@ -392,7 +407,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        2,
@@ -402,16 +417,12 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				Id:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  pData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   1,
+		Version: 1,
+		Source:  pData,
+	}}
 
 	// should still be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -419,7 +430,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		if status != proto.StateObserved_STARTING {
 			return fmt.Errorf("should be reported as starting; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", policyId) {
+		if msg != fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		return nil
@@ -440,7 +451,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   2,
 		},
-		PolicyId:           policyId,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        1,
@@ -450,16 +461,12 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				Id:      rId,
-				SeqNo:   2,
-				Version: 1,
-				Source:  pData,
-			},
-		})
-	}()
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   2,
+		Version: 1,
+		Source:  pData,
+	}}
 
 	// should now be set to healthy
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -467,7 +474,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		if status != proto.StateObserved_HEALTHY {
 			return fmt.Errorf("should be reported as healthy; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s", policyId) {
+		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		return nil
@@ -489,11 +496,19 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 			ID: "",
 		},
 	}
-	policyId := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 	reporter := &FakeReporter{}
-	bulker := ftesting.MockBulk{}
-	mm := mock.NewMockIndexMonitor()
-	monitor := NewSelfMonitor(cfg, bulker, mm, policyId, reporter)
+
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
+	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.checkTime = 100 * time.Millisecond
 
@@ -506,8 +521,8 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}
 
 	var tokenLock sync.Mutex
-	var tokenResult []model.EnrollmentApiKey
-	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error) {
+	var tokenResult []model.EnrollmentAPIKey
+	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 		tokenLock.Lock()
 		defer tokenLock.Unlock()
 		return tokenResult, nil
@@ -531,7 +546,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		if status != proto.StateObserved_STARTING {
 			return fmt.Errorf("should be reported as starting; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", policyId) {
+		if msg != fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		return nil
@@ -552,7 +567,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyId:           policyId,
+		PolicyID:           policyID,
 		CoordinatorIdx:     1,
 		Data:               policyContents,
 		RevisionIdx:        1,
@@ -564,29 +579,27 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}
 
 	// add inactive token that should be filtered out
-	inactiveToken := model.EnrollmentApiKey{
+	inactiveToken := model.EnrollmentAPIKey{
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
 		Active:   false,
-		ApiKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
-		ApiKeyId: xid.New().String(),
+		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
+		APIKeyID: xid.New().String(),
 		Name:     "Inactive",
-		PolicyId: policyId,
+		PolicyID: policyID,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, inactiveToken)
 	tokenLock.Unlock()
 
 	go func() {
-		mm.Notify(ctx, []es.HitT{
-			{
-				Id:      rId,
-				SeqNo:   1,
-				Version: 1,
-				Source:  policyData,
-			},
-		})
+		chHitT <- []es.HitT{{
+			ID:      rId,
+			SeqNo:   1,
+			Version: 1,
+			Source:  policyData,
+		}}
 		policyLock.Lock()
 		defer policyLock.Unlock()
 		policyResult = append(policyResult, policy)
@@ -598,22 +611,22 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		if status != proto.StateObserved_STARTING {
 			return fmt.Errorf("should be reported as starting; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", policyId) {
+		if msg != fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		return nil
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-	activeToken := model.EnrollmentApiKey{
+	activeToken := model.EnrollmentAPIKey{
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
 		Active:   true,
-		ApiKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
-		ApiKeyId: xid.New().String(),
+		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
+		APIKeyID: xid.New().String(),
 		Name:     "Active",
-		PolicyId: policyId,
+		PolicyID: policyID,
 	}
 	tokenLock.Lock()
 	tokenResult = append(tokenResult, activeToken)
@@ -625,7 +638,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		if status != proto.StateObserved_DEGRADED {
 			return fmt.Errorf("should be reported as degraded; instead its %s", status)
 		}
-		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s; missing config fleet.agent.id (expected during bootstrap process)", policyId) {
+		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s; missing config fleet.agent.id (expected during bootstrap process)", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
 		}
 		if payload == nil {
@@ -635,7 +648,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		if !set {
 			return fmt.Errorf("payload should have enrollment-token set")
 		}
-		if token != activeToken.ApiKey {
+		if token != activeToken.APIKey {
 			return fmt.Errorf("enrollment_token value is incorrect")
 		}
 		return nil

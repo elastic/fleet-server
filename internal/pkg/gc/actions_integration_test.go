@@ -42,7 +42,7 @@ func TestCleanupActions(t *testing.T) {
 	}
 }
 
-func testCleanupActionsWithSelectSize(t *testing.T, selectSize int) {
+func testCleanupActionsWithSelectSize(t *testing.T, _ int) {
 	const (
 		thirtyDays        = "720h"
 		thirtyDaysAndHour = "721h"

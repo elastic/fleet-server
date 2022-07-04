@@ -5,21 +5,25 @@
 //go:build !integration
 // +build !integration
 
+//nolint:dupl // duplicated lines used for test cases
 package config
 
 import (
 	"crypto/tls"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
-	"github.com/elastic/go-elasticsearch/v7"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/go-elasticsearch/v7"
+
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
 func TestToESConfig(t *testing.T) {
@@ -102,9 +106,11 @@ func TestToESConfig(t *testing.T) {
 				MaxRetries:   6,
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
+						InsecureSkipVerify: true, //nolint:gosec // test case
 						MinVersion:         tls.VersionTLS11,
 						MaxVersion:         tls.VersionTLS13,
+						Certificates:       []tls.Certificate{},
+						CurvePreferences:   []tls.CurveID{},
 					},
 					TLSHandshakeTimeout:   10 * time.Second,
 					MaxIdleConns:          100,
@@ -138,9 +144,11 @@ func TestToESConfig(t *testing.T) {
 				MaxRetries:   6,
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
+						InsecureSkipVerify: true, //nolint:gosec // test case
 						MinVersion:         tls.VersionTLS11,
 						MaxVersion:         tls.VersionTLS13,
+						Certificates:       []tls.Certificate{},
+						CurvePreferences:   []tls.CurveID{},
 					},
 					TLSHandshakeTimeout:   10 * time.Second,
 					MaxIdleConns:          100,
@@ -158,9 +166,10 @@ func TestToESConfig(t *testing.T) {
 		copts := cmp.Options{
 			cmpopts.IgnoreUnexported(http.Transport{}),
 			cmpopts.IgnoreFields(http.Transport{}, "DialContext"),
-			cmpopts.IgnoreUnexported(tls.Config{}),
+			cmpopts.IgnoreUnexported(tls.Config{}), //nolint:gosec //test case
 		}
 		t.Run(name, func(t *testing.T) {
+			_ = testlog.SetLogger(t)
 			res, err := test.cfg.ToESConfig(false)
 			require.NoError(t, err)
 
@@ -221,19 +230,20 @@ func TestESProxyConfig(t *testing.T) {
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
+			_ = testlog.SetLogger(t)
 			setTestEnv(t, test.env)
 
 			res, err := test.cfg.ToESConfig(false)
 			require.NoError(t, err)
 
-			transport := res.Transport.(*http.Transport)
+			transport := res.Transport.(*http.Transport) //nolint:errcheck // test case
 			if test.want == "" {
 				require.Nil(t, transport.Proxy)
 				return
 			}
 			require.NotNil(t, transport.Proxy)
 
-			req, err := http.NewRequest("GET", test.url, nil)
+			req, err := http.NewRequest("GET", test.url, nil) //nolint:noctx // test case
 			require.NoError(t, err)
 
 			got, err := transport.Proxy(req)
@@ -255,24 +265,8 @@ func TestESProxyConfig(t *testing.T) {
 }
 
 func setTestEnv(t *testing.T, env map[string]string) {
-	var oldEnv map[string]string
-	for k := range env {
-		if v := os.Getenv(k); v != "" {
-			oldEnv[k] = v
-		}
-	}
-
-	t.Cleanup(func() {
-		for k := range env {
-			if v := oldEnv[k]; v != v {
-				os.Setenv(k, v)
-			} else {
-				os.Unsetenv(k)
-			}
-		}
-	})
-
+	t.Helper()
 	for k, v := range env {
-		os.Setenv(k, v)
+		t.Setenv(k, v)
 	}
 }

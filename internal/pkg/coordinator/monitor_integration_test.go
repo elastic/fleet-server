@@ -10,6 +10,7 @@ package coordinator
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -55,7 +56,7 @@ func TestMonitorLeadership(t *testing.T) {
 	// start with 1 initial policy
 	policy1Id := uuid.Must(uuid.NewV4()).String()
 	policy1 := model.Policy{
-		PolicyId:       policy1Id,
+		PolicyID:       policy1Id,
 		CoordinatorIdx: 0,
 		Data:           []byte("{}"),
 		RevisionIdx:    1,
@@ -69,14 +70,14 @@ func TestMonitorLeadership(t *testing.T) {
 	g, _ := errgroup.WithContext(context.Background())
 	g.Go(func() error {
 		err := pim.Run(ctx)
-		if err != nil && err != context.Canceled {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			return err
 		}
 		return nil
 	})
 	g.Go(func() error {
 		err := pm.Run(ctx)
-		if err != nil && err != context.Canceled {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			return err
 		}
 		return nil
@@ -86,7 +87,7 @@ func TestMonitorLeadership(t *testing.T) {
 	<-time.After(500 * time.Millisecond)
 	policy2Id := uuid.Must(uuid.NewV4()).String()
 	policy2 := model.Policy{
-		PolicyId:       policy2Id,
+		PolicyID:       policy2Id,
 		CoordinatorIdx: 0,
 		Data:           []byte("{}"),
 		RevisionIdx:    1,
@@ -142,60 +143,61 @@ func TestMonitorUnenroller(t *testing.T) {
 	// add policy with unenroll timeout
 	policy1Id := uuid.Must(uuid.NewV4()).String()
 	policy1 := model.Policy{
-		PolicyId:        policy1Id,
+		PolicyID:        policy1Id,
 		CoordinatorIdx:  0,
 		Data:            []byte("{}"),
 		RevisionIdx:     1,
-		UnenrollTimeout: 300, // 5 minutes (300 seconds)
+		UnenrollTimeout: 5,
 	}
 	_, err = dl.CreatePolicy(ctx, bulker, policy1, dl.WithIndexName(policiesIndex))
 	require.NoError(t, err)
 
 	// create apikeys that should be invalidated
-	agentId := uuid.Must(uuid.NewV4()).String()
-	accessKey, err := bulker.ApiKeyCreate(
+	agentID := uuid.Must(uuid.NewV4()).String()
+	accessKey, err := bulker.APIKeyCreate(
 		ctx,
-		agentId,
+		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentId, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, apikey.TypeAccess),
 	)
 	require.NoError(t, err)
-	outputKey, err := bulker.ApiKeyCreate(
+	outputKey, err := bulker.APIKeyCreate(
 		ctx,
-		agentId,
+		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentId, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, apikey.TypeAccess),
 	)
 	require.NoError(t, err)
 
 	// add agent that should be unenrolled
 	sixAgo := time.Now().UTC().Add(-6 * time.Minute)
 	agentBody, err := json.Marshal(model.Agent{
-		AccessApiKeyId:  accessKey.Id,
-		DefaultApiKeyId: outputKey.Id,
+		AccessAPIKeyID:  accessKey.ID,
+		DefaultAPIKeyID: outputKey.ID,
 		Active:          true,
 		EnrolledAt:      sixAgo.Format(time.RFC3339),
 		LastCheckin:     sixAgo.Format(time.RFC3339),
-		PolicyId:        policy1Id,
+		PolicyID:        policy1Id,
 		UpdatedAt:       sixAgo.Format(time.RFC3339),
 	})
-	_, err = bulker.Create(ctx, agentsIndex, agentId, agentBody)
+	require.NoError(t, err)
+	_, err = bulker.Create(ctx, agentsIndex, agentID, agentBody)
 	require.NoError(t, err)
 
 	// start the monitors
 	g, _ := errgroup.WithContext(context.Background())
 	g.Go(func() error {
 		err := pim.Run(ctx)
-		if err != nil && err != context.Canceled {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			return err
 		}
 		return nil
 	})
 	g.Go(func() error {
 		err := pm.Run(ctx)
-		if err != nil && err != context.Canceled {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			return err
 		}
 		return nil
@@ -203,15 +205,15 @@ func TestMonitorUnenroller(t *testing.T) {
 
 	// should set the agent to not active (aka. unenrolled)
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldId, agentId, dl.WithIndexName(agentsIndex))
+		agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(agentsIndex))
 		if err != nil {
 			return err
 		}
 		if agent.Active {
-			return fmt.Errorf("agent %s is still active", agentId)
+			return fmt.Errorf("agent %s is still active", agentID)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(50))
+	}, ftesting.RetrySleep(5*time.Second), ftesting.RetryCount(50))
 
 	// stop the monitors
 	cn()
@@ -219,7 +221,7 @@ func TestMonitorUnenroller(t *testing.T) {
 	require.NoError(t, err)
 
 	// check other fields now we know its marked unactive
-	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldId, agentId, dl.WithIndexName(agentsIndex))
+	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(agentsIndex))
 	require.NoError(t, err)
 	assert.NotEmpty(t, agent.UnenrolledAt)
 	assert.Equal(t, unenrolledReasonTimeout, agent.UnenrolledReason)
@@ -227,9 +229,9 @@ func TestMonitorUnenroller(t *testing.T) {
 	assert.Len(t, pm.(*monitorT).policiesCanceller, 1)
 
 	// should error as they are now invalidated
-	_, err = bulker.ApiKeyAuth(bulkCtx, *accessKey)
+	_, err = bulker.APIKeyAuth(bulkCtx, *accessKey)
 	assert.Error(t, err)
-	_, err = bulker.ApiKeyAuth(bulkCtx, *outputKey)
+	_, err = bulker.APIKeyAuth(bulkCtx, *outputKey)
 	assert.Error(t, err)
 }
 
@@ -261,7 +263,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 	// add policy with unenroll timeout
 	policy1Id := uuid.Must(uuid.NewV4()).String()
 	policy1 := model.Policy{
-		PolicyId:        policy1Id,
+		PolicyID:        policy1Id,
 		CoordinatorIdx:  0,
 		Data:            []byte("{}"),
 		RevisionIdx:     1,
@@ -274,14 +276,14 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 	g, _ := errgroup.WithContext(context.Background())
 	g.Go(func() error {
 		err := pim.Run(ctx)
-		if err != nil && err != context.Canceled {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			return err
 		}
 		return nil
 	})
 	g.Go(func() error {
 		err := pm.Run(ctx)
-		if err != nil && err != context.Canceled {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			return err
 		}
 		return nil
@@ -289,7 +291,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 
 	// update policy to clear timeout
 	policy2 := model.Policy{
-		PolicyId:       policy1Id,
+		PolicyID:       policy1Id,
 		CoordinatorIdx: 0,
 		Data:           []byte("{}"),
 		RevisionIdx:    2,
@@ -298,36 +300,37 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 	require.NoError(t, err)
 
 	// create apikeys that should be invalidated
-	agentId := uuid.Must(uuid.NewV4()).String()
-	accessKey, err := bulker.ApiKeyCreate(
+	agentID := uuid.Must(uuid.NewV4()).String()
+	accessKey, err := bulker.APIKeyCreate(
 		ctx,
-		agentId,
+		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentId, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, apikey.TypeAccess),
 	)
 	require.NoError(t, err)
-	outputKey, err := bulker.ApiKeyCreate(
+	outputKey, err := bulker.APIKeyCreate(
 		ctx,
-		agentId,
+		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentId, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, apikey.TypeAccess),
 	)
 	require.NoError(t, err)
 
 	// add agent that should be unenrolled
 	sixAgo := time.Now().UTC().Add(-6 * time.Minute)
 	agentBody, err := json.Marshal(model.Agent{
-		AccessApiKeyId:  accessKey.Id,
-		DefaultApiKeyId: outputKey.Id,
+		AccessAPIKeyID:  accessKey.ID,
+		DefaultAPIKeyID: outputKey.ID,
 		Active:          true,
 		EnrolledAt:      sixAgo.Format(time.RFC3339),
 		LastCheckin:     sixAgo.Format(time.RFC3339),
-		PolicyId:        policy1Id,
+		PolicyID:        policy1Id,
 		UpdatedAt:       sixAgo.Format(time.RFC3339),
 	})
-	_, err = bulker.Create(ctx, agentsIndex, agentId, agentBody)
+	require.NoError(t, err)
+	_, err = bulker.Create(ctx, agentsIndex, agentID, agentBody)
 	require.NoError(t, err)
 
 	// Sleep to allow monitors to run
@@ -339,7 +342,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 	require.NoError(t, err)
 
 	// check other fields now we know its marked inactive
-	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldId, agentId, dl.WithIndexName(agentsIndex))
+	agent, err := dl.FindAgent(bulkCtx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(agentsIndex))
 	require.NoError(t, err)
 	assert.True(t, agent.Active)
 	// Make sure canceller is no longer there
@@ -372,15 +375,15 @@ func ensureServer(ctx context.Context, t *testing.T, bulker bulk.Bulk, cfg confi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if srv.Agent.Id != cfg.Agent.ID {
+	if srv.Agent.ID != cfg.Agent.ID {
 		t.Fatal("agent.id should match from configuration")
 	}
 }
 
-func ensureLeadership(ctx context.Context, t *testing.T, bulker bulk.Bulk, cfg config.Fleet, index string, policyId string) {
+func ensureLeadership(ctx context.Context, t *testing.T, bulker bulk.Bulk, cfg config.Fleet, index string, policyID string) {
 	t.Helper()
 	var leader model.PolicyLeader
-	data, err := bulker.Read(ctx, index, policyId)
+	data, err := bulker.Read(ctx, index, policyID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +391,7 @@ func ensureLeadership(ctx context.Context, t *testing.T, bulker bulk.Bulk, cfg c
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leader.Server.Id != cfg.Agent.ID {
+	if leader.Server.ID != cfg.Agent.ID {
 		t.Fatal("server.id should match from configuration")
 	}
 	lt, err := leader.Time()
@@ -400,15 +403,16 @@ func ensureLeadership(ctx context.Context, t *testing.T, bulker bulk.Bulk, cfg c
 	}
 }
 
-func ensurePolicy(ctx context.Context, t *testing.T, bulker bulk.Bulk, index string, policyId string, revisionIdx, coordinatorIdx int64) {
+func ensurePolicy(ctx context.Context, t *testing.T, bulker bulk.Bulk, index string, policyID string, revisionIdx, coordinatorIdx int64) {
 	t.Helper()
 	policies, err := dl.QueryLatestPolicies(ctx, bulker, dl.WithIndexName(index))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var found *model.Policy
-	for _, p := range policies {
-		if p.PolicyId == policyId {
+	for i := range policies {
+		p := policies[i]
+		if p.PolicyID == policyID {
 			found = &p
 			break
 		}
@@ -424,10 +428,10 @@ func ensurePolicy(ctx context.Context, t *testing.T, bulker bulk.Bulk, index str
 	}
 }
 
-func ensureLeadershipReleased(ctx context.Context, t *testing.T, bulker bulk.Bulk, cfg config.Fleet, index string, policyId string) {
+func ensureLeadershipReleased(ctx context.Context, t *testing.T, bulker bulk.Bulk, cfg config.Fleet, index string, policyID string) {
 	t.Helper()
 	var leader model.PolicyLeader
-	data, err := bulker.Read(ctx, index, policyId)
+	data, err := bulker.Read(ctx, index, policyID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,7 +439,7 @@ func ensureLeadershipReleased(ctx context.Context, t *testing.T, bulker bulk.Bul
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leader.Server.Id != cfg.Agent.ID {
+	if leader.Server.ID != cfg.Agent.ID {
 		t.Fatal("server.id should match from configuration")
 	}
 	lt, err := leader.Time()

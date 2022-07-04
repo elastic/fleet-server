@@ -1,6 +1,5 @@
-# CI Specific
-/.ci/ @elastic/observablt-robots
-/Jenkinsfile @elastic/observablt-robots
-
 # Team responsable for Fleet Server
-/ @elastic/elastic-agent-control-plane
+* @elastic/elastic-agent-control-plane
+
+# Allow to auto-merge PRs with Mergify
+dev-tools/integration/.env

@@ -7,21 +7,22 @@ package logger
 import (
 	"encoding/json"
 
-	"github.com/elastic/beats/v7/libbeat/logp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 func encoderConfig() zapcore.EncoderConfig {
 	return zapcore.EncoderConfig{
-		MessageKey:     EcsMessage,
-		LevelKey:       EcsLogLevel,
-		NameKey:        EcsLogName,
-		TimeKey:        EcsTimestamp,
-		CallerKey:      EcsLogCaller,
-		StacktraceKey:  EcsLogStackTrace,
+		MessageKey:     ECSMessage,
+		LevelKey:       ECSLogLevel,
+		NameKey:        ECSLogName,
+		TimeKey:        ECSTimestamp,
+		CallerKey:      ECSLogCaller,
+		StacktraceKey:  ECSLogStackTrace,
 		LineEnding:     "\n",
 		EncodeTime:     zapcore.EpochTimeEncoder,
 		EncodeLevel:    zapcore.LowercaseLevelEncoder,
@@ -71,7 +72,7 @@ func (z zapStub) Write(p []byte) (n int, err error) {
 	for key, val := range m {
 
 		// Don't dupe the timestamp, use the fleet formatted timestamp.
-		if key != EcsTimestamp {
+		if key != ECSTimestamp {
 			ctx.Interface(key, val)
 		}
 	}

@@ -128,7 +128,7 @@ func (t *Tmpl) MustResolve(n *Node) *Tmpl {
 	return t
 }
 
-// Convenince function to avoid map when only one token
+// RenderOne is a convenience function to avoid map when only one token
 func (t *Tmpl) RenderOne(name string, v interface{}) ([]byte, error) {
 	d, err := json.Marshal(v)
 	if err != nil {

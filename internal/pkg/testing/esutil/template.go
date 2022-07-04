@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	templateSuffix  = "template"
 	templateVersion = 1
 
 	defaultSettings = `
@@ -50,7 +49,7 @@ type AckResponse struct {
 }
 
 func EnsureTemplate(ctx context.Context, cli *elasticsearch.Client, name, mapping string, ilm bool) (err error) {
-	templateName := nameWithSuffix(name, templateSuffix)
+	templateName := GetILMPolicyName(name)
 
 	// Get current template
 	res, err := cli.Indices.GetTemplate(
@@ -138,7 +137,7 @@ func createTemplate(ctx context.Context, cli *elasticsearch.Client, name string,
 	var r AckResponse
 	err = json.NewDecoder(res.Body).Decode(&r)
 	if err != nil {
-		return fmt.Errorf("failed to parse put template response: %v version: %v, err: %v", name, templateVersion, err)
+		return fmt.Errorf("failed to parse put template response: %v version: %v, err: %w", name, templateVersion, err)
 	}
 	if !r.Acknowledged {
 		return fmt.Errorf("failed to receive acknowledgment for put template request: %v version: %v", name, templateVersion)

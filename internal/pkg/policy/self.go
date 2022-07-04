@@ -28,7 +28,7 @@ import (
 // DefaultCheckTime is the default interval for self to check for its policy.
 const DefaultCheckTime = 5 * time.Second
 
-type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error)
+type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error)
 
 type SelfMonitor interface {
 	// Run runs the monitor.
@@ -45,7 +45,7 @@ type selfMonitorT struct {
 	bulker  bulk.Bulk
 	monitor monitor.Monitor
 
-	policyId string
+	policyID string
 	status   proto.StateObserved_Status
 	reporter status.Reporter
 
@@ -63,13 +63,13 @@ type selfMonitorT struct {
 //
 // Ensures that the policy that this Fleet Server attached to exists and that it
 // has a Fleet Server input defined.
-func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monitor, policyId string, reporter status.Reporter) SelfMonitor {
+func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monitor, policyID string, reporter status.Reporter) SelfMonitor {
 	return &selfMonitorT{
 		log:              log.With().Str("ctx", "policy self monitor").Logger(),
 		fleet:            fleet,
 		bulker:           bulker,
 		monitor:          monitor,
-		policyId:         policyId,
+		policyID:         policyID,
 		status:           proto.StateObserved_STARTING,
 		reporter:         reporter,
 		policyF:          dl.QueryLatestPolicies,
@@ -138,13 +138,13 @@ func (m *selfMonitorT) Status() proto.StateObserved_Status {
 	return m.status
 }
 
-func (m *selfMonitorT) waitStart(ctx context.Context) (err error) {
+func (m *selfMonitorT) waitStart(ctx context.Context) error { //nolint:unused // not sure if this is used in tests
 	select {
 	case <-ctx.Done():
-		err = ctx.Err()
+		return ctx.Err()
 	case <-m.startCh:
 	}
-	return
+	return nil
 }
 
 func (m *selfMonitorT) process(ctx context.Context) (proto.StateObserved_Status, error) {
@@ -167,11 +167,12 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 		return proto.StateObserved_STARTING, nil
 	}
 	latest := m.groupByLatest(policies)
-	for _, policy := range latest {
-		if m.policyId != "" && policy.PolicyId == m.policyId {
+	for i := range latest {
+		policy := latest[i]
+		if m.policyID != "" && policy.PolicyID == m.policyID {
 			m.policy = &policy
 			break
-		} else if m.policyId == "" && policy.DefaultFleetServer {
+		} else if m.policyID == "" && policy.DefaultFleetServer {
 			m.policy = &policy
 			break
 		}
@@ -180,21 +181,7 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 }
 
 func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.Policy {
-	latest := make(map[string]model.Policy)
-	for _, policy := range policies {
-		curr, ok := latest[policy.PolicyId]
-		if !ok {
-			latest[policy.PolicyId] = policy
-			continue
-		}
-		if policy.RevisionIdx > curr.RevisionIdx {
-			latest[policy.PolicyId] = policy
-			continue
-		} else if policy.RevisionIdx == curr.RevisionIdx && policy.CoordinatorIdx > curr.CoordinatorIdx {
-			latest[policy.PolicyId] = policy
-		}
-	}
-	return latest
+	return groupByLatest(policies)
 }
 
 func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_Status, error) {
@@ -204,10 +191,10 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 	if m.policy == nil {
 		// no policy found
 		m.status = proto.StateObserved_STARTING
-		if m.policyId == "" {
-			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on default policy with Fleet Server integration", nil)
+		if m.policyID == "" {
+			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on default policy with Fleet Server integration", nil) //nolint:errcheck // not clear what to do in failure cases
 		} else {
-			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", m.policyId), nil)
+			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", m.policyID), nil) //nolint:errcheck // not clear what to do in failure cases
 		}
 		return proto.StateObserved_STARTING, nil
 	}
@@ -220,10 +207,10 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 	if !data.HasType("fleet-server") {
 		// no fleet-server input
 		m.status = proto.StateObserved_STARTING
-		if m.policyId == "" {
-			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on fleet-server input to be added to default policy", nil)
+		if m.policyID == "" {
+			m.reporter.Status(proto.StateObserved_STARTING, "Waiting on fleet-server input to be added to default policy", nil) //nolint:errcheck // not clear what to do in failure cases
 		} else {
-			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", m.policyId), nil)
+			m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", m.policyID), nil) //nolint:errcheck // not clear what to do in failure cases
 		}
 		return proto.StateObserved_STARTING, nil
 	}
@@ -237,29 +224,29 @@ func (m *selfMonitorT) updateStatus(ctx context.Context) (proto.StateObserved_St
 
 		// Elastic Agent has not been enrolled; Fleet Server passes back the enrollment token so the Elastic Agent
 		// can perform enrollment.
-		tokens, err := m.enrollmentTokenF(ctx, m.bulker, m.policy.PolicyId)
+		tokens, err := m.enrollmentTokenF(ctx, m.bulker, m.policy.PolicyID)
 		if err != nil {
 			return proto.StateObserved_FAILED, err
 		}
 		tokens = filterActiveTokens(tokens)
 		if len(tokens) == 0 {
 			// no tokens created for the policy, still starting
-			if m.policyId == "" {
-				m.reporter.Status(proto.StateObserved_STARTING, "Waiting on active enrollment keys to be created in default policy with Fleet Server integration", nil)
+			if m.policyID == "" {
+				m.reporter.Status(proto.StateObserved_STARTING, "Waiting on active enrollment keys to be created in default policy with Fleet Server integration", nil) //nolint:errcheck // not clear what to do in failure cases
 			} else {
-				m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", m.policyId), nil)
+				m.reporter.Status(proto.StateObserved_STARTING, fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", m.policyID), nil) //nolint:errcheck // not clear what to do in failure cases
 			}
 			return proto.StateObserved_STARTING, nil
 		}
 		payload = map[string]interface{}{
-			"enrollment_token": tokens[0].ApiKey,
+			"enrollment_token": tokens[0].APIKey,
 		}
 	}
 	m.status = status
-	if m.policyId == "" {
-		m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), payload)
+	if m.policyID == "" {
+		m.reporter.Status(status, fmt.Sprintf("Running on default policy with Fleet Server integration%s", extendMsg), payload) //nolint:errcheck // not clear what to do in failure cases
 	} else {
-		m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyId, extendMsg), payload)
+		m.reporter.Status(status, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyID, extendMsg), payload) //nolint:errcheck // not clear what to do in failure cases
 	}
 	return status, nil
 }
@@ -281,12 +268,12 @@ func (d *policyData) HasType(val string) bool {
 	return false
 }
 
-func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentApiKey, error) {
-	return dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyId, policyID)
+func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
+	return dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyID, policyID)
 }
 
-func filterActiveTokens(tokens []model.EnrollmentApiKey) []model.EnrollmentApiKey {
-	active := make([]model.EnrollmentApiKey, 0, len(tokens))
+func filterActiveTokens(tokens []model.EnrollmentAPIKey) []model.EnrollmentAPIKey {
+	active := make([]model.EnrollmentAPIKey, 0, len(tokens))
 	for _, t := range tokens {
 		if t.Active {
 			active = append(active, t)

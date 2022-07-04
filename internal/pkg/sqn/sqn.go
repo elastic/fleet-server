@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package sqn provides sequence numbers handling functions
 package sqn
 
 import (
@@ -13,13 +14,15 @@ const UndefinedSeqNo = -1
 
 var DefaultSeqNo = []int64{UndefinedSeqNo}
 
-// Abstracts the array of document seq numbers
+// SeqNo abstracts the array of document seq numbers.
 type SeqNo []int64
 
+// JSONString returns SeqNo as a JSON encoded array.
 func (s SeqNo) JSONString() string {
 	return s.toString(true)
 }
 
+// String returns SeqNo as a comma separated list.
 func (s SeqNo) String() string {
 	return s.toString(false)
 }
@@ -51,11 +54,12 @@ func (s SeqNo) toString(withBrackets bool) string {
 	return b.String()
 }
 
+// IsSet returns true when the SeqNo was initialized with a value.
 func (s SeqNo) IsSet() bool {
 	return len(s) > 0 && s[0] >= 0
 }
 
-// Returns one/first value until we get and API to get the next checkpoints on search
+// Value returns the first value in the sequence.
 func (s SeqNo) Value() int64 {
 	if len(s) == 0 {
 		return UndefinedSeqNo
@@ -63,6 +67,7 @@ func (s SeqNo) Value() int64 {
 	return s[0]
 }
 
+// Clone copies and returns SeqNo.
 func (s SeqNo) Clone() SeqNo {
 	if s == nil {
 		return nil

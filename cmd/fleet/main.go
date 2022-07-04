@@ -2,10 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package fleet is the main entry point for fleet-server.
 package fleet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -15,12 +17,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/go-ucfg"
-	"github.com/elastic/go-ucfg/yaml"
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
 
+	"github.com/elastic/go-ucfg"
+	"github.com/elastic/go-ucfg/yaml"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
+	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -41,18 +45,17 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 const (
-	kServiceName               = "fleet-server"
 	kAgentMode                 = "agent-mode"
 	kAgentModeRestartLoopDelay = 2 * time.Second
 
@@ -84,13 +87,13 @@ func makeCacheConfig(cfg *config.Config) cache.Config {
 		ActionTTL:    ccfg.ActionTTL,
 		EnrollKeyTTL: ccfg.EnrollKeyTTL,
 		ArtifactTTL:  ccfg.ArtifactTTL,
-		ApiKeyTTL:    ccfg.ApiKeyTTL,
-		ApiKeyJitter: ccfg.ApiKeyJitter,
+		APIKeyTTL:    ccfg.APIKeyTTL,
+		APIKeyJitter: ccfg.APIKeyJitter,
 	}
 }
 
 func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, error) {
-	l, err := logger.Init(cfg, kServiceName)
+	l, err := logger.Init(cfg, build.ServiceName)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +113,7 @@ func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, err
 
 func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		cfgObject := cmd.Flags().Lookup("E").Value.(*config.Flag)
+		cfgObject := cmd.Flags().Lookup("E").Value.(*config.Flag) //nolint:errcheck // we know the flag exists
 		cliCfg := cfgObject.Config()
 
 		agentMode, err := cmd.Flags().GetBool(kAgentMode)
@@ -167,7 +170,7 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 			runErr = srv.Run(installSignalHandler())
 		}
 
-		if runErr != nil && runErr != context.Canceled {
+		if runErr != nil && !errors.Is(runErr, context.Canceled) {
 			log.Error().Err(runErr).Msg("Exiting")
 			l.Sync()
 			return runErr
@@ -179,7 +182,7 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 
 func NewCommand(bi build.Info) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   kServiceName,
+		Use:   build.ServiceName,
 		Short: "Fleet Server controls a fleet of Elastic Agents",
 		RunE:  getRunCommand(bi),
 	}
@@ -242,7 +245,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	var cfg firstCfg
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("never received initial configuration")
+		return fmt.Errorf("never received initial configuration: %w", ctx.Err())
 	case cfg = <-a.firstCfg:
 	}
 
@@ -282,12 +285,12 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	go func() {
 		for {
 			err := a.srv.Run(srvCtx)
-			if err == nil || err == context.Canceled {
+			if err == nil || errors.Is(err, context.Canceled) {
 				res <- err
 				return
 			}
 			// sleep some before calling Run again
-			sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay)
+			_ = sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay)
 		}
 	}()
 	return <-res
@@ -396,9 +399,8 @@ func (a *AgentMode) OnError(err error) {
 }
 
 type FleetServer struct {
-	bi       build.Info
-	verCon   version.Constraints
-	policyId string
+	bi     build.Info
+	verCon version.Constraints
 
 	cfg      *config.Config
 	cfgCh    chan *config.Config
@@ -408,11 +410,15 @@ type FleetServer struct {
 
 // NewFleetServer creates the actual fleet server service.
 func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter) (*FleetServer, error) {
-	verCon, err := buildVersionConstraint(bi.Version)
+	verCon, err := api.BuildVersionConstraint(bi.Version)
 	if err != nil {
 		return nil, err
 	}
 
+	err = cfg.LoadServerLimits()
+	if err != nil {
+		return nil, fmt.Errorf("encountered error while loading server limits: %w", err)
+	}
 	cache, err := makeCache(cfg)
 	if err != nil {
 		return nil, err
@@ -430,7 +436,7 @@ func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter)
 
 type runFunc func(context.Context) error
 
-// Run runs the fleet server.
+// Run runs the fleet server
 func (f *FleetServer) Run(ctx context.Context) error {
 	var curCfg *config.Config
 	newCfg := f.cfg
@@ -446,7 +452,10 @@ func (f *FleetServer) Run(ctx context.Context) error {
 			cn()
 		}
 		if g != nil {
-			g.Wait()
+			err := g.Wait()
+			if err != nil {
+				log.Error().Err(err).Msg("error encountered while stopping server")
+			}
 		}
 	}
 
@@ -474,12 +483,16 @@ func (f *FleetServer) Run(ctx context.Context) error {
 LOOP:
 	for {
 		ech := make(chan error, 2)
-
 		if started {
-			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil)
+			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		} else {
 			started = true
-			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil)
+			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
+		}
+
+		err := newCfg.LoadServerLimits()
+		if err != nil {
+			return fmt.Errorf("encountered error while loading server limits: %w", err)
 		}
 
 		// Create or recreate cache
@@ -527,11 +540,11 @@ LOOP:
 		case newCfg = <-f.cfgCh:
 			log.Info().Msg("Server configuration update")
 		case err := <-ech:
-			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil)
+			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			log.Error().Err(err).Msg("Fleet Server failed")
 			return err
 		case <-ctx.Done():
-			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil)
+			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			break LOOP
 		}
 	}
@@ -642,7 +655,8 @@ func configCacheChanged(curCfg, newCfg *config.Config) bool {
 	return curCfg.Inputs[0].Cache != newCfg.Inputs[0].Cache
 }
 
-func safeWait(g *errgroup.Group, to time.Duration) (err error) {
+func safeWait(g *errgroup.Group, to time.Duration) error {
+	var err error
 	waitCh := make(chan error)
 	go func() {
 		waitCh <- g.Wait()
@@ -652,10 +666,10 @@ func safeWait(g *errgroup.Group, to time.Duration) (err error) {
 	case err = <-waitCh:
 	case <-time.After(to):
 		log.Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
-		err = errors.New("Group wait timeout")
+		err = errors.New("group wait timeout")
 	}
 
-	return
+	return err
 }
 
 func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error {
@@ -707,12 +721,14 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	initRuntime(cfg)
 
 	// The metricsServer is only enabled if http.enabled is set in the config
-	metricsServer, err := f.initMetrics(ctx, cfg)
+	metricsServer, err := api.InitMetrics(ctx, cfg, f.bi)
 	switch {
 	case err != nil:
 		return err
 	case metricsServer != nil:
-		defer metricsServer.Stop()
+		defer func() {
+			_ = metricsServer.Stop()
+		}()
 	}
 
 	// Bulker is started in its own context and managed in the scope of this function. This is done so
@@ -785,8 +801,11 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	esCli := bulker.Client()
 
 	// Check version compatibility with Elasticsearch
-	err = ver.CheckCompatibility(ctx, esCli, f.bi.Version)
+	remoteVersion, err := ver.CheckCompatibility(ctx, esCli, f.bi.Version)
 	if err != nil {
+		if len(remoteVersion) != 0 {
+			return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w", f.bi.Version, remoteVersion, err)
+		}
 		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
@@ -857,20 +876,20 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
-	ct := NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
-	et, err := NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
+	ct := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
+	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
 	}
 
-	at := NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
-	ack := NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
-	st := NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
+	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
+	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
+	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
 
-	router := NewRouter(ctx, bulker, ct, et, at, ack, st, sm, tracer, f.bi)
+	router := api.NewRouter(ctx, bulker, ct, et, at, ack, st, sm, tracer, f.bi)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
-		return runServer(ctx, router, &cfg.Inputs[0].Server)
+		return api.Run(ctx, router, &cfg.Inputs[0].Server)
 	}))
 
 	return err

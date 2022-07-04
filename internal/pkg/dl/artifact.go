@@ -58,7 +58,7 @@ func FindArtifact(ctx context.Context, bulker bulk.Bulk, ident, sha2 string) (*m
 			Str("ident", ident).
 			Str("sha2", sha2).
 			Int("cnt", len(res.Hits)).
-			Str("used", res.Hits[0].Id).
+			Str("used", res.Hits[0].ID).
 			Msg("Multiple HITS on artifact query.  Using the first returned.")
 	}
 

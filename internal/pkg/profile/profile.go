@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package profile exposes /debug/pprof endpoints
 package profile
 
 import (
@@ -13,6 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// RunProfiler exposes /debug/pprof on the passed address by staringa server.
 func RunProfiler(ctx context.Context, addr string) error {
 
 	if addr == "" {

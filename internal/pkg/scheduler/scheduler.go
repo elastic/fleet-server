@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package scheduler provides the ability to run functions on a schedule
 package scheduler
 
 import (
@@ -21,16 +22,17 @@ const (
 	defaultFirstRunDelay = 10 * time.Second
 )
 
+// WorkFunc is the type of function a Scheduler can run.
 type WorkFunc func(ctx context.Context) error
 
+// Schedule tracks when to execute a WorkFunc.
 type Schedule struct {
 	Name     string
-	Interval time.Duration
+	Interval time.Duration // Time between executions
 	WorkFn   WorkFunc
 }
 
-type OptFunc func(*Scheduler) error
-
+// Scheduler tracks scheduled functions.
 type Scheduler struct {
 	log zerolog.Logger
 
@@ -41,6 +43,11 @@ type Scheduler struct {
 	schedules []Schedule
 }
 
+// OptFunc is a functional option used to configure a scheduler.
+type OptFunc func(*Scheduler) error
+
+// WithSplayPercent sets the splay value as a percentage.
+// Only values less then 100 are allowed.
 func WithSplayPercent(splayPercent uint) OptFunc {
 	return func(s *Scheduler) error {
 		if splayPercent >= 100 {
@@ -51,6 +58,7 @@ func WithSplayPercent(splayPercent uint) OptFunc {
 	}
 }
 
+// WithFirstRunDelay sets the amount of time that scheduled functions will wait on the first execution.
 func WithFirstRunDelay(delay time.Duration) OptFunc {
 	return func(s *Scheduler) error {
 		s.firstRunDelay = delay
@@ -58,12 +66,14 @@ func WithFirstRunDelay(delay time.Duration) OptFunc {
 	}
 }
 
+// New creates a new Scheduler with the specified schedules.
+// Schedules may not be added to a scheduler after creation.
 func New(schedules []Schedule, opts ...OptFunc) (*Scheduler, error) {
 	s := &Scheduler{
 		log:           log.With().Str("ctx", "elasticsearch CG scheduler").Logger(),
 		splayPercent:  defaultSplayPercent,
 		firstRunDelay: defaultFirstRunDelay,
-		rand:          rand.New(rand.NewSource(time.Now().UnixNano())),
+		rand:          rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec // used for timing offsets
 		schedules:     schedules,
 	}
 
@@ -77,6 +87,8 @@ func New(schedules []Schedule, opts ...OptFunc) (*Scheduler, error) {
 	return s, nil
 }
 
+// Run executes all scheduled function according to their schedules.
+// Schedule Interval times are guaranteed minium values (if the execution takes a very long time, the scheduler will wait Interval before running the function again).
 func (s *Scheduler) Run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 

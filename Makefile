@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
-DEFAULT_VERSION=$(shell awk '/const defaultVersion/{print $$NF}' main.go | tr -d '"')
+DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
 TARGET_ARCH_386=x86
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
@@ -39,6 +39,10 @@ help: ## - Show help message
 	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | sed -e "s/^Makefile://" | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
+.PHONY: list-platforms
+list-platforms: ## - Show the possible PLATFORMS
+	@echo  "${PLATFORMS}"
+
 .PHONY: local
 local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
@@ -54,7 +58,7 @@ clean: ## - Clean up build artifacts
 .PHONY: generate
 generate: ## - Generate schema models
 	@printf "${CMD_COLOR_ON} Installing module for go generate\n${CMD_COLOR_OFF}"
-	env GOBIN=${GOBIN} go install github.com/elastic/go-json-schema-generate/cmd/schema-generate@c47877ac4d0624482caa0f6201b61bd6dc6f5899
+	env GOBIN=${GOBIN} go install github.com/elastic/go-json-schema-generate/cmd/schema-generate@ec19b88f6b5ef7825a928df8274a99337b855d1f
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
 	env PATH="${GOBIN}:${PATH}" go generate ./...
 
@@ -96,7 +100,7 @@ notice: ## - Generates the NOTICE.txt file.
 		-depsOut ""
 
 .PHONY: defaults
-defaults: ## -Generate defaults based on limits files.
+defaults: ## - Generate defaults based on limits files.
 	@echo "Generating env_defaults.go"
 	@go run dev-tools/buildlimits/buildlimits.go --in "internal/pkg/config/defaults/*.yml" --out internal/pkg/config/env_defaults.go
 
@@ -151,6 +155,10 @@ ifeq ($(OS),windows)
 	@mv build/binaries/fleet-server-$(VERSION)-$(OS)-$(ARCH)/fleet-server build/binaries/fleet-server-$(VERSION)-$(OS)-$(ARCH)/fleet-server.exe
 	@cd build/binaries && zip -q -r ../distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH).zip fleet-server-$(VERSION)-$(OS)-$(ARCH)
 	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-$(ARCH).zip > fleet-server-$(VERSION)-$(OS)-$(ARCH).zip.sha512
+else ifeq ($(OS)-$(ARCH),darwin-arm64)
+	@mv build/binaries/fleet-server-$(VERSION)-$(OS)-$(ARCH) build/binaries/fleet-server-$(VERSION)-$(OS)-aarch64
+	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz fleet-server-$(VERSION)-$(OS)-aarch64
+	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz > fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz.sha512
 else
 	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz fleet-server-$(VERSION)-$(OS)-$(ARCH)
 	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz > fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz.sha512
@@ -166,6 +174,19 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
 
+release-manager-dependencies: ## - Prepares the dependencies file.
+	@mkdir -p build/distributions/reports
+	./dev-tools/run_with_go_ver dev-tools/dependencies-report --csv build/distributions/reports/dependencies-$(VERSION).csv
+	@cd build/distributions/reports && shasum -a 512 dependencies-$(VERSION).csv > dependencies-$(VERSION).csv.sha512
+
+.PHONY: release-manager-dependencies-snapshot
+release-manager-dependencies-snapshot: ## - Prepares the dependencies file for a snapshot.
+	@$(MAKE) SNAPSHOT=true release-manager-dependencies
+
+.PHONY: release-manager-dependencies-release
+release-manager-dependencies-release: ## - Prepares the dependencies file for a release.
+	@$(MAKE) release-manager-dependencies
+
 .PHONY: release-manager-snapshot
 release-manager-snapshot: ## - Builds a snapshot release. The Go version defined in .go-version will be installed and used for the build.
 	@$(MAKE) SNAPSHOT=true release-manager-release
@@ -173,6 +194,11 @@ release-manager-snapshot: ## - Builds a snapshot release. The Go version defined
 .PHONY: release-manager-release
 release-manager-release: ## - Builds a snapshot release. The Go version defined in .go-version will be installed and used for the build.
 	./dev-tools/run_with_go_ver $(MAKE) release
+
+## get-version : Get the Fleet server version
+.PHONY: get-version
+get-version:
+	@echo $(DEFAULT_VERSION)
 
 ##################################################
 # Integration testing targets

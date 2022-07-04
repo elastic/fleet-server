@@ -14,15 +14,15 @@ import (
 	"strings"
 	"time"
 
+	urlutil "github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/go-elasticsearch/v7"
-
-	"github.com/elastic/beats/v7/libbeat/common"
-	"github.com/elastic/beats/v7/libbeat/common/transport/tlscommon"
 )
 
 // The timeout would be driven by the server for long poll.
 // Giving it some sane long value.
 const httpTransportLongPollTimeout = 10 * time.Minute
+const schemeHTTP = "http"
 
 var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
@@ -45,7 +45,7 @@ type Elasticsearch struct {
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *Elasticsearch) InitDefaults() {
-	c.Protocol = "http"
+	c.Protocol = schemeHTTP
 	c.Hosts = []string{"localhost:9200"}
 	c.Timeout = 90 * time.Second
 	c.MaxRetries = 3
@@ -58,7 +58,7 @@ func (c *Elasticsearch) Validate() error {
 		return fmt.Errorf("cannot connect to elasticsearch with api_key; must use service_token")
 	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
-		if _, err := common.ParseURL(c.ProxyURL); err != nil {
+		if _, err := urlutil.ParseURL(c.ProxyURL); err != nil {
 			return err
 		}
 	}
@@ -120,11 +120,11 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 
 	if !c.ProxyDisable {
 		if c.ProxyURL != "" {
-			proxyUrl, err := common.ParseURL(c.ProxyURL)
+			proxyURL, err := urlutil.ParseURL(c.ProxyURL)
 			if err != nil {
 				return elasticsearch.Config{}, err
 			}
-			httpTransport.Proxy = http.ProxyURL(proxyUrl)
+			httpTransport.Proxy = http.ProxyURL(proxyURL)
 		} else {
 			httpTransport.Proxy = http.ProxyFromEnvironment
 		}
@@ -180,7 +180,7 @@ func (c *Output) Validate() error {
 
 func makeURL(defaultScheme string, defaultPath string, rawURL string, defaultPort int) (string, error) {
 	if defaultScheme == "" {
-		defaultScheme = "http"
+		defaultScheme = schemeHTTP
 	}
 	if !hasScheme.MatchString(rawURL) {
 		rawURL = fmt.Sprintf("%v://%v", defaultScheme, rawURL)

@@ -25,14 +25,14 @@ func TestEnsureServer(t *testing.T) {
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetServers)
 
-	agentId := uuid.Must(uuid.NewV4()).String()
+	agentID := uuid.Must(uuid.NewV4()).String()
 	agent := model.AgentMetadata{
-		Id:      agentId,
+		ID:      agentID,
 		Version: "1.0.0",
 	}
 	host := model.HostMetadata{
 		Architecture: runtime.GOOS,
-		Id:           agentId,
+		ID:           agentID,
 		Ip:           []string{"::1"},
 		Name:         "testing-host",
 	}
@@ -43,7 +43,7 @@ func TestEnsureServer(t *testing.T) {
 	}
 
 	var srv model.Server
-	data, err := bulker.Read(ctx, index, agentId)
+	data, err := bulker.Read(ctx, index, agentID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestEnsureServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if srv.Agent.Id != agentId {
+	if srv.Agent.ID != agentID {
 		t.Fatal("agent.id should match agentId")
 	}
 }

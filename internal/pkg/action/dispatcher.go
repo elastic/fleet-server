@@ -2,11 +2,13 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// Package action is used to dispatch actions read from elasticsearch to elastic-agents
 package action
 
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -17,16 +19,19 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Sub is an action subscription that will give a single agent all of it's actions.
 type Sub struct {
-	agentId string
+	agentID string
 	seqNo   sqn.SeqNo
 	ch      chan []model.Action
 }
 
+// Ch returns the emitter channel for actions.
 func (s Sub) Ch() chan []model.Action {
 	return s.ch
 }
 
+// Dispatcher tracks agent subscriptions and emits actions to the subscriptions.
 type Dispatcher struct {
 	am monitor.SimpleMonitor
 
@@ -34,6 +39,7 @@ type Dispatcher struct {
 	subs map[string]Sub
 }
 
+// NewDispatcher creates a Dispatcher using the provided monitor.
 func NewDispatcher(am monitor.SimpleMonitor) *Dispatcher {
 	return &Dispatcher{
 		am:   am,
@@ -41,6 +47,9 @@ func NewDispatcher(am monitor.SimpleMonitor) *Dispatcher {
 	}
 }
 
+// Run starts the Dispatcher.
+// After the Dispatcher is started subscriptions may receive actions.
+// Subscribe may be called before or after Run.
 func (d *Dispatcher) Run(ctx context.Context) (err error) {
 	for {
 		select {
@@ -52,38 +61,43 @@ func (d *Dispatcher) Run(ctx context.Context) (err error) {
 	}
 }
 
-func (d *Dispatcher) Subscribe(agentId string, seqNo sqn.SeqNo) *Sub {
+// Subscribe generates a new subscription with the Dispatcher using the provided agentID and seqNo.
+// There is no check to ensure that the agentID has not been used; using the same one twice results in undefined behaviour.
+func (d *Dispatcher) Subscribe(agentID string, seqNo sqn.SeqNo) *Sub {
 	cbCh := make(chan []model.Action, 1)
 
 	sub := Sub{
-		agentId: agentId,
+		agentID: agentID,
 		seqNo:   seqNo,
 		ch:      cbCh,
 	}
 
 	d.mx.Lock()
-	d.subs[agentId] = sub
+	d.subs[agentID] = sub
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentId, agentId).Int("sz", sz).Msg("Subscribed to action dispatcher")
+	log.Trace().Str(logger.AgentID, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
 
 	return &sub
 }
 
+// Unsubscribe removes the given subscription from the dispatcher.
+// Note that the channel sub.Ch() provides is not closed in this event.
 func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	if sub == nil {
 		return
 	}
 
 	d.mx.Lock()
-	delete(d.subs, sub.agentId)
+	delete(d.subs, sub.agentID)
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentId, sub.agentId).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
+	log.Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
+// process gathers actions from the monitor and dispatches them to the corresponding subscriptions.
 func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	// Parse hits into map of agent -> actions
 	// Actions are ordered by sequence
@@ -96,31 +110,60 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 			log.Error().Err(err).Msg("Failed to unmarshal action document")
 			break
 		}
-		for _, agentId := range action.Agents {
-			arr := agentActions[agentId]
+		numAgents := len(action.Agents)
+		for i, agentID := range action.Agents {
+			arr := agentActions[agentID]
 			actionNoAgents := action
+			actionNoAgents.StartTime = offsetStartTime(action.StartTime, action.Expiration, action.MinimumExecutionDuration, i, numAgents)
 			actionNoAgents.Agents = nil
 			arr = append(arr, actionNoAgents)
-			agentActions[agentId] = arr
+			agentActions[agentID] = arr
 		}
 	}
 
-	for agentId, actions := range agentActions {
-		d.dispatch(ctx, agentId, actions)
+	for agentID, actions := range agentActions {
+		d.dispatch(ctx, agentID, actions)
 	}
 }
 
-func (d *Dispatcher) getSub(agentId string) (Sub, bool) {
+// offsetStartTime will return a new start time between start:end-dur based on index i and the total number of agents
+// An empty string will be returned if start or exp are empty or if there is an error parsing inputs
+// As we expect i < total  the latest return time will always be < exp-dur
+func offsetStartTime(start, exp string, dur int64, i, total int) string {
+
+	if start == "" || exp == "" {
+		return ""
+	}
+	startTS, err := time.Parse(time.RFC3339, start)
+	if err != nil {
+		log.Error().Err(err).Msg("unable to parse start_time string")
+		return ""
+	}
+	expTS, err := time.Parse(time.RFC3339, exp)
+	if err != nil {
+		log.Error().Err(err).Msg("unable to parse expiration string")
+		return ""
+	}
+	d := time.Second * time.Duration(dur)
+	d = expTS.Add(-1 * d).Sub(startTS)                                   // the valid scheduling range is: d = exp - dur - start
+	startTS = startTS.Add((d * time.Duration(i)) / time.Duration(total)) // adjust start to a position within the range
+	return startTS.Format(time.RFC3339)
+}
+
+// getSub returns the subscription (if any) for the specified agentID.
+func (d *Dispatcher) getSub(agentID string) (Sub, bool) {
 	d.mx.RLock()
-	sub, ok := d.subs[agentId]
+	sub, ok := d.subs[agentID]
 	d.mx.RUnlock()
 	return sub, ok
 }
 
-func (d *Dispatcher) dispatch(ctx context.Context, agentId string, acdocs []model.Action) {
-	sub, ok := d.getSub(agentId)
+// dispatch passes the actions into the subscription channel as a non-blocking operation.
+// It may drop actions that will be re-sent to the agent on its next check in.
+func (d *Dispatcher) dispatch(_ context.Context, agentID string, acdocs []model.Action) {
+	sub, ok := d.getSub(agentID)
 	if !ok {
-		log.Debug().Str(logger.AgentId, agentId).Msg("Agent is not currently connected. Not dispatching actions.")
+		log.Debug().Str(logger.AgentID, agentID).Msg("Agent is not currently connected. Not dispatching actions.")
 		return
 	}
 	select {

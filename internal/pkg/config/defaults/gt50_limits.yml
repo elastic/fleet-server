@@ -1,0 +1,26 @@
+num_agents:
+  min: 50
+  max: 5000
+recommended_min_ram: 1024
+cache_limits:
+  num_counters: 20000
+  max_cost: 20971520
+server_limits:
+  policy_throttle: 50ms
+  max_connections: 7000
+  checkin_limit:
+    interval: 5ms
+    burst: 500
+    max: 5001
+  artifact_limit: 
+    interval: 5ms
+    burst: 500
+    max: 1000
+  enroll_limit: 
+    interval: 20ms
+    burst: 50
+    max: 100
+  ack_limit:
+    interval: 4ms
+    burst: 500
+    max: 1000

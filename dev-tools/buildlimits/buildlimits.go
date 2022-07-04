@@ -13,8 +13,8 @@ import (
 	"os"
 	"text/template"
 
-	"github.com/elastic/beats/v7/licenses"
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
+	"github.com/elastic/elastic-agent/pkg/packer"
+	"github.com/elastic/fleet-server/v7/licenses"
 )
 
 var (
@@ -41,10 +41,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
+	"github.com/elastic/elastic-agent/pkg/packer"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/pbnjay/memory"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -86,14 +87,15 @@ type valueRange struct {
 }
 
 type envLimits struct {
-	RAM    valueRange           ` + "`config:\"ram\"`" + `
-	Server *serverLimitDefaults ` + "`config:\"server_limits\"`" + `
-	Cache  *cacheLimits         ` + "`config:\"cache_limits\"`" + `
+	Agents         valueRange           ` + "`config:\"num_agents\"`" + `
+	RecommendedRAM int                  ` + "`config:\"recommended_min_ram\"`" + `
+	Server         *serverLimitDefaults ` + "`config:\"server_limits\"`" + `
+	Cache          *cacheLimits         ` + "`config:\"cache_limits\"`" + `
 }
 
 func defaultEnvLimits() *envLimits {
 	return &envLimits{
-		RAM: valueRange{
+		Agents: valueRange{
 			Min: 0,
 			Max: int(getMaxInt()),
 		},
@@ -194,19 +196,23 @@ func init() {
 	}
 }
 
-func loadLimits() *envLimits {
-	ramSize := int(memory.TotalMemory() / 1024 / 1024)
-	return loadLimitsForRam(ramSize)
+func loadLimits(agentLimit int) *envLimits {
+	return loadLimitsForAgents(agentLimit)
 }
 
-func loadLimitsForRam(currentRAM int) *envLimits {
+func loadLimitsForAgents(agentLimit int) *envLimits {
 	for _, l := range defaults {
-		// get max possible config for current env
-		if l.RAM.Min < currentRAM && currentRAM <= l.RAM.Max {
+		// get nearest limits for configured agent numbers
+		if l.Agents.Min < agentLimit && agentLimit <= l.Agents.Max {
+			log.Info().Msgf("Using system limits for %d to %d agents for a configured value of %d agents", l.Agents.Min, l.Agents.Max, agentLimit)
+			ramSize := int(memory.TotalMemory() / 1024 / 1024)
+			if ramSize < l.RecommendedRAM {
+				log.Warn().Msgf("Detected %d MB of system RAM, which is lower than the recommended amount (%d MB) for the configured agent limit", ramSize, l.RecommendedRAM)
+			}
 			return l
 		}
 	}
-
+	log.Info().Msgf("No applicable limit for %d agents, using default.", agentLimit)
 	return defaultEnvLimits()
 }
 
@@ -241,23 +247,23 @@ func main() {
 	}
 
 	if output == "-" {
-		os.Stdout.Write(data)
+		_, _ = os.Stdout.Write(data)
 		return
 	} else {
-		ioutil.WriteFile(output, data, 0640)
+		_ = ioutil.WriteFile(output, data, 0600)
 	}
 
 	return
 }
 
-func gen(path string, l string) ([]byte, error) {
+func gen(_ string, l string) ([]byte, error) {
 	pack, files, err := packer.Pack(input)
 	if err != nil {
 		return nil, err
 	}
 
 	var buf bytes.Buffer
-	tmpl.Execute(&buf, struct {
+	_ = tmpl.Execute(&buf, struct {
 		Pack    string
 		Files   []string
 		License string

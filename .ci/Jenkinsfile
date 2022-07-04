@@ -111,23 +111,49 @@ pipeline {
           dir("${BASE_DIR}"){
             withGoEnv(){
               sh(label: 'Create release artifacts', script: 'make docker-release')
-              uploadPackagesToGoogleBucket(pattern: 'build/binaries/')
+              uploadPackagesToGoogleBucket(pattern: 'build/distributions/')
+              sh(label: 'Check release artifacts', script: 'make test-release')
             }
           }
         }
       }
-      post {
-        success {
-          dir("${BASE_DIR}"){
-            sh(label: 'Check release artifacts', script: 'make test-release')
-          }
-        }
+    }
+    // Package registry is decoupled from the unified release, but we provide versioned distribution
+    // images with a "snapshot" of the packages available in epr.elastic.co. We decided to trigger the
+    // build of this snapshot from a project coupled to the unified release. It is now in fleet-server, but
+    // it could be in other projects.
+    stage('Release - Package Registry Distribution') {
+      options { skipDefaultCheckout() }
+      when { expression { isTag() } }
+      steps {
+        build(job: "release-package-registry-distribution",
+              propagate: false,
+              wait: false,
+              parameters: [
+                string(name: 'DOCKER_TAG', value: "${env.TAG_NAME}")
+              ]
+            )
+      }
+    }
+    stage('Downstream - Package') {
+      options { skipDefaultCheckout() }
+      when {
+        not { changeRequest() }
+      }
+      steps {
+        build(job: "Ingest-manager/fleet-server-package-mbp/${env.JOB_BASE_NAME}",
+              propagate: false,
+              wait: false,
+              parameters: [string(name: 'COMMIT', value: "${env.GIT_BASE_COMMIT}")])
       }
     }
   }
   post {
     cleanup {
-      notifyBuildResult(prComment: true)
+      notifyBuildResult(prComment: true,
+                        analyzeFlakey: !isTag(), jobName: getFlakyJobName(withBranch: (isPR() ? env.CHANGE_TARGET : env.BRANCH_NAME)),
+                        githubIssue: isBranch() && currentBuild.currentResult != "SUCCESS",
+                        githubLabels: 'Team:Elastic-Agent-Control-Plane')
     }
   }
 }

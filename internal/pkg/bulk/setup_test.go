@@ -8,20 +8,23 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"math/rand"
+	"errors"
+	"math"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/Pallinder/go-randomdata"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/rs/xid"
-	"github.com/rs/zerolog"
 
-	"github.com/Pallinder/go-randomdata"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
-	"github.com/elastic/fleet-server/v7/internal/pkg/testutil"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/rnd"
 )
+
+var rand = rnd.New()
 
 var defaultCfg config.Config
 var defaultCfgData = []byte(`
@@ -70,12 +73,24 @@ type testT struct {
 	DateVal   string `json:"dateval"`
 }
 
-func NewRandomSample() testT {
+// environment tracks env vars that can be used for testing
+type environment struct {
+	Username string
+	Password string
+}
 
+func getEnvironment() environment {
+	return environment{
+		Username: os.Getenv("ELASTICSEARCH_USERNAME"),
+		Password: os.Getenv("ELASTICSEARCH_PASSWORD"),
+	}
+}
+
+func NewRandomSample() testT {
 	return testT{
-		IntVal:    int(rand.Int31()),
+		IntVal:    rand.Int(0, math.MaxInt32),
 		ObjVal:    subT{SubString: randomdata.SillyName()},
-		BoolVal:   (rand.Intn(1) == 1),
+		BoolVal:   rand.Bool(),
 		KWVal:     randomdata.SillyName(),
 		BinaryVal: base64.StdEncoding.EncodeToString([]byte(randomdata.SillyName())),
 		DateVal:   time.Now().Format(time.RFC3339),
@@ -117,7 +132,7 @@ func SetupBulk(ctx context.Context, t testing.TB, opts ...BulkOpt) Bulk {
 	t.Helper()
 
 	// Set up the client with username and password since this test is generic for any index and uses it's own index/mapping
-	e := testutil.GetEnvironment()
+	e := getEnvironment()
 	cli, err := es.NewClient(ctx, &defaultCfg, false, es.WithUsrPwd(e.Username, e.Password))
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +141,7 @@ func SetupBulk(ctx context.Context, t testing.TB, opts ...BulkOpt) Bulk {
 	opts = append(opts, BulkOptsFromCfg(&defaultCfg)...)
 
 	bulker := NewBulker(cli, opts...)
-	go bulker.Run(ctx)
+	go func() { _ = bulker.Run(ctx) }()
 
 	return bulker
 }
@@ -148,30 +163,21 @@ func SetupIndexWithBulk(ctx context.Context, t testing.TB, mapping string, opts 
 	return index, bulker
 }
 
-func QuietLogger() func() {
-	l := zerolog.GlobalLevel()
-
-	zerolog.SetGlobalLevel(zerolog.ErrorLevel)
-
-	return func() {
-		zerolog.SetGlobalLevel(l)
-	}
-}
-
 func EqualElastic(werr, gerr error) bool {
-	if werr == gerr {
+	if errors.Is(werr, gerr) {
 		return true
 	}
 
-	wantErr, ok1 := werr.(es.ErrElastic)
-	gotErr, ok2 := gerr.(*es.ErrElastic)
-
-	if !ok2 {
-		if tryAgain, ok3 := gerr.(es.ErrElastic); ok3 {
-			gotErr = &tryAgain
-			ok2 = true
-		}
+	var wantErr es.ErrElastic
+	if !errors.As(werr, &wantErr) {
+		return false
 	}
 
-	return (ok1 && ok2 && wantErr.Status == gotErr.Status && wantErr.Type == gotErr.Type)
+	var gotErr *es.ErrElastic
+	ok2 := errors.As(gerr, &gotErr)
+	if !ok2 {
+		ok2 = errors.As(gerr, gotErr)
+	}
+
+	return (ok2 && wantErr.Status == gotErr.Status && wantErr.Type == gotErr.Type)
 }

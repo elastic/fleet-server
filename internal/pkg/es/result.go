@@ -27,7 +27,7 @@ type AckResponse struct {
 }
 
 type HitT struct {
-	Id      string          `json:"_id"`
+	ID      string          `json:"_id"`
 	SeqNo   int64           `json:"_seq_no"`
 	Version int64           `json:"version"`
 	Index   string          `json:"_index"`
@@ -41,7 +41,7 @@ func (hit *HitT) Unmarshal(v interface{}) error {
 		return err
 	}
 	if s, ok := v.(model.ESInitializer); ok {
-		s.ESInitialize(hit.Id, hit.SeqNo, hit.Version)
+		s.ESInitialize(hit.ID, hit.SeqNo, hit.Version)
 	}
 	return nil
 }

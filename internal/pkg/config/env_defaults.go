@@ -12,10 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/packer"
+	"github.com/elastic/elastic-agent/pkg/packer"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/pbnjay/memory"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -57,14 +58,15 @@ type valueRange struct {
 }
 
 type envLimits struct {
-	RAM    valueRange           `config:"ram"`
-	Server *serverLimitDefaults `config:"server_limits"`
-	Cache  *cacheLimits         `config:"cache_limits"`
+	Agents         valueRange           `config:"num_agents"`
+	RecommendedRAM int                  `config:"recommended_min_ram"`
+	Server         *serverLimitDefaults `config:"server_limits"`
+	Cache          *cacheLimits         `config:"cache_limits"`
 }
 
 func defaultEnvLimits() *envLimits {
 	return &envLimits{
-		RAM: valueRange{
+		Agents: valueRange{
 			Min: 0,
 			Max: int(getMaxInt()),
 		},
@@ -145,13 +147,14 @@ var defaults []*envLimits
 
 func init() {
 	// Packed Files
-	// internal/pkg/config/defaults/1024_limits.yml
-	// internal/pkg/config/defaults/2048_limits.yml
-	// internal/pkg/config/defaults/4096_limits.yml
-	// internal/pkg/config/defaults/8192_limits.yml
-	// internal/pkg/config/defaults/base_limits.yml
+	// internal/pkg/config/defaults/gt10000_limits.yml
+	// internal/pkg/config/defaults/gt12500_limits.yml
+	// internal/pkg/config/defaults/gt5000_limits.yml
+	// internal/pkg/config/defaults/gt50_limits.yml
+	// internal/pkg/config/defaults/gt7500_limits.yml
+	// internal/pkg/config/defaults/lte50_limits.yml
 	// internal/pkg/config/defaults/max_limits.yml
-	unpacked := packer.MustUnpack("eJzsll9vqkgYxu/3Y/R6swUUc9zkXIyOIDQzRoP8u9kwYBEO/1KxMGz2u28GwbZCFZtNerOXTvCZd97nN887fz8ESb57SZzoMfvlP7pp8hz4j97u2TlG+eGR54TxX1EQB/nhDxpHD38+uLGUr/zUV2Q+I2HqIw1QDOrf+x1MfRQCbgWy0DJwauvTg2PwmbdEk3kAfJLouSngV88QOdtUq1UAKIKgQO3/pWlIRpg7rf8aIW1LEcgq21QF21SfiRzljrmp6v2Xs1ciR+FOn3LOUn31lpuDraU+1ma5W7zTE8SjbWDOMaZHt0p9XLX74dQ28ItjiI3uuq5Rmc8ykmwiN7H3BKY+NviqWQ88U608tqaBolnLLdOfKHBbILh4UuazvZtsMjuWQk9qzg5T/+u6iwJBwHQjkqivRC7PtSrsDHPgO6deCpZRTBSoFMRET2xdkVXeTepe8qj5lhjSeBWAstHcW0J+/ezy4Bp/Pvx+nSSBG/+4QVJNzhtJGAIR+4NJ4j4hif8qSegGSUgDrTuhI+uhI0RHUygzYkRcrdtxRz3pzYFvJTp1R+t3DoO3c1fbAq3ZvhL15Ci2DMyddYP22+joyTr1YunAbkuP68zlC6eUO2la9NFUXtaLwtM+loFf/ovzMz0Eft4kasxNJ9eJOhH0RtQKLkQ0nKjxJ0SVCK7HWHMFVrkrMBd02p7crVLW4YIIZWaNomdP3lMy2nBE3k4UqF8nKryXKKmno0q3ozWp9+UT6smnkzMfsoRrKbMNkRKhPNwgtUQ9mYI6maI0fZdChz/X2avXQyjtkr8elFE/+KlwnagTQe+mnWZVK7h+sgSJOfYxV2SRJzqjRq8rPmWGVbTVsQ4y4lrXVppbYo2d/M6J1zjV6pFYjKzRJiOCyCiuzq4NnXgaKLxuV7luVxcUa6Cs776pco5h763R5kambAu01LtTBXbIGn8zWTyCM757u9ad27WCw/KKOIfdp3S195TiO99OV0i6M5uUou3gJySV92XTtm96ULzuf4sMziUN9E+lyzdO7bJ+dOPpgXxNk7985wybcr1Tk17UR4cQEzvlrcf398cPir8tfngE/4+fc/z889u/AQAA///e0qUb")
+	unpacked := packer.MustUnpack("eJzsl1+PqkYYxu/7Mfa66QKKjU3OxawIC5vBSIABbhoGFMHhT44gf5p+92ZArausQtrkJE0vTeSZd573N88788dLmOSb74lLXrN98OqlyTYMXv3N1i1IfngNcpZhGOZ3EsZhfviljsnLby84MXOLExMH8YzXpB/y4i130XQmC8sSCqBchCDASJyuQlDByCghyGoHqUeMWIJjjTjiPHcRv/ViMV+FYAr1fb2I1Z3N7YjFVRlG5Kxb+Ijd2tycxYlGvATSNTi6BgRpIEvsbiPOIzxRmVUIaijsJ1A3aiiAD48zaz826xu9EnNVZk/I1pd2NZ5oDJaMmSyYuVde6XF84SCVcdG88Jo0gI1M90W/j1zJjFyOFGfdVZAG8gIELuIZx1I4G5UzWTBK+G421Ad58Rb6ltL4Qhqo57oXN/6s6dpi7UsktpHKXLRDuiYIZIkUvkT3Ix5WIWCh8Ma29S5AYCdm7U3WM1lYn2oE3T6ENFhdfDILL54fsDg/uIjNaC2n2rLOV2eHhTSA+lt+r7u8rbk+ebGzuXyLJZK71nrWp6fqoPQteKpJYb2k7RNzZoRyY1vBTBYCWvu3l5+fwsjxI2CsaQFXMDYdOA9hrNQITlWQRTZSU8c8GfYO2w12a6lHv2t20/0fnOHIbWtHYW2bDSPAq82ShREoF4lKTSEe+aznSfS3ylsTLfXiOeNLFaEG49a0i16BYzPyJXLE7QGA9dlAemBsLs8wuTT2HwEDdaOEwrJtrpdomROLkf8EmpFNptoEJ8oRS9UFHhn0HaJlie91q7uao5MXSP3+Lx3KaVt78G0AkPyIcDSuOKF+eGwbVLEZYY7NHcTvHaRtMSKFNVF2WG/3xqyGs8h8EYzsJRhB1lA/HEs5ea81rVfvb0cskWhjzhn3XTn679rB0a8C4atg1MHIYFT6A+amp2ozOhTrL1i5YVD+wQwO2z/Vg2AYf8Ppu0pCtnUmUYjNzXOMzMKRzL3FsTRJahsxXVXR+sPmRNrZz7RIPItNSpfZdqAl4XkKjhzJRvk4Bb2R5Jk9zhu3J5/6UrWdtBTGRc7OnmhPCBmkeyHRQXyNuerwjGYosfdJpd+m9VDqtME1Pifu1xETuEu4v0/f6Xr4kLt1udLtwdy1V5w+7nTArARjoo6fvuxj7uRy5PStehKkvk+m1puR7Ik9fZXv0/QHXwMhume5S7hPeswQ/ki+GRJ5naXGE9TAuHh78OIYe8GDwvPBOuqC1xMXMDL642IwXsuyV/c+hkYN1N5oW99EUeu1GLns46PVv++7Yfp0kMZuNTTT4IAMg7Xa2NPhT9ruRv8fedK2r67/n7SnJ+2fP/0VAAD//1871n0=")
 
 	for f, v := range unpacked {
 		cfg, err := yaml.NewConfig(v, DefaultOptions...)
@@ -168,19 +171,23 @@ func init() {
 	}
 }
 
-func loadLimits() *envLimits {
-	ramSize := int(memory.TotalMemory() / 1024 / 1024)
-	return loadLimitsForRam(ramSize)
+func loadLimits(agentLimit int) *envLimits {
+	return loadLimitsForAgents(agentLimit)
 }
 
-func loadLimitsForRam(currentRAM int) *envLimits {
+func loadLimitsForAgents(agentLimit int) *envLimits {
 	for _, l := range defaults {
-		// get max possible config for current env
-		if l.RAM.Min < currentRAM && currentRAM <= l.RAM.Max {
+		// get nearest limits for configured agent numbers
+		if l.Agents.Min < agentLimit && agentLimit <= l.Agents.Max {
+			log.Info().Msgf("Using system limits for %d to %d agents for a configured value of %d agents", l.Agents.Min, l.Agents.Max, agentLimit)
+			ramSize := int(memory.TotalMemory() / 1024 / 1024)
+			if ramSize < l.RecommendedRAM {
+				log.Warn().Msgf("Detected %d MB of system RAM, which is lower than the recommended amount (%d MB) for the configured agent limit", ramSize, l.RecommendedRAM)
+			}
 			return l
 		}
 	}
-
+	log.Info().Msgf("No applicable limit for %d agents, using default.", agentLimit)
 	return defaultEnvLimits()
 }
 

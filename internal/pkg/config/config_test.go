@@ -12,8 +12,11 @@ import (
 	"testing"
 	"time"
 
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/elastic/go-ucfg"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -121,11 +124,11 @@ func TestConfig(t *testing.T) {
 							},
 							CompressionLevel:  1,
 							CompressionThresh: 1024,
-							Limits:            defaultServerLimits(),
+							Limits:            generateServerLimits(12500),
 							Bulk:              defaultServerBulk(),
 							GC:                defaultServerGC(),
 						},
-						Cache: defaultCache(),
+						Cache: generateCache(12500),
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,
@@ -137,7 +140,7 @@ func TestConfig(t *testing.T) {
 			},
 		},
 		"bad-input": {
-			err: "input type must be fleet-server",
+			err: "input type must be \"fleet-server\"",
 		},
 		"bad-input-many": {
 			err: "only 1 fleet-server input can be defined",
@@ -152,19 +155,23 @@ func TestConfig(t *testing.T) {
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
+			_ = testlog.SetLogger(t)
 			path := filepath.Join("testdata", name+".yml")
 			cfg, err := LoadFile(path)
 			if test.err != "" {
 				if err == nil {
 					t.Error("no error was reported")
 				} else {
-					cfgErr := err.(ucfg.Error)
+					cfgErr := err.(ucfg.Error) //nolint:errcheck,errorlint // this is checked below, but the linter doesn't respect it.
 					require.Equal(t, test.err, cfgErr.Reason().Error())
 				}
 			} else {
 				require.NoError(t, err)
-				if !assert.True(t, cmp.Equal(test.cfg, cfg)) {
-					diff := cmp.Diff(test.cfg, cfg)
+				err = cfg.LoadServerLimits()
+				require.NoError(t, err)
+				skipUnexported := cmpopts.IgnoreUnexported(Config{})
+				if !assert.True(t, cmp.Equal(test.cfg, cfg, skipUnexported)) {
+					diff := cmp.Diff(test.cfg, cfg, skipUnexported)
 					if diff != "" {
 						t.Errorf("%s mismatch (-want +got):\n%s", name, diff)
 					}
@@ -182,15 +189,16 @@ func defaultCache() Cache {
 	return d
 }
 
-func defaultServerTimeouts() ServerTimeouts {
-	var d ServerTimeouts
-	d.InitDefaults()
+func generateCache(maxAgents int) Cache {
+	var d Cache
+	d.LoadLimits(loadLimits(maxAgents))
 	return d
 }
 
-func defaultServerLimits() ServerLimits {
+func generateServerLimits(maxAgents int) ServerLimits {
 	var d ServerLimits
-	d.InitDefaults()
+	d.MaxAgents = maxAgents
+	d.LoadLimits(loadLimits(maxAgents))
 	return d
 }
 
