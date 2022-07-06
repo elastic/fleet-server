@@ -43,8 +43,10 @@ SNAPSHOT=true EXTERNAL=true PLATFORMS="linux/amd64" PACKAGES="tar.gz" mage -v de
 Change `release-linux/amd64` to `release-YOUR_OS/platform`. Run `make list-platforms` to check
 out the possible values.
 
+The `DEV=true` will allow the binary to be debugged ~~with a debugger~~.
+
 ```shell
-SNAPSHOT=true make release-linux/amd64
+DEV=true SNAPSHOT=true make release-linux/amd64
 
 vagrant up
 vagrant ssh
