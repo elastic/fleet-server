@@ -43,12 +43,12 @@ func (r *Rollback) Rollback(ctx context.Context) (err error) {
 		log := r.log.With().Str("rollback_fn_name", rb.name).Logger()
 		log.Debug().Msg("rollback function called")
 		if rerr := rb.fn(ctx); rerr != nil {
-			log.Error().Err(rerr).Msgf("rollback function \"%s\" failed", rb.name)
+			log.Error().Err(rerr).Msgf("rollback function %q failed", rb.name)
 			if err == nil {
 				err = rerr
 			}
 		} else {
-			log.Debug().Msgf("rollback function \"%s\" succeeded", rb.name)
+			log.Debug().Msgf("rollback function %q succeeded", rb.name)
 		}
 	}
 	return //nolint:nakedret // short function
