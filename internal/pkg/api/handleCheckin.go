@@ -565,7 +565,7 @@ func calcPollDuration(zlog zerolog.Logger, cfg *config.Server, setupDuration tim
 
 	if setupDuration >= pollDuration {
 		// We took so long to setup that we need to exit immediately
-		pollDuration = 0
+		pollDuration = time.Millisecond
 		zlog.Warn().
 			Dur("setupDuration", setupDuration).
 			Dur("pollDuration", cfg.Timeouts.CheckinLongPoll).
