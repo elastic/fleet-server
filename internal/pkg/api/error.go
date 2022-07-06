@@ -7,6 +7,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -159,8 +160,8 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 
 	// Default
 	return HTTPErrResp{
-		StatusCode: http.StatusBadRequest,
-		Error:      "BadRequest",
+		StatusCode: http.StatusInternalServerError,
+		Error:      fmt.Sprintf("Unexpected error: %s", err.Error()),
 		Level:      zerolog.InfoLevel,
 	}
 }
