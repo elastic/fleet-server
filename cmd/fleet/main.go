@@ -918,6 +918,7 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) (*apm.Tracer, error
 		envVerifyServerCert = "ELASTIC_APM_VERIFY_SERVER_CERT"
 		envServerCert       = "ELASTIC_APM_SERVER_CERT"
 		envCACert           = "ELASTIC_APM_SERVER_CA_CERT_FILE"
+		envGlobalLabels     = "ELASTIC_APM_GLOBAL_LABELS"
 	)
 	if cfg.TLS.SkipVerify {
 		os.Setenv(envVerifyServerCert, "false")
@@ -930,6 +931,10 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) (*apm.Tracer, error
 	if cfg.TLS.ServerCA != "" {
 		os.Setenv(envCACert, cfg.TLS.ServerCA)
 		defer os.Unsetenv(envCACert)
+	}
+	if cfg.GlobalLabels != "" {
+		os.Setenv(envGlobalLabels, cfg.GlobalLabels)
+		defer os.Unsetenv(envGlobalLabels)
 	}
 	transport, err := apmtransport.NewHTTPTransport()
 	if err != nil {
