@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm"
 )
 
 var (
@@ -30,6 +31,8 @@ var (
 // WARNING: This does not validate that the api key is valid for the Fleet Domain.
 // An additional check must be executed to validate it is not a random api key.
 func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKey, error) {
+	span, ctx := apm.StartSpan(r.Context(), "authAPIKey", "auth")
+	defer span.End()
 
 	key, err := apikey.ExtractAPIKey(r)
 	if err != nil {
@@ -37,14 +40,17 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 	}
 
 	if c.ValidAPIKey(*key) {
+		span.Context.SetLabel("api_key_cache_hit", true)
 		return key, nil
+	} else {
+		span.Context.SetLabel("api_key_cache_hit", false)
 	}
 
 	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	start := time.Now()
 
-	info, err := bulker.APIKeyAuth(r.Context(), *key)
+	info, err := bulker.APIKeyAuth(ctx, *key)
 
 	if err != nil {
 		log.Info().

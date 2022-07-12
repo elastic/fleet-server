@@ -705,7 +705,7 @@ func initRuntime(cfg *config.Config) {
 	}
 }
 
-func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk.Bulker, error) {
+func (f *FleetServer) initBulker(ctx context.Context, tracer *apm.Tracer, cfg *config.Config) (*bulk.Bulker, error) {
 	es, err := es.NewClient(ctx, cfg, false, elasticsearchOptions(
 		cfg.Inputs[0].Server.Instrumentation.Enabled, f.bi,
 	)...)
@@ -713,7 +713,7 @@ func (f *FleetServer) initBulker(ctx context.Context, cfg *config.Config) (*bulk
 		return nil, err
 	}
 
-	blk := bulk.NewBulker(es, bulk.BulkOptsFromCfg(cfg)...)
+	blk := bulk.NewBulker(es, tracer, bulk.BulkOptsFromCfg(cfg)...)
 	return blk, nil
 }
 
@@ -737,14 +737,14 @@ func (f *FleetServer) runServer(ctx context.Context, cfg *config.Config) (err er
 	bulkCtx, bulkCancel := context.WithCancel(context.Background())
 	defer bulkCancel()
 
-	// Create the bulker subsystem
-	bulker, err := f.initBulker(bulkCtx, cfg)
+	// Create the APM tracer.
+	tracer, err := f.initTracer(cfg.Inputs[0].Server.Instrumentation)
 	if err != nil {
 		return err
 	}
 
-	// Create the APM tracer.
-	tracer, err := f.initTracer(cfg.Inputs[0].Server.Instrumentation)
+	// Create the bulker subsystem
+	bulker, err := f.initBulker(bulkCtx, tracer, cfg)
 	if err != nil {
 		return err
 	}

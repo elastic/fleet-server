@@ -19,7 +19,7 @@ func BenchmarkMultiUpdateMock(b *testing.B) {
 	_ = testlog.SetLogger(b)
 
 	// Allocate, but don't run.  Stub the client.
-	bulker := NewBulker(nil)
+	bulker := NewBulker(nil, nil)
 	defer close(bulker.ch)
 
 	go func() {

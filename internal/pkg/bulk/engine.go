@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"go.elastic.co/apm"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
@@ -69,6 +70,7 @@ type Bulker struct {
 	opts        bulkOptT
 	blkPool     sync.Pool
 	apikeyLimit *semaphore.Weighted
+	tracer      *apm.Tracer
 }
 
 const (
@@ -80,7 +82,7 @@ const (
 	defaultAPIKeyMaxParallel = 32
 )
 
-func NewBulker(es esapi.Transport, opts ...BulkOpt) *Bulker {
+func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
 
 	bopts := parseBulkOpts(opts...)
 
@@ -94,6 +96,7 @@ func NewBulker(es esapi.Transport, opts ...BulkOpt) *Bulker {
 		ch:          make(chan *bulkT, bopts.blockQueueSz),
 		blkPool:     sync.Pool{New: poolFunc},
 		apikeyLimit: semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
+		tracer:      tracer,
 	}
 }
 
@@ -273,11 +276,20 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		var err error
 		switch queue.ty {
 		case kQueueRead, kQueueRefreshRead:
+			trans := b.tracer.StartTransaction("flushRead", "bulker")
+			ctx := apm.ContextWithTransaction(ctx, trans)
 			err = b.flushRead(ctx, queue)
+			trans.End()
 		case kQueueSearch, kQueueFleetSearch:
+			trans := b.tracer.StartTransaction("flushSearch", "bulker")
+			ctx := apm.ContextWithTransaction(ctx, trans)
 			err = b.flushSearch(ctx, queue)
+			trans.End()
 		default:
+			trans := b.tracer.StartTransaction("flushBulk", "bulker")
+			ctx := apm.ContextWithTransaction(ctx, trans)
 			err = b.flushBulk(ctx, queue)
+			trans.End()
 		}
 
 		if err != nil {
