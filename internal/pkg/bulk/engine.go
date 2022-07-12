@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -271,25 +272,24 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 	go func() {
 		start := time.Now()
 
+		if b.tracer != nil {
+			trans := b.tracer.StartTransaction(fmt.Sprintf("Flush queue %s", queue.Type()), "bulker")
+			trans.Context.SetLabel("queue.size", queue.cnt)
+			trans.Context.SetLabel("queue.pending", queue.pending)
+			ctx = apm.ContextWithTransaction(ctx, trans)
+			defer trans.End()
+		}
+
 		defer w.Release(1)
 
 		var err error
 		switch queue.ty {
 		case kQueueRead, kQueueRefreshRead:
-			trans := b.tracer.StartTransaction("flushRead", "bulker")
-			ctx := apm.ContextWithTransaction(ctx, trans)
 			err = b.flushRead(ctx, queue)
-			trans.End()
 		case kQueueSearch, kQueueFleetSearch:
-			trans := b.tracer.StartTransaction("flushSearch", "bulker")
-			ctx := apm.ContextWithTransaction(ctx, trans)
 			err = b.flushSearch(ctx, queue)
-			trans.End()
 		default:
-			trans := b.tracer.StartTransaction("flushBulk", "bulker")
-			ctx := apm.ContextWithTransaction(ctx, trans)
 			err = b.flushBulk(ctx, queue)
-			trans.End()
 		}
 
 		if err != nil {
