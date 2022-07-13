@@ -9,3 +9,4 @@
 - Use the darwin-aarch64 as the suffix for Darwin Arm64 release {pull}1267[1267]
 - Allow Elastic Agent to provide tags at enrollment time to identify them. {pull}1350[1350]
 - Add start_time and minimum_execution_duration to actions to allow fleet-server to schedule agent actions. {pull}1381[1381]
+- Fleet Server now allows setting global labels on APM instrumentation. {pull}1649[1649]

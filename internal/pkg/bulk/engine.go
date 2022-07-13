@@ -8,12 +8,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"go.elastic.co/apm"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
@@ -69,6 +71,7 @@ type Bulker struct {
 	opts        bulkOptT
 	blkPool     sync.Pool
 	apikeyLimit *semaphore.Weighted
+	tracer      *apm.Tracer
 }
 
 const (
@@ -80,7 +83,7 @@ const (
 	defaultAPIKeyMaxParallel = 32
 )
 
-func NewBulker(es esapi.Transport, opts ...BulkOpt) *Bulker {
+func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
 
 	bopts := parseBulkOpts(opts...)
 
@@ -94,6 +97,7 @@ func NewBulker(es esapi.Transport, opts ...BulkOpt) *Bulker {
 		ch:          make(chan *bulkT, bopts.blockQueueSz),
 		blkPool:     sync.Pool{New: poolFunc},
 		apikeyLimit: semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
+		tracer:      tracer,
 	}
 }
 
@@ -267,6 +271,14 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 
 	go func() {
 		start := time.Now()
+
+		if b.tracer != nil {
+			trans := b.tracer.StartTransaction(fmt.Sprintf("Flush queue %s", queue.Type()), "bulker")
+			trans.Context.SetLabel("queue.size", queue.cnt)
+			trans.Context.SetLabel("queue.pending", queue.pending)
+			ctx = apm.ContextWithTransaction(ctx, trans)
+			defer trans.End()
+		}
 
 		defer w.Release(1)
 

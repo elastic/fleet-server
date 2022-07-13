@@ -111,7 +111,7 @@ func (m *mockBulkTransport) Perform(req *http.Request) (*http.Response, error) {
 // cancelling a call does not mean the transaction did not occur.
 func TestCancelCtx(t *testing.T) {
 	// create a bulker, but don't bother running it
-	bulker := NewBulker(nil)
+	bulker := NewBulker(nil, nil)
 
 	tests := []struct {
 		name string
@@ -282,7 +282,7 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 	defer cancelF()
 
 	n := len(samples)
-	bulker := NewBulker(mock, WithFlushThresholdCount(n))
+	bulker := NewBulker(mock, nil, WithFlushThresholdCount(n))
 
 	var waitBulker sync.WaitGroup
 	waitBulker.Add(1)
