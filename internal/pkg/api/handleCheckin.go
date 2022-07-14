@@ -142,7 +142,6 @@ func (ct *CheckinT) handleCheckin(zlog *zerolog.Logger, w http.ResponseWriter, r
 	defer limitF()
 
 	agent, err := authAgent(r, &id, ct.bulker, ct.cache)
-
 	if err != nil {
 		return err
 	}
@@ -233,7 +232,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		Uint64("bodyCount", readCounter.Count()).
 		Msg("checkin start long poll")
 
-	// Chill out for for a bit. Long poll.
+	// Chill out for a bit. Long poll.
 	longPoll := time.NewTicker(pollDuration)
 	defer longPoll.Stop()
 
@@ -459,7 +458,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
 		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, outputs)
-
 		if err != nil {
 			return nil, err
 		}

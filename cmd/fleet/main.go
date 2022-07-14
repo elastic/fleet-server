@@ -245,7 +245,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	var cfg firstCfg
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("never received initial configuration")
+		return fmt.Errorf("never received initial configuration: %w", ctx.Err())
 	case cfg = <-a.firstCfg:
 	}
 

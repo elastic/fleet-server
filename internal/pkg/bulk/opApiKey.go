@@ -10,7 +10,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 )
 
-// The ApiKey API's are not yet bulk enabled.  Stub the calls in the bulker
+// The ApiKey API's are not yet bulk enabled. Stub the calls in the bulker
 // and limit parallel access to prevent many requests from overloading
 // the connection pool in the elastic search client.
 

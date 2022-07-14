@@ -53,7 +53,6 @@ type EnrollerT struct {
 }
 
 func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bulk, c cache.Cache) (*EnrollerT, error) {
-
 	log.Info().
 		Interface("limits", cfg.Limits.EnrollLimit).
 		Msg("Setting config enroll_limit")
@@ -283,7 +282,7 @@ func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, age
 func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, apikeyID string) error {
 
 	// hack-a-rama:  We purposely do not force a "refresh:true" on the Apikey creation
-	// because doing so causes the api call to slow down at scale.  It is already very slow.
+	// because doing so causes the api call to slow down at scale. It is already very slow.
 	// So we have to wait for the key to become visible until we can invalidate it.
 
 	zlog = zlog.With().Str(LogAPIKeyID, apikeyID).Logger()

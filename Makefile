@@ -39,6 +39,10 @@ help: ## - Show help message
 	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | sed -e "s/^Makefile://" | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
+.PHONY: list-platforms
+list-platforms: ## - Show the possible PLATFORMS
+	@echo  "${PLATFORMS}"
+
 .PHONY: local
 local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
@@ -96,7 +100,7 @@ notice: ## - Generates the NOTICE.txt file.
 		-depsOut ""
 
 .PHONY: defaults
-defaults: ## -Generate defaults based on limits files.
+defaults: ## - Generate defaults based on limits files.
 	@echo "Generating env_defaults.go"
 	@go run dev-tools/buildlimits/buildlimits.go --in "internal/pkg/config/defaults/*.yml" --out internal/pkg/config/env_defaults.go
 
