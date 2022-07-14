@@ -53,7 +53,6 @@ type EnrollerT struct {
 }
 
 func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bulk, c cache.Cache) (*EnrollerT, error) {
-
 	log.Info().
 		Interface("limits", cfg.Limits.EnrollLimit).
 		Msg("Setting config enroll_limit")

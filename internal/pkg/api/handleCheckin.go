@@ -458,7 +458,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
 		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, outputs)
-
 		if err != nil {
 			return nil, err
 		}

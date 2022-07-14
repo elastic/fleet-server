@@ -41,7 +41,11 @@ type PolicyOutput struct {
 func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
 	switch p.Type {
 	case OutputTypeElasticsearch:
-		zlog.Debug().Msg("preparing elasticsearch output")
+		zlog = zlog.With().
+			Str("fleet.agent.id", agent.Id).
+			Str("fleet.policy.output.name", p.Name).Logger()
+
+		zlog.Info().Msg("preparing elasticsearch output")
 
 		// The role is required to do api key management
 		if p.Role == nil {
@@ -59,27 +63,32 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		needNewKey := true
 		switch {
 		case agent.DefaultAPIKey == "":
-			zlog.Debug().Msg("must generate api key as default API key is not present")
+			zlog.Info().Msg("must generate api key as default API key is not present")
 		case p.Role.Sha2 != agent.PolicyOutputPermissionsHash:
-			zlog.Debug().Msg("must generate api key as policy output permissions changed")
+			zlog.Info().Msg("must generate api key as policy output permissions changed")
 		default:
 			needNewKey = false
-			zlog.Debug().Msg("policy output permissions are the same")
+			zlog.Info().Msg("policy output permissions are the same")
 		}
 
 		if needNewKey {
-			zlog.Debug().
+			zlog.Info().
 				RawJSON("roles", p.Role.Raw).
 				Str("oldHash", agent.PolicyOutputPermissionsHash).
 				Str("newHash", p.Role.Sha2).
 				Msg("Generating a new API key")
 
+			ctx := zlog.WithContext(ctx)
 			outputAPIKey, err := generateOutputAPIKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw)
 			if err != nil {
 				zlog.Error().Err(err).Msg("fail generate output key")
 				return err
 			}
 
+			zlog.Info().
+				Str(logger.DefaultOutputAPIKeyID+"old", agent.DefaultAPIKey).
+				Str(logger.DefaultOutputAPIKeyID+".new", outputAPIKey.Agent()).
+				Msgf("swapping agent API key")
 			agent.DefaultAPIKey = outputAPIKey.Agent()
 
 			// When a new keys is generated we need to update the Agent record,
@@ -128,7 +137,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 			return ErrFailInjectAPIKey
 		}
 	case OutputTypeLogstash:
-		zlog.Debug().Msg("preparing logstash output")
+		zlog.Info().Msg("preparing logstash output")
 		zlog.Info().Msg("no actions required for logstash output preparation")
 	default:
 		zlog.Error().Msgf("unknown output type: %s; skipping preparation", p.Type)
@@ -160,6 +169,8 @@ func renderUpdatePainlessScript(fields map[string]interface{}) ([]byte, error) {
 
 func generateOutputAPIKey(ctx context.Context, bulk bulk.Bulk, agentID, outputName string, roles []byte) (*apikey.APIKey, error) {
 	name := fmt.Sprintf("%s:%s", agentID, outputName)
+	zerolog.Ctx(ctx).Info().Msgf("generating output API key %s for agent ID %s",
+		name, agentID)
 	return bulk.APIKeyCreate(
 		ctx,
 		name,
