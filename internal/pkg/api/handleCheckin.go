@@ -446,7 +446,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// Parse the outputs maps in order to prepare the outputs
 	const outputsProperty = "outputs"
 	outputs, err := smap.Parse(pp.Fields[outputsProperty])
-
 	if err != nil {
 		return nil, err
 	}

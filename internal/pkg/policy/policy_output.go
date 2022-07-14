@@ -49,7 +49,9 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 
 		// The role is required to do api key management
 		if p.Role == nil {
-			zlog.Error().Str("name", p.Name).Msg("policy does not contain required output permission section")
+			zlog.Error().
+				Str("fleet.output.name", p.Name).
+				Msg("policy does not contain required output permission section")
 			return ErrNoOutputPerms
 		}
 
@@ -84,18 +86,17 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 				zlog.Error().Err(err).Msg("fail generate output key")
 				return err
 			}
-
 			zlog.Info().
-				Str(logger.DefaultOutputAPIKeyID+"old", agent.DefaultAPIKey).
-				Str(logger.DefaultOutputAPIKeyID+".new", outputAPIKey.Agent()).
-				Msgf("swapping agent API key")
+				Str("fleet.anderson.default.old.apikey", agent.DefaultAPIKey).
+				Str("fleet.anderson.default.new.apikey", outputAPIKey.Agent()).
+				Msg("setting / swapping agent default API key")
 			agent.DefaultAPIKey = outputAPIKey.Agent()
 
 			// When a new keys is generated we need to update the Agent record,
 			// this will need to be updated when multiples Elasticsearch output
 			// are used.
 			zlog.Info().
-				Str("hash.sha256", p.Role.Sha2).
+				Str("fleet.role.hash.sha256", p.Role.Sha2).
 				Str(logger.DefaultOutputAPIKeyID, outputAPIKey.ID).
 				Msg("Updating agent record to pick up default output key.")
 
@@ -113,14 +114,13 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 
 			// Using painless script to append the old keys to the history
 			body, err := renderUpdatePainlessScript(fields)
-
 			if err != nil {
-				return err
+				return fmt.Errorf("could no tupdate painless script: %w", err)
 			}
 
 			if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body); err != nil {
 				zlog.Error().Err(err).Msg("fail update agent record")
-				return err
+				return fmt.Errorf("fail update agent record: %w", err)
 			}
 		}
 
@@ -133,6 +133,16 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		// in place to reduce number of agent policy allocation when sending the updated
 		// agent policy to multiple agents.
 		// See: https://github.com/elastic/fleet-server/issues/1301
+		//
+		// WIP:
+		// The agent struct is a pointer, thus shared between the runs of Prepare
+		// for each output. Given 2 outputs (1 and 2), if 1 gets a new API key,
+		// agent.DefaultAPIKey changes. However, if 2 does not get one, the code
+		// below runs anyway, therefore the API key for output 2 will be set to the
+		// api key for output 1
+		// The agent struct cannot be shared! The new API key must be its own local
+		// variable and a special case for the 'default output' has to handle
+		// updating agent.DefaultAPIKey.
 		if ok := setMapObj(outputMap, agent.DefaultAPIKey, p.Name, "api_key"); !ok {
 			return ErrFailInjectAPIKey
 		}
