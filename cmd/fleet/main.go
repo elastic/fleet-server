@@ -538,7 +538,7 @@ LOOP:
 
 		select {
 		case newCfg = <-f.cfgCh:
-			log.Info().Msg("Server configuration update")
+			log.Info().Interface("cfg", redactConfig(curCfg)).Msg("Server configuration update")
 		case err := <-ech:
 			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			log.Error().Err(err).Msg("Fleet Server failed")
@@ -618,6 +618,13 @@ func redactServerCfg(cfg *config.Config) config.Server {
 		redacted.TLS = &newTLS
 	}
 
+	return redacted
+}
+
+func redactConfig(cfg *config.Config) config.Config {
+	redacted := *cfg
+	redacted.Inputs[0].Server = redactServerCfg(cfg)
+	redacted.Output = redactOutputCfg(cfg)
 	return redacted
 }
 
