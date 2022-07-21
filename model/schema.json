@@ -346,6 +346,24 @@
       ]
     },
 
+    "api_key_history": {
+      "description": "Output API Key History",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "API Key identifier",
+            "type": "string"
+          },
+          "retired_at": {
+            "description": "Date/time the API key was retired",
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
 
     "policy_output" : {
       "type": "object",
@@ -356,21 +374,7 @@
         },
         "api_key_history": {
           "description": "Default API Key History",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "description": "API Key identifier",
-                "type": "string"
-              },
-              "retired_at": {
-                "description": "Date/time the API key was retired",
-                "type": "string",
-                "format": "date-time"
-              }
-            }
-          }
+          "$ref":  "#/definitions/api_key_history"
         },
         "api_key_id": {
           "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
@@ -508,21 +512,7 @@
         },
         "default_api_key_history": {
           "description": "Deprecated. Use Outputs instead. Default API Key History",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "description": "API Key identifier",
-                "type": "string"
-              },
-              "retired_at": {
-                "description": "Date/time the API key was retired",
-                "type": "string",
-                "format": "date-time"
-              }
-            }
-          }
+          "$ref":  "#/definitions/api_key_history"
         },
         "elasticsearch_outputs": {
           "description": "ElasticsearchOutputs is the policy output data for each Elasticsearch output. It maps the output name to its data",
