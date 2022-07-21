@@ -443,10 +443,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		zlog.Error().Err(err).Msg("fail find agent record")
 		return nil, err
 	}
-	// TODO: do we need to kee it here?
-	if agent.ElasticsearchOutputs == nil {
-		agent.ElasticsearchOutputs = map[string]*model.PolicyOutput{}
-	}
 
 	// Parse the outputs maps in order to prepare the outputs
 	const outputsProperty = "outputs"
