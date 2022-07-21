@@ -126,13 +126,13 @@ func parsePerms(permsRaw json.RawMessage) (RoleMapT, error) {
 	// iterate across the keys
 	m := make(RoleMapT, len(permMap))
 	for k := range permMap {
-
 		v := permMap.GetMap(k)
 
 		if v != nil {
 			var r RoleT
 
 			// Stable hash on permissions payload
+			// permission hash created here
 			if r.Sha2, err = v.Hash(); err != nil {
 				return nil, err
 			}
