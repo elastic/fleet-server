@@ -71,6 +71,10 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 		return ErrNoOutputPerms
 	}
 
+	// 1 - just use the new ElasticsearchOutputs
+	// 2 - make the tests check if they're correctly filled in
+	// 3 - ensure Default* is made empty/nil at the end
+
 	// Determine whether we need to generate an output ApiKey.
 	// This is accomplished by comparing the sha2 hash stored in the agent
 	// record with the precalculated sha2 hash of the role.
