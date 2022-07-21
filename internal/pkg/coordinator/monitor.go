@@ -478,7 +478,7 @@ func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyID string, unenr
 
 func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, zlog zerolog.Logger, agentsIndex string) error {
 	agents, err := dl.FindOfflineAgents(ctx, bulker, policyID, unenrollTimeout, dl.WithIndexName(agentsIndex))
-	if err != nil || len(agents) == 0 {
+	if err != nil {
 		return err
 	}
 

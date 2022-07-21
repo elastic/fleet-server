@@ -6,6 +6,7 @@ package dl
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -48,19 +49,26 @@ func prepareOfflineAgentsByPolicyID() *dsl.Tmpl {
 	return tmpl
 }
 
-func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name string, v interface{}, opt ...Option) (agent model.Agent, err error) {
+func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name string, v interface{}, opt ...Option) (model.Agent, error) {
 	o := newOption(FleetAgents, opt...)
 	res, err := SearchWithOneParam(ctx, bulker, tmpl, o.indexName, name, v)
 	if err != nil {
-		return
+		return model.Agent{}, fmt.Errorf("failed searching for agent: %w", err)
 	}
 
 	if len(res.Hits) == 0 {
-		return agent, ErrNotFound
+		return model.Agent{}, ErrNotFound
 	}
 
-	err = res.Hits[0].Unmarshal(&agent)
-	return agent, err
+	var agent model.Agent
+	if err = res.Hits[0].Unmarshal(&agent); err != nil {
+		return model.Agent{}, fmt.Errorf("could not unmarshal ES document into model.Agent: %w", err)
+	}
+
+	if agent.ElasticsearchOutputs == nil {
+		agent.ElasticsearchOutputs = map[string]*model.PolicyOutput{}
+	}
+	return agent, nil
 }
 
 func FindOfflineAgents(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, opt ...Option) ([]model.Agent, error) {
@@ -71,18 +79,22 @@ func FindOfflineAgents(ctx context.Context, bulker bulk.Bulk, policyID string, u
 		FieldLastCheckin: past,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed searching for agent: %w", err)
 	}
 
 	if len(res.Hits) == 0 {
-		return nil, nil
+		return nil, ErrNotFound
 	}
 
 	agents := make([]model.Agent, len(res.Hits))
 	for i, hit := range res.Hits {
 		if err := hit.Unmarshal(&agents[i]); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not unmarshal ES document into model.Agent: %w", err)
+		}
+		if agents[i].ElasticsearchOutputs == nil {
+			agents[i].ElasticsearchOutputs = map[string]*model.PolicyOutput{}
 		}
 	}
+	
 	return agents, nil
 }
