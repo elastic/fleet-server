@@ -8,6 +8,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -86,8 +87,9 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 	t.Run("Permission hash == Agent Permission Hash no need to regenerate the key", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
+		apiKey := bulk.APIKey{ID: "test_id", Key: "EXISTING-KEY"}
 		hashPerm := "abc123"
-		po := Output{
+		output := Output{
 			Type: OutputTypeElasticsearch,
 			Name: "test output",
 			Role: &RoleT{
@@ -101,29 +103,51 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		}
 
 		testAgent := &model.Agent{
-			DefaultAPIKey:               "test_id:EXISTING-KEY",
+			DefaultAPIKey:               apiKey.Agent(),
 			PolicyOutputPermissionsHash: hashPerm,
+			ElasticsearchOutputs: map[string]*model.PolicyOutput{
+				output.Name: {
+					ESDocument:            model.ESDocument{},
+					APIKey:                apiKey.Agent(),
+					APIKeyHistory:         nil,
+					APIKeyID:              apiKey.ID,
+					PolicyPermissionsHash: hashPerm,
+				},
+			},
 		}
 
-		err := po.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
+		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
-		key, ok := policyMap.GetMap("test output")["api_key"].(string)
+		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
 
-		require.True(t, ok, "unable to case api key")
-		require.Equal(t, testAgent.DefaultAPIKey, key)
-		bulker.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		bulker.AssertNotCalled(t, "APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		assert.True(t, ok, "api key not present on policy map")
+		assert.Equal(t, testAgent.ElasticsearchOutputs[output.Name].APIKey, key)
+		assert.Empty(t, testAgent.DefaultAPIKey) // Migration path: ensure we don't use DefaultAPIKey anymore
+
+		bulker.AssertNotCalled(t, "Update",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		bulker.AssertNotCalled(t, "APIKeyCreate",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		bulker.AssertExpectations(t)
 	})
 
 	t.Run("Permission hash != Agent Permission Hash need to regenerate the key", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
-		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once() //nolint:govet // test case
 
-		po := Output{
+		oldAPIKey := bulk.APIKey{ID: "test_id", Key: "EXISTING-KEY"}
+		wantAPIKey := bulk.APIKey{ID: "abc", Key: "new-key"}
+		hashPerm := "old-HASH"
+
+		bulker.On("Update",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Once()
+		bulker.On("APIKeyCreate",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(&wantAPIKey, nil).Once() //nolint:govet // test case
+
+		output := Output{
 			Type: OutputTypeElasticsearch,
 			Name: "test output",
 			Role: &RoleT{
@@ -137,27 +161,44 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		}
 
 		testAgent := &model.Agent{
-			DefaultAPIKey:               "test_id:EXISTING-KEY",
-			PolicyOutputPermissionsHash: "old-HASH",
+			DefaultAPIKey:               oldAPIKey.Agent(),
+			PolicyOutputPermissionsHash: hashPerm,
+			ElasticsearchOutputs: map[string]*model.PolicyOutput{
+				output.Name: {
+					ESDocument:            model.ESDocument{},
+					APIKey:                oldAPIKey.Agent(),
+					APIKeyHistory:         nil,
+					APIKeyID:              oldAPIKey.ID,
+					PolicyPermissionsHash: hashPerm,
+				},
+			},
 		}
 
-		err := po.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
+		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
-		key, ok := policyMap.GetMap("test output")["api_key"].(string)
+		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
 
 		require.True(t, ok, "unable to case api key")
-		require.Equal(t, "abc:new-key", key)
+		require.Equal(t, wantAPIKey.Agent(), key)
+		assert.Empty(t, testAgent.DefaultAPIKey) // Migration path: ensure we don't use DefaultAPIKey anymore
+		assert.Equal(t, testAgent.ElasticsearchOutputs[output.Name].APIKey, key)
+
 		bulker.AssertExpectations(t)
 	})
 
 	t.Run("Generate API Key on new Agent", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
-		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{ID: "abc", Key: "new-key"}, nil).Once() //nolint:govet // test case
+		bulker.On("Update",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Once()
+		apiKey := bulk.APIKey{ID: "abc", Key: "new-key"}
+		bulker.On("APIKeyCreate",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(&apiKey, nil).Once() //nolint:govet // test case
 
-		po := Output{
+		output := Output{
 			Type: OutputTypeElasticsearch,
 			Name: "test output",
 			Role: &RoleT{
@@ -170,15 +211,15 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			"test output": map[string]interface{}{},
 		}
 
-		testAgent := &model.Agent{}
+		testAgent := &model.Agent{ElasticsearchOutputs: map[string]*model.PolicyOutput{}}
 
-		err := po.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
+		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
-		key, ok := policyMap.GetMap("test output")["api_key"].(string)
+		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
 
 		require.True(t, ok, "unable to case api key")
-		require.Equal(t, "abc:new-key", key)
+		require.Equal(t, apiKey.Agent(), key)
 		bulker.AssertExpectations(t)
 	})
 }

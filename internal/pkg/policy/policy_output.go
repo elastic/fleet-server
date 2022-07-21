@@ -75,6 +75,26 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 	// 2 - make the tests check if they're correctly filled in
 	// 3 - ensure Default* is made empty/nil at the end
 
+	output, ok := agent.ElasticsearchOutputs[p.Name]
+	if !ok {
+		zlog.Debug().Msgf("creating agent.ElasticsearchOutputs[%s]", p.Name)
+		output = &model.PolicyOutput{}
+		agent.ElasticsearchOutputs[p.Name] = output
+	}
+
+	// Migration path, use agent.ElasticsearchOutputs instead of agent.Default*
+	if agent.DefaultAPIKey != "" {
+		output.APIKey = agent.DefaultAPIKey
+		output.APIKeyID = agent.DefaultAPIKeyID
+		output.PolicyPermissionsHash = agent.PolicyOutputPermissionsHash
+		output.APIKeyHistory = agent.DefaultAPIKeyHistory
+
+		agent.DefaultAPIKey = ""
+		agent.DefaultAPIKeyID = ""
+		agent.PolicyOutputPermissionsHash = ""
+		agent.DefaultAPIKeyHistory = nil
+	}
+
 	// Determine whether we need to generate an output ApiKey.
 	// This is accomplished by comparing the sha2 hash stored in the agent
 	// record with the precalculated sha2 hash of the role.
@@ -84,9 +104,9 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 	// is monitors. When updating for multiple ES instances we need to tie the token to the output.
 	needNewKey := true
 	switch {
-	case agent.DefaultAPIKey == "":
+	case output.APIKey == "":
 		zlog.Debug().Msg("must generate api key as default API key is not present")
-	case p.Role.Sha2 != agent.PolicyOutputPermissionsHash:
+	case p.Role.Sha2 != output.PolicyPermissionsHash:
 		// the is actually the OutputPermissionsHash for the default hash. The Agent
 		// document on ES does not have OutputPermissionsHash for any other output
 		// besides the default one. It seems to me error-prone to rely on the default
@@ -100,7 +120,7 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 	if needNewKey {
 		zlog.Debug().
 			RawJSON("fleet.policy.roles", p.Role.Raw).
-			Str("fleet.policy.default.oldHash", agent.PolicyOutputPermissionsHash).
+			Str("fleet.policy.default.oldHash", output.PolicyPermissionsHash).
 			Str("fleet.policy.default.newHash", p.Role.Sha2).
 			Msg("Generating a new API key")
 
@@ -111,7 +131,7 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 			return err
 		}
 
-		agent.DefaultAPIKey = outputAPIKey.Agent()
+		output.APIKey = outputAPIKey.Agent()
 
 		// When a new keys is generated we need to update the Agent record,
 		// this will need to be updated when multiples Elasticsearch output
@@ -126,9 +146,9 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 			dl.FieldDefaultAPIKeyID:             outputAPIKey.ID,
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 		}
-		if agent.DefaultAPIKeyID != "" {
-			fields[dl.FieldDefaultAPIKeyHistory] = model.DefaultAPIKeyHistoryItems{
-				ID:        agent.DefaultAPIKeyID,
+		if agent.DefaultAPIKeyID != "" { // TODO: output.APIKeyID != ""
+			fields[dl.FieldDefaultAPIKeyHistory] = model.APIKeyHistoryItems{
+				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 			}
 		}
@@ -164,7 +184,7 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 	// The agent struct cannot be shared! The new API key must be its own local
 	// variable and a special case for the 'default output' has to handle
 	// updating agent.DefaultAPIKey.
-	if err := setMapObj(outputMap, agent.DefaultAPIKey, p.Name, "api_key"); err != nil {
+	if err := setMapObj(outputMap, output.APIKey, p.Name, "api_key"); err != nil {
 		return err
 	}
 
