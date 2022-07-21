@@ -545,5 +545,7 @@ func getAPIKeyIDs(agent *model.Agent) []string {
 	if agent.DefaultAPIKeyID != "" {
 		keys = append(keys, agent.DefaultAPIKeyID)
 	}
+	// TODO: should we also collect the old (a.k.a history) api keys to ensure
+	// they're deleted?
 	return keys
 }
