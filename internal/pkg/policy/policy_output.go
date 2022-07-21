@@ -32,7 +32,7 @@ var (
 	ErrFailInjectAPIKey = errors.New("fail inject api key")
 )
 
-type PolicyOutput struct {
+type Output struct {
 	Name string
 	Type string
 	Role *RoleT
@@ -40,7 +40,7 @@ type PolicyOutput struct {
 
 // Prepare prepares the output p to be sent to the elastic-agent
 // The agent might be mutated for an elasticsearch output
-func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
+func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
 	switch p.Type {
 	case OutputTypeElasticsearch:
 		if err := p.prepareElasticsearch(ctx, zlog, bulker, agent, outputMap); err != nil {
@@ -56,7 +56,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 	return nil
 }
 
-func (p *PolicyOutput) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
+func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
 	zlog = zlog.With().
 		Str("fleet.agent.id", agent.Id).
 		Str("fleet.policy.output.name", p.Name).Logger()

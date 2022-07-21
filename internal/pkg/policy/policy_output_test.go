@@ -23,7 +23,7 @@ var TestPayload []byte
 func TestPolicyLogstashOutputPrepare(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
-	po := PolicyOutput{
+	po := Output{
 		Type: OutputTypeLogstash,
 		Name: "test output",
 		Role: &RoleT{
@@ -39,7 +39,7 @@ func TestPolicyLogstashOutputPrepare(t *testing.T) {
 func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
-	po := PolicyOutput{
+	po := Output{
 		Type: OutputTypeLogstash,
 		Name: "test output",
 		Role: nil,
@@ -54,7 +54,7 @@ func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
-	po := PolicyOutput{
+	po := Output{
 		Type: OutputTypeLogstash,
 		Name: "test output",
 		Role: &RoleT{
@@ -71,7 +71,7 @@ func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 func TestPolicyESOutputPrepareNoRole(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
-	po := PolicyOutput{
+	po := Output{
 		Type: OutputTypeElasticsearch,
 		Name: "test output",
 		Role: nil,
@@ -87,7 +87,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
 		hashPerm := "abc123"
-		po := PolicyOutput{
+		po := Output{
 			Type: OutputTypeElasticsearch,
 			Name: "test output",
 			Role: &RoleT{
@@ -123,7 +123,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once() //nolint:govet // test case
 
-		po := PolicyOutput{
+		po := Output{
 			Type: OutputTypeElasticsearch,
 			Name: "test output",
 			Role: &RoleT{
@@ -157,7 +157,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{ID: "abc", Key: "new-key"}, nil).Once() //nolint:govet // test case
 
-		po := PolicyOutput{
+		po := Output{
 			Type: OutputTypeElasticsearch,
 			Name: "test output",
 			Role: &RoleT{

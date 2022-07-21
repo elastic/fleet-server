@@ -42,7 +42,7 @@ type ParsedPolicy struct {
 	Policy  model.Policy
 	Fields  map[string]json.RawMessage
 	Roles   RoleMapT
-	Outputs map[string]PolicyOutput
+	Outputs map[string]Output
 	Default ParsedPolicyDefaults
 }
 
@@ -91,8 +91,8 @@ func NewParsedPolicy(p model.Policy) (*ParsedPolicy, error) {
 	return pp, nil
 }
 
-func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) (map[string]PolicyOutput, error) {
-	result := make(map[string]PolicyOutput)
+func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) (map[string]Output, error) {
+	result := make(map[string]Output)
 
 	outputsMap, err := smap.Parse(outputsRaw)
 	if err != nil {
@@ -102,7 +102,7 @@ func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) 
 	for k := range outputsMap {
 		v := outputsMap.GetMap(k)
 
-		p := PolicyOutput{
+		p := Output{
 			Name: k,
 			Type: v.GetString(FieldOutputType),
 		}
