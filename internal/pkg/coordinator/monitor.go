@@ -453,6 +453,21 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 }
 
 func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, l zerolog.Logger, checkInterval time.Duration, agentsIndex string) {
+	// When fleet-server is offline for a long period and finally recovers, it means that the connected
+	// agent will be offline for a long period of time since their last checkin and fleet server will
+	// start unenrolling every Elastic Agent from the system. Instead on boot the Elastic Agent
+	// should wait at least the unenrollTimeout period before actively unenrolling agents in the system.
+	// This gives a grace period to the Elastic Agent to connect back to the system.
+	l.Info().
+		Dur("checkInterval", checkInterval).
+		Dur("unenrollTimeout", unenrollTimeout).
+		Msg("giving a grace period to Elastic Agent before enforcing unenrollTimeout monitor")
+
+	if err := waitWithContext(ctx, unenrollTimeout); err != nil {
+		l.Err(err).Dur("unenroll_timeout", unenrollTimeout).
+			Msg("failed to delay the unenroller monitor startup")
+	}
+
 	l.Info().
 		Dur("checkInterval", checkInterval).
 		Dur("unenrollTimeout", unenrollTimeout).
@@ -548,4 +563,15 @@ func getAPIKeyIDs(agent *model.Agent) []string {
 	// TODO: should we also collect the old (a.k.a history) api keys to ensure
 	// they're deleted?
 	return keys
+}
+
+func waitWithContext(ctx context.Context, to time.Duration) error {
+	t := time.NewTimer(to)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+	}
+	return nil
 }

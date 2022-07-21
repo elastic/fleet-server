@@ -137,9 +137,7 @@ pipeline {
     }
     stage('Downstream - Package') {
       options { skipDefaultCheckout() }
-      when {
-        not { changeRequest() }
-      }
+      when { expression { isBranch() } }
       steps {
         build(job: "Ingest-manager/fleet-server-package-mbp/${env.JOB_BASE_NAME}",
               propagate: false,
