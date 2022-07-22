@@ -82,12 +82,22 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 		agent.ElasticsearchOutputs[p.Name] = output
 	}
 
-	// Migration path, use agent.ElasticsearchOutputs instead of agent.Default*
+	// Migration path:
+	// - force API keys to be regenerated:
+	//    - make them empty
+	//    - add them to Old API key, so they'll be deleted
+	// - use agent.ElasticsearchOutputs instead of agent.Default*
 	if agent.DefaultAPIKey != "" {
-		output.APIKey = agent.DefaultAPIKey
-		output.APIKeyID = agent.DefaultAPIKeyID
+		output.APIKey = ""
+		output.APIKeyID = ""
 		output.PolicyPermissionsHash = agent.PolicyOutputPermissionsHash
-		output.APIKeyHistory = agent.DefaultAPIKeyHistory
+		output.ToRetireAPIKeys = append(output.ToRetireAPIKeys,
+			model.ToRetireAPIKeysItems{
+				ID:        agent.DefaultAPIKeyID,
+				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+			})
+		output.ToRetireAPIKeys = append(output.ToRetireAPIKeys,
+			agent.DefaultAPIKeyHistory...)
 
 		agent.DefaultAPIKey = ""
 		agent.DefaultAPIKeyID = ""
@@ -127,11 +137,12 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 		ctx := zlog.WithContext(ctx)
 		outputAPIKey, err := generateOutputAPIKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw)
 		if err != nil {
-			zlog.Error().Err(err).Msg("fail generate output key")
-			return err
+			return fmt.Errorf("failed generate output API key: %w", err)
 		}
 
 		output.APIKey = outputAPIKey.Agent()
+		output.APIKeyID = outputAPIKey.ID
+		output.PolicyPermissionsHash = p.Role.Sha2 // for the sake of consistency
 
 		// When a new keys is generated we need to update the Agent record,
 		// this will need to be updated when multiples Elasticsearch output
@@ -146,8 +157,8 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 			dl.FieldDefaultAPIKeyID:             outputAPIKey.ID,
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 		}
-		if agent.DefaultAPIKeyID != "" { // TODO: output.APIKeyID != ""
-			fields[dl.FieldDefaultAPIKeyHistory] = model.APIKeyHistoryItems{
+		if output.APIKeyID != "" {
+			fields[dl.FieldDefaultAPIKeyHistory] = model.ToRetireAPIKeysItems{
 				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 			}

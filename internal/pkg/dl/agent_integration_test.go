@@ -121,7 +121,7 @@ func TestFindAgent_NewModel(t *testing.T) {
 	wantElasticsearchOutputs := map[string]*model.PolicyOutput{
 		"default": {
 			APIKey: "TestFindNewModelAgent_APIKey",
-			APIKeyHistory: []model.APIKeyHistoryItems{
+			ToRetireAPIKeys: []model.ToRetireAPIKeysItems{
 				{
 					ID:        "TestFindNewModelAgent_APIKeyID_invalidated",
 					RetiredAt: "TestFindNewModelAgent_APIKeyID_invalidated_at"},

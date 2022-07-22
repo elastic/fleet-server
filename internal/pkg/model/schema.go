@@ -25,16 +25,6 @@ func (d *ESDocument) ESInitialize(id string, seqno, version int64) {
 	d.Version = version
 }
 
-// APIKeyHistoryItems
-type APIKeyHistoryItems struct {
-
-	// API Key identifier
-	ID string `json:"id,omitempty"`
-
-	// Date/time the API key was retired
-	RetiredAt string `json:"retired_at,omitempty"`
-}
-
 // Action An Elastic Agent action
 type Action struct {
 	ESDocument
@@ -134,7 +124,7 @@ type Agent struct {
 	DefaultAPIKey string `json:"default_api_key,omitempty"`
 
 	// Deprecated. Use Outputs instead. Default API Key History
-	DefaultAPIKeyHistory []APIKeyHistoryItems `json:"default_api_key_history,omitempty"`
+	DefaultAPIKeyHistory []ToRetireAPIKeysItems `json:"default_api_key_history,omitempty"`
 
 	// Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKeyID string `json:"default_api_key_id,omitempty"`
@@ -332,21 +322,21 @@ type PolicyLeader struct {
 	Timestamp string `json:"@timestamp,omitempty"`
 }
 
-// PolicyOutput
+// PolicyOutput holds the needed data to manage the output API keys
 type PolicyOutput struct {
 	ESDocument
 
 	// API key the Elastic Agent uses to authenticate with elasticsearch
 	APIKey string `json:"api_key"`
 
-	// Default API Key History
-	APIKeyHistory []APIKeyHistoryItems `json:"api_key_history"`
-
 	// ID of the API key the Elastic Agent uses to authenticate with elasticsearch
 	APIKeyID string `json:"api_key_id"`
 
 	// The policy output permissions hash
 	PolicyPermissionsHash string `json:"policy_permissions_hash"`
+
+	// API keys to be invalidated on next agent ack
+	ToRetireAPIKeys []ToRetireAPIKeysItems `json:"to_retire_api_keys,omitempty"`
 }
 
 // Server A Fleet Server
@@ -368,6 +358,16 @@ type ServerMetadata struct {
 
 	// The version of the Fleet Server
 	Version string `json:"version"`
+}
+
+// ToRetireAPIKeysItems the Output API Keys that were replaced and should be retired
+type ToRetireAPIKeysItems struct {
+
+	// API Key identifier
+	ID string `json:"id,omitempty"`
+
+	// Date/time the API key was retired
+	RetiredAt string `json:"retired_at,omitempty"`
 }
 
 // UserProvidedMetadata User provided metadata information for the Elastic Agent
