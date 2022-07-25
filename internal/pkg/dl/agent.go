@@ -65,9 +65,6 @@ func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name strin
 		return model.Agent{}, fmt.Errorf("could not unmarshal ES document into model.Agent: %w", err)
 	}
 
-	if agent.ElasticsearchOutputs == nil {
-		agent.ElasticsearchOutputs = map[string]*model.PolicyOutput{}
-	}
 	return agent, nil
 }
 
@@ -91,10 +88,7 @@ func FindOfflineAgents(ctx context.Context, bulker bulk.Bulk, policyID string, u
 		if err := hit.Unmarshal(&agents[i]); err != nil {
 			return nil, fmt.Errorf("could not unmarshal ES document into model.Agent: %w", err)
 		}
-		if agents[i].ElasticsearchOutputs == nil {
-			agents[i].ElasticsearchOutputs = map[string]*model.PolicyOutput{}
-		}
 	}
-	
+
 	return agents, nil
 }

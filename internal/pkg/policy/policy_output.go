@@ -77,6 +77,10 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 
 	output, ok := agent.ElasticsearchOutputs[p.Name]
 	if !ok {
+		if agent.ElasticsearchOutputs == nil {
+			agent.ElasticsearchOutputs = map[string]*model.PolicyOutput{}
+		}
+
 		zlog.Debug().Msgf("creating agent.ElasticsearchOutputs[%s]", p.Name)
 		output = &model.PolicyOutput{}
 		agent.ElasticsearchOutputs[p.Name] = output
