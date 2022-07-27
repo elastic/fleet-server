@@ -37,16 +37,24 @@ func (e ErrElastic) Error() string {
 	// Otherwise were getting: "elastic fail 404::"
 	msg := "elastic fail "
 	var b strings.Builder
-	b.Grow(len(msg) + 5 + len(e.Type) + len(e.Reason))
+	b.Grow(len(msg) + 11 + len(e.Type) + len(e.Reason) + len(e.Cause.Type) + len(e.Cause.Reason))
 	b.WriteString(msg)
 	b.WriteString(strconv.Itoa(e.Status))
 	if e.Type != "" {
-		b.WriteString(":")
+		b.WriteString(": ")
 		b.WriteString(e.Type)
 	}
 	if e.Reason != "" {
-		b.WriteString(":")
+		b.WriteString(": ")
 		b.WriteString(e.Reason)
+	}
+	if e.Cause.Type != "" {
+		b.WriteString(": ")
+		b.WriteString(e.Cause.Type)
+	}
+	if e.Cause.Reason != "" {
+		b.WriteString(": ")
+		b.WriteString(e.Cause.Reason)
 	}
 	return b.String()
 }
@@ -83,8 +91,8 @@ func TranslateError(status int, e *ErrorT) error {
 				Type   string
 				Reason string
 			}{
-				e.Cause.Type,
-				e.Cause.Reason,
+				Type:   e.Cause.Type,
+				Reason: e.Cause.Reason,
 			},
 		}
 	}
