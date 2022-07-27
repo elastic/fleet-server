@@ -7,6 +7,7 @@ package bulk
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -187,7 +188,6 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	}
 
 	res, err := req.Do(ctx, b.es)
-
 	if err != nil {
 		log.Error().Err(err).Str("mod", kModBulk).Msg("Fail BulkRequest req.Do")
 		return err
@@ -217,12 +217,16 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	var blk bulkIndexerResponse
 	blk.Items = make([]bulkStubItem, 0, queueCnt)
 
+	// TODO: We're loosing information abut the errors, we should check a way
+	// to return the full error ES returns
 	if err = easyjson.Unmarshal(buf.Bytes(), &blk); err != nil {
-		log.Error().
-			Err(err).
+		log.Err(err).
 			Str("mod", kModBulk).
-			Msg("Unmarshal error")
-		return err
+			Msg("flushBulk failed, could not unmarshal ES response")
+		return fmt.Errorf("flushBulk failed, could not unmarshal ES response: %w", err)
+	}
+	if blk.HasErrors {
+		log.Debug().Err(errors.New(buf.String())).Msg("Bulk call: Es returned an error")
 	}
 
 	log.Trace().
