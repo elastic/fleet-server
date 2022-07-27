@@ -621,8 +621,8 @@ func redactServerCfg(cfg *config.Config) config.Server {
 	return redacted
 }
 
-func redactConfig(cfg *config.Config) config.Config {
-	redacted := *cfg
+func redactConfig(cfg *config.Config) *config.Config {
+	redacted, _ := (&config.Config{}).Merge(cfg)
 	redacted.Inputs[0].Server = redactServerCfg(cfg)
 	redacted.Output = redactOutputCfg(cfg)
 	return redacted
