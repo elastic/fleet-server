@@ -131,3 +131,16 @@ pull_request_rules:
         - files~=^(dev-tools/integration/.env|.go-version)$
     actions:
       delete_head_branch:
+  - name: backport patches to 8.4 branch
+    conditions:
+      - merged
+      - label=backport-v8.4.0
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "8.4"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
