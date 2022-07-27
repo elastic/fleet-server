@@ -922,10 +922,11 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) (*apm.Tracer, error
 	// but it doesn't exist today. Update this code once we have something
 	// available via the APM Go agent.
 	const (
-		envVerifyServerCert = "ELASTIC_APM_VERIFY_SERVER_CERT"
-		envServerCert       = "ELASTIC_APM_SERVER_CERT"
-		envCACert           = "ELASTIC_APM_SERVER_CA_CERT_FILE"
-		envGlobalLabels     = "ELASTIC_APM_GLOBAL_LABELS"
+		envVerifyServerCert      = "ELASTIC_APM_VERIFY_SERVER_CERT"
+		envServerCert            = "ELASTIC_APM_SERVER_CERT"
+		envCACert                = "ELASTIC_APM_SERVER_CA_CERT_FILE"
+		envGlobalLabels          = "ELASTIC_APM_GLOBAL_LABELS"
+		envTransactionSampleRate = "ELASTIC_APM_TRANSACTION_SAMPLE_RATE"
 	)
 	if cfg.TLS.SkipVerify {
 		os.Setenv(envVerifyServerCert, "false")
@@ -942,6 +943,10 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) (*apm.Tracer, error
 	if cfg.GlobalLabels != "" {
 		os.Setenv(envGlobalLabels, cfg.GlobalLabels)
 		defer os.Unsetenv(envGlobalLabels)
+	}
+	if cfg.TransactionSampleRate != "" {
+		os.Setenv(envTransactionSampleRate, cfg.TransactionSampleRate)
+		defer os.Unsetenv(envTransactionSampleRate)
 	}
 	transport, err := apmtransport.NewHTTPTransport()
 	if err != nil {
