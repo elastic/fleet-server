@@ -382,7 +382,3 @@ func TestPolicyOutputESPrepare_newModel(t *testing.T) {
 		bulker.AssertExpectations(t)
 	})
 }
-
-func TestRenderUpdatePainlessScript(t *testing.T) {
-
-}

@@ -157,19 +157,19 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 			Msg("Updating agent record to pick up default output key.")
 
 		fields := map[string]interface{}{
-			dl.FieldDefaultAPIKey:               outputAPIKey.Agent(),
-			dl.FieldDefaultAPIKeyID:             outputAPIKey.ID,
+			dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
+			dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 		}
 		if output.APIKeyID != "" {
-			fields[dl.FieldDefaultAPIKeyHistory] = model.ToRetireAPIKeysItems{
+			fields[dl.FieldPolicyOutputToRetireAPIKeys] = model.ToRetireAPIKeysItems{
 				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 			}
 		}
 
 		// Using painless script to append the old keys to the history
-		body, err := renderUpdatePainlessScript(fields)
+		body, err := renderUpdatePainlessScript(p.Name, fields)
 		if err != nil {
 			return fmt.Errorf("could no tupdate painless script: %w", err)
 		}
@@ -206,13 +206,27 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 	return nil
 }
 
-func renderUpdatePainlessScript(fields map[string]interface{}) ([]byte, error) {
+func renderUpdatePainlessScript(outputName string, fields map[string]interface{}) ([]byte, error) {
 	var source strings.Builder
+	source.WriteString(fmt.Sprintf(`
+if (ctx._source['elasticsearch_outputs']==null)
+  {ctx._source['elasticsearch_outputs']=new HashMap();}
+if (ctx._source['elasticsearch_outputs']['%s']==null)
+  {ctx._source['elasticsearch_outputs']['%s']=new HashMap();}
+`,
+		outputName, outputName))
+
 	for field := range fields {
-		if field == dl.FieldDefaultAPIKeyHistory {
-			source.WriteString(fmt.Sprint("if (ctx._source.", field, "==null) {ctx._source.", field, "=new ArrayList();} ctx._source.", field, ".add(params.", field, ");"))
+		if field == dl.FieldPolicyOutputToRetireAPIKeys {
+			source.WriteString(fmt.Sprintf(`
+if (ctx._source['elasticsearch_outputs']['%s'].%s==null)
+  {ctx._source['elasticsearch_outputs']['%s'].%s=new ArrayList();}
+ctx._source['elasticsearch_outputs']['%s'].%s.add(params.%s);
+`, outputName, field, outputName, field, outputName, field, field))
 		} else {
-			source.WriteString(fmt.Sprint("ctx._source.", field, "=", "params.", field, ";"))
+			source.WriteString(fmt.Sprintf(`
+ctx._source['elasticsearch_outputs']['%s'].%s=params.%s;`,
+				outputName, field, field))
 		}
 	}
 
