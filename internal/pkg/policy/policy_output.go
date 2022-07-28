@@ -41,8 +41,13 @@ type Output struct {
 // Prepare prepares the output p to be sent to the elastic-agent
 // The agent might be mutated for an elasticsearch output
 func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
+	zlog = zlog.With().
+		Str("fleet.agent.id", agent.Id).
+		Str("fleet.policy.output.name", p.Name).Logger()
+
 	switch p.Type {
 	case OutputTypeElasticsearch:
+		zlog.Debug().Msg("preparing elasticsearch output")
 		if err := p.prepareElasticsearch(ctx, zlog, bulker, agent, outputMap); err != nil {
 			return fmt.Errorf("failed to prepare elasticsearch output %q: %w", p.Name, err)
 		}
@@ -56,13 +61,12 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	return nil
 }
 
-func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
-	zlog = zlog.With().
-		Str("fleet.agent.id", agent.Id).
-		Str("fleet.policy.output.name", p.Name).Logger()
-
-	zlog.Info().Msg("preparing elasticsearch output")
-
+func (p *Output) prepareElasticsearch(
+	ctx context.Context,
+	zlog zerolog.Logger,
+	bulker bulk.Bulk,
+	agent *model.Agent,
+	outputMap smap.Map) error {
 	// The role is required to do api key management
 	if p.Role == nil {
 		zlog.Error().
@@ -70,10 +74,6 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 			Msg("policy does not contain required output permission section")
 		return ErrNoOutputPerms
 	}
-
-	// 1 - just use the new ElasticsearchOutputs
-	// 2 - make the tests check if they're correctly filled in
-	// 3 - ensure Default* is made empty/nil at the end
 
 	output, ok := agent.ElasticsearchOutputs[p.Name]
 	if !ok {
@@ -86,7 +86,7 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 		agent.ElasticsearchOutputs[p.Name] = output
 	}
 
-	// Migration path:
+	// Migration path, see https://github.com/elastic/fleet-server/issues/1672:
 	// - force API keys to be regenerated:
 	//    - make them empty
 	//    - add them to Old API key, so they'll be deleted
@@ -189,16 +189,6 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 	// in place to reduce number of agent policy allocation when sending the updated
 	// agent policy to multiple agents.
 	// See: https://github.com/elastic/fleet-server/issues/1301
-	//
-	// WIP:
-	// The agent struct is a pointer, thus shared between the runs of Prepare
-	// for each output. Given 2 outputs (1 and 2), if 1 gets a new API key,
-	// agent.DefaultAPIKey changes. However, if 2 does not get one, the code
-	// below runs anyway, therefore the API key for output 2 will be set to the
-	// api key for output 1
-	// The agent struct cannot be shared! The new API key must be its own local
-	// variable and a special case for the 'default output' has to handle
-	// updating agent.DefaultAPIKey.
 	if err := setMapObj(outputMap, output.APIKey, p.Name, "api_key"); err != nil {
 		return err
 	}
@@ -208,22 +198,27 @@ func (p *Output) prepareElasticsearch(ctx context.Context, zlog zerolog.Logger, 
 
 func renderUpdatePainlessScript(outputName string, fields map[string]interface{}) ([]byte, error) {
 	var source strings.Builder
+
+	// prepare agent.elasticsearch_outputs[OUTPUT_NAME]
 	source.WriteString(fmt.Sprintf(`
 if (ctx._source['elasticsearch_outputs']==null)
   {ctx._source['elasticsearch_outputs']=new HashMap();}
 if (ctx._source['elasticsearch_outputs']['%s']==null)
   {ctx._source['elasticsearch_outputs']['%s']=new HashMap();}
-`,
-		outputName, outputName))
+`, outputName, outputName))
 
 	for field := range fields {
 		if field == dl.FieldPolicyOutputToRetireAPIKeys {
+			// dl.FieldPolicyOutputToRetireAPIKeys is a special case.
+			// It's an array that gets deleted when the keys are invalidated.
+			// Thus, append the old API key ID, create the field if necessary.
 			source.WriteString(fmt.Sprintf(`
 if (ctx._source['elasticsearch_outputs']['%s'].%s==null)
   {ctx._source['elasticsearch_outputs']['%s'].%s=new ArrayList();}
 ctx._source['elasticsearch_outputs']['%s'].%s.add(params.%s);
 `, outputName, field, outputName, field, outputName, field, field))
 		} else {
+			// Update the other fields
 			source.WriteString(fmt.Sprintf(`
 ctx._source['elasticsearch_outputs']['%s'].%s=params.%s;`,
 				outputName, field, field))
