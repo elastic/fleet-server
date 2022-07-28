@@ -28,21 +28,21 @@ const (
 	FieldActionSeqNo = "action_seq_no"
 
 	FieldActionID                    = "action_id"
-	FieldPolicyID                    = "policy_id"
-	FieldRevisionIdx                 = "revision_idx"
+	FieldAgent                       = "agent"
+	FieldAgentVersion                = "version"
 	FieldCoordinatorIdx              = "coordinator_idx"
 	FieldLastCheckin                 = "last_checkin"
 	FieldLastCheckinStatus           = "last_checkin_status"
 	FieldLocalMetadata               = "local_metadata"
-	FieldPolicyRevisionIdx           = "policy_revision_idx"
 	FieldPolicyCoordinatorIdx        = "policy_coordinator_idx"
-	FieldDefaultAPIKey               = "default_api_key"
-	FieldDefaultAPIKeyID             = "default_api_key_id"      //nolint:gosec // field name
-	FieldDefaultAPIKeyHistory        = "default_api_key_history" //nolint:gosec // field name
-	FieldPolicyOutputPermissionsHash = "policy_output_permissions_hash"
+	FieldPolicyID                    = "policy_id"
+	FieldPolicyOutputAPIKey          = "api_key"
+	FieldPolicyOutputAPIKeyID        = "api_key_id" //nolint:gosec // field name
+	FieldPolicyOutputPermissionsHash = "policy_permissions_hash"
+	FieldPolicyOutputToRetireAPIKeys = "to_retire_api_keys" //nolint:gosec // field name
+	FieldPolicyRevisionIdx           = "policy_revision_idx"
+	FieldRevisionIdx                 = "revision_idx"
 	FieldUnenrolledReason            = "unenrolled_reason"
-	FieldAgentVersion                = "version"
-	FieldAgent                       = "agent"
 
 	FieldActive           = "active"
 	FieldUpdatedAt        = "updated_at"
