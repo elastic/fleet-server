@@ -159,7 +159,7 @@ func TestMonitorUnenroller(t *testing.T) {
 		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentID, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, "", apikey.TypeAccess),
 	)
 	require.NoError(t, err)
 	outputKey, err := bulker.APIKeyCreate(
@@ -167,7 +167,7 @@ func TestMonitorUnenroller(t *testing.T) {
 		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentID, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, "default", apikey.TypeAccess),
 	)
 	require.NoError(t, err)
 
@@ -306,7 +306,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentID, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, "", apikey.TypeAccess),
 	)
 	require.NoError(t, err)
 	outputKey, err := bulker.APIKeyCreate(
@@ -314,7 +314,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentID, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, "default", apikey.TypeAccess),
 	)
 	require.NoError(t, err)
 
