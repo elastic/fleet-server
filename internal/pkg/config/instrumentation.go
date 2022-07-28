@@ -6,13 +6,14 @@ package config
 
 // Instrumentation configures APM Tracing for the `fleet-server`.
 type Instrumentation struct {
-	TLS          InstrumentationTLS `config:"tls"`
-	Environment  string             `config:"environment"`
-	APIKey       string             `config:"api_key"`
-	SecretToken  string             `config:"secret_token"`
-	Hosts        []string           `config:"hosts"`
-	Enabled      bool               `config:"enabled"`
-	GlobalLabels string             `config:"global_labels"`
+	TLS                   InstrumentationTLS `config:"tls"`
+	Environment           string             `config:"environment"`
+	APIKey                string             `config:"api_key"`
+	SecretToken           string             `config:"secret_token"`
+	Hosts                 []string           `config:"hosts"`
+	Enabled               bool               `config:"enabled"`
+	GlobalLabels          string             `config:"global_labels"`
+	TransactionSampleRate string             `config:"transaction_sample_rate"`
 }
 
 type InstrumentationTLS struct {
