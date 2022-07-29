@@ -86,6 +86,9 @@ func (p *Output) prepareElasticsearch(
 		agent.ElasticsearchOutputs[p.Name] = output
 	}
 
+	// Now that there is a 'migrateElasticsearchOutputs' on internal/pkg/dl/migration.go,
+	// the code below likely can be deleted and this function can only rely on the new agent model.
+
 	// Migration path, see https://github.com/elastic/fleet-server/issues/1672:
 	// - force API keys to be regenerated:
 	//    - make them empty

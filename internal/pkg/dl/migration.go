@@ -20,51 +20,36 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Migrate(ctx context.Context, bulker bulk.Bulk) error {
-	return migrateAgentMetadata(ctx, bulker)
-}
-
-// FleetServer 7.15 added a new *AgentMetadata field to the Agent record.
-// This field was populated in new enrollments in 7.15 and later; however, the
-// change was not backported to support 7.14.  The security team is reliant on the
-// existence of this field in 7.16, so the following migration was added to
-// support upgrade from 7.14.
-//
-// It is currently safe to run this in the background; albeit with some
-// concern on conflicts.  The conflict risk exists regardless as N Fleet Servers
-// can be run in parallel at the same time.
-//
-// As the update only occurs once, the 99.9% case is a noop.
-func migrateAgentMetadata(ctx context.Context, bulker bulk.Bulk) error {
-
-	root := dsl.NewRoot()
-	root.Query().Bool().MustNot().Exists("agent.id")
-
-	painless := "ctx._source.agent = [:]; ctx._source.agent.id = ctx._id;"
-	root.Param("script", painless)
-
-	body, err := root.MarshalJSON()
-	if err != nil {
-		return err
+type (
+	migrationBodyFn   func() (string, []byte, error)
+	migrationResponse struct {
+		Took             int  `json:"took"`
+		TimedOut         bool `json:"timed_out"`
+		Total            int  `json:"total"`
+		Updated          int  `json:"updated"`
+		Deleted          int  `json:"deleted"`
+		Batches          int  `json:"batches"`
+		VersionConflicts int  `json:"version_conflicts"`
+		Noops            int  `json:"noops"`
+		Retries          struct {
+			Bulk   int `json:"bulk"`
+			Search int `json:"search"`
+		} `json:"retries"`
+		Failures []json.RawMessage `json:"failures"`
 	}
+)
 
-LOOP:
-	for {
-		nConflicts, err := updateAgentMetadata(ctx, bulker, body)
-		if err != nil {
+func Migrate(ctx context.Context, bulker bulk.Bulk) error {
+	for _, fn := range []migrationBodyFn{migrateAgentMetadata, migrateElasticsearchOutputs} {
+		if _, err := migrate(ctx, bulker, fn); err != nil {
 			return err
 		}
-		if nConflicts == 0 {
-			break LOOP
-		}
-
-		time.Sleep(time.Second)
 	}
 
 	return nil
 }
 
-func updateAgentMetadata(ctx context.Context, bulker bulk.Bulk, body []byte) (int, error) {
+func applyMigration(ctx context.Context, name string, bulker bulk.Bulk, body []byte) (migrationResponse, error) {
 	start := time.Now()
 
 	client := bulker.Client()
@@ -79,39 +64,25 @@ func updateAgentMetadata(ctx context.Context, bulker bulk.Bulk, body []byte) (in
 	}
 
 	res, err := client.UpdateByQuery([]string{FleetAgents}, opts...)
-
 	if err != nil {
-		return 0, err
+		return migrationResponse{}, err
 	}
 
 	if res.IsError() {
 		if res.StatusCode == http.StatusNotFound {
 			// Ignore index not created yet; nothing to upgrade
-			return 0, nil
+			return migrationResponse{}, nil
 		}
 
-		return 0, fmt.Errorf("Migrate UpdateByQuery %s", res.String())
+		return migrationResponse{}, fmt.Errorf("migrate %s UpdateByQuery failed: %s",
+			name, res.String())
 	}
 
-	resp := struct {
-		Took             int  `json:"took"`
-		TimedOut         bool `json:"timed_out"`
-		Total            int  `json:"total"`
-		Updated          int  `json:"updated"`
-		Deleted          int  `json:"deleted"`
-		Batches          int  `json:"batches"`
-		VersionConflicts int  `json:"version_conflicts"`
-		Noops            int  `json:"noops"`
-		Retries          struct {
-			Bulk   int `json:"bulk"`
-			Search int `json:"search"`
-		} `json:"retries"`
-		Failures []json.RawMessage `json:"failures"`
-	}{}
+	resp := migrationResponse{}
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&resp); err != nil {
-		return 0, errors.Wrap(err, "decode UpdateByQuery response")
+		return migrationResponse{}, errors.Wrap(err, "decode UpdateByQuery response")
 	}
 
 	log.Info().
@@ -126,11 +97,97 @@ func updateAgentMetadata(ctx context.Context, bulker bulk.Bulk, body []byte) (in
 		Int("retries.bulk", resp.Retries.Bulk).
 		Int("retries.search", resp.Retries.Search).
 		Dur("rtt", time.Since(start)).
-		Msg("migrate agent records response")
+		Msgf("migration %s: agent records response", name)
 
 	for _, fail := range resp.Failures {
-		log.Error().RawJSON("failure", fail).Msg("migration failure")
+		log.Error().RawJSON("failure", fail).Msgf("failed applying %s migration", name)
 	}
 
-	return resp.VersionConflicts, err
+	return resp, err
+}
+
+func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, error) {
+	var updatedDocs int
+	for {
+		name, body, err := fn()
+		if err != nil {
+			return updatedDocs, fmt.Errorf(": %w", err)
+		}
+
+		resp, err := applyMigration(ctx, name, bulker, body)
+		if err != nil {
+			return updatedDocs, fmt.Errorf("failed to apply migration %q: %w",
+				name, err)
+		}
+		updatedDocs += resp.Updated
+		if resp.VersionConflicts == 0 {
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+	return updatedDocs, nil
+}
+
+// FleetServer 7.15 added a new *AgentMetadata field to the Agent record.
+// This field was populated in new enrollments in 7.15 and later; however, the
+// change was not backported to support 7.14. The security team is reliant on the
+// existence of this field in 7.16, so the following migration was added to
+// support upgrade from 7.14.
+//
+// It is currently safe to run this in the background; albeit with some
+// concern on conflicts.  The conflict risk exists regardless as N Fleet Servers
+// can be run in parallel at the same time.
+//
+// As the update only occurs once, the 99.9% case is a noop.
+func migrateAgentMetadata() (string, []byte, error) {
+	const migrationName = "AgentMetadata"
+	root := dsl.NewRoot()
+	root.Query().Bool().MustNot().Exists("agent.id")
+
+	painless := "ctx._source.agent = [:]; ctx._source.agent.id = ctx._id;"
+	root.Param("script", painless)
+
+	body, err := root.MarshalJSON()
+	if err != nil {
+		return migrationName, nil, fmt.Errorf("could not marshal ES query: %w", err)
+	}
+
+	return migrationName, body, nil
+}
+
+// TODO(Anderson): Add migration description
+func migrateElasticsearchOutputs() (string, []byte, error) {
+	const migrationName = "ElasticsearchOutputs"
+
+	root := dsl.NewRoot()
+	root.Query().Bool().MustNot().Exists("elasticsearch_outputs")
+
+	painless := `
+// set up the new filed
+if (ctx._source['elasticsearch_outputs']==null)
+ {ctx._source['elasticsearch_outputs']=new HashMap();}
+if (ctx._source['elasticsearch_outputs']['default']==null)
+ {ctx._source['elasticsearch_outputs']['default']=new HashMap();}
+
+// copy old values to new 'elasticsearch_outputs' field
+ctx._source['elasticsearch_outputs']['default'].to_retire_api_keys=ctx._source.default_api_key_history;
+ctx._source['elasticsearch_outputs']['default'].api_key=ctx._source.default_api_key;
+ctx._source['elasticsearch_outputs']['default'].api_key_id=ctx._source.default_api_key_id;
+ctx._source['elasticsearch_outputs']['default'].policy_permissions_hash=ctx._source.policy_output_permissions_hash;
+
+// Erase deprecated fields
+ctx._source.default_api_key_history=null;
+ctx._source.default_api_key="";
+ctx._source.default_api_key_id="";
+ctx._source.policy_output_permissions_hash="";
+`
+	root.Param("script", painless)
+
+	body, err := root.MarshalJSON()
+	if err != nil {
+		return migrationName, nil, fmt.Errorf("could not marshal ES query: %w", err)
+	}
+
+	return migrationName, body, nil
 }

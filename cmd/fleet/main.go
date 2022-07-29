@@ -809,12 +809,12 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
-	// Run migrations; current safe to do in background.  That may change in the future.
+	// Run migrations; currently it's safe to do it in the background. That may change in the future.
 	g.Go(loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
 		return dl.Migrate(ctx, bulker)
 	}))
 
-	// Run schduler for periodic GC/cleanup
+	// Run scheduler for periodic GC/cleanup
 	gcCfg := cfg.Inputs[0].Server.GC
 	sched, err := scheduler.New(gc.Schedules(bulker, gcCfg.ScheduleInterval, gcCfg.CleanupAfterExpiredInterval))
 	if err != nil {
@@ -831,6 +831,7 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	}
 
 	// Coordinator policy monitor
+	// TODO(Anderson): perhapes here to increase the coordinator index
 	pim, err := monitor.New(dl.FleetPolicies, esCli, monCli,
 		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
 		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
