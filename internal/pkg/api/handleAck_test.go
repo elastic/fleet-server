@@ -15,13 +15,14 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
-	"github.com/google/go-cmp/cmp"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -438,4 +439,36 @@ func TestHandleAckEvents(t *testing.T) {
 			bulker.AssertExpectations(t)
 		})
 	}
+}
+
+func TestInvalidateAPIKeys(t *testing.T) {
+	toRetire1 := []model.ToRetireAPIKeysItems{{
+		ID: "toRetire1",
+	}}
+	toRetire2 := []model.ToRetireAPIKeysItems{{
+		ID: "toRetire2_0",
+	}, {
+		ID: "toRetire2_1",
+	}}
+	var toRetire3 []model.ToRetireAPIKeysItems
+
+	want := []string{"toRetire1", "toRetire2_0", "toRetire2_1"}
+
+	agent := model.Agent{
+		Outputs: map[string]*model.PolicyOutput{
+			"1": {ToRetireAPIKeys: toRetire1},
+			"2": {ToRetireAPIKeys: toRetire2},
+			"3": {ToRetireAPIKeys: toRetire3},
+		},
+	}
+
+	bulker := ftesting.NewMockBulk()
+	bulker.On("APIKeyInvalidate",
+		context.Background(), want).
+		Return(nil)
+
+	ack := &AckT{bulk: bulker}
+	ack.invalidateAPIKeys(context.Background(), &agent)
+
+	bulker.AssertExpectations(t)
 }
