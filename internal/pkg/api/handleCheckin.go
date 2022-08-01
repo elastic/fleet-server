@@ -61,7 +61,6 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 		Logger()
 
 	err := rt.ct.handleCheckin(&zlog, w, r, id)
-
 	if err != nil {
 		cntCheckin.IncError(err)
 		resp := NewHTTPErrResp(err)

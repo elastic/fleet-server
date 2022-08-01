@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/pkg/errors"
@@ -40,7 +41,7 @@ type (
 )
 
 func Migrate(ctx context.Context, bulker bulk.Bulk) error {
-	for _, fn := range []migrationBodyFn{migrateAgentMetadata, migrateOutputs} {
+	for _, fn := range []migrationBodyFn{migrateAgentMetadata, migrateAgentOutputs} {
 		if _, err := migrate(ctx, bulker, fn); err != nil {
 			return err
 		}
@@ -157,18 +158,21 @@ func migrateAgentMetadata() (string, []byte, error) {
 	return migrationName, body, nil
 }
 
+// migrateAgentOutputs performs the necessary changes on the Agent documents
+// to introduce the `Outputs` field.
+//
 // FleetServer 8.4.0 introduces a new field to the Agent document, Outputs, to
 // store the outputs credentials and data. The DefaultAPIKey, DefaultAPIKeyID,
 // DefaultAPIKeyHistory and PolicyOutputPermissionsHash are now deprecated in
 // favour of the new `Outputs` fields, which maps the output name to its data.
 // This change fixes https://github.com/elastic/fleet-server/issues/1672.
-
+//
 // The change is backward compatible as the deprecated fields are just set to
 // their zero value and an older version of FleetServer can repopulate them.
 // However, reverting FleetServer to an older version might cause very issue
 // this change fixes.
-func migrateOutputs() (string, []byte, error) {
-	const migrationName = "Outputs"
+func migrateAgentOutputs() (string, []byte, error) {
+	const migrationName = "AgentOutputs"
 
 	root := dsl.NewRoot()
 	root.Query().Bool().MustNot().Exists("elasticsearch_outputs")
@@ -181,7 +185,47 @@ if (ctx._source['outputs']['default']==null)
  {ctx._source['outputs']['default']=new HashMap();}
 
 // copy old values to new 'outputs' field
-ctx._source['outputs']['default'].type="elasticsearch";
+ctx._source['outputs']['default'].type="` + policy.OutputTypeElasticsearch + `";
+ctx._source['outputs']['default'].to_retire_api_keys=ctx._source.default_api_key_history;
+ctx._source['outputs']['default'].api_key=ctx._source.default_api_key;
+ctx._source['outputs']['default'].api_key_id=ctx._source.default_api_key_id;
+ctx._source['outputs']['default'].policy_permissions_hash=ctx._source.policy_output_permissions_hash;
+
+// Erase deprecated fields
+ctx._source.default_api_key_history=null;
+ctx._source.default_api_key="";
+ctx._source.default_api_key_id="";
+ctx._source.policy_output_permissions_hash="";
+`
+	root.Param("script", painless)
+
+	body, err := root.MarshalJSON()
+	if err != nil {
+		return migrationName, nil, fmt.Errorf("could not marshal ES query: %w", err)
+	}
+
+	return migrationName, body, nil
+}
+
+// migratePolicyCoordinatorIdx increases the policy's CoordinatorIdx to force
+// a policy update ensuring the output data will be migrated to the new
+// Agent.Outputs field. See migrateAgentOutputs and https://github.com/elastic/fleet-server/issues/1672
+// for details.
+func migratePolicyCoordinatorIdx() (string, []byte, error) {
+	const migrationName = "AgentOutputs"
+
+	root := dsl.NewRoot()
+	root.Query().Bool().MustNot().Exists("elasticsearch_outputs")
+
+	painless := `
+// set up the new filed
+if (ctx._source['outputs']==null)
+ {ctx._source['outputs']=new HashMap();}
+if (ctx._source['outputs']['default']==null)
+ {ctx._source['outputs']['default']=new HashMap();}
+
+// copy old values to new 'outputs' field
+ctx._source['outputs']['default'].type="` + policy.OutputTypeElasticsearch + `";
 ctx._source['outputs']['default'].to_retire_api_keys=ctx._source.default_api_key_history;
 ctx._source['outputs']['default'].api_key=ctx._source.default_api_key;
 ctx._source['outputs']['default'].api_key_id=ctx._source.default_api_key_id;

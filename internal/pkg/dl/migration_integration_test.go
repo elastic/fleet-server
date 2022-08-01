@@ -75,7 +75,7 @@ func TestMigrateOutputs(t *testing.T) {
 
 	agentIDs := createSomeAgents(t, 10, apiKey, index, bulker)
 
-	migratedAgents, err := migrate(context.Background(), bulker, migrateOutputs)
+	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
 	require.NoError(t, err)
 
 	assert.Equal(t, len(agentIDs), migratedAgents)
