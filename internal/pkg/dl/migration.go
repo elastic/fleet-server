@@ -12,13 +12,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
-
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 )
 
 type (
@@ -185,7 +184,7 @@ if (ctx._source['outputs']['default']==null)
  {ctx._source['outputs']['default']=new HashMap();}
 
 // copy old values to new 'outputs' field
-ctx._source['outputs']['default'].type="` + policy.OutputTypeElasticsearch + `";
+ctx._source['outputs']['default'].type="elasticsearch";
 ctx._source['outputs']['default'].to_retire_api_keys=ctx._source.default_api_key_history;
 ctx._source['outputs']['default'].api_key=ctx._source.default_api_key;
 ctx._source['outputs']['default'].api_key_id=ctx._source.default_api_key_id;
@@ -225,7 +224,7 @@ if (ctx._source['outputs']['default']==null)
  {ctx._source['outputs']['default']=new HashMap();}
 
 // copy old values to new 'outputs' field
-ctx._source['outputs']['default'].type="` + policy.OutputTypeElasticsearch + `";
+ctx._source['outputs']['default'].type="elasticsearch";
 ctx._source['outputs']['default'].to_retire_api_keys=ctx._source.default_api_key_history;
 ctx._source['outputs']['default'].api_key=ctx._source.default_api_key;
 ctx._source['outputs']['default'].api_key_id=ctx._source.default_api_key_id;
