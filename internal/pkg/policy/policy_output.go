@@ -70,7 +70,6 @@ func (p *Output) prepareElasticsearch(
 	// The role is required to do api key management
 	if p.Role == nil {
 		zlog.Error().
-			Str("fleet.output.name", p.Name).
 			Msg("policy does not contain required output permission section")
 		return ErrNoOutputPerms
 	}
@@ -86,39 +85,12 @@ func (p *Output) prepareElasticsearch(
 		agent.ElasticsearchOutputs[p.Name] = output
 	}
 
-	// Now that there is a 'migrateElasticsearchOutputs' on internal/pkg/dl/migration.go,
-	// the code below likely can be deleted and this function can only rely on the new agent model.
-
-	// Migration path, see https://github.com/elastic/fleet-server/issues/1672:
-	// - force API keys to be regenerated:
-	//    - make them empty
-	//    - add them to Old API key, so they'll be deleted
-	// - use agent.ElasticsearchOutputs instead of agent.Default*
-	if agent.DefaultAPIKey != "" {
-		output.APIKey = ""
-		output.APIKeyID = ""
-		output.PolicyPermissionsHash = agent.PolicyOutputPermissionsHash
-		output.ToRetireAPIKeys = append(output.ToRetireAPIKeys,
-			model.ToRetireAPIKeysItems{
-				ID:        agent.DefaultAPIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-			})
-		output.ToRetireAPIKeys = append(output.ToRetireAPIKeys,
-			agent.DefaultAPIKeyHistory...)
-
-		agent.DefaultAPIKey = ""
-		agent.DefaultAPIKeyID = ""
-		agent.PolicyOutputPermissionsHash = ""
-		agent.DefaultAPIKeyHistory = nil
-	}
-
 	// Determine whether we need to generate an output ApiKey.
-	// This is accomplished by comparing the sha2 hash stored in the agent
-	// record with the precalculated sha2 hash of the role.
+	// This is accomplished by comparing the sha2 hash stored in the corresponding
+	// output in the agent record with the precalculated sha2 hash of the role.
 
 	// Note: This will need to be updated when doing multi-cluster elasticsearch support
-	// Currently, we only have access to the token for the elasticsearch instance fleet-server
-	// is monitors. When updating for multiple ES instances we need to tie the token to the output.
+	// Currently, we assume all ES outputs are the same ES fleet-server is connected to.
 	needNewKey := true
 	switch {
 	case output.APIKey == "":
@@ -153,10 +125,10 @@ func (p *Output) prepareElasticsearch(
 		output.PolicyPermissionsHash = p.Role.Sha2 // for the sake of consistency
 
 		// When a new keys is generated we need to update the Agent record,
-		// this will need to be updated when multiples Elasticsearch output
-		// are used.
+		// this will need to be updated when multiples remote Elasticsearch output
+		// are supported.
 		zlog.Info().
-			Str("fleet.role.hash.sha256", p.Role.Sha2).
+			Str("fleet.policy.role.hash.sha256", p.Role.Sha2).
 			Str(logger.DefaultOutputAPIKeyID, outputAPIKey.ID).
 			Msg("Updating agent record to pick up default output key.")
 
