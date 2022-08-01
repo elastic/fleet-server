@@ -86,18 +86,19 @@ func applyMigration(ctx context.Context, name string, bulker bulk.Bulk, body []b
 	}
 
 	log.Info().
-		Int("took", resp.Took).
-		Bool("timed_out", resp.TimedOut).
-		Int("total", resp.Total).
-		Int("updated", resp.Updated).
-		Int("deleted", resp.Deleted).
-		Int("batches", resp.Batches).
-		Int("version_conflicts", resp.VersionConflicts).
-		Int("noops", resp.Noops).
-		Int("retries.bulk", resp.Retries.Bulk).
-		Int("retries.search", resp.Retries.Search).
-		Dur("rtt", time.Since(start)).
-		Msgf("migration %s: agent records response", name)
+		Str("fleet.migration.name", name).
+		Int("fleet.migration.es.took", resp.Took).
+		Bool("fleet.migration.es.timed_out", resp.TimedOut).
+		Int("fleet.migration.total", resp.Total).
+		Int("fleet.migration.updated", resp.Updated).
+		Int("fleet.migration.deleted", resp.Deleted).
+		Int("fleet.migration.batches", resp.Batches).
+		Int("fleet.migration.version_conflicts", resp.VersionConflicts).
+		Int("fleet.migration.noops", resp.Noops).
+		Int("fleet.migration.retries.bulk", resp.Retries.Bulk).
+		Int("fleet.migration.retries.search", resp.Retries.Search).
+		Dur("fleet.migration.total.duration", time.Since(start)).
+		Msgf("migration %s done", name)
 
 	for _, fail := range resp.Failures {
 		log.Error().RawJSON("failure", fail).Msgf("failed applying %s migration", name)
@@ -136,7 +137,7 @@ func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, er
 // support upgrade from 7.14.
 //
 // It is currently safe to run this in the background; albeit with some
-// concern on conflicts.  The conflict risk exists regardless as N Fleet Servers
+// concern on conflicts. The conflict risk exists regardless as N Fleet Servers
 // can be run in parallel at the same time.
 //
 // As the update only occurs once, the 99.9% case is a noop.
@@ -156,7 +157,16 @@ func migrateAgentMetadata() (string, []byte, error) {
 	return migrationName, body, nil
 }
 
-// TODO(Anderson): Add migration description
+// FleetServer 8.4.0 introduces a new field to the Agent document, Outputs, to
+// store the outputs credentials and data. The DefaultAPIKey, DefaultAPIKeyID,
+// DefaultAPIKeyHistory and PolicyOutputPermissionsHash are now deprecated in
+// favour of the new `Outputs` fields, which maps the output name to its data.
+// This change fixes https://github.com/elastic/fleet-server/issues/1672.
+
+// The change is backward compatible as the deprecated fields are just set to
+// their zero value and an older version of FleetServer can repopulate them.
+// However, reverting FleetServer to an older version might cause very issue
+// this change fixes.
 func migrateElasticsearchOutputs() (string, []byte, error) {
 	const migrationName = "ElasticsearchOutputs"
 
