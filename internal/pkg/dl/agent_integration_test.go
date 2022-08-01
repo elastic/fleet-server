@@ -118,7 +118,7 @@ func TestFindAgent_NewModel(t *testing.T) {
 	policyID := uuid.Must(uuid.NewV4()).String()
 	agentID := uuid.Must(uuid.NewV4()).String()
 
-	wantElasticsearchOutputs := map[string]*model.PolicyOutput{
+	wantOutputs := map[string]*model.PolicyOutput{
 		"default": {
 			APIKey: "TestFindNewModelAgent_APIKey",
 			ToRetireAPIKeys: []model.ToRetireAPIKeysItems{
@@ -131,13 +131,13 @@ func TestFindAgent_NewModel(t *testing.T) {
 		},
 	}
 	body, err := json.Marshal(model.Agent{
-		PolicyID:             policyID,
-		Active:               true,
-		LastCheckin:          nowStr,
-		LastCheckinStatus:    "",
-		UpdatedAt:            nowStr,
-		EnrolledAt:           nowStr,
-		ElasticsearchOutputs: wantElasticsearchOutputs,
+		PolicyID:          policyID,
+		Active:            true,
+		LastCheckin:       nowStr,
+		LastCheckinStatus: "",
+		UpdatedAt:         nowStr,
+		EnrolledAt:        nowStr,
+		Outputs:           wantOutputs,
 	})
 	require.NoError(t, err)
 
@@ -150,5 +150,5 @@ func TestFindAgent_NewModel(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, agentID, agent.Id)
-	assert.Equal(t, wantElasticsearchOutputs, agent.ElasticsearchOutputs)
+	assert.Equal(t, wantOutputs, agent.Outputs)
 }

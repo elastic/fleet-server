@@ -244,6 +244,7 @@
         "name"
       ]
     },
+
     "server-metadata": {
       "title": "Server Metadata",
       "description": "A Fleet Server metadata",
@@ -264,6 +265,7 @@
         "version"
       ]
     },
+
     "server": {
       "title": "Server",
       "description": "A Fleet Server",
@@ -284,6 +286,7 @@
         "server"
       ]
     },
+
     "policy": {
       "title": "Policy",
       "description": "A policy that an Elastic Agent is attached to",
@@ -329,6 +332,7 @@
         "default_fleet_server"
       ]
     },
+
     "policy-leader": {
       "title": "Policy Leader",
       "description": "The current leader Fleet Server for a policy",
@@ -384,13 +388,18 @@
         "policy_permissions_hash": {
           "description": "The policy output permissions hash",
           "type": "string"
+        },
+        "type": {
+          "description": "Type is the output type. Currently only Elasticsearch is supported.",
+          "type": "string"
         }
       },
       "required": [
         "api_key",
         "api_key_history",
         "api_key_id",
-        "policy_permissions_hash"
+        "policy_permissions_hash",
+        "type"
       ]
     },
 
@@ -515,8 +524,8 @@
           "description": "Deprecated. Use Outputs instead. Default API Key History",
           "$ref":  "#/definitions/to_retire_api_keys"
         },
-        "elasticsearch_outputs": {
-          "description": "ElasticsearchOutputs is the policy output data for each Elasticsearch output. It maps the output name to its data",
+        "outputs": {
+          "description": "Outputs is the policy output data, mapping the output name to its data",
           "type": "object",
           "additionalProperties": {  "$ref":  "#/definitions/policy_output"}
         },
@@ -548,6 +557,7 @@
         "status"
       ]
     },
+
     "enrollment_api_key": {
       "title": "Enrollment API key",
       "description": "An Elastic Agent enrollment API key",
@@ -591,6 +601,7 @@
       ]
     }
   },
+
   "checkin": {
     "title": "Checkin",
     "description": "An Elastic Agent checkin to Fleet",

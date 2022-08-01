@@ -105,13 +105,14 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		}
 
 		testAgent := &model.Agent{
-			ElasticsearchOutputs: map[string]*model.PolicyOutput{
+			Outputs: map[string]*model.PolicyOutput{
 				output.Name: {
 					ESDocument:            model.ESDocument{},
 					APIKey:                apiKey.Agent(),
 					ToRetireAPIKeys:       nil,
 					APIKeyID:              apiKey.ID,
 					PolicyPermissionsHash: hashPerm,
+					Type:                  OutputTypeElasticsearch,
 				},
 			},
 		}
@@ -120,7 +121,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		require.NoError(t, err, "expected prepare to pass")
 
 		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
-		gotOutput := testAgent.ElasticsearchOutputs[output.Name]
+		gotOutput := testAgent.Outputs[output.Name]
 
 		require.True(t, ok, "api key not present on policy map")
 		assert.Equal(t, apiKey.Agent(), key)
@@ -128,6 +129,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		assert.Equal(t, apiKey.Agent(), gotOutput.APIKey)
 		assert.Equal(t, apiKey.ID, gotOutput.APIKeyID)
 		assert.Equal(t, output.Role.Sha2, gotOutput.PolicyPermissionsHash)
+		assert.Equal(t, output.Type, gotOutput.Type)
 		assert.Empty(t, gotOutput.ToRetireAPIKeys)
 
 		// Old model must always remain empty
@@ -172,13 +174,14 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		}
 
 		testAgent := &model.Agent{
-			ElasticsearchOutputs: map[string]*model.PolicyOutput{
+			Outputs: map[string]*model.PolicyOutput{
 				output.Name: {
 					ESDocument:            model.ESDocument{},
 					APIKey:                oldAPIKey.Agent(),
 					ToRetireAPIKeys:       nil,
 					APIKeyID:              oldAPIKey.ID,
 					PolicyPermissionsHash: hashPerm,
+					Type:                  OutputTypeElasticsearch,
 				},
 			},
 		}
@@ -187,7 +190,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		require.NoError(t, err, "expected prepare to pass")
 
 		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
-		gotOutput := testAgent.ElasticsearchOutputs[output.Name]
+		gotOutput := testAgent.Outputs[output.Name]
 
 		require.True(t, ok, "unable to case api key")
 		require.Equal(t, wantAPIKey.Agent(), key)
@@ -195,6 +198,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		assert.Equal(t, wantAPIKey.Agent(), gotOutput.APIKey)
 		assert.Equal(t, wantAPIKey.ID, gotOutput.APIKeyID)
 		assert.Equal(t, output.Role.Sha2, gotOutput.PolicyPermissionsHash)
+		assert.Equal(t, output.Type, gotOutput.Type)
 
 		// assert.Contains(t, gotOutput.ToRetireAPIKeys, oldAPIKey.ID) // TODO: assert on bulker.Update
 
@@ -231,13 +235,13 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			"test output": map[string]interface{}{},
 		}
 
-		testAgent := &model.Agent{ElasticsearchOutputs: map[string]*model.PolicyOutput{}}
+		testAgent := &model.Agent{Outputs: map[string]*model.PolicyOutput{}}
 
 		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
 		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
-		gotOutput := testAgent.ElasticsearchOutputs[output.Name]
+		gotOutput := testAgent.Outputs[output.Name]
 
 		require.True(t, ok, "unable to case api key")
 		assert.Equal(t, apiKey.Agent(), key)
@@ -245,6 +249,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		assert.Equal(t, apiKey.Agent(), gotOutput.APIKey)
 		assert.Equal(t, apiKey.ID, gotOutput.APIKeyID)
 		assert.Equal(t, output.Role.Sha2, gotOutput.PolicyPermissionsHash)
+		assert.Equal(t, output.Type, gotOutput.Type)
 		assert.Empty(t, gotOutput.ToRetireAPIKeys)
 
 		// Old model must always remain empty

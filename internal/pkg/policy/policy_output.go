@@ -74,15 +74,15 @@ func (p *Output) prepareElasticsearch(
 		return ErrNoOutputPerms
 	}
 
-	output, ok := agent.ElasticsearchOutputs[p.Name]
+	output, ok := agent.Outputs[p.Name]
 	if !ok {
-		if agent.ElasticsearchOutputs == nil {
-			agent.ElasticsearchOutputs = map[string]*model.PolicyOutput{}
+		if agent.Outputs == nil {
+			agent.Outputs = map[string]*model.PolicyOutput{}
 		}
 
-		zlog.Debug().Msgf("creating agent.ElasticsearchOutputs[%s]", p.Name)
+		zlog.Debug().Msgf("creating agent.Outputs[%s]", p.Name)
 		output = &model.PolicyOutput{}
-		agent.ElasticsearchOutputs[p.Name] = output
+		agent.Outputs[p.Name] = output
 	}
 
 	// Determine whether we need to generate an output ApiKey.
@@ -120,6 +120,7 @@ func (p *Output) prepareElasticsearch(
 			return fmt.Errorf("failed generate output API key: %w", err)
 		}
 
+		output.Type = OutputTypeElasticsearch
 		output.APIKey = outputAPIKey.Agent()
 		output.APIKeyID = outputAPIKey.ID
 		output.PolicyPermissionsHash = p.Role.Sha2 // for the sake of consistency
@@ -177,10 +178,10 @@ func renderUpdatePainlessScript(outputName string, fields map[string]interface{}
 
 	// prepare agent.elasticsearch_outputs[OUTPUT_NAME]
 	source.WriteString(fmt.Sprintf(`
-if (ctx._source['elasticsearch_outputs']==null)
-  {ctx._source['elasticsearch_outputs']=new HashMap();}
-if (ctx._source['elasticsearch_outputs']['%s']==null)
-  {ctx._source['elasticsearch_outputs']['%s']=new HashMap();}
+if (ctx._source['outputs']==null)
+  {ctx._source['outputs']=new HashMap();}
+if (ctx._source['outputs']['%s']==null)
+  {ctx._source['outputs']['%s']=new HashMap();}
 `, outputName, outputName))
 
 	for field := range fields {
@@ -189,14 +190,14 @@ if (ctx._source['elasticsearch_outputs']['%s']==null)
 			// It's an array that gets deleted when the keys are invalidated.
 			// Thus, append the old API key ID, create the field if necessary.
 			source.WriteString(fmt.Sprintf(`
-if (ctx._source['elasticsearch_outputs']['%s'].%s==null)
-  {ctx._source['elasticsearch_outputs']['%s'].%s=new ArrayList();}
-ctx._source['elasticsearch_outputs']['%s'].%s.add(params.%s);
+if (ctx._source['outputs']['%s'].%s==null)
+  {ctx._source['outputs']['%s'].%s=new ArrayList();}
+ctx._source['outputs']['%s'].%s.add(params.%s);
 `, outputName, field, outputName, field, outputName, field, field))
 		} else {
 			// Update the other fields
 			source.WriteString(fmt.Sprintf(`
-ctx._source['elasticsearch_outputs']['%s'].%s=params.%s;`,
+ctx._source['outputs']['%s'].%s=params.%s;`,
 				outputName, field, field))
 		}
 	}

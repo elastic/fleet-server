@@ -53,11 +53,12 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 				Key: "old_" + outputAPIKey.Key,
 			}
 
-			wantElasticsearchOutputs := map[string]*model.PolicyOutput{
+			wantOutputs := map[string]*model.PolicyOutput{
 				outputName: {
 					APIKey:                outputAPIKey.Agent(),
 					APIKeyID:              outputAPIKey.ID,
 					PolicyPermissionsHash: outputPermissionSha,
+					Type:                  OutputTypeElasticsearch,
 					ToRetireAPIKeys: append(tt.existingToRetireAPIKeys,
 						model.ToRetireAPIKeysItems{
 							ID: previousAPIKey.ID, RetiredAt: nowStr}),
@@ -71,8 +72,9 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 				LastCheckinStatus: "",
 				UpdatedAt:         nowStr,
 				EnrolledAt:        nowStr,
-				ElasticsearchOutputs: map[string]*model.PolicyOutput{
+				Outputs: map[string]*model.PolicyOutput{
 					outputName: {
+						Type:                  OutputTypeElasticsearch,
 						APIKey:                previousAPIKey.Agent(),
 						APIKeyID:              previousAPIKey.ID,
 						PolicyPermissionsHash: "old_" + outputPermissionSha,
@@ -80,7 +82,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 				},
 			}
 			if tt.existingToRetireAPIKeys != nil {
-				agentModel.ElasticsearchOutputs[outputName].ToRetireAPIKeys =
+				agentModel.Outputs[outputName].ToRetireAPIKeys =
 					tt.existingToRetireAPIKeys
 			}
 
@@ -114,8 +116,8 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, agentID, gotAgent.Id)
-			assert.Len(t, gotAgent.ElasticsearchOutputs, len(wantElasticsearchOutputs))
-			assert.Equal(t, wantElasticsearchOutputs, gotAgent.ElasticsearchOutputs)
+			assert.Len(t, gotAgent.Outputs, len(wantOutputs))
+			assert.Equal(t, wantOutputs, gotAgent.Outputs)
 		})
 	}
 }

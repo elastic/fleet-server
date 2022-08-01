@@ -129,9 +129,6 @@ type Agent struct {
 	// Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKeyID string `json:"default_api_key_id,omitempty"`
 
-	// ElasticsearchOutputs is the policy output data for each Elasticsearch output. It maps the output name to its data
-	ElasticsearchOutputs map[string]*PolicyOutput `json:"elasticsearch_outputs,omitempty"`
-
 	// Date/time the Elastic Agent enrolled
 	EnrolledAt string `json:"enrolled_at"`
 
@@ -146,6 +143,9 @@ type Agent struct {
 
 	// Local metadata information for the Elastic Agent
 	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
+
+	// Outputs is the policy output data, mapping the output name to its data
+	Outputs map[string]*PolicyOutput `json:"outputs,omitempty"`
 
 	// Packages array
 	Packages []string `json:"packages,omitempty"`
@@ -337,6 +337,9 @@ type PolicyOutput struct {
 
 	// API keys to be invalidated on next agent ack
 	ToRetireAPIKeys []ToRetireAPIKeysItems `json:"to_retire_api_keys,omitempty"`
+
+	// Type is the output type. Currently only Elasticsearch is supported.
+	Type string `json:"type"`
 }
 
 // Server A Fleet Server

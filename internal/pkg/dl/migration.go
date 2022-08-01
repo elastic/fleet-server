@@ -40,7 +40,7 @@ type (
 )
 
 func Migrate(ctx context.Context, bulker bulk.Bulk) error {
-	for _, fn := range []migrationBodyFn{migrateAgentMetadata, migrateElasticsearchOutputs} {
+	for _, fn := range []migrationBodyFn{migrateAgentMetadata, migrateOutputs} {
 		if _, err := migrate(ctx, bulker, fn); err != nil {
 			return err
 		}
@@ -167,24 +167,25 @@ func migrateAgentMetadata() (string, []byte, error) {
 // their zero value and an older version of FleetServer can repopulate them.
 // However, reverting FleetServer to an older version might cause very issue
 // this change fixes.
-func migrateElasticsearchOutputs() (string, []byte, error) {
-	const migrationName = "ElasticsearchOutputs"
+func migrateOutputs() (string, []byte, error) {
+	const migrationName = "Outputs"
 
 	root := dsl.NewRoot()
 	root.Query().Bool().MustNot().Exists("elasticsearch_outputs")
 
 	painless := `
 // set up the new filed
-if (ctx._source['elasticsearch_outputs']==null)
- {ctx._source['elasticsearch_outputs']=new HashMap();}
-if (ctx._source['elasticsearch_outputs']['default']==null)
- {ctx._source['elasticsearch_outputs']['default']=new HashMap();}
+if (ctx._source['outputs']==null)
+ {ctx._source['outputs']=new HashMap();}
+if (ctx._source['outputs']['default']==null)
+ {ctx._source['outputs']['default']=new HashMap();}
 
-// copy old values to new 'elasticsearch_outputs' field
-ctx._source['elasticsearch_outputs']['default'].to_retire_api_keys=ctx._source.default_api_key_history;
-ctx._source['elasticsearch_outputs']['default'].api_key=ctx._source.default_api_key;
-ctx._source['elasticsearch_outputs']['default'].api_key_id=ctx._source.default_api_key_id;
-ctx._source['elasticsearch_outputs']['default'].policy_permissions_hash=ctx._source.policy_output_permissions_hash;
+// copy old values to new 'outputs' field
+ctx._source['outputs']['default'].type="elasticsearch";
+ctx._source['outputs']['default'].to_retire_api_keys=ctx._source.default_api_key_history;
+ctx._source['outputs']['default'].api_key=ctx._source.default_api_key;
+ctx._source['outputs']['default'].api_key_id=ctx._source.default_api_key_id;
+ctx._source['outputs']['default'].policy_permissions_hash=ctx._source.policy_output_permissions_hash;
 
 // Erase deprecated fields
 ctx._source.default_api_key_history=null;

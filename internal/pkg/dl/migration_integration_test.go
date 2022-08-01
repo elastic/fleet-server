@@ -66,7 +66,7 @@ func createSomeAgents(t *testing.T, n int, apiKey bulk.APIKey, index string, bul
 	return createdAgents
 }
 
-func TestMigrateElasticsearchOutputs(t *testing.T) {
+func TestMigrateOutputs(t *testing.T) {
 	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
 	apiKey := bulk.APIKey{
 		ID:  fmt.Sprint("testAgent_"),
@@ -75,12 +75,13 @@ func TestMigrateElasticsearchOutputs(t *testing.T) {
 
 	agentIDs := createSomeAgents(t, 10, apiKey, index, bulker)
 
-	migratedAgents, err := migrate(context.Background(), bulker, migrateElasticsearchOutputs)
+	migratedAgents, err := migrate(context.Background(), bulker, migrateOutputs)
 	require.NoError(t, err)
 
 	assert.Equal(t, len(agentIDs), migratedAgents)
 
 	for i, id := range agentIDs {
+		wantOutputType := "elasticsearch"
 		wantAPIKey := bulk.APIKey{
 			ID:  fmt.Sprint(apiKey.ID, i),
 			Key: fmt.Sprint(apiKey.Key, i),
@@ -94,13 +95,14 @@ func TestMigrateElasticsearchOutputs(t *testing.T) {
 		}
 
 		// Assert new fields
-		require.Len(t, got.ElasticsearchOutputs, 1)
-		assert.Equal(t, wantAPIKey.Agent(), got.ElasticsearchOutputs["default"].APIKey)
-		assert.Equal(t, wantAPIKey.ID, got.ElasticsearchOutputs["default"].APIKeyID)
-		assert.Equal(t, wantAPIKey.Agent(), got.ElasticsearchOutputs["default"].APIKey)
+		require.Len(t, got.Outputs, 1)
+		assert.Equal(t, wantAPIKey.Agent(), got.Outputs["default"].APIKey)
+		assert.Equal(t, wantAPIKey.ID, got.Outputs["default"].APIKeyID)
+		assert.Equal(t, wantAPIKey.Agent(), got.Outputs["default"].APIKey)
+		assert.Equal(t, wantOutputType, got.Outputs["default"].Type)
 		assert.Equal(t,
 			fmt.Sprint("a_output_permission_SHA_", i),
-			got.ElasticsearchOutputs["default"].PolicyPermissionsHash)
+			got.Outputs["default"].PolicyPermissionsHash)
 
 		// Assert deprecated fields
 		assert.Empty(t, got.DefaultAPIKey)
