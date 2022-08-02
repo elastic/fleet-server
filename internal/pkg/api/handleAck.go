@@ -398,7 +398,7 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, agent *model.Agent) {
 }
 
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
-	apiKeys := _getAPIKeyIDs(agent)
+	apiKeys := agent.APIKeyIDs()
 	if len(apiKeys) > 0 {
 		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
 
@@ -450,19 +450,6 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 		Msg("ack upgrade")
 
 	return nil
-}
-
-func _getAPIKeyIDs(agent *model.Agent) []string {
-
-	keys := make([]string, 0, 1)
-	if agent.AccessAPIKeyID != "" {
-		keys = append(keys, agent.AccessAPIKeyID)
-	}
-	// TODO: FIX ME
-	if agent.DefaultAPIKeyID != "" {
-		keys = append(keys, agent.DefaultAPIKeyID)
-	}
-	return keys
 }
 
 // Generate an update script that validates that the policy_id
