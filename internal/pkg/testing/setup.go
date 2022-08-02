@@ -12,7 +12,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"testing"
 
 	"github.com/elastic/go-elasticsearch/v7"
@@ -38,12 +37,6 @@ fleet:
 `)
 
 func init() {
-	os.Setenv("ELASTICSEARCH_SERVICE_TOKEN",
-		"AAEAAWVsYXN0aWMvZmxlZXQtc2VydmVyL3Rva2VuMTozUTBwOHVFWVRYT3Y0dXZnRXktV29n")
-	os.Setenv("ELASTICSEARCH_HOSTS", "localhost:9200")
-	os.Setenv("ELASTICSEARCH_USERNAME", "elastic")
-	os.Setenv("ELASTICSEARCH_PASSWORD", "changeme")
-
 	c, err := yaml.NewConfig(defaultCfgData, config.DefaultOptions...)
 	if err != nil {
 		panic(err)
@@ -117,18 +110,6 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 	}
 
 	cli := bulker.Client()
-
-	// // Just running DeleteByQuery with refresh true, does not seem to be enought
-	// req, err := http.NewRequest(http.MethodPost, index+"/_refresh", nil)
-	// if err != nil {
-	// 	t.Fatalf("could not clean index: failed to create request to refresh index %q: %v",
-	// 		index, err)
-	// }
-	// _, err = cli.Perform(req)
-	// if err != nil {
-	// 	t.Fatalf("could not clean index: failed to refresh index %q: %v",
-	// 		index, err)
-	// }
 
 	res, err := cli.API.DeleteByQuery([]string{index}, bytes.NewReader(query),
 		cli.API.DeleteByQuery.WithContext(ctx),
