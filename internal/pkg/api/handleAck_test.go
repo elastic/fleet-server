@@ -464,7 +464,11 @@ func TestInvalidateAPIKeys(t *testing.T) {
 
 	bulker := ftesting.NewMockBulk()
 	bulker.On("APIKeyInvalidate",
-		context.Background(), want).
+		context.Background(), mock.MatchedBy(func(ids []string) bool {
+			// If A is a subset of B and B is a subset of A => A = B
+			return assert.Subset(t, ids, want) &&
+				assert.Subset(t, want, ids)
+		})).
 		Return(nil)
 
 	ack := &AckT{bulk: bulker}
