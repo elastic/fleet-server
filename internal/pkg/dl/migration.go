@@ -53,32 +53,27 @@ func Migrate(ctx context.Context, bulker bulk.Bulk) error {
 	return nil
 }
 
-func migrateTov7_15(ctx context.Context, bulker bulk.Bulk) error {
-	_, err := migrate(ctx, bulker, migrateAgentMetadata)
-	if err != nil {
-		return fmt.Errorf("v7.15.0 data migration failed: %w", err)
-	}
-
-	return nil
-}
-
-func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
-	migrated, err := migrate(ctx, bulker, migrateAgentOutputs)
-	if err != nil {
-		return fmt.Errorf("v8.4.0 data migration failed: %w", err)
-	}
-
-	// The migration was necessary and indeed run, thus we need to regenerate
-	// the API keys for all agents. In order to do so, we increase the policy
-	// coordinator index to force a policy update.
-	if migrated > 0 {
-		_, err := migrate(ctx, bulker, migratePolicyCoordinatorIdx)
+func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, error) {
+	var updatedDocs int
+	for {
+		name, index, body, err := fn()
 		if err != nil {
-			return fmt.Errorf("v8.4.0 data migration failed: %w", err)
+			return updatedDocs, fmt.Errorf(": %w", err)
 		}
-	}
 
-	return nil
+		resp, err := applyMigration(ctx, name, index, bulker, body)
+		if err != nil {
+			return updatedDocs, fmt.Errorf("failed to apply migration %q: %w",
+				name, err)
+		}
+		updatedDocs += resp.Updated
+		if resp.VersionConflicts == 0 {
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+	return updatedDocs, nil
 }
 
 func applyMigration(ctx context.Context, name string, index string, bulker bulk.Bulk, body []byte) (migrationResponse, error) {
@@ -139,27 +134,14 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 	return resp, err
 }
 
-func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, error) {
-	var updatedDocs int
-	for {
-		name, index, body, err := fn()
-		if err != nil {
-			return updatedDocs, fmt.Errorf(": %w", err)
-		}
-
-		resp, err := applyMigration(ctx, name, index, bulker, body)
-		if err != nil {
-			return updatedDocs, fmt.Errorf("failed to apply migration %q: %w",
-				name, err)
-		}
-		updatedDocs += resp.Updated
-		if resp.VersionConflicts == 0 {
-			break
-		}
-
-		time.Sleep(time.Second)
+// ============================== V7.15 migration ==============================
+func migrateTov7_15(ctx context.Context, bulker bulk.Bulk) error {
+	_, err := migrate(ctx, bulker, migrateAgentMetadata)
+	if err != nil {
+		return fmt.Errorf("v7.15.0 data migration failed: %w", err)
 	}
-	return updatedDocs, nil
+
+	return nil
 }
 
 // FleetServer 7.15 added a new *AgentMetadata field to the Agent record.
@@ -175,18 +157,40 @@ func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, er
 // As the update only occurs once, the 99.9% case is a noop.
 func migrateAgentMetadata() (string, string, []byte, error) {
 	const migrationName = "AgentMetadata"
-	root := dsl.NewRoot()
-	root.Query().Bool().MustNot().Exists("agent.id")
+	query := dsl.NewRoot().Query().Bool().MustNot()
+	query.Exists("agent.id")
 
 	painless := "ctx._source.agent = [:]; ctx._source.agent.id = ctx._id;"
-	root.Param("script", painless)
+	query.Param("script", painless)
 
-	body, err := root.MarshalJSON()
+	body, err := query.MarshalJSON()
 	if err != nil {
 		return migrationName, FleetAgents, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
 
 	return migrationName, FleetAgents, body, nil
+}
+
+// ============================== V8.4.0 migration =============================
+// https://github.com/elastic/fleet-server/issues/1672
+
+func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
+	migrated, err := migrate(ctx, bulker, migrateAgentOutputs)
+	if err != nil {
+		return fmt.Errorf("v8.4.0 data migration failed: %w", err)
+	}
+
+	// The migration was necessary and indeed run, thus we need to regenerate
+	// the API keys for all agents. In order to do so, we increase the policy
+	// coordinator index to force a policy update.
+	if migrated > 0 {
+		_, err := migrate(ctx, bulker, migratePolicyCoordinatorIdx)
+		if err != nil {
+			return fmt.Errorf("v8.4.0 data migration failed: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // migrateAgentOutputs performs the necessary changes on the Agent documents
@@ -205,8 +209,8 @@ func migrateAgentMetadata() (string, string, []byte, error) {
 func migrateAgentOutputs() (string, string, []byte, error) {
 	const migrationName = "AgentOutputs"
 
-	root := dsl.NewRoot()
-	root.Query().Bool().MustNot().Exists("elasticsearch_outputs")
+	query := dsl.NewRoot().Query().Bool().MustNot()
+	query.Exists("elasticsearch_outputs")
 
 	painless := `
 // set up the new filed
@@ -228,9 +232,9 @@ ctx._source.default_api_key="";
 ctx._source.default_api_key_id="";
 ctx._source.policy_output_permissions_hash="";
 `
-	root.Param("script", painless)
+	query.Param("script", painless)
 
-	body, err := root.MarshalJSON()
+	body, err := query.MarshalJSON()
 	if err != nil {
 		return migrationName, FleetAgents, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
@@ -245,14 +249,10 @@ ctx._source.policy_output_permissions_hash="";
 func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
 	const migrationName = "PolicyCoordinatorIdx"
 
-	root := dsl.NewRoot()
-	root.Query().MatchAll()
+	query := dsl.NewRoot().Query().MatchAll()
+	query.Param("script", `ctx._source.coordinator_idx++;`)
 
-	painless := `
-	ctx._source.coordinator_idx++;`
-	root.Param("script", painless)
-
-	body, err := root.MarshalJSON()
+	body, err := query.MarshalJSON()
 	if err != nil {
 		return migrationName, FleetPolicies, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
