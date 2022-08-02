@@ -804,15 +804,16 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	remoteVersion, err := ver.CheckCompatibility(ctx, esCli, f.bi.Version)
 	if err != nil {
 		if len(remoteVersion) != 0 {
-			return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w", f.bi.Version, remoteVersion, err)
+			return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w",
+				f.bi.Version, remoteVersion, err)
 		}
 		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
-	// Run migrations; currently it's safe to do it in the background. That may change in the future.
-	g.Go(loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
+	// Run migrations
+	loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
 		return dl.Migrate(ctx, bulker)
-	}))
+	})
 
 	// Run scheduler for periodic GC/cleanup
 	gcCfg := cfg.Inputs[0].Server.GC
@@ -831,7 +832,6 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	}
 
 	// Coordinator policy monitor
-	// TODO(Anderson): perhapes here to increase the coordinator index
 	pim, err := monitor.New(dl.FleetPolicies, esCli, monCli,
 		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
 		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),

@@ -21,6 +21,7 @@ import (
 )
 
 type (
+	migrationFn       func(context.Context, bulk.Bulk) error
 	migrationBodyFn   func() (string, string, []byte, error)
 	migrationResponse struct {
 		Took             int  `json:"took"`
@@ -39,10 +40,41 @@ type (
 	}
 )
 
+// Migrate applies, in sequence, the migration functions. Currently, each migration
+// function is responsible to ensure it only applies the migration if needed,
+// being a no-op otherwise.
 func Migrate(ctx context.Context, bulker bulk.Bulk) error {
-	for _, fn := range []migrationBodyFn{migrateAgentMetadata, migrateAgentOutputs} {
-		if _, err := migrate(ctx, bulker, fn); err != nil {
+	for _, fn := range []migrationFn{migrateTov7_15, migrateToV8_4} {
+		if err := fn(ctx, bulker); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func migrateTov7_15(ctx context.Context, bulker bulk.Bulk) error {
+	_, err := migrate(ctx, bulker, migrateAgentMetadata)
+	if err != nil {
+		return fmt.Errorf("v7.15.0 data migration failed: %w", err)
+	}
+
+	return nil
+}
+
+func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
+	migrated, err := migrate(ctx, bulker, migrateAgentOutputs)
+	if err != nil {
+		return fmt.Errorf("v8.4.0 data migration failed: %w", err)
+	}
+
+	// The migration was necessary and indeed run, thus we need to regenerate
+	// the API keys for all agents. In order to do so, we increase the policy
+	// coordinator index to force a policy update.
+	if migrated > 0 {
+		_, err := migrate(ctx, bulker, migratePolicyCoordinatorIdx)
+		if err != nil {
+			return fmt.Errorf("v8.4.0 data migration failed: %w", err)
 		}
 	}
 
