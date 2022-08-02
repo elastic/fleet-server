@@ -157,8 +157,8 @@ func migrateTov7_15(ctx context.Context, bulker bulk.Bulk) error {
 // As the update only occurs once, the 99.9% case is a noop.
 func migrateAgentMetadata() (string, string, []byte, error) {
 	const migrationName = "AgentMetadata"
-	query := dsl.NewRoot().Query().Bool().MustNot()
-	query.Exists("agent.id")
+	query := dsl.NewRoot()
+	query.Query().Bool().MustNot().Exists("agent.id")
 
 	painless := "ctx._source.agent = [:]; ctx._source.agent.id = ctx._id;"
 	query.Param("script", painless)
@@ -209,8 +209,8 @@ func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
 func migrateAgentOutputs() (string, string, []byte, error) {
 	const migrationName = "AgentOutputs"
 
-	query := dsl.NewRoot().Query().Bool().MustNot()
-	query.Exists("elasticsearch_outputs")
+	query := dsl.NewRoot()
+	query.Query().Bool().MustNot().Exists("elasticsearch_outputs")
 
 	painless := `
 // set up the new filed
@@ -249,8 +249,8 @@ ctx._source.policy_output_permissions_hash="";
 func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
 	const migrationName = "PolicyCoordinatorIdx"
 
-	query := dsl.NewRoot().Query().MatchAll()
-	query.Param("script", `ctx._source.coordinator_idx++;`)
+	query := dsl.NewRoot()
+	query.Query().MatchAll().Param("script", `ctx._source.coordinator_idx++;`)
 
 	body, err := query.MarshalJSON()
 	if err != nil {
