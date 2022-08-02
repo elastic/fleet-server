@@ -66,6 +66,68 @@ func createSomeAgents(t *testing.T, n int, apiKey bulk.APIKey, index string, bul
 	return createdAgents
 }
 
+func createSomePolicies(t *testing.T, n int, index string, bulker bulk.Bulk) []string {
+	t.Helper()
+
+	var created []string
+
+	for i := 0; i < n; i++ {
+		now := time.Now().UTC()
+		nowStr := now.Format(time.RFC3339)
+
+		policyModel := model.Policy{
+			ESDocument:         model.ESDocument{},
+			CoordinatorIdx:     int64(i),
+			Data:               nil,
+			DefaultFleetServer: false,
+			PolicyID:           fmt.Sprint(i),
+			RevisionIdx:        1,
+			Timestamp:          nowStr,
+			UnenrollTimeout:    0,
+		}
+
+		body, err := json.Marshal(policyModel)
+		require.NoError(t, err)
+
+		policyDocID, err := bulker.Create(
+			context.Background(), index, "", body, bulk.WithRefresh())
+		require.NoError(t, err)
+
+		created = append(created, policyDocID)
+	}
+
+	return created
+}
+
+func TestPolicyCoordinatorIdx(t *testing.T) {
+	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetPolicies)
+
+	docIDs := createSomePolicies(t, 25, index, bulker)
+
+	migrated, err := migrate(context.Background(), bulker, migratePolicyCoordinatorIdx)
+	require.NoError(t, err)
+
+	require.Equal(t, len(docIDs), migrated)
+
+	for i := range docIDs {
+		policies, err := QueryLatestPolicies(
+			context.Background(), bulker, WithIndexName(index))
+		if err != nil {
+			assert.NoError(t, err, "failed to query latest policies") // we want to continue even if a single agent fails
+			continue
+		}
+
+		var got model.Policy
+		for _, p := range policies {
+			if p.PolicyID == fmt.Sprint(i) {
+				got = p
+			}
+		}
+
+		assert.Equal(t, int64(i+1), got.CoordinatorIdx)
+	}
+}
+
 func TestMigrateOutputs(t *testing.T) {
 	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
 	apiKey := bulk.APIKey{

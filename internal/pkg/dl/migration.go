@@ -21,7 +21,7 @@ import (
 )
 
 type (
-	migrationBodyFn   func() (string, []byte, error)
+	migrationBodyFn   func() (string, string, []byte, error)
 	migrationResponse struct {
 		Took             int  `json:"took"`
 		TimedOut         bool `json:"timed_out"`
@@ -49,7 +49,7 @@ func Migrate(ctx context.Context, bulker bulk.Bulk) error {
 	return nil
 }
 
-func applyMigration(ctx context.Context, name string, bulker bulk.Bulk, body []byte) (migrationResponse, error) {
+func applyMigration(ctx context.Context, name string, index string, bulker bulk.Bulk, body []byte) (migrationResponse, error) {
 	start := time.Now()
 
 	client := bulker.Client()
@@ -63,7 +63,7 @@ func applyMigration(ctx context.Context, name string, bulker bulk.Bulk, body []b
 		client.UpdateByQuery.WithConflicts("proceed"),
 	}
 
-	res, err := client.UpdateByQuery([]string{FleetAgents}, opts...)
+	res, err := client.UpdateByQuery([]string{index}, opts...)
 	if err != nil {
 		return migrationResponse{}, err
 	}
@@ -110,12 +110,12 @@ func applyMigration(ctx context.Context, name string, bulker bulk.Bulk, body []b
 func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, error) {
 	var updatedDocs int
 	for {
-		name, body, err := fn()
+		name, index, body, err := fn()
 		if err != nil {
 			return updatedDocs, fmt.Errorf(": %w", err)
 		}
 
-		resp, err := applyMigration(ctx, name, bulker, body)
+		resp, err := applyMigration(ctx, name, index, bulker, body)
 		if err != nil {
 			return updatedDocs, fmt.Errorf("failed to apply migration %q: %w",
 				name, err)
@@ -141,7 +141,7 @@ func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, er
 // can be run in parallel at the same time.
 //
 // As the update only occurs once, the 99.9% case is a noop.
-func migrateAgentMetadata() (string, []byte, error) {
+func migrateAgentMetadata() (string, string, []byte, error) {
 	const migrationName = "AgentMetadata"
 	root := dsl.NewRoot()
 	root.Query().Bool().MustNot().Exists("agent.id")
@@ -151,10 +151,10 @@ func migrateAgentMetadata() (string, []byte, error) {
 
 	body, err := root.MarshalJSON()
 	if err != nil {
-		return migrationName, nil, fmt.Errorf("could not marshal ES query: %w", err)
+		return migrationName, FleetAgents, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
 
-	return migrationName, body, nil
+	return migrationName, FleetAgents, body, nil
 }
 
 // migrateAgentOutputs performs the necessary changes on the Agent documents
@@ -170,7 +170,7 @@ func migrateAgentMetadata() (string, []byte, error) {
 // their zero value and an older version of FleetServer can repopulate them.
 // However, reverting FleetServer to an older version might cause very issue
 // this change fixes.
-func migrateAgentOutputs() (string, []byte, error) {
+func migrateAgentOutputs() (string, string, []byte, error) {
 	const migrationName = "AgentOutputs"
 
 	root := dsl.NewRoot()
@@ -200,48 +200,30 @@ ctx._source.policy_output_permissions_hash="";
 
 	body, err := root.MarshalJSON()
 	if err != nil {
-		return migrationName, nil, fmt.Errorf("could not marshal ES query: %w", err)
+		return migrationName, FleetAgents, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
 
-	return migrationName, body, nil
+	return migrationName, FleetAgents, body, nil
 }
 
 // migratePolicyCoordinatorIdx increases the policy's CoordinatorIdx to force
 // a policy update ensuring the output data will be migrated to the new
 // Agent.Outputs field. See migrateAgentOutputs and https://github.com/elastic/fleet-server/issues/1672
 // for details.
-func migratePolicyCoordinatorIdx() (string, []byte, error) {
-	const migrationName = "AgentOutputs"
+func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
+	const migrationName = "PolicyCoordinatorIdx"
 
 	root := dsl.NewRoot()
-	root.Query().Bool().MustNot().Exists("elasticsearch_outputs")
+	root.Query().MatchAll()
 
 	painless := `
-// set up the new filed
-if (ctx._source['outputs']==null)
- {ctx._source['outputs']=new HashMap();}
-if (ctx._source['outputs']['default']==null)
- {ctx._source['outputs']['default']=new HashMap();}
-
-// copy old values to new 'outputs' field
-ctx._source['outputs']['default'].type="elasticsearch";
-ctx._source['outputs']['default'].to_retire_api_keys=ctx._source.default_api_key_history;
-ctx._source['outputs']['default'].api_key=ctx._source.default_api_key;
-ctx._source['outputs']['default'].api_key_id=ctx._source.default_api_key_id;
-ctx._source['outputs']['default'].policy_permissions_hash=ctx._source.policy_output_permissions_hash;
-
-// Erase deprecated fields
-ctx._source.default_api_key_history=null;
-ctx._source.default_api_key="";
-ctx._source.default_api_key_id="";
-ctx._source.policy_output_permissions_hash="";
-`
+	ctx._source.coordinator_idx++;`
 	root.Param("script", painless)
 
 	body, err := root.MarshalJSON()
 	if err != nil {
-		return migrationName, nil, fmt.Errorf("could not marshal ES query: %w", err)
+		return migrationName, FleetPolicies, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
 
-	return migrationName, body, nil
+	return migrationName, FleetPolicies, body, nil
 }

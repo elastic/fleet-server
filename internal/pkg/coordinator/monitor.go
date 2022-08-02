@@ -557,6 +557,7 @@ func getAPIKeyIDs(agent *model.Agent) []string {
 	if agent.AccessAPIKeyID != "" {
 		keys = append(keys, agent.AccessAPIKeyID)
 	}
+	// TODO: FIX ME
 	if agent.DefaultAPIKeyID != "" {
 		keys = append(keys, agent.DefaultAPIKeyID)
 	}

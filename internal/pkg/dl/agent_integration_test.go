@@ -19,7 +19,6 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
@@ -121,7 +120,7 @@ func TestFindAgent_NewModel(t *testing.T) {
 
 	wantOutputs := map[string]*model.PolicyOutput{
 		"default": {
-			Type:   policy.OutputTypeElasticsearch,
+			Type:   "elasticsearch",
 			APIKey: "TestFindNewModelAgent_APIKey",
 			ToRetireAPIKeys: []model.ToRetireAPIKeysItems{
 				{

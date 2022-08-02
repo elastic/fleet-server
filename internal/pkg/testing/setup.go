@@ -39,7 +39,7 @@ fleet:
 
 func init() {
 	os.Setenv("ELASTICSEARCH_SERVICE_TOKEN",
-		"AAEAAWVsYXN0aWMvZmxlZXQtc2VydmVyL3Rva2VuMToyNzJ5dmhndFM3UzVsb1h3SERhT0dB")
+		"AAEAAWVsYXN0aWMvZmxlZXQtc2VydmVyL3Rva2VuMTozUTBwOHVFWVRYT3Y0dXZnRXktV29n")
 	os.Setenv("ELASTICSEARCH_HOSTS", "localhost:9200")
 	os.Setenv("ELASTICSEARCH_USERNAME", "elastic")
 	os.Setenv("ELASTICSEARCH_PASSWORD", "changeme")
