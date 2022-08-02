@@ -158,7 +158,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			Return(nil).Once()
 		bulker.On("APIKeyCreate",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(&wantAPIKey, nil).Once() //nolint:govet // test case
+			Return(&wantAPIKey, nil).Once()
 
 		output := Output{
 			Type: OutputTypeElasticsearch,
@@ -220,7 +220,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		apiKey := bulk.APIKey{ID: "abc", Key: "new-key"}
 		bulker.On("APIKeyCreate",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(&apiKey, nil).Once() //nolint:govet // test case
+			Return(&apiKey, nil).Once()
 
 		output := Output{
 			Type: OutputTypeElasticsearch,

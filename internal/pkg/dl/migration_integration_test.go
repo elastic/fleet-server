@@ -135,8 +135,8 @@ func TestPolicyCoordinatorIdx(t *testing.T) {
 func TestMigrateOutputs(t *testing.T) {
 	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
 	apiKey := bulk.APIKey{
-		ID:  fmt.Sprint("testAgent_"),
-		Key: fmt.Sprint("testAgent_key_"),
+		ID:  "testAgent_",
+		Key: "testAgent_key_",
 	}
 
 	agentIDs := createSomeAgents(t, 10, apiKey, index, bulker)
