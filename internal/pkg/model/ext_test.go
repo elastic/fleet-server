@@ -131,7 +131,6 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 			// if A contains B and B contains A => A = B
 			assert.Subset(t, tc.want, got)
 			assert.Subset(t, got, tc.want)
-			assert.ObjectsAreEqualValues()
 		})
 	}
 }
