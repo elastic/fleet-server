@@ -27,14 +27,36 @@ func (m *Server) SetTime(t time.Time) {
 }
 
 // CheckDifferentVersion returns Agent version if it is different from ver, otherwise return empty string
-func (m *Agent) CheckDifferentVersion(ver string) string {
-	if m == nil {
+func (a *Agent) CheckDifferentVersion(ver string) string {
+	if a == nil {
 		return ""
 	}
 
-	if m.Agent == nil || ver != m.Agent.Version {
+	if a.Agent == nil || ver != a.Agent.Version {
 		return ver
 	}
 
 	return ""
+}
+
+// APIKeyIDs returns all the API keys, the valid, in-use as well as the one
+// marked to be retired.
+func (a *Agent) APIKeyIDs() []string {
+	if a == nil {
+		return nil
+	}
+	keys := make([]string, 0, len(a.Outputs)+1)
+	if a.AccessAPIKeyID != "" {
+		keys = append(keys, a.AccessAPIKeyID)
+	}
+
+	for _, output := range a.Outputs {
+		keys = append(keys, output.APIKeyID)
+		for _, key := range output.ToRetireAPIKeys {
+			keys = append(keys, key.ID)
+		}
+	}
+
+	return keys
+
 }
