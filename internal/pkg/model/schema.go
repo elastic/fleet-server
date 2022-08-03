@@ -128,7 +128,7 @@ type Agent struct {
 	DefaultAPIKey string `json:"default_api_key,omitempty"`
 
 	// Deprecated. Use Outputs instead. Default API Key History
-	DefaultAPIKeyHistory []ToRetireAPIKeysItems `json:"default_api_key_history,omitempty"`
+	DefaultAPIKeyHistory []ToRetireAPIKeyIdsItems `json:"default_api_key_history,omitempty"`
 
 	// Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKeyID string `json:"default_api_key_id,omitempty"`
@@ -340,7 +340,7 @@ type PolicyOutput struct {
 	PolicyPermissionsHash string `json:"policy_permissions_hash"`
 
 	// API keys to be invalidated on next agent ack
-	ToRetireAPIKeys []ToRetireAPIKeysItems `json:"to_retire_api_keys,omitempty"`
+	ToRetireAPIKeyIds []ToRetireAPIKeyIdsItems `json:"to_retire_api_key_ids,omitempty"`
 
 	// Type is the output type. Currently only Elasticsearch is supported.
 	Type string `json:"type"`
@@ -367,8 +367,8 @@ type ServerMetadata struct {
 	Version string `json:"version"`
 }
 
-// ToRetireAPIKeysItems the Output API Keys that were replaced and should be retired
-type ToRetireAPIKeysItems struct {
+// ToRetireAPIKeyIdsItems the Output API Keys that were replaced and should be retired
+type ToRetireAPIKeyIdsItems struct {
 
 	// API Key identifier
 	ID string `json:"id,omitempty"`

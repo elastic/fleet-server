@@ -221,7 +221,7 @@ if (ctx._source['outputs']['default']==null)
 
 // copy old values to new 'outputs' field
 ctx._source['outputs']['default'].type="elasticsearch";
-ctx._source['outputs']['default'].to_retire_api_keys=ctx._source.default_api_key_history;
+ctx._source['outputs']['default'].to_retire_api_key_ids=ctx._source.default_api_key_history;
 ctx._source['outputs']['default'].api_key=ctx._source.default_api_key;
 ctx._source['outputs']['default'].api_key_id=ctx._source.default_api_key_id;
 ctx._source['outputs']['default'].policy_permissions_hash=ctx._source.policy_output_permissions_hash;

@@ -29,10 +29,10 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 		existingToRetireAPIKeys []model.ToRetireAPIKeysItems
 	}{
 		{
-			name: "to_retire_api_keys is empty",
+			name: "to_retire_api_key_ids is empty",
 		},
 		{
-			name: "to_retire_api_keys is not empty",
+			name: "to_retire_api_key_ids is not empty",
 			existingToRetireAPIKeys: []model.ToRetireAPIKeysItems{{
 				ID: "pre_existing_ID", RetiredAt: "pre_existing__RetiredAt"}},
 		},
@@ -101,7 +101,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 				dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
 				dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
 				dl.FieldPolicyOutputPermissionsHash: outputPermissionSha,
-				dl.FieldPolicyOutputToRetireAPIKeys: model.ToRetireAPIKeysItems{
+				dl.FieldPolicyOutputToRetireAPIKeyIDs: model.ToRetireAPIKeysItems{
 					ID: previousAPIKey.ID, RetiredAt: nowStr},
 			}
 

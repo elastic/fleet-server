@@ -350,7 +350,7 @@
       ]
     },
 
-    "to_retire_api_keys": {
+    "to_retire_api_key_ids": {
       "type": "array",
       "items": {
         "description": "the Output API Keys that were replaced and should be retired",
@@ -377,9 +377,9 @@
           "description": "API key the Elastic Agent uses to authenticate with elasticsearch",
           "type": "string"
         },
-        "to_retire_api_keys": {
+        "to_retire_api_key_ids": {
           "description": "API keys to be invalidated on next agent ack",
-          "$ref":  "#/definitions/to_retire_api_keys"
+          "$ref":  "#/definitions/to_retire_api_key_ids"
         },
         "api_key_id": {
           "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
@@ -522,7 +522,7 @@
         },
         "default_api_key_history": {
           "description": "Deprecated. Use Outputs instead. Default API Key History",
-          "$ref":  "#/definitions/to_retire_api_keys"
+          "$ref":  "#/definitions/to_retire_api_key_ids"
         },
         "outputs": {
           "description": "Outputs is the policy output data, mapping the output name to its data",

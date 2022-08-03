@@ -139,7 +139,7 @@ func (p *Output) prepareElasticsearch(
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 		}
 		if output.APIKeyID != "" {
-			fields[dl.FieldPolicyOutputToRetireAPIKeys] = model.ToRetireAPIKeysItems{
+			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeysItems{
 				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 			}
@@ -185,8 +185,8 @@ if (ctx._source['outputs']['%s']==null)
 `, outputName, outputName))
 
 	for field := range fields {
-		if field == dl.FieldPolicyOutputToRetireAPIKeys {
-			// dl.FieldPolicyOutputToRetireAPIKeys is a special case.
+		if field == dl.FieldPolicyOutputToRetireAPIKeyIDs {
+			// dl.FieldPolicyOutputToRetireAPIKeyIDs is a special case.
 			// It's an array that gets deleted when the keys are invalidated.
 			// Thus, append the old API key ID, create the field if necessary.
 			source.WriteString(fmt.Sprintf(`
