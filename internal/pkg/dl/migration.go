@@ -250,7 +250,8 @@ func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
 	const migrationName = "PolicyCoordinatorIdx"
 
 	query := dsl.NewRoot()
-	query.Query().Bool().MatchAll().Param("script", `ctx._source.coordinator_idx++;`)
+	query.Query().MatchAll()
+	query.Param("script", `ctx._source.coordinator_idx++;`)
 
 	body, err := query.MarshalJSON()
 	if err != nil {

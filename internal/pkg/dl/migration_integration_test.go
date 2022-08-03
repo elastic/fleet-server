@@ -139,7 +139,7 @@ func TestMigrateOutputs(t *testing.T) {
 		Key: "testAgent_key_",
 	}
 
-	agentIDs := createSomeAgents(t, 10, apiKey, index, bulker)
+	agentIDs := createSomeAgents(t, 25, apiKey, index, bulker)
 
 	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
 	require.NoError(t, err)
