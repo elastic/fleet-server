@@ -39,7 +39,7 @@ const (
 	FieldPolicyOutputAPIKey            = "api_key"
 	FieldPolicyOutputAPIKeyID          = "api_key_id"
 	FieldPolicyOutputPermissionsHash   = "policy_permissions_hash"
-	FieldPolicyOutputToRetireAPIKeyIDs = "to_retire_api_key_ids"
+	FieldPolicyOutputToRetireAPIKeyIDs = "to_retire_api_key_ids" //nolint:gosec // false positive
 	FieldPolicyRevisionIdx             = "policy_revision_idx"
 	FieldRevisionIdx                   = "revision_idx"
 	FieldUnenrolledReason              = "unenrolled_reason"
