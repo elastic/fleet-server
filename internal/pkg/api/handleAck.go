@@ -378,10 +378,10 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 }
 
 func (ack *AckT) invalidateAPIKeys(ctx context.Context, agent *model.Agent) {
-	var toRetire []model.ToRetireAPIKeysItems
+	var toRetire []model.ToRetireAPIKeyIdsItems
 
 	for _, out := range agent.Outputs {
-		toRetire = append(toRetire, out.ToRetireAPIKeys...)
+		toRetire = append(toRetire, out.ToRetireAPIKeyIds...)
 	}
 
 	size := len(toRetire)

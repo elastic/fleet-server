@@ -108,12 +108,12 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 				Outputs: map[string]*PolicyOutput{
 					"p1": {
 						APIKeyID: "p1_api_key_id",
-						ToRetireAPIKeys: []ToRetireAPIKeysItems{{
+						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
 							ID: "p1_to_retire_key",
 						}}},
 					"p2": {
 						APIKeyID: "p2_api_key_id",
-						ToRetireAPIKeys: []ToRetireAPIKeysItems{{
+						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
 							ID: "p2_to_retire_key",
 						}}},
 				},

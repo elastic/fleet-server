@@ -442,23 +442,23 @@ func TestHandleAckEvents(t *testing.T) {
 }
 
 func TestInvalidateAPIKeys(t *testing.T) {
-	toRetire1 := []model.ToRetireAPIKeysItems{{
+	toRetire1 := []model.ToRetireAPIKeyIdsItems{{
 		ID: "toRetire1",
 	}}
-	toRetire2 := []model.ToRetireAPIKeysItems{{
+	toRetire2 := []model.ToRetireAPIKeyIdsItems{{
 		ID: "toRetire2_0",
 	}, {
 		ID: "toRetire2_1",
 	}}
-	var toRetire3 []model.ToRetireAPIKeysItems
+	var toRetire3 []model.ToRetireAPIKeyIdsItems
 
 	want := []string{"toRetire1", "toRetire2_0", "toRetire2_1"}
 
 	agent := model.Agent{
 		Outputs: map[string]*model.PolicyOutput{
-			"1": {ToRetireAPIKeys: toRetire1},
-			"2": {ToRetireAPIKeys: toRetire2},
-			"3": {ToRetireAPIKeys: toRetire3},
+			"1": {ToRetireAPIKeyIds: toRetire1},
+			"2": {ToRetireAPIKeyIds: toRetire2},
+			"3": {ToRetireAPIKeyIds: toRetire3},
 		},
 	}
 

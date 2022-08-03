@@ -26,14 +26,14 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 	tts := []struct {
 		name string
 
-		existingToRetireAPIKeys []model.ToRetireAPIKeysItems
+		existingToRetireAPIKeyIds []model.ToRetireAPIKeyIdsItems
 	}{
 		{
 			name: "to_retire_api_key_ids is empty",
 		},
 		{
 			name: "to_retire_api_key_ids is not empty",
-			existingToRetireAPIKeys: []model.ToRetireAPIKeysItems{{
+			existingToRetireAPIKeyIds: []model.ToRetireAPIKeyIdsItems{{
 				ID: "pre_existing_ID", RetiredAt: "pre_existing__RetiredAt"}},
 		},
 	}
@@ -63,8 +63,8 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 					APIKeyID:              outputAPIKey.ID,
 					PolicyPermissionsHash: outputPermissionSha,
 					Type:                  OutputTypeElasticsearch,
-					ToRetireAPIKeys: append(tt.existingToRetireAPIKeys,
-						model.ToRetireAPIKeysItems{
+					ToRetireAPIKeyIds: append(tt.existingToRetireAPIKeyIds,
+						model.ToRetireAPIKeyIdsItems{
 							ID: previousAPIKey.ID, RetiredAt: nowStr}),
 				},
 			}
@@ -85,9 +85,9 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 					},
 				},
 			}
-			if tt.existingToRetireAPIKeys != nil {
-				agentModel.Outputs[outputName].ToRetireAPIKeys =
-					tt.existingToRetireAPIKeys
+			if tt.existingToRetireAPIKeyIds != nil {
+				agentModel.Outputs[outputName].ToRetireAPIKeyIds =
+					tt.existingToRetireAPIKeyIds
 			}
 
 			body, err := json.Marshal(agentModel)
@@ -101,7 +101,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 				dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
 				dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
 				dl.FieldPolicyOutputPermissionsHash: outputPermissionSha,
-				dl.FieldPolicyOutputToRetireAPIKeyIDs: model.ToRetireAPIKeysItems{
+				dl.FieldPolicyOutputToRetireAPIKeyIDs: model.ToRetireAPIKeyIdsItems{
 					ID: previousAPIKey.ID, RetiredAt: nowStr},
 			}
 

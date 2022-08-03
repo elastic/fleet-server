@@ -139,7 +139,7 @@ func (p *Output) prepareElasticsearch(
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 		}
 		if output.APIKeyID != "" {
-			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeysItems{
+			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeyIdsItems{
 				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 			}

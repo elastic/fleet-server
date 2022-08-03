@@ -52,7 +52,7 @@ func (a *Agent) APIKeyIDs() []string {
 
 	for _, output := range a.Outputs {
 		keys = append(keys, output.APIKeyID)
-		for _, key := range output.ToRetireAPIKeys {
+		for _, key := range output.ToRetireAPIKeyIds {
 			keys = append(keys, key.ID)
 		}
 	}

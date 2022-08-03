@@ -109,7 +109,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 				output.Name: {
 					ESDocument:            model.ESDocument{},
 					APIKey:                apiKey.Agent(),
-					ToRetireAPIKeys:       nil,
+					ToRetireAPIKeyIds:     nil,
 					APIKeyID:              apiKey.ID,
 					PolicyPermissionsHash: hashPerm,
 					Type:                  OutputTypeElasticsearch,
@@ -130,7 +130,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		assert.Equal(t, apiKey.ID, gotOutput.APIKeyID)
 		assert.Equal(t, output.Role.Sha2, gotOutput.PolicyPermissionsHash)
 		assert.Equal(t, output.Type, gotOutput.Type)
-		assert.Empty(t, gotOutput.ToRetireAPIKeys)
+		assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
 
 		// Old model must always remain empty
 		assert.Empty(t, testAgent.DefaultAPIKey)
@@ -178,7 +178,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 				output.Name: {
 					ESDocument:            model.ESDocument{},
 					APIKey:                oldAPIKey.Agent(),
-					ToRetireAPIKeys:       nil,
+					ToRetireAPIKeyIds:     nil,
 					APIKeyID:              oldAPIKey.ID,
 					PolicyPermissionsHash: hashPerm,
 					Type:                  OutputTypeElasticsearch,
@@ -200,7 +200,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		assert.Equal(t, output.Role.Sha2, gotOutput.PolicyPermissionsHash)
 		assert.Equal(t, output.Type, gotOutput.Type)
 
-		// assert.Contains(t, gotOutput.ToRetireAPIKeys, oldAPIKey.ID) // TODO: assert on bulker.Update
+		// assert.Contains(t, gotOutput.ToRetireAPIKeyIds, oldAPIKey.ID) // TODO: assert on bulker.Update
 
 		// Old model must always remain empty
 		assert.Empty(t, testAgent.DefaultAPIKey)
@@ -250,7 +250,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		assert.Equal(t, apiKey.ID, gotOutput.APIKeyID)
 		assert.Equal(t, output.Role.Sha2, gotOutput.PolicyPermissionsHash)
 		assert.Equal(t, output.Type, gotOutput.Type)
-		assert.Empty(t, gotOutput.ToRetireAPIKeys)
+		assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
 
 		// Old model must always remain empty
 		assert.Empty(t, testAgent.DefaultAPIKey)

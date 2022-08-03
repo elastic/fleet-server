@@ -49,7 +49,7 @@ func createSomeAgents(t *testing.T, n int, apiKey bulk.APIKey, index string, bul
 			DefaultAPIKeyID:             outputAPIKey.ID,
 			DefaultAPIKey:               outputAPIKey.Agent(),
 			PolicyOutputPermissionsHash: fmt.Sprint("a_output_permission_SHA_", i),
-			DefaultAPIKeyHistory: []model.ToRetireAPIKeysItems{
+			DefaultAPIKeyHistory: []model.ToRetireAPIKeyIdsItems{
 				{
 					ID:        "old_" + outputAPIKey.ID,
 					RetiredAt: now.Add(-5 * time.Minute).Format(time.RFC3339),

@@ -122,7 +122,7 @@ func TestFindAgent_NewModel(t *testing.T) {
 		"default": {
 			Type:   "elasticsearch",
 			APIKey: "TestFindNewModelAgent_APIKey",
-			ToRetireAPIKeys: []model.ToRetireAPIKeysItems{
+			ToRetireAPIKeyIds: []model.ToRetireAPIKeyIdsItems{
 				{
 					ID:        "TestFindNewModelAgent_APIKeyID_invalidated",
 					RetiredAt: "TestFindNewModelAgent_APIKeyID_invalidated_at"},
