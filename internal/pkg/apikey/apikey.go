@@ -6,6 +6,7 @@
 package apikey
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -66,11 +67,16 @@ func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKey
 		APIKeys []APIKeyResponse `json:"api_keys"`
 	}
 
+	var buff bytes.Buffer
+	if _, err := buff.ReadFrom(res.Body); err != nil {
+		return nil, fmt.Errorf("could not read from response body: %w", err)
+	}
+	defer res.Body.Close()
+
 	var resp GetAPIKeyResponse
-	d := json.NewDecoder(res.Body)
-	if err = d.Decode(&resp); err != nil {
+	if err = json.Unmarshal(buff.Bytes(), &resp); err != nil {
 		return nil, fmt.Errorf(
-			"could not decode elasticsearch GetAPIKeyResponse: %w", err)
+			"could not Unmarshal elasticsearch GetAPIKeyResponse: %w", err)
 	}
 
 	if len(resp.APIKeys) == 0 {
@@ -78,7 +84,6 @@ func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKey
 	}
 
 	first := resp.APIKeys[0]
-
 	return &APIKeyMetadata{
 		ID:       first.ID,
 		Metadata: first.Metadata,
