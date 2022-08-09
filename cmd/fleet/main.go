@@ -585,6 +585,10 @@ func redactOutputCfg(cfg *config.Config) config.Output {
 		redacted.Elasticsearch.APIKey = kRedacted
 	}
 
+	if redacted.Elasticsearch.ServiceToken != "" {
+		redacted.Elasticsearch.ServiceToken = kRedacted
+	}
+
 	if redacted.Elasticsearch.TLS != nil {
 		newTLS := *redacted.Elasticsearch.TLS
 
