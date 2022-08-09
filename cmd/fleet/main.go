@@ -629,7 +629,7 @@ func redactConfig(cfg *config.Config) *config.Config {
 	redacted := &config.Config{
 		Fleet:   cfg.Fleet,
 		Output:  cfg.Output,
-		Inputs:  cfg.Inputs,
+		Inputs:  make([]config.Input, 1),
 		Logging: cfg.Logging,
 		HTTP:    cfg.HTTP,
 	}
