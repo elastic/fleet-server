@@ -106,7 +106,7 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 
 	query, err := q.Render(make(map[string]interface{}))
 	if err != nil {
-		t.Fatalf("could not clena index: failed t render query template: %v", err)
+		t.Fatalf("could not clean index: failed to render query template: %v", err)
 	}
 
 	cli := bulker.Client()

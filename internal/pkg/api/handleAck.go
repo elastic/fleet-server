@@ -378,18 +378,14 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 }
 
 func (ack *AckT) invalidateAPIKeys(ctx context.Context, agent *model.Agent) {
-	var toRetire []model.ToRetireAPIKeyIdsItems
-
+	var ids []string
 	for _, out := range agent.Outputs {
-		toRetire = append(toRetire, out.ToRetireAPIKeyIds...)
+		for _, k := range out.ToRetireAPIKeyIds {
+			ids = append(ids, k.ID)
+		}
 	}
 
-	size := len(toRetire)
-	if size > 0 {
-		ids := make([]string, size)
-		for i := 0; i < size; i++ {
-			ids[i] = toRetire[i].ID
-		}
+	if len(ids) > 0 {
 		log.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
 		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
 			log.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")

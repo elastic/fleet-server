@@ -71,7 +71,6 @@ func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKey
 	if _, err := buff.ReadFrom(res.Body); err != nil {
 		return nil, fmt.Errorf("could not read from response body: %w", err)
 	}
-	defer res.Body.Close()
 
 	var resp GetAPIKeyResponse
 	if err = json.Unmarshal(buff.Bytes(), &resp); err != nil {
