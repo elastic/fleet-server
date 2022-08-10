@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM golang:${GO_VERSION}-stretch
+FROM golang:${GO_VERSION}-buster
 
 RUN apt-get update && apt-get install -y zip
 
