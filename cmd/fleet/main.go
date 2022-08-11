@@ -538,7 +538,7 @@ LOOP:
 
 		select {
 		case newCfg = <-f.cfgCh:
-			log.Info().Interface("cfg", redactConfig(curCfg)).Msg("Server configuration update")
+			log.Info().Msg("Server configuration update")
 		case err := <-ech:
 			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			log.Error().Err(err).Msg("Fleet Server failed")
@@ -640,7 +640,7 @@ func redactConfig(cfg *config.Config) *config.Config {
 
 func configChangedServer(curCfg, newCfg *config.Config) bool {
 
-	zlog := log.With().Interface("new", redactServerCfg(newCfg)).Logger()
+	zlog := log.With().Interface("new", redactConfig(newCfg)).Logger()
 
 	changed := true
 	switch {
@@ -648,15 +648,15 @@ func configChangedServer(curCfg, newCfg *config.Config) bool {
 		zlog.Info().Msg("initial server configuration")
 	case !reflect.DeepEqual(curCfg.Fleet, newCfg.Fleet):
 		zlog.Info().
-			Interface("old", curCfg).
+			Interface("old", redactConfig(curCfg)).
 			Msg("fleet configuration has changed")
 	case !reflect.DeepEqual(curCfg.Output, newCfg.Output):
 		zlog.Info().
-			Interface("old", redactOutputCfg(curCfg)).
+			Interface("old", redactConfig(curCfg)).
 			Msg("output configuration has changed")
 	case !reflect.DeepEqual(curCfg.Inputs[0].Server, newCfg.Inputs[0].Server):
 		zlog.Info().
-			Interface("old", redactServerCfg(curCfg)).
+			Interface("old", redactConfig(curCfg)).
 			Msg("server configuration has changed")
 	default:
 		changed = false
