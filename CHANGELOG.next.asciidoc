@@ -2,6 +2,7 @@
 
 - Return a better error on enrolling and the Elasticsearch version is incompatible. {pull}1211[1211]
 - Give a grace period when starting the unenroll monitor. {issue}1500[1500]
+- Fixes a race condition between the unenroller goroutine and the main goroutine for the coordinator monitor. {issues}1738[1738]
 
 ==== New Features
 
