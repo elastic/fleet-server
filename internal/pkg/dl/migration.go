@@ -136,6 +136,7 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 
 // ============================== V7.15 migration ==============================
 func migrateTov7_15(ctx context.Context, bulker bulk.Bulk) error {
+	log.Info().Msg("applying migration to v7.15")
 	_, err := migrate(ctx, bulker, migrateAgentMetadata)
 	if err != nil {
 		return fmt.Errorf("v7.15.0 data migration failed: %w", err)
@@ -175,6 +176,7 @@ func migrateAgentMetadata() (string, string, []byte, error) {
 // https://github.com/elastic/fleet-server/issues/1672
 
 func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
+	log.Info().Msg("applying migration to v8.4")
 	migrated, err := migrate(ctx, bulker, migrateAgentOutputs)
 	if err != nil {
 		return fmt.Errorf("v8.4.0 data migration failed: %w", err)

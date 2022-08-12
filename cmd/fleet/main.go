@@ -811,9 +811,12 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	}
 
 	// Run migrations
-	loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
+	loggedMigration := loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
 		return dl.Migrate(ctx, bulker)
 	})
+	if err = loggedMigration(); err != nil {
+		return fmt.Errorf("failed to run subsystems: %w", err)
+	}
 
 	// Run scheduler for periodic GC/cleanup
 	gcCfg := cfg.Inputs[0].Server.GC
