@@ -136,7 +136,7 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 
 // ============================== V7.15 migration ==============================
 func migrateTov7_15(ctx context.Context, bulker bulk.Bulk) error {
-	log.Info().Msg("applying migration to v7.15")
+	log.Debug().Msg("applying migration to v7.15")
 	_, err := migrate(ctx, bulker, migrateAgentMetadata)
 	if err != nil {
 		return fmt.Errorf("v7.15.0 data migration failed: %w", err)
@@ -176,7 +176,7 @@ func migrateAgentMetadata() (string, string, []byte, error) {
 // https://github.com/elastic/fleet-server/issues/1672
 
 func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
-	log.Info().Msg("applying migration to v8.4")
+	log.Debug().Msg("applying migration to v8.4")
 	migrated, err := migrate(ctx, bulker, migrateAgentOutputs)
 	if err != nil {
 		return fmt.Errorf("v8.4.0 data migration failed: %w", err)
@@ -209,24 +209,27 @@ func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
 // However, reverting FleetServer to an older version might cause very issue
 // this change fixes.
 func migrateAgentOutputs() (string, string, []byte, error) {
-	const migrationName = "AgentOutputs"
+	const (
+		migrationName = "AgentOutputs"
+		fieldOutputs  = "outputs"
+	)
 
 	query := dsl.NewRoot()
-	query.Query().Bool().MustNot().Exists("elasticsearch_outputs")
+	query.Query().Bool().MustNot().Exists(fieldOutputs)
 
 	painless := `
 // set up the new filed
-if (ctx._source['outputs']==null)
- {ctx._source['outputs']=new HashMap();}
-if (ctx._source['outputs']['default']==null)
- {ctx._source['outputs']['default']=new HashMap();}
+if (ctx._source['` + fieldOutputs + `']==null)
+ {ctx._source['` + fieldOutputs + `']=new HashMap();}
+if (ctx._source['` + fieldOutputs + `']['default']==null)
+ {ctx._source['` + fieldOutputs + `']['default']=new HashMap();}
 
 // copy old values to new 'outputs' field
-ctx._source['outputs']['default'].type="elasticsearch";
-ctx._source['outputs']['default'].to_retire_api_key_ids=ctx._source.default_api_key_history;
-ctx._source['outputs']['default'].api_key=ctx._source.default_api_key;
-ctx._source['outputs']['default'].api_key_id=ctx._source.default_api_key_id;
-ctx._source['outputs']['default'].policy_permissions_hash=ctx._source.policy_output_permissions_hash;
+ctx._source['` + fieldOutputs + `']['default'].type="elasticsearch";
+ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids=ctx._source.default_api_key_history;
+ctx._source['` + fieldOutputs + `']['default'].api_key="";
+ctx._source['` + fieldOutputs + `']['default'].api_key_id="";
+ctx._source['` + fieldOutputs + `']['default'].policy_permissions_hash=ctx._source.policy_output_permissions_hash;
 
 // Erase deprecated fields
 ctx._source.default_api_key_history=null;
