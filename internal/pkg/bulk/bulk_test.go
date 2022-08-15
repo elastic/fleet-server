@@ -251,9 +251,10 @@ func TestCancelCtx(t *testing.T) {
 		},
 	}
 
+	_ = testlog.SetLogger(t)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_ = testlog.SetLogger(t)
 			ctx, cancelF := context.WithCancel(context.Background())
 
 			var wg sync.WaitGroup
