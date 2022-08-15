@@ -33,18 +33,20 @@ func WithFlushInterval(d time.Duration) Opt {
 }
 
 type extraT struct {
-	meta  []byte
-	seqNo sqn.SeqNo
-	ver   string
+	meta       []byte
+	seqNo      sqn.SeqNo
+	ver        string
+	components []byte
 }
 
 // Minimize the size of this structure.
 // There will be 10's of thousands of items
 // in the map at any point.
 type pendingT struct {
-	ts     string
-	status string
-	extra  *extraT
+	ts      string
+	status  string
+	message string
+	extra   *extraT
 }
 
 // Bulk will batch pending checkins and update elasticsearch at a set interval.
@@ -98,25 +100,27 @@ func (bc *Bulk) timestamp() string {
 // CheckIn will add the agent (identified by id) to the pending set.
 // The pending agents are sent to elasticsearch as a bulk update at each flush interval.
 // WARNING: Bulk will take ownership of fields, so do not use after passing in.
-func (bc *Bulk) CheckIn(id string, status string, meta []byte, seqno sqn.SeqNo, newVer string) error {
+func (bc *Bulk) CheckIn(id string, status, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string) error {
 	// Separate out the extra data to minimize
 	// the memory footprint of the 90% case of just
 	// updating the timestamp.
 	var extra *extraT
-	if meta != nil || seqno.IsSet() || newVer != "" {
+	if meta != nil || seqno.IsSet() || newVer != "" || components != nil {
 		extra = &extraT{
-			meta:  meta,
-			seqNo: seqno,
-			ver:   newVer,
+			meta:       meta,
+			seqNo:      seqno,
+			ver:        newVer,
+			components: components,
 		}
 	}
 
 	bc.mut.Lock()
 
 	bc.pending[id] = pendingT{
-		ts:     bc.timestamp(),
-		status: status,
-		extra:  extra,
+		ts:      bc.timestamp(),
+		status:  status,
+		message: message,
+		extra:   extra,
 	}
 
 	bc.mut.Unlock()
@@ -180,9 +184,10 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			body, ok = simpleCache[pendingData]
 			if !ok {
 				fields := bulk.UpdateFields{
-					dl.FieldLastCheckin:       pendingData.ts,
-					dl.FieldUpdatedAt:         nowTimestamp,
-					dl.FieldLastCheckinStatus: pendingData.status,
+					dl.FieldLastCheckin:        pendingData.ts,
+					dl.FieldUpdatedAt:          nowTimestamp,
+					dl.FieldLastCheckinStatus:  pendingData.status,
+					dl.FieldLastCheckinMessage: pendingData.message,
 				}
 				if body, err = fields.Marshal(); err != nil {
 					return err
@@ -192,9 +197,10 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		} else {
 
 			fields := bulk.UpdateFields{
-				dl.FieldLastCheckin:       pendingData.ts,     // Set the checkin timestamp
-				dl.FieldUpdatedAt:         nowTimestamp,       // Set "updated_at" to the current timestamp
-				dl.FieldLastCheckinStatus: pendingData.status, // Set the pending status
+				dl.FieldLastCheckin:        pendingData.ts,      // Set the checkin timestamp
+				dl.FieldUpdatedAt:          nowTimestamp,        // Set "updated_at" to the current timestamp
+				dl.FieldLastCheckinStatus:  pendingData.status,  // Set the pending status
+				dl.FieldLastCheckinMessage: pendingData.message, // Set the status message
 			}
 
 			// If the agent version is not empty it needs to be updated
@@ -211,6 +217,11 @@ func (bc *Bulk) flush(ctx context.Context) error {
 				// the encode process, so there my be unexpected memory overhead:
 				// https://github.com/golang/go/blob/go1.16.3/src/encoding/json/encode.go#L499
 				fields[dl.FieldLocalMetadata] = json.RawMessage(pendingData.extra.meta)
+			}
+
+			// Update components if provided
+			if pendingData.extra.components != nil {
+				fields[dl.FieldComponents] = json.RawMessage(pendingData.extra.components)
 			}
 
 			// If seqNo changed, set the field appropriately
