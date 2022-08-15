@@ -576,6 +576,10 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 		if err := json.Unmarshal(req.Components, &reqComponents); err != nil {
 			return nil, errors.Wrap(err, "parseComponents request")
 		}
+		// Validate that components is an array
+		if _, ok := reqComponents.([]interface{}); !ok {
+			return nil, errors.Wrap(errors.New("components property is not array"), "parseComponents request")
+		}
 	}
 
 	// If empty, don't step on existing data
