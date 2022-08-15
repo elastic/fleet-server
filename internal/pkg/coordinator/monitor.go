@@ -74,8 +74,10 @@ type monitorT struct {
 	leadersIndex  string
 	agentsIndex   string
 
-	policies          map[string]policyT
-	policiesCanceller map[string]context.CancelFunc
+	policies map[string]policyT
+
+	muPoliciesCanceller sync.Mutex
+	policiesCanceller   map[string]context.CancelFunc
 }
 
 // NewMonitor creates a new coordinator policy monitor.
@@ -311,7 +313,10 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		if r.cord == nil {
 			// either failed to take leadership or lost leadership
 			delete(m.policies, r.id)
+
+			m.muPoliciesCanceller.Lock()
 			delete(m.policiesCanceller, r.id)
+			m.muPoliciesCanceller.Unlock()
 		} else {
 			m.policies[r.id] = r
 		}
@@ -396,6 +401,9 @@ func (m *monitorT) getIPs() ([]string, error) {
 }
 
 func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *model.Policy) {
+	m.muPoliciesCanceller.Lock()
+	defer m.muPoliciesCanceller.Unlock()
+
 	u := uuid.Must(uuid.NewV4())
 	l := m.log.With().Str(dl.FieldPolicyID, pt.id).Str("unenroller_uuid", u.String()).Logger()
 	unenrollTimeout := time.Duration(p.UnenrollTimeout) * time.Second
@@ -416,6 +424,13 @@ func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *mod
 		l.Debug().Dur("unenroll_timeout", unenrollTimeout).Msg("setting unenrollment timeout")
 		pt.unenrollTimeout = unenrollTimeout
 	}
+}
+
+func (m *monitorT) ActivePoliciesCancellerCount() int {
+	m.muPoliciesCanceller.Lock()
+	defer m.muPoliciesCanceller.Unlock()
+
+	return len(m.policiesCanceller)
 }
 
 func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d time.Duration) {
