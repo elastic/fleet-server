@@ -426,6 +426,13 @@ func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *mod
 	}
 }
 
+func (m *monitorT) ActivePoliciesCancellerCount() int {
+	m.muPoliciesCanceller.Lock()
+	defer m.muPoliciesCanceller.Unlock()
+
+	return len(m.policiesCanceller)
+}
+
 func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d time.Duration) {
 	cnt := 0
 	for {
