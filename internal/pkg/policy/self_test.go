@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/gofrs/uuid"
 	"github.com/rs/xid"
 	"github.com/stretchr/testify/mock"
@@ -69,9 +69,9 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	// should be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, _ := reporter.Current()
-		if status != proto.StateObserved_STARTING {
-			return fmt.Errorf("should be reported as starting; instead its %s", status)
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateStarting {
+			return fmt.Errorf("should be reported as starting; instead its %s", state)
 		}
 		if msg != "Waiting on default policy with Fleet Server integration" {
 			return fmt.Errorf("should be matching with default policy")
@@ -110,9 +110,9 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	// should still be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, _ := reporter.Current()
-		if status != proto.StateObserved_STARTING {
-			return fmt.Errorf("should be reported as starting; instead its %s", status)
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateStarting {
+			return fmt.Errorf("should be reported as starting; instead its %s", state)
 		}
 		if msg != "Waiting on fleet-server input to be added to default policy" {
 			return fmt.Errorf("should be matching with default policy")
@@ -154,9 +154,9 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	// should now be set to healthy
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, _ := reporter.Current()
-		if status != proto.StateObserved_HEALTHY {
-			return fmt.Errorf("should be reported as healthy; instead its %s", status)
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateHealthy {
+			return fmt.Errorf("should be reported as healthy; instead its %s", state)
 		}
 		if msg != "Running on default policy with Fleet Server integration" {
 			return fmt.Errorf("should be matching with default policy")
@@ -225,9 +225,9 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	// should be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, _ := reporter.Current()
-		if status != proto.StateObserved_STARTING {
-			return fmt.Errorf("should be reported as starting; instead its %s", status)
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateStarting {
+			return fmt.Errorf("should be reported as starting; instead its %s", state)
 		}
 		if msg != "Waiting on default policy with Fleet Server integration" {
 			return fmt.Errorf("should be matching with default policy")
@@ -291,9 +291,9 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	// should be set to starting because of missing active enrollment keys
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, _ := reporter.Current()
-		if status != proto.StateObserved_STARTING {
-			return fmt.Errorf("should be reported as starting; instead its %s", status)
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateStarting {
+			return fmt.Errorf("should be reported as starting; instead its %s", state)
 		}
 		if msg != "Waiting on active enrollment keys to be created in default policy with Fleet Server integration" {
 			return fmt.Errorf("should be matching with default policy")
@@ -318,9 +318,9 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	// should now be set to degraded
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, payload := reporter.Current()
-		if status != proto.StateObserved_DEGRADED {
-			return fmt.Errorf("should be reported as degraded; instead its %s", status)
+		state, msg, payload := reporter.Current()
+		if state != client.UnitStateDegraded {
+			return fmt.Errorf("should be reported as degraded; instead its %s", state)
 		}
 		if msg != "Running on default policy with Fleet Server integration; missing config fleet.agent.id (expected during bootstrap process)" {
 			return fmt.Errorf("should be matching with default policy")
@@ -386,9 +386,9 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 
 	// should be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, _ := reporter.Current()
-		if status != proto.StateObserved_STARTING {
-			return fmt.Errorf("should be reported as starting; instead its %s", status)
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateStarting {
+			return fmt.Errorf("should be reported as starting; instead its %s", state)
 		}
 		if msg != fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
@@ -426,9 +426,9 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 
 	// should still be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, _ := reporter.Current()
-		if status != proto.StateObserved_STARTING {
-			return fmt.Errorf("should be reported as starting; instead its %s", status)
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateStarting {
+			return fmt.Errorf("should be reported as starting; instead its %s", state)
 		}
 		if msg != fmt.Sprintf("Waiting on fleet-server input to be added to policy: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
@@ -470,9 +470,9 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 
 	// should now be set to healthy
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, _ := reporter.Current()
-		if status != proto.StateObserved_HEALTHY {
-			return fmt.Errorf("should be reported as healthy; instead its %s", status)
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateHealthy {
+			return fmt.Errorf("should be reported as healthy; instead its %s", state)
 		}
 		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
@@ -542,9 +542,9 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 
 	// should be set to starting
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, _ := reporter.Current()
-		if status != proto.StateObserved_STARTING {
-			return fmt.Errorf("should be reported as starting; instead its %s", status)
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateStarting {
+			return fmt.Errorf("should be reported as starting; instead its %s", state)
 		}
 		if msg != fmt.Sprintf("Waiting on policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
@@ -607,9 +607,9 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 
 	// should be set to starting because of missing active enrollment keys
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, _ := reporter.Current()
-		if status != proto.StateObserved_STARTING {
-			return fmt.Errorf("should be reported as starting; instead its %s", status)
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateStarting {
+			return fmt.Errorf("should be reported as starting; instead its %s", state)
 		}
 		if msg != fmt.Sprintf("Waiting on active enrollment keys to be created in policy with Fleet Server integration: %s", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
@@ -634,9 +634,9 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 
 	// should now be set to degraded
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		status, msg, payload := reporter.Current()
-		if status != proto.StateObserved_DEGRADED {
-			return fmt.Errorf("should be reported as degraded; instead its %s", status)
+		state, msg, payload := reporter.Current()
+		if state != client.UnitStateDegraded {
+			return fmt.Errorf("should be reported as degraded; instead its %s", state)
 		}
 		if msg != fmt.Sprintf("Running on policy with Fleet Server integration: %s; missing config fleet.agent.id (expected during bootstrap process)", policyID) {
 			return fmt.Errorf("should be matching with specific policy")
@@ -663,22 +663,22 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 
 type FakeReporter struct {
 	lock    sync.Mutex
-	status  proto.StateObserved_Status
+	state   client.UnitState
 	msg     string
 	payload map[string]interface{}
 }
 
-func (r *FakeReporter) Status(status proto.StateObserved_Status, message string, payload map[string]interface{}) error {
+func (r *FakeReporter) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	r.status = status
+	r.state = state
 	r.msg = message
 	r.payload = payload
 	return nil
 }
 
-func (r *FakeReporter) Current() (proto.StateObserved_Status, string, map[string]interface{}) {
+func (r *FakeReporter) Current() (client.UnitState, string, map[string]interface{}) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	return r.status, r.msg, r.payload
+	return r.state, r.msg, r.payload
 }

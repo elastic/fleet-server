@@ -215,7 +215,7 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 		return client.UnitStateStarting, nil
 	}
 
-	state := client.UnitStateStarting
+	state := client.UnitStateHealthy
 	extendMsg := ""
 	var payload map[string]interface{}
 	if m.fleet.Agent.ID == "" {
