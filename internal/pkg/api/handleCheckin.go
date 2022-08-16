@@ -193,6 +193,12 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		return err
 	}
 
+	// Compare agent_components content and update if different
+	rawComponents, err := parseComponents(zlog, agent, &req)
+	if err != nil {
+		return err
+	}
+
 	// Resolve AckToken from request, fallback on the agent record
 	seqno, err := ct.resolveSeqNo(ctx, zlog, req, agent)
 	if err != nil {
@@ -237,7 +243,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer longPoll.Stop()
 
 	// Initial update on checkin, and any user fields that might have changed
-	err = ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno, ver)
+	err = ct.bc.CheckIn(agent.Id, req.Status, req.Message, rawMeta, rawComponents, seqno, ver)
 	if err != nil {
 		zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
 	}
@@ -277,7 +283,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				zlog.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
-				err := ct.bc.CheckIn(agent.Id, req.Status, nil, nil, ver)
+				err := ct.bc.CheckIn(agent.Id, req.Status, req.Message, nil, rawComponents, nil, ver)
 				if err != nil {
 					zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
 				}
@@ -553,6 +559,60 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	}
 
 	return outMeta, nil
+}
+
+func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
+
+	// Quick comparison first; compare the JSON payloads.
+	// If the data is not consistently normalized, this short-circuit will not work.
+	if bytes.Equal(req.Components, agent.Components) {
+		zlog.Trace().Msg("quick comparing agent components data is equal")
+		return nil, nil
+	}
+
+	// Deserialize the request components data
+	var reqComponents interface{}
+	if len(req.Components) > 0 {
+		if err := json.Unmarshal(req.Components, &reqComponents); err != nil {
+			return nil, errors.Wrap(err, "parseComponents request")
+		}
+		// Validate that components is an array
+		if _, ok := reqComponents.([]interface{}); !ok {
+			return nil, errors.Wrap(errors.New("components property is not array"), "parseComponents request")
+		}
+	}
+
+	// If empty, don't step on existing data
+	if reqComponents == nil {
+		return nil, nil
+	}
+
+	// Deserialize the agent's components copy
+	var agentComponents interface{}
+	if len(agent.Components) > 0 {
+		if err := json.Unmarshal(agent.Components, &agentComponents); err != nil {
+			return nil, errors.Wrap(err, "parseComponents local")
+		}
+	}
+
+	var outComponents []byte
+
+	// Compare the deserialized meta structures and return the bytes to update if different
+	if !reflect.DeepEqual(reqComponents, agentComponents) {
+
+		zlog.Trace().
+			RawJSON("oldComponents", agent.Components).
+			RawJSON("newComponents", req.Components).
+			Msg("local components data is not equal")
+
+		zlog.Info().
+			RawJSON("req.Components", req.Components).
+			Msg("applying new components data")
+
+		outComponents = req.Components
+	}
+
+	return outComponents, nil
 }
 
 func calcPollDuration(zlog zerolog.Logger, cfg *config.Server, setupDuration time.Duration) (time.Duration, time.Duration) {

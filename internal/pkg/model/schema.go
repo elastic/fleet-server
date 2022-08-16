@@ -124,6 +124,9 @@ type Agent struct {
 	Active bool           `json:"active"`
 	Agent  *AgentMetadata `json:"agent,omitempty"`
 
+	// Elastic Agent components detailed status information
+	Components json.RawMessage `json:"components,omitempty"`
+
 	// API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKey string `json:"default_api_key,omitempty"`
 
@@ -138,6 +141,9 @@ type Agent struct {
 
 	// Date/time the Elastic Agent checked in last time
 	LastCheckin string `json:"last_checkin,omitempty"`
+
+	// Last checkin message
+	LastCheckinMessage string `json:"last_checkin_message,omitempty"`
 
 	// Lst checkin status
 	LastCheckinStatus string `json:"last_checkin_status,omitempty"`
@@ -241,6 +247,10 @@ type Artifact struct {
 
 // Body Encoded artifact data
 type Body struct {
+}
+
+// Components Elastic Agent components detailed status information
+type Components struct {
 }
 
 // Data The opaque payload.
