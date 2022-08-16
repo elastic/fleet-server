@@ -595,7 +595,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 		}
 	}
 
-	var outMeta []byte
+	var outComponents []byte
 
 	// Compare the deserialized meta structures and return the bytes to update if different
 	if !reflect.DeepEqual(reqComponents, agentComponents) {
@@ -609,10 +609,10 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 			RawJSON("req.Components", req.Components).
 			Msg("applying new components data")
 
-		outMeta = req.Components
+		outComponents = req.Components
 	}
 
-	return outMeta, nil
+	return outComponents, nil
 }
 
 func calcPollDuration(zlog zerolog.Logger, cfg *config.Server, setupDuration time.Duration) (time.Duration, time.Duration) {
