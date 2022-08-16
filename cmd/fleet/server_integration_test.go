@@ -32,7 +32,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
-	"github.com/elastic/fleet-server/v7/internal/pkg/status"
+	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
@@ -82,7 +82,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
 
-	srv, err := NewFleetServer(cfg, build.Info{Version: serverVersion}, status.NewLog())
+	srv, err := NewFleetServer(cfg, build.Info{Version: serverVersion}, state.NewLog())
 	if err != nil {
 		return nil, fmt.Errorf("unable to create server: %w", err)
 	}

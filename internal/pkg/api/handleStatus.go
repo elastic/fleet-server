@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"net/http"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/julienschmidt/httprouter"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -68,7 +68,7 @@ func (st StatusT) authenticate(r *http.Request) (*apikey.APIKey, error) {
 	return authAPIKey(r, st.bulk, st.cache)
 }
 
-func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, status proto.StateObserved_Status, err error) {
+func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, state client.UnitState, err error) {
 	limitF, err := st.limit.Acquire()
 	// When failing to acquire a limiter send an error response.
 	if err != nil {
@@ -82,10 +82,10 @@ func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (
 		authed = false
 	}
 
-	status = rt.sm.Status()
+	state = rt.sm.State()
 	resp = StatusResponse{
 		Name:   build.ServiceName,
-		Status: status.String(),
+		Status: state.String(),
 	}
 
 	if authed {
@@ -96,7 +96,7 @@ func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (
 		}
 	}
 
-	return resp, status, nil
+	return resp, state, nil
 
 }
 
@@ -113,7 +113,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 		Str("mod", kStatusMod).
 		Logger()
 
-	resp, status, err := rt.st.handleStatus(&zlog, r, &rt)
+	resp, state, err := rt.st.handleStatus(&zlog, r, &rt)
 	if err != nil {
 		cntStatus.IncError(err)
 		resp := NewHTTPErrResp(err)
@@ -140,7 +140,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 	}
 
 	code := http.StatusServiceUnavailable
-	if status == proto.StateObserved_DEGRADED || status == proto.StateObserved_HEALTHY {
+	if state == client.UnitStateDegraded || state == client.UnitStateHealthy {
 		code = http.StatusOK
 	}
 	w.WriteHeader(code)

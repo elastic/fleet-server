@@ -42,7 +42,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/scheduler"
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
-	"github.com/elastic/fleet-server/v7/internal/pkg/status"
+	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
 	"github.com/hashicorp/go-version"
@@ -52,14 +52,15 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 const (
 	kAgentMode                 = "agent-mode"
 	kAgentModeRestartLoopDelay = 2 * time.Second
 
+	kFleetServer   = "fleet-server"
 	kUAFleetServer = "Fleet-Server"
+	kElasticsearch = "elasticsearch"
 )
 
 func init() {
@@ -162,7 +163,7 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
-			srv, err := NewFleetServer(cfg, bi, status.NewLog())
+			srv, err := NewFleetServer(cfg, bi, state.NewLog())
 			if err != nil {
 				return err
 			}
@@ -192,24 +193,21 @@ func NewCommand(bi build.Info) *cobra.Command {
 	return cmd
 }
 
-type firstCfg struct {
-	cfg *config.Config
-	err error
-}
-
 type AgentMode struct {
 	cliCfg      *ucfg.Config
 	bi          build.Info
 	reloadables []reload.Reloadable
 
-	agent client.Client
+	agent client.V2
+
+	outputUnit *client.Unit
+	inputUnit  *client.Unit
 
 	mux          sync.Mutex
-	firstCfg     chan firstCfg
 	srv          *FleetServer
 	srvCtx       context.Context
 	srvCanceller context.CancelFunc
-	startChan    chan struct{}
+	srvDone      chan bool
 }
 
 func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables ...reload.Reloadable) (*AgentMode, error) {
@@ -220,7 +218,14 @@ func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadab
 		bi:          bi,
 		reloadables: reloadables,
 	}
-	a.agent, err = client.NewFromReader(reader, a)
+	a.agent, _, err = client.NewV2FromReader(reader, client.VersionInfo{
+		Name:    kFleetServer,
+		Version: bi.Version,
+		Meta: map[string]string{
+			"commit":     bi.Commit,
+			"build_time": bi.BuildTime.String(),
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -228,174 +233,286 @@ func NewAgentMode(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadab
 }
 
 func (a *AgentMode) Run(ctx context.Context) error {
-	ctx, canceller := context.WithCancel(ctx)
-	defer canceller()
+	subCtx, subCanceller := context.WithCancel(ctx)
+	defer subCanceller()
 
-	a.firstCfg = make(chan firstCfg)
-	a.startChan = make(chan struct{}, 1)
-	log.Info().Msg("starting communication connection back to Elastic Agent")
-	err := a.agent.Start(ctx)
-	if err != nil {
-		return err
-	}
-
-	// wait for the initial configuration to be sent from the
-	// Elastic Agent before starting the actual Fleet Server.
-	log.Info().Msg("waiting for Elastic Agent to send initial configuration")
-	var cfg firstCfg
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("never received initial configuration: %w", ctx.Err())
-	case cfg = <-a.firstCfg:
-	}
-
-	// possible that first configuration resulted in an error
-	if cfg.err != nil {
-		// unblock startChan even though there was an error
-		a.startChan <- struct{}{}
-		return cfg.err
-	}
-
-	// start fleet server with the initial configuration and its
-	// own context (needed so when OnStop occurs the fleet server
-	// is stopped and not the elastic-agent-client as well)
-	srvCtx, srvCancel := context.WithCancel(ctx)
-	defer srvCancel()
-	log.Info().Msg("received initial configuration starting Fleet Server")
-	srv, err := NewFleetServer(cfg.cfg, a.bi, status.NewChained(status.NewLog(), a.agent))
-	if err != nil {
-		// unblock startChan even though there was an error
-		a.startChan <- struct{}{}
-		return err
-	}
-	a.mux.Lock()
-	close(a.firstCfg)
-	a.firstCfg = nil
-	a.srv = srv
-	a.srvCtx = srvCtx
-	a.srvCanceller = srvCancel
-	a.mux.Unlock()
-
-	// trigger startChan so OnConfig can continue
-	a.startChan <- struct{}{}
-
-	// keep trying to restart the FleetServer on failure, reporting
-	// the status back to Elastic Agent
-	res := make(chan error)
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
-			err := a.srv.Run(srvCtx)
+			select {
+			case <-subCtx.Done():
+				return
+			case err := <-a.agent.Errors():
+				if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
+					log.Error().Err(err)
+				}
+			case change := <-a.agent.UnitChanges():
+				switch change.Type {
+				case client.UnitChangedAdded:
+					err := a.unitAdded(subCtx, change.Unit)
+					if err != nil {
+						log.Error().Str("unit", change.Unit.ID()).Err(err)
+						_ = change.Unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+					}
+				case client.UnitChangedModified:
+					err := a.unitModified(subCtx, change.Unit)
+					if err != nil {
+						log.Error().Str("unit", change.Unit.ID()).Err(err)
+						_ = change.Unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
+					}
+				case client.UnitChangedRemoved:
+					a.unitRemoved(change.Unit)
+				}
+			}
+		}
+	}()
+
+	log.Info().Msg("starting communication connection back to Elastic Agent")
+	err := a.agent.Start(subCtx)
+	if err != nil {
+		return err
+	}
+
+	<-subCtx.Done()
+	wg.Wait()
+
+	return nil
+}
+
+// UpdateState updates the state of the message and payload.
+func (a *AgentMode) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
+	if a.inputUnit != nil {
+		_ = a.inputUnit.UpdateState(state, message, payload)
+	}
+	if a.outputUnit != nil {
+		_ = a.outputUnit.UpdateState(state, message, payload)
+	}
+	return nil
+}
+
+func (a *AgentMode) unitAdded(ctx context.Context, unit *client.Unit) error {
+	if unit.Type() == client.UnitTypeInput {
+		_, _, cfg := unit.Expected()
+		if cfg.Type != kFleetServer {
+			// not support input type
+			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("%s is an unsupported input type", cfg.Type), nil)
+			return nil
+		}
+		if a.inputUnit != nil {
+			// already have 1 unit, not allowed to have more than 1 input unit
+			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("fleet-server input unit %s already exists", a.inputUnit.ID()), nil)
+			return nil
+		}
+		a.inputUnit = unit
+		if a.outputUnit == nil {
+			// waiting for output unit to really start Fleet Server
+			_ = unit.UpdateState(client.UnitStateStarting, "waiting for output unit", nil)
+			return nil
+		}
+		return a.start(ctx)
+	}
+	if unit.Type() == client.UnitTypeOutput {
+		_, _, cfg := unit.Expected()
+		if cfg.Type != kElasticsearch {
+			// not support output type
+			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("%s is an unsupported output type", cfg.Type), nil)
+			return nil
+		}
+		if a.outputUnit != nil {
+			// already have 1 unit, not allowed to have more than 1 output unit
+			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("elasticsearch output unit %s already exists", a.outputUnit.ID()), nil)
+			return nil
+		}
+		a.outputUnit = unit
+		if a.inputUnit == nil {
+			// waiting for input unit to really start Fleet Server
+			_ = unit.UpdateState(client.UnitStateStarting, "waiting for input unit", nil)
+			return nil
+		}
+		return a.start(ctx)
+	}
+	return fmt.Errorf("unknown unit type %v", unit.Type())
+}
+
+func (a *AgentMode) unitModified(ctx context.Context, unit *client.Unit) error {
+	state, _, _ := unit.Expected()
+	if unit.Type() == client.UnitTypeInput {
+		if a.inputUnit != unit {
+			// not our input unit; would have been marked failed in unitAdded; do nothing
+			return nil
+		}
+		if state == client.UnitStateHealthy {
+			if a.outputUnit == nil {
+				// still no output unit; would have been marked starting already; do nothing
+				return nil
+			}
+
+			// configuration modified (should still be running)
+			return a.reconfigure(ctx)
+		} else if state == client.UnitStateStopped {
+			// unit should be stopped
+			a.stop()
+			return nil
+		}
+		return fmt.Errorf("unknown unit state %v", state)
+	}
+	if unit.Type() == client.UnitTypeOutput {
+		if a.outputUnit != unit {
+			// not our output unit; would have been marked failed in unitAdded; do nothing
+			return nil
+		}
+		if state == client.UnitStateHealthy {
+			if a.inputUnit == nil {
+				// still no input unit; would have been marked starting already; do nothing
+				return nil
+			}
+
+			// configuration modified (should still be running)
+			return a.reconfigure(ctx)
+		} else if state == client.UnitStateStopped {
+			// unit should be stopped
+			a.stop()
+			return nil
+		}
+		return fmt.Errorf("unknown unit state %v", state)
+	}
+	return fmt.Errorf("unknown unit type %v", unit.Type())
+}
+
+func (a *AgentMode) unitRemoved(unit *client.Unit) {
+	stop := false
+	if a.inputUnit == unit || a.outputUnit == unit {
+		stop = true
+	}
+	if stop {
+		a.stop()
+	}
+	if a.inputUnit == unit {
+		a.inputUnit = nil
+	}
+	if a.outputUnit == unit {
+		a.outputUnit = nil
+	}
+}
+
+func (a *AgentMode) start(ctx context.Context) error {
+	if a.srv != nil {
+		return a.reconfigure(ctx)
+	}
+
+	cfg, err := a.configFromUnits()
+	if err != nil {
+		return err
+	}
+
+	// reload the generic reloadables
+	for _, r := range a.reloadables {
+		err = r.Reload(ctx, cfg)
+		if err != nil {
+			return err
+		}
+	}
+
+	srvDone := make(chan bool)
+	srvCtx, srvCanceller := context.WithCancel(ctx)
+	srv, err := NewFleetServer(cfg, a.bi, state.NewChained(state.NewLog(), a))
+	if err != nil {
+		close(srvDone)
+		srvCanceller()
+		return err
+	}
+
+	go func() {
+		defer close(srvDone)
+		for {
+			err := srv.Run(srvCtx)
 			if err == nil || errors.Is(err, context.Canceled) {
-				res <- err
 				return
 			}
 			// sleep some before calling Run again
 			_ = sleep.WithContext(srvCtx, kAgentModeRestartLoopDelay)
 		}
 	}()
-	return <-res
+
+	a.srv = srv
+	a.srvCtx = srvCtx
+	a.srvCanceller = srvCanceller
+	a.srvDone = srvDone
+	return nil
 }
 
-func (a *AgentMode) OnConfig(s string) {
-	a.mux.Lock()
-	cliCfg := ucfg.MustNewFrom(a.cliCfg, config.DefaultOptions...)
-	srv := a.srv
-	ctx := a.srvCtx
-	canceller := a.srvCanceller
-	cfgChan := a.firstCfg
-	startChan := a.startChan
-	a.mux.Unlock()
+func (a *AgentMode) reconfigure(ctx context.Context) error {
+	if a.srv == nil {
+		return a.start(ctx)
+	}
 
-	var cfg *config.Config
-	var err error
-	defer func() {
+	cfg, err := a.configFromUnits()
+	if err != nil {
+		return err
+	}
+
+	// reload the generic reloadables
+	for _, r := range a.reloadables {
+		err = r.Reload(ctx, cfg)
 		if err != nil {
-			if cfgChan != nil {
-				// failure on first config
-				cfgChan <- firstCfg{
-					cfg: nil,
-					err: err,
-				}
-				// block until startChan signalled
-				<-startChan
-				return
-			}
-
-			log.Err(err).Msg("failed to reload configuration")
-			if canceller != nil {
-				canceller()
-			}
+			return err
 		}
-	}()
-
-	// load configuration and then merge it on top of the CLI configuration
-	var cfgData *ucfg.Config
-	cfgData, err = yaml.NewConfig([]byte(s), config.DefaultOptions...)
-	if err != nil {
-		return
-	}
-	err = cliCfg.Merge(cfgData, config.DefaultOptions...)
-	if err != nil {
-		return
-	}
-	cfg, err = config.FromConfig(cliCfg)
-	if err != nil {
-		return
 	}
 
-	if cfgChan != nil {
-		// reload the generic reloadables
-		for _, r := range a.reloadables {
-			err = r.Reload(ctx, cfg)
-			if err != nil {
-				return
-			}
-		}
-
-		// send starting configuration so Fleet Server can start
-		cfgChan <- firstCfg{
-			cfg: cfg,
-			err: nil,
-		}
-
-		// block handling more OnConfig calls until the Fleet Server
-		// has been fully started
-		<-startChan
-	} else if srv != nil {
-		// reload the generic reloadables
-		for _, r := range a.reloadables {
-			err = r.Reload(ctx, cfg)
-			if err != nil {
-				return
-			}
-		}
-
-		// reload the server
-		err = srv.Reload(ctx, cfg)
-		if err != nil {
-			return
-		}
-	} else {
-		err = fmt.Errorf("internal service should have been started")
-		return
-	}
+	return a.srv.Reload(ctx, cfg)
 }
 
-func (a *AgentMode) OnStop() {
-	a.mux.Lock()
+func (a *AgentMode) stop() {
+	if a.srvCanceller == nil {
+		return
+	}
+
 	canceller := a.srvCanceller
-	a.mux.Unlock()
-
-	if canceller != nil {
-		canceller()
-	}
+	a.srvCanceller = nil
+	a.srvCtx = nil
+	a.srv = nil
+	canceller()
+	<-a.srvDone
+	a.srvDone = nil
 }
 
-func (a *AgentMode) OnError(err error) {
-	// Log communication error through the logger. These errors are only
-	// provided for logging purposes. The elastic-agent-client handles
-	// retries and reconnects internally automatically.
-	log.Err(err)
+// configFromUnits takes both inputUnit and outputUnit and creates a single configuration just like fleet server was
+// being started from a configuration file.
+func (a *AgentMode) configFromUnits() (*config.Config, error) {
+	agentInfo := a.agent.AgentInfo()
+	_, inputLevel, inputCfg := a.inputUnit.Expected()
+	_, outputLevel, outputCfg := a.outputUnit.Expected()
+	logLevel := inputLevel
+	if outputLevel > logLevel {
+		logLevel = outputLevel
+	}
+
+	cfgData, err := ucfg.NewFrom(map[string]interface{}{
+		"fleet": map[string]interface{}{
+			"agent": map[string]interface{}{
+				"id":      agentInfo.ID,
+				"version": agentInfo.Version,
+				"logging": map[string]interface{}{
+					"level": logLevel.String(),
+				},
+			},
+		},
+		"output": map[string]interface{}{
+			"elasticsearch": outputCfg.Source.AsMap(),
+		},
+		"inputs": []interface{}{
+			inputCfg.Source.AsMap(),
+		},
+		"logging": map[string]interface{}{
+			"level": logLevel.String(),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return config.FromConfig(cfgData)
 }
 
 type FleetServer struct {
@@ -405,11 +522,11 @@ type FleetServer struct {
 	cfg      *config.Config
 	cfgCh    chan *config.Config
 	cache    cache.Cache
-	reporter status.Reporter
+	reporter state.Reporter
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter) (*FleetServer, error) {
+func NewFleetServer(cfg *config.Config, bi build.Info, reporter state.Reporter) (*FleetServer, error) {
 	verCon, err := api.BuildVersionConstraint(bi.Version)
 	if err != nil {
 		return nil, err
@@ -484,10 +601,10 @@ LOOP:
 	for {
 		ech := make(chan error, 2)
 		if started {
-			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
+			f.reporter.UpdateState(client.UnitStateConfiguring, "Re-configuring", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		} else {
 			started = true
-			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
+			f.reporter.UpdateState(client.UnitStateStarting, "Starting", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		}
 
 		err := newCfg.LoadServerLimits()
@@ -540,11 +657,11 @@ LOOP:
 		case newCfg = <-f.cfgCh:
 			log.Info().Msg("Server configuration update")
 		case err := <-ech:
-			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
+			f.reporter.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			log.Error().Err(err).Msg("Fleet Server failed")
 			return err
 		case <-ctx.Done():
-			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
+			f.reporter.UpdateState(client.UnitStateStopping, "Stopping", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			break LOOP
 		}
 	}
