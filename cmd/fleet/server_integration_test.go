@@ -12,6 +12,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -62,13 +64,39 @@ func (s *tserver) waitExit() error {
 	return s.g.Wait()
 }
 
-func startTestServer(ctx context.Context) (*tserver, error) {
+func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
+	t.Helper()
+
 	cfg, err := config.LoadFile("../../fleet-server.yml")
 	if err != nil {
 		return nil, fmt.Errorf("config load error: %w", err)
 	}
 
 	logger.Init(cfg, "fleet-server") //nolint:errcheck // test logging setup
+
+	bulker := ftesting.SetupBulk(ctx, t)
+
+	policyID := uuid.Must(uuid.NewV4()).String()
+	_, err = dl.CreatePolicy(ctx, bulker, model.Policy{
+		PolicyID:           policyID,
+		RevisionIdx:        1,
+		DefaultFleetServer: true,
+		Data:               policyData,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentAPIKey{
+		Name:     "Default",
+		APIKey:   "keyvalue",
+		APIKeyID: "keyid",
+		PolicyID: policyID,
+		Active:   true,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	port, err := ftesting.FreePort()
 	if err != nil {
@@ -82,7 +110,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
 
-	srv, err := NewFleetServer(cfg, build.Info{Version: serverVersion}, state.NewLog())
+	srv, err := NewFleetServer(build.Info{Version: serverVersion}, state.NewLog())
 	if err != nil {
 		return nil, fmt.Errorf("unable to create server: %w", err)
 	}
@@ -90,7 +118,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return srv.Run(ctx)
+		return srv.Run(ctx, cfg)
 	})
 
 	tsrv := &tserver{cfg: cfg, g: g, srv: srv}
@@ -140,7 +168,7 @@ func TestServerUnauthorized(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(ctx)
+	srv, err := startTestServer(t, ctx)
 	require.NoError(t, err)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
@@ -244,7 +272,7 @@ func TestServerInstrumentation(t *testing.T) {
 	defer server.Close()
 
 	// Start test server
-	srv, err := startTestServer(ctx)
+	srv, err := startTestServer(t, ctx)
 	require.NoError(t, err)
 
 	newInstrumentationCfg := func(cfg config.Config, instr config.Instrumentation) { //nolint:govet // mutex should not be copied in operation (hopefully)

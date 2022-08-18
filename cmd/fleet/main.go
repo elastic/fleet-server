@@ -61,6 +61,8 @@ const (
 	kFleetServer   = "fleet-server"
 	kUAFleetServer = "Fleet-Server"
 	kElasticsearch = "elasticsearch"
+
+	kStopped = "Stopped"
 )
 
 func init() {
@@ -163,12 +165,12 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
-			srv, err := NewFleetServer(cfg, bi, state.NewLog())
+			srv, err := NewFleetServer(bi, state.NewLog())
 			if err != nil {
 				return err
 			}
 
-			runErr = srv.Run(installSignalHandler())
+			runErr = srv.Run(installSignalHandler(), cfg)
 		}
 
 		if runErr != nil && !errors.Is(runErr, context.Canceled) {
@@ -240,6 +242,9 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		t := time.NewTicker(1 * time.Second)
+		defer t.Stop()
 		for {
 			select {
 			case <-subCtx.Done():
@@ -264,6 +269,18 @@ func (a *AgentMode) Run(ctx context.Context) error {
 					}
 				case client.UnitChangedRemoved:
 					a.unitRemoved(change.Unit)
+				}
+			case <-t.C:
+				// Fleet Server is the only component that gets started by Elastic Agent without an Agent ID. We loop
+				// here on interval waiting for the Elastic Agent to enroll so then the Agent ID is then set.
+				agentInfo := a.agent.AgentInfo()
+				if agentInfo != nil && agentInfo.ID != "" {
+					// Agent ID is not set for the component.
+					t.Stop()
+					err := a.reconfigure(subCtx)
+					if err != nil {
+						log.Error().Err(err)
+					}
 				}
 			}
 		}
@@ -417,7 +434,7 @@ func (a *AgentMode) start(ctx context.Context) error {
 
 	srvDone := make(chan bool)
 	srvCtx, srvCanceller := context.WithCancel(ctx)
-	srv, err := NewFleetServer(cfg, a.bi, state.NewChained(state.NewLog(), a))
+	srv, err := NewFleetServer(a.bi, state.NewChained(state.NewLog(), a))
 	if err != nil {
 		close(srvDone)
 		srvCanceller()
@@ -427,7 +444,7 @@ func (a *AgentMode) start(ctx context.Context) error {
 	go func() {
 		defer close(srvDone)
 		for {
-			err := srv.Run(srvCtx)
+			err := srv.Run(srvCtx, cfg)
 			if err == nil || errors.Is(err, context.Canceled) {
 				return
 			}
@@ -476,6 +493,13 @@ func (a *AgentMode) stop() {
 	canceller()
 	<-a.srvDone
 	a.srvDone = nil
+
+	if a.inputUnit != nil {
+		_ = a.inputUnit.UpdateState(client.UnitStateStopped, kStopped, nil)
+	}
+	if a.outputUnit != nil {
+		_ = a.outputUnit.UpdateState(client.UnitStateStopped, kStopped, nil)
+	}
 }
 
 // configFromUnits takes both inputUnit and outputUnit and creates a single configuration just like fleet server was
@@ -519,24 +543,14 @@ type FleetServer struct {
 	bi     build.Info
 	verCon version.Constraints
 
-	cfg      *config.Config
 	cfgCh    chan *config.Config
 	cache    cache.Cache
 	reporter state.Reporter
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config, bi build.Info, reporter state.Reporter) (*FleetServer, error) {
+func NewFleetServer(bi build.Info, reporter state.Reporter) (*FleetServer, error) {
 	verCon, err := api.BuildVersionConstraint(bi.Version)
-	if err != nil {
-		return nil, err
-	}
-
-	err = cfg.LoadServerLimits()
-	if err != nil {
-		return nil, fmt.Errorf("encountered error while loading server limits: %w", err)
-	}
-	cache, err := makeCache(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -544,19 +558,29 @@ func NewFleetServer(cfg *config.Config, bi build.Info, reporter state.Reporter) 
 	return &FleetServer{
 		bi:       bi,
 		verCon:   verCon,
-		cfg:      cfg,
 		cfgCh:    make(chan *config.Config, 1),
-		cache:    cache,
 		reporter: reporter,
 	}, nil
 }
 
 type runFunc func(context.Context) error
 
+type runFuncCfg func(context.Context, *config.Config) error
+
 // Run runs the fleet server
-func (f *FleetServer) Run(ctx context.Context) error {
+func (f *FleetServer) Run(ctx context.Context, initCfg *config.Config) error {
+	err := initCfg.LoadServerLimits()
+	if err != nil {
+		return fmt.Errorf("encountered error while loading server limits: %w", err)
+	}
+	cache, err := makeCache(initCfg)
+	if err != nil {
+		return err
+	}
+	f.cache = cache
+
 	var curCfg *config.Config
-	newCfg := f.cfg
+	newCfg := initCfg
 
 	// Replace context with cancellable ctx
 	// in order to automatically cancel all the go routines
@@ -576,12 +600,12 @@ func (f *FleetServer) Run(ctx context.Context) error {
 		}
 	}
 
-	start := func(ctx context.Context, runfn runFunc, ech chan<- error) (*errgroup.Group, context.CancelFunc) {
+	start := func(ctx context.Context, runfn runFuncCfg, cfg *config.Config, ech chan<- error) (*errgroup.Group, context.CancelFunc) {
 		ctx, cn = context.WithCancel(ctx)
 		g, ctx := errgroup.WithContext(ctx)
 
 		g.Go(func() error {
-			err := runfn(ctx)
+			err := runfn(ctx, cfg)
 			if err != nil {
 				ech <- err
 			}
@@ -632,9 +656,9 @@ LOOP:
 			proEg, proCancel = nil, nil
 			if newCfg.Inputs[0].Server.Profiler.Enabled {
 				log.Info().Msg("starting profiler on configuration change")
-				proEg, proCancel = start(ctx, func(ctx context.Context) error {
-					return profile.RunProfiler(ctx, newCfg.Inputs[0].Server.Profiler.Bind)
-				}, ech)
+				proEg, proCancel = start(ctx, func(ctx context.Context, cfg *config.Config) error {
+					return profile.RunProfiler(ctx, cfg.Inputs[0].Server.Profiler.Bind)
+				}, newCfg, ech)
 			}
 		}
 
@@ -645,13 +669,12 @@ LOOP:
 				stop(srvCancel, srvEg)
 			}
 			log.Info().Msg("starting server on configuration change")
-			srvEg, srvCancel = start(ctx, func(ctx context.Context) error {
-				return f.runServer(ctx, newCfg)
-			}, ech)
+			srvEg, srvCancel = start(ctx, func(ctx context.Context, cfg *config.Config) error {
+				return f.runServer(ctx, cfg)
+			}, newCfg, ech)
 		}
 
 		curCfg = newCfg
-		f.cfg = curCfg
 
 		select {
 		case newCfg = <-f.cfgCh:
@@ -668,7 +691,7 @@ LOOP:
 
 	// Server is coming down; wait for the server group to exit cleanly.
 	// Timeout if something is locked up.
-	err := safeWait(srvEg, time.Second)
+	err = safeWait(srvEg, time.Second)
 
 	// Eat cancel error to minimize confusion in logs
 	if errors.Is(err, context.Canceled) {
