@@ -5,7 +5,6 @@
 //go:build integration
 // +build integration
 
-//nolint:unused // some unused code may be added to more tests
 package fleet
 
 import (
@@ -248,7 +247,7 @@ func (s *StubV2Control) Port() int {
 }
 
 func (s *StubV2Control) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", ":0")
+	lis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return err
 	}
@@ -257,7 +256,7 @@ func (s *StubV2Control) Start(opt ...grpc.ServerOption) error {
 	s.server = srv
 	proto.RegisterElasticAgentServer(s.server, s)
 	go func() {
-		srv.Serve(lis)
+		_ = srv.Serve(lis)
 	}()
 	return nil
 }

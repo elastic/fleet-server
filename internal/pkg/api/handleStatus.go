@@ -8,10 +8,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"net/http"
 	"time"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"

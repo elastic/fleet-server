@@ -205,7 +205,6 @@ type AgentMode struct {
 	outputUnit *client.Unit
 	inputUnit  *client.Unit
 
-	mux          sync.Mutex
 	srv          *FleetServer
 	srvCtx       context.Context
 	srvCanceller context.CancelFunc
