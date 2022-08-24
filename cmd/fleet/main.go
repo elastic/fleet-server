@@ -504,7 +504,13 @@ func (a *AgentMode) stop() {
 // configFromUnits takes both inputUnit and outputUnit and creates a single configuration just like fleet server was
 // being started from a configuration file.
 func (a *AgentMode) configFromUnits() (*config.Config, error) {
+	agentID := ""
+	agentVersion := ""
 	agentInfo := a.agent.AgentInfo()
+	if agentInfo != nil {
+		agentID = agentInfo.ID
+		agentVersion = agentInfo.Version
+	}
 	_, inputLevel, inputCfg := a.inputUnit.Expected()
 	_, outputLevel, outputCfg := a.outputUnit.Expected()
 	logLevel := inputLevel
@@ -515,8 +521,8 @@ func (a *AgentMode) configFromUnits() (*config.Config, error) {
 	cfgData, err := ucfg.NewFrom(map[string]interface{}{
 		"fleet": map[string]interface{}{
 			"agent": map[string]interface{}{
-				"id":      agentInfo.ID,
-				"version": agentInfo.Version,
+				"id":      agentID,
+				"version": agentVersion,
 				"logging": map[string]interface{}{
 					"level": logLevel.String(),
 				},
