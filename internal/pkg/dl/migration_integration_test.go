@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,6 +22,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
+
+const nowStr = "2022-08-12T16:50:05Z"
 
 func createSomeAgents(t *testing.T, n int, apiKey bulk.APIKey, index string, bulker bulk.Bulk) []string {
 	t.Helper()
@@ -32,9 +35,6 @@ func createSomeAgents(t *testing.T, n int, apiKey bulk.APIKey, index string, bul
 			ID:  fmt.Sprint(apiKey.ID, i),
 			Key: fmt.Sprint(apiKey.Key, i),
 		}
-
-		now := time.Now().UTC()
-		nowStr := now.Format(time.RFC3339)
 
 		agentID := uuid.Must(uuid.NewV4()).String()
 		policyID := uuid.Must(uuid.NewV4()).String()
@@ -52,7 +52,7 @@ func createSomeAgents(t *testing.T, n int, apiKey bulk.APIKey, index string, bul
 			DefaultAPIKeyHistory: []model.ToRetireAPIKeyIdsItems{
 				{
 					ID:        "old_" + outputAPIKey.ID,
-					RetiredAt: now.Add(-5 * time.Minute).Format(time.RFC3339),
+					RetiredAt: nowStr,
 				},
 			},
 		}
@@ -133,6 +133,12 @@ func TestPolicyCoordinatorIdx(t *testing.T) {
 }
 
 func TestMigrateOutputs(t *testing.T) {
+	now, err := time.Parse(time.RFC3339, nowStr)
+	require.NoError(t, err, "could not parse time "+nowStr)
+	timeNow = func() time.Time {
+		return now
+	}
+
 	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
 	apiKey := bulk.APIKey{
 		ID:  "testAgent_",
@@ -148,10 +154,6 @@ func TestMigrateOutputs(t *testing.T) {
 
 	for i, id := range agentIDs {
 		wantOutputType := "elasticsearch"
-		wantAPIKey := bulk.APIKey{
-			ID:  fmt.Sprint(apiKey.ID, i),
-			Key: fmt.Sprint(apiKey.Key, i),
-		}
 
 		got, err := FindAgent(
 			context.Background(), bulker, QueryAgentByID, FieldID, id, WithIndexName(index))
@@ -160,15 +162,38 @@ func TestMigrateOutputs(t *testing.T) {
 			continue
 		}
 
+		wantToRetireAPIKeyIds := []model.ToRetireAPIKeyIdsItems{
+			{
+				// Current API should be marked to retire after the migration
+				ID:        fmt.Sprintf("%s%d", apiKey.ID, i),
+				RetiredAt: timeNow().UTC().Format(time.RFC3339)},
+			{
+				ID:        fmt.Sprintf("old_%s%d", apiKey.ID, i),
+				RetiredAt: nowStr},
+		}
+
 		// Assert new fields
 		require.Len(t, got.Outputs, 1)
-		assert.Equal(t, wantAPIKey.Agent(), got.Outputs["default"].APIKey)
-		assert.Equal(t, wantAPIKey.ID, got.Outputs["default"].APIKeyID)
-		assert.Equal(t, wantAPIKey.Agent(), got.Outputs["default"].APIKey)
+		// Default API key is empty to force fleet-server to regenerate them.
+		assert.Empty(t, got.Outputs["default"].APIKey)
+		assert.Empty(t, got.Outputs["default"].APIKeyID)
+
 		assert.Equal(t, wantOutputType, got.Outputs["default"].Type)
 		assert.Equal(t,
 			fmt.Sprint("a_output_permission_SHA_", i),
 			got.Outputs["default"].PolicyPermissionsHash)
+
+		// Assert ToRetireAPIKeyIds contains the expected values, regardless of the order.
+		for _, want := range wantToRetireAPIKeyIds {
+			var found bool
+			for _, got := range got.Outputs["default"].ToRetireAPIKeyIds {
+				found = found || cmp.Equal(want, got)
+			}
+			if !found {
+				t.Errorf("could not find %#v, in %#v",
+					want, got.Outputs["default"].ToRetireAPIKeyIds)
+			}
+		}
 
 		// Assert deprecated fields
 		assert.Empty(t, got.DefaultAPIKey)

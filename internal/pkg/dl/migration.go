@@ -40,6 +40,9 @@ type (
 	}
 )
 
+// timeNow is used to get the current time. It should be replaced for testing.
+var timeNow = time.Now
+
 // Migrate applies, in sequence, the migration functions. Currently, each migration
 // function is responsible to ensure it only applies the migration if needed,
 // being a no-op otherwise.
@@ -70,9 +73,8 @@ func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, er
 		if resp.VersionConflicts == 0 {
 			break
 		}
-
-		time.Sleep(time.Second)
 	}
+
 	return updatedDocs, nil
 }
 
@@ -210,26 +212,35 @@ func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
 // this change fixes.
 func migrateAgentOutputs() (string, string, []byte, error) {
 	const (
-		migrationName = "AgentOutputs"
-		fieldOutputs  = "outputs"
+		migrationName  = "AgentOutputs"
+		fieldOutputs   = "outputs"
+		fieldRetiredAt = "retiredAt"
 	)
 
 	query := dsl.NewRoot()
 	query.Query().Bool().MustNot().Exists(fieldOutputs)
 
+	fields := map[string]interface{}{fieldRetiredAt: timeNow().UTC().Format(time.RFC3339)}
 	painless := `
-// set up the new filed
-if (ctx._source['` + fieldOutputs + `']==null)
- {ctx._source['` + fieldOutputs + `']=new HashMap();}
-if (ctx._source['` + fieldOutputs + `']['default']==null)
- {ctx._source['` + fieldOutputs + `']['default']=new HashMap();}
+// set up the new fields
+ctx._source['` + fieldOutputs + `']=new HashMap();
+ctx._source['` + fieldOutputs + `']['default']=new HashMap();
+ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids=new ArrayList();
 
-// copy old values to new 'outputs' field
+// copy 'default_api_key_history' to new 'outputs' field
 ctx._source['` + fieldOutputs + `']['default'].type="elasticsearch";
 ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids=ctx._source.default_api_key_history;
+
+Map map = new HashMap();
+map.put("retired_at", params.` + fieldRetiredAt + `);
+map.put("id", ctx._source.default_api_key_id);
+
+// Make current API key empty, so fleet-server will generate a new one
+// Add current API jey to be retired
+ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids.add(map);
 ctx._source['` + fieldOutputs + `']['default'].api_key="";
 ctx._source['` + fieldOutputs + `']['default'].api_key_id="";
-ctx._source['` + fieldOutputs + `']['default'].policy_permissions_hash=ctx._source.policy_output_permissions_hash;
+ctx._source['` + fieldOutputs + `']['default'].permissions_hash=ctx._source.policy_output_permissions_hash;
 
 // Erase deprecated fields
 ctx._source.default_api_key_history=null;
@@ -237,7 +248,11 @@ ctx._source.default_api_key="";
 ctx._source.default_api_key_id="";
 ctx._source.policy_output_permissions_hash="";
 `
-	query.Param("script", painless)
+	query.Param("script", map[string]interface{}{
+		"lang":   "painless",
+		"source": painless,
+		"params": fields,
+	})
 
 	body, err := query.MarshalJSON()
 	if err != nil {

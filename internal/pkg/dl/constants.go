@@ -38,7 +38,7 @@ const (
 	FieldPolicyID                      = "policy_id"
 	FieldPolicyOutputAPIKey            = "api_key"
 	FieldPolicyOutputAPIKeyID          = "api_key_id"
-	FieldPolicyOutputPermissionsHash   = "policy_permissions_hash"
+	FieldPolicyOutputPermissionsHash   = "permissions_hash"
 	FieldPolicyOutputToRetireAPIKeyIDs = "to_retire_api_key_ids" //nolint:gosec // false positive
 	FieldPolicyRevisionIdx             = "policy_revision_idx"
 	FieldRevisionIdx                   = "revision_idx"

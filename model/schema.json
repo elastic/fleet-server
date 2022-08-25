@@ -385,7 +385,7 @@
           "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
           "type": "string"
         },
-        "policy_permissions_hash": {
+        "permissions_hash": {
           "description": "The policy output permissions hash",
           "type": "string"
         },
@@ -398,7 +398,7 @@
         "api_key",
         "api_key_history",
         "api_key_id",
-        "policy_permissions_hash",
+        "permissions_hash",
         "type"
       ]
     },
