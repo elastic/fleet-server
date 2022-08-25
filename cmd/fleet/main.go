@@ -317,9 +317,8 @@ func (a *AgentMode) unitAdded(ctx context.Context, unit *client.Unit) error {
 			return nil
 		}
 		if a.inputUnit != nil {
-			// already have 1 unit, not allowed to have more than 1 input unit
-			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("fleet-server input unit %s already exists", a.inputUnit.ID()), nil)
-			return nil
+			// original input unit is being stopped; swapping in this unit as the new input unit
+			_ = a.inputUnit.UpdateState(client.UnitStateStopped, kStopped, nil)
 		}
 		a.inputUnit = unit
 		if a.outputUnit == nil {
@@ -337,9 +336,8 @@ func (a *AgentMode) unitAdded(ctx context.Context, unit *client.Unit) error {
 			return nil
 		}
 		if a.outputUnit != nil {
-			// already have 1 unit, not allowed to have more than 1 output unit
-			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("elasticsearch output unit %s already exists", a.outputUnit.ID()), nil)
-			return nil
+			// original output unit is being stopped; swapping in this unit as the new output unit
+			_ = a.outputUnit.UpdateState(client.UnitStateStopped, kStopped, nil)
 		}
 		a.outputUnit = unit
 		if a.inputUnit == nil {
