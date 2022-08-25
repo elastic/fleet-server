@@ -585,6 +585,10 @@ func redactOutputCfg(cfg *config.Config) config.Output {
 		redacted.Elasticsearch.APIKey = kRedacted
 	}
 
+	if redacted.Elasticsearch.ServiceToken != "" {
+		redacted.Elasticsearch.ServiceToken = kRedacted
+	}
+
 	if redacted.Elasticsearch.TLS != nil {
 		newTLS := *redacted.Elasticsearch.TLS
 
@@ -621,9 +625,22 @@ func redactServerCfg(cfg *config.Config) config.Server {
 	return redacted
 }
 
+func redactConfig(cfg *config.Config) *config.Config {
+	redacted := &config.Config{
+		Fleet:   cfg.Fleet,
+		Output:  cfg.Output,
+		Inputs:  make([]config.Input, 1),
+		Logging: cfg.Logging,
+		HTTP:    cfg.HTTP,
+	}
+	redacted.Inputs[0].Server = redactServerCfg(cfg)
+	redacted.Output = redactOutputCfg(cfg)
+	return redacted
+}
+
 func configChangedServer(curCfg, newCfg *config.Config) bool {
 
-	zlog := log.With().Interface("new", redactServerCfg(newCfg)).Logger()
+	zlog := log.With().Interface("new", redactConfig(newCfg)).Logger()
 
 	changed := true
 	switch {
@@ -631,15 +648,15 @@ func configChangedServer(curCfg, newCfg *config.Config) bool {
 		zlog.Info().Msg("initial server configuration")
 	case !reflect.DeepEqual(curCfg.Fleet, newCfg.Fleet):
 		zlog.Info().
-			Interface("old", curCfg).
+			Interface("old", redactConfig(curCfg)).
 			Msg("fleet configuration has changed")
 	case !reflect.DeepEqual(curCfg.Output, newCfg.Output):
 		zlog.Info().
-			Interface("old", redactOutputCfg(curCfg)).
+			Interface("old", redactConfig(curCfg)).
 			Msg("output configuration has changed")
 	case !reflect.DeepEqual(curCfg.Inputs[0].Server, newCfg.Inputs[0].Server):
 		zlog.Info().
-			Interface("old", redactServerCfg(curCfg)).
+			Interface("old", redactConfig(curCfg)).
 			Msg("server configuration has changed")
 	default:
 		changed = false

@@ -227,7 +227,7 @@ func TestMonitorUnenroller(t *testing.T) {
 	assert.NotEmpty(t, agent.UnenrolledAt)
 	assert.Equal(t, unenrolledReasonTimeout, agent.UnenrolledReason)
 	assert.Len(t, pm.(*monitorT).policies, 1)
-	assert.Len(t, pm.(*monitorT).policiesCanceller, 1)
+	assert.Equal(t, pm.(*monitorT).ActivePoliciesCancellerCount(), 1)
 
 	// should error as they are now invalidated
 	_, err = bulker.APIKeyAuth(bulkCtx, *accessKey)
@@ -348,7 +348,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 	assert.True(t, agent.Active)
 	// Make sure canceller is no longer there
 	assert.Len(t, pm.(*monitorT).policies, 1)
-	assert.Len(t, pm.(*monitorT).policiesCanceller, 0)
+	assert.Equal(t, pm.(*monitorT).ActivePoliciesCancellerCount(), 0)
 
 }
 
