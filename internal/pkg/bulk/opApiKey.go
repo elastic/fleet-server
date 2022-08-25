@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	expectedApiKeySize = 64 // 64B
+	expectedAPIKeySize = 64 // 64B
 	envelopeSize       = 64 // 64B
 	safeBuffer         = 0.9
 )
@@ -84,20 +84,20 @@ func (b *Bulker) APIKeyUpdate(ctx context.Context, id, outputPolicyHash string, 
 		return err
 	}
 
-	_, err = b.waitBulkAction(ctx, ActionUpdateApiKey, "", id, body)
+	_, err = b.waitBulkAction(ctx, ActionUpdateAPIKey, "", id, body)
 	return err
 }
 
-// flushUpdateApiKey takes an update API Key queue and groups request based on roles applied
+// flushUpdateAPIKey takes an update API Key queue and groups request based on roles applied
 // it needs to group agent IDs per Role Hash in order to produce more efficient request containing a list of IDs for a change(update)
 // one thing to have in mind is that in a single queue there may be change and ack request with roles. in this case
-// later occurence wins overwriting policy change to reduced set of permissions.
+// later occurrence wins overwriting policy change to reduced set of permissions.
 // even if the order was incorrect we end up with just a bit broader permission set, never too strict, so agent does not
 // end up with fewer permissions than it needs
-func (b *Bulker) flushUpdateApiKey(ctx context.Context, queue queueT) error {
+func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 	idsPerRole := make(map[string][]string)
 	roles := make(map[string]json.RawMessage)
-	rolePerId := make(map[string]string)
+	rolePerID := make(map[string]string)
 	responses := make(map[int]int)
 	idxToID := make(map[int32]string)
 	IDToResponse := make(map[string]int)
@@ -130,12 +130,12 @@ func (b *Bulker) flushUpdateApiKey(ctx context.Context, queue queueT) error {
 		}
 
 		// last one wins, it may be policy change and ack are in the same queue
-		rolePerId[req.ID] = req.RolesHash
+		rolePerID[req.ID] = req.RolesHash
 		idxToID[n.idx] = req.ID
 	}
 
-	for id, roleHash := range rolePerId {
-		delete(rolePerId, id)
+	for id, roleHash := range rolePerID {
+		delete(rolePerID, id)
 		if _, tracked := idsPerRole[roleHash]; !tracked {
 			idsPerRole[roleHash] = []string{id}
 		} else {
@@ -241,8 +241,8 @@ func (b *Bulker) flushUpdateApiKey(ctx context.Context, queue queueT) error {
 
 func (b *Bulker) getIdsCountPerBatch(roleSize int) int {
 	spareSpace := b.opts.apikeyMaxReqSize - roleSize - envelopeSize
-	if spareSpace > expectedApiKeySize {
-		return int(float64(spareSpace) * safeBuffer / expectedApiKeySize)
+	if spareSpace > expectedAPIKeySize {
+		return int(float64(spareSpace) * safeBuffer / expectedAPIKeySize)
 	}
 	return 0
 }

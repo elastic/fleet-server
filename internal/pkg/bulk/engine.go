@@ -138,8 +138,8 @@ func blkToQueueType(blk *bulkT) queueType {
 		} else {
 			queueIdx = kQueueRead
 		}
-	case ActionUpdateApiKey:
-		queueIdx = kQueueApiKeyUpdate
+	case ActionUpdateAPIKey:
+		queueIdx = kQueueAPIKeyUpdate
 	default:
 		if forceRefresh {
 			queueIdx = kQueueRefreshBulk
@@ -292,8 +292,8 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 			err = b.flushRead(ctx, queue)
 		case kQueueSearch, kQueueFleetSearch:
 			err = b.flushSearch(ctx, queue)
-		case kQueueApiKeyUpdate:
-			err = b.flushUpdateApiKey(ctx, queue)
+		case kQueueAPIKeyUpdate:
+			err = b.flushUpdateAPIKey(ctx, queue)
 		default:
 			err = b.flushBulk(ctx, queue)
 		}

@@ -43,7 +43,7 @@ const (
 	ActionDelete
 	ActionIndex
 	ActionUpdate
-	ActionUpdateApiKey
+	ActionUpdateAPIKey
 	ActionRead
 	ActionSearch
 	ActionFleetSearch

@@ -121,11 +121,11 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
 		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		bulker.On("APIKeyUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once() //nolint:govet // test case
+		bulker.On("APIKeyUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		bulker.
 			On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything).
 			Return(&bulk.APIKeyMetadata{ID: "test_id", RoleDescriptors: TestPayload}, nil).
-			Once() //nolint:govet // test case
+			Once()
 
 		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,
