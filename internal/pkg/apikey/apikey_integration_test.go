@@ -54,7 +54,7 @@ func TestCreateAPIKeyWithMetadata(t *testing.T) {
 	}
 
 	// Get the key and verify that metadata was saved correctly
-	aKeyMeta, err := Read(ctx, es, akey.ID)
+	aKeyMeta, err := Read(ctx, es, akey.ID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestCreateAPIKeyWithMetadata(t *testing.T) {
 	}
 
 	// Try to get the key that doesn't exists, expect ErrApiKeyNotFound
-	_, err = Read(ctx, es, "0000000000000")
+	_, err = Read(ctx, es, "0000000000000", false)
 	if !errors.Is(err, ErrAPIKeyNotFound) {
 		t.Errorf("Unexpected error type: %v", err)
 	}
