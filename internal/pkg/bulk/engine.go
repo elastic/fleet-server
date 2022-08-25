@@ -55,9 +55,10 @@ type Bulk interface {
 
 	// APIKey operations
 	APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*APIKey, error)
-	APIKeyRead(ctx context.Context, id string) (*APIKeyMetadata, error)
+	APIKeyRead(ctx context.Context, id string, withOwner bool) (*APIKeyMetadata, error)
 	APIKeyAuth(ctx context.Context, key APIKey) (*SecurityInfo, error)
 	APIKeyInvalidate(ctx context.Context, ids ...string) error
+	APIKeyUpdate(ctx context.Context, id, outputPolicyHash string, roles []byte) error
 
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
@@ -81,6 +82,7 @@ const (
 	defaultMaxPending        = 32
 	defaultBlockQueueSz      = 32 // Small capacity to allow multiOp to spin fast
 	defaultAPIKeyMaxParallel = 32
+	defaultApikeyMaxReqSize  = 100 * 1024 * 1024
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -136,6 +138,8 @@ func blkToQueueType(blk *bulkT) queueType {
 		} else {
 			queueIdx = kQueueRead
 		}
+	case ActionUpdateApiKey:
+		queueIdx = kQueueApiKeyUpdate
 	default:
 		if forceRefresh {
 			queueIdx = kQueueRefreshBulk
@@ -288,6 +292,8 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 			err = b.flushRead(ctx, queue)
 		case kQueueSearch, kQueueFleetSearch:
 			err = b.flushSearch(ctx, queue)
+		case kQueueApiKeyUpdate:
+			err = b.flushUpdateApiKey(ctx, queue)
 		default:
 			err = b.flushBulk(ctx, queue)
 		}

@@ -43,6 +43,7 @@ const (
 	ActionDelete
 	ActionIndex
 	ActionUpdate
+	ActionUpdateApiKey
 	ActionRead
 	ActionSearch
 	ActionFleetSearch
@@ -53,6 +54,7 @@ var actionStrings = []string{
 	"delete",
 	"index",
 	"update",
+	"update_api_key",
 	"read",
 	"search",
 	"fleet_search",

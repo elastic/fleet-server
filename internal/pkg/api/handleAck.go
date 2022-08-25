@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
+	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	"github.com/pkg/errors"
 
 	"github.com/julienschmidt/httprouter"
@@ -349,10 +350,44 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
+	if agent.DefaultAPIKeyID != "" {
+		res, err := ack.bulk.APIKeyRead(ctx, agent.DefaultAPIKeyID, true)
+		if err != nil {
+			zlog.Info().
+				Err(err).
+				Str("id", agent.DefaultAPIKeyID).
+				Msg("Failed to read API Key roles")
+		} else {
+			clean, removedCount, err := cleanRoles(res.RoleDescriptors)
+			if err != nil {
+				zlog.Info().
+					Err(err).
+					RawJSON("roles", res.RoleDescriptors).
+					Str("id", agent.DefaultAPIKeyID).
+					Msg("Failed to cleanup roles")
+			} else if removedCount > 0 {
+				if err := ack.bulk.APIKeyUpdate(ctx, agent.DefaultAPIKeyID, agent.PolicyOutputPermissionsHash, clean); err != nil {
+					zlog.Info().Err(err).RawJSON("roles", clean).Str("id", agent.DefaultAPIKeyID).Msg("Failed to refresh API Key")
+				} else {
+					zlog.Debug().
+						Str("hash.sha256", agent.PolicyOutputPermissionsHash).
+						Str("apikey", agent.DefaultAPIKeyID).
+						RawJSON("roles", clean).
+						Int("removed", removedCount).
+						Msg("Updating agent record to pick up reduced roles.")
+				}
+			}
+		}
+	}
+
 	sz := len(agent.DefaultAPIKeyHistory)
 	if sz > 0 {
 		ids := make([]string, sz)
 		for i := 0; i < sz; i++ {
+			if agent.DefaultAPIKeyHistory[i].ID == agent.DefaultAPIKeyID {
+				// already updated
+				continue
+			}
 			ids[i] = agent.DefaultAPIKeyHistory[i].ID
 		}
 		log.Info().Strs("ids", ids).Msg("Invalidate old API keys")
@@ -383,6 +418,32 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		Msg("ack policy")
 
 	return errors.Wrap(err, "handlePolicyChange update")
+}
+
+func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
+	rr := smap.Map{}
+	if err := json.Unmarshal(roles, &rr); err != nil {
+		return nil, 0, err
+	}
+
+	keys := make([]string, 0, len(rr))
+	for k := range rr {
+		if strings.HasSuffix(k, "-rdstale") {
+			keys = append(keys, k)
+		}
+
+	}
+
+	if len(keys) == 0 {
+		return roles, 0, nil
+	}
+
+	for _, k := range keys {
+		delete(rr, k)
+	}
+
+	r, err := json.Marshal(rr)
+	return r, len(keys), err
 }
 
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
