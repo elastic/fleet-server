@@ -337,7 +337,7 @@ type PolicyOutput struct {
 	APIKeyID string `json:"api_key_id"`
 
 	// The policy output permissions hash
-	PolicyPermissionsHash string `json:"permissions_hash"`
+	PermissionsHash string `json:"permissions_hash"`
 
 	// API keys to be invalidated on next agent ack
 	ToRetireAPIKeyIds []ToRetireAPIKeyIdsItems `json:"to_retire_api_key_ids,omitempty"`
