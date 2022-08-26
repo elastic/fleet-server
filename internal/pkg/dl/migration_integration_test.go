@@ -181,7 +181,7 @@ func TestMigrateOutputs(t *testing.T) {
 		assert.Equal(t, wantOutputType, got.Outputs["default"].Type)
 		assert.Equal(t,
 			fmt.Sprint("a_output_permission_SHA_", i),
-			got.Outputs["default"].PolicyPermissionsHash)
+			got.Outputs["default"].PermissionsHash)
 
 		// Assert ToRetireAPIKeyIds contains the expected values, regardless of the order.
 		for _, want := range wantToRetireAPIKeyIds {

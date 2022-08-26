@@ -107,12 +107,12 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		testAgent := &model.Agent{
 			Outputs: map[string]*model.PolicyOutput{
 				output.Name: {
-					ESDocument:            model.ESDocument{},
-					APIKey:                apiKey.Agent(),
-					ToRetireAPIKeyIds:     nil,
-					APIKeyID:              apiKey.ID,
-					PolicyPermissionsHash: hashPerm,
-					Type:                  OutputTypeElasticsearch,
+					ESDocument:        model.ESDocument{},
+					APIKey:            apiKey.Agent(),
+					ToRetireAPIKeyIds: nil,
+					APIKeyID:          apiKey.ID,
+					PermissionsHash:   hashPerm,
+					Type:              OutputTypeElasticsearch,
 				},
 			},
 		}
@@ -128,7 +128,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		assert.Equal(t, apiKey.Agent(), gotOutput.APIKey)
 		assert.Equal(t, apiKey.ID, gotOutput.APIKeyID)
-		assert.Equal(t, output.Role.Sha2, gotOutput.PolicyPermissionsHash)
+		assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
 		assert.Equal(t, output.Type, gotOutput.Type)
 		assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
 
@@ -176,12 +176,12 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		testAgent := &model.Agent{
 			Outputs: map[string]*model.PolicyOutput{
 				output.Name: {
-					ESDocument:            model.ESDocument{},
-					APIKey:                oldAPIKey.Agent(),
-					ToRetireAPIKeyIds:     nil,
-					APIKeyID:              oldAPIKey.ID,
-					PolicyPermissionsHash: hashPerm,
-					Type:                  OutputTypeElasticsearch,
+					ESDocument:        model.ESDocument{},
+					APIKey:            oldAPIKey.Agent(),
+					ToRetireAPIKeyIds: nil,
+					APIKeyID:          oldAPIKey.ID,
+					PermissionsHash:   hashPerm,
+					Type:              OutputTypeElasticsearch,
 				},
 			},
 		}
@@ -197,7 +197,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		assert.Equal(t, wantAPIKey.Agent(), gotOutput.APIKey)
 		assert.Equal(t, wantAPIKey.ID, gotOutput.APIKeyID)
-		assert.Equal(t, output.Role.Sha2, gotOutput.PolicyPermissionsHash)
+		assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
 		assert.Equal(t, output.Type, gotOutput.Type)
 
 		// assert.Contains(t, gotOutput.ToRetireAPIKeyIds, oldAPIKey.ID) // TODO: assert on bulker.Update
@@ -248,7 +248,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		assert.Equal(t, apiKey.Agent(), gotOutput.APIKey)
 		assert.Equal(t, apiKey.ID, gotOutput.APIKeyID)
-		assert.Equal(t, output.Role.Sha2, gotOutput.PolicyPermissionsHash)
+		assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
 		assert.Equal(t, output.Type, gotOutput.Type)
 		assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
 

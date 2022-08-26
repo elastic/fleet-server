@@ -59,10 +59,10 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 
 			wantOutputs := map[string]*model.PolicyOutput{
 				outputName: {
-					APIKey:                outputAPIKey.Agent(),
-					APIKeyID:              outputAPIKey.ID,
-					PolicyPermissionsHash: outputPermissionSha,
-					Type:                  OutputTypeElasticsearch,
+					APIKey:          outputAPIKey.Agent(),
+					APIKeyID:        outputAPIKey.ID,
+					PermissionsHash: outputPermissionSha,
+					Type:            OutputTypeElasticsearch,
 					ToRetireAPIKeyIds: append(tt.existingToRetireAPIKeyIds,
 						model.ToRetireAPIKeyIdsItems{
 							ID: previousAPIKey.ID, RetiredAt: nowStr}),
@@ -78,10 +78,10 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 				EnrolledAt:        nowStr,
 				Outputs: map[string]*model.PolicyOutput{
 					outputName: {
-						Type:                  OutputTypeElasticsearch,
-						APIKey:                previousAPIKey.Agent(),
-						APIKeyID:              previousAPIKey.ID,
-						PolicyPermissionsHash: "old_" + outputPermissionSha,
+						Type:            OutputTypeElasticsearch,
+						APIKey:          previousAPIKey.Agent(),
+						APIKeyID:        previousAPIKey.ID,
+						PermissionsHash: "old_" + outputPermissionSha,
 					},
 				},
 			}

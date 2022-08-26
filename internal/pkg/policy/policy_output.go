@@ -95,7 +95,7 @@ func (p *Output) prepareElasticsearch(
 	switch {
 	case output.APIKey == "":
 		zlog.Debug().Msg("must generate api key as default API key is not present")
-	case p.Role.Sha2 != output.PolicyPermissionsHash:
+	case p.Role.Sha2 != output.PermissionsHash:
 		// the is actually the OutputPermissionsHash for the default hash. The Agent
 		// document on ES does not have OutputPermissionsHash for any other output
 		// besides the default one. It seems to me error-prone to rely on the default
@@ -109,7 +109,7 @@ func (p *Output) prepareElasticsearch(
 	if needNewKey {
 		zlog.Debug().
 			RawJSON("fleet.policy.roles", p.Role.Raw).
-			Str("fleet.policy.default.oldHash", output.PolicyPermissionsHash).
+			Str("fleet.policy.default.oldHash", output.PermissionsHash).
 			Str("fleet.policy.default.newHash", p.Role.Sha2).
 			Msg("Generating a new API key")
 
@@ -123,7 +123,7 @@ func (p *Output) prepareElasticsearch(
 		output.Type = OutputTypeElasticsearch
 		output.APIKey = outputAPIKey.Agent()
 		output.APIKeyID = outputAPIKey.ID
-		output.PolicyPermissionsHash = p.Role.Sha2 // for the sake of consistency
+		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
 
 		// When a new keys is generated we need to update the Agent record,
 		// this will need to be updated when multiples remote Elasticsearch output

@@ -127,8 +127,8 @@ func TestFindAgent_NewModel(t *testing.T) {
 					ID:        "TestFindNewModelAgent_APIKeyID_invalidated",
 					RetiredAt: "TestFindNewModelAgent_APIKeyID_invalidated_at"},
 			},
-			APIKeyID:              "TestFindNewModelAgent_APIKeyID",
-			PolicyPermissionsHash: "TestFindNewModelAgent_PolicyPermissionsHash",
+			APIKeyID:        "TestFindNewModelAgent_APIKeyID",
+			PermissionsHash: "TestFindNewModelAgent_PermisPolicysionsHash",
 		},
 	}
 	body, err := json.Marshal(model.Agent{
