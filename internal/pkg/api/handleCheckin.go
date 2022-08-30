@@ -163,10 +163,10 @@ func (ct *CheckinT) handleCheckin(zlog *zerolog.Logger, w http.ResponseWriter, r
 	dfunc := cntCheckin.IncStart()
 	defer dfunc()
 
-	return ct.processRequest(*zlog, w, r, start, agent, newVer)
+	return ct.ProcessRequest(*zlog, w, r, start, agent, newVer)
 }
 
-func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
+func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
 
 	ctx := r.Context()
 

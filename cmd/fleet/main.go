@@ -6,10 +6,13 @@
 package fleet
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"reflect"
@@ -35,6 +38,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/gc"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/profile"
@@ -42,6 +46,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/scheduler"
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
@@ -162,7 +167,7 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
-			srv, err := NewFleetServer(cfg, bi, status.NewLog())
+			srv, err := NewFleetServer(cfg, bi, status.NewLog(), true)
 			if err != nil {
 				return err
 			}
@@ -262,7 +267,7 @@ func (a *AgentMode) Run(ctx context.Context) error {
 	srvCtx, srvCancel := context.WithCancel(ctx)
 	defer srvCancel()
 	log.Info().Msg("received initial configuration starting Fleet Server")
-	srv, err := NewFleetServer(cfg.cfg, a.bi, status.NewChained(status.NewLog(), a.agent))
+	srv, err := NewFleetServer(cfg.cfg, a.bi, status.NewChained(status.NewLog(), a.agent), false)
 	if err != nil {
 		// unblock startChan even though there was an error
 		a.startChan <- struct{}{}
@@ -399,6 +404,11 @@ func (a *AgentMode) OnError(err error) {
 }
 
 type FleetServer struct {
+	standAlone bool
+	agent      *model.Agent
+	ackToken   string
+	ct         *api.CheckinT
+
 	bi     build.Info
 	verCon version.Constraints
 
@@ -409,7 +419,7 @@ type FleetServer struct {
 }
 
 // NewFleetServer creates the actual fleet server service.
-func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter) (*FleetServer, error) {
+func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter, standAlone bool) (*FleetServer, error) {
 	verCon, err := api.BuildVersionConstraint(bi.Version)
 	if err != nil {
 		return nil, err
@@ -425,12 +435,13 @@ func NewFleetServer(cfg *config.Config, bi build.Info, reporter status.Reporter)
 	}
 
 	return &FleetServer{
-		bi:       bi,
-		verCon:   verCon,
-		cfg:      cfg,
-		cfgCh:    make(chan *config.Config, 1),
-		cache:    cache,
-		reporter: reporter,
+		standAlone: standAlone,
+		bi:         bi,
+		verCon:     verCon,
+		cfg:        cfg,
+		cfgCh:      make(chan *config.Config, 1),
+		cache:      cache,
+		reporter:   reporter,
 	}, nil
 }
 
@@ -856,6 +867,39 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 		return err
 	}
 
+	// If fleet-server is not under agent check to see if enrollment is needed and  enroll
+	if f.standAlone {
+		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, cfg.Fleet.Agent.ID)
+		// Enroll the agent if it's not found
+		if errors.Is(err, dl.ErrNotFound) || errors.Is(err, es.ErrIndexNotFound) {
+			agentData := model.Agent{
+				Active:      true,
+				PolicyID:    cfg.Inputs[0].Policy.ID,
+				Type:        "PERMANENT",
+				EnrolledAt:  time.Now().UTC().Format(time.RFC3339),
+				ActionSeqNo: []int64{sqn.UndefinedSeqNo},
+				Agent: &model.AgentMetadata{
+					ID:      cfg.Fleet.Agent.ID,
+					Version: f.bi.Version,
+				},
+			}
+			p, err := json.Marshal(agentData)
+			if err != nil {
+				return fmt.Errorf("unable to marshal data for enrollment: %w", err)
+			}
+			_, err = bulker.Create(ctx, dl.FleetAgents, cfg.Fleet.Agent.ID, p, bulk.WithRefresh())
+			if err != nil {
+				return fmt.Errorf("unable to enroll fleet-server: %w", err)
+			}
+			f.agent = &agentData
+		} else if err != nil {
+			return fmt.Errorf("unable to find agent entry: %w", err)
+		} else {
+			f.agent = &agent
+			// TODO santiy check agent that is found?
+		}
+	}
+
 	g.Go(loggedRunFunc(ctx, "Policy index monitor", pim.Run))
 	cord := coordinator.NewMonitor(cfg.Fleet, f.bi.Version, bulker, pim, coordinator.NewCoordinatorZero)
 	g.Go(loggedRunFunc(ctx, "Coordinator policy monitor", cord.Run))
@@ -897,6 +941,12 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
+	}
+
+	// Start a self-checkin manager
+	if f.standAlone {
+		f.ct = ct
+		g.Go(loggedRunFunc(ctx, "self-checkin", f.checkin))
 	}
 
 	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
@@ -985,6 +1035,68 @@ func (f *FleetServer) initTracer(cfg config.Instrumentation) (*apm.Tracer, error
 		ServiceEnvironment: cfg.Environment,
 		Transport:          transport,
 	})
+}
+
+func (f *FleetServer) checkin(ctx context.Context) error {
+	tick := time.NewTimer(30 * time.Second) // fleet-server holds poll open for up to 5m
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case ts := <-tick.C:
+			log.Info().Msg("self-checkin start")
+			body := api.CheckinRequest{
+				Status:   "HEALTHY", // TODO change to use reporter?
+				AckToken: f.ackToken,
+			}
+			b, _ := json.Marshal(body)
+			req, _ := http.NewRequestWithContext(ctx, "", "", bytes.NewReader(b))
+			resp := newResponse()
+			// TODO change logger?
+			err := f.ct.ProcessRequest(log.Logger, resp, req, ts, f.agent, f.bi.Version)
+			if err != nil {
+				return err // log instead?
+			}
+			if resp.b.Len() < 1 {
+				log.Warn().Msg("self-checkin returned no body")
+				continue
+			}
+			rBody := api.CheckinResponse{}
+			err = json.Unmarshal(resp.b.Bytes(), &rBody)
+			if err != nil {
+				log.Error().Err(err).Msg("self-checkin unable to unmarshal response")
+				return err
+			}
+			f.ackToken = rBody.AckToken
+			log.Info().Msgf("self-checkin success token: %s, %d actions", f.ackToken, len(rBody.Actions))
+			tick.Reset(30 * time.Second)
+		}
+	}
+}
+
+type fakeResponse struct {
+	status int
+	h      http.Header
+	b      bytes.Buffer
+}
+
+func newResponse() *fakeResponse {
+	return &fakeResponse{
+		h: http.Header{},
+	}
+}
+
+func (r *fakeResponse) Header() http.Header {
+	return r.h
+}
+
+func (r *fakeResponse) Write(p []byte) (int, error) {
+	return r.b.Write(p)
+}
+
+func (r *fakeResponse) WriteHeader(status int) {
+	r.status = status
 }
 
 func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
