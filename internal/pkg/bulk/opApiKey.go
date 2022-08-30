@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	expectedAPIKeySize = 64 // 64B
-	envelopeSize       = 64 // 64B
-	safeBuffer         = 0.9
+	envelopeSize = 64 // 64B
+	safeBuffer   = 0.9
 )
 
 // The ApiKey API's are not yet bulk enabled. Stub the calls in the bulker
@@ -101,6 +100,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 	responses := make(map[int]int)
 	idxToID := make(map[int32]string)
 	IDToResponse := make(map[string]int)
+	maxKeySize := 0
 
 	// merge ids
 	for n := queue.head; n != nil; n = n.next {
@@ -132,6 +132,9 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		// last one wins, it may be policy change and ack are in the same queue
 		rolePerID[req.ID] = req.RolesHash
 		idxToID[n.idx] = req.ID
+		if maxKeySize < len(req.ID) {
+			maxKeySize = len(req.ID)
+		}
 	}
 
 	for id, roleHash := range rolePerID {
@@ -145,7 +148,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 
 	responseIdx := 0
 	for hash, role := range roles {
-		idsPerBatch := b.getIdsCountPerBatch(len(role))
+		idsPerBatch := b.getIdsCountPerBatch(len(role), maxKeySize)
 		ids := idsPerRole[hash]
 		if idsPerBatch <= 0 {
 			log.Error().Str("err", "request too large").Msg("No API Key ID could fit request size for bulk update")
@@ -239,10 +242,10 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 	return nil
 }
 
-func (b *Bulker) getIdsCountPerBatch(roleSize int) int {
+func (b *Bulker) getIdsCountPerBatch(roleSize, maxKeySize int) int {
 	spareSpace := b.opts.apikeyMaxReqSize - roleSize - envelopeSize
-	if spareSpace > expectedAPIKeySize {
-		return int(float64(spareSpace) * safeBuffer / expectedAPIKeySize)
+	if spareSpace > maxKeySize {
+		return int(float64(spareSpace) * safeBuffer / float64(maxKeySize))
 	}
 	return 0
 }

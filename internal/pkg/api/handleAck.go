@@ -431,7 +431,6 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 		if strings.HasSuffix(k, "-rdstale") {
 			keys = append(keys, k)
 		}
-
 	}
 
 	if len(keys) == 0 {
