@@ -872,16 +872,19 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, cfg.Fleet.Agent.ID)
 		// Enroll the agent if it's not found
 		if errors.Is(err, dl.ErrNotFound) || errors.Is(err, es.ErrIndexNotFound) {
+			hostname, _ := os.Hostname()
 			agentData := model.Agent{
-				Active:      true,
-				PolicyID:    cfg.Inputs[0].Policy.ID,
-				Type:        "PERMANENT",
-				EnrolledAt:  time.Now().UTC().Format(time.RFC3339),
-				ActionSeqNo: []int64{sqn.UndefinedSeqNo},
+				Active:            true,
+				PolicyID:          cfg.Inputs[0].Policy.ID,
+				PolicyRevisionIdx: 1, // FIXME the policy in fleet-server.yml does not match what's actually specified. maybe we need to generate and retrieve the policy as part of bootstrapping?
+				Type:              "PERMANENT",
+				EnrolledAt:        time.Now().UTC().Format(time.RFC3339),
+				ActionSeqNo:       []int64{sqn.UndefinedSeqNo},
 				Agent: &model.AgentMetadata{
 					ID:      cfg.Fleet.Agent.ID,
 					Version: f.bi.Version,
 				},
+				LocalMetadata: json.RawMessage(`{"host":{"hostname":"` + hostname + `"},"elastic":{"agent":{"id":"` + cfg.Fleet.Agent.ID + `","version":"` + f.bi.Version + `"}}}`),
 			}
 			p, err := json.Marshal(agentData)
 			if err != nil {
@@ -1070,6 +1073,8 @@ func (f *FleetServer) checkin(ctx context.Context) error {
 			}
 			f.ackToken = rBody.AckToken
 			log.Info().Msgf("self-checkin success token: %s, %d actions", f.ackToken, len(rBody.Actions))
+			// TODO handle policy-change, unenroll, and settings actions? upgrade?
+			log.Info().Msgf("self-checkin actions: %v", rBody.Actions)
 			tick.Reset(30 * time.Second)
 		}
 	}
