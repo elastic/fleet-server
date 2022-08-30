@@ -17,8 +17,8 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
-	"go.elastic.co/apm"
-	apmtransport "go.elastic.co/apm/transport"
+	"go.elastic.co/apm/v2"
+	apmtransport "go.elastic.co/apm/v2/transport"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
@@ -548,7 +548,7 @@ func (f *Fleet) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
 		os.Setenv(envTransactionSampleRate, cfg.TransactionSampleRate)
 		defer os.Unsetenv(envTransactionSampleRate)
 	}
-	transport, err := apmtransport.NewHTTPTransport()
+	transport, err := apmtransport.NewHTTPTransport(apmtransport.HTTPTransportOptions{})
 	if err != nil {
 		return nil, err
 	}

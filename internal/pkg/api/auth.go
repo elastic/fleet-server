@@ -17,7 +17,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 
 	"github.com/rs/zerolog/log"
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 )
 
 var (

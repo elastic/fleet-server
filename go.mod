@@ -24,8 +24,10 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
 	go.elastic.co/apm v1.15.0
-	go.elastic.co/apm/module/apmelasticsearch v1.15.0
-	go.elastic.co/apm/module/apmhttprouter v1.15.0
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.2.0
+	go.elastic.co/apm/module/apmhttp/v2 v2.2.0
+	go.elastic.co/apm/module/apmhttprouter/v2 v2.2.0
+	go.elastic.co/apm/v2 v2.2.0
 	go.elastic.co/ecszerolog v0.1.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.1.0
@@ -66,8 +68,6 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	go.elastic.co/apm/module/apmhttp v1.15.0 // indirect
-	go.elastic.co/apm/module/apmhttp/v2 v2.2.0 // indirect
-	go.elastic.co/apm/v2 v2.2.0 // indirect
 	go.elastic.co/ecszap v1.0.1 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect

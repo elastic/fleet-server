@@ -20,8 +20,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog/log"
-	"go.elastic.co/apm"
-	"go.elastic.co/apm/module/apmhttprouter"
+	"go.elastic.co/apm/module/apmhttprouter/v2"
+	"go.elastic.co/apm/v2"
 )
 
 const (
