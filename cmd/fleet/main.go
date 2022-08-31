@@ -867,19 +867,41 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 		return err
 	}
 
+	g.Go(loggedRunFunc(ctx, "Policy index monitor", pim.Run))
+	cord := coordinator.NewMonitor(cfg.Fleet, f.bi.Version, bulker, pim, coordinator.NewCoordinatorZero)
+	g.Go(loggedRunFunc(ctx, "Coordinator policy monitor", cord.Run))
+
+	// Policy monitor
+	pm := policy.NewMonitor(bulker, pim, cfg.Inputs[0].Server.Limits.PolicyThrottle)
+	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
+
+	sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
+	// get policy if in stand alone mode
+	if f.standAlone {
+		if err := sm.Run(ctx); err != nil {
+			return err
+		}
+	} else {
+		g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
+	}
+
 	// If fleet-server is not under agent check to see if enrollment is needed and  enroll
 	if f.standAlone {
+		policy := sm.Policy()
+		log.Info().Msgf("Policy Data: %s", string(policy.Data))
+		// TODO use policy from self monitor
 		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, cfg.Fleet.Agent.ID)
 		// Enroll the agent if it's not found
 		if errors.Is(err, dl.ErrNotFound) || errors.Is(err, es.ErrIndexNotFound) {
 			hostname, _ := os.Hostname()
 			agentData := model.Agent{
-				Active:            true,
-				PolicyID:          cfg.Inputs[0].Policy.ID,
-				PolicyRevisionIdx: 1, // FIXME the policy in fleet-server.yml does not match what's actually specified. maybe we need to generate and retrieve the policy as part of bootstrapping?
-				Type:              "PERMANENT",
-				EnrolledAt:        time.Now().UTC().Format(time.RFC3339),
-				ActionSeqNo:       []int64{sqn.UndefinedSeqNo},
+				Active:               true,
+				PolicyID:             cfg.Inputs[0].Policy.ID,
+				PolicyRevisionIdx:    policy.RevisionIdx, // FIXME the policy in fleet-server.yml does not match what's actually specified. maybe we need to use the policy that's retrived by the self monitor.
+				PolicyCoordinatorIdx: policy.CoordinatorIdx,
+				Type:                 "PERMANENT",
+				EnrolledAt:           time.Now().UTC().Format(time.RFC3339),
+				ActionSeqNo:          []int64{sqn.UndefinedSeqNo},
 				Agent: &model.AgentMetadata{
 					ID:      cfg.Fleet.Agent.ID,
 					Version: f.bi.Version,
@@ -902,18 +924,6 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 			// TODO santiy check agent that is found?
 		}
 	}
-
-	g.Go(loggedRunFunc(ctx, "Policy index monitor", pim.Run))
-	cord := coordinator.NewMonitor(cfg.Fleet, f.bi.Version, bulker, pim, coordinator.NewCoordinatorZero)
-	g.Go(loggedRunFunc(ctx, "Coordinator policy monitor", cord.Run))
-
-	// Policy monitor
-	pm := policy.NewMonitor(bulker, pim, cfg.Inputs[0].Server.Limits.PolicyThrottle)
-	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
-
-	// Policy self monitor
-	sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
-	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 
 	// Actions monitoring
 	var am monitor.SimpleMonitor
