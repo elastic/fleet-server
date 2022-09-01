@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm"
 )
 
 const (
@@ -110,6 +111,9 @@ func FindAction(ctx context.Context, bulker bulk.Bulk, id string, opts ...Option
 }
 
 func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo sqn.SeqNo, agentID string) ([]model.Action, error) {
+	span, ctx := apm.StartSpan(ctx, "find agent actions", "query")
+	defer span.End()
+
 	const index = FleetActions
 	params := map[string]interface{}{
 		FieldSeqNo:      minSeqNo.Value(),
@@ -122,8 +126,84 @@ func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo 
 	if err != nil || res == nil {
 		return nil, err
 	}
+	results, err := hitsToActions(res.Hits)
 
-	return hitsToActions(res.Hits)
+	// find all actions
+
+	paramsAll := map[string]interface{}{
+		FieldSeqNo:      minSeqNo.Value(),
+		FieldMaxSeqNo:   maxSeqNo.Value(),
+		FieldExpiration: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	span2, ctx := apm.StartSpan(ctx, "find agent all actions", "query")
+	defer span2.End()
+	resAll, _ := findActionsHits(ctx, bulker, QueryAllAgentActions, index, paramsAll, maxSeqNo)
+
+	// all actions are the same as the ones with agents array with agent id, no percolator check needed
+	if len(res.Hits) == len(resAll.Hits) {
+		return results, err
+	}
+
+	resultsAll, err := hitsToActions(resAll.Hits)
+
+	// Find matching percolate queries - pending bulk actions with kuery
+	spanP, ctx := apm.StartSpan(ctx, "query percolator", "query")
+
+	matches := FindPercolateActions(agentID, ctx, bulker)
+
+	if len(matches) > 0 {
+		// processing the first percolator query for the POC, should iterate all matches
+		// log.Info().Str("id", matches[0]).Msg("Percolate match found")
+		spanP.Context.SetLabel("percolator_hit", true)
+		spanP.Context.SetLabel("actionID", matches[0])
+		spanP.Context.SetLabel("agentID", agentID)
+
+		// find action in resultsAll with action id matches[0]
+		for _, v := range resultsAll {
+			if v.ActionID == matches[0] {
+				// adding action to list of pending actions for this agent
+				results = append(results, v)
+				spanP.Context.SetLabel("actionType", v.Type)
+			}
+		}
+
+	} else {
+		spanP.Context.SetLabel("percolator_hit", false)
+	}
+	defer spanP.End()
+
+	return results, err
+}
+
+func FindPercolateActions(agentID string, ctx context.Context, bulker bulk.Bulk) []string {
+	var buffer bytes.Buffer
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"constant_score": map[string]interface{}{
+				"filter": map[string]interface{}{
+					"percolate": map[string]interface{}{
+						"field": "query",
+						"index": ".fleet-agents",
+						"id":    agentID,
+					},
+				},
+			},
+		},
+	}
+	// log.Info().Msg("Running percolate query")
+	json.NewEncoder(&buffer).Encode(query)
+	client := bulker.Client()
+	response, _ := client.Search(client.Search.WithContext(ctx), client.Search.WithIndex(".fleet-percolator-queries"), client.Search.WithBody(&buffer))
+	var result map[string]interface{}
+	json.NewDecoder(response.Body).Decode(&result)
+
+	matches := make([]string, 0, len(result["hits"].(map[string]interface{})["hits"].([]interface{})))
+
+	for _, hit := range result["hits"].(map[string]interface{})["hits"].([]interface{}) {
+		matches = append(matches, hit.(map[string]interface{})["_id"].(string))
+	}
+	return matches
 }
 
 func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, cleanupIntervalAfterExpired string) (count int64, err error) {

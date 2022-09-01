@@ -29,6 +29,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm"
 )
 
 type HTTPError struct {
@@ -220,6 +221,13 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			Int("n", n).Logger()
 
 		log.Info().Msg("ack event")
+
+		span, ctx := apm.StartSpan(ctx, "ack agent actions", "ack")
+		defer span.End()
+
+		span.Context.SetLabel("actionType", ev.Type)
+		span.Context.SetLabel("actionID", ev.ActionID)
+		span.Context.SetLabel("agentID", ev.AgentID)
 
 		// Check agent id mismatch
 		if ev.AgentID != "" && ev.AgentID != agent.Id {
