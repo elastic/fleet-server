@@ -9,7 +9,7 @@ pipeline {
     SLACK_CHANNEL = '#elastic-agent-control-plane'
     NOTIFY_TO = 'fleet-server+build-package@elastic.co'
     JOB_GCS_BUCKET = credentials('gcs-bucket')
-    JOB_GCS_CREDENTIALS = 'beats-ci-gcs-plugin'
+    JOB_GCS_CREDENTIALS = 'fleet-ci-gcs-plugin'
     DOCKER_SECRET = 'secret/observability-team/ci/docker-registry/prod'
     DOCKER_REGISTRY = 'docker.elastic.co'
     DRA_OUTPUT = 'release-manager.out'
