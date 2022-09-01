@@ -119,7 +119,7 @@ pipeline {
       options { skipDefaultCheckout() }
       when { expression { isBranch() } }
       steps {
-        build(job: "Ingest-manager/fleet-server-package-mbp/${env.JOB_BASE_NAME}",
+        build(job: "fleet-server/fleet-server-package-mbp/${env.JOB_BASE_NAME}",
               propagate: false,
               wait: false,
               parameters: [string(name: 'COMMIT', value: "${env.GIT_BASE_COMMIT}")])
