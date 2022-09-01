@@ -1,6 +1,6 @@
 ---
 - job:
-    name: Ingest-manager/fleet-server
+    name: fleet-server/fleet-server-mbp
     display-name: Fleet Server
     description: Jenkins pipeline for the Elastic Fleet Server project
     view: Beats
