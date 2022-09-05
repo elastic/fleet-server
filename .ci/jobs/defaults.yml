@@ -3,7 +3,7 @@
 ##### GLOBAL METADATA
 
 - meta:
-    cluster: beats-ci
+    cluster: fleet-ci
 
 ##### JOB DEFAULTS
 
