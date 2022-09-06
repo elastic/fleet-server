@@ -418,10 +418,10 @@ func ensurePolicy(ctx context.Context, t *testing.T, bulker bulk.Bulk, index str
 			break
 		}
 	}
-	if found == nil { //nolint:staticcheck // false positive
+	if found == nil {
 		t.Fatal("policy not found")
 	}
-	if found.RevisionIdx != revisionIdx { //nolint:staticcheck,nolintlint // found is never nil
+	if found.RevisionIdx != revisionIdx {
 		t.Fatal("revision_idx does not match")
 	}
 	if found.CoordinatorIdx != coordinatorIdx {
