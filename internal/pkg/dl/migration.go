@@ -47,7 +47,7 @@ var timeNow = time.Now
 // function is responsible to ensure it only applies the migration if needed,
 // being a no-op otherwise.
 func Migrate(ctx context.Context, bulker bulk.Bulk) error {
-	for _, fn := range []migrationFn{migrateTov7_15, migrateToV8_4} {
+	for _, fn := range []migrationFn{migrateTov7_15, migrateToV8_5} {
 		if err := fn(ctx, bulker); err != nil {
 			return err
 		}
@@ -174,14 +174,14 @@ func migrateAgentMetadata() (string, string, []byte, error) {
 	return migrationName, FleetAgents, body, nil
 }
 
-// ============================== V8.4.0 migration =============================
+// ============================== V8.5.0 migration =============================
 // https://github.com/elastic/fleet-server/issues/1672
 
-func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
+func migrateToV8_5(ctx context.Context, bulker bulk.Bulk) error {
 	log.Debug().Msg("applying migration to v8.4")
 	migrated, err := migrate(ctx, bulker, migrateAgentOutputs)
 	if err != nil {
-		return fmt.Errorf("v8.4.0 data migration failed: %w", err)
+		return fmt.Errorf("v8.5.0 data migration failed: %w", err)
 	}
 
 	// The migration was necessary and indeed run, thus we need to regenerate
@@ -190,7 +190,7 @@ func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
 	if migrated > 0 {
 		_, err := migrate(ctx, bulker, migratePolicyCoordinatorIdx)
 		if err != nil {
-			return fmt.Errorf("v8.4.0 data migration failed: %w", err)
+			return fmt.Errorf("v8.5.0 data migration failed: %w", err)
 		}
 	}
 
@@ -200,7 +200,7 @@ func migrateToV8_4(ctx context.Context, bulker bulk.Bulk) error {
 // migrateAgentOutputs performs the necessary changes on the Agent documents
 // to introduce the `Outputs` field.
 //
-// FleetServer 8.4.0 introduces a new field to the Agent document, Outputs, to
+// FleetServer 8.5.0 introduces a new field to the Agent document, Outputs, to
 // store the outputs credentials and data. The DefaultAPIKey, DefaultAPIKeyID,
 // DefaultAPIKeyHistory and PolicyOutputPermissionsHash are now deprecated in
 // favour of the new `Outputs` fields, which maps the output name to its data.
