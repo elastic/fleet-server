@@ -227,7 +227,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	}
 	if blk.HasErrors {
 		// We lack information to properly correlate this error with what has failed.
-		// Thus, for now it'd be mre noise tan information outside an investigation.
+		// Thus, for now it'd be more noise than information outside an investigation.
 		log.Debug().Err(errors.New(buf.String())).Msg("Bulk call: Es returned an error")
 	}
 
