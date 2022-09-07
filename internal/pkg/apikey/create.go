@@ -42,6 +42,7 @@ func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refres
 		bytes.NewReader(body),
 		opts...,
 	)
+
 	if err != nil {
 		return nil, err
 	}

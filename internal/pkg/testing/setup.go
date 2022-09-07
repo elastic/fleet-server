@@ -98,7 +98,7 @@ func SetupCleanIndex(ctx context.Context, t *testing.T, index string, opts ...bu
 
 func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index string) string {
 	t.Helper()
-
+	t.Helper()
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
 	root.Query().MatchAll()
@@ -106,25 +106,25 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 
 	query, err := q.Render(make(map[string]interface{}))
 	if err != nil {
-		t.Fatalf("could not clean index: failed to render query template: %v", err)
+		t.Fatal(err)
 	}
 
 	cli := bulker.Client()
-
 	res, err := cli.API.DeleteByQuery([]string{index}, bytes.NewReader(query),
 		cli.API.DeleteByQuery.WithContext(ctx),
 		cli.API.DeleteByQuery.WithRefresh(true),
 	)
+
 	if err != nil {
-		t.Fatalf("could not clean index %s, DeleteByQuery failed: %v",
-			index, err)
+		t.Fatal(err)
 	}
 	defer res.Body.Close()
 
 	var esres es.DeleteByQueryResponse
+
 	err = json.NewDecoder(res.Body).Decode(&esres)
 	if err != nil {
-		t.Fatalf("could not decode ES response: %v", err)
+		t.Fatal(err)
 	}
 
 	if res.IsError() {
@@ -135,9 +135,9 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 			}
 		}
 	}
-	if err != nil {
-		t.Fatalf("ES returned an error: %v. body: %q", err, res)
-	}
 
+	if err != nil {
+		t.Fatal(err)
+	}
 	return index
 }

@@ -508,7 +508,7 @@ func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyID string, unenr
 
 func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, zlog zerolog.Logger, agentsIndex string) error {
 	agents, err := dl.FindOfflineAgents(ctx, bulker, policyID, unenrollTimeout, dl.WithIndexName(agentsIndex))
-	if err != nil {
+	if err != nil || len(agents) == 0 {
 		return err
 	}
 
@@ -540,13 +540,11 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		dl.FieldUnenrolledReason: unenrolledReasonTimeout,
 		dl.FieldUpdatedAt:        now,
 	}
-
 	body, err := fields.Marshal()
 	if err != nil {
 		return err
 	}
-
-	apiKeys := agent.APIKeyIDs()
+	apiKeys := getAPIKeyIDs(agent)
 
 	zlog = zlog.With().
 		Str(logger.AgentID, agent.Id).
@@ -567,6 +565,17 @@ func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	return err
+}
+
+func getAPIKeyIDs(agent *model.Agent) []string {
+	keys := make([]string, 0, 1)
+	if agent.AccessAPIKeyID != "" {
+		keys = append(keys, agent.AccessAPIKeyID)
+	}
+	if agent.DefaultAPIKeyID != "" {
+		keys = append(keys, agent.DefaultAPIKeyID)
+	}
+	return keys
 }
 
 func waitWithContext(ctx context.Context, to time.Duration) error {

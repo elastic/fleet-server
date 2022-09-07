@@ -13,6 +13,7 @@ import (
 )
 
 func TestNewParsedPolicy(t *testing.T) {
+
 	// Run two formatting of the same payload to validate that the sha2 remains the same
 	payloads := []string{
 		testPolicy,

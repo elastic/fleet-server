@@ -6,18 +6,12 @@
 package apikey
 
 import (
-	"bytes"
-	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
 const (
@@ -33,61 +27,6 @@ var (
 )
 
 var AuthKey = http.CanonicalHeaderKey("Authorization")
-
-// APIKeyMetadata tracks Metadata associated with an APIKey.
-type APIKeyMetadata struct {
-	ID       string
-	Metadata Metadata
-}
-
-// Read gathers APIKeyMetadata from Elasticsearch using the given client.
-func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKeyMetadata, error) {
-	opts := []func(*esapi.SecurityGetAPIKeyRequest){
-		client.Security.GetAPIKey.WithContext(ctx),
-		client.Security.GetAPIKey.WithID(id),
-	}
-
-	res, err := client.Security.GetAPIKey(
-		opts...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("request to elasticsearch failed: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return nil, fmt.Errorf("%s: %w", res.String(), ErrAPIKeyNotFound)
-	}
-
-	type APIKeyResponse struct {
-		ID       string   `json:"id"`
-		Metadata Metadata `json:"metadata"`
-	}
-	type GetAPIKeyResponse struct {
-		APIKeys []APIKeyResponse `json:"api_keys"`
-	}
-
-	var buff bytes.Buffer
-	if _, err := buff.ReadFrom(res.Body); err != nil {
-		return nil, fmt.Errorf("could not read from response body: %w", err)
-	}
-
-	var resp GetAPIKeyResponse
-	if err = json.Unmarshal(buff.Bytes(), &resp); err != nil {
-		return nil, fmt.Errorf(
-			"could not Unmarshal elasticsearch GetAPIKeyResponse: %w", err)
-	}
-
-	if len(resp.APIKeys) == 0 {
-		return nil, ErrAPIKeyNotFound
-	}
-
-	first := resp.APIKeys[0]
-	return &APIKeyMetadata{
-		ID:       first.ID,
-		Metadata: first.Metadata,
-	}, nil
-}
 
 // APIKey is used to represent an Elasticsearch API Key.
 type APIKey struct {

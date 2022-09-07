@@ -6,7 +6,6 @@ package dl
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -49,23 +48,19 @@ func prepareOfflineAgentsByPolicyID() *dsl.Tmpl {
 	return tmpl
 }
 
-func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name string, v interface{}, opt ...Option) (model.Agent, error) {
+func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name string, v interface{}, opt ...Option) (agent model.Agent, err error) {
 	o := newOption(FleetAgents, opt...)
 	res, err := SearchWithOneParam(ctx, bulker, tmpl, o.indexName, name, v)
 	if err != nil {
-		return model.Agent{}, fmt.Errorf("failed searching for agent: %w", err)
+		return
 	}
 
 	if len(res.Hits) == 0 {
-		return model.Agent{}, ErrNotFound
+		return agent, ErrNotFound
 	}
 
-	var agent model.Agent
-	if err = res.Hits[0].Unmarshal(&agent); err != nil {
-		return model.Agent{}, fmt.Errorf("could not unmarshal ES document into model.Agent: %w", err)
-	}
-
-	return agent, nil
+	err = res.Hits[0].Unmarshal(&agent)
+	return agent, err
 }
 
 func FindOfflineAgents(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, opt ...Option) ([]model.Agent, error) {
@@ -76,19 +71,18 @@ func FindOfflineAgents(ctx context.Context, bulker bulk.Bulk, policyID string, u
 		FieldLastCheckin: past,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed searching for agent: %w", err)
+		return nil, err
 	}
 
 	if len(res.Hits) == 0 {
-		return nil, ErrNotFound
+		return nil, nil
 	}
 
 	agents := make([]model.Agent, len(res.Hits))
 	for i, hit := range res.Hits {
 		if err := hit.Unmarshal(&agents[i]); err != nil {
-			return nil, fmt.Errorf("could not unmarshal ES document into model.Agent: %w", err)
+			return nil, err
 		}
 	}
-
 	return agents, nil
 }

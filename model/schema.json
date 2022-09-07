@@ -244,7 +244,6 @@
         "name"
       ]
     },
-
     "server-metadata": {
       "title": "Server Metadata",
       "description": "A Fleet Server metadata",
@@ -265,7 +264,6 @@
         "version"
       ]
     },
-
     "server": {
       "title": "Server",
       "description": "A Fleet Server",
@@ -286,7 +284,6 @@
         "server"
       ]
     },
-
     "policy": {
       "title": "Policy",
       "description": "A policy that an Elastic Agent is attached to",
@@ -332,7 +329,6 @@
         "default_fleet_server"
       ]
     },
-
     "policy-leader": {
       "title": "Policy Leader",
       "description": "The current leader Fleet Server for a policy",
@@ -349,60 +345,6 @@
         "server"
       ]
     },
-
-    "to_retire_api_key_ids": {
-      "type": "array",
-      "items": {
-        "description": "the Output API Keys that were replaced and should be retired",
-        "type": "object",
-        "properties": {
-          "id": {
-            "description": "API Key identifier",
-            "type": "string"
-          },
-          "retired_at": {
-            "description": "Date/time the API key was retired",
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      }
-    },
-
-    "policy_output" : {
-      "type": "object",
-      "description": "holds the needed data to manage the output API keys",
-      "properties": {
-        "api_key": {
-          "description": "API key the Elastic Agent uses to authenticate with elasticsearch",
-          "type": "string"
-        },
-        "to_retire_api_key_ids": {
-          "description": "API keys to be invalidated on next agent ack",
-          "$ref":  "#/definitions/to_retire_api_key_ids"
-        },
-        "api_key_id": {
-          "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
-          "type": "string"
-        },
-        "permissions_hash": {
-          "description": "The policy output permissions hash",
-          "type": "string"
-        },
-        "type": {
-          "description": "Type is the output type. Currently only Elasticsearch is supported.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "api_key",
-        "api_key_history",
-        "api_key_id",
-        "permissions_hash",
-        "type"
-      ]
-    },
-
     "agent": {
       "title": "Agent",
       "description": "An Elastic Agent that has enrolled into Fleet",
@@ -499,7 +441,7 @@
           "type": "integer"
         },
         "policy_output_permissions_hash": {
-          "description": "Deprecated. Use Outputs instead. The policy output permissions hash",
+          "description": "The policy output permissions hash",
           "type": "string"
         },
         "last_updated": {
@@ -517,21 +459,30 @@
           "type": "string"
         },
         "default_api_key_id": {
-          "description": "Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
+          "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
           "type": "string"
         },
         "default_api_key": {
-          "description": "Deprecated. Use Outputs instead. API key the Elastic Agent uses to authenticate with elasticsearch",
+          "description": "API key the Elastic Agent uses to authenticate with elasticsearch",
           "type": "string"
         },
         "default_api_key_history": {
-          "description": "Deprecated. Use Outputs instead. Default API Key History",
-          "$ref":  "#/definitions/to_retire_api_key_ids"
-        },
-        "outputs": {
-          "description": "Outputs is the policy output data, mapping the output name to its data",
-          "type": "object",
-          "additionalProperties": {  "$ref":  "#/definitions/policy_output"}
+          "description": "Default API Key History",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "description": "API Key identifier",
+                "type": "string"
+              },
+              "retired_at": {
+                "description": "Date/time the API key was retired",
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
         },
         "updated_at": {
           "description": "Date/time the Elastic Agent was last updated",
@@ -561,7 +512,6 @@
         "status"
       ]
     },
-
     "enrollment_api_key": {
       "title": "Enrollment API key",
       "description": "An Elastic Agent enrollment API key",
@@ -605,7 +555,6 @@
       ]
     }
   },
-
   "checkin": {
     "title": "Checkin",
     "description": "An Elastic Agent checkin to Fleet",

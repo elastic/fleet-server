@@ -2,13 +2,15 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build !integration
+// +build !integration
+
 package model
 
 import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestAgentGetNewVersion(t *testing.T) {
@@ -80,57 +82,6 @@ func TestAgentGetNewVersion(t *testing.T) {
 			if diff != "" {
 				t.Error(diff)
 			}
-		})
-	}
-}
-
-func TestAgentAPIKeyIDs(t *testing.T) {
-	tcs := []struct {
-		name  string
-		agent Agent
-		want  []string
-	}{
-		{
-			name: "no API key marked to be retired",
-			agent: Agent{
-				AccessAPIKeyID: "access_api_key_id",
-				Outputs: map[string]*PolicyOutput{
-					"p1": {APIKeyID: "p1_api_key_id"},
-					"p2": {APIKeyID: "p2_api_key_id"},
-				},
-			},
-			want: []string{"access_api_key_id", "p1_api_key_id", "p2_api_key_id"},
-		},
-		{
-			name: "with API key marked to be retired",
-			agent: Agent{
-				AccessAPIKeyID: "access_api_key_id",
-				Outputs: map[string]*PolicyOutput{
-					"p1": {
-						APIKeyID: "p1_api_key_id",
-						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
-							ID: "p1_to_retire_key",
-						}}},
-					"p2": {
-						APIKeyID: "p2_api_key_id",
-						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
-							ID: "p2_to_retire_key",
-						}}},
-				},
-			},
-			want: []string{
-				"access_api_key_id", "p1_api_key_id", "p2_api_key_id",
-				"p1_to_retire_key", "p2_to_retire_key"},
-		},
-	}
-
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			got := tc.agent.APIKeyIDs()
-
-			// if A contains B and B contains A => A = B
-			assert.Subset(t, tc.want, got)
-			assert.Subset(t, got, tc.want)
 		})
 	}
 }

@@ -821,21 +821,17 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 	remoteVersion, err := ver.CheckCompatibility(ctx, esCli, f.bi.Version)
 	if err != nil {
 		if len(remoteVersion) != 0 {
-			return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w",
-				f.bi.Version, remoteVersion, err)
+			return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w", f.bi.Version, remoteVersion, err)
 		}
 		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
-	// Run migrations
-	loggedMigration := loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
+	// Run migrations; current safe to do in background.  That may change in the future.
+	g.Go(loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
 		return dl.Migrate(ctx, bulker)
-	})
-	if err = loggedMigration(); err != nil {
-		return fmt.Errorf("failed to run subsystems: %w", err)
-	}
+	}))
 
-	// Run scheduler for periodic GC/cleanup
+	// Run schduler for periodic GC/cleanup
 	gcCfg := cfg.Inputs[0].Server.GC
 	sched, err := scheduler.New(gc.Schedules(bulker, gcCfg.ScheduleInterval, gcCfg.CleanupAfterExpiredInterval))
 	if err != nil {
