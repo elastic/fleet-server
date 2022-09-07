@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -24,7 +26,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
-	"github.com/pkg/errors"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog"
@@ -337,8 +338,9 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 			Int64("rev.coordinatorIdx", rev.CoordinatorIdx).
 			Msg("ack policy revision")
 
-		if ok && rev.PolicyID == agent.PolicyID && (rev.RevisionIdx > currRev ||
-			(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
+		if ok && rev.PolicyID == agent.PolicyID &&
+			(rev.RevisionIdx > currRev ||
+				(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
 			found = true
 			currRev = rev.RevisionIdx
 			currCoord = rev.CoordinatorIdx
@@ -349,17 +351,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
-	sz := len(agent.DefaultAPIKeyHistory)
-	if sz > 0 {
-		ids := make([]string, sz)
-		for i := 0; i < sz; i++ {
-			ids[i] = agent.DefaultAPIKeyHistory[i].ID
-		}
-		log.Info().Strs("ids", ids).Msg("Invalidate old API keys")
-		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
-			log.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
-		}
-	}
+	ack.invalidateAPIKeys(ctx, agent)
 
 	body := makeUpdatePolicyBody(
 		agent.PolicyID,
@@ -385,8 +377,24 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	return errors.Wrap(err, "handlePolicyChange update")
 }
 
+func (ack *AckT) invalidateAPIKeys(ctx context.Context, agent *model.Agent) {
+	var ids []string
+	for _, out := range agent.Outputs {
+		for _, k := range out.ToRetireAPIKeyIds {
+			ids = append(ids, k.ID)
+		}
+	}
+
+	if len(ids) > 0 {
+		log.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
+		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
+			log.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+		}
+	}
+}
+
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
-	apiKeys := _getAPIKeyIDs(agent)
+	apiKeys := agent.APIKeyIDs()
 	if len(apiKeys) > 0 {
 		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
 
@@ -438,17 +446,6 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 		Msg("ack upgrade")
 
 	return nil
-}
-
-func _getAPIKeyIDs(agent *model.Agent) []string {
-	keys := make([]string, 0, 1)
-	if agent.AccessAPIKeyID != "" {
-		keys = append(keys, agent.AccessAPIKeyID)
-	}
-	if agent.DefaultAPIKeyID != "" {
-		keys = append(keys, agent.DefaultAPIKeyID)
-	}
-	return keys
 }
 
 // Generate an update script that validates that the policy_id

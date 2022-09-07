@@ -124,13 +124,13 @@ type Agent struct {
 	Active bool           `json:"active"`
 	Agent  *AgentMetadata `json:"agent,omitempty"`
 
-	// API key the Elastic Agent uses to authenticate with elasticsearch
+	// Deprecated. Use Outputs instead. API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKey string `json:"default_api_key,omitempty"`
 
-	// Default API Key History
-	DefaultAPIKeyHistory []DefaultAPIKeyHistoryItems `json:"default_api_key_history,omitempty"`
+	// Deprecated. Use Outputs instead. Default API Key History
+	DefaultAPIKeyHistory []ToRetireAPIKeyIdsItems `json:"default_api_key_history,omitempty"`
 
-	// ID of the API key the Elastic Agent uses to authenticate with elasticsearch
+	// Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKeyID string `json:"default_api_key_id,omitempty"`
 
 	// Date/time the Elastic Agent enrolled
@@ -148,6 +148,9 @@ type Agent struct {
 	// Local metadata information for the Elastic Agent
 	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
 
+	// Outputs is the policy output data, mapping the output name to its data
+	Outputs map[string]*PolicyOutput `json:"outputs,omitempty"`
+
 	// Packages array
 	Packages []string `json:"packages,omitempty"`
 
@@ -157,7 +160,7 @@ type Agent struct {
 	// The policy ID for the Elastic Agent
 	PolicyID string `json:"policy_id,omitempty"`
 
-	// The policy output permissions hash
+	// Deprecated. Use Outputs instead. The policy output permissions hash
 	PolicyOutputPermissionsHash string `json:"policy_output_permissions_hash,omitempty"`
 
 	// The current policy revision_idx for the Elastic Agent
@@ -247,16 +250,6 @@ type Body struct {
 type Data struct {
 }
 
-// DefaultAPIKeyHistoryItems
-type DefaultAPIKeyHistoryItems struct {
-
-	// API Key identifier
-	ID string `json:"id,omitempty"`
-
-	// Date/time the API key was retired
-	RetiredAt string `json:"retired_at,omitempty"`
-}
-
 // EnrollmentAPIKey An Elastic Agent enrollment API key
 type EnrollmentAPIKey struct {
 	ESDocument
@@ -333,6 +326,26 @@ type PolicyLeader struct {
 	Timestamp string `json:"@timestamp,omitempty"`
 }
 
+// PolicyOutput holds the needed data to manage the output API keys
+type PolicyOutput struct {
+	ESDocument
+
+	// API key the Elastic Agent uses to authenticate with elasticsearch
+	APIKey string `json:"api_key"`
+
+	// ID of the API key the Elastic Agent uses to authenticate with elasticsearch
+	APIKeyID string `json:"api_key_id"`
+
+	// The policy output permissions hash
+	PermissionsHash string `json:"permissions_hash"`
+
+	// API keys to be invalidated on next agent ack
+	ToRetireAPIKeyIds []ToRetireAPIKeyIdsItems `json:"to_retire_api_key_ids,omitempty"`
+
+	// Type is the output type. Currently only Elasticsearch is supported.
+	Type string `json:"type"`
+}
+
 // Server A Fleet Server
 type Server struct {
 	ESDocument
@@ -352,6 +365,16 @@ type ServerMetadata struct {
 
 	// The version of the Fleet Server
 	Version string `json:"version"`
+}
+
+// ToRetireAPIKeyIdsItems the Output API Keys that were replaced and should be retired
+type ToRetireAPIKeyIdsItems struct {
+
+	// API Key identifier
+	ID string `json:"id,omitempty"`
+
+	// Date/time the API key was retired
+	RetiredAt string `json:"retired_at,omitempty"`
 }
 
 // UserProvidedMetadata User provided metadata information for the Elastic Agent
