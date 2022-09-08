@@ -153,7 +153,7 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 	assert.Equal(t, len(agentIDs), migratedAgents)
 
 	for i, id := range agentIDs {
-		wantOutputType := "elasticsearch"
+		wantOutputType := "elasticsearch" //nolint:goconst // test cases have some duplication
 
 		got, err := FindAgent(
 			context.Background(), bulker, QueryAgentByID, FieldID, id, WithIndexName(index))
@@ -204,7 +204,7 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 }
 
 func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
-	wantOutputType := "elasticsearch"
+	wantOutputType := "elasticsearch" //nolint:goconst // test cases have some duplication
 
 	now, err := time.Parse(time.RFC3339, nowStr)
 	require.NoError(t, err, "could not parse time "+nowStr)
