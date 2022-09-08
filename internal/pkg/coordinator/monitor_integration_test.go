@@ -159,7 +159,7 @@ func TestMonitorUnenroller(t *testing.T) {
 		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentID, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, "", apikey.TypeAccess),
 	)
 	require.NoError(t, err)
 	outputKey, err := bulker.APIKeyCreate(
@@ -167,20 +167,21 @@ func TestMonitorUnenroller(t *testing.T) {
 		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentID, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, "default", apikey.TypeAccess),
 	)
 	require.NoError(t, err)
 
 	// add agent that should be unenrolled
 	sixAgo := time.Now().UTC().Add(-6 * time.Minute)
 	agentBody, err := json.Marshal(model.Agent{
-		AccessAPIKeyID:  accessKey.ID,
-		DefaultAPIKeyID: outputKey.ID,
-		Active:          true,
-		EnrolledAt:      sixAgo.Format(time.RFC3339),
-		LastCheckin:     sixAgo.Format(time.RFC3339),
-		PolicyID:        policy1Id,
-		UpdatedAt:       sixAgo.Format(time.RFC3339),
+		AccessAPIKeyID: accessKey.ID,
+		Outputs: map[string]*model.PolicyOutput{
+			"default": {APIKeyID: outputKey.ID}},
+		Active:      true,
+		EnrolledAt:  sixAgo.Format(time.RFC3339),
+		LastCheckin: sixAgo.Format(time.RFC3339),
+		PolicyID:    policy1Id,
+		UpdatedAt:   sixAgo.Format(time.RFC3339),
 	})
 	require.NoError(t, err)
 	_, err = bulker.Create(ctx, agentsIndex, agentID, agentBody)
@@ -306,7 +307,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentID, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, "", apikey.TypeAccess),
 	)
 	require.NoError(t, err)
 	outputKey, err := bulker.APIKeyCreate(
@@ -314,7 +315,7 @@ func TestMonitorUnenrollerSetAndClear(t *testing.T) {
 		agentID,
 		"",
 		[]byte(""),
-		apikey.NewMetadata(agentID, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, "default", apikey.TypeAccess),
 	)
 	require.NoError(t, err)
 

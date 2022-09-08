@@ -19,18 +19,20 @@ func (t Type) String() string {
 
 // Metadata is additional information associated with an APIKey.
 type Metadata struct {
-	AgentID   string `json:"agent_id,omitempty"`
-	Managed   bool   `json:"managed,omitempty"`
-	ManagedBy string `json:"managed_by,omitempty"`
-	Type      string `json:"type,omitempty"`
+	AgentID    string `json:"agent_id,omitempty"`
+	Managed    bool   `json:"managed,omitempty"`
+	ManagedBy  string `json:"managed_by,omitempty"`
+	OutputName string `json:"output_name,omitempty"`
+	Type       string `json:"type,omitempty"`
 }
 
 // NewMetadata returns Metadata for the given agentID.
-func NewMetadata(agentID string, typ Type) Metadata {
+func NewMetadata(agentID string, outputName string, typ Type) Metadata {
 	return Metadata{
-		AgentID:   agentID,
-		Managed:   true,
-		ManagedBy: ManagedByFleetServer,
-		Type:      typ.String(),
+		AgentID:    agentID,
+		Managed:    true,
+		ManagedBy:  ManagedByFleetServer,
+		OutputName: outputName,
+		Type:       typ.String(),
 	}
 }

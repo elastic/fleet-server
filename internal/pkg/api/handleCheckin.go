@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"reflect"
@@ -60,7 +61,6 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 		Logger()
 
 	err := rt.ct.handleCheckin(&zlog, w, r, id)
-
 	if err != nil {
 		cntCheckin.IncError(err)
 		resp := NewHTTPErrResp(err)
@@ -430,13 +430,13 @@ func convertActions(agentID string, actions []model.Action) ([]ActionResp, strin
 //
 func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string, pp *policy.ParsedPolicy) (*ActionResp, error) {
 	zlog = zlog.With().
-		Str("ctx", "processPolicy").
-		Int64("policyRevision", pp.Policy.RevisionIdx).
-		Int64("policyCoordinator", pp.Policy.CoordinatorIdx).
+		Str("fleet.ctx", "processPolicy").
+		Int64("fleet.policyRevision", pp.Policy.RevisionIdx).
+		Int64("fleet.policyCoordinator", pp.Policy.CoordinatorIdx).
 		Str(LogPolicyID, pp.Policy.PolicyID).
 		Logger()
 
-	// Repull and decode the agent object.  Do not trust the cache.
+	// Repull and decode the agent object. Do not trust the cache.
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail find agent record")
@@ -446,7 +446,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// Parse the outputs maps in order to prepare the outputs
 	const outputsProperty = "outputs"
 	outputs, err := smap.Parse(pp.Fields[outputsProperty])
-
 	if err != nil {
 		return nil, err
 	}
@@ -458,9 +457,9 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
 		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, outputs)
-
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to prepare output %q: %w",
+				policyOutput.Name, err)
 		}
 	}
 
