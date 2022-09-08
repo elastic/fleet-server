@@ -429,6 +429,7 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeStartedAt: nil,
 		dl.FieldUpgradedAt:       now,
+		dl.FieldUpgradeStatus:    "completed",
 	}
 
 	body, err := doc.Marshal()
