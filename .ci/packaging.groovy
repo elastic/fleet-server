@@ -133,7 +133,7 @@ pipeline {
             }
           }
         }
-        stage('DRA Staging (if no main)') {
+        stage('DRA Staging (release branches only)') {
           options { skipDefaultCheckout() }
           when {
             allOf {
