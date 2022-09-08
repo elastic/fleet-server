@@ -133,7 +133,7 @@ pipeline {
             }
           }
         }
-        stage('DRA Staging') {
+        stage('DRA Staging (if no main)') {
           options { skipDefaultCheckout() }
           when {
             allOf {
