@@ -278,3 +278,18 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 	assert.Empty(t, got.PolicyOutputPermissionsHash)
 	assert.Nil(t, got.DefaultAPIKeyHistory)
 }
+
+func TestMigrateOutputs_no_agent_document(t *testing.T) {
+	now, err := time.Parse(time.RFC3339, nowStr)
+	require.NoError(t, err, "could not parse time "+nowStr)
+	timeNow = func() time.Time {
+		return now
+	}
+
+	_, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
+
+	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, migratedAgents)
+}
