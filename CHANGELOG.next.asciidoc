@@ -3,6 +3,7 @@
 - Return a better error on enrolling and the Elasticsearch version is incompatible. {pull}1211[1211]
 - Give a grace period when starting the unenroll monitor. {issue}1500[1500]
 - Fixes a race condition between the unenroller goroutine and the main goroutine for the coordinator monitor. {issues}1738[1738]
+- Remove events from agent checkin body. {issue}1774[1774]
 
 ==== New Features
 
@@ -12,3 +13,7 @@
 - Add start_time and minimum_execution_duration to actions to allow fleet-server to schedule agent actions. {pull}1381[1381]
 - Fleet Server now allows setting global labels on APM instrumentation. {pull}1649[1649]
 - Fleet Server now allows setting transaction sample rate on APM instrumentation {pull}1681[1681]
+<<<<<<< HEAD
+=======
+- Log redacted config when config updates. {issue}1626[1626] {pull}1668[1668]
+>>>>>>> 8a22669 (Remove events from agent checkin body. (#1842))
