@@ -54,7 +54,6 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 		span.Context.SetLabel("api_key_cache_hit", false)
 	}
 
-
 	info, err := bulker.APIKeyAuth(ctx, *key)
 
 	if err != nil {
