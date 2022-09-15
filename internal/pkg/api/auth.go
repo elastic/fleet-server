@@ -33,6 +33,8 @@ var (
 func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKey, error) {
 	span, ctx := apm.StartSpan(r.Context(), "authAPIKey", "auth")
 	defer span.End()
+	start := time.Now()
+	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	key, err := apikey.ExtractAPIKey(r)
 	if err != nil {
@@ -41,14 +43,17 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 
 	if c.ValidAPIKey(*key) {
 		span.Context.SetLabel("api_key_cache_hit", true)
+		log.Debug().
+			Str("id", key.ID).
+			Str(ECSHTTPRequestID, reqID).
+			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
+			Bool("fleet.api_key.cache_hit", true).
+			Msg("ApiKey authenticated")
 		return key, nil
 	} else {
 		span.Context.SetLabel("api_key_cache_hit", false)
 	}
 
-	reqID := r.Header.Get(logger.HeaderRequestID)
-
-	start := time.Now()
 
 	info, err := bulker.APIKeyAuth(ctx, *key)
 
@@ -62,7 +67,7 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 		return nil, err
 	}
 
-	log.Trace().
+	log.Debug().
 		Str("id", key.ID).
 		Str(ECSHTTPRequestID, reqID).
 		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
@@ -70,6 +75,7 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 		Strs("roles", info.Roles).
 		Bool("enabled", info.Enabled).
 		RawJSON("meta", info.Metadata).
+		Bool("fleet.api_key.cache_hit", false).
 		Msg("ApiKey authenticated")
 
 	c.SetAPIKey(*key, info.Enabled)
