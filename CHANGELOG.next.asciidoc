@@ -1,3 +1,7 @@
+==== Breaking Changes
+
+- Upgrade to Go 1.18. Certificates signed with SHA-1 are now rejected. See the Go 1.18 https://tip.golang.org/doc/go1.18#sha1[release notes] for details. {pull}1709[1709]
+
 ==== Bugfixes
 
 - Return a better error on enrolling and the Elasticsearch version is incompatible. {pull}1211[1211]
