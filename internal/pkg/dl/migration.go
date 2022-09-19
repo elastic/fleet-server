@@ -229,9 +229,7 @@ ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids=new ArrayLi
 
 // copy 'default_api_key_history' to new 'outputs' field
 ctx._source['` + fieldOutputs + `']['default'].type="elasticsearch";
-if (ctx._source.default_api_key_history != null && ctx._source.default_api_key_history.length > 0) {
-    ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids=ctx._source.default_api_key_history;
-}
+ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids=ctx._source.default_api_key_history;
 
 Map map = new HashMap();
 map.put("retired_at", params.` + fieldRetiredAt + `);

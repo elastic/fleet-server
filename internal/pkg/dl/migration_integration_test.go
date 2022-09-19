@@ -132,7 +132,7 @@ func TestPolicyCoordinatorIdx(t *testing.T) {
 	}
 }
 
-func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
+func TestMigrateOutputs(t *testing.T) {
 	now, err := time.Parse(time.RFC3339, nowStr)
 	require.NoError(t, err, "could not parse time "+nowStr)
 	timeNow = func() time.Time {
@@ -153,7 +153,7 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 	assert.Equal(t, len(agentIDs), migratedAgents)
 
 	for i, id := range agentIDs {
-		wantOutputType := "elasticsearch" //nolint:goconst // test cases have some duplication
+		wantOutputType := "elasticsearch"
 
 		got, err := FindAgent(
 			context.Background(), bulker, QueryAgentByID, FieldID, id, WithIndexName(index))
@@ -201,95 +201,4 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 		assert.Empty(t, got.PolicyOutputPermissionsHash)
 		assert.Nil(t, got.DefaultAPIKeyHistory)
 	}
-}
-
-func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
-	wantOutputType := "elasticsearch" //nolint:goconst // test cases have some duplication
-
-	now, err := time.Parse(time.RFC3339, nowStr)
-	require.NoError(t, err, "could not parse time "+nowStr)
-	timeNow = func() time.Time {
-		return now
-	}
-
-	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
-	apiKey := bulk.APIKey{
-		ID:  "testAgent_",
-		Key: "testAgent_key_",
-	}
-
-	i := 0
-	outputAPIKey := bulk.APIKey{
-		ID:  fmt.Sprint(apiKey.ID, i),
-		Key: fmt.Sprint(apiKey.Key, i),
-	}
-
-	agentID := uuid.Must(uuid.NewV4()).String()
-	policyID := uuid.Must(uuid.NewV4()).String()
-
-	agentModel := model.Agent{
-		PolicyID:                    policyID,
-		Active:                      true,
-		LastCheckin:                 nowStr,
-		LastCheckinStatus:           "",
-		UpdatedAt:                   nowStr,
-		EnrolledAt:                  nowStr,
-		DefaultAPIKeyID:             outputAPIKey.ID,
-		DefaultAPIKey:               outputAPIKey.Agent(),
-		PolicyOutputPermissionsHash: fmt.Sprint("a_output_permission_SHA_", i),
-	}
-
-	body, err := json.Marshal(agentModel)
-	require.NoError(t, err)
-
-	_, err = bulker.Create(
-		context.Background(), index, agentID, body, bulk.WithRefresh())
-	require.NoError(t, err)
-
-	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
-	require.NoError(t, err)
-
-	got, err := FindAgent(
-		context.Background(), bulker, QueryAgentByID, FieldID, agentID, WithIndexName(index))
-	require.NoError(t, err, "failed to find agent ID %q", agentID) // we want to continue even if a single agent fails
-
-	assert.Equal(t, 1, migratedAgents)
-
-	// Assert new fields
-	require.Len(t, got.Outputs, 1)
-	// Default API key is empty to force fleet-server to regenerate them.
-	assert.Empty(t, got.Outputs["default"].APIKey)
-	assert.Empty(t, got.Outputs["default"].APIKeyID)
-	assert.Equal(t, wantOutputType, got.Outputs["default"].Type)
-	assert.Equal(t,
-		fmt.Sprint("a_output_permission_SHA_", i),
-		got.Outputs["default"].PermissionsHash)
-
-	// Assert ToRetireAPIKeyIds contains the expected values, regardless of the order.
-	if assert.Len(t, got.Outputs["default"].ToRetireAPIKeyIds, 1) {
-		assert.Equal(t,
-			model.ToRetireAPIKeyIdsItems{ID: outputAPIKey.ID, RetiredAt: nowStr},
-			got.Outputs["default"].ToRetireAPIKeyIds[0])
-	}
-
-	// Assert deprecated fields
-	assert.Empty(t, got.DefaultAPIKey)
-	assert.Empty(t, got.DefaultAPIKey)
-	assert.Empty(t, got.PolicyOutputPermissionsHash)
-	assert.Nil(t, got.DefaultAPIKeyHistory)
-}
-
-func TestMigrateOutputs_no_agent_document(t *testing.T) {
-	now, err := time.Parse(time.RFC3339, nowStr)
-	require.NoError(t, err, "could not parse time "+nowStr)
-	timeNow = func() time.Time {
-		return now
-	}
-
-	_, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
-
-	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
-	require.NoError(t, err)
-
-	assert.Equal(t, 0, migratedAgents)
 }
