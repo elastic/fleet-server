@@ -8,7 +8,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -24,7 +23,7 @@ var TestPayload []byte
 func TestPolicyLogstashOutputPrepare(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
-	po := Output{
+	po := PolicyOutput{
 		Type: OutputTypeLogstash,
 		Name: "test output",
 		Role: &RoleT{
@@ -40,7 +39,7 @@ func TestPolicyLogstashOutputPrepare(t *testing.T) {
 func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
-	po := Output{
+	po := PolicyOutput{
 		Type: OutputTypeLogstash,
 		Name: "test output",
 		Role: nil,
@@ -55,7 +54,7 @@ func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
-	po := Output{
+	po := PolicyOutput{
 		Type: OutputTypeLogstash,
 		Name: "test output",
 		Role: &RoleT{
@@ -72,7 +71,7 @@ func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 func TestPolicyESOutputPrepareNoRole(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
-	po := Output{
+	po := PolicyOutput{
 		Type: OutputTypeElasticsearch,
 		Name: "test output",
 		Role: nil,
@@ -87,11 +86,8 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 	t.Run("Permission hash == Agent Permission Hash no need to regenerate the key", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
-
-		apiKey := bulk.APIKey{ID: "test_id_existing", Key: "existing-key"}
-
 		hashPerm := "abc123"
-		output := Output{
+		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,
 			Name: "test output",
 			Role: &RoleT{
@@ -105,62 +101,29 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		}
 
 		testAgent := &model.Agent{
-			Outputs: map[string]*model.PolicyOutput{
-				output.Name: {
-					ESDocument:        model.ESDocument{},
-					APIKey:            apiKey.Agent(),
-					ToRetireAPIKeyIds: nil,
-					APIKeyID:          apiKey.ID,
-					PermissionsHash:   hashPerm,
-					Type:              OutputTypeElasticsearch,
-				},
-			},
+			DefaultAPIKey:               "test_id:EXISTING-KEY",
+			PolicyOutputPermissionsHash: hashPerm,
 		}
 
-		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
+		err := po.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
-		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
-		gotOutput := testAgent.Outputs[output.Name]
+		key, ok := policyMap.GetMap("test output")["api_key"].(string)
 
-		require.True(t, ok, "api key not present on policy map")
-		assert.Equal(t, apiKey.Agent(), key)
-
-		assert.Equal(t, apiKey.Agent(), gotOutput.APIKey)
-		assert.Equal(t, apiKey.ID, gotOutput.APIKeyID)
-		assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
-		assert.Equal(t, output.Type, gotOutput.Type)
-		assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
-
-		// Old model must always remain empty
-		assert.Empty(t, testAgent.DefaultAPIKey)
-		assert.Empty(t, testAgent.DefaultAPIKeyID)
-		assert.Empty(t, testAgent.DefaultAPIKeyHistory)
-		assert.Empty(t, testAgent.PolicyOutputPermissionsHash)
-
-		bulker.AssertNotCalled(t, "Update",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		bulker.AssertNotCalled(t, "APIKeyCreate",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		require.True(t, ok, "unable to case api key")
+		require.Equal(t, testAgent.DefaultAPIKey, key)
+		bulker.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		bulker.AssertNotCalled(t, "APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		bulker.AssertExpectations(t)
 	})
 
 	t.Run("Permission hash != Agent Permission Hash need to regenerate the key", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
+		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once() //nolint:govet // test case
 
-		oldAPIKey := bulk.APIKey{ID: "test_id", Key: "EXISTING-KEY"}
-		wantAPIKey := bulk.APIKey{ID: "abc", Key: "new-key"}
-		hashPerm := "old-HASH"
-
-		bulker.On("Update",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).Once()
-		bulker.On("APIKeyCreate",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(&wantAPIKey, nil).Once()
-
-		output := Output{
+		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,
 			Name: "test output",
 			Role: &RoleT{
@@ -174,55 +137,27 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		}
 
 		testAgent := &model.Agent{
-			Outputs: map[string]*model.PolicyOutput{
-				output.Name: {
-					ESDocument:        model.ESDocument{},
-					APIKey:            oldAPIKey.Agent(),
-					ToRetireAPIKeyIds: nil,
-					APIKeyID:          oldAPIKey.ID,
-					PermissionsHash:   hashPerm,
-					Type:              OutputTypeElasticsearch,
-				},
-			},
+			DefaultAPIKey:               "test_id:EXISTING-KEY",
+			PolicyOutputPermissionsHash: "old-HASH",
 		}
 
-		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
+		err := po.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
-		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
-		gotOutput := testAgent.Outputs[output.Name]
+		key, ok := policyMap.GetMap("test output")["api_key"].(string)
 
 		require.True(t, ok, "unable to case api key")
-		require.Equal(t, wantAPIKey.Agent(), key)
-
-		assert.Equal(t, wantAPIKey.Agent(), gotOutput.APIKey)
-		assert.Equal(t, wantAPIKey.ID, gotOutput.APIKeyID)
-		assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
-		assert.Equal(t, output.Type, gotOutput.Type)
-
-		// assert.Contains(t, gotOutput.ToRetireAPIKeyIds, oldAPIKey.ID) // TODO: assert on bulker.Update
-
-		// Old model must always remain empty
-		assert.Empty(t, testAgent.DefaultAPIKey)
-		assert.Empty(t, testAgent.DefaultAPIKeyID)
-		assert.Empty(t, testAgent.DefaultAPIKeyHistory)
-		assert.Empty(t, testAgent.PolicyOutputPermissionsHash)
-
+		require.Equal(t, "abc:new-key", key)
 		bulker.AssertExpectations(t)
 	})
 
 	t.Run("Generate API Key on new Agent", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
-		bulker.On("Update",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).Once()
-		apiKey := bulk.APIKey{ID: "abc", Key: "new-key"}
-		bulker.On("APIKeyCreate",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(&apiKey, nil).Once()
+		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once() //nolint:govet // test case
 
-		output := Output{
+		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,
 			Name: "test output",
 			Role: &RoleT{
@@ -235,29 +170,15 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			"test output": map[string]interface{}{},
 		}
 
-		testAgent := &model.Agent{Outputs: map[string]*model.PolicyOutput{}}
+		testAgent := &model.Agent{}
 
-		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
+		err := po.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
-		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
-		gotOutput := testAgent.Outputs[output.Name]
+		key, ok := policyMap.GetMap("test output")["api_key"].(string)
 
 		require.True(t, ok, "unable to case api key")
-		assert.Equal(t, apiKey.Agent(), key)
-
-		assert.Equal(t, apiKey.Agent(), gotOutput.APIKey)
-		assert.Equal(t, apiKey.ID, gotOutput.APIKeyID)
-		assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
-		assert.Equal(t, output.Type, gotOutput.Type)
-		assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
-
-		// Old model must always remain empty
-		assert.Empty(t, testAgent.DefaultAPIKey)
-		assert.Empty(t, testAgent.DefaultAPIKeyID)
-		assert.Empty(t, testAgent.DefaultAPIKeyHistory)
-		assert.Empty(t, testAgent.PolicyOutputPermissionsHash)
-
+		require.Equal(t, "abc:new-key", key)
 		bulker.AssertExpectations(t)
 	})
 }

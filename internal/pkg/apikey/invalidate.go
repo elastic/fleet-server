@@ -38,6 +38,7 @@ func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string
 		bytes.NewReader(body),
 		opts...,
 	)
+
 	if err != nil {
 		return fmt.Errorf("InvalidateAPIKey: %w", err)
 	}

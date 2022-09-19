@@ -42,7 +42,7 @@ type ParsedPolicy struct {
 	Policy  model.Policy
 	Fields  map[string]json.RawMessage
 	Roles   RoleMapT
-	Outputs map[string]Output
+	Outputs map[string]PolicyOutput
 	Default ParsedPolicyDefaults
 }
 
@@ -91,8 +91,8 @@ func NewParsedPolicy(p model.Policy) (*ParsedPolicy, error) {
 	return pp, nil
 }
 
-func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) (map[string]Output, error) {
-	result := make(map[string]Output)
+func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) (map[string]PolicyOutput, error) {
+	result := make(map[string]PolicyOutput)
 
 	outputsMap, err := smap.Parse(outputsRaw)
 	if err != nil {
@@ -102,7 +102,7 @@ func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) 
 	for k := range outputsMap {
 		v := outputsMap.GetMap(k)
 
-		p := Output{
+		p := PolicyOutput{
 			Name: k,
 			Type: v.GetString(FieldOutputType),
 		}
@@ -126,13 +126,13 @@ func parsePerms(permsRaw json.RawMessage) (RoleMapT, error) {
 	// iterate across the keys
 	m := make(RoleMapT, len(permMap))
 	for k := range permMap {
+
 		v := permMap.GetMap(k)
 
 		if v != nil {
 			var r RoleT
 
 			// Stable hash on permissions payload
-			// permission hash created here
 			if r.Sha2, err = v.Hash(); err != nil {
 				return nil, err
 			}

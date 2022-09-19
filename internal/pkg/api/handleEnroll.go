@@ -53,6 +53,7 @@ type EnrollerT struct {
 }
 
 func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bulk, c cache.Cache) (*EnrollerT, error) {
+
 	log.Info().
 		Interface("limits", cfg.Limits.EnrollLimit).
 		Msg("Setting config enroll_limit")
@@ -186,13 +187,7 @@ func (et *EnrollerT) processRequest(rb *rollback.Rollback, zlog zerolog.Logger, 
 	return et._enroll(r.Context(), rb, zlog, req, erec.PolicyID, ver)
 }
 
-func (et *EnrollerT) _enroll(
-	ctx context.Context,
-	rb *rollback.Rollback,
-	zlog zerolog.Logger,
-	req *EnrollRequest,
-	policyID,
-	ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog zerolog.Logger, req *EnrollRequest, policyID, ver string) (*EnrollResponse, error) {
 
 	if req.SharedID != "" {
 		// TODO: Support pre-existing install
@@ -432,7 +427,7 @@ func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (
 		agentID,
 		"",
 		[]byte(kFleetAccessRolesJSON),
-		apikey.NewMetadata(agentID, "", apikey.TypeAccess),
+		apikey.NewMetadata(agentID, apikey.TypeAccess),
 	)
 }
 

@@ -15,14 +15,13 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -439,40 +438,4 @@ func TestHandleAckEvents(t *testing.T) {
 			bulker.AssertExpectations(t)
 		})
 	}
-}
-
-func TestInvalidateAPIKeys(t *testing.T) {
-	toRetire1 := []model.ToRetireAPIKeyIdsItems{{
-		ID: "toRetire1",
-	}}
-	toRetire2 := []model.ToRetireAPIKeyIdsItems{{
-		ID: "toRetire2_0",
-	}, {
-		ID: "toRetire2_1",
-	}}
-	var toRetire3 []model.ToRetireAPIKeyIdsItems
-
-	want := []string{"toRetire1", "toRetire2_0", "toRetire2_1"}
-
-	agent := model.Agent{
-		Outputs: map[string]*model.PolicyOutput{
-			"1": {ToRetireAPIKeyIds: toRetire1},
-			"2": {ToRetireAPIKeyIds: toRetire2},
-			"3": {ToRetireAPIKeyIds: toRetire3},
-		},
-	}
-
-	bulker := ftesting.NewMockBulk()
-	bulker.On("APIKeyInvalidate",
-		context.Background(), mock.MatchedBy(func(ids []string) bool {
-			// if A contains B and B contains A => A = B
-			return assert.Subset(t, ids, want) &&
-				assert.Subset(t, want, ids)
-		})).
-		Return(nil)
-
-	ack := &AckT{bulk: bulker}
-	ack.invalidateAPIKeys(context.Background(), &agent)
-
-	bulker.AssertExpectations(t)
 }

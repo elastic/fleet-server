@@ -10,7 +10,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v7"
 )
 
-// EnsureIndex sets up the index if it doesn't exist. It's utilized for integration tests at the moment.
+// EnsureIndex sets up the index if it doesn't exists, utilized for integration tests at the moment
 func EnsureIndex(ctx context.Context, cli *elasticsearch.Client, name, mapping string) error {
 	err := EnsureTemplate(ctx, cli, name, mapping, false)
 	if err != nil {
