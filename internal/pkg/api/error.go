@@ -161,6 +161,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 	return HTTPErrResp{
 		StatusCode: http.StatusBadRequest,
 		Error:      "BadRequest",
+		Message:    err.Error(),
 		Level:      zerolog.InfoLevel,
 	}
 }
