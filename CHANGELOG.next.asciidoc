@@ -1,7 +1,15 @@
+==== Breaking Changes
+
+- Upgrade to Go 1.18. Certificates signed with SHA-1 are now rejected. See the Go 1.18 https://tip.golang.org/doc/go1.18#sha1[release notes] for details. {pull}1709[1709]
+
 ==== Bugfixes
 
 - Return a better error on enrolling and the Elasticsearch version is incompatible. {pull}1211[1211]
 - Give a grace period when starting the unenroll monitor. {issue}1500[1500]
+- Fixes a race condition between the unenroller goroutine and the main goroutine for the coordinator monitor. {issues}1738[1738]
+- Remove events from agent checkin body. {issue}1774[1774]
+- Improve authc debug logging. {pull}1870[1870]
+- Add error detail to catch-all HTTP error response. {pull}1854[1854]
 
 ==== New Features
 

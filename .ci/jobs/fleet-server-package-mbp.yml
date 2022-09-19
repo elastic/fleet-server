@@ -1,6 +1,6 @@
 ---
 - job:
-    name: Ingest-manager/fleet-server-package-mbp
+    name: fleet-server/fleet-server-package-mbp
     display-name: Fleet Server Package
     description: Jenkins pipeline for the Elastic Fleet Server package process
     project-type: multibranch
@@ -53,4 +53,4 @@
           reference-repo: /var/lib/jenkins/.git-references/fleet-server.git
         timeout: '15'
         use-author: true
-        wipe-workspace: 'True'
+        wipe-workspace: true

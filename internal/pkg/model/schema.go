@@ -139,7 +139,7 @@ type Agent struct {
 	// Date/time the Elastic Agent checked in last time
 	LastCheckin string `json:"last_checkin,omitempty"`
 
-	// Lst checkin status
+	// Last checkin status
 	LastCheckinStatus string `json:"last_checkin_status,omitempty"`
 
 	// Date/time the Elastic Agent was last updated
@@ -186,6 +186,9 @@ type Agent struct {
 
 	// Date/time the Elastic Agent started the current upgrade
 	UpgradeStartedAt string `json:"upgrade_started_at,omitempty"`
+
+	// Upgrade status
+	UpgradeStatus string `json:"upgrade_status,omitempty"`
 
 	// Date/time the Elastic Agent was last upgraded
 	UpgradedAt string `json:"upgraded_at,omitempty"`
