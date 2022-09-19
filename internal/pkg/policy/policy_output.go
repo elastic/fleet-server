@@ -74,8 +74,8 @@ func (p *Output) prepareElasticsearch(
 		return ErrNoOutputPerms
 	}
 
-	output, ok := agent.Outputs[p.Name]
-	if !ok {
+	output, foundOutput := agent.Outputs[p.Name]
+	if !foundOutput {
 		if agent.Outputs == nil {
 			agent.Outputs = map[string]*model.PolicyOutput{}
 		}
@@ -120,11 +120,6 @@ func (p *Output) prepareElasticsearch(
 			return fmt.Errorf("failed generate output API key: %w", err)
 		}
 
-		output.Type = OutputTypeElasticsearch
-		output.APIKey = outputAPIKey.Agent()
-		output.APIKeyID = outputAPIKey.ID
-		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
-
 		// When a new keys is generated we need to update the Agent record,
 		// this will need to be updated when multiples remote Elasticsearch output
 		// are supported.
@@ -137,6 +132,10 @@ func (p *Output) prepareElasticsearch(
 			dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
 			dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
+		}
+
+		if !foundOutput {
+			fields[dl.FiledType] = OutputTypeElasticsearch
 		}
 		if output.APIKeyID != "" {
 			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeyIdsItems{
@@ -155,6 +154,15 @@ func (p *Output) prepareElasticsearch(
 			zlog.Error().Err(err).Msg("fail update agent record")
 			return fmt.Errorf("fail update agent record: %w", err)
 		}
+
+		// Now that all is done, we can update the output on the agent variable
+		// Right not it's more for consistency and to ensure the in-memory agent
+		// data is correct and in sync with ES, so it can be safely used after
+		// this method returns.
+		output.Type = OutputTypeElasticsearch
+		output.APIKey = outputAPIKey.Agent()
+		output.APIKeyID = outputAPIKey.ID
+		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
 	}
 
 	// Always insert the `api_key` as part of the output block, this is required
