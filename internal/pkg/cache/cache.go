@@ -11,15 +11,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
 type Cache interface {
-	Reconfigure(Config) error
+	Reconfigure(config.Cache) error
 
 	SetAction(model.Action)
 	GetAction(id string) (model.Action, bool)
@@ -39,28 +39,8 @@ type SecurityInfo = apikey.SecurityInfo
 
 type CacheT struct {
 	cache Cacher
-	cfg   Config
+	cfg   config.Cache
 	mut   sync.RWMutex
-}
-
-type Config struct {
-	NumCounters  int64 // number of keys to track frequency of
-	MaxCost      int64 // maximum cost of cache in 'cost' units
-	ActionTTL    time.Duration
-	APIKeyTTL    time.Duration
-	EnrollKeyTTL time.Duration
-	ArtifactTTL  time.Duration
-	APIKeyJitter time.Duration
-}
-
-func (c *Config) MarshalZerologObject(e *zerolog.Event) {
-	e.Int64("numCounters", c.NumCounters)
-	e.Int64("maxCost", c.MaxCost)
-	e.Dur("actionTTL", c.ActionTTL)
-	e.Dur("enrollTTL", c.EnrollKeyTTL)
-	e.Dur("artifactTTL", c.ArtifactTTL)
-	e.Dur("apiKeyTTL", c.APIKeyTTL)
-	e.Dur("apiKeyJitter", c.APIKeyJitter)
 }
 
 type actionCache struct {
@@ -69,7 +49,7 @@ type actionCache struct {
 }
 
 // New creates a new cache.
-func New(cfg Config) (*CacheT, error) {
+func New(cfg config.Cache) (*CacheT, error) {
 	cache, err := newCache(cfg)
 	if err != nil {
 		return nil, err
@@ -84,7 +64,7 @@ func New(cfg Config) (*CacheT, error) {
 }
 
 // Reconfigure will drop cache
-func (c *CacheT) Reconfigure(cfg Config) error {
+func (c *CacheT) Reconfigure(cfg config.Cache) error {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 

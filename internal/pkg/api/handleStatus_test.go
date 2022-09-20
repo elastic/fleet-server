@@ -51,7 +51,7 @@ func TestHandleStatus(t *testing.T) {
 
 	cfg := &config.Server{}
 	cfg.InitDefaults()
-	c, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 
 	authfnOk := func(r *http.Request) (*apikey.APIKey, error) {

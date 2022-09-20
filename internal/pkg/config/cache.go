@@ -6,6 +6,8 @@ package config
 
 import (
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -40,4 +42,27 @@ func (c *Cache) LoadLimits(limits *envLimits) {
 	c.ArtifactTTL = defaultArtifactTTL
 	c.APIKeyTTL = defaultAPIKeyTTL
 	c.APIKeyJitter = defaultAPIKeyJitter
+}
+
+func CopyCache(cfg *Config) Cache {
+	ccfg := cfg.Inputs[0].Cache
+	return Cache{
+		NumCounters:  ccfg.NumCounters,
+		MaxCost:      ccfg.MaxCost,
+		ActionTTL:    ccfg.ActionTTL,
+		EnrollKeyTTL: ccfg.EnrollKeyTTL,
+		ArtifactTTL:  ccfg.ArtifactTTL,
+		APIKeyTTL:    ccfg.APIKeyTTL,
+		APIKeyJitter: ccfg.APIKeyJitter,
+	}
+}
+
+func (c *Cache) MarshalZerologObject(e *zerolog.Event) {
+	e.Int64("numCounters", c.NumCounters)
+	e.Int64("maxCost", c.MaxCost)
+	e.Dur("actionTTL", c.ActionTTL)
+	e.Dur("enrollTTL", c.EnrollKeyTTL)
+	e.Dur("artifactTTL", c.ArtifactTTL)
+	e.Dur("apiKeyTTL", c.APIKeyTTL)
+	e.Dur("apiKeyJitter", c.APIKeyJitter)
 }

@@ -73,23 +73,9 @@ func installSignalHandler() context.Context {
 }
 
 func makeCache(cfg *config.Config) (cache.Cache, error) {
-	cacheCfg := makeCacheConfig(cfg)
+	cacheCfg := config.CopyCache(cfg)
 	log.Info().Interface("cfg", cacheCfg).Msg("Setting cache config options")
 	return cache.New(cacheCfg)
-}
-
-func makeCacheConfig(cfg *config.Config) cache.Config {
-	ccfg := cfg.Inputs[0].Cache
-
-	return cache.Config{
-		NumCounters:  ccfg.NumCounters,
-		MaxCost:      ccfg.MaxCost,
-		ActionTTL:    ccfg.ActionTTL,
-		EnrollKeyTTL: ccfg.EnrollKeyTTL,
-		ArtifactTTL:  ccfg.ArtifactTTL,
-		APIKeyTTL:    ccfg.APIKeyTTL,
-		APIKeyJitter: ccfg.APIKeyJitter,
-	}
 }
 
 func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, error) {
@@ -498,7 +484,7 @@ LOOP:
 		// Create or recreate cache
 		if configCacheChanged(curCfg, newCfg) {
 			log.Info().Msg("reconfigure cache on configuration change")
-			cacheCfg := makeCacheConfig(newCfg)
+			cacheCfg := config.CopyCache(newCfg)
 			err := f.cache.Reconfigure(cacheCfg)
 			log.Info().Err(err).Interface("cfg", cacheCfg).Msg("reconfigure cache complete")
 			if err != nil {
