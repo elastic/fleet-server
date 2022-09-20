@@ -33,7 +33,7 @@ type firstCfg struct {
 }
 
 // Agent is a fleet-server that runs under the elastic-agent.
-// An Agent instance will retrive connection information from the passed reader (normally stdin).
+// An Agent instance will retrieve connection information from the passed reader (normally stdin).
 // Agent uses client.StateInterface to gather config data and manage its lifecylce.
 type Agent struct {
 	cliCfg      *ucfg.Config
@@ -136,7 +136,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	return <-res
 }
 
-// OnConfig defines what the fleet-server running under the elastic-agent does when it recieves a new config.
+// OnConfig defines what the fleet-server running under the elastic-agent does when it receives a new config.
 // This is part of the client.StateInterface definition.
 func (a *Agent) OnConfig(s string) {
 	a.mux.Lock()
