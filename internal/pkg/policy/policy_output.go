@@ -214,6 +214,14 @@ func fetchAPIKeyRoles(ctx context.Context, b bulk.Bulk, apiKeyID string) (*RoleT
 	return r, nil
 }
 
+// mergeRoles takes old and new role sets and merges them following these rules:
+// - take all new roles
+// - append all old roles
+// to avoid name collisions every old entry has a `rdstale` suffix
+// if rdstale suffix already exists it uses `{index}-rdstale` to avoid further collisions
+// everything ending with `rdstale` is removed on ack.
+// in case we have key `123` in both old and new result will be: {"123", "123-0-rdstale"}
+// in case old contains {"123", "123-0-rdstale"} and new contains {"123"} result is: {"123", "123-rdstale", "123-0-rdstale"}
 func mergeRoles(zlog zerolog.Logger, old, new *RoleT) (*RoleT, error) {
 	if old == nil {
 		return new, nil
@@ -245,10 +253,18 @@ func mergeRoles(zlog zerolog.Logger, old, new *RoleT) (*RoleT, error) {
 	}
 
 	findNewKey := func(m smap.Map, candidate string) string {
+		if strings.HasSuffix(candidate, "-rdstale") {
+			candidate = strings.TrimSuffix(candidate, "-rdstale")
+			dashIdx := strings.LastIndex(candidate, "-")
+			if dashIdx >= 0 {
+				candidate = candidate[:dashIdx]
+			}
+
+		}
 		// creates new key for permissions
 		// marks it stale so they can be removed later
 		if _, exists := m[candidate]; !exists {
-			return fmt.Sprintf("%s-rdstale", candidate)
+			return fmt.Sprintf("%s-0-rdstale", candidate)
 		}
 
 		// 1 should be enough, 100 is just to have some space
