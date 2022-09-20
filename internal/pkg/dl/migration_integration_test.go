@@ -204,7 +204,7 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 }
 
 func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
-	wantOutputType := "elasticsearch" //nolint:goconst // test cases have some duplication
+	wantOutputType := "elasticsearch"
 
 	now, err := time.Parse(time.RFC3339, nowStr)
 	require.NoError(t, err, "could not parse time "+nowStr)
