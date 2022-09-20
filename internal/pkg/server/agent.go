@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package server
 
 import (
@@ -9,14 +13,16 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/go-ucfg"
+	"github.com/elastic/go-ucfg/yaml"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
-	"github.com/elastic/go-ucfg"
+
 	"github.com/rs/zerolog/log"
-	"go.etcd.io/etcd/clientv3/yaml"
 )
 
 const kAgentModeRestartLoopDelay = 2 * time.Second

@@ -163,8 +163,8 @@ func (c *Config) Redact() *Config {
 		Logging: c.Logging,
 		HTTP:    c.HTTP,
 	}
-	redacted.Inputs[0].Server = redactServer(cfg)
-	redacted.Output = redactOutput(cfg)
+	redacted.Inputs[0].Server = redactServer(c)
+	redacted.Output = redactOutput(c)
 	return redacted
 }
 

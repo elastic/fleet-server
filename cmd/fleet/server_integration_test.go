@@ -31,6 +31,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/server"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
@@ -45,7 +46,7 @@ const (
 type tserver struct {
 	cfg *config.Config
 	g   *errgroup.Group
-	srv *FleetServer
+	srv *server.Fleet
 }
 
 func (s *tserver) baseURL() string {
@@ -82,7 +83,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
 
-	srv, err := NewFleetServer(cfg, build.Info{Version: serverVersion}, status.NewLog())
+	srv, err := server.NewFleet(cfg, build.Info{Version: serverVersion}, status.NewLog())
 	if err != nil {
 		return nil, fmt.Errorf("unable to create server: %w", err)
 	}

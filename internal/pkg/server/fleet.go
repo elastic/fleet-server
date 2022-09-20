@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package server
 
 import (
@@ -11,6 +15,9 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"go.elastic.co/apm"
+	apmtransport "go.elastic.co/apm/transport"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
@@ -28,10 +35,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/scheduler"
 	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
+
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"go.elastic.co/apm"
 	"golang.org/x/sync/errgroup"
 )
 
