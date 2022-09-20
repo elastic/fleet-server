@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
-var updateAPIKeyPath = "/_security/api_key/_bulk_update"
+const updateAPIKeyPath = "/_security/api_key/_bulk_update"
 type UpdateApiKeyBulk func (o ...func(*UpdateApiKeyBulkRequest))(*Response,error)
 
 type UpdateApiKeyBulkRequest struct{
@@ -34,17 +34,12 @@ type UpdateApiKeyBulkRequest struct{
 // Do executes the request and returns response or error.
 //
 func (r UpdateApiKeyBulkRequest) Do(ctx context.Context, transport esapi.Transport) (*esapi.Response, error) {
-    var (
-      method string
-      path   strings.Builder
-    )
-
-    method = "POST"
-
+    var   path   strings.Builder
+    
     path.Grow(len(updateAPIKeyPath))
     path.WriteString(updateAPIKeyPath)
 
-    req, err := newRequest(method, path.String(), r.Body)
+    req, err := newRequest(http.MethodPost, path.String(), r.Body)
     if err != nil {
       return nil, err
     }

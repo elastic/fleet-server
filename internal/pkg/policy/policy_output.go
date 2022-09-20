@@ -74,7 +74,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 				RawJSON("roles", p.Role.Raw).
 				Str("oldHash", agent.PolicyOutputPermissionsHash).
 				Str("newHash", p.Role.Sha2).
-				Msg("Generating a new API key")
+				Msg("Updating an API key")
 
 			// query current api key for roles so we don't lose permissions in the meantime
 			currentRoles, err := fetchAPIKeyRoles(ctx, bulker, agent.DefaultAPIKeyID)
@@ -98,7 +98,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 			err = bulker.APIKeyUpdate(ctx, agent.DefaultAPIKeyID, newRoles.Sha2, newRoles.Raw)
 			if err != nil {
 				zlog.Error().Err(err).Msg("fail generate output key")
-				zlog.Debug().RawJSON("roles", newRoles.Raw).Str("sha", newRoles.Sha2).Err(err).Msg("fail generate output key")
+				zlog.Debug().RawJSON("roles", newRoles.Raw).Str("sha", newRoles.Sha2).Err(err).Msg("roles not updated")
 				return err
 			}
 
@@ -111,7 +111,7 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 				dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 			}
 
-			// Using painless script to append the old keys to the history
+			// Using painless script to update permission hash for updated key
 			body, err := renderUpdatePainlessScript(fields)
 			if err != nil {
 				return err
@@ -234,7 +234,6 @@ func mergeRoles(zlog zerolog.Logger, old, new *RoleT) (*RoleT, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if newMap == nil {
 		return old, nil
 	}
@@ -272,7 +271,7 @@ func mergeRoles(zlog zerolog.Logger, old, new *RoleT) (*RoleT, error) {
 			zlog.Debug().
 				RawJSON("roles", new.Raw).
 				Str("candidate", k).
-				Msg("Failed to find a key for role assignement.")
+				Msg("roles not included.")
 
 			continue
 		}

@@ -109,7 +109,7 @@ func WithAPIKeyMaxParallel(max int) BulkOpt {
 	}
 }
 
-// WithAPIKeyMaxRequestSize sets the size of the request body. Default 100MB
+// WithAPIKeyMaxRequestSize sets the maximum size of the request body. Default 100MB
 func WithAPIKeyMaxRequestSize(maxBytes int) BulkOpt {
 	return func(opt *bulkOptT) {
 		if opt.apikeyMaxReqSize > 0 {

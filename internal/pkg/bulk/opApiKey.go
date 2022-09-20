@@ -88,10 +88,10 @@ func (b *Bulker) APIKeyUpdate(ctx context.Context, id, outputPolicyHash string, 
 }
 
 // flushUpdateAPIKey takes an update API Key queue and groups request based on roles applied
-// it needs to group agent IDs per Role Hash in order to produce more efficient request containing a list of IDs for a change(update)
-// one thing to have in mind is that in a single queue there may be change and ack request with roles. in this case
-// later occurrence wins overwriting policy change to reduced set of permissions.
-// even if the order was incorrect we end up with just a bit broader permission set, never too strict, so agent does not
+// It needs to group agent IDs per Role Hash in order to produce more efficient request containing a list of IDs for a change(update)
+// One thing to have in mind is that in a single queue there may be change and ack request with roles. in this case
+// Later occurrence wins overwriting policy change to reduced set of permissions.
+// Even if the order was incorrect we end up with just a bit broader permission set, never too strict, so agent does not
 // end up with fewer permissions than it needs
 func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 	idsPerRole := make(map[string][]string)
@@ -109,8 +109,8 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		dec := json.NewDecoder(bytes.NewReader(content))
 		if err := dec.Decode(&metaMap); err != nil {
 			log.Error().
+				Err(err).
 				Str("mod", kModBulk).
-				Str("err", err.Error()).
 				Msg("Failed to unmarshal api key update meta map")
 			return err
 		}
@@ -118,8 +118,8 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		var req *apiKeyUpdateRequest
 		if err := dec.Decode(&req); err != nil {
 			log.Error().
+				Err(err).
 				Str("mod", kModBulk).
-				Str("err", err.Error()).
 				Str("request", string(content)).
 				Msg("Failed to unmarshal api key update request")
 			return err
@@ -139,24 +139,20 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 
 	for id, roleHash := range rolePerID {
 		delete(rolePerID, id)
-		if _, tracked := idsPerRole[roleHash]; !tracked {
-			idsPerRole[roleHash] = []string{id}
-		} else {
-			idsPerRole[roleHash] = append(idsPerRole[roleHash], id)
-		}
+		idsPerRole[roleHash] = append(idsPerRole[roleHash], id)
+
 	}
 
 	responseIdx := 0
 	for hash, role := range roles {
-		idsPerBatch := b.getIdsCountPerBatch(len(role), maxKeySize)
+		idsPerBatch := b.getIDsCountPerBatch(len(role), maxKeySize)
 		ids := idsPerRole[hash]
 		if idsPerBatch <= 0 {
 			log.Error().Str("err", "request too large").Msg("No API Key ID could fit request size for bulk update")
 			log.Debug().
 				RawJSON("role", role).
 				Strs("ids", ids).
-				Str("err", "request too large").
-				Msg("No API Key ID could fit request size for bulk update")
+				Msg("IDs could not fit into a message")
 
 			// idsPerRole for specific role no longer needed
 			delete(idsPerRole, hash)
@@ -242,7 +238,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 	return nil
 }
 
-func (b *Bulker) getIdsCountPerBatch(roleSize, maxKeySize int) int {
+func (b *Bulker) getIDsCountPerBatch(roleSize, maxKeySize int) int {
 	spareSpace := b.opts.apikeyMaxReqSize - roleSize - envelopeSize
 	if spareSpace > maxKeySize {
 		return int(float64(spareSpace) * safeBuffer / float64(maxKeySize))

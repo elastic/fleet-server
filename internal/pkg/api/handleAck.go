@@ -353,27 +353,27 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	if agent.DefaultAPIKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, agent.DefaultAPIKeyID, true)
 		if err != nil {
-			zlog.Info().
+			zlog.Error().
 				Err(err).
-				Str("id", agent.DefaultAPIKeyID).
+				Str(LogAPIKeyID, agent.DefaultAPIKeyID).
 				Msg("Failed to read API Key roles")
 		} else {
-			clean, removedCount, err := cleanRoles(res.RoleDescriptors)
+			clean, removedRolesCount, err := cleanRoles(res.RoleDescriptors)
 			if err != nil {
-				zlog.Info().
+				zlog.Error().
 					Err(err).
 					RawJSON("roles", res.RoleDescriptors).
-					Str("id", agent.DefaultAPIKeyID).
+					Str(LogAPIKeyID, agent.DefaultAPIKeyID).
 					Msg("Failed to cleanup roles")
-			} else if removedCount > 0 {
+			} else if removedRolesCount > 0 {
 				if err := ack.bulk.APIKeyUpdate(ctx, agent.DefaultAPIKeyID, agent.PolicyOutputPermissionsHash, clean); err != nil {
-					zlog.Info().Err(err).RawJSON("roles", clean).Str("id", agent.DefaultAPIKeyID).Msg("Failed to refresh API Key")
+					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, agent.DefaultAPIKeyID).Msg("Failed to update API Key")
 				} else {
 					zlog.Debug().
 						Str("hash.sha256", agent.PolicyOutputPermissionsHash).
-						Str("apikey", agent.DefaultAPIKeyID).
+						Str(LogAPIKeyID, agent.DefaultAPIKeyID).
 						RawJSON("roles", clean).
-						Int("removed", removedCount).
+						Int("removedRoles", removedRolesCount).
 						Msg("Updating agent record to pick up reduced roles.")
 				}
 			}
@@ -392,7 +392,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		}
 		log.Info().Strs("ids", ids).Msg("Invalidate old API keys")
 		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
-			log.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+			log.Warn().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
 		}
 	}
 
@@ -411,7 +411,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		bulk.WithRetryOnConflict(3),
 	)
 
-	zlog.Info().Err(err).
+	zlog.Err(err).
 		Str(LogPolicyID, agent.PolicyID).
 		Int64("policyRevision", currRev).
 		Int64("policyCoordinator", currCoord).
@@ -423,7 +423,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 	rr := smap.Map{}
 	if err := json.Unmarshal(roles, &rr); err != nil {
-		return nil, 0, err
+		return nil, 0, errors.Wrap(err, "failed to unmarshal provided roles")
 	}
 
 	keys := make([]string, 0, len(rr))
@@ -442,7 +442,7 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 	}
 
 	r, err := json.Marshal(rr)
-	return r, len(keys), err
+	return r, len(keys), errors.Wrap(err, "failed to marshal resulting role definition")
 }
 
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
