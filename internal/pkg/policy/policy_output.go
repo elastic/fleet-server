@@ -56,18 +56,73 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		// Note: This will need to be updated when doing multi-cluster elasticsearch support
 		// Currently, we only have access to the token for the elasticsearch instance fleet-server
 		// is monitors. When updating for multiple ES instances we need to tie the token to the output.
-		needNewKey := true
+		needNewKey := false
+		needUpdateKey := false
 		switch {
 		case agent.DefaultAPIKey == "":
 			zlog.Debug().Msg("must generate api key as default API key is not present")
+			needNewKey = true
 		case p.Role.Sha2 != agent.PolicyOutputPermissionsHash:
 			zlog.Debug().Msg("must generate api key as policy output permissions changed")
+			needUpdateKey = true
 		default:
-			needNewKey = false
 			zlog.Debug().Msg("policy output permissions are the same")
 		}
 
-		if needNewKey {
+		if needUpdateKey {
+			zlog.Debug().
+				RawJSON("roles", p.Role.Raw).
+				Str("oldHash", agent.PolicyOutputPermissionsHash).
+				Str("newHash", p.Role.Sha2).
+				Msg("Updating an API key")
+
+			// query current api key for roles so we don't lose permissions in the meantime
+			currentRoles, err := fetchAPIKeyRoles(ctx, bulker, agent.DefaultAPIKeyID)
+			if err != nil {
+				zlog.Error().
+					Str("apiKeyID", agent.DefaultAPIKeyID).
+					Err(err).Msg("fail fetching roles for key")
+				return err
+			}
+
+			// merge roles with p.Role
+			newRoles, err := mergeRoles(zlog, currentRoles, p.Role)
+			if err != nil {
+				zlog.Error().
+					Str("apiKeyID", agent.DefaultAPIKeyID).
+					Err(err).Msg("fail merging roles for key")
+				return err
+			}
+
+			// hash provided is only for merging request together and not persisted
+			err = bulker.APIKeyUpdate(ctx, agent.DefaultAPIKeyID, newRoles.Sha2, newRoles.Raw)
+			if err != nil {
+				zlog.Error().Err(err).Msg("fail generate output key")
+				zlog.Debug().RawJSON("roles", newRoles.Raw).Str("sha", newRoles.Sha2).Err(err).Msg("roles not updated")
+				return err
+			}
+
+			zlog.Debug().
+				Str("hash.sha256", p.Role.Sha2).
+				Str("roles", string(p.Role.Raw)).
+				Msg("Updating agent record to pick up most recent roles.")
+
+			fields := map[string]interface{}{
+				dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
+			}
+
+			// Using painless script to update permission hash for updated key
+			body, err := renderUpdatePainlessScript(fields)
+			if err != nil {
+				return err
+			}
+
+			if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body); err != nil {
+				zlog.Error().Err(err).Msg("fail update agent record")
+				return err
+			}
+
+		} else if needNewKey {
 			zlog.Debug().
 				RawJSON("roles", p.Role.Raw).
 				Str("oldHash", agent.PolicyOutputPermissionsHash).
@@ -135,6 +190,119 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 		return fmt.Errorf("encountered unexpected output type while preparing outputs: %s", p.Type)
 	}
 	return nil
+}
+
+func fetchAPIKeyRoles(ctx context.Context, b bulk.Bulk, apiKeyID string) (*RoleT, error) {
+	res, err := b.APIKeyRead(ctx, apiKeyID, true)
+	if err != nil {
+		return nil, err
+	}
+
+	roleMap, err := smap.Parse(res.RoleDescriptors)
+	if err != nil {
+		return nil, err
+	}
+	r := &RoleT{
+		Raw: res.RoleDescriptors,
+	}
+
+	// Stable hash on permissions payload
+	if r.Sha2, err = roleMap.Hash(); err != nil {
+		return nil, err
+	}
+
+	return r, nil
+}
+
+// mergeRoles takes old and new role sets and merges them following these rules:
+// - take all new roles
+// - append all old roles
+// to avoid name collisions every old entry has a `rdstale` suffix
+// if rdstale suffix already exists it uses `{index}-rdstale` to avoid further collisions
+// everything ending with `rdstale` is removed on ack.
+// in case we have key `123` in both old and new result will be: {"123", "123-0-rdstale"}
+// in case old contains {"123", "123-0-rdstale"} and new contains {"123"} result is: {"123", "123-rdstale", "123-0-rdstale"}
+func mergeRoles(zlog zerolog.Logger, old, new *RoleT) (*RoleT, error) {
+	if old == nil {
+		return new, nil
+	}
+	if new == nil {
+		return old, nil
+	}
+
+	oldMap, err := smap.Parse(old.Raw)
+	if err != nil {
+		return nil, err
+	}
+	if oldMap == nil {
+		return new, nil
+	}
+
+	newMap, err := smap.Parse(new.Raw)
+	if err != nil {
+		return nil, err
+	}
+	if newMap == nil {
+		return old, nil
+	}
+
+	destMap := smap.Map{}
+	// copy all from new
+	for k, v := range newMap {
+		destMap[k] = v
+	}
+
+	findNewKey := func(m smap.Map, candidate string) string {
+		if strings.HasSuffix(candidate, "-rdstale") {
+			candidate = strings.TrimSuffix(candidate, "-rdstale")
+			dashIdx := strings.LastIndex(candidate, "-")
+			if dashIdx >= 0 {
+				candidate = candidate[:dashIdx]
+			}
+
+		}
+		// creates new key for permissions
+		// marks it stale so they can be removed later
+		if _, exists := m[candidate]; !exists {
+			return fmt.Sprintf("%s-0-rdstale", candidate)
+		}
+
+		// 1 should be enough, 100 is just to have some space
+		for i := 0; i < 100; i++ {
+			c := fmt.Sprintf("%s-%d-rdstale", candidate, i)
+
+			if _, exists := m[c]; !exists {
+				return c
+			}
+		}
+
+		return ""
+	}
+	// copy old
+	for k, v := range oldMap {
+		newKey := findNewKey(destMap, k)
+		if newKey == "" {
+			zlog.Warn().Msg("Failed to find a key for role assignement.")
+
+			zlog.Debug().
+				RawJSON("roles", new.Raw).
+				Str("candidate", k).
+				Msg("roles not included.")
+
+			continue
+		}
+		destMap[newKey] = v
+	}
+
+	r := &RoleT{}
+	if r.Sha2, err = destMap.Hash(); err != nil {
+		return nil, err
+	}
+	if r.Raw, err = json.Marshal(destMap); err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }
 
 func renderUpdatePainlessScript(fields map[string]interface{}) ([]byte, error) {

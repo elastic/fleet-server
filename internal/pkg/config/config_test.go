@@ -237,12 +237,13 @@ func defaultFleet() Fleet {
 
 func defaultElastic() Elasticsearch {
 	return Elasticsearch{
-		Protocol:       "http",
-		ServiceToken:   "test-token",
-		Hosts:          []string{"localhost:9200"},
-		MaxRetries:     3,
-		MaxConnPerHost: 128,
-		Timeout:        90 * time.Second,
+		Protocol:         "http",
+		ServiceToken:     "test-token",
+		Hosts:            []string{"localhost:9200"},
+		MaxRetries:       3,
+		MaxConnPerHost:   128,
+		MaxContentLength: 104857600,
+		Timeout:          90 * time.Second,
 	}
 }
 

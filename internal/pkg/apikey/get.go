@@ -15,16 +15,20 @@ import (
 
 // APIKetMetadata tracks Metadata associated with an APIKey.
 type APIKeyMetadata struct {
-	ID       string
-	Metadata Metadata
+	ID              string
+	Metadata        Metadata
+	RoleDescriptors json.RawMessage
 }
 
 // Read gathers APIKeyMetadata from Elasticsearch using the given client.
-func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKeyMetadata, error) {
+func Read(ctx context.Context, client *elasticsearch.Client, id string, withOwner bool) (*APIKeyMetadata, error) {
 
 	opts := []func(*esapi.SecurityGetAPIKeyRequest){
 		client.Security.GetAPIKey.WithContext(ctx),
 		client.Security.GetAPIKey.WithID(id),
+	}
+	if withOwner {
+		opts = append(opts, client.Security.GetAPIKey.WithOwner(true))
 	}
 
 	res, err := client.Security.GetAPIKey(
@@ -42,8 +46,9 @@ func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKey
 	}
 
 	type APIKeyResponse struct {
-		ID       string   `json:"id"`
-		Metadata Metadata `json:"metadata"`
+		ID              string          `json:"id"`
+		Metadata        Metadata        `json:"metadata"`
+		RoleDescriptors json.RawMessage `json:"role_descriptors"`
 	}
 	type GetAPIKeyResponse struct {
 		APIKeys []APIKeyResponse `json:"api_keys"`
@@ -62,7 +67,8 @@ func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKey
 	first := resp.APIKeys[0]
 
 	return &APIKeyMetadata{
-		ID:       first.ID,
-		Metadata: first.Metadata,
+		ID:              first.ID,
+		Metadata:        first.Metadata,
+		RoleDescriptors: first.RoleDescriptors,
 	}, nil
 }

@@ -117,11 +117,15 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		bulker.AssertExpectations(t)
 	})
 
-	t.Run("Permission hash != Agent Permission Hash need to regenerate the key", func(t *testing.T) {
+	t.Run("Permission hash != Agent Permission Hash need to regenerate permissions", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
 		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&bulk.APIKey{"abc", "new-key"}, nil).Once() //nolint:govet // test case
+		bulker.On("APIKeyUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		bulker.
+			On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything).
+			Return(&bulk.APIKeyMetadata{ID: "test_id", RoleDescriptors: TestPayload}, nil).
+			Once()
 
 		po := PolicyOutput{
 			Type: OutputTypeElasticsearch,
@@ -147,7 +151,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		key, ok := policyMap.GetMap("test output")["api_key"].(string)
 
 		require.True(t, ok, "unable to case api key")
-		require.Equal(t, "abc:new-key", key)
+		require.Equal(t, testAgent.DefaultAPIKey, key)
 		bulker.AssertExpectations(t)
 	})
 
