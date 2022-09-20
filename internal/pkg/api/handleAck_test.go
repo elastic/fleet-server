@@ -452,7 +452,16 @@ func TestInvalidateAPIKeys(t *testing.T) {
 	}}
 	var toRetire3 []model.ToRetireAPIKeyIdsItems
 
-	want := []string{"toRetire1", "toRetire2_0", "toRetire2_1"}
+	skips := map[string]string{
+		"1": "toRetire1",
+		"2": "toRetire2_0",
+		"3": "",
+	}
+	wants := map[string][]string{
+		"1": {},
+		"2": {"toRetire2_1"},
+		"3": {},
+	}
 
 	agent := model.Agent{
 		Outputs: map[string]*model.PolicyOutput{
@@ -462,17 +471,24 @@ func TestInvalidateAPIKeys(t *testing.T) {
 		},
 	}
 
-	bulker := ftesting.NewMockBulk()
-	bulker.On("APIKeyInvalidate",
-		context.Background(), mock.MatchedBy(func(ids []string) bool {
-			// if A contains B and B contains A => A = B
-			return assert.Subset(t, ids, want) &&
-				assert.Subset(t, want, ids)
-		})).
-		Return(nil)
+	for i, out := range agent.Outputs {
+		skip := skips[i]
+		want := wants[i]
 
-	ack := &AckT{bulk: bulker}
-	ack.invalidateAPIKeys(context.Background(), &agent)
+		bulker := ftesting.NewMockBulk()
+		if len(want) > 0 {
+			bulker.On("APIKeyInvalidate",
+				context.Background(), mock.MatchedBy(func(ids []string) bool {
+					// if A contains B and B contains A => A = B
+					return assert.Subset(t, ids, want) &&
+						assert.Subset(t, want, ids)
+				})).
+				Return(nil)
+		}
 
-	bulker.AssertExpectations(t)
+		ack := &AckT{bulk: bulker}
+		ack.invalidateAPIKeys(context.Background(), out.ToRetireAPIKeyIds, skip)
+
+		bulker.AssertExpectations(t)
+	}
 }

@@ -62,6 +62,7 @@ type bulkOptT struct {
 	maxPending        int
 	blockQueueSz      int
 	apikeyMaxParallel int
+	apikeyMaxReqSize  int
 }
 
 type BulkOpt func(*bulkOptT)
@@ -108,6 +109,15 @@ func WithAPIKeyMaxParallel(max int) BulkOpt {
 	}
 }
 
+// WithAPIKeyMaxRequestSize sets the maximum size of the request body. Default 100MB
+func WithAPIKeyMaxRequestSize(maxBytes int) BulkOpt {
+	return func(opt *bulkOptT) {
+		if opt.apikeyMaxReqSize > 0 {
+			opt.apikeyMaxReqSize = maxBytes
+		}
+	}
+}
+
 func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 	bopt := bulkOptT{
 		flushInterval:     defaultFlushInterval,
@@ -116,6 +126,7 @@ func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		maxPending:        defaultMaxPending,
 		apikeyMaxParallel: defaultAPIKeyMaxParallel,
 		blockQueueSz:      defaultBlockQueueSz,
+		apikeyMaxReqSize:  defaultApikeyMaxReqSize,
 	}
 
 	for _, f := range opts {
@@ -132,6 +143,7 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Int("maxPending", o.maxPending)
 	e.Int("blockQueueSz", o.blockQueueSz)
 	e.Int("apikeyMaxParallel", o.apikeyMaxParallel)
+	e.Int("apikeyMaxReqSize", o.apikeyMaxReqSize)
 }
 
 // BulkOptsFromCfg transforms config to a slize of BulkOpt
@@ -152,5 +164,6 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 		WithFlushThresholdSize(bulkCfg.FlushThresholdSize),
 		WithMaxPending(bulkCfg.FlushMaxPending),
 		WithAPIKeyMaxParallel(maxKeyParallel),
+		WithAPIKeyMaxRequestSize(cfg.Output.Elasticsearch.MaxContentLength),
 	}
 }

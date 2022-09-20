@@ -298,7 +298,7 @@ func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk
 LOOP:
 	for {
 
-		_, err := bulker.APIKeyRead(ctx, apikeyID)
+		_, err := bulker.APIKeyRead(ctx, apikeyID, false)
 
 		switch {
 		case err == nil:
