@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
@@ -17,6 +18,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.etcd.io/etcd/clientv3/yaml"
 )
+
+const kAgentModeRestartLoopDelay = 2 * time.Second
 
 type firstCfg struct {
 	cfg *config.Config

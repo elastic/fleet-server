@@ -35,6 +35,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const kUAFleetServer = "Fleet-Server"
+
 // Fleet is an instance of the fleet-server.
 type Fleet struct {
 	bi     build.Info

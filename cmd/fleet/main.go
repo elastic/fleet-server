@@ -9,7 +9,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"time"
 
 	"go.elastic.co/apm"
 
@@ -27,10 +26,7 @@ import (
 )
 
 const (
-	kAgentMode                 = "agent-mode"
-	kAgentModeRestartLoopDelay = 2 * time.Second
-
-	kUAFleetServer = "Fleet-Server"
+	kAgentMode = "agent-mode"
 )
 
 func init() {
