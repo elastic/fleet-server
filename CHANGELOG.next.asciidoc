@@ -4,6 +4,7 @@
 - Give a grace period when starting the unenroll monitor. {issue}1500[1500]
 - Fixes a race condition between the unenroller goroutine and the main goroutine for the coordinator monitor. {issues}1738[1738]
 - Remove events from agent checkin body. {issue}1774[1774]
+- Improve authc debug logging. {pull}1870[1870]
 - Add error detail to catch-all HTTP error response. {pull}1854[1854]
 
 ==== New Features
