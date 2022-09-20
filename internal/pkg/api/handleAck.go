@@ -15,6 +15,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/julienschmidt/httprouter"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -25,11 +30,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
-	"github.com/pkg/errors"
-
-	"github.com/julienschmidt/httprouter"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 type HTTPError struct {
@@ -338,8 +338,9 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 			Int64("rev.coordinatorIdx", rev.CoordinatorIdx).
 			Msg("ack policy revision")
 
-		if ok && rev.PolicyID == agent.PolicyID && (rev.RevisionIdx > currRev ||
-			(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
+		if ok && rev.PolicyID == agent.PolicyID &&
+			(rev.RevisionIdx > currRev ||
+				(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
 			found = true
 			currRev = rev.RevisionIdx
 			currCoord = rev.CoordinatorIdx
@@ -350,12 +351,39 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
-	if agent.DefaultAPIKeyID != "" {
-		res, err := ack.bulk.APIKeyRead(ctx, agent.DefaultAPIKeyID, true)
+	for _, output := range agent.Outputs {
+		if output.Type != policy.OutputTypeElasticsearch {
+			continue
+		}
+
+		err := ack.updateAPIKey(ctx,
+			zlog,
+			agent.Id,
+			currRev, currCoord,
+			agent.PolicyID,
+			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+
+}
+
+func (ack *AckT) updateAPIKey(ctx context.Context,
+	zlog zerolog.Logger,
+	agentID string,
+	currRev, currCoord int64,
+	policyID, apiKeyID, permissionHash string,
+	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
+
+	if apiKeyID != "" {
+		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
 			zlog.Error().
 				Err(err).
-				Str(LogAPIKeyID, agent.DefaultAPIKeyID).
+				Str(LogAPIKeyID, apiKeyID).
 				Msg("Failed to read API Key roles")
 		} else {
 			clean, removedRolesCount, err := cleanRoles(res.RoleDescriptors)
@@ -363,41 +391,26 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 				zlog.Error().
 					Err(err).
 					RawJSON("roles", res.RoleDescriptors).
-					Str(LogAPIKeyID, agent.DefaultAPIKeyID).
+					Str(LogAPIKeyID, apiKeyID).
 					Msg("Failed to cleanup roles")
 			} else if removedRolesCount > 0 {
-				if err := ack.bulk.APIKeyUpdate(ctx, agent.DefaultAPIKeyID, agent.PolicyOutputPermissionsHash, clean); err != nil {
-					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, agent.DefaultAPIKeyID).Msg("Failed to update API Key")
+				if err := ack.bulk.APIKeyUpdate(ctx, apiKeyID, permissionHash, clean); err != nil {
+					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, apiKeyID).Msg("Failed to update API Key")
 				} else {
 					zlog.Debug().
-						Str("hash.sha256", agent.PolicyOutputPermissionsHash).
-						Str(LogAPIKeyID, agent.DefaultAPIKeyID).
+						Str("hash.sha256", permissionHash).
+						Str(LogAPIKeyID, apiKeyID).
 						RawJSON("roles", clean).
 						Int("removedRoles", removedRolesCount).
 						Msg("Updating agent record to pick up reduced roles.")
 				}
 			}
 		}
-	}
-
-	sz := len(agent.DefaultAPIKeyHistory)
-	if sz > 0 {
-		ids := make([]string, sz)
-		for i := 0; i < sz; i++ {
-			if agent.DefaultAPIKeyHistory[i].ID == agent.DefaultAPIKeyID {
-				// already updated
-				continue
-			}
-			ids[i] = agent.DefaultAPIKeyHistory[i].ID
-		}
-		log.Info().Strs("ids", ids).Msg("Invalidate old API keys")
-		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
-			log.Warn().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
-		}
+		ack.invalidateAPIKeys(ctx, toRetireAPIKeyIDs, apiKeyID)
 	}
 
 	body := makeUpdatePolicyBody(
-		agent.PolicyID,
+		policyID,
 		currRev,
 		currCoord,
 	)
@@ -405,14 +418,14 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	err := ack.bulk.Update(
 		ctx,
 		dl.FleetAgents,
-		agent.Id,
+		agentID,
 		body,
 		bulk.WithRefresh(),
 		bulk.WithRetryOnConflict(3),
 	)
 
 	zlog.Err(err).
-		Str(LogPolicyID, agent.PolicyID).
+		Str(LogPolicyID, policyID).
 		Int64("policyRevision", currRev).
 		Int64("policyCoordinator", currCoord).
 		Msg("ack policy")
@@ -445,8 +458,25 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 	return r, len(keys), errors.Wrap(err, "failed to marshal resulting role definition")
 }
 
+func (ack *AckT) invalidateAPIKeys(ctx context.Context, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
+	ids := make([]string, 0, len(toRetireAPIKeyIDs))
+	for _, k := range toRetireAPIKeyIDs {
+		if k.ID == skip || k.ID == "" {
+			continue
+		}
+		ids = append(ids, k.ID)
+	}
+
+	if len(ids) > 0 {
+		log.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
+		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
+			log.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+		}
+	}
+}
+
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
-	apiKeys := _getAPIKeyIDs(agent)
+	apiKeys := agent.APIKeyIDs()
 	if len(apiKeys) > 0 {
 		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
 
@@ -499,17 +529,6 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 		Msg("ack upgrade")
 
 	return nil
-}
-
-func _getAPIKeyIDs(agent *model.Agent) []string {
-	keys := make([]string, 0, 1)
-	if agent.AccessAPIKeyID != "" {
-		keys = append(keys, agent.AccessAPIKeyID)
-	}
-	if agent.DefaultAPIKeyID != "" {
-		keys = append(keys, agent.DefaultAPIKeyID)
-	}
-	return keys
 }
 
 // Generate an update script that validates that the policy_id
