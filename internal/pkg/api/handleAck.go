@@ -278,16 +278,16 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		// The unenroll and upgrade acks might overwrite it later
 		setResult(n, http.StatusOK)
 
-		if ev.Error == "" {
-			if action.Type == TypeUnenroll {
-				unenrollIdxs = append(unenrollIdxs, n)
-			} else if action.Type == TypeUpgrade {
-				if err := ack.handleUpgrade(ctx, zlog, agent); err != nil {
-					setError(n, err)
-					log.Error().Err(err).Msg("handle upgrade event")
-					continue
-				}
+		if action.Type == TypeUpgrade {
+			if err := ack.handleUpgrade(ctx, zlog, agent, ev); err != nil {
+				setError(n, err)
+				log.Error().Err(err).Msg("handle upgrade event")
+				continue
 			}
+		}
+
+		if ev.Error == "" && action.Type == TypeUnenroll {
+			unenrollIdxs = append(unenrollIdxs, n)
 		}
 	}
 
@@ -505,13 +505,29 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 	return nil
 }
 
-func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
-
+func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event Event) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeStartedAt: nil,
 		dl.FieldUpgradedAt:       now,
 		dl.FieldUpgradeStatus:    "completed",
+	}
+	if event.Error != "" {
+		// unmarshal event payload
+		var pl struct {
+			Retry   bool `json:"retry"`
+			Attempt int  `json:"retry_attempt"`
+		}
+		err := json.Unmarshal(event.Payload, &pl)
+		if err != nil {
+			zlog.Error().Err(err).Msg("unable to unmarshal upgrade event payload")
+		}
+
+		// if the payload indicates a retry, mark change the upgrade status to retrying.
+		if pl.Retry {
+			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as retrying")
+			doc[dl.FieldUpgradeStatus] = "retrying" // TODO should we also change FieldUpgradedAt and FieldUpgradeStated at?
+		}
 	}
 
 	body, err := doc.Marshal()

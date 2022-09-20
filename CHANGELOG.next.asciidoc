@@ -20,3 +20,4 @@
 - Fleet Server now allows setting global labels on APM instrumentation. {pull}1649[1649]
 - Fleet Server now allows setting transaction sample rate on APM instrumentation {pull}1681[1681]
 - Log redacted config when config updates. {issue}1626[1626] {pull}1668[1668]
+- Allow upgrade actions to signal that they will be retried. {pull}1887[1887]

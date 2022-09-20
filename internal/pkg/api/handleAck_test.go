@@ -406,6 +406,71 @@ func TestHandleAckEvents(t *testing.T) {
 			},
 			err: &HTTPError{Status: http.StatusNotFound},
 		},
+		{
+			name: "upgrade action failed",
+			events: []Event{
+				{
+					ActionID: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
+					Type:     "UPGRADE",
+					Error:    "Error with no payload",
+				},
+			},
+			res: newAckResponse(true, []AckResponseItem{
+				{
+					Status:  http.StatusOK,
+					Message: http.StatusText(http.StatusOK),
+				},
+			}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"ab12dcd8-bde0-4045-92dc-c4b27668d73a","type":"UPGRADE"}`),
+					}},
+				}}, nil).Once()
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				return m
+			},
+		},
+		{
+			name: "upgrade action retrying",
+			events: []Event{
+				{
+					ActionID: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
+					Type:     "UPGRADE",
+					Error:    "Error with payload",
+					Payload:  json.RawMessage(`{"retry":true,"retry_attempt":1}`),
+				},
+			},
+			res: newAckResponse(true, []AckResponseItem{
+				{
+					Status:  http.StatusOK,
+					Message: http.StatusText(http.StatusOK),
+				},
+			}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"ab12dcd8-bde0-4045-92dc-c4b27668d73a","type":"UPGRADE"}`),
+					}},
+				}}, nil).Once()
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(t *testing.T, body []byte) bool {
+					t.Helper()
+					var pl struct {
+						Retry   bool `json:"retry"`
+						Attempt int  `json:"retry_attempt"`
+					}
+					if err := json.Unmarshal(body, &pl); err != nil {
+						t.Fatal(err)
+					}
+					return pl.Retry && pl.Attempt == 1
+				}), mock.Anything).Return(nil).Once()
+				return m
+			},
+		},
 	}
 
 	for _, tc := range tests {
