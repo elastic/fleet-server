@@ -44,6 +44,7 @@ func (c *Cache) LoadLimits(limits *envLimits) {
 	c.APIKeyJitter = defaultAPIKeyJitter
 }
 
+// CopyCache returns a copy of the config's Cache settings
 func CopyCache(cfg *Config) Cache {
 	ccfg := cfg.Inputs[0].Cache
 	return Cache{
@@ -57,6 +58,7 @@ func CopyCache(cfg *Config) Cache {
 	}
 }
 
+// MarshalZerologObject turns the cache settings into a zerolog event
 func (c *Cache) MarshalZerologObject(e *zerolog.Event) {
 	e.Int64("numCounters", c.NumCounters)
 	e.Int64("maxCost", c.MaxCost)
