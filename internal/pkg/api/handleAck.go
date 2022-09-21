@@ -25,7 +25,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -42,27 +41,21 @@ func (e *HTTPError) Error() string {
 
 type AckT struct {
 	cfg   *config.Server
-	limit *limit.Limiter
 	bulk  bulk.Bulk
 	cache cache.Cache
 }
 
 func NewAckT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *AckT {
-	log.Info().
-		Interface("limits", cfg.Limits.AckLimit).
-		Msg("Setting config ack_limits")
-
 	return &AckT{
 		cfg:   cfg,
 		bulk:  bulker,
 		cache: cache,
-		limit: limit.NewLimiter(&cfg.Limits.AckLimit),
 	}
 }
 
-func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+//nolint:dupl // function body calls different internal hander then handleCheckin
+func (rt *Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	start := time.Now()
-
 	id := ps.ByName("id")
 
 	reqID := r.Header.Get(logger.HeaderRequestID)
@@ -91,12 +84,6 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 }
 
 func (ack *AckT) handleAcks(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, id string) error {
-	limitF, err := ack.limit.Acquire()
-	if err != nil {
-		return err
-	}
-	defer limitF()
-
 	agent, err := authAgent(r, &id, ack.bulk, ack.cache)
 	if err != nil {
 		return err
@@ -106,10 +93,6 @@ func (ack *AckT) handleAcks(zlog *zerolog.Logger, w http.ResponseWriter, r *http
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
 		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
 	})
-
-	// Metrics; serenity now.
-	dfunc := cntAcks.IncStart()
-	defer dfunc()
 
 	return ack.processRequest(*zlog, w, r, agent)
 }

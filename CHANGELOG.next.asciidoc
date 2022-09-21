@@ -10,6 +10,7 @@
 - Remove events from agent checkin body. {issue}1774[1774]
 - Improve authc debug logging. {pull}1870[1870]
 - Add error detail to catch-all HTTP error response. {pull}1854[1854]
+- Use seperate rate limiters for internal and external API listeners. {issue}1859[1859] {pull}1904[1904]
 
 ==== New Features
 
