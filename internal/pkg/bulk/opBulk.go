@@ -14,6 +14,8 @@ import (
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/mailru/easyjson"
 	"github.com/rs/zerolog/log"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 func (b *Bulker) Create(ctx context.Context, index, id string, body []byte, opts ...Opt) (string, error) {
@@ -73,6 +75,9 @@ func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id s
 	r, ok := resp.data.(*BulkIndexerResponseItem)
 	if !ok {
 		return nil, fmt.Errorf("unable to cast to *BulkIndexerResponseItem, detected type %T", resp.data)
+	}
+	if err := es.TranslateError(r.Status, r.Error); err != nil {
+		return nil, err
 	}
 	return r, nil
 }

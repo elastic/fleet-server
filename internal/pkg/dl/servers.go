@@ -55,5 +55,5 @@ func EnsureServer(ctx context.Context, bulker bulk.Bulk, version string, agent m
 	if err != nil {
 		return err
 	}
-	return bulker.Update(ctx, o.indexName, agent.ID, data)
+	return bulker.Update(ctx, o.indexName, agent.ID, data, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
