@@ -22,7 +22,7 @@ func TestLoadLimits(t *testing.T) {
 	}{
 		{"few agents", 5, 49},
 		{"512", 512, 4999},
-		{"precise", 7500, 7500},
+		{"precise", 7499, 7499},
 		{"10k", 10050, 12499},
 		{"close to max", 13000, 29999},
 		{"above max", 30001, int(getMaxInt())},
