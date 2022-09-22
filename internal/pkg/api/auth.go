@@ -47,7 +47,7 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 			Str("id", key.ID).
 			Str(ECSHTTPRequestID, reqID).
 			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Bool("fleet.api_key.cache_hit", true).
+			Bool("fleet.apikey.cache_hit", true).
 			Msg("ApiKey authenticated")
 		return key, nil
 	} else {
@@ -74,7 +74,7 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 		Strs("roles", info.Roles).
 		Bool("enabled", info.Enabled).
 		RawJSON("meta", info.Metadata).
-		Bool("fleet.api_key.cache_hit", false).
+		Bool("fleet.apikey.cache_hit", false).
 		Msg("ApiKey authenticated")
 
 	c.SetAPIKey(*key, info.Enabled)
