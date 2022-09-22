@@ -25,11 +25,14 @@ import (
 )
 
 const (
-	RouteStatus    = "/api/status"
-	RouteEnroll    = "/api/fleet/agents/:id"
-	RouteCheckin   = "/api/fleet/agents/:id/checkin"
-	RouteAcks      = "/api/fleet/agents/:id/acks"
-	RouteArtifacts = "/api/fleet/artifacts/:id/:sha2"
+	RouteStatus         = "/api/status"
+	RouteEnroll         = "/api/fleet/agents/:id"
+	RouteCheckin        = "/api/fleet/agents/:id/checkin"
+	RouteAcks           = "/api/fleet/agents/:id/acks"
+	RouteArtifacts      = "/api/fleet/artifacts/:id/:sha2"
+	RouteUploadBegin    = "/api/fleet/uploads"
+	RouteUploadChunk    = "/api/fleet/uploads/:id/:num"
+	RouteUploadComplete = "/api/fleet/uploads/:id"
 )
 
 type Router struct {
@@ -41,12 +44,13 @@ type Router struct {
 	at     *ArtifactT
 	ack    *AckT
 	st     *StatusT
+	ut     *UploadT
 	sm     policy.SelfMonitor
 	tracer *apm.Tracer
 	bi     build.Info
 }
 
-func NewRouter(cfg *config.Server, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, sm policy.SelfMonitor, tracer *apm.Tracer, bi build.Info) *Router {
+func NewRouter(cfg *config.Server, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, ut *UploadT, sm policy.SelfMonitor, tracer *apm.Tracer, bi build.Info) *Router {
 	rt := &Router{
 		cfg:    cfg,
 		bulker: bulker,
@@ -57,6 +61,7 @@ func NewRouter(cfg *config.Server, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT
 		ack:    ack,
 		st:     st,
 		tracer: tracer,
+		ut:     ut,
 		bi:     bi,
 	}
 
@@ -97,6 +102,21 @@ func (rt *Router) newHTTPRouter(addr string) *httprouter.Router {
 			http.MethodGet,
 			RouteArtifacts,
 			limiter.WrapArtifact(rt.handleArtifacts, &cntArtifacts),
+		},
+		{
+			http.MethodPost,
+			RouteUploadBegin,
+			rt.handleUploadStart,
+		},
+		{
+			http.MethodPut,
+			RouteUploadChunk,
+			rt.handleUploadChunk,
+		},
+		{
+			http.MethodPost,
+			RouteUploadComplete,
+			rt.handleUploadComplete,
 		},
 	}
 

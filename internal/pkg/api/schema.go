@@ -175,3 +175,10 @@ type StatusResponse struct {
 	Status  string                 `json:"status"`
 	Version *StatusResponseVersion `json:"version,omitempty"`
 }
+
+type FileInfo struct {
+	Size      int64  `json:"size"`
+	Name      string `json:"name"`
+	Extension string `json:"ext"`
+	Mime      string `json:"mime_type"`
+}
