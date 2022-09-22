@@ -66,7 +66,7 @@ func NewRouter(cfg *config.Server, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT
 // Create a new httprouter, the passed addr is only added as a label in log messages
 func (rt *Router) newHTTPRouter(addr string) *httprouter.Router {
 	log.Info().Str("addr", addr).Interface("limits", rt.cfg.Limits).Msg("fleet-server creating new limiter")
-	limiter := limit.NewLimiter(&rt.cfg.Limits)
+	limiter := limit.NewLimiter(addr, &rt.cfg.Limits)
 
 	routes := []struct {
 		method  string

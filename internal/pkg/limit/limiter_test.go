@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/sync/semaphore"
@@ -43,7 +44,7 @@ func TestWrap(t *testing.T) {
 		i.On("IncStart").Return(fdec).Once()
 		l := &limiter{}
 
-		h := l.wrap(stubHandle(), i)
+		h := l.wrap(zerolog.Nop(), zerolog.DebugLevel, stubHandle(), i)
 		w := httptest.NewRecorder()
 		h(w, &http.Request{}, httprouter.Params{})
 
@@ -63,7 +64,7 @@ func TestWrap(t *testing.T) {
 			maxLimit: semaphore.NewWeighted(0),
 		}
 
-		h := l.wrap(stubHandle(), i)
+		h := l.wrap(zerolog.Nop(), zerolog.DebugLevel, stubHandle(), i)
 		w := httptest.NewRecorder()
 		h(w, &http.Request{}, httprouter.Params{})
 
@@ -83,7 +84,7 @@ func TestWrap(t *testing.T) {
 			rateLimit: rate.NewLimiter(rate.Limit(0), 0),
 		}
 
-		h := l.wrap(stubHandle(), i)
+		h := l.wrap(zerolog.Nop(), zerolog.DebugLevel, stubHandle(), i)
 		w := httptest.NewRecorder()
 		h(w, &http.Request{}, httprouter.Params{})
 
