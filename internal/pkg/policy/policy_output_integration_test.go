@@ -165,7 +165,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	}
 
 	gotOutput, ok := got.Outputs[output.Name]
-	require.True(t, ok, "no '%s' output fouled on agent document", output.Name)
+	require.True(t, ok, "no '%s' output failed on agent document", output.Name)
 
 	assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
 	assert.Equal(t, gotOutput.Type, OutputTypeElasticsearch)

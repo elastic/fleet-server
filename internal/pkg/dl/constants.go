@@ -43,7 +43,7 @@ const (
 	FieldPolicyRevisionIdx             = "policy_revision_idx"
 	FieldRevisionIdx                   = "revision_idx"
 	FieldUnenrolledReason              = "unenrolled_reason"
-	FiledType                          = "type"
+	FieldType                          = "type"
 
 	FieldActive           = "active"
 	FieldUpdatedAt        = "updated_at"

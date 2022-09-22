@@ -74,15 +74,13 @@ func (p *Output) prepareElasticsearch(
 		return ErrNoOutputPerms
 	}
 
-	output, foundOutput := agent.Outputs[p.Name]
-	if !foundOutput {
+	if _, foundOutput := agent.Outputs[p.Name]; !foundOutput {
 		if agent.Outputs == nil {
 			agent.Outputs = map[string]*model.PolicyOutput{}
 		}
 
 		zlog.Debug().Msgf("creating agent.Outputs[%s]", p.Name)
-		output = &model.PolicyOutput{}
-		agent.Outputs[p.Name] = output
+		agent.Outputs[p.Name] = &model.PolicyOutput{}
 	}
 
 	// Determine whether we need to generate an output ApiKey.
@@ -91,135 +89,37 @@ func (p *Output) prepareElasticsearch(
 
 	// Note: This will need to be updated when doing multi-cluster elasticsearch support
 	// Currently, we assume all ES outputs are the same ES fleet-server is connected to.
-	needNewKey := false
-	needUpdateKey := false
 	switch {
-	case output.APIKey == "":
+	case agent.Outputs[p.Name].APIKey == "":
 		zlog.Debug().Msg("must generate api key as default API key is not present")
-		needNewKey = true
-	case p.Role.Sha2 != output.PermissionsHash:
+		apiKey, err := p.newKey(ctx, zlog, bulker, agent.Id, agent.Outputs[p.Name])
+		if err != nil {
+			return fmt.Errorf("failed to create new API key for output %q: %w",
+				p.Name, err)
+		}
+
+		// This is for consistency, so the in-memory agent model reflects what
+		// was saved on ES.
+		agent.Outputs[p.Name].Type = OutputTypeElasticsearch
+		agent.Outputs[p.Name].APIKey = apiKey.Agent()
+		agent.Outputs[p.Name].APIKeyID = apiKey.ID
+
+	case p.Role.Sha2 != agent.Outputs[p.Name].PermissionsHash:
 		// the is actually the OutputPermissionsHash for the default hash. The Agent
 		// document on ES does not have OutputPermissionsHash for any other output
 		// besides the default one. It seems to me error-prone to rely on the default
 		// output permissions hash to generate new API keys for other outputs.
 		zlog.Debug().Msg("must generate api key as policy output permissions changed")
-		needUpdateKey = true
+
+		if err := p.updateKey(ctx, zlog, bulker, agent, agent.Outputs[p.Name]); err != nil {
+			return fmt.Errorf("failed to update API key for output %q: %w",
+				p.Name, err)
+		}
 	default:
 		zlog.Debug().Msg("policy output permissions are the same")
 	}
 
-	if needUpdateKey {
-		zlog.Debug().
-			RawJSON("roles", p.Role.Raw).
-			Str("oldHash", output.PermissionsHash).
-			Str("newHash", p.Role.Sha2).
-			Msg("Generating a new API key")
-
-		// query current api key for roles so we don't lose permissions in the meantime
-		currentRoles, err := fetchAPIKeyRoles(ctx, bulker, output.APIKeyID)
-		if err != nil {
-			zlog.Error().
-				Str("apiKeyID", output.APIKeyID).
-				Err(err).Msg("fail fetching roles for key")
-			return err
-		}
-
-		// merge roles with p.Role
-		newRoles, err := mergeRoles(zlog, currentRoles, p.Role)
-		if err != nil {
-			zlog.Error().
-				Str("apiKeyID", output.APIKeyID).
-				Err(err).Msg("fail merging roles for key")
-			return err
-		}
-
-		// hash provided is only for merging request together and not persisted
-		err = bulker.APIKeyUpdate(ctx, output.APIKeyID, newRoles.Sha2, newRoles.Raw)
-		if err != nil {
-			zlog.Error().Err(err).Msg("fail generate output key")
-			zlog.Debug().RawJSON("roles", newRoles.Raw).Str("sha", newRoles.Sha2).Err(err).Msg("roles not updated")
-			return err
-		}
-
-		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
-		zlog.Debug().
-			Str("hash.sha256", p.Role.Sha2).
-			Str("roles", string(p.Role.Raw)).
-			Msg("Updating agent record to pick up most recent roles.")
-
-		fields := map[string]interface{}{
-			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
-		}
-
-		// Using painless script to update permission hash for updated key
-		body, err := renderUpdatePainlessScript(p.Name, fields)
-		if err != nil {
-			return err
-		}
-
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return err
-		}
-
-	} else if needNewKey {
-		zlog.Debug().
-			RawJSON("fleet.policy.roles", p.Role.Raw).
-			Str("fleet.policy.default.oldHash", output.PermissionsHash).
-			Str("fleet.policy.default.newHash", p.Role.Sha2).
-			Msg("Generating a new API key")
-
-		ctx := zlog.WithContext(ctx)
-		outputAPIKey, err :=
-			generateOutputAPIKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw)
-		if err != nil {
-			return fmt.Errorf("failed generate output API key: %w", err)
-		}
-
-		// When a new keys is generated we need to update the Agent record,
-		// this will need to be updated when multiples remote Elasticsearch output
-		// are supported.
-		zlog.Info().
-			Str("fleet.policy.role.hash.sha256", p.Role.Sha2).
-			Str(logger.DefaultOutputAPIKeyID, outputAPIKey.ID).
-			Msg("Updating agent record to pick up default output key.")
-
-		fields := map[string]interface{}{
-			dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
-			dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
-			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
-		}
-
-		if !foundOutput {
-			fields[dl.FiledType] = OutputTypeElasticsearch
-		}
-		if output.APIKeyID != "" {
-			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeyIdsItems{
-				ID:        output.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-			}
-		}
-
-		// Using painless script to append the old keys to the history
-		body, err := renderUpdatePainlessScript(p.Name, fields)
-		if err != nil {
-			return fmt.Errorf("could no tupdate painless script: %w", err)
-		}
-
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
-
-		// Now that all is done, we can update the output on the agent variable
-		// Right not it's more for consistency and to ensure the in-memory agent
-		// data is correct and in sync with ES, so it can be safely used after
-		// this method returns.
-		output.Type = OutputTypeElasticsearch
-		output.APIKey = outputAPIKey.Agent()
-		output.APIKeyID = outputAPIKey.ID
-		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
-	}
+	agent.Outputs[p.Name].PermissionsHash = p.Role.Sha2 // for the sake of consistency
 
 	// Always insert the `api_key` as part of the output block, this is required
 	// because only fleet server knows the api key for the specific agent, if we don't
@@ -230,7 +130,125 @@ func (p *Output) prepareElasticsearch(
 	// in place to reduce number of agent policy allocation when sending the updated
 	// agent policy to multiple agents.
 	// See: https://github.com/elastic/fleet-server/issues/1301
-	if err := setMapObj(outputMap, output.APIKey, p.Name, "api_key"); err != nil {
+	if err := setMapObj(outputMap, agent.Outputs[p.Name].APIKey, p.Name, "api_key"); err != nil {
+		return fmt.Errorf("could not set API key for output %s on the policy output block: %w",
+			p.Name, err)
+	}
+
+	return nil
+}
+
+func (p *Output) newKey(
+	ctx context.Context,
+	zlog zerolog.Logger,
+	bulker bulk.Bulk,
+	agentID string,
+	output *model.PolicyOutput) (*apikey.APIKey, error) {
+
+	zlog.Debug().
+		RawJSON("fleet.policy.roles", p.Role.Raw).
+		Str("fleet.policy.default.oldHash", output.PermissionsHash).
+		Str("fleet.policy.default.newHash", p.Role.Sha2).
+		Msg("Generating a new API key")
+
+	ctx = zlog.WithContext(ctx)
+	outputAPIKey, err :=
+		generateOutputAPIKey(ctx, bulker, agentID, p.Name, p.Role.Raw)
+	if err != nil {
+		return nil, fmt.Errorf("failed generate output API key: %w", err)
+	}
+
+	// When a new keys is generated we need to update the Agent record,
+	// this will need to be updated when multiples remote Elasticsearch output
+	// are supported.
+	zlog.Info().
+		Str("fleet.policy.role.hash.sha256", p.Role.Sha2).
+		Str(logger.DefaultOutputAPIKeyID, outputAPIKey.ID).
+		Msg("Updating agent record to pick up default output key.")
+
+	fields := map[string]interface{}{
+		dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
+		dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
+		dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
+		dl.FieldType:                        OutputTypeElasticsearch, // If a new output is created, we need to set this
+	}
+
+	if output.APIKeyID != "" {
+		fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeyIdsItems{
+			ID:        output.APIKeyID,
+			RetiredAt: time.Now().UTC().Format(time.RFC3339),
+		}
+	}
+
+	// Using painless script to append the old keys to the history
+	body, err := renderUpdatePainlessScript(p.Name, fields)
+	if err != nil {
+		return nil, fmt.Errorf("could no tupdate painless script: %w", err)
+	}
+
+	if err = bulker.Update(ctx, dl.FleetAgents, agentID, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+		zlog.Error().Err(err).Msg("fail update agent record")
+		return nil, fmt.Errorf("fail update agent record: %w", err)
+	}
+
+	return outputAPIKey, nil
+}
+
+func (p *Output) updateKey(
+	ctx context.Context,
+	zlog zerolog.Logger,
+	bulker bulk.Bulk,
+	agent *model.Agent,
+	output *model.PolicyOutput) error {
+	zlog.Debug().
+		RawJSON("roles", p.Role.Raw).
+		Str("oldHash", output.PermissionsHash).
+		Str("newHash", p.Role.Sha2).
+		Msg("Generating a new API key")
+
+	// query current api key for roles, so we don't lose permissions in the meantime
+	currentRoles, err := fetchAPIKeyRoles(ctx, bulker, output.APIKeyID)
+	if err != nil {
+		zlog.Error().
+			Str("apiKeyID", output.APIKeyID).
+			Err(err).Msg("fail fetching roles for key")
+		return err
+	}
+
+	// merge roles with p.Role
+	newRoles, err := mergeRoles(zlog, currentRoles, p.Role)
+	if err != nil {
+		zlog.Error().
+			Str("apiKeyID", output.APIKeyID).
+			Err(err).Msg("fail merging roles for key")
+		return err
+	}
+
+	// hash provided is only for merging request together and not persisted
+	err = bulker.APIKeyUpdate(ctx, output.APIKeyID, newRoles.Sha2, newRoles.Raw)
+	if err != nil {
+		zlog.Error().Err(err).Msg("fail generate output key")
+		zlog.Debug().RawJSON("roles", newRoles.Raw).Str("sha", newRoles.Sha2).Err(err).Msg("roles not updated")
+		return err
+	}
+
+	output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
+	zlog.Debug().
+		Str("hash.sha256", p.Role.Sha2).
+		Str("roles", string(p.Role.Raw)).
+		Msg("Updating agent record to pick up most recent roles.")
+
+	fields := map[string]interface{}{
+		dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
+	}
+	// Using painless script to update permission hash for updated key
+	body, err := renderUpdatePainlessScript(p.Name, fields)
+	if err != nil {
+		return err
+	}
+
+	if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body); err != nil {
+		zlog.Error().Err(err).Msg("fail update agent record")
 		return err
 	}
 
