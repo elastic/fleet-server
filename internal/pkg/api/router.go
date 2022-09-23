@@ -33,7 +33,7 @@ const (
 )
 
 type Router struct {
-	ctx    context.Context // used only by handleEnroll
+	ctx    context.Context // used only by handleEnroll, set at start of Run func
 	cfg    *config.Server
 	bulker bulk.Bulk
 	ct     *CheckinT
@@ -66,7 +66,7 @@ func NewRouter(cfg *config.Server, bulker bulk.Bulk, ct *CheckinT, et *EnrollerT
 // Create a new httprouter, the passed addr is only added as a label in log messages
 func (rt *Router) newHTTPRouter(addr string) *httprouter.Router {
 	log.Info().Str("addr", addr).Interface("limits", rt.cfg.Limits).Msg("fleet-server creating new limiter")
-	limiter := limit.NewLimiter(addr, &rt.cfg.Limits)
+	limiter := limit.NewHTTPWrapper(addr, &rt.cfg.Limits)
 
 	routes := []struct {
 		method  string
@@ -139,7 +139,7 @@ func (rt *Router) Run(ctx context.Context) error {
 	bctx := func(net.Listener) context.Context { return ctx }
 
 	errChan := make(chan error)
-	cancelCtx, cancel := context.WithCancel(ctx) // TODO should we set rt.ctx = cancelCtx?
+	baseCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	for _, addr := range listeners {
@@ -224,7 +224,7 @@ func (rt *Router) Run(ctx context.Context) error {
 			if err := server.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				errChan <- err
 			}
-		}(cancelCtx, errChan, ln)
+		}(baseCtx, errChan, ln)
 
 	}
 
@@ -233,7 +233,7 @@ func (rt *Router) Run(ctx context.Context) error {
 		if !errors.Is(err, context.Canceled) {
 			return err
 		}
-	case <-cancelCtx.Done():
+	case <-baseCtx.Done():
 	}
 
 	return nil
