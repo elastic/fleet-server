@@ -6,6 +6,7 @@
 - Remove events from agent checkin body. {issue}1774[1774]
 - Improve authc debug logging. {pull}1870[1870]
 - Add error detail to catch-all HTTP error response. {pull}1854[1854]
+- Update apikey.cache_hit log field name to match convention. {pull}1900[1900]
 
 ==== New Features
 
