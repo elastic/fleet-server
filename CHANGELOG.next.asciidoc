@@ -1,3 +1,4 @@
 ==== Bugfixes
 
 - Return a better error on enrolling and the Elasticsearch version is incompatible. {pull}1211[1211]
+- Add error detail to catch-all HTTP error response. {pull}1854[1854]
