@@ -5,6 +5,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,8 +18,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 	"github.com/elastic/fleet-server/v7/internal/pkg/upload"
 	"github.com/julienschmidt/httprouter"
@@ -26,12 +29,20 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// the only valid values of upload status according to storage spec
+type UploadStatus string
+
+const (
+	UploadAwaiting UploadStatus = "AWAITING_UPLOAD"
+	UploadProgress UploadStatus = "UPLOADING"
+	UploadDone     UploadStatus = "READY"
+	UploadFail     UploadStatus = "UPLOAD_ERROR"
+	UploadDel      UploadStatus = "DELETED"
+)
+
 const (
 	// TODO: move to a config
 	maxParallelUploads = 5
-
-	// specification-designated maximum
-	maxChunkSize = 4194304 // 4 MiB
 )
 
 func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -181,21 +192,38 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 	}
 	r.Body.Close()
 
-	if strings.TrimSpace(fi.Name) == "" {
+	if strings.TrimSpace(fi.File.Name) == "" {
 		return errors.New("file name is required")
 	}
-	if fi.Size <= 0 {
+	if fi.File.Size <= 0 {
 		return errors.New("invalid file size, size is required")
 	}
+	if strings.TrimSpace(fi.File.Mime) == "" {
+		return errors.New("mime_type is required")
+	}
 
-	uploadID, err := ut.upl.Begin()
+	op, err := ut.upl.Begin(fi.File.Size)
 	if err != nil {
 		return err
 	}
 
-	// TODO: write header doc
+	doc := uploadRequestToFileInfo(fi, op.ChunkSize)
+	ret, err := dl.CreateUploadInfo(r.Context(), ut.bulker, doc, op.ID) // @todo: replace uploadID with correct file base ID
+	if err != nil {
+		return err
+	}
 
-	_, err = w.Write([]byte(uploadID))
+	zlog.Info().Str("return", ret).Msg("wrote doc")
+
+	out, err := json.Marshal(map[string]interface{}{
+		"upload_id":  op.ID,
+		"chunk_size": op.ChunkSize,
+	})
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, err = w.Write(out)
 	if err != nil {
 		return err
 	}
@@ -203,15 +231,19 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 }
 
 func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string, chunkID int) error {
-	// prevent over-sized chunks
-	chunk := http.MaxBytesReader(w, r.Body, maxChunkSize)
-	data, err := ut.upl.Chunk(uplID, chunkID, chunk)
+	info, err := ut.upl.Chunk(uplID, chunkID)
 	if err != nil {
 		return err
 	}
+	if info.FirstReceived {
+		if err := updateUploadStatus(r.Context(), ut.bulker, uplID, UploadProgress); err != nil {
+			zlog.Warn().Err(err).Str("upload", uplID).Msg("unable to update upload status")
+		}
+	}
 
-	_, err = w.Write([]byte(data))
-	if err != nil {
+	// prevent over-sized chunks
+	chunk := http.MaxBytesReader(w, r.Body, upload.MaxChunkSize)
+	if err := dl.UploadChunk(r.Context(), ut.bulker, chunk, info); err != nil {
 		return err
 	}
 	return nil
@@ -223,9 +255,64 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 		return err
 	}
 
+	if err := updateUploadStatus(r.Context(), ut.bulker, uplID, UploadDone); err != nil {
+		// should be 500 error probably?
+		zlog.Warn().Err(err).Str("upload", uplID).Msg("unable to set upload status to complete")
+		return err
+
+	}
+
 	_, err = w.Write([]byte(data))
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func uploadRequestToFileInfo(req FileInfo, chunkSize int64) model.FileInfo {
+	return model.FileInfo{
+		File: &model.FileMetadata{
+			Accessed:    req.File.Accessed,
+			Attributes:  req.File.Attributes,
+			ChunkSize:   chunkSize,
+			Compression: req.File.Compression,
+			Created:     req.File.Created,
+			Ctime:       req.File.CTime,
+			Device:      req.File.Device,
+			Directory:   req.File.Directory,
+			DriveLetter: req.File.DriveLetter,
+			Extension:   req.File.Extension,
+			Gid:         req.File.GID,
+			Group:       req.File.Group,
+			Hash: &model.Hash{
+				Sha256: req.File.Hash.SHA256,
+			},
+			Inode:      req.File.INode,
+			MimeType:   req.File.Mime,
+			Mode:       req.File.Mode,
+			Mtime:      req.File.MTime,
+			Name:       req.File.Name,
+			Owner:      req.File.Owner,
+			Path:       req.File.Path,
+			Size:       req.File.Size,
+			Status:     string(UploadAwaiting),
+			TargetPath: req.File.TargetPath,
+			Type:       req.File.Type,
+			Uid:        req.File.UID,
+		},
+	}
+}
+
+func updateUploadStatus(ctx context.Context, bulker bulk.Bulk, fileID string, status UploadStatus) error {
+	data, err := json.Marshal(map[string]interface{}{
+		"doc": map[string]interface{}{
+			"file": map[string]string{
+				"Status": string(status),
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return dl.UpdateUpload(ctx, bulker, fileID, data)
 }

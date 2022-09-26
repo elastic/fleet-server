@@ -7,7 +7,7 @@ package upload
 import (
 	"errors"
 	"fmt"
-	"io"
+	"sync"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -18,21 +18,43 @@ const (
 	//these should be configs probably
 	uploadRequestTimeout = time.Hour
 	chunkProgressTimeout = time.Hour / 4
+
+	// specification-designated maximum
+	MaxChunkSize = 4194304 // 4 MiB
 )
 
 var (
 	ErrMaxConcurrentUploads = errors.New("the max number of concurrent uploads has been reached")
 	ErrInvalidUploadID      = errors.New("active upload not found with this ID, it may be expired")
+
+	//@todo: explicit error for expired uploads
 )
 
 type upload struct {
 	complete  chan<- struct{}
 	chunkRecv chan<- struct{}
+	begun     bool
+	Info      Info
 }
 
 type Uploader struct {
 	current       map[string]upload
+	mu            sync.Mutex
 	parallelLimit int
+}
+
+type Info struct {
+	ID        string
+	ChunkSize int64
+	Total     int64
+	Count     int
+}
+
+type ChunkInfo struct {
+	ID            int
+	FirstReceived bool
+	Final         bool
+	Upload        Info
 }
 
 func New(limit int) *Uploader {
@@ -44,14 +66,14 @@ func New(limit int) *Uploader {
 
 // Start an upload operation, as long as the max concurrent has not been reached
 // returns the upload ID
-func (u *Uploader) Begin() (string, error) {
+func (u *Uploader) Begin(size int64) (Info, error) {
 	if len(u.current) >= u.parallelLimit {
-		return "", ErrMaxConcurrentUploads
+		return Info{}, ErrMaxConcurrentUploads
 	}
 
 	uid, err := uuid.NewV4()
 	if err != nil {
-		return "", fmt.Errorf("unable to generate upload operation ID: %w", err)
+		return Info{}, fmt.Errorf("unable to generate upload operation ID: %w", err)
 	}
 	id := uid.String()
 
@@ -70,7 +92,7 @@ func (u *Uploader) Begin() (string, error) {
 				if !chunkT.Stop() {
 					<-chunkT.C
 				}
-				delete(u.current, id)
+				u.cancel(id)
 				return
 			case <-chunkT.C: // no chunk progress within chunk timer, expire operation
 				log.Trace().Str("uploadID", id).Msg("upload operation chunk activity timed out")
@@ -78,7 +100,7 @@ func (u *Uploader) Begin() (string, error) {
 				if !total.Stop() {
 					<-total.C
 				}
-				delete(u.current, id)
+				u.cancel(id)
 				return
 			case <-chunkRecv: // chunk activity, update chunk timer
 				if !chunkT.Stop() {
@@ -92,34 +114,49 @@ func (u *Uploader) Begin() (string, error) {
 				if !total.Stop() {
 					<-total.C
 				}
-				delete(u.current, id)
+				u.finalize(id)
 				return
 			}
 		}
 	}()
+	info := Info{
+		ID:        id,
+		ChunkSize: MaxChunkSize,
+		Total:     size,
+	}
+	cnt := info.Total / info.ChunkSize
+	if info.Total%info.ChunkSize > 0 {
+		cnt += 1
+	}
+	info.Count = int(cnt)
 	u.current[id] = upload{
 		complete:  complete,
 		chunkRecv: chunkRecv,
+		Info:      info,
 	}
-	return id, nil
+	return info, nil
 }
 
-func (u *Uploader) Chunk(uplID string, chunknum int, body io.ReadCloser) (string, error) {
-	if body == nil {
-		return "", errors.New("body is required")
+func (u *Uploader) Chunk(uplID string, chunkID int) (ChunkInfo, error) {
+	u.mu.Lock()
+	upl, valid := u.current[uplID]
+	if !valid {
+		u.mu.Unlock()
+		return ChunkInfo{}, ErrInvalidUploadID
 	}
-	defer body.Close()
-	if _, valid := u.current[uplID]; !valid {
-		return "", ErrInvalidUploadID
+	upl.chunkRecv <- struct{}{}
+	if !upl.begun {
+		upl.begun = true
 	}
-	u.current[uplID].chunkRecv <- struct{}{}
+	u.current[uplID] = upl
+	u.mu.Unlock()
 
-	_, err := io.ReadAll(body)
-	if err != nil {
-		return "", err
-	}
-
-	return "", nil
+	return ChunkInfo{
+		ID:            chunkID,
+		FirstReceived: upl.begun,
+		Final:         chunkID == upl.Info.Count-1,
+		Upload:        upl.Info,
+	}, nil
 }
 
 func (u *Uploader) Complete(id string) (string, error) {
@@ -128,4 +165,21 @@ func (u *Uploader) Complete(id string) (string, error) {
 	}
 	u.current[id].complete <- struct{}{}
 	return "", nil
+}
+
+func (u *Uploader) cancel(uplID string) error {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	delete(u.current, uplID)
+	// @todo: delete any uploaded chunks from ES
+	// leave header doc and mark failed?
+	return nil
+}
+
+func (u *Uploader) finalize(uplID string) error {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	delete(u.current, uplID)
+	// @todo: write Status:READY here?
+	return nil
 }

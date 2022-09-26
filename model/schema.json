@@ -608,7 +608,7 @@
         "api_key"
       ]
     },
-    "file-chunk": {
+    "filechunk": {
       "title": "Chunk",
       "description": "One section of the blob contents of a file",
       "type": "object",
@@ -686,7 +686,10 @@
             },
             "attributes": {
               "description": "Platform-dependent sequence of file attributes such as readonly, execute, hidden",
-              "type": "string"
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "created": {
               "description": "File creation time",
@@ -758,6 +761,17 @@
             },
             "uid": {
               "description":"The user ID (UID) or security identifier (SID) of the file owner",
+              "type":"string"
+            }
+          }
+        },
+        "host": { "$ref": "#/definitions/host-metadata" },
+        "event": {
+          "title": "Event information",
+          "description": "Event identifiers to coordinate the source reason",
+          "properties": {
+            "id": {
+              "description": "unique event identifier",
               "type":"string"
             }
           }

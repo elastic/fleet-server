@@ -273,12 +273,23 @@ type EnrollmentAPIKey struct {
 	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
+// EventInformation Event identifiers to coordinate the source reason
+type EventInformation struct {
+
+	// unique event identifier
+	ID string `json:"id,omitempty"`
+}
+
 // FileInfo An uploaded File
 type FileInfo struct {
 	ESDocument
 
+	// Event identifiers to coordinate the source reason
+	Event *EventInformation `json:"event,omitempty"`
+
 	// Information about the file properties
 	File *FileMetadata `json:"file,omitempty"`
+	Host *HostMetadata `json:"host,omitempty"`
 }
 
 // FileMetadata Information about the file properties
@@ -288,7 +299,7 @@ type FileMetadata struct {
 	Accessed string `json:"accessed,omitempty"`
 
 	// Platform-dependent sequence of file attributes such as readonly, execute, hidden
-	Attributes string `json:"attributes,omitempty"`
+	Attributes []string `json:"attributes,omitempty"`
 
 	// Size, in bytes, of each data chunk
 	ChunkSize int64 `json:"ChunkSize,omitempty"`
