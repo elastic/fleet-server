@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"gotest.tools/gotestsum/log"
 )
 
 var (
@@ -35,6 +37,7 @@ func writeError(w http.ResponseWriter, err error) error {
 		resp.Error = "MaxLimit"
 		resp.Message = "exceeded the max limit"
 	default:
+		log.Error().Err(err).Msg("Encountered unknown limiter error")
 	}
 	p, wErr := json.Marshal(&resp)
 	if wErr != nil {

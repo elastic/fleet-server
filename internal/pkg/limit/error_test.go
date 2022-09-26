@@ -18,19 +18,19 @@ func TestWriteError(t *testing.T) {
 	tests := []struct {
 		name string
 		err  error
-		str  string
+		want string
 	}{{
 		name: "unknown",
 		err:  errors.New("unknown"),
-		str:  "UnknownLimiter",
+		want: "UnknownLimiter",
 	}, {
 		name: "rate limit",
 		err:  ErrRateLimit,
-		str:  "RateLimit",
+		want: "RateLimit",
 	}, {
 		name: "max limit",
 		err:  ErrMaxLimit,
-		str:  "MaxLimit",
+		want: "MaxLimit",
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -50,7 +50,7 @@ func TestWriteError(t *testing.T) {
 			err = dec.Decode(&body)
 			require.NoError(t, err)
 			require.Equal(t, http.StatusTooManyRequests, body.Status)
-			require.Equal(t, tt.str, body.Error)
+			require.Equal(t, tt.want, body.Error)
 		})
 	}
 }
