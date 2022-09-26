@@ -15,8 +15,8 @@ var (
 	ErrMaxLimit  = errors.New("max limit")
 )
 
-// writeError recreates the behaviour of api/error.go
-// it is defined separatly here to stop a circular import
+// writeError recreates the behaviour of api/error.go.
+// It is defined separately here to stop a circular import
 func writeError(w http.ResponseWriter, err error) error {
 	resp := struct {
 		Status  int    `json:"statusCode"`
@@ -24,7 +24,7 @@ func writeError(w http.ResponseWriter, err error) error {
 		Message string `json:"message"`
 	}{
 		Status:  http.StatusTooManyRequests,
-		Error:   "UnknownLimiter",
+		Error:   "UnknownLimiterError",
 		Message: "unknown limiter error encountered",
 	}
 	switch {

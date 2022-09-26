@@ -53,7 +53,7 @@ func NewAckT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *AckT {
 	}
 }
 
-//nolint:dupl // function body calls different internal hander then handleCheckin
+//nolint:dupl // function body calls different internal handler then handleCheckin
 func (rt *Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	start := time.Now()
 	id := ps.ByName("id")
