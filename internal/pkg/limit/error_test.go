@@ -22,7 +22,7 @@ func TestWriteError(t *testing.T) {
 	}{{
 		name: "unknown",
 		err:  errors.New("unknown"),
-		want: "UnknownLimiter",
+		want: "UnknownLimiterError",
 	}, {
 		name: "rate limit",
 		err:  ErrRateLimit,
