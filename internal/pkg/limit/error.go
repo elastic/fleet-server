@@ -9,7 +9,7 @@ import (
 	"errors"
 	"net/http"
 
-	"gotest.tools/gotestsum/log"
+	"github.com/rs/zerolog/log"
 )
 
 var (
