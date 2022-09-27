@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
@@ -42,21 +41,10 @@ func updateUpload(ctx context.Context, bulker bulk.Bulk, index string, fileID st
 
 func UploadChunk(ctx context.Context, bulker bulk.Bulk, data io.ReadCloser, chunkInfo upload.ChunkInfo) error {
 	client := bulker.Client()
-	var chunkBody io.Reader
 	cbor := upload.NewCBORChunkWriter(data, chunkInfo.Final, chunkInfo.Upload.ID, chunkInfo.Upload.ChunkSize)
-	chunkBody = cbor
-	const DEBUG = false
-
-	if DEBUG || chunkInfo.Final {
-		f, err := os.OpenFile("/home/dan/dev/elastic/file-store-poc/out2.data", os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0644)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		chunkBody = io.TeeReader(cbor, f)
-	}
 
 	/*
+		// the non-streaming version
 		buf := bytes.NewBuffer(nil)
 		out, err := io.ReadAll(data)
 		if err != nil {
@@ -76,9 +64,10 @@ func UploadChunk(ctx context.Context, bulker bulk.Bulk, data io.ReadCloser, chun
 
 	req := esapi.IndexRequest{
 		Index:      ".fleet-file_data",
-		Body:       chunkBody,
+		Body:       cbor,
 		DocumentID: fmt.Sprintf("%s.%d", chunkInfo.Upload.ID, chunkInfo.ID),
 	}
+	// need to set the Content-Type of the request to CBOR, notes below
 	overrider := contentTypeOverrider{client}
 	resp, err := req.Do(ctx, overrider)
 	/*
@@ -101,14 +90,11 @@ func UploadChunk(ctx context.Context, bulker bulk.Bulk, data io.ReadCloser, chun
 		return err
 	}
 
-	//var buf bytes.Buffer
-	//spy := io.TeeReader(resp.Body, &buf)
-
 	var response ChunkUploadResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return err
 	}
-	log.Info().Int("statuscode", resp.StatusCode).Interface("chunk-response", response).Msg("uploaded chunk")
+	log.Trace().Int("statuscode", resp.StatusCode).Interface("chunk-response", response).Msg("uploaded chunk")
 
 	if response.Error.Type != "" {
 		return fmt.Errorf("%s: %s. Caused by %s: %s", response.Error.Type, response.Error.Reason, response.Error.Cause.Type, response.Error.Cause.Reason)

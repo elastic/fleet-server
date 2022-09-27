@@ -70,7 +70,7 @@ func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps ht
 			Err(err).
 			Int(ECSHTTPResponseCode, resp.StatusCode).
 			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail checkin")
+			Msg("fail upload initiation")
 
 		if err := resp.Write(w); err != nil {
 			zlog.Error().Err(err).Msg("fail writing error response")
@@ -116,7 +116,7 @@ func (rt Router) handleUploadChunk(w http.ResponseWriter, r *http.Request, ps ht
 			Err(err).
 			Int(ECSHTTPResponseCode, resp.StatusCode).
 			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail checkin")
+			Msg("fail upload chunk")
 
 		if err := resp.Write(w); err != nil {
 			zlog.Error().Err(err).Msg("fail writing error response")
@@ -152,7 +152,7 @@ func (rt Router) handleUploadComplete(w http.ResponseWriter, r *http.Request, ps
 			Err(err).
 			Int(ECSHTTPResponseCode, resp.StatusCode).
 			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail checkin")
+			Msg("fail upload completion")
 
 		if err := resp.Write(w); err != nil {
 			zlog.Error().Err(err).Msg("fail writing error response")

@@ -163,6 +163,8 @@ func (u *Uploader) Complete(id string) (string, error) {
 	if _, valid := u.current[id]; !valid {
 		return "", ErrInvalidUploadID
 	}
+	// @todo: verify chunks
+	// verify hashes, etc
 	u.current[id].complete <- struct{}{}
 	return "", nil
 }
