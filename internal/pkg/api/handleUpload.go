@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 	"github.com/elastic/fleet-server/v7/internal/pkg/upload"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -161,23 +162,25 @@ func (rt Router) handleUploadComplete(w http.ResponseWriter, r *http.Request, ps
 }
 
 type UploadT struct {
-	bulker     bulk.Bulk
-	cache      cache.Cache
-	esThrottle *throttle.Throttle
-	upl        *upload.Uploader
+	bulker      bulk.Bulk
+	chunkClient *elasticsearch.Client
+	cache       cache.Cache
+	esThrottle  *throttle.Throttle
+	upl         *upload.Uploader
 }
 
-func NewUploadT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *UploadT {
+func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *UploadT {
 	log.Info().
 		Interface("limits", cfg.Limits.ArtifactLimit).
 		Int("maxParallel", defaultMaxParallel).
 		Msg("Artifact install limits")
 
 	return &UploadT{
-		bulker:     bulker,
-		cache:      cache,
-		esThrottle: throttle.NewThrottle(defaultMaxParallel),
-		upl:        upload.New(maxParallelUploads),
+		chunkClient: chunkClient,
+		bulker:      bulker,
+		cache:       cache,
+		esThrottle:  throttle.NewThrottle(defaultMaxParallel),
+		upl:         upload.New(maxParallelUploads),
 	}
 }
 
@@ -243,7 +246,7 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 
 	// prevent over-sized chunks
 	chunk := http.MaxBytesReader(w, r.Body, upload.MaxChunkSize)
-	if err := dl.UploadChunk(r.Context(), ut.bulker, chunk, info); err != nil {
+	if err := dl.UploadChunk(r.Context(), ut.chunkClient, chunk, info); err != nil {
 		return err
 	}
 	return nil

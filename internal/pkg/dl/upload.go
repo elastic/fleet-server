@@ -39,8 +39,7 @@ func updateUpload(ctx context.Context, bulker bulk.Bulk, index string, fileID st
 	return bulker.Update(ctx, index, fileID, data)
 }
 
-func UploadChunk(ctx context.Context, bulker bulk.Bulk, data io.ReadCloser, chunkInfo upload.ChunkInfo) error {
-	client := bulker.Client()
+func UploadChunk(ctx context.Context, client *elasticsearch.Client, data io.ReadCloser, chunkInfo upload.ChunkInfo) error {
 	cbor := upload.NewCBORChunkWriter(data, chunkInfo.Final, chunkInfo.Upload.ID, chunkInfo.Upload.ChunkSize)
 
 	/*
