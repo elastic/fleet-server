@@ -239,7 +239,9 @@ map.put("id", ctx._source.default_api_key_id);
 
 // Make current API key empty, so fleet-server will generate a new one
 // Add current API jey to be retired
-ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids.add(map);
+if (ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids != null) {
+	ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids.add(map);
+}
 ctx._source['` + fieldOutputs + `']['default'].api_key="";
 ctx._source['` + fieldOutputs + `']['default'].api_key_id="";
 ctx._source['` + fieldOutputs + `']['default'].permissions_hash=ctx._source.policy_output_permissions_hash;
@@ -258,6 +260,8 @@ ctx._source.policy_output_permissions_hash="";
 
 	body, err := query.MarshalJSON()
 	if err != nil {
+		log.Debug().Str("painlessScript", painless).
+			Msgf("%s: failed painless script", migrationName)
 		return migrationName, FleetAgents, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
 
@@ -273,10 +277,13 @@ func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
 
 	query := dsl.NewRoot()
 	query.Query().MatchAll()
-	query.Param("script", `ctx._source.coordinator_idx++;`)
+	painless := `ctx._source.coordinator_idx++;`
+	query.Param("script", painless)
 
 	body, err := query.MarshalJSON()
 	if err != nil {
+		log.Debug().Str("painlessScript", painless).
+			Msgf("%s: failed painless script", migrationName)
 		return migrationName, FleetPolicies, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
 
