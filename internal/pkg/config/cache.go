@@ -32,16 +32,31 @@ func (c *Cache) InitDefaults() {
 	c.LoadLimits(loadLimits(0))
 }
 
+// LoadLimits loads envLimits for any attribute that is not defined in Cache
 func (c *Cache) LoadLimits(limits *envLimits) {
 	l := limits.Cache
 
-	c.NumCounters = l.NumCounters
-	c.MaxCost = l.MaxCost
-	c.ActionTTL = defaultActionTTL
-	c.EnrollKeyTTL = defaultEnrollKeyTTL
-	c.ArtifactTTL = defaultArtifactTTL
-	c.APIKeyTTL = defaultAPIKeyTTL
-	c.APIKeyJitter = defaultAPIKeyJitter
+	if c.NumCounters == 0 {
+		c.NumCounters = l.NumCounters
+	}
+	if c.MaxCost == 0 {
+		c.MaxCost = l.MaxCost
+	}
+	if c.ActionTTL == 0 {
+		c.ActionTTL = defaultActionTTL
+	}
+	if c.EnrollKeyTTL == 0 {
+		c.EnrollKeyTTL = defaultEnrollKeyTTL
+	}
+	if c.ArtifactTTL == 0 {
+		c.ArtifactTTL = defaultArtifactTTL
+	}
+	if c.APIKeyTTL == 0 {
+		c.APIKeyTTL = defaultAPIKeyTTL
+	}
+	if c.APIKeyJitter == 0 {
+		c.APIKeyJitter = defaultAPIKeyJitter
+	}
 }
 
 // CopyCache returns a copy of the config's Cache settings

@@ -157,7 +157,7 @@ func (p *Output) prepareElasticsearch(
 			return err
 		}
 
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body); err != nil {
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 			zlog.Error().Err(err).Msg("fail update agent record")
 			return err
 		}
@@ -206,7 +206,7 @@ func (p *Output) prepareElasticsearch(
 			return fmt.Errorf("could no tupdate painless script: %w", err)
 		}
 
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body); err != nil {
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 			zlog.Error().Err(err).Msg("fail update agent record")
 			return fmt.Errorf("fail update agent record: %w", err)
 		}
