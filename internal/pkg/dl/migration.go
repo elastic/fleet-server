@@ -239,7 +239,9 @@ map.put("id", ctx._source.default_api_key_id);
 
 // Make current API key empty, so fleet-server will generate a new one
 // Add current API jey to be retired
-ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids.add(map);
+if (ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids != null) {
+	ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids.add(map);
+}
 ctx._source['` + fieldOutputs + `']['default'].api_key="";
 ctx._source['` + fieldOutputs + `']['default'].api_key_id="";
 ctx._source['` + fieldOutputs + `']['default'].permissions_hash=ctx._source.policy_output_permissions_hash;
