@@ -36,38 +36,41 @@ func (c *ServerLimits) InitDefaults() {
 func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	l := limits.Server
 
-	c.MaxHeaderByteSize = 8192 // 8k
-	c.MaxConnections = l.MaxConnections
-	c.PolicyThrottle = l.PolicyThrottle
+	if c.MaxHeaderByteSize == 0 {
+		c.MaxHeaderByteSize = 8192 // 8k
+	}
+	if c.MaxConnections == 0 {
+		c.MaxConnections = l.MaxConnections
+	}
+	if c.PolicyThrottle == 0 {
+		c.PolicyThrottle = l.PolicyThrottle
+	}
 
-	c.CheckinLimit = Limit{
-		Interval: l.CheckinLimit.Interval,
-		Burst:    l.CheckinLimit.Burst,
-		Max:      l.CheckinLimit.Max,
-		MaxBody:  l.CheckinLimit.MaxBody,
+	c.CheckinLimit = mergeEnvLimit(c.CheckinLimit, l.CheckinLimit)
+	c.ArtifactLimit = mergeEnvLimit(c.ArtifactLimit, l.ArtifactLimit)
+	c.EnrollLimit = mergeEnvLimit(c.EnrollLimit, l.EnrollLimit)
+	c.AckLimit = mergeEnvLimit(c.AckLimit, l.AckLimit)
+	c.StatusLimit = mergeEnvLimit(c.StatusLimit, l.StatusLimit)
+}
+
+func mergeEnvLimit(L Limit, l limit) Limit {
+	result := Limit{
+		Interval: L.Interval,
+		Burst:    L.Burst,
+		Max:      L.Max,
+		MaxBody:  L.MaxBody,
 	}
-	c.ArtifactLimit = Limit{
-		Interval: l.ArtifactLimit.Interval,
-		Burst:    l.ArtifactLimit.Burst,
-		Max:      l.ArtifactLimit.Max,
-		MaxBody:  l.ArtifactLimit.MaxBody,
+	if result.Interval == 0 {
+		result.Interval = l.Interval
 	}
-	c.EnrollLimit = Limit{
-		Interval: l.EnrollLimit.Interval,
-		Burst:    l.EnrollLimit.Burst,
-		Max:      l.EnrollLimit.Max,
-		MaxBody:  l.EnrollLimit.MaxBody,
+	if result.Burst == 0 {
+		result.Burst = l.Burst
 	}
-	c.AckLimit = Limit{
-		Interval: l.AckLimit.Interval,
-		Burst:    l.AckLimit.Burst,
-		Max:      l.AckLimit.Max,
-		MaxBody:  l.AckLimit.MaxBody,
+	if result.Max == 0 {
+		result.Max = l.Max
 	}
-	c.StatusLimit = Limit{
-		Interval: l.StatusLimit.Interval,
-		Burst:    l.StatusLimit.Burst,
-		Max:      l.StatusLimit.Max,
-		MaxBody:  l.StatusLimit.MaxBody,
+	if result.MaxBody == 0 {
+		result.MaxBody = l.MaxBody
 	}
+	return result
 }
