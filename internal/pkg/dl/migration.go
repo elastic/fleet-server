@@ -258,6 +258,8 @@ ctx._source.policy_output_permissions_hash="";
 
 	body, err := query.MarshalJSON()
 	if err != nil {
+		log.Debug().Str("painlessScript", painless).
+			Msgf("%s: failed painless script", migrationName)
 		return migrationName, FleetAgents, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
 
@@ -273,10 +275,13 @@ func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
 
 	query := dsl.NewRoot()
 	query.Query().MatchAll()
-	query.Param("script", `ctx._source.coordinator_idx++;`)
+	painless := `ctx._source.coordinator_idx++;`
+	query.Param("script", painless)
 
 	body, err := query.MarshalJSON()
 	if err != nil {
+		log.Debug().Str("painlessScript", painless).
+			Msgf("%s: failed painless script", migrationName)
 		return migrationName, FleetPolicies, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
 
