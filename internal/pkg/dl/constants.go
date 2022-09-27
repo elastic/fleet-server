@@ -50,6 +50,7 @@ const (
 	FieldUnenrolledAt     = "unenrolled_at"
 	FieldUpgradedAt       = "upgraded_at"
 	FieldUpgradeStartedAt = "upgrade_started_at"
+	FieldUpgradeStatus    = "upgrade_status"
 
 	FieldDecodedSha256 = "decoded_sha256"
 	FieldIdentifier    = "identifier"

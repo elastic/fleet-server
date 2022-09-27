@@ -459,6 +459,10 @@
           "type": "string",
           "format": "date-time"
         },
+        "upgrade_status": {
+          "description": "Upgrade status",
+          "type": "string"
+        },
         "access_api_key_id": {
           "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
           "type": "string"
@@ -509,7 +513,7 @@
           "format": "date-time"
         },
         "last_checkin_status": {
-          "description": "Lst checkin status",
+          "description": "Last checkin status",
           "type": "string"
         },
         "default_api_key_id": {
