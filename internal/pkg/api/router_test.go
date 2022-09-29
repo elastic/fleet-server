@@ -38,7 +38,7 @@ func TestRun(t *testing.T) {
 	cfg.Port = port
 
 	verCon := mustBuildConstraints("8.0.0")
-	c, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 	bulker := ftesting.NewMockBulk()
 	pim := mock.NewMockMonitor()
