@@ -139,6 +139,9 @@ type Agent struct {
 	// Date/time the Elastic Agent checked in last time
 	LastCheckin string `json:"last_checkin,omitempty"`
 
+	// Last checkin message
+	LastCheckinMessage string `json:"last_checkin_message,omitempty"`
+
 	// Last checkin status
 	LastCheckinStatus string `json:"last_checkin_status,omitempty"`
 
