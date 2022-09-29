@@ -209,7 +209,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer longPoll.Stop()
 
 	// Initial update on checkin, and any user fields that might have changed
-	err = ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno, ver)
+	err = ct.bc.CheckIn(agent.Id, req.Status, req.Message, rawMeta, seqno, ver)
 	if err != nil {
 		zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
 	}
@@ -249,7 +249,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				zlog.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
-				err := ct.bc.CheckIn(agent.Id, req.Status, nil, nil, ver)
+				err := ct.bc.CheckIn(agent.Id, req.Status, req.Message, nil, nil, ver)
 				if err != nil {
 					zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
 				}
