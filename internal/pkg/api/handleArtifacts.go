@@ -19,7 +19,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
@@ -46,24 +45,17 @@ type ArtifactT struct {
 	bulker     bulk.Bulk
 	cache      cache.Cache
 	esThrottle *throttle.Throttle
-	limit      *limit.Limiter
 }
 
 func NewArtifactT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *ArtifactT {
-	log.Info().
-		Interface("limits", cfg.Limits.ArtifactLimit).
-		Int("maxParallel", defaultMaxParallel).
-		Msg("Artifact install limits")
-
 	return &ArtifactT{
 		bulker:     bulker,
 		cache:      cache,
-		limit:      limit.NewLimiter(&cfg.Limits.ArtifactLimit),
 		esThrottle: throttle.NewThrottle(defaultMaxParallel),
 	}
 }
 
-func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	start := time.Now()
 
 	var (
@@ -112,12 +104,6 @@ func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps http
 }
 
 func (at ArtifactT) handleArtifacts(zlog *zerolog.Logger, r *http.Request, id, sha2 string) (io.Reader, error) {
-	limitF, err := at.limit.Acquire()
-	if err != nil {
-		return nil, err
-	}
-	defer limitF()
-
 	// Authenticate the APIKey; retrieve agent record.
 	// Note: This is going to be a bit slow even if we hit the cache on the api key.
 	// In order to validate that the agent still has that api key, we fetch the agent record from elastic.
@@ -130,10 +116,6 @@ func (at ArtifactT) handleArtifacts(zlog *zerolog.Logger, r *http.Request, id, s
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
 		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
 	})
-
-	// Metrics; serenity now.
-	dfunc := cntArtifacts.IncStart()
-	defer dfunc()
 
 	return at.processRequest(r.Context(), *zlog, agent, id, sha2)
 }
