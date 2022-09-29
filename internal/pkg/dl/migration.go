@@ -70,7 +70,7 @@ func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, er
 		if err != nil {
 			log.Err(err).
 				Bytes("http.request.body.content", body).
-				Msgf("migration %s failed: %w", err)
+				Msgf("migration %s failed: %w", name, err)
 			return updatedDocs, fmt.Errorf("failed to apply migration %q: %w",
 				name, err)
 		}
