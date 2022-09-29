@@ -38,7 +38,7 @@ func TestRun(t *testing.T) {
 	cfg.Port = port
 
 	verCon := mustBuildConstraints("8.0.0")
-	c, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 	bulker := ftesting.NewMockBulk()
 	pim := mock.NewMockMonitor()
@@ -48,13 +48,13 @@ func TestRun(t *testing.T) {
 	et, err := NewEnrollerT(verCon, cfg, nil, c)
 	require.NoError(t, err)
 
-	router := NewRouter(ctx, bulker, ct, et, nil, nil, nil, nil, nil, fbuild.Info{})
+	router := NewRouter(cfg, bulker, ct, et, nil, nil, nil, nil, nil, fbuild.Info{})
 	errCh := make(chan error)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		err = Run(ctx, router, cfg)
+		err = router.Run(ctx)
 		wg.Done()
 	}()
 	var errFromChan error

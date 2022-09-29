@@ -411,7 +411,7 @@ func TestHandleAckEvents(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := testlog.SetLogger(t)
-			cache, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+			cache, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 			if err != nil {
 				t.Fatal(err)
 			}
