@@ -61,11 +61,16 @@ func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, er
 	for {
 		name, index, body, err := fn()
 		if err != nil {
-			return updatedDocs, fmt.Errorf(": %w", err)
+			return updatedDocs,
+				fmt.Errorf("failed to prepare request for migration %s: %w",
+					name, err)
 		}
 
 		resp, err := applyMigration(ctx, name, index, bulker, body)
 		if err != nil {
+			log.Err(err).
+				Bytes("http.request.body.content", body).
+				Msgf("migration %s failed", name)
 			return updatedDocs, fmt.Errorf("failed to apply migration %q: %w",
 				name, err)
 		}

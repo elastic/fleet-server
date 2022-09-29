@@ -106,7 +106,7 @@ func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, err
 		Str("exe", os.Args[0]).
 		Strs("args", os.Args[1:]).
 		Msg("Boot fleet-server")
-	log.Debug().Strs("env", os.Environ()).Msg("environment")
+	log.Debug().Strs("env", os.Environ()).Msg("environment variables")
 
 	return l, err
 }
@@ -832,7 +832,7 @@ func (f *FleetServer) runSubsystems(ctx context.Context, cfg *config.Config, g *
 		return dl.Migrate(ctx, bulker)
 	})
 	if err = loggedMigration(); err != nil {
-		return fmt.Errorf("failed to run subsystems: %w", err)
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	// Run scheduler for periodic GC/cleanup
