@@ -22,7 +22,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
@@ -48,7 +47,8 @@ const (
 	kEncodingGzip = "gzip"
 )
 
-func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+//nolint:dupl // function body calls different internal hander then handleAck
+func (rt *Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	start := time.Now()
 
 	id := ps.ByName("id")
@@ -64,12 +64,6 @@ func (rt Router) handleCheckin(w http.ResponseWriter, r *http.Request, ps httpro
 	if err != nil {
 		cntCheckin.IncError(err)
 		resp := NewHTTPErrResp(err)
-
-		// Log this as warn for visibility that limit has been reached.
-		// This allows customers to tune the configuration on detection of threshold.
-		if errors.Is(err, limit.ErrMaxLimit) {
-			resp.Level = zerolog.WarnLevel
-		}
 
 		zlog.WithLevel(resp.Level).
 			Err(err).
@@ -93,7 +87,6 @@ type CheckinT struct {
 	ad     *action.Dispatcher
 	tr     *action.TokenResolver
 	bulker bulk.Bulk
-	limit  *limit.Limiter
 }
 
 func NewCheckinT(
@@ -107,14 +100,6 @@ func NewCheckinT(
 	tr *action.TokenResolver,
 	bulker bulk.Bulk,
 ) *CheckinT {
-
-	log.Info().
-		Interface("limits", cfg.Limits.CheckinLimit).
-		Dur("long_poll_timeout", cfg.Timeouts.CheckinLongPoll).
-		Dur("long_poll_timestamp", cfg.Timeouts.CheckinTimestamp).
-		Dur("long_poll_jitter", cfg.Timeouts.CheckinJitter).
-		Msg("Checkin install limits")
-
 	ct := &CheckinT{
 		verCon: verCon,
 		cfg:    cfg,
@@ -124,7 +109,6 @@ func NewCheckinT(
 		gcp:    gcp,
 		ad:     ad,
 		tr:     tr,
-		limit:  limit.NewLimiter(&cfg.Limits.CheckinLimit),
 		bulker: bulker,
 	}
 
@@ -132,14 +116,7 @@ func NewCheckinT(
 }
 
 func (ct *CheckinT) handleCheckin(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, id string) error {
-
 	start := time.Now()
-
-	limitF, err := ct.limit.Acquire()
-	if err != nil {
-		return err
-	}
-	defer limitF()
 
 	agent, err := authAgent(r, &id, ct.bulker, ct.cache)
 	if err != nil {
@@ -158,11 +135,6 @@ func (ct *CheckinT) handleCheckin(zlog *zerolog.Logger, w http.ResponseWriter, r
 
 	// Safely check if the agent version is different, return empty string otherwise
 	newVer := agent.CheckDifferentVersion(ver)
-
-	// Metrics; serenity now.
-	dfunc := cntCheckin.IncStart()
-	defer dfunc()
-
 	return ct.processRequest(*zlog, w, r, start, agent, newVer)
 }
 
@@ -237,7 +209,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer longPoll.Stop()
 
 	// Initial update on checkin, and any user fields that might have changed
-	err = ct.bc.CheckIn(agent.Id, req.Status, rawMeta, seqno, ver)
+	err = ct.bc.CheckIn(agent.Id, req.Status, req.Message, rawMeta, seqno, ver)
 	if err != nil {
 		zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
 	}
@@ -277,7 +249,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				zlog.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
-				err := ct.bc.CheckIn(agent.Id, req.Status, nil, nil, ver)
+				err := ct.bc.CheckIn(agent.Id, req.Status, req.Message, nil, nil, ver)
 				if err != nil {
 					zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
 				}
