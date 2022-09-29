@@ -19,8 +19,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	// @todo: neither of these should be static. But should be specific to an integration
+	// somewhat configurable, but need to follow a pattern so that Fleet Server has write access
+	FileHeaderIndex = ".fleet-files"
+	FileDataIndex   = ".fleet-file_data"
+)
+
 func CreateUploadInfo(ctx context.Context, bulker bulk.Bulk, fi model.FileInfo, fileID string) (string, error) {
-	return createUploadInfo(ctx, bulker, ".fleet-files", fi, fileID) // @todo: index destination is an input (and different per integration)
+	return createUploadInfo(ctx, bulker, FileHeaderIndex, fi, fileID) // @todo: index destination is an input (and different per integration)
 }
 
 func createUploadInfo(ctx context.Context, bulker bulk.Bulk, index string, fi model.FileInfo, fileID string) (string, error) {
@@ -32,7 +39,7 @@ func createUploadInfo(ctx context.Context, bulker bulk.Bulk, index string, fi mo
 }
 
 func UpdateUpload(ctx context.Context, bulker bulk.Bulk, fileID string, data []byte) error {
-	return updateUpload(ctx, bulker, ".fleet-files", fileID, data)
+	return updateUpload(ctx, bulker, FileHeaderIndex, fileID, data)
 }
 
 func updateUpload(ctx context.Context, bulker bulk.Bulk, index string, fileID string, data []byte) error {
@@ -62,7 +69,7 @@ func UploadChunk(ctx context.Context, client *elasticsearch.Client, data io.Read
 	*/
 
 	req := esapi.IndexRequest{
-		Index:      ".fleet-file_data",
+		Index:      FileDataIndex,
 		Body:       cbor,
 		DocumentID: fmt.Sprintf("%s.%d", chunkInfo.Upload.ID, chunkInfo.ID),
 	}
