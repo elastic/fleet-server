@@ -79,12 +79,13 @@ func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) b
 }
 
 type bulkcase struct {
-	desc   string
-	id     string
-	status string
-	meta   []byte
-	seqno  sqn.SeqNo
-	ver    string
+	desc    string
+	id      string
+	status  string
+	message string
+	meta    []byte
+	seqno   sqn.SeqNo
+	ver     string
 }
 
 func TestBulkSimple(t *testing.T) {
@@ -96,6 +97,7 @@ func TestBulkSimple(t *testing.T) {
 			"Simple case",
 			"simpleId",
 			"online",
+			"message",
 			nil,
 			nil,
 			"",
@@ -104,6 +106,7 @@ func TestBulkSimple(t *testing.T) {
 			"Singled field case",
 			"singleFieldId",
 			"online",
+			"message",
 			[]byte(`{"hey":"now"}`),
 			nil,
 			"",
@@ -112,6 +115,7 @@ func TestBulkSimple(t *testing.T) {
 			"Multi field case",
 			"multiFieldId",
 			"online",
+			"message",
 			[]byte(`{"hey":"now","brown":"cow"}`),
 			nil,
 			ver,
@@ -120,6 +124,7 @@ func TestBulkSimple(t *testing.T) {
 			"Multi field nested case",
 			"multiFieldNestedId",
 			"online",
+			"message",
 			[]byte(`{"hey":"now","wee":{"little":"doggie"}}`),
 			nil,
 			"",
@@ -128,6 +133,7 @@ func TestBulkSimple(t *testing.T) {
 			"Simple case with seqNo",
 			"simpleseqno",
 			"online",
+			"message",
 			nil,
 			sqn.SeqNo{1, 2, 3, 4},
 			ver,
@@ -136,6 +142,7 @@ func TestBulkSimple(t *testing.T) {
 			"Field case with seqNo",
 			"simpleseqno",
 			"online",
+			"message",
 			[]byte(`{"uncle":"fester"}`),
 			sqn.SeqNo{5, 6, 7, 8},
 			ver,
@@ -144,6 +151,7 @@ func TestBulkSimple(t *testing.T) {
 			"Unusual status",
 			"singleFieldId",
 			"unusual",
+			"message",
 			nil,
 			nil,
 			"",
@@ -152,6 +160,7 @@ func TestBulkSimple(t *testing.T) {
 			"Empty status",
 			"singleFieldId",
 			"",
+			"message",
 			nil,
 			nil,
 			"",
@@ -165,7 +174,7 @@ func TestBulkSimple(t *testing.T) {
 			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
 			bc := NewBulk(mockBulk)
 
-			if err := bc.CheckIn(c.id, c.status, c.meta, c.seqno, c.ver); err != nil {
+			if err := bc.CheckIn(c.id, c.status, c.message, c.meta, c.seqno, c.ver); err != nil {
 				t.Fatal(err)
 			}
 
@@ -203,7 +212,7 @@ func benchmarkBulk(n int, flush bool, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 
 		for _, id := range ids {
-			err := bc.CheckIn(id, "", nil, nil, "")
+			err := bc.CheckIn(id, "", "", nil, nil, "")
 			if err != nil {
 				b.Fatal(err)
 			}
