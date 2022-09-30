@@ -183,7 +183,7 @@ func (p *Output) newKey(
 	// Using painless script to append the old keys to the history
 	body, err := renderUpdatePainlessScript(p.Name, fields)
 	if err != nil {
-		return nil, fmt.Errorf("could no tupdate painless script: %w", err)
+		return nil, fmt.Errorf("could not update painless script: %w", err)
 	}
 
 	if err = bulker.Update(ctx, dl.FleetAgents, agentID, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
