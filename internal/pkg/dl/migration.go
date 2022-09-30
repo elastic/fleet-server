@@ -61,11 +61,16 @@ func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, er
 	for {
 		name, index, body, err := fn()
 		if err != nil {
-			return updatedDocs, fmt.Errorf(": %w", err)
+			return updatedDocs,
+				fmt.Errorf("failed to prepare request for migration %s: %w",
+					name, err)
 		}
 
 		resp, err := applyMigration(ctx, name, index, bulker, body)
 		if err != nil {
+			log.Err(err).
+				Bytes("http.request.body.content", body).
+				Msgf("migration %s failed", name)
 			return updatedDocs, fmt.Errorf("failed to apply migration %q: %w",
 				name, err)
 		}
@@ -239,7 +244,9 @@ map.put("id", ctx._source.default_api_key_id);
 
 // Make current API key empty, so fleet-server will generate a new one
 // Add current API jey to be retired
-ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids.add(map);
+if (ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids != null) {
+	ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids.add(map);
+}
 ctx._source['` + fieldOutputs + `']['default'].api_key="";
 ctx._source['` + fieldOutputs + `']['default'].api_key_id="";
 ctx._source['` + fieldOutputs + `']['default'].permissions_hash=ctx._source.policy_output_permissions_hash;
@@ -273,10 +280,13 @@ func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
 
 	query := dsl.NewRoot()
 	query.Query().MatchAll()
-	query.Param("script", `ctx._source.coordinator_idx++;`)
+	painless := `ctx._source.coordinator_idx++;`
+	query.Param("script", painless)
 
 	body, err := query.MarshalJSON()
 	if err != nil {
+		log.Debug().Str("painlessScript", painless).
+			Msgf("%s: failed painless script", migrationName)
 		return migrationName, FleetPolicies, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
 
