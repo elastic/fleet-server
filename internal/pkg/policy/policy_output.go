@@ -67,7 +67,6 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 			zlog.Debug().Msg("policy output permissions are the same")
 		}
 
-<<<<<<< HEAD
 		if needNewKey {
 			zlog.Debug().
 				RawJSON("roles", p.Role.Raw).
@@ -79,69 +78,10 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 			if err != nil {
 				zlog.Error().Err(err).Msg("fail generate output key")
 				return err
-=======
-		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
-		zlog.Debug().
-			Str("hash.sha256", p.Role.Sha2).
-			Str("roles", string(p.Role.Raw)).
-			Msg("Updating agent record to pick up most recent roles.")
-
-		fields := map[string]interface{}{
-			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
-		}
-
-		// Using painless script to update permission hash for updated key
-		body, err := renderUpdatePainlessScript(p.Name, fields)
-		if err != nil {
-			return err
-		}
-
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return err
-		}
-
-	} else if needNewKey {
-		zlog.Debug().
-			RawJSON("fleet.policy.roles", p.Role.Raw).
-			Str("fleet.policy.default.oldHash", output.PermissionsHash).
-			Str("fleet.policy.default.newHash", p.Role.Sha2).
-			Msg("Generating a new API key")
-
-		ctx := zlog.WithContext(ctx)
-		outputAPIKey, err :=
-			generateOutputAPIKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw)
-		if err != nil {
-			return fmt.Errorf("failed generate output API key: %w", err)
-		}
-
-		// When a new keys is generated we need to update the Agent record,
-		// this will need to be updated when multiples remote Elasticsearch output
-		// are supported.
-		zlog.Info().
-			Str("fleet.policy.role.hash.sha256", p.Role.Sha2).
-			Str(logger.DefaultOutputAPIKeyID, outputAPIKey.ID).
-			Msg("Updating agent record to pick up default output key.")
-
-		fields := map[string]interface{}{
-			dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
-			dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
-			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
-		}
-
-		if !foundOutput {
-			fields[dl.FiledType] = OutputTypeElasticsearch
-		}
-		if output.APIKeyID != "" {
-			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeyIdsItems{
-				ID:        output.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
->>>>>>> f77b97c (Catch error in waitBulkAction. Add bulk.WithRetryOnConflict(3) in multiple places. (#1896))
 			}
 
 			agent.DefaultAPIKey = outputAPIKey.Agent()
 
-<<<<<<< HEAD
 			// When a new keys is generated we need to update the Agent record,
 			// this will need to be updated when multiples Elasticsearch output
 			// are used.
@@ -149,35 +89,6 @@ func (p *PolicyOutput) Prepare(ctx context.Context, zlog zerolog.Logger, bulker 
 				Str("hash.sha256", p.Role.Sha2).
 				Str(logger.DefaultOutputAPIKeyID, outputAPIKey.ID).
 				Msg("Updating agent record to pick up default output key.")
-=======
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
-
-		// Now that all is done, we can update the output on the agent variable
-		// Right not it's more for consistency and to ensure the in-memory agent
-		// data is correct and in sync with ES, so it can be safely used after
-		// this method returns.
-		output.Type = OutputTypeElasticsearch
-		output.APIKey = outputAPIKey.Agent()
-		output.APIKeyID = outputAPIKey.ID
-		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
-	}
-
-	// Always insert the `api_key` as part of the output block, this is required
-	// because only fleet server knows the api key for the specific agent, if we don't
-	// add it the agent will not receive the `api_key` and will not be able to connect
-	// to Elasticsearch.
-	//
-	// We need to investigate allocation with the new LS output, we had optimization
-	// in place to reduce number of agent policy allocation when sending the updated
-	// agent policy to multiple agents.
-	// See: https://github.com/elastic/fleet-server/issues/1301
-	if err := setMapObj(outputMap, output.APIKey, p.Name, "api_key"); err != nil {
-		return err
-	}
->>>>>>> f77b97c (Catch error in waitBulkAction. Add bulk.WithRetryOnConflict(3) in multiple places. (#1896))
 
 			fields := map[string]interface{}{
 				dl.FieldDefaultAPIKey:               outputAPIKey.Agent(),
