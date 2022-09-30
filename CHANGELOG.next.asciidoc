@@ -8,6 +8,7 @@
 - Add error detail to catch-all HTTP error response. {pull}1854[1854]
 - Update apikey.cache_hit log field name to match convention. {pull}1900[1900]
 - LoadServerLimits will not overwrite specified limits when loading default/agent number specified values. {issue}1841[1841] {pull}1912[1912]
+- Fix issue were errors where being ignored written to elasticsearch. {pull}1896[1896]
 
 ==== New Features
 
