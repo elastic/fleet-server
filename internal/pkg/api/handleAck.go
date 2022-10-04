@@ -530,7 +530,7 @@ func (ack *AckT) isAPIKeyReadError(ctx context.Context, zlog zerolog.Logger, age
 	if err != nil {
 		zlog.Warn().
 			Err(err).
-			Msg("failed to find agent by api key")
+			Msg("failed to find agent by ID")
 		return true
 	}
 
