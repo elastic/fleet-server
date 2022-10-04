@@ -28,6 +28,7 @@ const (
 var (
 	ErrMaxConcurrentUploads = errors.New("the max number of concurrent uploads has been reached")
 	ErrInvalidUploadID      = errors.New("active upload not found with this ID, it may be expired")
+	ErrFileSizeTooLarge     = errors.New("This file exceeds the maximum allowed file size")
 
 	//@todo: explicit error for expired uploads
 )
@@ -46,6 +47,7 @@ type Uploader struct {
 	mu                 sync.Mutex
 	opThrottle         *throttle.Throttle
 	parallelChunkLimit int
+	sizeLimit          int64
 }
 
 type Info struct {
@@ -65,9 +67,10 @@ type ChunkInfo struct {
 	Token         *throttle.Token
 }
 
-func New(opLimit int, chunkLimit int) *Uploader {
+func New(sizeLimit int64, opLimit int, chunkLimit int) *Uploader {
 	return &Uploader{
 		parallelChunkLimit: chunkLimit,
+		sizeLimit:          sizeLimit,
 		opThrottle:         throttle.NewThrottle(opLimit),
 		current:            make(map[string]upload, opLimit),
 	}
@@ -78,6 +81,9 @@ func New(opLimit int, chunkLimit int) *Uploader {
 func (u *Uploader) Begin(size int64, docID string, source string) (Info, error) {
 	if size <= 0 {
 		return Info{}, errors.New("invalid file size")
+	}
+	if size > u.sizeLimit {
+		return Info{}, ErrFileSizeTooLarge
 	}
 
 	uid, err := uuid.NewV4()

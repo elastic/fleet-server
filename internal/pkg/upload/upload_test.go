@@ -5,16 +5,21 @@
 package upload
 
 import (
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func TestMaxParallelUploadOpsReached(t *testing.T) {
+	_ = testlog.SetLogger(t)
 	opLimit := 4
 
-	u := New(opLimit, 0)
+	u := New(500, opLimit, 0)
 
 	var err error
 	for i := 0; i < opLimit; i++ {
@@ -28,32 +33,33 @@ func TestMaxParallelUploadOpsReached(t *testing.T) {
 
 func TestMaxParallelUploadOpsReleased(t *testing.T) {
 	opLimit := 4
-	u := New(opLimit, 0)
+	u := New(500, opLimit, 0)
 
 	// generate max operations
 	ops := make([]Info, 0, opLimit)
 	for i := 0; i < opLimit; i++ {
-		op, err := u.Begin(100, "", "")
+		op, err := u.Begin(100, strconv.Itoa(i), "")
 		require.NoError(t, err)
 		ops = append(ops, op)
 	}
 	// and verify max was reached
-	_, err := u.Begin(100, "", "")
+	_, err := u.Begin(100, "X", "")
 	assert.ErrorIs(t, err, ErrMaxConcurrentUploads)
 
 	// finishing an op should release the hold and allow another to begin
 	_, err = u.Complete(ops[0].ID)
 	require.NoError(t, err)
 
-	op, err := u.Begin(100, "", "")
+	time.Sleep(5 * time.Millisecond) // occasionally, a little time was required for the change to propagate
+
+	_, err = u.Begin(100, "Y", "")
 	assert.NoError(t, err)
-	assert.NotEmpty(t, op.ID)
 }
 
 func TestMaxParallelChunks(t *testing.T) {
 	chunkLim := 3
 
-	u := New(1, chunkLim)
+	u := New(104857600, 1, chunkLim)
 
 	// start an operation, that can have more than the test limit chunks
 	op, err := u.Begin(MaxChunkSize*int64(chunkLim+2), "", "")
@@ -72,7 +78,7 @@ func TestMaxParallelChunks(t *testing.T) {
 func TestMaxParallelChunksReleased(t *testing.T) {
 	chunkLim := 3
 
-	u := New(1, chunkLim)
+	u := New(104857600, 1, chunkLim)
 
 	// start an operation, that can have more than the test limit chunks
 	op, err := u.Begin(MaxChunkSize*int64(chunkLim+2), "", "")
@@ -107,7 +113,7 @@ func TestUploadChunkCount(t *testing.T) {
 		{7534559605, 1797, "7.5Gb file"},
 	}
 
-	u := New(len(tests), 1)
+	u := New(8388608000, len(tests), 1)
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -131,7 +137,7 @@ func TestChunkMarksFinal(t *testing.T) {
 		{7534559605, 1796, "7.5Gb file"},
 	}
 
-	u := New(len(tests), 4)
+	u := New(8388608000, len(tests), 4)
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -149,6 +155,33 @@ func TestChunkMarksFinal(t *testing.T) {
 			assert.NoError(t, err)
 			assert.True(t, chunk.Final)
 			chunk.Token.Release()
+		})
+	}
+}
+
+func TestMaxFileSize(t *testing.T) {
+	tests := []struct {
+		MaxSize     int64
+		TryFile     int64
+		ShouldError bool
+		Name        string
+	}{
+		{500, 800, true, "800 is too large"},
+		{800, 500, false, "file within limits"},
+		{1024, 1023, false, "1-less than limit"},
+		{1024, 1024, false, "file is exactly limit"},
+		{1024, 1025, true, "file is 1 over limit"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.Name, func(t *testing.T) {
+			u := New(tc.MaxSize, 1, 1)
+			_, err := u.Begin(tc.TryFile, "", "")
+			if tc.ShouldError {
+				assert.ErrorIs(t, err, ErrFileSizeTooLarge)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }

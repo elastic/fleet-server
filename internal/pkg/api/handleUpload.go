@@ -44,6 +44,8 @@ const (
 	// TODO: move to a config
 	maxParallelUploadOperations = 3
 	maxParallelChunks           = 4
+	maxFileSize                 = 104857600 // 100 MiB
+
 )
 
 func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -171,6 +173,7 @@ type UploadT struct {
 func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *UploadT {
 	log.Info().
 		Interface("limits", cfg.Limits.ArtifactLimit).
+		Int64("maxFileSize", maxFileSize).
 		Int("maxParallelOps", maxParallelUploadOperations).
 		Int("maxParallelChunks", maxParallelChunks).
 		Msg("Artifact install limits")
@@ -179,7 +182,7 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 		chunkClient: chunkClient,
 		bulker:      bulker,
 		cache:       cache,
-		upl:         upload.New(maxParallelChunks, maxParallelChunks),
+		upl:         upload.New(maxFileSize, maxParallelChunks, maxParallelChunks),
 	}
 }
 
