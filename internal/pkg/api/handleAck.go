@@ -365,7 +365,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	if apiKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
-			if ack.isAPIKeyReadError(ctx, zlog, apiKeyID, err) {
+			if ack.isAPIKeyReadError(ctx, zlog, agentID, err) {
 				zlog.Error().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
@@ -522,12 +522,11 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 	return nil
 }
 
-func (ack *AckT) isAPIKeyReadError(ctx context.Context, zlog zerolog.Logger, apiKeyID string, err error) bool {
+func (ack *AckT) isAPIKeyReadError(ctx context.Context, zlog zerolog.Logger, agentID string, err error) bool {
 	if !errors.Is(err, apikey.ErrAPIKeyNotFound) {
 		return false
 	}
-
-	agent, err := findAgentByAPIKeyID(ctx, ack.bulk, apiKeyID)
+	agent, err := dl.FindAgent(ctx, ack.bulk, dl.QueryAgentByID, dl.FieldID, agentID)
 	if err != nil {
 		zlog.Warn().
 			Err(err).
