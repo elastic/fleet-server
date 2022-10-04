@@ -7,9 +7,11 @@ package upload
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -31,16 +33,19 @@ var (
 )
 
 type upload struct {
-	complete  chan<- struct{}
-	chunkRecv chan<- struct{}
-	begun     bool
-	Info      Info
+	opToken       *throttle.Token
+	chunkThrottle *throttle.Throttle
+	complete      chan<- struct{}
+	chunkRecv     chan<- struct{}
+	begun         bool
+	Info          Info
 }
 
 type Uploader struct {
-	current       map[string]upload
-	mu            sync.Mutex
-	parallelLimit int
+	current            map[string]upload
+	mu                 sync.Mutex
+	opThrottle         *throttle.Throttle
+	parallelChunkLimit int
 }
 
 type Info struct {
@@ -55,20 +60,22 @@ type ChunkInfo struct {
 	FirstReceived bool
 	Final         bool
 	Upload        Info
+	Token         *throttle.Token
 }
 
-func New(limit int) *Uploader {
+func New(opLimit int, chunkLimit int) *Uploader {
 	return &Uploader{
-		parallelLimit: limit,
-		current:       make(map[string]upload, limit),
+		parallelChunkLimit: chunkLimit,
+		opThrottle:         throttle.NewThrottle(opLimit),
+		current:            make(map[string]upload, opLimit),
 	}
 }
 
 // Start an upload operation, as long as the max concurrent has not been reached
 // returns the upload ID
 func (u *Uploader) Begin(size int64) (Info, error) {
-	if len(u.current) >= u.parallelLimit {
-		return Info{}, ErrMaxConcurrentUploads
+	if size <= 0 {
+		return Info{}, errors.New("invalid file size")
 	}
 
 	uid, err := uuid.NewV4()
@@ -76,6 +83,11 @@ func (u *Uploader) Begin(size int64) (Info, error) {
 		return Info{}, fmt.Errorf("unable to generate upload operation ID: %w", err)
 	}
 	id := uid.String()
+
+	token := u.opThrottle.Acquire(id, 300*time.Hour)
+	if token == nil {
+		return Info{}, ErrMaxConcurrentUploads
+	}
 
 	total := time.NewTimer(uploadRequestTimeout)
 	chunkT := time.NewTimer(chunkProgressTimeout)
@@ -130,32 +142,42 @@ func (u *Uploader) Begin(size int64) (Info, error) {
 	}
 	info.Count = int(cnt)
 	u.current[id] = upload{
-		complete:  complete,
-		chunkRecv: chunkRecv,
-		Info:      info,
+		opToken:       token,
+		chunkThrottle: throttle.NewThrottle(u.parallelChunkLimit),
+		complete:      complete,
+		chunkRecv:     chunkRecv,
+		Info:          info,
 	}
 	return info, nil
 }
 
 func (u *Uploader) Chunk(uplID string, chunkID int) (ChunkInfo, error) {
 	u.mu.Lock()
+	defer u.mu.Unlock()
 	upl, valid := u.current[uplID]
 	if !valid {
-		u.mu.Unlock()
 		return ChunkInfo{}, ErrInvalidUploadID
+	}
+	if chunkID < 0 || chunkID >= upl.Info.Count {
+		return ChunkInfo{}, errors.New("invalid chunk number")
+	}
+
+	token := upl.chunkThrottle.Acquire(strconv.Itoa(chunkID), time.Hour)
+	if token == nil {
+		return ChunkInfo{}, ErrMaxConcurrentUploads
 	}
 	upl.chunkRecv <- struct{}{}
 	if !upl.begun {
 		upl.begun = true
 	}
 	u.current[uplID] = upl
-	u.mu.Unlock()
 
 	return ChunkInfo{
 		ID:            chunkID,
 		FirstReceived: upl.begun,
 		Final:         chunkID == upl.Info.Count-1,
 		Upload:        upl.Info,
+		Token:         token,
 	}, nil
 }
 
@@ -169,19 +191,27 @@ func (u *Uploader) Complete(id string) (string, error) {
 	return "", nil
 }
 
-func (u *Uploader) cancel(uplID string) error {
+func (u *Uploader) cleanupOperation(uplID string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
+	if upload, ok := u.current[uplID]; ok {
+		if upload.opToken != nil {
+			upload.opToken.Release()
+		}
+	}
 	delete(u.current, uplID)
+}
+
+func (u *Uploader) cancel(uplID string) error {
+	u.cleanupOperation(uplID)
+
 	// @todo: delete any uploaded chunks from ES
 	// leave header doc and mark failed?
 	return nil
 }
 
 func (u *Uploader) finalize(uplID string) error {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	delete(u.current, uplID)
+	u.cleanupOperation(uplID)
 	// @todo: write Status:READY here?
 	return nil
 }

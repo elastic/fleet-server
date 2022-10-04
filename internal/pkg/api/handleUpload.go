@@ -22,7 +22,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 	"github.com/elastic/fleet-server/v7/internal/pkg/upload"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/julienschmidt/httprouter"
@@ -43,7 +42,8 @@ const (
 
 const (
 	// TODO: move to a config
-	maxParallelUploads = 5
+	maxParallelUploadOperations = 3
+	maxParallelChunks           = 4
 )
 
 func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -165,22 +165,21 @@ type UploadT struct {
 	bulker      bulk.Bulk
 	chunkClient *elasticsearch.Client
 	cache       cache.Cache
-	esThrottle  *throttle.Throttle
 	upl         *upload.Uploader
 }
 
 func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *UploadT {
 	log.Info().
 		Interface("limits", cfg.Limits.ArtifactLimit).
-		Int("maxParallel", defaultMaxParallel).
+		Int("maxParallelOps", maxParallelUploadOperations).
+		Int("maxParallelChunks", maxParallelChunks).
 		Msg("Artifact install limits")
 
 	return &UploadT{
 		chunkClient: chunkClient,
 		bulker:      bulker,
 		cache:       cache,
-		esThrottle:  throttle.NewThrottle(defaultMaxParallel),
-		upl:         upload.New(maxParallelUploads),
+		upl:         upload.New(maxParallelChunks, maxParallelChunks),
 	}
 }
 
@@ -234,19 +233,20 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 }
 
 func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string, chunkID int) error {
-	info, err := ut.upl.Chunk(uplID, chunkID)
+	chunkInfo, err := ut.upl.Chunk(uplID, chunkID)
 	if err != nil {
 		return err
 	}
-	if info.FirstReceived {
+	defer chunkInfo.Token.Release()
+	if chunkInfo.FirstReceived {
 		if err := updateUploadStatus(r.Context(), ut.bulker, uplID, UploadProgress); err != nil {
 			zlog.Warn().Err(err).Str("upload", uplID).Msg("unable to update upload status")
 		}
 	}
 
 	// prevent over-sized chunks
-	chunk := http.MaxBytesReader(w, r.Body, upload.MaxChunkSize)
-	if err := dl.UploadChunk(r.Context(), ut.chunkClient, chunk, info); err != nil {
+	data := http.MaxBytesReader(w, r.Body, upload.MaxChunkSize)
+	if err := dl.UploadChunk(r.Context(), ut.chunkClient, data, chunkInfo); err != nil {
 		return err
 	}
 	return nil
