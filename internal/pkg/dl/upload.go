@@ -22,12 +22,12 @@ import (
 const (
 	// @todo: neither of these should be static. But should be specific to an integration
 	// somewhat configurable, but need to follow a pattern so that Fleet Server has write access
-	FileHeaderIndex = ".fleet-files"
-	FileDataIndex   = ".fleet-file_data"
+	FileHeaderIndexPattern = ".fleet-%s-files"
+	FileDataIndexPattern   = ".fleet-%s-file-data"
 )
 
-func CreateUploadInfo(ctx context.Context, bulker bulk.Bulk, fi model.FileInfo, fileID string) (string, error) {
-	return createUploadInfo(ctx, bulker, FileHeaderIndex, fi, fileID) // @todo: index destination is an input (and different per integration)
+func CreateUploadInfo(ctx context.Context, bulker bulk.Bulk, fi model.FileInfo, source string, fileID string) (string, error) {
+	return createUploadInfo(ctx, bulker, fmt.Sprintf(FileHeaderIndexPattern, source), fi, fileID)
 }
 
 func createUploadInfo(ctx context.Context, bulker bulk.Bulk, index string, fi model.FileInfo, fileID string) (string, error) {
@@ -38,8 +38,8 @@ func createUploadInfo(ctx context.Context, bulker bulk.Bulk, index string, fi mo
 	return bulker.Create(ctx, index, fileID, body, bulk.WithRefresh())
 }
 
-func UpdateUpload(ctx context.Context, bulker bulk.Bulk, fileID string, data []byte) error {
-	return updateUpload(ctx, bulker, FileHeaderIndex, fileID, data)
+func UpdateUpload(ctx context.Context, bulker bulk.Bulk, source string, fileID string, data []byte) error {
+	return updateUpload(ctx, bulker, fmt.Sprintf(FileHeaderIndexPattern, source), fileID, data)
 }
 
 func updateUpload(ctx context.Context, bulker bulk.Bulk, index string, fileID string, data []byte) error {
@@ -47,7 +47,7 @@ func updateUpload(ctx context.Context, bulker bulk.Bulk, index string, fileID st
 }
 
 func UploadChunk(ctx context.Context, client *elasticsearch.Client, data io.ReadCloser, chunkInfo upload.ChunkInfo) error {
-	cbor := upload.NewCBORChunkWriter(data, chunkInfo.Final, chunkInfo.Upload.ID, chunkInfo.Upload.ChunkSize)
+	cbor := upload.NewCBORChunkWriter(data, chunkInfo.Final, chunkInfo.Upload.DocID, chunkInfo.Upload.ChunkSize)
 
 	/*
 		// the non-streaming version
@@ -69,9 +69,9 @@ func UploadChunk(ctx context.Context, client *elasticsearch.Client, data io.Read
 	*/
 
 	req := esapi.IndexRequest{
-		Index:      FileDataIndex,
+		Index:      fmt.Sprintf(FileDataIndexPattern, chunkInfo.Upload.Source),
 		Body:       cbor,
-		DocumentID: fmt.Sprintf("%s.%d", chunkInfo.Upload.ID, chunkInfo.ID),
+		DocumentID: fmt.Sprintf("%s.%d", chunkInfo.Upload.DocID, chunkInfo.ID),
 	}
 	// need to set the Content-Type of the request to CBOR, notes below
 	overrider := contentTypeOverrider{client}

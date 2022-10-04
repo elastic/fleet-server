@@ -177,7 +177,10 @@ type StatusResponse struct {
 }
 
 type FileInfo struct {
-	File struct {
+	ActionID string `json:"action_id"`
+	AgentID  string `json:"agent_id"`
+	Source   string `json:"src"`
+	File     struct {
 		Size        int64  `json:"size"`
 		Name        string `json:"name"`
 		Extension   string `json:"ext"`

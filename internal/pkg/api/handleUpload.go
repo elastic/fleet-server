@@ -194,23 +194,19 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 	}
 	r.Body.Close()
 
-	if strings.TrimSpace(fi.File.Name) == "" {
-		return errors.New("file name is required")
-	}
-	if fi.File.Size <= 0 {
-		return errors.New("invalid file size, size is required")
-	}
-	if strings.TrimSpace(fi.File.Mime) == "" {
-		return errors.New("mime_type is required")
+	if err := validateUploadPayload(fi); err != nil {
+		return err
 	}
 
-	op, err := ut.upl.Begin(fi.File.Size)
+	docID := fmt.Sprintf("%s.%s", fi.ActionID, fi.AgentID)
+
+	op, err := ut.upl.Begin(fi.File.Size, docID, fi.Source)
 	if err != nil {
 		return err
 	}
 
 	doc := uploadRequestToFileInfo(fi, op.ChunkSize)
-	ret, err := dl.CreateUploadInfo(r.Context(), ut.bulker, doc, op.ID) // @todo: replace uploadID with correct file base ID
+	ret, err := dl.CreateUploadInfo(r.Context(), ut.bulker, doc, fi.Source, docID)
 	if err != nil {
 		return err
 	}
@@ -239,7 +235,7 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 	}
 	defer chunkInfo.Token.Release()
 	if chunkInfo.FirstReceived {
-		if err := updateUploadStatus(r.Context(), ut.bulker, uplID, UploadProgress); err != nil {
+		if err := updateUploadStatus(r.Context(), ut.bulker, chunkInfo.Upload, UploadProgress); err != nil {
 			zlog.Warn().Err(err).Str("upload", uplID).Msg("unable to update upload status")
 		}
 	}
@@ -253,19 +249,19 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 }
 
 func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
-	data, err := ut.upl.Complete(uplID)
+	info, err := ut.upl.Complete(uplID)
 	if err != nil {
 		return err
 	}
 
-	if err := updateUploadStatus(r.Context(), ut.bulker, uplID, UploadDone); err != nil {
+	if err := updateUploadStatus(r.Context(), ut.bulker, info, UploadDone); err != nil {
 		// should be 500 error probably?
 		zlog.Warn().Err(err).Str("upload", uplID).Msg("unable to set upload status to complete")
 		return err
 
 	}
 
-	_, err = w.Write([]byte(data))
+	_, err = w.Write([]byte(`{"status":"ok"}`))
 	if err != nil {
 		return err
 	}
@@ -306,7 +302,7 @@ func uploadRequestToFileInfo(req FileInfo, chunkSize int64) model.FileInfo {
 	}
 }
 
-func updateUploadStatus(ctx context.Context, bulker bulk.Bulk, fileID string, status UploadStatus) error {
+func updateUploadStatus(ctx context.Context, bulker bulk.Bulk, info upload.Info, status UploadStatus) error {
 	data, err := json.Marshal(map[string]interface{}{
 		"doc": map[string]interface{}{
 			"file": map[string]string{
@@ -317,5 +313,34 @@ func updateUploadStatus(ctx context.Context, bulker bulk.Bulk, fileID string, st
 	if err != nil {
 		return err
 	}
-	return dl.UpdateUpload(ctx, bulker, fileID, data)
+	return dl.UpdateUpload(ctx, bulker, info.Source, info.DocID, data)
+}
+
+func validateUploadPayload(fi FileInfo) error {
+
+	required := []struct {
+		Field string
+		Msg   string
+	}{
+		{fi.File.Name, "file name"},
+		{fi.File.Mime, "mime_type"},
+		{fi.ActionID, "action_id"},
+		{fi.AgentID, "agent_id"},
+		{fi.Source, "src"},
+	}
+
+	for _, req := range required {
+		if strings.TrimSpace(req.Field) == "" {
+			return fmt.Errorf("%s is required", req.Msg)
+		}
+	}
+
+	//@todo: valid action?
+	//@todo: valid agent?
+	//@todo: valid src? will that make future expansion harder and require FS updates? maybe just validate the index exists
+
+	if fi.File.Size <= 0 {
+		return errors.New("invalid file size, size is required")
+	}
+	return nil
 }

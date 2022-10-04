@@ -49,7 +49,9 @@ type Uploader struct {
 }
 
 type Info struct {
-	ID        string
+	ID        string // upload operation identifier. Ephemeral, just used for the upload process
+	DocID     string // document ID of the uploaded file and chunks
+	Source    string // which integration is performing the upload
 	ChunkSize int64
 	Total     int64
 	Count     int
@@ -73,7 +75,7 @@ func New(opLimit int, chunkLimit int) *Uploader {
 
 // Start an upload operation, as long as the max concurrent has not been reached
 // returns the upload ID
-func (u *Uploader) Begin(size int64) (Info, error) {
+func (u *Uploader) Begin(size int64, docID string, source string) (Info, error) {
 	if size <= 0 {
 		return Info{}, errors.New("invalid file size")
 	}
@@ -133,7 +135,9 @@ func (u *Uploader) Begin(size int64) (Info, error) {
 	}()
 	info := Info{
 		ID:        id,
+		DocID:     docID,
 		ChunkSize: MaxChunkSize,
+		Source:    source,
 		Total:     size,
 	}
 	cnt := info.Total / info.ChunkSize
@@ -181,14 +185,15 @@ func (u *Uploader) Chunk(uplID string, chunkID int) (ChunkInfo, error) {
 	}, nil
 }
 
-func (u *Uploader) Complete(id string) (string, error) {
-	if _, valid := u.current[id]; !valid {
-		return "", ErrInvalidUploadID
+func (u *Uploader) Complete(id string) (Info, error) {
+	info, valid := u.current[id]
+	if !valid {
+		return Info{}, ErrInvalidUploadID
 	}
 	// @todo: verify chunks
 	// verify hashes, etc
 	u.current[id].complete <- struct{}{}
-	return "", nil
+	return info.Info, nil
 }
 
 func (u *Uploader) cleanupOperation(uplID string) {
