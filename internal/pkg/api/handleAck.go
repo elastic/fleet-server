@@ -368,7 +368,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	if apiKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
-			if isAgentActive(ctx, zlog, ack.bulk, agent.Id, err) {
+			if isAgentActive(ctx, zlog, ack.bulk, agent.Id) {
 				zlog.Error().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
@@ -528,7 +528,7 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 	return nil
 }
 
-func isAgentActive(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, agentID string, err error) bool {
+func isAgentActive(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, agentID string) bool {
 	agent, err := dl.FindAgent(ctx, bulk, dl.QueryAgentByID, dl.FieldID, agentID)
 	if err != nil {
 		zlog.Warn().
