@@ -66,9 +66,9 @@ func encodePreambleToCBOR(final bool, baseID string, chunkSize int64) []byte {
 	preamble[4] = 's'
 	preamble[5] = 't'
 	if final {
-		preamble[6] = 0xF4 // bool true
+		preamble[6] = 0xF5 // bool true
 	} else {
-		preamble[6] = 0xF5 // bool false
+		preamble[6] = 0xF4 // bool false
 	}
 	preamble[7] = 0x63 // string with 3 chars
 	preamble[8] = 'b'
