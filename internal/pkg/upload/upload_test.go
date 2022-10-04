@@ -18,11 +18,11 @@ func TestMaxParallelUploadOpsReached(t *testing.T) {
 
 	var err error
 	for i := 0; i < opLimit; i++ {
-		_, err = u.Begin(100)
+		_, err = u.Begin(100, "", "")
 		assert.NoError(t, err)
 	}
 
-	_, err = u.Begin(100)
+	_, err = u.Begin(100, "", "")
 	assert.ErrorIs(t, err, ErrMaxConcurrentUploads)
 }
 
@@ -33,19 +33,19 @@ func TestMaxParallelUploadOpsReleased(t *testing.T) {
 	// generate max operations
 	ops := make([]Info, 0, opLimit)
 	for i := 0; i < opLimit; i++ {
-		op, err := u.Begin(100)
+		op, err := u.Begin(100, "", "")
 		require.NoError(t, err)
 		ops = append(ops, op)
 	}
 	// and verify max was reached
-	_, err := u.Begin(100)
+	_, err := u.Begin(100, "", "")
 	assert.ErrorIs(t, err, ErrMaxConcurrentUploads)
 
 	// finishing an op should release the hold and allow another to begin
 	_, err = u.Complete(ops[0].ID)
 	require.NoError(t, err)
 
-	op, err := u.Begin(100)
+	op, err := u.Begin(100, "", "")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, op.ID)
 }
@@ -56,7 +56,7 @@ func TestMaxParallelChunks(t *testing.T) {
 	u := New(1, chunkLim)
 
 	// start an operation, that can have more than the test limit chunks
-	op, err := u.Begin(MaxChunkSize * int64(chunkLim+2))
+	op, err := u.Begin(MaxChunkSize*int64(chunkLim+2), "", "")
 	require.NoError(t, err)
 
 	// upload up to the limit chunks, without releasing the request
@@ -75,7 +75,7 @@ func TestMaxParallelChunksReleased(t *testing.T) {
 	u := New(1, chunkLim)
 
 	// start an operation, that can have more than the test limit chunks
-	op, err := u.Begin(MaxChunkSize * int64(chunkLim+2))
+	op, err := u.Begin(MaxChunkSize*int64(chunkLim+2), "", "")
 	require.NoError(t, err)
 
 	// upload up to the limit chunks, without releasing the request
@@ -111,7 +111,7 @@ func TestUploadChunkCount(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			info, err := u.Begin(tc.FileSize)
+			info, err := u.Begin(tc.FileSize, "", "")
 			assert.NoError(t, err)
 			assert.Equal(t, tc.ExpectedCount, info.Count)
 		})
@@ -135,7 +135,7 @@ func TestChunkMarksFinal(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			info, err := u.Begin(tc.FileSize)
+			info, err := u.Begin(tc.FileSize, "", "")
 			assert.NoError(t, err)
 
 			if tc.FinalChunk > 0 {
