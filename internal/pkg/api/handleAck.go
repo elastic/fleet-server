@@ -20,7 +20,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -336,13 +335,18 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	for _, output := range agent.Outputs {
+		if !agent.Active {
+			// stop processing if agent is inactive
+			break
+		}
+
 		if output.Type != policy.OutputTypeElasticsearch {
 			continue
 		}
 
 		err := ack.updateAPIKey(ctx,
 			zlog,
-			agent.Id,
+			agent,
 			currRev, currCoord,
 			agent.PolicyID,
 			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
@@ -357,7 +361,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 
 func (ack *AckT) updateAPIKey(ctx context.Context,
 	zlog zerolog.Logger,
-	agentID string,
+	agent *model.Agent,
 	currRev, currCoord int64,
 	policyID, apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
@@ -365,7 +369,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	if apiKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
-			if ack.isAPIKeyReadError(ctx, zlog, agentID, err) {
+			if isAgentActive(ctx, zlog, ack.bulk, agent.Id, err) {
 				zlog.Error().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
@@ -376,6 +380,9 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
 					Msg("Failed to read invalidated API Key roles")
+
+				// update to inactive for future checks
+				agent.Active = false
 			}
 		} else {
 			clean, removedRolesCount, err := cleanRoles(res.RoleDescriptors)
@@ -410,7 +417,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	err := ack.bulk.Update(
 		ctx,
 		dl.FleetAgents,
-		agentID,
+		agent.Id,
 		body,
 		bulk.WithRefresh(),
 		bulk.WithRetryOnConflict(3),
@@ -522,11 +529,8 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 	return nil
 }
 
-func (ack *AckT) isAPIKeyReadError(ctx context.Context, zlog zerolog.Logger, agentID string, err error) bool {
-	if !errors.Is(err, apikey.ErrAPIKeyNotFound) {
-		return false
-	}
-	agent, err := dl.FindAgent(ctx, ack.bulk, dl.QueryAgentByID, dl.FieldID, agentID)
+func isAgentActive(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, agentID string, err error) bool {
+	agent, err := dl.FindAgent(ctx, bulk, dl.QueryAgentByID, dl.FieldID, agentID)
 	if err != nil {
 		zlog.Warn().
 			Err(err).
