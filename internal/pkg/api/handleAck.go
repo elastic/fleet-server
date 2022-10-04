@@ -31,6 +31,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
+var (
+	errUpdatingInactiveAgent = errors.New("updating inactive agent")
+)
+
 type HTTPError struct {
 	Status int
 }
@@ -335,21 +339,20 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	for _, output := range agent.Outputs {
-		if !agent.Active {
-			// stop processing if agent is inactive
-			break
-		}
-
 		if output.Type != policy.OutputTypeElasticsearch {
 			continue
 		}
 
 		err := ack.updateAPIKey(ctx,
 			zlog,
-			agent,
+			agent.Id,
 			currRev, currCoord,
+			agent.PolicyID,
 			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
 		if err != nil {
+			if errors.Is(err, errUpdatingInactiveAgent) {
+				break
+			}
 			return err
 		}
 	}
@@ -360,28 +363,28 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 
 func (ack *AckT) updateAPIKey(ctx context.Context,
 	zlog zerolog.Logger,
-	agent *model.Agent,
+	agentID string,
 	currRev, currCoord int64,
-	apiKeyID, permissionHash string,
+	policyID, apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
 
 	if apiKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
-			if isAgentActive(ctx, zlog, ack.bulk, agent.Id) {
+			if isAgentActive(ctx, zlog, ack.bulk, agentID) {
 				zlog.Error().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
 					Msg("Failed to read API Key roles")
 			} else {
-				// not an error, race when API key was invalidated before acking
+				// race when API key was invalidated before acking
 				zlog.Info().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
 					Msg("Failed to read invalidated API Key roles")
 
-				// update to inactive for future checks
-				agent.Active = false
+				// prevents future checks
+				return errUpdatingInactiveAgent
 			}
 		} else {
 			clean, removedRolesCount, err := cleanRoles(res.RoleDescriptors)
@@ -408,7 +411,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	}
 
 	body := makeUpdatePolicyBody(
-		agent.PolicyID,
+		policyID,
 		currRev,
 		currCoord,
 	)
@@ -416,14 +419,14 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	err := ack.bulk.Update(
 		ctx,
 		dl.FleetAgents,
-		agent.Id,
+		agentID,
 		body,
 		bulk.WithRefresh(),
 		bulk.WithRetryOnConflict(3),
 	)
 
 	zlog.Err(err).
-		Str(LogPolicyID, agent.PolicyID).
+		Str(LogPolicyID, policyID).
 		Int64("policyRevision", currRev).
 		Int64("policyCoordinator", currCoord).
 		Msg("ack policy")
