@@ -20,6 +20,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -364,10 +365,18 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	if apiKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
-			zlog.Error().
-				Err(err).
-				Str(LogAPIKeyID, apiKeyID).
-				Msg("Failed to read API Key roles")
+			if ack.isAPIKeyReadError(ctx, zlog, apiKeyID, err) {
+				zlog.Error().
+					Err(err).
+					Str(LogAPIKeyID, apiKeyID).
+					Msg("Failed to read API Key roles")
+			} else {
+				// not an error, race when API key was invalidated before acking
+				zlog.Info().
+					Err(err).
+					Str(LogAPIKeyID, apiKeyID).
+					Msg("Failed to read invalidated API Key roles")
+			}
 		} else {
 			clean, removedRolesCount, err := cleanRoles(res.RoleDescriptors)
 			if err != nil {
@@ -511,6 +520,22 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 		Msg("ack upgrade")
 
 	return nil
+}
+
+func (ack *AckT) isAPIKeyReadError(ctx context.Context, zlog zerolog.Logger, apiKeyID string, err error) bool {
+	if !errors.Is(err, apikey.ErrAPIKeyNotFound) {
+		return false
+	}
+
+	agent, err := findAgentByAPIKeyID(ctx, ack.bulk, apiKeyID)
+	if err != nil {
+		zlog.Warn().
+			Err(err).
+			Msg("failed to find agent by api key")
+		return true
+	}
+
+	return agent.Active // it is a valid error in case agent is active (was not invalidated)
 }
 
 // Generate an update script that validates that the policy_id
