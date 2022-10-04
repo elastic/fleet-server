@@ -348,7 +348,6 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 			zlog,
 			agent,
 			currRev, currCoord,
-			agent.PolicyID,
 			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
 		if err != nil {
 			return err
@@ -363,7 +362,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	zlog zerolog.Logger,
 	agent *model.Agent,
 	currRev, currCoord int64,
-	policyID, apiKeyID, permissionHash string,
+	apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
 
 	if apiKeyID != "" {
@@ -409,7 +408,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	}
 
 	body := makeUpdatePolicyBody(
-		policyID,
+		agent.PolicyID,
 		currRev,
 		currCoord,
 	)
@@ -424,7 +423,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	)
 
 	zlog.Err(err).
-		Str(LogPolicyID, policyID).
+		Str(LogPolicyID, agent.PolicyID).
 		Int64("policyRevision", currRev).
 		Int64("policyCoordinator", currCoord).
 		Msg("ack policy")
