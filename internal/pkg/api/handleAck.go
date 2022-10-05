@@ -509,6 +509,9 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 		if pl.Retry {
 			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as retrying")
 			doc[dl.FieldUpgradeStatus] = "retrying" // TODO should we also change FieldUpgradedAt and FieldUpgradeStated at?
+		} else {
+			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as failed")
+			doc[dl.FieldUpgradeStatus] = "failed" // TODO should we also change FieldUpgradedAt and FieldUpgradeStated at?
 		}
 	}
 

@@ -415,7 +415,7 @@ func TestHandleAckEvents(t *testing.T) {
 					Error:    "Error with no payload",
 				},
 			},
-			res: newAckResponse(true, []AckResponseItem{
+			res: newAckResponse(false, []AckResponseItem{
 				{
 					Status:  http.StatusOK,
 					Message: http.StatusText(http.StatusOK),
@@ -443,7 +443,7 @@ func TestHandleAckEvents(t *testing.T) {
 					Payload:  json.RawMessage(`{"retry":true,"retry_attempt":1}`),
 				},
 			},
-			res: newAckResponse(true, []AckResponseItem{
+			res: newAckResponse(false, []AckResponseItem{
 				{
 					Status:  http.StatusOK,
 					Message: http.StatusText(http.StatusOK),
@@ -457,17 +457,7 @@ func TestHandleAckEvents(t *testing.T) {
 					}},
 				}}, nil).Once()
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
-				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(t *testing.T, body []byte) bool {
-					t.Helper()
-					var pl struct {
-						Retry   bool `json:"retry"`
-						Attempt int  `json:"retry_attempt"`
-					}
-					if err := json.Unmarshal(body, &pl); err != nil {
-						t.Fatal(err)
-					}
-					return pl.Retry && pl.Attempt == 1
-				}), mock.Anything).Return(nil).Once()
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				return m
 			},
 		},
@@ -555,5 +545,86 @@ func TestInvalidateAPIKeys(t *testing.T) {
 		ack.invalidateAPIKeys(context.Background(), out.ToRetireAPIKeyIds, skip)
 
 		bulker.AssertExpectations(t)
+	}
+}
+
+func TestAckHandleUpgrade(t *testing.T) {
+	tests := []struct {
+		name   string
+		event  Event
+		bulker func(t *testing.T) *ftesting.MockBulk
+	}{{
+		name:  "ok",
+		event: Event{},
+		bulker: func(t *testing.T) *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			return m
+		},
+	}, {
+		name: "retry signaled",
+		event: Event{
+			Error:   "upgrade error",
+			Payload: json.RawMessage(`{"retry":true,"retry_attempt":1}`),
+		},
+		bulker: func(t *testing.T) *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
+				var body struct {
+					Doc struct {
+						Status string `json:"upgrade_status"`
+					} `json:"doc"`
+				}
+				if err := json.Unmarshal(p, &body); err != nil {
+					t.Fatal(err)
+				}
+				return body.Doc.Status == "retrying"
+			}), mock.Anything).Return(nil).Once()
+			return m
+		},
+	}, {
+		name: "no more retries",
+		event: Event{
+			Error:   "upgrade error",
+			Payload: json.RawMessage(`{"retry":false}`),
+		},
+		bulker: func(t *testing.T) *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
+				var body struct {
+					Doc struct {
+						Status string `json:"upgrade_status"`
+					} `json:"doc"`
+				}
+				if err := json.Unmarshal(p, &body); err != nil {
+					t.Fatal(err)
+				}
+				return body.Doc.Status == "failed"
+			}), mock.Anything).Return(nil).Once()
+			return m
+		},
+	}}
+	cfg := &config.Server{
+		Limits: config.ServerLimits{},
+	}
+	agent := &model.Agent{
+		ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+		Agent:      &model.AgentMetadata{Version: "8.0.0"},
+	}
+	ctx := context.Background()
+	cache, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			bulker := tc.bulker(t)
+			ack := NewAckT(cfg, bulker, cache)
+
+			err := ack.handleUpgrade(ctx, logger, agent, tc.event)
+			assert.NoError(t, err)
+			bulker.AssertExpectations(t)
+		})
 	}
 }
