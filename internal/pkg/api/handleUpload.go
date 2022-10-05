@@ -302,6 +302,9 @@ func uploadRequestToFileInfo(req FileInfo, chunkSize int64) model.FileInfo {
 			Type:       req.File.Type,
 			Uid:        req.File.UID,
 		},
+		ActionID: req.ActionID,
+		AgentID:  req.AgentID,
+		Source:   req.Source,
 	}
 }
 

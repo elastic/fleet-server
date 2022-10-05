@@ -284,12 +284,21 @@ type EventInformation struct {
 type FileInfo struct {
 	ESDocument
 
+	// The identifier for the action requesting this upload
+	ActionID string `json:"action_id,omitempty"`
+
+	// The unique identifier of the uploading agent
+	AgentID string `json:"agent_id,omitempty"`
+
 	// Event identifiers to coordinate the source reason
 	Event *EventInformation `json:"event,omitempty"`
 
 	// Information about the file properties
 	File *FileMetadata `json:"file,omitempty"`
 	Host *HostMetadata `json:"host,omitempty"`
+
+	// The integration initiating this file upload
+	Source string `json:"source,omitempty"`
 }
 
 // FileMetadata Information about the file properties

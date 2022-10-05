@@ -642,6 +642,20 @@
           "type": "string",
           "format": "uuid"
         },
+        "agent_id": {
+          "description": "The unique identifier of the uploading agent",
+          "type": "string",
+          "format": "uuid"
+        },
+        "action_id": {
+          "description": "The identifier for the action requesting this upload",
+          "type": "string",
+          "format": "uuid"
+        },
+        "source": {
+          "description": "The integration initiating this file upload",
+          "type": "string"
+        },
         "file": {
           "title": "File Metadata",
           "description": "Information about the file properties",
