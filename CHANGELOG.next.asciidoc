@@ -11,12 +11,9 @@
 - Improve authc debug logging. {pull}1870[1870]
 - Add error detail to catch-all HTTP error response. {pull}1854[1854]
 - Fix issue were errors where being ignored written to elasticsearch. {pull}1896[1896]
-<<<<<<< HEAD
 - LoadServerLimits will not overwrite specified limits when loading default/agent number specified values. {issue}1841[1841] {pull}1912[1912]
 - Use seperate rate limiters for internal and external API listeners. {issue}1859[1859] {pull}1904[1904]
-=======
 - Update apikey.cache_hit log field name to match convention. {pull}1900[1900]
->>>>>>> 95b57a0 (Update apikey.cache_hit log field name to match convention (#1900))
 
 ==== New Features
 
