@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	errUpdatingInactiveAgent = errors.New("updating inactive agent")
+	ErrUpdatingInactiveAgent = errors.New("updating inactive agent")
 )
 
 type HTTPError struct {
@@ -350,9 +350,6 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 			agent.PolicyID,
 			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
 		if err != nil {
-			if errors.Is(err, errUpdatingInactiveAgent) {
-				break
-			}
 			return err
 		}
 	}
@@ -384,7 +381,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 					Msg("Failed to read invalidated API Key roles")
 
 				// prevents future checks
-				return errUpdatingInactiveAgent
+				return ErrUpdatingInactiveAgent
 			}
 		} else {
 			clean, removedRolesCount, err := cleanRoles(res.RoleDescriptors)
