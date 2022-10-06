@@ -612,7 +612,7 @@ func TestAckHandleUpgrade(t *testing.T) {
 		Agent:      &model.AgentMetadata{Version: "8.0.0"},
 	}
 	ctx := context.Background()
-	cache, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+	cache, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	if err != nil {
 		t.Fatal(err)
 	}
