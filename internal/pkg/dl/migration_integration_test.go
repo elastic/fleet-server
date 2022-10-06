@@ -155,12 +155,29 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 	for i, id := range agentIDs {
 		wantOutputType := "elasticsearch" //nolint:goconst // test cases have some duplication
 
-		got, err := FindAgent(
-			context.Background(), bulker, QueryAgentByID, FieldID, id, WithIndexName(index))
-		if err != nil {
-			assert.NoError(t, err, "failed to find agent ID %q", id) // we want to continue even if a single agent fails
-			continue
-		}
+		res, err := SearchWithOneParam(context.Background(), bulker, QueryAgentByID, index, FieldID, id)
+		require.NoError(t, err)
+		require.Len(t, res.Hits, 1)
+
+		var got model.Agent
+		err = res.Hits[0].Unmarshal(&got)
+		require.NoError(t, err, "could not unmarshal ES document into model.Agent")
+
+		gotDeprecatedFields := struct {
+			// Deprecated. Use Outputs instead. API key the Elastic Agent uses to authenticate with elasticsearch
+			DefaultAPIKey *string `json:"default_api_key,omitempty"`
+
+			// Deprecated. Use Outputs instead. Default API Key History
+			DefaultAPIKeyHistory []model.ToRetireAPIKeyIdsItems `json:"default_api_key_history,omitempty"`
+
+			// Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch
+			DefaultAPIKeyID *string `json:"default_api_key_id,omitempty"`
+
+			// Deprecated. Use Outputs instead. The policy output permissions hash
+			PolicyOutputPermissionsHash *string `json:"policy_output_permissions_hash,omitempty"`
+		}{}
+		err = res.Hits[0].Unmarshal(&gotDeprecatedFields)
+		require.NoError(t, err, "could not unmarshal ES document into gotDeprecatedFields")
 
 		wantToRetireAPIKeyIds := []model.ToRetireAPIKeyIdsItems{
 			{
@@ -196,10 +213,10 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 		}
 
 		// Assert deprecated fields
-		assert.Empty(t, got.DefaultAPIKey)
-		assert.Empty(t, got.DefaultAPIKey)
-		assert.Empty(t, got.PolicyOutputPermissionsHash)
-		assert.Nil(t, got.DefaultAPIKeyHistory)
+		assert.Nil(t, gotDeprecatedFields.DefaultAPIKey)
+		assert.Nil(t, gotDeprecatedFields.DefaultAPIKeyID)
+		assert.Nil(t, gotDeprecatedFields.PolicyOutputPermissionsHash)
+		assert.Nil(t, gotDeprecatedFields.DefaultAPIKeyHistory)
 	}
 }
 
@@ -249,9 +266,30 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
 	require.NoError(t, err)
 
-	got, err := FindAgent(
-		context.Background(), bulker, QueryAgentByID, FieldID, agentID, WithIndexName(index))
-	require.NoError(t, err, "failed to find agent ID %q", agentID) // we want to continue even if a single agent fails
+	res, err := SearchWithOneParam(
+		context.Background(), bulker, QueryAgentByID, index, FieldID, agentID)
+	require.NoError(t, err, "failed to find agent ID %q", agentID)
+	require.Len(t, res.Hits, 1)
+
+	var got model.Agent
+	err = res.Hits[0].Unmarshal(&got)
+	require.NoError(t, err, "could not unmarshal ES document into model.Agent")
+
+	gotDeprecatedFields := struct {
+		// Deprecated. Use Outputs instead. API key the Elastic Agent uses to authenticate with elasticsearch
+		DefaultAPIKey *string `json:"default_api_key,omitempty"`
+
+		// Deprecated. Use Outputs instead. Default API Key History
+		DefaultAPIKeyHistory []model.ToRetireAPIKeyIdsItems `json:"default_api_key_history,omitempty"`
+
+		// Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch
+		DefaultAPIKeyID *string `json:"default_api_key_id,omitempty"`
+
+		// Deprecated. Use Outputs instead. The policy output permissions hash
+		PolicyOutputPermissionsHash *string `json:"policy_output_permissions_hash,omitempty"`
+	}{}
+	err = res.Hits[0].Unmarshal(&gotDeprecatedFields)
+	require.NoError(t, err, "could not unmarshal ES document into gotDeprecatedFields")
 
 	assert.Equal(t, 1, migratedAgents)
 
@@ -273,10 +311,10 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 	}
 
 	// Assert deprecated fields
-	assert.Empty(t, got.DefaultAPIKey)
-	assert.Empty(t, got.DefaultAPIKey)
-	assert.Empty(t, got.PolicyOutputPermissionsHash)
-	assert.Nil(t, got.DefaultAPIKeyHistory)
+	assert.Nil(t, gotDeprecatedFields.DefaultAPIKey)
+	assert.Nil(t, gotDeprecatedFields.DefaultAPIKey)
+	assert.Nil(t, gotDeprecatedFields.PolicyOutputPermissionsHash)
+	assert.Nil(t, gotDeprecatedFields.DefaultAPIKeyHistory)
 }
 
 func TestMigrateOutputs_no_agent_document(t *testing.T) {

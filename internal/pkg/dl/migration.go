@@ -254,9 +254,9 @@ ctx._source['` + fieldOutputs + `']['default'].permissions_hash=ctx._source.poli
 
 // Erase deprecated fields
 ctx._source.default_api_key_history=null;
-ctx._source.default_api_key="";
-ctx._source.default_api_key_id="";
-ctx._source.policy_output_permissions_hash="";
+ctx._source.default_api_key=null;
+ctx._source.default_api_key_id=null;
+ctx._source.policy_output_permissions_hash=null;
 `
 	query.Param("script", map[string]interface{}{
 		"lang":   "painless",
