@@ -115,6 +115,7 @@ func updateAgentMetadata(ctx context.Context, bulker bulk.Bulk, body []byte) (in
 	}
 
 	log.Info().
+<<<<<<< HEAD
 		Int("took", resp.Took).
 		Bool("timed_out", resp.TimedOut).
 		Int("total", resp.Total).
@@ -127,6 +128,21 @@ func updateAgentMetadata(ctx context.Context, bulker bulk.Bulk, body []byte) (in
 		Int("retries.search", resp.Retries.Search).
 		Dur("rtt", time.Since(start)).
 		Msg("migrate agent records response")
+=======
+		Str("fleet.migration.name", name).
+		Int("fleet.migration.es.took", resp.Took).
+		Bool("fleet.migration.es.timed_out", resp.TimedOut).
+		Int("fleet.migration.updated", resp.Updated).
+		Int("fleet.migration.deleted", resp.Deleted).
+		Int("fleet.migration.batches", resp.Batches).
+		Int("fleet.migration.version_conflicts", resp.VersionConflicts).
+		Int("fleet.migration.noops", resp.Noops).
+		Int("fleet.migration.retries.bulk", resp.Retries.Bulk).
+		Int("fleet.migration.retries.search", resp.Retries.Search).
+		Dur("fleet.migration.total.duration", time.Since(start)).
+		Int("fleet.migration.total.count", resp.Total).
+		Msgf("migration %s done", name)
+>>>>>>> 60ba1cf (Fix fleet.migration.total log key overlap (#1951))
 
 	for _, fail := range resp.Failures {
 		log.Error().RawJSON("failure", fail).Msg("migration failure")
