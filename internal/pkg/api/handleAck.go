@@ -531,7 +531,7 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 func isAgentActive(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, agentID string) bool {
 	agent, err := dl.FindAgent(ctx, bulk, dl.QueryAgentByID, dl.FieldID, agentID)
 	if err != nil {
-		zlog.Warn().
+		zlog.Error().
 			Err(err).
 			Msg("failed to find agent by ID")
 		return true
