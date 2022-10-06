@@ -376,6 +376,10 @@ func convertActions(agentID string, actions []model.Action) ([]ActionResp, strin
 
 	respList := make([]ActionResp, 0, sz)
 	for _, action := range actions {
+		if action.Type == "POLICY_CHANGE" {
+			log.Warn().Str("agent_id", agentID).Str("action_id", action.ActionID).Msg("Removing POLICY_CHANGE action found in index from check in response")
+			continue
+		}
 		respList = append(respList, ActionResp{
 			AgentID:    agentID,
 			CreatedAt:  action.Timestamp,

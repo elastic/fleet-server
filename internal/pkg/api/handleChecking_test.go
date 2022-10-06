@@ -15,25 +15,60 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConvertActionsEmpty(t *testing.T) {
-	resp, token := convertActions("1234", nil)
-	assert.Equal(t, resp, []ActionResp{})
-	assert.Equal(t, token, "")
-}
-
 func TestConvertActions(t *testing.T) {
-	actions := []model.Action{
-		{
-			ActionID: "1234",
-		},
-	}
-	resp, token := convertActions("agent-id", actions)
-	assert.Equal(t, resp, []ActionResp{
-		{
+	tests := []struct {
+		name    string
+		actions []model.Action
+		resp    []ActionResp
+		token   string
+	}{{
+		name:    "empty actions",
+		actions: nil,
+		resp:    []ActionResp{},
+		token:   "",
+	}, {
+		name:    "single action",
+		actions: []model.Action{{ActionID: "1234"}},
+		resp: []ActionResp{{
 			AgentID: "agent-id",
 			ID:      "1234",
 			Data:    json.RawMessage(nil),
+		}},
+		token: "",
+	}, {
+		name: "multiple actions",
+		actions: []model.Action{
+			{ActionID: "1234"},
+			{ActionID: "5678"},
 		},
-	})
-	assert.Equal(t, token, "")
+		resp: []ActionResp{{
+			AgentID: "agent-id",
+			ID:      "1234",
+			Data:    json.RawMessage(nil),
+		}, {
+			AgentID: "agent-id",
+			ID:      "5678",
+			Data:    json.RawMessage(nil),
+		}},
+		token: "",
+	}, {
+		name: "remove POLICY_CHANGE action",
+		actions: []model.Action{
+			{ActionID: "1234", Type: "POLICY_CHANGE"},
+			{ActionID: "5678"},
+		},
+		resp: []ActionResp{{
+			AgentID: "agent-id",
+			ID:      "5678",
+			Data:    json.RawMessage(nil),
+		}},
+		token: "",
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			resp, token := convertActions("agent-id", tc.actions)
+			assert.Equal(t, tc.resp, resp)
+			assert.Equal(t, tc.token, token)
+		})
+	}
 }
