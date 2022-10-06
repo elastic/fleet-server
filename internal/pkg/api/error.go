@@ -118,6 +118,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		{
+			ErrUpdatingInactiveAgent,
+			HTTPErrResp{
+				http.StatusUnauthorized,
+				"Unauthorized",
+				"Agent not active",
+				zerolog.InfoLevel,
+			},
+		},
 	}
 
 	for _, e := range errTable {
