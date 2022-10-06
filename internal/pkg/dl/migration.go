@@ -223,8 +223,10 @@ func migrateAgentOutputs() (string, string, []byte, error) {
 		fieldRetiredAt       = "retiredAt"
 	)
 
-	query := dsl.NewRoot()
-	query.Query().Bool().Must().Exists(fieldDefaultAPIKeyID)
+	root := dsl.NewRoot()
+	tmpl := dsl.NewTmpl()
+
+	root.Query().Bool().Must().Term(fieldDefaultAPIKeyID, tmpl.Bind(fieldDefaultAPIKeyID), nil)
 
 	fields := map[string]interface{}{fieldRetiredAt: timeNow().UTC().Format(time.RFC3339)}
 	painless := `
@@ -258,13 +260,15 @@ ctx._source.default_api_key="";
 ctx._source.default_api_key_id="";
 ctx._source.policy_output_permissions_hash="";
 `
-	query.Param("script", map[string]interface{}{
+	root.Param("script", map[string]interface{}{
 		"lang":   "painless",
 		"source": painless,
 		"params": fields,
 	})
 
-	body, err := query.MarshalJSON()
+	tmpl.MustResolve(root)
+
+	body, err := tmpl.Render(map[string]interface{}{fieldDefaultAPIKeyID: ""})
 	if err != nil {
 		return migrationName, FleetAgents, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
