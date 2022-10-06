@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	fserver "github.com/elastic/fleet-server/v7/internal/pkg/server"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/suite"
 )
@@ -117,7 +118,7 @@ func (s *agentSuite) TestAgentMode(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		agent, err := NewAgentMode(ucfg.New(), r, biInfo)
+		agent, err := fserver.NewAgent(ucfg.New(), r, biInfo)
 		require.NoError(t, err)
 		err = agent.Run(ctx)
 		assert.NoError(t, err)

@@ -9,9 +9,11 @@ package cache
 
 import (
 	"time"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
 
-func newCache(_ Config) (Cacher, error) {
+func newCache(_ config.Cache) (Cacher, error) {
 	return &NoCache{}, nil
 }
 

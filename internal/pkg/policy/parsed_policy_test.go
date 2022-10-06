@@ -6,7 +6,6 @@ package policy
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
@@ -50,7 +49,7 @@ func TestNewParsedPolicy(t *testing.T) {
 
 		for _, f := range fields {
 			if _, ok := pp.Fields[f]; !ok {
-				t.Error(fmt.Sprintf("Missing field %s", f))
+				t.Errorf("Missing field %s", f)
 			}
 		}
 
@@ -70,7 +69,7 @@ func TestNewParsedPolicy(t *testing.T) {
 
 		expectedSha2 := "d4d0840fe28ca4900129a749b56cee729562c0a88c935192c659252b5b0d762a"
 		if defaultOutput.Role.Sha2 != expectedSha2 {
-			t.Fatal(fmt.Sprintf("Expected sha2: '%s', got '%s'.", expectedSha2, defaultOutput.Role.Sha2))
+			t.Fatalf("Expected sha2: '%s', got '%s'.", expectedSha2, defaultOutput.Role.Sha2)
 		}
 	}
 }
@@ -104,7 +103,7 @@ func TestNewParsedPolicyNoES(t *testing.T) {
 
 	for _, f := range fields {
 		if _, ok := pp.Fields[f]; !ok {
-			t.Error(fmt.Sprintf("Missing field %s", f))
+			t.Errorf("Missing field %s", f)
 		}
 	}
 
