@@ -31,6 +31,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
+var (
+	ErrUpdatingInactiveAgent = errors.New("updating inactive agent")
+)
+
 type HTTPError struct {
 	Status int
 }
@@ -364,10 +368,21 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	if apiKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
-			zlog.Error().
-				Err(err).
-				Str(LogAPIKeyID, apiKeyID).
-				Msg("Failed to read API Key roles")
+			if isAgentActive(ctx, zlog, ack.bulk, agentID) {
+				zlog.Error().
+					Err(err).
+					Str(LogAPIKeyID, apiKeyID).
+					Msg("Failed to read API Key roles")
+			} else {
+				// race when API key was invalidated before acking
+				zlog.Info().
+					Err(err).
+					Str(LogAPIKeyID, apiKeyID).
+					Msg("Failed to read invalidated API Key roles")
+
+				// prevents future checks
+				return ErrUpdatingInactiveAgent
+			}
 		} else {
 			clean, removedRolesCount, err := cleanRoles(res.RoleDescriptors)
 			if err != nil {
@@ -511,6 +526,18 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 		Msg("ack upgrade")
 
 	return nil
+}
+
+func isAgentActive(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, agentID string) bool {
+	agent, err := dl.FindAgent(ctx, bulk, dl.QueryAgentByID, dl.FieldID, agentID)
+	if err != nil {
+		zlog.Error().
+			Err(err).
+			Msg("failed to find agent by ID")
+		return true
+	}
+
+	return agent.Active // it is a valid error in case agent is active (was not invalidated)
 }
 
 // Generate an update script that validates that the policy_id
