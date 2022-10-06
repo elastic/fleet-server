@@ -220,6 +220,31 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 	}
 }
 
+func TestMigrateOutputs_dontMigrateTwice(t *testing.T) {
+	now, err := time.Parse(time.RFC3339, nowStr)
+	require.NoError(t, err, "could not parse time "+nowStr)
+	timeNow = func() time.Time {
+		return now
+	}
+
+	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
+	apiKey := bulk.APIKey{
+		ID:  "testAgent_",
+		Key: "testAgent_key_",
+	}
+
+	agentIDs := createSomeAgents(t, 25, apiKey, index, bulker)
+
+	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
+	require.NoError(t, err)
+	assert.Equal(t, len(agentIDs), migratedAgents)
+
+	migratedAgents2, err := migrate(context.Background(), bulker, migrateAgentOutputs)
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, migratedAgents2)
+}
+
 func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 	wantOutputType := "elasticsearch"
 

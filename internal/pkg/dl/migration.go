@@ -224,7 +224,7 @@ func migrateAgentOutputs() (string, string, []byte, error) {
 	)
 
 	query := dsl.NewRoot()
-	query.Query().Bool().MustNot().Term(fieldDefaultAPIKeyID, "", nil)
+	query.Query().Bool().Must().Exists(fieldDefaultAPIKeyID)
 
 	fields := map[string]interface{}{fieldRetiredAt: timeNow().UTC().Format(time.RFC3339)}
 	painless := `
