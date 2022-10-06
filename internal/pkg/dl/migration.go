@@ -217,13 +217,14 @@ func migrateToV8_5(ctx context.Context, bulker bulk.Bulk) error {
 // this change fixes.
 func migrateAgentOutputs() (string, string, []byte, error) {
 	const (
-		migrationName  = "AgentOutputs"
-		fieldOutputs   = "outputs"
-		fieldRetiredAt = "retiredAt"
+		migrationName        = "AgentOutputs"
+		fieldOutputs         = "outputs"
+		fieldDefaultAPIKeyID = "default_api_key_id"
+		fieldRetiredAt       = "retiredAt"
 	)
 
 	query := dsl.NewRoot()
-	query.Query().Bool().MustNot().Exists(fieldOutputs)
+	query.Query().Bool().Must().Exists(fieldDefaultAPIKeyID)
 
 	fields := map[string]interface{}{fieldRetiredAt: timeNow().UTC().Format(time.RFC3339)}
 	painless := `
