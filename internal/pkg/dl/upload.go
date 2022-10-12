@@ -8,12 +8,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/upload"
+	"github.com/elastic/fleet-server/v7/internal/pkg/upload/cbor"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/rs/zerolog/log"
@@ -24,7 +25,22 @@ const (
 	// somewhat configurable, but need to follow a pattern so that Fleet Server has write access
 	FileHeaderIndexPattern = ".fleet-%s-files"
 	FileDataIndexPattern   = ".fleet-%s-file-data"
+
+	FieldBaseID = "bid"
 )
+
+var (
+	QueryChunkIDs = prepareFindChunkIDs()
+)
+
+func prepareFindChunkIDs() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	root.Param(FieldSource, false)
+	root.Query().Term(FieldBaseID, tmpl.Bind(FieldBaseID), nil)
+	tmpl.MustResolve(root)
+	return tmpl
+}
 
 func CreateUploadInfo(ctx context.Context, bulker bulk.Bulk, fi model.FileInfo, source string, fileID string) (string, error) {
 	return createUploadInfo(ctx, bulker, fmt.Sprintf(FileHeaderIndexPattern, source), fi, fileID)
@@ -46,8 +62,7 @@ func updateUpload(ctx context.Context, bulker bulk.Bulk, index string, fileID st
 	return bulker.Update(ctx, index, fileID, data)
 }
 
-func UploadChunk(ctx context.Context, client *elasticsearch.Client, data io.ReadCloser, chunkInfo upload.ChunkInfo) error {
-	cbor := upload.NewCBORChunkWriter(data, chunkInfo.Final, chunkInfo.Upload.DocID, chunkInfo.Upload.ChunkSize)
+func UploadChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, docID string, chunkID int) error {
 
 	/*
 		// the non-streaming version
@@ -69,9 +84,10 @@ func UploadChunk(ctx context.Context, client *elasticsearch.Client, data io.Read
 	*/
 
 	req := esapi.IndexRequest{
-		Index:      fmt.Sprintf(FileDataIndexPattern, chunkInfo.Upload.Source),
-		Body:       cbor,
-		DocumentID: fmt.Sprintf("%s.%d", chunkInfo.Upload.DocID, chunkInfo.ID),
+		Index:      fmt.Sprintf(FileDataIndexPattern, source),
+		Body:       body,
+		DocumentID: fmt.Sprintf("%s.%d", docID, chunkID),
+		Refresh:    "true",
 	}
 	// need to set the Content-Type of the request to CBOR, notes below
 	overrider := contentTypeOverrider{client}
@@ -136,4 +152,33 @@ type ChunkUploadResponse struct {
 			Reason string `json:"reason"`
 		} `json:"caused_by"`
 	} `json:"error"`
+}
+
+func ListChunkIDs(ctx context.Context, bulker bulk.Bulk, source string, fileID string) ([]es.HitT, error) {
+	return listChunkIDs(ctx, bulker, fmt.Sprintf(FileDataIndexPattern, source), fileID)
+}
+
+func listChunkIDs(ctx context.Context, bulker bulk.Bulk, index string, fileID string) ([]es.HitT, error) {
+	query, err := QueryChunkIDs.Render(map[string]interface{}{
+		FieldBaseID: fileID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := bulker.Search(ctx, index, query)
+	if err != nil {
+		return nil, err
+	}
+	return res.HitsT.Hits, nil
+}
+
+func GetChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkID int) (model.FileChunk, error) {
+	var chunk model.FileChunk
+	out, err := bulker.Read(ctx, fmt.Sprintf(FileDataIndexPattern, source), fmt.Sprintf("%s.%d", fileID, chunkID))
+	if err != nil {
+		return chunk, err
+	}
+	err = json.Unmarshal(out, &chunk)
+	return chunk, err
 }

@@ -380,11 +380,21 @@ type FileMetadata struct {
 	Uid string `json:"uid,omitempty"`
 }
 
+type FileChunk struct {
+	ESDocument
+
+	BID  string `json:"bid"`
+	Data []byte `json:"data"`
+	Last bool   `json:"last"`
+}
+
 // Hash Checksums on the file contents
 type Hash struct {
 
 	// SHA256 sum of the file contents
 	Sha256 string `json:"sha256,omitempty"`
+	// MD5 sum of the file contents
+	Md5 string `json:"md5,omitempty"`
 }
 
 // HostMetadata The host metadata for the Elastic Agent

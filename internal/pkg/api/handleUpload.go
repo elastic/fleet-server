@@ -6,9 +6,12 @@ package api
 
 import (
 	"context"
+	"crypto/md5"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
 	"strconv"
@@ -23,6 +26,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/upload"
+	"github.com/elastic/fleet-server/v7/internal/pkg/upload/cbor"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog"
@@ -203,7 +207,18 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 
 	docID := fmt.Sprintf("%s.%s", fi.ActionID, fi.AgentID)
 
-	op, err := ut.upl.Begin(fi.File.Size, docID, fi.Source)
+	var hasher hash.Hash
+	var sum string
+	switch {
+	case fi.File.Hash.SHA256 != "":
+		hasher = sha256.New()
+		sum = fi.File.Hash.SHA256
+	case fi.File.Hash.MD5 != "":
+		hasher = md5.New()
+		sum = fi.File.Hash.MD5
+	}
+
+	op, err := ut.upl.Begin(fi.File.Size, docID, fi.Source, sum, hasher)
 	if err != nil {
 		return err
 	}
@@ -245,14 +260,15 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 
 	// prevent over-sized chunks
 	data := http.MaxBytesReader(w, r.Body, upload.MaxChunkSize)
-	if err := dl.UploadChunk(r.Context(), ut.chunkClient, data, chunkInfo); err != nil {
+	ce := cbor.NewChunkWriter(data, chunkInfo.Final, chunkInfo.Upload.DocID, chunkInfo.Upload.ChunkSize)
+	if err := dl.UploadChunk(r.Context(), ut.chunkClient, ce, chunkInfo.Upload.Source, chunkInfo.Upload.DocID, chunkInfo.ID); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
-	info, err := ut.upl.Complete(uplID)
+	info, err := ut.upl.Complete(uplID, ut.bulker)
 	if err != nil {
 		return err
 	}
@@ -288,6 +304,7 @@ func uploadRequestToFileInfo(req FileInfo, chunkSize int64) model.FileInfo {
 			Group:       req.File.Group,
 			Hash: &model.Hash{
 				Sha256: req.File.Hash.SHA256,
+				Md5:    req.File.Hash.MD5,
 			},
 			Inode:      req.File.INode,
 			MimeType:   req.File.Mime,

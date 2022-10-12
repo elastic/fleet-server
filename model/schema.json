@@ -682,6 +682,10 @@
                 "sha256": {
                   "description": "SHA256 sum of the file contents",
                   "type": "string"
+                },
+                "md5": {
+                  "description": "MD5 sum of the file contents",
+                  "type": "string"
                 }
               }
             },

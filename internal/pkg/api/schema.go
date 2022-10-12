@@ -188,6 +188,7 @@ type FileInfo struct {
 		Compression string `json:"Compression"`
 		Hash        struct {
 			SHA256 string `json:"sha256"`
+			MD5    string `json:"md5"`
 		}
 		Accessed    string   `json:"accessed"`
 		Attributes  []string `json:"attributes"`

@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package upload
+package cbor
 
 import (
 	"encoding/binary"
@@ -16,7 +16,7 @@ import (
 // in memory.
 // It is not a general-purpose CBOR encoder.
 // A suitable general purpose library, if the future needs one, is github.com/fxamacker/cbor/v2
-type cborEncoder struct {
+type ChunkEncoder struct {
 	chunk       io.ReadCloser
 	final       bool
 	preamble    []byte
@@ -25,8 +25,8 @@ type cborEncoder struct {
 	wroteTerm   bool
 }
 
-func NewCBORChunkWriter(chunkData io.ReadCloser, finalChunk bool, baseID string, chunkSize int64) *cborEncoder {
-	return &cborEncoder{
+func NewChunkWriter(chunkData io.ReadCloser, finalChunk bool, baseID string, chunkSize int64) *ChunkEncoder {
+	return &ChunkEncoder{
 		chunk:       chunkData,
 		final:       finalChunk,
 		preamble:    encodePreambleToCBOR(finalChunk, baseID, chunkSize),
@@ -99,7 +99,7 @@ func encodePreambleToCBOR(final bool, baseID string, chunkSize int64) []byte {
 }
 
 // io.Reader interface for streaming out
-func (c *cborEncoder) Read(buf []byte) (int, error) {
+func (c *ChunkEncoder) Read(buf []byte) (int, error) {
 	if c.wroteTerm { // already wrote a terminating instruction for undefined byte sequence length
 		return 0, io.EOF
 	}
