@@ -507,6 +507,7 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeStartedAt: nil,
+		dl.FieldUpgradeStatus:    nil,
 		dl.FieldUpgradedAt:       now,
 	}
 	if event.Error != "" {
