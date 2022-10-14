@@ -123,7 +123,6 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 		Str("fleet.migration.name", name).
 		Int("fleet.migration.es.took", resp.Took).
 		Bool("fleet.migration.es.timed_out", resp.TimedOut).
-		Int("fleet.migration.total", resp.Total).
 		Int("fleet.migration.updated", resp.Updated).
 		Int("fleet.migration.deleted", resp.Deleted).
 		Int("fleet.migration.batches", resp.Batches).
@@ -132,6 +131,7 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 		Int("fleet.migration.retries.bulk", resp.Retries.Bulk).
 		Int("fleet.migration.retries.search", resp.Retries.Search).
 		Dur("fleet.migration.total.duration", time.Since(start)).
+		Int("fleet.migration.total.count", resp.Total).
 		Msgf("migration %s done", name)
 
 	for _, fail := range resp.Failures {
