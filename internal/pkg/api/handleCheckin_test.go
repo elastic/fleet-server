@@ -65,7 +65,7 @@ func TestFilterActions(t *testing.T) {
 	tests := []struct {
 		name    string
 		actions []model.Action
-		results []model.Action
+		resp    []model.Action
 	}{{
 		name:    "empty list",
 		actions: []model.Action{},
@@ -95,7 +95,7 @@ func TestFilterActions(t *testing.T) {
 		}},
 	}}
 	for _, tc := range tests {
-		t.Run(ts.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			resp := filterActions("agent-id", tc.actions)
 			assert.Equal(t, tc.resp, resp)
 		})
