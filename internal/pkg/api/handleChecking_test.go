@@ -51,24 +51,53 @@ func TestConvertActions(t *testing.T) {
 			Data:    json.RawMessage(nil),
 		}},
 		token: "",
-	}, {
-		name: "remove POLICY_CHANGE action",
-		actions: []model.Action{
-			{ActionID: "1234", Type: "POLICY_CHANGE"},
-			{ActionID: "5678"},
-		},
-		resp: []ActionResp{{
-			AgentID: "agent-id",
-			ID:      "5678",
-			Data:    json.RawMessage(nil),
-		}},
-		token: "",
 	}}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resp, token := convertActions("agent-id", tc.actions)
 			assert.Equal(t, tc.resp, resp)
 			assert.Equal(t, tc.token, token)
+		})
+	}
+}
+
+func TestFilterActions(t *testing.T) {
+	tests := []struct {
+		name    string
+		actions []model.Action
+		results []model.Action
+	}{{
+		name:    "empty list",
+		actions: []model.Action{},
+		resp:    []model.Action{},
+	}, {
+		name: "nothing filtered",
+		actions: []model.Action{{
+			ActionID: "1234",
+		}, {
+			ActionID: "5678",
+		}},
+		resp: []model.Action{{
+			ActionID: "1234",
+		}, {
+			ActionID: "5678",
+		}},
+	}, {
+		name: "filter POLICY_CHANGE action",
+		actions: []model.Action{{
+			ActionID: "1234",
+			Type:     TypePolicyChange,
+		}, {
+			ActionID: "5678",
+		}},
+		resp: []model.Action{{
+			ActionID: "5678",
+		}},
+	}}
+	for _, tc := range tests {
+		t.Run(ts.name, func(t *testing.T) {
+			resp := filterActions("agent-id", tc.actions)
+			assert.Equal(t, tc.resp, resp)
 		})
 	}
 }
