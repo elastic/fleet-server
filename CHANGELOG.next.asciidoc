@@ -15,6 +15,7 @@
 - Use seperate rate limiters for internal and external API listeners. {issue}1859[1859] {pull}1904[1904]
 - Update apikey.cache_hit log field name to match convention. {pull}1900[1900]
 - Fix fleet.migration.total log key overlap {pull}1951[1951]
+- Remove POLICY_CHANGE actions from list retrieved from actions index before sending actions to agent on Checkin. {issue}1773[1773] {pull}1963[1963]
 
 ==== New Features
 
@@ -25,3 +26,7 @@
 - Fleet Server now allows setting global labels on APM instrumentation. {pull}1649[1649]
 - Fleet Server now allows setting transaction sample rate on APM instrumentation {pull}1681[1681]
 - Log redacted config when config updates. {issue}1626[1626] {pull}1668[1668]
+<<<<<<< HEAD
+=======
+- Storing checkin message in last_checkin_message {pull}1932[1932]
+>>>>>>> b51bf97 (Don't send POLICY_CHANGE actions retrieved from index to agent. (#1963))
