@@ -288,40 +288,52 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 }
 
 func uploadRequestToFileInfo(req FileInfo, chunkSize int64) model.FileInfo {
+	primaryFile := fileRequestToFileData(req.File)
+	primaryFile.ChunkSize = chunkSize
+	primaryFile.Status = string(UploadAwaiting)
+
+	contents := make([]model.FileData, len(req.Contents))
+	for i, f := range req.Contents {
+		contents[i] = fileRequestToFileData(f)
+	}
+
 	return model.FileInfo{
-		File: &model.FileMetadata{
-			Accessed:    req.File.Accessed,
-			Attributes:  req.File.Attributes,
-			ChunkSize:   chunkSize,
-			Compression: req.File.Compression,
-			Created:     req.File.Created,
-			Ctime:       req.File.CTime,
-			Device:      req.File.Device,
-			Directory:   req.File.Directory,
-			DriveLetter: req.File.DriveLetter,
-			Extension:   req.File.Extension,
-			Gid:         req.File.GID,
-			Group:       req.File.Group,
-			Hash: &model.Hash{
-				Sha256: req.File.Hash.SHA256,
-				Md5:    req.File.Hash.MD5,
-			},
-			Inode:      req.File.INode,
-			MimeType:   req.File.Mime,
-			Mode:       req.File.Mode,
-			Mtime:      req.File.MTime,
-			Name:       req.File.Name,
-			Owner:      req.File.Owner,
-			Path:       req.File.Path,
-			Size:       req.File.Size,
-			Status:     string(UploadAwaiting),
-			TargetPath: req.File.TargetPath,
-			Type:       req.File.Type,
-			Uid:        req.File.UID,
-		},
+		File:     &primaryFile,
+		Contents: contents,
 		ActionID: req.ActionID,
 		AgentID:  req.AgentID,
 		Source:   req.Source,
+	}
+}
+
+func fileRequestToFileData(req FileData) model.FileData {
+	return model.FileData{
+		Accessed:    req.Accessed,
+		Attributes:  req.Attributes,
+		Compression: req.Compression,
+		Created:     req.Created,
+		Ctime:       req.CTime,
+		Device:      req.Device,
+		Directory:   req.Directory,
+		DriveLetter: req.DriveLetter,
+		Extension:   req.Extension,
+		Gid:         req.GID,
+		Group:       req.Group,
+		Hash: &model.Hash{
+			Sha256: req.Hash.SHA256,
+			Md5:    req.Hash.MD5,
+		},
+		Inode:      req.INode,
+		MimeType:   req.Mime,
+		Mode:       req.Mode,
+		Mtime:      req.MTime,
+		Name:       req.Name,
+		Owner:      req.Owner,
+		Path:       req.Path,
+		Size:       req.Size,
+		TargetPath: req.TargetPath,
+		Type:       req.Type,
+		Uid:        req.UID,
 	}
 }
 

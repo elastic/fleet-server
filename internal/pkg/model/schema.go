@@ -280,29 +280,8 @@ type EventInformation struct {
 	ID string `json:"id,omitempty"`
 }
 
-// FileInfo An uploaded File
-type FileInfo struct {
-	ESDocument
-
-	// The identifier for the action requesting this upload
-	ActionID string `json:"action_id,omitempty"`
-
-	// The unique identifier of the uploading agent
-	AgentID string `json:"agent_id,omitempty"`
-
-	// Event identifiers to coordinate the source reason
-	Event *EventInformation `json:"event,omitempty"`
-
-	// Information about the file properties
-	File *FileMetadata `json:"file,omitempty"`
-	Host *HostMetadata `json:"host,omitempty"`
-
-	// The integration initiating this file upload
-	Source string `json:"source,omitempty"`
-}
-
-// FileMetadata Information about the file properties
-type FileMetadata struct {
+// FileData Information about the file properties
+type FileData struct {
 
 	// Last time the file was accessed
 	Accessed string `json:"accessed,omitempty"`
@@ -380,21 +359,44 @@ type FileMetadata struct {
 	Uid string `json:"uid,omitempty"`
 }
 
+// FileInfo An uploaded File
+type FileInfo struct {
+	ESDocument
+
+	// The identifier for the action requesting this upload
+	ActionID string `json:"action_id,omitempty"`
+
+	// The unique identifier of the uploading agent
+	AgentID string `json:"agent_id,omitempty"`
+
+	// Description of the contents of an archive, when the file property describes an archive (e.g. zip)
+	Contents []FileData `json:"contents,omitempty"`
+
+	// Event identifiers to coordinate the source reason
+	Event *EventInformation `json:"event,omitempty"`
+	File  *FileData         `json:"file,omitempty"`
+	Host  *HostMetadata     `json:"host,omitempty"`
+
+	// The integration initiating this file upload
+	Source string `json:"source,omitempty"`
+}
+
+// Hash Checksums on the file contents
+type Hash struct {
+
+	// MD5 sum of the file contents
+	Md5 string `json:"md5,omitempty"`
+
+	// SHA256 sum of the file contents
+	Sha256 string `json:"sha256,omitempty"`
+}
+
 type FileChunk struct {
 	ESDocument
 
 	BID  string `json:"bid"`
 	Data []byte `json:"data"`
 	Last bool   `json:"last"`
-}
-
-// Hash Checksums on the file contents
-type Hash struct {
-
-	// SHA256 sum of the file contents
-	Sha256 string `json:"sha256,omitempty"`
-	// MD5 sum of the file contents
-	Md5 string `json:"md5,omitempty"`
 }
 
 // HostMetadata The host metadata for the Elastic Agent
