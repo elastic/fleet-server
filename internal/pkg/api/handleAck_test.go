@@ -406,6 +406,61 @@ func TestHandleAckEvents(t *testing.T) {
 			},
 			err: &HTTPError{Status: http.StatusNotFound},
 		},
+		{
+			name: "upgrade action failed",
+			events: []Event{
+				{
+					ActionID: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
+					Type:     "UPGRADE",
+					Error:    "Error with no payload",
+				},
+			},
+			res: newAckResponse(false, []AckResponseItem{
+				{
+					Status:  http.StatusOK,
+					Message: http.StatusText(http.StatusOK),
+				},
+			}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"ab12dcd8-bde0-4045-92dc-c4b27668d73a","type":"UPGRADE"}`),
+					}},
+				}}, nil).Once()
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				return m
+			},
+		},
+		{
+			name: "upgrade action retrying",
+			events: []Event{
+				{
+					ActionID: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
+					Type:     "UPGRADE",
+					Error:    "Error with payload",
+					Payload:  json.RawMessage(`{"retry":true,"retry_attempt":1}`),
+				},
+			},
+			res: newAckResponse(false, []AckResponseItem{
+				{
+					Status:  http.StatusOK,
+					Message: http.StatusText(http.StatusOK),
+				},
+			}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"ab12dcd8-bde0-4045-92dc-c4b27668d73a","type":"UPGRADE"}`),
+					}},
+				}}, nil).Once()
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				return m
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -490,5 +545,86 @@ func TestInvalidateAPIKeys(t *testing.T) {
 		ack.invalidateAPIKeys(context.Background(), out.ToRetireAPIKeyIds, skip)
 
 		bulker.AssertExpectations(t)
+	}
+}
+
+func TestAckHandleUpgrade(t *testing.T) {
+	tests := []struct {
+		name   string
+		event  Event
+		bulker func(t *testing.T) *ftesting.MockBulk
+	}{{
+		name:  "ok",
+		event: Event{},
+		bulker: func(t *testing.T) *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			return m
+		},
+	}, {
+		name: "retry signaled",
+		event: Event{
+			Error:   "upgrade error",
+			Payload: json.RawMessage(`{"retry":true,"retry_attempt":1}`),
+		},
+		bulker: func(t *testing.T) *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
+				var body struct {
+					Doc struct {
+						Status string `json:"upgrade_status"`
+					} `json:"doc"`
+				}
+				if err := json.Unmarshal(p, &body); err != nil {
+					t.Fatal(err)
+				}
+				return body.Doc.Status == "retrying"
+			}), mock.Anything).Return(nil).Once()
+			return m
+		},
+	}, {
+		name: "no more retries",
+		event: Event{
+			Error:   "upgrade error",
+			Payload: json.RawMessage(`{"retry":false}`),
+		},
+		bulker: func(t *testing.T) *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
+				var body struct {
+					Doc struct {
+						Status string `json:"upgrade_status"`
+					} `json:"doc"`
+				}
+				if err := json.Unmarshal(p, &body); err != nil {
+					t.Fatal(err)
+				}
+				return body.Doc.Status == "failed"
+			}), mock.Anything).Return(nil).Once()
+			return m
+		},
+	}}
+	cfg := &config.Server{
+		Limits: config.ServerLimits{},
+	}
+	agent := &model.Agent{
+		ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+		Agent:      &model.AgentMetadata{Version: "8.0.0"},
+	}
+	ctx := context.Background()
+	cache, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			bulker := tc.bulker(t)
+			ack := NewAckT(cfg, bulker, cache)
+
+			err := ack.handleUpgrade(ctx, logger, agent, tc.event)
+			assert.NoError(t, err)
+			bulker.AssertExpectations(t)
+		})
 	}
 }
