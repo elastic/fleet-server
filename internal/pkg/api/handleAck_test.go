@@ -599,7 +599,7 @@ func TestAckHandleUpgrade(t *testing.T) {
 				if err := json.Unmarshal(p, &body); err != nil {
 					t.Fatal(err)
 				}
-				return body.Doc.Status == "failed"
+				return body.Doc.Status == ""
 			}), mock.Anything).Return(nil).Once()
 			return m
 		},

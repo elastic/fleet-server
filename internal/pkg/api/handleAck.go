@@ -505,11 +505,7 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 
 func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event Event) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	doc := bulk.UpdateFields{
-		dl.FieldUpgradeStartedAt: nil,
-		dl.FieldUpgradeStatus:    nil,
-		dl.FieldUpgradedAt:       now,
-	}
+	doc := bulk.UpdateFields{}
 	if event.Error != "" {
 		// unmarshal event payload
 		var pl struct {
@@ -524,10 +520,20 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 		// if the payload indicates a retry, mark change the upgrade status to retrying.
 		if pl.Retry {
 			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as retrying")
-			doc[dl.FieldUpgradeStatus] = "retrying" // TODO should we also change FieldUpgradedAt and FieldUpgradeStated at?
+			doc[dl.FieldUpgradeStatus] = "retrying" // Keep FieldUpgradeStatedAt abd FieldUpgradeded at to original values
 		} else {
-			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as failed")
-			doc[dl.FieldUpgradeStatus] = "failed" // TODO should we also change FieldUpgradedAt and FieldUpgradeStated at?
+			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("Agent upgrade failed, marking agent as healthy, agent logs contain failure message")
+			doc = bulk.UpdateFields{
+				dl.FieldUpgradeStartedAt: nil,
+				dl.FieldUpgradeStatus:    nil,
+				dl.FieldUpgradedAt:       now,
+			}
+		}
+	} else {
+		doc = bulk.UpdateFields{
+			dl.FieldUpgradeStartedAt: nil,
+			dl.FieldUpgradeStatus:    nil,
+			dl.FieldUpgradedAt:       now,
 		}
 	}
 
