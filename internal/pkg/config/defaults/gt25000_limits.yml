@@ -1,6 +1,6 @@
 num_agents:
-  min: 12500
-  max: 24999
+  min: 25000
+  max: 49999
 recommended_min_ram: 16384
 cache_limits:
   num_counters: 160000

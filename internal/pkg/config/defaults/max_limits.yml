@@ -1,5 +1,5 @@
 num_agents:
-  min: 30000
+  min: 100000
 recommended_min_ram: 32768
 cache_limits:
   num_counters: 320000
