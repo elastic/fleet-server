@@ -24,8 +24,11 @@ func TestLoadLimits(t *testing.T) {
 		{"512", 512, 4999},
 		{"precise", 7499, 7499},
 		{"10k", 10050, 12499},
-		{"close to max", 13000, 29999},
-		{"above max", 30001, int(getMaxInt())},
+		{"12k", 12501, 24999},
+		{"25k", 25001, 49999},
+        {"50k", 50001, 74999},
+        {"75k", 75001, 99999},
+		{"above max", 100001, int(getMaxInt())},
 	}
 
 	for _, tc := range testCases {
