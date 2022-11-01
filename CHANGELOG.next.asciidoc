@@ -16,7 +16,7 @@
 - Use seperate rate limiters for internal and external API listeners. {issue}1859[1859] {pull}1904[1904]
 - Fix fleet.migration.total log key overlap {pull}1951[1951]
 - Remove POLICY_CHANGE actions from list retrieved from actions index before sending actions to agent on Checkin. {issue}1773[1773] {pull}1963[1963]
-- Add active: true filter to enrollemnent key queries. {issue}2029[2029] {pull}2044[2044]
+- Add "active: true" filter to enrollemnent key queries. {issue}2029[2029] {pull}2044[2044]
 
 ==== New Features
 

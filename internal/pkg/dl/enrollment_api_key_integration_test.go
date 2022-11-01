@@ -124,22 +124,22 @@ func TestSearchEnrollmentAPIKeyByPolicyIDWithInactiveIDs(t *testing.T) {
 	policyID := uuid.Must(uuid.NewV4()).String()
 	rec, err := storeRandomEnrollmentAPIKey(ctx, bulker, index, policyID, true)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("unable to store enrollment key: %v", err)
 	}
 	for i := 0; i < 10; i++ {
 		_, err = storeRandomEnrollmentAPIKey(ctx, bulker, index, uuid.Must(uuid.NewV4()).String(), false)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("unable to store enrollment key: %v", err)
 		}
 	}
 
 	foundRecs, err := findEnrollmentAPIKeys(ctx, bulker, index, QueryEnrollmentAPIKeyByPolicyID, FieldPolicyID, policyID)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("unable to find enrollment key: %v", err)
 	}
 
 	diff := cmp.Diff([]model.EnrollmentAPIKey{rec}, foundRecs)
 	if diff != "" {
-		t.Fatal(diff)
+		t.Fatalf("expected content does not match", diff)
 	}
 }
