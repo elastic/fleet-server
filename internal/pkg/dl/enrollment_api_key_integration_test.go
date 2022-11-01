@@ -140,6 +140,6 @@ func TestSearchEnrollmentAPIKeyByPolicyIDWithInactiveIDs(t *testing.T) {
 
 	diff := cmp.Diff([]model.EnrollmentAPIKey{rec}, foundRecs)
 	if diff != "" {
-		t.Fatalf("expected content does not match", diff)
+		t.Fatalf("expected content does not match: %v", diff)
 	}
 }
