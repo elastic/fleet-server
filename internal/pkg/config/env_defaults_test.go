@@ -25,7 +25,7 @@ func TestLoadLimits(t *testing.T) {
 		{"precise", 7499, 7499},
 		{"10k", 10050, 29999},
 		{"30k", 30050, 49999},
-        {"50k", 50050, 99999},
+		{"50k", 50050, 99999},
 		{"above max", 100001, int(getMaxInt())},
 	}
 

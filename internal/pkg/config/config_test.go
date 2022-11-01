@@ -124,11 +124,11 @@ func TestConfig(t *testing.T) {
 							},
 							CompressionLevel:  1,
 							CompressionThresh: 1024,
-							Limits:            generateServerLimits(12500),
+							Limits:            generateServerLimits(10000),
 							Bulk:              defaultServerBulk(),
 							GC:                defaultServerGC(),
 						},
-						Cache: generateCache(12500),
+						Cache: generateCache(10000),
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,

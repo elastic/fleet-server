@@ -11,7 +11,7 @@ inputs:
       host: "localhost"
       port: 8888
       limits:
-        max_agents: 12500
+        max_agents: 10000
       timeouts:
         read: 20s
         write: 5s
