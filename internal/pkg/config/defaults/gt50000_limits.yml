@@ -1,7 +1,7 @@
 num_agents:
   min: 50000
-  max: 74999
-recommended_min_ram: 24576
+  max: 99999
+recommended_min_ram: 32768
 cache_limits:
   num_counters: 640000
   max_cost: 419430400
