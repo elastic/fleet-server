@@ -270,14 +270,3 @@ func (d *policyData) HasType(val string) bool {
 func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 	return dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyID, policyID)
 }
-
-// FIXME filterActiveTokens may be used in self_test.go
-func filterActiveTokens(tokens []model.EnrollmentAPIKey) []model.EnrollmentAPIKey {
-	active := make([]model.EnrollmentAPIKey, 0, len(tokens))
-	for _, t := range tokens {
-		if t.Active {
-			active = append(active, t)
-		}
-	}
-	return active
-}
