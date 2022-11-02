@@ -19,25 +19,29 @@ const (
 )
 
 var (
-	QueryEnrollmentAPIKeyByID       = prepareFindEnrollmentAPIKeyByID()
-	QueryEnrollmentAPIKeyByPolicyID = prepareFindEnrollmentAPIKeyByPolicyID()
+	QueryEnrollmentAPIKeyByID       = prepareFindActiveEnrollmentAPIKeyByID()
+	QueryEnrollmentAPIKeyByPolicyID = prepareFindActiveEnrollmentAPIKeyByPolicyID()
 )
 
-func prepareFindEnrollmentAPIKeyByID() *dsl.Tmpl {
+func prepareFindActiveEnrollmentAPIKeyByID() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 
 	root := dsl.NewRoot()
-	root.Query().Bool().Filter().Term(FieldAPIKeyID, tmpl.Bind(FieldAPIKeyID), nil)
+	filter := root.Query().Bool().Filter()
+	filter.Term(FieldAPIKeyID, tmpl.Bind(FieldAPIKeyID), nil)
+	filter.Term(FieldActive, true, nil)
 
 	tmpl.MustResolve(root)
 	return tmpl
 }
 
-func prepareFindEnrollmentAPIKeyByPolicyID() *dsl.Tmpl {
+func prepareFindActiveEnrollmentAPIKeyByPolicyID() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 
 	root := dsl.NewRoot()
-	root.Query().Bool().Filter().Term(FieldPolicyID, tmpl.Bind(FieldPolicyID), nil)
+	filter := root.Query().Bool().Filter()
+	filter.Term(FieldPolicyID, tmpl.Bind(FieldPolicyID), nil)
+	filter.Term(FieldActive, true, nil)
 
 	tmpl.MustResolve(root)
 	return tmpl
