@@ -5,8 +5,8 @@ go 1.17
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.0
-	github.com/elastic/elastic-agent-client/v7 v7.0.0-20220804181728-b0328d2fe484
-	github.com/elastic/elastic-agent-libs v0.2.3
+	github.com/elastic/elastic-agent-client/v7 v7.0.0-20221102171927-bc376a4e0f9f
+	github.com/elastic/elastic-agent-libs v0.2.14
 	github.com/elastic/elastic-agent-system-metrics v0.3.0
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
 	github.com/elastic/go-ucfg v0.8.5
@@ -21,7 +21,7 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.3.0
-	github.com/rs/zerolog v1.26.1
+	github.com/rs/zerolog v1.27.0
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/apm v1.15.0
@@ -39,7 +39,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/elastic/go-licenser v0.4.0 // indirect
-	github.com/elastic/go-structform v0.0.9 // indirect
+	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-sysinfo v1.7.1 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
@@ -54,7 +54,7 @@ require (
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/kr/pretty v0.2.1 // indirect
-	github.com/magefile/mage v1.13.0 // indirect
+	github.com/magefile/mage v1.14.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -69,7 +69,6 @@ require (
 	go.elastic.co/ecszap v1.0.1 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/goleak v1.1.12 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.5.1 // indirect
@@ -82,12 +81,12 @@ require (
 	google.golang.org/grpc v1.46.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.0 // indirect
 )
 
 require (
-	github.com/elastic/elastic-agent v0.0.0-20220510120738-63b682fefc61
+	github.com/elastic/elastic-agent v0.0.0-20221107053805-657f66dad4bd
 	github.com/jcchavezs/porto v0.4.0 // indirect
 	go.elastic.co/apm/module/apmhttprouter v1.14.0
 )
