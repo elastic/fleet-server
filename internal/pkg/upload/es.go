@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package dl
+package upload
 
 import (
 	"context"
@@ -36,33 +36,21 @@ var (
 func prepareFindChunkIDs() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
-	root.Param(FieldSource, false)
+	root.Param("_source", false) // do not return large data payload
 	root.Query().Term(FieldBaseID, tmpl.Bind(FieldBaseID), nil)
 	tmpl.MustResolve(root)
 	return tmpl
 }
 
-func CreateUploadInfo(ctx context.Context, bulker bulk.Bulk, fi model.FileInfo, source string, fileID string) (string, error) {
-	return createUploadInfo(ctx, bulker, fmt.Sprintf(FileHeaderIndexPattern, source), fi, fileID)
+func CreateFileDoc(ctx context.Context, bulker bulk.Bulk, doc []byte, source string, fileID string) (string, error) {
+	return bulker.Create(ctx, fmt.Sprintf(FileHeaderIndexPattern, source), fileID, doc, bulk.WithRefresh())
 }
 
-func createUploadInfo(ctx context.Context, bulker bulk.Bulk, index string, fi model.FileInfo, fileID string) (string, error) {
-	body, err := json.Marshal(fi)
-	if err != nil {
-		return "", err
-	}
-	return bulker.Create(ctx, index, fileID, body, bulk.WithRefresh())
+func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID string, data []byte) error {
+	return bulker.Update(ctx, fmt.Sprintf(FileHeaderIndexPattern, source), fileID, data)
 }
 
-func UpdateUpload(ctx context.Context, bulker bulk.Bulk, source string, fileID string, data []byte) error {
-	return updateUpload(ctx, bulker, fmt.Sprintf(FileHeaderIndexPattern, source), fileID, data)
-}
-
-func updateUpload(ctx context.Context, bulker bulk.Bulk, index string, fileID string, data []byte) error {
-	return bulker.Update(ctx, index, fileID, data)
-}
-
-func UploadChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, docID string, chunkID int) error {
+func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, docID string, chunkID int) error {
 
 	/*
 		// the non-streaming version

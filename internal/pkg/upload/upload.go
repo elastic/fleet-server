@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog/log"
@@ -258,7 +257,7 @@ func (u *Uploader) finalize(uplID string) error {
 }
 
 func (u *Uploader) allChunksPresent(info Info, bulker bulk.Bulk) (bool, error) {
-	hits, err := dl.ListChunkIDs(context.TODO(), bulker, info.Source, info.DocID)
+	hits, err := ListChunkIDs(context.TODO(), bulker, info.Source, info.DocID)
 	if err != nil {
 		log.Warn().Err(err).Msg("error listing chunks")
 		return false, err
@@ -295,7 +294,7 @@ func (u *Uploader) verifyChunkData(info Info, bulker bulk.Bulk) (bool, error) {
 	// verify hash
 
 	for i := 0; i < info.Count; i++ {
-		chunk, err := dl.GetChunk(context.TODO(), bulker, info.Source, info.DocID, i)
+		chunk, err := GetChunk(context.TODO(), bulker, info.Source, info.DocID, i)
 		if err != nil {
 			return false, err
 		}
