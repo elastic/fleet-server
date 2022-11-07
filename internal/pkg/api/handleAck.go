@@ -15,20 +15,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/julienschmidt/httprouter"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
-	"github.com/pkg/errors"
+	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
+)
 
-	"github.com/julienschmidt/httprouter"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+var (
+	ErrUpdatingInactiveAgent = errors.New("updating inactive agent")
 )
 
 type HTTPError struct {
@@ -41,27 +45,21 @@ func (e *HTTPError) Error() string {
 
 type AckT struct {
 	cfg   *config.Server
-	limit *limit.Limiter
 	bulk  bulk.Bulk
 	cache cache.Cache
 }
 
 func NewAckT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *AckT {
-	log.Info().
-		Interface("limits", cfg.Limits.AckLimit).
-		Msg("Setting config ack_limits")
-
 	return &AckT{
 		cfg:   cfg,
 		bulk:  bulker,
 		cache: cache,
-		limit: limit.NewLimiter(&cfg.Limits.AckLimit),
 	}
 }
 
-func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+//nolint:dupl // function body calls different internal handler then handleCheckin
+func (rt *Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	start := time.Now()
-
 	id := ps.ByName("id")
 
 	reqID := r.Header.Get(logger.HeaderRequestID)
@@ -90,12 +88,6 @@ func (rt Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httproute
 }
 
 func (ack *AckT) handleAcks(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, id string) error {
-	limitF, err := ack.limit.Acquire()
-	if err != nil {
-		return err
-	}
-	defer limitF()
-
 	agent, err := authAgent(r, &id, ack.bulk, ack.cache)
 	if err != nil {
 		return err
@@ -105,10 +97,6 @@ func (ack *AckT) handleAcks(zlog *zerolog.Logger, w http.ResponseWriter, r *http
 	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
 		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
 	})
-
-	// Metrics; serenity now.
-	dfunc := cntAcks.IncStart()
-	defer dfunc()
 
 	return ack.processRequest(*zlog, w, r, agent)
 }
@@ -277,16 +265,16 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		// The unenroll and upgrade acks might overwrite it later
 		setResult(n, http.StatusOK)
 
-		if ev.Error == "" {
-			if action.Type == TypeUnenroll {
-				unenrollIdxs = append(unenrollIdxs, n)
-			} else if action.Type == TypeUpgrade {
-				if err := ack.handleUpgrade(ctx, zlog, agent); err != nil {
-					setError(n, err)
-					log.Error().Err(err).Msg("handle upgrade event")
-					continue
-				}
+		if action.Type == TypeUpgrade {
+			if err := ack.handleUpgrade(ctx, zlog, agent, ev); err != nil {
+				setError(n, err)
+				log.Error().Err(err).Msg("handle upgrade event")
+				continue
 			}
+		}
+
+		if ev.Error == "" && action.Type == TypeUnenroll {
+			unenrollIdxs = append(unenrollIdxs, n)
 		}
 	}
 
@@ -337,8 +325,9 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 			Int64("rev.coordinatorIdx", rev.CoordinatorIdx).
 			Msg("ack policy revision")
 
-		if ok && rev.PolicyID == agent.PolicyID && (rev.RevisionIdx > currRev ||
-			(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
+		if ok && rev.PolicyID == agent.PolicyID &&
+			(rev.RevisionIdx > currRev ||
+				(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
 			found = true
 			currRev = rev.RevisionIdx
 			currCoord = rev.CoordinatorIdx
@@ -349,20 +338,77 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
-	sz := len(agent.DefaultAPIKeyHistory)
-	if sz > 0 {
-		ids := make([]string, sz)
-		for i := 0; i < sz; i++ {
-			ids[i] = agent.DefaultAPIKeyHistory[i].ID
+	for _, output := range agent.Outputs {
+		if output.Type != policy.OutputTypeElasticsearch {
+			continue
 		}
-		log.Info().Strs("ids", ids).Msg("Invalidate old API keys")
-		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
-			log.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+
+		err := ack.updateAPIKey(ctx,
+			zlog,
+			agent.Id,
+			currRev, currCoord,
+			agent.PolicyID,
+			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
+		if err != nil {
+			return err
 		}
 	}
 
+	return nil
+
+}
+
+func (ack *AckT) updateAPIKey(ctx context.Context,
+	zlog zerolog.Logger,
+	agentID string,
+	currRev, currCoord int64,
+	policyID, apiKeyID, permissionHash string,
+	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
+
+	if apiKeyID != "" {
+		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
+		if err != nil {
+			if isAgentActive(ctx, zlog, ack.bulk, agentID) {
+				zlog.Error().
+					Err(err).
+					Str(LogAPIKeyID, apiKeyID).
+					Msg("Failed to read API Key roles")
+			} else {
+				// race when API key was invalidated before acking
+				zlog.Info().
+					Err(err).
+					Str(LogAPIKeyID, apiKeyID).
+					Msg("Failed to read invalidated API Key roles")
+
+				// prevents future checks
+				return ErrUpdatingInactiveAgent
+			}
+		} else {
+			clean, removedRolesCount, err := cleanRoles(res.RoleDescriptors)
+			if err != nil {
+				zlog.Error().
+					Err(err).
+					RawJSON("roles", res.RoleDescriptors).
+					Str(LogAPIKeyID, apiKeyID).
+					Msg("Failed to cleanup roles")
+			} else if removedRolesCount > 0 {
+				if err := ack.bulk.APIKeyUpdate(ctx, apiKeyID, permissionHash, clean); err != nil {
+					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, apiKeyID).Msg("Failed to update API Key")
+				} else {
+					zlog.Debug().
+						Str("hash.sha256", permissionHash).
+						Str(LogAPIKeyID, apiKeyID).
+						RawJSON("roles", clean).
+						Int("removedRoles", removedRolesCount).
+						Msg("Updating agent record to pick up reduced roles.")
+				}
+			}
+		}
+		ack.invalidateAPIKeys(ctx, toRetireAPIKeyIDs, apiKeyID)
+	}
+
 	body := makeUpdatePolicyBody(
-		agent.PolicyID,
+		policyID,
 		currRev,
 		currCoord,
 	)
@@ -370,14 +416,14 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	err := ack.bulk.Update(
 		ctx,
 		dl.FleetAgents,
-		agent.Id,
+		agentID,
 		body,
 		bulk.WithRefresh(),
 		bulk.WithRetryOnConflict(3),
 	)
 
-	zlog.Info().Err(err).
-		Str(LogPolicyID, agent.PolicyID).
+	zlog.Err(err).
+		Str(LogPolicyID, policyID).
 		Int64("policyRevision", currRev).
 		Int64("policyCoordinator", currCoord).
 		Msg("ack policy")
@@ -385,8 +431,50 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	return errors.Wrap(err, "handlePolicyChange update")
 }
 
+func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
+	rr := smap.Map{}
+	if err := json.Unmarshal(roles, &rr); err != nil {
+		return nil, 0, errors.Wrap(err, "failed to unmarshal provided roles")
+	}
+
+	keys := make([]string, 0, len(rr))
+	for k := range rr {
+		if strings.HasSuffix(k, "-rdstale") {
+			keys = append(keys, k)
+		}
+	}
+
+	if len(keys) == 0 {
+		return roles, 0, nil
+	}
+
+	for _, k := range keys {
+		delete(rr, k)
+	}
+
+	r, err := json.Marshal(rr)
+	return r, len(keys), errors.Wrap(err, "failed to marshal resulting role definition")
+}
+
+func (ack *AckT) invalidateAPIKeys(ctx context.Context, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
+	ids := make([]string, 0, len(toRetireAPIKeyIDs))
+	for _, k := range toRetireAPIKeyIDs {
+		if k.ID == skip || k.ID == "" {
+			continue
+		}
+		ids = append(ids, k.ID)
+	}
+
+	if len(ids) > 0 {
+		log.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
+		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
+			log.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+		}
+	}
+}
+
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
-	apiKeys := _getAPIKeyIDs(agent)
+	apiKeys := agent.APIKeyIDs()
 	if len(apiKeys) > 0 {
 		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
 
@@ -407,7 +495,7 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 		return errors.Wrap(err, "handleUnenroll marshal")
 	}
 
-	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh()); err != nil {
+	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 		return errors.Wrap(err, "handleUnenroll update")
 	}
 
@@ -415,12 +503,37 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 	return nil
 }
 
-func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
-
+func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event Event) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	doc := bulk.UpdateFields{
-		dl.FieldUpgradeStartedAt: nil,
-		dl.FieldUpgradedAt:       now,
+	doc := bulk.UpdateFields{}
+	if event.Error != "" {
+		// unmarshal event payload
+		var pl struct {
+			Retry   bool `json:"retry"`
+			Attempt int  `json:"retry_attempt"`
+		}
+		err := json.Unmarshal(event.Payload, &pl)
+		if err != nil {
+			zlog.Error().Err(err).Msg("unable to unmarshal upgrade event payload")
+		}
+
+		// if the payload indicates a retry, mark change the upgrade status to retrying.
+		if pl.Retry {
+			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as retrying")
+			doc[dl.FieldUpgradeStatus] = "retrying" // Keep FieldUpgradeStatedAt abd FieldUpgradeded at to original values
+		} else {
+			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as failed, agent logs contain failure message")
+			doc = bulk.UpdateFields{
+				dl.FieldUpgradeStartedAt: nil,
+				dl.FieldUpgradeStatus:    "failed",
+			}
+		}
+	} else {
+		doc = bulk.UpdateFields{
+			dl.FieldUpgradeStartedAt: nil,
+			dl.FieldUpgradeStatus:    nil,
+			dl.FieldUpgradedAt:       now,
+		}
 	}
 
 	body, err := doc.Marshal()
@@ -428,7 +541,7 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 		return errors.Wrap(err, "handleUpgrade marshal")
 	}
 
-	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh()); err != nil {
+	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 		return errors.Wrap(err, "handleUpgrade update")
 	}
 
@@ -440,15 +553,16 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 	return nil
 }
 
-func _getAPIKeyIDs(agent *model.Agent) []string {
-	keys := make([]string, 0, 1)
-	if agent.AccessAPIKeyID != "" {
-		keys = append(keys, agent.AccessAPIKeyID)
+func isAgentActive(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, agentID string) bool {
+	agent, err := dl.FindAgent(ctx, bulk, dl.QueryAgentByID, dl.FieldID, agentID)
+	if err != nil {
+		zlog.Error().
+			Err(err).
+			Msg("failed to find agent by ID")
+		return true
 	}
-	if agent.DefaultAPIKeyID != "" {
-		keys = append(keys, agent.DefaultAPIKeyID)
-	}
-	return keys
+
+	return agent.Active // it is a valid error in case agent is active (was not invalidated)
 }
 
 // Generate an update script that validates that the policy_id

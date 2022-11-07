@@ -100,7 +100,7 @@ func (bc *Bulk) timestamp() string {
 // CheckIn will add the agent (identified by id) to the pending set.
 // The pending agents are sent to elasticsearch as a bulk update at each flush interval.
 // WARNING: Bulk will take ownership of fields, so do not use after passing in.
-func (bc *Bulk) CheckIn(id string, status, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string) error {
+func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string) error {
 	// Separate out the extra data to minimize
 	// the memory footprint of the 90% case of just
 	// updating the timestamp.

@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/pkg/errors"
@@ -43,7 +42,6 @@ type HTTPErrResp struct {
 
 // NewHTTPErrResp creates an ErrResp from a go error
 func NewHTTPErrResp(err error) HTTPErrResp {
-
 	errTable := []struct {
 		target error
 		meta   HTTPErrResp
@@ -55,24 +53,6 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				"AgentNotFound",
 				"agent could not be found",
 				zerolog.WarnLevel,
-			},
-		},
-		{
-			limit.ErrRateLimit,
-			HTTPErrResp{
-				http.StatusTooManyRequests,
-				"RateLimit",
-				"exceeded the rate limit",
-				zerolog.DebugLevel,
-			},
-		},
-		{
-			limit.ErrMaxLimit,
-			HTTPErrResp{
-				http.StatusTooManyRequests,
-				"MaxLimit",
-				"exceeded the max limit",
-				zerolog.DebugLevel,
 			},
 		},
 		{
@@ -138,6 +118,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		{
+			ErrUpdatingInactiveAgent,
+			HTTPErrResp{
+				http.StatusUnauthorized,
+				"Unauthorized",
+				"Agent not active",
+				zerolog.InfoLevel,
+			},
+		},
 	}
 
 	for _, e := range errTable {
@@ -161,6 +150,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 	return HTTPErrResp{
 		StatusCode: http.StatusBadRequest,
 		Error:      "BadRequest",
+		Message:    err.Error(),
 		Level:      zerolog.InfoLevel,
 	}
 }

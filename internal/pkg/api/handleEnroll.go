@@ -16,7 +16,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
@@ -49,26 +48,19 @@ type EnrollerT struct {
 	cfg    *config.Server
 	bulker bulk.Bulk
 	cache  cache.Cache
-	limit  *limit.Limiter
 }
 
 func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bulk, c cache.Cache) (*EnrollerT, error) {
-
-	log.Info().
-		Interface("limits", cfg.Limits.EnrollLimit).
-		Msg("Setting config enroll_limit")
-
 	return &EnrollerT{
 		verCon: verCon,
 		cfg:    cfg,
-		limit:  limit.NewLimiter(&cfg.Limits.EnrollLimit),
 		bulker: bulker,
 		cache:  c,
 	}, nil
 
 }
 
-func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func (rt *Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	start := time.Now()
 
 	// Work around wonky router rule
@@ -130,13 +122,6 @@ func (rt Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprou
 }
 
 func (et *EnrollerT) handleEnroll(rb *rollback.Rollback, zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request) (*EnrollResponse, error) {
-
-	limitF, err := et.limit.Acquire()
-	if err != nil {
-		return nil, err
-	}
-	defer limitF()
-
 	key, err := authAPIKey(r, et.bulker, et.cache)
 	if err != nil {
 		return nil, err
@@ -151,10 +136,6 @@ func (et *EnrollerT) handleEnroll(rb *rollback.Rollback, zlog *zerolog.Logger, w
 	if err != nil {
 		return nil, err
 	}
-
-	// Metrics; serenity now.
-	dfunc := cntEnroll.IncStart()
-	defer dfunc()
 
 	return et.processRequest(rb, *zlog, w, r, key.ID, ver)
 }
@@ -187,7 +168,13 @@ func (et *EnrollerT) processRequest(rb *rollback.Rollback, zlog zerolog.Logger, 
 	return et._enroll(r.Context(), rb, zlog, req, erec.PolicyID, ver)
 }
 
-func (et *EnrollerT) _enroll(ctx context.Context, rb *rollback.Rollback, zlog zerolog.Logger, req *EnrollRequest, policyID, ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) _enroll(
+	ctx context.Context,
+	rb *rollback.Rollback,
+	zlog zerolog.Logger,
+	req *EnrollRequest,
+	policyID,
+	ver string) (*EnrollResponse, error) {
 
 	if req.SharedID != "" {
 		// TODO: Support pre-existing install
@@ -293,7 +280,7 @@ func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk
 LOOP:
 	for {
 
-		_, err := bulker.APIKeyRead(ctx, apikeyID)
+		_, err := bulker.APIKeyRead(ctx, apikeyID, false)
 
 		switch {
 		case err == nil:
@@ -427,7 +414,7 @@ func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (
 		agentID,
 		"",
 		[]byte(kFleetAccessRolesJSON),
-		apikey.NewMetadata(agentID, apikey.TypeAccess),
+		apikey.NewMetadata(agentID, "", apikey.TypeAccess),
 	)
 }
 

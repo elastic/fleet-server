@@ -6,6 +6,8 @@ package config
 
 import (
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -30,14 +32,54 @@ func (c *Cache) InitDefaults() {
 	c.LoadLimits(loadLimits(0))
 }
 
+// LoadLimits loads envLimits for any attribute that is not defined in Cache
 func (c *Cache) LoadLimits(limits *envLimits) {
 	l := limits.Cache
 
-	c.NumCounters = l.NumCounters
-	c.MaxCost = l.MaxCost
-	c.ActionTTL = defaultActionTTL
-	c.EnrollKeyTTL = defaultEnrollKeyTTL
-	c.ArtifactTTL = defaultArtifactTTL
-	c.APIKeyTTL = defaultAPIKeyTTL
-	c.APIKeyJitter = defaultAPIKeyJitter
+	if c.NumCounters == 0 {
+		c.NumCounters = l.NumCounters
+	}
+	if c.MaxCost == 0 {
+		c.MaxCost = l.MaxCost
+	}
+	if c.ActionTTL == 0 {
+		c.ActionTTL = defaultActionTTL
+	}
+	if c.EnrollKeyTTL == 0 {
+		c.EnrollKeyTTL = defaultEnrollKeyTTL
+	}
+	if c.ArtifactTTL == 0 {
+		c.ArtifactTTL = defaultArtifactTTL
+	}
+	if c.APIKeyTTL == 0 {
+		c.APIKeyTTL = defaultAPIKeyTTL
+	}
+	if c.APIKeyJitter == 0 {
+		c.APIKeyJitter = defaultAPIKeyJitter
+	}
+}
+
+// CopyCache returns a copy of the config's Cache settings
+func CopyCache(cfg *Config) Cache {
+	ccfg := cfg.Inputs[0].Cache
+	return Cache{
+		NumCounters:  ccfg.NumCounters,
+		MaxCost:      ccfg.MaxCost,
+		ActionTTL:    ccfg.ActionTTL,
+		EnrollKeyTTL: ccfg.EnrollKeyTTL,
+		ArtifactTTL:  ccfg.ArtifactTTL,
+		APIKeyTTL:    ccfg.APIKeyTTL,
+		APIKeyJitter: ccfg.APIKeyJitter,
+	}
+}
+
+// MarshalZerologObject turns the cache settings into a zerolog event
+func (c *Cache) MarshalZerologObject(e *zerolog.Event) {
+	e.Int64("numCounters", c.NumCounters)
+	e.Int64("maxCost", c.MaxCost)
+	e.Dur("actionTTL", c.ActionTTL)
+	e.Dur("enrollTTL", c.EnrollKeyTTL)
+	e.Dur("artifactTTL", c.ArtifactTTL)
+	e.Dur("apiKeyTTL", c.APIKeyTTL)
+	e.Dur("apiKeyJitter", c.APIKeyJitter)
 }

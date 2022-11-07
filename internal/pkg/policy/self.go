@@ -228,7 +228,6 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 		if err != nil {
 			return client.UnitStateFailed, err
 		}
-		tokens = filterActiveTokens(tokens)
 		if len(tokens) == 0 {
 			// no tokens created for the policy, still starting
 			if m.policyID == "" {
@@ -270,14 +269,4 @@ func (d *policyData) HasType(val string) bool {
 
 func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 	return dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyID, policyID)
-}
-
-func filterActiveTokens(tokens []model.EnrollmentAPIKey) []model.EnrollmentAPIKey {
-	active := make([]model.EnrollmentAPIKey, 0, len(tokens))
-	for _, t := range tokens {
-		if t.Active {
-			active = append(active, t)
-		}
-	}
-	return active
 }

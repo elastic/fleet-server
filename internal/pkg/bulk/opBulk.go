@@ -7,12 +7,15 @@ package bulk
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/mailru/easyjson"
 	"github.com/rs/zerolog/log"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 func (b *Bulker) Create(ctx context.Context, index, id string, body []byte, opts ...Opt) (string, error) {
@@ -72,6 +75,9 @@ func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id s
 	r, ok := resp.data.(*BulkIndexerResponseItem)
 	if !ok {
 		return nil, fmt.Errorf("unable to cast to *BulkIndexerResponseItem, detected type %T", resp.data)
+	}
+	if err := es.TranslateError(r.Status, r.Error); err != nil {
+		return nil, err
 	}
 	return r, nil
 }
@@ -187,7 +193,6 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	}
 
 	res, err := req.Do(ctx, b.es)
-
 	if err != nil {
 		log.Error().Err(err).Str("mod", kModBulk).Msg("Fail BulkRequest req.Do")
 		return err
@@ -217,12 +222,18 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	var blk bulkIndexerResponse
 	blk.Items = make([]bulkStubItem, 0, queueCnt)
 
+	// TODO: We're loosing information abut the errors, we should check a way
+	// to return the full error ES returns
 	if err = easyjson.Unmarshal(buf.Bytes(), &blk); err != nil {
-		log.Error().
-			Err(err).
+		log.Err(err).
 			Str("mod", kModBulk).
-			Msg("Unmarshal error")
-		return err
+			Msg("flushBulk failed, could not unmarshal ES response")
+		return fmt.Errorf("flushBulk failed, could not unmarshal ES response: %w", err)
+	}
+	if blk.HasErrors {
+		// We lack information to properly correlate this error with what has failed.
+		// Thus, for now it'd be more noise than information outside an investigation.
+		log.Debug().Err(errors.New(buf.String())).Msg("Bulk call: Es returned an error")
 	}
 
 	log.Trace().

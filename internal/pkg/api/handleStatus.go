@@ -17,7 +17,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/julienschmidt/httprouter"
 
@@ -33,7 +32,6 @@ type AuthFunc func(*http.Request) (*apikey.APIKey, error)
 
 type StatusT struct {
 	cfg    *config.Server
-	limit  *limit.Limiter
 	bulk   bulk.Bulk
 	cache  cache.Cache
 	authfn AuthFunc
@@ -42,15 +40,10 @@ type StatusT struct {
 type OptFunc func(*StatusT)
 
 func NewStatusT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache, opts ...OptFunc) *StatusT {
-	log.Info().
-		Interface("limits", cfg.Limits.StatusLimit).
-		Msg("Setting config status_limits")
-
 	st := &StatusT{
 		cfg:   cfg,
 		bulk:  bulker,
 		cache: cache,
-		limit: limit.NewLimiter(&cfg.Limits.StatusLimit),
 	}
 	st.authfn = st.authenticate
 
@@ -68,14 +61,7 @@ func (st StatusT) authenticate(r *http.Request) (*apikey.APIKey, error) {
 	return authAPIKey(r, st.bulk, st.cache)
 }
 
-func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, state client.UnitState, err error) {
-	limitF, err := st.limit.Acquire()
-	// When failing to acquire a limiter send an error response.
-	if err != nil {
-		return
-	}
-	defer limitF()
-
+func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, state client.UnitState) {
 	authed := true
 	if _, aerr := st.authfn(r); aerr != nil {
 		log.Debug().Err(aerr).Msg("unauthenticated status request, return short status response only")
@@ -96,16 +82,11 @@ func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (
 		}
 	}
 
-	return resp, state, nil
-
+	return resp, state
 }
 
-func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (rt *Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	start := time.Now()
-
-	dfunc := cntStatus.IncStart()
-	defer dfunc()
-
 	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	zlog := log.With().
@@ -113,22 +94,7 @@ func (rt Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprout
 		Str("mod", kStatusMod).
 		Logger()
 
-	resp, state, err := rt.st.handleStatus(&zlog, r, &rt)
-	if err != nil {
-		cntStatus.IncError(err)
-		resp := NewHTTPErrResp(err)
-
-		zlog.WithLevel(resp.Level).
-			Err(err).
-			Int(ECSHTTPResponseCode, resp.StatusCode).
-			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail status")
-
-		if rerr := resp.Write(w); rerr != nil {
-			zlog.Error().Err(rerr).Msg("fail writing error response")
-		}
-		return
-	}
+	resp, state := rt.st.handleStatus(&zlog, r, rt)
 
 	data, err := json.Marshal(&resp)
 	if err != nil {

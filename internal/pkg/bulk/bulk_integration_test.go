@@ -265,7 +265,7 @@ func TestBulkSearch(t *testing.T) {
 	}
 
 	if len(res.Hits) != 1 {
-		t.Fatal(fmt.Sprintf("hit mismatch: %d", len(res.Hits)))
+		t.Fatalf("hit mismatch: %d", len(res.Hits))
 	}
 
 	var dst3 testT

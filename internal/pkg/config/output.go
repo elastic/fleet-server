@@ -28,19 +28,20 @@ var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
 // Elasticsearch is the configuration for elasticsearch.
 type Elasticsearch struct {
-	Protocol       string            `config:"protocol"`
-	Hosts          []string          `config:"hosts"`
-	Path           string            `config:"path"`
-	Headers        map[string]string `config:"headers"`
-	APIKey         string            `config:"api_key"`
-	ServiceToken   string            `config:"service_token"`
-	ProxyURL       string            `config:"proxy_url"`
-	ProxyDisable   bool              `config:"proxy_disable"`
-	ProxyHeaders   map[string]string `config:"proxy_headers"`
-	TLS            *tlscommon.Config `config:"ssl"`
-	MaxRetries     int               `config:"max_retries"`
-	MaxConnPerHost int               `config:"max_conn_per_host"`
-	Timeout        time.Duration     `config:"timeout"`
+	Protocol         string            `config:"protocol"`
+	Hosts            []string          `config:"hosts"`
+	Path             string            `config:"path"`
+	Headers          map[string]string `config:"headers"`
+	APIKey           string            `config:"api_key"`
+	ServiceToken     string            `config:"service_token"`
+	ProxyURL         string            `config:"proxy_url"`
+	ProxyDisable     bool              `config:"proxy_disable"`
+	ProxyHeaders     map[string]string `config:"proxy_headers"`
+	TLS              *tlscommon.Config `config:"ssl"`
+	MaxRetries       int               `config:"max_retries"`
+	MaxConnPerHost   int               `config:"max_conn_per_host"`
+	Timeout          time.Duration     `config:"timeout"`
+	MaxContentLength int               `config:"max_content_length"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -50,6 +51,7 @@ func (c *Elasticsearch) InitDefaults() {
 	c.Timeout = 90 * time.Second
 	c.MaxRetries = 3
 	c.MaxConnPerHost = 128
+	c.MaxContentLength = 100 * 1024 * 1024
 }
 
 // Validate ensures that the configuration is valid.

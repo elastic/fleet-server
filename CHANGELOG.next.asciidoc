@@ -1,8 +1,22 @@
+==== Breaking Changes
+
+- Upgrade to Go 1.18. Certificates signed with SHA-1 are now rejected. See the Go 1.18 https://tip.golang.org/doc/go1.18#sha1[release notes] for details. {pull}1709[1709]
+
 ==== Bugfixes
 
 - Return a better error on enrolling and the Elasticsearch version is incompatible. {pull}1211[1211]
 - Give a grace period when starting the unenroll monitor. {issue}1500[1500]
 - Fixes a race condition between the unenroller goroutine and the main goroutine for the coordinator monitor. {issues}1738[1738]
+- Remove events from agent checkin body. {issue}1774[1774]
+- Improve authc debug logging. {pull}1870[1870]
+- Add error detail to catch-all HTTP error response. {pull}1854[1854]
+- Fix issue were errors where being ignored written to elasticsearch. {pull}1896[1896]
+- Update apikey.cache_hit log field name to match convention. {pull}1900[1900]
+- LoadServerLimits will not overwrite specified limits when loading default/agent number specified values. {issue}1841[1841] {pull}1912[1912]
+- Use seperate rate limiters for internal and external API listeners. {issue}1859[1859] {pull}1904[1904]
+- Fix fleet.migration.total log key overlap {pull}1951[1951]
+- Remove POLICY_CHANGE actions from list retrieved from actions index before sending actions to agent on Checkin. {issue}1773[1773] {pull}1963[1963]
+- Add "active: true" filter to enrollemnent key queries. {issue}2029[2029] {pull}2044[2044]
 
 ==== New Features
 
@@ -13,3 +27,5 @@
 - Fleet Server now allows setting global labels on APM instrumentation. {pull}1649[1649]
 - Fleet Server now allows setting transaction sample rate on APM instrumentation {pull}1681[1681]
 - Log redacted config when config updates. {issue}1626[1626] {pull}1668[1668]
+- Storing checkin message in last_checkin_message {pull}1932[1932]
+- Allow upgrade actions to signal that they will be retried. {pull}1887[1887]
