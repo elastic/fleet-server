@@ -255,6 +255,10 @@ type Artifact struct {
 type Body struct {
 }
 
+// Components Elastic Agent components detailed status information
+type Components struct {
+}
+
 // Data The opaque payload.
 type Data struct {
 }
