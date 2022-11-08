@@ -71,6 +71,8 @@ func NewFleet(bi build.Info, reporter state.Reporter) (*Fleet, error) {
 
 type runFunc func(context.Context) error
 
+type runFuncCfg func(context.Context, *config.Config) error
+
 // Run runs the fleet server
 func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
 	err := initCfg.LoadServerLimits()
@@ -106,12 +108,12 @@ func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
 		}
 	}
 
-	start := func(ctx context.Context, runfn runFunc, ech chan<- error) (*errgroup.Group, context.CancelFunc) {
+	start := func(ctx context.Context, runfn runFuncCfg, cfg *config.Config, ech chan<- error) (*errgroup.Group, context.CancelFunc) {
 		ctx, cn = context.WithCancel(ctx)
 		g, ctx := errgroup.WithContext(ctx)
 
 		g.Go(func() error {
-			err := runfn(ctx)
+			err := runfn(ctx, cfg)
 			if err != nil {
 				ech <- err
 			}
@@ -162,9 +164,9 @@ LOOP:
 			proEg, proCancel = nil, nil
 			if newCfg.Inputs[0].Server.Profiler.Enabled {
 				log.Info().Msg("starting profiler on configuration change")
-				proEg, proCancel = start(ctx, func(ctx context.Context) error {
-					return profile.RunProfiler(ctx, newCfg.Inputs[0].Server.Profiler.Bind)
-				}, ech)
+				proEg, proCancel = start(ctx, func(ctx context.Context, cfg *config.Config) error {
+					return profile.RunProfiler(ctx, cfg.Inputs[0].Server.Profiler.Bind)
+				}, newCfg, ech)
 			}
 		}
 
@@ -175,9 +177,9 @@ LOOP:
 				stop(srvCancel, srvEg)
 			}
 			log.Info().Msg("starting server on configuration change")
-			srvEg, srvCancel = start(ctx, func(ctx context.Context) error {
+			srvEg, srvCancel = start(ctx, func(ctx context.Context, cfg *config.Config) error {
 				return f.runServer(ctx, newCfg)
-			}, ech)
+			}, newCfg, ech)
 		}
 
 		curCfg = newCfg
