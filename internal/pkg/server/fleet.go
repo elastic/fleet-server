@@ -178,7 +178,7 @@ LOOP:
 			}
 			log.Info().Msg("starting server on configuration change")
 			srvEg, srvCancel = start(ctx, func(ctx context.Context, cfg *config.Config) error {
-				return f.runServer(ctx, newCfg)
+				return f.runServer(ctx, cfg)
 			}, newCfg, ech)
 		}
 
