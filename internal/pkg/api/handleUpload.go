@@ -60,6 +60,8 @@ func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps ht
 		Str(ECSHTTPRequestID, reqID).
 		Logger()
 
+	// authentication occurs inside here
+	// to check that key agent ID matches the ID in the body payload yet-to-be unmarshalled
 	err := rt.ut.handleUploadStart(&zlog, w, r)
 
 	if err != nil {
@@ -96,6 +98,17 @@ func (rt Router) handleUploadChunk(w http.ResponseWriter, r *http.Request, ps ht
 		Str(LogAgentID, id).
 		Str(ECSHTTPRequestID, reqID).
 		Logger()
+
+	// simpler authentication check, since chunk checksum must
+	// ultimately match the initial hash provided with the stricter key check
+	if _, err := authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
+		cntUpload.IncError(err)
+		resp := NewHTTPErrResp(err)
+		if err := resp.Write(w); err != nil {
+			zlog.Error().Err(err).Msg("failed writing error response")
+		}
+		return
+	}
 
 	chunkNum, err := strconv.Atoi(chunkID)
 	if err != nil {
@@ -141,6 +154,17 @@ func (rt Router) handleUploadComplete(w http.ResponseWriter, r *http.Request, ps
 		Str(LogAgentID, id).
 		Str(ECSHTTPRequestID, reqID).
 		Logger()
+
+	// simpler authentication check, file integrity checksum
+	// will catch directed tampering, this route just says "im done"
+	if _, err := authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
+		cntUpload.IncError(err)
+		resp := NewHTTPErrResp(err)
+		if err := resp.Write(w); err != nil {
+			zlog.Error().Err(err).Msg("failed writing error response")
+		}
+		return
+	}
 
 	err := rt.ut.handleUploadComplete(&zlog, w, r, id)
 
@@ -205,6 +229,11 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 		if errors.Is(err, io.EOF) {
 			return fmt.Errorf("file info body is required: %w", err)
 		}
+		return err
+	}
+
+	// check API key matches payload agent ID
+	if _, err := authAgent(r, &fi.AgentID, ut.bulker, ut.cache); err != nil {
 		return err
 	}
 
