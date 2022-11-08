@@ -110,7 +110,7 @@ func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
 
-	srv, err := NewFleet(cfg, build.Info{Version: serverVersion}, state.NewLog())
+	srv, err := NewFleet(build.Info{Version: serverVersion}, state.NewLog())
 	if err != nil {
 		return nil, fmt.Errorf("unable to create server: %w", err)
 	}
@@ -118,7 +118,7 @@ func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return srv.Run(ctx)
+		return srv.Run(ctx, cfg)
 	})
 
 	tsrv := &tserver{cfg: cfg, g: g, srv: srv}
