@@ -182,40 +182,13 @@ type FileInfo struct {
 	Source   string     `json:"src"`
 	File     FileData   `json:"file"`
 	Contents []FileData `json:"contents"`
-	Event    struct {
-		ID string `json:"id"`
-	} `json:"event"`
-	Host struct {
-		Hostname string `json:"hostname"`
-	} `json:"host"`
 }
 
 type FileData struct {
-	Size        int64  `json:"size"`
-	Name        string `json:"name"`
-	Extension   string `json:"ext"`
-	Mime        string `json:"mime_type"`
-	Compression string `json:"Compression"`
-	Hash        struct {
+	Size int64  `json:"size"`
+	Name string `json:"name"`
+	Hash struct {
 		SHA256 string `json:"sha256"`
 		MD5    string `json:"md5"`
 	}
-	Accessed    string   `json:"accessed"`
-	Attributes  []string `json:"attributes"`
-	Created     string   `json:"created"`
-	CTime       string   `json:"ctime"`
-	Device      string   `json:"device"`
-	Directory   string   `json:"directory"`
-	DriveLetter string   `json:"drive_letter"`
-	Ext         string   `json:"extension"`
-	GID         string   `json:"gid"`
-	Group       string   `json:"group"`
-	INode       string   `json:"inode"`
-	Mode        string   `json:"mode"`
-	MTime       string   `json:"mtime"`
-	Owner       string   `json:"owner"`
-	Path        string   `json:"path"`
-	TargetPath  string   `json:"target_path"`
-	Type        string   `json:"type"`
-	UID         string   `json:"uid"`
 }
