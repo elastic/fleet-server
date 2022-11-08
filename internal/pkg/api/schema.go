@@ -190,5 +190,5 @@ type FileData struct {
 	Hash struct {
 		SHA256 string `json:"sha256"`
 		MD5    string `json:"md5"`
-	}
+	} `json:"hash"`
 }
