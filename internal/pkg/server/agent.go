@@ -277,7 +277,7 @@ func (a *Agent) start(ctx context.Context) error {
 
 	srvDone := make(chan bool)
 	srvCtx, srvCanceller := context.WithCancel(ctx)
-	srv, err := NewFleet(cfg, a.bi, state.NewChained(state.NewLog(), a))
+	srv, err := NewFleet(a.bi, state.NewChained(state.NewLog(), a))
 	if err != nil {
 		close(srvDone)
 		srvCanceller()
@@ -287,7 +287,7 @@ func (a *Agent) start(ctx context.Context) error {
 	go func() {
 		defer close(srvDone)
 		for {
-			err := srv.Run(srvCtx)
+			err := srv.Run(srvCtx, cfg)
 			if err == nil || errors.Is(err, context.Canceled) {
 				return
 			}

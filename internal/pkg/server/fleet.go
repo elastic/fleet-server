@@ -49,27 +49,14 @@ type Fleet struct {
 	bi     build.Info
 	verCon version.Constraints
 
-	cfg      *config.Config
 	cfgCh    chan *config.Config
 	cache    cache.Cache
 	reporter state.Reporter
 }
 
 // NewFleet creates the actual fleet server service.
-func NewFleet(cfg *config.Config, bi build.Info, reporter state.Reporter) (*Fleet, error) {
+func NewFleet(bi build.Info, reporter state.Reporter) (*Fleet, error) {
 	verCon, err := api.BuildVersionConstraint(bi.Version)
-	if err != nil {
-		return nil, err
-	}
-
-	err = cfg.LoadServerLimits()
-	if err != nil {
-		return nil, fmt.Errorf("encountered error while loading server limits: %w", err)
-	}
-
-	cacheCfg := config.CopyCache(cfg)
-	log.Info().Interface("cfg", cacheCfg).Msg("Setting cache config options")
-	cache, err := cache.New(cacheCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -77,9 +64,7 @@ func NewFleet(cfg *config.Config, bi build.Info, reporter state.Reporter) (*Flee
 	return &Fleet{
 		bi:       bi,
 		verCon:   verCon,
-		cfg:      cfg,
 		cfgCh:    make(chan *config.Config, 1),
-		cache:    cache,
 		reporter: reporter,
 	}, nil
 }
@@ -87,9 +72,21 @@ func NewFleet(cfg *config.Config, bi build.Info, reporter state.Reporter) (*Flee
 type runFunc func(context.Context) error
 
 // Run runs the fleet server
-func (f *Fleet) Run(ctx context.Context) error {
+func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
+	err := initCfg.LoadServerLimits()
+	if err != nil {
+		return fmt.Errorf("encountered error while loading server limits: %w", err)
+	}
+	cacheCfg := config.CopyCache(initCfg)
+	log.Info().Interface("cfg", cacheCfg).Msg("Setting cache config options")
+	cache, err := cache.New(cacheCfg)
+	if err != nil {
+		return err
+	}
+	f.cache = cache
+
 	var curCfg *config.Config
-	newCfg := f.cfg
+	newCfg := initCfg
 
 	// Replace context with cancellable ctx
 	// in order to automatically cancel all the go routines
@@ -184,7 +181,6 @@ LOOP:
 		}
 
 		curCfg = newCfg
-		f.cfg = curCfg
 
 		select {
 		case newCfg = <-f.cfgCh:
@@ -201,7 +197,7 @@ LOOP:
 
 	// Server is coming down; wait for the server group to exit cleanly.
 	// Timeout if something is locked up.
-	err := safeWait(srvEg, time.Second)
+	err = safeWait(srvEg, time.Second)
 
 	// Eat cancel error to minimize confusion in logs
 	if errors.Is(err, context.Canceled) {
