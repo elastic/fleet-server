@@ -187,6 +187,7 @@ type FileInfo struct {
 type FileData struct {
 	Size int64  `json:"size"`
 	Name string `json:"name"`
+	Mime string `json:"mime_type"`
 	Hash struct {
 		SHA256 string `json:"sha256"`
 		MD5    string `json:"md5"`
