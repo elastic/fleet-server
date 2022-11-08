@@ -82,6 +82,7 @@ type bulkcase struct {
 	desc       string
 	id         string
 	status     string
+	message    string
 	meta       []byte
 	components []byte
 	seqno      sqn.SeqNo
@@ -97,6 +98,7 @@ func TestBulkSimple(t *testing.T) {
 			"Simple case",
 			"simpleId",
 			"online",
+			"message",
 			nil,
 			nil,
 			nil,
@@ -106,6 +108,7 @@ func TestBulkSimple(t *testing.T) {
 			"Singled field case",
 			"singleFieldId",
 			"online",
+			"message",
 			[]byte(`{"hey":"now"}`),
 			[]byte(`[{"id":"winlog-default"}]`),
 			nil,
@@ -115,6 +118,7 @@ func TestBulkSimple(t *testing.T) {
 			"Multi field case",
 			"multiFieldId",
 			"online",
+			"message",
 			[]byte(`{"hey":"now","brown":"cow"}`),
 			[]byte(`[{"id":"winlog-default","type":"winlog"}]`),
 			nil,
@@ -124,6 +128,7 @@ func TestBulkSimple(t *testing.T) {
 			"Multi field nested case",
 			"multiFieldNestedId",
 			"online",
+			"message",
 			[]byte(`{"hey":"now","wee":{"little":"doggie"}}`),
 			[]byte(`[{"id":"winlog-default","type":"winlog"}]`),
 			nil,
@@ -133,6 +138,7 @@ func TestBulkSimple(t *testing.T) {
 			"Simple case with seqNo",
 			"simpleseqno",
 			"online",
+			"message",
 			nil,
 			nil,
 			sqn.SeqNo{1, 2, 3, 4},
@@ -142,6 +148,7 @@ func TestBulkSimple(t *testing.T) {
 			"Field case with seqNo",
 			"simpleseqno",
 			"online",
+			"message",
 			[]byte(`{"uncle":"fester"}`),
 			[]byte(`[{"id":"log-default"}]`),
 			sqn.SeqNo{5, 6, 7, 8},
@@ -151,6 +158,7 @@ func TestBulkSimple(t *testing.T) {
 			"Unusual status",
 			"singleFieldId",
 			"unusual",
+			"message",
 			nil,
 			nil,
 			nil,
@@ -160,6 +168,7 @@ func TestBulkSimple(t *testing.T) {
 			"Empty status",
 			"singleFieldId",
 			"",
+			"message",
 			nil,
 			nil,
 			nil,
@@ -174,7 +183,7 @@ func TestBulkSimple(t *testing.T) {
 			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
 			bc := NewBulk(mockBulk)
 
-			if err := bc.CheckIn(c.id, c.status, "", c.meta, c.components, c.seqno, c.ver); err != nil {
+			if err := bc.CheckIn(c.id, c.status, c.message, c.meta, c.components, c.seqno, c.ver); err != nil {
 				t.Fatal(err)
 			}
 

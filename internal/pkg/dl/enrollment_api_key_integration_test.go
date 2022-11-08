@@ -22,13 +22,13 @@ import (
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
-func createRandomEnrollmentAPIKey(policyID string) model.EnrollmentAPIKey {
+func createRandomEnrollmentAPIKey(policyID string, active bool) model.EnrollmentAPIKey {
 	now := time.Now().UTC()
 	return model.EnrollmentAPIKey{
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
-		Active:    true,
+		Active:    active,
 		APIKey:    "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID:  xid.New().String(),
 		CreatedAt: now.Format(time.RFC3339),
@@ -38,8 +38,8 @@ func createRandomEnrollmentAPIKey(policyID string) model.EnrollmentAPIKey {
 
 }
 
-func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, policyID string) (rec model.EnrollmentAPIKey, err error) {
-	rec = createRandomEnrollmentAPIKey(policyID)
+func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, policyID string, active bool) (rec model.EnrollmentAPIKey, err error) {
+	rec = createRandomEnrollmentAPIKey(policyID, active)
 
 	body, err := json.Marshal(rec)
 	if err != nil {
@@ -58,7 +58,7 @@ func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetEnrollmentAPIKeys)
 
-	rec, err := storeRandomEnrollmentAPIKey(ctx, bulker, index, uuid.Must(uuid.NewV4()).String())
+	rec, err := storeRandomEnrollmentAPIKey(ctx, bulker, index, uuid.Must(uuid.NewV4()).String(), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,15 +91,15 @@ func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetEnrollmentAPIKeys)
 
 	policyID := uuid.Must(uuid.NewV4()).String()
-	rec1, err := storeRandomEnrollmentAPIKey(ctx, bulker, index, policyID)
+	rec1, err := storeRandomEnrollmentAPIKey(ctx, bulker, index, policyID, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec2, err := storeRandomEnrollmentAPIKey(ctx, bulker, index, policyID)
+	rec2, err := storeRandomEnrollmentAPIKey(ctx, bulker, index, policyID, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = storeRandomEnrollmentAPIKey(ctx, bulker, index, uuid.Must(uuid.NewV4()).String())
+	_, err = storeRandomEnrollmentAPIKey(ctx, bulker, index, uuid.Must(uuid.NewV4()).String(), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,5 +112,34 @@ func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
 	diff := cmp.Diff([]model.EnrollmentAPIKey{rec1, rec2}, foundRecs)
 	if diff != "" {
 		t.Fatal(diff)
+	}
+}
+
+func TestSearchEnrollmentAPIKeyByPolicyIDWithInactiveIDs(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetEnrollmentAPIKeys)
+
+	policyID := uuid.Must(uuid.NewV4()).String()
+	rec, err := storeRandomEnrollmentAPIKey(ctx, bulker, index, policyID, true)
+	if err != nil {
+		t.Fatalf("unable to store enrollment key: %v", err)
+	}
+	for i := 0; i < 10; i++ {
+		_, err = storeRandomEnrollmentAPIKey(ctx, bulker, index, uuid.Must(uuid.NewV4()).String(), false)
+		if err != nil {
+			t.Fatalf("unable to store enrollment key: %v", err)
+		}
+	}
+
+	foundRecs, err := findEnrollmentAPIKeys(ctx, bulker, index, QueryEnrollmentAPIKeyByPolicyID, FieldPolicyID, policyID)
+	if err != nil {
+		t.Fatalf("unable to find enrollment key: %v", err)
+	}
+
+	diff := cmp.Diff([]model.EnrollmentAPIKey{rec}, foundRecs)
+	if diff != "" {
+		t.Fatalf("expected content does not match: %v", diff)
 	}
 }

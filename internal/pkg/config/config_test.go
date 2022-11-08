@@ -181,6 +181,38 @@ func TestConfig(t *testing.T) {
 	}
 }
 
+func TestLoadServerLimits(t *testing.T) {
+	t.Run("empty loads limits", func(t *testing.T) {
+		c := &Config{Inputs: []Input{{}}}
+		err := c.LoadServerLimits()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(defaultCheckinMaxBody), c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
+		assert.Equal(t, defaultActionTTL, c.Inputs[0].Cache.ActionTTL)
+	})
+	t.Run("existing values are not overridden", func(t *testing.T) {
+		c := &Config{
+			Inputs: []Input{{
+				Server: Server{
+					Limits: ServerLimits{
+						CheckinLimit: Limit{
+							MaxBody: 5 * defaultCheckinMaxBody,
+						},
+					},
+				},
+				Cache: Cache{
+					ActionTTL: time.Minute,
+				},
+			}},
+		}
+		err := c.LoadServerLimits()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(5*defaultCheckinMaxBody), c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
+		assert.Equal(t, defaultCheckinBurst, c.Inputs[0].Server.Limits.CheckinLimit.Burst)
+		assert.Equal(t, time.Minute, c.Inputs[0].Cache.ActionTTL)
+	})
+
+}
+
 // Stub out the defaults so that the above is easier to maintain
 
 func defaultCache() Cache {
@@ -237,12 +269,13 @@ func defaultFleet() Fleet {
 
 func defaultElastic() Elasticsearch {
 	return Elasticsearch{
-		Protocol:       "http",
-		ServiceToken:   "test-token",
-		Hosts:          []string{"localhost:9200"},
-		MaxRetries:     3,
-		MaxConnPerHost: 128,
-		Timeout:        90 * time.Second,
+		Protocol:         "http",
+		ServiceToken:     "test-token",
+		Hosts:            []string{"localhost:9200"},
+		MaxRetries:       3,
+		MaxConnPerHost:   128,
+		MaxContentLength: 104857600,
+		Timeout:          90 * time.Second,
 	}
 }
 

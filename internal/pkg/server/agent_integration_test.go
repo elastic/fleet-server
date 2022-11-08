@@ -5,7 +5,7 @@
 //go:build integration
 // +build integration
 
-package fleet
+package server
 
 import (
 	"context"
@@ -55,7 +55,7 @@ var policyData = []byte(`
 }
 `)
 
-func TestAgentMode(t *testing.T) {
+func TestAgent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -106,7 +106,7 @@ func TestAgentMode(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		a := &AgentMode{
+		a := &Agent{
 			cliCfg: ucfg.New(),
 			bi:     biInfo,
 		}

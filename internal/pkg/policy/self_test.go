@@ -262,21 +262,6 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// add inactive token that should be filtered out
-	inactiveToken := model.EnrollmentAPIKey{
-		ESDocument: model.ESDocument{
-			Id: xid.New().String(),
-		},
-		Active:   false,
-		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
-		APIKeyID: xid.New().String(),
-		Name:     "Inactive",
-		PolicyID: policyID,
-	}
-	tokenLock.Lock()
-	tokenResult = append(tokenResult, inactiveToken)
-	tokenLock.Unlock()
-
 	go func() {
 		chHitT <- []es.HitT{{
 			ID:      rId,
@@ -577,21 +562,6 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// add inactive token that should be filtered out
-	inactiveToken := model.EnrollmentAPIKey{
-		ESDocument: model.ESDocument{
-			Id: xid.New().String(),
-		},
-		Active:   false,
-		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
-		APIKeyID: xid.New().String(),
-		Name:     "Inactive",
-		PolicyID: policyID,
-	}
-	tokenLock.Lock()
-	tokenResult = append(tokenResult, inactiveToken)
-	tokenLock.Unlock()
 
 	go func() {
 		chHitT <- []es.HitT{{

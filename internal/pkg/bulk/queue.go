@@ -20,6 +20,7 @@ const (
 	kQueueFleetSearch
 	kQueueRefreshBulk
 	kQueueRefreshRead
+	kQueueAPIKeyUpdate
 	kNumQueues
 )
 
@@ -37,6 +38,8 @@ func (q queueT) Type() string {
 		return "refreshBulk"
 	case kQueueRefreshRead:
 		return "refreshRead"
+	case kQueueAPIKeyUpdate:
+		return "apiKeyUpdate"
 	}
 	panic("unknown")
 }
