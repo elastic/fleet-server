@@ -163,6 +163,8 @@ func (u *Uploader) Begin(size int64, docID string, source string, hashsum string
 		cnt += 1
 	}
 	info.Count = int(cnt)
+	u.mu.Lock()
+	defer u.mu.Unlock()
 	u.current[id] = upload{
 		opToken:       token,
 		chunkThrottle: throttle.NewThrottle(u.parallelChunkLimit),
@@ -321,7 +323,7 @@ func (u *Uploader) verifyChunkData(info Info, bulker bulk.Bulk) (bool, error) {
 			}
 		}
 
-		if info.Hasher != nil { // @todo: allow no-hash?
+		if info.Hasher != nil {
 			_, err = io.Copy(info.Hasher, bytes.NewReader(chunk.Data))
 			if err != nil {
 				return false, err
