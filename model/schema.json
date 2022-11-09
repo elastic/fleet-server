@@ -520,6 +520,15 @@
           "description": "Last checkin message",
           "type": "string"
         },
+        "last_checkin_message": {
+          "description": "Last checkin message",
+          "type": "string"
+        },
+        "components": {
+          "description": "Elastic Agent components detailed status information",
+          "type": "object",
+          "format": "raw"
+        },
         "default_api_key_id": {
           "description": "Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
           "type": "string"

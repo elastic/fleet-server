@@ -78,10 +78,11 @@ type EnrollResponse struct {
 }
 
 type CheckinRequest struct {
-	Status    string          `json:"status"`
-	Message   string          `json:"message"`
-	AckToken  string          `json:"ack_token,omitempty"`
-	LocalMeta json.RawMessage `json:"local_metadata"`
+	Status     string          `json:"status"`
+	Message    string          `json:"message"`
+	AckToken   string          `json:"ack_token,omitempty"`
+	LocalMeta  json.RawMessage `json:"local_metadata"`
+	Components json.RawMessage `json:"components,omitempty"`
 }
 
 type CheckinResponse struct {
