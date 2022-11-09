@@ -21,10 +21,9 @@ import (
 )
 
 const (
-	// @todo: neither of these should be static. But should be specific to an integration
-	// somewhat configurable, but need to follow a pattern so that Fleet Server has write access
-	FileHeaderIndexPattern = ".fleet-%s-files"
-	FileDataIndexPattern   = ".fleet-%s-file-data"
+	// integration name is substituted in
+	FileHeaderIndexPattern = ".fleet-files-%s"
+	FileDataIndexPattern   = ".fleet-file-data-%s"
 
 	FieldBaseID = "bid"
 )
