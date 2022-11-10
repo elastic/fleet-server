@@ -11,7 +11,12 @@ import (
 	"strings"
 )
 
-const unknownErrorType = "unknown error"
+const (
+	unknownErrorType         = "unknown_error"
+	timeoutErrorType         = "timeout_exception"
+	indexNotFoundErrorType   = "index_not_found_exception"
+	versionConflictErrorType = "version_conflict_engine_exception"
+)
 
 // TODO: Why do we have both ErrElastic and ErrorT?  Very strange.
 
@@ -26,9 +31,9 @@ type ErrElastic struct {
 }
 
 func (e *ErrElastic) Unwrap() error {
-	if e.Type == "index_not_found_exception" {
+	if e.Type == indexNotFoundErrorType {
 		return ErrIndexNotFound
-	} else if e.Type == "timeout_exception" {
+	} else if e.Type == timeoutErrorType {
 		return ErrTimeout
 	}
 
@@ -70,13 +75,16 @@ var (
 	ErrTimeout                = errors.New("timeout")
 	ErrNotFound               = errors.New("not found")
 
-	errorCheckQueue = [6]string{
-		ErrElasticVersionConflict.Error(),
-		ErrElasticNotFound.Error(),
-		ErrInvalidBody.Error(),
-		ErrIndexNotFound.Error(),
-		ErrTimeout.Error(),
-		ErrNotFound.Error(),
+	knownErrorTypes = [3]string{
+		timeoutErrorType,
+		indexNotFoundErrorType,
+		versionConflictErrorType,
+	}
+
+	errorTranslationMap = map[string]string{
+		ErrElasticVersionConflict.Error(): versionConflictErrorType,
+		ErrIndexNotFound.Error():          indexNotFoundErrorType,
+		ErrTimeout.Error():                timeoutErrorType,
 	}
 )
 
@@ -99,19 +107,29 @@ func TranslateError(status int, rawError json.RawMessage) error {
 	}
 
 	reason := string(rawError)
-	computedErr := &ErrElastic{
-		Status: status,
-		Type:   errType(reason),
-		Reason: reason,
+	eType := errType(reason)
+	switch eType {
+	case versionConflictErrorType:
+		return ErrElasticVersionConflict
+	default:
+		return &ErrElastic{
+			Status: status,
+			Type:   eType,
+			Reason: reason,
+		}
 	}
-
-	return computedErr
 }
 
 func errType(errBody string) string {
-	for _, errCheck := range errorCheckQueue {
+	for _, errCheck := range knownErrorTypes {
 		if strings.Contains(errBody, errCheck) {
 			return errCheck
+		}
+	}
+
+	for errCheck, errType := range errorTranslationMap {
+		if strings.Contains(errBody, errCheck) {
+			return errType
 		}
 	}
 
@@ -127,7 +145,7 @@ func translateDetailedError(status int, e *ErrorT) error {
 
 	var err error
 	switch e.Type {
-	case "version_conflict_engine_exception":
+	case versionConflictErrorType:
 		err = ErrElasticVersionConflict
 	default:
 		err = &ErrElastic{

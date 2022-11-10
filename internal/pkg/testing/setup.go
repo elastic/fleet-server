@@ -128,7 +128,7 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 	}
 
 	if res.IsError() {
-		err = es.TranslateError(res.StatusCode, &esres.Error)
+		err = es.TranslateError(res.StatusCode, esres.Error)
 		if err != nil {
 			if errors.Is(err, es.ErrIndexNotFound) {
 				err = nil
