@@ -107,7 +107,7 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 	log.Trace().Int("statuscode", resp.StatusCode).Interface("chunk-response", response).Msg("uploaded chunk")
 
 	if response.Error.Type != "" {
-		return fmt.Errorf("%s: %s. Caused by %s: %s", response.Error.Type, response.Error.Reason, response.Error.Cause.Type, response.Error.Cause.Reason)
+		return fmt.Errorf("%s: %s caused by %s: %s", response.Error.Type, response.Error.Reason, response.Error.Cause.Type, response.Error.Cause.Reason)
 	}
 	return nil
 }

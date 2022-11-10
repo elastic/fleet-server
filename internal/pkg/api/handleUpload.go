@@ -203,7 +203,7 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 		Int64("maxFileSize", maxFileSize).
 		Int("maxParallelOps", maxParallelUploadOperations).
 		Int("maxParallelChunks", maxParallelChunks).
-		Msg("Artifact install limits")
+		Msg("upload limits")
 
 	return &UploadT{
 		chunkClient: chunkClient,
@@ -337,7 +337,7 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 func uploadRequestToFileDoc(req map[string]interface{}, chunkSize int64) ([]byte, error) {
 	fileObj, ok := req["file"].(map[string]interface{})
 	if !ok {
-		return nil, errors.New("invalid upload request. File is not an object")
+		return nil, errors.New("invalid upload request, file is not an object")
 	}
 
 	fileObj["ChunkSize"] = chunkSize

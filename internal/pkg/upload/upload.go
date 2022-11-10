@@ -35,8 +35,8 @@ const (
 var (
 	ErrMaxConcurrentUploads = errors.New("the max number of concurrent uploads has been reached")
 	ErrInvalidUploadID      = errors.New("active upload not found with this ID, it may be expired")
-	ErrFileSizeTooLarge     = errors.New("This file exceeds the maximum allowed file size")
-	ErrMissingChunks        = errors.New("File data incomplete, not all chunks were uploaded")
+	ErrFileSizeTooLarge     = errors.New("this file exceeds the maximum allowed file size")
+	ErrMissingChunks        = errors.New("file data incomplete, not all chunks were uploaded")
 	ErrHashMismatch         = errors.New("file integrity hash does not match")
 	//@todo: explicit error for expired uploads
 )
