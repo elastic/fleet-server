@@ -227,8 +227,6 @@ func (u *Uploader) Complete(id string, bulker bulk.Bulk) (Info, error) {
 		return Info{}, errors.New("file contents did not pass validation")
 	}
 
-	// @todo: verify chunks
-	// verify hashes, etc
 	u.current[id].complete <- struct{}{}
 	return info.Info, nil
 }

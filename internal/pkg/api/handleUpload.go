@@ -380,7 +380,6 @@ func validateUploadPayload(fi FileInfo) error {
 	}
 
 	//@todo: valid action?
-	//@todo: valid agent?
 	//@todo: valid src? will that make future expansion harder and require FS updates? maybe just validate the index exists
 
 	if fi.File.Size <= 0 {

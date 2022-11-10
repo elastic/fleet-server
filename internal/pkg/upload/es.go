@@ -37,6 +37,7 @@ func prepareFindChunkIDs() *dsl.Tmpl {
 	root := dsl.NewRoot()
 	root.Param("_source", false) // do not return large data payload
 	root.Query().Term(FieldBaseID, tmpl.Bind(FieldBaseID), nil)
+	root.Size(10000) // 10k elasticsearch maximum. Result count breaks above 42gb files
 	tmpl.MustResolve(root)
 	return tmpl
 }
