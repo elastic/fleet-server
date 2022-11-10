@@ -154,15 +154,37 @@ func TestErrorTranslation(t *testing.T) {
 			"some reason",
 		},
 		{
-			500,
-			"detailed unknown error",
-			errorTinBytes(ErrorT{
-				Type:   "something funny",
-				Reason: "some reason",
-			}),
+			404,
+			"detailed index not found json",
+			[]byte(`{
+				"root_cause": [
+				  {
+					"type": "index_not_found_exception",
+					"reason": "no such index [.fleet-actions]",
+					"resource.type": "index_expression",
+					"resource.id": ".fleet-actions",
+					"index_uuid": "_na_",
+					"index": ".fleet-actions"
+				  }
+				],
+				"type": "index_not_found_exception",
+				"reason": "no such index [.fleet-actions]",
+				"resource.type": "index_expression",
+				"resource.id": ".fleet-actions",
+				"index_uuid": "_na_",
+				"index": ".fleet-actions"
+			  }`),
 			true,
-			"something funny",
-			"some reason",
+			indexNotFoundErrorType,
+			`no such index [.fleet-actions]`,
+		},
+		{
+			404,
+			"index not found json",
+			[]byte("IndexNotFoundException[no such index [.fleet-actions]]"),
+			true,
+			indexNotFoundErrorType,
+			"IndexNotFoundException[no such index [.fleet-actions]]",
 		},
 	}
 

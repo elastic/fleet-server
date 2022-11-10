@@ -81,10 +81,18 @@ var (
 		versionConflictErrorType,
 	}
 
+	// helps with native translation of native java exceptions
+	// list possible exceptions is much broader, these we recognize.
+	// all listed here: https://github.com/elastic/elasticsearch/blob/f8d1d2afa67afd1b9769751fde35f86c5ec885d9/server/src/main/java/org/elasticsearch/ElasticsearchException.java#L730
 	errorTranslationMap = map[string]string{
-		ErrElasticVersionConflict.Error(): versionConflictErrorType,
-		ErrIndexNotFound.Error():          indexNotFoundErrorType,
-		ErrTimeout.Error():                timeoutErrorType,
+		ErrIndexNotFound.Error():              indexNotFoundErrorType,
+		"IndexNotFoundException":              indexNotFoundErrorType,
+		ErrTimeout.Error():                    timeoutErrorType,
+		"ElasticsearchTimeoutException":       timeoutErrorType,
+		"ProcessClusterEventTimeoutException": timeoutErrorType,
+		"ReceiveTimeoutTransportException":    timeoutErrorType,
+		ErrElasticVersionConflict.Error():     versionConflictErrorType,
+		"VersionConflictEngineException":      versionConflictErrorType,
 	}
 )
 
