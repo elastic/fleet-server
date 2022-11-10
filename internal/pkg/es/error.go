@@ -5,10 +5,13 @@
 package es
 
 import (
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
 )
+
+const unknownErrorType = "unknown error"
 
 // TODO: Why do we have both ErrElastic and ErrorT?  Very strange.
 
@@ -66,12 +69,56 @@ var (
 	ErrIndexNotFound          = errors.New("index not found")
 	ErrTimeout                = errors.New("timeout")
 	ErrNotFound               = errors.New("not found")
+
+	errorCheckQueue = [6]string{
+		ErrElasticVersionConflict.Error(),
+		ErrElasticNotFound.Error(),
+		ErrInvalidBody.Error(),
+		ErrIndexNotFound.Error(),
+		ErrTimeout.Error(),
+		ErrNotFound.Error(),
+	}
 )
 
-func TranslateError(status int, e *ErrorT) error {
+func TranslateError(status int, rawError json.RawMessage) error {
 	if status == 200 || status == 201 {
 		return nil
 	}
+
+	if len(rawError) == 0 {
+		// error was omitted
+		return &ErrElastic{
+			Status: status,
+		}
+	}
+
+	// try decoding detailed error by default
+	detailedError := &ErrorT{}
+	if err := json.Unmarshal(rawError, &detailedError); err == nil {
+		return translateDetailedError(status, detailedError)
+	}
+
+	reason := string(rawError)
+	computedErr := &ErrElastic{
+		Status: status,
+		Type:   errType(reason),
+		Reason: reason,
+	}
+
+	return computedErr
+}
+
+func errType(errBody string) string {
+	for _, errCheck := range errorCheckQueue {
+		if strings.Contains(errBody, errCheck) {
+			return errCheck
+		}
+	}
+
+	return unknownErrorType
+}
+
+func translateDetailedError(status int, e *ErrorT) error {
 	if e == nil {
 		return &ErrElastic{
 			Status: status,

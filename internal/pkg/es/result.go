@@ -22,8 +22,8 @@ type ErrorT struct {
 
 // Acknowledgement response
 type AckResponse struct {
-	Acknowledged bool   `json:"acknowledged"`
-	Error        ErrorT `json:"error,omitempty"`
+	Acknowledged bool            `json:"acknowledged"`
+	Error        json.RawMessage `json:"error,omitempty"`
 }
 
 type HitT struct {
@@ -126,7 +126,7 @@ type Response struct {
 	Hits         HitsT                  `json:"hits"`
 	Aggregations map[string]Aggregation `json:"aggregations,omitempty"`
 
-	Error ErrorT `json:"error,omitempty"`
+	Error json.RawMessage `json:"error,omitempty"`
 }
 
 type DeleteByQueryResponse struct {
@@ -135,7 +135,7 @@ type DeleteByQueryResponse struct {
 	TimedOut bool   `json:"timed_out"`
 	Deleted  int64  `json:"deleted"`
 
-	Error ErrorT `json:"error,omitempty"`
+	Error json.RawMessage `json:"error,omitempty"`
 }
 
 type ResultT struct {
