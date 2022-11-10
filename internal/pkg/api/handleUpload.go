@@ -218,7 +218,6 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 	// store raw body since we will json-decode twice
 	// 2MB is a reasonable json payload size. Any more might be an indication of garbage
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 2*1024*1024))
-	r.Body.Close()
 	if err != nil {
 		return fmt.Errorf("error reading request: %w", err)
 	}
