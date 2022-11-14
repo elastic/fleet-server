@@ -30,7 +30,7 @@ func (u UpdateFields) Marshal() ([]byte, error) {
 func parseError(res *esapi.Response) error {
 
 	var e struct {
-		Err *es.ErrorT `json:"error"`
+		Err json.RawMessage `json:"error"`
 	}
 
 	decoder := json.NewDecoder(res.Body)
