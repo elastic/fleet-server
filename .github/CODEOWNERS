@@ -1,4 +1,4 @@
-# Team responsable for Fleet Server
+# Team responsible for Fleet Server
 * @elastic/fleet
 
 # Allow to auto-merge PRs with Mergify
