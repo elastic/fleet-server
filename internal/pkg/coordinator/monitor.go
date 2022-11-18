@@ -512,6 +512,12 @@ func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyID string, u
 		return err
 	}
 
+	if len(agents) == 0 {
+		zlog.Info().
+			Msg("no agents to unenroll")
+		return nil
+	}
+
 	zlog = zlog.With().Dur("timeout", unenrollTimeout).Logger()
 
 	agentIds := make([]string, len(agents))
