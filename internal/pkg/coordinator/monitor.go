@@ -40,10 +40,9 @@ type Monitor interface {
 }
 
 type policyT struct {
-	id              string
-	cord            Coordinator
-	cordCanceller   context.CancelFunc
-	unenrollTimeout time.Duration
+	id            string
+	cord          Coordinator
+	cordCanceller context.CancelFunc
 }
 
 type monitorT struct {
