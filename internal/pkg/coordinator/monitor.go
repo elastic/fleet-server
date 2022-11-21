@@ -509,13 +509,11 @@ func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyID string, unenr
 func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, zlog zerolog.Logger, agentsIndex string) error {
 	agents, err := dl.FindOfflineAgents(ctx, bulker, policyID, unenrollTimeout, dl.WithIndexName(agentsIndex))
 	if err != nil {
+		if errors.Is(err, dl.ErrNotFound) {
+			zlog.Info().Msg("no agents to unenroll")
+			return nil
+		}
 		return err
-	}
-
-	if len(agents) == 0 {
-		zlog.Info().
-			Msg("no agents to unenroll")
-		return nil
 	}
 
 	zlog = zlog.With().Dur("timeout", unenrollTimeout).Logger()

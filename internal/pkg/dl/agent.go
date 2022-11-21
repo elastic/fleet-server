@@ -80,7 +80,7 @@ func FindOfflineAgents(ctx context.Context, bulker bulk.Bulk, policyID string, u
 	}
 
 	if len(res.Hits) == 0 {
-		return nil, nil
+		return nil, ErrNotFound
 	}
 
 	agents := make([]model.Agent, len(res.Hits))
