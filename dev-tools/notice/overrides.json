@@ -10,3 +10,15 @@
 {"name": "github.com/xeipuuv/gojsonpointer", "licenceType": "Apache-2.0"}
 {"name": "github.com/xeipuuv/gojsonreference", "licenceType": "Apache-2.0"}
 {"name": "github.com/xeipuuv/gojsonschema", "licenceType": "Apache-2.0"}
+{"name": "github.com/acomagu/bufpipe", "licenceType": "MIT", "url": "https://github.com/acomagu/bufpipe/blob/master/LICENSE"}
+{"name": "github.com/bmizerany/assert", "licenceType": "MIT"}
+{"name": "github.com/dnaeon/go-vcr", "licenceType": "BSD-3-Clause", "url": "https://github.com/dnaeon/go-vcr/blob/v3/LICENSE"}
+{"name": "github.com/elastic/e2e-testing", "licenceType": "Elastic"}
+{"name": "github.com/elastic/elastic-agent", "licenceType": "Elastic"}
+{"name": "github.com/elastic/elastic-package", "licenceType": "Elastic"}
+{"name": "github.com/elastic/package-spec", "licenceType": "Elastic"}
+{"name": "github.com/go-errors/errors", "licenceType": "MIT", "url": "https://github.com/go-errors/errors/blob/master/LICENSE.MIT"}
+{"name": "github.com/pascaldekloe/goe", "licenceType": "CC0", "url": "https://github.com/pascaldekloe/goe/blob/master/LICENSE"}
+{"name": "github.com/pelletier/go-buffruneio", "licenceType": "MIT", "url": "https://github.com/pelletier/go-buffruneio/blob/master/LICENSE"}
+{"name": "github.com/xi2/xz", "licenceType": "Public Domain", "url": "https://github.com/xi2/xz/blob/master/LICENSE"}
+{"name": "gopkg.in/yaml.v1", "licenceType": "Apache-2.0"}
