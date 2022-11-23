@@ -51,9 +51,13 @@ func (a *Agent) APIKeyIDs() []string {
 	}
 
 	for _, output := range a.Outputs {
-		keys = append(keys, output.APIKeyID)
+		if output.APIKeyID != "" {
+			keys = append(keys, output.APIKeyID)
+		}
 		for _, key := range output.ToRetireAPIKeyIds {
-			keys = append(keys, key.ID)
+			if key.ID != "" {
+				keys = append(keys, key.ID)
+			}
 		}
 	}
 
