@@ -12,13 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
-	"github.com/elastic/fleet-server/v7/internal/pkg/state"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
+	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"github.com/elastic/go-ucfg"
 	"github.com/rs/zerolog/log"
 )
