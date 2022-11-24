@@ -32,11 +32,6 @@ const (
 	kStopped = "Stopped"
 )
 
-type firstCfg struct {
-	cfg *config.Config
-	err error
-}
-
 // Agent is a fleet-server that runs under the elastic-agent.
 // An Agent instance will retrieve connection information from the passed reader (normally stdin).
 // Agent uses client.StateInterface to gather config data and manage its lifecylce.
