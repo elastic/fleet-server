@@ -8,11 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
-	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
+	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
@@ -385,5 +386,11 @@ func (a *Agent) configFromUnits() (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return config.FromConfig(cfgData)
+
+	cliCfg := ucfg.MustNewFrom(a.cliCfg, config.DefaultOptions...)
+	err = cliCfg.Merge(cfgData, config.DefaultOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return config.FromConfig(cliCfg)
 }
