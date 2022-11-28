@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/go-ucfg"
 	"github.com/rs/zerolog/log"
 )
@@ -32,6 +33,11 @@ const (
 	kStopped = "Stopped"
 )
 
+type clientUnit interface {
+	Expected() (client.UnitState, client.UnitLogLevel, *proto.UnitExpectedConfig)
+	UpdateState(state client.UnitState, message string, payload map[string]interface{}) error
+}
+
 // Agent is a fleet-server that runs under the elastic-agent.
 // An Agent instance will retrieve connection information from the passed reader (normally stdin).
 // Agent uses client.StateInterface to gather config data and manage its lifecylce.
@@ -42,8 +48,8 @@ type Agent struct {
 
 	agent client.V2
 
-	outputUnit *client.Unit
-	inputUnit  *client.Unit
+	outputUnit clientUnit
+	inputUnit  clientUnit
 
 	srv          *Fleet
 	srvCtx       context.Context
