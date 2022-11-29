@@ -119,11 +119,10 @@ type mockClientUnit struct {
 
 func (u *mockClientUnit) Expected() (client.UnitState, client.UnitLogLevel, *proto.UnitExpectedConfig) {
 	args := u.Called()
-	state := args.Get(0).(client.UnitState)
-	logLevel := args.Get(1).(client.UnitLogLevel)
-	config := args.Get(2).(*proto.UnitExpectedConfig)
 
-	return state, logLevel, config
+	return args.Get(0).(client.UnitState),
+		args.Get(1).(client.UnitLogLevel),
+		args.Get(2).(*proto.UnitExpectedConfig)
 }
 func (u *mockClientUnit) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
 	args := u.Called()
