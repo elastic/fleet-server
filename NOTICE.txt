@@ -330,11 +330,19 @@ these terms.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-client/v7
+<<<<<<< HEAD
 Version: v7.0.0-20221102171927-bc376a4e0f9f
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.0.0-20221102171927-bc376a4e0f9f/LICENSE.txt:
+=======
+Version: v7.0.2-0.20221129150247-15881a8e64ef
+Licence type (autodetected): Elastic
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.0.2-0.20221129150247-15881a8e64ef/LICENSE.txt:
+>>>>>>> af0f027 (Updated elastic-agent-client to v7.0.2-0.20221129150247-15881a8e64ef (#2136))
 
 ELASTIC LICENSE AGREEMENT
 

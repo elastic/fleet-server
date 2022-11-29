@@ -4,10 +4,17 @@ go 1.17
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
+<<<<<<< HEAD
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20221102171927-bc376a4e0f9f
 	github.com/elastic/elastic-agent-libs v0.2.14
 	github.com/elastic/elastic-agent-system-metrics v0.3.0
+=======
+	github.com/dgraph-io/ristretto v0.1.1
+	github.com/elastic/elastic-agent-client/v7 v7.0.2-0.20221129150247-15881a8e64ef
+	github.com/elastic/elastic-agent-libs v0.2.15
+	github.com/elastic/elastic-agent-system-metrics v0.4.4
+>>>>>>> af0f027 (Updated elastic-agent-client to v7.0.2-0.20221129150247-15881a8e64ef (#2136))
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
 	github.com/elastic/go-ucfg v0.8.5
 	github.com/gofrs/uuid v4.2.0+incompatible
