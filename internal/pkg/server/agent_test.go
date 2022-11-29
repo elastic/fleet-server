@@ -86,29 +86,29 @@ type mockClientV2 struct {
 func (mockClientV2) RegisterDiagnosticHook(name string, description string, filename string, contentType string, hook client.DiagnosticHook) {
 }
 
-func (c mockClientV2) Start(ctx context.Context) error {
+func (c *mockClientV2) Start(ctx context.Context) error {
 	args := c.Called()
 	return args.Get(0).(error)
 }
 
-func (c mockClientV2) Stop() {}
+func (c *mockClientV2) Stop() {}
 
-func (c mockClientV2) UnitChanges() <-chan client.UnitChanged {
+func (c *mockClientV2) UnitChanges() <-chan client.UnitChanged {
 	args := c.Called()
 	return args.Get(0).(<-chan client.UnitChanged)
 }
 
-func (c mockClientV2) Errors() <-chan error {
+func (c *mockClientV2) Errors() <-chan error {
 	args := c.Called()
 	return args.Get(0).(<-chan error)
 }
 
-func (c mockClientV2) Artifacts() client.ArtifactsClient {
+func (c *mockClientV2) Artifacts() client.ArtifactsClient {
 	args := c.Called()
 	return args.Get(0).(client.ArtifactsClient)
 }
 
-func (c mockClientV2) AgentInfo() *client.AgentInfo {
+func (c *mockClientV2) AgentInfo() *client.AgentInfo {
 	args := c.Called()
 	return args.Get(0).(*client.AgentInfo)
 }
@@ -117,7 +117,7 @@ type mockClientUnit struct {
 	mock.Mock
 }
 
-func (u mockClientUnit) Expected() (client.UnitState, client.UnitLogLevel, *proto.UnitExpectedConfig) {
+func (u *mockClientUnit) Expected() (client.UnitState, client.UnitLogLevel, *proto.UnitExpectedConfig) {
 	args := u.Called()
 	state := args.Get(0).(client.UnitState)
 	logLevel := args.Get(1).(client.UnitLogLevel)
@@ -125,7 +125,7 @@ func (u mockClientUnit) Expected() (client.UnitState, client.UnitLogLevel, *prot
 
 	return state, logLevel, config
 }
-func (u mockClientUnit) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
+func (u *mockClientUnit) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
 	args := u.Called()
 	return args.Get(0).(error)
 }
