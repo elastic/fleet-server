@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/fleet-server/v7/version"
 	"github.com/elastic/go-ucfg"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -40,28 +41,35 @@ func TestCLIOverrides(t *testing.T) {
 	sampleOutputConfig, err := structpb.NewStruct(map[string]interface{}{})
 	require.NoError(t, err)
 
+	clientMock := &mockClientV2{}
+	clientMock.On("AgentInfo").Return(&client.AgentInfo{
+		ID:      "test-agent",
+		Version: version.DefaultVersion,
+	})
+
+	mockInputUnit := &mockClientUnit{}
+	mockInputUnit.On("Expected").Return(
+		client.UnitStateHealthy,
+		client.UnitLogLevelInfo,
+		&proto.UnitExpectedConfig{
+			Source: sampleInputConfig,
+		},
+	)
+
+	mockOutputUnit := &mockClientUnit{}
+	mockOutputUnit.On("Expected").Return(
+		client.UnitStateHealthy,
+		client.UnitLogLevelInfo,
+		&proto.UnitExpectedConfig{
+			Source: sampleOutputConfig,
+		},
+	)
+
 	agent := &Agent{
-		cliCfg: cliConfig,
-		inputUnit: &testClientUnit{
-			state:    client.UnitStateHealthy,
-			logLevel: client.UnitLogLevelInfo,
-			config: &proto.UnitExpectedConfig{
-				Source: sampleInputConfig,
-			},
-		},
-		outputUnit: &testClientUnit{
-			state:    client.UnitStateHealthy,
-			logLevel: client.UnitLogLevelInfo,
-			config: &proto.UnitExpectedConfig{
-				Source: sampleOutputConfig,
-			},
-		},
-		agent: testClientV2{
-			agentInfo: &client.AgentInfo{
-				ID:      "test-agent",
-				Version: version.DefaultVersion,
-			},
-		},
+		cliCfg:     cliConfig,
+		inputUnit:  mockInputUnit,
+		outputUnit: mockOutputUnit,
+		agent:      clientMock,
 	}
 
 	generatedCfg, err := agent.configFromUnits()
@@ -71,48 +79,53 @@ func TestCLIOverrides(t *testing.T) {
 	require.Equal(t, loggingFilesNameExpected, generatedCfg.Logging.Files.Name)
 }
 
-type testClientV2 struct {
-	errorChan       chan error
-	unitChangedChan chan client.UnitChanged
-	agentInfo       *client.AgentInfo
+type mockClientV2 struct {
+	mock.Mock
 }
 
-func (testClientV2) RegisterDiagnosticHook(name string, description string, filename string, contentType string, hook client.DiagnosticHook) {
+func (mockClientV2) RegisterDiagnosticHook(name string, description string, filename string, contentType string, hook client.DiagnosticHook) {
 }
 
-func (testClientV2) Start(ctx context.Context) error { return nil }
-
-func (c testClientV2) Stop() {
-	if c.unitChangedChan != nil {
-		close(c.unitChangedChan)
-	}
+func (c mockClientV2) Start(ctx context.Context) error {
+	args := c.Called()
+	return args.Get(0).(error)
 }
 
-func (c testClientV2) UnitChanges() <-chan client.UnitChanged {
-	return c.unitChangedChan
+func (c mockClientV2) Stop() {}
+
+func (c mockClientV2) UnitChanges() <-chan client.UnitChanged {
+	args := c.Called()
+	return args.Get(0).(<-chan client.UnitChanged)
 }
 
-func (c testClientV2) Errors() <-chan error {
-	return c.errorChan
+func (c mockClientV2) Errors() <-chan error {
+	args := c.Called()
+	return args.Get(0).(<-chan error)
 }
 
-func (testClientV2) Artifacts() client.ArtifactsClient {
-	return nil
+func (c mockClientV2) Artifacts() client.ArtifactsClient {
+	args := c.Called()
+	return args.Get(0).(client.ArtifactsClient)
 }
 
-func (c testClientV2) AgentInfo() *client.AgentInfo {
-	return c.agentInfo
+func (c mockClientV2) AgentInfo() *client.AgentInfo {
+	args := c.Called()
+	return args.Get(0).(*client.AgentInfo)
 }
 
-type testClientUnit struct {
-	state    client.UnitState
-	logLevel client.UnitLogLevel
-	config   *proto.UnitExpectedConfig
+type mockClientUnit struct {
+	mock.Mock
 }
 
-func (u testClientUnit) Expected() (client.UnitState, client.UnitLogLevel, *proto.UnitExpectedConfig) {
-	return u.state, u.logLevel, u.config
+func (u mockClientUnit) Expected() (client.UnitState, client.UnitLogLevel, *proto.UnitExpectedConfig) {
+	args := u.Called()
+	state := args.Get(0).(client.UnitState)
+	logLevel := args.Get(1).(client.UnitLogLevel)
+	config := args.Get(2).(*proto.UnitExpectedConfig)
+
+	return state, logLevel, config
 }
-func (testClientUnit) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
-	return nil
+func (u mockClientUnit) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
+	args := u.Called()
+	return args.Get(0).(error)
 }
