@@ -83,7 +83,7 @@ type mockClientV2 struct {
 	mock.Mock
 }
 
-func (mockClientV2) RegisterDiagnosticHook(name string, description string, filename string, contentType string, hook client.DiagnosticHook) {
+func (*mockClientV2) RegisterDiagnosticHook(name string, description string, filename string, contentType string, hook client.DiagnosticHook) {
 }
 
 func (c *mockClientV2) Start(ctx context.Context) error {
