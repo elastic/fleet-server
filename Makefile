@@ -23,7 +23,7 @@ endif
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
 COMMIT=$(shell git rev-parse --short HEAD)
 NOW=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
-LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=$(NOW) 
+LDFLAGS=-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=$(NOW)
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
 CMD_COLOR_OFF=\033[0m
 
@@ -100,7 +100,7 @@ check-no-changes:
 
 .PHONY: test
 test: prepare-test-context  ## - Run all tests
-	@./dev-tools/run_with_go_ver $(MAKE) test-unit 
+	@./dev-tools/run_with_go_ver $(MAKE) test-unit
 	@./dev-tools/run_with_go_ver $(MAKE) test-int
 	@$(MAKE) junit-report
 
@@ -118,7 +118,7 @@ prepare-test-context: ## - Prepare the test context folders
 
 .PHONY: junit-report
 junit-report: ## - Run the junit-report generation for all the out files generated
-	@go get -v -u github.com/jstemmer/go-junit-report
+	@go install -v github.com/jstemmer/go-junit-report
 	$(foreach file, $(wildcard build/*.out), go-junit-report > "${file}.xml" < ${file};)
 
 ##################################################
