@@ -8,16 +8,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
-	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"io"
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
+	"github.com/elastic/fleet-server/v7/internal/pkg/state"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/go-ucfg"
 	"github.com/rs/zerolog/log"
 )
@@ -31,9 +33,9 @@ const (
 	kStopped = "Stopped"
 )
 
-type firstCfg struct {
-	cfg *config.Config
-	err error
+type clientUnit interface {
+	Expected() (client.UnitState, client.UnitLogLevel, *proto.UnitExpectedConfig)
+	UpdateState(state client.UnitState, message string, payload map[string]interface{}) error
 }
 
 // Agent is a fleet-server that runs under the elastic-agent.
@@ -46,8 +48,8 @@ type Agent struct {
 
 	agent client.V2
 
-	outputUnit *client.Unit
-	inputUnit  *client.Unit
+	outputUnit clientUnit
+	inputUnit  clientUnit
 
 	srv          *Fleet
 	srvCtx       context.Context
@@ -385,5 +387,11 @@ func (a *Agent) configFromUnits() (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return config.FromConfig(cfgData)
+
+	cliCfg := ucfg.MustNewFrom(a.cliCfg, config.DefaultOptions...)
+	err = cliCfg.Merge(cfgData, config.DefaultOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return config.FromConfig(cliCfg)
 }
