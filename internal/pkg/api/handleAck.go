@@ -342,7 +342,6 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		agent.Id,
 		currRev, currCoord,
 		agent.PolicyID)
-
 	if err != nil {
 		return err
 	}
