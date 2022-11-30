@@ -41,11 +41,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/dgraph-io/ristretto
-Version: v0.1.0
+Version: v0.1.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/dgraph-io/ristretto@v0.1.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/dgraph-io/ristretto@v0.1.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -330,11 +330,11 @@ these terms.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-client/v7
-Version: v7.0.0-20221102171927-bc376a4e0f9f
+Version: v7.0.2-0.20221129150247-15881a8e64ef
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.0.0-20221102171927-bc376a4e0f9f/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.0.2-0.20221129150247-15881a8e64ef/LICENSE.txt:
 
 ELASTIC LICENSE AGREEMENT
 
@@ -563,11 +563,11 @@ SOFTWARE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.2.14
+Version: v0.2.15
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.2.14/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.2.15/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -774,11 +774,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-l
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-system-metrics
-Version: v0.3.0
+Version: v0.4.4
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.3.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.4.4/LICENSE.txt:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -21938,11 +21938,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/mitchellh/mapstructure
-Version: v1.5.0
+Version: v1.4.3
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/mitchellh/mapstructure@v1.5.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/mitchellh/mapstructure@v1.4.3/LICENSE:
 
 The MIT License (MIT)
 
@@ -28911,11 +28911,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/sys
-Version: v0.0.0-20220422013727-9388b58f7150
+Version: v0.0.0-20221010170243-090e33056c14
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.0.0-20220422013727-9388b58f7150/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.0.0-20221010170243-090e33056c14/LICENSE:
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
