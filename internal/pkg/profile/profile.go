@@ -11,10 +11,11 @@ import (
 	"net/http"
 	"net/http/pprof"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/rs/zerolog/log"
 )
 
-// RunProfiler exposes /debug/pprof on the passed address by staringa server.
+// RunProfiler exposes /debug/pprof on the passed address by staring a server.
 func RunProfiler(ctx context.Context, addr string) error {
 
 	if addr == "" {
@@ -32,10 +33,17 @@ func RunProfiler(ctx context.Context, addr string) error {
 	r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	r.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
+	cfg := &config.ServerTimeouts{}
+	cfg.InitDefaults()
+
 	server := http.Server{
-		Addr:        addr,
-		Handler:     r,
-		BaseContext: bctx,
+		Addr:              addr,
+		Handler:           r,
+		BaseContext:       bctx,
+		ReadTimeout:       cfg.Read,
+		ReadHeaderTimeout: cfg.ReadHeader,
+		WriteTimeout:      cfg.Write,
+		IdleTimeout:       cfg.Idle,
 	}
 
 	log.Info().Str("bind", addr).Msg("Installing profiler")
