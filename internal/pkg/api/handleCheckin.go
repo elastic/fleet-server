@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -32,7 +33,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miolini/datacounter"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -154,7 +154,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	var req CheckinRequest
 	decoder := json.NewDecoder(readCounter)
 	if err := decoder.Decode(&req); err != nil {
-		return errors.Wrap(err, "decode checkin request")
+		return fmt.Errorf("decode checkin request: %w", err)
 	}
 
 	cntCheckin.bodyIn.Add(readCounter.Count())
@@ -185,7 +185,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	// Subscribe to policy manager for changes on PolicyId > policyRev
 	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
 	if err != nil {
-		return errors.Wrap(err, "subscribe policy monitor")
+		return fmt.Errorf("subscribe policy monitor: %w", err)
 	}
 	defer func() {
 		err := ct.pm.Unsubscribe(sub)
@@ -249,7 +249,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 			case policy := <-sub.Output():
 				actionResp, err := processPolicy(ctx, zlog, ct.bulker, agent.Id, policy)
 				if err != nil {
-					return errors.Wrap(err, "processPolicy")
+					return fmt.Errorf("processPolicy: %w", err)
 				}
 				actions = append(actions, *actionResp)
 				break LOOP
@@ -289,7 +289,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 
 	payload, err := json.Marshal(&resp)
 	if err != nil {
-		return errors.Wrap(err, "writeResponse marshal")
+		return fmt.Errorf("writeResponse marshal: %w", err)
 	}
 
 	compressionLevel := ct.cfg.CompressionLevel
@@ -301,17 +301,17 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 
 		zipper, err := gzip.NewWriterLevel(wrCounter, compressionLevel)
 		if err != nil {
-			return errors.Wrap(err, "writeResponse new gzip")
+			return fmt.Errorf("writeResponse new gzip: %w", err)
 		}
 
 		w.Header().Set("Content-Encoding", kEncodingGzip)
 
 		if _, err = zipper.Write(payload); err != nil {
-			return errors.Wrap(err, "writeResponse gzip write")
+			return fmt.Errorf("writeResponse gzip write: %w", err)
 		}
 
 		if err = zipper.Close(); err != nil {
-			err = errors.Wrap(err, "writeResponse gzip close")
+			err = fmt.Errorf("writeResponse gzip close: %w", err)
 		}
 
 		cntCheckin.bodyOut.Add(wrCounter.Count())
@@ -328,7 +328,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 		cntCheckin.bodyOut.Add(uint64(nWritten))
 
 		if err != nil {
-			err = errors.Wrap(err, "writeResponse payload")
+			err = fmt.Errorf("writeResponse payload: %w", err)
 		}
 	}
 
@@ -359,7 +359,7 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req C
 				zlog.Debug().Str("token", ackToken).Msg("revision token not found")
 				err = nil
 			} else {
-				return seqno, errors.Wrap(err, "resolveSeqNo")
+				return seqno, fmt.Errorf("resolveSeqNo: %w", err)
 			}
 		}
 		seqno = []int64{sn}
@@ -372,7 +372,7 @@ func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqN
 	actions, err := dl.FindAgentActions(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentID)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "fetchAgentPendingActions")
+		return nil, fmt.Errorf("fetchAgentPendingActions: %w", err)
 	}
 
 	return actions, err
@@ -454,7 +454,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	for _, policyOutput := range pp.Outputs {
 		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, outputs)
 		if err != nil {
-			return nil, fmt.Errorf("failed to prepare output %q: %w",
+			return nil, fmt.Errorf("failed to prepare output %q:: %w",
 				policyOutput.Name, err)
 		}
 	}
@@ -496,7 +496,7 @@ func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*mod
 		if errors.Is(err, dl.ErrNotFound) {
 			err = ErrAgentNotFound
 		} else {
-			err = errors.Wrap(err, "findAgentByApiKeyId")
+			err = fmt.Errorf("findAgentByApiKeyId: %w", err)
 		}
 	}
 	return &agent, err
@@ -516,7 +516,7 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	// Deserialize the request metadata
 	var reqLocalMeta interface{}
 	if err := json.Unmarshal(req.LocalMeta, &reqLocalMeta); err != nil {
-		return nil, errors.Wrap(err, "parseMeta request")
+		return nil, fmt.Errorf("parseMeta request: %w", err)
 	}
 
 	// If empty, don't step on existing data
@@ -527,7 +527,7 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	// Deserialize the agent's metadata copy
 	var agentLocalMeta interface{}
 	if err := json.Unmarshal(agent.LocalMetadata, &agentLocalMeta); err != nil {
-		return nil, errors.Wrap(err, "parseMeta local")
+		return nil, fmt.Errorf("parseMeta local: %w", err)
 	}
 
 	var outMeta []byte
@@ -563,11 +563,11 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	var reqComponents interface{}
 	if len(req.Components) > 0 {
 		if err := json.Unmarshal(req.Components, &reqComponents); err != nil {
-			return nil, errors.Wrap(err, "parseComponents request")
+			return nil, fmt.Errorf("parseComponents request: %w", err)
 		}
 		// Validate that components is an array
 		if _, ok := reqComponents.([]interface{}); !ok {
-			return nil, errors.Wrap(errors.New("components property is not array"), "parseComponents request")
+			return nil, errors.New("parseComponets request: components property is not array")
 		}
 	}
 
@@ -580,7 +580,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	var agentComponents interface{}
 	if len(agent.Components) > 0 {
 		if err := json.Unmarshal(agent.Components, &agentComponents); err != nil {
-			return nil, errors.Wrap(err, "parseComponents local")
+			return nil, fmt.Errorf("parseComponents local: %w", err)
 		}
 	}
 
