@@ -219,7 +219,7 @@ func migrateAgentOutputs() (string, string, []byte, error) {
 	const (
 		migrationName        = "AgentOutputs"
 		fieldOutputs         = "outputs"
-		fieldDefaultAPIKeyID = "default_api_key_id" // nolint:gosec,G101 // this is not a credential
+		fieldDefaultAPIKeyID = "default_api_key_id" //nolint:gosec // this is not a credential
 		fieldRetiredAt       = "retiredAt"
 	)
 

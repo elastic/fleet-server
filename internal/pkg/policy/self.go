@@ -9,9 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"sync"
 	"time"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
