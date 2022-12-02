@@ -428,7 +428,10 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 		Int64("policyCoordinator", currCoord).
 		Msg("ack policy")
 
-	return fmt.Errorf("handlePolicyChange update: %w", err)
+	if err != nil {
+		return fmt.Errorf("handlePolicyChange update: %w", err)
+	}
+	return nil
 }
 
 func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
@@ -453,7 +456,10 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 	}
 
 	r, err := json.Marshal(rr)
-	return r, len(keys), fmt.Errorf("failed to marshal resulting role definition: %w", err)
+	if err != nil {
+		return r, len(keys), fmt.Errorf("failed to marshal resulting role definition: %w", err)
+	}
+	return r, len(keys), nil
 }
 
 func (ack *AckT) invalidateAPIKeys(ctx context.Context, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {

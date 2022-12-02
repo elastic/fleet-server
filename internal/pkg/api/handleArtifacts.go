@@ -245,7 +245,10 @@ func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, iden
 		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("fetch artifact")
 
-	return artifact, fmt.Errorf("fetchArtifact: %w", err)
+	if err != nil {
+		return artifact, fmt.Errorf("fetchArtifact: %w", err)
+	}
+	return artifact, nil
 }
 
 func validateSha2String(sha2 string) error {
