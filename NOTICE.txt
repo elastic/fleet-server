@@ -330,19 +330,11 @@ these terms.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-client/v7
-<<<<<<< HEAD
-Version: v7.0.2-0.20221129150247-15881a8e64ef
-Licence type (autodetected): Elastic
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.0.2-0.20221129150247-15881a8e64ef/LICENSE.txt:
-=======
 Version: v7.0.1
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.0.1/LICENSE.txt:
->>>>>>> 6e21816 (Update module dependencies (#2126))
 
 ELASTIC LICENSE AGREEMENT
 
@@ -45030,11 +45022,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/mitchellh/mapstructure
-Version: v1.4.3
+Version: v1.5.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/mitchellh/mapstructure@v1.4.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/mitchellh/mapstructure@v1.5.0/LICENSE:
 
 The MIT License (MIT)
 
@@ -52003,19 +51995,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/sys
-<<<<<<< HEAD
-Version: v0.0.0-20221010170243-090e33056c14
-Licence type (autodetected): BSD-3-Clause
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.0.0-20221010170243-090e33056c14/LICENSE:
-=======
 Version: v0.1.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.1.0/LICENSE:
->>>>>>> 6e21816 (Update module dependencies (#2126))
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
