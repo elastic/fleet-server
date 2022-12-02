@@ -82,7 +82,6 @@ require (
 )
 
 require (
-	github.com/elastic/elastic-agent v0.0.0-20221128144110-5b7a0ff4a28c
 	github.com/jcchavezs/porto v0.4.0 // indirect
 	go.elastic.co/apm/module/apmhttprouter v1.14.0
 )
