@@ -36,6 +36,7 @@ var tmpl = template.Must(template.New("specs").Parse(`
 package config
 
 import (
+	"fmt"
 	"math"
 	"runtime"
 	"strings"
@@ -44,7 +45,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/packer"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/pbnjay/memory"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -184,12 +184,12 @@ func init() {
 	for f, v := range unpacked {
 		cfg, err := yaml.NewConfig(v, DefaultOptions...)
 		if err != nil {
-			panic(errors.Wrap(err, "Cannot read spec from "+f))
+			panic(fmt.Errorf("cannot read spec from %s: %w", f, err))
 		}
 
 		l := defaultEnvLimits()
 		if err := cfg.Unpack(&l, DefaultOptions...); err != nil {
-			panic(errors.Wrap(err, "Cannot unpack spec from "+f))
+			panic(fmt.Errorf("cannot unpack spec from %s: %w", f, err))
 		}
 
 		defaults = append(defaults, l)

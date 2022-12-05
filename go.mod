@@ -19,7 +19,6 @@ require (
 	github.com/mailru/easyjson v0.7.7
 	github.com/miolini/datacounter v1.0.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
-	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.3.0
 	github.com/rs/zerolog v1.27.0
 	github.com/spf13/cobra v1.3.0
@@ -57,6 +56,7 @@ require (
 	github.com/magefile/mage v1.14.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/santhosh-tekuri/jsonschema v1.2.4 // indirect

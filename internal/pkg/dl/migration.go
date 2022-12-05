@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -116,7 +115,7 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&resp); err != nil {
-		return migrationResponse{}, errors.Wrap(err, "decode UpdateByQuery response")
+		return migrationResponse{}, fmt.Errorf("decode UpdateByQuery response: %w", err)
 	}
 
 	log.Info().
