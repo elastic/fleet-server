@@ -5,11 +5,7 @@ go 1.17
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.1
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-client/v7 v7.0.1
-=======
 	github.com/elastic/elastic-agent-client/v7 v7.0.2
->>>>>>> a2f4567 (Update client dependency to latest 7.0.2" (#2158))
 	github.com/elastic/elastic-agent-libs v0.2.15
 	github.com/elastic/elastic-agent-system-metrics v0.4.4
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
