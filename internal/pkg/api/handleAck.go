@@ -338,14 +338,6 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
-	err := ack.updateAgentDoc(ctx, zlog,
-		agent.Id,
-		currRev, currCoord,
-		agent.PolicyID)
-	if err != nil {
-		return err
-	}
-
 	for _, output := range agent.Outputs {
 		if output.Type != policy.OutputTypeElasticsearch {
 			continue
@@ -358,6 +350,14 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		if err != nil {
 			return err
 		}
+	}
+
+	err := ack.updateAgentDoc(ctx, zlog,
+		agent.Id,
+		currRev, currCoord,
+		agent.PolicyID)
+	if err != nil {
+		return err
 	}
 
 	return nil
