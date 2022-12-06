@@ -25,6 +25,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	go.elastic.co/apm v1.15.0
 	go.elastic.co/apm/module/apmelasticsearch v1.14.0
+	go.elastic.co/apm/module/apmhttprouter v1.14.0
 	go.elastic.co/ecszerolog v0.1.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/sync v0.1.0
@@ -50,6 +51,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
+	github.com/jcchavezs/porto v0.4.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/kr/pretty v0.2.1 // indirect
@@ -79,12 +81,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.0 // indirect
-)
-
-require (
-	github.com/elastic/elastic-agent v0.0.0-20221128144110-5b7a0ff4a28c
-	github.com/jcchavezs/porto v0.4.0 // indirect
-	go.elastic.co/apm/module/apmhttprouter v1.14.0
 )
 
 replace (
