@@ -346,12 +346,18 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		err := ack.updateAPIKey(ctx,
 			zlog,
 			agent.Id,
-			currRev, currCoord,
-			agent.PolicyID,
 			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
 		if err != nil {
 			return err
 		}
+	}
+
+	err := ack.updateAgentDoc(ctx, zlog,
+		agent.Id,
+		currRev, currCoord,
+		agent.PolicyID)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -361,8 +367,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 func (ack *AckT) updateAPIKey(ctx context.Context,
 	zlog zerolog.Logger,
 	agentID string,
-	currRev, currCoord int64,
-	policyID, apiKeyID, permissionHash string,
+	apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
 
 	if apiKeyID != "" {
@@ -407,6 +412,15 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 		ack.invalidateAPIKeys(ctx, toRetireAPIKeyIDs, apiKeyID)
 	}
 
+	return nil
+}
+
+func (ack *AckT) updateAgentDoc(ctx context.Context,
+	zlog zerolog.Logger,
+	agentID string,
+	currRev, currCoord int64,
+	policyID string,
+) error {
 	body := makeUpdatePolicyBody(
 		policyID,
 		currRev,
