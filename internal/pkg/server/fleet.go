@@ -8,13 +8,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"net/url"
 	"os"
 	"reflect"
 	"runtime/debug"
 	"time"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"

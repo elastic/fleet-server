@@ -7,6 +7,8 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -25,7 +27,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miolini/datacounter"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -289,7 +290,7 @@ LOOP:
 			zlog.Error().Err(err).Msg("Fail ApiKeyRead")
 			return err
 		case time.Since(start) > time.Minute:
-			err := errors.New("Apikey index failed to refresh")
+			err := errors.New("apikey index failed to refresh")
 			zlog.Error().Err(err).Msg("Abort query attempt on apikey")
 			return err
 		}
@@ -318,14 +319,14 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 
 	data, err := json.Marshal(resp)
 	if err != nil {
-		return errors.Wrap(err, "marshal enrollResponse")
+		return fmt.Errorf("marshal enrollResponse: %w", err)
 	}
 
 	numWritten, err := w.Write(data)
 	cntEnroll.bodyOut.Add(uint64(numWritten))
 
 	if err != nil {
-		return errors.Wrap(err, "fail send enroll response")
+		return fmt.Errorf("fail send enroll response: %w", err)
 	}
 
 	zlog.Info().
@@ -427,7 +428,7 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	// Pull API key record from .fleet-enrollment-api-keys
 	rec, err := dl.FindEnrollmentAPIKey(ctx, et.bulker, dl.QueryEnrollmentAPIKeyByID, dl.FieldAPIKeyID, id)
 	if err != nil {
-		return nil, errors.Wrap(err, "FindEnrollmentAPIKey")
+		return nil, fmt.Errorf("FindEnrollmentAPIKey: %w", err)
 	}
 
 	if !rec.Active {
@@ -445,7 +446,7 @@ func decodeEnrollRequest(data io.Reader) (*EnrollRequest, error) {
 	var req EnrollRequest
 	decoder := json.NewDecoder(data)
 	if err := decoder.Decode(&req); err != nil {
-		return nil, errors.Wrap(err, "decode enroll request")
+		return nil, fmt.Errorf("decode enroll request: %w", err)
 	}
 
 	// Validate

@@ -348,7 +348,7 @@ func getESServiceToken() string {
 	return os.Getenv("ELASTICSEARCH_SERVICE_TOKEN")
 }
 
-func getUnitState(control *StubV2Control, unitType proto.UnitType, unitID string) proto.State {
+func getUnitState(control *StubV2Control, unitType proto.UnitType, unitID string) proto.State { //nolint:unparam // used for tests
 	obs := control.Observed()
 	if obs == nil {
 		return proto.State_STARTING
@@ -361,7 +361,7 @@ func getUnitState(control *StubV2Control, unitType proto.UnitType, unitID string
 	return proto.State_STARTING
 }
 
-func makeExpected(agentID string, inputConfigIdx uint64, inputSource *structpb.Struct, outputConfigIdx uint64, outputSource *structpb.Struct) *proto.CheckinExpected {
+func makeExpected(agentID string, inputConfigIdx uint64, inputSource *structpb.Struct, outputConfigIdx uint64, outputSource *structpb.Struct) *proto.CheckinExpected { //nolint:unparam // used for tests
 	return &proto.CheckinExpected{
 		AgentInfo: &proto.CheckinAgentInfo{
 			Id:       agentID,

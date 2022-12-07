@@ -6,6 +6,8 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/elastic/elastic-agent-libs/api"
 	cfglib "github.com/elastic/elastic-agent-libs/config"
@@ -18,7 +20,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/version"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -56,7 +57,7 @@ func InitMetrics(ctx context.Context, cfg *config.Config, bi build.Info) (*api.S
 	}
 	s, err := api.NewWithDefaultRoutes(zapStub, cfgStub, monitoring.GetNamespace)
 	if err != nil {
-		err = errors.Wrap(err, "could not start the HTTP server for the API")
+		err = fmt.Errorf("could not start the HTTP server for the API: %w", err)
 	} else {
 		s.Start()
 	}
