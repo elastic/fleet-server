@@ -17,7 +17,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 const updateAPIKeyPath = "/_security/api_key/_bulk_update"

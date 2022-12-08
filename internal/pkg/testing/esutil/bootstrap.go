@@ -7,7 +7,7 @@ package esutil
 import (
 	"context"
 
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // EnsureIndex sets up the index if it doesn't exist. It's utilized for integration tests at the moment.
