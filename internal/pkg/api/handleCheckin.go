@@ -32,6 +32,9 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
+
+	"go.elastic.co/apm/module/apmhttp/v2"
+	"go.elastic.co/apm/v2"
 )
 
 var (
@@ -234,27 +237,54 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		}
 	}
 
-	for _, action := range actions {
-		zlog.Info().
-			Str("ackToken", ackToken).
-			Str("createdAt", action.CreatedAt).
-			Str("id", action.Id).
-			Str("type", action.Type).
-			Str("inputType", action.InputType).
-			Int64("timeout", fromPtr(action.Timeout)).
-			Msg("Action delivered to agent on checkin")
-	}
-
 	resp := CheckinResponse{
 		AckToken: &ackToken,
 		Action:   "checkin",
 		Actions:  &actions,
 	}
 
-	return ct.writeResponse(zlog, w, r, resp)
+	return ct.writeResponse(zlog, w, r, agent, resp)
 }
 
-func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, resp CheckinResponse) error {
+func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
+	// TODO: only process this if we have an apm tracer
+	// var parentContexts []apm.TraceContext
+	var links []apm.SpanLink
+	for _, a := range resp.Actions {
+		if a.Traceparent != "" {
+			traceContext, err := apmhttp.ParseTraceparentHeader(a.Traceparent)
+			if err != nil {
+				zlog.Debug().Err(err).Msg("unable to parse traceparent header")
+				continue
+			}
+
+			zlog.Debug().Str("traceparent", a.Traceparent).Msgf("✅ parsed traceparent header: %s", a.Traceparent)
+
+			// parentContexts = append(parentContexts, traceContext)
+			links = append(links, apm.SpanLink{
+				Trace: traceContext.Trace,
+				Span:  traceContext.Span,
+			})
+		}
+	}
+
+	span, _ := apm.StartSpanOptions(r.Context(), "action delivery", "fleet-server", apm.SpanOptions{
+		Links: links,
+	})
+	span.Context.SetLabel("action_count", len(resp.Actions))
+	span.Context.SetLabel("agent_id", agent.Id)
+	defer span.End()
+
+	for _, action := range resp.Actions {
+		zlog.Info().
+			Str("ackToken", resp.AckToken).
+			Str("createdAt", action.CreatedAt).
+			Str("id", action.ID).
+			Str("type", action.Type).
+			Str("inputType", action.InputType).
+			Int64("timeout", action.Timeout).
+			Msg("Action delivered to agent on checkin")
+	}
 
 	payload, err := json.Marshal(&resp)
 	if err != nil {
@@ -375,30 +405,18 @@ func convertActions(agentID string, actions []model.Action) ([]Action, string) {
 
 	respList := make([]Action, 0, sz)
 	for _, action := range actions {
-		r := Action{
-			AgentId:   agentID,
-			CreatedAt: action.Timestamp,
-			Data:      action.Data,
-			Id:        action.ActionID,
-			Type:      action.Type,
-			InputType: action.InputType,
-		}
-		if action.StartTime != "" {
-			r.StartTime = &action.StartTime
-		}
-		if action.Expiration != "" {
-			r.Expiration = &action.Expiration
-		}
-		if action.Timeout != 0 {
-			r.Timeout = &action.Timeout
-		}
-		if action.Signed != nil {
-			r.Signed = &ActionSignature{
-				Data:      action.Signed.Data,
-				Signature: action.Signed.Signature,
-			}
-		}
-		respList = append(respList, r)
+		respList = append(respList, ActionResp{
+			AgentID:     agentID,
+			CreatedAt:   action.Timestamp,
+			StartTime:   action.StartTime,
+			Expiration:  action.Expiration,
+			Data:        action.Data,
+			ID:          action.ActionID,
+			Type:        action.Type,
+			InputType:   action.InputType,
+			Timeout:     action.Timeout,
+			Traceparent: action.Traceparent,
+		})
 	}
 
 	if sz > 0 {
