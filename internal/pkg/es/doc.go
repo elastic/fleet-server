@@ -5,5 +5,5 @@
 // Package es provides utilities to interact with Elasticsearch.
 //
 // For the most part the fleet-server uses the go-elasticsearch client directly.
-// The es package has structs for encoding/decoding results as well as some utilitiy calls to get version numbers and do some index manipulation.
+// The es package has structs for encoding/decoding results as well as some utility calls to get version numbers and do some index manipulation.
 package es
