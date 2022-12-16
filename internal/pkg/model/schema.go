@@ -65,6 +65,9 @@ type Action struct {
 
 	// The ID of the user who created the action.
 	UserID string `json:"user_id,omitempty"`
+
+	// APM traceparent for the action
+	Traceparent string `json:"traceparent,omitempty"`
 }
 
 // ActionData The opaque payload.

@@ -125,6 +125,11 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 		return nil, err
 	}
 
+	tx := apm.TransactionFromContext(r.Context())
+	if tx != nil {
+		tx.Context.SetLabel("agent_id", agent.Id)
+	}
+
 	if agent.Agent == nil {
 		zlog.Warn().
 			Err(ErrAgentCorrupted).

@@ -135,15 +135,16 @@ func (a *AckResponse) SetError(pos int, err error) {
 }
 
 type ActionResp struct {
-	AgentID    string      `json:"agent_id"`
-	CreatedAt  string      `json:"created_at"`
-	StartTime  string      `json:"start_time,omitempty"`
-	Expiration string      `json:"expiration,omitempty"`
-	Data       interface{} `json:"data"`
-	ID         string      `json:"id"`
-	Type       string      `json:"type"`
-	InputType  string      `json:"input_type"`
-	Timeout    int64       `json:"timeout,omitempty"`
+	AgentID     string      `json:"agent_id"`
+	CreatedAt   string      `json:"created_at"`
+	StartTime   string      `json:"start_time,omitempty"`
+	Expiration  string      `json:"expiration,omitempty"`
+	Data        interface{} `json:"data"`
+	ID          string      `json:"id"`
+	Type        string      `json:"type"`
+	InputType   string      `json:"input_type"`
+	Timeout     int64       `json:"timeout,omitempty"`
+	Traceparent string      `json:"traceparent,omitempty"`
 }
 
 type Event struct {
