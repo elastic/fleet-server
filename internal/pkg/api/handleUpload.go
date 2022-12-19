@@ -23,7 +23,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/upload"
 	"github.com/elastic/fleet-server/v7/internal/pkg/upload/cbor"
@@ -54,17 +53,8 @@ func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps ht
 	err := rt.ut.handleUploadStart(&zlog, w, r)
 
 	if err != nil {
-		cntUpload.IncError(err)
-		resp := NewHTTPErrResp(err)
-		zlog.WithLevel(resp.Level).
-			Err(err).
-			Int(ECSHTTPResponseCode, resp.StatusCode).
-			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail upload initiation")
-
-		if err := resp.Write(w); err != nil {
-			zlog.Error().Err(err).Msg("fail writing error response")
-		}
+		writeUploadError(err, w, zlog, start, "error initiating upload process")
+		return
 	}
 }
 
@@ -86,45 +76,19 @@ func (rt Router) handleUploadChunk(w http.ResponseWriter, r *http.Request, ps ht
 	// AND optionally the initial hash, both having stricter auth checks
 	if AUTH_ENABLED {
 		if _, err := authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
-			cntUpload.IncError(err)
-			resp := NewHTTPErrResp(err)
-			if err := resp.Write(w); err != nil {
-				zlog.Error().Err(err).Msg("failed writing error response")
-			}
+			writeUploadError(err, w, zlog, start, "authentication failure for chunk write")
 			return
 		}
 	}
 
 	chunkNum, err := strconv.Atoi(chunkID)
 	if err != nil {
-		cntUpload.IncError(err)
-		resp := NewHTTPErrResp(err)
-		if err := resp.Write(w); err != nil {
-			zlog.Error().Err(err).Msg("fail writing error response")
-		}
+		writeUploadError(err, w, zlog, start, "error parsing chunk index")
 		return
 	}
-	err = rt.ut.handleUploadChunk(&zlog, w, r, id, chunkNum)
-
-	if err != nil {
-		cntUpload.IncError(err)
-		resp := NewHTTPErrResp(err)
-
-		// Log this as warn for visibility that limit has been reached.
-		// This allows customers to tune the configuration on detection of threshold.
-		if errors.Is(err, limit.ErrMaxLimit) {
-			resp.Level = zerolog.WarnLevel
-		}
-
-		zlog.WithLevel(resp.Level).
-			Err(err).
-			Int(ECSHTTPResponseCode, resp.StatusCode).
-			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail upload chunk")
-
-		if err := resp.Write(w); err != nil {
-			zlog.Error().Err(err).Msg("fail writing error response")
-		}
+	if err := rt.ut.handleUploadChunk(&zlog, w, r, id, chunkNum); err != nil {
+		writeUploadError(err, w, zlog, start, "error uploading chunk")
+		return
 	}
 }
 
@@ -147,36 +111,14 @@ func (rt Router) handleUploadComplete(w http.ResponseWriter, r *http.Request, ps
 	// doc, but that means we had to doc-lookup early
 	if AUTH_ENABLED {
 		if _, err := authAgent(r, &agentID, rt.bulker, rt.ut.cache); err != nil {
-			cntUpload.IncError(err)
-			resp := NewHTTPErrResp(err)
-			if err := resp.Write(w); err != nil {
-				zlog.Error().Err(err).Msg("failed writing error response")
-			}
+			writeUploadError(err, w, zlog, start, "error authenticating for upload finalization")
 			return
 		}
 	}
 
-	err := rt.ut.handleUploadComplete(&zlog, w, r, id)
-
-	if err != nil {
-		cntUpload.IncError(err)
-		resp := NewHTTPErrResp(err)
-
-		// Log this as warn for visibility that limit has been reached.
-		// This allows customers to tune the configuration on detection of threshold.
-		if errors.Is(err, limit.ErrMaxLimit) {
-			resp.Level = zerolog.WarnLevel
-		}
-
-		zlog.WithLevel(resp.Level).
-			Err(err).
-			Int(ECSHTTPResponseCode, resp.StatusCode).
-			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail upload completion")
-
-		if err := resp.Write(w); err != nil {
-			zlog.Error().Err(err).Msg("fail writing error response")
-		}
+	if err := rt.ut.handleUploadComplete(&zlog, w, r, id); err != nil {
+		writeUploadError(err, w, zlog, start, "error finalizing upload")
+		return
 	}
 }
 
@@ -399,6 +341,22 @@ func validateUploadPayload(fi FileInfo) error {
 		return errors.New("invalid file size, size is required")
 	}
 	return nil
+}
+
+// helper function for doing all the error responsibilities
+// at the HTTP edge
+func writeUploadError(err error, w http.ResponseWriter, zlog zerolog.Logger, start time.Time, msg string) {
+	cntUpload.IncError(err)
+	resp := NewHTTPErrResp(err)
+
+	zlog.WithLevel(resp.Level).
+		Err(err).
+		Int(ECSHTTPResponseCode, resp.StatusCode).
+		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
+		Msg(msg)
+	if e := resp.Write(w); e != nil {
+		zlog.Error().Err(e).Msg("failure writing error response")
+	}
 }
 
 type UploadCompleteRequest struct {
