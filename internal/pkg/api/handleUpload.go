@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,30 +33,18 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// the only valid values of upload status according to storage spec
-type UploadStatus string
-
-const (
-	UploadAwaiting UploadStatus = "AWAITING_UPLOAD"
-	UploadProgress UploadStatus = "UPLOADING"
-	UploadDone     UploadStatus = "READY"
-	UploadFail     UploadStatus = "UPLOAD_ERROR"
-	UploadDel      UploadStatus = "DELETED"
-)
-
 const (
 	// TODO: move to a config
-	maxParallelUploadOperations = 3
-	maxParallelChunks           = 4
-	maxFileSize                 = 104857600 // 100 MiB
+	maxFileSize    = 100 * 104857600 // 100 MiB
+	maxUploadTimer = 24 * time.Hour
 
+	// temp for easy development
+	AUTH_ENABLED = false // @todo: remove
 )
 
 func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	start := time.Now()
-
 	reqID := r.Header.Get(logger.HeaderRequestID)
-
 	zlog := log.With().
 		Str(ECSHTTPRequestID, reqID).
 		Logger()
@@ -67,13 +56,6 @@ func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps ht
 	if err != nil {
 		cntUpload.IncError(err)
 		resp := NewHTTPErrResp(err)
-
-		// Log this as warn for visibility that limit has been reached.
-		// This allows customers to tune the configuration on detection of threshold.
-		if errors.Is(err, limit.ErrMaxLimit) || errors.Is(err, upload.ErrMaxConcurrentUploads) {
-			resp.Level = zerolog.WarnLevel
-		}
-
 		zlog.WithLevel(resp.Level).
 			Err(err).
 			Int(ECSHTTPResponseCode, resp.StatusCode).
@@ -99,15 +81,18 @@ func (rt Router) handleUploadChunk(w http.ResponseWriter, r *http.Request, ps ht
 		Str(ECSHTTPRequestID, reqID).
 		Logger()
 
-	// simpler authentication check, since chunk checksum must
-	// ultimately match the initial hash provided with the stricter key check
-	if _, err := authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
-		cntUpload.IncError(err)
-		resp := NewHTTPErrResp(err)
-		if err := resp.Write(w); err != nil {
-			zlog.Error().Err(err).Msg("failed writing error response")
+	// simpler authentication check,  for high chunk throughput
+	// since chunk checksums must match transit hash
+	// AND optionally the initial hash, both having stricter auth checks
+	if AUTH_ENABLED {
+		if _, err := authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
+			cntUpload.IncError(err)
+			resp := NewHTTPErrResp(err)
+			if err := resp.Write(w); err != nil {
+				zlog.Error().Err(err).Msg("failed writing error response")
+			}
+			return
 		}
-		return
 	}
 
 	chunkNum, err := strconv.Atoi(chunkID)
@@ -155,15 +140,20 @@ func (rt Router) handleUploadComplete(w http.ResponseWriter, r *http.Request, ps
 		Str(ECSHTTPRequestID, reqID).
 		Logger()
 
-	// simpler authentication check, file integrity checksum
-	// will catch directed tampering, this route just says "im done"
-	if _, err := authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
-		cntUpload.IncError(err)
-		resp := NewHTTPErrResp(err)
-		if err := resp.Write(w); err != nil {
-			zlog.Error().Err(err).Msg("failed writing error response")
+	//@todo: doc lookup, agent ID is in there
+	agentID := "ABC"
+
+	// need to auth that it matches the ID in the initial
+	// doc, but that means we had to doc-lookup early
+	if AUTH_ENABLED {
+		if _, err := authAgent(r, &agentID, rt.bulker, rt.ut.cache); err != nil {
+			cntUpload.IncError(err)
+			resp := NewHTTPErrResp(err)
+			if err := resp.Write(w); err != nil {
+				zlog.Error().Err(err).Msg("failed writing error response")
+			}
+			return
 		}
-		return
 	}
 
 	err := rt.ut.handleUploadComplete(&zlog, w, r, id)
@@ -201,15 +191,13 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 	log.Info().
 		Interface("limits", cfg.Limits.ArtifactLimit).
 		Int64("maxFileSize", maxFileSize).
-		Int("maxParallelOps", maxParallelUploadOperations).
-		Int("maxParallelChunks", maxParallelChunks).
 		Msg("upload limits")
 
 	return &UploadT{
 		chunkClient: chunkClient,
 		bulker:      bulker,
 		cache:       cache,
-		upl:         upload.New(maxFileSize, maxParallelChunks, maxParallelChunks),
+		upl:         upload.New(chunkClient, bulker, maxFileSize, maxUploadTimer),
 	}
 }
 
@@ -232,8 +220,10 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 	}
 
 	// check API key matches payload agent ID
-	if _, err := authAgent(r, &fi.AgentID, ut.bulker, ut.cache); err != nil {
-		return err
+	if AUTH_ENABLED {
+		if _, err := authAgent(r, &fi.AgentID, ut.bulker, ut.cache); err != nil {
+			return err
+		}
 	}
 
 	if err := validateUploadPayload(fi); err != nil {
@@ -264,7 +254,7 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 		return fmt.Errorf("error parsing request json: %w", err)
 	}
 
-	doc, err := uploadRequestToFileDoc(reqDoc, op.ChunkSize)
+	doc, err := uploadRequestToFileDoc(reqDoc, op.ChunkSize, op.ID)
 	if err != nil {
 		return fmt.Errorf("unable to convert request to file metadata doc: %w", err)
 	}
@@ -291,33 +281,55 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 }
 
 func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string, chunkID int) error {
-	chunkInfo, err := ut.upl.Chunk(uplID, chunkID)
+	chunkHash := strings.TrimSpace(r.Header.Get("X-Chunk-Sha2"))
+
+	if chunkHash == "" {
+		return errors.New("chunk hash header required")
+	}
+
+	chunkInfo, err := ut.upl.Chunk(uplID, chunkID, chunkHash)
 	if err != nil {
 		return err
-	}
-	defer chunkInfo.Token.Release()
-	if chunkInfo.FirstReceived {
-		if err := updateUploadStatus(r.Context(), ut.bulker, chunkInfo.Upload, UploadProgress); err != nil {
-			zlog.Warn().Err(err).Str("upload", uplID).Msg("unable to update upload status")
-		}
 	}
 
 	// prevent over-sized chunks
 	data := http.MaxBytesReader(w, r.Body, upload.MaxChunkSize)
-	ce := cbor.NewChunkWriter(data, chunkInfo.Final, chunkInfo.Upload.DocID, chunkInfo.Upload.ChunkSize)
+
+	// compute hash as we stream it
+	hash := sha256.New()
+	copier := io.TeeReader(data, hash)
+
+	ce := cbor.NewChunkWriter(copier, chunkInfo.Final, chunkInfo.Upload.DocID, chunkInfo.Hash, chunkInfo.Upload.ChunkSize)
 	if err := upload.IndexChunk(r.Context(), ut.chunkClient, ce, chunkInfo.Upload.Source, chunkInfo.Upload.DocID, chunkInfo.ID); err != nil {
 		return err
 	}
+
+	hashsum := hex.EncodeToString(hash.Sum(nil))
+
+	if strings.ToLower(chunkHash) != strings.ToLower(hashsum) {
+		// @todo: delete document, since we wrote it, but the hash was invalid
+		return upload.ErrHashMismatch
+	}
+
 	return nil
 }
 
 func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
-	info, err := ut.upl.Complete(uplID, ut.bulker)
+	var req UploadCompleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return errors.New("unable to parse request body")
+	}
+
+	if strings.TrimSpace(req.TransitHash.SHA256) == "" {
+		return errors.New("transit hash required")
+	}
+
+	info, err := ut.upl.Complete(uplID, req.TransitHash.SHA256, ut.bulker)
 	if err != nil {
 		return err
 	}
 
-	if err := updateUploadStatus(r.Context(), ut.bulker, info, UploadDone); err != nil {
+	if err := updateUploadStatus(r.Context(), ut.bulker, info, upload.StatusDone); err != nil {
 		// should be 500 error probably?
 		zlog.Warn().Err(err).Str("upload", uplID).Msg("unable to set upload status to complete")
 		return err
@@ -333,19 +345,21 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 
 // takes the arbitrary input document from an upload request and injects
 // a few known fields as it passes through
-func uploadRequestToFileDoc(req map[string]interface{}, chunkSize int64) ([]byte, error) {
+func uploadRequestToFileDoc(req map[string]interface{}, chunkSize int64, uploadID string) ([]byte, error) {
 	fileObj, ok := req["file"].(map[string]interface{})
 	if !ok {
 		return nil, errors.New("invalid upload request, file is not an object")
 	}
 
 	fileObj["ChunkSize"] = chunkSize
-	fileObj["Status"] = string(UploadAwaiting)
+	fileObj["Status"] = string(upload.StatusAwaiting)
+	req["upload_id"] = uploadID
+	req["upload_start"] = time.Now().UnixMilli()
 
 	return json.Marshal(req)
 }
 
-func updateUploadStatus(ctx context.Context, bulker bulk.Bulk, info upload.Info, status UploadStatus) error {
+func updateUploadStatus(ctx context.Context, bulker bulk.Bulk, info upload.Info, status upload.Status) error {
 	data, err := json.Marshal(map[string]interface{}{
 		"doc": map[string]interface{}{
 			"file": map[string]string{
@@ -385,4 +399,10 @@ func validateUploadPayload(fi FileInfo) error {
 		return errors.New("invalid file size, size is required")
 	}
 	return nil
+}
+
+type UploadCompleteRequest struct {
+	TransitHash struct {
+		SHA256 string `json:"sha256"`
+	} `json:"transithash"`
 }

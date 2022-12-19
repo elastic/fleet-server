@@ -25,11 +25,13 @@ const (
 	FileHeaderIndexPattern = ".fleet-files-%s"
 	FileDataIndexPattern   = ".fleet-file-data-%s"
 
-	FieldBaseID = "bid"
+	FieldBaseID   = "bid"
+	FieldUploadID = "upload_id"
 )
 
 var (
 	QueryChunkIDs = prepareFindChunkIDs()
+	QueryUploadID = prepareFindByUploadID()
 )
 
 func prepareFindChunkIDs() *dsl.Tmpl {
@@ -42,8 +44,35 @@ func prepareFindChunkIDs() *dsl.Tmpl {
 	return tmpl
 }
 
+func prepareFindByUploadID() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	//root.Param("_source", false) // do not return large data payload
+	root.Query().Term(FieldUploadID, tmpl.Bind(FieldUploadID), nil)
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
 func CreateFileDoc(ctx context.Context, bulker bulk.Bulk, doc []byte, source string, fileID string) (string, error) {
+	//@todo: put_if_absent
 	return bulker.Create(ctx, fmt.Sprintf(FileHeaderIndexPattern, source), fileID, doc, bulk.WithRefresh())
+}
+
+func GetFileDoc(ctx context.Context, bulker bulk.Bulk, uploadID string) ([]es.HitT, error) {
+
+	query, err := QueryUploadID.Render(map[string]interface{}{
+		FieldUploadID: uploadID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := bulker.Search(ctx, fmt.Sprintf(FileHeaderIndexPattern, "*"), query)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.HitsT.Hits, nil
 }
 
 func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID string, data []byte) error {
@@ -51,26 +80,6 @@ func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID 
 }
 
 func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, docID string, chunkID int) error {
-
-	/*
-		// the non-streaming version
-		buf := bytes.NewBuffer(nil)
-		out, err := io.ReadAll(data)
-		if err != nil {
-			return err
-		}
-		data.Close()
-		err = cbor.NewEncoder(buf).Encode(map[string]interface{}{
-			"bid":  fileID,
-			"last": false,
-			"data": out,
-		})
-		if err != nil {
-			return err
-		}
-		buf2 := buf.Bytes()
-	*/
-
 	req := esapi.IndexRequest{
 		Index:      fmt.Sprintf(FileDataIndexPattern, source),
 		Body:       body,
@@ -83,7 +92,7 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 	/*
 		standard approach when content-type override no longer needed
 
-		resp, err := client.Index(".fleet-file_data", data, func(req *esapi.IndexRequest) {
+		resp, err := client.Index(fmt.Sprintf(FileDataIndexPattern, source), data, func(req *esapi.IndexRequest) {
 			req.DocumentID = fmt.Sprintf("%s.%d", fileID, chunkID)
 			if req.Header == nil {
 				req.Header = make(http.Header)

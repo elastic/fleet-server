@@ -283,6 +283,7 @@ type FileChunk struct {
 	BID  string `json:"bid"`
 	Data []byte `json:"data"`
 	Last bool   `json:"last"`
+	SHA2 string `json:"sha2"`
 }
 
 // HostMetadata The host metadata for the Elastic Agent

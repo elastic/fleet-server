@@ -629,6 +629,10 @@
         "last": {
           "description": "Whether this chunk is the final chunk of a file",
           "type": "boolean"
+        },
+        "sha2": {
+          "description": "the sha256 hash of the chunk contents",
+          "type": "string"
         }
       }
     }

@@ -5,13 +5,11 @@
 package upload
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash"
-	"io"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,54 +17,63 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog/log"
 )
 
 const (
-	//these should be configs probably
-	uploadRequestTimeout = time.Hour
-	chunkProgressTimeout = time.Hour / 4
-
 	// specification-designated maximum
 	MaxChunkSize = 4194304 // 4 MiB
 )
 
 var (
-	ErrMaxConcurrentUploads = errors.New("the max number of concurrent uploads has been reached")
-	ErrInvalidUploadID      = errors.New("active upload not found with this ID, it may be expired")
-	ErrFileSizeTooLarge     = errors.New("this file exceeds the maximum allowed file size")
-	ErrMissingChunks        = errors.New("file data incomplete, not all chunks were uploaded")
-	ErrHashMismatch         = errors.New("file integrity hash does not match")
-	//@todo: explicit error for expired uploads
+	ErrInvalidUploadID  = errors.New("active upload not found with this ID, it may be expired")
+	ErrFileSizeTooLarge = errors.New("this file exceeds the maximum allowed file size")
+	ErrMissingChunks    = errors.New("file data incomplete, not all chunks were uploaded")
+	ErrHashMismatch     = errors.New("hash does not match")
+	ErrUploadExpired    = errors.New("upload has expired")
+	ErrUploadStopped    = errors.New("upload has stopped")
+	ErrInvalidChunkNum  = errors.New("invalid chunk number")
 )
 
-type upload struct {
-	opToken       *throttle.Token
-	chunkThrottle *throttle.Throttle
-	complete      chan<- struct{}
-	chunkRecv     chan<- struct{}
-	begun         bool
-	Info          Info
-}
+// the only valid values of upload status according to storage spec
+type Status string
+
+const (
+	StatusAwaiting Status = "AWAITING_UPLOAD"
+	StatusProgress Status = "UPLOADING"
+	StatusDone     Status = "READY"
+	StatusFail     Status = "UPLOAD_ERROR"
+	StatusDel      Status = "DELETED"
+)
 
 type Uploader struct {
-	current            map[string]upload
-	mu                 sync.Mutex
-	opThrottle         *throttle.Throttle
-	parallelChunkLimit int
-	sizeLimit          int64
+	metaCache map[string]Info // simple read-cache of file metadata doc info
+	mu        sync.RWMutex    // lock for the above
+	sizeLimit int64           // @todo: what if configuration changes? is this recreated with another New()?
+	timeLimit time.Duration   // @todo: same as above
+
+	// @todo: some es credentials
+	chunkClient *elasticsearch.Client
+	bulker      bulk.Bulk
 }
 
 type Info struct {
-	ID        string // upload operation identifier. Ephemeral, just used for the upload process
+	ID        string // upload operation identifier. Used to identify the upload process
 	DocID     string // document ID of the uploaded file and chunks
 	Source    string // which integration is performing the upload
 	ChunkSize int64
 	Total     int64
 	Count     int
-	HashSum   string
-	Hasher    hash.Hash
+	Start     time.Time
+	Status    Status
+}
+
+// convenience functions for computing current "Status" based on the fields
+func (i Info) Expired(timeout time.Duration) bool { return i.Start.Add(timeout).After(time.Now()) }
+func (i Info) StatusCanUpload() bool { // returns true if more chunks can be uploaded. False if the upload process has completed (with or without error)
+	return !(i.Status == StatusFail || i.Status == StatusDone || i.Status == StatusDel)
 }
 
 type ChunkInfo struct {
@@ -74,15 +81,16 @@ type ChunkInfo struct {
 	FirstReceived bool
 	Final         bool
 	Upload        Info
+	Hash          string
 	Token         *throttle.Token
 }
 
-func New(sizeLimit int64, opLimit int, chunkLimit int) *Uploader {
+func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, sizeLimit int64, timeLimit time.Duration) *Uploader {
 	return &Uploader{
-		parallelChunkLimit: chunkLimit,
-		sizeLimit:          sizeLimit,
-		opThrottle:         throttle.NewThrottle(opLimit),
-		current:            make(map[string]upload, opLimit),
+		chunkClient: chunkClient,
+		bulker:      bulker,
+		sizeLimit:   sizeLimit,
+		timeLimit:   timeLimit,
 	}
 }
 
@@ -102,116 +110,71 @@ func (u *Uploader) Begin(size int64, docID string, source string, hashsum string
 	}
 	id := uid.String()
 
-	token := u.opThrottle.Acquire(id, 300*time.Hour)
-	if token == nil {
-		return Info{}, ErrMaxConcurrentUploads
-	}
-
-	total := time.NewTimer(uploadRequestTimeout)
-	chunkT := time.NewTimer(chunkProgressTimeout)
-	chunkRecv := make(chan struct{})
-	complete := make(chan struct{})
-	// total timer could also be achieved with context deadline and cancelling
-
-	go func() {
-		for {
-			select {
-			case <-total.C: // entire upload operation timed out
-				log.Trace().Str("uploadID", id).Msg("upload operation timed out")
-				// stop and drain chunk timer
-				if !chunkT.Stop() {
-					<-chunkT.C
-				}
-				u.cancel(id)
-				return
-			case <-chunkT.C: // no chunk progress within chunk timer, expire operation
-				log.Trace().Str("uploadID", id).Msg("upload operation chunk activity timed out")
-				// stop and drain total timer
-				if !total.Stop() {
-					<-total.C
-				}
-				u.cancel(id)
-				return
-			case <-chunkRecv: // chunk activity, update chunk timer
-				if !chunkT.Stop() {
-					<-chunkT.C
-				}
-				chunkT.Reset(chunkProgressTimeout)
-			case <-complete: // upload operation complete, clean up
-				if !chunkT.Stop() {
-					<-chunkT.C
-				}
-				if !total.Stop() {
-					<-total.C
-				}
-				u.finalize(id)
-				return
-			}
-		}
-	}()
 	info := Info{
 		ID:        id,
 		DocID:     docID,
 		ChunkSize: MaxChunkSize,
 		Source:    source,
 		Total:     size,
-		Hasher:    hasher,
-		HashSum:   hashsum,
+		//Hasher:    hasher,
+		//HashSum:   hashsum,
 	}
 	cnt := info.Total / info.ChunkSize
 	if info.Total%info.ChunkSize > 0 {
 		cnt += 1
 	}
 	info.Count = int(cnt)
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	u.current[id] = upload{
-		opToken:       token,
-		chunkThrottle: throttle.NewThrottle(u.parallelChunkLimit),
-		complete:      complete,
-		chunkRecv:     chunkRecv,
-		Info:          info,
-	}
+
 	return info, nil
 }
 
-func (u *Uploader) Chunk(uplID string, chunkID int) (ChunkInfo, error) {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	upl, valid := u.current[uplID]
-	if !valid {
-		return ChunkInfo{}, ErrInvalidUploadID
-	}
-	if chunkID < 0 || chunkID >= upl.Info.Count {
-		return ChunkInfo{}, errors.New("invalid chunk number")
+func (u *Uploader) Chunk(uplID string, chunkID int, chunkHash string) (ChunkInfo, error) {
+
+	// Fetch metadata doc, if not cached
+	u.mu.RLock()
+	defer u.mu.RUnlock()
+	info, exist := u.metaCache[uplID]
+	if !exist {
+		u.mu.Lock()
+		defer u.mu.Unlock()
+		// fetch and write
+
+		//resp, err := u.es.Get()
+
+		found := false
+		if !found {
+			return ChunkInfo{}, ErrInvalidUploadID
+		}
+
 	}
 
-	token := upl.chunkThrottle.Acquire(strconv.Itoa(chunkID), time.Hour)
-	if token == nil {
-		return ChunkInfo{}, ErrMaxConcurrentUploads
+	if info.Expired(u.timeLimit) {
+		return ChunkInfo{}, ErrUploadExpired
 	}
-	upl.chunkRecv <- struct{}{}
-	if !upl.begun {
-		upl.begun = true
+	if !info.StatusCanUpload() {
+		return ChunkInfo{}, ErrUploadStopped
 	}
-	u.current[uplID] = upl
+	if chunkID < 0 || chunkID >= info.Count {
+		return ChunkInfo{}, ErrInvalidChunkNum
+	}
 
 	return ChunkInfo{
 		ID:            chunkID,
-		FirstReceived: upl.begun,
-		Final:         chunkID == upl.Info.Count-1,
-		Upload:        upl.Info,
-		Token:         token,
+		FirstReceived: false, // @todo
+		Final:         chunkID == info.Count-1,
+		Upload:        info,
+		Hash:          chunkHash,
+		//Token:         token,
 	}, nil
 }
 
-func (u *Uploader) Complete(id string, bulker bulk.Bulk) (Info, error) {
-	info, valid := u.current[id]
+func (u *Uploader) Complete(id string, transitHash string, bulker bulk.Bulk) (Info, error) {
+	info, valid := u.metaCache[id]
 	if !valid {
 		return Info{}, ErrInvalidUploadID
 	}
 
-	ok, err := u.allChunksPresent(info.Info, bulker)
+	ok, err := u.allChunksPresent(info, bulker)
 	if err != nil {
 		return Info{}, err
 	}
@@ -219,7 +182,7 @@ func (u *Uploader) Complete(id string, bulker bulk.Bulk) (Info, error) {
 		return Info{}, ErrMissingChunks
 	}
 
-	ok, err = u.verifyChunkData(info.Info, bulker)
+	ok, err = u.verifyChunkData(info, transitHash, bulker)
 	if err != nil {
 		return Info{}, err
 	}
@@ -227,19 +190,13 @@ func (u *Uploader) Complete(id string, bulker bulk.Bulk) (Info, error) {
 		return Info{}, errors.New("file contents did not pass validation")
 	}
 
-	u.current[id].complete <- struct{}{}
-	return info.Info, nil
+	return info, nil
 }
 
 func (u *Uploader) cleanupOperation(uplID string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if upload, ok := u.current[uplID]; ok {
-		if upload.opToken != nil {
-			upload.opToken.Release()
-		}
-	}
-	delete(u.current, uplID)
+	delete(u.metaCache, uplID)
 }
 
 func (u *Uploader) cancel(uplID string) error {
@@ -287,7 +244,7 @@ func (u *Uploader) allChunksPresent(info Info, bulker bulk.Bulk) (bool, error) {
 	return true, nil
 }
 
-func (u *Uploader) verifyChunkData(info Info, bulker bulk.Bulk) (bool, error) {
+func (u *Uploader) verifyChunkData(info Info, transitHash string, bulker bulk.Bulk) (bool, error) {
 	// verify all chunks except last are info.ChunkSize size
 	// verify last: false (or field excluded) for all except final chunk
 	// verify final chunk is last: true
@@ -321,19 +278,81 @@ func (u *Uploader) verifyChunkData(info Info, bulker bulk.Bulk) (bool, error) {
 			}
 		}
 
-		if info.Hasher != nil {
-			_, err = io.Copy(info.Hasher, bytes.NewReader(chunk.Data))
-			if err != nil {
-				return false, err
+		/*
+			if info.Hasher != nil {
+				_, err = io.Copy(info.Hasher, bytes.NewReader(chunk.Data))
+				if err != nil {
+					return false, err
+				}
 			}
-		}
+		*/
 	}
 
-	if info.Hasher != nil {
-		fullHash := hex.EncodeToString(info.Hasher.Sum(nil))
-		if fullHash != info.HashSum {
-			return false, ErrHashMismatch
+	/*
+		if info.Hasher != nil {
+			fullHash := hex.EncodeToString(info.Hasher.Sum(nil))
+			if fullHash != info.HashSum {
+				return false, ErrHashMismatch
+			}
 		}
-	}
+	*/
 	return true, nil
+}
+
+// retrieves upload metadata info from elasticsearch
+// which may be locally cached
+func (u *Uploader) GetUploadInfo(uploadID string) (Info, error) {
+	results, err := GetFileDoc(context.TODO(), u.bulker, uploadID)
+	if err != nil {
+		return Info{}, err
+	}
+	if len(results) == 0 {
+		return Info{}, ErrInvalidUploadID
+	}
+	if len(results) > 1 {
+		return Info{}, fmt.Errorf("unable to locate upload record, got %d records, expected 1", len(results))
+	}
+
+	var fi FileMetaDoc
+	if err := json.Unmarshal(results[0].Source, &fi); err != nil {
+		return Info{}, fmt.Errorf("file meta doc parsing error: %v", err)
+	}
+
+	// calculate number of chunks required
+	cnt := fi.File.Size / fi.File.ChunkSize
+	if fi.File.Size%fi.File.ChunkSize > 0 {
+		cnt += 1
+	}
+
+	return Info{
+		ID:        fi.UploadID,
+		Source:    fi.Source,
+		DocID:     results[0].ID,
+		ChunkSize: fi.File.ChunkSize,
+		Total:     fi.File.Size,
+		Count:     int(cnt),
+		Start:     fi.Start,
+		Status:    Status(fi.File.Status),
+	}, nil
+}
+
+type FileMetaDoc struct {
+	ActionID string     `json:"action_id"`
+	AgentID  string     `json:"agent_id"`
+	Source   string     `json:"src"`
+	File     FileData   `json:"file"`
+	Contents []FileData `json:"contents"`
+	UploadID string     `json:"upload_id"`
+	Start    time.Time  `json:"upload_start"`
+}
+type FileData struct {
+	Size      int64  `json:"size"`
+	ChunkSize int64  `json:"ChunkSize"`
+	Status    string `json:"Status"`
+	Name      string `json:"name"`
+	Mime      string `json:"mime_type"`
+	Hash      struct {
+		SHA256 string `json:"sha256"`
+		MD5    string `json:"md5"`
+	} `json:"hash"`
 }

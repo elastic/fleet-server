@@ -17,7 +17,7 @@ import (
 // It is not a general-purpose CBOR encoder.
 // A suitable general purpose library, if the future needs one, is github.com/fxamacker/cbor/v2
 type ChunkEncoder struct {
-	chunk       io.ReadCloser
+	chunk       io.Reader
 	final       bool
 	preamble    []byte
 	prbWritten  bool
@@ -25,11 +25,11 @@ type ChunkEncoder struct {
 	wroteTerm   bool
 }
 
-func NewChunkWriter(chunkData io.ReadCloser, finalChunk bool, baseID string, chunkSize int64) *ChunkEncoder {
+func NewChunkWriter(chunkData io.Reader, finalChunk bool, baseID string, chunkHash string, chunkSize int64) *ChunkEncoder {
 	return &ChunkEncoder{
 		chunk:       chunkData,
 		final:       finalChunk,
-		preamble:    encodePreambleToCBOR(finalChunk, baseID, chunkSize),
+		preamble:    encodePreambleToCBOR(finalChunk, baseID, chunkHash, chunkSize),
 		prbWritten:  false,
 		prbWritePos: 0,
 		wroteTerm:   false,
@@ -38,16 +38,18 @@ func NewChunkWriter(chunkData io.ReadCloser, finalChunk bool, baseID string, chu
 
 // Writes the start of a CBOR object (equiv. JSON object)
 // {
-//	"bid": "baseID",
 //	"last": true/false,
+//	"bid": "baseID",
+//	"sha2": "...",
 //	"data":
 // }
 // the slice ends where the chunk data bytes ("byte string") should begin.
 // it is therefore an incomplete CBOR object on its own
 // expecting the next section to be filled in by the caller.
 // the CBOR spec may be found here: https://www.rfc-editor.org/rfc/rfc8949
-func encodePreambleToCBOR(final bool, baseID string, chunkSize int64) []byte {
+func encodePreambleToCBOR(final bool, baseID string, chunkHash string, chunkSize int64) []byte {
 	bidLen := len(baseID)
+	hashLen := len(chunkHash)
 
 	// if we know the size of the chunk stream, we will write the 4-byte uint32
 	// descriptor of that length
@@ -58,9 +60,9 @@ func encodePreambleToCBOR(final bool, baseID string, chunkSize int64) []byte {
 		chunkLen = 1
 	}
 
-	preamble := make([]byte, 13+bidLen+chunkLen+5)
-	preamble[0] = 0xA3 // Object with 3 keys
-	preamble[1] = 0x64 // string with 4 chars
+	preamble := make([]byte, 11+bidLen+2+5+hashLen+2+chunkLen+5)
+	preamble[0] = 0xA4 // Object with 4 keys
+	preamble[1] = 0x64 // string with 4 chars (key: last)
 	preamble[2] = 'l'
 	preamble[3] = 'a'
 	preamble[4] = 's'
@@ -70,23 +72,31 @@ func encodePreambleToCBOR(final bool, baseID string, chunkSize int64) []byte {
 	} else {
 		preamble[6] = 0xF4 // bool false
 	}
-	preamble[7] = 0x63 // string with 3 chars
+	preamble[7] = 0x63 // string with 3 chars (key: bid)
 	preamble[8] = 'b'
 	preamble[9] = 'i'
 	preamble[10] = 'd'
-	preamble[11] = 0x78 // UTF-8 string coming, next byte describes length
-	preamble[12] = uint8(bidLen)
-	i := 13
-	for _, c := range baseID { // now write the document baseID
-		preamble[i] = byte(c)
-		i++
+	i := 11
+	if n, err := writeString(preamble[i:], baseID); err != nil {
+		return nil
+	} else {
+		i = 11 + n
 	}
-	preamble[i] = 0x64 // string with 4 chars
-	preamble[i+1] = 'd'
-	preamble[i+2] = 'a'
-	preamble[i+3] = 't'
-	preamble[i+4] = 'a'
-	i += 5
+	if n, err := writeKey(preamble[i:], "sha2"); err != nil {
+		return nil
+	} else {
+		i += n
+	}
+	if n, err := writeString(preamble[i:], chunkHash); err != nil {
+		return nil
+	} else {
+		i += n
+	}
+	if n, err := writeKey(preamble[i:], "data"); err != nil {
+		return nil
+	} else {
+		i += n
+	}
 	if !final {
 		// byte data should be precisely chunkSize long, otherwise malformed
 		preamble[i] = 0x5A // say length descriptor will be 32-bit int
@@ -143,4 +153,42 @@ func (c *ChunkEncoder) Read(buf []byte) (int, error) {
 
 	return c.chunk.Read(buf)
 
+}
+
+// writes len(key)+1 bytes
+func writeKey(buf []byte, key string) (int, error) {
+	keylen := len(key)
+	if keylen > 0x17 { // CBOR spec max size for single-byte string length descriptor
+		// another method would have to be used for writing the string length
+		return 0, errors.New("large key size, write manually")
+	}
+	if len(buf) < keylen+1 {
+		return 0, errors.New("cbor buffer size too small")
+	}
+
+	buf[0] = byte(0x60 + keylen)
+	for i, c := range key {
+		buf[i+1] = byte(c)
+	}
+
+	return keylen + 1, nil
+}
+
+// writes len(string)+2 bytes
+func writeString(buf []byte, val string) (int, error) {
+	strlen := len(val)
+	if strlen > 0xff { // max single-byte strlen
+		return 0, errors.New("oversize string")
+	}
+	if len(buf) < strlen+2 {
+		return 0, errors.New("cbor buffer size too small")
+	}
+
+	buf[0] = 0x78 // Descriptor for: "UTF8 string. Next byte is a uint8 for n, and then n bytes follow"
+	buf[1] = uint8(strlen)
+	for i, c := range val {
+		buf[i+2] = byte(c)
+	}
+
+	return strlen + 2, nil
 }
