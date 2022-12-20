@@ -27,12 +27,13 @@ type AckResponse struct {
 }
 
 type HitT struct {
-	ID      string          `json:"_id"`
-	SeqNo   int64           `json:"_seq_no"`
-	Version int64           `json:"version"`
-	Index   string          `json:"_index"`
-	Source  json.RawMessage `json:"_source"`
-	Score   *float64        `json:"_score"`
+	ID      string                 `json:"_id"`
+	SeqNo   int64                  `json:"_seq_no"`
+	Version int64                  `json:"version"`
+	Index   string                 `json:"_index"`
+	Source  json.RawMessage        `json:"_source"`
+	Score   *float64               `json:"_score"`
+	Fields  map[string]interface{} `json:"fields"`
 }
 
 func (hit *HitT) Unmarshal(v interface{}) error {

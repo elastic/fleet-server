@@ -175,21 +175,3 @@ type StatusResponse struct {
 	Status  string                 `json:"status"`
 	Version *StatusResponseVersion `json:"version,omitempty"`
 }
-
-type FileInfo struct {
-	ActionID string     `json:"action_id"`
-	AgentID  string     `json:"agent_id"`
-	Source   string     `json:"src"`
-	File     FileData   `json:"file"`
-	Contents []FileData `json:"contents"`
-}
-
-type FileData struct {
-	Size int64  `json:"size"`
-	Name string `json:"name"`
-	Mime string `json:"mime_type"`
-	Hash struct {
-		SHA256 string `json:"sha256"`
-		MD5    string `json:"md5"`
-	} `json:"hash"`
-}

@@ -31,7 +31,7 @@ import (
 
 const (
 	// TODO: move to a config
-	maxFileSize    = 100 * 104857600 // 100 MiB
+	maxFileSize    = 104857600 // 100 MiB
 	maxUploadTimer = 24 * time.Hour
 
 	// temp for easy development
@@ -188,7 +188,7 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 		return errors.New("chunk hash header required")
 	}
 
-	chunkInfo, err := ut.uploader.Chunk(r.Context(), uplID, chunkID, chunkHash)
+	upinfo, chunkInfo, err := ut.uploader.Chunk(r.Context(), uplID, chunkID, chunkHash)
 	if err != nil {
 		return err
 	}
@@ -200,14 +200,14 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 	hash := sha256.New()
 	copier := io.TeeReader(data, hash)
 
-	ce := cbor.NewChunkWriter(copier, chunkInfo.Final, chunkInfo.Upload.DocID, chunkInfo.Hash, chunkInfo.Upload.ChunkSize)
-	if err := upload.IndexChunk(r.Context(), ut.chunkClient, ce, chunkInfo.Upload.Source, chunkInfo.Upload.DocID, chunkInfo.ID); err != nil {
+	ce := cbor.NewChunkWriter(copier, chunkInfo.Last, chunkInfo.BID, chunkInfo.SHA2, upinfo.ChunkSize)
+	if err := upload.IndexChunk(r.Context(), ut.chunkClient, ce, upinfo.Source, chunkInfo.BID, chunkInfo.Pos); err != nil {
 		return err
 	}
 
 	hashsum := hex.EncodeToString(hash.Sum(nil))
 
-	if strings.ToLower(chunkHash) != strings.ToLower(hashsum) {
+	if !strings.EqualFold(chunkHash, hashsum) {
 		// @todo: delete document, since we wrote it, but the hash was invalid
 		return upload.ErrHashMismatch
 	}
@@ -225,7 +225,7 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 		return errors.New("transit hash required")
 	}
 
-	info, err := ut.uploader.Complete(uplID, req.TransitHash.SHA256, ut.bulker)
+	info, err := ut.uploader.Complete(r.Context(), uplID, req.TransitHash.SHA256)
 	if err != nil {
 		return err
 	}

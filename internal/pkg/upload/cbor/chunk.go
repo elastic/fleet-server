@@ -47,6 +47,7 @@ func NewChunkWriter(chunkData io.Reader, finalChunk bool, baseID string, chunkHa
 // it is therefore an incomplete CBOR object on its own
 // expecting the next section to be filled in by the caller.
 // the CBOR spec may be found here: https://www.rfc-editor.org/rfc/rfc8949
+// chunksize is ignored when writing the "final"=true chunk
 func encodePreambleToCBOR(final bool, baseID string, chunkHash string, chunkSize int64) []byte {
 	bidLen := len(baseID)
 	hashLen := len(chunkHash)

@@ -6,16 +6,17 @@ package upload
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog/log"
@@ -70,18 +71,18 @@ type Info struct {
 }
 
 // convenience functions for computing current "Status" based on the fields
-func (i Info) Expired(timeout time.Duration) bool { return i.Start.Add(timeout).After(time.Now()) }
+func (i Info) Expired(timeout time.Duration) bool { return time.Now().After(i.Start.Add(timeout)) }
 func (i Info) StatusCanUpload() bool { // returns true if more chunks can be uploaded. False if the upload process has completed (with or without error)
 	return !(i.Status == StatusFail || i.Status == StatusDone || i.Status == StatusDel)
 }
 
 type ChunkInfo struct {
-	ID            int
-	FirstReceived bool
-	Final         bool
-	Upload        Info
-	Hash          string
-	Token         *throttle.Token
+	Pos  int  // Ordered chunk position in file
+	Last bool // Is this the final chunk in the file
+	SHA2 string
+	Size int
+	BID  string // base id, matches metadata doc's _id
+	//FirstReceived bool
 }
 
 func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, sizeLimit int64, timeLimit time.Duration) *Uploader {
@@ -90,6 +91,7 @@ func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, sizeLimit int64, t
 		bulker:      bulker,
 		sizeLimit:   sizeLimit,
 		timeLimit:   timeLimit,
+		metaCache:   make(map[string]Info),
 	}
 }
 
@@ -169,7 +171,7 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (Info, error) {
 	return info, nil
 }
 
-func (u *Uploader) Chunk(ctx context.Context, uplID string, chunkID int, chunkHash string) (ChunkInfo, error) {
+func (u *Uploader) Chunk(ctx context.Context, uplID string, chunkNum int, chunkHash string) (Info, ChunkInfo, error) {
 
 	// Fetch metadata doc, if not cached
 	//u.mu.RLock()
@@ -183,50 +185,45 @@ func (u *Uploader) Chunk(ctx context.Context, uplID string, chunkID int, chunkHa
 		var err error
 		info, err = u.GetUploadInfo(ctx, uplID)
 		if err != nil {
-			return ChunkInfo{}, fmt.Errorf("unable to retrieve upload info: %w", err)
+			return Info{}, ChunkInfo{}, fmt.Errorf("unable to retrieve upload info: %w", err)
 		}
 		u.metaCache[uplID] = info
 	}
 
 	if info.Expired(u.timeLimit) {
-		return ChunkInfo{}, ErrUploadExpired
+		return Info{}, ChunkInfo{}, ErrUploadExpired
 	}
 	if !info.StatusCanUpload() {
-		return ChunkInfo{}, ErrUploadStopped
+		return Info{}, ChunkInfo{}, ErrUploadStopped
 	}
-	if chunkID < 0 || chunkID >= info.Count {
-		return ChunkInfo{}, ErrInvalidChunkNum
+	if chunkNum < 0 || chunkNum >= info.Count {
+		return Info{}, ChunkInfo{}, ErrInvalidChunkNum
 	}
 
-	return ChunkInfo{
-		ID:            chunkID,
-		FirstReceived: false, // @todo
-		Final:         chunkID == info.Count-1,
-		Upload:        info,
-		Hash:          chunkHash,
-		//Token:         token,
+	return info, ChunkInfo{
+		Pos: chunkNum,
+		BID: info.DocID,
+		//FirstReceived: false, // @todo
+		Last: chunkNum == info.Count-1,
+		Size: int(info.ChunkSize),
+		SHA2: chunkHash,
 	}, nil
 }
 
-func (u *Uploader) Complete(id string, transitHash string, bulker bulk.Bulk) (Info, error) {
+func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) (Info, error) {
 	info, valid := u.metaCache[id]
 	if !valid {
 		return Info{}, ErrInvalidUploadID
 	}
 
-	ok, err := u.allChunksPresent(info, bulker)
+	chunks, err := GetChunkInfos(ctx, u.bulker, info.DocID)
 	if err != nil {
 		return Info{}, err
 	}
-	if !ok {
+	if !u.allChunksPresent(info, chunks) {
 		return Info{}, ErrMissingChunks
 	}
-
-	ok, err = u.verifyChunkData(info, transitHash, bulker)
-	if err != nil {
-		return Info{}, err
-	}
-	if !ok {
+	if !u.verifyChunkInfo(info, chunks, transitHash) {
 		return Info{}, errors.New("file contents did not pass validation")
 	}
 
@@ -253,90 +250,83 @@ func (u *Uploader) finalize(uplID string) error {
 	return nil
 }
 
-func (u *Uploader) allChunksPresent(info Info, bulker bulk.Bulk) (bool, error) {
-	hits, err := ListChunkIDs(context.TODO(), bulker, info.Source, info.DocID)
-	if err != nil {
-		log.Warn().Err(err).Msg("error listing chunks")
-		return false, err
-	}
-	if len(hits) != info.Count {
-		log.Warn().Int("expectedCount", info.Count).Int("received", len(hits)).Interface("hits", hits).Msg("mismatch number of chunks")
-		return false, nil
+func (u *Uploader) allChunksPresent(info Info, chunks []ChunkInfo) bool {
+	// check overall count
+	if len(chunks) != info.Count {
+		log.Warn().Int("expectedCount", info.Count).Int("received", len(chunks)).Interface("chunks", chunks).Msg("mismatch number of chunks")
+		return false
 	}
 
-	ids := make(map[int]bool, len(hits))
-	for _, h := range hits {
-		chunkID := strings.TrimPrefix(h.ID, info.DocID+".")
-		ival, err := strconv.Atoi(chunkID)
-		if err != nil {
-			log.Warn().Err(err).Str("chunkID", h.ID).Str("docID", info.DocID).Str("parsedChunkInt", chunkID).Interface("hits", hits).Msg("unable to convert to int value")
-			return false, err
+	// now ensure all positions are accounted for, no gaps, etc
+	sort.Slice(chunks, func(i, j int) bool {
+		return chunks[i].Pos < chunks[j].Pos
+	})
+
+	for i, c := range chunks {
+		if c.Pos != i {
+			log.Warn().Int("expected", i).Interface("chunk", c).Msg("chunk position doesn't match. May be a gap in uploaded file")
+			return false
 		}
-		ids[ival] = true
 	}
 
-	for i := 0; i < info.Count; i++ {
-		if got, exists := ids[i]; !got || !exists {
-			log.Warn().Int("expected", i).Interface("hits", hits).Msg("mismatch chunk")
-			return false, nil
-		}
-	}
-	return true, nil
+	return true
 }
 
-func (u *Uploader) verifyChunkData(info Info, transitHash string, bulker bulk.Bulk) (bool, error) {
+func (u *Uploader) verifyChunkInfo(info Info, chunks []ChunkInfo, transitHash string) bool {
 	// verify all chunks except last are info.ChunkSize size
 	// verify last: false (or field excluded) for all except final chunk
 	// verify final chunk is last: true
 	// verify hash
 
-	for i := 0; i < info.Count; i++ {
-		chunk, err := GetChunk(context.TODO(), bulker, info.Source, info.DocID, i)
-		if err != nil {
-			return false, err
-		}
-		if err != nil {
-			return false, err
-		}
+	hasher := sha256.New()
+
+	for i, chunk := range chunks {
 		if i < info.Count-1 {
 			if chunk.Last {
 				log.Debug().Int("chunkID", i).Msg("non-final chunk was incorrectly marked last")
-				return false, nil
+				return false
 			}
-			if len(chunk.Data) != int(info.ChunkSize) {
-				log.Debug().Int64("requiredSize", info.ChunkSize).Int("chunkID", i).Int("gotSize", len(chunk.Data)).Msg("chunk was undersized")
-				return false, nil
+			if chunk.Size != int(info.ChunkSize) {
+				log.Debug().Int64("requiredSize", info.ChunkSize).Int("chunkID", i).Int("gotSize", chunk.Size).Msg("chunk was undersized")
+				return false
 			}
 		} else {
 			if !chunk.Last {
 				log.Debug().Int("chunkID", i).Msg("final chunk was not marked as final")
-				return false, nil
+				return false
 			}
-			if len(chunk.Data) == 0 {
+			if chunk.Size == 0 {
 				log.Debug().Int("chunkID", i).Msg("final chunk was 0 size")
-				return false, nil
+				return false
+			}
+			if chunk.Size > int(info.ChunkSize) {
+				log.Debug().Int("chunk-size", chunk.Size).Int("maxsize", int(info.ChunkSize)).Msg("final chunk was oversized")
+				return false
 			}
 		}
 
-		/*
-			if info.Hasher != nil {
-				_, err = io.Copy(info.Hasher, bytes.NewReader(chunk.Data))
-				if err != nil {
-					return false, err
-				}
-			}
-		*/
+		rawHash, err := hex.DecodeString(chunk.SHA2)
+		if err != nil {
+			log.Warn().Err(err).Msg("error decoding chunk hash")
+			return false
+		}
+
+		if n, err := hasher.Write(rawHash); err != nil {
+			log.Error().Err(err).Msg("error computing transitHash from component chunk hashes")
+			return false
+		} else if n != len(rawHash) {
+			log.Error().Int("wrote", n).Int("expected", len(rawHash)).Msg("transitHash calculation failure, could not write to hasher")
+			return false
+		}
 	}
 
-	/*
-		if info.Hasher != nil {
-			fullHash := hex.EncodeToString(info.Hasher.Sum(nil))
-			if fullHash != info.HashSum {
-				return false, ErrHashMismatch
-			}
-		}
-	*/
-	return true, nil
+	calcHash := hex.EncodeToString(hasher.Sum(nil))
+	if !strings.EqualFold(transitHash, calcHash) {
+		log.Warn().Str("provided-hash", transitHash).Str("calc-hash", calcHash).Msg("file upload streaming hash does not match")
+		return false
+	}
+
+	return true
 }
 
 func validateUploadPayload(info JSDict) error {
@@ -403,15 +393,6 @@ func (u *Uploader) GetUploadInfo(ctx context.Context, uploadID string) (Info, er
 	}, nil
 }
 
-type FileMetaDoc struct {
-	ActionID string     `json:"action_id"`
-	AgentID  string     `json:"agent_id"`
-	Source   string     `json:"src"`
-	File     FileData   `json:"file"`
-	Contents []FileData `json:"contents"`
-	UploadID string     `json:"upload_id"`
-	Start    time.Time  `json:"upload_start"`
-}
 type FileData struct {
 	Size      int64  `json:"size"`
 	ChunkSize int64  `json:"ChunkSize"`
@@ -422,4 +403,31 @@ type FileData struct {
 		SHA256 string `json:"sha256"`
 		MD5    string `json:"md5"`
 	} `json:"hash"`
+}
+
+type FileMetaDoc struct {
+	ActionID string    `json:"action_id"`
+	AgentID  string    `json:"agent_id"`
+	Source   string    `json:"src"`
+	File     FileData  `json:"file"`
+	UploadID string    `json:"upload_id"`
+	Start    time.Time `json:"upload_start"`
+}
+
+// custom unmarshaller to make unix-epoch values
+// work
+func (f *FileMetaDoc) UnmarshalJSON(b []byte) error {
+	type InnerFile FileMetaDoc // type alias to prevent recursion into this func
+	// override the field to parse as an int, then manually convert to time.time
+	var tmp struct {
+		InnerFile
+		Start int64 `json:"upload_start"`
+	}
+	if err := json.Unmarshal(b, &tmp); err != nil {
+		return err
+	}
+
+	*f = FileMetaDoc(tmp.InnerFile) // copy over all fields
+	f.Start = time.UnixMilli(tmp.Start)
+	return nil
 }
