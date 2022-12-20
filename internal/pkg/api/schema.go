@@ -17,9 +17,11 @@ const (
 )
 
 const (
-	TypePolicyChange = "POLICY_CHANGE"
-	TypeUnenroll     = "UNENROLL"
-	TypeUpgrade      = "UPGRADE"
+	TypePolicyChange  = "POLICY_CHANGE"
+	TypeUnenroll      = "UNENROLL"
+	TypeUpgrade       = "UPGRADE"
+	TypeUpdateTags    = "UPDATE_TAGS"
+	TypeForceUnenroll = "FORCE_UNENROLL"
 )
 
 const kFleetAccessRolesJSON = `
