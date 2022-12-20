@@ -384,8 +384,13 @@ func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqN
 func filterActions(agentID string, actions []model.Action) []model.Action {
 	resp := make([]model.Action, 0, len(actions))
 	for _, action := range actions {
-		if action.Type == TypePolicyChange {
-			log.Info().Str("agent_id", agentID).Str("action_id", action.ActionID).Msg("Removing POLICY_CHANGE action found in index from check in response")
+		ignoredTypes := map[string]bool{
+			TypePolicyChange:  true,
+			TypeUpdateTags:    true,
+			TypeForceUnenroll: true,
+		}
+		if exists := ignoredTypes[action.Type]; exists {
+			log.Info().Str("agent_id", agentID).Str("action_id", action.ActionID).Str("type", action.Type).Msg("Removing action found in index from check in response")
 			continue
 		}
 		resp = append(resp, action)
