@@ -16,7 +16,7 @@ import (
 
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // The timeout would be driven by the server for long poll.

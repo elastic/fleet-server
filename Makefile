@@ -72,7 +72,6 @@ generate: ## - Generate schema models
 .PHONY: check-ci
 check-ci: ## - Run all checks of the ci without linting, the linter is run through github action to have comments in the pull-request.
 	@$(MAKE) generate
-	@$(MAKE) defaults
 	@$(MAKE) check-headers
 	@$(MAKE) notice
 	@$(MAKE) check-no-changes
@@ -89,7 +88,7 @@ check-headers:  ## - Check copyright headers
 
 .PHONY: check-go
 check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.44.2
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.47.2
 	@./bin/golangci-lint run -v
 
 .PHONY: notice
@@ -105,11 +104,6 @@ notice: ## - Generates the NOTICE.txt file.
 		-noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
 		-noticeOut NOTICE.txt \
 		-depsOut ""
-
-.PHONY: defaults
-defaults: ## - Generate defaults based on limits files.
-	@echo "Generating env_defaults.go"
-	@go run dev-tools/buildlimits/buildlimits.go --in "internal/pkg/config/defaults/*.yml" --out internal/pkg/config/env_defaults.go
 
 .PHONY: check-no-changes
 check-no-changes:

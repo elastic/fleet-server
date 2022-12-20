@@ -17,9 +17,11 @@ const (
 )
 
 const (
-	TypePolicyChange = "POLICY_CHANGE"
-	TypeUnenroll     = "UNENROLL"
-	TypeUpgrade      = "UPGRADE"
+	TypePolicyChange  = "POLICY_CHANGE"
+	TypeUnenroll      = "UNENROLL"
+	TypeUpgrade       = "UPGRADE"
+	TypeUpdateTags    = "UPDATE_TAGS"
+	TypeForceUnenroll = "FORCE_UNENROLL"
 )
 
 const kFleetAccessRolesJSON = `
@@ -78,10 +80,11 @@ type EnrollResponse struct {
 }
 
 type CheckinRequest struct {
-	Status    string          `json:"status"`
-	Message   string          `json:"message"`
-	AckToken  string          `json:"ack_token,omitempty"`
-	LocalMeta json.RawMessage `json:"local_metadata"`
+	Status     string          `json:"status"`
+	Message    string          `json:"message"`
+	AckToken   string          `json:"ack_token,omitempty"`
+	LocalMeta  json.RawMessage `json:"local_metadata"`
+	Components json.RawMessage `json:"components,omitempty"`
 }
 
 type CheckinResponse struct {

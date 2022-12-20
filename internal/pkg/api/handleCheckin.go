@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -32,7 +33,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miolini/datacounter"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -154,13 +154,19 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	var req CheckinRequest
 	decoder := json.NewDecoder(readCounter)
 	if err := decoder.Decode(&req); err != nil {
-		return errors.Wrap(err, "decode checkin request")
+		return fmt.Errorf("decode checkin request: %w", err)
 	}
 
 	cntCheckin.bodyIn.Add(readCounter.Count())
 
 	// Compare local_metadata content and update if different
 	rawMeta, err := parseMeta(zlog, agent, &req)
+	if err != nil {
+		return err
+	}
+
+	// Compare agent_components content and update if different
+	rawComponents, err := parseComponents(zlog, agent, &req)
 	if err != nil {
 		return err
 	}
@@ -179,7 +185,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	// Subscribe to policy manager for changes on PolicyId > policyRev
 	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
 	if err != nil {
-		return errors.Wrap(err, "subscribe policy monitor")
+		return fmt.Errorf("subscribe policy monitor: %w", err)
 	}
 	defer func() {
 		err := ct.pm.Unsubscribe(sub)
@@ -209,7 +215,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer longPoll.Stop()
 
 	// Initial update on checkin, and any user fields that might have changed
-	err = ct.bc.CheckIn(agent.Id, req.Status, req.Message, rawMeta, seqno, ver)
+	err = ct.bc.CheckIn(agent.Id, req.Status, req.Message, rawMeta, rawComponents, seqno, ver)
 	if err != nil {
 		zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
 	}
@@ -243,7 +249,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 			case policy := <-sub.Output():
 				actionResp, err := processPolicy(ctx, zlog, ct.bulker, agent.Id, policy)
 				if err != nil {
-					return errors.Wrap(err, "processPolicy")
+					return fmt.Errorf("processPolicy: %w", err)
 				}
 				actions = append(actions, *actionResp)
 				break LOOP
@@ -251,7 +257,7 @@ func (ct *CheckinT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				zlog.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
-				err := ct.bc.CheckIn(agent.Id, req.Status, req.Message, nil, nil, ver)
+				err := ct.bc.CheckIn(agent.Id, req.Status, req.Message, nil, rawComponents, nil, ver)
 				if err != nil {
 					zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
 				}
@@ -283,7 +289,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 
 	payload, err := json.Marshal(&resp)
 	if err != nil {
-		return errors.Wrap(err, "writeResponse marshal")
+		return fmt.Errorf("writeResponse marshal: %w", err)
 	}
 
 	compressionLevel := ct.cfg.CompressionLevel
@@ -295,17 +301,17 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 
 		zipper, err := gzip.NewWriterLevel(wrCounter, compressionLevel)
 		if err != nil {
-			return errors.Wrap(err, "writeResponse new gzip")
+			return fmt.Errorf("writeResponse new gzip: %w", err)
 		}
 
 		w.Header().Set("Content-Encoding", kEncodingGzip)
 
 		if _, err = zipper.Write(payload); err != nil {
-			return errors.Wrap(err, "writeResponse gzip write")
+			return fmt.Errorf("writeResponse gzip write: %w", err)
 		}
 
 		if err = zipper.Close(); err != nil {
-			err = errors.Wrap(err, "writeResponse gzip close")
+			err = fmt.Errorf("writeResponse gzip close: %w", err)
 		}
 
 		cntCheckin.bodyOut.Add(wrCounter.Count())
@@ -322,7 +328,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 		cntCheckin.bodyOut.Add(uint64(nWritten))
 
 		if err != nil {
-			err = errors.Wrap(err, "writeResponse payload")
+			err = fmt.Errorf("writeResponse payload: %w", err)
 		}
 	}
 
@@ -353,7 +359,7 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req C
 				zlog.Debug().Str("token", ackToken).Msg("revision token not found")
 				err = nil
 			} else {
-				return seqno, errors.Wrap(err, "resolveSeqNo")
+				return seqno, fmt.Errorf("resolveSeqNo: %w", err)
 			}
 		}
 		seqno = []int64{sn}
@@ -366,20 +372,26 @@ func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqN
 	actions, err := dl.FindAgentActions(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentID)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "fetchAgentPendingActions")
+		return nil, fmt.Errorf("fetchAgentPendingActions: %w", err)
 	}
 
 	return actions, err
 }
 
-// filterActions removes the POLICY_CHANGE action from the passed list.
+// filterActions removes the POLICY_CHANGE, UPDATE_TAGS, FORCE_UNENROLL action from the passed list.
 // The source of this list are documents from the fleet actions index.
 // The POLICY_CHANGE action that the agent receives are generated by the fleet-server when it detects a different policy in processRequest()
+// The UPDATE_TAGS, FORCE_UNENROLL actions are UI only actions, should not be delivered to agents
 func filterActions(agentID string, actions []model.Action) []model.Action {
 	resp := make([]model.Action, 0, len(actions))
 	for _, action := range actions {
-		if action.Type == TypePolicyChange {
-			log.Info().Str("agent_id", agentID).Str("action_id", action.ActionID).Msg("Removing POLICY_CHANGE action found in index from check in response")
+		ignoredTypes := map[string]bool{
+			TypePolicyChange:  true,
+			TypeUpdateTags:    true,
+			TypeForceUnenroll: true,
+		}
+		if exists := ignoredTypes[action.Type]; exists {
+			log.Info().Str("agent_id", agentID).Str("action_id", action.ActionID).Str("type", action.Type).Msg("Removing action found in index from check in response")
 			continue
 		}
 		resp = append(resp, action)
@@ -448,7 +460,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	for _, policyOutput := range pp.Outputs {
 		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, outputs)
 		if err != nil {
-			return nil, fmt.Errorf("failed to prepare output %q: %w",
+			return nil, fmt.Errorf("failed to prepare output %q:: %w",
 				policyOutput.Name, err)
 		}
 	}
@@ -490,7 +502,7 @@ func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*mod
 		if errors.Is(err, dl.ErrNotFound) {
 			err = ErrAgentNotFound
 		} else {
-			err = errors.Wrap(err, "findAgentByApiKeyId")
+			err = fmt.Errorf("findAgentByApiKeyId: %w", err)
 		}
 	}
 	return &agent, err
@@ -510,7 +522,7 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	// Deserialize the request metadata
 	var reqLocalMeta interface{}
 	if err := json.Unmarshal(req.LocalMeta, &reqLocalMeta); err != nil {
-		return nil, errors.Wrap(err, "parseMeta request")
+		return nil, fmt.Errorf("parseMeta request: %w", err)
 	}
 
 	// If empty, don't step on existing data
@@ -521,7 +533,7 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	// Deserialize the agent's metadata copy
 	var agentLocalMeta interface{}
 	if err := json.Unmarshal(agent.LocalMetadata, &agentLocalMeta); err != nil {
-		return nil, errors.Wrap(err, "parseMeta local")
+		return nil, fmt.Errorf("parseMeta local: %w", err)
 	}
 
 	var outMeta []byte
@@ -542,6 +554,60 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	}
 
 	return outMeta, nil
+}
+
+func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
+
+	// Quick comparison first; compare the JSON payloads.
+	// If the data is not consistently normalized, this short-circuit will not work.
+	if bytes.Equal(req.Components, agent.Components) {
+		zlog.Trace().Msg("quick comparing agent components data is equal")
+		return nil, nil
+	}
+
+	// Deserialize the request components data
+	var reqComponents interface{}
+	if len(req.Components) > 0 {
+		if err := json.Unmarshal(req.Components, &reqComponents); err != nil {
+			return nil, fmt.Errorf("parseComponents request: %w", err)
+		}
+		// Validate that components is an array
+		if _, ok := reqComponents.([]interface{}); !ok {
+			return nil, errors.New("parseComponets request: components property is not array")
+		}
+	}
+
+	// If empty, don't step on existing data
+	if reqComponents == nil {
+		return nil, nil
+	}
+
+	// Deserialize the agent's components copy
+	var agentComponents interface{}
+	if len(agent.Components) > 0 {
+		if err := json.Unmarshal(agent.Components, &agentComponents); err != nil {
+			return nil, fmt.Errorf("parseComponents local: %w", err)
+		}
+	}
+
+	var outComponents []byte
+
+	// Compare the deserialized meta structures and return the bytes to update if different
+	if !reflect.DeepEqual(reqComponents, agentComponents) {
+
+		zlog.Trace().
+			RawJSON("oldComponents", agent.Components).
+			RawJSON("newComponents", req.Components).
+			Msg("local components data is not equal")
+
+		zlog.Info().
+			RawJSON("req.Components", req.Components).
+			Msg("applying new components data")
+
+		outComponents = req.Components
+	}
+
+	return outComponents, nil
 }
 
 func calcPollDuration(zlog zerolog.Logger, cfg *config.Server, setupDuration time.Duration) (time.Duration, time.Duration) {

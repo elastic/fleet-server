@@ -5,9 +5,17 @@
 package es
 
 import (
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
+)
+
+const (
+	unknownErrorType         = "unknown_error"
+	timeoutErrorType         = "timeout_exception"
+	indexNotFoundErrorType   = "index_not_found_exception"
+	versionConflictErrorType = "version_conflict_engine_exception"
 )
 
 // TODO: Why do we have both ErrElastic and ErrorT?  Very strange.
@@ -23,9 +31,9 @@ type ErrElastic struct {
 }
 
 func (e *ErrElastic) Unwrap() error {
-	if e.Type == "index_not_found_exception" {
+	if e.Type == indexNotFoundErrorType {
 		return ErrIndexNotFound
-	} else if e.Type == "timeout_exception" {
+	} else if e.Type == timeoutErrorType {
 		return ErrTimeout
 	}
 
@@ -66,12 +74,77 @@ var (
 	ErrIndexNotFound          = errors.New("index not found")
 	ErrTimeout                = errors.New("timeout")
 	ErrNotFound               = errors.New("not found")
+
+	knownErrorTypes = [3]string{
+		timeoutErrorType,
+		indexNotFoundErrorType,
+		versionConflictErrorType,
+	}
+
+	// helps with native translation of native java exceptions
+	// list possible exceptions is much broader, these we recognize.
+	// all listed here: https://github.com/elastic/elasticsearch/blob/f8d1d2afa67afd1b9769751fde35f86c5ec885d9/server/src/main/java/org/elasticsearch/ElasticsearchException.java#L730
+	errorTranslationMap = map[string]string{
+		ErrIndexNotFound.Error():              indexNotFoundErrorType,
+		"IndexNotFoundException":              indexNotFoundErrorType,
+		ErrTimeout.Error():                    timeoutErrorType,
+		"ElasticsearchTimeoutException":       timeoutErrorType,
+		"ProcessClusterEventTimeoutException": timeoutErrorType,
+		"ReceiveTimeoutTransportException":    timeoutErrorType,
+		ErrElasticVersionConflict.Error():     versionConflictErrorType,
+		"VersionConflictEngineException":      versionConflictErrorType,
+	}
 )
 
-func TranslateError(status int, e *ErrorT) error {
+func TranslateError(status int, rawError json.RawMessage) error {
 	if status == 200 || status == 201 {
 		return nil
 	}
+
+	if len(rawError) == 0 {
+		// error was omitted
+		return &ErrElastic{
+			Status: status,
+		}
+	}
+
+	// try decoding detailed error by default
+	detailedError := &ErrorT{}
+	if err := json.Unmarshal(rawError, &detailedError); err == nil {
+		return translateDetailedError(status, detailedError)
+	}
+
+	reason := string(rawError)
+	eType := errType(reason)
+	switch eType {
+	case versionConflictErrorType:
+		return ErrElasticVersionConflict
+	default:
+		return &ErrElastic{
+			Status: status,
+			Type:   eType,
+			Reason: reason,
+		}
+	}
+}
+
+func errType(errBody string) string {
+	for _, errCheck := range knownErrorTypes {
+		if strings.Contains(errBody, errCheck) {
+			return errCheck
+		}
+	}
+
+	for errCheck, errType := range errorTranslationMap {
+		if strings.Contains(errBody, errCheck) {
+			return errType
+		}
+	}
+
+	return unknownErrorType
+}
+
+func translateDetailedError(status int, e *ErrorT) error {
 	if e == nil {
 		return &ErrElastic{
 			Status: status,
@@ -80,7 +153,7 @@ func TranslateError(status int, e *ErrorT) error {
 
 	var err error
 	switch e.Type {
-	case "version_conflict_engine_exception":
+	case versionConflictErrorType:
 		err = ErrElasticVersionConflict
 	default:
 		err = &ErrElastic{

@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	fbuild "github.com/elastic/fleet-server/v7/internal/pkg/build"
@@ -35,15 +36,15 @@ func withAuthFunc(authfn AuthFunc) OptFunc {
 }
 
 type mockPolicyMonitor struct {
-	status proto.StateObserved_Status
+	state client.UnitState
 }
 
 func (pm *mockPolicyMonitor) Run(ctx context.Context) error {
 	return nil
 }
 
-func (pm *mockPolicyMonitor) Status() proto.StateObserved_Status {
-	return pm.status
+func (pm *mockPolicyMonitor) State() client.UnitState {
+	return pm.state
 }
 
 func TestHandleStatus(t *testing.T) {
@@ -80,13 +81,13 @@ func TestHandleStatus(t *testing.T) {
 	// Test table, with inner loop on all available statuses
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			for k, v := range proto.StateObserved_Status_name {
+			for k, v := range proto.State_name {
 				t.Run(v, func(t *testing.T) {
-					status := proto.StateObserved_Status(k)
+					state := client.UnitState(k)
 					r := Router{
 						ctx: ctx,
 						st:  NewStatusT(cfg, nil, c, withAuthFunc(tc.AuthFn)),
-						sm:  &mockPolicyMonitor{status},
+						sm:  &mockPolicyMonitor{state},
 						bi: fbuild.Info{
 							Version:   "8.1.0",
 							Commit:    "4eff928",
@@ -102,7 +103,7 @@ func TestHandleStatus(t *testing.T) {
 					hr.ServeHTTP(w, req)
 
 					expectedCode := http.StatusServiceUnavailable
-					if status == proto.StateObserved_DEGRADED || status == proto.StateObserved_HEALTHY {
+					if state == client.UnitStateDegraded || state == client.UnitStateHealthy {
 						expectedCode = http.StatusOK
 					}
 
@@ -119,7 +120,7 @@ func TestHandleStatus(t *testing.T) {
 						t.Error(diff)
 					}
 
-					if diff := cmp.Diff(res.Status, status.String()); diff != "" {
+					if diff := cmp.Diff(res.Status, state.String()); diff != "" {
 						t.Error(diff)
 					}
 

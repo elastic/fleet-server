@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -331,7 +331,7 @@ func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[
 	}
 
 	if res.IsError() {
-		err = es.TranslateError(res.StatusCode, &esres.Error)
+		err = es.TranslateError(res.StatusCode, esres.Error)
 	}
 
 	if err != nil {

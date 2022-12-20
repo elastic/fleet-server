@@ -99,7 +99,7 @@ func changed(a *config.Config, b *config.Config) bool {
 	if al != bl {
 		return true
 	}
-	if (aFiles == nil && bFiles != nil) || (aFiles != nil && bFiles == nil) || (*aFiles != *bFiles) {
+	if (aFiles == nil && bFiles != nil) || (aFiles != nil && bFiles == nil) || ((aFiles != nil && bFiles != nil) && *aFiles != *bFiles) {
 		return true
 	}
 	return false

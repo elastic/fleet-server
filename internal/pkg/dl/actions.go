@@ -152,7 +152,7 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 	}
 
 	if res.IsError() {
-		err = es.TranslateError(res.StatusCode, &esres.Error)
+		err = es.TranslateError(res.StatusCode, esres.Error)
 		if err != nil {
 			if errors.Is(err, es.ErrIndexNotFound) {
 				log.Debug().Str("index", index).Msg(es.ErrIndexNotFound.Error())

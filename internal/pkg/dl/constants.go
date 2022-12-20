@@ -35,6 +35,7 @@ const (
 	FieldLastCheckinStatus             = "last_checkin_status"
 	FieldLastCheckinMessage            = "last_checkin_message"
 	FieldLocalMetadata                 = "local_metadata"
+	FieldComponents                    = "components"
 	FieldPolicyCoordinatorIdx          = "policy_coordinator_idx"
 	FieldPolicyID                      = "policy_id"
 	FieldPolicyOutputAPIKey            = "api_key"

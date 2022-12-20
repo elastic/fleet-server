@@ -23,6 +23,16 @@ Please label this PR with one of the following labels, depending on the scope of
 Explain here how this PR will be tested by the reviewer if anything special is needed for manual testing: commands, dependencies, steps, etc.
 -->
 
+## Design Checklist
+
+<!-- Mandatory
+This checklist is a reminder about high level design problems that should be considered for any change made to fleet server.
+-->
+
+- [ ] I have ensured my design is stateless and will work when multiple fleet-server instances are behind a load balancer.
+- [ ] I have or intend to scale test my changes, ensuring it will work reliably with 100K+ agents connected.
+- [ ] I have included fail safe mechanisms to limit the load on fleet-server: rate limiting, circuit breakers, caching, load shedding, etc. 
+
 ## Checklist
 
 <!-- Mandatory

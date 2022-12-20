@@ -6,12 +6,11 @@ package action
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rs/zerolog/log"
 )
 
@@ -22,12 +21,12 @@ const cacheSize = 5000
 // by fleet-server to send state information to the agent.
 type TokenResolver struct {
 	bulker bulk.Bulk
-	cache  *lru.Cache
+	cache  *lru.Cache[string, int64]
 }
 
 // NewTokenResolver returns a TokenResolver that uses the Bulk to resolve the returned seqno on a cache miss.
 func NewTokenResolver(bulker bulk.Bulk) (*TokenResolver, error) {
-	cache, err := lru.New(cacheSize)
+	cache, err := lru.New[string, int64](cacheSize)
 	if err != nil {
 		return nil, err
 	}
@@ -44,12 +43,8 @@ func (r *TokenResolver) Resolve(ctx context.Context, token string) (int64, error
 		return 0, dl.ErrNotFound
 	}
 	if v, ok := r.cache.Get(token); ok {
-		seqno, ok := v.(int64)
-		if !ok {
-			return seqno, fmt.Errorf("unable to cast %v as type int64, detected type is: %T", v, v)
-		}
-		log.Debug().Str("token", token).Int64("seqno", seqno).Msg("Found token cached")
-		return seqno, nil
+		log.Debug().Str("token", token).Int64("seqno", v).Msg("Found token cached")
+		return v, nil
 	}
 
 	seqno, err := dl.FindSeqNoByDocID(ctx, r.bulker, dl.QuerySeqNoByDocID, dl.FleetActions, token)

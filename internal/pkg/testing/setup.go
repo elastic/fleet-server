@@ -14,7 +14,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/rs/xid"
 
@@ -128,7 +128,7 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 	}
 
 	if res.IsError() {
-		err = es.TranslateError(res.StatusCode, &esres.Error)
+		err = es.TranslateError(res.StatusCode, esres.Error)
 		if err != nil {
 			if errors.Is(err, es.ErrIndexNotFound) {
 				err = nil

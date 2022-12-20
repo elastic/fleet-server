@@ -17,6 +17,8 @@
 - Fix fleet.migration.total log key overlap {pull}1951[1951]
 - Remove POLICY_CHANGE actions from list retrieved from actions index before sending actions to agent on Checkin. {issue}1773[1773] {pull}1963[1963]
 - Add "active: true" filter to enrollemnent key queries. {issue}2029[2029] {pull}2044[2044]
+- Fixed unenroll offline agents logic {issue}2091[2091] {pull}2092[2092]
+- Ignore UPDATE_TAGS and FORCE_UNENROLL actions on agent checkin {issue}2199[2199] {pull}2200[2200]
 
 ==== New Features
 

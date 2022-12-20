@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -112,14 +112,14 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 
 	raw, err := ioutil.ReadAll(body)
 	if err != nil {
-		return errors.Wrap(err, "handleAcks read body")
+		return fmt.Errorf("handleAcks read body: %w", err)
 	}
 
 	cntAcks.bodyIn.Add(uint64(len(raw)))
 
 	var req AckRequest
 	if err := json.Unmarshal(raw, &req); err != nil {
-		return errors.Wrap(err, "handleAcks unmarshal")
+		return fmt.Errorf("handleAcks unmarshal: %w", err)
 	}
 
 	zlog.Trace().RawJSON("raw", raw).Msg("Ack request")
@@ -140,7 +140,7 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 	// Always write response body even if the error HTTP status code was set
 	data, err := json.Marshal(&resp)
 	if err != nil {
-		return errors.Wrap(err, "handleAcks marshal response")
+		return fmt.Errorf("handleAcks marshal response: %w", err)
 	}
 
 	var nWritten int
@@ -346,12 +346,18 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		err := ack.updateAPIKey(ctx,
 			zlog,
 			agent.Id,
-			currRev, currCoord,
-			agent.PolicyID,
 			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
 		if err != nil {
 			return err
 		}
+	}
+
+	err := ack.updateAgentDoc(ctx, zlog,
+		agent.Id,
+		currRev, currCoord,
+		agent.PolicyID)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -361,8 +367,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 func (ack *AckT) updateAPIKey(ctx context.Context,
 	zlog zerolog.Logger,
 	agentID string,
-	currRev, currCoord int64,
-	policyID, apiKeyID, permissionHash string,
+	apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
 
 	if apiKeyID != "" {
@@ -407,6 +412,15 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 		ack.invalidateAPIKeys(ctx, toRetireAPIKeyIDs, apiKeyID)
 	}
 
+	return nil
+}
+
+func (ack *AckT) updateAgentDoc(ctx context.Context,
+	zlog zerolog.Logger,
+	agentID string,
+	currRev, currCoord int64,
+	policyID string,
+) error {
 	body := makeUpdatePolicyBody(
 		policyID,
 		currRev,
@@ -428,13 +442,16 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 		Int64("policyCoordinator", currCoord).
 		Msg("ack policy")
 
-	return errors.Wrap(err, "handlePolicyChange update")
+	if err != nil {
+		return fmt.Errorf("handlePolicyChange update: %w", err)
+	}
+	return nil
 }
 
 func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 	rr := smap.Map{}
 	if err := json.Unmarshal(roles, &rr); err != nil {
-		return nil, 0, errors.Wrap(err, "failed to unmarshal provided roles")
+		return nil, 0, fmt.Errorf("failed to unmarshal provided roles: %w", err)
 	}
 
 	keys := make([]string, 0, len(rr))
@@ -453,7 +470,10 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 	}
 
 	r, err := json.Marshal(rr)
-	return r, len(keys), errors.Wrap(err, "failed to marshal resulting role definition")
+	if err != nil {
+		return r, len(keys), fmt.Errorf("failed to marshal resulting role definition: %w", err)
+	}
+	return r, len(keys), nil
 }
 
 func (ack *AckT) invalidateAPIKeys(ctx context.Context, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
@@ -479,7 +499,7 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
 
 		if err := ack.bulk.APIKeyInvalidate(ctx, apiKeys...); err != nil {
-			return errors.Wrap(err, "handleUnenroll invalidate apikey")
+			return fmt.Errorf("handleUnenroll invalidate apikey: %w", err)
 		}
 	}
 
@@ -492,11 +512,11 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 
 	body, err := doc.Marshal()
 	if err != nil {
-		return errors.Wrap(err, "handleUnenroll marshal")
+		return fmt.Errorf("handleUnenroll marshal: %w", err)
 	}
 
 	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-		return errors.Wrap(err, "handleUnenroll update")
+		return fmt.Errorf("handleUnenroll update: %w", err)
 	}
 
 	zlog.Info().Msg("ack unenroll")
@@ -538,11 +558,11 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 
 	body, err := doc.Marshal()
 	if err != nil {
-		return errors.Wrap(err, "handleUpgrade marshal")
+		return fmt.Errorf("handleUpgrade marshal: %w", err)
 	}
 
 	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-		return errors.Wrap(err, "handleUpgrade update")
+		return fmt.Errorf("handleUpgrade update: %w", err)
 	}
 
 	zlog.Info().

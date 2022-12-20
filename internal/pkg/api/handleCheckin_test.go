@@ -93,6 +93,20 @@ func TestFilterActions(t *testing.T) {
 		resp: []model.Action{{
 			ActionID: "5678",
 		}},
+	}, {
+		name: "filter UPDATE_TAGS action",
+		actions: []model.Action{{
+			ActionID: "1234",
+			Type:     TypeUpdateTags,
+		}},
+		resp: []model.Action{},
+	}, {
+		name: "filter FORCE_UNENROLL action",
+		actions: []model.Action{{
+			ActionID: "1234",
+			Type:     TypeForceUnenroll,
+		}},
+		resp: []model.Action{},
 	}}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
