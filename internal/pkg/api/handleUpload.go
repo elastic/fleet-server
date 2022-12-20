@@ -6,15 +6,12 @@ package api
 
 import (
 	"context"
-	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -50,9 +47,7 @@ func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps ht
 
 	// authentication occurs inside here
 	// to check that key agent ID matches the ID in the body payload yet-to-be unmarshalled
-	err := rt.ut.handleUploadStart(&zlog, w, r)
-
-	if err != nil {
+	if err := rt.ut.handleUploadStart(&zlog, w, r); err != nil {
 		writeUploadError(err, w, zlog, start, "error initiating upload process")
 		return
 	}
@@ -126,7 +121,7 @@ type UploadT struct {
 	bulker      bulk.Bulk
 	chunkClient *elasticsearch.Client
 	cache       cache.Cache
-	upl         *upload.Uploader
+	uploader    *upload.Uploader
 }
 
 func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *UploadT {
@@ -139,22 +134,14 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 		chunkClient: chunkClient,
 		bulker:      bulker,
 		cache:       cache,
-		upl:         upload.New(chunkClient, bulker, maxFileSize, maxUploadTimer),
+		uploader:    upload.New(chunkClient, bulker, maxFileSize, maxUploadTimer),
 	}
 }
 
 func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request) error {
-
-	// store raw body since we will json-decode twice
-	// 2MB is a reasonable json payload size. Any more might be an indication of garbage
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 2*1024*1024))
+	// decode early to match agentID in the payload
+	payload, err := upload.ReadDict(r.Body)
 	if err != nil {
-		return fmt.Errorf("error reading request: %w", err)
-	}
-
-	// decode once here to access known fields we need to parse and work with
-	var fi FileInfo
-	if err := json.Unmarshal(body, &fi); err != nil {
 		if errors.Is(err, io.EOF) {
 			return fmt.Errorf("file info body is required: %w", err)
 		}
@@ -162,54 +149,26 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 	}
 
 	// check API key matches payload agent ID
+	agentID, ok := payload.Str("agent_id")
+	if !ok || agentID == "" {
+		return errors.New("required field agent_id is missing")
+	}
 	if AUTH_ENABLED {
-		if _, err := authAgent(r, &fi.AgentID, ut.bulker, ut.cache); err != nil {
+		if _, err := authAgent(r, &agentID, ut.bulker, ut.cache); err != nil {
 			return err
 		}
 	}
 
-	if err := validateUploadPayload(fi); err != nil {
-		return err
-	}
-
-	docID := fmt.Sprintf("%s.%s", fi.ActionID, fi.AgentID)
-
-	var hasher hash.Hash
-	var sum string
-	switch {
-	case fi.File.Hash.SHA256 != "":
-		hasher = sha256.New()
-		sum = fi.File.Hash.SHA256
-	case fi.File.Hash.MD5 != "":
-		hasher = md5.New()
-		sum = fi.File.Hash.MD5
-	}
-
-	op, err := ut.upl.Begin(fi.File.Size, docID, fi.Source, sum, hasher)
+	// validate payload, enrich with additional fields, and write metadata doc to ES
+	info, err := ut.uploader.Begin(r.Context(), payload)
 	if err != nil {
 		return err
 	}
 
-	// second decode here to maintain the arbitrary shape and fields we will just pass through
-	var reqDoc map[string]interface{}
-	if err := json.Unmarshal(body, &reqDoc); err != nil {
-		return fmt.Errorf("error parsing request json: %w", err)
-	}
-
-	doc, err := uploadRequestToFileDoc(reqDoc, op.ChunkSize, op.ID)
-	if err != nil {
-		return fmt.Errorf("unable to convert request to file metadata doc: %w", err)
-	}
-	ret, err := upload.CreateFileDoc(r.Context(), ut.bulker, doc, fi.Source, docID)
-	if err != nil {
-		return err
-	}
-
-	zlog.Info().Str("return", ret).Msg("wrote doc")
-
+	// prepare and write response
 	out, err := json.Marshal(map[string]interface{}{
-		"upload_id":  op.ID,
-		"chunk_size": op.ChunkSize,
+		"upload_id":  info.ID,
+		"chunk_size": info.ChunkSize,
 	})
 	if err != nil {
 		return err
@@ -229,7 +188,7 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 		return errors.New("chunk hash header required")
 	}
 
-	chunkInfo, err := ut.upl.Chunk(uplID, chunkID, chunkHash)
+	chunkInfo, err := ut.uploader.Chunk(r.Context(), uplID, chunkID, chunkHash)
 	if err != nil {
 		return err
 	}
@@ -266,7 +225,7 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 		return errors.New("transit hash required")
 	}
 
-	info, err := ut.upl.Complete(uplID, req.TransitHash.SHA256, ut.bulker)
+	info, err := ut.uploader.Complete(uplID, req.TransitHash.SHA256, ut.bulker)
 	if err != nil {
 		return err
 	}
@@ -285,22 +244,6 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 	return nil
 }
 
-// takes the arbitrary input document from an upload request and injects
-// a few known fields as it passes through
-func uploadRequestToFileDoc(req map[string]interface{}, chunkSize int64, uploadID string) ([]byte, error) {
-	fileObj, ok := req["file"].(map[string]interface{})
-	if !ok {
-		return nil, errors.New("invalid upload request, file is not an object")
-	}
-
-	fileObj["ChunkSize"] = chunkSize
-	fileObj["Status"] = string(upload.StatusAwaiting)
-	req["upload_id"] = uploadID
-	req["upload_start"] = time.Now().UnixMilli()
-
-	return json.Marshal(req)
-}
-
 func updateUploadStatus(ctx context.Context, bulker bulk.Bulk, info upload.Info, status upload.Status) error {
 	data, err := json.Marshal(map[string]interface{}{
 		"doc": map[string]interface{}{
@@ -313,34 +256,6 @@ func updateUploadStatus(ctx context.Context, bulker bulk.Bulk, info upload.Info,
 		return err
 	}
 	return upload.UpdateFileDoc(ctx, bulker, info.Source, info.DocID, data)
-}
-
-func validateUploadPayload(fi FileInfo) error {
-
-	required := []struct {
-		Field string
-		Msg   string
-	}{
-		{fi.File.Name, "file name"},
-		{fi.File.Mime, "mime_type"},
-		{fi.ActionID, "action_id"},
-		{fi.AgentID, "agent_id"},
-		{fi.Source, "src"},
-	}
-
-	for _, req := range required {
-		if strings.TrimSpace(req.Field) == "" {
-			return fmt.Errorf("%s is required", req.Msg)
-		}
-	}
-
-	//@todo: valid action?
-	//@todo: valid src? will that make future expansion harder and require FS updates? maybe just validate the index exists
-
-	if fi.File.Size <= 0 {
-		return errors.New("invalid file size, size is required")
-	}
-	return nil
 }
 
 // helper function for doing all the error responsibilities

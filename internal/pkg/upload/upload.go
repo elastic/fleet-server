@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash"
 	"strconv"
 	"strings"
 	"sync"
@@ -96,10 +95,21 @@ func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, sizeLimit int64, t
 
 // Start an upload operation, as long as the max concurrent has not been reached
 // returns the upload ID
-func (u *Uploader) Begin(size int64, docID string, source string, hashsum string, hasher hash.Hash) (Info, error) {
-	if size <= 0 {
-		return Info{}, errors.New("invalid file size")
+func (u *Uploader) Begin(ctx context.Context, data JSDict) (Info, error) {
+	if data == nil {
+		return Info{}, errors.New("upload start payload required")
 	}
+
+	/*
+		Validation and Input parsing
+	*/
+
+	// make sure all required fields are present and non-empty
+	if err := validateUploadPayload(data); err != nil {
+		return Info{}, err
+	}
+
+	size, _ := data.Int64("file", "size")
 	if size > u.sizeLimit {
 		return Info{}, ErrFileSizeTooLarge
 	}
@@ -110,42 +120,72 @@ func (u *Uploader) Begin(size int64, docID string, source string, hashsum string
 	}
 	id := uid.String()
 
+	// grab required fields that were checked already in validation step
+	agentID, _ := data.Str("agent_id")
+	actionID, _ := data.Str("action_id")
+	source, _ := data.Str("src")
+	docID := fmt.Sprintf("%s.%s", actionID, agentID)
+
 	info := Info{
 		ID:        id,
 		DocID:     docID,
 		ChunkSize: MaxChunkSize,
 		Source:    source,
 		Total:     size,
-		//Hasher:    hasher,
-		//HashSum:   hashsum,
 	}
-	cnt := info.Total / info.ChunkSize
+	chunkCount := info.Total / info.ChunkSize
 	if info.Total%info.ChunkSize > 0 {
-		cnt += 1
+		chunkCount += 1
 	}
-	info.Count = int(cnt)
+	info.Count = int(chunkCount)
+
+	/*
+		Enrich document with additional server-side fields
+	*/
+
+	if err := data.Put(info.ChunkSize, "file", "ChunkSize"); err != nil {
+		return Info{}, err
+	}
+	if err := data.Put(string(StatusAwaiting), "file", "Status"); err != nil {
+		return Info{}, err
+	}
+	if err := data.Put(id, "upload_id"); err != nil {
+		return Info{}, err
+	}
+	if err := data.Put(time.Now().UnixMilli(), "upload_start"); err != nil {
+		return Info{}, err
+	}
+
+	doc, err := json.Marshal(data)
+	if err != nil {
+		return Info{}, err
+	}
+
+	_, err = CreateFileDoc(ctx, u.bulker, doc, source, docID)
+	if err != nil {
+		return Info{}, err
+	}
 
 	return info, nil
 }
 
-func (u *Uploader) Chunk(uplID string, chunkID int, chunkHash string) (ChunkInfo, error) {
+func (u *Uploader) Chunk(ctx context.Context, uplID string, chunkID int, chunkHash string) (ChunkInfo, error) {
 
 	// Fetch metadata doc, if not cached
-	u.mu.RLock()
-	defer u.mu.RUnlock()
+	//u.mu.RLock()
+	//defer u.mu.RUnlock()
 	info, exist := u.metaCache[uplID]
 	if !exist {
-		u.mu.Lock()
-		defer u.mu.Unlock()
+		//u.mu.Lock()
+		//defer u.mu.Unlock()
 		// fetch and write
 
-		//resp, err := u.es.Get()
-
-		found := false
-		if !found {
-			return ChunkInfo{}, ErrInvalidUploadID
+		var err error
+		info, err = u.GetUploadInfo(ctx, uplID)
+		if err != nil {
+			return ChunkInfo{}, fmt.Errorf("unable to retrieve upload info: %w", err)
 		}
-
+		u.metaCache[uplID] = info
 	}
 
 	if info.Expired(u.timeLimit) {
@@ -299,10 +339,37 @@ func (u *Uploader) verifyChunkData(info Info, transitHash string, bulker bulk.Bu
 	return true, nil
 }
 
+func validateUploadPayload(info JSDict) error {
+
+	required := [][]string{
+		{"file", "name"},
+		{"file", "mime_type"},
+		{"action_id"},
+		{"agent_id"},
+		{"src"},
+	}
+
+	for _, fields := range required {
+		if value, ok := info.Str(fields...); !ok || strings.TrimSpace(value) == "" {
+			return fmt.Errorf("%s is required", strings.Join(fields, "."))
+		}
+	}
+
+	//@todo: valid action?
+	//@todo: valid src? will that make future expansion harder and require FS updates? maybe just validate the index exists
+
+	if size, ok := info.Int64("file", "size"); !ok {
+		return errors.New("file.size is required")
+	} else if size <= 0 {
+		return fmt.Errorf("invalid file.size: %d", size)
+	}
+	return nil
+}
+
 // retrieves upload metadata info from elasticsearch
 // which may be locally cached
-func (u *Uploader) GetUploadInfo(uploadID string) (Info, error) {
-	results, err := GetFileDoc(context.TODO(), u.bulker, uploadID)
+func (u *Uploader) GetUploadInfo(ctx context.Context, uploadID string) (Info, error) {
+	results, err := GetFileDoc(ctx, u.bulker, uploadID)
 	if err != nil {
 		return Info{}, err
 	}
@@ -315,7 +382,7 @@ func (u *Uploader) GetUploadInfo(uploadID string) (Info, error) {
 
 	var fi FileMetaDoc
 	if err := json.Unmarshal(results[0].Source, &fi); err != nil {
-		return Info{}, fmt.Errorf("file meta doc parsing error: %v", err)
+		return Info{}, fmt.Errorf("file meta doc parsing error: %w", err)
 	}
 
 	// calculate number of chunks required

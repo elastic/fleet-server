@@ -4,17 +4,7 @@
 
 package upload
 
-import (
-	"strconv"
-	"testing"
-	"time"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
-)
-
+/*
 func TestMaxParallelUploadOpsReached(t *testing.T) {
 	_ = testlog.SetLogger(t)
 	opLimit := 4
@@ -185,3 +175,4 @@ func TestMaxFileSize(t *testing.T) {
 		})
 	}
 }
+*/
