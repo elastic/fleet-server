@@ -18,8 +18,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/upload/cbor"
-	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 )
 
@@ -106,31 +106,15 @@ func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID 
 }
 
 func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, docID string, chunkNum int) error {
-	req := esapi.IndexRequest{
-		Index:      fmt.Sprintf(FileDataIndexPattern, source),
-		Body:       body,
-		DocumentID: fmt.Sprintf("%s.%d", docID, chunkNum),
-		Refresh:    "true",
-	}
-	// need to set the Content-Type of the request to CBOR, notes below
-	overrider := contentTypeOverrider{client}
-	resp, err := req.Do(ctx, overrider)
-	/*
-		standard approach when content-type override no longer needed
-
-		resp, err := client.Index(fmt.Sprintf(FileDataIndexPattern, source), data, func(req *esapi.IndexRequest) {
-			req.DocumentID = fmt.Sprintf("%s.%d", fileID, chunkNum)
-			if req.Header == nil {
-				req.Header = make(http.Header)
-			}
-			// the below setting actually gets overridden in the ES client
-			// when it checks for the existence of r.Body, and then sets content-type to JSON
-			// this setting is then *added* so multiple content-types are sent.
-			// https://github.com/elastic/go-elasticsearch/blob/7.17/esapi/api.index.go#L183-L193
-			// we have to temporarily override this with a custom esapi.Transport
-			req.Header.Set("Content-Type", "application/cbor")
-			req.Header.Set("Accept","application/json") // this one has no issues being set this way. We need to specify we want JSON response
-		})*/
+	resp, err := client.Index(fmt.Sprintf(FileDataIndexPattern, source), body, func(req *esapi.IndexRequest) {
+		req.DocumentID = fmt.Sprintf("%s.%d", docID, chunkNum)
+		if req.Header == nil {
+			req.Header = make(http.Header)
+		}
+		req.Header.Set("Content-Type", "application/cbor")
+		req.Header.Set("Accept", "application/json")
+		req.Refresh = "true"
+	})
 	if err != nil {
 		return err
 	}
@@ -145,16 +129,6 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 		return fmt.Errorf("%s: %s caused by %s: %s", response.Error.Type, response.Error.Reason, response.Error.Cause.Type, response.Error.Cause.Reason)
 	}
 	return nil
-}
-
-type contentTypeOverrider struct {
-	client *elasticsearch.Client
-}
-
-func (c contentTypeOverrider) Perform(req *http.Request) (*http.Response, error) {
-	req.Header.Set("Content-Type", "application/cbor") // we will SEND cbor
-	req.Header.Set("Accept", "application/json")       // but we want JSON back
-	return c.client.Perform(req)
 }
 
 type ChunkUploadResponse struct {
