@@ -12,7 +12,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 )
