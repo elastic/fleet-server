@@ -117,7 +117,7 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 	log.Debug().Int64("checkpoint", checkpoint.Value()).Msg("checkpoint after test action delete")
 
 	// Wait for fleet server monitor checkpoint to be incremented after delete
-	m := mon.(*simpleMonitorT)
+	m, _ := mon.(*simpleMonitorT)
 	timeout := 10 * time.Second // This should not take that long, can wait until the test times out or shorter like this
 	start := time.Now()
 	for {

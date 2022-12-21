@@ -266,7 +266,7 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		// The fetch happens at least once.
 		// The fetch repeats until there is no more documents to fetch.
 
-		// Set count to max fetch size (m.fetchSize) initialy, so the fetch happens at least once.
+		// Set count to max fetch size (m.fetchSize) initially, so the fetch happens at least once.
 		count := m.fetchSize
 		for count == m.fetchSize {
 			// Fetch the documents between the last known checkpoint and the new checkpoint value received from "wait advance".
