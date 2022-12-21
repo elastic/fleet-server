@@ -99,18 +99,8 @@ func (rt Router) handleUploadComplete(w http.ResponseWriter, r *http.Request, ps
 		Str(ECSHTTPRequestID, reqID).
 		Logger()
 
-	//@todo: doc lookup, agent ID is in there
-	agentID := "ABC"
-
-	// need to auth that it matches the ID in the initial
-	// doc, but that means we had to doc-lookup early
-	if AUTH_ENABLED {
-		if _, err := authAgent(r, &agentID, rt.bulker, rt.ut.cache); err != nil {
-			writeUploadError(err, w, zlog, start, "error authenticating for upload finalization")
-			return
-		}
-	}
-
+	// authentication occurs inside here, to ensure key agent ID
+	// matches the same agent ID the operation started with
 	if err := rt.ut.handleUploadComplete(&zlog, w, r, id); err != nil {
 		writeUploadError(err, w, zlog, start, "error finalizing upload")
 		return
@@ -183,7 +173,6 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 
 func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string, chunkID int) error {
 	chunkHash := strings.TrimSpace(r.Header.Get("X-Chunk-Sha2"))
-
 	if chunkHash == "" {
 		return errors.New("chunk hash header required")
 	}
@@ -216,6 +205,18 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 }
 
 func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
+	info, err := ut.uploader.GetUploadInfo(r.Context(), uplID)
+	if err != nil {
+		return err
+	}
+	// need to auth that it matches the ID in the initial
+	// doc, but that means we had to doc-lookup early
+	if AUTH_ENABLED {
+		if _, err := authAgent(r, &info.AgentID, ut.bulker, ut.cache); err != nil {
+			return fmt.Errorf("Error authenticating for upload finalization: %w", err)
+		}
+	}
+
 	var req UploadCompleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return errors.New("unable to parse request body")
@@ -225,7 +226,7 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 		return errors.New("transit hash required")
 	}
 
-	info, err := ut.uploader.Complete(r.Context(), uplID, req.TransitHash.SHA256)
+	info, err = ut.uploader.Complete(r.Context(), uplID, req.TransitHash.SHA256)
 	if err != nil {
 		return err
 	}

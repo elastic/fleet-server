@@ -79,8 +79,11 @@ func prepareFindByUploadID() *dsl.Tmpl {
 	return tmpl
 }
 
+/*
+	Metadata Doc Operations
+*/
+
 func CreateFileDoc(ctx context.Context, bulker bulk.Bulk, doc []byte, source string, fileID string) (string, error) {
-	//@todo: put_if_absent
 	return bulker.Create(ctx, fmt.Sprintf(FileHeaderIndexPattern, source), fileID, doc, bulk.WithRefresh())
 }
 
@@ -104,6 +107,10 @@ func GetFileDoc(ctx context.Context, bulker bulk.Bulk, uploadID string) ([]es.Hi
 func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID string, data []byte) error {
 	return bulker.Update(ctx, fmt.Sprintf(FileHeaderIndexPattern, source), fileID, data)
 }
+
+/*
+	Chunk Operations
+*/
 
 func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, docID string, chunkNum int) error {
 	resp, err := client.Index(fmt.Sprintf(FileDataIndexPattern, source), body, func(req *esapi.IndexRequest) {
@@ -141,37 +148,13 @@ type ChunkUploadResponse struct {
 		Success int `json:"successful"`
 		Failed  int `json:"failed"`
 	} `json:"_shards"`
-	Error struct {
-		Type   string `json:"type"`
-		Reason string `json:"reason"`
-		Cause  struct {
-			Type   string `json:"type"`
-			Reason string `json:"reason"`
-		} `json:"caused_by"`
-	} `json:"error"`
+	Error es.ErrorT `json:"error"`
 }
 
-func ListChunkIDs(ctx context.Context, bulker bulk.Bulk, source string, fileID string) ([]es.HitT, error) {
-	return listChunkIDs(ctx, bulker, fmt.Sprintf(FileDataIndexPattern, source), fileID)
-}
-
-func listChunkIDs(ctx context.Context, bulker bulk.Bulk, index string, fileID string) ([]es.HitT, error) {
-	query, err := QueryChunkIDs.Render(map[string]interface{}{
-		FieldBaseID: fileID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := bulker.Search(ctx, index, query)
-	if err != nil {
-		return nil, err
-	}
-	return res.HitsT.Hits, nil
-}
-
+// Retrieves a subset of chunk document fields, specifically omitting the Data payload (bytes)
+// but adding the calculated field "size", that is the length, in bytes, of the Data field
+// the chunk's ordered index position (Pos) is also parsed from the document ID
 func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, baseID string) ([]ChunkInfo, error) {
-
 	query, err := QueryChunkInfo.Render(map[string]interface{}{
 		FieldBaseID: baseID,
 	})
@@ -225,6 +208,17 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, baseID string) ([]Chun
 	return chunks, nil
 }
 
+// retrieves a full chunk document, Data included
+func GetChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkNum int) (model.FileChunk, error) {
+	var chunk model.FileChunk
+	out, err := bulker.Read(ctx, fmt.Sprintf(FileDataIndexPattern, source), fmt.Sprintf("%s.%d", fileID, chunkNum))
+	if err != nil {
+		return chunk, err
+	}
+	err = json.Unmarshal(out, &chunk)
+	return chunk, err
+}
+
 // convenience function for translating the elasticsearch "field" response format
 // of "field": { "a": [value], "b": [value] }
 func getResultField(fields map[string]interface{}, key string) (interface{}, bool) {
@@ -269,14 +263,4 @@ func getResultsFieldInt(fields map[string]interface{}, key string) (int, bool) {
 	default:
 		return 0, false
 	}
-}
-
-func GetChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkNum int) (model.FileChunk, error) {
-	var chunk model.FileChunk
-	out, err := bulker.Read(ctx, fmt.Sprintf(FileDataIndexPattern, source), fmt.Sprintf("%s.%d", fileID, chunkNum))
-	if err != nil {
-		return chunk, err
-	}
-	err = json.Unmarshal(out, &chunk)
-	return chunk, err
 }
