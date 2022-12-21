@@ -189,12 +189,12 @@ func (m *simpleMonitorT) loadCheckpoint() sqn.SeqNo {
 
 // Run runs monitor.
 func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
-	m.log.Info().Msg("Starting index monitor")
+	m.log.Info().Msg("starting index monitor")
 	defer func() {
 		if errors.Is(err, context.Canceled) {
 			err = nil
 		}
-		m.log.Info().Err(err).Msg("Index monitor exited")
+		m.log.Info().Err(err).Msg("index monitor exited")
 	}()
 
 	defer func() {
@@ -203,7 +203,7 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	// Initialize global checkpoint from the index stats
+	// Get initial global checkpoint
 	var checkpoint sqn.SeqNo
 	checkpoint, err = gcheckpt.Query(ctx, m.monCli, m.index)
 	if err != nil {
@@ -211,6 +211,7 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		return err
 	}
 	m.storeCheckpoint(checkpoint)
+	m.log.Debug().Ints64("checkpoint", checkpoint).Msg("initial checkpoint")
 
 	// Signal the monitor is ready
 	if m.readyCh != nil {
@@ -221,7 +222,9 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 	for {
 		checkpoint := m.loadCheckpoint()
 
-		// Wait checkpoint advance
+		// Wait for checkpoint advance, long poll.
+		// It returns only if there are new documents fully indexed with _seq_no greater than the passed checkpoint value
+		// or the timeout (long poll interval).
 		newCheckpoint, err := gcheckpt.WaitAdvance(ctx, m.monCli, m.index, checkpoint, m.pollTimeout)
 		if err != nil {
 			if errors.Is(err, es.ErrIndexNotFound) {
@@ -230,9 +233,12 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			} else if errors.Is(err, es.ErrTimeout) {
 				// Timed out, wait again
 				m.log.Debug().Msg("timeout on global checkpoints advance, poll again")
+				// Loop back to the checkpoint "wait advance" without delay
 				continue
 			} else if errors.Is(err, context.Canceled) {
 				m.log.Info().Msg("context closed waiting for global checkpoints advance")
+				// Exit run
+				return err
 			} else {
 				// Log the error and keep trying
 				m.log.Info().Err(err).Msg("failed on waiting for global checkpoints advance")
@@ -243,6 +249,8 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			if err != nil {
 				return err
 			}
+			// Loop back to the checkpoint "wait advance" after the retry delay
+			continue
 		}
 
 		// This is an example of steps for fetching the documents without "holes" (not-yet-indexed documents in between)
@@ -253,21 +261,40 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		// 4. Search and get 4,5
 		// 5. Return to step 1
 
-		// Fetch up to known checkpoint
+		// Fetch up to the new checkpoint.
+		//
+		// The fetch happens at least once.
+		// The fetch repeats until there is no more documents to fetch.
+
+		// Set count to max fetch size (m.fetchSize) initialy, so the fetch happens at least once.
 		count := m.fetchSize
 		for count == m.fetchSize {
+			// Fetch the documents between the last known checkpoint and the new checkpoint value received from "wait advance".
 			hits, err := m.fetch(ctx, checkpoint, newCheckpoint)
 			if err != nil {
 				m.log.Error().Err(err).Msg("failed checking new documents")
 				break
 			}
 
-			// Notify call updates checkpoint
+			// Notify call updates m.checkpoint as max(_seq_no) from the fetched hits
 			count = m.notify(ctx, hits)
+			m.log.Debug().Int("count", count).Msg("hits found after notify")
 
-			// Get the latest checkpoint for the next fetch iteration
+			// If the number of fetched document is the same as the max fetch size, then it's possible there are more documents to fetch.
 			if count == m.fetchSize {
+				// Get the latest checkpoint value for the next fetch iteration.
 				checkpoint = m.loadCheckpoint()
+			} else {
+				// If the fetched number of documents is less than the max fetched size, then it is a final fetch for new checkpoint.
+				// Update the monitor checkpoint value from the checkpoint "wait advance" response.
+				//
+				// This avoids the situation where the actions monitor checkpoint gets out of sync with the index checkpoint,
+				// due to the index checkpoint being incremented by elasticsearch upon deleting the document.
+				//
+				// This fixes the issue https://github.com/elastic/fleet-server/issues/2205.
+				// The root cause of the issue was the monitor implementation was not correctly accounting for the index
+				// checkpoint increment when the action document is deleted from the index.
+				m.storeCheckpoint(newCheckpoint)
 			}
 		}
 	}
