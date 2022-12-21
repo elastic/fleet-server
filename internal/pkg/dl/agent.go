@@ -18,9 +18,8 @@ const (
 )
 
 var (
-	QueryAgentByAssessAPIKeyID   = prepareAgentFindByAccessAPIKeyID()
-	QueryAgentByID               = prepareAgentFindByID()
-	QueryOfflineAgentsByPolicyID = prepareOfflineAgentsByPolicyID()
+	QueryAgentByAssessAPIKeyID = prepareAgentFindByAccessAPIKeyID()
+	QueryAgentByID             = prepareAgentFindByID()
 )
 
 func prepareAgentFindByID() *dsl.Tmpl {
@@ -33,19 +32,6 @@ func prepareAgentFindByAccessAPIKeyID() *dsl.Tmpl {
 
 func prepareAgentFindByField(field string) *dsl.Tmpl {
 	return prepareFindByField(field, map[string]interface{}{"version": true})
-}
-
-func prepareOfflineAgentsByPolicyID() *dsl.Tmpl {
-	tmpl := dsl.NewTmpl()
-
-	root := dsl.NewRoot()
-	filter := root.Query().Bool().Filter()
-	filter.Term(FieldActive, true, nil)
-	filter.Term(FieldPolicyID, tmpl.Bind(FieldPolicyID), nil)
-	filter.Range(FieldLastCheckin, dsl.WithRangeLTE(tmpl.Bind(FieldLastCheckin)))
-
-	tmpl.MustResolve(root)
-	return tmpl
 }
 
 func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name string, v interface{}, opt ...Option) (model.Agent, error) {
