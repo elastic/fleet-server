@@ -55,7 +55,7 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 	g, ctx := errgroup.WithContext(ctx)
 
 	var createdActions []model.Action
-	ch := make(chan model.Action, 0)
+	ch := make(chan model.Action)
 	readyCh := make(chan error)
 	mon, err := NewSimple(index, bulker.Client(), bulker.Client(),
 		WithReadyChan(readyCh),
@@ -65,7 +65,7 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	g.Go(func() error {
-		return runSimpleMonitor(t, ctx, mon, readyCh, index, bulker, ch, func(ctx context.Context) error {
+		return runSimpleMonitor(t, ctx, mon, readyCh, ch, func(ctx context.Context) error {
 			defer wg.Done()
 			var err error
 			createdActions, err = ftesting.StoreRandomActions(ctx, bulker, index, 1, 7)
@@ -81,7 +81,6 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 			case <-ch:
 			}
 		}
-		return nil
 	})
 
 	// Wait until actions are created
@@ -141,10 +140,10 @@ func runNewSimpleMonitor(t *testing.T, ctx context.Context, index string, bulker
 	if err != nil {
 		return err
 	}
-	return runSimpleMonitor(t, ctx, mon, readyCh, index, bulker, ch, onReady)
+	return runSimpleMonitor(t, ctx, mon, readyCh, ch, onReady)
 }
 
-func runSimpleMonitor(t *testing.T, ctx context.Context, mon SimpleMonitor, readyCh chan error, index string, bulker bulk.Bulk, ch chan<- model.Action, onReady onReadyFunc) error {
+func runSimpleMonitor(t *testing.T, ctx context.Context, mon SimpleMonitor, readyCh chan error, ch chan<- model.Action, onReady onReadyFunc) error {
 	t.Helper()
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -188,7 +187,6 @@ func runSimpleMonitor(t *testing.T, ctx context.Context, mon SimpleMonitor, read
 				return nil
 			}
 		}
-		return nil
 	})
 
 	return g.Wait()
@@ -201,7 +199,7 @@ func runSimpleMonitorTest(t *testing.T, ctx context.Context, index string, bulke
 	g, ctx := errgroup.WithContext(ctx)
 
 	var createdActions []model.Action
-	ch := make(chan model.Action, 0)
+	ch := make(chan model.Action)
 	g.Go(func() error {
 		return runNewSimpleMonitor(t, ctx, index, bulker, ch, func(ctx context.Context) error {
 			var err error
