@@ -9,15 +9,14 @@ package monitor
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -34,6 +33,7 @@ func TestSimpleMonitorEmptyIndex(t *testing.T) {
 	defer cn()
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetActions)
+
 	runSimpleMonitorTest(t, ctx, index, bulker)
 }
 
@@ -42,6 +42,7 @@ func TestSimpleMonitorNonEmptyIndex(t *testing.T) {
 	defer cn()
 
 	index, bulker, _ := ftesting.SetupActions(ctx, t, 1, 12)
+
 	runSimpleMonitorTest(t, ctx, index, bulker)
 }
 
@@ -49,55 +50,42 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	// Cleanup the index and create a set of random actions
-	index, bulker, actions := ftesting.SetupActions(ctx, t, 1, 12)
+	index, bulker, _ := ftesting.SetupActions(ctx, t, 1, 12)
 
+	g, ctx := errgroup.WithContext(ctx)
+
+	var createdActions []model.Action
+	ch := make(chan model.Action, 0)
 	readyCh := make(chan error)
 	mon, err := NewSimple(index, bulker.Client(), bulker.Client(),
 		WithReadyChan(readyCh),
 	)
 	require.NoError(t, err)
 
-	// Start monitor
 	var wg sync.WaitGroup
-	mctx, mcn := context.WithCancel(ctx)
-	var merr error
 	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		merr = mon.Run(mctx)
-		if errors.Is(merr, context.Canceled) {
-			merr = nil
-		}
-	}()
+	g.Go(func() error {
+		return runSimpleMonitor(t, ctx, mon, readyCh, index, bulker, ch, func(ctx context.Context) error {
+			defer wg.Done()
+			var err error
+			createdActions, err = ftesting.StoreRandomActions(ctx, bulker, index, 1, 7)
+			return err
+		})
+	})
 
-	// Wait until monitor is running
-	err = <-readyCh
-	require.NoError(t, err)
-
-	var gotActions []model.Action
-	// Listen monitor updates
-	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	g.Go(func() error {
 		for {
 			select {
-			case hits := <-mon.Output():
-				for _, hit := range hits {
-					var action model.Action
-					er := hit.Unmarshal(&action)
-					require.NoError(t, er)
-					gotActions = append(gotActions, action)
-					if len(gotActions) == len(actions) {
-						return
-					}
-				}
-			case <-mctx.Done():
-				return
+			case <-ctx.Done():
+				return nil
+			case <-ch:
 			}
 		}
-	}()
+		return nil
+	})
+
+	// Wait until actions are created
+	wg.Wait()
 
 	var checkpoint, monCheckpoint sqn.SeqNo
 	checkpoint, err = gcheckpt.Query(ctx, bulker.Client(), index)
@@ -108,8 +96,8 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 	// Delete an action to emulate the gap between the fleet server tracking checkpoint and the index checkpoint
 	// The delete causes the checkpoint increment and the fleet-server was not updating it's checkpoint tracked value correctly
 	// in these cases.
-	idx := len(actions) - 1
-	err = bulker.Delete(ctx, index, actions[idx].Id, bulk.WithRefresh())
+	idx := len(createdActions) - 1
+	err = bulker.Delete(ctx, index, createdActions[idx].Id, bulk.WithRefresh())
 	require.NoError(t, err)
 
 	checkpoint, err = gcheckpt.Query(ctx, bulker.Client(), index)
@@ -122,7 +110,7 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 	start := time.Now()
 	for {
 		monCheckpoint = m.loadCheckpoint()
-		log.Debug().Int64("checkpoint", checkpoint.Value()).Msg("monitor checkpoint")
+		log.Debug().Int64("wait checkpoint", checkpoint.Value()).Int64("got checkpoint", monCheckpoint.Value()).Msg("monitor checkpoint")
 		if checkpoint.Value() == monCheckpoint.Value() {
 			break
 		}
@@ -136,81 +124,111 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 
 	assert.Equal(t, checkpoint, monCheckpoint)
 
-	// Stop monitor and wait for clean exit
-	mcn()
-	mwg.Wait()
-	wg.Wait()
-	require.NoError(t, merr)
+	// Cancel context to stop monitor and exit all go routines
+	cn()
+
+	require.NoError(t, g.Wait())
 }
 
-func runSimpleMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk.Bulk) {
+type onReadyFunc func(ctx context.Context) error
+
+func runNewSimpleMonitor(t *testing.T, ctx context.Context, index string, bulker bulk.Bulk, ch chan<- model.Action, onReady onReadyFunc) error {
+	t.Helper()
 	readyCh := make(chan error)
 	mon, err := NewSimple(index, bulker.Client(), bulker.Client(),
 		WithReadyChan(readyCh),
 	)
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
+	return runSimpleMonitor(t, ctx, mon, readyCh, index, bulker, ch, onReady)
+}
 
-	// Start monitor
-	var wg sync.WaitGroup
-	mctx, mcn := context.WithCancel(ctx)
-	var merr error
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		merr = mon.Run(mctx)
-		if errors.Is(merr, context.Canceled) {
-			merr = nil
+func runSimpleMonitor(t *testing.T, ctx context.Context, mon SimpleMonitor, readyCh chan error, index string, bulker bulk.Bulk, ch chan<- model.Action, onReady onReadyFunc) error {
+	t.Helper()
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	monCtx, monCn := context.WithCancel(ctx)
+	defer monCn()
+
+	// Run monitor
+	g.Go(func() error {
+		return mon.Run(monCtx)
+	})
+
+	// Wait for monitor ready and call createActions
+	err := <-readyCh
+	if err != nil {
+		return err
+	}
+	if onReady != nil {
+		err = onReady(ctx)
+		if err != nil {
+			return err
 		}
-	}()
+	}
 
-	// Wait until monitor is running
-	err = <-readyCh
-	require.NoError(t, err)
-
-	// Create random actions
-	actions, err := ftesting.StoreRandomActions(ctx, bulker, index, 1, 7)
-	require.NoError(t, err)
-
-	var gotActions []model.Action
-	// Listen monitor updates
-	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	// Listen for monitor notifications, exit when received all the actions
+	g.Go(func() error {
+		// Cancel/stop monitor on exit
+		defer monCn()
 		for {
 			select {
 			case hits := <-mon.Output():
 				for _, hit := range hits {
 					var action model.Action
-					er := hit.Unmarshal(&action)
-					require.NoError(t, er)
-					gotActions = append(gotActions, action)
-					if len(gotActions) == len(actions) {
-						return
+					err := hit.Unmarshal(&action)
+					if err != nil {
+						return err
 					}
+					ch <- action
 				}
 			case <-ctx.Done():
-				return
+				return nil
 			}
 		}
-	}()
-	mwg.Wait()
+		return nil
+	})
+
+	return g.Wait()
+}
+
+func runSimpleMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk.Bulk) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	var createdActions []model.Action
+	ch := make(chan model.Action, 0)
+	g.Go(func() error {
+		return runNewSimpleMonitor(t, ctx, index, bulker, ch, func(ctx context.Context) error {
+			var err error
+			createdActions, err = ftesting.StoreRandomActions(ctx, bulker, index, 1, 7)
+			return err
+		})
+	})
+
+	var gotActions []model.Action
+	g.Go(func() error {
+		defer cn()
+		for a := range ch {
+			gotActions = append(gotActions, a)
+			if len(createdActions) == len(gotActions) {
+				return nil
+			}
+		}
+		return nil
+	})
+
+	require.NoError(t, g.Wait())
 
 	// Need to set the seqno that are known only after the documents where indexed
 	// in order to compare the slices of structs as a whole
 	for i, a := range gotActions {
-		actions[i].SeqNo = a.SeqNo
+		createdActions[i].SeqNo = a.SeqNo
 	}
 
-	// The documents should be the same and in the same order
-	diff := cmp.Diff(actions, gotActions)
-	if diff != "" {
-		t.Fatal(diff)
-	}
-
-	// Stop monitor and wait for clean exit
-	mcn()
-	wg.Wait()
-	require.NoError(t, merr)
-
+	assert.Equal(t, createdActions, gotActions)
 }
