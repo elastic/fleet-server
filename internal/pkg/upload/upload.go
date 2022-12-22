@@ -236,26 +236,6 @@ func (u *Uploader) Chunk(ctx context.Context, uplID string, chunkNum int, chunkH
 	}, nil
 }
 
-func (u *Uploader) cleanupOperation(uplID string) {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	delete(u.metaCache, uplID)
-}
-
-func (u *Uploader) cancel(uplID string) error {
-	u.cleanupOperation(uplID)
-
-	// @todo: delete any uploaded chunks from ES
-	// leave header doc and mark failed?
-	return nil
-}
-
-func (u *Uploader) finalize(uplID string) error {
-	u.cleanupOperation(uplID)
-	// @todo: write Status:READY here?
-	return nil
-}
-
 func validateUploadPayload(info JSDict) error {
 
 	required := [][]string{
