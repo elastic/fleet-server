@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -26,6 +25,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func TestSimpleMonitorEmptyIndex(t *testing.T) {
@@ -47,6 +47,7 @@ func TestSimpleMonitorNonEmptyIndex(t *testing.T) {
 }
 
 func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
+	log := testlog.SetLogger(t)
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
