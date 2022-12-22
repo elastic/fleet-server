@@ -197,7 +197,15 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 	hashsum := hex.EncodeToString(hash.Sum(nil))
 
 	if !strings.EqualFold(chunkHash, hashsum) {
-		// @todo: delete document, since we wrote it, but the hash was invalid
+		// delete document, since we wrote it, but the hash was invalid
+		// context scoped to allow this operation to finish even if client disconnects
+		if err := upload.DeleteChunk(context.Background(), ut.bulker, upinfo.Source, chunkInfo.BID, chunkInfo.Pos); err != nil {
+			zlog.Warn().Err(err).
+				Str("source", upinfo.Source).
+				Str("fileID", chunkInfo.BID).
+				Int("chunkNum", chunkInfo.Pos).
+				Msg("a chunk hash mismatch occurred, and fleet server was unable to remove the invalid chunk")
+		}
 		return upload.ErrHashMismatch
 	}
 
@@ -231,32 +239,11 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 		return err
 	}
 
-	if err := updateUploadStatus(r.Context(), ut.bulker, info, upload.StatusDone); err != nil {
-		// should be 500 error probably?
-		zlog.Warn().Err(err).Str("upload", uplID).Msg("unable to set upload status to complete")
-		return err
-
-	}
-
 	_, err = w.Write([]byte(`{"status":"ok"}`))
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-func updateUploadStatus(ctx context.Context, bulker bulk.Bulk, info upload.Info, status upload.Status) error {
-	data, err := json.Marshal(map[string]interface{}{
-		"doc": map[string]interface{}{
-			"file": map[string]string{
-				"Status": string(status),
-			},
-		},
-	})
-	if err != nil {
-		return err
-	}
-	return upload.UpdateFileDoc(ctx, bulker, info.Source, info.DocID, data)
 }
 
 // helper function for doing all the error responsibilities

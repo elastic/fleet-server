@@ -5,6 +5,7 @@
 package upload
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -35,9 +36,10 @@ const (
 )
 
 var (
-	QueryChunkIDs  = prepareFindChunkIDs()
-	QueryUploadID  = prepareFindByUploadID()
-	QueryChunkInfo = prepareChunkWithoutData()
+	QueryChunkIDs   = prepareFindChunkIDs()
+	QueryUploadID   = prepareFindMetaByUploadID()
+	QueryChunkInfo  = prepareChunkWithoutData()
+	MatchChunkByBID = prepareQueryChunkByBID()
 )
 
 func prepareFindChunkIDs() *dsl.Tmpl {
@@ -70,11 +72,19 @@ func prepareChunkWithoutData() *dsl.Tmpl {
 	return tmpl
 }
 
-func prepareFindByUploadID() *dsl.Tmpl {
+func prepareFindMetaByUploadID() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
 	//root.Param("_source", false) // do not return large data payload
 	root.Query().Term(FieldUploadID, tmpl.Bind(FieldUploadID), nil)
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
+func prepareQueryChunkByBID() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	root.Query().Term(FieldBaseID, tmpl.Bind(FieldBaseID), nil)
 	tmpl.MustResolve(root)
 	return tmpl
 }
@@ -217,6 +227,21 @@ func GetChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID strin
 	}
 	err = json.Unmarshal(out, &chunk)
 	return chunk, err
+}
+
+func DeleteChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkNum int) error {
+	return bulker.Delete(ctx, fmt.Sprintf(FileDataIndexPattern, source), fmt.Sprintf("%s.%d", fileID, chunkNum))
+}
+
+func DeleteChunksByQuery(ctx context.Context, bulker bulk.Bulk, source string, baseID string) error {
+	q, err := MatchChunkByBID.Render(map[string]interface{}{
+		FieldBaseID: baseID,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = bulker.Client().DeleteByQuery([]string{fmt.Sprintf(FileDataIndexPattern, source)}, bytes.NewReader(q))
+	return err
 }
 
 // convenience function for translating the elasticsearch "field" response format
