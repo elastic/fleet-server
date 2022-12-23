@@ -21,6 +21,7 @@ import (
 	fbuild "github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/julienschmidt/httprouter"
@@ -45,6 +46,10 @@ func (pm *mockPolicyMonitor) Run(ctx context.Context) error {
 
 func (pm *mockPolicyMonitor) State() client.UnitState {
 	return pm.state
+}
+
+func (pm *mockPolicyMonitor) Policy() *model.Policy {
+	return nil
 }
 
 func TestHandleStatus(t *testing.T) {
