@@ -26,14 +26,16 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// standAloneSetup will ensure that the agent is enrolled.
 func (f *Fleet) standAloneSetup(ctx context.Context, bulker bulk.Bulk, sm policy.SelfMonitor, policyID, agentID string) (*model.Agent, error) {
 	err := sm.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to run self monitor for stand alone setup: %w", err)
 	}
 	policy := sm.Policy()
-	log.Debug().Msgf("Policy Data: %s", string(policy.Data))
+	log.Debug().Str("policy", string(policy.Data)).Msg("Found policy")
 	// TODO use policy from self monitor
+	// will need to happen as a bootstrapping step if it should occur here - otherwise we may want to fake revision id and coordinator id and update on checkin
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
 	// Enroll the agent if it's not found
 	if errors.Is(err, dl.ErrNotFound) || errors.Is(err, es.ErrIndexNotFound) {
@@ -41,7 +43,7 @@ func (f *Fleet) standAloneSetup(ctx context.Context, bulker bulk.Bulk, sm policy
 		agentData := model.Agent{
 			Active:               true,
 			PolicyID:             policyID,
-			PolicyRevisionIdx:    policy.RevisionIdx, // FIXME the policy in fleet-server.yml does not match what's actually specified. maybe we need to use the policy that's retrived by the self monitor.
+			PolicyRevisionIdx:    policy.RevisionIdx,
 			PolicyCoordinatorIdx: policy.CoordinatorIdx,
 			Type:                 "PERMANENT",
 			EnrolledAt:           time.Now().UTC().Format(time.RFC3339),
@@ -63,10 +65,8 @@ func (f *Fleet) standAloneSetup(ctx context.Context, bulker bulk.Bulk, sm policy
 		return &agentData, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("unable to find agent entry: %w", err)
-	} else {
-		return &agent, nil
-		// TODO santiy check agent that is found?
 	}
+	return &agent, nil
 }
 
 func (f *Fleet) standAloneCheckin(agent *model.Agent, ct *api.CheckinT) runFunc {
@@ -81,7 +81,7 @@ func (f *Fleet) standAloneCheckin(agent *model.Agent, ct *api.CheckinT) runFunc 
 			case ts := <-tick.C:
 				log.Info().Msg("self-checkin start")
 				body := api.CheckinRequest{
-					Status:   "HEALTHY", // TODO change to use reporter?
+					Status:   "HEALTHY",
 					AckToken: ackToken,
 				}
 				b, _ := json.Marshal(body)
@@ -103,7 +103,7 @@ func (f *Fleet) standAloneCheckin(agent *model.Agent, ct *api.CheckinT) runFunc 
 					return err
 				}
 				ackToken = rBody.AckToken
-				log.Info().Msgf("self-checkin success token: %s, %d actions", ackToken, len(rBody.Actions))
+				log.Info().Str("ackToken", ackToken).Int("action_count", len(rBody.Actions)).Msg("self-checkin success token")
 				// TODO handle policy-change, unenroll, and settings actions? upgrade?
 				log.Info().Msgf("self-checkin actions: %v", rBody.Actions)
 				tick.Reset(30 * time.Second)
