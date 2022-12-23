@@ -1,7 +1,11 @@
 ARG GO_VERSION
 FROM golang:${GO_VERSION}-buster
 
-RUN apt-get update && apt-get install -y zip
+RUN \
+  apt-get update \
+  && apt-get install -y zip \
+  && mkdir /.cache \
+  && chmod 777 /.cache
 
 WORKDIR /go/src/github.com/elastic/fleet-server
 
