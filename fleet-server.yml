@@ -1,8 +1,9 @@
+# This config is intended to be used with a stand-alone fleet-server instance for development.
 output:
   elasticsearch:
     hosts: '${ELASTICSEARCH_HOSTS:https://localhost:9200}'
     service_token: '${ELASTICSEARCH_SERVICE_TOKEN}'
-#    ssl.ca_trusted_fingerprint: '${ELASTICSEARCH_CA_TRUSTED_FINGERPRINT}'
+    ssl.ca_trusted_fingerprint: '${ELASTICSEARCH_CA_TRUSTED_FINGERPRINT}'
 
 fleet:
   agent:

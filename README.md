@@ -41,14 +41,14 @@ SNAPSHOT=true DEV=true make release-darwin/amd64
 GOOS=darwin GOARCH=amd64 go build -tags="dev" -gcflags="all=-N -l" -ldflags="-X main.Version=8.7.0 -X main.Commit=31668e0 -X main.BuildTime=2022-12-23T20:06:20Z" -buildmode=pie -o build/binaries/fleet-server-8.7.0-darwin-x86_64/fleet-server .
 ```
 
-Change `release-linux/amd64` to `release-YOUR_OS/platform`.
+Change `release-darwin/amd64` to `release-YOUR_OS/platform`.
 Run `make list-platforms` to check out the possible values.
 
 The `SNAPSHOT` flag sets the snapshot version flag.
 
 ### Running a development build
 
-#### ES and Kibana from SNAPSHOTS API
+#### ES and Kibana from SNAPSHOTS API on host
 
 Download SNAPSHOT builds for Elasticsearch and Kibana from the snapshots API:
 Edit the version and OS/arch to suit your system, or [check the API](https://artifacts-api.elastic.co/v1/search/8.7-SNAPSHOT) (change the version if needed) if the ones below does not suit you.
@@ -99,7 +99,7 @@ The fleet-server should appear as an agent with the ID `dev-fleet-server`.
 
 #### fleet-server+agent on a Vagrant VM
 
-The development Vagrant machine assumes the `elastic-agent`, `beats` and `fleet-server` repos are in the same folder.
+The development Vagrant machine assumes the `elastic-agent`, `beats`, and `fleet-server` repos are in the same folder.
 Thus, it mounts `../` to `/vagrant` on the Vagrant machine.
 ```shell
 vagrant up
