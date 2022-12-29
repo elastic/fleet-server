@@ -67,7 +67,7 @@ func (s *tserver) waitExit() error {
 func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 	t.Helper()
 
-	cfg, err := config.LoadFile("../../../fleet-server.yml")
+	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
 	if err != nil {
 		return nil, fmt.Errorf("config load error: %w", err)
 	}
