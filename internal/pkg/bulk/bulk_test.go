@@ -17,6 +17,7 @@ import (
 	"time"
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/rs/zerolog/log"
 )
 
 // TODO:
@@ -251,7 +252,7 @@ func TestCancelCtx(t *testing.T) {
 		},
 	}
 
-	_ = testlog.SetLogger(t)
+	log.Logger = testlog.SetLogger(t)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -275,7 +276,7 @@ func TestCancelCtx(t *testing.T) {
 
 func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 	b.ReportAllocs()
-	_ = testlog.SetLogger(b)
+	log.Logger = testlog.SetLogger(b)
 
 	mock := &mockBulkTransport{}
 

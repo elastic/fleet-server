@@ -10,13 +10,14 @@ import (
 	"testing"
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/rs/zerolog/log"
 )
 
 const payload = `{"_id" : "1", "_index" : "test"}`
 
 // Test throughput of creating multiOps
 func BenchmarkMultiUpdateMock(b *testing.B) {
-	_ = testlog.SetLogger(b)
+	log.Logger = testlog.SetLogger(b)
 
 	// Allocate, but don't run.  Stub the client.
 	bulker := NewBulker(nil, nil)
