@@ -32,10 +32,10 @@ type globalCheckpointsResponse struct {
 }
 
 func Query(ctx context.Context, es *elasticsearch.Client, index string) (seqno sqn.SeqNo, err error) {
-	req := esh.NewGlobalCheckpointsRequest(es.Transport)
-	res, err := req(req.WithContext(ctx),
-		req.WithIndex(index))
-
+	res, err := es.FleetGlobalCheckpoints(
+		index,
+		es.FleetGlobalCheckpoints.WithContext(ctx),
+	)
 	if err != nil {
 		return
 	}
@@ -50,15 +50,14 @@ func Query(ctx context.Context, es *elasticsearch.Client, index string) (seqno s
 }
 
 func WaitAdvance(ctx context.Context, es *elasticsearch.Client, index string, checkpoint sqn.SeqNo, to time.Duration) (seqno sqn.SeqNo, err error) {
-	req := esh.NewGlobalCheckpointsRequest(es.Transport)
-	res, err := req(req.WithContext(ctx),
-		req.WithIndex(index),
-		req.WithCheckpoints(checkpoint),
-		req.WithWaitForAdvance(true),
-		req.WithWaitForIndex(true),
-		req.WithTimeout(to),
+	res, err := es.FleetGlobalCheckpoints(
+		index,
+		es.FleetGlobalCheckpoints.WithContext(ctx),
+		es.FleetGlobalCheckpoints.WithCheckpoints(checkpoint.String()),
+		es.FleetGlobalCheckpoints.WithWaitForAdvance(true),
+		es.FleetGlobalCheckpoints.WithWaitForIndex(true),
+		es.FleetGlobalCheckpoints.WithTimeout(to),
 	)
-
 	if err != nil {
 		return
 	}

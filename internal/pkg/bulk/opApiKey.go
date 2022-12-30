@@ -11,7 +11,7 @@ import (
 	"math"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 )
 
@@ -183,7 +183,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 				return err
 			}
 
-			req := &es.UpdateApiKeyBulkRequest{
+			req := &esapi.SecurityBulkUpdateAPIKeysRequest{
 				Body: bytes.NewReader(payload),
 			}
 
