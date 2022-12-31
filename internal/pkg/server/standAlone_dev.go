@@ -28,12 +28,13 @@ import (
 
 // standAloneSetup will ensure that the agent is enrolled.
 func (f *Fleet) standAloneSetup(ctx context.Context, bulker bulk.Bulk, sm policy.SelfMonitor, policyID, agentID string) (*model.Agent, error) {
+	log.Debug().Str("agent_id", agentID).Msg("stand-alone dev setup starting")
 	err := sm.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to run self monitor for stand alone setup: %w", err)
 	}
 	policy := sm.Policy()
-	log.Debug().Str("policy", string(policy.Data)).Msg("Found policy")
+	//log.Debug().Str("policy", string(policy.Data)).Msg("Found policy")
 	// TODO use policy from self monitor
 	// will need to happen as a bootstrapping step if it should occur here - otherwise we may want to fake revision id and coordinator id and update on checkin
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
@@ -62,10 +63,17 @@ func (f *Fleet) standAloneSetup(ctx context.Context, bulker bulk.Bulk, sm policy
 		if err != nil {
 			return nil, fmt.Errorf("unable to enroll fleet-server: %w", err)
 		}
-		return &agentData, nil
+		// sanity check
+		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
+		if err != nil {
+			return nil, fmt.Errorf("unable to find indexed agent: %w", err)
+		}
+		log.Debug().Str("agent_id", agentID).Msg("stand-alone dev setup agent indexed.")
+		return &agent, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("unable to find agent entry: %w", err)
 	}
+	log.Debug().Str("agent_id", agentID).Msg("stand-alone dev setup agent found.")
 	return &agent, nil
 }
 
@@ -83,6 +91,7 @@ func (f *Fleet) standAloneCheckin(agent *model.Agent, ct *api.CheckinT) runFunc 
 				body := api.CheckinRequest{
 					Status:   "HEALTHY",
 					AckToken: ackToken,
+					// TODO Metadata?
 				}
 				b, _ := json.Marshal(body)
 				req, _ := http.NewRequestWithContext(ctx, "", "", bytes.NewReader(b))
@@ -109,6 +118,7 @@ func (f *Fleet) standAloneCheckin(agent *model.Agent, ct *api.CheckinT) runFunc 
 				tick.Reset(30 * time.Second)
 			}
 		}
+		log.Debug().Str("agent_id", agent.Agent.ID).Msg("exiting self-checkin")
 		return nil
 	}
 }
