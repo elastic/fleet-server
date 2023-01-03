@@ -90,12 +90,26 @@ Set the following env vars with the information from Kibana:
 - `ELASTICSEARCH_SERVICE_TOKEN`
 - `FLEET_SERVER_POLICY_ID`
 
+Create a self-signed TLS CA and cert+key for the fleet-server instance, you can use [elasticsearch-certutil](https://www.elastic.co/guide/en/elasticsearch/reference/current/certutil.html) for this:
+```shell
+# Create a CA
+../elasticsearch/bin/elasticsearch-certutil ca --pem --out stack.zip
+unzip stack.zip
+# Create a cert+key
+../elasticsearch/bin/elasticsearch-certutil cert --pem --ca-cert ca/ca.crt --ca-key ca/ca.key --ip $HOST_IP_ADDR --out cert.zip
+unzip cert.zip
+```
+
+Ensure that `server.ssl.enabled: true` is set as well as the `server.ssl.certificate` and `server.ssl.key` attributes in `fleet-server.yml`
+
 Then run the fleet-server:
 ```shell
 ./build/binaries/fleet-server-8.7.0-darwin-x86_64/fleet-server -c fleet-server.yml
 ```
 By default the fleet-server will attempt to connect to Elasticsearch on `https://localhost:9200`, if this needs to be changed set it with `ELASTICSEARCH_HOSTS`
 The fleet-server should appear as an agent with the ID `dev-fleet-server`.
+
+Any additional agents will need the `ca/ca.crt` file to enroll (or will need to use the `--insecure` flag).
 
 #### fleet-server+agent on a Vagrant VM
 
