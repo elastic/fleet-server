@@ -181,7 +181,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				Data:                     json.RawMessage(`{"key":"value"}`),
 				Expiration:               "2022-01-02T13:00:00Z",
 				MinimumExecutionDuration: 600,
-				StartTime:                "2022-01-02T12:16:40Z",
+				StartTime:                "2022-01-02T12:03:20Z",
 				Type:                     "upgrade",
 			}},
 			"agent3": []model.Action{model.Action{
@@ -190,7 +190,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				Data:                     json.RawMessage(`{"key":"value"}`),
 				Expiration:               "2022-01-02T13:00:00Z",
 				MinimumExecutionDuration: 600,
-				StartTime:                "2022-01-02T12:33:20Z",
+				StartTime:                "2022-01-02T12:06:40Z",
 				Type:                     "upgrade",
 			}},
 		},
@@ -267,10 +267,6 @@ func Test_offsetStartTime(t *testing.T) {
 		name:   "no start",
 		result: "",
 	}, {
-		name:   "no exp",
-		start:  "2022-01-02T12:00:00Z",
-		result: "",
-	}, {
 		name:   "first agent",
 		start:  "2022-01-02T12:00:00Z",
 		end:    "2022-01-02T13:00:00Z",
@@ -283,14 +279,14 @@ func Test_offsetStartTime(t *testing.T) {
 		end:    "2022-01-02T13:00:00Z",
 		i:      4,
 		total:  10,
-		result: "2022-01-02T12:24:00Z",
+		result: "2022-01-02T12:00:00Z",
 	}, {
 		name:   "last agent no dur",
 		start:  "2022-01-02T12:00:00Z",
 		end:    "2022-01-02T13:00:00Z",
 		i:      9,
 		total:  10,
-		result: "2022-01-02T12:54:00Z",
+		result: "2022-01-02T12:00:00Z",
 	}, {
 		name:   "first agent 10m dur",
 		start:  "2022-01-02T12:00:00Z",
@@ -306,7 +302,7 @@ func Test_offsetStartTime(t *testing.T) {
 		dur:    600,
 		i:      4,
 		total:  10,
-		result: "2022-01-02T12:20:00Z",
+		result: "2022-01-02T12:04:00Z",
 	}, {
 		name:   "last agent 10m dur",
 		start:  "2022-01-02T12:00:00Z",
@@ -314,11 +310,11 @@ func Test_offsetStartTime(t *testing.T) {
 		dur:    600,
 		i:      9,
 		total:  10,
-		result: "2022-01-02T12:45:00Z",
+		result: "2022-01-02T12:09:00Z",
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := offsetStartTime(tt.start, tt.end, tt.dur, tt.i, tt.total)
+			r := offsetStartTime(tt.start, tt.dur, tt.i, tt.total)
 			assert.Equal(t, tt.result, r)
 		})
 	}
