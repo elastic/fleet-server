@@ -114,7 +114,7 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 		for i, agentID := range action.Agents {
 			arr := agentActions[agentID]
 			actionNoAgents := action
-			actionNoAgents.StartTime = offsetStartTime(action.StartTime, action.MinimumExecutionDuration, i, numAgents)
+			actionNoAgents.StartTime = offsetStartTime(action.StartTime, action.RolloutDurationSeconds, i, numAgents)
 			actionNoAgents.Agents = nil
 			arr = append(arr, actionNoAgents)
 			agentActions[agentID] = arr

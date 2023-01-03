@@ -57,7 +57,7 @@ func compareActions(t *testing.T, expects, results []model.Action) {
 		assert.Equal(t, expect.Data, result.Data)
 		assert.Equal(t, expect.Expiration, result.Expiration)
 		assert.Equal(t, expect.InputType, result.InputType)
-		assert.Equal(t, expect.MinimumExecutionDuration, result.MinimumExecutionDuration)
+		assert.Equal(t, expect.RolloutDurationSeconds, result.RolloutDurationSeconds)
 		assert.Equal(t, expect.StartTime, result.StartTime)
 		assert.Equal(t, expect.Timeout, result.Timeout)
 		assert.Equal(t, expect.Type, result.Type)
@@ -133,7 +133,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 			ch := make(chan []es.HitT)
 			go func() {
 				ch <- []es.HitT{es.HitT{
-					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","minimum_execution_duration":600,"start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
+					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","rollout_duration_seconds":600,"start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
 				}}
 			}()
 			var rch <-chan []es.HitT = ch
@@ -142,13 +142,13 @@ func Test_Dispatcher_Run(t *testing.T) {
 		},
 		expect: map[string][]model.Action{
 			"agent1": []model.Action{model.Action{
-				ActionID:                 "test-action",
-				Agents:                   nil,
-				Data:                     json.RawMessage(`{"key":"value"}`),
-				Expiration:               "2022-01-02T13:00:00Z",
-				MinimumExecutionDuration: 600,
-				StartTime:                "2022-01-02T12:00:00Z",
-				Type:                     "upgrade",
+				ActionID:               "test-action",
+				Agents:                 nil,
+				Data:                   json.RawMessage(`{"key":"value"}`),
+				Expiration:             "2022-01-02T13:00:00Z",
+				RolloutDurationSeconds: 600,
+				StartTime:              "2022-01-02T12:00:00Z",
+				Type:                   "upgrade",
 			}},
 		},
 	}, {
@@ -158,7 +158,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 			ch := make(chan []es.HitT)
 			go func() {
 				ch <- []es.HitT{es.HitT{
-					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1","agent2","agent3"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","minimum_execution_duration":600,"start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
+					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1","agent2","agent3"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","rollout_duration_seconds":600,"start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
 				}}
 			}()
 			var rch <-chan []es.HitT = ch
@@ -167,31 +167,31 @@ func Test_Dispatcher_Run(t *testing.T) {
 		},
 		expect: map[string][]model.Action{
 			"agent1": []model.Action{model.Action{
-				ActionID:                 "test-action",
-				Agents:                   nil,
-				Data:                     json.RawMessage(`{"key":"value"}`),
-				Expiration:               "2022-01-02T13:00:00Z",
-				MinimumExecutionDuration: 600,
-				StartTime:                "2022-01-02T12:00:00Z",
-				Type:                     "upgrade",
+				ActionID:               "test-action",
+				Agents:                 nil,
+				Data:                   json.RawMessage(`{"key":"value"}`),
+				Expiration:             "2022-01-02T13:00:00Z",
+				RolloutDurationSeconds: 600,
+				StartTime:              "2022-01-02T12:00:00Z",
+				Type:                   "upgrade",
 			}},
 			"agent2": []model.Action{model.Action{
-				ActionID:                 "test-action",
-				Agents:                   nil,
-				Data:                     json.RawMessage(`{"key":"value"}`),
-				Expiration:               "2022-01-02T13:00:00Z",
-				MinimumExecutionDuration: 600,
-				StartTime:                "2022-01-02T12:03:20Z",
-				Type:                     "upgrade",
+				ActionID:               "test-action",
+				Agents:                 nil,
+				Data:                   json.RawMessage(`{"key":"value"}`),
+				Expiration:             "2022-01-02T13:00:00Z",
+				RolloutDurationSeconds: 600,
+				StartTime:              "2022-01-02T12:03:20Z",
+				Type:                   "upgrade",
 			}},
 			"agent3": []model.Action{model.Action{
-				ActionID:                 "test-action",
-				Agents:                   nil,
-				Data:                     json.RawMessage(`{"key":"value"}`),
-				Expiration:               "2022-01-02T13:00:00Z",
-				MinimumExecutionDuration: 600,
-				StartTime:                "2022-01-02T12:06:40Z",
-				Type:                     "upgrade",
+				ActionID:               "test-action",
+				Agents:                 nil,
+				Data:                   json.RawMessage(`{"key":"value"}`),
+				Expiration:             "2022-01-02T13:00:00Z",
+				RolloutDurationSeconds: 600,
+				StartTime:              "2022-01-02T12:06:40Z",
+				Type:                   "upgrade",
 			}},
 		},
 	}}
