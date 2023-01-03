@@ -334,19 +334,18 @@ func (m *simpleMonitorT) fetch(ctx context.Context, checkpoint, maxCheckpoint sq
 	return hits, nil
 }
 
-func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[string]interface{}, seqNos []int64) ([]es.HitT, error) {
+func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[string]interface{}, seqNos sqn.SeqNo) ([]es.HitT, error) {
 	query, err := tmpl.Render(params)
 	if err != nil {
 		return nil, err
 	}
 
-	req := es.FleetSearchRequest{
-		Index:              []string{m.index},
-		Body:               bytes.NewBuffer(query),
-		WaitForCheckpoints: seqNos,
-	}
-	res, err := req.Do(ctx, m.esCli)
-
+	res, err := m.esCli.FleetSearch(
+		m.index,
+		m.esCli.FleetSearch.WithContext(ctx),
+		m.esCli.FleetSearch.WithBody(bytes.NewBuffer(query)),
+		m.esCli.FleetSearch.WithWaitForCheckpoints(seqNos.String()),
+	)
 	if err != nil {
 		return nil, err
 	}

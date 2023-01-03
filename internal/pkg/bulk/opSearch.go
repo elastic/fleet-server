@@ -138,9 +138,7 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 	)
 
 	if queue.ty == kQueueFleetSearch {
-		// Using custom _fleet/_fleet_msearch, possibly temporary
-		// Replace with regular _msearch if _fleet/_fleet_msearch implementation merges with _msearch
-		req := es.FleetMsearchRequest{
+		req := esapi.FleetMsearchRequest{
 			Body: bytes.NewReader(buf.Bytes()),
 		}
 		res, err = req.Do(ctx, b.es)
