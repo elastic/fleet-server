@@ -280,7 +280,7 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			count = m.notify(ctx, hits)
 			m.log.Debug().Int("count", count).Msg("hits found after notify")
 
-			// If the number of fetched document is the same as the max fetch size, then it's possible there are more documents to fetch.
+			// If the number of fetched documents is the same as the max fetch size, then it's possible there are more documents to fetch.
 			if count == m.fetchSize {
 				// Get the latest checkpoint value for the next fetch iteration.
 				checkpoint = m.loadCheckpoint()
