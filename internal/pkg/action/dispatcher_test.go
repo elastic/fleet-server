@@ -57,7 +57,6 @@ func compareActions(t *testing.T, expects, results []model.Action) {
 		assert.Equal(t, expect.Data, result.Data)
 		assert.Equal(t, expect.Expiration, result.Expiration)
 		assert.Equal(t, expect.InputType, result.InputType)
-		assert.Equal(t, expect.MinimumExecutionDuration, result.MinimumExecutionDuration)
 		assert.Equal(t, expect.RolloutDurationSeconds, result.RolloutDurationSeconds)
 		assert.Equal(t, expect.StartTime, result.StartTime)
 		assert.Equal(t, expect.Timeout, result.Timeout)
@@ -134,7 +133,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 			ch := make(chan []es.HitT)
 			go func() {
 				ch <- []es.HitT{es.HitT{
-					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","minimum_execution_duration":600,"start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
+					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","rollout_duration_seconds":600,"start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
 				}}
 			}()
 			var rch <-chan []es.HitT = ch
@@ -143,13 +142,13 @@ func Test_Dispatcher_Run(t *testing.T) {
 		},
 		expect: map[string][]model.Action{
 			"agent1": []model.Action{model.Action{
-				ActionID:                 "test-action",
-				Agents:                   nil,
-				Data:                     json.RawMessage(`{"key":"value"}`),
-				Expiration:               "2022-01-02T13:00:00Z",
-				MinimumExecutionDuration: 600,
-				StartTime:                "2022-01-02T12:00:00Z",
-				Type:                     "upgrade",
+				ActionID:               "test-action",
+				Agents:                 nil,
+				Data:                   json.RawMessage(`{"key":"value"}`),
+				Expiration:             "2022-01-02T13:00:00Z",
+				RolloutDurationSeconds: 600,
+				StartTime:              "2022-01-02T12:00:00Z",
+				Type:                   "upgrade",
 			}},
 		},
 	}, {
@@ -159,7 +158,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 			ch := make(chan []es.HitT)
 			go func() {
 				ch <- []es.HitT{es.HitT{
-					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1","agent2","agent3"],"data":{"key":"value"},"rollout_duration_seconds":600,"start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
+					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1","agent2","agent3"],"data":{"key":"value"},"expiration":"2022-01-02T13:00:00Z","rollout_duration_seconds":600,"start_time":"2022-01-02T12:00:00Z","type":"upgrade"}`),
 				}}
 			}()
 			var rch <-chan []es.HitT = ch
@@ -171,6 +170,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				ActionID:               "test-action",
 				Agents:                 nil,
 				Data:                   json.RawMessage(`{"key":"value"}`),
+				Expiration:             "2022-01-02T13:00:00Z",
 				RolloutDurationSeconds: 600,
 				StartTime:              "2022-01-02T12:00:00Z",
 				Type:                   "upgrade",
@@ -179,6 +179,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				ActionID:               "test-action",
 				Agents:                 nil,
 				Data:                   json.RawMessage(`{"key":"value"}`),
+				Expiration:             "2022-01-02T13:00:00Z",
 				RolloutDurationSeconds: 600,
 				StartTime:              "2022-01-02T12:03:20Z",
 				Type:                   "upgrade",
@@ -187,6 +188,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				ActionID:               "test-action",
 				Agents:                 nil,
 				Data:                   json.RawMessage(`{"key":"value"}`),
+				Expiration:             "2022-01-02T13:00:00Z",
 				RolloutDurationSeconds: 600,
 				StartTime:              "2022-01-02T12:06:40Z",
 				Type:                   "upgrade",
@@ -257,7 +259,6 @@ func Test_offsetStartTime(t *testing.T) {
 		name   string
 		start  string
 		end    string
-		minDur int64
 		dur    int64
 		i      int
 		total  int
@@ -278,17 +279,18 @@ func Test_offsetStartTime(t *testing.T) {
 		end:    "2022-01-02T13:00:00Z",
 		i:      4,
 		total:  10,
-		result: "2022-01-02T12:24:00Z",
+		result: "2022-01-02T12:00:00Z",
 	}, {
 		name:   "last agent no dur",
 		start:  "2022-01-02T12:00:00Z",
 		end:    "2022-01-02T13:00:00Z",
 		i:      9,
 		total:  10,
-		result: "2022-01-02T12:54:00Z",
+		result: "2022-01-02T12:00:00Z",
 	}, {
 		name:   "first agent 10m dur",
 		start:  "2022-01-02T12:00:00Z",
+		end:    "2022-01-02T13:00:00Z",
 		dur:    600,
 		i:      0,
 		total:  10,
@@ -296,6 +298,7 @@ func Test_offsetStartTime(t *testing.T) {
 	}, {
 		name:   "mid agent 10m dur",
 		start:  "2022-01-02T12:00:00Z",
+		end:    "2022-01-02T13:00:00Z",
 		dur:    600,
 		i:      4,
 		total:  10,
@@ -303,30 +306,15 @@ func Test_offsetStartTime(t *testing.T) {
 	}, {
 		name:   "last agent 10m dur",
 		start:  "2022-01-02T12:00:00Z",
+		end:    "2022-01-02T13:00:00Z",
 		dur:    600,
 		i:      9,
 		total:  10,
 		result: "2022-01-02T12:09:00Z",
-	}, {
-		name:   "mid agent 10m minDur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		minDur: 600,
-		i:      4,
-		total:  10,
-		result: "2022-01-02T12:20:00Z",
-	}, {
-		name:   "last agent 10m minDur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		minDur: 600,
-		i:      9,
-		total:  10,
-		result: "2022-01-02T12:45:00Z",
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := offsetStartTime(tt.start, tt.dur, tt.end, tt.minDur, tt.i, tt.total)
+			r := offsetStartTime(tt.start, tt.dur, tt.i, tt.total)
 			assert.Equal(t, tt.result, r)
 		})
 	}
