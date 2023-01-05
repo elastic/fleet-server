@@ -114,7 +114,7 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 		for i, agentID := range action.Agents {
 			arr := agentActions[agentID]
 			actionNoAgents := action
-			actionNoAgents.StartTime = offsetStartTime(action.StartTime, action.RolloutDurationSeconds, i, numAgents)
+			actionNoAgents.StartTime = offsetStartTime(action.StartTime, action.RolloutDurationSeconds, action.Expiration, action.MinimumExecutionDuration, i, numAgents)
 			actionNoAgents.Agents = nil
 			arr = append(arr, actionNoAgents)
 			agentActions[agentID] = arr
@@ -128,7 +128,8 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 
 // offsetStartTime will return a new start time between start:start+dur based on index i and the total number of agents
 // As we expect i < total  the latest return time will always be < start+dur
-func offsetStartTime(start string, dur int64, i, total int) string {
+// fallback to legacy logic of start time between start:end-minDur
+func offsetStartTime(start string, dur int64, exp string, minDur int64, i, total int) string {
 
 	if start == "" {
 		return ""
@@ -140,6 +141,18 @@ func offsetStartTime(start string, dur int64, i, total int) string {
 	}
 	d := time.Second * time.Duration(dur)
 	startTS = startTS.Add((d * time.Duration(i)) / time.Duration(total)) // adjust start to a position within the range
+
+	// fallback to old logic for BWC
+	if dur == 0 && exp != "" {
+		expTS, errExp := time.Parse(time.RFC3339, exp)
+		if errExp != nil {
+			log.Error().Err(err).Msg("unable to parse expiration string")
+			return ""
+		}
+		d = time.Second * time.Duration(minDur)
+		d = expTS.Add(-1 * d).Sub(startTS)                                   // the valid scheduling range is: d = exp - dur - start
+		startTS = startTS.Add((d * time.Duration(i)) / time.Duration(total)) // adjust start to a position within the range
+	}
 	return startTS.Format(time.RFC3339)
 }
 
