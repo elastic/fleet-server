@@ -109,6 +109,8 @@ func encodePreambleToCBOR(final bool, baseID string, chunkHash string, chunkSize
 	return preamble
 }
 
+const varLenHeaderSize = 5
+
 // io.Reader interface for streaming out
 func (c *ChunkEncoder) Read(buf []byte) (int, error) {
 	if c.wroteTerm { // already wrote a terminating instruction for undefined byte sequence length
@@ -129,7 +131,7 @@ func (c *ChunkEncoder) Read(buf []byte) (int, error) {
 		if len(buf) < 10 {
 			return 0, errors.New("buffer too small")
 		}
-		n, err := c.chunk.Read(buf[5:])
+		n, err := c.chunk.Read(buf[varLenHeaderSize:])
 		buf[0] = 0x5A // 4-byte length descriptor to follow
 		binary.BigEndian.PutUint32(buf[1:], uint32(n))
 
@@ -140,8 +142,8 @@ func (c *ChunkEncoder) Read(buf []byte) (int, error) {
 				return 1, io.EOF
 			}
 			// if we can tack-on the terminating byte from this read call, do it
-			if len(buf) > n+5+1 {
-				buf[n+5] = 0xFF
+			if len(buf) > n+varLenHeaderSize+1 {
+				buf[n+varLenHeaderSize] = 0xFF
 				c.wroteTerm = true
 				n = n + 1
 			} else {
@@ -149,7 +151,7 @@ func (c *ChunkEncoder) Read(buf []byte) (int, error) {
 				err = nil
 			}
 		}
-		return n + 5, err
+		return n + varLenHeaderSize, err
 	}
 
 	return c.chunk.Read(buf)
