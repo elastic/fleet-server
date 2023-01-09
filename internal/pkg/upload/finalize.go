@@ -15,6 +15,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var (
+	ErrFailValidation  = errors.New("file contents failed validation")
+	ErrStatusNoUploads = errors.New("file closed, not accepting uploads")
+)
+
 func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) (Info, error) {
 	// make sure document is freshly fetched, not cached
 	// so accurate status checking happens
@@ -29,7 +34,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 
 	// if already done, failed or deleted, exit
 	if !info.StatusCanUpload() {
-		return info, err
+		return info, ErrStatusNoUploads
 	}
 
 	chunks, err := GetChunkInfos(ctx, u.bulker, info.DocID)
@@ -46,7 +51,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 		if err := DeleteChunksByQuery(ctx, u.bulker, info.Source, info.DocID); err != nil {
 			log.Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error deleting left-behind chunk data")
 		}
-		return info, errors.New("file contents did not pass validation")
+		return info, ErrFailValidation
 	}
 
 	/*
