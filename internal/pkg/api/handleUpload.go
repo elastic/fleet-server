@@ -230,11 +230,12 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 		return errors.New("unable to parse request body")
 	}
 
-	if strings.TrimSpace(req.TransitHash.SHA256) == "" {
+	hash := strings.TrimSpace(req.TransitHash.SHA256)
+	if hash == "" {
 		return errors.New("transit hash required")
 	}
 
-	info, err = ut.uploader.Complete(r.Context(), uplID, req.TransitHash.SHA256)
+	info, err = ut.uploader.Complete(r.Context(), uplID, hash)
 	if err != nil {
 		return err
 	}
