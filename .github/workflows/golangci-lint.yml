@@ -15,11 +15,6 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - name: Echo details
-        env:
-          GOOS: ${{ matrix.GOOS }}
-        run: echo Go GOOS=$GOOS
-
       - uses: actions/checkout@v3
 
       - uses: actions/setup-go@v3
