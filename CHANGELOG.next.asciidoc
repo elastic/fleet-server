@@ -35,3 +35,4 @@
 - Storing checkin message in last_checkin_message {pull}1932[1932]
 - Allow upgrade actions to signal that they will be retried. {pull}1887[1887]
 - Replaced upgrade expiration and minimum_execution_duration with rollout_duration_seconds. {pull}2243[2243]
+- Document how to run fleet server locally. {issue}1423[1423] {pull}2212[2212]

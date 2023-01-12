@@ -112,7 +112,7 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
-			srv, err := server.NewFleet(bi, state.NewLog())
+			srv, err := server.NewFleet(bi, state.NewLog(), true)
 			if err != nil {
 				return err
 			}

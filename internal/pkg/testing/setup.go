@@ -52,7 +52,7 @@ func SetupES(ctx context.Context, t *testing.T) *elasticsearch.Client {
 
 	cli, err := es.NewClient(ctx, &defaultCfg, false)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Unable to create elasticsearch client: %v", err)
 	}
 
 	return cli
@@ -88,7 +88,6 @@ func SetupIndexWithBulk(ctx context.Context, t *testing.T, mapping string, opts 
 }
 
 func SetupCleanIndex(ctx context.Context, t *testing.T, index string, opts ...bulk.BulkOpt) (string, bulk.Bulk) {
-
 	bulker := SetupBulk(ctx, t, opts...)
 
 	CleanIndex(ctx, t, bulker, index)
