@@ -61,7 +61,7 @@ func (f *Fleet) standAloneSetup(ctx context.Context, bulker bulk.Bulk, sm policy
 		}
 		_, err = bulker.Create(ctx, dl.FleetAgents, agentID, p, bulk.WithRefresh())
 		if err != nil {
-			return nil, fmt.Errorf("unable to enroll fleet-server: %w", err)
+			return nil, fmt.Errorf("unable to create agent document for fleet-server mock/dev/fake agent: %w", err)
 		}
 		// sanity check
 		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
