@@ -17,7 +17,7 @@ import (
 
 // Run the SelfMonitor synchronously
 func (f *Fleet) standAloneSetup(ctx context.Context, _ bulk.Bulk, sm policy.SelfMonitor, _, _ string) (*model.Agent, error) {
-	return nil, sm.Run(ctx)
+	panic(" fleet-server stand alone mode is only allowed for dev builds")
 }
 
 // nop
