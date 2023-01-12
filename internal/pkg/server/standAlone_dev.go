@@ -34,7 +34,6 @@ func (f *Fleet) standAloneSetup(ctx context.Context, bulker bulk.Bulk, sm policy
 		return nil, fmt.Errorf("unable to run self monitor for stand alone setup: %w", err)
 	}
 	policy := sm.Policy()
-	//log.Debug().Str("policy", string(policy.Data)).Msg("Found policy")
 	// TODO use policy from self monitor
 	// will need to happen as a bootstrapping step if it should occur here - otherwise we may want to fake revision id and coordinator id and update on checkin
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
