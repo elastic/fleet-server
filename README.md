@@ -114,7 +114,8 @@ Any additional agents will need the `ca/ca.crt` file to enroll (or will need to 
 #### fleet-server+agent on a Vagrant VM
 
 The development Vagrant machine assumes the `elastic-agent`, `beats`, and `fleet-server` repos are in the same folder.
-Thus, it mounts `../` to `/vagrant` on the Vagrant machine.
+Thus, it mounts `../` to `/vagrant` on the Vagrant machine. The vagrant machine IP address is `192.168.56.43`.
+Use `https://192.168.56.43:8220` as fleet-server host.
 ```shell
 vagrant up
 vagrant ssh
