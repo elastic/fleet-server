@@ -22,7 +22,5 @@ func (f *Fleet) standAloneSetup(ctx context.Context, _ bulk.Bulk, sm policy.Self
 
 // nop
 func (f *Fleet) standAloneCheckin(_ *model.Agent, _ *api.CheckinT) runFunc {
-	return func(_ context.Context) error {
-		return nil
-	}
+	panic(" fleet-server stand alone mode is only allowed for dev builds")
 }
