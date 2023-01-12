@@ -85,7 +85,7 @@ func (f *Fleet) standAloneCheckin(agent *model.Agent, ct *api.CheckinT) runFunc 
 		for {
 			select {
 			case <-ctx.Done():
-				return ctx.Err()
+				return fmt.Errorf("standAloneCheckin ctx is done: %w", ctx.Err())
 			case ts := <-tick.C:
 				log.Info().Msg("self-checkin start")
 				body := api.CheckinRequest{
