@@ -166,6 +166,8 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (Info, error) {
 		ChunkSize: MaxChunkSize,
 		Source:    source,
 		Total:     size,
+		Status:    StatusAwaiting,
+		Start:     time.Now(),
 	}
 	chunkCount := info.Total / info.ChunkSize
 	if info.Total%info.ChunkSize > 0 {
@@ -180,13 +182,13 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (Info, error) {
 	if err := data.Put(info.ChunkSize, "file", "ChunkSize"); err != nil {
 		return Info{}, err
 	}
-	if err := data.Put(string(StatusAwaiting), "file", "Status"); err != nil {
+	if err := data.Put(info.Status, "file", "Status"); err != nil {
 		return Info{}, err
 	}
 	if err := data.Put(id, "upload_id"); err != nil {
 		return Info{}, err
 	}
-	if err := data.Put(time.Now().UnixMilli(), "upload_start"); err != nil {
+	if err := data.Put(info.Start.UnixMilli(), "upload_start"); err != nil {
 		return Info{}, err
 	}
 
