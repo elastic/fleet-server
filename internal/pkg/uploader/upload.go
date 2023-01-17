@@ -10,10 +10,10 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
@@ -76,10 +76,7 @@ type ChunkInfo struct {
 }
 
 type Uploader struct {
-	metaCache map[string]upload.Info // cache of file metadata doc info
-	mu        sync.RWMutex           // lock for the above
-	// @todo: cache eviction so it's not unbounded growth
-	// @todo: cache refresh so status is accurate
+	cache     cache.Cache   // cache of file metadata doc info
 	sizeLimit int64         // @todo: what if configuration changes? is this recreated with another New()?
 	timeLimit time.Duration // @todo: same as above
 
@@ -87,13 +84,13 @@ type Uploader struct {
 	bulker      bulk.Bulk
 }
 
-func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, sizeLimit int64, timeLimit time.Duration) *Uploader {
+func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, cache cache.Cache, sizeLimit int64, timeLimit time.Duration) *Uploader {
 	return &Uploader{
 		chunkClient: chunkClient,
 		bulker:      bulker,
 		sizeLimit:   sizeLimit,
 		timeLimit:   timeLimit,
-		metaCache:   make(map[string]upload.Info),
+		cache:       cache,
 	}
 }
 
@@ -200,9 +197,8 @@ func (u *Uploader) Chunk(ctx context.Context, uplID string, chunkNum int, chunkH
 	}
 
 	return info, ChunkInfo{
-		Pos: chunkNum,
-		BID: info.DocID,
-		//FirstReceived: false, // @todo
+		Pos:  chunkNum,
+		BID:  info.DocID,
 		Last: chunkNum == info.Count-1,
 		Size: int(info.ChunkSize),
 		SHA2: chunkHash,
@@ -240,9 +236,7 @@ func validateUploadPayload(info JSDict) error {
 // otherwise, fetches from elasticsearch and caches for next use
 func (u *Uploader) GetUploadInfo(ctx context.Context, uploadID string) (upload.Info, error) {
 	// Fetch metadata doc, if not cached
-	u.mu.RLock()
-	info, exist := u.metaCache[uploadID]
-	u.mu.RUnlock() // not deferred since this must be clear before we gain a write lock below
+	info, exist := u.cache.GetUpload(uploadID)
 	if exist {
 		return info, nil
 	}
@@ -252,8 +246,6 @@ func (u *Uploader) GetUploadInfo(ctx context.Context, uploadID string) (upload.I
 	if err != nil {
 		return upload.Info{}, fmt.Errorf("unable to retrieve upload info: %w", err)
 	}
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	u.metaCache[uploadID] = info
+	u.cache.SetUpload(uploadID, info)
 	return info, nil
 }

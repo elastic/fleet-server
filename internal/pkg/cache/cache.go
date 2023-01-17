@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 )
 
 type Cache interface {
@@ -32,6 +33,9 @@ type Cache interface {
 
 	SetArtifact(artifact model.Artifact)
 	GetArtifact(ident, sha2 string) (model.Artifact, bool)
+
+	SetUpload(id string, info upload.Info)
+	GetUpload(id string) (upload.Info, bool)
 }
 
 type APIKey = apikey.APIKey
@@ -269,4 +273,38 @@ func (c *CacheT) SetArtifact(artifact model.Artifact) {
 		Int64("cost", cost).
 		Dur("ttl", ttl).
 		Msg("Artifact cache SET")
+}
+
+func (c *CacheT) SetUpload(id string, info upload.Info) {
+	c.mut.RLock()
+	defer c.mut.RUnlock()
+
+	scopedKey := "upload:" + id
+	ttl := time.Hour / 2 // @todo: add to configurable
+	cost := int64(len(info.ID) + len(info.DocID) + len(info.ActionID) + len(info.AgentID) + len(info.Source) + len(info.Status) + 8*4)
+	ok := c.cache.SetWithTTL(scopedKey, info, cost, ttl)
+	log.Trace().
+		Bool("ok", ok).
+		Str("id", id).
+		Int64("cost", cost).
+		Dur("ttl", ttl).
+		Msg("Upload info cache SET")
+}
+func (c *CacheT) GetUpload(id string) (upload.Info, bool) {
+	c.mut.RLock()
+	defer c.mut.RUnlock()
+
+	scopedKey := "upload:" + id
+	if v, ok := c.cache.Get(scopedKey); ok {
+		log.Trace().Str("id", id).Msg("upload info cache HIT")
+		key, ok := v.(upload.Info)
+		if !ok {
+			log.Error().Str("id", id).Msg("upload info cache cast fail")
+			return upload.Info{}, false
+		}
+		return key, ok
+	}
+
+	log.Trace().Str("id", id).Msg("upload info cache MISS")
+	return upload.Info{}, false
 }
