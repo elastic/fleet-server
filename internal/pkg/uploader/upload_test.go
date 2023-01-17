@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package upload
+package uploader
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	itesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -83,7 +84,7 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 	assert.Equal(t, action, info.ActionID)
 	assert.Equal(t, agent, info.AgentID)
 	assert.Equal(t, src, info.Source)
-	assert.Equal(t, StatusAwaiting, info.Status)
+	assert.Equal(t, upload.StatusAwaiting, info.Status)
 	assert.Greaterf(t, info.ChunkSize, int64(0), "server chosen chunk size should be >0")
 	assert.Equal(t, action+"."+agent, info.DocID)
 	assert.WithinDuration(t, time.Now(), info.Start, time.Minute)

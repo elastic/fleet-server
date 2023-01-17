@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package upload
+package uploader
 
 import (
 	"context"
@@ -10,24 +10,25 @@ import (
 	"fmt"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 )
 
 // retrieves upload metadata info from elasticsearch
-func FetchUploadInfo(ctx context.Context, bulker bulk.Bulk, uploadID string) (Info, error) {
+func FetchUploadInfo(ctx context.Context, bulker bulk.Bulk, uploadID string) (upload.Info, error) {
 	results, err := GetFileDoc(ctx, bulker, uploadID)
 	if err != nil {
-		return Info{}, err
+		return upload.Info{}, err
 	}
 	if len(results) == 0 {
-		return Info{}, ErrInvalidUploadID
+		return upload.Info{}, ErrInvalidUploadID
 	}
 	if len(results) > 1 {
-		return Info{}, fmt.Errorf("unable to locate upload record, got %d records, expected 1", len(results))
+		return upload.Info{}, fmt.Errorf("unable to locate upload record, got %d records, expected 1", len(results))
 	}
 
 	var fi FileMetaDoc
 	if err := json.Unmarshal(results[0].Source, &fi); err != nil {
-		return Info{}, fmt.Errorf("file meta doc parsing error: %w", err)
+		return upload.Info{}, fmt.Errorf("file meta doc parsing error: %w", err)
 	}
 
 	// calculate number of chunks required
@@ -36,7 +37,7 @@ func FetchUploadInfo(ctx context.Context, bulker bulk.Bulk, uploadID string) (In
 		cnt += 1
 	}
 
-	return Info{
+	return upload.Info{
 		ID:        fi.UploadID,
 		Source:    fi.Source,
 		AgentID:   fi.AgentID,
@@ -46,11 +47,11 @@ func FetchUploadInfo(ctx context.Context, bulker bulk.Bulk, uploadID string) (In
 		Total:     fi.File.Size,
 		Count:     int(cnt),
 		Start:     fi.Start,
-		Status:    Status(fi.File.Status),
+		Status:    upload.Status(fi.File.Status),
 	}, nil
 }
 
-func SetStatus(ctx context.Context, bulker bulk.Bulk, info Info, status Status) error {
+func SetStatus(ctx context.Context, bulker bulk.Bulk, info upload.Info, status upload.Status) error {
 	data, err := json.Marshal(map[string]interface{}{
 		"doc": map[string]interface{}{
 			"file": map[string]string{
@@ -64,11 +65,11 @@ func SetStatus(ctx context.Context, bulker bulk.Bulk, info Info, status Status) 
 	return UpdateFileDoc(ctx, bulker, info.Source, info.DocID, data)
 }
 
-func MarkComplete(ctx context.Context, bulker bulk.Bulk, info Info, hash string) error {
+func MarkComplete(ctx context.Context, bulker bulk.Bulk, info upload.Info, hash string) error {
 	data, err := json.Marshal(map[string]interface{}{
 		"doc": map[string]interface{}{
 			"file": map[string]string{
-				"Status": string(StatusDone),
+				"Status": string(upload.StatusDone),
 			},
 			"transithash": map[string]interface{}{
 				"sha256": hash,

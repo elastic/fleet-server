@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package upload
+package uploader
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 	"github.com/rs/zerolog/log"
 )
 
@@ -20,7 +21,7 @@ var (
 	ErrStatusNoUploads = errors.New("file closed, not accepting uploads")
 )
 
-func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) (Info, error) {
+func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) (upload.Info, error) {
 	// make sure document is freshly fetched, not cached
 	// so accurate status checking happens
 	info, err := FetchUploadInfo(ctx, u.bulker, id)
@@ -45,7 +46,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 		return info, ErrMissingChunks
 	}
 	if !u.verifyChunkInfo(info, chunks, transitHash) {
-		if err := SetStatus(ctx, u.bulker, info, StatusFail); err != nil {
+		if err := SetStatus(ctx, u.bulker, info, upload.StatusFail); err != nil {
 			log.Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error setting the upload status to failure")
 		}
 		if err := DeleteChunksByQuery(ctx, u.bulker, info.Source, info.DocID); err != nil {
@@ -65,7 +66,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 	return info, nil
 }
 
-func (u *Uploader) allChunksPresent(info Info, chunks []ChunkInfo) bool {
+func (u *Uploader) allChunksPresent(info upload.Info, chunks []ChunkInfo) bool {
 	// check overall count
 	if len(chunks) != info.Count {
 		log.Warn().Int("expectedCount", info.Count).Int("received", len(chunks)).Interface("chunks", chunks).Msg("mismatch number of chunks")
@@ -87,7 +88,7 @@ func (u *Uploader) allChunksPresent(info Info, chunks []ChunkInfo) bool {
 	return true
 }
 
-func (u *Uploader) verifyChunkInfo(info Info, chunks []ChunkInfo, transitHash string) bool {
+func (u *Uploader) verifyChunkInfo(info upload.Info, chunks []ChunkInfo, transitHash string) bool {
 	// verify all chunks except last are info.ChunkSize size
 	// verify last: false (or field excluded) for all except final chunk
 	// verify final chunk is last: true

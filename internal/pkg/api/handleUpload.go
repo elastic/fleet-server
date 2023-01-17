@@ -21,8 +21,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/elastic/fleet-server/v7/internal/pkg/upload"
-	"github.com/elastic/fleet-server/v7/internal/pkg/upload/cbor"
+	"github.com/elastic/fleet-server/v7/internal/pkg/uploader"
+	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/cbor"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog"
@@ -106,7 +106,7 @@ type UploadT struct {
 	bulker      bulk.Bulk
 	chunkClient *elasticsearch.Client
 	cache       cache.Cache
-	uploader    *upload.Uploader
+	uploader    *uploader.Uploader
 }
 
 func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *UploadT {
@@ -119,13 +119,13 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 		chunkClient: chunkClient,
 		bulker:      bulker,
 		cache:       cache,
-		uploader:    upload.New(chunkClient, bulker, maxFileSize, maxUploadTimer),
+		uploader:    uploader.New(chunkClient, bulker, maxFileSize, maxUploadTimer),
 	}
 }
 
 func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request) error { //nolint:unparam // log is standard first arg for the handlers
 	// decode early to match agentID in the payload
-	payload, err := upload.ReadDict(r.Body)
+	payload, err := uploader.ReadDict(r.Body)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
 			return fmt.Errorf("file info body is required: %w", err)
@@ -176,14 +176,14 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 	}
 
 	// prevent over-sized chunks
-	data := http.MaxBytesReader(w, r.Body, upload.MaxChunkSize)
+	data := http.MaxBytesReader(w, r.Body, uploader.MaxChunkSize)
 
 	// compute hash as we stream it
 	hash := sha256.New()
 	copier := io.TeeReader(data, hash)
 
 	ce := cbor.NewChunkWriter(copier, chunkInfo.Last, chunkInfo.BID, chunkInfo.SHA2, upinfo.ChunkSize)
-	if err := upload.IndexChunk(r.Context(), ut.chunkClient, ce, upinfo.Source, chunkInfo.BID, chunkInfo.Pos); err != nil {
+	if err := uploader.IndexChunk(r.Context(), ut.chunkClient, ce, upinfo.Source, chunkInfo.BID, chunkInfo.Pos); err != nil {
 		return err
 	}
 
@@ -192,14 +192,14 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 	if !strings.EqualFold(chunkHash, hashsum) {
 		// delete document, since we wrote it, but the hash was invalid
 		// context scoped to allow this operation to finish even if client disconnects
-		if err := upload.DeleteChunk(context.Background(), ut.bulker, upinfo.Source, chunkInfo.BID, chunkInfo.Pos); err != nil {
+		if err := uploader.DeleteChunk(context.Background(), ut.bulker, upinfo.Source, chunkInfo.BID, chunkInfo.Pos); err != nil {
 			zlog.Warn().Err(err).
 				Str("source", upinfo.Source).
 				Str("fileID", chunkInfo.BID).
 				Int("chunkNum", chunkInfo.Pos).
 				Msg("a chunk hash mismatch occurred, and fleet server was unable to remove the invalid chunk")
 		}
-		return upload.ErrHashMismatch
+		return uploader.ErrHashMismatch
 	}
 
 	return nil
