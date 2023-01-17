@@ -66,6 +66,10 @@ func (j JSDict) Int64(keys ...string) (int64, bool) {
 		case json.Number: // json UseNumber() to get int64 directly
 			n, err := v.Int64()
 			return n, err == nil
+		case int:
+			return int64(v), true
+		case int64:
+			return v, true
 		default:
 			return 0, false
 		}
