@@ -123,7 +123,7 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 	}
 }
 
-func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request) error {
+func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request) error { //nolint:unparam // log is standard first arg for the handlers
 	// decode early to match agentID in the payload
 	payload, err := upload.ReadDict(r.Body)
 	if err != nil {
@@ -205,7 +205,7 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 	return nil
 }
 
-func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
+func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error { //nolint:unparam // log is standard first arg for the handlers
 	info, err := ut.uploader.GetUploadInfo(r.Context(), uplID)
 	if err != nil {
 		return err

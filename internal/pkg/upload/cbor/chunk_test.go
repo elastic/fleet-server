@@ -80,7 +80,7 @@ func TestChunkWriterLargeLastChunk(t *testing.T) {
 
 	contents := make([]byte, 4096)
 
-	n, err := rand.Read(contents)
+	n, err := rand.Read(contents) //nolint:gosec // weak RNG here is just for testing
 	require.NoError(t, err)
 	require.Equal(t, n, 4096)
 
