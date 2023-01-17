@@ -33,9 +33,6 @@ const (
 	// TODO: move to a config
 	maxFileSize    = 104857600 // 100 MiB
 	maxUploadTimer = 24 * time.Hour
-
-	// temp for easy development
-	AUTH_ENABLED = false // @todo: remove
 )
 
 func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -66,14 +63,12 @@ func (rt Router) handleUploadChunk(w http.ResponseWriter, r *http.Request, ps ht
 		Str(ECSHTTPRequestID, reqID).
 		Logger()
 
-	// simpler authentication check,  for high chunk throughput
-	// since chunk checksums must match transit hash
-	// AND optionally the initial hash, both having stricter auth checks
-	if AUTH_ENABLED {
-		if _, err := authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
-			writeUploadError(err, w, zlog, start, "authentication failure for chunk write")
-			return
-		}
+		// simpler authentication check,  for high chunk throughput
+		// since chunk checksums must match transit hash
+		// AND optionally the initial hash, both having stricter auth checks
+	if _, err := authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
+		writeUploadError(err, w, zlog, start, "authentication failure for chunk write")
+		return
 	}
 
 	chunkNum, err := strconv.Atoi(chunkID)
@@ -143,10 +138,8 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 	if !ok || agentID == "" {
 		return errors.New("required field agent_id is missing")
 	}
-	if AUTH_ENABLED {
-		if _, err := authAgent(r, &agentID, ut.bulker, ut.cache); err != nil {
-			return err
-		}
+	if _, err := authAgent(r, &agentID, ut.bulker, ut.cache); err != nil {
+		return err
 	}
 
 	// validate payload, enrich with additional fields, and write metadata doc to ES
@@ -219,10 +212,8 @@ func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWri
 	}
 	// need to auth that it matches the ID in the initial
 	// doc, but that means we had to doc-lookup early
-	if AUTH_ENABLED {
-		if _, err := authAgent(r, &info.AgentID, ut.bulker, ut.cache); err != nil {
-			return fmt.Errorf("Error authenticating for upload finalization: %w", err)
-		}
+	if _, err := authAgent(r, &info.AgentID, ut.bulker, ut.cache); err != nil {
+		return fmt.Errorf("Error authenticating for upload finalization: %w", err)
 	}
 
 	var req UploadCompleteRequest
