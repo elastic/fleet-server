@@ -290,7 +290,7 @@ func (c *CacheT) SetUpload(id string, info upload.Info) {
 		Dur("ttl", ttl).
 		Msg("Upload info cache SET")
 }
-func (c *CacheT) GetUpload(id string) (upload.Info, bool) {
+func (c *CacheT) GetUpload(id string) (upload.Info, bool) { //nolint:dupl // a little repetition to support strong typing
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
