@@ -63,9 +63,9 @@ func (rt Router) handleUploadChunk(w http.ResponseWriter, r *http.Request, ps ht
 		Str(ECSHTTPRequestID, reqID).
 		Logger()
 
-		// simpler authentication check,  for high chunk throughput
-		// since chunk checksums must match transit hash
-		// AND optionally the initial hash, both having stricter auth checks
+	// simpler authentication check,  for high chunk throughput
+	// since chunk checksums must match transit hash
+	// AND optionally the initial hash, both having stricter auth checks
 	if _, err := authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
 		writeUploadError(err, w, zlog, start, "authentication failure for chunk write")
 		return
