@@ -75,7 +75,6 @@ func prepareChunkWithoutData() *dsl.Tmpl {
 func prepareFindMetaByUploadID() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
-	//root.Param("_source", false) // do not return large data payload
 	root.Query().Term(FieldUploadID, tmpl.Bind(FieldUploadID), nil)
 	tmpl.MustResolve(root)
 	return tmpl
