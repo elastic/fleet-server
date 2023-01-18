@@ -17,8 +17,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/cbor"
+	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
@@ -219,8 +219,8 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, baseID string) ([]Chun
 }
 
 // retrieves a full chunk document, Data included
-func GetChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkNum int) (model.FileChunk, error) {
-	var chunk model.FileChunk
+func GetChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkNum int) (upload.Chunk, error) {
+	var chunk upload.Chunk
 	out, err := bulker.Read(ctx, fmt.Sprintf(FileDataIndexPattern, source), fmt.Sprintf("%s.%d", fileID, chunkNum))
 	if err != nil {
 		return chunk, err

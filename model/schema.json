@@ -616,34 +616,6 @@
         "api_key_id",
         "api_key"
       ]
-    },
-    "filechunk": {
-      "title": "Chunk",
-      "description": "One section of the blob contents of a file",
-      "type": "object",
-      "properties": {
-        "_id": {
-          "description": "The identifier for the file chunk, describing the ID of the file, and the chunk position",
-          "type": "string"
-        },
-        "data": {
-          "description": "Blob contents of the file",
-          "type": "binary"
-        },
-        "bid": {
-          "description": "Base ID of the chunk, matching all chunks together as the base ID of the file",
-          "type": "string",
-          "format": "uuid"
-        },
-        "last": {
-          "description": "Whether this chunk is the final chunk of a file",
-          "type": "boolean"
-        },
-        "sha2": {
-          "description": "the sha256 hash of the chunk contents",
-          "type": "string"
-        }
-      }
     }
   },
   "checkin": {
