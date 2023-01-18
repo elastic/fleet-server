@@ -72,13 +72,12 @@ type ChunkInfo struct {
 	SHA2 string
 	Size int
 	BID  string // base id, matches metadata doc's _id
-	//FirstReceived bool
 }
 
 type Uploader struct {
-	cache     cache.Cache   // cache of file metadata doc info
-	sizeLimit int64         // @todo: what if configuration changes? is this recreated with another New()?
-	timeLimit time.Duration // @todo: same as above
+	cache     cache.Cache // cache of file metadata doc info
+	sizeLimit int64
+	timeLimit time.Duration
 
 	chunkClient *elasticsearch.Client
 	bulker      bulk.Bulk

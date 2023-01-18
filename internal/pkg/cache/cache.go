@@ -280,7 +280,8 @@ func (c *CacheT) SetUpload(id string, info upload.Info) {
 	defer c.mut.RUnlock()
 
 	scopedKey := "upload:" + id
-	ttl := time.Hour / 2 // @todo: add to configurable
+	ttl := 30 * time.Minute // @todo: add to configurable
+	// cache cost for other entries use bytes as the unit. Add up the string lengths and the size of the int64s in the upload.Info struct, as a manual 'sizeof'
 	cost := int64(len(info.ID) + len(info.DocID) + len(info.ActionID) + len(info.AgentID) + len(info.Source) + len(info.Status) + 8*4)
 	ok := c.cache.SetWithTTL(scopedKey, info, cost, ttl)
 	log.Trace().
