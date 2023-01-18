@@ -196,7 +196,7 @@ func (c *CacheT) ValidAPIKey(key APIKey) bool {
 }
 
 // GetEnrollmentAPIKey returns the enrollment API key by ID.
-func (c *CacheT) GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool) {
+func (c *CacheT) GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool) { //nolint:dupl // similar getters to support strong typing
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 

@@ -11,11 +11,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	itesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // convenience function for making a typical file request structure
@@ -76,7 +79,9 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 		mock.Anything,       // bulker options
 	).Return("", nil)
 
-	u := New(nil, fakeBulk, int64(size), time.Hour)
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	require.NoError(t, err)
+	u := New(nil, fakeBulk, c, int64(size), time.Hour)
 	info, err := u.Begin(context.Background(), data)
 	assert.NoError(t, err)
 
@@ -118,8 +123,10 @@ func TestUploadBeginWritesDocumentFromInputs(t *testing.T) {
 		mock.Anything,       // bulker options
 	).Return("", nil)
 
-	u := New(nil, fakeBulk, int64(size), time.Hour)
-	_, err := u.Begin(context.Background(), data)
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	require.NoError(t, err)
+	u := New(nil, fakeBulk, c, int64(size), time.Hour)
+	_, err = u.Begin(context.Background(), data)
 	assert.NoError(t, err)
 
 	payload, ok := fakeBulk.Calls[0].Arguments[3].([]byte)
@@ -154,7 +161,9 @@ func TestUploadBeginCalculatesCorrectChunkCount(t *testing.T) {
 		{7534559605, 1797, "7.5Gb file"},
 	}
 
-	u := New(nil, fakeBulk, MaxChunkSize*3000, time.Hour)
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	require.NoError(t, err)
+	u := New(nil, fakeBulk, c, MaxChunkSize*3000, time.Hour)
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -191,9 +200,12 @@ func TestUploadBeginMaxFileSize(t *testing.T) {
 		mock.Anything, // bulker options
 	).Return("", nil)
 
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	require.NoError(t, err)
+
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			u := New(nil, fakeBulk, tc.UploadSizeLimit, time.Hour)
+			u := New(nil, fakeBulk, c, tc.UploadSizeLimit, time.Hour)
 			data := makeUploadRequestDict(map[string]interface{}{
 				"file.size": tc.FileSize,
 			})
