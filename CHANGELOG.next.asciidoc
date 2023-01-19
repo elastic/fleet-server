@@ -31,3 +31,4 @@
 - Log redacted config when config updates. {issue}1626[1626] {pull}1668[1668]
 - Storing checkin message in last_checkin_message {pull}1932[1932]
 - Allow upgrade actions to signal that they will be retried. {pull}1887[1887]
+- Fleet server now supports file uploads for a limited subset of integrations {pull}1902[1902]
