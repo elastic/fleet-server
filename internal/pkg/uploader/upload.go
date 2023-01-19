@@ -220,9 +220,6 @@ func validateUploadPayload(info JSDict) error {
 		}
 	}
 
-	//@todo: valid action?
-	//@todo: valid src? will that make future expansion harder and require FS updates? maybe just validate the index exists
-
 	if size, ok := info.Int64("file", "size"); !ok {
 		return errors.New("file.size is required")
 	} else if size <= 0 {

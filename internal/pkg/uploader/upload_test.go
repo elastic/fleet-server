@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	itesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 
@@ -219,20 +220,90 @@ func TestUploadBeginMaxFileSize(t *testing.T) {
 	}
 }
 
-/*
 func TestUploadRejectsMissingRequiredFields(t *testing.T) {
-	data := makeUploadRequestDict()
 
-	u := New(nil, nil, 1024, time.Hour)
-	info, err := u.Begin(context.Background(), data)
-	assert.Error(t, err)
+	tests := []string{
+		"file.name",
+		"file.mime_type",
+		"file.size",
+		"action_id",
+		"agent_id",
+		"src",
+	}
+
+	fakeBulk := itesting.NewMockBulk()
+	fakeBulk.On("Create",
+		mock.Anything, // match context.Context
+		mock.Anything, // index
+		mock.Anything, // document ID
+		mock.Anything, // ES document
+		mock.Anything, // bulker options
+	).Return("", nil)
+
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	require.NoError(t, err)
+
+	u := New(nil, fakeBulk, c, 2048, time.Hour)
+
+	var ok bool
+	for _, field := range tests {
+
+		t.Run("required field "+field, func(t *testing.T) {
+			// create input that already has all required fields
+			data := makeUploadRequestDict(nil)
+
+			// now delete this field and expect failure below
+			d := map[string]interface{}(data)
+			parts := strings.Split(field, ".")
+			for i, part := range parts {
+				if i == len(parts)-1 { // leaf of an object tree
+					delete(d, part)
+				} else {
+					d, ok = d[part].(map[string]interface{})
+					assert.Truef(t, ok, "incorrect key path '%s' when testing required fields", field)
+				}
+			}
+
+			_, err = u.Begin(context.Background(), data)
+			assert.Errorf(t, err, "%s is a required field and should error if not provided", field)
+		})
+
+	}
 
 }
 
+func mockUploadInfoResult(bulker *itesting.MockBulk, info upload.Info) {
 
-*/
+	// convert info into how it's stored/returned in ES
+	out, _ := json.Marshal(map[string]interface{}{
+		"action_id": info.ActionID,
+		"agent_id":  info.AgentID,
+		"src":       info.Source,
+		"file": map[string]interface{}{
+			"size":      info.Total,
+			"ChunkSize": info.ChunkSize,
+			"Status":    info.Status,
+		},
+		"upload_id":    info.ID,
+		"upload_start": info.Start.UnixMilli(),
+	})
 
-/*
+	bulker.On("Search",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(&es.ResultT{
+		HitsT: es.HitsT{
+			Hits: []es.HitT{
+				{
+					ID:     info.DocID,
+					Source: out,
+				},
+			},
+		},
+	}, nil).Once()
+}
 
 func TestChunkMarksFinal(t *testing.T) {
 	tests := []struct {
@@ -247,27 +318,47 @@ func TestChunkMarksFinal(t *testing.T) {
 		{7534559605, 1796, "7.5Gb file"},
 	}
 
-	u := New(8388608000, len(tests), 4)
-
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			info, err := u.Begin(tc.FileSize, "", "")
+
+			fakeBulk := itesting.NewMockBulk()
+			fakeBulk.On("Create",
+				mock.Anything, // match context.Context
+				mock.Anything, // index
+				mock.Anything, // document ID
+				mock.Anything, // ES document
+				mock.Anything, // bulker options
+			).Return("", nil)
+
+			// shared caches, mock bulker, and uploader between test runs had race conditions
+			// preventing return of the correct mock data for each call, so we will
+			// recreate them within each test run
+			c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+			require.NoError(t, err)
+
+			u := New(nil, fakeBulk, c, 8388608000, time.Hour)
+
+			data := makeUploadRequestDict(map[string]interface{}{
+				"file.size": tc.FileSize,
+			})
+
+			info, err := u.Begin(context.Background(), data)
 			assert.NoError(t, err)
 
+			// for anything larger than 1-chunk, check for off-by-ones
 			if tc.FinalChunk > 0 {
-				prev, err := u.Chunk(info.ID, tc.FinalChunk-1)
+				mockUploadInfoResult(fakeBulk, info)
+				_, prev, err := u.Chunk(context.Background(), info.ID, tc.FinalChunk-1, "")
 				assert.NoError(t, err)
-				assert.Falsef(t, prev.Final, "previous chunk ID before last should not be marked final")
-				prev.Token.Release()
+				assert.Falsef(t, prev.Last, "penultimate chunk number (%d) should not be marked final", tc.FinalChunk-1)
 			}
 
-			chunk, err := u.Chunk(info.ID, tc.FinalChunk)
+			mockUploadInfoResult(fakeBulk, info)
+
+			// make sure the final chunk is marked as such
+			_, chunk, err := u.Chunk(context.Background(), info.ID, tc.FinalChunk, "")
 			assert.NoError(t, err)
-			assert.True(t, chunk.Final)
-			chunk.Token.Release()
+			assert.Truef(t, chunk.Last, "chunk number %d should be marked as Last", tc.FinalChunk)
 		})
 	}
 }
-
-
-*/
