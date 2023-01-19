@@ -279,7 +279,7 @@ func (a *Agent) start(ctx context.Context) error {
 
 	srvDone := make(chan bool)
 	srvCtx, srvCanceller := context.WithCancel(ctx)
-	srv, err := NewFleet(a.bi, state.NewChained(state.NewLog(), a))
+	srv, err := NewFleet(a.bi, state.NewChained(state.NewLog(), a), false)
 	if err != nil {
 		close(srvDone)
 		srvCanceller()

@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
@@ -33,9 +31,6 @@ const (
 	defaultLeaderInterval          = 30 * time.Second // become leader for at least 30 seconds
 	defaultMetadataInterval        = 5 * time.Minute  // update metadata every 5 minutes
 	defaultCoordinatorRestartDelay = 5 * time.Second  // delay in restarting coordinator on failure
-	defaultUnenrollCheckInterval   = 1 * time.Minute  // perform unenroll timeout interval check
-
-	unenrolledReasonTimeout = "timeout" // reason agent was unenrolled
 )
 
 // Monitor monitors the leader election of policies and routes managed policies to the coordinator.
@@ -45,10 +40,9 @@ type Monitor interface {
 }
 
 type policyT struct {
-	id              string
-	cord            Coordinator
-	cordCanceller   context.CancelFunc
-	unenrollTimeout time.Duration
+	id            string
+	cord          Coordinator
+	cordCanceller context.CancelFunc
 }
 
 type monitorT struct {
@@ -63,11 +57,10 @@ type monitorT struct {
 	agentMetadata model.AgentMetadata
 	hostMetadata  model.HostMetadata
 
-	checkInterval         time.Duration
-	leaderInterval        time.Duration
-	metadataInterval      time.Duration
-	coordRestartDelay     time.Duration
-	unenrollCheckInterval time.Duration
+	checkInterval     time.Duration
+	leaderInterval    time.Duration
+	metadataInterval  time.Duration
+	coordRestartDelay time.Duration
 
 	serversIndex  string
 	policiesIndex string
@@ -83,23 +76,22 @@ type monitorT struct {
 // NewMonitor creates a new coordinator policy monitor.
 func NewMonitor(fleet config.Fleet, version string, bulker bulk.Bulk, monitor monitor.Monitor, factory Factory) Monitor {
 	return &monitorT{
-		log:                   log.With().Str("ctx", "policy leader manager").Logger(),
-		version:               version,
-		fleet:                 fleet,
-		bulker:                bulker,
-		monitor:               monitor,
-		factory:               factory,
-		checkInterval:         defaultCheckInterval,
-		leaderInterval:        defaultLeaderInterval,
-		metadataInterval:      defaultMetadataInterval,
-		coordRestartDelay:     defaultCoordinatorRestartDelay,
-		unenrollCheckInterval: defaultUnenrollCheckInterval,
-		serversIndex:          dl.FleetServers,
-		policiesIndex:         dl.FleetPolicies,
-		leadersIndex:          dl.FleetPoliciesLeader,
-		agentsIndex:           dl.FleetAgents,
-		policies:              make(map[string]policyT),
-		policiesCanceller:     make(map[string]context.CancelFunc),
+		log:               log.With().Str("ctx", "policy leader manager").Logger(),
+		version:           version,
+		fleet:             fleet,
+		bulker:            bulker,
+		monitor:           monitor,
+		factory:           factory,
+		checkInterval:     defaultCheckInterval,
+		leaderInterval:    defaultLeaderInterval,
+		metadataInterval:  defaultMetadataInterval,
+		coordRestartDelay: defaultCoordinatorRestartDelay,
+		serversIndex:      dl.FleetServers,
+		policiesIndex:     dl.FleetPolicies,
+		leadersIndex:      dl.FleetPoliciesLeader,
+		agentsIndex:       dl.FleetAgents,
+		policies:          make(map[string]policyT),
+		policiesCanceller: make(map[string]context.CancelFunc),
 	}
 }
 
@@ -193,7 +185,6 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 					return err
 				}
 			}
-			m.rescheduleUnenroller(ctx, &p, &policy)
 		} else {
 			new = true
 		}
@@ -305,7 +296,6 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 					l.Err(err).Msg("failed to update coordinator")
 				}
 			}
-			m.rescheduleUnenroller(ctx, &pt, &p)
 		}(p, pt)
 	}
 	for range lead {
@@ -400,39 +390,6 @@ func (m *monitorT) getIPs() ([]string, error) {
 	return ips, nil
 }
 
-func (m *monitorT) rescheduleUnenroller(ctx context.Context, pt *policyT, p *model.Policy) {
-	m.muPoliciesCanceller.Lock()
-	defer m.muPoliciesCanceller.Unlock()
-
-	u := uuid.Must(uuid.NewV4())
-	l := m.log.With().Str(dl.FieldPolicyID, pt.id).Str("unenroller_uuid", u.String()).Logger()
-	unenrollTimeout := time.Duration(p.UnenrollTimeout) * time.Second
-	if unenrollTimeout != pt.unenrollTimeout {
-		// unenroll timeout changed
-		if c, ok := m.policiesCanceller[pt.id]; ok {
-			l.Debug().Dur("unenroll_timeout", unenrollTimeout).Msg("cancelling unenrollment monitor")
-			c()
-			delete(m.policiesCanceller, pt.id)
-		}
-
-		if unenrollTimeout > 0 {
-			// start worker for unenrolling agents based timeout
-			unenrollCtx, canceller := context.WithCancel(ctx)
-			m.policiesCanceller[pt.id] = canceller
-			go runUnenroller(unenrollCtx, m.bulker, pt.id, unenrollTimeout, l, m.unenrollCheckInterval, m.agentsIndex)
-		}
-		l.Debug().Dur("unenroll_timeout", unenrollTimeout).Msg("setting unenrollment timeout")
-		pt.unenrollTimeout = unenrollTimeout
-	}
-}
-
-func (m *monitorT) ActivePoliciesCancellerCount() int {
-	m.muPoliciesCanceller.Lock()
-	defer m.muPoliciesCanceller.Unlock()
-
-	return len(m.policiesCanceller)
-}
-
 func runCoordinator(ctx context.Context, cord Coordinator, l zerolog.Logger, d time.Duration) {
 	cnt := 0
 	for {
@@ -465,121 +422,4 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 			return
 		}
 	}
-}
-
-func runUnenroller(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, l zerolog.Logger, checkInterval time.Duration, agentsIndex string) {
-	// When fleet-server is offline for a long period and finally recovers, it means that the connected
-	// agent will be offline for a long period of time since their last checkin and fleet server will
-	// start unenrolling every Elastic Agent from the system. Instead on boot the Elastic Agent
-	// should wait at least the unenrollTimeout period before actively unenrolling agents in the system.
-	// This gives a grace period to the Elastic Agent to connect back to the system.
-	l.Info().
-		Dur("checkInterval", checkInterval).
-		Dur("unenrollTimeout", unenrollTimeout).
-		Msg("giving a grace period to Elastic Agent before enforcing unenrollTimeout monitor")
-
-	if err := waitWithContext(ctx, unenrollTimeout); err != nil {
-		l.Err(err).Dur("unenroll_timeout", unenrollTimeout).
-			Msg("failed to delay the unenroller monitor startup")
-	}
-
-	l.Info().
-		Dur("checkInterval", checkInterval).
-		Dur("unenrollTimeout", unenrollTimeout).
-		Msg("unenroll monitor start")
-	defer l.Info().Msg("Unenroll monitor exit")
-
-	t := time.NewTimer(checkInterval)
-	defer t.Stop()
-
-	for {
-		select {
-		case <-t.C:
-			l.Debug().Msg("running unenroller")
-			if err := runUnenrollerWork(ctx, bulker, policyID, unenrollTimeout, l, agentsIndex); err != nil {
-				l.Err(err).Dur("unenroll_timeout", unenrollTimeout).Msg("failed to unenroll offline agents")
-			}
-			t.Reset(checkInterval)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func runUnenrollerWork(ctx context.Context, bulker bulk.Bulk, policyID string, unenrollTimeout time.Duration, zlog zerolog.Logger, agentsIndex string) error {
-	agents, err := dl.FindOfflineAgents(ctx, bulker, policyID, unenrollTimeout, dl.WithIndexName(agentsIndex))
-	if err != nil {
-		if errors.Is(err, dl.ErrNotFound) {
-			zlog.Info().Msg("no agents to unenroll")
-			return nil
-		}
-		return err
-	}
-
-	zlog = zlog.With().Dur("timeout", unenrollTimeout).Logger()
-
-	agentIds := make([]string, len(agents))
-
-	for i := range agents {
-		agent := agents[i]
-		err = unenrollAgent(ctx, zlog, bulker, &agent, agentsIndex)
-		if err != nil {
-			return err
-		}
-		agentIds[i] = agent.Id
-	}
-
-	zlog.Info().
-		Strs(logger.APIKeyID, agentIds).
-		Msg("marked agents unenrolled due to unenroll timeout")
-
-	return nil
-}
-
-func unenrollAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, agentsIndex string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	fields := bulk.UpdateFields{
-		dl.FieldActive:           false,
-		dl.FieldUnenrolledAt:     now,
-		dl.FieldUnenrolledReason: unenrolledReasonTimeout,
-		dl.FieldUpdatedAt:        now,
-	}
-
-	body, err := fields.Marshal()
-	if err != nil {
-		return err
-	}
-
-	apiKeys := agent.APIKeyIDs()
-
-	zlog = zlog.With().
-		Str(logger.AgentID, agent.Id).
-		Strs(logger.APIKeyID, apiKeys).
-		Logger()
-
-	zlog.Info().Msg("unenrollAgent due to unenroll timeout")
-
-	if len(apiKeys) > 0 {
-		err = bulker.APIKeyInvalidate(ctx, apiKeys...)
-		if err != nil {
-			zlog.Error().Err(err).Msg("Fail apiKey invalidate")
-			return err
-		}
-	}
-	if err = bulker.Update(ctx, agentsIndex, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-		zlog.Error().Err(err).Msg("Fail unenrollAgent record update")
-	}
-
-	return err
-}
-
-func waitWithContext(ctx context.Context, to time.Duration) error {
-	t := time.NewTimer(to)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-	}
-	return nil
 }

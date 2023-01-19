@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -178,7 +179,7 @@ func TestBulkSimple(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			_ = testlog.SetLogger(t)
+			log.Logger = testlog.SetLogger(t)
 			mockBulk := ftesting.NewMockBulk()
 			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
 			bc := NewBulk(mockBulk)
@@ -205,7 +206,7 @@ func validateTimestamp(tb testing.TB, start time.Time, ts string) {
 }
 
 func benchmarkBulk(n int, flush bool, b *testing.B) {
-	_ = testlog.SetLogger(b)
+	log.Logger = testlog.SetLogger(b)
 	b.ReportAllocs()
 
 	mockBulk := ftesting.NewMockBulk()

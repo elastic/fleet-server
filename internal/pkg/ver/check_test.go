@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/rs/zerolog/log"
 )
 
 func TestCheckCompatibilityInternal(t *testing.T) {
@@ -87,7 +88,7 @@ func TestCheckCompatibilityInternal(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_ = testlog.SetLogger(t)
+			log.Logger = testlog.SetLogger(t)
 			err := checkCompatibility(tc.fleetVersion, tc.esVersion)
 			if tc.err != nil {
 				if err == nil {

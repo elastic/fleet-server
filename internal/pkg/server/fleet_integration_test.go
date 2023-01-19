@@ -67,7 +67,7 @@ func (s *tserver) waitExit() error {
 func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 	t.Helper()
 
-	cfg, err := config.LoadFile("../../../fleet-server.yml")
+	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
 	if err != nil {
 		return nil, fmt.Errorf("config load error: %w", err)
 	}
@@ -110,7 +110,7 @@ func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
 
-	srv, err := NewFleet(build.Info{Version: serverVersion}, state.NewLog())
+	srv, err := NewFleet(build.Info{Version: serverVersion}, state.NewLog(), false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create server: %w", err)
 	}

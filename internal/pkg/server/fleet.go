@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"go.elastic.co/apm"
@@ -47,8 +48,9 @@ const kUAFleetServer = "Fleet-Server"
 
 // Fleet is an instance of the fleet-server.
 type Fleet struct {
-	bi     build.Info
-	verCon version.Constraints
+	standAlone bool
+	bi         build.Info
+	verCon     version.Constraints
 
 	cfgCh    chan *config.Config
 	cache    cache.Cache
@@ -56,17 +58,18 @@ type Fleet struct {
 }
 
 // NewFleet creates the actual fleet server service.
-func NewFleet(bi build.Info, reporter state.Reporter) (*Fleet, error) {
+func NewFleet(bi build.Info, reporter state.Reporter, standAlone bool) (*Fleet, error) {
 	verCon, err := api.BuildVersionConstraint(bi.Version)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Fleet{
-		bi:       bi,
-		verCon:   verCon,
-		cfgCh:    make(chan *config.Config, 1),
-		reporter: reporter,
+		standAlone: standAlone,
+		bi:         bi,
+		verCon:     verCon,
+		cfgCh:      make(chan *config.Config, 1),
+		reporter:   reporter,
 	}, nil
 }
 
@@ -456,7 +459,15 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 
 	// Policy self monitor
 	sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
-	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
+	var agent *model.Agent
+	if f.standAlone {
+		agent, err = f.standAloneSetup(ctx, bulker, sm, cfg.Inputs[0].Policy.ID, cfg.Fleet.Agent.ID)
+		if err != nil {
+			return err
+		}
+	} else {
+		g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
+	}
 
 	// Actions monitoring
 	var am monitor.SimpleMonitor
@@ -487,6 +498,10 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
+	}
+
+	if f.standAlone {
+		g.Go(loggedRunFunc(ctx, "self-checkin", f.standAloneCheckin(agent, ct)))
 	}
 
 	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
