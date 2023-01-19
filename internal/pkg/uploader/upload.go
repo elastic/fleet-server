@@ -228,7 +228,7 @@ func validateUploadPayload(info JSDict) error {
 	return nil
 }
 
-// Searches for Upload Metadata document in local memory cache if available
+// GetUploadInfo searches for Upload Metadata document in local memory cache if available
 // otherwise, fetches from elasticsearch and caches for next use
 func (u *Uploader) GetUploadInfo(ctx context.Context, uploadID string) (upload.Info, error) {
 	// Fetch metadata doc, if not cached

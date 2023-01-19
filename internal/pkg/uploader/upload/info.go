@@ -10,7 +10,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
-// the only valid values of upload status according to storage spec
+// Status represents the only valid values of upload status according to storage spec
 type Status string
 
 const (
