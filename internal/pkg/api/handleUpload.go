@@ -17,10 +17,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/cbor"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -66,14 +68,14 @@ func (rt Router) handleUploadChunk(w http.ResponseWriter, r *http.Request, ps ht
 	// simpler authentication check,  for high chunk throughput
 	// since chunk checksums must match transit hash
 	// AND optionally the initial hash, both having stricter auth checks
-	if _, err := authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
+	if _, err := rt.ut.authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
 		writeUploadError(err, w, zlog, start, "authentication failure for chunk write")
 		return
 	}
 
 	chunkNum, err := strconv.Atoi(chunkID)
 	if err != nil {
-		writeUploadError(err, w, zlog, start, "error parsing chunk index")
+		writeUploadError(uploader.ErrInvalidChunkNum, w, zlog, start, "error parsing chunk index")
 		return
 	}
 	if err := rt.ut.handleUploadChunk(&zlog, w, r, id, chunkNum); err != nil {
@@ -107,6 +109,8 @@ type UploadT struct {
 	chunkClient *elasticsearch.Client
 	cache       cache.Cache
 	uploader    *uploader.Uploader
+	authAgent   func(*http.Request, *string, bulk.Bulk, cache.Cache) (*model.Agent, error) // injectable for testing purposes
+	authAPIKey  func(*http.Request, bulk.Bulk, cache.Cache) (*apikey.APIKey, error)        // as above
 }
 
 func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *UploadT {
@@ -120,10 +124,12 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 		bulker:      bulker,
 		cache:       cache,
 		uploader:    uploader.New(chunkClient, bulker, cache, maxFileSize, maxUploadTimer),
+		authAgent:   authAgent,
+		authAPIKey:  authAPIKey,
 	}
 }
 
-func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request) error { //nolint:unparam // log is standard first arg for the handlers
+func (ut *UploadT) handleUploadStart(_ *zerolog.Logger, w http.ResponseWriter, r *http.Request) error {
 	// decode early to match agentID in the payload
 	payload, err := uploader.ReadDict(r.Body)
 	if err != nil {
@@ -138,7 +144,8 @@ func (ut *UploadT) handleUploadStart(zlog *zerolog.Logger, w http.ResponseWriter
 	if !ok || agentID == "" {
 		return errors.New("required field agent_id is missing")
 	}
-	if _, err := authAgent(r, &agentID, ut.bulker, ut.cache); err != nil {
+	_, err = ut.authAgent(r, &agentID, ut.bulker, ut.cache)
+	if err != nil {
 		return err
 	}
 
@@ -205,14 +212,14 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 	return nil
 }
 
-func (ut *UploadT) handleUploadComplete(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error { //nolint:unparam // log is standard first arg for the handlers
+func (ut *UploadT) handleUploadComplete(_ *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
 	info, err := ut.uploader.GetUploadInfo(r.Context(), uplID)
 	if err != nil {
 		return err
 	}
 	// need to auth that it matches the ID in the initial
 	// doc, but that means we had to doc-lookup early
-	if _, err := authAgent(r, &info.AgentID, ut.bulker, ut.cache); err != nil {
+	if _, err := ut.authAgent(r, &info.AgentID, ut.bulker, ut.cache); err != nil {
 		return fmt.Errorf("Error authenticating for upload finalization: %w", err)
 	}
 
