@@ -622,7 +622,6 @@
       ]
     }
   },
-
   "checkin": {
     "title": "Checkin",
     "description": "An Elastic Agent checkin to Fleet",

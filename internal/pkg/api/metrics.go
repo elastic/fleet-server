@@ -33,6 +33,7 @@ var (
 	cntEnroll    routeStats
 	cntAcks      routeStats
 	cntStatus    routeStats
+	cntUpload    routeStats
 	cntArtifacts artifactStats
 )
 
@@ -104,6 +105,7 @@ func init() {
 	cntArtifacts.Register(routesRegistry.NewRegistry("artifacts"))
 	cntAcks.Register(routesRegistry.NewRegistry("acks"))
 	cntStatus.Register(routesRegistry.NewRegistry("status"))
+	cntUpload.Register(routesRegistry.NewRegistry("upload"))
 }
 
 func (rt *routeStats) IncError(err error) {
