@@ -1,6 +1,7 @@
 ==== Breaking Changes
 
 - Upgrade to Go 1.18. Certificates signed with SHA-1 are now rejected. See the Go 1.18 https://tip.golang.org/doc/go1.18#sha1[release notes] for details. {pull}1709[1709]
+- Remove automatic agent unenrollment. {pull}2096[2096]
 
 ==== Bugfixes
 
@@ -17,6 +18,10 @@
 - Fix fleet.migration.total log key overlap {pull}1951[1951]
 - Remove POLICY_CHANGE actions from list retrieved from actions index before sending actions to agent on Checkin. {issue}1773[1773] {pull}1963[1963]
 - Add "active: true" filter to enrollemnent key queries. {issue}2029[2029] {pull}2044[2044]
+- Fixed unenroll offline agents logic {issue}2091[2091] {pull}2092[2092]
+- Ignore UPDATE_TAGS and FORCE_UNENROLL actions on agent checkin {issue}2199[2199] {pull}2200[2200]
+- Fix the index monitor checkpoint tracking for when the documents are deleted {issue}2205[2205] {pull}2206[2206]
+
 
 ==== New Features
 
@@ -29,4 +34,7 @@
 - Log redacted config when config updates. {issue}1626[1626] {pull}1668[1668]
 - Storing checkin message in last_checkin_message {pull}1932[1932]
 - Allow upgrade actions to signal that they will be retried. {pull}1887[1887]
+- Replaced upgrade expiration and minimum_execution_duration with rollout_duration_seconds. {pull}2243[2243]
+- Document how to run fleet server locally. {issue}1423[1423] {pull}2212[2212]
+- Fleet server now supports file uploads for a limited subset of integrations {pull}1902[1902]
 - Updated server limits. {issue}1857[1857] {pull}2043[2043]

@@ -39,6 +39,10 @@
           "description": "The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.",
           "type": "integer"
         },
+        "rollout_duration_seconds": {
+          "description": "The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.",
+          "type": "integer"
+        },
         "type": {
           "description": "The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",
           "type": "string"
@@ -520,6 +524,15 @@
           "description": "Last checkin message",
           "type": "string"
         },
+        "last_checkin_message": {
+          "description": "Last checkin message",
+          "type": "string"
+        },
+        "components": {
+          "description": "Elastic Agent components detailed status information",
+          "type": "object",
+          "format": "raw"
+        },
         "default_api_key_id": {
           "description": "Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
           "type": "string"
@@ -609,7 +622,6 @@
       ]
     }
   },
-
   "checkin": {
     "title": "Checkin",
     "description": "An Elastic Agent checkin to Fleet",

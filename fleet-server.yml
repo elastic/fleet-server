@@ -1,62 +1,31 @@
+# This config is intended to be used with a stand-alone fleet-server instance for development.
 output:
   elasticsearch:
-    hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
+    hosts: '${ELASTICSEARCH_HOSTS:https://localhost:9200}'
     service_token: '${ELASTICSEARCH_SERVICE_TOKEN}'
+    ssl.ca_trusted_fingerprint: '${ELASTICSEARCH_CA_TRUSTED_FINGERPRINT}'
 
 fleet:
   agent:
-    id: 1e4954ce-af37-4731-9f4a-407b08e69e42
-    logging:
-      level: '${LOG_LEVEL:DEBUG}'
+    id: '${FLEET_SERVER_AGENT_ID:dev-fleet-server}'
 
-# Input config provided by the Elastic Agent for the server
-#inputs:
-#  - type: fleet-server
+inputs:
+  - type: fleet-server
+    policy.id: '${FLEET_SERVER_POLICY_ID:fleet-server-policy}'
 #    server:
-#      host: localhost
-#      port: 8220
-#      timeouts:
-#        checkin_long_poll: 300s # long poll timeout
-#      instrumentation:
-#        enabled: false
-#        hosts: ["localhost:8200"]
-#      profiler:
-#        enabled: true # enable profiler
-#      limits:
-#        policy_throttle: 100ms
-#        max_connetions: 150
-#          checkin_limit:
-#            interval: 100ms
-#            burst: 25
-#            max: 100
-#          artifact_limit:
-#            interval: 10ms
-#            burst: 5
-#            max: 10
-#          ack_limit:
-#            interval: 10ms
-#            burst: 20
-#            max: 10
-#          enroll_limit:
-#            interval: 50ms
-#            burst: 10
-#            max: 8
-#        ssl:
-#          enabled: true
-#          certificate: /creds/cert.pem
-#          key: /creds/key.pem
-#    cache:
-#      num_counters: 500000  # 10x times expected count
-#      max_cost: 50 * 1024 * 1024  # 50MiB cache size
+#      ssl:
+#        enabled: true
+#        certificate: /creds/cert.pem
+#        key: /creds/key.pem
+#        key_passphrase: /creds/key.pem
 
 logging:
   to_stderr: true # Force the logging output to stderr
-  #level: trace
+  pretty: true
+  level: '${LOG_LEVEL:DEBUG}'
 
 # Enables the stats endpoint under http://localhost:5601 by default.
 # Additional stats can be found under http://127.0.0.1:5066/stats and http://127.0.0.1:5066/state
 http.enabled: true
 #http.host: http://127.0.0.1
 #http.port: 5601
-#http.named_pipe.user:
-#http.named_pipe.security_descriptor:

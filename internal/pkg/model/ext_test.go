@@ -122,6 +122,31 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 				"access_api_key_id", "p1_api_key_id", "p2_api_key_id",
 				"p1_to_retire_key", "p2_to_retire_key"},
 		},
+		{
+			name: "API key empty",
+			agent: Agent{
+				AccessAPIKeyID: "access_api_key_id",
+				Outputs: map[string]*PolicyOutput{
+					"p1": {APIKeyID: ""},
+				},
+			},
+			want: []string{"access_api_key_id"},
+		},
+		{
+			name: "retired API key empty",
+			agent: Agent{
+				AccessAPIKeyID: "access_api_key_id",
+				Outputs: map[string]*PolicyOutput{
+					"p1": {
+						APIKeyID: "p1_api_key_id",
+						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
+							ID: "",
+						}}},
+				},
+			},
+			want: []string{
+				"access_api_key_id", "p1_api_key_id"},
+		},
 	}
 
 	for _, tc := range tcs {

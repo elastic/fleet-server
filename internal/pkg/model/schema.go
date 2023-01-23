@@ -51,6 +51,9 @@ type Action struct {
 	// The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.
 	MinimumExecutionDuration int64 `json:"minimum_execution_duration,omitempty"`
 
+	// The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.
+	RolloutDurationSeconds int64 `json:"rollout_duration_seconds,omitempty"`
+
 	// The action start date/time
 	StartTime string `json:"start_time,omitempty"`
 
@@ -123,6 +126,9 @@ type Agent struct {
 	// Active flag
 	Active bool           `json:"active"`
 	Agent  *AgentMetadata `json:"agent,omitempty"`
+
+	// Elastic Agent components detailed status information
+	Components json.RawMessage `json:"components,omitempty"`
 
 	// Deprecated. Use Outputs instead. API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKey string `json:"default_api_key,omitempty"`
@@ -250,6 +256,10 @@ type Artifact struct {
 
 // Body Encoded artifact data
 type Body struct {
+}
+
+// Components Elastic Agent components detailed status information
+type Components struct {
 }
 
 // Data The opaque payload.

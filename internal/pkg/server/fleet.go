@@ -14,7 +14,10 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/state"
+
 	"go.elastic.co/apm"
 	apmtransport "go.elastic.co/apm/transport"
 
@@ -33,7 +36,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/profile"
 	"github.com/elastic/fleet-server/v7/internal/pkg/scheduler"
-	"github.com/elastic/fleet-server/v7/internal/pkg/status"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
 	"github.com/hashicorp/go-version"
@@ -46,50 +48,51 @@ const kUAFleetServer = "Fleet-Server"
 
 // Fleet is an instance of the fleet-server.
 type Fleet struct {
-	bi     build.Info
-	verCon version.Constraints
+	standAlone bool
+	bi         build.Info
+	verCon     version.Constraints
 
-	cfg      *config.Config
 	cfgCh    chan *config.Config
 	cache    cache.Cache
-	reporter status.Reporter
+	reporter state.Reporter
 }
 
 // NewFleet creates the actual fleet server service.
-func NewFleet(cfg *config.Config, bi build.Info, reporter status.Reporter) (*Fleet, error) {
+func NewFleet(bi build.Info, reporter state.Reporter, standAlone bool) (*Fleet, error) {
 	verCon, err := api.BuildVersionConstraint(bi.Version)
 	if err != nil {
 		return nil, err
 	}
 
-	err = cfg.LoadServerLimits()
-	if err != nil {
-		return nil, fmt.Errorf("encountered error while loading server limits: %w", err)
-	}
-
-	cacheCfg := config.CopyCache(cfg)
-	log.Info().Interface("cfg", cacheCfg).Msg("Setting cache config options")
-	cache, err := cache.New(cacheCfg)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Fleet{
-		bi:       bi,
-		verCon:   verCon,
-		cfg:      cfg,
-		cfgCh:    make(chan *config.Config, 1),
-		cache:    cache,
-		reporter: reporter,
+		standAlone: standAlone,
+		bi:         bi,
+		verCon:     verCon,
+		cfgCh:      make(chan *config.Config, 1),
+		reporter:   reporter,
 	}, nil
 }
 
 type runFunc func(context.Context) error
 
+type runFuncCfg func(context.Context, *config.Config) error
+
 // Run runs the fleet server
-func (f *Fleet) Run(ctx context.Context) error {
+func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
+	err := initCfg.LoadServerLimits()
+	if err != nil {
+		return fmt.Errorf("encountered error while loading server limits: %w", err)
+	}
+	cacheCfg := config.CopyCache(initCfg)
+	log.Info().Interface("cfg", cacheCfg).Msg("Setting cache config options")
+	cache, err := cache.New(cacheCfg)
+	if err != nil {
+		return err
+	}
+	f.cache = cache
+
 	var curCfg *config.Config
-	newCfg := f.cfg
+	newCfg := initCfg
 
 	// Replace context with cancellable ctx
 	// in order to automatically cancel all the go routines
@@ -109,12 +112,12 @@ func (f *Fleet) Run(ctx context.Context) error {
 		}
 	}
 
-	start := func(ctx context.Context, runfn runFunc, ech chan<- error) (*errgroup.Group, context.CancelFunc) {
+	start := func(ctx context.Context, runfn runFuncCfg, cfg *config.Config, ech chan<- error) (*errgroup.Group, context.CancelFunc) {
 		ctx, cn = context.WithCancel(ctx)
 		g, ctx := errgroup.WithContext(ctx)
 
 		g.Go(func() error {
-			err := runfn(ctx)
+			err := runfn(ctx, cfg)
 			if err != nil {
 				ech <- err
 			}
@@ -134,10 +137,10 @@ LOOP:
 	for {
 		ech := make(chan error, 2)
 		if started {
-			f.reporter.Status(proto.StateObserved_CONFIGURING, "Re-configuring", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
+			f.reporter.UpdateState(client.UnitStateConfiguring, "Re-configuring", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		} else {
 			started = true
-			f.reporter.Status(proto.StateObserved_STARTING, "Starting", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
+			f.reporter.UpdateState(client.UnitStateStarting, "Starting", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		}
 
 		err := newCfg.LoadServerLimits()
@@ -165,9 +168,9 @@ LOOP:
 			proEg, proCancel = nil, nil
 			if newCfg.Inputs[0].Server.Profiler.Enabled {
 				log.Info().Msg("starting profiler on configuration change")
-				proEg, proCancel = start(ctx, func(ctx context.Context) error {
-					return profile.RunProfiler(ctx, newCfg.Inputs[0].Server.Profiler.Bind)
-				}, ech)
+				proEg, proCancel = start(ctx, func(ctx context.Context, cfg *config.Config) error {
+					return profile.RunProfiler(ctx, cfg.Inputs[0].Server.Profiler.Bind)
+				}, newCfg, ech)
 			}
 		}
 
@@ -178,30 +181,29 @@ LOOP:
 				stop(srvCancel, srvEg)
 			}
 			log.Info().Msg("starting server on configuration change")
-			srvEg, srvCancel = start(ctx, func(ctx context.Context) error {
-				return f.runServer(ctx, newCfg)
-			}, ech)
+			srvEg, srvCancel = start(ctx, func(ctx context.Context, cfg *config.Config) error {
+				return f.runServer(ctx, cfg)
+			}, newCfg, ech)
 		}
 
 		curCfg = newCfg
-		f.cfg = curCfg
 
 		select {
 		case newCfg = <-f.cfgCh:
 			log.Info().Msg("Server configuration update")
 		case err := <-ech:
-			f.reporter.Status(proto.StateObserved_FAILED, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
+			f.reporter.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			log.Error().Err(err).Msg("Fleet Server failed")
 			return err
 		case <-ctx.Done():
-			f.reporter.Status(proto.StateObserved_STOPPING, "Stopping", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
+			f.reporter.UpdateState(client.UnitStateStopping, "Stopping", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			break LOOP
 		}
 	}
 
 	// Server is coming down; wait for the server group to exit cleanly.
 	// Timeout if something is locked up.
-	err := safeWait(srvEg, time.Second)
+	err = safeWait(srvEg, time.Second)
 
 	// Eat cancel error to minimize confusion in logs
 	if errors.Is(err, context.Canceled) {
@@ -457,7 +459,15 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 
 	// Policy self monitor
 	sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
-	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
+	var agent *model.Agent
+	if f.standAlone {
+		agent, err = f.standAloneSetup(ctx, bulker, sm, cfg.Inputs[0].Policy.ID, cfg.Fleet.Agent.ID)
+		if err != nil {
+			return err
+		}
+	} else {
+		g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
+	}
 
 	// Actions monitoring
 	var am monitor.SimpleMonitor
@@ -490,11 +500,16 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 		return err
 	}
 
+	if f.standAlone {
+		g.Go(loggedRunFunc(ctx, "self-checkin", f.standAloneCheckin(agent, ct)))
+	}
+
 	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
+	ut := api.NewUploadT(&cfg.Inputs[0].Server, bulker, monCli, f.cache) // uses no-retry client for bufferless chunk upload
 
-	router := api.NewRouter(&cfg.Inputs[0].Server, bulker, ct, et, at, ack, st, sm, tracer, f.bi)
+	router := api.NewRouter(&cfg.Inputs[0].Server, bulker, ct, et, at, ack, st, ut, sm, tracer, f.bi)
 
 	g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 		return router.Run(ctx)

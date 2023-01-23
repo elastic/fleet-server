@@ -11,10 +11,11 @@ import (
 	"time"
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/rs/zerolog/log"
 )
 
 func TestThrottleZero(t *testing.T) {
-	_ = testlog.SetLogger(t)
+	log.Logger = testlog.SetLogger(t)
 
 	// Zero max parallel means we can acquire as many as we want,
 	// but still cannot acquire existing that has not timed out
@@ -83,7 +84,7 @@ func TestThrottleZero(t *testing.T) {
 }
 
 func TestThrottleN(t *testing.T) {
-	_ = testlog.SetLogger(t)
+	log.Logger = testlog.SetLogger(t)
 
 	for N := 1; N < 11; N++ {
 
@@ -152,7 +153,7 @@ func TestThrottleN(t *testing.T) {
 }
 
 func TestThrottleExpireIdentity(t *testing.T) {
-	_ = testlog.SetLogger(t)
+	log.Logger = testlog.SetLogger(t)
 
 	throttle := NewThrottle(1)
 
@@ -188,7 +189,7 @@ func TestThrottleExpireIdentity(t *testing.T) {
 
 // Test that a token from a different key is expired when at max
 func TestThrottleExpireAtMax(t *testing.T) {
-	_ = testlog.SetLogger(t)
+	log.Logger = testlog.SetLogger(t)
 
 	throttle := NewThrottle(1)
 

@@ -12,8 +12,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"github.com/pkg/errors"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -116,7 +115,7 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&resp); err != nil {
-		return migrationResponse{}, errors.Wrap(err, "decode UpdateByQuery response")
+		return migrationResponse{}, fmt.Errorf("decode UpdateByQuery response: %w", err)
 	}
 
 	log.Info().
@@ -219,7 +218,7 @@ func migrateAgentOutputs() (string, string, []byte, error) {
 	const (
 		migrationName        = "AgentOutputs"
 		fieldOutputs         = "outputs"
-		fieldDefaultAPIKeyID = "default_api_key_id" // nolint:gosec,G101 // this is not a credential
+		fieldDefaultAPIKeyID = "default_api_key_id" //nolint:gosec // this is not a credential
 		fieldRetiredAt       = "retiredAt"
 	)
 

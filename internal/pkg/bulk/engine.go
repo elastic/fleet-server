@@ -17,8 +17,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"go.elastic.co/apm"
 
-	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/semaphore"
 )

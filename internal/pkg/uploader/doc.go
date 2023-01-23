@@ -2,14 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// Package server defines the fleet-server instance.
-package server
-
-import (
-	"context"
-)
-
-// Server defines the interface to run the service instance.
-type Server interface {
-	Run(context.Context) error
-}
+/*
+	The uploader package provides the ability to store files in Elasticsearch
+	in a chunked format that is compatible with Kibana's files plugin.
+*/
+package uploader

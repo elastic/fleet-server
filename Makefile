@@ -54,7 +54,7 @@ list-platforms: ## - Show the possible PLATFORMS
 .PHONY: local
 local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
-	go build -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
+	go build $(if $(DEV),-tags="dev",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
 .PHONY: clean
@@ -72,7 +72,6 @@ generate: ## - Generate schema models
 .PHONY: check-ci
 check-ci: ## - Run all checks of the ci without linting, the linter is run through github action to have comments in the pull-request.
 	@$(MAKE) generate
-	@$(MAKE) defaults
 	@$(MAKE) check-headers
 	@$(MAKE) notice
 	@$(MAKE) check-no-changes
@@ -89,7 +88,7 @@ check-headers:  ## - Check copyright headers
 
 .PHONY: check-go
 check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.44.2
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.47.2
 	@./bin/golangci-lint run -v
 
 .PHONY: notice
@@ -105,11 +104,6 @@ notice: ## - Generates the NOTICE.txt file.
 		-noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
 		-noticeOut NOTICE.txt \
 		-depsOut ""
-
-.PHONY: defaults
-defaults: ## - Generate defaults based on limits files.
-	@echo "Generating env_defaults.go"
-	@go run dev-tools/buildlimits/buildlimits.go --in "internal/pkg/config/defaults/*.yml" --out internal/pkg/config/env_defaults.go
 
 .PHONY: check-no-changes
 check-no-changes:
@@ -153,7 +147,7 @@ $(PLATFORM_TARGETS): release-%:
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst release-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(DEV),-tags="dev",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
 
 .PHONY: package-target
@@ -176,7 +170,7 @@ build-releaser: ## - Build a Docker image to run make package including all buil
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
-	docker run --rm --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE)
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE)
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.

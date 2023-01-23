@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	zl "github.com/rs/zerolog/log"
 )
 
 // SetLogger will set zerolog's package level logger to the testing output and returns the logger
@@ -17,6 +16,6 @@ func SetLogger(tb testing.TB) zerolog.Logger {
 	tb.Helper()
 	tw := zerolog.TestWriter{T: tb, Frame: 4}
 	logger := zerolog.New(tw).Level(zerolog.DebugLevel)
-	zl.Logger = logger
+	//zl.Logger = logger // causing data races
 	return logger
 }

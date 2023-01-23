@@ -19,7 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/server"
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
-	"github.com/elastic/fleet-server/v7/internal/pkg/status"
+	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -69,7 +69,6 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 		}
 
 		var l *logger.Logger
-		var srv server.Server
 		if agentMode {
 			cfg, err := config.FromConfig(cliCfg)
 			if err != nil {
@@ -80,8 +79,14 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
-			srv, err = server.NewAgent(cliCfg, os.Stdin, bi, l)
+			srv, err := server.NewAgent(cliCfg, os.Stdin, bi, l)
 			if err != nil {
+				return err
+			}
+
+			if err := srv.Run(installSignalHandler()); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error().Err(err).Msg("Exiting")
+				l.Sync()
 				return err
 			}
 		} else {
@@ -107,17 +112,18 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
-			srv, err = server.NewFleet(cfg, bi, status.NewLog())
+			srv, err := server.NewFleet(bi, state.NewLog(), true)
 			if err != nil {
+				return err
+			}
+
+			if err := srv.Run(installSignalHandler(), cfg); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error().Err(err).Msg("Exiting")
+				l.Sync()
 				return err
 			}
 		}
 
-		if err := srv.Run(installSignalHandler()); err != nil && !errors.Is(err, context.Canceled) {
-			log.Error().Err(err).Msg("Exiting")
-			l.Sync()
-			return err
-		}
 		l.Sync()
 		return nil
 	}

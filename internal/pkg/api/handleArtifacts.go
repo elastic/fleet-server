@@ -11,6 +11,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -24,7 +26,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -244,7 +245,10 @@ func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, iden
 		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("fetch artifact")
 
-	return artifact, errors.Wrap(err, "fetchArtifact")
+	if err != nil {
+		return artifact, fmt.Errorf("fetchArtifact: %w", err)
+	}
+	return artifact, nil
 }
 
 func validateSha2String(sha2 string) error {
@@ -263,7 +267,7 @@ func validateSha2String(sha2 string) error {
 func validateSha2Data(data []byte, sha2 string) error {
 	src, err := hex.DecodeString(sha2)
 	if err != nil {
-		return errors.Wrap(err, "sha2 hex decode")
+		return fmt.Errorf("sha2 hex decode: %w", err)
 	}
 
 	sum := sha256.Sum256(data)

@@ -18,7 +18,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog/log"
 
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // Variables to define errors when comparing versions.

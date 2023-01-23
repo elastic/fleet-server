@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -19,7 +20,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/julienschmidt/httprouter"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -61,17 +61,17 @@ func (st StatusT) authenticate(r *http.Request) (*apikey.APIKey, error) {
 	return authAPIKey(r, st.bulk, st.cache)
 }
 
-func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, status proto.StateObserved_Status) {
+func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, state client.UnitState) {
 	authed := true
 	if _, aerr := st.authfn(r); aerr != nil {
 		log.Debug().Err(aerr).Msg("unauthenticated status request, return short status response only")
 		authed = false
 	}
 
-	status = rt.sm.Status()
+	state = rt.sm.State()
 	resp = StatusResponse{
 		Name:   build.ServiceName,
-		Status: status.String(),
+		Status: state.String(),
 	}
 
 	if authed {
@@ -82,8 +82,7 @@ func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (
 		}
 	}
 
-	return resp, status
-
+	return resp, state
 }
 
 func (rt *Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -95,7 +94,7 @@ func (rt *Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprou
 		Str("mod", kStatusMod).
 		Logger()
 
-	resp, status := rt.st.handleStatus(&zlog, r, rt)
+	resp, state := rt.st.handleStatus(&zlog, r, rt)
 
 	data, err := json.Marshal(&resp)
 	if err != nil {
@@ -107,7 +106,7 @@ func (rt *Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprou
 	}
 
 	code := http.StatusServiceUnavailable
-	if status == proto.StateObserved_DEGRADED || status == proto.StateObserved_HEALTHY {
+	if state == client.UnitStateDegraded || state == client.UnitStateHealthy {
 		code = http.StatusOK
 	}
 	w.WriteHeader(code)

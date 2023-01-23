@@ -5,7 +5,7 @@
 //go:build integration
 // +build integration
 
-package fleet
+package server
 
 import (
 	"bytes"
@@ -30,10 +30,11 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/elastic/fleet-server/v7/internal/pkg/server"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
-	"github.com/elastic/fleet-server/v7/internal/pkg/status"
+	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
@@ -46,7 +47,7 @@ const (
 type tserver struct {
 	cfg *config.Config
 	g   *errgroup.Group
-	srv *server.Fleet
+	srv *Fleet
 }
 
 func (s *tserver) baseURL() string {
@@ -63,13 +64,39 @@ func (s *tserver) waitExit() error {
 	return s.g.Wait()
 }
 
-func startTestServer(ctx context.Context) (*tserver, error) {
-	cfg, err := config.LoadFile("../../fleet-server.yml")
+func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
+	t.Helper()
+
+	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
 	if err != nil {
 		return nil, fmt.Errorf("config load error: %w", err)
 	}
 
 	logger.Init(cfg, "fleet-server") //nolint:errcheck // test logging setup
+
+	bulker := ftesting.SetupBulk(ctx, t)
+
+	policyID := uuid.Must(uuid.NewV4()).String()
+	_, err = dl.CreatePolicy(ctx, bulker, model.Policy{
+		PolicyID:           policyID,
+		RevisionIdx:        1,
+		DefaultFleetServer: true,
+		Data:               policyData,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentAPIKey{
+		Name:     "Default",
+		APIKey:   "keyvalue",
+		APIKeyID: "keyid",
+		PolicyID: policyID,
+		Active:   true,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	port, err := ftesting.FreePort()
 	if err != nil {
@@ -83,7 +110,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
 
-	srv, err := server.NewFleet(cfg, build.Info{Version: serverVersion}, status.NewLog())
+	srv, err := NewFleet(build.Info{Version: serverVersion}, state.NewLog(), false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create server: %w", err)
 	}
@@ -91,7 +118,7 @@ func startTestServer(ctx context.Context) (*tserver, error) {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return srv.Run(ctx)
+		return srv.Run(ctx, cfg)
 	})
 
 	tsrv := &tserver{cfg: cfg, g: g, srv: srv}
@@ -106,7 +133,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 	start := time.Now()
 	cli := cleanhttp.DefaultClient()
 	for {
-		res, err := cli.Get(s.baseURL() + "/api/status") //nolint:noctx // test setup
+		res, err := cli.Get(s.baseURL() + "/api/status")
 		if err != nil {
 			if time.Since(start) > dur {
 				return err
@@ -141,7 +168,7 @@ func TestServerUnauthorized(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(ctx)
+	srv, err := startTestServer(t, ctx)
 	require.NoError(t, err)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
@@ -162,7 +189,7 @@ func TestServerUnauthorized(t *testing.T) {
 	// TODO: revisit error response format
 	t.Run("no auth header", func(t *testing.T) {
 		for _, u := range allurls {
-			res, err := cli.Post(u, "application/json", bytes.NewBuffer([]byte("{}"))) //nolint:noctx // test case
+			res, err := cli.Post(u, "application/json", bytes.NewBuffer([]byte("{}")))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -192,7 +219,7 @@ func TestServerUnauthorized(t *testing.T) {
 	// Unauthorized, expecting error from /_security/_authenticate
 	t.Run("unauthorized", func(t *testing.T) {
 		for _, u := range agenturls {
-			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}"))) //nolint:noctx // test case
+			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}")))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "ApiKey ZExqY1hYWUJJUVVxWDVia2JvVGM6M05XaUt5aHBRYk9YSTRQWDg4YWp0UQ==")
@@ -245,7 +272,7 @@ func TestServerInstrumentation(t *testing.T) {
 	defer server.Close()
 
 	// Start test server
-	srv, err := startTestServer(ctx)
+	srv, err := startTestServer(t, ctx)
 	require.NoError(t, err)
 
 	newInstrumentationCfg := func(cfg config.Config, instr config.Instrumentation) { //nolint:govet // mutex should not be copied in operation (hopefully)
@@ -270,11 +297,11 @@ func TestServerInstrumentation(t *testing.T) {
 		defer require.NoError(t, Err)
 		for {
 			agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
-			res, err := cli.Post(srv.buildURL(agentID, "checkin"), "application/json", bytes.NewBuffer([]byte("{}"))) //nolint:noctx,staticcheck // test case
+			res, err := cli.Post(srv.buildURL(agentID, "checkin"), "application/json", bytes.NewBuffer([]byte("{}"))) //nolint:staticcheck // error check work around
 			if res != nil && res.Body != nil {
 				res.Body.Close()
 			}
-			Err = err //nolint:ineffassign,staticcheck,wastedassign // ugly work around for error checking
+			Err = err //nolint:ineffassign,staticcheck // ugly work around for error checking
 			select {
 			case <-ctx.Done():
 				return
