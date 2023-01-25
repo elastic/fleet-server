@@ -1072,7 +1072,7 @@ paths:
         - agentApiKey: []
       requestBody:
         required: true
-        contents:
+        content:
           application/json:
             schema:
               $ref: '#/components/schemas/uploadCompleteRequest'
