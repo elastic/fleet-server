@@ -475,6 +475,95 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ackResponseItem'
+    uploadBeginRequest:
+      title: "Upload Operation Start request body"
+      type: object
+      required:
+        - file
+        - action_id
+        - agent_id
+        - src
+      properties:
+        file:
+          type: object
+          properties:
+            Compression:
+              description: "The algorithm used to compress the file. Valid values: br,gzip,deflate,none"
+              type: string
+              example: deflate
+            hash:
+              title: Hash
+              description: Checksums on the file contents
+              type: object
+              properties:
+                sha256:
+                  description: SHA256 of the contents
+                  type: string
+                  example: 04f81394bababa0fb31e6ad2d703c875eb46dc254527e39ff316564c0dc339e2
+            name:
+              description: Name of the file including the extension, without the directory
+              type: string
+              example: yankees-stats.zip
+            mime_type:
+              description: MIME type of the file
+              type: string
+              example: application/zip
+            size:
+              description: Size of the file contents, in bytes
+              type: integer
+              example: 8276748
+          required:
+            - name
+            - size
+            - mime_type
+        action_id:
+          description: ID of the action that requested this file
+          type: string
+          format: uuid
+          example: 2f440d31-2ea4-42f8-b0f2-4b6e98e8dc5e
+        agent_id:
+          description: Identifier of the agent uploading. Matches the ID usually found in agent.id
+          type: string
+          format: uuid
+          example: 9347e918-5e00-48b0-b302-a09f9258a46d
+        src:
+          description: The source integration sending this file
+          type: string
+          enum:
+            - endpoint
+            - agent
+    uploadBeginResponse:
+      description: Response to initiating a file upload
+      type: object
+      required:
+        - upload_id
+        - chunk_size
+      properties:
+        upload_id:
+          description: A unique identifier for the ensuing upload operation
+          type: string
+          format: uuid
+          example: fbc8e23c-055d-461e-87f7-b0d1b57f14b4
+        chunk_size:
+          description: The required size (in bytes) that the file must be segmented into for each chunk
+          type: integer
+          example: 4194304
+    uploadCompleteRequest:
+      description: Request to verify and finish an uploaded file
+      type: object
+      required:
+        - transithash
+      properties:
+        transithash:
+          description: the transithash (sha256 of the concatenation of each in-order chunk hash) of the entire file contents
+          type: object
+          required:
+            - sha256
+          properties:
+            sha256:
+              description: SHA256 hash
+              type: string
+              example: 83810fdc61c44290778c212d7829d0c3f0232e81bd551d3943998a920025d14f
   parameters:
     requestId:
       name: X-Request-ID
@@ -831,6 +920,8 @@ paths:
       security:
         - agentApiKey: []
       requestBody:
+        required: true
+        description: Information about the file to be uploaded. Minimum required fields are marked as required. Additional fields may be specified and are allowed. For information about the file itself, ECS.file paths are recommended. For archived files, information about the archive should be placed in `file`. Information about the archive members may be placed in a `contents` array.
         content:
           application/json:
             schema:
@@ -911,4 +1002,99 @@ paths:
           $ref: '#/components/responses/throttle'
         '503':
           $ref: '#/components/responses/unavailable'
-# TODO: Include the file-upload endpoints?
+  /api/fleet/uploads:
+    post:
+      summary: Initiate a file upload process
+      description: ""
+      security:
+        - agentApiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/uploadBeginRequest'
+      responses:
+        '200':
+          description: Information about the upload procedure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/uploadBeginResponse'
+        '400':
+          $ref: '#/components/responses/badRequest'
+  /api/fleet/uploads/{id}/{chunkNum}:
+    put:
+      summary: Upload a section of file data
+      description: "Upload portions of the intended file in a piecewise fashion. This route is idempotent in that any successive calls will overwrite previous ones for the same URL parameters. Chunks may be uploaded in any order, and may be uploaded in parallel. The body is the raw contents of the file at the given position matching the chunk number. The body must be the exact chunk size returned from the upload initiation response. All chunks must be this size except for the final one, which is naturally the file remainder."
+      security:
+        - agentApiKey: []
+      parameters:
+        - name: id
+          in: path
+          description: The upload_id as returned in the Upload initiation response
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
+        - name: chunkNum
+          in: path
+          description: the positional index of the chunk within the file. The first chunk is 0, the next 1, etc.
+          required: true
+          schema:
+            type: integer
+            example: 3
+        - name: X-Chunk-SHA2
+          in: header
+          required: true
+          description: the SHA256 hash of the body contents for this request
+          schema:
+            type: string
+            example: 0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1
+      requestBody:
+        description: The chunk contents as bytes
+        required: true
+        content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+      responses:
+        '200':
+          description: Successful chunk upload
+        '400':
+          $ref: '#/components/responses/badRequest'
+  /api/fleet/uploads/{id}:
+    post:
+      summary: Complete a file upload process
+      description: ""
+      security:
+        - agentApiKey: []
+      requestBody:
+        required: true
+        contents:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/uploadCompleteRequest'
+      parameters:
+        - name: id
+          in: path
+          description: The upload_id as returned in the Upload initiation response
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
+      responses:
+        '200':
+          description: success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+        '400':
+          $ref: '#/components/responses/badRequest'
