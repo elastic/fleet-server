@@ -43,7 +43,7 @@ Vagrant.configure("2") do |config|
           curl \
           delve \
           make \
-          unzip
+          unzip \
           vim \
           wget \
           zip
