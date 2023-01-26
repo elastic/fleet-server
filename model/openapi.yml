@@ -511,6 +511,7 @@ components:
             size:
               description: Size of the file contents, in bytes
               type: integer
+              format: int64
               example: 8276748
           required:
             - name
@@ -547,6 +548,7 @@ components:
         chunk_size:
           description: The required size (in bytes) that the file must be segmented into for each chunk
           type: integer
+          format: int64
           example: 4194304
     uploadCompleteRequest:
       description: Request to verify and finish an uploaded file
@@ -920,8 +922,6 @@ paths:
       security:
         - agentApiKey: []
       requestBody:
-        required: true
-        description: Information about the file to be uploaded. Minimum required fields are marked as required. Additional fields may be specified and are allowed. For information about the file itself, ECS.file paths are recommended. For archived files, information about the archive should be placed in `file`. Information about the archive members may be placed in a `contents` array.
         content:
           application/json:
             schema:
@@ -1008,7 +1008,11 @@ paths:
       description: ""
       security:
         - agentApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/requestId'
       requestBody:
+        required: true
+        description: Information about the file to be uploaded. Minimum required fields are marked as required. Additional fields may be specified and are allowed. For information about the file itself, ECS.file paths are recommended. For archived files, information about the archive should be placed in `file`. Information about the archive members may be placed in a `contents` array.
         content:
           application/json:
             schema:
@@ -1022,6 +1026,12 @@ paths:
                 $ref: '#/components/schemas/uploadBeginResponse'
         '400':
           $ref: '#/components/responses/badRequest'
+        '401':
+          $ref: '#/components/responses/keyNotEnabled'
+        '408':
+          $ref: '#/components/responses/deadline'
+        '503':
+          $ref: '#/components/responses/unavailable'
   /api/fleet/uploads/{id}/{chunkNum}:
     put:
       summary: Upload a section of file data
@@ -1051,6 +1061,7 @@ paths:
           schema:
             type: string
             example: 0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1
+        - $ref: '#/components/parameters/requestId'
       requestBody:
         description: The chunk contents as bytes
         required: true
@@ -1064,6 +1075,12 @@ paths:
           description: Successful chunk upload
         '400':
           $ref: '#/components/responses/badRequest'
+        '401':
+          $ref: '#/components/responses/keyNotEnabled'
+        '408':
+          $ref: '#/components/responses/deadline'
+        '503':
+          $ref: '#/components/responses/unavailable'
   /api/fleet/uploads/{id}:
     post:
       summary: Complete a file upload process
@@ -1085,6 +1102,7 @@ paths:
             type: string
             format: uuid
             example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
+        - $ref: '#/components/parameters/requestId'
       responses:
         '200':
           description: success response
@@ -1098,3 +1116,9 @@ paths:
                     example: "ok"
         '400':
           $ref: '#/components/responses/badRequest'
+        '401':
+          $ref: '#/components/responses/keyNotEnabled'
+        '408':
+          $ref: '#/components/responses/deadline'
+        '503':
+          $ref: '#/components/responses/unavailable'
