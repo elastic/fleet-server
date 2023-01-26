@@ -433,8 +433,9 @@ components:
         data:
           description: |
             An embedded JSON object that has the data about the ack.
+
             Used by REQUEST_DIAGNOSTICS actions.
-            Contains a `file_id` attribute used to communicate the successfullly uploaded diagnostics ID.
+            Contains a `upload_id` attribute used to communicate the successfullly uploaded diagnostics ID.
           type: string
           format: application/json
           x-go-type: json.RawMessage
