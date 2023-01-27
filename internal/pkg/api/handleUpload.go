@@ -209,6 +209,7 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 		return uploader.ErrHashMismatch
 	}
 
+	w.WriteHeader(http.StatusOK)
 	return nil
 }
 
