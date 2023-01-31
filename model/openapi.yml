@@ -401,7 +401,7 @@ components:
         message:
           description: An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
           type: string
-        payload:
+        payload: # FIXME Deprecate and use data instead?
           description: |
             An embedded JSON object that contains additional information for the fleet-server to process.
             Defined as a json.RawMessage in both the fleet-server and the elastic-agent.
@@ -427,6 +427,15 @@ components:
           x-go-type: json.RawMessage
         action_response:
           description: The action response for the input action being acknowledged.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        data:
+          description: |
+            An embedded JSON object that has the data about the ack.
+
+            Used by REQUEST_DIAGNOSTICS actions.
+            Contains a `upload_id` attribute used to communicate the successfullly uploaded diagnostics ID.
           type: string
           format: application/json
           x-go-type: json.RawMessage
