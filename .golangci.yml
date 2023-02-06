@@ -114,7 +114,7 @@ linters-settings:
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18"
+    go: "1.18.10"
 
   misspell:
     # Correct spellings using locale preferences for US or UK.
@@ -149,11 +149,11 @@ linters-settings:
 
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18"
+    go: "1.18.10"
 
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18"
+    go: "1.18.10"
     initialisms: ["ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS", "ECS"]
 
 
@@ -166,4 +166,4 @@ linters-settings:
 
   unused:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18"
+    go: "1.18.10"
