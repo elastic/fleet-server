@@ -16,7 +16,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/gofrs/uuid"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -45,7 +46,7 @@ type FileMetaDoc struct {
 	AgentID  string    `json:"agent_id"`
 	Source   string    `json:"src"`
 	File     FileData  `json:"file"`
-	UploadID string    `json:"upload_id"`
+	UploadID uuid.UUID `json:"upload_id"`
 	Start    time.Time `json:"upload_start"`
 }
 
@@ -113,11 +114,10 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (upload.Info, error) 
 		return upload.Info{}, ErrFileSizeTooLarge
 	}
 
-	uid, err := uuid.NewV4()
+	uid, err := uuid.NewRandom()
 	if err != nil {
 		return upload.Info{}, fmt.Errorf("unable to generate upload operation ID: %w", err)
 	}
-	id := uid.String()
 
 	// grab required fields that were checked already in validation step
 	agentID, _ := data.Str("agent_id")
@@ -126,7 +126,7 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (upload.Info, error) 
 	docID := fmt.Sprintf("%s.%s", actionID, agentID)
 
 	info := upload.Info{
-		ID:        id,
+		ID:        uid,
 		DocID:     docID,
 		AgentID:   agentID,
 		ActionID:  actionID,
@@ -152,6 +152,8 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (upload.Info, error) 
 	if err := data.Put(info.Status, "file", "Status"); err != nil {
 		return upload.Info{}, err
 	}
+
+	id := uid.String()
 	if err := data.Put(id, "upload_id"); err != nil {
 		return upload.Info{}, err
 	}

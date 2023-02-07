@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+
+	"github.com/google/uuid"
 )
 
 // Status represents the only valid values of upload status according to storage spec
@@ -22,9 +24,9 @@ const (
 )
 
 type Info struct {
-	ID        string // upload operation identifier. Used to identify the upload process
-	DocID     string // document ID of the uploaded file and chunks
-	Source    string // which integration is performing the upload
+	ID        uuid.UUID // upload operation identifier. Used to identify the upload process
+	DocID     string    // document ID of the uploaded file and chunks
+	Source    string    // which integration is performing the upload
 	AgentID   string
 	ActionID  string
 	ChunkSize int64

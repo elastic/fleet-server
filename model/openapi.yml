@@ -295,10 +295,10 @@ components:
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "expiration"
         data:
+          # oapi-codegen type should be: interface{}
           description: An embedded action-specific object.
-          type: object
-          x-go-custom-tag: yaml:"data" # openapi-generator
-          x-oapi-codegen-extra-tags: # oapi-codegen tags
+          x-go-custom-tag: yaml:"data"
+          x-oapi-codegen-extra-tags:
             yaml: "data"
         id:
           description: The action ID.
@@ -312,7 +312,7 @@ components:
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
-        input_type: # NOTE not sure why input_type and timeout are not part of data; do we have an explanation?
+        input_type: # FIXME not sure why input_type and timeout are not part of data; do we have an explanation?
           description: The input type of the action for actions with type `INPUT_ACTION`.
           type: string
           x-go-custom-tag: yaml:"input_type" # openapi-generator
@@ -472,6 +472,8 @@ components:
       type: object
       required:
         - action
+        - items  # NOTE: work around as we don't want a pointer here
+        - errors # NOTE: work around as we don't want a pointer here
       properties:
         action:
           description: The action result. Will have the value "acks".
@@ -479,14 +481,21 @@ components:
         errors:
           description: A flag to indicate if one or more errors occured when proccessing events.
           type: boolean
+          nullable: false
+          x-oapi-codegen-extra-tags:
+            json: "errors,omitempty"
         items:
           description: The in-order list of results from processing events.
           type: array
+          nullable: false
           items:
             $ref: '#/components/schemas/ackResponseItem'
+          x-oapi-codegen-extra-tags:
+            json: "items,omitempty"
     uploadBeginRequest:
       title: "Upload Operation Start request body"
       type: object
+      additionalProperties: true
       required:
         - file
         - action_id
@@ -495,6 +504,7 @@ components:
       properties:
         file:
           type: object
+          additionalProperties: true
           properties:
             Compression:
               description: "The algorithm used to compress the file. Valid values: br,gzip,deflate,none"
@@ -692,6 +702,7 @@ components:
 paths:
   /api/status:
     get:
+      operationId: status
       parameters:
         - $ref: '#/components/parameters/requestId'
       security:
@@ -751,6 +762,7 @@ paths:
     # However the id is expected to be "enroll" by fleet-server's implementation.
     # Should this route be changed to reflect that?
     post:
+      operationId: agentEnroll
       parameters:
         - name: id
           in: path
@@ -834,6 +846,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/agents/{id}/checkin:
     post:
+      operationId: agentCheckin
       description: |
         The agent checkin endpoint.
         Clients will long-poll this endpoint.
@@ -916,6 +929,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/agents/{id}/acks:
     post:
+      operationId: agentAcks
       description: |
         The endpoint that an agent uses to acknowledge (and inform fleet-server) of events that it has recieved/executed.
         A single action may have multiple different events associated with it.
@@ -974,6 +988,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/artifacts/{id}/{sha2}:
     get:
+      operationId: artifact
       description: The route to retrieve an artifact from Elasticsearch.
       parameters:
         - name: id
@@ -1013,6 +1028,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/uploads:
     post:
+      operationId: uploadBegin
       summary: Initiate a file upload process
       description: ""
       security:
@@ -1043,6 +1059,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/uploads/{id}/{chunkNum}:
     put:
+      operationId: uploadChunk
       summary: Upload a section of file data
       description: "Upload portions of the intended file in a piecewise fashion. This route is idempotent in that any successive calls will overwrite previous ones for the same URL parameters. Chunks may be uploaded in any order, and may be uploaded in parallel. The body is the raw contents of the file at the given position matching the chunk number. The body must be the exact chunk size returned from the upload initiation response. All chunks must be this size except for the final one, which is naturally the file remainder."
       security:
@@ -1092,6 +1109,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/uploads/{id}:
     post:
+      operationId: uploadComplete
       summary: Complete a file upload process
       description: ""
       security:

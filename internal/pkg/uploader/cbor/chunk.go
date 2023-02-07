@@ -37,12 +37,14 @@ func NewChunkWriter(chunkData io.Reader, finalChunk bool, baseID string, chunkHa
 }
 
 // Writes the start of a CBOR object (equiv. JSON object)
-// {
-//	"last": true/false,
-//	"bid": "baseID",
-//	"sha2": "...",
-//	"data":
-// }
+//
+//	{
+//		"last": true/false,
+//		"bid": "baseID",
+//		"sha2": "...",
+//		"data":
+//	}
+//
 // the slice ends where the chunk data bytes ("byte string") should begin.
 // it is therefore an incomplete CBOR object on its own
 // expecting the next section to be filled in by the caller.

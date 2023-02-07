@@ -25,10 +25,8 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-version"
-	"github.com/julienschmidt/httprouter"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -38,6 +36,19 @@ const (
 	EnrollPermanent = "PERMANENT"
 	EnrollTemporary = "TEMPORARY"
 )
+
+const kFleetAccessRolesJSON = `
+{
+	"fleet-apikey-access": {
+		"cluster": [],
+		"applications": [{
+			"application": "fleet",
+			"privileges": ["no-privileges"],
+			"resources": ["*"]
+		}]
+	}
+}
+`
 
 var (
 	ErrUnknownEnrollType     = errors.New("unknown enroll request type")
@@ -61,87 +72,30 @@ func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bu
 
 }
 
-func (rt *Router) handleEnroll(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	start := time.Now()
-
-	// Work around wonky router rule
-	if ps.ByName("id") != "enroll" {
-		http.Error(w, "", http.StatusNotFound)
-		return
-	}
-
-	reqID := r.Header.Get(logger.HeaderRequestID)
-
-	zlog := log.With().
-		Str(ECSHTTPRequestID, reqID).
-		Str("mod", kEnrollMod).
-		Logger()
-
-	// Error in the scope for deferred rolback function check
-	var err error
-
-	// Initialize rollback/cleanup for enrollment
-	// This deletes all the artifacts that were created during enrollment
-	rb := rollback.New(zlog)
-	defer func() {
-		if err != nil {
-			zlog.Error().Err(err).Msg("perform rollback on enrollment failure")
-			// Using the router context for the rollback
-			err = rb.Rollback(rt.ctx)
-			if err != nil {
-				zlog.Error().Err(err).Msg("rollback error on enrollment failure")
-			}
-		}
-	}()
-
-	var resp *EnrollResponse
-	resp, err = rt.et.handleEnroll(rb, &zlog, w, r)
-
-	if err != nil {
-		cntEnroll.IncError(err)
-		resp := NewHTTPErrResp(err)
-
-		zlog.WithLevel(resp.Level).
-			Err(err).
-			Int(ECSHTTPResponseCode, resp.StatusCode).
-			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail enroll")
-
-		if rerr := resp.Write(w); rerr != nil {
-			zlog.Error().Err(rerr).Msg("fail writing error response")
-		}
-		return
-	}
-
-	if err = writeResponse(zlog, w, resp, start); err != nil {
-		cntEnroll.IncError(err)
-		zlog.Error().
-			Err(err).
-			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail write response")
-	}
-}
-
-func (et *EnrollerT) handleEnroll(rb *rollback.Rollback, zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request) (*EnrollResponse, error) {
+func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, userAgent string) error {
 	key, err := authAPIKey(r, et.bulker, et.cache)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	zlog = zlog.With().Str(LogEnrollAPIKeyID, key.ID).Logger()
+	ctx := zlog.WithContext(r.Context())
+	r = r.WithContext(ctx)
 
-	// Pointer is passed in to allow UpdateContext by child function
-	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogEnrollAPIKeyID, key.ID)
-	})
-
-	ver, err := validateUserAgent(*zlog, r, et.verCon)
+	ver, err := validateUserAgent(zlog, userAgent, et.verCon)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return et.processRequest(rb, *zlog, w, r, key.ID, ver)
+	resp, err := et.processRequest(zlog, w, r, rb, key.ID, ver)
+	if err != nil {
+		return err
+	}
+
+	ts, _ := logger.CtxStartTime(r.Context())
+	return writeResponse(zlog, w, resp, ts)
 }
 
-func (et *EnrollerT) processRequest(rb *rollback.Rollback, zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, enrollmentAPIKeyID, ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKeyID, ver string) (*EnrollResponse, error) {
 
 	// Validate that an enrollment record exists for a key with this id.
 	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentAPIKeyID)
@@ -177,7 +131,7 @@ func (et *EnrollerT) _enroll(
 	policyID,
 	ver string) (*EnrollResponse, error) {
 
-	if req.SharedID != "" {
+	if req.SharedId != "" {
 		// TODO: Support pre-existing install
 		return nil, errors.New("preexisting install not yet supported")
 	}
@@ -193,7 +147,7 @@ func (et *EnrollerT) _enroll(
 	agentID := u.String()
 
 	// Update the local metadata agent id
-	localMeta, err := updateLocalMetaAgentID(req.Meta.Local, agentID)
+	localMeta, err := updateLocalMetaAgentID(req.Metadata.Local, agentID)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +166,7 @@ func (et *EnrollerT) _enroll(
 	agentData := model.Agent{
 		Active:         true,
 		PolicyID:       policyID,
-		Type:           req.Type,
+		Type:           string(req.Type),
 		EnrolledAt:     now.UTC().Format(time.RFC3339),
 		LocalMetadata:  localMeta,
 		AccessAPIKeyID: accessAPIKey.ID,
@@ -221,7 +175,7 @@ func (et *EnrollerT) _enroll(
 			ID:      agentID,
 			Version: ver,
 		},
-		Tags: req.Meta.Tags,
+		Tags: req.Metadata.Tags,
 	}
 
 	err = createFleetAgent(ctx, et.bulker, agentID, agentData)
@@ -237,17 +191,17 @@ func (et *EnrollerT) _enroll(
 	resp := EnrollResponse{
 		Action: "created",
 		Item: EnrollResponseItem{
-			ID:             agentID,
-			Active:         agentData.Active,
-			PolicyID:       agentData.PolicyID,
-			Type:           agentData.Type,
-			EnrolledAt:     agentData.EnrolledAt,
-			UserMeta:       agentData.UserProvidedMetadata,
-			LocalMeta:      agentData.LocalMetadata,
-			AccessAPIKeyID: agentData.AccessAPIKeyID,
-			AccessAPIKey:   accessAPIKey.Token(),
-			Status:         "online",
-			Tags:           agentData.Tags,
+			AccessApiKey:         accessAPIKey.Token(),
+			AccessApiKeyId:       agentData.AccessAPIKeyID,
+			Active:               agentData.Active,
+			EnrolledAt:           agentData.EnrolledAt,
+			Id:                   agentID,
+			LocalMetadata:        agentData.LocalMetadata,
+			PolicyId:             agentData.PolicyID,
+			Status:               "online",
+			Tags:                 agentData.Tags,
+			Type:                 agentData.Type,
+			UserProvidedMetadata: agentData.UserProvidedMetadata,
 		},
 	}
 
@@ -316,7 +270,6 @@ LOOP:
 }
 
 func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, start time.Time) error {
-
 	data, err := json.Marshal(resp)
 	if err != nil {
 		return fmt.Errorf("marshal enrollResponse: %w", err)
@@ -330,9 +283,9 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 	}
 
 	zlog.Info().
-		Str(LogAgentID, resp.Item.ID).
-		Str(LogPolicyID, resp.Item.PolicyID).
-		Str(LogAccessAPIKeyID, resp.Item.AccessAPIKeyID).
+		Str(LogAgentID, resp.Item.Id).
+		Str(LogPolicyID, resp.Item.PolicyId).
+		Str(LogAccessAPIKeyID, resp.Item.AccessApiKeyId).
 		Int(ECSHTTPResponseBodyBytes, numWritten).
 		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("Elastic Agent successfully enrolled")
@@ -342,30 +295,31 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 
 // updateMetaLocalAgentId updates the agent id in the local metadata if exists
 // At the time of writing the local metadata blob looks something like this
-// {
-//     "elastic": {
-//         "agent": {
-//             "id": "1b9c327a-c93a-4aef-b67f-effbef54d836",
-//             "version": "8.0.0",
-//             "snapshot": false,
-//             "upgradeable": false
-//         }
-//     },
-//     "host": {
-//         "architecture": "x86_64",
-//         "hostname": "eh-Hounddiamond",
-//         "name": "eh-Hounddiamond",
-//         "id": "1b9c327a-c93a-4aef-b67f-effbef54d836"
-//     },
-//     "os": {
-//         "family": "darwin",
-//         "kernel": "19.6.0",
-//         "platform": "darwin",
-//         "version": "10.15.7",
-//         "name": "Mac OS X",
-//         "full": "Mac OS X(10.15.7)"
-//     }
-// }
+//
+//	{
+//	    "elastic": {
+//	        "agent": {
+//	            "id": "1b9c327a-c93a-4aef-b67f-effbef54d836",
+//	            "version": "8.0.0",
+//	            "snapshot": false,
+//	            "upgradeable": false
+//	        }
+//	    },
+//	    "host": {
+//	        "architecture": "x86_64",
+//	        "hostname": "eh-Hounddiamond",
+//	        "name": "eh-Hounddiamond",
+//	        "id": "1b9c327a-c93a-4aef-b67f-effbef54d836"
+//	    },
+//	    "os": {
+//	        "family": "darwin",
+//	        "kernel": "19.6.0",
+//	        "platform": "darwin",
+//	        "version": "10.15.7",
+//	        "name": "Mac OS X",
+//	        "full": "Mac OS X(10.15.7)"
+//	    }
+//	}
 func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 	if data == nil {
 		return data, nil
@@ -420,7 +374,6 @@ func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (
 }
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentAPIKey, error) {
-
 	if key, ok := et.cache.GetEnrollmentAPIKey(id); ok {
 		return &key, nil
 	}
@@ -442,7 +395,6 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 }
 
 func decodeEnrollRequest(data io.Reader) (*EnrollRequest, error) {
-
 	var req EnrollRequest
 	decoder := json.NewDecoder(data)
 	if err := decoder.Decode(&req); err != nil {

@@ -133,7 +133,11 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 	start := time.Now()
 	cli := cleanhttp.DefaultClient()
 	for {
-		res, err := cli.Get(s.baseURL() + "/api/status")
+		req, err := http.NewRequestWithContext(ctx, "GET", s.baseURL()+"/api/status", nil)
+		if err != nil {
+			return err
+		}
+		res, err := cli.Do(req)
 		if err != nil {
 			if time.Since(start) > dur {
 				return err
@@ -189,7 +193,12 @@ func TestServerUnauthorized(t *testing.T) {
 	// TODO: revisit error response format
 	t.Run("no auth header", func(t *testing.T) {
 		for _, u := range allurls {
-			res, err := cli.Post(u, "application/json", bytes.NewBuffer([]byte("{}")))
+			req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewBuffer([]byte("{}")))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			res, err := cli.Do(req)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -219,7 +228,7 @@ func TestServerUnauthorized(t *testing.T) {
 	// Unauthorized, expecting error from /_security/_authenticate
 	t.Run("unauthorized", func(t *testing.T) {
 		for _, u := range agenturls {
-			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}")))
+			req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewBuffer([]byte("{}")))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "ApiKey ZExqY1hYWUJJUVVxWDVia2JvVGM6M05XaUt5aHBRYk9YSTRQWDg4YWp0UQ==")
@@ -297,7 +306,9 @@ func TestServerInstrumentation(t *testing.T) {
 		defer require.NoError(t, Err)
 		for {
 			agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
-			res, err := cli.Post(srv.buildURL(agentID, "checkin"), "application/json", bytes.NewBuffer([]byte("{}"))) //nolint:staticcheck // error check work around
+			req, _ := http.NewRequestWithContext(ctx, "POST", srv.buildURL(agentID, "checkin"), bytes.NewBuffer([]byte("{}")))
+			req.Header.Set("Content-Type", "application/json")
+			res, err := cli.Do(req) //nolint:staticcheck // error check work around
 			if res != nil && res.Body != nil {
 				res.Body.Close()
 			}

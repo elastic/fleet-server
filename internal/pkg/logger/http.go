@@ -5,6 +5,7 @@
 package logger
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -15,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -23,7 +24,7 @@ import (
 )
 
 const (
-	HeaderRequestID = "X-Request-ID"
+	HeaderRequestID = "X-Request-Id"
 	httpSlashPrefix = "HTTP/"
 )
 
@@ -83,6 +84,14 @@ func (rc *ResponseCounter) Count() uint64 {
 	return atomic.LoadUint64(&rc.count)
 }
 
+type ctxTSKey struct{}
+
+// CtxStartTime returns the start time associated with a context
+func CtxStartTime(ctx context.Context) (time.Time, bool) {
+	ts, ok := ctx.Value(ctxTSKey{}).(time.Time)
+	return ts, ok
+}
+
 func splitAddr(addr string) (host string, port int) {
 	host, portS, err := net.SplitHostPort(addr)
 	if err == nil {
@@ -112,11 +121,6 @@ func stripHTTP(h string) string {
 }
 
 func httpMeta(r *http.Request, e *zerolog.Event) {
-	// Look for request id
-	if reqID := r.Header.Get(HeaderRequestID); reqID != "" {
-		e.Str(ECSHTTPRequestID, reqID)
-	}
-
 	oldForce := r.URL.ForceQuery
 	r.URL.ForceQuery = false
 	e.Str(ECSURLFull, r.URL.String())
@@ -182,18 +186,45 @@ func httpDebug(r *http.Request, e *zerolog.Event) {
 	}
 }
 
-// HTTPHandler returns an httprouter.Handle that wraps the request with an ECS logger and
-// captures metrics for the current request.
-func HTTPHandler(next httprouter.Handle) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		e := log.Info()
+// Middleware wraps an HTTP Middleware in a request logger.
+//
+// It will also attach a (zerolog) logger, and request start time to each requests' context.
+// The default settings will result in an ECS compliant entry if the response code is not 2XX.
+// The middleware will generate a new UUID if there's no X-Request-ID header
+// Responses will also have the X-Request-ID header set.
+// If debug is enabled a request will result in 2 log entries; one at the start of the request and one when the response is sent (regardless of status code)
+func Middleware(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now().UTC()
+		// Look for request id
+		reqID := r.Header.Get(HeaderRequestID)
+		if reqID == "" { // generate a request ID if there's none
+			// zerolog has strong support for github.com/rs/xid a 12byte ID - perhaps we should use it if UUID is too big?
+			uid, err := uuid.NewRandom()
+			if err == nil {
+				reqID = uid.String()
+				r.Header.Set(HeaderRequestID, reqID) // incase other handlers need it
+			}
+		}
+		// Insert X-Request-ID header into response
+		w.Header().Set(HeaderRequestID, reqID)
+
+		// get the server bound addr from the req ctx
+		addr, _ := r.Context().Value(http.LocalAddrContextKey).(string)
+
+		// Update request context
+		// NOTE this injects the request id and addr into all logs that use the request logger
+		zlog := log.With().Str(ECSHTTPRequestID, reqID).Str(ECSServerAddress, addr).Logger()
+		ctx := zlog.WithContext(r.Context())
+		ctx = context.WithValue(ctx, ctxTSKey{}, start)
+		r = r.WithContext(ctx)
+
+		e := zlog.Info()
 
 		if !e.Enabled() {
-			next(w, r, p)
+			next.ServeHTTP(w, r)
 			return
 		}
-
-		start := time.Now()
 
 		rdCounter := NewReaderCounter(r.Body)
 		r.Body = rdCounter
@@ -207,11 +238,9 @@ func HTTPHandler(next httprouter.Handle) httprouter.Handle {
 			d.Msg("HTTP start")
 		}
 
-		next(wrCounter, r, p)
-
+		next.ServeHTTP(wrCounter, r)
 		httpMeta(r, e)
 
-		// Only logs non 2xx errors unless we are debugging.
 		if log.Debug().Enabled() || (wrCounter.statusCode < 200 && wrCounter.statusCode >= 300) {
 			e.Uint64(ECSHTTPRequestBodyBytes, rdCounter.Count())
 			e.Uint64(ECSHTTPResponseBodyBytes, wrCounter.Count())
@@ -221,6 +250,7 @@ func HTTPHandler(next httprouter.Handle) httprouter.Handle {
 			e.Msgf("%d HTTP Request", wrCounter.statusCode)
 		}
 	}
+	return http.HandlerFunc(fn)
 }
 
 func TLSVersionToString(vers uint16) string {

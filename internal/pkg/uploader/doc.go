@@ -3,7 +3,7 @@
 // you may not use this file except in compliance with the Elastic License.
 
 /*
-	The uploader package provides the ability to store files in Elasticsearch
-	in a chunked format that is compatible with Kibana's files plugin.
+The uploader package provides the ability to store files in Elasticsearch
+in a chunked format that is compatible with Kibana's files plugin.
 */
 package uploader
