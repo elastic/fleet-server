@@ -67,12 +67,12 @@ func strToLevel(s string) (zerolog.Level, error) {
 		l = zerolog.DebugLevel
 	case "info":
 		l = zerolog.InfoLevel
-	case "warning":
+	case "warn":
 		l = zerolog.WarnLevel
 	case "error":
 		l = zerolog.ErrorLevel
 	default:
-		return l, fmt.Errorf("invalid log level; must be one of: trace, debug, info, warning, error")
+		return l, fmt.Errorf("invalid log level; must be one of: trace, debug, info, warn, error")
 	}
 
 	return l, nil
