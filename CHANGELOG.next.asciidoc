@@ -21,7 +21,7 @@
 - Fixed unenroll offline agents logic {issue}2091[2091] {pull}2092[2092]
 - Ignore UPDATE_TAGS and FORCE_UNENROLL actions on agent checkin {issue}2199[2199] {pull}2200[2200]
 - Fix the index monitor checkpoint tracking for when the documents are deleted {issue}2205[2205] {pull}2206[2206]
-- Change the representation for the Warn log level from "warning" to "warn" {issue}2328[2328] {pull}2331[2331]
+- Allow the the Warn log level to be specified as "warning" and "warn" {issue}2328[2328] {pull}2331[2331]
 
 ==== New Features
 
