@@ -47,6 +47,9 @@ var policyData = []byte(`
 			"type": "elasticsearch"
 		}
 	},
+	"output_permissions": {
+	    "default": {}
+	},
 	"inputs": [
 		{
 			"type": "fleet-server"

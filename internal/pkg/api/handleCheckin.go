@@ -241,7 +241,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 			Str("id", action.Id).
 			Str("type", action.Type).
 			Str("inputType", action.InputType).
-			Int64("timeout", *action.Timeout).
+			Int64("timeout", fromPtr(action.Timeout)).
 			Msg("Action delivered to agent on checkin")
 	}
 
@@ -486,6 +486,9 @@ func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*mod
 // parseMeta compares the agent and the request local_metadata content
 // and returns fields to update the agent record or nil
 func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
+	if req.LocalMetadata == nil {
+		return nil, nil
+	}
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
@@ -532,6 +535,9 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 }
 
 func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
+	if req.Components == nil {
+		return nil, nil
+	}
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.

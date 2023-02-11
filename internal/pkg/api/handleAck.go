@@ -48,6 +48,7 @@ func (e *HTTPError) Error() string {
 func NewAckResponse(size int) AckResponse {
 	return AckResponse{
 		Action: "acks",
+		Errors: false,
 		Items:  make([]AckResponseItem, size),
 	}
 }
@@ -358,7 +359,6 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	return nil
-
 }
 
 func (ack *AckT) updateAPIKey(ctx context.Context,
