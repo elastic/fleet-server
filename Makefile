@@ -12,7 +12,7 @@ BUILDMODE_windows_amd64=-buildmode=pie
 BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
-BUILDER_IMAGE=docker.elastic.co/observability-ci/fleet-server-builder:latest
+BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-main-debian10
 
 ifdef VERSION_QUALIFIER
 DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
