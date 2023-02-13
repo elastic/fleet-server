@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}
+FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-buster
 
 RUN \
   apt-get update \
