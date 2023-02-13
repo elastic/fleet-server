@@ -1,0 +1,44 @@
+---
+name: Bump elastic-stack to latest snapshot version
+
+actions:
+  default:
+    title: '[updatecli] update elastic stack version for testing {{ source "latestVersion" }}'
+    kind: github/pullrequest
+    spec:
+      labels:
+        - automation
+        - dependency
+        - backport-skip
+    scmid: default
+
+scms:
+  default:
+    kind: github
+    spec:
+      user: '{{ requiredEnv "GIT_USER" }}'
+      email: '{{ requiredEnv "GIT_EMAIL" }}'
+      owner: elastic
+      repository: fleet-server
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      username: '{{ requiredEnv "GIT_USER" }}'
+      branch: '{{ requiredEnv "BRANCH" }}'
+
+sources:
+  latestVersion:
+    name: Get latest snapshot build
+    kind: json
+    spec:
+      file: https://storage.googleapis.com/artifacts-api/snapshots/{{ requiredEnv "BRANCH" }}.json
+      key: .build_id
+
+targets:
+  update-snapshot:
+    name: "Update snapshot.yml"
+    kind: file
+    sourceid: latestVersion
+    scmid: default
+    spec:
+      file: dev-tools/integration/.env
+      matchpattern: '(ELASTICSEARCH_VERSION=)\d+.\d+.\d+-.*-SNAPSHOT'
+      replacepattern: '$1{{ source "latestVersion" }}-SNAPSHOT'
