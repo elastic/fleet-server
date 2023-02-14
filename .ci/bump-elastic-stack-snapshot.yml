@@ -1,9 +1,10 @@
 ---
 name: Bump elastic-stack to latest snapshot version
+pipelineid: 'bump-elastic-stack-snapshot-{{ requiredEnv "BRANCH" }}'
 
 actions:
   default:
-    title: '[updatecli] update elastic stack version for testing {{ source "latestVersion" }}'
+    title: '[updatecli] update elastic stack version for testing {{ source "latestVersion" }}-SNAPSHOT'
     kind: github/pullrequest
     spec:
       labels:
@@ -40,5 +41,5 @@ targets:
     scmid: default
     spec:
       file: dev-tools/integration/.env
-      matchpattern: '(ELASTICSEARCH_VERSION=)\d+.\d+.\d+-.*-SNAPSHOT'
-      replacepattern: '$1{{ source "latestVersion" }}-SNAPSHOT'
+      matchpattern: '(ELASTICSEARCH_VERSION)=\d+.\d+.\d+-.*-SNAPSHOT'
+      replacepattern: '$1={{ source "latestVersion" }}-SNAPSHOT'
