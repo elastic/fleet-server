@@ -78,7 +78,7 @@ func (f *Fleet) standAloneSetup(ctx context.Context, bulker bulk.Bulk, sm policy
 
 func (f *Fleet) standAloneCheckin(agent *model.Agent, ct *api.CheckinT) runFunc {
 	return func(ctx context.Context) error {
-		tick := time.NewTimer(30 * time.Second) // fleet-server holds poll open for up to 5m
+		tick := time.NewTimer(30 * time.Second) // fleet-server holds poll open for up to 28m
 		defer tick.Stop()
 		var ackToken string // TODO persistence?
 		for {
