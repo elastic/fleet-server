@@ -14,8 +14,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
-	"go.elastic.co/apm"
-	"go.elastic.co/apm/module/apmchi"
+	"go.elastic.co/apm/module/apmchi/v2"
+	"go.elastic.co/apm/v2"
 )
 
 func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer) http.Handler {

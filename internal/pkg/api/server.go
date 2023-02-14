@@ -19,7 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog/log"
 )

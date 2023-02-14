@@ -18,8 +18,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
-	"go.elastic.co/apm"
-	apmtransport "go.elastic.co/apm/transport"
+	"go.elastic.co/apm/v2"
+	apmtransport "go.elastic.co/apm/v2/transport"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
@@ -565,27 +565,26 @@ func (f *Fleet) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
 		os.Setenv(envTransactionSampleRate, cfg.TransactionSampleRate)
 		defer os.Unsetenv(envTransactionSampleRate)
 	}
-	transport, err := apmtransport.NewHTTPTransport()
+
+	hosts := make([]*url.URL, 0, len(cfg.Hosts))
+	for _, host := range cfg.Hosts {
+		u, err := url.Parse(host)
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing %s: %w", host, err)
+		}
+		hosts = append(hosts, u)
+	}
+
+	options := apmtransport.HTTPTransportOptions{
+		APIKey:      cfg.APIKey, // NOTE: Either the APIKey or SecretToken will be non-empty here
+		SecretToken: cfg.SecretToken,
+		ServerURLs:  hosts,
+	}
+	transport, err := apmtransport.NewHTTPTransport(options)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(cfg.Hosts) > 0 {
-		hosts := make([]*url.URL, 0, len(cfg.Hosts))
-		for _, host := range cfg.Hosts {
-			u, err := url.Parse(host)
-			if err != nil {
-				return nil, fmt.Errorf("failed parsing %s: %w", host, err)
-			}
-			hosts = append(hosts, u)
-		}
-		transport.SetServerURL(hosts...)
-	}
-	if cfg.APIKey != "" {
-		transport.SetAPIKey(cfg.APIKey)
-	} else {
-		transport.SetSecretToken(cfg.SecretToken)
-	}
 	return apm.NewTracerOptions(apm.TracerOptions{
 		ServiceName:        "fleet-server",
 		ServiceVersion:     f.bi.Version,
