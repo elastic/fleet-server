@@ -616,7 +616,7 @@ func calcPollDuration(zlog zerolog.Logger, cfg *config.Server, setupDuration tim
 
 	// Under heavy load, elastic may take along time to authorize the api key, many seconds to minutes.
 	// Short circuit the long poll to take the setup delay into account.  This is particularly necessary
-	// in cloud where the proxy will time us out after 5m20s causing unnecessary errors.
+	// in cloud where the proxy will time us out after 30m20s causing unnecessary errors.
 
 	if setupDuration >= pollDuration {
 		// We took so long to setup that we need to exit immediately
