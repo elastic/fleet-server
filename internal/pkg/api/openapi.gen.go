@@ -14,7 +14,6 @@ import (
 	"net/http"
 
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
-	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -376,10 +375,10 @@ type StatusResponseVersion struct {
 // UploadBeginRequest defines model for uploadBeginRequest.
 type UploadBeginRequest struct {
 	// ActionId ID of the action that requested this file
-	ActionId openapi_types.UUID `json:"action_id"`
+	ActionId string `json:"action_id"`
 
 	// AgentId Identifier of the agent uploading. Matches the ID usually found in agent.id
-	AgentId openapi_types.UUID      `json:"agent_id"`
+	AgentId string                  `json:"agent_id"`
 	File    UploadBeginRequest_File `json:"file"`
 
 	// Src The source integration sending this file
@@ -418,7 +417,7 @@ type UploadBeginResponse struct {
 	ChunkSize int64 `json:"chunk_size"`
 
 	// UploadId A unique identifier for the ensuing upload operation
-	UploadId openapi_types.UUID `json:"upload_id"`
+	UploadId string `json:"upload_id"`
 }
 
 // UploadCompleteRequest Request to verify and finish an uploaded file
@@ -781,10 +780,10 @@ type ServerInterface interface {
 	UploadBegin(w http.ResponseWriter, r *http.Request, params UploadBeginParams)
 	// Complete a file upload process
 	// (POST /api/fleet/uploads/{id})
-	UploadComplete(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params UploadCompleteParams)
+	UploadComplete(w http.ResponseWriter, r *http.Request, id string, params UploadCompleteParams)
 	// Upload a section of file data
 	// (PUT /api/fleet/uploads/{id}/{chunkNum})
-	UploadChunk(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, chunkNum int, params UploadChunkParams)
+	UploadChunk(w http.ResponseWriter, r *http.Request, id string, chunkNum int, params UploadChunkParams)
 
 	// (GET /api/status)
 	Status(w http.ResponseWriter, r *http.Request, params StatusParams)
@@ -1131,7 +1130,7 @@ func (siw *ServerInterfaceWrapper) UploadComplete(w http.ResponseWriter, r *http
 	var err error
 
 	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
+	var id string
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "id", runtime.ParamLocationPath, chi.URLParam(r, "id"), &id)
 	if err != nil {
@@ -1183,7 +1182,7 @@ func (siw *ServerInterfaceWrapper) UploadChunk(w http.ResponseWriter, r *http.Re
 	var err error
 
 	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
+	var id string
 
 	err = runtime.BindStyledParameterWithLocation("simple", false, "id", runtime.ParamLocationPath, chi.URLParam(r, "id"), &id)
 	if err != nil {

@@ -12,7 +12,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 
-	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
 	"github.com/rs/zerolog/hlog"
 )
 
@@ -103,24 +102,24 @@ func (a *apiServer) UploadBegin(w http.ResponseWriter, r *http.Request, params U
 	}
 }
 
-func (a *apiServer) UploadComplete(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params UploadCompleteParams) {
-	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id.String()).Logger()
-	err := a.ut.handleUploadComplete(zlog, w, r, id.String())
+func (a *apiServer) UploadComplete(w http.ResponseWriter, r *http.Request, id string, params UploadCompleteParams) {
+	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
+	err := a.ut.handleUploadComplete(zlog, w, r, id)
 	if err != nil {
 		cntUpload.IncError(err)
 		ErrorResp(w, r, err)
 	}
 }
 
-func (a *apiServer) UploadChunk(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, chunkNum int, params UploadChunkParams) {
-	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id.String()).Logger()
+func (a *apiServer) UploadChunk(w http.ResponseWriter, r *http.Request, id string, chunkNum int, params UploadChunkParams) {
+	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
 
 	if _, err := a.ut.authAPIKey(r, a.bulker, a.ut.cache); err != nil {
 		cntUpload.IncError(err)
 		ErrorResp(w, r, err)
 		return
 	}
-	if err := a.ut.handleUploadChunk(zlog, w, r, id.String(), chunkNum, params.XChunkSHA2); err != nil {
+	if err := a.ut.handleUploadChunk(zlog, w, r, id, chunkNum, params.XChunkSHA2); err != nil {
 		cntUpload.IncError(err)
 		ErrorResp(w, r, err)
 	}

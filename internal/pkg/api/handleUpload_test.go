@@ -31,7 +31,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 	"github.com/elastic/go-elasticsearch/v8"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -304,7 +303,7 @@ func TestChunkUploadRouteParams(t *testing.T) {
 	_, err := hasher.Write(data)
 	require.NoError(t, err)
 	hash := hex.EncodeToString(hasher.Sum(nil))
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	tests := []struct {
 		Name              string
@@ -312,10 +311,10 @@ func TestChunkUploadRouteParams(t *testing.T) {
 		ExpectStatus      int
 		ExpectErrContains string
 	}{
-		{"Valid chunk number is OK", "/api/fleet/uploads/" + mockUploadID.String() + "/0", http.StatusOK, ""},
-		{"Non-numeric chunk number is rejected", "/api/fleet/uploads/" + mockUploadID.String() + "/CHUNKNUM", http.StatusBadRequest, "error binding string parameter"},
-		{"Negative chunk number is rejected", "/api/fleet/uploads/" + mockUploadID.String() + "/-2", http.StatusBadRequest, "invalid chunk number"},
-		{"Too large chunk number is rejected", "/api/fleet/uploads/" + mockUploadID.String() + "/50", http.StatusBadRequest, "invalid chunk number"},
+		{"Valid chunk number is OK", "/api/fleet/uploads/" + mockUploadID + "/0", http.StatusOK, ""},
+		{"Non-numeric chunk number is rejected", "/api/fleet/uploads/" + mockUploadID + "/CHUNKNUM", http.StatusBadRequest, "error binding string parameter"},
+		{"Negative chunk number is rejected", "/api/fleet/uploads/" + mockUploadID + "/-2", http.StatusBadRequest, "invalid chunk number"},
+		{"Too large chunk number is rejected", "/api/fleet/uploads/" + mockUploadID + "/50", http.StatusBadRequest, "invalid chunk number"},
 	}
 
 	for _, tc := range tests {
@@ -352,7 +351,7 @@ func TestChunkUploadRouteParams(t *testing.T) {
 
 func TestChunkUploadRequiresChunkHashHeader(t *testing.T) {
 	data := []byte("filedata")
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
 	mockUploadInfoResult(fakebulk, upload.Info{
@@ -369,7 +368,7 @@ func TestChunkUploadRequiresChunkHashHeader(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID.String()+"/0", bytes.NewReader(data))
+	req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
 	hr.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -384,7 +383,7 @@ func TestChunkUploadStatus(t *testing.T) {
 	require.NoError(t, err)
 	hash := hex.EncodeToString(hasher.Sum(nil))
 
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	tests := []struct {
 		Name              string
@@ -417,7 +416,7 @@ func TestChunkUploadStatus(t *testing.T) {
 			})
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID.String()+"/0", bytes.NewReader(data))
+			req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
 			req.Header.Set("X-Chunk-SHA2", hash)
 
 			hr.ServeHTTP(rec, req)
@@ -438,7 +437,7 @@ func TestChunkUploadExpiry(t *testing.T) {
 	require.NoError(t, err)
 	hash := hex.EncodeToString(hasher.Sum(nil))
 
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	tests := []struct {
 		Name              string
@@ -468,7 +467,7 @@ func TestChunkUploadExpiry(t *testing.T) {
 			})
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID.String()+"/0", bytes.NewReader(data))
+			req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
 			req.Header.Set("X-Chunk-SHA2", hash)
 
 			hr.ServeHTTP(rec, req)
@@ -498,7 +497,7 @@ func TestUploadCompleteRequiresMatchingAuth(t *testing.T) {
 		{"Agent ID in File not matching API Key should reject", true, "oneID", "differentID", http.StatusBadRequest},
 		{"Bad auth should reject request", false, "", "IDinDoc", http.StatusBadRequest},
 	}
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -546,7 +545,7 @@ func TestUploadCompleteRequiresMatchingAuth(t *testing.T) {
 			}
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID.String(), strings.NewReader(`{"transithash":{"sha256":"`+transit+`"}}`))
+			req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash":{"sha256":"`+transit+`"}}`))
 			hr.ServeHTTP(rec, req)
 
 			assert.Equal(t, tc.ExpectStatus, rec.Code)
@@ -555,7 +554,7 @@ func TestUploadCompleteRequiresMatchingAuth(t *testing.T) {
 }
 
 func TestUploadCompleteRequiresValidStatus(t *testing.T) {
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	tests := []struct {
 		Name              string
@@ -596,7 +595,7 @@ func TestUploadCompleteRequiresValidStatus(t *testing.T) {
 			}})
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID.String(), strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
+			req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
 
 			hr.ServeHTTP(rec, req)
 
@@ -609,7 +608,7 @@ func TestUploadCompleteRequiresValidStatus(t *testing.T) {
 }
 
 func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
 	mockInfo := upload.Info{
@@ -644,7 +643,7 @@ func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID.String(), strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
 
 	hr.ServeHTTP(rec, req)
 
@@ -653,7 +652,7 @@ func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
 }
 
 func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
 	mockInfo := upload.Info{
@@ -694,7 +693,7 @@ func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID.String(), strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
 
 	hr.ServeHTTP(rec, req)
 
@@ -703,7 +702,7 @@ func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
 }
 
 func TestUploadCompleteNonFinalChunkMarkedFinal(t *testing.T) {
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
 	mockInfo := upload.Info{
@@ -744,7 +743,7 @@ func TestUploadCompleteNonFinalChunkMarkedFinal(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID.String(), strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
 
 	hr.ServeHTTP(rec, req)
 
@@ -753,7 +752,7 @@ func TestUploadCompleteNonFinalChunkMarkedFinal(t *testing.T) {
 }
 
 func TestUploadCompleteUndersizedChunk(t *testing.T) {
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
 	mockInfo := upload.Info{
@@ -794,7 +793,7 @@ func TestUploadCompleteUndersizedChunk(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID.String(), strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
 
 	hr.ServeHTTP(rec, req)
 
@@ -803,7 +802,7 @@ func TestUploadCompleteUndersizedChunk(t *testing.T) {
 }
 
 func TestUploadCompleteIncorrectTransitHash(t *testing.T) {
-	mockUploadID := uuid.New()
+	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
 	mockInfo := upload.Info{
@@ -844,7 +843,7 @@ func TestUploadCompleteIncorrectTransitHash(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID.String(), strings.NewReader(`{"transithash": {"sha256": "wrongHash"}}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "wrongHash"}}`))
 
 	hr.ServeHTTP(rec, req)
 

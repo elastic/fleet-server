@@ -7,10 +7,8 @@ package api
 // Test json encoding/decoding for all req/resp items
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -103,10 +101,9 @@ func TestAckRequest(t *testing.T) {
 
 func TestUploadBeginRequest(t *testing.T) {
 	br := UploadBeginRequest{}
-	uid := uuid.New().String()
-	body := fmt.Sprintf(`{
-	    "action_id": "%s",
-	    "agent_id": "%s",
+	body := `{
+	    "action_id": "abc123",
+	    "agent_id": "def456",
 	    "file": {
 		"mime_type": "text",
 		"name": "fname",
@@ -115,12 +112,12 @@ func TestUploadBeginRequest(t *testing.T) {
 	    },
 	    "src": "agent",
 	    "key2": "val2"
-	}`, uid, uid)
+	}`
 	err := json.Unmarshal([]byte(body), &br)
 	require.NoError(t, err)
 
-	assert.Equal(t, uid, br.ActionId.String())
-	assert.Equal(t, uid, br.AgentId.String())
+	assert.Equal(t, "abc123", br.ActionId)
+	assert.Equal(t, "def456", br.AgentId)
 	assert.Equal(t, "text", br.File.MimeType)
 	assert.Equal(t, "fname", br.File.Name)
 	assert.Equal(t, int64(100), br.File.Size)

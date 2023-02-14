@@ -47,10 +47,10 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 	}
 	if !u.verifyChunkInfo(info, chunks, transitHash) {
 		if err := SetStatus(ctx, u.bulker, info, upload.StatusFail); err != nil {
-			log.Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID.String()).Msg("file upload failed chunk validation, but encountered an error setting the upload status to failure")
+			log.Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error setting the upload status to failure")
 		}
 		if err := DeleteChunksByQuery(ctx, u.bulker, info.Source, info.DocID); err != nil {
-			log.Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID.String()).Msg("file upload failed chunk validation, but encountered an error deleting left-behind chunk data")
+			log.Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error deleting left-behind chunk data")
 		}
 		return info, ErrFailValidation
 	}

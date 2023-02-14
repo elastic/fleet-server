@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -200,7 +200,7 @@ func Middleware(next http.Handler) http.Handler {
 		reqID := r.Header.Get(HeaderRequestID)
 		if reqID == "" { // generate a request ID if there's none
 			// zerolog has strong support for github.com/rs/xid a 12byte ID - perhaps we should use it if UUID is too big?
-			uid, err := uuid.NewRandom()
+			uid, err := uuid.NewV4()
 			if err == nil {
 				reqID = uid.String()
 				r.Header.Set(HeaderRequestID, reqID) // incase other handlers need it

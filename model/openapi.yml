@@ -539,12 +539,10 @@ components:
         action_id:
           description: ID of the action that requested this file
           type: string
-          format: uuid
           example: 2f440d31-2ea4-42f8-b0f2-4b6e98e8dc5e
         agent_id:
           description: Identifier of the agent uploading. Matches the ID usually found in agent.id
           type: string
-          format: uuid
           example: 9347e918-5e00-48b0-b302-a09f9258a46d
         src:
           description: The source integration sending this file
@@ -562,7 +560,6 @@ components:
         upload_id:
           description: A unique identifier for the ensuing upload operation
           type: string
-          format: uuid
           example: fbc8e23c-055d-461e-87f7-b0d1b57f14b4
         chunk_size:
           description: The required size (in bytes) that the file must be segmented into for each chunk
@@ -1071,7 +1068,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
             example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
         - name: chunkNum
           in: path
@@ -1127,7 +1123,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
             example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
         - $ref: '#/components/parameters/requestId'
       responses:

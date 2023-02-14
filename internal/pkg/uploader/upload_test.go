@@ -348,7 +348,7 @@ func TestChunkMarksFinal(t *testing.T) {
 			// for anything larger than 1-chunk, check for off-by-ones
 			if tc.FinalChunk > 0 {
 				mockUploadInfoResult(fakeBulk, info)
-				_, prev, err := u.Chunk(context.Background(), info.ID.String(), tc.FinalChunk-1, "")
+				_, prev, err := u.Chunk(context.Background(), info.ID, tc.FinalChunk-1, "")
 				assert.NoError(t, err)
 				assert.Falsef(t, prev.Last, "penultimate chunk number (%d) should not be marked final", tc.FinalChunk-1)
 			}
@@ -356,7 +356,7 @@ func TestChunkMarksFinal(t *testing.T) {
 			mockUploadInfoResult(fakeBulk, info)
 
 			// make sure the final chunk is marked as such
-			_, chunk, err := u.Chunk(context.Background(), info.ID.String(), tc.FinalChunk, "")
+			_, chunk, err := u.Chunk(context.Background(), info.ID, tc.FinalChunk, "")
 			assert.NoError(t, err)
 			assert.Truef(t, chunk.Last, "chunk number %d should be marked as Last", tc.FinalChunk)
 		})
