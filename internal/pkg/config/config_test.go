@@ -213,6 +213,25 @@ func TestLoadServerLimits(t *testing.T) {
 
 }
 
+func TestDuplicateKey(t *testing.T) {
+	c, err := ucfg.NewFrom(map[string]interface{}{
+		"inputs": []interface{}{map[string]interface{}{
+			"type":                              "fleet-server",
+			"server":                            defaultServer(),
+			"server.limits.max_agents":          1000,
+			"server.timeouts.checkin_long_poll": "1m",
+		}},
+	})
+	require.NoError(t, err)
+	cfg, err := FromConfig(c)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1000, cfg.Inputs[0].Server.Limits.MaxAgents)
+	assert.Equal(t, time.Minute, cfg.Inputs[0].Server.Timeouts.CheckinLongPoll)
+	assert.Equal(t, time.Minute, cfg.Inputs[0].Server.Timeouts.Read)
+	assert.Equal(t, kDefaultHost, cfg.Inputs[0].Server.Host)
+}
+
 // Stub out the defaults so that the above is easier to maintain
 
 func defaultCache() Cache {
