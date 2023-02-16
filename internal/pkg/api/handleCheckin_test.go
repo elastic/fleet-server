@@ -40,11 +40,11 @@ func TestConvertActions(t *testing.T) {
 	}, {
 		name:    "single action signed",
 		actions: []model.Action{{ActionID: "1234", Signed: &model.Signed{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="}}},
-		resp: []ActionResp{{
-			AgentID: "agent-id",
-			ID:      "1234",
+		resp: []Action{{
+			AgentId: "agent-id",
+			Id:      "1234",
 			Data:    json.RawMessage(nil),
-			Signed:  &ActionRespSigned{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="},
+			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="},
 		}},
 		token: "",
 	}, {name: "multiple actions",
@@ -60,7 +60,7 @@ func TestConvertActions(t *testing.T) {
 			AgentId: "agent-id",
 			Id:      "5678",
 			Data:    json.RawMessage(nil),
-			Signed:  &ActionRespSigned{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="},
+			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="},
 		}},
 		token: "",
 	}}

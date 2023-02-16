@@ -138,19 +138,19 @@ func TestUploadBeginRequest(t *testing.T) {
 func TestActionRespSerialization(t *testing.T) {
 	tests := []struct {
 		name   string
-		action ActionResp
+		action Action
 	}{
 		{
 			name:   "empty action",
-			action: ActionResp{},
+			action: Action{},
 		},
 		{
 			name:   "action id only",
-			action: ActionResp{ID: "1234"},
+			action: Action{Id: "1234"},
 		},
 		{
 			name:   "action signed",
-			action: ActionResp{ID: "1234", Signed: &ActionRespSigned{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="}},
+			action: Action{Id: "1234", Signed: &ActionSignature{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="}},
 		},
 	}
 	for _, tc := range tests {
@@ -160,7 +160,7 @@ func TestActionRespSerialization(t *testing.T) {
 	}
 }
 
-func validateSerialization(t *testing.T, action ActionResp) {
+func validateSerialization(t *testing.T, action Action) {
 	b, err := json.Marshal(action)
 	assert.NoError(t, err)
 
@@ -171,7 +171,7 @@ func validateSerialization(t *testing.T, action ActionResp) {
 	accID, ok := m["id"]
 
 	assert.True(t, ok)
-	assert.Equal(t, action.ID, accID)
+	assert.Equal(t, action.Id, accID)
 
 	signed, ok := m["signed"]
 	if action.Signed == nil {
