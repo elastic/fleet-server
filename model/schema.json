@@ -70,6 +70,20 @@
           "description": "The opaque payload.",
           "type": "object",
           "format": "raw"
+        },
+        "signed": {
+          "description": "The action signed data and signature.",
+          "type": "object",
+          "properties": {
+            "data": {
+              "description": "The base64 encoded, UTF-8 JSON serialized action bytes that are signed.",
+              "type": "string"
+            },
+            "signature": {
+              "description": "The base64 encoded signature.",
+              "type": "string"
+            }
+          }
         }
       },
       "required": [
