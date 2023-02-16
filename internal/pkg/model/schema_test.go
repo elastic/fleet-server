@@ -37,8 +37,6 @@ func TestActionSerialization(t *testing.T) {
 }
 
 func validateSerialization(t *testing.T, action Action) {
-	t.Helper()
-
 	b, err := json.Marshal(action)
 	assert.NoError(t, err)
 

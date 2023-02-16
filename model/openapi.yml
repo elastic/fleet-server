@@ -328,7 +328,6 @@ components:
         signed:
           description: The optional action signing data.
           type: object
-          format: int64
           x-go-custom-tag: yaml:"signed" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "signed"
