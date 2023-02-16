@@ -406,7 +406,7 @@ func convertActions(agentID string, actions []model.Action) ([]ActionResp, strin
 
 	respList := make([]ActionResp, 0, sz)
 	for _, action := range actions {
-		respList = append(respList, ActionResp{
+		ar := ActionResp{
 			AgentID:    agentID,
 			CreatedAt:  action.Timestamp,
 			StartTime:  action.StartTime,
@@ -416,8 +416,15 @@ func convertActions(agentID string, actions []model.Action) ([]ActionResp, strin
 			Type:       action.Type,
 			InputType:  action.InputType,
 			Timeout:    action.Timeout,
-			Signed:     action.Signed, // Pass through the "signed" raw json with the action response
-		})
+		}
+
+		if action.Signed != nil {
+			ar.Signed = &ActionRespSigned{
+				Data:      action.Signed.Data,
+				Signature: action.Signed.Signature,
+			}
+		}
+		respList = append(respList, ar)
 	}
 
 	if sz > 0 {

@@ -325,6 +325,29 @@ components:
           x-go-custom-tag: yaml:"timeout" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "timeout"
+        signed:
+          description: The optional action signing data.
+          type: object
+          format: int64
+          x-go-custom-tag: yaml:"signed" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "signed"
+          properties:
+            data:
+              description: The base64 encoded, UTF-8 JSON serialized action bytes that are signed.
+              type: string
+              format: base64
+              x-go-custom-tag: yaml:"data" # openapi-generator
+              x-oapi-codegen-extra-tags: # oapi-codegen tags
+                yaml: "data"
+            signature:
+              description: The base64 encoded signature.
+              type: string
+              format: base64
+              x-go-custom-tag: yaml:"signature" # openapi-generator
+              x-oapi-codegen-extra-tags: # oapi-codegen tags
+                yaml: "signature"
+
     checkinResponse:
       type: object
       required:

@@ -55,7 +55,7 @@ type Action struct {
 	RolloutDurationSeconds int64 `json:"rollout_duration_seconds,omitempty"`
 
 	// The action signed data and signature.
-	Signed json.RawMessage `json:"signed,omitempty"`
+	Signed *Signed `json:"signed,omitempty"`
 
 	// The action start date/time
 	StartTime string `json:"start_time,omitempty"`
@@ -388,6 +388,12 @@ type ServerMetadata struct {
 
 // Signed The action signed data and signature.
 type Signed struct {
+
+	// The base64 encoded, UTF-8 JSON serialized action bytes that are signed.
+	Data string `json:"data,omitempty"`
+
+	// The base64 encoded signature.
+	Signature string `json:"signature,omitempty"`
 }
 
 // ToRetireAPIKeyIdsItems the Output API Keys that were replaced and should be retired

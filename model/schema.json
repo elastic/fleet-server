@@ -74,7 +74,16 @@
         "signed": {
           "description": "The action signed data and signature.",
           "type": "object",
-          "format": "raw"
+          "properties": {
+            "data": {
+              "description": "The base64 encoded, UTF-8 JSON serialized action bytes that are signed.",
+              "type": "string"
+            },
+            "signature": {
+              "description": "The base64 encoded signature.",
+              "type": "string"
+            }
+          }
         }
       },
       "required": [
