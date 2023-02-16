@@ -51,7 +51,8 @@ func validateSerialization(t *testing.T, action ActionResp) {
 	if action.Signed == nil {
 		assert.False(t, ok)
 	} else {
-		sm := signed.(map[string]interface{})
+		sm, ok := signed.(map[string]interface{})
+		assert.True(t, ok)
 		assert.Equal(t, action.Signed.Data, sm["data"])
 		assert.Equal(t, action.Signed.Signature, sm["signature"])
 	}
