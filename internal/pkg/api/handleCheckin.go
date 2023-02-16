@@ -392,6 +392,12 @@ func convertActions(agentID string, actions []model.Action) ([]Action, string) {
 		if action.Timeout != 0 {
 			r.Timeout = &action.Timeout
 		}
+		if action.Signed != nil {
+			r.Signed = &ActionSignature{
+				Data:      action.Signed.Data,
+				Signature: action.Signed.Signature,
+			}
+		}
 		respList = append(respList, r)
 	}
 

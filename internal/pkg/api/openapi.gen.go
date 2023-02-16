@@ -128,6 +128,9 @@ type Action struct {
 	// InputType The input type of the action for actions with type `INPUT_ACTION`.
 	InputType string `json:"input_type" yaml:"input_type"`
 
+	// Signed Optional action signing data.
+	Signed *ActionSignature `json:"signed,omitempty" yaml:"signed"`
+
 	// StartTime The earliest execution time for the action. Agent will not execute the action before this time. Used for scheduled actions.
 	StartTime *string `json:"start_time,omitempty" yaml:"start_time"`
 
@@ -136,6 +139,15 @@ type Action struct {
 
 	// Type The action type.
 	Type string `json:"type" yaml:"type"`
+}
+
+// ActionSignature Optional action signing data.
+type ActionSignature struct {
+	// Data The base64 encoded, UTF-8 JSON serialized action bytes that are signed.
+	Data string `json:"data,omitempty" yaml:"data"`
+
+	// Signature The base64 encoded signature.
+	Signature string `json:"signature,omitempty" yaml:"signature"`
 }
 
 // CheckinRequest defines model for checkinRequest.
