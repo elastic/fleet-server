@@ -462,7 +462,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	var agent *model.Agent
 	if cfg.Fleet.Agent.Checkin {
 		sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
-		if f.standAlone && cfg.Fleet.Agent.Checkin {
+		if f.standAlone {
 			agent, err = f.standAloneSetup(ctx, bulker, sm, cfg.Inputs[0].Policy.ID, cfg.Fleet.Agent.ID)
 			if err != nil {
 				return err
