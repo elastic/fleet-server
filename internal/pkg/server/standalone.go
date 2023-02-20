@@ -115,8 +115,6 @@ func (f *Fleet) standAloneCheckin(agent *model.Agent, ct *api.CheckinT) runFunc 
 				tick.Reset(30 * time.Second)
 			}
 		}
-		log.Debug().Str("agent_id", agent.Agent.ID).Msg("exiting self-checkin")
-		return nil
 	}
 }
 
