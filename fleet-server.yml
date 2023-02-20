@@ -10,7 +10,7 @@ fleet:
     id: '${FLEET_SERVER_AGENT_ID:dev-fleet-server}'
 
     # Disable self check-in for standalone mode.
-    checkin: ${FLEET_SERVER_AGENT_CHECKIN:false}
+    checkin: ${FLEET_SERVER_AGENT_CHECKIN:true}
 
 inputs:
   - type: fleet-server
