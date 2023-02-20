@@ -38,4 +38,5 @@
 - Document how to run fleet server locally. {issue}1423[1423] {pull}2212[2212]
 - Fleet server now supports file uploads for a limited subset of integrations {pull}1902[1902]
 - Increase checkin long-poll default time to 28m, and write time to 29m. {issue}2337[2337] {pull}2341[2341]
+- Fleet server can be run in stand-alone mode without needing to check into Kibana. {}[] {}[]
 

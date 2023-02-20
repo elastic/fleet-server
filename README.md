@@ -6,8 +6,6 @@ Fleet server is the control server to manage a fleet of [elastic-agents](https:/
 
 For production deployments the fleet-server is supervised and bootstrapped by an elastic-agent.
 
-To assist with development the fleet-server may run in a stand-alone mode.
-
 ## Compatibility and upgrades
 
 Fleet-server communicates with Elasticsearch. Elasticsearch must be on the same version or newer.
@@ -34,7 +32,7 @@ The following are notes to help developers onboarding to the project to quickly 
 ### Development build
 
 To compile the fleet-server in development mode set the env var `DEV=true`.
-When compiled in development mode the fleet-server will support debugging and stand-alone execution.
+When compiled in development mode the fleet-server will support debugging.
 i.e.:
 ```shell
 SNAPSHOT=true DEV=true make release-darwin/amd64
