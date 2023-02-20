@@ -68,7 +68,11 @@ func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (
 		authed = false
 	}
 
-	state = rt.sm.State()
+	// TODO: Implement an actual self-monitor for standalone and get an actual state.
+	state = client.UnitStateHealthy
+	if rt.sm != nil {
+		state = rt.sm.State()
+	}
 	resp = StatusResponse{
 		Name:   build.ServiceName,
 		Status: state.String(),

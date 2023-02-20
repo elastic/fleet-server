@@ -458,15 +458,18 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
 
 	// Policy self monitor
-	sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
+	var sm policy.SelfMonitor
 	var agent *model.Agent
-	if f.standAlone {
-		agent, err = f.standAloneSetup(ctx, bulker, sm, cfg.Inputs[0].Policy.ID, cfg.Fleet.Agent.ID)
-		if err != nil {
-			return err
+	if cfg.Fleet.Agent.Checkin {
+		sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
+		if f.standAlone && cfg.Fleet.Agent.Checkin {
+			agent, err = f.standAloneSetup(ctx, bulker, sm, cfg.Inputs[0].Policy.ID, cfg.Fleet.Agent.ID)
+			if err != nil {
+				return err
+			}
+		} else {
+			g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 		}
-	} else {
-		g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 	}
 
 	// Actions monitoring
@@ -500,7 +503,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 		return err
 	}
 
-	if f.standAlone {
+	if f.standAlone && cfg.Fleet.Agent.Checkin {
 		g.Go(loggedRunFunc(ctx, "self-checkin", f.standAloneCheckin(agent, ct)))
 	}
 
