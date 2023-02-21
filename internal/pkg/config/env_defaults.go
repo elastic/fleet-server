@@ -50,6 +50,21 @@ const (
 	defaultStatusBurst    = 25
 	defaultStatusMax      = 50
 	defaultStatusMaxBody  = 0
+
+	defaultUploadStartInterval = time.Second * 3
+	defaultUploadStartBurst    = 8
+	defaultUploadStartMax      = 3
+	defaultUploadStartMaxBody  = 1024 * 1024 * 5
+
+	defaultUploadEndInterval = time.Second * 2
+	defaultUploadEndBurst    = 5
+	defaultUploadEndMax      = 2
+	defaultUploadEndMaxBody  = 1024
+
+	defaultUploadChunkInterval = time.Millisecond * 3
+	defaultUploadChunkBurst    = 10
+	defaultUploadChunkMax      = 5
+	defaultUploadChunkMaxBody  = 1024 * 1024 * 4 // this is also enforced in handler, a chunk MAY NOT be larger than 4 MiB
 )
 
 type valueRange struct {
@@ -98,11 +113,14 @@ type serverLimitDefaults struct {
 	PolicyThrottle time.Duration `config:"policy_throttle"`
 	MaxConnections int           `config:"max_connections"`
 
-	CheckinLimit  limit `config:"checkin_limit"`
-	ArtifactLimit limit `config:"artifact_limit"`
-	EnrollLimit   limit `config:"enroll_limit"`
-	AckLimit      limit `config:"ack_limit"`
-	StatusLimit   limit `config:"status_limit"`
+	CheckinLimit     limit `config:"checkin_limit"`
+	ArtifactLimit    limit `config:"artifact_limit"`
+	EnrollLimit      limit `config:"enroll_limit"`
+	AckLimit         limit `config:"ack_limit"`
+	StatusLimit      limit `config:"status_limit"`
+	UploadStartLimit limit `config:"upload_start_limit"`
+	UploadEndLimit   limit `config:"upload_end_limit"`
+	UploadChunkLimit limit `config:"upload_chunk_limit"`
 }
 
 func defaultserverLimitDefaults() *serverLimitDefaults {
@@ -139,6 +157,24 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Burst:    defaultStatusBurst,
 			Max:      defaultStatusMax,
 			MaxBody:  defaultStatusMaxBody,
+		},
+		UploadStartLimit: limit{
+			Interval: defaultUploadStartInterval,
+			Burst:    defaultUploadStartBurst,
+			Max:      defaultUploadStartMax,
+			MaxBody:  defaultUploadStartMaxBody,
+		},
+		UploadEndLimit: limit{
+			Interval: defaultUploadEndInterval,
+			Burst:    defaultUploadEndBurst,
+			Max:      defaultUploadEndMax,
+			MaxBody:  defaultUploadEndMaxBody,
+		},
+		UploadChunkLimit: limit{
+			Interval: defaultUploadChunkInterval,
+			Burst:    defaultUploadChunkBurst,
+			Max:      defaultUploadChunkMax,
+			MaxBody:  defaultUploadChunkMaxBody,
 		},
 	}
 }
