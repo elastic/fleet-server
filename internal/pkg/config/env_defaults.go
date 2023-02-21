@@ -59,7 +59,7 @@ const (
 	defaultUploadChunkInterval = time.Millisecond * 3
 	defaultUploadChunkBurst    = 10
 	defaultUploadChunkMax      = 5
-	defaultUploadChunkMaxBody  = 1024 * 1024 * 100 // this is also enforced in handler, a chunk MAY NOT be larger than 100 MiB
+	defaultUploadChunkMaxBody  = 1024 * 1024 * 4 // this is also enforced in handler, a chunk MAY NOT be larger than 4 MiB
 )
 
 type valueRange struct {
