@@ -406,7 +406,7 @@ func convertActions(agentID string, actions []model.Action) ([]ActionResp, strin
 
 	respList := make([]ActionResp, 0, sz)
 	for _, action := range actions {
-		respList = append(respList, ActionResp{
+		ar := ActionResp{
 			AgentID:    agentID,
 			CreatedAt:  action.Timestamp,
 			StartTime:  action.StartTime,
@@ -416,7 +416,15 @@ func convertActions(agentID string, actions []model.Action) ([]ActionResp, strin
 			Type:       action.Type,
 			InputType:  action.InputType,
 			Timeout:    action.Timeout,
-		})
+		}
+
+		if action.Signed != nil {
+			ar.Signed = &ActionRespSigned{
+				Data:      action.Signed.Data,
+				Signature: action.Signed.Signature,
+			}
+		}
+		respList = append(respList, ar)
 	}
 
 	if sz > 0 {
@@ -427,9 +435,8 @@ func convertActions(agentID string, actions []model.Action) ([]ActionResp, strin
 }
 
 // A new policy exists for this agent.  Perform the following:
-//  - Generate and update default ApiKey if roles have changed.
-//  - Rewrite the policy for delivery to the agent injecting the key material.
-//
+//   - Generate and update default ApiKey if roles have changed.
+//   - Rewrite the policy for delivery to the agent injecting the key material.
 func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string, pp *policy.ParsedPolicy) (*ActionResp, error) {
 	zlog = zlog.With().
 		Str("fleet.ctx", "processPolicy").
