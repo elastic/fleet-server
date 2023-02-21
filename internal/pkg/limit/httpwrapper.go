@@ -13,23 +13,29 @@ import (
 
 // HTTPWrapper enforces rate limits for each API endpoint.
 type HTTPWrapper struct {
-	checkin  *limiter
-	artifact *limiter
-	enroll   *limiter
-	ack      *limiter
-	status   *limiter
-	log      zerolog.Logger
+	checkin     *limiter
+	artifact    *limiter
+	enroll      *limiter
+	ack         *limiter
+	status      *limiter
+	uploadStart *limiter
+	uploadEnd   *limiter
+	uploadChunk *limiter
+	log         zerolog.Logger
 }
 
 // Create a new HTTPWrapper using the specified limits.
 func NewHTTPWrapper(addr string, cfg *config.ServerLimits) *HTTPWrapper {
 	return &HTTPWrapper{
-		checkin:  newLimiter(&cfg.CheckinLimit),
-		artifact: newLimiter(&cfg.ArtifactLimit),
-		enroll:   newLimiter(&cfg.EnrollLimit),
-		ack:      newLimiter(&cfg.AckLimit),
-		status:   newLimiter(&cfg.StatusLimit),
-		log:      log.With().Str("addr", addr).Logger(),
+		checkin:     newLimiter(&cfg.CheckinLimit),
+		artifact:    newLimiter(&cfg.ArtifactLimit),
+		enroll:      newLimiter(&cfg.EnrollLimit),
+		ack:         newLimiter(&cfg.AckLimit),
+		status:      newLimiter(&cfg.StatusLimit),
+		uploadStart: newLimiter(&cfg.UploadStartLimit),
+		uploadEnd:   newLimiter(&cfg.UploadEndLimit),
+		uploadChunk: newLimiter(&cfg.UploadChunkLimit),
+		log:         log.With().Str("addr", addr).Logger(),
 	}
 }
 
@@ -56,6 +62,18 @@ func (l *HTTPWrapper) WrapAck(h httprouter.Handle, i StatIncer) httprouter.Handl
 // WhapStatus wraps the checkin handler with the rate limiter and tracks statistics for the endpoint.
 func (l *HTTPWrapper) WrapStatus(h httprouter.Handle, i StatIncer) httprouter.Handle {
 	return l.status.wrap(l.log.With().Str("route", "status").Logger(), zerolog.DebugLevel, h, i)
+}
+
+func (l *HTTPWrapper) WrapUploadStart(h httprouter.Handle, i StatIncer) httprouter.Handle {
+	return l.uploadStart.wrap(l.log.With().Str("route", "uploadStart").Logger(), zerolog.DebugLevel, h, i)
+}
+
+func (l *HTTPWrapper) WrapUploadEnd(h httprouter.Handle, i StatIncer) httprouter.Handle {
+	return l.uploadEnd.wrap(l.log.With().Str("route", "uploadEnd").Logger(), zerolog.DebugLevel, h, i)
+}
+
+func (l *HTTPWrapper) WrapUploadChunk(h httprouter.Handle, i StatIncer) httprouter.Handle {
+	return l.uploadChunk.wrap(l.log.With().Str("route", "uploadChunk").Logger(), zerolog.DebugLevel, h, i)
 }
 
 // StatIncer is the interface used to count statistics associated with an endpoint.
