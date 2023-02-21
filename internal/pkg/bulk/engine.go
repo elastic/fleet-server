@@ -337,7 +337,7 @@ func (b *Bulker) parseOpts(opts ...Opt) optionsT {
 func (b *Bulker) newBlk(action actionT, opts optionsT) *bulkT {
 	blk := b.blkPool.Get().(*bulkT) //nolint:errcheck // we control what is placed in the pool
 	blk.action = action
-	if opts.Refresh {
+	if opts.Refresh == "wait_for" {
 		blk.flags.Set(flagRefresh)
 	}
 	return blk

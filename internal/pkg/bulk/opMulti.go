@@ -80,7 +80,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 		bulk.idx = int32(i)
 		bulk.action = action
 		bulk.buf.Set(bodySlice)
-		if opt.Refresh {
+		if opt.Refresh == "wait_for" {
 			bulk.flags.Set(flagRefresh)
 		}
 	}

@@ -129,7 +129,7 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 		}
 		req.Header.Set("Content-Type", "application/cbor")
 		req.Header.Set("Accept", "application/json")
-		req.Refresh = "true"
+		req.Refresh = "wait_for"
 	})
 	if err != nil {
 		return err

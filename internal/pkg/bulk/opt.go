@@ -17,7 +17,7 @@ import (
 // Transaction options
 
 type optionsT struct {
-	Refresh            bool
+	Refresh            string
 	RetryOnConflict    string
 	Indices            []string
 	WaitForCheckpoints []int64
@@ -27,7 +27,7 @@ type Opt func(*optionsT)
 
 func WithRefresh() Opt {
 	return func(opt *optionsT) {
-		opt.Refresh = true
+		opt.Refresh = "wait_for"
 	}
 }
 
