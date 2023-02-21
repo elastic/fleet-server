@@ -22,6 +22,7 @@
 - Ignore UPDATE_TAGS and FORCE_UNENROLL actions on agent checkin {issue}2199[2199] {pull}2200[2200]
 - Fix the index monitor checkpoint tracking for when the documents are deleted {issue}2205[2205] {pull}2206[2206]
 - Allow the the Warn log level to be specified as "warning" and "warn" {issue}2328[2328] {pull}2331[2331]
+- Fix fleet-server discarding duplicate `server` keys input when creating config from policy. {issue}2303[2303] {pull}2354[2354]
 
 ==== New Features
 
