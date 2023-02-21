@@ -364,6 +364,17 @@ func (a *Agent) configFromUnits() (*config.Config, error) {
 		logLevel = outputLevel
 	}
 
+	// pass inputs from policy through go-ucfg in order to flatten keys
+	// if inputCfg.Source.AsMap() is passed directly, any additional server.* settings will be missed
+	var input map[string]interface{}
+	inputsConfig, err := ucfg.NewFrom(inputCfg.Source.AsMap(), config.DefaultOptions...)
+	if err != nil {
+		return nil, err
+	}
+	if err := inputsConfig.Unpack(&input, config.DefaultOptions...); err != nil {
+		return nil, err
+	}
+
 	cfgData, err := ucfg.NewFrom(map[string]interface{}{
 		"fleet": map[string]interface{}{
 			"agent": map[string]interface{}{
@@ -378,7 +389,7 @@ func (a *Agent) configFromUnits() (*config.Config, error) {
 			"elasticsearch": outputCfg.Source.AsMap(),
 		},
 		"inputs": []interface{}{
-			inputCfg.Source.AsMap(),
+			input,
 		},
 		"logging": map[string]interface{}{
 			"level": logLevel.String(),
