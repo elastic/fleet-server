@@ -35,7 +35,6 @@ const (
 )
 
 // FIXME Should we use the structs in openapi.gen.go instead of the generic ones? Will need to rework the uploader if we do
-
 type UploadT struct {
 	bulker      bulk.Bulk
 	chunkClient *elasticsearch.Client

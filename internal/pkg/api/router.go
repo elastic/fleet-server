@@ -54,9 +54,9 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 		enroll:         limit.NewLimiter(&cfg.EnrollLimit),
 		ack:            limit.NewLimiter(&cfg.AckLimit),
 		status:         limit.NewLimiter(&cfg.StatusLimit),
-		uploadBegin:    limit.NewLimiter(nil), // TODO add limits
-		uploadChunk:    limit.NewLimiter(nil),
-		uploadComplete: limit.NewLimiter(nil),
+		uploadBegin:    limit.NewLimiter(&cfg.UploadStartLimit),
+		uploadChunk:    limit.NewLimiter(&cfg.UploadChunkLimit),
+		uploadComplete: limit.NewLimiter(&cfg.UploadEndLimit),
 	}
 }
 
@@ -107,7 +107,7 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 		case "artifact":
 			l.artifact.Wrap("artifact", &cntArtifacts, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "uploadBegin":
-			l.uploadBegin.Wrap("uploadBegin", &cntUpload, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+			l.uploadBegin.Wrap("uploadBegin", &cntUploadStart, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "uploadComplete":
 			l.uploadComplete.Wrap("uploadComplete", &cntUploadEnd, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "uploadChunk":

@@ -97,7 +97,7 @@ func (a *apiServer) UploadBegin(w http.ResponseWriter, r *http.Request, params U
 	zlog := hlog.FromRequest(r).With().Logger()
 	err := a.ut.handleUploadBegin(zlog, w, r)
 	if err != nil {
-		cntUpload.IncError(err)
+		cntUploadStart.IncError(err)
 		ErrorResp(w, r, err)
 	}
 }
@@ -106,7 +106,7 @@ func (a *apiServer) UploadComplete(w http.ResponseWriter, r *http.Request, id st
 	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
 	err := a.ut.handleUploadComplete(zlog, w, r, id)
 	if err != nil {
-		cntUpload.IncError(err)
+		cntUploadEnd.IncError(err)
 		ErrorResp(w, r, err)
 	}
 }
@@ -115,12 +115,12 @@ func (a *apiServer) UploadChunk(w http.ResponseWriter, r *http.Request, id strin
 	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
 
 	if _, err := a.ut.authAPIKey(r, a.bulker, a.ut.cache); err != nil {
-		cntUpload.IncError(err)
+		cntUploadChunk.IncError(err)
 		ErrorResp(w, r, err)
 		return
 	}
 	if err := a.ut.handleUploadChunk(zlog, w, r, id, chunkNum, params.XChunkSHA2); err != nil {
-		cntUpload.IncError(err)
+		cntUploadChunk.IncError(err)
 		ErrorResp(w, r, err)
 	}
 }
