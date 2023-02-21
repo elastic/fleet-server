@@ -21,11 +21,13 @@ type ServerLimits struct {
 	MaxHeaderByteSize int           `config:"max_header_byte_size"`
 	MaxConnections    int           `config:"max_connections"`
 
-	CheckinLimit  Limit `config:"checkin_limit"`
-	ArtifactLimit Limit `config:"artifact_limit"`
-	EnrollLimit   Limit `config:"enroll_limit"`
-	AckLimit      Limit `config:"ack_limit"`
-	StatusLimit   Limit `config:"status_limit"`
+	CheckinLimit     Limit `config:"checkin_limit"`
+	ArtifactLimit    Limit `config:"artifact_limit"`
+	EnrollLimit      Limit `config:"enroll_limit"`
+	AckLimit         Limit `config:"ack_limit"`
+	StatusLimit      Limit `config:"status_limit"`
+	UploadFileLimit  Limit `config:"upload_file_limit"`
+	UploadChunkLimit Limit `config:"upload_chunk_limit"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -51,6 +53,8 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	c.EnrollLimit = mergeEnvLimit(c.EnrollLimit, l.EnrollLimit)
 	c.AckLimit = mergeEnvLimit(c.AckLimit, l.AckLimit)
 	c.StatusLimit = mergeEnvLimit(c.StatusLimit, l.StatusLimit)
+	c.UploadFileLimit = mergeEnvLimit(c.UploadFileLimit, l.UploadFileLimit)
+	c.UploadChunkLimit = mergeEnvLimit(c.UploadChunkLimit, l.UploadChunkLimit)
 }
 
 func mergeEnvLimit(L Limit, l limit) Limit {

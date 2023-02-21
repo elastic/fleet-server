@@ -106,17 +106,17 @@ func (rt *Router) newHTTPRouter(addr string) *httprouter.Router {
 		{
 			http.MethodPost,
 			RouteUploadBegin,
-			rt.handleUploadStart,
+			limiter.WrapUploadFile(rt.handleUploadStart, &cntUpload),
 		},
 		{
 			http.MethodPut,
 			RouteUploadChunk,
-			rt.handleUploadChunk,
+			limiter.WrapUploadChunk(rt.handleUploadChunk, &cntUplChunk),
 		},
 		{
 			http.MethodPost,
 			RouteUploadComplete,
-			rt.handleUploadComplete,
+			limiter.WrapUploadFile(rt.handleUploadComplete, &cntUpload),
 		},
 	}
 

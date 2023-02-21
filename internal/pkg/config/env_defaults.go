@@ -50,6 +50,16 @@ const (
 	defaultStatusBurst    = 25
 	defaultStatusMax      = 50
 	defaultStatusMaxBody  = 0
+
+	defaultUploadFileInterval = time.Second * 3
+	defaultUploadFileBurst    = 8
+	defaultUploadFileMax      = 3
+	defaultUploadFileMaxBody  = 1024 * 1024 * 5
+
+	defaultUploadChunkInterval = time.Millisecond * 3
+	defaultUploadChunkBurst    = 10
+	defaultUploadChunkMax      = 5
+	defaultUploadChunkMaxBody  = 1024 * 1024 * 100 // this is also enforced in handler, a chunk MAY NOT be larger than 100 MiB
 )
 
 type valueRange struct {
@@ -98,11 +108,13 @@ type serverLimitDefaults struct {
 	PolicyThrottle time.Duration `config:"policy_throttle"`
 	MaxConnections int           `config:"max_connections"`
 
-	CheckinLimit  limit `config:"checkin_limit"`
-	ArtifactLimit limit `config:"artifact_limit"`
-	EnrollLimit   limit `config:"enroll_limit"`
-	AckLimit      limit `config:"ack_limit"`
-	StatusLimit   limit `config:"status_limit"`
+	CheckinLimit     limit `config:"checkin_limit"`
+	ArtifactLimit    limit `config:"artifact_limit"`
+	EnrollLimit      limit `config:"enroll_limit"`
+	AckLimit         limit `config:"ack_limit"`
+	StatusLimit      limit `config:"status_limit"`
+	UploadFileLimit  limit `config:"upload_limit"`
+	UploadChunkLimit limit `config:"upload_chunk_limit"`
 }
 
 func defaultserverLimitDefaults() *serverLimitDefaults {
@@ -139,6 +151,18 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Burst:    defaultStatusBurst,
 			Max:      defaultStatusMax,
 			MaxBody:  defaultStatusMaxBody,
+		},
+		UploadFileLimit: limit{
+			Interval: defaultUploadFileInterval,
+			Burst:    defaultUploadFileBurst,
+			Max:      defaultUploadFileMax,
+			MaxBody:  defaultUploadFileMaxBody,
+		},
+		UploadChunkLimit: limit{
+			Interval: defaultUploadChunkInterval,
+			Burst:    defaultUploadChunkBurst,
+			Max:      defaultUploadChunkMax,
+			MaxBody:  defaultUploadChunkMaxBody,
 		},
 	}
 }
