@@ -51,10 +51,15 @@ const (
 	defaultStatusMax      = 50
 	defaultStatusMaxBody  = 0
 
-	defaultUploadFileInterval = time.Second * 3
-	defaultUploadFileBurst    = 8
-	defaultUploadFileMax      = 3
-	defaultUploadFileMaxBody  = 1024 * 1024 * 5
+	defaultUploadStartInterval = time.Second * 3
+	defaultUploadStartBurst    = 8
+	defaultUploadStartMax      = 3
+	defaultUploadStartMaxBody  = 1024 * 1024 * 5
+
+	defaultUploadEndInterval = time.Second * 2
+	defaultUploadEndBurst    = 5
+	defaultUploadEndMax      = 2
+	defaultUploadEndMaxBody  = 1024
 
 	defaultUploadChunkInterval = time.Millisecond * 3
 	defaultUploadChunkBurst    = 10
@@ -113,7 +118,8 @@ type serverLimitDefaults struct {
 	EnrollLimit      limit `config:"enroll_limit"`
 	AckLimit         limit `config:"ack_limit"`
 	StatusLimit      limit `config:"status_limit"`
-	UploadFileLimit  limit `config:"upload_limit"`
+	UploadStartLimit limit `config:"upload_start_limit"`
+	UploadEndLimit   limit `config:"upload_end_limit"`
 	UploadChunkLimit limit `config:"upload_chunk_limit"`
 }
 
@@ -152,11 +158,17 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Max:      defaultStatusMax,
 			MaxBody:  defaultStatusMaxBody,
 		},
-		UploadFileLimit: limit{
-			Interval: defaultUploadFileInterval,
-			Burst:    defaultUploadFileBurst,
-			Max:      defaultUploadFileMax,
-			MaxBody:  defaultUploadFileMaxBody,
+		UploadStartLimit: limit{
+			Interval: defaultUploadStartInterval,
+			Burst:    defaultUploadStartBurst,
+			Max:      defaultUploadStartMax,
+			MaxBody:  defaultUploadStartMaxBody,
+		},
+		UploadEndLimit: limit{
+			Interval: defaultUploadEndInterval,
+			Burst:    defaultUploadEndBurst,
+			Max:      defaultUploadEndMax,
+			MaxBody:  defaultUploadEndMaxBody,
 		},
 		UploadChunkLimit: limit{
 			Interval: defaultUploadChunkInterval,

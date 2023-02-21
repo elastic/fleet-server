@@ -106,7 +106,7 @@ func (rt *Router) newHTTPRouter(addr string) *httprouter.Router {
 		{
 			http.MethodPost,
 			RouteUploadBegin,
-			limiter.WrapUploadFile(rt.handleUploadStart, &cntUpload),
+			limiter.WrapUploadStart(rt.handleUploadStart, &cntUplStart),
 		},
 		{
 			http.MethodPut,
@@ -116,7 +116,7 @@ func (rt *Router) newHTTPRouter(addr string) *httprouter.Router {
 		{
 			http.MethodPost,
 			RouteUploadComplete,
-			limiter.WrapUploadFile(rt.handleUploadComplete, &cntUpload),
+			limiter.WrapUploadEnd(rt.handleUploadComplete, &cntUplEnd),
 		},
 	}
 

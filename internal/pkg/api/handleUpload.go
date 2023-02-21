@@ -47,6 +47,7 @@ func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps ht
 	// authentication occurs inside here
 	// to check that key agent ID matches the ID in the body payload yet-to-be unmarshalled
 	if err := rt.ut.handleUploadStart(&zlog, w, r); err != nil {
+		cntUplStart.IncError(err)
 		writeUploadError(err, w, zlog, start, "error initiating upload process")
 		return
 	}
@@ -69,6 +70,7 @@ func (rt Router) handleUploadChunk(w http.ResponseWriter, r *http.Request, ps ht
 	// since chunk checksums must match transit hash
 	// AND optionally the initial hash, both having stricter auth checks
 	if _, err := rt.ut.authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
+		cntUplChunk.IncError(err)
 		writeUploadError(err, w, zlog, start, "authentication failure for chunk write")
 		return
 	}
@@ -99,6 +101,7 @@ func (rt Router) handleUploadComplete(w http.ResponseWriter, r *http.Request, ps
 	// authentication occurs inside here, to ensure key agent ID
 	// matches the same agent ID the operation started with
 	if err := rt.ut.handleUploadComplete(&zlog, w, r, id); err != nil {
+		cntUplEnd.IncError(err)
 		writeUploadError(err, w, zlog, start, "error finalizing upload")
 		return
 	}
@@ -249,7 +252,6 @@ func (ut *UploadT) handleUploadComplete(_ *zerolog.Logger, w http.ResponseWriter
 // helper function for doing all the error responsibilities
 // at the HTTP edge
 func writeUploadError(err error, w http.ResponseWriter, zlog zerolog.Logger, start time.Time, msg string) {
-	cntUpload.IncError(err)
 	resp := NewHTTPErrResp(err)
 
 	zlog.WithLevel(resp.Level).

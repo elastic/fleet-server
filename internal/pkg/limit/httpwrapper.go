@@ -18,7 +18,8 @@ type HTTPWrapper struct {
 	enroll      *limiter
 	ack         *limiter
 	status      *limiter
-	uploadFile  *limiter
+	uploadStart *limiter
+	uploadEnd   *limiter
 	uploadChunk *limiter
 	log         zerolog.Logger
 }
@@ -31,7 +32,8 @@ func NewHTTPWrapper(addr string, cfg *config.ServerLimits) *HTTPWrapper {
 		enroll:      newLimiter(&cfg.EnrollLimit),
 		ack:         newLimiter(&cfg.AckLimit),
 		status:      newLimiter(&cfg.StatusLimit),
-		uploadFile:  newLimiter(&cfg.UploadFileLimit),
+		uploadStart: newLimiter(&cfg.UploadStartLimit),
+		uploadEnd:   newLimiter(&cfg.UploadEndLimit),
 		uploadChunk: newLimiter(&cfg.UploadChunkLimit),
 		log:         log.With().Str("addr", addr).Logger(),
 	}
@@ -62,8 +64,12 @@ func (l *HTTPWrapper) WrapStatus(h httprouter.Handle, i StatIncer) httprouter.Ha
 	return l.status.wrap(l.log.With().Str("route", "status").Logger(), zerolog.DebugLevel, h, i)
 }
 
-func (l *HTTPWrapper) WrapUploadFile(h httprouter.Handle, i StatIncer) httprouter.Handle {
-	return l.uploadFile.wrap(l.log.With().Str("route", "upload").Logger(), zerolog.DebugLevel, h, i)
+func (l *HTTPWrapper) WrapUploadStart(h httprouter.Handle, i StatIncer) httprouter.Handle {
+	return l.uploadStart.wrap(l.log.With().Str("route", "uploadStart").Logger(), zerolog.DebugLevel, h, i)
+}
+
+func (l *HTTPWrapper) WrapUploadEnd(h httprouter.Handle, i StatIncer) httprouter.Handle {
+	return l.uploadEnd.wrap(l.log.With().Str("route", "uploadEnd").Logger(), zerolog.DebugLevel, h, i)
 }
 
 func (l *HTTPWrapper) WrapUploadChunk(h httprouter.Handle, i StatIncer) httprouter.Handle {
