@@ -15,9 +15,10 @@ DEFAULT_IMAGE_TAG=8.8.0-4671daa2-SNAPSHOT
 BASE_IMAGE="${BASE_IMAGE:-docker.elastic.co/beats/elastic-agent:$DEFAULT_IMAGE_TAG}"
 GOARCH="${GOARCH:-$(go env GOARCH)}"
 
+SOURCE_CLOUD_IMAGE_NAME=docker.elastic.co/beats-ci/elastic-agent-cloud
 
 export DOCKER_BUILDKIT=1
-docker pull $BASE_IMAGE
+docker pull --platform linux/$GOARCH $BASE_IMAGE
 
 STACK_VERSION=$(docker inspect -f '{{index .Config.Labels "org.label-schema.version"}}' $BASE_IMAGE)
 VCS_REF=$(docker inspect -f '{{index .Config.Labels "org.label-schema.vcs-ref"}}' $BASE_IMAGE)
@@ -32,11 +33,11 @@ docker build \
 	--build-arg STACK_VERSION=$STACK_VERSION \
 	--build-arg VCS_REF_SHORT=${VCS_REF:0:6} \
 	--platform linux/$GOARCH \
-	-t ${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG} \
+	-t ${SOURCE_CLOUD_IMAGE_NAME}:${CUSTOM_IMAGE_TAG} \
 	$* $REPO_ROOT/build
 
 
-docker push ${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}
+# docker push ${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}
 
 echo "Image available at:"
 echo "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
