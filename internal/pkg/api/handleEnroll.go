@@ -175,7 +175,7 @@ func (et *EnrollerT) _enroll(
 			ID:      agentID,
 			Version: ver,
 		},
-		Tags: req.Metadata.Tags,
+		Tags: removeDuplicateStr(req.Metadata.Tags),
 	}
 
 	err = createFleetAgent(ctx, et.bulker, agentID, agentData)
@@ -199,7 +199,7 @@ func (et *EnrollerT) _enroll(
 			LocalMetadata:        agentData.LocalMetadata,
 			PolicyId:             agentData.PolicyID,
 			Status:               "online",
-			Tags:                 agentData.Tags,
+			Tags:                 removeDuplicateStr(agentData.Tags),
 			Type:                 agentData.Type,
 			UserProvidedMetadata: agentData.UserProvidedMetadata,
 		},
@@ -209,6 +209,19 @@ func (et *EnrollerT) _enroll(
 	et.cache.SetAPIKey(*accessAPIKey, true)
 
 	return &resp, nil
+}
+
+func removeDuplicateStr(strSlice []string) []string {
+	allKeys := make(map[string]bool)
+	list := []string{}
+	for _, item := range strSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
+		}
+	}
+
+	return list
 }
 
 func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string) error {
