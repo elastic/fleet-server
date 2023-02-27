@@ -3,14 +3,11 @@ output:
   elasticsearch:
     hosts: '${ELASTICSEARCH_HOSTS:https://localhost:9200}'
     service_token: '${ELASTICSEARCH_SERVICE_TOKEN}'
-    # ssl.ca_trusted_fingerprint: '${ELASTICSEARCH_CA_TRUSTED_FINGERPRINT}'
+    ssl.ca_trusted_fingerprint: '${ELASTICSEARCH_CA_TRUSTED_FINGERPRINT}'
 
 fleet:
   agent:
     id: '${FLEET_SERVER_AGENT_ID:dev-fleet-server}'
-
-    # Disable self check-in for standalone mode.
-    checkin: ${FLEET_SERVER_AGENT_CHECKIN:true}
 
 inputs:
   - type: fleet-server

@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"go.elastic.co/apm"
@@ -459,17 +458,9 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 
 	// Policy self monitor
 	var sm policy.SelfMonitor
-	var agent *model.Agent
-	if cfg.Fleet.Agent.Checkin {
-		sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
-		if f.standAlone {
-			agent, err = f.standAloneSetup(ctx, bulker, sm, cfg.Inputs[0].Policy.ID, cfg.Fleet.Agent.ID)
-			if err != nil {
-				return err
-			}
-		} else {
-			g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
-		}
+	if !f.standAlone {
+		sm = policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
+		g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 	}
 
 	// Actions monitoring
@@ -501,10 +492,6 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
-	}
-
-	if f.standAlone && cfg.Fleet.Agent.Checkin {
-		g.Go(loggedRunFunc(ctx, "self-checkin", f.standAloneCheckin(agent, ct)))
 	}
 
 	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
