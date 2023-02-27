@@ -29,14 +29,14 @@ var (
 	cntHTTPNew   *monitoring.Uint
 	cntHTTPClose *monitoring.Uint
 
-	cntCheckin   routeStats
-	cntEnroll    routeStats
-	cntAcks      routeStats
-	cntStatus    routeStats
-	cntUplStart  routeStats
-	cntUplEnd    routeStats
-	cntUplChunk  routeStats
-	cntArtifacts artifactStats
+	cntCheckin     routeStats
+	cntEnroll      routeStats
+	cntAcks        routeStats
+	cntStatus      routeStats
+	cntUploadStart routeStats
+	cntUploadChunk routeStats
+	cntUploadEnd   routeStats
+	cntArtifacts   artifactStats
 )
 
 func InitMetrics(ctx context.Context, cfg *config.Config, bi build.Info) (*api.Server, error) {
@@ -107,9 +107,9 @@ func init() {
 	cntArtifacts.Register(routesRegistry.NewRegistry("artifacts"))
 	cntAcks.Register(routesRegistry.NewRegistry("acks"))
 	cntStatus.Register(routesRegistry.NewRegistry("status"))
-	cntUplStart.Register(routesRegistry.NewRegistry("uploadStart"))
-	cntUplEnd.Register(routesRegistry.NewRegistry("uploadEnd"))
-	cntUplChunk.Register(routesRegistry.NewRegistry("uploadChunk"))
+	cntUploadStart.Register(routesRegistry.NewRegistry("uploadStart"))
+	cntUploadChunk.Register(routesRegistry.NewRegistry("uploadChunk"))
+	cntUploadEnd.Register(routesRegistry.NewRegistry("uploadEnd"))
 }
 
 func (rt *routeStats) IncError(err error) {

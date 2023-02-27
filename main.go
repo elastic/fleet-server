@@ -3,7 +3,9 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:generate schema-generate -esdoc -s -cm "{\"Api\": \"API\", \"Id\": \"ID\"}" -o internal/pkg/model/schema.go -p model model/schema.json
+//go:generate oapi-codegen --config model/oapi-cfg.yml model/openapi.yml
 //go:generate go fmt internal/pkg/model/schema.go
+//go:generate go fmt internal/pkg/api/openapi.gen.go
 
 package main
 
