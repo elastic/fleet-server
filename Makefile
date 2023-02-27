@@ -257,3 +257,10 @@ test-int-set: ## - Run integration tests without setup
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	go test -v -tags=integration -count=1 -race -p 1 ./...
+
+##################################################
+# Cloud testing targets
+##################################################
+.PHONY: build-and-push-cloud-image
+build-and-push-cloud-image:
+	GOARCH=amd64 ./dev-tools/cloud/docker/build.sh
