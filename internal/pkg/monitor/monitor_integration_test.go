@@ -194,7 +194,7 @@ func runSimpleMonitor(t *testing.T, ctx context.Context, mon SimpleMonitor, read
 }
 
 func runSimpleMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk.Bulk) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(ctx)
 	defer cn()
 
 	g, ctx := errgroup.WithContext(ctx)

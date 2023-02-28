@@ -10,7 +10,7 @@ import (
 	"errors"
 	"os"
 
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/go-ucfg/yaml"
 
@@ -31,7 +31,7 @@ const (
 
 func init() {
 	// Close default apm tracer.
-	apm.DefaultTracer.Close()
+	apm.DefaultTracer().Close()
 }
 
 func installSignalHandler() context.Context {

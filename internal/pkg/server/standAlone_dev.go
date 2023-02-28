@@ -89,7 +89,7 @@ func (f *Fleet) standAloneCheckin(agent *model.Agent, ct *api.CheckinT) runFunc 
 				log.Info().Msg("self-checkin start")
 				body := api.CheckinRequest{
 					Status:   "HEALTHY",
-					AckToken: ackToken,
+					AckToken: &ackToken,
 					// TODO Metadata?
 				}
 				b, _ := json.Marshal(body)
@@ -110,8 +110,8 @@ func (f *Fleet) standAloneCheckin(agent *model.Agent, ct *api.CheckinT) runFunc 
 					log.Error().Err(err).Msg("self-checkin unable to unmarshal response")
 					return err
 				}
-				ackToken = rBody.AckToken
-				log.Info().Str("ackToken", ackToken).Int("action_count", len(rBody.Actions)).Msg("self-checkin success token")
+				ackToken = *rBody.AckToken
+				log.Info().Str("ackToken", ackToken).Int("action_count", len(*rBody.Actions)).Msg("self-checkin success token")
 				// TODO handle policy-change, unenroll, and settings actions? upgrade?
 				log.Info().Msgf("self-checkin actions: %v", rBody.Actions)
 				tick.Reset(30 * time.Second)

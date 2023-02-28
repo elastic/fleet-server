@@ -5,6 +5,7 @@
 //go:build integration
 // +build integration
 
+//nolint:dupl // don't care about repeating code
 package server
 
 import (
@@ -17,9 +18,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
@@ -28,6 +31,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -39,15 +43,30 @@ import (
 )
 
 const (
-	serverVersion = "1.0.0"
+	serverVersion = "8.0.0"
 
 	testWaitServerUp = 3 * time.Second
+
+	enrollBody = `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	checkinBody = `{
+	    "status": "online",
+	    "message": ""
+	}`
 )
 
 type tserver struct {
-	cfg *config.Config
-	g   *errgroup.Group
-	srv *Fleet
+	cfg       *config.Config
+	g         *errgroup.Group
+	srv       *Fleet
+	enrollKey string
 }
 
 func (s *tserver) baseURL() string {
@@ -87,15 +106,53 @@ func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 		return nil, err
 	}
 
+	// In order to create a functional enrollement token we need to use the ES endpoint to create a new api key
+	// then add the key (id/value) to the enrollment index
+	esCfg := elasticsearch.Config{
+		Username: "elastic",
+		Password: "changeme",
+	}
+	es, err := elasticsearch.NewClient(esCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := apikey.Create(ctx, es, "default", "", "true", []byte(`{
+	    "fleet-apikey-enroll": {
+		"cluster": [],
+		"index": [],
+		"applications": [{
+		    "application": "fleet",
+		    "privileges": ["no-privileges"],
+		    "resources": ["*"]
+		}]
+	    }
+	}`), map[string]interface{}{
+		"managed_by": "fleet",
+		"managed":    true,
+		"type":       "enroll",
+		"policy_id":  policyID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentAPIKey{
 		Name:     "Default",
-		APIKey:   "keyvalue",
-		APIKeyID: "keyid",
+		APIKey:   key.Key,
+		APIKeyID: key.ID,
 		PolicyID: policyID,
 		Active:   true,
 	})
 	if err != nil {
 		return nil, err
+	}
+	// sanity check
+	tokens, err := dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyID, policyID)
+	if err != nil {
+		return nil, err
+	}
+	if len(tokens) == 0 {
+		return nil, fmt.Errorf("no enrollment tokens found")
 	}
 
 	port, err := ftesting.FreePort()
@@ -121,7 +178,7 @@ func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 		return srv.Run(ctx, cfg)
 	})
 
-	tsrv := &tserver{cfg: cfg, g: g, srv: srv}
+	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token()}
 	err = tsrv.waitServerUp(ctx, testWaitServerUp)
 	if err != nil {
 		return nil, fmt.Errorf("unable to start server: %w", err)
@@ -133,7 +190,11 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 	start := time.Now()
 	cli := cleanhttp.DefaultClient()
 	for {
-		res, err := cli.Get(s.baseURL() + "/api/status")
+		req, err := http.NewRequestWithContext(ctx, "GET", s.baseURL()+"/api/status", nil)
+		if err != nil {
+			return err
+		}
+		res, err := cli.Do(req)
 		if err != nil {
 			if time.Since(start) > dur {
 				return err
@@ -189,7 +250,12 @@ func TestServerUnauthorized(t *testing.T) {
 	// TODO: revisit error response format
 	t.Run("no auth header", func(t *testing.T) {
 		for _, u := range allurls {
-			res, err := cli.Post(u, "application/json", bytes.NewBuffer([]byte("{}")))
+			req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewBuffer([]byte("{}")))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			res, err := cli.Do(req)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -219,7 +285,7 @@ func TestServerUnauthorized(t *testing.T) {
 	// Unauthorized, expecting error from /_security/_authenticate
 	t.Run("unauthorized", func(t *testing.T) {
 		for _, u := range agenturls {
-			req, err := http.NewRequest("POST", u, bytes.NewBuffer([]byte("{}")))
+			req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewBuffer([]byte("{}")))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "ApiKey ZExqY1hYWUJJUVVxWDVia2JvVGM6M05XaUt5aHBRYk9YSTRQWDg4YWp0UQ==")
@@ -297,7 +363,9 @@ func TestServerInstrumentation(t *testing.T) {
 		defer require.NoError(t, Err)
 		for {
 			agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
-			res, err := cli.Post(srv.buildURL(agentID, "checkin"), "application/json", bytes.NewBuffer([]byte("{}"))) //nolint:staticcheck // error check work around
+			req, _ := http.NewRequestWithContext(ctx, "POST", srv.buildURL(agentID, "checkin"), bytes.NewBuffer([]byte("{}")))
+			req.Header.Set("Content-Type", "application/json")
+			res, err := cli.Do(req) //nolint:staticcheck // error check work around
 			if res != nil && res.Body != nil {
 				res.Body.Close()
 			}
@@ -349,4 +417,321 @@ func TestServerInstrumentation(t *testing.T) {
 	close(stopClient)
 	cancel()
 	require.NoError(t, srv.waitExit())
+}
+
+// Test_SmokeTest_Agent_Calls is a basic sanity test for fleet-server.
+// API server creation with all middlewares apply.
+//
+// It tests the agent enrollement workflow.
+// make an enroll request with an enrollment API key
+// make a followup checkin request to get the policy action
+// make another followup ack request for the action
+func Test_SmokeTest_Agent_Calls(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx)
+	require.NoError(t, err)
+
+	cli := cleanhttp.DefaultClient()
+
+	// enroll an agent
+	t.Log("Enroll an agent")
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Agent enrollment successful, verify body")
+	p, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	var obj map[string]interface{} // NOTE Should we use response objects?
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	item, ok := obj["item"]
+	require.True(t, ok, "expected attribute item is missing")
+	mm, ok := item.(map[string]interface{})
+	require.True(t, ok, "expected attribute item to be an object")
+
+	id, ok := mm["id"]
+	require.True(t, ok, "expected attribute id is missing")
+	str, ok := id.(string)
+	require.True(t, ok, "expected attribute id to be a string")
+	require.NotEmpty(t, str)
+
+	apiKey, ok := mm["access_api_key"]
+	require.True(t, ok, "expected attribute access_api_key is missing")
+	key, ok := apiKey.(string)
+	require.True(t, ok, "expected attribute access_api_key to be a string")
+	require.NotEmpty(t, key)
+
+	// checkin
+	t.Logf("Fake a checkin for agent %s", str)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+str+"/checkin", strings.NewReader(checkinBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Checkin successful, verify body")
+	p, _ = io.ReadAll(res.Body)
+	res.Body.Close()
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	at, ok := obj["ack_token"]
+	require.True(t, ok, "expected ack_token in response")
+	_, ok = at.(string)
+	require.True(t, ok, "ack_token is not a string")
+
+	actionsRaw, ok := obj["actions"]
+	require.True(t, ok, "expected actions is missing")
+	actions, ok := actionsRaw.([]interface{})
+	require.True(t, ok, "expected actions to be an array")
+	require.Greater(t, len(actions), 0, "expected at least 1 action")
+	action, ok := actions[0].(map[string]interface{})
+	require.True(t, ok, "expected action to be an object")
+	aIDRaw, ok := action["id"]
+	require.True(t, ok, "expected action id attribute missing")
+	aID, ok := aIDRaw.(string)
+	require.True(t, ok, "expected action id to be string")
+	aAgentIDRaw, ok := action["agent_id"]
+	require.True(t, ok, "expected action agent_id attribute missing")
+	aAgentID, ok := aAgentIDRaw.(string)
+	require.True(t, ok, "expected action agent_id to be string")
+	require.Equal(t, str, aAgentID)
+
+	body := fmt.Sprintf(`{
+	    "events": [{
+		"action_id": "%s",
+		"agent_id": "%s",
+		"message": "test-message",
+		"type": "ACTION_RESULT",
+		"subtype": "ACKNOWLEDGED"
+	    }]
+	}`, aID, str)
+	t.Logf("Fake an ack for action %s for agent %s", aID, str)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+str+"/acks", strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Ack successful, verify body")
+	p, _ = io.ReadAll(res.Body)
+	res.Body.Close()
+	var ackObj map[string]interface{}
+	err = json.Unmarshal(p, &ackObj)
+	require.NoError(t, err)
+
+	// NOTE the checkin response will only have the errors attribute if it's set to true in the response.
+	// When decoding to a (typed) struct, the default will implicitly be false if it's missing
+	_, ok = ackObj["errors"]
+	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
+}
+
+func Test_Agent_Auth_errors(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx)
+	require.NoError(t, err)
+
+	cli := cleanhttp.DefaultClient()
+
+	// Setup for some strange auth cases
+	// enroll an agent, and get it's API key
+	t.Log("Enroll an agent")
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	p, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	var obj map[string]interface{} // NOTE Should we use response objects?
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	item, ok := obj["item"]
+	require.True(t, ok, "expected attribute item is missing")
+	mm, ok := item.(map[string]interface{})
+	require.True(t, ok, "expected attribute item to be an object")
+	keyRaw, ok := mm["access_api_key"]
+	require.True(t, ok, "expected attribute access_api_key is missing")
+	key, ok := keyRaw.(string)
+	require.True(t, ok, "expected attribute access_api_key to be a string")
+	require.NotEmpty(t, key)
+
+	idRaw, ok := mm["id"]
+	require.True(t, ok, "expected attribute id is missing")
+	id, ok := idRaw.(string)
+	require.True(t, ok, "expected attribute id to be a string")
+	require.NotEmpty(t, id)
+
+	t.Run("use enroll key for checkin", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusNotFound, res.StatusCode) // NOTE this is a 404 and not a 400
+	})
+	t.Run("wrong agent ID", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/bad-agent-id/checkin", strings.NewReader(checkinBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+key)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+	t.Run("use another agent's api key", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		t.Log("Agent enrollment successful, verify body")
+		p, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		var obj map[string]interface{} // NOTE Should we use response objects?
+		err = json.Unmarshal(p, &obj)
+		require.NoError(t, err)
+
+		item, ok := obj["item"]
+		require.True(t, ok, "expected attribute item is missing")
+		mm, ok := item.(map[string]interface{})
+		require.True(t, ok, "expected attribute item to be an object")
+
+		idRaw, ok := mm["id"]
+		require.True(t, ok, "expected attribute id is missing")
+		id, ok := idRaw.(string)
+		require.True(t, ok, "expected attribute id to be a string")
+		require.NotEmpty(t, id)
+
+		req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+key)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+
+		res, err = cli.Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+	t.Run("use api key for enrollment", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+key)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+}
+
+func Test_Agent_request_errors(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx)
+	require.NoError(t, err)
+
+	cli := cleanhttp.DefaultClient()
+	t.Run("no auth", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+		require.NoError(t, err)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+	t.Run("bad path", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/temporary", strings.NewReader(enrollBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
+	t.Run("wrong method", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, "PUT", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
+	})
+	t.Run("no body", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", nil)
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+	t.Run("no user agent", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+	t.Run("bad user agent", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+		req.Header.Set("User-Agent", "elastic-agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
 }

@@ -255,6 +255,32 @@ components:
           type: string
           format: application/json
           x-go-type: json.RawMessage
+    actionSignature:
+      description: Optional action signing data.
+      type: object
+      x-go-custom-tag: yaml:"signed" # openapi-generator
+      x-oapi-codegen-extra-tags: # oapi-codegen tags
+        yaml: "signed"
+      required:
+        - data      # NOTE: work around to avoid a pointer
+        - signature # NOTE: work around to avoid a pointer
+      properties:
+        data:
+          description: The base64 encoded, UTF-8 JSON serialized action bytes that are signed.
+          type: string
+          format: base64
+          x-go-custom-tag: yaml:"data" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "data"
+            json: "data,omitempty"
+        signature:
+          description: The base64 encoded signature.
+          type: string
+          format: base64
+          x-go-custom-tag: yaml:"signature" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "signature"
+            json: "signature,omitempty"
     action:
       description: |
         An action for an elastic-agent.
@@ -295,10 +321,10 @@ components:
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "expiration"
         data:
+          # oapi-codegen type should be: interface{}
           description: An embedded action-specific object.
-          type: object
-          x-go-custom-tag: yaml:"data" # openapi-generator
-          x-oapi-codegen-extra-tags: # oapi-codegen tags
+          x-go-custom-tag: yaml:"data"
+          x-oapi-codegen-extra-tags:
             yaml: "data"
         id:
           description: The action ID.
@@ -312,7 +338,7 @@ components:
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
-        input_type: # NOTE not sure why input_type and timeout are not part of data; do we have an explanation?
+        input_type: # FIXME not sure why input_type and timeout are not part of data; do we have an explanation?
           description: The input type of the action for actions with type `INPUT_ACTION`.
           type: string
           x-go-custom-tag: yaml:"input_type" # openapi-generator
@@ -326,26 +352,7 @@ components:
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "timeout"
         signed:
-          description: The optional action signing data.
-          type: object
-          x-go-custom-tag: yaml:"signed" # openapi-generator
-          x-oapi-codegen-extra-tags: # oapi-codegen tags
-            yaml: "signed"
-          properties:
-            data:
-              description: The base64 encoded, UTF-8 JSON serialized action bytes that are signed.
-              type: string
-              format: base64
-              x-go-custom-tag: yaml:"data" # openapi-generator
-              x-oapi-codegen-extra-tags: # oapi-codegen tags
-                yaml: "data"
-            signature:
-              description: The base64 encoded signature.
-              type: string
-              format: base64
-              x-go-custom-tag: yaml:"signature" # openapi-generator
-              x-oapi-codegen-extra-tags: # oapi-codegen tags
-                yaml: "signature"
+          $ref: '#/components/schemas/actionSignature'
 
     checkinResponse:
       type: object
@@ -494,6 +501,8 @@ components:
       type: object
       required:
         - action
+        - items  # NOTE: work around as we don't want a pointer here
+        - errors # NOTE: work around as we don't want a pointer here
       properties:
         action:
           description: The action result. Will have the value "acks".
@@ -501,14 +510,21 @@ components:
         errors:
           description: A flag to indicate if one or more errors occured when proccessing events.
           type: boolean
+          nullable: false
+          x-oapi-codegen-extra-tags:
+            json: "errors,omitempty"
         items:
           description: The in-order list of results from processing events.
           type: array
+          nullable: false
           items:
             $ref: '#/components/schemas/ackResponseItem'
+          x-oapi-codegen-extra-tags:
+            json: "items,omitempty"
     uploadBeginRequest:
       title: "Upload Operation Start request body"
       type: object
+      additionalProperties: true
       required:
         - file
         - action_id
@@ -517,6 +533,7 @@ components:
       properties:
         file:
           type: object
+          additionalProperties: true
           properties:
             Compression:
               description: "The algorithm used to compress the file. Valid values: br,gzip,deflate,none"
@@ -551,12 +568,10 @@ components:
         action_id:
           description: ID of the action that requested this file
           type: string
-          format: uuid
           example: 2f440d31-2ea4-42f8-b0f2-4b6e98e8dc5e
         agent_id:
           description: Identifier of the agent uploading. Matches the ID usually found in agent.id
           type: string
-          format: uuid
           example: 9347e918-5e00-48b0-b302-a09f9258a46d
         src:
           description: The source integration sending this file
@@ -574,7 +589,6 @@ components:
         upload_id:
           description: A unique identifier for the ensuing upload operation
           type: string
-          format: uuid
           example: fbc8e23c-055d-461e-87f7-b0d1b57f14b4
         chunk_size:
           description: The required size (in bytes) that the file must be segmented into for each chunk
@@ -714,6 +728,7 @@ components:
 paths:
   /api/status:
     get:
+      operationId: status
       parameters:
         - $ref: '#/components/parameters/requestId'
       security:
@@ -773,6 +788,7 @@ paths:
     # However the id is expected to be "enroll" by fleet-server's implementation.
     # Should this route be changed to reflect that?
     post:
+      operationId: agentEnroll
       parameters:
         - name: id
           in: path
@@ -856,6 +872,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/agents/{id}/checkin:
     post:
+      operationId: agentCheckin
       description: |
         The agent checkin endpoint.
         Clients will long-poll this endpoint.
@@ -938,6 +955,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/agents/{id}/acks:
     post:
+      operationId: agentAcks
       description: |
         The endpoint that an agent uses to acknowledge (and inform fleet-server) of events that it has recieved/executed.
         A single action may have multiple different events associated with it.
@@ -996,6 +1014,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/artifacts/{id}/{sha2}:
     get:
+      operationId: artifact
       description: The route to retrieve an artifact from Elasticsearch.
       parameters:
         - name: id
@@ -1035,6 +1054,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/uploads:
     post:
+      operationId: uploadBegin
       summary: Initiate a file upload process
       description: ""
       security:
@@ -1065,6 +1085,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/uploads/{id}/{chunkNum}:
     put:
+      operationId: uploadChunk
       summary: Upload a section of file data
       description: "Upload portions of the intended file in a piecewise fashion. This route is idempotent in that any successive calls will overwrite previous ones for the same URL parameters. Chunks may be uploaded in any order, and may be uploaded in parallel. The body is the raw contents of the file at the given position matching the chunk number. The body must be the exact chunk size returned from the upload initiation response. All chunks must be this size except for the final one, which is naturally the file remainder."
       security:
@@ -1076,7 +1097,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
             example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
         - name: chunkNum
           in: path
@@ -1114,6 +1134,7 @@ paths:
           $ref: '#/components/responses/unavailable'
   /api/fleet/uploads/{id}:
     post:
+      operationId: uploadComplete
       summary: Complete a file upload process
       description: ""
       security:
@@ -1131,7 +1152,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
             example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
         - $ref: '#/components/parameters/requestId'
       responses:

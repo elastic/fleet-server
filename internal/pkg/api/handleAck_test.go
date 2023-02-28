@@ -66,23 +66,23 @@ func TestEventToActionResult(t *testing.T) {
 		{
 			name: "success",
 			ev: Event{
-				ActionID:        "1b12dcd8-bde0-4045-92dc-c4b27668d733",
+				ActionId:        "1b12dcd8-bde0-4045-92dc-c4b27668d733",
 				ActionInputType: "osquery",
 				StartedAt:       "2022-02-23T18:26:08.506128Z",
 				CompletedAt:     "2022-02-23T18:26:08.507593Z",
-				ActionData:      []byte(`{"query": "select * from osquery_info"}`),
-				ActionResponse:  []byte(`{"osquery": {"count": 1}}`),
+				ActionData:      ptr(json.RawMessage(`{"query": "select * from osquery_info"}`)),
+				ActionResponse:  ptr(json.RawMessage(`{"osquery": {"count": 1}}`)),
 			},
 		},
 		{
 			name: "error",
 			ev: Event{
-				ActionID:        "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+				ActionId:        "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				ActionInputType: "osquery",
 				StartedAt:       "2022-02-24T18:26:08.506128Z",
 				CompletedAt:     "2022-02-24T18:26:08.507593Z",
-				ActionData:      []byte(`{"query": "select * from osquery_info"}`),
-				Error:           "action undefined",
+				ActionData:      ptr(json.RawMessage(`{"query": "select * from osquery_info"}`)),
+				Error:           ptr("action undefined"),
 			},
 		},
 	}
@@ -91,13 +91,25 @@ func TestEventToActionResult(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			acr := eventToActionResult(agentID, tc.ev)
 			assert.Equal(t, agentID, acr.AgentID)
-			assert.Equal(t, tc.ev.ActionID, acr.ActionID)
+			assert.Equal(t, tc.ev.ActionId, acr.ActionID)
 			assert.Equal(t, tc.ev.ActionInputType, acr.ActionInputType)
 			assert.Equal(t, tc.ev.StartedAt, acr.StartedAt)
 			assert.Equal(t, tc.ev.CompletedAt, acr.CompletedAt)
-			assert.Equal(t, tc.ev.ActionData, acr.ActionData)
-			assert.Equal(t, tc.ev.ActionResponse, acr.ActionResponse)
-			assert.Equal(t, tc.ev.Error, acr.Error)
+			if tc.ev.ActionData != nil {
+				assert.Equal(t, *tc.ev.ActionData, acr.ActionData)
+			} else {
+				assert.Empty(t, acr.ActionData)
+			}
+			if tc.ev.ActionResponse != nil {
+				assert.Equal(t, *tc.ev.ActionResponse, acr.ActionResponse)
+			} else {
+				assert.Empty(t, acr.ActionResponse)
+			}
+			if tc.ev.Error != nil {
+				assert.Equal(t, *tc.ev.Error, acr.Error)
+			} else {
+				assert.Empty(t, acr.Error)
+			}
 		})
 	}
 }
@@ -151,9 +163,10 @@ func TestHandleAckEvents(t *testing.T) {
 		}
 	}
 	newAckResponseItem := func(status int) AckResponseItem {
+		s := http.StatusText(status)
 		return AckResponseItem{
 			Status:  status,
-			Message: http.StatusText(status),
+			Message: &s,
 		}
 	}
 
@@ -183,8 +196,8 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action agentID mismatch",
 			events: []Event{
 				{
-					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
-					AgentID:  "ab12dcd8-bde0-4045-92dc-c4b27668d737",
+					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					AgentId:  "ab12dcd8-bde0-4045-92dc-c4b27668d737",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusBadRequest)}),
@@ -197,7 +210,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action empty agent id",
 			events: []Event{
 				{
-					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusNotFound)}),
@@ -212,7 +225,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action find error",
 			events: []Event{
 				{
-					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
@@ -227,12 +240,12 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "policy action",
 			events: []Event{
 				{
-					ActionID: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionId: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(false, []AckResponseItem{{
 				Status:  http.StatusOK,
-				Message: http.StatusText(http.StatusOK),
+				Message: ptr(http.StatusText(http.StatusOK)),
 			}}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				return ftesting.NewMockBulk()
@@ -242,12 +255,12 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action found",
 			events: []Event{
 				{
-					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(false, []AckResponseItem{{
 				Status:  http.StatusOK,
-				Message: http.StatusText(http.StatusOK),
+				Message: ptr(http.StatusText(http.StatusOK)),
 			}}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
@@ -265,7 +278,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action found, create result general error",
 			events: []Event{
 				{
-					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
@@ -285,7 +298,7 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "action found, create result elasticsearch error",
 			events: []Event{
 				{
-					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusServiceUnavailable)}),
@@ -305,13 +318,13 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "upgrade action found, update agent error",
 			events: []Event{
 				{
-					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 					Type:     "UPGRADE",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{{
 				Status:  http.StatusServiceUnavailable,
-				Message: http.StatusText(http.StatusServiceUnavailable),
+				Message: ptr(http.StatusText(http.StatusServiceUnavailable)),
 			}}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
@@ -329,52 +342,52 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "mixed actions found",
 			events: []Event{
 				{
-					ActionID: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:1",
+					ActionId: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:1",
 					Type:     "POLICY_CHANGE",
 				},
 				{
-					ActionID: "1b12dcd8-bde0-4045-92dc-c4b27668d731",
+					ActionId: "1b12dcd8-bde0-4045-92dc-c4b27668d731",
 					Type:     "UNENROLL",
 				},
 				{
-					ActionID: "1b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionId: "1b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 				{
-					ActionID: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
+					ActionId: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
 					Type:     "UPGRADE",
 				},
 				{
-					ActionID: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+					ActionId: "2b12dcd8-bde0-4045-92dc-c4b27668d733",
 				},
 				{
-					ActionID: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:2",
+					ActionId: "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:2",
 					Type:     "POLICY_CHANGE",
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{
 				{
 					Status:  http.StatusOK,
-					Message: http.StatusText(http.StatusOK),
+					Message: ptr(http.StatusText(http.StatusOK)),
 				},
 				{
 					Status:  http.StatusOK,
-					Message: http.StatusText(http.StatusOK),
+					Message: ptr(http.StatusText(http.StatusOK)),
 				},
 				{
 					Status:  http.StatusNotFound,
-					Message: http.StatusText(http.StatusNotFound),
+					Message: ptr(http.StatusText(http.StatusNotFound)),
 				},
 				{
 					Status:  http.StatusOK,
-					Message: http.StatusText(http.StatusOK),
+					Message: ptr(http.StatusText(http.StatusOK)),
 				},
 				{
 					Status:  http.StatusOK,
-					Message: http.StatusText(http.StatusOK),
+					Message: ptr(http.StatusText(http.StatusOK)),
 				},
 				{
 					Status:  http.StatusOK,
-					Message: http.StatusText(http.StatusOK),
+					Message: ptr(http.StatusText(http.StatusOK)),
 				},
 			}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
@@ -410,15 +423,15 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "upgrade action failed",
 			events: []Event{
 				{
-					ActionID: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
+					ActionId: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
 					Type:     "UPGRADE",
-					Error:    "Error with no payload",
+					Error:    ptr("Error with no payload"),
 				},
 			},
 			res: newAckResponse(false, []AckResponseItem{
 				{
 					Status:  http.StatusOK,
-					Message: http.StatusText(http.StatusOK),
+					Message: ptr(http.StatusText(http.StatusOK)),
 				},
 			}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
@@ -437,16 +450,16 @@ func TestHandleAckEvents(t *testing.T) {
 			name: "upgrade action retrying",
 			events: []Event{
 				{
-					ActionID: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
+					ActionId: "ab12dcd8-bde0-4045-92dc-c4b27668d73a",
 					Type:     "UPGRADE",
-					Error:    "Error with payload",
-					Payload:  json.RawMessage(`{"retry":true,"retry_attempt":1}`),
+					Error:    ptr("Error with payload"),
+					Payload:  ptr(json.RawMessage(`{"retry":true,"retry_attempt":1}`)),
 				},
 			},
 			res: newAckResponse(false, []AckResponseItem{
 				{
 					Status:  http.StatusOK,
-					Message: http.StatusText(http.StatusOK),
+					Message: ptr(http.StatusText(http.StatusOK)),
 				},
 			}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
@@ -541,8 +554,9 @@ func TestInvalidateAPIKeys(t *testing.T) {
 				Return(nil)
 		}
 
+		logger := testlog.SetLogger(t)
 		ack := &AckT{bulk: bulker}
-		ack.invalidateAPIKeys(context.Background(), out.ToRetireAPIKeyIds, skip)
+		ack.invalidateAPIKeys(context.Background(), logger, out.ToRetireAPIKeyIds, skip)
 
 		bulker.AssertExpectations(t)
 	}
@@ -564,8 +578,8 @@ func TestAckHandleUpgrade(t *testing.T) {
 	}, {
 		name: "retry signaled",
 		event: Event{
-			Error:   "upgrade error",
-			Payload: json.RawMessage(`{"retry":true,"retry_attempt":1}`),
+			Error:   ptr("upgrade error"),
+			Payload: ptr(json.RawMessage(`{"retry":true,"retry_attempt":1}`)),
 		},
 		bulker: func(t *testing.T) *ftesting.MockBulk {
 			m := ftesting.NewMockBulk()
@@ -585,8 +599,8 @@ func TestAckHandleUpgrade(t *testing.T) {
 	}, {
 		name: "no more retries",
 		event: Event{
-			Error:   "upgrade error",
-			Payload: json.RawMessage(`{"retry":false}`),
+			Error:   ptr("upgrade error"),
+			Payload: ptr(json.RawMessage(`{"retry":false}`)),
 		},
 		bulker: func(t *testing.T) *ftesting.MockBulk {
 			m := ftesting.NewMockBulk()
