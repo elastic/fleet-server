@@ -199,7 +199,7 @@ func (et *EnrollerT) _enroll(
 			LocalMetadata:        agentData.LocalMetadata,
 			PolicyId:             agentData.PolicyID,
 			Status:               "online",
-			Tags:                 removeDuplicateStr(agentData.Tags),
+			Tags:                 agentData.Tags,
 			Type:                 agentData.Type,
 			UserProvidedMetadata: agentData.UserProvidedMetadata,
 		},
