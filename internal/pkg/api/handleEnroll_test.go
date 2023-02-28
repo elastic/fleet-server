@@ -5,7 +5,6 @@
 package api
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 )
@@ -32,7 +31,6 @@ func TestRemoveDuplicateStr(t *testing.T) {
 			agentTags: []string{"foo", "bar", "baz"},
 		},
 	}
-	fmt.Println(tests)
 	for _, tr := range tests {
 		t.Run(tr.name, func(t *testing.T) {
 			uniqueTags := removeDuplicateStr(tr.inputTags)
