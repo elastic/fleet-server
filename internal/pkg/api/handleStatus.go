@@ -67,11 +67,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 		authed = false
 	}
 
-	// TODO: Implement an actual self-monitor for standalone and get an actual state.
-	state := client.UnitStateHealthy
-	if sm != nil {
-		state = sm.State()
-	}
+	state := sm.State()
 	resp := StatusResponse{
 		Name:   build.ServiceName,
 		Status: StatusResponseStatus(state.String()), // TODO try to make the oapi codegen less verbose here
