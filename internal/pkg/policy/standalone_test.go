@@ -54,7 +54,7 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
 			bulker.On("Search", searchArguments...).Return(c.searchResult, c.searchErr)
 
-			reporter := &FakeReporter{}
+			reporter := &FakeReporter{} // nolint:typecheck // golint-ci reports that `FakeReporter` doesn't exist.
 
 			sm := NewStandAloneSelfMonitor(bulker, reporter)
 			assert.Equal(t, sm.State(), client.UnitStateStarting)
