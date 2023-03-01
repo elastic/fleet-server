@@ -40,7 +40,6 @@ func (c *AgentLogging) LogLevel() zerolog.Level {
 // Agent is the ID and logging configuration of the Agent running this Fleet Server.
 type Agent struct {
 	ID      string       `config:"id"`
-	Checkin bool         `config:"checkin"`
 	Version string       `config:"version"`
 	Logging AgentLogging `config:"logging"`
 }
