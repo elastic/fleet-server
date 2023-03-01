@@ -3,10 +3,6 @@ run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   timeout: 1m
   build-tags: integration
-<<<<<<< HEAD
-=======
-  go: "1.19.5"
->>>>>>> 41972d6 ([updatecli][githubrelease] Bump version to 1.19.5 (#2321))
 
 issues:
   # Maximum count of issues with the same text.
@@ -118,7 +114,7 @@ linters-settings:
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18.10"
+    go: "1.19.5"
 
   misspell:
     # Correct spellings using locale preferences for US or UK.
@@ -153,11 +149,11 @@ linters-settings:
 
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18.10"
+    go: "1.19.5"
 
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18.10"
+    go: "1.19.5"
     initialisms: ["ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS", "ECS"]
 
 
@@ -168,17 +164,6 @@ linters-settings:
     # with golangci-lint call it on a directory with the changed file.
     check-exported: false
 
-<<<<<<< HEAD
   unused:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18.10"
-=======
-  gomodguard:
-    blocked:
-      # List of blocked modules.
-      modules:
-        - github.com/elastic/beats/v7:
-            reason: "There must be no Beats dependency, use elastic-agent-libs instead."
-        - github.com/elastic/beats/elastic-agent:
-            reason: "There must be no elastic-agent dependency, use elastic-agent-libs instead."
->>>>>>> 41972d6 ([updatecli][githubrelease] Bump version to 1.19.5 (#2321))
+    go: "1.19.5"
