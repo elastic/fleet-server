@@ -15,7 +15,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -88,10 +87,6 @@ func (m *standAloneSelfMonitorT) State() client.UnitState {
 	m.mut.RLock()
 	defer m.mut.RUnlock()
 	return m.state
-}
-
-func (m *standAloneSelfMonitorT) Policy() *model.Policy {
-	return nil
 }
 
 func (m *standAloneSelfMonitorT) check(ctx context.Context) client.UnitState {
