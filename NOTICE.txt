@@ -250,11 +250,11 @@ License Version 2.0.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-client/v7
-Version: v7.0.3
+Version: v7.0.0-20210727140539-f0905d9377f6
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.0.3/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.0.0-20210727140539-f0905d9377f6/LICENSE.txt:
 
 ELASTIC LICENSE AGREEMENT
 
@@ -52880,11 +52880,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/kr/text
-Version: v0.2.0
+Version: v0.1.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/kr/text@v0.2.0/License:
+Contents of probable licence file $GOMODCACHE/github.com/kr/text@v0.1.0/License:
 
 Copyright 2012 Keith Rarick
 
@@ -65429,11 +65429,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : gopkg.in/check.v1
-Version: v1.0.0-20201130134442-10cb98267c6c
+Version: v1.0.0-20200227125254-8fa46927fb4f
 Licence type (autodetected): BSD-2-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/gopkg.in/check.v1@v1.0.0-20201130134442-10cb98267c6c/LICENSE:
+Contents of probable licence file $GOMODCACHE/gopkg.in/check.v1@v1.0.0-20200227125254-8fa46927fb4f/LICENSE:
 
 Gocheck - A rich testing framework for Go
  
