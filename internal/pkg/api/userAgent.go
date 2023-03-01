@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -58,9 +57,7 @@ func maximizePatch(ver *version.Version) string {
 
 // validateUserAgent validates that the User-Agent of the connecting Elastic Agent is valid and that the version is
 // supported for this Fleet Server.
-func validateUserAgent(zlog zerolog.Logger, r *http.Request, verConst version.Constraints) (string, error) {
-	userAgent := r.Header.Get("User-Agent")
-
+func validateUserAgent(zlog zerolog.Logger, userAgent string, verConst version.Constraints) (string, error) {
 	zlog = zlog.With().Str("userAgent", userAgent).Logger()
 
 	if userAgent == "" {

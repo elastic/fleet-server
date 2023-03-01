@@ -1,0 +1,7 @@
+package: api
+generate:
+#  embedded-spec: true
+  models: true
+  chi-server: true
+#  strict-server: true # We need to figure out where/how to handle auth if we want to use strict generation
+output: ./internal/pkg/api/openapi.gen.go
