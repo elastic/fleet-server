@@ -67,8 +67,6 @@ func (m *standAloneSelfMonitorT) Run(ctx context.Context) error {
 		case <-cT.C:
 		}
 	}
-
-	return nil
 }
 
 func (m *standAloneSelfMonitorT) updateState(state client.UnitState, reason string) client.UnitState {
@@ -76,7 +74,7 @@ func (m *standAloneSelfMonitorT) updateState(state client.UnitState, reason stri
 	defer m.mut.Unlock()
 
 	if m.state != state {
-		m.reporter.UpdateState(state, reason, nil)
+		m.reporter.UpdateState(state, reason, nil) //nolint:errcheck // not clear what to do in failure cases
 		m.state = state
 	}
 

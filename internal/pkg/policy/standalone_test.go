@@ -2,6 +2,9 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build !integration
+// +build !integration
+
 package policy
 
 import (
@@ -54,7 +57,7 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
 			bulker.On("Search", searchArguments...).Return(c.searchResult, c.searchErr)
 
-			reporter := &FakeReporter{} // nolint:typecheck // golint-ci reports that `FakeReporter` doesn't exist.
+			reporter := &FakeReporter{}
 
 			sm := NewStandAloneSelfMonitor(bulker, reporter)
 			assert.Equal(t, sm.State(), client.UnitStateStarting)
