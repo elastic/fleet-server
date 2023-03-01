@@ -1,13 +1,24 @@
 module github.com/elastic/fleet-server/v7
 
+<<<<<<< HEAD
 go 1.16
+=======
+go 1.19
+>>>>>>> 41972d6 ([updatecli][githubrelease] Bump version to 1.19.5 (#2321))
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.1
+<<<<<<< HEAD
 	github.com/elastic/beats/v7 v7.11.2
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
+=======
+	github.com/elastic/elastic-agent-client/v7 v7.0.3
+	github.com/elastic/elastic-agent-libs v0.3.3
+	github.com/elastic/elastic-agent-system-metrics v0.4.4
+	github.com/elastic/go-elasticsearch/v8 v8.6.0
+>>>>>>> 41972d6 ([updatecli][githubrelease] Bump version to 1.19.5 (#2321))
 	github.com/elastic/go-ucfg v0.8.6
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/google/go-cmp v0.5.9
