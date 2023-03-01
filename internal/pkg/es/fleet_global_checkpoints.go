@@ -41,7 +41,6 @@ func formatDuration(d time.Duration) string {
 type GlobalCheckpoints func(o ...func(*GlobalCheckpointsRequest)) (*esapi.Response, error)
 
 // GlobalCheckpointsRequest configures the _fleet API global_checkpoints request.
-//
 type GlobalCheckpointsRequest struct {
 	ctx context.Context
 
@@ -55,7 +54,6 @@ type GlobalCheckpointsRequest struct {
 }
 
 // Do executes the request and returns response or error.
-//
 func (r GlobalCheckpointsRequest) Do(ctx context.Context, transport esapi.Transport) (*esapi.Response, error) {
 	var (
 		method string
@@ -135,7 +133,6 @@ func (r GlobalCheckpointsRequest) Do(ctx context.Context, transport esapi.Transp
 }
 
 // WithContext sets the request context.
-//
 func (f GlobalCheckpoints) WithContext(v context.Context) func(*GlobalCheckpointsRequest) {
 	return func(r *GlobalCheckpointsRequest) {
 		r.ctx = v
@@ -143,7 +140,6 @@ func (f GlobalCheckpoints) WithContext(v context.Context) func(*GlobalCheckpoint
 }
 
 // WithIndex - an index name
-//
 func (f GlobalCheckpoints) WithIndex(index string) func(*GlobalCheckpointsRequest) {
 	return func(r *GlobalCheckpointsRequest) {
 		r.Index = index

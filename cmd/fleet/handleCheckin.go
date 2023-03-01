@@ -414,9 +414,8 @@ func convertActions(agentId string, actions []model.Action) ([]ActionResp, strin
 }
 
 // A new policy exists for this agent.  Perform the following:
-//  - Generate and update default ApiKey if roles have changed.
-//  - Rewrite the policy for delivery to the agent injecting the key material.
-//
+//   - Generate and update default ApiKey if roles have changed.
+//   - Rewrite the policy for delivery to the agent injecting the key material.
 func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentId string, pp *policy.ParsedPolicy) (*ActionResp, error) {
 
 	zlog = zlog.With().

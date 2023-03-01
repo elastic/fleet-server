@@ -118,7 +118,7 @@ prepare-test-context: ## - Prepare the test context folders
 
 .PHONY: junit-report
 junit-report: ## - Run the junit-report generation for all the out files generated
-	@go install -v github.com/jstemmer/go-junit-report
+	@env GOBIN=${GOBIN} go install -v github.com/jstemmer/go-junit-report@latest
 	$(foreach file, $(wildcard build/*.out), go-junit-report > "${file}.xml" < ${file};)
 
 ##################################################
@@ -153,7 +153,7 @@ build-releaser: ## - Build a Docker image to run make package including all buil
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
-	docker run --rm --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE)
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE)
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
