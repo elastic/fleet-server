@@ -330,30 +330,31 @@ func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollRespo
 
 // updateMetaLocalAgentId updates the agent id in the local metadata if exists
 // At the time of writing the local metadata blob looks something like this
-// {
-//     "elastic": {
-//         "agent": {
-//             "id": "1b9c327a-c93a-4aef-b67f-effbef54d836",
-//             "version": "8.0.0",
-//             "snapshot": false,
-//             "upgradeable": false
-//         }
-//     },
-//     "host": {
-//         "architecture": "x86_64",
-//         "hostname": "eh-Hounddiamond",
-//         "name": "eh-Hounddiamond",
-//         "id": "1b9c327a-c93a-4aef-b67f-effbef54d836"
-//     },
-//     "os": {
-//         "family": "darwin",
-//         "kernel": "19.6.0",
-//         "platform": "darwin",
-//         "version": "10.15.7",
-//         "name": "Mac OS X",
-//         "full": "Mac OS X(10.15.7)"
-//     }
-// }
+//
+//	{
+//	    "elastic": {
+//	        "agent": {
+//	            "id": "1b9c327a-c93a-4aef-b67f-effbef54d836",
+//	            "version": "8.0.0",
+//	            "snapshot": false,
+//	            "upgradeable": false
+//	        }
+//	    },
+//	    "host": {
+//	        "architecture": "x86_64",
+//	        "hostname": "eh-Hounddiamond",
+//	        "name": "eh-Hounddiamond",
+//	        "id": "1b9c327a-c93a-4aef-b67f-effbef54d836"
+//	    },
+//	    "os": {
+//	        "family": "darwin",
+//	        "kernel": "19.6.0",
+//	        "platform": "darwin",
+//	        "version": "10.15.7",
+//	        "name": "Mac OS X",
+//	        "full": "Mac OS X(10.15.7)"
+//	    }
+//	}
 func updateLocalMetaAgentId(data []byte, agentId string) ([]byte, error) {
 	if data == nil {
 		return data, nil
