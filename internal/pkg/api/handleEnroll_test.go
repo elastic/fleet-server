@@ -28,7 +28,7 @@ func TestRemoveDuplicateStr(t *testing.T) {
 		{
 			name:      "multiple duplicated tags",
 			inputTags: []string{"foo", "bar", "bar", "baz", "foo"},
-			agentTags: []string{"foo", "bar", "baz"},
+			agentTags: []string{"bar", "baz", "foo"},
 		},
 	}
 	for _, tr := range tests {

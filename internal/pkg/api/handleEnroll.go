@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/str"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -211,17 +212,10 @@ func (et *EnrollerT) _enroll(
 	return &resp, nil
 }
 
+// Helper function to remove duplicate agent tags.
+// Note that this implementation will also sort the tags alphabetically.
 func removeDuplicateStr(strSlice []string) []string {
-	allKeys := make(map[string]bool)
-	list := []string{}
-	for _, item := range strSlice {
-		if _, value := allKeys[item]; !value {
-			allKeys[item] = true
-			list = append(list, item)
-		}
-	}
-
-	return list
+	return str.MakeSet(strSlice...).ToSlice()
 }
 
 func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string) error {
