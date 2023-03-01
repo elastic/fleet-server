@@ -115,7 +115,7 @@ func TestConfig(t *testing.T) {
 								Idle:             30 * time.Second,
 								Write:            5 * time.Second,
 								CheckinTimestamp: 30 * time.Second,
-								CheckinLongPoll:  5 * time.Minute,
+								CheckinLongPoll:  28 * time.Minute,
 								CheckinJitter:    30 * time.Second,
 							},
 							Profiler: ServerProfiler{
@@ -146,7 +146,7 @@ func TestConfig(t *testing.T) {
 			err: "only 1 fleet-server input can be defined",
 		},
 		"bad-logging": {
-			err: "invalid log level; must be one of: trace, debug, info, warning, error",
+			err: "invalid log level; must be one of: trace, debug, info, warn, error",
 		},
 		"bad-output": {
 			err: "can only contain elasticsearch key",

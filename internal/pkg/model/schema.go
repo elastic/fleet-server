@@ -54,6 +54,9 @@ type Action struct {
 	// The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.
 	RolloutDurationSeconds int64 `json:"rollout_duration_seconds,omitempty"`
 
+	// The action signed data and signature.
+	Signed *Signed `json:"signed,omitempty"`
+
 	// The action start date/time
 	StartTime string `json:"start_time,omitempty"`
 
@@ -381,6 +384,16 @@ type ServerMetadata struct {
 
 	// The version of the Fleet Server
 	Version string `json:"version"`
+}
+
+// Signed The action signed data and signature.
+type Signed struct {
+
+	// The base64 encoded, UTF-8 JSON serialized action bytes that are signed.
+	Data string `json:"data,omitempty"`
+
+	// The base64 encoded signature.
+	Signature string `json:"signature,omitempty"`
 }
 
 // ToRetireAPIKeyIdsItems the Output API Keys that were replaced and should be retired
