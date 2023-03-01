@@ -118,7 +118,7 @@ prepare-test-context: ## - Prepare the test context folders
 
 .PHONY: junit-report
 junit-report: ## - Run the junit-report generation for all the out files generated
-	@go install -v github.com/jstemmer/go-junit-report
+	@env GOBIN=${GOBIN} go install -v github.com/jstemmer/go-junit-report@latest
 	$(foreach file, $(wildcard build/*.out), go-junit-report > "${file}.xml" < ${file};)
 
 ##################################################
