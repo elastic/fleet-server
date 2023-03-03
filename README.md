@@ -50,10 +50,29 @@ You can build a fleet-server docker image with `make release-docker`. This image
 includes the default `fleet-server.yml` configuration file and can be customized
 with the available environment variables.
 
-You can define your own configuration by mounting a volume with your
-configuration file in `/etc/fleet-server.yml`.
+This image includes only `fleet-server` and is intended for stand alone mode, see
+the section about stand alone Fleet Server to know more.
 
-This image includes only `fleet-server` and is intended for standalone mode.
+You can run this image with the included configuration file with the following
+command:
+```
+docker run -it --rm \
+  -e ELASTICSEARCH_HOSTS="https://elasticsearch:9200" \
+  -e ELASTICSEARCH_SERVICE_TOKEN="someservicetoken" \
+  -e ELASTICSEARCH_CA_TRUSTED_FINGERPRINT="somefingerprint" \
+  docker.elastic.co/elastic-agent/fleet-server:8.8.0
+```
+
+You can replace the included configuration by mounting your
+configuration file as a volume in `/etc/fleet-server.yml`.
+```
+docker run -it --rm \
+  -e ELASTICSEARCH_HOSTS="https://elasticsearch:9200" \
+  -e ELASTICSEARCH_SERVICE_TOKEN="someservicetoken" \
+  -e ELASTICSEARCH_CA_TRUSTED_FINGERPRINT="somefingerprint" \
+  -v "/path/to/your/fleet-server.yml:/etc/fleet-server.yml:ro" \
+  docker.elastic.co/elastic-agent/fleet-server:8.8.0
+```
 
 ### Running a development build
 
