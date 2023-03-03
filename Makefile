@@ -158,7 +158,8 @@ release-docker:
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg=GCFLAGS="${GCFLAGS}" \
 		--build-arg=LDFLAGS="${LDFLAGS}" \
-		--build-arg=TAGS="$(if $(DEV),dev,)" \
+		--build-arg=DEV="$(DEV)" \
+		--build-arg=VERSION="$(VERSION)" \
 		-t docker.elastic.co/elastic-agent/fleet-server:$(VERSION)$(if $(DEV),-dev,) .
 
 .PHONY: package-target
