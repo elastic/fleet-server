@@ -44,6 +44,17 @@ Run `make list-platforms` to check out the possible values.
 
 The `SNAPSHOT` flag sets the snapshot version flag.
 
+### Docker build
+
+You can build a fleet-server docker image with `make release-docker`. This image
+includes the default `fleet-server.yml` configuration file and can be customized
+with the available environment variables.
+
+You can define your own configuration by mounting a volume with your
+configuration file in `/etc/fleet-server.yml`.
+
+This image includes only `fleet-server` and is intended for standalone mode.
+
 ### Running a development build
 
 #### ES and Kibana from SNAPSHOTS API on host
@@ -81,6 +92,11 @@ The kibana output will show a URL that will need to be visted in order to config
 More instructions for setup can be found in the [Elastic Stack Installation Guide](https://www.elastic.co/guide/en/elastic-stack/current/installing-elastic-stack.html).
 
 #### fleet-server stand alone
+
+Fleet UI requires a managed Fleet Server, to be able to use stand alone Fleet
+server, you need to enroll a managed Fleet Server or disable this requirement.
+You can disable this requirement since Kibana 8.8.0, starting it with
+`xpack.fleet.enableExperimental: ['fleetServerStandalone']`.
 
 Access the Fleet UI on Kibana and generate a fleet-server policy.
 Set the following env vars with the information from Kibana:
