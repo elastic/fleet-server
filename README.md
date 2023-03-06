@@ -115,7 +115,8 @@ More instructions for setup can be found in the [Elastic Stack Installation Guid
 Fleet UI requires a managed Fleet Server, to be able to use stand alone Fleet
 server, you need to enroll a managed Fleet Server or disable this requirement.
 You can disable this requirement since Kibana 8.8.0, starting it with
-`xpack.fleet.enableExperimental: ['fleetServerStandalone']`.
+`xpack.fleet.enableExperimental: ['fleetServerStandalone']`. This is only
+supported internally and is not intended for end-users at this time.
 
 Access the Fleet UI on Kibana and generate a fleet-server policy.
 Set the following env vars with the information from Kibana:
