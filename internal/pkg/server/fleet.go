@@ -405,6 +405,8 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk, tracer *apm.Tracer) (err error) {
 	esCli := bulker.Client()
 
+	// Version check is not performed in standalone mode because it is expected that
+	// standalone Fleet Server may be running with older versions of Elasticsearch.
 	if !f.standAlone {
 		// Check version compatibility with Elasticsearch
 		remoteVersion, err := ver.CheckCompatibility(ctx, esCli, f.bi.Version)
@@ -415,7 +417,11 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 			}
 			return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 		}
+	}
 
+	// Migrations are not executed in standalone mode. When needed, they will be executed
+	// by some external process.
+	if !f.standAlone {
 		// Run migrations
 		loggedMigration := loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
 			return dl.Migrate(ctx, bulker)
