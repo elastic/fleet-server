@@ -6,8 +6,6 @@ Fleet server is the control server to manage a fleet of [elastic-agents](https:/
 
 For production deployments the fleet-server is supervised and bootstrapped by an elastic-agent.
 
-To assist with development the fleet-server may run in a stand-alone mode.
-
 ## Compatibility and upgrades
 
 Fleet-server communicates with Elasticsearch. Elasticsearch must be on the same version or newer.
@@ -34,7 +32,7 @@ The following are notes to help developers onboarding to the project to quickly 
 ### Development build
 
 To compile the fleet-server in development mode set the env var `DEV=true`.
-When compiled in development mode the fleet-server will support debugging and stand-alone execution.
+When compiled in development mode the fleet-server will support debugging.
 i.e.:
 ```shell
 SNAPSHOT=true DEV=true make release-darwin/amd64
@@ -45,6 +43,36 @@ Change `release-darwin/amd64` to `release-YOUR_OS/platform`.
 Run `make list-platforms` to check out the possible values.
 
 The `SNAPSHOT` flag sets the snapshot version flag.
+
+### Docker build
+
+You can build a fleet-server docker image with `make release-docker`. This image
+includes the default `fleet-server.yml` configuration file and can be customized
+with the available environment variables.
+
+This image includes only `fleet-server` and is intended for stand alone mode, see
+the section about stand alone Fleet Server to know more.
+
+You can run this image with the included configuration file with the following
+command:
+```
+docker run -it --rm \
+  -e ELASTICSEARCH_HOSTS="https://elasticsearch:9200" \
+  -e ELASTICSEARCH_SERVICE_TOKEN="someservicetoken" \
+  -e ELASTICSEARCH_CA_TRUSTED_FINGERPRINT="somefingerprint" \
+  docker.elastic.co/elastic-agent/fleet-server:8.8.0
+```
+
+You can replace the included configuration by mounting your
+configuration file as a volume in `/etc/fleet-server.yml`.
+```
+docker run -it --rm \
+  -e ELASTICSEARCH_HOSTS="https://elasticsearch:9200" \
+  -e ELASTICSEARCH_SERVICE_TOKEN="someservicetoken" \
+  -e ELASTICSEARCH_CA_TRUSTED_FINGERPRINT="somefingerprint" \
+  -v "/path/to/your/fleet-server.yml:/etc/fleet-server.yml:ro" \
+  docker.elastic.co/elastic-agent/fleet-server:8.8.0
+```
 
 ### Running a development build
 
@@ -83,6 +111,12 @@ The kibana output will show a URL that will need to be visted in order to config
 More instructions for setup can be found in the [Elastic Stack Installation Guide](https://www.elastic.co/guide/en/elastic-stack/current/installing-elastic-stack.html).
 
 #### fleet-server stand alone
+
+Fleet UI requires a managed Fleet Server, to be able to use stand alone Fleet
+server, you need to enroll a managed Fleet Server or disable this requirement.
+You can disable this requirement since Kibana 8.8.0, starting it with
+`xpack.fleet.enableExperimental: ['fleetServerStandalone']`. This is only
+supported internally and is not intended for end-users at this time.
 
 Access the Fleet UI on Kibana and generate a fleet-server policy.
 Set the following env vars with the information from Kibana:

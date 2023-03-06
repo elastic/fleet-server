@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"go.elastic.co/apm/v2"
@@ -406,22 +405,30 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk, tracer *apm.Tracer) (err error) {
 	esCli := bulker.Client()
 
-	// Check version compatibility with Elasticsearch
-	remoteVersion, err := ver.CheckCompatibility(ctx, esCli, f.bi.Version)
-	if err != nil {
-		if len(remoteVersion) != 0 {
-			return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w",
-				f.bi.Version, remoteVersion, err)
+	// Version check is not performed in standalone mode because it is expected that
+	// standalone Fleet Server may be running with older versions of Elasticsearch.
+	if !f.standAlone {
+		// Check version compatibility with Elasticsearch
+		remoteVersion, err := ver.CheckCompatibility(ctx, esCli, f.bi.Version)
+		if err != nil {
+			if len(remoteVersion) != 0 {
+				return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w",
+					f.bi.Version, remoteVersion, err)
+			}
+			return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 		}
-		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
-	// Run migrations
-	loggedMigration := loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
-		return dl.Migrate(ctx, bulker)
-	})
-	if err = loggedMigration(); err != nil {
-		return fmt.Errorf("failed to run subsystems: %w", err)
+	// Migrations are not executed in standalone mode. When needed, they will be executed
+	// by some external process.
+	if !f.standAlone {
+		// Run migrations
+		loggedMigration := loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
+			return dl.Migrate(ctx, bulker)
+		})
+		if err = loggedMigration(); err != nil {
+			return fmt.Errorf("failed to run subsystems: %w", err)
+		}
 	}
 
 	// Run scheduler for periodic GC/cleanup
@@ -458,16 +465,13 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
 
 	// Policy self monitor
-	sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
-	var agent *model.Agent
+	var sm policy.SelfMonitor
 	if f.standAlone {
-		agent, err = f.standAloneSetup(ctx, bulker, sm, cfg.Inputs[0].Policy.ID, cfg.Fleet.Agent.ID)
-		if err != nil {
-			return err
-		}
+		sm = policy.NewStandAloneSelfMonitor(bulker, f.reporter)
 	} else {
-		g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
+		sm = policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
 	}
+	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 
 	// Actions monitoring
 	var am monitor.SimpleMonitor
@@ -498,10 +502,6 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
-	}
-
-	if f.standAlone {
-		g.Go(loggedRunFunc(ctx, "self-checkin", f.standAloneCheckin(agent, ct)))
 	}
 
 	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)

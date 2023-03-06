@@ -152,6 +152,16 @@ $(PLATFORM_TARGETS): release-%:
 	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(DEV),-tags="dev",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
 
+.PHONY: release-docker
+release-docker:
+	docker build \
+		--build-arg GO_VERSION=$(GO_VERSION) \
+		--build-arg=GCFLAGS="${GCFLAGS}" \
+		--build-arg=LDFLAGS="${LDFLAGS}" \
+		--build-arg=DEV="$(DEV)" \
+		--build-arg=VERSION="$(VERSION)" \
+		-t docker.elastic.co/elastic-agent/fleet-server:$(VERSION)$(if $(DEV),-dev,) .
+
 .PHONY: package-target
 package-target: build/distributions
 ifeq ($(OS),windows)
