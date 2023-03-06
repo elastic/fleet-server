@@ -91,7 +91,8 @@ components:
         - local
         - tags
       properties:
-        user_provided: # FIXME should we deprecate this attribute?
+        user_provided:
+          deprecated: true
           description: |
             An embedded JSON object that holds user-provided meta-data values.
             Defined in fleet-server as a `json.RawMessage`.
@@ -126,15 +127,17 @@ components:
         - metadata
       properties:
         type:
+          deprecated: true
           description: |
             The enrollment type of the agent.
             The agent only supports the PERMANENT value
           type: string
-          enum: # FIXME what are the others for? Should this attribute be deprecated?
+          enum:
             - EPHEMERAL
             - PERMANENT
             - TEMPORARY
-        shared_id: # FIXME Should this attribute be deprecated?
+        shared_id:
+          deprecated: true
           type: string
           description: |
             The shared ID of the agent.
@@ -162,30 +165,35 @@ components:
         id:
           description: The agent ID
           type: string
-        active: # FIXME We don't support enrolling in the inactive state, i don't know if that's on the roadmap. Is this attribute needed?
+        active:
+          deprecated: true
           description: If the agent is active in fleet. Will be set to true upon enrollment.
           type: boolean
         policy_id:
           description: The policy ID that the agent is enrolled with. Decoded from the API key used in the request.
           type: string
-        type: # FIXME is this needed?
+        type:
+          deprecated: true
           description: The enrollment request type.
           type: string
         enrolled_at:
           description: The RFC3339 timestamp that the agent was enrolled at.
           type: string
           #format: date-time
-        user_provided_metadata: # FIXME still needed?
+        user_provided_metadata:
+          deprecated: true
           description: A copy of the user provided metadata from the enrollment request. Currently will be empty.
           type: string
           format: application/json
           x-go-type: json.RawMessage
         local_metadata:
+          deprecated: true
           description: A copy of the (updated) local metadata provided in the enrollment request.
           type: string
           format: application/json
           x-go-type: json.RawMessage
-        actions: # FIXME deprecate?
+        actions:
+          deprecated: true
           description: Defined in fleet-server and elastic-agent as `[]interface{}` but never used.
           type: array
           items:
@@ -197,7 +205,8 @@ components:
           description: The ApiKey token that fleet-server has generated for the enrolling agent.
           type: string
           format: password
-        status: # FIXME Does this have any value? The UI does other calculations to infer status.
+        status:
+          deprecated: true
           description: Agent status from fleet-server. fleet-ui may differ.
           type: string
         tags:
@@ -338,7 +347,7 @@ components:
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
-        input_type: # FIXME not sure why input_type and timeout are not part of data; do we have an explanation?
+        input_type:
           description: The input type of the action for actions with type `INPUT_ACTION`.
           type: string
           x-go-custom-tag: yaml:"input_type" # openapi-generator
@@ -386,7 +395,8 @@ components:
         - started_at
         - completed_at
       properties:
-        type: # FIXME: Deprecate?
+        type:
+          deprecated: true
           description: The event type of the ack. Not used by fleet-server. Currently the elastic-agent will only generate ACTION_RESULT events.
           type: string
           enum:
@@ -394,7 +404,8 @@ components:
             - ERROR
             - ACTION_RESULT
             - ACTION
-        subtype: # FIXME: Deprecate?
+        subtype:
+          deprecated: true
           description: The subtype of the ack event. Not used by fleet-server. Currently the elastic-agent will only generate ACKNOWLEDGED events.
           type: string
           enum:
@@ -414,13 +425,15 @@ components:
         action_id:
           description: The action ID.
           type: string
-        action_input_type: # FIXME fleet-server will list this in ES, but I'm not sure if it's needed.
+        action_input_type:
           description: The input_type of the action for input actions.
           type: string
-        policy_id: # FIXME: Deprecate?
+        policy_id:
+          deprecated: true
           description: Not used by the fleet-server.
           type: string
-        stream_id: # FIXME Deprecate?
+        stream_id:
+          deprecated: true
           description: Not used by the fleet-server.
           type: string
         timestamp:
@@ -430,7 +443,8 @@ components:
         message:
           description: An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
           type: string
-        payload: # FIXME Deprecate and use data instead?
+        payload:
+          deprecated: true
           description: |
             An embedded JSON object that contains additional information for the fleet-server to process.
             Defined as a json.RawMessage in both the fleet-server and the elastic-agent.
@@ -783,23 +797,10 @@ paths:
                       number: 8.6.0
                       build_hash: fd6d862bcbebe841f930e8cdd2fa5107922e66e7
                       build_time: 2022-12-01T01:02:03Z
-  /api/fleet/agents/{id}:
-    # FIXME: The fleet-server route has the enroll endpoint created with an id parameter.
-    # However the id is expected to be "enroll" by fleet-server's implementation.
-    # Should this route be changed to reflect that?
+  /api/fleet/agents/enroll:
     post:
       operationId: agentEnroll
       parameters:
-        - name: id
-          in: path
-          description: The id of the enrollment action. Expected to be "enroll".
-          required: true
-          schema:
-            type: string
-          examples:
-            enroll:
-              description: The only accepted value
-              value: enroll
         - $ref: '#/components/parameters/userAgent'
         - $ref: '#/components/parameters/requestId'
       security:
@@ -1036,10 +1037,10 @@ paths:
         '200':
           description: The artifact retrieved from ES.
           content:
-            application/octet-stream: # FIXME: Not sure if this is octet-stream, json (as it's encoded), or just text
+            "*/*":
               schema:
                 type: string
-                format: base64
+                format: binary
         '400':
           $ref: '#/components/responses/badRequest'
         '401':
