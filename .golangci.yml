@@ -3,10 +3,7 @@ run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   timeout: 1m
   build-tags: integration
-<<<<<<< HEAD
-=======
   go: "1.19.6"
->>>>>>> e96b46c ([updatecli][githubrelease] Bump version to 1.19.6 (#2406))
 
 issues:
   # Maximum count of issues with the same text.
