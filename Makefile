@@ -157,7 +157,6 @@ $(PLATFORM_TARGETS): release-%:
 
 .PHONY: build-docker
 build-docker:
-	echo "Version ${DOCKER_IMAGE_TAG}"
 	docker build \
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg=GCFLAGS="${GCFLAGS}" \
@@ -168,7 +167,6 @@ build-docker:
 
 .PHONY: release-docker
 release-docker:
-	echo "Version ${DOCKER_IMAGE_TAG}"
 	# docker push \
 	# 	-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
 
