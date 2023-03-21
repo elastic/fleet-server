@@ -110,9 +110,6 @@ pipeline {
     }
     stage('Publish Docker Image') {
       options { skipDefaultCheckout() }
-      when {
-        not { changeRequest() }
-      }
       environment {
         DOCKER_IMAGE_SHA_TAG = "${env.GIT_BASE_COMMIT}"
         DOCKER_IMAGE_LATEST_TAG = "latest"
