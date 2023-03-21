@@ -123,12 +123,12 @@ pipeline {
               dockerLogin(secret: "${env.DOCKER_REGISTRY_SECRET}",
                 registry: "${env.DOCKER_REGISTRY}")
 
-              sh(label: 'Build docker image', script: '''
+              sh(label: 'Build docker image', script: """
                 # not rebuild the image if it exists in the docker registry
                 if ! docker pull -q ${env.DOCKER_IMAGE}:${env.DOCKER_IMAGE_SHA_TAG} 2> /dev/null ; then
                   DOCKER_IMAGE="${env.DOCKER_IMAGE}" DOCKER_IMAGE_TAG="${env.DOCKER_IMAGE_SHA_TAG}" make build-docker
                 fi
-              ''')
+              """)
 
               pushDockerImage(image: "${env.DOCKER_IMAGE}", tag: "${env.DOCKER_IMAGE_SHA_TAG}")
 
@@ -208,15 +208,15 @@ def cleanup(){
 }
 
 def retagDockerImage(Map args=[:]) {
-  sh(label: "Re-tag docker as git tag ${env.newTag}", script: '''
+  sh(label: "Re-tag docker as git tag ${env.newTag}", script: """
       docker tag ${args.image}:${args.currentTag} ${args.image}:${args.newTag}
-  ''')
+  """)
 }
 
 def pushDockerImage(Map args=[:]) {
   retryWithSleep(retries: 3, seconds: 5, backoff: true){
-    sh(label: "Push Docker image ${args.image}:${args.tag}", script: '''
+    sh(label: "Push Docker image ${args.image}:${args.tag}", script: """
       echo DOCKER_IMAGE="${args.image}" DOCKER_IMAGE_TAG="${args.tag}" make release-docker
-    ''')
+    """)
   }
 }
