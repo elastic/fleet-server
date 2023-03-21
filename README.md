@@ -46,7 +46,7 @@ The `SNAPSHOT` flag sets the snapshot version flag.
 
 ### Docker build
 
-You can build a fleet-server docker image with `make release-docker`. This image
+You can build a fleet-server docker image with `make build-docker`. This image
 includes the default `fleet-server.yml` configuration file and can be customized
 with the available environment variables.
 
