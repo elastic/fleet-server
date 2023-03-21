@@ -210,6 +210,7 @@ func benchmarkBulk(n int, flush bool, b *testing.B) {
 	b.ReportAllocs()
 
 	mockBulk := ftesting.NewMockBulk()
+	mockBulk.On("MUpdate", mock.Anything, mock.Anything, []bulk.Opt(nil)).Return([]bulk.BulkIndexerResponseItem{}, nil)
 
 	bc := NewBulk(mockBulk)
 
