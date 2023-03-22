@@ -16,7 +16,7 @@ pipeline {
     DOCKER_REGISTRY = 'docker.elastic.co'
     DOCKER_REGISTRY_SECRET = 'secret/observability-team/ci/docker-registry/prod'
 
-    DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/fleet-server/fleet-server"
+    DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/observability-ci/fleet-server"
   }
   options {
     timeout(time: 1, unit: 'HOURS')
@@ -110,9 +110,6 @@ pipeline {
     }
     stage('Publish Docker Image') {
       options { skipDefaultCheckout() }
-      when {
-        not { changeRequest() }
-      }
       environment {
         DOCKER_IMAGE_SHA_TAG = "${env.GIT_BASE_COMMIT}"
         DOCKER_IMAGE_LATEST_TAG = "latest"
