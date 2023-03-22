@@ -233,6 +233,7 @@ And this will print the difference between the baseline and next results.
 You can read more on the [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) official site.
 
 There are some additional parameters that you can use with the `benchmark` target. 
-- `BENCHMARK_FILTER`: you can define the test filter so that you only run a subset of tests (Default: Bench)
+- `BENCHMARK_FILTER`: you can define the test filter so that you only run a subset of tests (Default: Bench, only run
+the test BenchmarkXXXX and not unit tests)
 - `BENCHMARK_COUNT`: you can define the number of iterations go test will run. Having larger number helps
 remove run-to-run variations (Default: 8)
