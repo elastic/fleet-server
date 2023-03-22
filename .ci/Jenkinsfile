@@ -110,6 +110,9 @@ pipeline {
     }
     stage('Publish Docker Image') {
       options { skipDefaultCheckout() }
+      when {
+        not { changeRequest() }
+      }
       environment {
         DOCKER_IMAGE_SHA_TAG = "${env.GIT_BASE_COMMIT}"
         DOCKER_IMAGE_LATEST_TAG = "latest"
@@ -134,11 +137,11 @@ pipeline {
 
               whenFalse(isTag()) {
                 retagDockerImage(image: "${env.DOCKER_IMAGE}", currentTag: "${env.DOCKER_IMAGE_SHA_TAG}", newTag: "${env.DOCKER_IMAGE_LATEST_TAG}")
-                // pushDockerImage(image: "${env.DOCKER_IMAGE}", tag: "${env.DOCKER_IMAGE_LATEST_TAG}")
+                pushDockerImage(image: "${env.DOCKER_IMAGE}", tag: "${env.DOCKER_IMAGE_LATEST_TAG}")
               }
               whenTrue(isTag()) {
                 retagDockerImage(image: "${env.DOCKER_IMAGE}", currentTag: "${env.DOCKER_IMAGE_SHA_TAG}", newTag: "${env.DOCKER_IMAGE_GIT_TAG}")
-                // pushDockerImage(image: "${env.DOCKER_IMAGE}", tag: "${env.DOCKER_IMAGE_GIT_TAG}")
+                pushDockerImage(image: "${env.DOCKER_IMAGE}", tag: "${env.DOCKER_IMAGE_GIT_TAG}")
               }
             }
           }
