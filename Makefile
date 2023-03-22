@@ -167,8 +167,8 @@ build-docker:
 
 .PHONY: release-docker
 release-docker:
-	# docker push \
-	# 	-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
+	docker push \
+		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
 
 .PHONY: package-target
 package-target: build/distributions
