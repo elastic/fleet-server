@@ -40,7 +40,7 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 			title:         "index not found",
 			searchResult:  nil,
 			searchErr:     es.ErrIndexNotFound,
-			expectedState: client.UnitStateStarting,
+			expectedState: client.UnitStateHealthy,
 		},
 		{
 			title:         "failed to connect with Elasticsearch",
