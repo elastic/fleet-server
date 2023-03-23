@@ -26,6 +26,14 @@ var DefaultOptions = []ucfg.Option{
 const kRedacted = "[redacted]"
 
 // Config is the global configuration.
+//
+// fleet-server does not provide any builtin env var mappings.
+// The DefaultOptions are set to use env var substitution if it's defined explicity in go-ucfg's input.
+// For example:
+//   output.elasticsearch.service_token: ${MY_TOKEN_VAR}
+//
+// The env vars that `elastic-agent container` command uses are unrelated.
+// The agent will do all substitutions before sending fleet-server the complete config.
 type Config struct {
 	Fleet   Fleet   `config:"fleet"`
 	Output  Output  `config:"output"`
