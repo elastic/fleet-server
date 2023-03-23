@@ -184,3 +184,56 @@ cd elastic-agent-8.7.0-SNAPSHOT-linux-x86_64
 cp build/binaries/fleet-server-8.7.0-SNAPSHOT-linux-x86_64/fleet-server ./data/elastic-agent-494b79/components/
 ./elastic-agent install ...
 ```
+
+
+### Running go test and benchmarks
+
+When developing new features as you write code you would want to make sure your changes are not breaking any pre-existing
+functionality. For this reason as you make changes you might want to run a subset of tests or the full tests before
+you create a pull request. 
+
+#### Running go tests
+
+To execute the full unit tests from your local environment you can do the following
+```bash
+make test-unit
+```
+
+This make target will execute the go unit tests and should normally pass without an issue.
+
+#### Running go benchmark tests
+
+It's a good practice before you start your changes to establish the current baseline of the benchmarks in your machine.
+To establish the baseline benchmark report you can follow the following workflow
+
+__Establish a baseline__ 
+```bash
+BENCH_BASE=base.out make benchmark
+```
+
+This will execute all the go benchmark test and write the output into the file build/base.out. If you omit the 
+`BENCH_BASE` variable it will automatically select the name `build/benchmark-{git_head_sha1}.out`. 
+
+__Re-running benchmark after changes__
+
+After applying your changes into the code you can reuse the same command but with different output file.
+```bash
+BENCH_BASE=next.out make benchmark
+```
+
+At this point you can compare the 2 reports using benchstat.
+
+__Comparing the 2 results__
+```bash
+BENCH_BASE=base.out BENCH_NEXT=next.out make benchstat
+```
+
+And this will print the difference between the baseline and next results.
+
+You can read more on the [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) official site.
+
+There are some additional parameters that you can use with the `benchmark` target. 
+- `BENCHMARK_FILTER`: you can define the test filter so that you only run a subset of tests (Default: Bench, only run
+the test BenchmarkXXXX and not unit tests)
+- `BENCHMARK_COUNT`: you can define the number of iterations go test will run. Having larger number helps
+remove run-to-run variations (Default: 8)
