@@ -9,7 +9,6 @@ package logger
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -40,8 +39,13 @@ type Logger struct {
 }
 
 // Reload reloads the logger configuration.
+// If only the log level has changed then only GlobalLogLevel is set.
+// NOTE: Trace level logs need to be a little more thought out here?
 func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
-	if changed(l.cfg, cfg) {
+	if levelChanged(cfg) {
+		zerolog.SetGlobalLevel(level(cfg))
+	}
+	if !l.cfg.Logging.EqualExcludeLevel(cfg.Logging) {
 		// sync before reload
 		l.Sync()
 
@@ -68,6 +72,7 @@ func (l *Logger) Sync() {
 func Init(cfg *config.Config, svcName string) (*Logger, error) {
 	var err error
 	once.Do(func() {
+		zerolog.SetGlobalLevel(level(cfg))
 
 		var l zerolog.Logger
 		var w WriterSync
@@ -86,23 +91,11 @@ func Init(cfg *config.Config, svcName string) (*Logger, error) {
 	return gLogger, err
 }
 
-func changed(a *config.Config, b *config.Config) bool {
-	if a.Fleet.Agent.Logging != b.Fleet.Agent.Logging {
+func levelChanged(cfg *config.Config) bool {
+	if cfg.Fleet.Agent.Logging.LogLevel() != zerolog.GlobalLevel() {
 		return true
 	}
-	al := a.Logging
-	aFiles := al.Files
-	al.Files = nil
-	bl := b.Logging
-	bFiles := bl.Files
-	bl.Files = nil
-	if al != bl {
-		return true
-	}
-	if (aFiles == nil && bFiles != nil) || (aFiles != nil && bFiles == nil) || ((aFiles != nil && bFiles != nil) && *aFiles != *bFiles) {
-		return true
-	}
-	return false
+	return level(cfg) != zerolog.GlobalLevel()
 }
 
 func level(cfg *config.Config) zerolog.Level {
@@ -113,17 +106,15 @@ func level(cfg *config.Config) zerolog.Level {
 }
 
 func configureStderrLogger(cfg *config.Config) (zerolog.Logger, WriterSync) {
-
 	out := io.Writer(os.Stderr)
 	if cfg.Logging.Pretty {
 		out = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}
 	}
 
-	return ecszerolog.New(out).Level(level(cfg)), os.Stderr
+	return ecszerolog.New(out), os.Stderr
 }
 
 func configureFileRotatorLogger(cfg *config.Config) (zerolog.Logger, WriterSync, error) {
-
 	files := cfg.Logging.Files
 	if files == nil {
 		files = &config.LoggingFiles{}
@@ -141,18 +132,17 @@ func configureFileRotatorLogger(cfg *config.Config) (zerolog.Logger, WriterSync,
 	if err != nil {
 		return zerolog.Logger{}, nil, err
 	}
-	return ecszerolog.New(rotator).Level(level(cfg)), rotator, nil
+	return ecszerolog.New(rotator), rotator, nil
 }
 
 func configure(cfg *config.Config, svcName string) (lg zerolog.Logger, wr WriterSync, err error) {
-
 	switch {
 	case cfg.Logging.ToStderr:
 		lg, wr = configureStderrLogger(cfg)
 	case cfg.Logging.ToFiles:
 		lg, wr, err = configureFileRotatorLogger(cfg)
 	default:
-		lg = ecszerolog.New(ioutil.Discard).Level(level(cfg))
+		lg = ecszerolog.New(io.Discard)
 		wr = &nopSync{}
 	}
 
