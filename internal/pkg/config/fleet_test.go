@@ -14,9 +14,7 @@ import (
 func TestFleetAgentDefaultLevel(t *testing.T) {
 	cfg := Fleet{}
 
-	if cfg.Agent.Logging.LogLevel() != zerolog.DebugLevel {
-		t.Errorf("expected DebugLevel got: %s", cfg.Agent.Logging.LogLevel())
-	}
+	assert.Equal(t, zerolog.DebugLevel, cfg.Agent.Logging.LogLevel(), "expected debug got %s", cfg.Agent.Logging.LogLevel())
 }
 
 func TestFleetCopyNoLogging(t *testing.T) {

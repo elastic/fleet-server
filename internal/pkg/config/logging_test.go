@@ -15,10 +15,7 @@ import (
 func TestDefaultLevel(t *testing.T) {
 	cfg := Logging{}
 	cfg.InitDefaults()
-
-	if cfg.LogLevel() != zerolog.InfoLevel {
-		t.Errorf("expected InfoLevel, got %s", cfg.LogLevel())
-	}
+	assert.Equal(t, zerolog.InfoLevel, cfg.LogLevel(), "expected info got: %s", cfg.LogLevel())
 }
 
 func Test_Logging_EqualExcludeLevel(t *testing.T) {

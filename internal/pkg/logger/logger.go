@@ -32,6 +32,9 @@ type WriterSync interface {
 }
 
 // Logger for the Fleet Server.
+//
+// Logger will manage the zerolog/log.Logger variable.
+// An instance with TraceLevel is always created and log level is controlled through zerolog.GlobalLevel.
 type Logger struct {
 	cfg  *config.Config
 	sync WriterSync
@@ -40,7 +43,6 @@ type Logger struct {
 
 // Reload reloads the logger configuration.
 // If only the log level has changed then only GlobalLogLevel is set.
-// NOTE: Trace level logs need to be a little more thought out here?
 func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 	if levelChanged(cfg) {
 		zerolog.SetGlobalLevel(level(cfg))
@@ -145,6 +147,7 @@ func configure(cfg *config.Config, svcName string) (lg zerolog.Logger, wr Writer
 		lg = ecszerolog.New(io.Discard)
 		wr = &nopSync{}
 	}
+	lg = lg.Level(zerolog.TraceLevel)
 
 	if svcName != "" {
 		lg = lg.With().Str(ECSServiceName, svcName).Logger()
