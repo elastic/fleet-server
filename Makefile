@@ -14,6 +14,13 @@ BUILDMODE_darwin_arm64=-buildmode=pie
 
 BUILDER_IMAGE=docker.elastic.co/observability-ci/fleet-server-builder:latest
 
+#Benchmark related targets
+BENCH_BASE ?= benchmark-$(COMMIT).out
+BENCH_NEXT ?=
+BENCHMARK_ARGS := -count=8
+BENCHMARK_PACKAGE ?= ./...
+BENCHMARK_FILTER ?= Bench
+
 ifdef VERSION_QUALIFIER
 DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
 endif
@@ -126,6 +133,22 @@ test-release:  ## - Check that all release binaries are created
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
 	set -o pipefail; go test -v -race ./... | tee build/test-unit.out
+
+.PHONY: benchmark
+benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
+	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
+
+.PHONY: install-benchstat
+install-benchstat: ## - Install the benchstat package
+	@benchstat 2> /dev/null || go install golang.org/x/perf/cmd/benchstat@latest
+
+.PHONY: benchstat
+benchstat: install-benchstat ## - Run the benchstat comparing base against next, BENCH_BASE and BENCH_NEXT are required for comparison
+	$(eval BENCHSTAT_ARGS := "build/$(BENCH_BASE)")
+ifneq ($(BENCH_NEXT),)
+	$(eval BENCHSTAT_ARGS += "build/$(BENCH_NEXT)")
+endif
+	@benchstat $(BENCHSTAT_ARGS)
 
 .PHONY: prepare-test-context
 prepare-test-context: ## - Prepare the test context folders
