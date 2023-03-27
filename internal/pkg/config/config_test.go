@@ -283,3 +283,12 @@ func defaultServer() Server {
 	d.InitDefaults()
 	return d
 }
+
+func TestConfigFromEnv(t *testing.T) {
+	t.Setenv("ELASTICSEARCH_SERVICE_TOKEN", "test-val")
+	_ = testlog.SetLogger(t)
+	path := filepath.Join("..", "testing", "fleet-server-testing.yml")
+	c, err := LoadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "test-val", c.Output.Elasticsearch.ServiceToken)
+}
