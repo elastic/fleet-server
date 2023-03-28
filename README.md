@@ -46,7 +46,7 @@ The `SNAPSHOT` flag sets the snapshot version flag.
 
 ### Docker build
 
-You can build a fleet-server docker image with `make release-docker`. This image
+You can build a fleet-server docker image with `make build-docker`. This image
 includes the default `fleet-server.yml` configuration file and can be customized
 with the available environment variables.
 
@@ -60,7 +60,7 @@ docker run -it --rm \
   -e ELASTICSEARCH_HOSTS="https://elasticsearch:9200" \
   -e ELASTICSEARCH_SERVICE_TOKEN="someservicetoken" \
   -e ELASTICSEARCH_CA_TRUSTED_FINGERPRINT="somefingerprint" \
-  docker.elastic.co/elastic-agent/fleet-server:8.8.0
+  docker.elastic.co/fleet-server/fleet-server:8.8.0
 ```
 
 You can replace the included configuration by mounting your
@@ -71,7 +71,7 @@ docker run -it --rm \
   -e ELASTICSEARCH_SERVICE_TOKEN="someservicetoken" \
   -e ELASTICSEARCH_CA_TRUSTED_FINGERPRINT="somefingerprint" \
   -v "/path/to/your/fleet-server.yml:/etc/fleet-server.yml:ro" \
-  docker.elastic.co/elastic-agent/fleet-server:8.8.0
+  docker.elastic.co/fleet-server/fleet-server:8.8.0
 ```
 
 ### Running a development build
