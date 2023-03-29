@@ -92,7 +92,7 @@ func (m *standAloneSelfMonitorT) check(ctx context.Context) client.UnitState {
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
 			m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
-			return m.updateState(client.UnitStateStarting, "Policies not available yet")
+			return m.updateState(client.UnitStateHealthy, "Running: Policies not available yet")
 		}
 		if err != nil {
 			return m.updateState(client.UnitStateFailed, fmt.Sprintf("Failed to request policies: %s", err))
