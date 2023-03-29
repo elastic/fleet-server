@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"reflect"
 	"runtime/debug"
@@ -539,47 +538,23 @@ func (f *Fleet) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
 	// but it doesn't exist today. Update this code once we have something
 	// available via the APM Go agent.
 	const (
-		envVerifyServerCert      = "ELASTIC_APM_VERIFY_SERVER_CERT"
-		envServerCert            = "ELASTIC_APM_SERVER_CERT"
-		envCACert                = "ELASTIC_APM_SERVER_CA_CERT_FILE"
 		envGlobalLabels          = "ELASTIC_APM_GLOBAL_LABELS"
 		envTransactionSampleRate = "ELASTIC_APM_TRANSACTION_SAMPLE_RATE"
 	)
-	if cfg.TLS.SkipVerify {
-		os.Setenv(envVerifyServerCert, "false")
-		defer os.Unsetenv(envVerifyServerCert)
-	}
-	if cfg.TLS.ServerCertificate != "" {
-		os.Setenv(envServerCert, cfg.TLS.ServerCertificate)
-		defer os.Unsetenv(envServerCert)
-	}
-	if cfg.TLS.ServerCA != "" {
-		os.Setenv(envCACert, cfg.TLS.ServerCA)
-		defer os.Unsetenv(envCACert)
-	}
 	if cfg.GlobalLabels != "" {
 		os.Setenv(envGlobalLabels, cfg.GlobalLabels)
 		defer os.Unsetenv(envGlobalLabels)
 	}
 	if cfg.TransactionSampleRate != "" {
 		os.Setenv(envTransactionSampleRate, cfg.TransactionSampleRate)
-		defer os.Unsetenv(envTransactionSampleRate)
+		defer os.Unsetenv(envTransactionSampleRate) // FIXME this is noted as a dynamic variable in the apm docs - what does that mean?
 	}
 
-	hosts := make([]*url.URL, 0, len(cfg.Hosts))
-	for _, host := range cfg.Hosts {
-		u, err := url.Parse(host)
-		if err != nil {
-			return nil, fmt.Errorf("failed parsing %s: %w", host, err)
-		}
-		hosts = append(hosts, u)
+	options, err := cfg.APMHTTPTransportOptions()
+	if err != nil {
+		return nil, err
 	}
 
-	options := apmtransport.HTTPTransportOptions{
-		APIKey:      cfg.APIKey, // NOTE: Either the APIKey or SecretToken will be non-empty here
-		SecretToken: cfg.SecretToken,
-		ServerURLs:  hosts,
-	}
 	transport, err := apmtransport.NewHTTPTransport(options)
 	if err != nil {
 		return nil, err

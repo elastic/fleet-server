@@ -40,4 +40,4 @@
 - Fleet server now supports file uploads for a limited subset of integrations {pull}1902[1902]
 - Increase checkin long-poll default time to 28m, and write time to 29m. {issue}2337[2337] {pull}2341[2341]
 - Fleet server can be run in stand-alone mode without needing to check into Kibana. {issue}2351[2351] {pull}2359[2359]
-
+- Allow secret values to be provided through externally provisioned secret files. {pull}2455[2455]
