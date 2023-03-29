@@ -115,7 +115,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 	})
 
 	t.Run("api key file", func(t *testing.T) {
-		fileName := writeTestFile(t, "test-key")
+		fileName := testFile(t, "test-key")
 		i := &Instrumentation{
 			APIKeyFile: fileName,
 		}
@@ -126,7 +126,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 	})
 
 	t.Run("api key value preffered over file", func(t *testing.T) {
-		fileName := writeTestFile(t, "test-value")
+		fileName := testFile(t, "test-value")
 		i := &Instrumentation{
 			APIKey:     "test-key",
 			APIKeyFile: fileName,
@@ -138,7 +138,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 	})
 
 	t.Run("secret token file", func(t *testing.T) {
-		fileName := writeTestFile(t, "test-token")
+		fileName := testFile(t, "test-token")
 		i := &Instrumentation{
 			SecretTokenFile: fileName,
 		}
@@ -149,7 +149,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 	})
 
 	t.Run("secret token value preffered over file", func(t *testing.T) {
-		fileName := writeTestFile(t, "test-value")
+		fileName := testFile(t, "test-value")
 		i := &Instrumentation{
 			SecretToken:     "test-token",
 			SecretTokenFile: fileName,
@@ -167,4 +167,15 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 		_, err := i.APMHTTPTransportOptions()
 		assert.ErrorAs(t, err, &os.ErrNotExist)
 	})
+}
+
+func testFile(t *testing.T, content string) string {
+	t.Helper()
+	f, err := os.CreateTemp(t.TempDir(), "")
+	require.NoError(t, err)
+	_, err = f.WriteString(content)
+	require.NoError(t, err)
+	err = f.Close()
+	require.NoError(t, err)
+	return f.Name()
 }
