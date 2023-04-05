@@ -12,6 +12,11 @@ pipeline {
     PIPELINE_LOG_LEVEL='INFO'
     JOB_GCS_BUCKET = 'fleet-ci-artifacts'
     JOB_GCS_CREDENTIALS = 'fleet-ci-gcs-plugin-file-credentials'
+
+    DOCKER_REGISTRY = 'docker.elastic.co'
+    DOCKER_REGISTRY_SECRET = 'secret/observability-team/ci/docker-registry/prod'
+
+    DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/observability-ci/fleet-server"
   }
   options {
     timeout(time: 1, unit: 'HOURS')
@@ -103,6 +108,46 @@ pipeline {
         }
       }
     }
+    stage('Publish Docker Image') {
+      options { skipDefaultCheckout() }
+      when {
+        not { changeRequest() }
+      }
+      environment {
+        DOCKER_IMAGE_SHA_TAG = "${env.GIT_BASE_COMMIT}"
+        DOCKER_IMAGE_LATEST_TAG = "latest"
+        DOCKER_IMAGE_GIT_TAG = "${env.BRANCH_NAME}"
+      }
+      steps {
+        withGithubNotify(context: "Publish Docker images") {
+          cleanup()
+          dir("${BASE_DIR}") {
+            catchError(buildResult: 'UNSTABLE', message: 'Unable to push Docker images', stageResult: 'FAILURE') {
+              dockerLogin(secret: "${env.DOCKER_REGISTRY_SECRET}",
+                registry: "${env.DOCKER_REGISTRY}")
+
+              sh(label: 'Build docker image', script: """
+                # not rebuild the image if it exists in the docker registry
+                if ! docker pull -q ${env.DOCKER_IMAGE}:${env.DOCKER_IMAGE_SHA_TAG} 2> /dev/null ; then
+                  DOCKER_IMAGE="${env.DOCKER_IMAGE}" DOCKER_IMAGE_TAG="${env.DOCKER_IMAGE_SHA_TAG}" make build-docker
+                fi
+              """)
+
+              pushDockerImage(image: "${env.DOCKER_IMAGE}", tag: "${env.DOCKER_IMAGE_SHA_TAG}")
+
+              whenFalse(isTag()) {
+                retagDockerImage(image: "${env.DOCKER_IMAGE}", currentTag: "${env.DOCKER_IMAGE_SHA_TAG}", newTag: "${env.DOCKER_IMAGE_LATEST_TAG}")
+                pushDockerImage(image: "${env.DOCKER_IMAGE}", tag: "${env.DOCKER_IMAGE_LATEST_TAG}")
+              }
+              whenTrue(isTag()) {
+                retagDockerImage(image: "${env.DOCKER_IMAGE}", currentTag: "${env.DOCKER_IMAGE_SHA_TAG}", newTag: "${env.DOCKER_IMAGE_GIT_TAG}")
+                pushDockerImage(image: "${env.DOCKER_IMAGE}", tag: "${env.DOCKER_IMAGE_GIT_TAG}")
+              }
+            }
+          }
+        }
+      }
+    }
     stage('Release Test') {
       options { skipDefaultCheckout() }
       steps {
@@ -114,7 +159,7 @@ pipeline {
               uploadPackagesToGoogleBucket(pattern: 'build/distributions/')
               sh(label: 'Check release artifacts', script: 'make test-release')
 
-              sh(label: 'Build docker image', script: 'make release-docker')
+              sh(label: 'Build docker image', script: 'make build-docker')
             }
           }
         }
@@ -163,4 +208,18 @@ def cleanup(){
     deleteDir()
   }
   unstash 'source'
+}
+
+def retagDockerImage(Map args=[:]) {
+  sh(label: "Re-tag docker as git tag ${env.newTag}", script: """
+      docker tag ${args.image}:${args.currentTag} ${args.image}:${args.newTag}
+  """)
+}
+
+def pushDockerImage(Map args=[:]) {
+  retryWithSleep(retries: 3, seconds: 5, backoff: true){
+    sh(label: "Push Docker image ${args.image}:${args.tag}", script: """
+      DOCKER_IMAGE="${args.image}" DOCKER_IMAGE_TAG="${args.tag}" make release-docker
+    """)
+  }
 }

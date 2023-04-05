@@ -31,6 +31,9 @@ else
 VERSION=${DEFAULT_VERSION}
 endif
 
+DOCKER_IMAGE_TAG?=${VERSION}
+DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
+
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
 COMMIT=$(shell git rev-parse --short HEAD)
@@ -175,15 +178,20 @@ $(PLATFORM_TARGETS): release-%:
 	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(DEV),-tags="dev",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
 
-.PHONY: release-docker
-release-docker:
+.PHONY: build-docker
+build-docker:
 	docker build \
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg=GCFLAGS="${GCFLAGS}" \
 		--build-arg=LDFLAGS="${LDFLAGS}" \
 		--build-arg=DEV="$(DEV)" \
 		--build-arg=VERSION="$(VERSION)" \
-		-t docker.elastic.co/elastic-agent/fleet-server:$(VERSION)$(if $(DEV),-dev,) .
+		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
+
+.PHONY: release-docker
+release-docker:
+	docker push \
+		$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,)
 
 .PHONY: package-target
 package-target: build/distributions
