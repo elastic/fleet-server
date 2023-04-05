@@ -190,7 +190,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		res.SetResult(pos, status)
 	}
 
-	setError := func(pos int, err error, span *apm.Span) {
+	setError := func(pos int, err error) {
 		var esErr *es.ErrElastic
 		if errors.As(err, &esErr) {
 			setResult(pos, esErr.Status)
@@ -241,7 +241,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionId)
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
-				setError(n, err, span)
+				setError(n, err)
 				continue
 			}
 
@@ -256,7 +256,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		}
 
 		if err := ack.handleActionResult(ctx, zlog, agent, action, ev); err != nil {
-			setError(n, err, span)
+			setError(n, err)
 		} else {
 			setResult(n, http.StatusOK)
 		}
@@ -270,7 +270,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	if len(policyAcks) > 0 {
 		if err := ack.handlePolicyChange(ctx, zlog, agent, policyAcks...); err != nil {
 			for _, idx := range policyIdxs {
-				setError(idx, err, span)
+				setError(idx, err)
 			}
 		}
 	}
@@ -281,7 +281,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			zlog.Error().Err(err).Msg("handle unenroll event")
 			// Set errors for each unenroll event
 			for _, idx := range unenrollIdxs {
-				setError(idx, err, span)
+				setError(idx, err)
 			}
 		}
 	}

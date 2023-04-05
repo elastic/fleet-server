@@ -258,7 +258,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 				continue
 			}
 
-			zlog.Debug().Str("traceparent", fromPtr(a.Traceparent)).Msgf("✅ parsed traceparent header: %s", a.Traceparent)
+			zlog.Debug().Str("traceparent", fromPtr(a.Traceparent)).Msgf("✅ parsed traceparent header: %s", fromPtr(a.Traceparent))
 
 			// parentContexts = append(parentContexts, traceContext)
 			links = append(links, apm.SpanLink{
