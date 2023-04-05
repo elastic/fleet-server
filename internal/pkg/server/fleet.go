@@ -534,9 +534,7 @@ func (f *Fleet) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
 
 	log.Info().Msg("fleet-server instrumentation is enabled")
 
-	// TODO(marclop): Ideally, we'd use apmtransport.NewHTTPTransportOptions()
-	// but it doesn't exist today. Update this code once we have something
-	// available via the APM Go agent.
+	// Use env vars to configure additional APM settings.
 	const (
 		envGlobalLabels          = "ELASTIC_APM_GLOBAL_LABELS"
 		envTransactionSampleRate = "ELASTIC_APM_TRANSACTION_SAMPLE_RATE"
@@ -547,7 +545,7 @@ func (f *Fleet) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
 	}
 	if cfg.TransactionSampleRate != "" {
 		os.Setenv(envTransactionSampleRate, cfg.TransactionSampleRate)
-		defer os.Unsetenv(envTransactionSampleRate) // FIXME this is noted as a dynamic variable in the apm docs - what does that mean?
+		defer os.Unsetenv(envTransactionSampleRate)
 	}
 
 	options, err := cfg.APMHTTPTransportOptions()
