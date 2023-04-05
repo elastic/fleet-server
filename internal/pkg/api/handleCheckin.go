@@ -250,15 +250,15 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	// TODO: only process this if we have an apm tracer
 	// var parentContexts []apm.TraceContext
 	var links []apm.SpanLink
-	for _, a := range *resp.Actions {
-		if a.Traceparent != "" {
-			traceContext, err := apmhttp.ParseTraceparentHeader(a.Traceparent)
+	for _, a := range fromPtr(resp.Actions) {
+		if fromPtr(a.Traceparent) != "" {
+			traceContext, err := apmhttp.ParseTraceparentHeader(fromPtr(a.Traceparent))
 			if err != nil {
 				zlog.Debug().Err(err).Msg("unable to parse traceparent header")
 				continue
 			}
 
-			zlog.Debug().Str("traceparent", a.Traceparent).Msgf("✅ parsed traceparent header: %s", a.Traceparent)
+			zlog.Debug().Str("traceparent", fromPtr(a.Traceparent)).Msgf("✅ parsed traceparent header: %s", a.Traceparent)
 
 			// parentContexts = append(parentContexts, traceContext)
 			links = append(links, apm.SpanLink{
@@ -406,19 +406,21 @@ func convertActions(agentID string, actions []model.Action) ([]Action, string) {
 	respList := make([]Action, 0, sz)
 	for _, action := range actions {
 		r := Action{
-			AgentId:     agentID,
-			CreatedAt:   action.Timestamp,
-			Data:        action.Data,
-			Id:          action.ActionID,
-			Type:        action.Type,
-			InputType:   action.InputType,
-			Traceparent: action.Traceparent,
+			AgentId:   agentID,
+			CreatedAt: action.Timestamp,
+			Data:      action.Data,
+			Id:        action.ActionID,
+			Type:      action.Type,
+			InputType: action.InputType,
 		}
 		if action.StartTime != "" {
 			r.StartTime = &action.StartTime
 		}
 		if action.Expiration != "" {
 			r.Expiration = &action.Expiration
+		}
+		if action.Traceparent != "" {
+			r.Traceparent = &action.Traceparent
 		}
 		if action.Timeout != 0 {
 			r.Timeout = &action.Timeout

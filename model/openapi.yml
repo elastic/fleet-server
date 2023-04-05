@@ -332,6 +332,12 @@ components:
           x-go-custom-tag: yaml:"action_id" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "action_id"
+        traceparent:
+          description: APM traceparent for the action.
+          type: string
+          x-go-custom-tag: yaml:"traceparent" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "traceparent"
         type:
           description: The action type.
           type: string

@@ -137,6 +137,9 @@ type Action struct {
 	// Timeout The timeout value (in seconds) for actions with type `INPUT_ACTION`.
 	Timeout *int64 `json:"timeout,omitempty" yaml:"timeout"`
 
+	// Traceparent APM traceparent for the action.
+	Traceparent *string `json:"traceparent,omitempty" yaml:"traceparent"`
+
 	// Type The action type.
 	Type string `json:"type" yaml:"type"`
 }
