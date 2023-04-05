@@ -14,7 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
-	"go.elastic.co/apm/module/apmchi/v2"
+	"go.elastic.co/apm/module/apmchiv5/v2"
 	"go.elastic.co/apm/v2"
 )
 
@@ -24,7 +24,7 @@ func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer)
 	r.Use(middleware.Recoverer)
 	r.Use(Limiter(cfg).middleware)
 	if tracer != nil {
-		r.Use(apmchi.Middleware(apmchi.WithTracer(tracer)))
+		r.Use(apmchiv5.Middleware(apmchiv5.WithTracer(tracer)))
 	}
 	return HandlerWithOptions(si, ChiServerOptions{
 		BaseRouter:       r,
