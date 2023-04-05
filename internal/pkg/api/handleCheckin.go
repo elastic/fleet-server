@@ -250,7 +250,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	// TODO: only process this if we have an apm tracer
 	// var parentContexts []apm.TraceContext
 	var links []apm.SpanLink
-	for _, a := range resp.Actions {
+	for _, a := range *resp.Actions {
 		if a.Traceparent != "" {
 			traceContext, err := apmhttp.ParseTraceparentHeader(a.Traceparent)
 			if err != nil {
@@ -271,18 +271,18 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	span, _ := apm.StartSpanOptions(r.Context(), "action delivery", "fleet-server", apm.SpanOptions{
 		Links: links,
 	})
-	span.Context.SetLabel("action_count", len(resp.Actions))
+	span.Context.SetLabel("action_count", len(fromPtr(resp.Actions)))
 	span.Context.SetLabel("agent_id", agent.Id)
 	defer span.End()
 
-	for _, action := range resp.Actions {
+	for _, action := range fromPtr(resp.Actions) {
 		zlog.Info().
-			Str("ackToken", resp.AckToken).
+			Str("ackToken", fromPtr(resp.AckToken)).
 			Str("createdAt", action.CreatedAt).
-			Str("id", action.ID).
+			Str("id", action.Id).
 			Str("type", action.Type).
 			Str("inputType", action.InputType).
-			Int64("timeout", action.Timeout).
+			Int64("timeout", fromPtr(action.Timeout)).
 			Msg("Action delivered to agent on checkin")
 	}
 
@@ -405,18 +405,31 @@ func convertActions(agentID string, actions []model.Action) ([]Action, string) {
 
 	respList := make([]Action, 0, sz)
 	for _, action := range actions {
-		respList = append(respList, ActionResp{
-			AgentID:     agentID,
+		r := Action{
+			AgentId:     agentID,
 			CreatedAt:   action.Timestamp,
-			StartTime:   action.StartTime,
-			Expiration:  action.Expiration,
 			Data:        action.Data,
-			ID:          action.ActionID,
+			Id:          action.ActionID,
 			Type:        action.Type,
 			InputType:   action.InputType,
-			Timeout:     action.Timeout,
 			Traceparent: action.Traceparent,
-		})
+		}
+		if action.StartTime != "" {
+			r.StartTime = &action.StartTime
+		}
+		if action.Expiration != "" {
+			r.Expiration = &action.Expiration
+		}
+		if action.Timeout != 0 {
+			r.Timeout = &action.Timeout
+		}
+		if action.Signed != nil {
+			r.Signed = &ActionSignature{
+				Data:      action.Signed.Data,
+				Signature: action.Signed.Signature,
+			}
+		}
+		respList = append(respList, r)
 	}
 
 	if sz > 0 {

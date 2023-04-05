@@ -320,13 +320,13 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 
 	// Save action result document
 	if _, err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
-		log.Error().Err(err).Msg("create action result")
+		zlog.Error().Err(err).Msg("create action result")
 		return err
 	}
 
 	if action.Type == TypeUpgrade {
 		if err := ack.handleUpgrade(ctx, zlog, agent, ev); err != nil {
-			log.Error().Err(err).Msg("handle upgrade event")
+			zlog.Error().Err(err).Msg("handle upgrade event")
 			return err
 		}
 	}
