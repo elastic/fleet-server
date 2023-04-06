@@ -296,7 +296,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, action model.Action, ev Event) error {
 	// Build span links for actions
 	var links []apm.SpanLink
-	if action.Traceparent != "" {
+	if ack.bulk.HasTracer() && action.Traceparent != "" {
 		traceCtx, err := apmhttp.ParseTraceparentHeader(action.Traceparent)
 		if err != nil {
 			zlog.Trace().Err(err).Msgf("Error parsing traceparent: %s %s", action.Traceparent, err)

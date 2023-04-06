@@ -247,24 +247,23 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 }
 
 func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
-	// TODO: only process this if we have an apm tracer
-	// var parentContexts []apm.TraceContext
 	var links []apm.SpanLink
-	for _, a := range fromPtr(resp.Actions) {
-		if fromPtr(a.Traceparent) != "" {
-			traceContext, err := apmhttp.ParseTraceparentHeader(fromPtr(a.Traceparent))
-			if err != nil {
-				zlog.Debug().Err(err).Msg("unable to parse traceparent header")
-				continue
+	if ct.bulker.HasTracer() {
+		for _, a := range fromPtr(resp.Actions) {
+			if fromPtr(a.Traceparent) != "" {
+				traceContext, err := apmhttp.ParseTraceparentHeader(fromPtr(a.Traceparent))
+				if err != nil {
+					zlog.Debug().Err(err).Msg("unable to parse traceparent header")
+					continue
+				}
+
+				zlog.Debug().Str("traceparent", fromPtr(a.Traceparent)).Msgf("✅ parsed traceparent header: %s", fromPtr(a.Traceparent))
+
+				links = append(links, apm.SpanLink{
+					Trace: traceContext.Trace,
+					Span:  traceContext.Span,
+				})
 			}
-
-			zlog.Debug().Str("traceparent", fromPtr(a.Traceparent)).Msgf("✅ parsed traceparent header: %s", fromPtr(a.Traceparent))
-
-			// parentContexts = append(parentContexts, traceContext)
-			links = append(links, apm.SpanLink{
-				Trace: traceContext.Trace,
-				Span:  traceContext.Span,
-			})
 		}
 	}
 
