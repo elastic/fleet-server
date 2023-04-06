@@ -24,10 +24,10 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
-	go.elastic.co/apm/module/apmchi/v2 v2.2.0
+	go.elastic.co/apm/module/apmchiv5/v2 v2.3.0
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.2.0
-	go.elastic.co/apm/module/apmhttp/v2 v2.2.0
-	go.elastic.co/apm/v2 v2.2.0
+	go.elastic.co/apm/module/apmhttp/v2 v2.3.0
+	go.elastic.co/apm/v2 v2.3.0
 	go.elastic.co/ecszerolog v0.1.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.1.0
@@ -50,7 +50,6 @@ require (
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/fatih/color v1.13.0 // indirect
-	github.com/go-chi/chi v1.5.4 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
@@ -67,7 +66,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	github.com/santhosh-tekuri/jsonschema v1.2.4 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	go.elastic.co/ecszap v1.0.1 // indirect
