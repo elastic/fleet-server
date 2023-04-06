@@ -240,7 +240,7 @@ func configChangedServer(curCfg, newCfg *config.Config) bool {
 	switch {
 	case curCfg == nil:
 		zlog.Info().Msg("initial server configuration")
-	case !reflect.DeepEqual(curCfg.Fleet, newCfg.Fleet):
+	case !reflect.DeepEqual(curCfg.Fleet.CopyNoLogging(), newCfg.Fleet.CopyNoLogging()):
 		zlog.Info().
 			Interface("old", curCfg.Redact()).
 			Msg("fleet configuration has changed")

@@ -52,6 +52,7 @@ var deprecatedConfigOptions = map[string]string{
 func (c *Config) InitDefaults() {
 	c.Inputs = make([]Input, 1)
 	c.Inputs[0].InitDefaults()
+	c.Logging.InitDefaults()
 	c.HTTP.InitDefaults()
 }
 
