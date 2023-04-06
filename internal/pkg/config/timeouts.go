@@ -48,13 +48,13 @@ func (c *ServerTimeouts) InitDefaults() {
 	// so in that case it covers the TLS handshake.  If the connection is reused, the write timeout
 	// covers the time from the end of the request header to the end of the response write.
 	// Set to a very large timeout to allow for slow backend; must be at least as large as Read timeout plus Long Poll.
-	c.Write = 29 * time.Minute
+	c.Write = 10 * time.Minute
 
 	// Write out a timestamp to elastic on this timeout during long poll
 	c.CheckinTimestamp = 30 * time.Second
 
 	// Long poll timeout, will be short-circuited on policy change
-	c.CheckinLongPoll = 28 * time.Minute
+	c.CheckinLongPoll = 5 * time.Minute
 
 	// Jitter subtracted from c.CheckinLongPoll.  Disabled if zero.
 	c.CheckinJitter = 30 * time.Second

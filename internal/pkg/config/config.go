@@ -121,10 +121,6 @@ func (c *Config) Merge(other *Config) (*Config, error) {
 func redactOutput(cfg *Config) Output {
 	redacted := cfg.Output
 
-	if redacted.Elasticsearch.APIKey != "" {
-		redacted.Elasticsearch.APIKey = kRedacted
-	}
-
 	if redacted.Elasticsearch.ServiceToken != "" {
 		redacted.Elasticsearch.ServiceToken = kRedacted
 	}
