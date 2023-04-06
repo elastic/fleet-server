@@ -40,7 +40,7 @@ type Elasticsearch struct {
 	Path             string            `config:"path"`
 	Headers          map[string]string `config:"headers"`
 	ServiceToken     string            `config:"service_token"`
-	ServiceTokenFile string            `config:"service_token_file"`
+	ServiceTokenPath string            `config:"service_token_path"`
 	ProxyURL         string            `config:"proxy_url"`
 	ProxyDisable     bool              `config:"proxy_disable"`
 	ProxyHeaders     map[string]string `config:"proxy_headers"`
@@ -64,13 +64,13 @@ func (c *Elasticsearch) InitDefaults() {
 // Validate ensures that the configuration is valid.
 func (c *Elasticsearch) Validate() error {
 	if c.ServiceToken == "" {
-		if c.ServiceTokenFile == "" {
+		if c.ServiceTokenPath == "" {
 			return fmt.Errorf("service_token is undefined")
 		}
-		if p, err := os.ReadFile(c.ServiceTokenFile); err != nil {
-			return fmt.Errorf("unable to read service_token_file: %w", err)
+		if p, err := os.ReadFile(c.ServiceTokenPath); err != nil {
+			return fmt.Errorf("unable to read service_token_path: %w", err)
 		} else if len(p) == 0 {
-			return fmt.Errorf("empty service_token_file")
+			return fmt.Errorf("empty service_token_path")
 		}
 	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
@@ -165,10 +165,10 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	h.Set("X-elastic-product-origin", "fleet")
 
 	serviceToken := c.ServiceToken
-	if c.ServiceToken == "" && c.ServiceTokenFile != "" {
-		p, err := os.ReadFile(c.ServiceTokenFile)
+	if c.ServiceToken == "" && c.ServiceTokenPath != "" {
+		p, err := os.ReadFile(c.ServiceTokenPath)
 		if err != nil {
-			return elasticsearch.Config{}, fmt.Errorf("unable to read service_token_file: %w", err)
+			return elasticsearch.Config{}, fmt.Errorf("unable to read service_token_path: %w", err)
 		}
 		serviceToken = string(p)
 	}

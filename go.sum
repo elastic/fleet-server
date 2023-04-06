@@ -157,8 +157,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/elastic/elastic-agent-client/v7 v7.0.3 h1:YqZPnO7Z9rlj25sFZEUaxGGK3mZR4v0uSOcfO8GRv7s=
 github.com/elastic/elastic-agent-client/v7 v7.0.3/go.mod h1:cHviLpA5fAwMbfBIHBVNl16qp90bO7pKHMAQaG+9raU=
-github.com/elastic/elastic-agent-libs v0.3.5 h1:QWEaGRqycs3Q3YctiXBimH1t2bbswsZ5pwi/PQmxVUE=
-github.com/elastic/elastic-agent-libs v0.3.5/go.mod h1:h48hzjQcn6XPwfWRM5HimAKlsG0J92ULgAzdX+WedA8=
+github.com/elastic/elastic-agent-libs v0.3.7 h1:81xd4P+aTBp98Gkm54RIvPUr/3306heUfSPyjUgiyjE=
+github.com/elastic/elastic-agent-libs v0.3.7/go.mod h1:h48hzjQcn6XPwfWRM5HimAKlsG0J92ULgAzdX+WedA8=
 github.com/elastic/elastic-agent-system-metrics v0.4.4 h1:Br3S+TlBhijrLysOvbHscFhgQ00X/trDT5VEnOau0E0=
 github.com/elastic/elastic-agent-system-metrics v0.4.4/go.mod h1:tF/f9Off38nfzTZHIVQ++FkXrDm9keFhFpJ+3pQ00iI=
 github.com/elastic/elastic-transport-go/v8 v8.0.0-20211216131617-bbee439d559c/go.mod h1:87Tcz8IVNe6rVSLdBux1o/PEItLtyabHU3naC7IoqKI=

@@ -25,12 +25,12 @@ type Instrumentation struct {
 	Environment string `config:"environment"`
 	// APIKey specifies the API key value - may be specified with ELASTIC_APM_API_KEY
 	APIKey string `config:"api_key"`
-	// APIKeyFile specifies the path to the API key secret file
-	APIKeyFile string `config:"api_key_file"`
+	// APIKeyPath specifies the path to the API key secret file
+	APIKeyPath string `config:"api_key_path"`
 	// SecretToken specifies the secret token value - may be specified with ELASTIC_APM_SECRET_TOKEN
 	SecretToken string `config:"secret_token"`
-	// SecretTokenFile specifies the path to the secret token file
-	SecretTokenFile string `config:"secret_token_file"`
+	// SecretTokenPath specifies the path to the secret token file
+	SecretTokenPath string `config:"secret_token_path"`
 	// Hosts specifies the APM server urls - may be specified with ELASTIC_APM_SERVER_URL
 	Hosts []string `config:"hosts"`
 	// GlobalLabels specifies apm global labels - may be specified with ELASTIC_APM_GLOBAL_LABELS
@@ -89,8 +89,8 @@ func (c *Instrumentation) APMHTTPTransportOptions() (apmtransport.HTTPTransportO
 	}
 
 	apiKey := c.APIKey
-	if c.APIKey == "" && c.APIKeyFile != "" {
-		p, err := os.ReadFile(c.APIKeyFile)
+	if c.APIKey == "" && c.APIKeyPath != "" {
+		p, err := os.ReadFile(c.APIKeyPath)
 		if err != nil {
 			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to read API key file: %w", err)
 		}
@@ -98,8 +98,8 @@ func (c *Instrumentation) APMHTTPTransportOptions() (apmtransport.HTTPTransportO
 	}
 
 	secretToken := c.SecretToken
-	if c.SecretToken == "" && c.SecretTokenFile != "" {
-		p, err := os.ReadFile(c.SecretTokenFile)
+	if c.SecretToken == "" && c.SecretTokenPath != "" {
+		p, err := os.ReadFile(c.SecretTokenPath)
 		if err != nil {
 			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to read secret token file: %w", err)
 		}
