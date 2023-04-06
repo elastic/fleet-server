@@ -82,7 +82,7 @@ jobs:
         continue-on-error: true
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          GITHUB_TOKEN: ${{ secrets.ELASTIC_ORG_GITHUB_ACTIONS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PROJECT_ASSIGNER_TOKEN }}
           header: benchmark
           message: |
             ### Benchmark Result
