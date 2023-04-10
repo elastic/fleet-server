@@ -6,9 +6,9 @@ package cbor
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
 	"io"
-	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,7 +80,7 @@ func TestChunkWriterLargeLastChunk(t *testing.T) {
 
 	contents := make([]byte, 4096)
 
-	n, err := rand.Read(contents) //nolint:gosec // weak RNG here is just for testing
+	n, err := rand.Read(contents)
 	require.NoError(t, err)
 	require.Equal(t, n, 4096)
 
