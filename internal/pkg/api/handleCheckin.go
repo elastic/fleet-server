@@ -108,16 +108,13 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 }
 
 func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
-
 	ctx := r.Context()
 
 	body := r.Body
-
 	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
 	if ct.cfg.Limits.CheckinLimit.MaxBody > 0 {
 		body = http.MaxBytesReader(w, body, ct.cfg.Limits.CheckinLimit.MaxBody)
 	}
-
 	readCounter := datacounter.NewReaderCounter(body)
 
 	var req CheckinRequest
@@ -125,8 +122,36 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	if err := decoder.Decode(&req); err != nil {
 		return fmt.Errorf("decode checkin request: %w", err)
 	}
-
 	cntCheckin.bodyIn.Add(readCounter.Count())
+
+	var pDur time.Duration
+	var err error
+	if req.PollTimeout != nil {
+		pDur, err = time.ParseDuration(*req.PollTimeout)
+		if err != nil {
+			return fmt.Errorf("poll_timeout cannot be parsed as duration: %w", err)
+		}
+	}
+
+	pollDuration := ct.cfg.Timeouts.CheckinLongPoll
+	// set the pollDuration if pDur parsed from poll_timeout was a non-zero value
+	// sets timeout to max(1m, pDur-2m)
+	// sets the response write timeout to max(2m, pDur-1m)
+	if pDur != time.Duration(0) {
+		pollDuration = pDur - (2 * time.Minute)
+		if pollDuration < time.Minute {
+			pollDuration = time.Minute
+		}
+
+		wTime := pollDuration + time.Minute
+		rc := http.NewResponseController(w)
+		if err := rc.SetWriteDeadline(start.Add(wTime)); err != nil {
+			zlog.Warn().Err(err).Time("write_deadline", start.Add(wTime)).Msg("Unable to set checkin write deadline.")
+		} else {
+			zlog.Trace().Time("write_deadline", start.Add(wTime)).Msg("Request write deadline set.")
+		}
+	}
+	zlog.Trace().Dur("pollDuration", pollDuration).Msg("Request poll duration set.")
 
 	// Compare local_metadata content and update if different
 	rawMeta, err := parseMeta(zlog, agent, &req)
@@ -168,7 +193,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer tick.Stop()
 
 	setupDuration := time.Since(start)
-	pollDuration, jitter := calcPollDuration(zlog, ct.cfg, setupDuration)
+	pollDuration, jitter := calcPollDuration(zlog, pollDuration, setupDuration, ct.cfg.Timeouts.CheckinJitter)
 
 	zlog.Debug().
 		Str("status", string(req.Status)).
@@ -597,22 +622,17 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	return outComponents, nil
 }
 
-func calcPollDuration(zlog zerolog.Logger, cfg *config.Server, setupDuration time.Duration) (time.Duration, time.Duration) {
-
-	pollDuration := cfg.Timeouts.CheckinLongPoll
-
+func calcPollDuration(zlog zerolog.Logger, pollDuration, setupDuration, jitterDuration time.Duration) (time.Duration, time.Duration) {
 	// Under heavy load, elastic may take along time to authorize the api key, many seconds to minutes.
 	// Short circuit the long poll to take the setup delay into account.  This is particularly necessary
 	// in cloud where the proxy will time us out after 10m20s causing unnecessary errors.
-
 	if setupDuration >= pollDuration {
-		// We took so long to setup that we need to exit immediately
-		pollDuration = time.Millisecond
 		zlog.Warn().
 			Dur("setupDuration", setupDuration).
-			Dur("pollDuration", cfg.Timeouts.CheckinLongPoll).
+			Dur("pollDuration", pollDuration).
 			Msg("excessive setup duration short cicuit long poll")
-
+		// We took so long to setup that we need to exit immediately
+		return time.Millisecond, time.Duration(0)
 	} else {
 		pollDuration -= setupDuration
 		if setupDuration > (time.Second * 10) {
@@ -624,8 +644,8 @@ func calcPollDuration(zlog zerolog.Logger, cfg *config.Server, setupDuration tim
 	}
 
 	var jitter time.Duration
-	if cfg.Timeouts.CheckinJitter != 0 {
-		jitter = time.Duration(rand.Int63n(int64(cfg.Timeouts.CheckinJitter))) //nolint:gosec // jitter time does not need to by generated from a crypto secure source
+	if jitterDuration != 0 {
+		jitter = time.Duration(rand.Int63n(int64(jitterDuration))) //nolint:gosec // jitter time does not need to by generated from a crypto secure source
 		if jitter < pollDuration {
 			pollDuration = pollDuration - jitter
 			zlog.Trace().Dur("poll", pollDuration).Msg("Long poll with jitter")
