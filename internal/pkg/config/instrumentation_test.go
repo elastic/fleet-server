@@ -117,7 +117,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 	t.Run("api key file", func(t *testing.T) {
 		fileName := testFile(t, "test-key")
 		i := &Instrumentation{
-			APIKeyFile: fileName,
+			APIKeyPath: fileName,
 		}
 		cfg, err := i.APMHTTPTransportOptions()
 		require.NoError(t, err)
@@ -129,7 +129,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 		fileName := testFile(t, "test-value")
 		i := &Instrumentation{
 			APIKey:     "test-key",
-			APIKeyFile: fileName,
+			APIKeyPath: fileName,
 		}
 		cfg, err := i.APMHTTPTransportOptions()
 		require.NoError(t, err)
@@ -140,7 +140,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 	t.Run("secret token file", func(t *testing.T) {
 		fileName := testFile(t, "test-token")
 		i := &Instrumentation{
-			SecretTokenFile: fileName,
+			SecretTokenPath: fileName,
 		}
 		cfg, err := i.APMHTTPTransportOptions()
 		require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 		fileName := testFile(t, "test-value")
 		i := &Instrumentation{
 			SecretToken:     "test-token",
-			SecretTokenFile: fileName,
+			SecretTokenPath: fileName,
 		}
 		cfg, err := i.APMHTTPTransportOptions()
 		require.NoError(t, err)
@@ -162,7 +162,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 
 	t.Run("api key file does not exist", func(t *testing.T) {
 		i := &Instrumentation{
-			APIKeyFile: "/path/does/not/exist",
+			APIKeyPath: "/path/does/not/exist",
 		}
 		_, err := i.APMHTTPTransportOptions()
 		assert.ErrorAs(t, err, &os.ErrNotExist)

@@ -57,12 +57,12 @@ func TestToESConfig(t *testing.T) {
 				},
 			},
 		},
-		"service_token and service_token_file defined": {
+		"service_token and service_token_path defined": {
 			cfg: Elasticsearch{
 				Protocol:         "http",
 				Hosts:            []string{"localhost:9200"},
 				ServiceToken:     "test-token",
-				ServiceTokenFile: "/path/is/ignored",
+				ServiceTokenPath: "/path/is/ignored",
 				MaxRetries:       3,
 				MaxConnPerHost:   128,
 				Timeout:          90 * time.Second,
@@ -209,12 +209,12 @@ func TestToESConfig(t *testing.T) {
 		})
 	}
 
-	t.Run("service_token_file is ok", func(t *testing.T) {
+	t.Run("service_token_path is ok", func(t *testing.T) {
 		fileName := writeTestFile(t, "test-token")
 		cfg := &Elasticsearch{
 			Protocol:         schemeHTTP,
 			Hosts:            []string{"localhost:9200"},
-			ServiceTokenFile: fileName,
+			ServiceTokenPath: fileName,
 			MaxRetries:       3,
 			MaxConnPerHost:   128,
 			Timeout:          90 * time.Second,
@@ -242,12 +242,12 @@ func TestToESConfig(t *testing.T) {
 		assert.True(t, cmp.Equal(expect, es, copts...), "mismatch (-want +got)\n%s", cmp.Diff(expect, es, copts...))
 	})
 
-	t.Run("service_token_file is empty", func(t *testing.T) {
+	t.Run("service_token_path is empty", func(t *testing.T) {
 		fileName := writeTestFile(t, "")
 		cfg := &Elasticsearch{
 			Protocol:         schemeHTTP,
 			Hosts:            []string{"localhost:9200"},
-			ServiceTokenFile: fileName,
+			ServiceTokenPath: fileName,
 			MaxRetries:       3,
 			MaxConnPerHost:   128,
 			Timeout:          90 * time.Second,
@@ -274,11 +274,11 @@ func TestToESConfig(t *testing.T) {
 		assert.True(t, cmp.Equal(expect, es, copts...), "mismatch (-want +got)\n%s", cmp.Diff(expect, es, copts...))
 	})
 
-	t.Run("service_token_file does not exist", func(t *testing.T) {
+	t.Run("service_token_path does not exist", func(t *testing.T) {
 		cfg := &Elasticsearch{
 			Protocol:         schemeHTTP,
 			Hosts:            []string{"localhost:9200"},
-			ServiceTokenFile: filepath.Join(t.TempDir(), "some-file"),
+			ServiceTokenPath: filepath.Join(t.TempDir(), "some-file"),
 			MaxRetries:       3,
 			MaxConnPerHost:   128,
 			Timeout:          90 * time.Second,
