@@ -23,6 +23,7 @@ func TestCLIOverrides(t *testing.T) {
 	httpEnabledExpected := true
 	httpHostExpected := "sample-host"
 	loggingFilesNameExpected := "fleet-server-logging"
+	serviceToken := "token-test"
 
 	cliConfig, err := ucfg.NewFrom(map[string]interface{}{
 		"http": map[string]interface{}{
@@ -32,6 +33,11 @@ func TestCLIOverrides(t *testing.T) {
 		"logging": map[string]interface{}{
 			"files": map[string]interface{}{
 				"name": loggingFilesNameExpected,
+			},
+		},
+		"output": map[string]interface{}{
+			"elasticsearch": map[string]interface{}{
+				"service_token": serviceToken,
 			},
 		},
 	})
@@ -79,6 +85,7 @@ func TestCLIOverrides(t *testing.T) {
 	require.Equal(t, httpEnabledExpected, generatedCfg.HTTP.Enabled)
 	require.Equal(t, httpHostExpected, generatedCfg.HTTP.Host)
 	require.Equal(t, loggingFilesNameExpected, generatedCfg.Logging.Files.Name)
+	require.Equal(t, serviceToken, generatedCfg.Output.Elasticsearch.ServiceToken)
 }
 
 type mockClientV2 struct {
@@ -138,7 +145,9 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		Version: "test-version",
 	})
 	t.Run("input has additional server keys", func(t *testing.T) {
-		outStruct, err := structpb.NewStruct(map[string]interface{}{})
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"service_token": "test-token",
+		})
 		require.NoError(t, err)
 		mockOutClient := &mockClientUnit{}
 		mockOutClient.On("Expected").Return(client.UnitStateHealthy, client.UnitLogLevelInfo, &proto.UnitExpectedConfig{Source: outStruct})
@@ -173,6 +182,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, 29*time.Minute, cfg.Inputs[0].Server.Timeouts.Write)
 		assert.Equal(t, time.Minute, cfg.Inputs[0].Server.Timeouts.CheckinLongPoll)
 		assert.Equal(t, 1000, cfg.Inputs[0].Server.Limits.MaxAgents)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
 	})
 
 }

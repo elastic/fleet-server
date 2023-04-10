@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/go-ucfg"
 	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -29,8 +30,11 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
@@ -61,6 +65,7 @@ func TestAgent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	t.Log("Setup agent integration test")
 	bulker := ftesting.SetupBulk(ctx, t)
 
 	// add a real default fleet server policy
@@ -108,9 +113,13 @@ func TestAgent(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
+		l, err := logger.Init(&config.Config{}, "test")
+		require.NoError(t, err)
+
 		a := &Agent{
-			cliCfg: ucfg.New(),
-			bi:     biInfo,
+			cliCfg:      ucfg.New(),
+			reloadables: []reload.Reloadable{l},
+			bi:          biInfo,
 		}
 		a.agent = client.NewV2(fmt.Sprintf("localhost:%d", control.Port()), control.Token(), client.VersionInfo{
 			Name:    "fleet-server",
@@ -120,6 +129,7 @@ func TestAgent(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
+	t.Log("'bootstrap' fleet-server test")
 	// wait for fleet-server to report as degraded (starting mode without agent.id)
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
 		state := getUnitState(control, proto.UnitType_INPUT, "fleet-server-default-fleet-server")
@@ -133,7 +143,6 @@ func TestAgent(t *testing.T) {
 	agentID := uuid.Must(uuid.NewV4()).String()
 	expected = makeExpected(agentID, 1, inputSource, 1, outputSource)
 	control.Expected(expected)
-	require.NoError(t, err)
 
 	// wait for fleet-server to report as healthy
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -144,6 +153,9 @@ func TestAgent(t *testing.T) {
 		return nil
 	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
 
+	assert.Equal(t, zerolog.InfoLevel, zerolog.GlobalLevel(), "expected log level info got: %s", zerolog.GlobalLevel())
+
+	t.Log("Test bad configuration can recover")
 	// trigger update with bad configuration
 	badSource, err := structpb.NewStruct(map[string]interface{}{
 		"id":            "default",
@@ -166,7 +178,7 @@ func TestAgent(t *testing.T) {
 		return nil
 	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
 
-	// reconfigure to good config
+	// reconfigure to good config with debug log level
 	goodSource, err := structpb.NewStruct(map[string]interface{}{
 		"id":            "default",
 		"type":          "elasticsearch",
@@ -177,6 +189,7 @@ func TestAgent(t *testing.T) {
 	})
 	require.NoError(t, err)
 	expected = makeExpected(agentID, 1, inputSource, 3, goodSource)
+	expected.Units[0].LogLevel = proto.UnitLogLevel_DEBUG
 	control.Expected(expected)
 
 	// wait for fleet-server to report as healthy
@@ -188,6 +201,9 @@ func TestAgent(t *testing.T) {
 		return nil
 	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
 
+	assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel(), "expected log level debug got: %s", zerolog.GlobalLevel())
+
+	t.Log("Test stop")
 	// trigger stop
 	expected = makeExpected(agentID, 1, inputSource, 3, outputSource)
 	expected.Units[0].State = proto.State_STOPPED
