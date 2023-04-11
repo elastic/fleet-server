@@ -63,16 +63,6 @@ func (c *Elasticsearch) InitDefaults() {
 
 // Validate ensures that the configuration is valid.
 func (c *Elasticsearch) Validate() error {
-	if c.ServiceToken == "" {
-		if c.ServiceTokenPath == "" {
-			return fmt.Errorf("service_token is undefined")
-		}
-		if p, err := os.ReadFile(c.ServiceTokenPath); err != nil {
-			return fmt.Errorf("unable to read service_token_path: %w", err)
-		} else if len(p) == 0 {
-			return fmt.Errorf("empty service_token_path")
-		}
-	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
 		if _, err := urlutil.ParseURL(c.ProxyURL); err != nil {
 			return err
