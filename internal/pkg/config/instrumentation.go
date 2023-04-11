@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -81,9 +82,9 @@ func (c *Instrumentation) APMHTTPTransportOptions() (apmtransport.HTTPTransportO
 
 	if c.TLS.ServerCA != "" {
 		pool, errs := tlscommon.LoadCertificateAuthorities([]string{c.TLS.ServerCA})
-		// FIXME once we update to go 1.20 we can return multiple wrapped errors
+		// FIXME once we update elastic-agent-libs to go 1.20 we can return multiple errors directly with errors.Join()
 		if len(errs) != 0 {
-			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to load instrumentation cas: %v", errs)
+			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to load instrumentation cas: %w", errors.Join(errs...))
 		}
 		tlsConfig.RootCAs = pool
 	}
