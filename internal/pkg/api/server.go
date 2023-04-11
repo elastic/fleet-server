@@ -133,7 +133,7 @@ func (s *server) Run(ctx context.Context) error {
 	defer cancel()
 
 	go func(_ context.Context, errCh chan error, ln net.Listener) {
-		log.Debug().Msgf("Listening on %s", s.addr)
+		log.Info().Msgf("Listening on %s", s.addr)
 		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
