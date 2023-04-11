@@ -803,6 +803,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	res, err = cli.Do(req)
 	require.NoError(t, err)
+	res.Body.Close()
 	require.Equal(t, http.StatusOK, res.StatusCode)
 
 	t.Logf("checkin 2: agent %s poll_timeout 3m", agentID)
