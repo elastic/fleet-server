@@ -116,6 +116,7 @@ func TestConfig(t *testing.T) {
 								CheckinTimestamp: 30 * time.Second,
 								CheckinLongPoll:  5 * time.Minute,
 								CheckinJitter:    30 * time.Second,
+								CheckinMaxPoll:   10 * time.Minute,
 							},
 							Profiler: ServerProfiler{
 								Enabled: false,

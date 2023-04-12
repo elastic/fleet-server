@@ -135,10 +135,13 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	pollDuration := ct.cfg.Timeouts.CheckinLongPoll
 	// set the pollDuration if pDur parsed from poll_timeout was a non-zero value
-	// sets timeout to max(1m, pDur-2m)
-	// sets the response write timeout to max(2m, pDur-1m)
+	// sets timeout is set to max(1m, min(pDur-2m, max poll time))
+	// sets the response write timeout to max(2m, timeout+1m)
 	if pDur != time.Duration(0) {
 		pollDuration = pDur - (2 * time.Minute)
+		if pollDuration > ct.cfg.Timeouts.CheckinMaxPoll {
+			pollDuration = ct.cfg.Timeouts.CheckinMaxPoll
+		}
 		if pollDuration < time.Minute {
 			pollDuration = time.Minute
 		}

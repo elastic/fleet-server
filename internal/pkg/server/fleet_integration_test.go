@@ -161,6 +161,7 @@ func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 
 	srvcfg := &config.Server{}
 	srvcfg.InitDefaults()
+	srvcfg.Timeouts.CheckinMaxPoll = 2 * time.Minute // set to a short value for tests
 	srvcfg.Host = "localhost"
 	srvcfg.Port = port
 	cfg.Inputs[0].Server = *srvcfg
@@ -831,4 +832,33 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	t.Logf("Request duration: %s", dur)
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	require.LessOrEqual(t, dur, 2*time.Minute)
+	err = json.Unmarshal(p, &checkinResponse)
+	require.NoError(t, err)
+
+	t.Logf("checkin 3: agent %s poll_timeout 10m checkin_max_limit returns early", agentID)
+	ctx, cancel = context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
+	    "ack_token": "%s",
+	    "status": "online",
+	    "message": "",
+	    "poll_timeout": "10m"
+	}`, *checkinResponse.AckToken)))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	start = time.Now()
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	dur = time.Since(start)
+	t.Logf("checkin 3: agent %s took %s", agentID, time.Since(start))
+	p, err = io.ReadAll(res.Body)
+	res.Body.Close()
+	require.NoError(t, err)
+	t.Logf("Response body: %s", string(p))
+	t.Logf("Request duration: %s", dur)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.LessOrEqual(t, dur, 3*time.Minute) // include write timeout
+	require.GreaterOrEqual(t, dur, time.Minute)
 }
