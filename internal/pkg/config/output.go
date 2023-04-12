@@ -160,7 +160,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 		if err != nil {
 			return elasticsearch.Config{}, fmt.Errorf("unable to read service_token_path: %w", err)
 		}
-		serviceToken = string(p)
+		serviceToken = strings.TrimSpace(string(p))
 	}
 
 	return elasticsearch.Config{

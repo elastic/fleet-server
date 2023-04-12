@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 
@@ -94,7 +95,7 @@ func (c *Instrumentation) APMHTTPTransportOptions() (apmtransport.HTTPTransportO
 		if err != nil {
 			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to read API key file: %w", err)
 		}
-		apiKey = string(p)
+		apiKey = strings.TrimSpace(string(p))
 	}
 
 	secretToken := c.SecretToken
@@ -103,7 +104,7 @@ func (c *Instrumentation) APMHTTPTransportOptions() (apmtransport.HTTPTransportO
 		if err != nil {
 			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to read secret token file: %w", err)
 		}
-		secretToken = string(p)
+		secretToken = strings.TrimSpace(string(p))
 	}
 
 	return apmtransport.HTTPTransportOptions{
