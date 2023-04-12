@@ -49,6 +49,18 @@ type Logging struct {
 	Files    *LoggingFiles `config:"files"`
 }
 
+func (c *Logging) EqualExcludeLevel(cfg Logging) bool {
+	if !(c.ToStderr == cfg.ToStderr && c.ToFiles == cfg.ToFiles && c.Pretty == cfg.Pretty) {
+		return false
+	}
+	af := c.Files
+	bf := cfg.Files
+	if (af == nil && bf != nil) || (af != nil && bf == nil) || ((af != nil && bf != nil) && *af != *bf) {
+		return false
+	}
+	return true
+}
+
 // InitDefaults initializes the defaults for the configuration.
 func (c *Logging) InitDefaults() {
 	c.Level = defaultLevel
