@@ -41,3 +41,4 @@
 - Fleet server now supports file uploads for a limited subset of integrations {pull}1902[1902]
 - Fleet server can be run in stand-alone mode without needing to check into Kibana. {issue}2351[2351] {pull}2359[2359]
 - Allow secret values to be provided through externally provisioned secret files. {pull}2455[2455]
+- Action APM tracing. {pull}2472[2472]
