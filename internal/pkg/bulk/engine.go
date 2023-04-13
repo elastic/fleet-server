@@ -46,6 +46,7 @@ type Bulk interface {
 	Delete(ctx context.Context, index, id string, opts ...Opt) error
 	Index(ctx context.Context, index, id string, body []byte, opts ...Opt) (string, error)
 	Search(ctx context.Context, index string, body []byte, opts ...Opt) (*es.ResultT, error)
+	HasTracer() bool
 
 	// Multi Operation API's run in the bulk engine
 	MCreate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
