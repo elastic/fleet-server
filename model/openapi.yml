@@ -255,6 +255,13 @@ components:
           type: string
           format: application/json
           x-go-type: json.RawMessage
+        poll_timeout:
+          description: |
+            An optional timeout value that informs fleet-server of when a client will time out on it's checkin request.
+            If not specified fleet-server will use the timeout values specified in the config (defaults to 5m polling and a 10m write timeout).
+            If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
+          type: string
+          format: duration
     actionSignature:
       description: Optional action signing data.
       type: object
@@ -882,12 +889,11 @@ paths:
       description: |
         The agent checkin endpoint.
         Clients will long-poll this endpoint.
+        A client may inform fleet-server of it's long-poll timeout in the request body.
         The fleet-server will return a response if there is a new action for the agent, or if the polling timeout is reached.
-        The fleet-server may also use some jitter to offset the polling duration, if a jitter value is defined the timeout value is the duration's max possible value.
+        The fleet-server may also use some jitter to offset the polling timeout, if specified a random amount of the jitter value may be subtracted from the polling timeout.
         The fleet-sever polling timeout is short-circuited in cases of heavy load where setting up the checkin (ensuring the API key is authed etc) takes longer then the timeout value.
-        The fleet-server sets the timeout to 5m.
-        The elastic-agent sets its connection timeout to 10m.
-        The cloud fleet-proxy timeout is set to 10m20s.
+        Fleet-server sets the poll timeout to 5m by default (with a 10m write timeout), for these values we assume that elastic-agent's request timeout is set to 10m and the cloud-proxy's timeout is longer than 10m.
       parameters:
         - name: id
           in: path

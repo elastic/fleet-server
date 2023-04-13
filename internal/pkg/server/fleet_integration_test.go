@@ -161,6 +161,7 @@ func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 
 	srvcfg := &config.Server{}
 	srvcfg.InitDefaults()
+	srvcfg.Timeouts.CheckinMaxPoll = 2 * time.Minute // set to a short value for tests
 	srvcfg.Host = "localhost"
 	srvcfg.Port = port
 	cfg.Inputs[0].Server = *srvcfg
@@ -733,4 +734,131 @@ func Test_Agent_request_errors(t *testing.T) {
 		res.Body.Close()
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
+}
+
+func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx)
+	require.NoError(t, err)
+
+	cli := cleanhttp.DefaultClient()
+
+	// enroll an agent
+	t.Log("Enroll an agent")
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	dec := json.NewDecoder(res.Body)
+	var enrollResponse api.EnrollResponse
+	err = dec.Decode(&enrollResponse)
+	res.Body.Close()
+	require.NoError(t, err)
+	agentID := enrollResponse.Item.Id
+	apiKey := enrollResponse.Item.AccessApiKey
+
+	// checkin
+	t.Logf("checkin 1: agent %s no poll_timeout", agentID)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(checkinBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	start := time.Now()
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	t.Logf("checkin 1: agent %s took %s", agentID, time.Since(start))
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	var checkinResponse api.CheckinResponse
+	dec = json.NewDecoder(res.Body)
+	err = dec.Decode(&checkinResponse)
+	res.Body.Close()
+	require.NoError(t, err)
+
+	t.Logf("Ack actions for agent %s", agentID)
+	events := make([]api.Event, 0, len(*checkinResponse.Actions))
+	for _, action := range *checkinResponse.Actions {
+		events = append(events, api.Event{
+			ActionId: action.Id,
+			AgentId:  agentID,
+			Message:  "test-message",
+			Type:     api.ACTIONRESULT,
+			Subtype:  api.ACKNOWLEDGED,
+		})
+	}
+	p, err := json.Marshal(api.AckRequest{Events: events})
+	require.NoError(t, err)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/acks", bytes.NewBuffer(p))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	res.Body.Close()
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	t.Logf("checkin 2: agent %s poll_timeout 3m", agentID)
+	ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
+	    "ack_token": "%s",
+	    "status": "online",
+	    "message": "",
+	    "poll_timeout": "3m"
+	}`, *checkinResponse.AckToken)))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	start = time.Now()
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	dur := time.Since(start)
+	t.Logf("checkin 2: agent %s took %s", agentID, time.Since(start))
+	p, err = io.ReadAll(res.Body)
+	res.Body.Close()
+	require.NoError(t, err)
+	t.Logf("Response body: %s", string(p))
+	t.Logf("Request duration: %s", dur)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.LessOrEqual(t, dur, 2*time.Minute)
+	err = json.Unmarshal(p, &checkinResponse)
+	require.NoError(t, err)
+
+	t.Logf("checkin 3: agent %s poll_timeout 10m checkin_max_limit returns early", agentID)
+	ctx, cancel = context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
+	    "ack_token": "%s",
+	    "status": "online",
+	    "message": "",
+	    "poll_timeout": "10m"
+	}`, *checkinResponse.AckToken)))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	start = time.Now()
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	dur = time.Since(start)
+	t.Logf("checkin 3: agent %s took %s", agentID, time.Since(start))
+	p, err = io.ReadAll(res.Body)
+	res.Body.Close()
+	require.NoError(t, err)
+	t.Logf("Response body: %s", string(p))
+	t.Logf("Request duration: %s", dur)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.LessOrEqual(t, dur, 3*time.Minute) // include write timeout
+	require.GreaterOrEqual(t, dur, time.Minute)
 }

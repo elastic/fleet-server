@@ -173,6 +173,11 @@ type CheckinRequest struct {
 	// Message State message, may be overridden or use the error message of a failing component.
 	Message string `json:"message"`
 
+	// PollTimeout An optional timeout value that informs fleet-server of when a client will time out on it's checkin request.
+	// If not specified fleet-server will use the timeout values specified in the config (defaults to 5m polling and a 10m write timeout).
+	// If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
+	PollTimeout *string `json:"poll_timeout,omitempty"`
+
 	// Status The agent state, inferred from agent control protocol states.
 	Status CheckinRequestStatus `json:"status"`
 }

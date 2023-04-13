@@ -80,6 +80,11 @@ func (rc *ResponseCounter) WriteHeader(statusCode int) {
 	}
 }
 
+// Unwrap unwraps the underlying ResponseWriter
+func (rc *ResponseCounter) Unwrap() http.ResponseWriter {
+	return rc.ResponseWriter
+}
+
 func (rc *ResponseCounter) Count() uint64 {
 	return atomic.LoadUint64(&rc.count)
 }
