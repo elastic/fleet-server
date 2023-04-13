@@ -26,6 +26,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	go.elastic.co/apm/module/apmchiv5/v2 v2.3.0
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.3.0
+	go.elastic.co/apm/module/apmhttp/v2 v2.3.0
 	go.elastic.co/apm/v2 v2.3.0
 	go.elastic.co/ecszerolog v0.1.0
 	go.uber.org/zap v1.24.0
@@ -72,7 +73,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
-	go.elastic.co/apm/module/apmhttp/v2 v2.3.0 // indirect
 	go.elastic.co/ecszap v1.0.1 // indirect
 	go.elastic.co/fastjson v1.1.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect

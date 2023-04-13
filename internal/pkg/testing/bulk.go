@@ -103,4 +103,8 @@ func (m *MockBulk) APIKeyUpdate(ctx context.Context, id, outputPolicyHash string
 	return args.Error(0)
 }
 
+func (m *MockBulk) HasTracer() bool {
+	return false
+}
+
 var _ bulk.Bulk = (*MockBulk)(nil)

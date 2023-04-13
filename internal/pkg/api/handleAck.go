@@ -26,6 +26,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
+	"go.elastic.co/apm/module/apmhttp/v2"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -169,6 +171,8 @@ func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
 // 1. AckResponse and nil error, when the whole request is successful
 // 2. AckResponse and non-nil error, when the request items had errors
 func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) (AckResponse, error) {
+	span, ctx := apm.StartSpan(ctx, "handleAckEvents", "ack")
+	defer span.End()
 	var policyAcks []string
 
 	var policyIdxs []int
@@ -194,6 +198,8 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			setResult(pos, http.StatusInternalServerError)
 		}
 		res.SetError(pos, err)
+		e := apm.CaptureError(ctx, err)
+		e.Send()
 	}
 
 	for n, ev := range events {
@@ -249,26 +255,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			ack.cache.SetAction(action)
 		}
 
-		// Convert ack event to action result document
-		acr := eventToActionResult(agent.Id, ev)
-
-		// Save action result document
-		if _, err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
+		if err := ack.handleActionResult(ctx, zlog, agent, action, ev); err != nil {
 			setError(n, err)
-			log.Error().Err(err).Msg("create action result")
-			continue
-		}
-
-		// Set OK result
-		// The unenroll and upgrade acks might overwrite it later
-		setResult(n, http.StatusOK)
-
-		if action.Type == TypeUpgrade {
-			if err := ack.handleUpgrade(ctx, zlog, agent, ev); err != nil {
-				setError(n, err)
-				log.Error().Err(err).Msg("handle upgrade event")
-				continue
-			}
+		} else {
+			setResult(n, http.StatusOK)
 		}
 
 		if ev.Error == nil && action.Type == TypeUnenroll {
@@ -301,6 +291,47 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		return res, &httpErr
 	}
 	return res, nil
+}
+
+func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, action model.Action, ev Event) error {
+	// Build span links for actions
+	var links []apm.SpanLink
+	if ack.bulk.HasTracer() && action.Traceparent != "" {
+		traceCtx, err := apmhttp.ParseTraceparentHeader(action.Traceparent)
+		if err != nil {
+			zlog.Trace().Err(err).Msgf("Error parsing traceparent: %s %s", action.Traceparent, err)
+		} else {
+			links = []apm.SpanLink{
+				{
+					Trace: traceCtx.Trace,
+					Span:  traceCtx.Span,
+				},
+			}
+		}
+	}
+
+	span, ctx := apm.StartSpanOptions(ctx, fmt.Sprintf("Process action result %s", action.Type), "app", apm.SpanOptions{Links: links})
+	span.Context.SetLabel("action_id", action.Id)
+	span.Context.SetLabel("agent_id", agent.Agent.ID)
+	defer span.End()
+
+	// Convert ack event to action result document
+	acr := eventToActionResult(agent.Id, ev)
+
+	// Save action result document
+	if _, err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
+		zlog.Error().Err(err).Msg("create action result")
+		return err
+	}
+
+	if action.Type == TypeUpgrade {
+		if err := ack.handleUpgrade(ctx, zlog, agent, ev); err != nil {
+			zlog.Error().Err(err).Msg("handle upgrade event")
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, actionIds ...string) error {

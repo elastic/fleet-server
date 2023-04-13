@@ -32,6 +32,9 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
+
+	"go.elastic.co/apm/module/apmhttp/v2"
+	"go.elastic.co/apm/v2"
 )
 
 var (
@@ -262,9 +265,46 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		}
 	}
 
-	for _, action := range actions {
+	resp := CheckinResponse{
+		AckToken: &ackToken,
+		Action:   "checkin",
+		Actions:  &actions,
+	}
+
+	return ct.writeResponse(zlog, w, r, agent, resp)
+}
+
+func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
+	var links []apm.SpanLink
+	if ct.bulker.HasTracer() {
+		for _, a := range fromPtr(resp.Actions) {
+			if fromPtr(a.Traceparent) != "" {
+				traceContext, err := apmhttp.ParseTraceparentHeader(fromPtr(a.Traceparent))
+				if err != nil {
+					zlog.Debug().Err(err).Msg("unable to parse traceparent header")
+					continue
+				}
+
+				zlog.Debug().Str("traceparent", fromPtr(a.Traceparent)).Msgf("✅ parsed traceparent header: %s", fromPtr(a.Traceparent))
+
+				links = append(links, apm.SpanLink{
+					Trace: traceContext.Trace,
+					Span:  traceContext.Span,
+				})
+			}
+		}
+	}
+
+	span, _ := apm.StartSpanOptions(r.Context(), "action delivery", "fleet-server", apm.SpanOptions{
+		Links: links,
+	})
+	span.Context.SetLabel("action_count", len(fromPtr(resp.Actions)))
+	span.Context.SetLabel("agent_id", agent.Id)
+	defer span.End()
+
+	for _, action := range fromPtr(resp.Actions) {
 		zlog.Info().
-			Str("ackToken", ackToken).
+			Str("ackToken", fromPtr(resp.AckToken)).
 			Str("createdAt", action.CreatedAt).
 			Str("id", action.Id).
 			Str("type", action.Type).
@@ -272,17 +312,6 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 			Int64("timeout", fromPtr(action.Timeout)).
 			Msg("Action delivered to agent on checkin")
 	}
-
-	resp := CheckinResponse{
-		AckToken: &ackToken,
-		Action:   "checkin",
-		Actions:  &actions,
-	}
-
-	return ct.writeResponse(zlog, w, r, resp)
-}
-
-func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, resp CheckinResponse) error {
 
 	payload, err := json.Marshal(&resp)
 	if err != nil {
@@ -416,6 +445,9 @@ func convertActions(agentID string, actions []model.Action) ([]Action, string) {
 		}
 		if action.Expiration != "" {
 			r.Expiration = &action.Expiration
+		}
+		if action.Traceparent != "" {
+			r.Traceparent = &action.Traceparent
 		}
 		if action.Timeout != 0 {
 			r.Timeout = &action.Timeout
