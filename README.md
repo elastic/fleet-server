@@ -34,8 +34,8 @@ The following are notes to help developers onboarding to the project to quickly 
 The changelog for fleet-server is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool).
 Read the [installation](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/install.md) and [usage](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md#im-a-developer) instructions to get started.
 
-The changelog tool produces fragement files that are consolidated to generate a changelog for each release
-Each PR containing a change with user impact (new feature, bug fix, etc.) must contain a changelog fragement describing the change.
+The changelog tool produces fragment files that are consolidated to generate a changelog for each release
+Each PR containing a change with user impact (new feature, bug fix, etc.) must contain a changelog fragment describing the change.
 
 A simple example of a changelog fragment is below for reference:
 ```yaml
