@@ -31,7 +31,7 @@ This checklist is a reminder about high level design problems that should be con
 
 - [ ] I have ensured my design is stateless and will work when multiple fleet-server instances are behind a load balancer.
 - [ ] I have or intend to scale test my changes, ensuring it will work reliably with 100K+ agents connected.
-- [ ] I have included fail safe mechanisms to limit the load on fleet-server: rate limiting, circuit breakers, caching, load shedding, etc. 
+- [ ] I have included fail safe mechanisms to limit the load on fleet-server: rate limiting, circuit breakers, caching, load shedding, etc.
 
 ## Checklist
 
@@ -43,7 +43,7 @@ This checklist is to help creators of PRs to find parts which might not be direc
 - [ ] I have made corresponding changes to the documentation
 - [ ] I have made corresponding change to the default configuration files
 - [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] I have added an entry in `CHANGELOG.next.asciidoc` or `CHANGELOG-developer.next.asciidoc`.
+- [ ] I have added an entry in `./changelog/fragments` using the [changelog tool](https://github.com/elastic/fleet-server#changelog)
 
 
 ## Related issues
