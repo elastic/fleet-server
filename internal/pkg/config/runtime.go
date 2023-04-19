@@ -5,7 +5,8 @@
 package config
 
 type Runtime struct {
-	GCPercent int `config:"gc_percent"`
+	GCPercent   int   `config:"gc_percent"`
+	MemoryLimit int64 `config:"memory_limit"`
 }
 
 func (r Runtime) InitDefaults() {
