@@ -43,6 +43,8 @@ inputs:
         flush_interval: 100ms   # Flush ES bulk queues on this interval.
       runtime:
         gc_percent: 20          # Force the GC to execute more frequently: see https://golang.org/pkg/runtime/debug/#SetGCPercent
+        memory_limit: 4000000000      # Set a soft memory limit to prevent OOM: see https://pkg.go.dev/runtime/debug#SetMemoryLimit 
+
 
 
 http:

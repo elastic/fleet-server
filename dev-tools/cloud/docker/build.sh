@@ -11,7 +11,7 @@ REPO_ROOT=$(cd $(dirname $(readlink -f "$0"))/../../.. && pwd)
 USER_NAME=${USER}
 CI_ELASTIC_AGENT_DOCKER_IMAGE=docker.elastic.co/observability-ci/elastic-agent
 
-DEFAULT_IMAGE_TAG=8.8.0-681a23b0-SNAPSHOT
+DEFAULT_IMAGE_TAG=8.8.0-94522507-SNAPSHOT
 BASE_IMAGE="${BASE_IMAGE:-docker.elastic.co/cloud-release/elastic-agent-cloud:$DEFAULT_IMAGE_TAG}"
 GOARCH="${GOARCH:-$(go env GOARCH)}"
 

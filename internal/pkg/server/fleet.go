@@ -307,6 +307,16 @@ func initRuntime(cfg *config.Config) {
 			Int("new", gcPercent).
 			Msg("SetGCPercent")
 	}
+	memoryLimit := cfg.Inputs[0].Server.Runtime.MemoryLimit
+	if memoryLimit != 0 {
+		old := debug.SetMemoryLimit(memoryLimit)
+
+		log.Info().
+			Int64("old", old).
+			Int64("new", memoryLimit).
+			Msg("SetMemoryLimit")
+	}
+
 }
 
 func (f *Fleet) initBulker(ctx context.Context, tracer *apm.Tracer, cfg *config.Config) (*bulk.Bulker, error) {
