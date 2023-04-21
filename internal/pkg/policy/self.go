@@ -36,8 +36,6 @@ type SelfMonitor interface {
 	Run(ctx context.Context) error
 	// State gets current state of monitor.
 	State() client.UnitState
-	// Policy returns the policy retrieved from the self monitor
-	Policy() *model.Policy
 }
 
 type selfMonitorT struct {
@@ -139,12 +137,6 @@ func (m *selfMonitorT) State() client.UnitState {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 	return m.state
-}
-
-func (m *selfMonitorT) Policy() *model.Policy {
-	m.mut.Lock()
-	defer m.mut.Unlock()
-	return m.policy
 }
 
 func (m *selfMonitorT) waitStart(ctx context.Context) error { //nolint:unused // not sure if this is used in tests

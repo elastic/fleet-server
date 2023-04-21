@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !integration
-// +build !integration
 
 package config
 
@@ -115,8 +114,9 @@ func TestConfig(t *testing.T) {
 								Idle:             30 * time.Second,
 								Write:            5 * time.Second,
 								CheckinTimestamp: 30 * time.Second,
-								CheckinLongPoll:  28 * time.Minute,
+								CheckinLongPoll:  5 * time.Minute,
 								CheckinJitter:    30 * time.Second,
+								CheckinMaxPoll:   10 * time.Minute,
 							},
 							Profiler: ServerProfiler{
 								Enabled: false,
@@ -283,4 +283,13 @@ func defaultServer() Server {
 	var d Server
 	d.InitDefaults()
 	return d
+}
+
+func TestConfigFromEnv(t *testing.T) {
+	t.Setenv("ELASTICSEARCH_SERVICE_TOKEN", "test-val")
+	_ = testlog.SetLogger(t)
+	path := filepath.Join("..", "testing", "fleet-server-testing.yml")
+	c, err := LoadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "test-val", c.Output.Elasticsearch.ServiceToken)
 }

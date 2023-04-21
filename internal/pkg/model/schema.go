@@ -66,6 +66,9 @@ type Action struct {
 	// Date/time the action was created
 	Timestamp string `json:"@timestamp,omitempty"`
 
+	// APM traceparent for the action.
+	Traceparent string `json:"traceparent,omitempty"`
+
 	// The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.
 	Type string `json:"type,omitempty"`
 

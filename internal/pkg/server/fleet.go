@@ -8,14 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"reflect"
 	"runtime/debug"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"go.elastic.co/apm/v2"
@@ -242,7 +240,7 @@ func configChangedServer(curCfg, newCfg *config.Config) bool {
 	switch {
 	case curCfg == nil:
 		zlog.Info().Msg("initial server configuration")
-	case !reflect.DeepEqual(curCfg.Fleet, newCfg.Fleet):
+	case !reflect.DeepEqual(curCfg.Fleet.CopyNoLogging(), newCfg.Fleet.CopyNoLogging()):
 		zlog.Info().
 			Interface("old", curCfg.Redact()).
 			Msg("fleet configuration has changed")
@@ -309,6 +307,16 @@ func initRuntime(cfg *config.Config) {
 			Int("new", gcPercent).
 			Msg("SetGCPercent")
 	}
+	memoryLimit := cfg.Inputs[0].Server.Runtime.MemoryLimit
+	if memoryLimit != 0 {
+		old := debug.SetMemoryLimit(memoryLimit)
+
+		log.Info().
+			Int64("old", old).
+			Int64("new", memoryLimit).
+			Msg("SetMemoryLimit")
+	}
+
 }
 
 func (f *Fleet) initBulker(ctx context.Context, tracer *apm.Tracer, cfg *config.Config) (*bulk.Bulker, error) {
@@ -406,22 +414,30 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk, tracer *apm.Tracer) (err error) {
 	esCli := bulker.Client()
 
-	// Check version compatibility with Elasticsearch
-	remoteVersion, err := ver.CheckCompatibility(ctx, esCli, f.bi.Version)
-	if err != nil {
-		if len(remoteVersion) != 0 {
-			return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w",
-				f.bi.Version, remoteVersion, err)
+	// Version check is not performed in standalone mode because it is expected that
+	// standalone Fleet Server may be running with older versions of Elasticsearch.
+	if !f.standAlone {
+		// Check version compatibility with Elasticsearch
+		remoteVersion, err := ver.CheckCompatibility(ctx, esCli, f.bi.Version)
+		if err != nil {
+			if len(remoteVersion) != 0 {
+				return fmt.Errorf("failed version compatibility check with elasticsearch (Agent: %s, Elasticsearch: %s): %w",
+					f.bi.Version, remoteVersion, err)
+			}
+			return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 		}
-		return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 	}
 
-	// Run migrations
-	loggedMigration := loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
-		return dl.Migrate(ctx, bulker)
-	})
-	if err = loggedMigration(); err != nil {
-		return fmt.Errorf("failed to run subsystems: %w", err)
+	// Migrations are not executed in standalone mode. When needed, they will be executed
+	// by some external process.
+	if !f.standAlone {
+		// Run migrations
+		loggedMigration := loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
+			return dl.Migrate(ctx, bulker)
+		})
+		if err = loggedMigration(); err != nil {
+			return fmt.Errorf("failed to run subsystems: %w", err)
+		}
 	}
 
 	// Run scheduler for periodic GC/cleanup
@@ -458,16 +474,13 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
 
 	// Policy self monitor
-	sm := policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
-	var agent *model.Agent
+	var sm policy.SelfMonitor
 	if f.standAlone {
-		agent, err = f.standAloneSetup(ctx, bulker, sm, cfg.Inputs[0].Policy.ID, cfg.Fleet.Agent.ID)
-		if err != nil {
-			return err
-		}
+		sm = policy.NewStandAloneSelfMonitor(bulker, f.reporter)
 	} else {
-		g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
+		sm = policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
 	}
+	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 
 	// Actions monitoring
 	var am monitor.SimpleMonitor
@@ -498,10 +511,6 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
-	}
-
-	if f.standAlone {
-		g.Go(loggedRunFunc(ctx, "self-checkin", f.standAloneCheckin(agent, ct)))
 	}
 
 	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
@@ -535,28 +544,11 @@ func (f *Fleet) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
 
 	log.Info().Msg("fleet-server instrumentation is enabled")
 
-	// TODO(marclop): Ideally, we'd use apmtransport.NewHTTPTransportOptions()
-	// but it doesn't exist today. Update this code once we have something
-	// available via the APM Go agent.
+	// Use env vars to configure additional APM settings.
 	const (
-		envVerifyServerCert      = "ELASTIC_APM_VERIFY_SERVER_CERT"
-		envServerCert            = "ELASTIC_APM_SERVER_CERT"
-		envCACert                = "ELASTIC_APM_SERVER_CA_CERT_FILE"
 		envGlobalLabels          = "ELASTIC_APM_GLOBAL_LABELS"
 		envTransactionSampleRate = "ELASTIC_APM_TRANSACTION_SAMPLE_RATE"
 	)
-	if cfg.TLS.SkipVerify {
-		os.Setenv(envVerifyServerCert, "false")
-		defer os.Unsetenv(envVerifyServerCert)
-	}
-	if cfg.TLS.ServerCertificate != "" {
-		os.Setenv(envServerCert, cfg.TLS.ServerCertificate)
-		defer os.Unsetenv(envServerCert)
-	}
-	if cfg.TLS.ServerCA != "" {
-		os.Setenv(envCACert, cfg.TLS.ServerCA)
-		defer os.Unsetenv(envCACert)
-	}
 	if cfg.GlobalLabels != "" {
 		os.Setenv(envGlobalLabels, cfg.GlobalLabels)
 		defer os.Unsetenv(envGlobalLabels)
@@ -566,20 +558,11 @@ func (f *Fleet) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
 		defer os.Unsetenv(envTransactionSampleRate)
 	}
 
-	hosts := make([]*url.URL, 0, len(cfg.Hosts))
-	for _, host := range cfg.Hosts {
-		u, err := url.Parse(host)
-		if err != nil {
-			return nil, fmt.Errorf("failed parsing %s: %w", host, err)
-		}
-		hosts = append(hosts, u)
+	options, err := cfg.APMHTTPTransportOptions()
+	if err != nil {
+		return nil, err
 	}
 
-	options := apmtransport.HTTPTransportOptions{
-		APIKey:      cfg.APIKey, // NOTE: Either the APIKey or SecretToken will be non-empty here
-		SecretToken: cfg.SecretToken,
-		ServerURLs:  hosts,
-	}
 	transport, err := apmtransport.NewHTTPTransport(options)
 	if err != nil {
 		return nil, err

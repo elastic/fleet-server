@@ -277,3 +277,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 
 	return nil
 }
+
+func (b *Bulker) HasTracer() bool {
+	return b.tracer != nil
+}

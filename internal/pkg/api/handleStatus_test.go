@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !integration
-// +build !integration
 
 package api
 
@@ -21,7 +20,6 @@ import (
 	fbuild "github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/stretchr/testify/assert"
@@ -46,10 +44,6 @@ func (pm *mockPolicyMonitor) Run(ctx context.Context) error {
 
 func (pm *mockPolicyMonitor) State() client.UnitState {
 	return pm.state
-}
-
-func (pm *mockPolicyMonitor) Policy() *model.Policy {
-	return nil
 }
 
 func TestHandleStatus(t *testing.T) {
