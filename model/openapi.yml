@@ -127,15 +127,13 @@ components:
         - metadata
       properties:
         type:
-          deprecated: true
           description: |
             The enrollment type of the agent.
-            The agent only supports the PERMANENT value
+            The agent only supports the PERMANENT value.
+            In the future the enrollment type may be used to indicate agents that use fleet for reporting and monitoring, but do not use policies.
           type: string
           enum:
-            - EPHEMERAL
             - PERMANENT
-            - TEMPORARY
         shared_id:
           deprecated: true
           type: string
@@ -239,6 +237,7 @@ components:
             - online
             - error
             - degraded
+            - starting
         message:
           description: State message, may be overridden or use the error message of a failing component.
           type: string
