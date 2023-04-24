@@ -59,6 +59,10 @@
           "description": "The ID of the user who created the action.",
           "type": "string"
         },
+        "traceparent": {
+          "description": "APM traceparent for the action.",
+          "type": "string"
+        },
         "agents": {
           "description": "The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids",
           "type": "array",
@@ -70,6 +74,20 @@
           "description": "The opaque payload.",
           "type": "object",
           "format": "raw"
+        },
+        "signed": {
+          "description": "The action signed data and signature.",
+          "type": "object",
+          "properties": {
+            "data": {
+              "description": "The base64 encoded, UTF-8 JSON serialized action bytes that are signed.",
+              "type": "string"
+            },
+            "signature": {
+              "description": "The base64 encoded signature.",
+              "type": "string"
+            }
+          }
         }
       },
       "required": [

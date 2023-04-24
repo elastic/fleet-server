@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -30,68 +29,64 @@ func (m *mockIncer) IncStart() func() {
 	return args.Get(0).(func())
 }
 
-func stubHandle() httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func stubHandle() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}
+	})
 }
 
-func TestWrap(t *testing.T) {
-	t.Run("no limits reached", func(t *testing.T) {
-		var b bool
-		var fdec = func() { b = true }
-		i := &mockIncer{}
-		i.On("IncStart").Return(fdec).Once()
-		l := &limiter{}
-
-		h := l.wrap(zerolog.Nop(), zerolog.DebugLevel, stubHandle(), i)
-		w := httptest.NewRecorder()
-		h(w, &http.Request{}, httprouter.Params{})
-
-		resp := w.Result()
-		resp.Body.Close()
-		i.AssertExpectations(t)
-		assert.True(t, b, "expected dec func to have been called")
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-	})
-	t.Run("max limit reached", func(t *testing.T) {
-		var b bool
-		var fdec = func() { b = true }
-		i := &mockIncer{}
-		i.On("IncStart").Return(fdec).Once()
-		i.On("IncError", ErrMaxLimit).Once()
-		l := &limiter{
+func Test_Limiter_Wrap(t *testing.T) {
+	tests := []struct {
+		name   string
+		l      *Limiter
+		stats  func() *mockIncer
+		status int
+	}{{
+		name: "no limits",
+		l:    &Limiter{},
+		stats: func() *mockIncer {
+			m := &mockIncer{}
+			m.On("IncStart").Return(noop).Once()
+			return m
+		},
+		status: http.StatusOK,
+	}, {
+		name: "max limit",
+		l: &Limiter{
 			maxLimit: semaphore.NewWeighted(0),
-		}
-
-		h := l.wrap(zerolog.Nop(), zerolog.DebugLevel, stubHandle(), i)
-		w := httptest.NewRecorder()
-		h(w, &http.Request{}, httprouter.Params{})
-
-		resp := w.Result()
-		resp.Body.Close()
-		i.AssertExpectations(t)
-		assert.True(t, b, "expected dec func to have been called")
-		assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
-	})
-	t.Run("rate limit reached", func(t *testing.T) {
-		var b bool
-		var fdec = func() { b = true }
-		i := &mockIncer{}
-		i.On("IncStart").Return(fdec).Once()
-		i.On("IncError", ErrRateLimit).Once()
-		l := &limiter{
+		},
+		stats: func() *mockIncer {
+			m := &mockIncer{}
+			m.On("IncStart").Return(noop).Once()
+			m.On("IncError", ErrMaxLimit).Once()
+			return m
+		},
+		status: http.StatusTooManyRequests,
+	}, {
+		name: "rate limit",
+		l: &Limiter{
 			rateLimit: rate.NewLimiter(rate.Limit(0), 0),
-		}
+		},
+		stats: func() *mockIncer {
+			m := &mockIncer{}
+			m.On("IncStart").Return(noop).Once()
+			m.On("IncError", ErrRateLimit).Once()
+			return m
+		},
+		status: http.StatusTooManyRequests,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mi := tt.stats()
+			h := tt.l.Wrap("name", mi, zerolog.DebugLevel)
 
-		h := l.wrap(zerolog.Nop(), zerolog.DebugLevel, stubHandle(), i)
-		w := httptest.NewRecorder()
-		h(w, &http.Request{}, httprouter.Params{})
+			w := httptest.NewRecorder()
+			h(stubHandle()).ServeHTTP(w, &http.Request{})
 
-		resp := w.Result()
-		resp.Body.Close()
-		i.AssertExpectations(t)
-		assert.True(t, b, "expected dec func to have been called")
-		assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
-	})
+			resp := w.Result()
+			resp.Body.Close()
+			assert.Equal(t, tt.status, resp.StatusCode)
+			mi.AssertExpectations(t)
+		})
+	}
 }

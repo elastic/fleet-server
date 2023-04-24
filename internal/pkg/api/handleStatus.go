@@ -18,10 +18,9 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/julienschmidt/httprouter"
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -61,48 +60,31 @@ func (st StatusT) authenticate(r *http.Request) (*apikey.APIKey, error) {
 	return authAPIKey(r, st.bulk, st.cache)
 }
 
-func (st StatusT) handleStatus(_ *zerolog.Logger, r *http.Request, rt *Router) (resp StatusResponse, state client.UnitState) {
+func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi build.Info, r *http.Request, w http.ResponseWriter) error {
 	authed := true
 	if _, aerr := st.authfn(r); aerr != nil {
-		log.Debug().Err(aerr).Msg("unauthenticated status request, return short status response only")
+		zlog.Debug().Err(aerr).Msg("unauthenticated status request, return short status response only")
 		authed = false
 	}
 
-	state = rt.sm.State()
-	resp = StatusResponse{
+	state := sm.State()
+	resp := StatusResponse{
 		Name:   build.ServiceName,
-		Status: state.String(),
+		Status: StatusResponseStatus(state.String()), // TODO try to make the oapi codegen less verbose here
 	}
 
 	if authed {
+		bt := bi.BuildTime.Format(time.RFC3339)
 		resp.Version = &StatusResponseVersion{
-			Number:    rt.bi.Version,
-			BuildHash: rt.bi.Commit,
-			BuildTime: rt.bi.BuildTime.Format(time.RFC3339),
+			Number:    &bi.Version,
+			BuildHash: &bi.Commit,
+			BuildTime: &bt,
 		}
 	}
 
-	return resp, state
-}
-
-func (rt *Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	start := time.Now()
-	reqID := r.Header.Get(logger.HeaderRequestID)
-
-	zlog := log.With().
-		Str(ECSHTTPRequestID, reqID).
-		Str("mod", kStatusMod).
-		Logger()
-
-	resp, state := rt.st.handleStatus(&zlog, r, rt)
-
 	data, err := json.Marshal(&resp)
 	if err != nil {
-		code := http.StatusInternalServerError
-		zlog.Error().Err(err).Int(ECSHTTPResponseCode, code).
-			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
-		http.Error(w, "", code)
-		return
+		return err
 	}
 
 	code := http.StatusServiceUnavailable
@@ -111,17 +93,24 @@ func (rt *Router) handleStatus(w http.ResponseWriter, r *http.Request, _ httprou
 	}
 	w.WriteHeader(code)
 
-	var nWritten int
-	if nWritten, err = w.Write(data); err != nil {
+	ts, ok := logger.CtxStartTime(r.Context())
+	nWritten, err := w.Write(data)
+	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			zlog.Error().Err(err).Int(ECSHTTPResponseCode, code).
-				Int64(ECSEventDuration, time.Since(start).Nanoseconds()).Msg("fail status")
+			e := zlog.Error().Err(err).Int(ECSHTTPResponseCode, code)
+			if ok {
+				e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
+			}
+			e.Msg("fail status")
 		}
 	}
 
 	cntStatus.bodyOut.Add(uint64(nWritten))
-	zlog.Debug().
-		Int(ECSHTTPResponseBodyBytes, nWritten).
-		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-		Msg("ok status")
+	e := zlog.Debug().Int(ECSHTTPResponseBodyBytes, nWritten)
+	if ok {
+		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
+	}
+	e.Msg("ok status")
+
+	return nil
 }

@@ -13,11 +13,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 
-	"github.com/rs/zerolog/log"
-	"go.elastic.co/apm"
+	"github.com/rs/zerolog/hlog"
+	"go.elastic.co/apm/v2"
 )
 
 var (
@@ -34,7 +33,6 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 	span, ctx := apm.StartSpan(r.Context(), "authAPIKey", "auth")
 	defer span.End()
 	start := time.Now()
-	reqID := r.Header.Get(logger.HeaderRequestID)
 
 	key, err := apikey.ExtractAPIKey(r)
 	if err != nil {
@@ -43,9 +41,8 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 
 	if c.ValidAPIKey(*key) {
 		span.Context.SetLabel("api_key_cache_hit", true)
-		log.Debug().
+		hlog.FromRequest(r).Debug().
 			Str("id", key.ID).
-			Str(ECSHTTPRequestID, reqID).
 			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Bool("fleet.apikey.cache_hit", true).
 			Msg("ApiKey authenticated")
@@ -57,18 +54,16 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 	info, err := bulker.APIKeyAuth(ctx, *key)
 
 	if err != nil {
-		log.Info().
+		hlog.FromRequest(r).Info().
 			Err(err).
 			Str(LogAPIKeyID, key.ID).
-			Str(ECSHTTPRequestID, reqID).
 			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey fail authentication")
 		return nil, err
 	}
 
-	log.Debug().
+	hlog.FromRequest(r).Debug().
 		Str("id", key.ID).
-		Str(ECSHTTPRequestID, reqID).
 		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Str("userName", info.UserName).
 		Strs("roles", info.Roles).
@@ -80,10 +75,9 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 	c.SetAPIKey(*key, info.Enabled)
 	if !info.Enabled {
 		err = ErrAPIKeyNotEnabled
-		log.Info().
+		hlog.FromRequest(r).Info().
 			Err(err).
 			Str("id", key.ID).
-			Str(ECSHTTPRequestID, reqID).
 			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey not enabled")
 	}
@@ -102,9 +96,8 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 		return nil, err
 	}
 
-	w := log.With().
-		Str(LogAccessAPIKeyID, key.ID).
-		Str(ECSHTTPRequestID, r.Header.Get(logger.HeaderRequestID))
+	w := hlog.FromRequest(r).With().
+		Str(LogAccessAPIKeyID, key.ID)
 
 	if id != nil {
 		w = w.Str(LogAgentID, *id)
@@ -123,6 +116,11 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 	agent, err := findAgentByAPIKeyID(r.Context(), bulker, key.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	tx := apm.TransactionFromContext(r.Context())
+	if tx != nil {
+		tx.Context.SetLabel("agent_id", agent.Id)
 	}
 
 	if agent.Agent == nil {

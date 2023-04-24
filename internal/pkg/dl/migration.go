@@ -46,6 +46,9 @@ var timeNow = time.Now
 // function is responsible to ensure it only applies the migration if needed,
 // being a no-op otherwise.
 func Migrate(ctx context.Context, bulker bulk.Bulk) error {
+	// WARNING: No new migrations should be added here. We need to implement
+	// a mechanism to perform migrations with standalone mode.
+	// See https://github.com/elastic/fleet-server/pull/2359.
 	for _, fn := range []migrationFn{migrateTov7_15, migrateToV8_5} {
 		if err := fn(ctx, bulker); err != nil {
 			return err

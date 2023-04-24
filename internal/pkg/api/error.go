@@ -11,11 +11,14 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/hlog"
 )
 
 // Alias logger constants
@@ -110,6 +113,24 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			limit.ErrRateLimit,
+			HTTPErrResp{
+				http.StatusTooManyRequests,
+				"RateLimit",
+				"exceeded the rate limit",
+				zerolog.WarnLevel,
+			},
+		},
+		{
+			limit.ErrMaxLimit,
+			HTTPErrResp{
+				http.StatusTooManyRequests,
+				"MaxLimit",
+				"exceeded the max limit",
+				zerolog.WarnLevel,
+			},
+		},
+		{
 			os.ErrDeadlineExceeded,
 			HTTPErrResp{
 				http.StatusRequestTimeout,
@@ -132,6 +153,17 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 	for _, e := range errTable {
 		if errors.Is(err, e.target) {
 			return e.meta
+		}
+	}
+
+	// If it's a JSON marshal error
+	var jErr *json.MarshalerError
+	if errors.As(err, &jErr) {
+		return HTTPErrResp{
+			http.StatusInternalServerError,
+			err.Error(),
+			"Fleet server unable to marshall JSON",
+			zerolog.ErrorLevel,
 		}
 	}
 
@@ -166,4 +198,17 @@ func (er HTTPErrResp) Write(w http.ResponseWriter) error {
 	w.WriteHeader(er.StatusCode)
 	_, err = w.Write(data)
 	return err
+}
+
+func ErrorResp(w http.ResponseWriter, r *http.Request, err error) {
+	zlog := hlog.FromRequest(r)
+	resp := NewHTTPErrResp(err)
+	e := zlog.WithLevel(resp.Level).Err(err).Int(ECSHTTPResponseCode, resp.StatusCode)
+	if ts, ok := logger.CtxStartTime(r.Context()); ok {
+		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
+	}
+	e.Msg("HTTP request error")
+	if rerr := resp.Write(w); rerr != nil {
+		zlog.Error().Err(rerr).Msg("fail writing error response")
+	}
 }

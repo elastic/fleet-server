@@ -2,72 +2,100 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build !integration
-// +build !integration
-
 package api
 
 import (
-	"context"
-	"errors"
+	"fmt"
 	"net/http"
-	"sync"
+	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
-	fbuild "github.com/elastic/fleet-server/v7/internal/pkg/build"
-	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
-	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
-	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
-	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestRun(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	port, err := ftesting.FreePort()
-	require.NoError(t, err)
-	cfg := &config.Server{}
-	cfg.InitDefaults()
-	cfg.Host = "localhost"
-	cfg.Port = port
-
-	verCon := mustBuildConstraints("8.0.0")
-	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
-	require.NoError(t, err)
-	bulker := ftesting.NewMockBulk()
-	pim := mock.NewMockMonitor()
-	pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
-	bc := checkin.NewBulk(nil)
-	ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
-	et, err := NewEnrollerT(verCon, cfg, nil, c)
-	require.NoError(t, err)
-
-	router := NewRouter(cfg, bulker, ct, et, nil, nil, nil, nil, nil, nil, fbuild.Info{})
-	errCh := make(chan error)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		err = router.Run(ctx)
-		wg.Done()
-	}()
-	var errFromChan error
-	select {
-	case err := <-errCh:
-		errFromChan = err
-	case <-time.After(500 * time.Millisecond):
-		break
+func TestPathToOperation(t *testing.T) {
+	tests := []struct {
+		path string
+		op   string
+	}{
+		{"/api/status/", "status"},
+		{"/api/status", "status"},
+		{"/api/status/toolong", ""},
+		{"/api/fleet/uploads", "uploadBegin"},
+		{"/api/fleet/upload", ""},
+		{"/api/fleet/agents/some-id", "enroll"},
+		{"/api/fleet/agents/some-id/acks", "acks"},
+		{"/api/fleet/agents/some-id/checkin", "checkin"},
+		{"/api/fleet/uploads/some-id", "uploadComplete"},
+		{"/api/fleet/uploads/some-id/0", "uploadChunk"},
+		{"/api/fleet/artifacts/some-id/hash", "artifact"},
+		{"/api/fleet/unimplemented/some-id", ""},
+		{"/api/flet/agents/some-id/acks", ""},
+		{"/api/fleet/agents/some-id/other", ""},
 	}
-	cancel()
-	wg.Wait()
-	require.NoError(t, errFromChan)
-	if !errors.Is(err, http.ErrServerClosed) {
-		require.NoError(t, err)
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("testcase %d", i), func(t *testing.T) {
+			assert.Equal(t, tt.op, pathToOperation(tt.path))
+		})
+	}
+}
+
+func testStatusServer(t *testing.T, cfg *config.ServerLimits) http.Handler {
+	t.Helper()
+	l := Limiter(cfg)
+
+	r := chi.NewRouter()
+	r.Use(l.middleware)
+	r.Get("/api/status", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("{}"))
+	})
+	return r
+}
+
+func TestLimiter(t *testing.T) {
+	tests := []struct {
+		name   string
+		cfg    *config.ServerLimits
+		status int
+	}{{
+		name: "enabled",
+		cfg: &config.ServerLimits{
+			StatusLimit: config.Limit{
+				Interval: time.Second,
+				Burst:    1,
+				Max:      1,
+			},
+		},
+		status: http.StatusOK,
+	}, {
+		name: "limit reached (negative values)",
+		cfg: &config.ServerLimits{
+			StatusLimit: config.Limit{
+				Interval: -1 * time.Second,
+				Burst:    -1,
+				Max:      -1,
+			},
+		},
+		status: http.StatusTooManyRequests,
+	}, {
+		name:   "disabled (zero values)",
+		cfg:    &config.ServerLimits{},
+		status: http.StatusOK,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := testStatusServer(t, tt.cfg)
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest("GET", "/api/status", nil)
+
+			h.ServeHTTP(w, r)
+			resp := w.Result()
+			resp.Body.Close()
+			assert.Equal(t, tt.status, resp.StatusCode)
+		})
 	}
 }

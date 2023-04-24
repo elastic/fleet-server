@@ -14,6 +14,13 @@ BUILDMODE_darwin_arm64=-buildmode=pie
 
 BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-main-debian10
 
+#Benchmark related targets
+BENCH_BASE ?= benchmark-$(COMMIT).out
+BENCH_NEXT ?=
+BENCHMARK_ARGS := -count=8
+BENCHMARK_PACKAGE ?= ./...
+BENCHMARK_FILTER ?= Bench
+
 ifdef VERSION_QUALIFIER
 DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
 endif
@@ -23,6 +30,9 @@ VERSION=${DEFAULT_VERSION}-SNAPSHOT
 else
 VERSION=${DEFAULT_VERSION}
 endif
+
+DOCKER_IMAGE_TAG?=${VERSION}
+DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
@@ -66,6 +76,8 @@ clean: ## - Clean up build artifacts
 generate: ## - Generate schema models
 	@printf "${CMD_COLOR_ON} Installing module for go generate\n${CMD_COLOR_OFF}"
 	env GOBIN=${GOBIN} go install github.com/elastic/go-json-schema-generate/cmd/schema-generate@ec19b88f6b5ef7825a928df8274a99337b855d1f
+	@printf "${CMD_COLOR_ON} Installing module for oapi-codegen\n${CMD_COLOR_OFF}"
+	env GOBIN=${GOBIN} go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
 	env PATH="${GOBIN}:${PATH}" go generate ./...
 
@@ -88,7 +100,7 @@ check-headers:  ## - Check copyright headers
 
 .PHONY: check-go
 check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.47.2
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.51.1
 	@./bin/golangci-lint run -v
 
 .PHONY: notice
@@ -125,6 +137,22 @@ test-release:  ## - Check that all release binaries are created
 test-unit: prepare-test-context  ## - Run unit tests only
 	set -o pipefail; go test -v -race ./... | tee build/test-unit.out
 
+.PHONY: benchmark
+benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
+	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
+
+.PHONY: install-benchstat
+install-benchstat: ## - Install the benchstat package
+	@benchstat 2> /dev/null || go install golang.org/x/perf/cmd/benchstat@latest
+
+.PHONY: benchstat
+benchstat: install-benchstat ## - Run the benchstat comparing base against next, BENCH_BASE and BENCH_NEXT are required for comparison
+	$(eval BENCHSTAT_ARGS := "build/$(BENCH_BASE)")
+ifneq ($(BENCH_NEXT),)
+	$(eval BENCHSTAT_ARGS += "build/$(BENCH_NEXT)")
+endif
+	@benchstat $(BENCHSTAT_ARGS)
+
 .PHONY: prepare-test-context
 prepare-test-context: ## - Prepare the test context folders
 	@mkdir -p build
@@ -149,6 +177,21 @@ $(PLATFORM_TARGETS): release-%:
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
 	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(DEV),-tags="dev",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
+
+.PHONY: build-docker
+build-docker:
+	docker build \
+		--build-arg GO_VERSION=$(GO_VERSION) \
+		--build-arg=GCFLAGS="${GCFLAGS}" \
+		--build-arg=LDFLAGS="${LDFLAGS}" \
+		--build-arg=DEV="$(DEV)" \
+		--build-arg=VERSION="$(VERSION)" \
+		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
+
+.PHONY: release-docker
+release-docker:
+	docker push \
+		$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,)
 
 .PHONY: package-target
 package-target: build/distributions
@@ -248,3 +291,10 @@ test-int-set: ## - Run integration tests without setup
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	go test -v -tags=integration -count=1 -race -p 1 ./...
+
+##################################################
+# Cloud testing targets
+##################################################
+.PHONY: build-and-push-cloud-image
+build-and-push-cloud-image:
+	GOARCH=amd64 ./dev-tools/cloud/docker/build.sh

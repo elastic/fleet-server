@@ -15,11 +15,11 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"go.elastic.co/apm"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -46,6 +46,7 @@ type Bulk interface {
 	Delete(ctx context.Context, index, id string, opts ...Opt) error
 	Index(ctx context.Context, index, id string, body []byte, opts ...Opt) (string, error)
 	Search(ctx context.Context, index string, body []byte, opts ...Opt) (*es.ResultT, error)
+	HasTracer() bool
 
 	// Multi Operation API's run in the bulk engine
 	MCreate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)

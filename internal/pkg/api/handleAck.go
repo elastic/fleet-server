@@ -10,25 +10,29 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
+	"go.elastic.co/apm/module/apmhttp/v2"
+	"go.elastic.co/apm/v2"
+)
+
+const (
+	TypeUnenroll = "UNENROLL"
+	TypeUpgrade  = "UPGRADE"
 )
 
 var (
@@ -41,6 +45,35 @@ type HTTPError struct {
 
 func (e *HTTPError) Error() string {
 	return fmt.Sprintf("%d: %s", e.Status, http.StatusText(e.Status))
+}
+
+func NewAckResponse(size int) AckResponse {
+	return AckResponse{
+		Action: "acks",
+		Errors: false,
+		Items:  make([]AckResponseItem, size),
+	}
+}
+
+func (a *AckResponse) setMessage(pos int, status int, message string) {
+	if status != http.StatusOK {
+		a.Errors = true
+	}
+	a.Items[pos].Status = status
+	a.Items[pos].Message = &message
+}
+
+func (a *AckResponse) SetResult(pos int, status int) {
+	a.setMessage(pos, status, http.StatusText(status))
+}
+
+func (a *AckResponse) SetError(pos int, err error) {
+	var esErr *es.ErrElastic
+	if errors.As(err, &esErr) {
+		a.setMessage(pos, esErr.Status, esErr.Reason)
+	} else {
+		a.SetResult(pos, http.StatusInternalServerError)
+	}
 }
 
 type AckT struct {
@@ -57,52 +90,19 @@ func NewAckT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *AckT {
 	}
 }
 
-//nolint:dupl // function body calls different internal handler then handleCheckin
-func (rt *Router) handleAcks(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	start := time.Now()
-	id := ps.ByName("id")
-
-	reqID := r.Header.Get(logger.HeaderRequestID)
-
-	zlog := log.With().
-		Str(LogAgentID, id).
-		Str(ECSHTTPRequestID, reqID).
-		Logger()
-
-	err := rt.ack.handleAcks(&zlog, w, r, id)
-
-	if err != nil {
-		cntAcks.IncError(err)
-		resp := NewHTTPErrResp(err)
-
-		zlog.WithLevel(resp.Level).
-			Err(err).
-			Int(ECSHTTPResponseCode, resp.StatusCode).
-			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail ACK")
-
-		if err := resp.Write(w); err != nil {
-			zlog.Error().Err(err).Msg("fail writing error response")
-		}
-	}
-}
-
-func (ack *AckT) handleAcks(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, id string) error {
+func (ack *AckT) handleAcks(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, id string) error {
 	agent, err := authAgent(r, &id, ack.bulk, ack.cache)
 	if err != nil {
 		return err
 	}
+	zlog = zlog.With().Str(LogAccessAPIKeyID, agent.AccessAPIKeyID).Logger()
+	ctx := zlog.WithContext(r.Context())
+	r = r.WithContext(ctx)
 
-	// Pointer is passed in to allow UpdateContext by child function
-	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
-	})
-
-	return ack.processRequest(*zlog, w, r, agent)
+	return ack.processRequest(zlog, w, r, agent)
 }
 
 func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent) error {
-
 	body := r.Body
 
 	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
@@ -110,7 +110,7 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 		body = http.MaxBytesReader(w, body, ack.cfg.Limits.AckLimit.MaxBody)
 	}
 
-	raw, err := ioutil.ReadAll(body)
+	raw, err := io.ReadAll(body)
 	if err != nil {
 		return fmt.Errorf("handleAcks read body: %w", err)
 	}
@@ -155,15 +155,15 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 
 func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
 	return model.ActionResult{
-		ActionID:        ev.ActionID,
+		ActionID:        ev.ActionId,
 		AgentID:         agentID,
 		ActionInputType: ev.ActionInputType,
 		StartedAt:       ev.StartedAt,
 		CompletedAt:     ev.CompletedAt,
-		ActionData:      ev.ActionData,
-		ActionResponse:  ev.ActionResponse,
-		Data:            ev.Data,
-		Error:           ev.Error,
+		ActionData:      fromPtr(ev.ActionData),
+		ActionResponse:  fromPtr(ev.ActionResponse),
+		Data:            fromPtr(ev.Data),
+		Error:           fromPtr(ev.Error),
 	}
 }
 
@@ -171,6 +171,8 @@ func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
 // 1. AckResponse and nil error, when the whole request is successful
 // 2. AckResponse and non-nil error, when the request items had errors
 func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) (AckResponse, error) {
+	span, ctx := apm.StartSpan(ctx, "handleAckEvents", "ack")
+	defer span.End()
 	var policyAcks []string
 
 	var policyIdxs []int
@@ -196,21 +198,23 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			setResult(pos, http.StatusInternalServerError)
 		}
 		res.SetError(pos, err)
+		e := apm.CaptureError(ctx, err)
+		e.Send()
 	}
 
 	for n, ev := range events {
 		log := zlog.With().
-			Str("actionType", ev.Type).
-			Str("actionSubType", ev.SubType).
-			Str("actionId", ev.ActionID).
-			Str("agentId", ev.AgentID).
+			Str("actionType", string(ev.Type)).
+			Str("actionSubType", string(ev.Subtype)).
+			Str("actionId", ev.ActionId).
+			Str("agentId", ev.AgentId).
 			Str("timestamp", ev.Timestamp).
 			Int("n", n).Logger()
 
 		log.Info().Msg("ack event")
 
 		// Check agent id mismatch
-		if ev.AgentID != "" && ev.AgentID != agent.Id {
+		if ev.AgentId != "" && ev.AgentId != agent.Id {
 			log.Error().Msg("agent id mismatch")
 			setResult(n, http.StatusBadRequest)
 			continue
@@ -218,10 +222,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 		// Check if this is the policy change ack
 		// The policy change acks are handled after actions
-		if strings.HasPrefix(ev.ActionID, "policy:") {
-			if ev.Error == "" {
+		if strings.HasPrefix(ev.ActionId, "policy:") {
+			if ev.Error == nil {
 				// only added if no error on action
-				policyAcks = append(policyAcks, ev.ActionID)
+				policyAcks = append(policyAcks, ev.ActionId)
 				policyIdxs = append(policyIdxs, n)
 			}
 			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
@@ -231,10 +235,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 		// Process non-policy change actions
 		// Find matching action by action ID
-		action, ok := ack.cache.GetAction(ev.ActionID)
+		action, ok := ack.cache.GetAction(ev.ActionId)
 		if !ok {
 			// Find action by ID
-			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionID)
+			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionId)
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
 				setError(n, err)
@@ -251,29 +255,13 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			ack.cache.SetAction(action)
 		}
 
-		// Convert ack event to action result document
-		acr := eventToActionResult(agent.Id, ev)
-
-		// Save action result document
-		if _, err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
+		if err := ack.handleActionResult(ctx, zlog, agent, action, ev); err != nil {
 			setError(n, err)
-			log.Error().Err(err).Msg("create action result")
-			continue
+		} else {
+			setResult(n, http.StatusOK)
 		}
 
-		// Set OK result
-		// The unenroll and upgrade acks might overwrite it later
-		setResult(n, http.StatusOK)
-
-		if action.Type == TypeUpgrade {
-			if err := ack.handleUpgrade(ctx, zlog, agent, ev); err != nil {
-				setError(n, err)
-				log.Error().Err(err).Msg("handle upgrade event")
-				continue
-			}
-		}
-
-		if ev.Error == "" && action.Type == TypeUnenroll {
+		if ev.Error == nil && action.Type == TypeUnenroll {
 			unenrollIdxs = append(unenrollIdxs, n)
 		}
 	}
@@ -290,7 +278,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	// Process unenroll acks
 	if len(unenrollIdxs) > 0 {
 		if err := ack.handleUnenroll(ctx, zlog, agent); err != nil {
-			log.Error().Err(err).Msg("handle unenroll event")
+			zlog.Error().Err(err).Msg("handle unenroll event")
 			// Set errors for each unenroll event
 			for _, idx := range unenrollIdxs {
 				setError(idx, err)
@@ -303,6 +291,47 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		return res, &httpErr
 	}
 	return res, nil
+}
+
+func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, action model.Action, ev Event) error {
+	// Build span links for actions
+	var links []apm.SpanLink
+	if ack.bulk.HasTracer() && action.Traceparent != "" {
+		traceCtx, err := apmhttp.ParseTraceparentHeader(action.Traceparent)
+		if err != nil {
+			zlog.Trace().Err(err).Msgf("Error parsing traceparent: %s %s", action.Traceparent, err)
+		} else {
+			links = []apm.SpanLink{
+				{
+					Trace: traceCtx.Trace,
+					Span:  traceCtx.Span,
+				},
+			}
+		}
+	}
+
+	span, ctx := apm.StartSpanOptions(ctx, fmt.Sprintf("Process action result %s", action.Type), "app", apm.SpanOptions{Links: links})
+	span.Context.SetLabel("action_id", action.Id)
+	span.Context.SetLabel("agent_id", agent.Agent.ID)
+	defer span.End()
+
+	// Convert ack event to action result document
+	acr := eventToActionResult(agent.Id, ev)
+
+	// Save action result document
+	if _, err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
+		zlog.Error().Err(err).Msg("create action result")
+		return err
+	}
+
+	if action.Type == TypeUpgrade {
+		if err := ack.handleUpgrade(ctx, zlog, agent, ev); err != nil {
+			zlog.Error().Err(err).Msg("handle upgrade event")
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, actionIds ...string) error {
@@ -361,7 +390,6 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	return nil
-
 }
 
 func (ack *AckT) updateAPIKey(ctx context.Context,
@@ -409,7 +437,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 				}
 			}
 		}
-		ack.invalidateAPIKeys(ctx, toRetireAPIKeyIDs, apiKeyID)
+		ack.invalidateAPIKeys(ctx, zlog, toRetireAPIKeyIDs, apiKeyID)
 	}
 
 	return nil
@@ -476,7 +504,7 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 	return r, len(keys), nil
 }
 
-func (ack *AckT) invalidateAPIKeys(ctx context.Context, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
+func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
 	ids := make([]string, 0, len(toRetireAPIKeyIDs))
 	for _, k := range toRetireAPIKeyIDs {
 		if k.ID == skip || k.ID == "" {
@@ -486,9 +514,9 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, toRetireAPIKeyIDs []mode
 	}
 
 	if len(ids) > 0 {
-		log.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
+		zlog.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
 		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
-			log.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+			zlog.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
 		}
 	}
 }
@@ -526,13 +554,13 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event Event) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{}
-	if event.Error != "" {
+	if event.Error != nil {
 		// unmarshal event payload
 		var pl struct {
 			Retry   bool `json:"retry"`
 			Attempt int  `json:"retry_attempt"`
 		}
-		err := json.Unmarshal(event.Payload, &pl)
+		err := json.Unmarshal(fromPtr(event.Payload), &pl)
 		if err != nil {
 			zlog.Error().Err(err).Msg("unable to unmarshal upgrade event payload")
 		}

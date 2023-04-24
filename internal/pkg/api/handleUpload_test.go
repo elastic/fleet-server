@@ -3,13 +3,11 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !integration
-// +build !integration
 
 package api
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -31,7 +29,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/julienschmidt/httprouter"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -41,7 +39,9 @@ import (
   Upload Begin route testing
 */
 
-func TestUploadStartValidation(t *testing.T) {
+const RouteUploadBegin = "/api/fleet/uploads"
+
+func TestUploadBeginValidation(t *testing.T) {
 	hr, _, _ := prepareUploaderMock(t)
 
 	// test empty body
@@ -225,7 +225,7 @@ func TestUploadStartValidation(t *testing.T) {
 
 }
 
-func TestUploadStartAuth(t *testing.T) {
+func TestUploadBeginAuth(t *testing.T) {
 
 	tests := []struct {
 		Name               string
@@ -276,24 +276,19 @@ func TestUploadStartAuth(t *testing.T) {
 
 }
 
-func TestUploadStartResponse(t *testing.T) {
+func TestUploadBeginResponse(t *testing.T) {
 	hr, _, _ := prepareUploaderMock(t)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockStartBodyWithAgent("foo")))
 	hr.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	type UploadStartResponse struct {
-		UploadID  string `json:"upload_id"`
-		ChunkSize int    `json:"chunk_size"`
-	}
-
-	var response UploadStartResponse
+	var response UploadBeginResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &response)
 	assert.NoErrorf(t, err, "upload start should provide valid JSON response")
 
-	assert.NotEmptyf(t, response.UploadID, "upload start response should provide an ID")
-	assert.Greaterf(t, response.ChunkSize, 0, "upload start response should provide a chunk size > 0")
+	assert.NotEmptyf(t, response.UploadId, "upload start response should provide an ID")
+	assert.Greaterf(t, response.ChunkSize, int64(0), "upload start response should provide a chunk size > 0")
 
 }
 
@@ -302,13 +297,11 @@ func TestUploadStartResponse(t *testing.T) {
 */
 
 func TestChunkUploadRouteParams(t *testing.T) {
-
 	data := []byte("filedata")
 	hasher := sha256.New()
 	_, err := hasher.Write(data)
 	require.NoError(t, err)
 	hash := hex.EncodeToString(hasher.Sum(nil))
-
 	mockUploadID := "abc123"
 
 	tests := []struct {
@@ -318,7 +311,7 @@ func TestChunkUploadRouteParams(t *testing.T) {
 		ExpectErrContains string
 	}{
 		{"Valid chunk number is OK", "/api/fleet/uploads/" + mockUploadID + "/0", http.StatusOK, ""},
-		{"Non-numeric chunk number is rejected", "/api/fleet/uploads/" + mockUploadID + "/CHUNKNUM", http.StatusBadRequest, "invalid chunk number"},
+		{"Non-numeric chunk number is rejected", "/api/fleet/uploads/" + mockUploadID + "/CHUNKNUM", http.StatusBadRequest, "error binding string parameter"},
 		{"Negative chunk number is rejected", "/api/fleet/uploads/" + mockUploadID + "/-2", http.StatusBadRequest, "invalid chunk number"},
 		{"Too large chunk number is rejected", "/api/fleet/uploads/" + mockUploadID + "/50", http.StatusBadRequest, "invalid chunk number"},
 	}
@@ -378,7 +371,7 @@ func TestChunkUploadRequiresChunkHashHeader(t *testing.T) {
 	hr.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), "hash header")
+	assert.Contains(t, rec.Body.String(), "Header parameter X-Chunk-SHA2 is required, but not found")
 
 }
 
@@ -491,7 +484,7 @@ func TestChunkUploadExpiry(t *testing.T) {
 	Upload finalization route testing
 */
 
-func TestUploadFinalizeRequiresMatchingAuth(t *testing.T) {
+func TestUploadCompleteRequiresMatchingAuth(t *testing.T) {
 	tests := []struct {
 		Name              string
 		AuthSuccess       bool
@@ -559,7 +552,7 @@ func TestUploadFinalizeRequiresMatchingAuth(t *testing.T) {
 	}
 }
 
-func TestUploadFinalizeRequiresValidStatus(t *testing.T) {
+func TestUploadCompleteRequiresValidStatus(t *testing.T) {
 	mockUploadID := "abc123"
 
 	tests := []struct {
@@ -613,7 +606,7 @@ func TestUploadFinalizeRequiresValidStatus(t *testing.T) {
 	}
 }
 
-func TestUploadFinalizeRejectsMissingChunks(t *testing.T) {
+func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
 	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
@@ -657,7 +650,7 @@ func TestUploadFinalizeRejectsMissingChunks(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "incomplete")
 }
 
-func TestUploadFinalizeRejectsFinalChunkNotMarkedFinal(t *testing.T) {
+func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
 	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
@@ -707,7 +700,7 @@ func TestUploadFinalizeRejectsFinalChunkNotMarkedFinal(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "failed validation")
 }
 
-func TestUploadFinalizeNonFinalChunkMarkedFinal(t *testing.T) {
+func TestUploadCompleteNonFinalChunkMarkedFinal(t *testing.T) {
 	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
@@ -757,7 +750,7 @@ func TestUploadFinalizeNonFinalChunkMarkedFinal(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "failed validation")
 }
 
-func TestUploadFinalizeUndersizedChunk(t *testing.T) {
+func TestUploadCompleteUndersizedChunk(t *testing.T) {
 	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
@@ -807,7 +800,7 @@ func TestUploadFinalizeUndersizedChunk(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "failed validation")
 }
 
-func TestUploadFinalizeIncorrectTransitHash(t *testing.T) {
+func TestUploadCompleteIncorrectTransitHash(t *testing.T) {
 	mockUploadID := "abc123"
 
 	hr, _, fakebulk := prepareUploaderMock(t)
@@ -862,7 +855,7 @@ func TestUploadFinalizeIncorrectTransitHash(t *testing.T) {
 */
 
 // prepareUploaderMock sets up common dependencies and registers upload routes to a returned router
-func prepareUploaderMock(t *testing.T) (*httprouter.Router, Router, *itesting.MockBulk) {
+func prepareUploaderMock(t *testing.T) (http.Handler, apiServer, *itesting.MockBulk) {
 	// chunk index operations skip the bulker in order to send binary docs directly
 	// so a mock *elasticsearch.Client needs to be be prepared
 	es := mockESClient(t)
@@ -893,9 +886,8 @@ func prepareUploaderMock(t *testing.T) (*httprouter.Router, Router, *itesting.Mo
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 
-	// create a router instance with an UploadT that will handle the incoming requests
-	rt := Router{
-		ctx: context.Background(),
+	// create an apiServer with an UploadT that will handle the incoming requests
+	si := apiServer{
 		ut: &UploadT{
 			bulker:      fakebulk,
 			chunkClient: es,
@@ -917,11 +909,7 @@ func prepareUploaderMock(t *testing.T) (*httprouter.Router, Router, *itesting.Mo
 		},
 	}
 
-	hr := httprouter.New()
-	hr.Handle(http.MethodPost, RouteUploadBegin, rt.handleUploadStart)
-	hr.Handle(http.MethodPut, RouteUploadChunk, rt.handleUploadChunk)
-	hr.Handle(http.MethodPost, RouteUploadComplete, rt.handleUploadComplete)
-	return hr, rt, fakebulk
+	return Handler(&si), si, fakebulk
 }
 
 // mockStartBodyWithAgent returns the minimum required JSON payload for beginning an upload, with agent set as input

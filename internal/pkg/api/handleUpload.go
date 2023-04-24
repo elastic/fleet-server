@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,12 +20,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/cbor"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/julienschmidt/httprouter"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -37,73 +34,7 @@ const (
 	maxUploadTimer = 24 * time.Hour
 )
 
-func (rt Router) handleUploadStart(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	start := time.Now()
-	reqID := r.Header.Get(logger.HeaderRequestID)
-	zlog := log.With().
-		Str(ECSHTTPRequestID, reqID).
-		Logger()
-
-	// authentication occurs inside here
-	// to check that key agent ID matches the ID in the body payload yet-to-be unmarshalled
-	if err := rt.ut.handleUploadStart(&zlog, w, r); err != nil {
-		writeUploadError(err, w, zlog, start, "error initiating upload process")
-		return
-	}
-}
-
-func (rt Router) handleUploadChunk(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	start := time.Now()
-
-	id := ps.ByName("id")
-	chunkID := ps.ByName("num")
-
-	reqID := r.Header.Get(logger.HeaderRequestID)
-
-	zlog := log.With().
-		Str(LogAgentID, id).
-		Str(ECSHTTPRequestID, reqID).
-		Logger()
-
-	// simpler authentication check,  for high chunk throughput
-	// since chunk checksums must match transit hash
-	// AND optionally the initial hash, both having stricter auth checks
-	if _, err := rt.ut.authAPIKey(r, rt.bulker, rt.ut.cache); err != nil {
-		writeUploadError(err, w, zlog, start, "authentication failure for chunk write")
-		return
-	}
-
-	chunkNum, err := strconv.Atoi(chunkID)
-	if err != nil {
-		writeUploadError(uploader.ErrInvalidChunkNum, w, zlog, start, "error parsing chunk index")
-		return
-	}
-	if err := rt.ut.handleUploadChunk(&zlog, w, r, id, chunkNum); err != nil {
-		writeUploadError(err, w, zlog, start, "error uploading chunk")
-		return
-	}
-}
-
-func (rt Router) handleUploadComplete(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	start := time.Now()
-
-	id := ps.ByName("id")
-
-	reqID := r.Header.Get(logger.HeaderRequestID)
-
-	zlog := log.With().
-		Str(LogAgentID, id).
-		Str(ECSHTTPRequestID, reqID).
-		Logger()
-
-	// authentication occurs inside here, to ensure key agent ID
-	// matches the same agent ID the operation started with
-	if err := rt.ut.handleUploadComplete(&zlog, w, r, id); err != nil {
-		writeUploadError(err, w, zlog, start, "error finalizing upload")
-		return
-	}
-}
-
+// FIXME Should we use the structs in openapi.gen.go instead of the generic ones? Will need to rework the uploader if we do
 type UploadT struct {
 	bulker      bulk.Bulk
 	chunkClient *elasticsearch.Client
@@ -129,7 +60,7 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 	}
 }
 
-func (ut *UploadT) handleUploadStart(_ *zerolog.Logger, w http.ResponseWriter, r *http.Request) error {
+func (ut *UploadT) handleUploadBegin(_ zerolog.Logger, w http.ResponseWriter, r *http.Request) error {
 	// decode early to match agentID in the payload
 	payload, err := uploader.ReadDict(r.Body)
 	if err != nil {
@@ -156,10 +87,11 @@ func (ut *UploadT) handleUploadStart(_ *zerolog.Logger, w http.ResponseWriter, r
 	}
 
 	// prepare and write response
-	out, err := json.Marshal(map[string]interface{}{
-		"upload_id":  info.ID,
-		"chunk_size": info.ChunkSize,
-	})
+	resp := UploadBeginResponse{
+		ChunkSize: info.ChunkSize,
+		UploadId:  info.ID,
+	}
+	out, err := json.Marshal(resp)
 	if err != nil {
 		return err
 	}
@@ -171,12 +103,8 @@ func (ut *UploadT) handleUploadStart(_ *zerolog.Logger, w http.ResponseWriter, r
 	return nil
 }
 
-func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string, chunkID int) error {
-	chunkHash := strings.TrimSpace(r.Header.Get("X-Chunk-Sha2"))
-	if chunkHash == "" {
-		return errors.New("chunk hash header required")
-	}
-
+func (ut *UploadT) handleUploadChunk(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string, chunkID int, chunkHash string) error {
+	// chunkHash is checked by router
 	upinfo, chunkInfo, err := ut.uploader.Chunk(r.Context(), uplID, chunkID, chunkHash)
 	if err != nil {
 		return err
@@ -213,7 +141,7 @@ func (ut *UploadT) handleUploadChunk(zlog *zerolog.Logger, w http.ResponseWriter
 	return nil
 }
 
-func (ut *UploadT) handleUploadComplete(_ *zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
+func (ut *UploadT) handleUploadComplete(_ zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
 	info, err := ut.uploader.GetUploadInfo(r.Context(), uplID)
 	if err != nil {
 		return err
@@ -221,7 +149,7 @@ func (ut *UploadT) handleUploadComplete(_ *zerolog.Logger, w http.ResponseWriter
 	// need to auth that it matches the ID in the initial
 	// doc, but that means we had to doc-lookup early
 	if _, err := ut.authAgent(r, &info.AgentID, ut.bulker, ut.cache); err != nil {
-		return fmt.Errorf("Error authenticating for upload finalization: %w", err)
+		return fmt.Errorf("error authenticating for upload finalization: %w", err)
 	}
 
 	var req UploadCompleteRequest
@@ -229,7 +157,7 @@ func (ut *UploadT) handleUploadComplete(_ *zerolog.Logger, w http.ResponseWriter
 		return errors.New("unable to parse request body")
 	}
 
-	hash := strings.TrimSpace(req.TransitHash.SHA256)
+	hash := strings.TrimSpace(req.Transithash.Sha256)
 	if hash == "" {
 		return errors.New("transit hash required")
 	}
@@ -244,26 +172,4 @@ func (ut *UploadT) handleUploadComplete(_ *zerolog.Logger, w http.ResponseWriter
 		return err
 	}
 	return nil
-}
-
-// helper function for doing all the error responsibilities
-// at the HTTP edge
-func writeUploadError(err error, w http.ResponseWriter, zlog zerolog.Logger, start time.Time, msg string) {
-	cntUpload.IncError(err)
-	resp := NewHTTPErrResp(err)
-
-	zlog.WithLevel(resp.Level).
-		Err(err).
-		Int(ECSHTTPResponseCode, resp.StatusCode).
-		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-		Msg(msg)
-	if e := resp.Write(w); e != nil {
-		zlog.Error().Err(e).Msg("failure writing error response")
-	}
-}
-
-type UploadCompleteRequest struct {
-	TransitHash struct {
-		SHA256 string `json:"sha256"`
-	} `json:"transithash"`
 }

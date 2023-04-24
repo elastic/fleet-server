@@ -3,6 +3,7 @@ run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   timeout: 1m
   build-tags: integration
+  go: "1.20.3"
 
 issues:
   # Maximum count of issues with the same text.
@@ -28,13 +29,12 @@ output:
 linters:
   disable-all: true
   enable:
-    - deadcode # finds unused code
     - errcheck # checking for unchecked errors in go programs
     - errorlint # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
     - goconst # finds repeated strings that could be replaced by a constant
     - dupl # tool for code clone detection
     - forbidigo # forbids identifiers	matched by reg exps
-    #- gomoddirectives # manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
+    - gomoddirectives # manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
     - gosimple # linter for Go source code that specializes in simplifying a code
     - misspell # finds commonly misspelled English words in comments
     - nakedret # finds naked returns in functions greater than a specified function length
@@ -48,9 +48,7 @@ linters:
     - gomodguard
     - govet # Vet examines Go source code and reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
     - ineffassign # detects when assignments to existing variables are not used
-    - structcheck # finds unused struct fields
     - typecheck # Like the front-end of a Go compiler, parses and type-checks Go code
-    - varcheck # Finds unused global variables and constants
     - asciicheck # simple linter to check that your code does not contain non-ASCII identifiers
     - bodyclose # checks whether HTTP response body is closed successfully
     - durationcheck # check for two durations multiplied together
@@ -61,8 +59,12 @@ linters:
     - nilerr # finds the code that returns nil even if it checks that the error is not nil.
     - noctx # noctx finds sending http request without context.Context
     - unconvert # Remove unnecessary type conversions
-    - wastedassign # wastedassign finds wasted assignment statements.
+    #- wastedassign # wastedassign finds wasted assignment statements. # NOTE disabled due to lack of generics support
     #- godox # tool for detection of FIXME, TODO and other comment keywords
+    - asasalint
+    - bidichk
+    - gocheckcompilerdirectives
+    - tenv
 
 
 # all available settings of specific linters
@@ -101,28 +103,7 @@ linters-settings:
     # Allow local `replace` directives. Default is false.
     replace-local: false
     replace-allow-list:
-      - github.com/Shopify/sarama
-      - github.com/dop251/goja
-      - github.com/fsnotify/fsevents
-
-  gomodguard:
-    blocked:
-      # List of blocked modules.
-      modules:
-        - github.com/elastic/beats/v7:
-            reason: "There must be no Beats dependency, use elastic-agent-libs instead."
-
-  gosimple:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.18.10"
-
-  misspell:
-    # Correct spellings using locale preferences for US or UK.
-    # Default is to use a neutral variety of English.
-    # Setting locale to US will correct the British spelling of 'colour' to 'color'.
-    # locale: US
-    # ignore-words:
-    #   - IdP
+      - github.com/deepmap/oapi-codegen
 
   nakedret:
     # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
@@ -147,15 +128,8 @@ linters-settings:
     # Enable to require nolint directives to mention the specific linter being suppressed. Default is false.
     require-specific: true
 
-  staticcheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.18.10"
-
   stylecheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.18.10"
     initialisms: ["ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS", "ECS"]
-
 
   unparam:
     # Inspect exported functions, default is false. Set to true if no external program/library imports your code.
@@ -164,6 +138,11 @@ linters-settings:
     # with golangci-lint call it on a directory with the changed file.
     check-exported: false
 
-  unused:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.18.10"
+  gomodguard:
+    blocked:
+      # List of blocked modules.
+      modules:
+        - github.com/elastic/beats/v7:
+            reason: "There must be no Beats dependency, use elastic-agent-libs instead."
+        - github.com/elastic/beats/elastic-agent:
+            reason: "There must be no elastic-agent dependency, use elastic-agent-libs instead."
