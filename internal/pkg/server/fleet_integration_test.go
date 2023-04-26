@@ -260,7 +260,7 @@ func TestServerUnauthorized(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer res.Body.Close()
-			diff := cmp.Diff(400, res.StatusCode)
+			diff := cmp.Diff(http.StatusBadRequest, res.StatusCode)
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -271,11 +271,11 @@ func TestServerUnauthorized(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			diff = cmp.Diff(400, resp.StatusCode)
+			diff = cmp.Diff(http.StatusBadRequest, resp.StatusCode)
 			if diff != "" {
 				t.Fatal(diff)
 			}
-			diff = cmp.Diff("BadRequest", resp.Error)
+			diff = cmp.Diff("ErrNoAuthHeader", resp.Error)
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -294,7 +294,7 @@ func TestServerUnauthorized(t *testing.T) {
 			require.NoError(t, err)
 			defer res.Body.Close()
 
-			diff := cmp.Diff(400, res.StatusCode)
+			diff := cmp.Diff(http.StatusBadRequest, res.StatusCode)
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -309,7 +309,7 @@ func TestServerUnauthorized(t *testing.T) {
 			if diff != "" {
 				t.Fatal(diff)
 			}
-			diff = cmp.Diff("BadRequest", resp.Error)
+			diff = cmp.Diff("ErrUnauthorized", resp.Error)
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -657,7 +657,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		res, err := cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		require.Equal(t, http.StatusInternalServerError, res.StatusCode)
 	})
 }
 
@@ -711,7 +711,7 @@ func Test_Agent_request_errors(t *testing.T) {
 		res, err := cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		require.Equal(t, http.StatusInternalServerError, res.StatusCode)
 	})
 	t.Run("no user agent", func(t *testing.T) {
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))

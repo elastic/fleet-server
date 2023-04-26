@@ -233,6 +233,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			apikey.ErrUnauthorized,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrUnauthorized",
+				"unauthorized",
+				zerolog.InfoLevel,
+			},
+		},
+		{
 			apikey.ErrMalformedToken,
 			HTTPErrResp{
 				http.StatusBadRequest,
