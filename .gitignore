@@ -21,3 +21,4 @@ dev-tools/integration/.env.bck
 *.swn
 
 .service_token
+.kibana_service_token

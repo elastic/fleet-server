@@ -70,7 +70,7 @@ local: ## - Build local binary for local environment (bin/fleet-server)
 .PHONY: clean
 clean: ## - Clean up build artifacts
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
-	rm -rf .service_token ./bin/ ./build/
+	rm -rf .service_token .kibana_service_token ./bin/ ./build/
 
 .PHONY: generate
 generate: ## - Generate schema models
@@ -272,6 +272,7 @@ int-docker-start: ## - Start docker envronment for integration tests and wait un
 .PHONY: int-docker-stop
 int-docker-stop: ## - Stop docker environment for integration tests
 	@docker-compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env down
+	@rm -f .service_token
 
 # Run integration tests with starting/stopping docker
 .PHONY: test-int
@@ -291,6 +292,47 @@ test-int-set: ## - Run integration tests without setup
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	go test -v -tags=integration -count=1 -race -p 1 ./...
+
+##################################################
+# e2e testing targets
+##################################################
+
+# Build a custom elastic-agent image injected with the locally built fleet-server
+# based off build-and-push-cloud-image
+.PHONY: build-e2e-agent-image
+build-e2e-agent-image:
+	@printf "${CMD_COLOR_ON} Creating test e2e agent image\n${CMD_COLOR_OFF}"
+	GOARCH=amd64 ./dev-tools/e2e/build.sh
+
+# Use openssl to create a CA and sign a certificate for testing purposes
+.PHONY: e2e-certs
+e2e-certs:
+	@printf "${CMD_COLOR_ON} Creating test e2e certs\n${CMD_COLOR_OFF}"
+	@./dev-tools/e2e/certs.sh
+
+.PHONY: e2e-docker-start
+e2e-docker-start: int-docker-start
+	@./dev-tools/e2e/get-kibana-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}
+	@docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file .kibana_service_token --env-file ./dev-tools/integration/.env up  -d --remove-orphans kibana
+	@./dev-tools/e2e/wait-for-kibana.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:5601
+
+e2e-docker-stop:
+	@docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env down
+	@rm -f .kibana_service_token
+	@$(MAKE) int-docker-stop
+
+# Run e2e tests using the integration test container
+.PHONY: test-e2e
+test-e2e: prepare-test-context local build-e2e-agent-image e2e-certs
+	@$(MAKE) e2e-docker-start
+	@set -o pipefail; $(MAKE) test-e2e-set | tee build/test-int.out
+	@$(MAKE) e2e-docker-stop
+
+test-e2e-set:
+	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
+	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
+	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
+	go test -v -tags=e2e -count=1 -race -p 1 ./testing/...
 
 ##################################################
 # Cloud testing targets
