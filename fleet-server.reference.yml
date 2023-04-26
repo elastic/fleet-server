@@ -1,0 +1,254 @@
+###################### fleet-server configuration example #########################
+
+# This file contains all configuration options for the fleet-server.
+# These options are either specified through configuration flags or the
+# fleet-server integration when running under elastic-agent.
+# A configuration file can also be used when running fleet-server in stand alone
+# (development only).
+
+##############################
+# Output configuration
+# controls how fleet-server connects to elasticsearch.
+##############################
+
+output:
+  elasticsearch:
+    # protocol - either http or https
+    protocol: http
+    hosts: ['localhost:9200']
+    service_token: 'example-token'
+    timeout: 90s
+    max_retries: 3
+    max_conn_per_host: 128
+    max_content_length: 1048576 # 10MiB
+#    service_token_path: /path/to/service-token
+#    path: /elasticsearch
+#    headers: {key: value}
+#    proxy_url: 'https://proxy:8080'
+#    proxy_disable: false
+#    proxy_headers: {key: value}
+#    ssl.enabled: true
+#    ssl.verification_mode: full
+#    ssl.certificate_authorities: ["/etc/pki/root/ca.pem"]
+#    ssl.supported_protocols: [TLSv1.0, TLSv1.1, TLSv1.2]
+#    ssl.cipher_suites: []
+#    ssl.curve_types: []
+#    ssl.ca_sha256: []
+#    ssl.ca_trusted_fingerprint: 'CA-FINGERPRINT-VALUE'
+#    ssl.renegotiation: never
+
+##############################
+# Fleet configuration
+# indicators automatically populated when fleet-server runs under the elastic-agent
+# only needs fleet.agent.id in stand alone operation
+##############################
+
+fleet:
+  agent:
+    # The id is provided by elastic-agent if fleet-server is supervised by an agent
+    # It must be explicitly provided if fleet-server runs in stand-alone mode
+    id: fleet-server-agent-idv
+#    # version is the version of the elastic-agent instance
+#    version:
+#    # agent logging level may also be specified in top level logging config
+#    logging.level: info
+#  host:
+#    id:
+#    name:
+
+##############################
+# Input configuration
+# Controls the fleet-server API.
+# Expected to be a list with a single object that has "type: fleet-server"
+# Provided through the integration settings when running under elastic-agent.
+##############################
+
+#inputs:
+#  - type: fleet-server
+#    # The policy ID is used by a fleet-server running under elastic-agent
+#    policy.id: '${FLEET_SERVER_POLICY_ID:fleet-server-policy}'
+#    server:
+#      # host is the hostname the external api will bind to.
+#      # If running under the elastic-agent this setting must be specified at install time, the attribute recieved from the policy is ignored.
+#      host: 0.0.0.0
+#      # port is the port number the external api will bind to.
+#      # If running under the elastic-agent this setting must be specified at install time, the attribute recieved from the policy is ignored.
+#      port: 8220
+#      # the internal_port specifies the port the internal api will bind to on localhost.
+#      # the internal api is used if by elastic-agent to communicate to fleet-server if the agent is running a fleet-server instance.
+#      internal_port: 8221
+#
+#      # ssl controls all ssl settings of the fleet-server apis (internal and external).
+#      ssl:
+#        enabled: false
+#        verification_mode: full
+#        supported_protocols: [TLSv1.0, TLSv1.1, TLSv1.2]
+#        cipher_suites: []
+#        curve_types: []
+#        certificate_authorities: []
+#        ca_sha256: []
+#        client_authentication: none
+#        certificate: /creds/cert.pem
+#        key: /creds/key.pem
+#        key_passphrase_path: /creds/key.pem
+#
+#     # timeouts controls various api timeouts
+#     timeouts:
+#       # read timeout is how long from connection ACCEPT to reading the entire body including TLS handshake.
+#       # this timeout includes authenication in most cases, and  as a result a large value is used to accomodate authentication lag.
+#       read: 60s
+#       # read_header timeout covers ACCEPT to the end of the HTTP headers including TLS handshake.
+#       # this timeout is a preauth timeout.
+#       read_header: 5s
+#       # write is the response write timeout.
+#       # it may be altered for certain endpoints such as the checkin endpoint.
+#       write: 10m
+#       # idle is the timeout to keep the connection open when keep-alives are enabled.
+#       idle: 30s
+#       # checkin_long_poll is the amount of time the fleet-server will poll for new actions on the checkin endpoint.
+#       # a different value may be used if the request-body specifies it.
+#       checkin_long_poll: 5m
+#       # how often to update the agent document timestamp on a long-poll checkin request
+#       checkin_timestamp: 30s
+#       # checkin_jitter time may be subtracted from the long_poll time.
+#       # a 0 value disables jitter
+#       checkin_jitter: 30s
+#       # checkin_max_poll is the maximum long_poll value a client can request.
+#       checkin_max_poll: 1h
+#
+#     # profiler will bind Go's pprof endpoints to a new listener if enabled.
+#     profiler:
+#       enabled: false
+#       bind: localhost:6060
+#
+#     # compressions sesttings for checkin responses if the request accepts gzip encoding
+#     compression_level: 1 # flate.BestSpeed
+#     compression_threshold: 1024
+#
+#     # limits controls api and rate limits for the fleet-server
+#     # Note that use of limit attributes excluding max_agents is considered an advanced use case.
+#     # A 0 value will disable any specific limit.
+#     limits:
+#       # max_agents is the preffered way to set limits
+#       # If specified a set of other limits is automatically loaded.
+#       max_agents: 0
+#       # policy_throttle is the duration that the fleet-server will wait in between attempts to dispatch policy updates to polling agents # TODO verify this
+#       policy_throttle: 5ms # 1ms min is forced
+#       # max_header_byte_size is the request header size limit
+#       max_header_byte_size: 8192 # 8Kib
+#       # max_connections is the maximum number of connnections per API endpoint
+#       max_connections: 0
+#
+#       # endpoint specific limits below
+#       checkin_limit:
+#         interval: 1ms
+#         burst: 1000
+#         max: 0
+#         max_body_byte_size: 1048567 # 1MiB
+#       artifact_limit:
+#         interval: 5ms
+#         burst: 25
+#         max: 50
+#         max_body_byte_size: 0
+#       enroll_limit:
+#         interval: 10ms
+#         burst: 100
+#         max: 50
+#         max_body_byte_size: 524288 # 512Kib
+#       ack_limit:
+#         interval: 10ms
+#         burst: 100
+#         max: 50
+#         max_body_byte_size: 2097152 # 2MiB
+#       status_limit:
+#         interval: 5ms
+#         burst: 25
+#         max: 50
+#         max_body_byte_size: 0
+#       upload_start_limit:
+#         interval: 3s
+#         burst: 8
+#         max: 3
+#         max_body_byte_size: 5242880 # 5MiB
+#       upload_chunk_limit:
+#         interval: 3s
+#         burst: 10
+#         max: 4
+#         max_body_byte_size: 4194304 # 4MiB - hard coded value # TODO check
+#       upload_end_limit:
+#         interval: 2s
+#         burst: 5
+#         max: 2
+#         max_body_byte_size: 1024
+#
+#         # go runtime limits
+#         runtime:
+#           gc_percent: 0
+#           memory_limit: math.MaxInt64
+#
+#         # elasticsearch bulk client config
+#         bulk:
+#           flush_interval: 250ms
+#           flush_threshold_cnt: 2048
+#           flush_threshold_size: 1048567 # 1MiB
+#           flush_max_pending: 8
+#
+#         # gc controls fleet-server index garbage collection operations
+#         # currently manages actions cleanup
+#         gc:
+#           schedule_interval: 1h
+#           cleanup_after_expired_interval: 30d
+#
+#         # instrumentation controls APM tracing
+#         instrumentation:
+#           enabled: false
+#           tls:
+#             skip_verify: false
+#             server_certificate: ""
+#             server_ca: ""
+#           environment: ""
+#           api_key: ""
+#           api_key_path: ""
+#           secret_token: ""
+#           secret_token_path: ""
+#           hosts: []
+#           global_labels: ""
+#           transaction_sample_rate: ""
+
+##############################
+# Logging configuration
+# control logging output
+# logging is disabled if to_files and to_stderr are both false.
+##############################
+
+logging:
+  level: info
+  # to_files will output logs to files as described by the logging.files attribute
+  to_files: true
+  # to_stderr forces logging output to stderr, logging.files is ignored in this case
+  to_stderr: false
+  # pretty will pretty print output if to_stderr: true is used
+  pretty: false
+  files:
+    path: "."
+    name: "fleet-server.log"
+    rotateeverybytes: 104857600 # 10MiB
+    keepfiles: 7
+    permissions: 0600
+    interval: 0
+    rotateonstartup: true
+    redirect_stderr: true
+
+##############################
+# Metrics endpoint configuration
+# enables the stats endpoint at http://localhost:5601, disabled by default.
+# Additional stats can be found under http://127.0.0.1:5066/stats and http://127.0.0.1:5066/state
+##############################
+
+http:
+  enabled: false
+  host: localhost
+  port: 5066
+#  # named_pipe attributes are used to bind the metrics endpoint to a Named Pipe on Windows systems.
+#  named_pipe.user: ""
+#  named_pipe.security_descriptor: ""
