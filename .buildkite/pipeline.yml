@@ -1,3 +1,50 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+env:
+  SETUP_GVM_VERSION: 'v0.5.0'
+  DOCKER_COMPOSE_VERSION: '1.25.5'
+  ELASTIC_PACKAGE_COMPOSE_DISABLE_ANSI: "true"
+  KIND_VERSION: 'v0.17.0'
+  K8S_VERSION: 'v1.26.0'
+
 steps:
-  - label: "Example test"
-    command: echo "Hello!"
+  - group: "Check and build"
+    key: "tests"
+    steps:
+      - label: ":go: Run check-ci"
+        key: check-ci
+        command: "make check-ci"
+
+      - label: ":go: Run local build"
+        key: make-local
+        command: "make local"
+
+        agents:
+          image: "golang:1.20.3"
+          cpu: "8"
+          memory: "4G"
+
+  - wait: ~
+    continue_on_failure: false
+
+  - group: "Run tests"
+    steps:
+      - label: "Run unit test"
+        key: unit-test
+        command: "make test-unit && make junit-report"
+
+      - label: "Run integration tests"
+        key: int-test
+        command: "make test-int && make junit-report"
+
+      - wait: ~
+
+      - label: ":junit: Junit annotate"
+        plugins:
+          - junit-annotate#v2.4.1:
+              artifacts: "build/*.xml"
+
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - "build/*.xml"
