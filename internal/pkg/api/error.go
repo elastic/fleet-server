@@ -205,10 +205,10 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
-			ErrAgentIdMissing,
+			ErrAgentIDMissing,
 			HTTPErrResp{
 				http.StatusBadRequest,
-				"ErrAgentIdMissing",
+				"ErrAgentIDMissing",
 				"equired field agent_id is missing",
 				zerolog.InfoLevel,
 			},

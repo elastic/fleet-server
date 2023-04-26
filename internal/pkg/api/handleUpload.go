@@ -37,7 +37,7 @@ const (
 var (
 	ErrTransitHashRequired = errors.New("transit hash required")
 
-	ErrAgentIdMissing       = errors.New("required field agent_id is missing")
+	ErrAgentIDMissing       = errors.New("required field agent_id is missing")
 	ErrFileInfoBodyRequired = fmt.Errorf("file info body is required")
 )
 
@@ -80,7 +80,7 @@ func (ut *UploadT) handleUploadBegin(_ zerolog.Logger, w http.ResponseWriter, r 
 	// check API key matches payload agent ID
 	agentID, ok := payload.Str("agent_id")
 	if !ok || agentID == "" {
-		return ErrAgentIdMissing
+		return ErrAgentIDMissing
 	}
 	_, err = ut.authAgent(r, &agentID, ut.bulker, ut.cache)
 	if err != nil {
