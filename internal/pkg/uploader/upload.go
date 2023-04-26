@@ -32,6 +32,11 @@ var (
 	ErrUploadExpired    = errors.New("upload has expired")
 	ErrUploadStopped    = errors.New("upload has stopped")
 	ErrInvalidChunkNum  = errors.New("invalid chunk number")
+
+	ErrPayloadRequired  = errors.New("upload start payload required")
+	ErrFileSizeRequired = errors.New("file.size is required")
+	ErrInvalidFileSize  = errors.New("invalid filesize")
+	ErrFieldRequired    = errors.New("field required")
 )
 
 type FileData struct {
@@ -96,7 +101,7 @@ func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, cache cache.Cache,
 // Start an upload operation
 func (u *Uploader) Begin(ctx context.Context, data JSDict) (upload.Info, error) {
 	if data == nil {
-		return upload.Info{}, errors.New("upload start payload required")
+		return upload.Info{}, ErrPayloadRequired
 	}
 
 	/*
@@ -216,14 +221,14 @@ func validateUploadPayload(info JSDict) error {
 
 	for _, fields := range required {
 		if value, ok := info.Str(fields...); !ok || strings.TrimSpace(value) == "" {
-			return fmt.Errorf("%s is required", strings.Join(fields, "."))
+			return fmt.Errorf("%s is required: %w", strings.Join(fields, "."), ErrFieldRequired)
 		}
 	}
 
 	if size, ok := info.Int64("file", "size"); !ok {
-		return errors.New("file.size is required")
+		return ErrFileSizeRequired
 	} else if size <= 0 {
-		return fmt.Errorf("invalid file.size: %d", size)
+		return fmt.Errorf("file.size: %d: %w", size, ErrInvalidFileSize)
 	}
 	return nil
 }
