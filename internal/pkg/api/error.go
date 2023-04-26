@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -394,7 +393,6 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			return e.meta
 		}
 	}
-	fmt.Println(">>> ", err)
 
 	// If it's a JSON marshal error
 	var jErr *json.MarshalerError
