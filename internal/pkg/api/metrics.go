@@ -124,7 +124,7 @@ type statsGauge struct {
 func newGauge(registry *metricsRegistry, name string) *statsGauge {
 	return &statsGauge{
 		metric: monitoring.NewUint(registry.registry, name),
-		gauge: prometheus.NewGauge(prometheus.GaugeOpts{
+		gauge: promauto.NewGauge(prometheus.GaugeOpts{
 			Name: registry.fullName + "_" + name,
 		}),
 	}
@@ -214,7 +214,6 @@ func init() {
 }
 
 func (rt *routeStats) IncError(err error) {
-
 	switch {
 	case errors.Is(err, limit.ErrRateLimit):
 		rt.rateLimit.Inc()
