@@ -13,21 +13,24 @@ import (
 	cfglib "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-system-metrics/report"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog/log"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/version"
-
-	"github.com/rs/zerolog/log"
 )
 
 var (
-	registry *monitoring.Registry
+	registry *metricsRegistry
 
-	cntHTTPNew   *monitoring.Uint
-	cntHTTPClose *monitoring.Uint
+	cntHTTPNew   *statsCounter
+	cntHTTPClose *statsCounter
 
 	cntCheckin     routeStats
 	cntEnroll      routeStats
@@ -60,34 +63,132 @@ func InitMetrics(ctx context.Context, cfg *config.Config, bi build.Info) (*api.S
 	}
 	s, err := api.NewWithDefaultRoutes(zapStub, cfgStub, monitoring.GetNamespace)
 	if err != nil {
-		err = fmt.Errorf("could not start the HTTP server for the API: %w", err)
-	} else {
-		s.Start()
+		return nil, fmt.Errorf("could not start the HTTP server for the API: %w", err)
 	}
 
+	err = initPrometheusMetrics(s, bi)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize prometheus metrics")
+	}
+
+	s.Start()
 	return s, err
 }
 
-type routeStats struct {
-	active    *monitoring.Uint
-	total     *monitoring.Uint
-	rateLimit *monitoring.Uint
-	maxLimit  *monitoring.Uint
-	failure   *monitoring.Uint
-	drop      *monitoring.Uint
-	bodyIn    *monitoring.Uint
-	bodyOut   *monitoring.Uint
+type metricsRouter interface {
+	AddRoute(string, api.HandlerFunc)
 }
 
-func (rt *routeStats) Register(registry *monitoring.Registry) {
-	rt.active = monitoring.NewUint(registry, "active")
-	rt.total = monitoring.NewUint(registry, "total")
-	rt.rateLimit = monitoring.NewUint(registry, "limit_rate")
-	rt.maxLimit = monitoring.NewUint(registry, "limit_max")
-	rt.failure = monitoring.NewUint(registry, "fail")
-	rt.drop = monitoring.NewUint(registry, "drop")
-	rt.bodyIn = monitoring.NewUint(registry, "body_in")
-	rt.bodyOut = monitoring.NewUint(registry, "body_out")
+func initPrometheusMetrics(router metricsRouter, bi build.Info) error {
+	prometheusInfo := promauto.NewCounter(prometheus.CounterOpts{
+		Name: "service_info",
+		Help: "Service information",
+		ConstLabels: prometheus.Labels{
+			"version": bi.Version,
+			"name":    build.ServiceName,
+		},
+	})
+	prometheusInfo.Inc()
+
+	router.AddRoute("/metrics", promhttp.Handler().ServeHTTP)
+
+	return nil
+}
+
+type metricsRegistry struct {
+	fullName string
+	registry *monitoring.Registry
+}
+
+func newMetricsRegistry(name string) *metricsRegistry {
+	def := metricsRegistry{registry: monitoring.Default}
+	return def.newRegistry(name)
+}
+
+func (r *metricsRegistry) newRegistry(name string) *metricsRegistry {
+	fullName := name
+	if r.fullName != "" {
+		fullName = r.fullName + "_" + name
+	}
+	return &metricsRegistry{
+		fullName: fullName,
+		registry: r.registry.NewRegistry(name),
+	}
+}
+
+type statsGauge struct {
+	metric *monitoring.Uint
+	gauge  prometheus.Gauge
+}
+
+func newGauge(registry *metricsRegistry, name string) *statsGauge {
+	return &statsGauge{
+		metric: monitoring.NewUint(registry.registry, name),
+		gauge: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: registry.fullName + "_" + name,
+		}),
+	}
+}
+
+func (g *statsGauge) Add(delta uint64) {
+	g.metric.Add(delta)
+	g.gauge.Add(float64(delta))
+}
+
+func (g *statsGauge) Inc() {
+	g.metric.Inc()
+	g.gauge.Inc()
+}
+
+func (g *statsGauge) Dec() {
+	g.metric.Dec()
+	g.gauge.Dec()
+}
+
+type statsCounter struct {
+	metric  *monitoring.Uint
+	counter prometheus.Counter
+}
+
+func newCounter(registry *metricsRegistry, name string) *statsCounter {
+	return &statsCounter{
+		metric: monitoring.NewUint(registry.registry, name),
+		counter: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: registry.fullName + "_" + name,
+		}),
+	}
+}
+
+func (g *statsCounter) Add(delta uint64) {
+	g.metric.Add(delta)
+	g.counter.Add(float64(delta))
+}
+
+func (g *statsCounter) Inc() {
+	g.metric.Inc()
+	g.counter.Inc()
+}
+
+type routeStats struct {
+	active    *statsGauge
+	total     *statsCounter
+	rateLimit *statsCounter
+	maxLimit  *statsCounter
+	failure   *statsCounter
+	drop      *statsCounter
+	bodyIn    *statsCounter
+	bodyOut   *statsCounter
+}
+
+func (rt *routeStats) Register(registry *metricsRegistry) {
+	rt.active = newGauge(registry, "active")
+	rt.total = newCounter(registry, "total")
+	rt.rateLimit = newCounter(registry, "limit_rate")
+	rt.maxLimit = newCounter(registry, "limit_max")
+	rt.failure = newCounter(registry, "fail")
+	rt.drop = newCounter(registry, "drop")
+	rt.bodyIn = newCounter(registry, "body_in")
+	rt.bodyOut = newCounter(registry, "body_out")
 }
 
 func init() {
@@ -96,20 +197,20 @@ func init() {
 		log.Error().Err(err).Msg("unable to initialize metrics")
 	}
 
-	registry = monitoring.Default.NewRegistry("http_server")
-	cntHTTPNew = monitoring.NewUint(registry, "tcp_open")
-	cntHTTPClose = monitoring.NewUint(registry, "tcp_close")
+	registry = newMetricsRegistry("http_server")
+	cntHTTPNew = newCounter(registry, "tcp_open")
+	cntHTTPClose = newCounter(registry, "tcp_close")
 
-	routesRegistry := registry.NewRegistry("routes")
+	routesRegistry := registry.newRegistry("routes")
 
-	cntCheckin.Register(routesRegistry.NewRegistry("checkin"))
-	cntEnroll.Register(routesRegistry.NewRegistry("enroll"))
-	cntArtifacts.Register(routesRegistry.NewRegistry("artifacts"))
-	cntAcks.Register(routesRegistry.NewRegistry("acks"))
-	cntStatus.Register(routesRegistry.NewRegistry("status"))
-	cntUploadStart.Register(routesRegistry.NewRegistry("uploadStart"))
-	cntUploadChunk.Register(routesRegistry.NewRegistry("uploadChunk"))
-	cntUploadEnd.Register(routesRegistry.NewRegistry("uploadEnd"))
+	cntCheckin.Register(routesRegistry.newRegistry("checkin"))
+	cntEnroll.Register(routesRegistry.newRegistry("enroll"))
+	cntArtifacts.Register(routesRegistry.newRegistry("artifacts"))
+	cntAcks.Register(routesRegistry.newRegistry("acks"))
+	cntStatus.Register(routesRegistry.newRegistry("status"))
+	cntUploadStart.Register(routesRegistry.newRegistry("uploadStart"))
+	cntUploadChunk.Register(routesRegistry.newRegistry("uploadChunk"))
+	cntUploadEnd.Register(routesRegistry.newRegistry("uploadEnd"))
 }
 
 func (rt *routeStats) IncError(err error) {
@@ -134,14 +235,14 @@ func (rt *routeStats) IncStart() func() {
 
 type artifactStats struct {
 	routeStats
-	notFound *monitoring.Uint
-	throttle *monitoring.Uint
+	notFound *statsCounter
+	throttle *statsCounter
 }
 
-func (rt *artifactStats) Register(registry *monitoring.Registry) {
+func (rt *artifactStats) Register(registry *metricsRegistry) {
 	rt.routeStats.Register(registry)
-	rt.notFound = monitoring.NewUint(registry, "not_found")
-	rt.throttle = monitoring.NewUint(registry, "throttle")
+	rt.notFound = newCounter(registry, "not_found")
+	rt.throttle = newCounter(registry, "throttle")
 }
 
 func (rt *artifactStats) IncError(err error) {
