@@ -66,10 +66,7 @@ func InitMetrics(ctx context.Context, cfg *config.Config, bi build.Info) (*api.S
 		return nil, fmt.Errorf("could not start the HTTP server for the API: %w", err)
 	}
 
-	err = initPrometheusMetrics(s, bi)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize prometheus metrics")
-	}
+	initPrometheusMetrics(s, bi)
 
 	s.Start()
 	return s, err
@@ -79,7 +76,7 @@ type metricsRouter interface {
 	AddRoute(string, api.HandlerFunc)
 }
 
-func initPrometheusMetrics(router metricsRouter, bi build.Info) error {
+func initPrometheusMetrics(router metricsRouter, bi build.Info) {
 	prometheusInfo := promauto.NewCounter(prometheus.CounterOpts{
 		Name: "service_info",
 		Help: "Service information",
@@ -91,8 +88,6 @@ func initPrometheusMetrics(router metricsRouter, bi build.Info) error {
 	prometheusInfo.Inc()
 
 	router.AddRoute("/metrics", promhttp.Handler().ServeHTTP)
-
-	return nil
 }
 
 type metricsRegistry struct {
