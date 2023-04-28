@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM golang:${GO_VERSION}-buster
+FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-main-debian11
 
 RUN \
   apt-get update \
