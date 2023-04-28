@@ -1,8 +1,5 @@
 #!/bin/bash
-
 set -eu
-echo '--- Configuring Git fetch refs'
 
-
-# Configure local git to access PR reflog
+# Configure the remote to have access to the PR refs
 git config remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
