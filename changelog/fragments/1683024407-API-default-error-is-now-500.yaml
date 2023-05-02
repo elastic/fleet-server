@@ -17,7 +17,7 @@ summary: API default error is now 500
 # this field accommodate a description without length limits.
 description: Up until now when any not expected error was encountered it resulted int Bad Request response.
 This is changing and any not expected error will return Internal Server Error while keeping most of the current behavior
-unchanged and returning Bad Request. 
+unchanged and returning Bad Request on expected failure paths. 
 
 # Affected component; a word indicating the component this changeset affects.
 component:
