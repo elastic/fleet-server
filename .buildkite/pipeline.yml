@@ -1,5 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
 steps:
-  - command: ls
+  - label: "Update git fetch refmap"
     plugins:
       - Hivebrite/git-flags#v0.0.1:
           fetch: "-v --prune --refmap='+refs/pull/{{BUILDKITE_PULL_REQUEST}}/merge:refs/pull/{{BUILDKITE_PULL_REQUEST}}/merge'"
