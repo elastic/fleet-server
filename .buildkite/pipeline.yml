@@ -1,3 +1,8 @@
 steps:
+  - command: ls
+    plugins:
+      - Hivebrite/git-flags#v0.0.1:
+          fetch: "-v --prune --refmap='+refs/pull/{{BUILDKITE_PULL_REQUEST}}/merge:refs/pull/{{BUILDKITE_PULL_REQUEST}}/merge'"
+
   - label: "Example test"
     command: echo "Hello!"
