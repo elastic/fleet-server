@@ -2,6 +2,7 @@
 
 steps:
   - label: "Update git fetch refmap"
+    command: echo "Updating fetch refmap"
     plugins:
       - Hivebrite/git-flags#v0.0.1:
           fetch: "-v --prune --refmap='+refs/pull/{{BUILDKITE_PULL_REQUEST}}/merge:refs/pull/{{BUILDKITE_PULL_REQUEST}}/merge'"
