@@ -9,7 +9,6 @@
         "build_on_comment": true,
         "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
         "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
-        "use_merge_commit": true,
         "fail_on_not_mergeable": true
       }]
 }
