@@ -7,6 +7,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -59,7 +60,7 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 			Str(LogAPIKeyID, key.ID).
 			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 			Msg("ApiKey fail authentication")
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", apikey.ErrUnauthorized, err)
 	}
 
 	hlog.FromRequest(r).Debug().

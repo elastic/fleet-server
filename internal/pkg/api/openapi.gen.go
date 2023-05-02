@@ -465,6 +465,9 @@ type BadRequest = Error
 // Deadline Error processing request.
 type Deadline = Error
 
+// InternalServerError Error processing request.
+type InternalServerError = Error
+
 // KeyNotEnabled Error processing request.
 type KeyNotEnabled = Error
 
