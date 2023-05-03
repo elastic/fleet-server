@@ -8,12 +8,17 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"syscall"
 	"testing"
 	"time"
+
+	"github.com/elastic/fleet-server/v7/version"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -29,7 +34,11 @@ func TestStandAloneRunningSuite(t *testing.T) {
 }
 
 func (suite *StandAloneSuite) SetupSuite() {
-	path, err := filepath.Abs(filepath.Join("..", "..", "bin", binaryName))
+	arch := runtime.GOARCH
+	if arch == "amd64" {
+		arch = "x86_64"
+	}
+	path, err := filepath.Abs(filepath.Join("..", "..", "build", "cover", fmt.Sprintf("fleet-server-%s-SNAPSHOT-%s-%s", version.DefaultVersion, runtime.GOOS, arch), binaryName))
 	suite.Require().NoError(err)
 	suite.binaryPath = path
 	_, err = os.Stat(suite.binaryPath)
@@ -61,6 +70,10 @@ func (suite *StandAloneSuite) TestHTTP() {
 
 	// Run the fleet-server binary
 	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath}
 	err = cmd.Start()
 	suite.Require().NoError(err)
 
@@ -96,6 +109,10 @@ func (suite *StandAloneSuite) TestWithSecretFiles() {
 
 	// Run the fleet-server binary, cancelling context should stop process
 	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath}
 	err = cmd.Start()
 	suite.Require().NoError(err)
 

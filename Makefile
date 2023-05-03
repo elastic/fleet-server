@@ -36,6 +36,7 @@ DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
+COVER_TARGETS=$(addprefix cover-, $(PLATFORMS))
 COMMIT=$(shell git rev-parse --short HEAD)
 NOW=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
@@ -66,6 +67,24 @@ local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
 	go build $(if $(DEV),-tags="dev",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
+
+
+.PHONY: cover-e2e-binaries
+cover-e2e-binaries: ## - Build binaries for the test-e2e target with the go 1.20+ cover flag
+	SNAPSHOT=true $(MAKE) cover-$(shell go env GOOS)/$(shell go env GOARCH)
+	SNAPSHOT=true $(MAKE) cover-linux/$(shell go env GOARCH)
+
+.PHONY: $(COVER_TARGETS)
+$(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integration testing
+	@mkdir -p build/cover
+	$(eval $@_OS := $(firstword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
+	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
+	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
+	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(DEV),-tags="dev",) -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
+ifeq ($($@_OS),windows) # FIXME this isn't working on windows builds?
+	mv build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server.exe
+endif
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
@@ -297,38 +316,36 @@ test-int-set: ## - Run integration tests without setup
 # e2e testing targets
 ##################################################
 
-# Build a custom elastic-agent image injected with the locally built fleet-server
 # based off build-and-push-cloud-image
 .PHONY: build-e2e-agent-image
-build-e2e-agent-image:
+build-e2e-agent-image: cover-e2e-binaries ## - Build a custom elastic-agent image with the locally build e2e binarty injected into it
 	@printf "${CMD_COLOR_ON} Creating test e2e agent image\n${CMD_COLOR_OFF}"
 	GOARCH=amd64 ./dev-tools/e2e/build.sh
 
-# Use openssl to create a CA and sign a certificate for testing purposes
 .PHONY: e2e-certs
-e2e-certs:
+e2e-certs: ## - Use openssl to create a CA, encrypted private key, and signed fleet-server cert testing purposes
 	@printf "${CMD_COLOR_ON} Creating test e2e certs\n${CMD_COLOR_OFF}"
 	@./dev-tools/e2e/certs.sh
 
 .PHONY: e2e-docker-start
-e2e-docker-start: int-docker-start
+e2e-docker-start: int-docker-start ## - Start a testing instance of Elasticsearch and Kibana in docker containers
 	@./dev-tools/e2e/get-kibana-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}
 	@docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file .kibana_service_token --env-file ./dev-tools/integration/.env up  -d --remove-orphans kibana
 	@./dev-tools/e2e/wait-for-kibana.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:5601
 
-e2e-docker-stop:
+e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
 	@docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env down
 	@rm -f .kibana_service_token
 	@$(MAKE) int-docker-stop
 
-# Run e2e tests using the integration test container
 .PHONY: test-e2e
-test-e2e: prepare-test-context local build-e2e-agent-image e2e-certs
+test-e2e: cover-e2e-binaries build-e2e-agent-image e2e-certs ## - Setup and run the blackbox end to end test suite
+	@mkdir -p build/e2e-cover
 	@$(MAKE) e2e-docker-start
-	@set -o pipefail; $(MAKE) test-e2e-set | tee build/test-int.out
+	@set -o pipefail; $(MAKE) test-e2e-set | tee build/test-e2e.out
 	@$(MAKE) e2e-docker-stop
 
-test-e2e-set:
+test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \

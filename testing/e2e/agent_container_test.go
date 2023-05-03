@@ -61,8 +61,10 @@ func (suite *AgentContainerSuite) TestHTTP() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, suite.dockerCmd, "run", "--rm",
+	cmd := exec.CommandContext(ctx, suite.dockerCmd, "run", "--rm", "-d",
 		"--name", "fleet-server",
+		"-v", suite.coverPath+":/cover",
+		"-e", "GOCOVERDIR=/cover",
 		"-e", "FLEET_SERVER_ENABLE=1",
 		"-e", "FLEET_SERVER_ELASTICSEARCH_HOST=http://elasticsearch:9200",
 		"-e", "FLEET_SERVER_SERVICE_TOKEN="+suite.serviceToken,
@@ -73,12 +75,10 @@ func (suite *AgentContainerSuite) TestHTTP() {
 		"--network", "integration_default",
 		suite.dockerImg)
 
-	err := cmd.Start()
+	err := cmd.Run()
 	suite.Require().NoError(err)
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
-	cancel()
-	cmd.Wait()
 }
 
 func (suite *AgentContainerSuite) TestWithSecretFiles() {
@@ -90,10 +90,12 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, suite.dockerCmd, "run", "--rm",
+	cmd := exec.CommandContext(ctx, suite.dockerCmd, "run", "--rm", "-d",
 		"--name", "fleet-server",
 		"-v", suite.certPath+":/certs:ro",
 		"-v", dir+":/token:ro",
+		"-v", suite.coverPath+":/cover",
+		"-e", "GOCOVERDIR=/cover",
 		"-e", "FLEET_SERVER_ENABLE=1",
 		"-e", "FLEET_SERVER_CERT=/certs/fleet-server.crt",
 		"-e", "FLEET_SERVER_CERT_KEY=/certs/fleet-server.key",
@@ -105,10 +107,8 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 		"--network", "integration_default",
 		suite.dockerImg)
 
-	err = cmd.Start()
+	err = cmd.Run()
 	suite.Require().NoError(err)
 
 	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
-	cancel()
-	cmd.Wait()
 }

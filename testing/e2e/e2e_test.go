@@ -23,6 +23,7 @@ import (
 type BaseE2ETestSuite struct {
 	suite.Suite
 
+	coverPath    string // Path to use as GOCOVERDIR to collect test coverage
 	certPath     string // Path to custom certificates and CA
 	esHosts      string // comma seperated list of elasticsearch hosts
 	serviceToken string // service_token value
@@ -36,8 +37,15 @@ type BaseE2ETestSuite struct {
 func (suite *BaseE2ETestSuite) Setup() {
 	suite.T().Helper()
 
+	// populate cover path
+	path, err := filepath.Abs(filepath.Join("..", "..", "build", "e2e-cover"))
+	suite.Require().NoError(err)
+	suite.coverPath = path
+	_, err = os.Stat(suite.coverPath)
+	suite.Require().NoError(err)
+
 	// find certs
-	path, err := filepath.Abs(filepath.Join("..", "..", "build", "e2e-certs"))
+	path, err = filepath.Abs(filepath.Join("..", "..", "build", "e2e-certs"))
 	suite.Require().NoError(err)
 	suite.certPath = path
 	_, err = os.Stat(suite.certPath)

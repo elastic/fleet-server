@@ -24,8 +24,6 @@ VCS_REF=$(docker inspect -f '{{index .Config.Labels "org.label-schema.vcs-ref"}}
 
 CUSTOM_IMAGE_TAG=${STACK_VERSION}-e2e-${USER_NAME}-$(date +%s)
 
-SNAPSHOT=true make -C $REPO_ROOT release-linux/${GOARCH}
-
 docker build \
 	-f $REPO_ROOT/dev-tools/e2e/Dockerfile \
 	--build-arg ELASTIC_AGENT_IMAGE=$BASE_IMAGE \

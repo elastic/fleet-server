@@ -61,6 +61,10 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	if runtime.GOOS == "windows" {
 		suite.agentName = "elastic-agent.exe"
 	}
+	arch := runtime.GOARCH
+	if arch == "amd64" {
+		arch = "x86_64"
+	}
 	// check if agent is installed
 	if _, err := exec.LookPath(suite.agentName); err == nil {
 		suite.installDetected = true
@@ -71,7 +75,7 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	suite.SetupKibana()
 
 	// find compiled fleet-server
-	path, err := filepath.Abs(filepath.Join("..", "..", "bin", binaryName))
+	path, err := filepath.Abs(filepath.Join("..", "..", "build", "cover", fmt.Sprintf("fleet-server-%s-SNAPSHOT-%s-%s", version.DefaultVersion, runtime.GOOS, arch), binaryName))
 	suite.Require().NoError(err)
 	suite.binaryPath = path
 	_, err = os.Stat(suite.binaryPath)
@@ -309,6 +313,7 @@ func (suite *AgentInstallSuite) TestHTTP() {
 		"--fleet-server-host=0.0.0.0",
 		"--fleet-server-policy=fleet-server-policy",
 		"--non-interactive")
+	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath} // TODO Check if this env var will be passed by the agent to fleet-server
 
 	output, err := cmd.CombinedOutput()
 	suite.Require().NoErrorf(err, "elastic-agent install failed. exit_code: %d, output: %s", cmd.ProcessState.ExitCode(), string(output))
@@ -334,6 +339,7 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 		"--fleet-server-cert-key="+filepath.Join(suite.certPath, "fleet-server.key"),
 		"--fleet-server-cert-key-passphrase="+filepath.Join(suite.certPath, "passphrase"),
 		"--non-interactive")
+	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath} // TODO Check if this env var will be passed by the agent to fleet-server
 
 	output, err := cmd.CombinedOutput()
 	suite.Require().NoErrorf(err, "elastic-agent install failed. exit_code: %d, output: %s", cmd.ProcessState.ExitCode(), string(output))
