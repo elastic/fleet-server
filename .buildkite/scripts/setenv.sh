@@ -1,44 +1,27 @@
 #!/bin/bash
 
-set -euo pipefail
+set -exuo pipefail
 
-WORKSPACE="$(pwd)/bin"
+MSG="environment variable missing: DOCKER_COMPOSE_VERSION."
+DOCKER_COMPOSE_VERSION=${DOCKER_COMPOSE_VERSION:?$MSG}
+HOME=${HOME:?$MSG}
 
-add_bin_path(){
-    mkdir -p ${WORKSPACE}
-    export PATH="${WORKSPACE}:${PATH}"
-}
+if command -v docker-compose
+then
+    echo "Found docker-compose. Checking version.."
+    FOUND_DOCKER_COMPOSE_VERSION=$(docker-compose --version|awk '{print $3}'|sed s/\,//)
+    if [ "$FOUND_DOCKER_COMPOSE_VERSION" == "$DOCKER_COMPOSE_VERSION" ]
+    then
+        echo "Versions match. No need to install docker-compose. Exiting."
+        exit 0
+    fi
+fi
 
-with_go() {
-    mkdir -p ${WORKSPACE}
-    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
-    chmod +x ${WORKSPACE}/gvm
-    eval "$(gvm $(cat .go-version))"
-    go version
-    which go
-    echo "export PATH=\$(go env GOPATH):${PATH}" >> ~/.bashrc
-}
+echo "UNMET DEP: Installing docker-compose"
 
-retry() {
-    local retries=$1
-    shift
+DC_CMD="${HOME}/bin/docker-compose"
 
-    local count=0
-    until "$@"; do
-        exit=$?
-        wait=$((2 ** count))
-        count=$((count + 1))
-        if [ $count -lt "$retries" ]; then
-            >&2 echo "Retry $count/$retries exited $exit, retrying in $wait seconds..."
-            sleep $wait
-        else
-            >&2 echo "Retry $count/$retries exited $exit, no more retries left."
-            return $exit
-        fi
-    done
-    return 0
-}
+mkdir -p "${HOME}/bin"
 
-add_bin_path
-
-with_go
+curl -sSLo "${DC_CMD}" "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)"
+chmod +x "${DC_CMD}"
