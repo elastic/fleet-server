@@ -9,9 +9,9 @@ set -eu
 REPO_ROOT=$(cd $(dirname $(readlink -f "$0"))/../../.. && pwd)
 
 USER_NAME=${USER}
-CI_ELASTIC_AGENT_DOCKER_IMAGE=docker.elastic.co/observability-ci/elastic-agent
+CI_ELASTIC_AGENT_DOCKER_IMAGE=${CI_ELASTIC_AGENT_DOCKER_IMAGE:-"docker.elastic.co/observability-ci/elastic-agent"}
 
-DEFAULT_IMAGE_TAG=8.8.0-94522507-SNAPSHOT
+DEFAULT_IMAGE_TAG=8.9.0-5c23b5b2-SNAPSHOT
 BASE_IMAGE="${BASE_IMAGE:-docker.elastic.co/cloud-release/elastic-agent-cloud:$DEFAULT_IMAGE_TAG}"
 GOARCH="${GOARCH:-$(go env GOARCH)}"
 
@@ -21,7 +21,7 @@ docker pull --platform linux/$GOARCH $BASE_IMAGE
 STACK_VERSION=$(docker inspect -f '{{index .Config.Labels "org.label-schema.version"}}' $BASE_IMAGE)
 VCS_REF=$(docker inspect -f '{{index .Config.Labels "org.label-schema.vcs-ref"}}' $BASE_IMAGE)
 
-CUSTOM_IMAGE_TAG=${STACK_VERSION}-${USER_NAME}-$(date +%s)
+CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG:-"${STACK_VERSION}-${USER_NAME}-$(date +%s)"} 
 
 SNAPSHOT=true make -C $REPO_ROOT release-linux/${GOARCH}
 
