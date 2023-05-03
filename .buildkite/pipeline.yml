@@ -22,8 +22,40 @@ steps:
       - label: ":go: Run local build"
         key: make-local
         command: "make local"
-
         agents:
           image: "golang:1.20.3"
           cpu: "8"
           memory: "4G"
+
+  - group: "Run tests"
+    steps:
+      - label: "Run unit test"
+        key: unit-test
+        commands:
+          - ".buildkite/scripts/setenv.sh"
+          - "make test-unit"
+          - "make junit-report"
+        agents:
+          provider: "gcp"
+
+      - label: "Run integration tests"
+        key: int-test
+        commands:
+          - ".buildkite/scripts/setenv.sh"
+          - "make test-int"
+          - "make junit-report"
+        agents:
+          provider: "gcp"
+
+      - label: ":junit: Junit annotate"
+        plugins:
+          - junit-annotate#v2.4.1:
+              artifacts: "build/*.xml"
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - "build/*.xml"
+        depends_on:
+          - "unit-test"
+          - "int-test"
+    depends_on: "tests"
