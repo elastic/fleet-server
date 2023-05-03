@@ -7,10 +7,15 @@ package apikey
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+)
+
+var (
+	ErrUnauthorized = errors.New("unauthorized")
 )
 
 // SecurityInfo contains all related information about an APIKey that Elasticsearch tracks.
@@ -46,7 +51,7 @@ func (k APIKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	}
 
 	if res.IsError() {
-		return nil, fmt.Errorf("apikey auth response %s: %s", k.ID, res.String())
+		return nil, fmt.Errorf("%w: %w", ErrUnauthorized, fmt.Errorf("apikey auth response %s: %s", k.ID, res.String()))
 	}
 
 	var info SecurityInfo

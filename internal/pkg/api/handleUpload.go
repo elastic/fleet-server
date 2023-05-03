@@ -34,6 +34,13 @@ const (
 	maxUploadTimer = 24 * time.Hour
 )
 
+var (
+	ErrTransitHashRequired = errors.New("transit hash required")
+
+	ErrAgentIDMissing       = errors.New("required field agent_id is missing")
+	ErrFileInfoBodyRequired = fmt.Errorf("file info body is required")
+)
+
 // FIXME Should we use the structs in openapi.gen.go instead of the generic ones? Will need to rework the uploader if we do
 type UploadT struct {
 	bulker      bulk.Bulk
@@ -65,7 +72,7 @@ func (ut *UploadT) handleUploadBegin(_ zerolog.Logger, w http.ResponseWriter, r 
 	payload, err := uploader.ReadDict(r.Body)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			return fmt.Errorf("file info body is required: %w", err)
+			return fmt.Errorf("%w: %w", ErrFileInfoBodyRequired, err)
 		}
 		return err
 	}
@@ -73,7 +80,7 @@ func (ut *UploadT) handleUploadBegin(_ zerolog.Logger, w http.ResponseWriter, r 
 	// check API key matches payload agent ID
 	agentID, ok := payload.Str("agent_id")
 	if !ok || agentID == "" {
-		return errors.New("required field agent_id is missing")
+		return ErrAgentIDMissing
 	}
 	_, err = ut.authAgent(r, &agentID, ut.bulker, ut.cache)
 	if err != nil {
@@ -159,7 +166,7 @@ func (ut *UploadT) handleUploadComplete(_ zerolog.Logger, w http.ResponseWriter,
 
 	hash := strings.TrimSpace(req.Transithash.Sha256)
 	if hash == "" {
-		return errors.New("transit hash required")
+		return ErrTransitHashRequired
 	}
 
 	info, err = ut.uploader.Complete(r.Context(), uplID, hash)

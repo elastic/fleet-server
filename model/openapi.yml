@@ -670,6 +670,19 @@ components:
               value:
                 statusCode: 400
                 error: BadRequest
+    internalServerError:
+      description: |
+        A 500 response for encountering not expected bahavior.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+          examples:
+            internalServerError:
+              description: Generic internal server error response.
+              value:
+                statusCode: 500
+                error: InternalServerError
     keyNotEnabled:
       description: 401 response when the API key is not enabled on any endpoint except /api/fleet/status. Or when there are issues updating an inactive agent on the ack endpoint.
       content:
@@ -882,6 +895,8 @@ paths:
           description: Bad request path, expected id to be enroll.
         '408':
           $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
         '503':
           $ref: '#/components/responses/unavailable'
   /api/fleet/agents/{id}/checkin:
@@ -964,6 +979,8 @@ paths:
           $ref: '#/components/responses/agentNotFound'
         '408':
           $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
         '503':
           $ref: '#/components/responses/unavailable'
   /api/fleet/agents/{id}/acks:
@@ -1023,6 +1040,8 @@ paths:
           $ref: '#/components/responses/agentNotFound'
         '408':
           $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
         '503':
           $ref: '#/components/responses/unavailable'
   /api/fleet/artifacts/{id}/{sha2}:
@@ -1063,6 +1082,8 @@ paths:
           $ref: '#/components/responses/deadline'
         '428':
           $ref: '#/components/responses/throttle'
+        '500':
+          $ref: '#/components/responses/internalServerError'
         '503':
           $ref: '#/components/responses/unavailable'
   /api/fleet/uploads:
@@ -1094,6 +1115,8 @@ paths:
           $ref: '#/components/responses/keyNotEnabled'
         '408':
           $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
         '503':
           $ref: '#/components/responses/unavailable'
   /api/fleet/uploads/{id}/{chunkNum}:
@@ -1143,6 +1166,8 @@ paths:
           $ref: '#/components/responses/keyNotEnabled'
         '408':
           $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
         '503':
           $ref: '#/components/responses/unavailable'
   /api/fleet/uploads/{id}:
@@ -1184,5 +1209,7 @@ paths:
           $ref: '#/components/responses/keyNotEnabled'
         '408':
           $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
         '503':
           $ref: '#/components/responses/unavailable'
