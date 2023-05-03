@@ -234,7 +234,7 @@ func (suite *AgentInstallSuite) extractDarwin(r io.Reader) {
 }
 
 // extractLinux treats the passed Reader as a tar.gz stream and unarchives it to a temp dir
-// Additionally the MacOS specific elastic-agent symlink will be recreated with a hard link.
+// fleet-server binary in archive is replaced by a locally compiled version
 func (suite *AgentInstallSuite) extractLinux(r io.Reader) {
 	suite.T().Helper()
 	fleetPath := ""
@@ -246,23 +246,23 @@ func (suite *AgentInstallSuite) extractLinux(r io.Reader) {
 		if header.FileInfo().IsDir() {
 			err := os.Mkdir(filepath.Join(suite.downloadPath, header.Name), 0755)
 			suite.Require().NoError(err)
-		} else {
-			if !header.FileInfo().Mode().IsRegular() {
-				// Linux archives should not have symlinks
-				suite.T().Logf("unable to extract %s", header.Name)
-				continue
-			}
-			dst, err := os.Create(filepath.Join(suite.downloadPath, header.Name))
-			suite.Require().NoError(err)
-			err = dst.Chmod(header.FileInfo().Mode())
-			suite.Require().NoError(err)
-			_, err = io.Copy(dst, tarReader)
-			dst.Close() // might be a dirty close
-			suite.Require().NoError(err)
+			continue
+		}
+		if !header.FileInfo().Mode().IsRegular() {
+			// Linux archives should not have symlinks
+			suite.T().Logf("unable to extract %s", header.Name)
+			continue
+		}
+		dst, err := os.Create(filepath.Join(suite.downloadPath, header.Name))
+		suite.Require().NoError(err)
+		err = dst.Chmod(header.FileInfo().Mode())
+		suite.Require().NoError(err)
+		_, err = io.Copy(dst, tarReader)
+		dst.Close() // might be a dirty close
+		suite.Require().NoError(err)
 
-			if strings.HasSuffix(header.Name, binaryName) {
-				fleetPath = filepath.Join(suite.downloadPath, header.Name)
-			}
+		if strings.HasSuffix(header.Name, binaryName) {
+			fleetPath = filepath.Join(suite.downloadPath, header.Name)
 		}
 	}
 	// Copy fleet-server binary to un archived package

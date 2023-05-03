@@ -71,8 +71,7 @@ local: ## - Build local binary for local environment (bin/fleet-server)
 
 .PHONY: cover-e2e-binaries
 cover-e2e-binaries: ## - Build binaries for the test-e2e target with the go 1.20+ cover flag
-	SNAPSHOT=true $(MAKE) cover-$(shell go env GOOS)/$(shell go env GOARCH)
-	SNAPSHOT=true $(MAKE) cover-linux/$(shell go env GOARCH)
+	SNAPSHOT=true $(MAKE) cover-$(shell go env GOOS)/$(shell go env GOARCH) cover-linux/$(shell go env GOARCH)
 
 .PHONY: $(COVER_TARGETS)
 $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integration testing
@@ -81,10 +80,7 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(DEV),-tags="dev",) -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
-ifeq ($($@_OS),windows) # FIXME this isn't working on windows builds?
-	mv build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server.exe
-endif
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(DEV),-tags="dev",) -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
@@ -333,6 +329,7 @@ e2e-docker-start: int-docker-start ## - Start a testing instance of Elasticsearc
 	@docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file .kibana_service_token --env-file ./dev-tools/integration/.env up  -d --remove-orphans kibana
 	@./dev-tools/e2e/wait-for-kibana.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:5601
 
+.PHONY: e2e-docker-stop
 e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
 	@docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env down
 	@rm -f .kibana_service_token
@@ -345,6 +342,7 @@ test-e2e: cover-e2e-binaries build-e2e-agent-image e2e-certs ## - Setup and run 
 	@set -o pipefail; $(MAKE) test-e2e-set | tee build/test-e2e.out
 	@$(MAKE) e2e-docker-stop
 
+.PHONY: test-e2e-set
 test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
