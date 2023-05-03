@@ -32,6 +32,7 @@ steps:
       - label: "Run unit test"
         key: unit-test
         commands:
+          - "chmod +x .buildkite/scripts/setenv.sh"
           - ".buildkite/scripts/setenv.sh"
           - "make test-unit"
           - "make junit-report"
@@ -41,6 +42,7 @@ steps:
       - label: "Run integration tests"
         key: int-test
         commands:
+          - "chmod +x .buildkite/scripts/setenv.sh"
           - ".buildkite/scripts/setenv.sh"
           - "make test-int"
           - "make junit-report"
