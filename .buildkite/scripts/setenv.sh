@@ -25,7 +25,5 @@ mkdir -p "${HOME}/bin"
 
 curl -sSLo "${DC_CMD}" "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)"
 chmod +x "${DC_CMD}"
-pwd
-ls -l
-echo "PATH="${HOME}/bin:'${PATH}'"" >> dev-tools/integration/.env
+echo -e "\nPATH="${HOME}/bin:'${PATH}'"" >> dev-tools/integration/.env
 cat dev-tools/integration/.env
