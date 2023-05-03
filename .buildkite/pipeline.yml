@@ -32,29 +32,29 @@ steps:
       - label: "Run unit test"
         key: unit-test
         commands:
-          - "chmod +x .buildkite/scripts/setenv.sh"
-          - ".buildkite/scripts/setenv.sh"
+#          - "chmod +x .buildkite/scripts/setenv.sh"
+#          - ".buildkite/scripts/setenv.sh"
           - "make test-unit"
           - "make junit-report"
         agents:
-          provider: "gcp"
+          provider: "golang:1.20.3"
 
       - label: "Run integration tests"
         key: int-test
         commands:
-          - "chmod +x .buildkite/scripts/setenv.sh"
-          - ".buildkite/scripts/setenv.sh"
+#          - "chmod +x .buildkite/scripts/setenv.sh"
+#          - ".buildkite/scripts/setenv.sh"
           - "make test-int"
           - "make junit-report"
         agents:
-          provider: "gcp"
+          provider: "golang:1.20.3"
 
       - label: ":junit: Junit annotate"
         plugins:
           - junit-annotate#v2.4.1:
               artifacts: "build/*.xml"
         agents:
-          provider: "gcp"
+          provider: "golang:1.20.3"
         artifact_paths:
           - "build/*.xml"
         depends_on:
