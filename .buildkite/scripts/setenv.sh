@@ -2,21 +2,21 @@
 
 set -euo pipefail
 
-WORKSPACE="$(pwd)"
+WORKSPACE="$(pwd)/bin"
 
 add_bin_path(){
-    mkdir -p ${WORKSPACE}/bin
-    export PATH="${WORKSPACE}/bin:${PATH}"
+    mkdir -p ${WORKSPACE}
+    export PATH="${WORKSPACE}:${PATH}"
 }
 
 with_go() {
-    mkdir -p ${WORKSPACE}/bin
-    retry 5 curl -sL -o ${WORKSPACE}/bin/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
-    chmod +x ${WORKSPACE}/bin/gvm
+    mkdir -p ${WORKSPACE}
+    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
+    chmod +x ${WORKSPACE}/gvm
     eval "$(gvm $(cat .go-version))"
     go version
     which go
-    export PATH="$(go env GOPATH)/bin:${PATH}"
+    echo "export PATH=\$(go env GOPATH):${PATH}" >> ~/.bashrc
 }
 
 retry() {
