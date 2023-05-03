@@ -97,6 +97,7 @@ components:
             An embedded JSON object that holds user-provided meta-data values.
             Defined in fleet-server as a `json.RawMessage`.
             fleet-server does not use these values on enrollment of an agent.
+
             Defined in the elastic-agent as a `map[string]interface{}` with no way to specify any values.
           type: string
           format: application/json
@@ -140,7 +141,8 @@ components:
           description: |
             The shared ID of the agent.
             To support pre-existing installs.
-            NOT YET IMPLEMENTED.
+
+            Never implemented.
         metadata:
           $ref: '#/components/schemas/enrollMetadata'
     enrollResponseItem:
@@ -165,14 +167,21 @@ components:
           type: string
         active:
           deprecated: true
-          description: If the agent is active in fleet. Will be set to true upon enrollment.
+          description: |
+            If the agent is active in fleet.
+            Set to true upon enrollment.
+
+            Handling of other values never implemented.
           type: boolean
         policy_id:
           description: The policy ID that the agent is enrolled with. Decoded from the API key used in the request.
           type: string
         type:
           deprecated: true
-          description: The enrollment request type.
+          description: |
+            The enrollment request type.
+
+            Handling of other values never implemented.
           type: string
         enrolled_at:
           description: The RFC3339 timestamp that the agent was enrolled at.
@@ -180,19 +189,28 @@ components:
           #format: date-time
         user_provided_metadata:
           deprecated: true
-          description: A copy of the user provided metadata from the enrollment request. Currently will be empty.
+          description: |
+            A copy of the user provided metadata from the enrollment request.
+
+            Currently will be empty.
           type: string
           format: application/json
           x-go-type: json.RawMessage
         local_metadata:
           deprecated: true
-          description: A copy of the (updated) local metadata provided in the enrollment request.
+          description: |
+            A copy of the (updated) local metadata provided in the enrollment request.
+
+            Never used by agent.
           type: string
           format: application/json
           x-go-type: json.RawMessage
         actions:
           deprecated: true
-          description: Defined in fleet-server and elastic-agent as `[]interface{}` but never used.
+          description: |
+            Defined in fleet-server and elastic-agent as `[]interface{}`.
+
+            Never used by agent.
           type: array
           items:
             type: object
@@ -205,7 +223,11 @@ components:
           format: password
         status:
           deprecated: true
-          description: Agent status from fleet-server. fleet-ui may differ.
+          description: |
+            Agent status from fleet-server.
+            fleet-ui may differ.
+
+            Never used by agent.
           type: string
         tags:
           description: A copy of the tags that were sent with the enrollment request.
@@ -410,7 +432,13 @@ components:
       properties:
         type:
           deprecated: true
-          description: The event type of the ack. Not used by fleet-server. Currently the elastic-agent will only generate ACTION_RESULT events.
+          description: |
+            The event type of the ack.
+            Currently the elastic-agent will only generate ACTION_RESULT events.
+
+            Not used by fleet-server.
+            Actions that have errored should use the error attribute to communicate an error status.
+            Additional action status information can be provided in the data attribute.
           type: string
           enum:
             - STATE
@@ -419,7 +447,13 @@ components:
             - ACTION
         subtype:
           deprecated: true
-          description: The subtype of the ack event. Not used by fleet-server. Currently the elastic-agent will only generate ACKNOWLEDGED events.
+          description: |
+            The subtype of the ack event.
+            The elastic-agent will only generate ACKNOWLEDGED events.
+
+            Not used by fleet-server.
+            Actions that have errored should use the error attribute to communicate an error status.
+            Additional action status information can be provided in the data attribute.
           type: string
           enum:
             - RUNNING
@@ -465,6 +499,8 @@ components:
             Is currently used by UPGRADE actions to signal retries.
             If the error attribute is non empty payload is checked for `retry: bool` and `retry_attempt: int`.
             If retry is true, fleet-serve will mark the agent as retrying, if it's false the upgrade will be marked as failed.
+
+            Additional action status information can be provided in the data attribute.
           type: string
           format: application/json
           x-go-type: json.RawMessage
