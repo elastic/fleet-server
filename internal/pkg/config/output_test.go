@@ -10,6 +10,8 @@ package config
 import (
 	"crypto/tls"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -38,6 +40,32 @@ func TestToESConfig(t *testing.T) {
 				MaxRetries:     3,
 				MaxConnPerHost: 128,
 				Timeout:        90 * time.Second,
+			},
+			result: elasticsearch.Config{
+				Addresses:    []string{"http://localhost:9200"},
+				ServiceToken: "test-token",
+				Header:       http.Header{},
+				MaxRetries:   3,
+				Transport: &http.Transport{
+					TLSHandshakeTimeout:   10 * time.Second,
+					MaxIdleConns:          100,
+					MaxIdleConnsPerHost:   32,
+					MaxConnsPerHost:       128,
+					IdleConnTimeout:       60 * time.Second,
+					ResponseHeaderTimeout: 90 * time.Second,
+					ExpectContinueTimeout: 1 * time.Second,
+				},
+			},
+		},
+		"service_token and service_token_path defined": {
+			cfg: Elasticsearch{
+				Protocol:         "http",
+				Hosts:            []string{"localhost:9200"},
+				ServiceToken:     "test-token",
+				ServiceTokenPath: "/path/is/ignored",
+				MaxRetries:       3,
+				MaxConnPerHost:   128,
+				Timeout:          90 * time.Second,
 			},
 			result: elasticsearch.Config{
 				Addresses:    []string{"http://localhost:9200"},
@@ -161,12 +189,13 @@ func TestToESConfig(t *testing.T) {
 		},
 	}
 
+	copts := cmp.Options{
+		cmpopts.IgnoreUnexported(http.Transport{}),
+		cmpopts.IgnoreFields(http.Transport{}, "DialContext"),
+		cmpopts.IgnoreUnexported(tls.Config{}), //nolint:gosec //test case
+	}
+
 	for name, test := range testcases {
-		copts := cmp.Options{
-			cmpopts.IgnoreUnexported(http.Transport{}),
-			cmpopts.IgnoreFields(http.Transport{}, "DialContext"),
-			cmpopts.IgnoreUnexported(tls.Config{}), //nolint:gosec //test case
-		}
 		t.Run(name, func(t *testing.T) {
 			_ = testlog.SetLogger(t)
 			res, err := test.cfg.ToESConfig(false)
@@ -176,14 +205,98 @@ func TestToESConfig(t *testing.T) {
 			res.Transport.(*http.Transport).Proxy = nil
 
 			test.result.Header.Set("X-elastic-product-origin", "fleet")
-			if !assert.True(t, cmp.Equal(test.result, res, copts...)) {
-				diff := cmp.Diff(test.result, res, copts...)
-				if diff != "" {
-					t.Errorf("%s mismatch (-want +got):\n%s", name, diff)
-				}
-			}
+			assert.True(t, cmp.Equal(test.result, res, copts...), "mismatch (-want +got)\n%s", cmp.Diff(test.result, res, copts...))
 		})
 	}
+
+	t.Run("service_token_path is ok", func(t *testing.T) {
+		fileName := writeTestFile(t, "test-token")
+		cfg := &Elasticsearch{
+			Protocol:         schemeHTTP,
+			Hosts:            []string{"localhost:9200"},
+			ServiceTokenPath: fileName,
+			MaxRetries:       3,
+			MaxConnPerHost:   128,
+			Timeout:          90 * time.Second,
+		}
+		es, err := cfg.ToESConfig(false)
+		require.NoError(t, err)
+
+		expect := elasticsearch.Config{
+			Addresses:    []string{"http://localhost:9200"},
+			ServiceToken: "test-token",
+			Header:       http.Header{"X-Elastic-Product-Origin": []string{"fleet"}},
+			MaxRetries:   3,
+			Transport: &http.Transport{
+				TLSHandshakeTimeout:   10 * time.Second,
+				MaxIdleConns:          100,
+				MaxIdleConnsPerHost:   32,
+				MaxConnsPerHost:       128,
+				IdleConnTimeout:       60 * time.Second,
+				ResponseHeaderTimeout: 90 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		}
+
+		es.Transport.(*http.Transport).Proxy = nil
+		assert.True(t, cmp.Equal(expect, es, copts...), "mismatch (-want +got)\n%s", cmp.Diff(expect, es, copts...))
+	})
+
+	t.Run("service_token_path is empty", func(t *testing.T) {
+		fileName := writeTestFile(t, "")
+		cfg := &Elasticsearch{
+			Protocol:         schemeHTTP,
+			Hosts:            []string{"localhost:9200"},
+			ServiceTokenPath: fileName,
+			MaxRetries:       3,
+			MaxConnPerHost:   128,
+			Timeout:          90 * time.Second,
+		}
+		es, err := cfg.ToESConfig(false)
+		require.NoError(t, err)
+
+		expect := elasticsearch.Config{
+			Addresses:  []string{"http://localhost:9200"},
+			Header:     http.Header{"X-Elastic-Product-Origin": []string{"fleet"}},
+			MaxRetries: 3,
+			Transport: &http.Transport{
+				TLSHandshakeTimeout:   10 * time.Second,
+				MaxIdleConns:          100,
+				MaxIdleConnsPerHost:   32,
+				MaxConnsPerHost:       128,
+				IdleConnTimeout:       60 * time.Second,
+				ResponseHeaderTimeout: 90 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		}
+
+		es.Transport.(*http.Transport).Proxy = nil
+		assert.True(t, cmp.Equal(expect, es, copts...), "mismatch (-want +got)\n%s", cmp.Diff(expect, es, copts...))
+	})
+
+	t.Run("service_token_path does not exist", func(t *testing.T) {
+		cfg := &Elasticsearch{
+			Protocol:         schemeHTTP,
+			Hosts:            []string{"localhost:9200"},
+			ServiceTokenPath: filepath.Join(t.TempDir(), "some-file"),
+			MaxRetries:       3,
+			MaxConnPerHost:   128,
+			Timeout:          90 * time.Second,
+		}
+		_, err := cfg.ToESConfig(false)
+		assert.ErrorAs(t, err, &os.ErrNotExist)
+	})
+}
+
+func writeTestFile(t *testing.T, content string) string {
+	t.Helper()
+	f, err := os.CreateTemp(t.TempDir(), "")
+	require.NoError(t, err)
+	_, err = f.WriteString(content)
+	require.NoError(t, err)
+	err = f.Close()
+	require.NoError(t, err)
+	return f.Name()
 }
 
 func TestESProxyConfig(t *testing.T) {

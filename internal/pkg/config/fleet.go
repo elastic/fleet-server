@@ -56,6 +56,20 @@ type Fleet struct {
 	Host  Host  `config:"host"`
 }
 
+// CopyNoLogging returns a copy of Fleet without any logging specifiers.
+func (c *Fleet) CopyNoLogging() *Fleet {
+	return &Fleet{
+		Agent: Agent{
+			ID:      c.Agent.ID,
+			Version: c.Agent.Version,
+		},
+		Host: Host{
+			ID:   c.Host.ID,
+			Name: c.Host.Name,
+		},
+	}
+}
+
 func strToLevel(s string) (zerolog.Level, error) {
 	l := zerolog.DebugLevel
 

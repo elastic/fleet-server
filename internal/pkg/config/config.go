@@ -52,6 +52,7 @@ var deprecatedConfigOptions = map[string]string{
 func (c *Config) InitDefaults() {
 	c.Inputs = make([]Input, 1)
 	c.Inputs[0].InitDefaults()
+	c.Logging.InitDefaults()
 	c.HTTP.InitDefaults()
 }
 
@@ -119,10 +120,6 @@ func (c *Config) Merge(other *Config) (*Config, error) {
 
 func redactOutput(cfg *Config) Output {
 	redacted := cfg.Output
-
-	if redacted.Elasticsearch.APIKey != "" {
-		redacted.Elasticsearch.APIKey = kRedacted
-	}
 
 	if redacted.Elasticsearch.ServiceToken != "" {
 		redacted.Elasticsearch.ServiceToken = kRedacted

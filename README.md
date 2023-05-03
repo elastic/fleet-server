@@ -29,6 +29,22 @@ The `golang-crossbuild:1.16.X-darwin-debian10` images expects the minimum MacOSX
 
 The following are notes to help developers onboarding to the project to quickly get running. These notes might change at any time.
 
+### Changelog
+
+The changelog for fleet-server is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool).
+Read the [installation](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/install.md) and [usage](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md#im-a-developer) instructions to get started.
+
+The changelog tool produces fragment files that are consolidated to generate a changelog for each release
+Each PR containing a change with user impact (new feature, bug fix, etc.) must contain a changelog fragment describing the change.
+
+A simple example of a changelog fragment is below for reference:
+```yaml
+kind: feature
+summary: Accept raw errors as a fallback to detailed error type
+pr: https://github.com/elastic/fleet-server/pull/2079
+issue: https://github.com/elastic/elastic-agent/issues/931
+```
+
 ### Development build
 
 To compile the fleet-server in development mode set the env var `DEV=true`.
@@ -190,7 +206,7 @@ cp build/binaries/fleet-server-8.7.0-SNAPSHOT-linux-x86_64/fleet-server ./data/e
 
 When developing new features as you write code you would want to make sure your changes are not breaking any pre-existing
 functionality. For this reason as you make changes you might want to run a subset of tests or the full tests before
-you create a pull request. 
+you create a pull request.
 
 #### Running go tests
 
@@ -206,13 +222,13 @@ This make target will execute the go unit tests and should normally pass without
 It's a good practice before you start your changes to establish the current baseline of the benchmarks in your machine.
 To establish the baseline benchmark report you can follow the following workflow
 
-__Establish a baseline__ 
+__Establish a baseline__
 ```bash
 BENCH_BASE=base.out make benchmark
 ```
 
-This will execute all the go benchmark test and write the output into the file build/base.out. If you omit the 
-`BENCH_BASE` variable it will automatically select the name `build/benchmark-{git_head_sha1}.out`. 
+This will execute all the go benchmark test and write the output into the file build/base.out. If you omit the
+`BENCH_BASE` variable it will automatically select the name `build/benchmark-{git_head_sha1}.out`.
 
 __Re-running benchmark after changes__
 
@@ -232,7 +248,7 @@ And this will print the difference between the baseline and next results.
 
 You can read more on the [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) official site.
 
-There are some additional parameters that you can use with the `benchmark` target. 
+There are some additional parameters that you can use with the `benchmark` target.
 - `BENCHMARK_FILTER`: you can define the test filter so that you only run a subset of tests (Default: Bench, only run
 the test BenchmarkXXXX and not unit tests)
 - `BENCHMARK_COUNT`: you can define the number of iterations go test will run. Having larger number helps

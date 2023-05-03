@@ -17,6 +17,7 @@ type ServerTimeouts struct {
 	CheckinTimestamp time.Duration `config:"checkin_timestamp"`
 	CheckinLongPoll  time.Duration `config:"checkin_long_poll"`
 	CheckinJitter    time.Duration `config:"checkin_jitter"`
+	CheckinMaxPoll   time.Duration `config:"checkin_max_poll"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -48,14 +49,19 @@ func (c *ServerTimeouts) InitDefaults() {
 	// so in that case it covers the TLS handshake.  If the connection is reused, the write timeout
 	// covers the time from the end of the request header to the end of the response write.
 	// Set to a very large timeout to allow for slow backend; must be at least as large as Read timeout plus Long Poll.
-	c.Write = 29 * time.Minute
+	c.Write = 10 * time.Minute
 
 	// Write out a timestamp to elastic on this timeout during long poll
 	c.CheckinTimestamp = 30 * time.Second
 
 	// Long poll timeout, will be short-circuited on policy change
-	c.CheckinLongPoll = 28 * time.Minute
+	c.CheckinLongPoll = 5 * time.Minute
 
 	// Jitter subtracted from c.CheckinLongPoll.  Disabled if zero.
 	c.CheckinJitter = 30 * time.Second
+
+	// MaxPoll is the maximum allowed value for a long poll when the client specified poll_timeout value is used.
+	// The long poll value is poll_timeout-2m, and the request's write timeout is set to poll_timeout-1m
+	// CheckinMaxPoll values of less then 1m are effectively ignored and a 1m limit is used.
+	c.CheckinMaxPoll = time.Hour
 }
