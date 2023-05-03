@@ -37,7 +37,9 @@ steps:
           - "make test-unit"
           - "make junit-report"
         agents:
-          provider: "golang:1.20.3"
+          image: "golang:1.20.3"
+          cpu: "8"
+          memory: "4G"
 
       - label: "Run integration tests"
         key: int-test
@@ -47,7 +49,9 @@ steps:
           - "make test-int"
           - "make junit-report"
         agents:
-          provider: "golang:1.20.3"
+          image: "golang:1.20.3"
+          cpu: "8"
+          memory: "4G"
 
       - label: ":junit: Junit annotate"
         plugins:
