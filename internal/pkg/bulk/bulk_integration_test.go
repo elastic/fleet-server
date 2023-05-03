@@ -149,7 +149,7 @@ func TestBulkCreateBody(t *testing.T) {
 			[]byte(`{"overflow": 99999999999999999999}`),
 			es.ErrElastic{
 				Status: 400,
-				Type:   "mapper_parsing_exception",
+				Type:   "document_parsing_exception",
 			},
 		},
 		{
@@ -157,7 +157,7 @@ func TestBulkCreateBody(t *testing.T) {
 			[]byte{0x7b, 0x22, 0x6f, 0x6b, 0x22, 0x3a, 0x22, 0xfe, 0xfe, 0xff, 0xff, 0x22, 0x7d}, // {"ok":"${BADUTF8}"}
 			es.ErrElastic{
 				Status: 400,
-				Type:   "mapper_parsing_exception",
+				Type:   "document_parsing_exception",
 			},
 		},
 	}
@@ -166,7 +166,7 @@ func TestBulkCreateBody(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) {
 			_, err := bulker.Create(ctx, index, "", test.Body)
 			if !EqualElastic(test.Err, err) {
-				t.Fatal(err)
+				t.Fatalf("expected: %v, got: %v", test.Err, err)
 			}
 			if err != nil {
 				return
