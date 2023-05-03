@@ -6,6 +6,7 @@ WORKSPACE="$(pwd)"
 
 with_go() {
     mkdir -p ${WORKSPACE}/bin
+    export PATH="${WORKSPACE}/bin:${PATH}"
     retry 5 curl -sL -o ${WORKSPACE}/bin/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
     chmod +x ${WORKSPACE}/bin/gvm
     eval "$(gvm $(cat .go-version))"
