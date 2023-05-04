@@ -12,7 +12,8 @@ token=$(echo ${jsonBody} |  grep -Eo '"value"[^}]*' | grep -Eo ':.*' | sed -r "s
 if [ -z "$token" ]
 then
     token=`cat .kibana_service_token`
+else
+    echo "$token" > .kibana_service_token
 fi
 
-echo "KIBANA_TOKEN=$token" > .kibana_service_token
-echo $token
+echo "$token"
