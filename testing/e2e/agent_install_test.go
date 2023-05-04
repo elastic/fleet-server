@@ -96,11 +96,9 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	suite.Require().NoError(err)
 	switch runtime.GOOS {
 	case "windows":
-		suite.extractWindows(rc)
-	case "darwin":
-		suite.extractDarwin(rc)
-	case "linux":
-		suite.extractLinux(rc)
+		suite.extractZip(rc)
+	case "darwin", "linux":
+		suite.extractTar(rc)
 	default:
 		suite.Require().Failf("Unsupported OS", "OS %s is unsupported for tests", runtime.GOOS)
 	}
@@ -141,10 +139,10 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 	return resp.Body
 }
 
-// extractWindows treats the passed Reader as a zip stream and unarchives it to a temp dir
+// extractZip treats the passed Reader as a zip stream and unarchives it to a temp dir
 // fleet-server binary in archive is replaced by a locally compiled version
 // FIXME this method might be broken as it hasn't been tested.
-func (suite *AgentInstallSuite) extractWindows(r io.Reader) {
+func (suite *AgentInstallSuite) extractZip(r io.Reader) {
 	suite.T().Helper()
 	// Extract zip stream
 	var b bytes.Buffer
@@ -180,10 +178,10 @@ func (suite *AgentInstallSuite) extractWindows(r io.Reader) {
 	suite.Require().NoError(err)
 }
 
-// extractDarwin treats the passed Reader as a tar.gz stream and unarchives it to a temp dir
+// extractTar treats the passed Reader as a tar.gz stream and unarchives it to a temp dir
 // fleet-server binary in archive is replaced by a locally compiled version
-// Additionally the MacOS specific elastic-agent symlink will be recreated with a hard link.
-func (suite *AgentInstallSuite) extractDarwin(r io.Reader) {
+// Additionally the elastic-agent symlink will be recreated.
+func (suite *AgentInstallSuite) extractTar(r io.Reader) {
 	suite.T().Helper()
 	var fleetPath, agentSrc, agentDst, agentLink string
 	// Extract tar.gz stream
@@ -192,33 +190,46 @@ func (suite *AgentInstallSuite) extractDarwin(r io.Reader) {
 	tarReader := tar.NewReader(stream)
 	for header, err := tarReader.Next(); err == nil; header, err = tarReader.Next() {
 		if header.FileInfo().IsDir() {
-			err := os.Mkdir(filepath.Join(suite.downloadPath, header.Name), 0755)
+			// headers may be specified out of order in the archive, as a shortcut we'll make all nested dirs
+			err := os.MkdirAll(filepath.Join(suite.downloadPath, header.Name), 0755)
 			suite.Require().NoError(err)
-		} else {
-			if !header.FileInfo().Mode().IsRegular() && header.FileInfo().Name() == suite.agentName {
-				// MacOS archives have a symlink for the elastic-agent binary
+			continue
+		}
+		if !header.FileInfo().Mode().IsRegular() {
+			// the elastic-agent may count as a symlink in Linux or MacOS bundles
+			if header.FileInfo().Name() == suite.agentName {
 				agentDst = filepath.Join(suite.downloadPath, header.Name)
 				agentLink = header.Linkname
 				continue
-			} else if !header.FileInfo().Mode().IsRegular() {
-				suite.T().Logf("unable to extract %s", header.Name)
-				continue
 			}
-			dst, err := os.Create(filepath.Join(suite.downloadPath, header.Name))
-			suite.Require().NoError(err)
-			err = dst.Chmod(header.FileInfo().Mode())
-			suite.Require().NoError(err)
-			_, err = io.Copy(dst, tarReader)
-			dst.Close() // might be a dirty close
-			suite.Require().NoError(err)
+			suite.T().Logf("unable to extract irregular file: %s linkname: %s", header.Name, header.Linkname)
+			continue
+		}
 
-			if strings.HasSuffix(header.Name, binaryName) {
-				fleetPath = filepath.Join(suite.downloadPath, header.Name)
-			}
-			if strings.HasSuffix(header.Name, agentLink) {
-				agentSrc = filepath.Join(suite.downloadPath, header.Name)
-				suite.T().Logf("source is %s", agentSrc)
-			}
+		var pathErr *os.PathError
+		dst, err := os.Create(filepath.Join(suite.downloadPath, header.Name))
+		// if we get a PathError, try to make the directory before retrying file creation
+		// headers may be specified out of order in the archive, as a shortcut we'll make all nested dirs
+		if errors.As(err, &pathErr) {
+			dir := filepath.Dir(header.Name)
+			err = os.MkdirAll(filepath.Join(suite.downloadPath, dir), 0755)
+			suite.Require().NoErrorf(err, "unable to create directory %s", dir)
+			dst, err = os.Create(filepath.Join(suite.downloadPath, header.Name))
+			suite.Require().NoErrorf(err, "unable to create file %s", header.Name)
+		} else if err != nil {
+			suite.Require().Failf("unable to create file", "filename: %s, error: %v", header.Name, err)
+		}
+		err = dst.Chmod(header.FileInfo().Mode())
+		suite.Require().NoError(err)
+		_, err = io.Copy(dst, tarReader)
+		dst.Close() // might be a dirty close
+		suite.Require().NoError(err)
+
+		if strings.HasSuffix(header.Name, binaryName) {
+			fleetPath = filepath.Join(suite.downloadPath, header.Name)
+		}
+		if strings.HasSuffix(header.Name, agentLink) {
+			agentSrc = filepath.Join(suite.downloadPath, header.Name)
 		}
 	}
 	// Copy fleet-server binary to un archived package
@@ -229,67 +240,12 @@ func (suite *AgentInstallSuite) extractDarwin(r io.Reader) {
 	suite.Require().NoError(err)
 
 	// link elastic-agent to the actual binary
-	suite.Require().NotEmpty(agentSrc, "agent link src undetected")
-	suite.Require().NotEmpty(agentDst, "agent link dst undetected")
-	err = os.Link(agentSrc, agentDst)
-	suite.Require().NoError(err)
-}
-
-// extractLinux treats the passed Reader as a tar.gz stream and unarchives it to a temp dir
-// fleet-server binary in archive is replaced by a locally compiled version
-func (suite *AgentInstallSuite) extractLinux(r io.Reader) {
-	suite.T().Helper()
-	fleetPath := ""
-	stream, err := gzip.NewReader(r)
-	suite.Require().NoError(err)
-	tarReader := tar.NewReader(stream)
-
-	// tar extraction on the CI showed that we can not assume that files in the archive are in-order.
-	// For example, a file may be specified before a header for the directory it's in, or a nested directory header may appear before the root dir.
-	for header, err := tarReader.Next(); err == nil; header, err = tarReader.Next() {
-		suite.T().Logf("processing %s isDir %v isRegular %v", header.Name, header.FileInfo().IsDir(), header.FileInfo().Mode().IsRegular())
-		if header.FileInfo().IsDir() {
-			suite.T().Logf("Creating directory %s", header.Name)
-			err := os.MkdirAll(filepath.Join(suite.downloadPath, header.Name), 0755)
-			suite.Require().NoError(err)
-			continue
-		}
-		if !header.FileInfo().Mode().IsRegular() {
-			// Linux archives should not have symlinks
-			suite.T().Logf("unable to extract %s", header.Name)
-			continue
-		}
-		var pathErr *os.PathError
-		dst, err := os.Create(filepath.Join(suite.downloadPath, header.Name))
-		// if we get a PathError, try to make the directory before retrying file creation
-		if errors.As(err, &pathErr) {
-			dir := filepath.Dir(header.Name)
-			err = os.MkdirAll(filepath.Join(suite.downloadPath, dir), 0755)
-			suite.Require().NoErrorf(err, "unable to create directory %s", dir)
-			dst, err = os.Create(filepath.Join(suite.downloadPath, header.Name))
-			suite.Require().NoErrorf(err, "unable to create file %s", header.Name)
-		} else if err != nil {
-			suite.Require().Failf("unable to create file", "filename: %s, error: %v", header.Name, err)
-		}
-
+	if agentLink != "" {
+		suite.Require().NotEmpty(agentSrc, "agent link src undetected")
+		suite.Require().NotEmpty(agentDst, "agent link dst undetected")
+		err = os.Symlink(agentSrc, agentDst)
 		suite.Require().NoError(err)
-		err = dst.Chmod(header.FileInfo().Mode())
-		suite.Require().NoError(err)
-		_, err = io.Copy(dst, tarReader)
-		dst.Close() // might be a dirty close
-		suite.Require().NoError(err)
-
-		if strings.HasSuffix(header.Name, binaryName) {
-			fleetPath = filepath.Join(suite.downloadPath, header.Name)
-		}
 	}
-
-	// Copy fleet-server binary to un archived package
-	suite.Require().NotEmpty(fleetPath, "no fleet-server component detected")
-	err = os.Remove(fleetPath)
-	suite.Require().NoError(err)
-	err = os.Link(suite.binaryPath, fleetPath)
-	suite.Require().NoError(err)
 }
 
 func (suite *AgentInstallSuite) TearDownSuite() {
