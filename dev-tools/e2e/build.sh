@@ -10,7 +10,7 @@ REPO_ROOT=$(cd $(dirname $(readlink -f "$0"))/../.. && pwd)
 
 source ${REPO_ROOT}/dev-tools/integration/.env
 
-USER_NAME=${USER}
+COMMIT=$(git rev-parse --short HEAD)
 CI_ELASTIC_AGENT_DOCKER_IMAGE=docker.elastic.co/observability-ci/elastic-agent
 
 BASE_IMAGE="${BASE_IMAGE:-docker.elastic.co/cloud-release/elastic-agent-cloud:$ELASTICSEARCH_VERSION}"
@@ -22,7 +22,7 @@ docker pull --platform linux/$GOARCH $BASE_IMAGE
 STACK_VERSION=$(docker inspect -f '{{index .Config.Labels "org.label-schema.version"}}' $BASE_IMAGE)
 VCS_REF=$(docker inspect -f '{{index .Config.Labels "org.label-schema.vcs-ref"}}' $BASE_IMAGE)
 
-CUSTOM_IMAGE_TAG=${STACK_VERSION}-e2e-${USER_NAME}-$(date +%s)
+CUSTOM_IMAGE_TAG=${STACK_VERSION}-e2e-${COMMIT}-$(date +%s)
 
 docker build \
 	-f $REPO_ROOT/dev-tools/e2e/Dockerfile \
