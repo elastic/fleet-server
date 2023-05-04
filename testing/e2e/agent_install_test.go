@@ -247,7 +247,7 @@ func (suite *AgentInstallSuite) extractLinux(r io.Reader) {
 	// tar extraction on the CI showed that we can not assume that files in the archive are in-order.
 	// For example, a file may be specified before a header for the directory it's in, or a nested directory header may appear before the root dir.
 	for header, err := tarReader.Next(); err == nil; header, err = tarReader.Next() {
-		suite.T().Logf("processing %s isDir %v isRegular %v", header.Name, header.FileInfo().IsDir(), header.FileInfo().Mod().IsRegular())
+		suite.T().Logf("processing %s isDir %v isRegular %v", header.Name, header.FileInfo().IsDir(), header.FileInfo().Mode().IsRegular())
 		if header.FileInfo().IsDir() {
 			suite.T().Logf("Creating directory %s", header.Name)
 			err := os.MkdirAll(filepath.Join(suite.downloadPath, header.Name), 0755)
@@ -262,7 +262,7 @@ func (suite *AgentInstallSuite) extractLinux(r io.Reader) {
 		var pathErr *os.PathError
 		dst, err := os.Create(filepath.Join(suite.downloadPath, header.Name))
 		// if we get a PathError, try to make the directory before retrying file creation
-		if errors.As(err, &pathError) {
+		if errors.As(err, &pathErr) {
 			dir := filepath.Dir(header.Name)
 			err = os.MkdirAll(filepath.Join(suite.downloadPath, dir), 0755)
 			suite.Require().NoErrorf(err, "unable to create directory %s", dir)
@@ -283,7 +283,6 @@ func (suite *AgentInstallSuite) extractLinux(r io.Reader) {
 			fleetPath = filepath.Join(suite.downloadPath, header.Name)
 		}
 	}
-	f.Close()
 
 	// Copy fleet-server binary to un archived package
 	suite.Require().NotEmpty(fleetPath, "no fleet-server component detected")
