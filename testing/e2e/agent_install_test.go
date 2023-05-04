@@ -295,9 +295,10 @@ func (suite *AgentInstallSuite) TestHTTP() {
 		"--fleet-server-policy=fleet-server-policy",
 		"--non-interactive")
 	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Dir = filepath.Dir(suite.agentPath)
 
 	output, err := cmd.CombinedOutput()
-	suite.Require().NoErrorf(err, "elastic-agent install failed. exit_code: %d, output: %s", cmd.ProcessState.ExitCode(), string(output))
+	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
 }
@@ -321,9 +322,10 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 		"--fleet-server-cert-key-passphrase="+filepath.Join(suite.certPath, "passphrase"),
 		"--non-interactive")
 	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Dir = filepath.Dir(suite.agentPath)
 
 	output, err := cmd.CombinedOutput()
-	suite.Require().NoErrorf(err, "elastic-agent install failed. exit_code: %d, output: %s", cmd.ProcessState.ExitCode(), string(output))
+	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
 
 	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
 }
