@@ -326,12 +326,12 @@ e2e-certs: ## - Use openssl to create a CA, encrypted private key, and signed fl
 .PHONY: e2e-docker-start
 e2e-docker-start: int-docker-start ## - Start a testing instance of Elasticsearch and Kibana in docker containers
 	@./dev-tools/e2e/get-kibana-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}
-	@docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file .kibana_service_token --env-file ./dev-tools/integration/.env up  -d --remove-orphans kibana
+	docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file .kibana_service_token --env-file ./dev-tools/integration/.env up  -d --remove-orphans kibana
 	@./dev-tools/e2e/wait-for-kibana.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:5601
 
 .PHONY: e2e-docker-stop
 e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
-	@docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env down
+	docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env down
 	@rm -f .kibana_service_token
 	@$(MAKE) int-docker-stop
 
