@@ -1,28 +1,81 @@
 #!/bin/bash
 
-set -exuo pipefail
+set -euo pipefail
 
-MSG="environment variable missing: DOCKER_COMPOSE_VERSION."
-DOCKER_COMPOSE_VERSION=${DOCKER_COMPOSE_VERSION:?$MSG}
-HOME=${HOME:?$MSG}
+WORKSPACE="$(pwd)/bin"
 
-if command -v docker-compose
-then
-    echo "Found docker-compose. Checking version.."
-    FOUND_DOCKER_COMPOSE_VERSION=$(docker-compose --version|awk '{print $3}'|sed s/\,//)
-    if [ "$FOUND_DOCKER_COMPOSE_VERSION" == "$DOCKER_COMPOSE_VERSION" ]
-    then
-        echo "Versions match. No need to install docker-compose. Exiting."
-        exit 0
-    fi
+add_bin_path(){
+    mkdir -p ${WORKSPACE}
+    export PATH="${WORKSPACE}:${PATH}"
+    echo $PATH
+}
+
+with_go() {
+    mkdir -p ${WORKSPACE}
+    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
+    chmod +x ${WORKSPACE}/gvm
+    eval "$(gvm $(cat .go-version))"
+    go version
+    which go
+    echo -e "\nPATH="$(go env GOPATH):${PATH}"" >> dev-tools/integration/.env
+    echo $PATH
+}
+
+with_docker_compose() {
+    mkdir -p ${WORKSPACE}
+    retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
+    chmod +x ${WORKSPACE}/docker-compose
+    docker-compose version
+    echo -e "\nPATH="${WORKSPACE}:${PATH}"" >> dev-tools/integration/.env
+    echo $PATH
+}
+
+retry() {
+    local retries=$1
+    shift
+
+    local count=0
+    until "$@"; do
+        exit=$?
+        wait=$((2 ** count))
+        count=$((count + 1))
+        if [ $count -lt "$retries" ]; then
+            >&2 echo "Retry $count/$retries exited $exit, retrying in $wait seconds..."
+            sleep $wait
+        else
+            >&2 echo "Retry $count/$retries exited $exit, no more retries left."
+            return $exit
+        fi
+    done
+    return 0
+}
+
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 <option>. Examples: "$0 with-go" or "$0 with-docker-compose" or "$0 with-go-docker-compose" "
+  exit 1
 fi
 
-echo "UNMET DEP: Installing docker-compose"
+option=$1
 
-DC_CMD="${HOME}/bin/docker-compose"
-
-mkdir -p "${HOME}/bin"
-
-curl -sSLo "${DC_CMD}" "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)"
-chmod +x "${DC_CMD}"
-echo -e "\nPATH="${HOME}/bin:${PATH}"" >> dev-tools/integration/.env
+case $option in
+  "with-go")
+    echo "Setting up Go environment..."
+    add_bin_path
+    with_go
+    ;;
+  "with-docker-compose")
+    echo "Setting up Docker-compose environment......"
+    add_bin_path
+    with_docker_compose
+    ;;
+  "with-go-docker-compose")
+    echo "Setting up Docker-compose environment......"
+    add_bin_path
+    with_go
+    with_docker_compose
+    ;;
+  *)
+    echo "unexpected input: $option. Please use with-go or with-docker-compose or with-go-docker-compose options."
+    exit 1
+    ;;
+esac

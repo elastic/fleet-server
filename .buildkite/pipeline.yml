@@ -32,24 +32,22 @@ steps:
       - label: "Run unit test"
         key: unit-test
         commands:
+          - "chmod +x .buildkite/scripts/setenv.sh"
+          - ".buildkite/scripts/setenv.sh with-go"
           - "make test-unit"
           - "make junit-report"
         agents:
-          image: "golang:1.20.3"
-          cpu: "8"
-          memory: "4G"
+          provider: "gcp"
 
       - label: "Run integration tests"
         key: int-test
         commands:
           - "chmod +x .buildkite/scripts/setenv.sh"
-          - ".buildkite/scripts/setenv.sh"
+          - ".buildkite/scripts/setenv.sh with-go-docker-compose"
           - "make test-int"
           - "make junit-report"
         agents:
-          image: "golang:1.20.3"
-          cpu: "8"
-          memory: "4G"
+          provider: "gcp"
 
       - label: ":junit: Junit annotate"
         plugins:
