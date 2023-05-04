@@ -7,7 +7,6 @@ WORKSPACE="$(pwd)/bin"
 add_bin_path(){
     mkdir -p ${WORKSPACE}
     export PATH="${WORKSPACE}:${PATH}"
-    echo $PATH
 }
 
 with_go() {
@@ -18,7 +17,10 @@ with_go() {
     go version
     which go
     echo -e "\nPATH="$(go env GOPATH):${PATH}"" >> dev-tools/integration/.env
-    echo $PATH
+    if ! which go-junit-report >/dev/null 2>&1; then
+        echo "go-junit-report not found, installing..."
+        go get github.com/jstemmer/go-junit-report
+    fi
 }
 
 with_docker_compose() {
@@ -27,7 +29,6 @@ with_docker_compose() {
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
     echo -e "\nPATH="${WORKSPACE}:${PATH}"" >> dev-tools/integration/.env
-    echo $PATH
 }
 
 retry() {
@@ -69,7 +70,7 @@ case $option in
     with_docker_compose
     ;;
   "with-go-docker-compose")
-    echo "Setting up Docker-compose environment......"
+    echo "Setting up Docker-compose and GO environments......"
     add_bin_path
     with_go
     with_docker_compose
