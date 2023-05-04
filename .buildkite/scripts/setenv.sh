@@ -16,11 +16,13 @@ with_go() {
     eval "$(gvm $(cat .go-version))"
     go version
     which go
-    echo -e "\nPATH="$(go env GOPATH):${PATH}"" >> dev-tools/integration/.env
     if ! which go-junit-report >/dev/null 2>&1; then
         echo "go-junit-report not found, installing..."
-        go get github.com/jstemmer/go-junit-report
+        go install -o "${WORKSPACE}/go-junit-report" github.com/jstemmer/go-junit-report
+        which go-junit-report
     fi
+    echo $PATH
+    echo -e "\nPATH="$(go env GOPATH):${PATH}"" >> dev-tools/integration/.env
 }
 
 with_docker_compose() {
