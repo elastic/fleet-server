@@ -1,6 +1,0 @@
-#!/bin/bash
-set -eu
-
-# Configure the remote to have access to the PR refs needed for buildkite-pr-bot 
-# with the enabled use_merge_commit setting
-git config remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
