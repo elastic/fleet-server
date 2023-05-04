@@ -4,7 +4,7 @@ terraform {
   required_providers {
     ec = {
       source  = "elastic/ec"
-      version = ">=0.6.0"
+      version = "0.5.1"
     }
   }
 }
@@ -12,8 +12,8 @@ terraform {
 provider "ec" {}
 
 variable "elastic_agent_docker_image" {
-    type        = string
-    description = "Elastic agent docker image with tag."
+  type        = string
+  description = "Elastic agent docker image with tag."
 }
 
 locals {
@@ -33,16 +33,12 @@ resource "ec_deployment" "deployment" {
     "docker_image_ea"        = local.docker_image_ea
   }
 
-  elasticsearch = {
-    hot = {
-      autoscaling = {}
-    }
-  }
-  kibana = {
-    topology = {}
-  }
-  integrations_server = {
-    config = {
+  elasticsearch {}
+
+  kibana {}
+
+  integrations_server {
+    config {
       docker_image = local.docker_image_ea
     }
   }

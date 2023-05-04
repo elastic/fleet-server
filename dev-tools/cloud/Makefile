@@ -26,17 +26,17 @@ build-and-push-cloud-image:
 	echo $(CUSTOM_IMAGE_TAG)
 	GOARCH=amd64 CI_ELASTIC_AGENT_DOCKER_IMAGE=${CI_ELASTIC_AGENT_DOCKER_IMAGE} CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG} ${REPO_ROOT}/dev-tools/cloud/docker/build.sh
 
-.PHONY: deploy-cloud
-deploy-cloud: build-and-push-cloud-image  ## Create a new cloud deployment
-	@cd ${TERRAFORM_PATH}; terraform init; TF_VAR_elastic_agent_docker_image="${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}" terraform apply -auto-approve
+.PHONY: cloud-deploy
+cloud-deploy: build-and-push-cloud-image  ## Create a new cloud deployment
+	@cd ${TERRAFORM_PATH}; echo 'elastic_agent_docker_image="${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"' > docker_image.auto.tfvars
+	@cd ${TERRAFORM_PATH}; terraform init; terraform apply -auto-approve
 
-.PHONY: clean-cloud
-clean-cloud: ## Clean cloud deployment
+.PHONY: cloud-clean
+cloud-clean: ## Clean cloud deployment
 	@cd ${TERRAFORM_PATH}; terraform destroy -auto-approve
 
-.PHONY: test
-test: build-and-push-cloud-image ## Clean cloud deployment
-	echo $(CUSTOM_IMAGE_TAG)
-	GOARCH=amd64 CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG} ${REPO_ROOT}/dev-tools/cloud/docker/build.sh
-	@cd ${TERRAFORM_PATH}; echo 'elastic_agent_docker_image="${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"' >> docker_image.auto.tfvars
+.PHONY: cloud-get-fleet-url
+cloud-get-fleet-url:  ## Clean cloud deployment
+	$(eval FLEET_SERVER_URL := $(shell terraform output --state=${TERRAFORM_PATH}/terraform.tfstate fleet_url))
+	@echo '${FLEET_SERVER_URL}'
 

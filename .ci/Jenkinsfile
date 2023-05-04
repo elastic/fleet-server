@@ -123,19 +123,13 @@ pipeline {
                   retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install Docker", script: '.ci/scripts/install-docker-compose.sh') }
                   dockerLogin(secret: "${env.DOCKER_REGISTRY_SECRET}",
                     registry: "${env.DOCKER_REGISTRY}")
-                  sh(label: 'deploy to cloud', script: 'USER=ci make -C dev-tools/cloud deploy-cloud')
-                  // sh(label: 'test', script: 'make junit-report')
+                  sh(label: 'cloud e2e tests', script: 'USER=fleetserverci make test-cloude2e')
                 }
               }
             }
           }
         }
       }
-      // post {
-      //   always {
-      //     // junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/*.xml")
-      //   }
-      // }
     }
     stage('Publish Docker Image') {
       options { skipDefaultCheckout() }
