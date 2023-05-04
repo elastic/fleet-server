@@ -7,7 +7,6 @@ package cloude2e
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"testing"
@@ -19,7 +18,7 @@ import (
 type TestSuite struct {
 	suite.Suite
 
-	fleetServerUrl string // Fleet server URL
+	fleetServerURL string // Fleet server URL
 
 	client *http.Client // http.Client
 }
@@ -34,9 +33,7 @@ func (suite *TestSuite) SetupSuite() {
 	// get env vars
 	v, ok := os.LookupEnv("FLEET_SERVER_URL")
 	suite.Require().True(ok, "expected FLEET_SERVER_URL to be defined")
-	suite.fleetServerUrl = v
-
-	fmt.Printf("%v+", suite.fleetServerUrl)
+	suite.fleetServerURL = v
 
 	suite.client = &http.Client{}
 }
@@ -52,7 +49,7 @@ func (suite *TestSuite) TestFleetServerStatusOK() {
 	defer cancel()
 
 	// ping /api/status
-	req, err := http.NewRequestWithContext(ctx, "GET", suite.fleetServerUrl+"/api/status", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", suite.fleetServerURL+"/api/status", nil)
 	suite.Require().NoError(err)
 
 	resp, err := suite.client.Do(req)
