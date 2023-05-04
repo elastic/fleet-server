@@ -18,11 +18,11 @@ with_go() {
     which go
     if ! which go-junit-report >/dev/null 2>&1; then
         echo "go-junit-report not found, installing..."
-        go install -i ${WORKSPACE} github.com/jstemmer/go-junit-report
+        go get github.com/jstemmer/go-junit-report
         which go-junit-report
     fi
     echo $PATH
-    echo -e "\nPATH="$(go env GOPATH):${PATH}"" >> dev-tools/integration/.env
+    echo -e "\nPATH="$(go env GOPATH):$(go env GOPATH)/bin:${PATH}"" >> dev-tools/integration/.env
 }
 
 with_docker_compose() {
