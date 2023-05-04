@@ -17,6 +17,9 @@ pipeline {
     DOCKER_REGISTRY_SECRET = 'secret/observability-team/ci/docker-registry/prod'
 
     DOCKER_IMAGE = "${env.DOCKER_REGISTRY}/observability-ci/fleet-server"
+
+    EC_KEY_SECRET = 'secret/observability-team/ci/elastic-cloud/observability-pro'
+    TERRAFORM_VERSION = '1.4.6'
   }
   options {
     timeout(time: 1, unit: 'HOURS')
@@ -107,6 +110,32 @@ pipeline {
           junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/*.xml")
         }
       }
+    }
+    stage('Cloud e2e Test') {
+      options { skipDefaultCheckout() }
+      steps {
+        withGithubNotify(context: "Cloud e2e test", tab: 'tests') {
+          cleanup()
+          dir("${BASE_DIR}"){
+            withGoEnv(){
+              withTerraformEnv(version: "${TERRAFORM_VERSION}", forceInstallation: true) {
+                withSecretVault(secret: "${EC_KEY_SECRET}", data: ['apiKey': 'EC_API_KEY'] ) {
+                  retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install Docker", script: '.ci/scripts/install-docker-compose.sh') }
+                  dockerLogin(secret: "${env.DOCKER_REGISTRY_SECRET}",
+                    registry: "${env.DOCKER_REGISTRY}")
+                  sh(label: 'deploy to cloud', script: 'USER=ci make -C dev-tools/cloud deploy-cloud')
+                  // sh(label: 'test', script: 'make junit-report')
+                }
+              }
+            }
+          }
+        }
+      }
+      // post {
+      //   always {
+      //     // junit(allowEmptyResults: true, keepLongStdio: true, testResults: "${BASE_DIR}/build/*.xml")
+      //   }
+      // }
     }
     stage('Publish Docker Image') {
       options { skipDefaultCheckout() }
