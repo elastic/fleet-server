@@ -16,6 +16,7 @@ with_go() {
     eval "$(gvm $(cat .go-version))"
     go version
     which go
+    echo "Installing dependencies..."
     go get github.com/jstemmer/go-junit-report
     export PATH="$(go env GOPATH):$(go env GOPATH)/bin:${PATH}"
     echo -e "\nPATH="${PATH}"" >> dev-tools/integration/.env
