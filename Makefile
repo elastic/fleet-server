@@ -298,10 +298,6 @@ test-int-set: ## - Run integration tests without setup
 ##################################################
 # Cloud testing targets
 ##################################################
-.PHONY: build-and-push-cloud-image
-build-and-push-cloud-image:
-	GOARCH=amd64 ./dev-tools/cloud/docker/build.sh
-
 .PHONY: test-cloude2e
 test-cloude2e: prepare-test-context  ## - Run cloude2e tests with full setup (slow!)
 	@make -C ${CLOUD_TESTING_BASE} cloud-deploy
