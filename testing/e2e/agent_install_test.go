@@ -34,7 +34,7 @@ type AgentInstallSuite struct {
 	BaseE2ETestSuite
 
 	installDetected bool   // Flag to skip tests if an agent is detected
-	agentName       string // platform specific name of elastic-agent binary
+	agentPath       string // path to extracted elastic-agent binary (or symlink)
 	binaryPath      string // path to compiled fleet-server
 	downloadPath    string // path to unarchived downloaded elastic-agent package
 
@@ -58,16 +58,12 @@ func TestAgentInstallSuite(t *testing.T) {
 }
 
 func (suite *AgentInstallSuite) SetupSuite() {
-	suite.agentName = "elastic-agent"
-	if runtime.GOOS == "windows" {
-		suite.agentName = "elastic-agent.exe"
-	}
 	arch := runtime.GOARCH
 	if arch == "amd64" {
 		arch = "x86_64"
 	}
 	// check if agent is installed
-	if _, err := exec.LookPath(suite.agentName); err == nil {
+	if _, err := exec.LookPath(agentName); err == nil {
 		suite.installDetected = true
 		return // don't bother with setup, skip all tests
 	}
@@ -169,6 +165,9 @@ func (suite *AgentInstallSuite) extractZip(r io.Reader) {
 			if strings.HasSuffix(file.Name, binaryName) {
 				fleetPath = filepath.Join(suite.downloadPath, file.Name)
 			}
+			if strings.HasSuffix(file.Name, agentName) {
+				suite.agentPath = filepath.Join(suite.downloadPath, file.Name)
+			}
 		}
 	}
 	suite.Require().NotEmpty(fleetPath, "no fleet-server component detected")
@@ -197,7 +196,7 @@ func (suite *AgentInstallSuite) extractTar(r io.Reader) {
 		}
 		if !header.FileInfo().Mode().IsRegular() {
 			// the elastic-agent may count as a symlink in Linux or MacOS bundles
-			if header.FileInfo().Name() == suite.agentName {
+			if header.FileInfo().Name() == agentName {
 				agentDst = filepath.Join(suite.downloadPath, header.Name)
 				agentLink = header.Linkname
 				continue
@@ -225,9 +224,15 @@ func (suite *AgentInstallSuite) extractTar(r io.Reader) {
 		dst.Close() // might be a dirty close
 		suite.Require().NoError(err)
 
+		// note the fleet-server locaction in the extracted path
 		if strings.HasSuffix(header.Name, binaryName) {
 			fleetPath = filepath.Join(suite.downloadPath, header.Name)
 		}
+		// note if elastic-agent has been extracted as a regular file
+		if strings.HasSuffix(header.Name, agentName) {
+			suite.agentPath = filepath.Join(suite.downloadPath, header.Name)
+		}
+		// note the source of the elastic-agent if it has been detected as a symlink
 		if strings.HasSuffix(header.Name, agentLink) {
 			agentSrc = filepath.Join(suite.downloadPath, header.Name)
 		}
@@ -245,6 +250,7 @@ func (suite *AgentInstallSuite) extractTar(r io.Reader) {
 		suite.Require().NotEmpty(agentDst, "agent link dst undetected")
 		err = os.Symlink(agentSrc, agentDst)
 		suite.Require().NoError(err)
+		suite.agentPath = agentDst // replace path if we are using a link
 	}
 }
 
@@ -268,7 +274,7 @@ func (suite *AgentInstallSuite) TearDownTest() {
 	if suite.T().Skipped() {
 		return
 	}
-	path, err := exec.LookPath(suite.agentName)
+	path, err := exec.LookPath(agentName)
 	if err != nil {
 		suite.T().Logf("unable to detect elastic-agent install on test tear-down: %s", err)
 		return
@@ -281,7 +287,7 @@ func (suite *AgentInstallSuite) TestHTTP() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, filepath.Join(suite.downloadPath, suite.agentName), "install",
+	cmd := exec.CommandContext(ctx, suite.agentPath, "install",
 		"--fleet-server-es="+suite.esHosts,
 		"--fleet-server-service-token="+suite.serviceToken,
 		"--fleet-server-insecure-http=true",
@@ -304,7 +310,7 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, filepath.Join(suite.downloadPath, suite.agentName), "install",
+	cmd := exec.CommandContext(ctx, suite.agentPath, "install",
 		"--url=https://localhost:8200",
 		"--certificate-authorities="+filepath.Join(suite.certPath, "e2e-test-ca.crt"),
 		"--fleet-server-es="+suite.esHosts,

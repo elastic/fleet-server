@@ -5,3 +5,4 @@
 package e2e
 
 const binaryName = "fleet-server.exe"
+const agentName = "elastic-agent.exe"
