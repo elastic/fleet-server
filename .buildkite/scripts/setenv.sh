@@ -17,7 +17,8 @@ with_go() {
     go version
     which go
     go get github.com/jstemmer/go-junit-report
-    echo -e "\nPATH="$(go env GOPATH):$(go env GOPATH)/bin:${PATH}"" >> dev-tools/integration/.env
+    export PATH="$(go env GOPATH):$(go env GOPATH)/bin:${PATH}"
+    echo -e "\nPATH="${PATH}"" >> dev-tools/integration/.env
 }
 
 with_docker_compose() {
@@ -25,7 +26,8 @@ with_docker_compose() {
     retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
-    echo -e "\nPATH="${WORKSPACE}:${PATH}"" >> dev-tools/integration/.env
+    export PATH="${WORKSPACE}:${PATH}"
+    echo -e "\nPATH="${PATH}"" >> dev-tools/integration/.env
 }
 
 retry() {
