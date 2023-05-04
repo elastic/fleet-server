@@ -13,6 +13,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -236,54 +237,41 @@ func (suite *AgentInstallSuite) extractDarwin(r io.Reader) {
 
 // extractLinux treats the passed Reader as a tar.gz stream and unarchives it to a temp dir
 // fleet-server binary in archive is replaced by a locally compiled version
-// NOTE archive extracted in two passes, 1st creates directory structure, 2nd gets files.
-//     This is done to avoid errors in the CI build
 func (suite *AgentInstallSuite) extractLinux(r io.Reader) {
 	suite.T().Helper()
 	fleetPath := ""
-	localName := filepath.Join(suite.downloadPath, "elastic-agent.tar.gz")
-
-	// write to local dir to avoid holding archive in memory
-	downloadFile, err := os.Create(localName)
-	suite.Require().NoError(err)
-	_, err = io.Copy(downloadFile, r)
-	suite.Require().NoError(err)
-	downloadFile.Close()
-	defer os.Remove(localName)
-
-	// create directories
-	f, err := os.Open(localName)
-	suite.Require().NoError(err)
-	stream, err := gzip.NewReader(f)
+	stream, err := gzip.NewReader(r)
 	suite.Require().NoError(err)
 	tarReader := tar.NewReader(stream)
+
+	// tar extraction on the CI showed that we can not assume that files in the archive are in-order.
+	// For example, a file may be specified before a header for the directory it's in, or a nested directory header may appear before the root dir.
 	for header, err := tarReader.Next(); err == nil; header, err = tarReader.Next() {
+		suite.T().Logf("processing %s isDir %v isRegular %v", header.Name, header.FileInfo().IsDir(), header.FileInfo().Mod().IsRegular())
 		if header.FileInfo().IsDir() {
 			suite.T().Logf("Creating directory %s", header.Name)
-			err := os.Mkdir(filepath.Join(suite.downloadPath, header.Name), 0755)
+			err := os.MkdirAll(filepath.Join(suite.downloadPath, header.Name), 0755)
 			suite.Require().NoError(err)
-		}
-	}
-	f.Close()
-
-	// create files
-	f, err = os.Open(localName)
-	suite.Require().NoError(err)
-	stream, err = gzip.NewReader(f)
-	suite.Require().NoError(err)
-	tarReader = tar.NewReader(stream)
-	for header, err := tarReader.Next(); err == nil; header, err = tarReader.Next() {
-		if header.FileInfo().IsDir() {
 			continue
 		}
-
 		if !header.FileInfo().Mode().IsRegular() {
 			// Linux archives should not have symlinks
 			suite.T().Logf("unable to extract %s", header.Name)
 			continue
 		}
-		suite.T().Logf("Creating file %s", header.Name)
+		var pathErr *os.PathError
 		dst, err := os.Create(filepath.Join(suite.downloadPath, header.Name))
+		// if we get a PathError, try to make the directory before retrying file creation
+		if errors.As(err, &pathError) {
+			dir := filepath.Dir(header.Name)
+			err = os.MkdirAll(filepath.Join(suite.downloadPath, dir), 0755)
+			suite.Require().NoErrorf(err, "unable to create directory %s", dir)
+			dst, err = os.Create(filepath.Join(suite.downloadPath, header.Name))
+			suite.Require().NoErrorf(err, "unable to create file %s", header.Name)
+		} else if err != nil {
+			suite.Require().Failf("unable to create file", "filename: %s, error: %v", header.Name, err)
+		}
+
 		suite.Require().NoError(err)
 		err = dst.Chmod(header.FileInfo().Mode())
 		suite.Require().NoError(err)
