@@ -142,6 +142,7 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 
 // extractWindows treats the passed Reader as a zip stream and unarchives it to a temp dir
 // fleet-server binary in archive is replaced by a locally compiled version
+// FIXME this method might be broken as it hasn't been tested.
 func (suite *AgentInstallSuite) extractWindows(r io.Reader) {
 	suite.T().Helper()
 	// Extract zip stream
@@ -235,25 +236,53 @@ func (suite *AgentInstallSuite) extractDarwin(r io.Reader) {
 
 // extractLinux treats the passed Reader as a tar.gz stream and unarchives it to a temp dir
 // fleet-server binary in archive is replaced by a locally compiled version
+// NOTE archive extracted in two passes, 1st creates directory structure, 2nd gets files.
+//     This is done to avoid errors in the CI build
 func (suite *AgentInstallSuite) extractLinux(r io.Reader) {
 	suite.T().Helper()
 	fleetPath := ""
-	// Extract tar.gz stream
-	stream, err := gzip.NewReader(r)
+	localName := filepath.Join(suite.downloadPath, "elastic-agent.tar.gz")
+
+	// write to local dir to avoid holding archive in memory
+	downloadFile, err := os.Create(localName)
+	suite.Require().NoError(err)
+	_, err = io.Copy(downloadFile, r)
+	suite.Require().NoError(err)
+	downloadFile.Close()
+	defer os.Remove(localName)
+
+	// create directories
+	f, err := os.Open(localName)
+	suite.Require().NoError(err)
+	stream, err := gzip.NewReader(f)
 	suite.Require().NoError(err)
 	tarReader := tar.NewReader(stream)
 	for header, err := tarReader.Next(); err == nil; header, err = tarReader.Next() {
-		suite.T().Logf("processing file %s idDir %v isRegular %v", header.Name, header.FileInfo().IsDir(), header.FileInfo().Mode().IsRegular())
 		if header.FileInfo().IsDir() {
+			suite.T().Logf("Creating directory %s", header.Name)
 			err := os.Mkdir(filepath.Join(suite.downloadPath, header.Name), 0755)
 			suite.Require().NoError(err)
+		}
+	}
+	f.Close()
+
+	// create files
+	f, err = os.Open(localName)
+	suite.Require().NoError(err)
+	stream, err = gzip.NewReader(f)
+	suite.Require().NoError(err)
+	tarReader = tar.NewReader(stream)
+	for header, err := tarReader.Next(); err == nil; header, err = tarReader.Next() {
+		if header.FileInfo().IsDir() {
 			continue
 		}
+
 		if !header.FileInfo().Mode().IsRegular() {
 			// Linux archives should not have symlinks
 			suite.T().Logf("unable to extract %s", header.Name)
 			continue
 		}
+		suite.T().Logf("Creating file %s", header.Name)
 		dst, err := os.Create(filepath.Join(suite.downloadPath, header.Name))
 		suite.Require().NoError(err)
 		err = dst.Chmod(header.FileInfo().Mode())
@@ -266,6 +295,8 @@ func (suite *AgentInstallSuite) extractLinux(r io.Reader) {
 			fleetPath = filepath.Join(suite.downloadPath, header.Name)
 		}
 	}
+	f.Close()
+
 	// Copy fleet-server binary to un archived package
 	suite.Require().NotEmpty(fleetPath, "no fleet-server component detected")
 	err = os.Remove(fleetPath)
