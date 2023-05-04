@@ -18,7 +18,7 @@ with_go() {
     which go
     if ! which go-junit-report >/dev/null 2>&1; then
         echo "go-junit-report not found, installing..."
-        go install -o "${WORKSPACE}/go-junit-report" github.com/jstemmer/go-junit-report
+        go install -i ${WORKSPACE} github.com/jstemmer/go-junit-report
         which go-junit-report
     fi
     echo $PATH
