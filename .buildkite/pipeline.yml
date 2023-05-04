@@ -36,8 +36,10 @@ steps:
           - ".buildkite/scripts/setenv.sh with-go"
           - "make test-unit"
           - "make junit-report"
+          - "buildkite-agent artifact upload build/*.xml"
         agents:
           provider: "gcp"
+
 
       - label: "Run integration tests"
         key: int-test
@@ -46,10 +48,13 @@ steps:
           - ".buildkite/scripts/setenv.sh with-go-docker-compose"
           - "make test-int"
           - "make junit-report"
+          - "buildkite-agent artifact upload build/*.xml"
         agents:
           provider: "gcp"
 
       - label: ":junit: Junit annotate"
+        commands:
+          - "buildkite-agent artifact download 'build/*.xml' build/"
         plugins:
           - junit-annotate#v2.4.1:
               artifacts: "build/*.xml"
