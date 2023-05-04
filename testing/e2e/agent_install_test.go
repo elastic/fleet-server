@@ -243,6 +243,7 @@ func (suite *AgentInstallSuite) extractLinux(r io.Reader) {
 	suite.Require().NoError(err)
 	tarReader := tar.NewReader(stream)
 	for header, err := tarReader.Next(); err == nil; header, err = tarReader.Next() {
+		suite.T().Logf("processing file %s idDir %v isRegular %v", header.Name, header.FileInfo().IsDir(), header.FileInfo().Mode().IsRegular())
 		if header.FileInfo().IsDir() {
 			err := os.Mkdir(filepath.Join(suite.downloadPath, header.Name), 0755)
 			suite.Require().NoError(err)
