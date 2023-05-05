@@ -65,12 +65,12 @@ case $option in
     with_go
     ;;
   "with-docker-compose")
-    echo "Setting up Docker-compose environment......"
+    echo "Setting up Docker-compose environment..."
     add_bin_path
     with_docker_compose
     ;;
   "with-go-docker-compose")
-    echo "Setting up Docker-compose and GO environments......"
+    echo "Setting up Docker-compose and GO environments..."
     add_bin_path
     with_go
     with_docker_compose
