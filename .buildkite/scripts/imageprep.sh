@@ -33,11 +33,11 @@ case $option in
     echo "Retagging images..."
     if ${BUILDKITE_TAG}; then
         docker tag ${DOCKER_IMAGE}:${DOCKER_IMAGE_SHA_TAG} ${DOCKER_IMAGE}:${DOCKER_IMAGE_GIT_TAG}
-        DOCKER_IMAGE_TAG=${DOCKER_IMAGE_GIT_TAG}
+        DOCKER_IMAGE_TAG=$(echo "${DOCKER_IMAGE_GIT_TAG}" | sed 's/:/-/g')                          # replace one extra symbol ":" to "-" in the tag because of the push issue
         publish_docker_image
     else
         docker tag ${DOCKER_IMAGE}:${DOCKER_IMAGE_SHA_TAG} ${DOCKER_IMAGE}:${DOCKER_IMAGE_LATEST_TAG}
-        DOCKER_IMAGE_TAG=${DOCKER_IMAGE_LATEST_TAG}
+        DOCKER_IMAGE_TAG=$(echo "${DOCKER_IMAGE_LATEST_TAG}" | sed 's/:/-/g')                          # replace one extra symbol ":" to "-" in the tag because of the push issue
         publish_docker_image
     fi
     ;;
