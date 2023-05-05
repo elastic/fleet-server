@@ -27,7 +27,8 @@ case $option in
 #    fi                                                                                 # we don't have docker-registry credentials
     ;;
   "push-image")
-         publish_docker_image
+        DOCKER_IMAGE_TAG=${DOCKER_IMAGE_SHA_TAG}
+        publish_docker_image
     ;;
   "retag-and-push-image")
     echo "Retagging images..."
