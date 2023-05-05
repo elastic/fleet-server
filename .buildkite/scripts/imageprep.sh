@@ -31,20 +31,24 @@ case $option in
     ;;
   "retag-and-push-image")
     echo "Retagging images..."
+
     echo "BUILDKITE_COMMIT = ${BUILDKITE_COMMIT}"
     echo "BUILDKITE_BRANCH = ${BUILDKITE_BRANCH}"
+    echo "DOCKER_IMAGE = ${DOCKER_IMAGE}"
     echo "DOCKER_IMAGE_TAG = ${DOCKER_IMAGE_TAG}"
     echo "DOCKER_IMAGE_SHA_TAG = ${DOCKER_IMAGE_SHA_TAG}"
+    echo "DOCKER_IMAGE_GIT_TAG = ${DOCKER_IMAGE_GIT_TAG}"
     echo "DOCKER_IMAGE_LATEST_TAG = ${DOCKER_IMAGE_LATEST_TAG}"
 
     if ${BUILDKITE_TAG}; then
+        DOCKER_IMAGE_GIT_TAG=$(echo "${DOCKER_IMAGE_GIT_TAG}" | sed 's/:/-/g')                      # replace one extra symbol ":" to "-" in the tag because of the push issue
         docker tag ${DOCKER_IMAGE}:${DOCKER_IMAGE_SHA_TAG} ${DOCKER_IMAGE}:${DOCKER_IMAGE_GIT_TAG}
-        DOCKER_IMAGE_TAG=$(echo "${DOCKER_IMAGE_GIT_TAG}" | sed 's/:/-/g')                          # replace one extra symbol ":" to "-" in the tag because of the push issue
+        DOCKER_IMAGE_TAG=${DOCKER_IMAGE_GIT_TAG}
         echo ${DOCKER_IMAGE_TAG}
         publish_docker_image
     else
         docker tag ${DOCKER_IMAGE}:${DOCKER_IMAGE_SHA_TAG} ${DOCKER_IMAGE}:${DOCKER_IMAGE_LATEST_TAG}
-        DOCKER_IMAGE_TAG=$(echo "${DOCKER_IMAGE_LATEST_TAG}" | sed 's/:/-/g')                          # replace one extra symbol ":" to "-" in the tag because of the push issue
+        DOCKER_IMAGE_TAG=${DOCKER_IMAGE_LATEST_TAG}
         echo ${DOCKER_IMAGE_TAG}
         publish_docker_image
     fi
