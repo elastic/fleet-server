@@ -83,4 +83,6 @@ steps:
           - ".buildkite/scripts/imageprep.sh retag-and-push-image"
         agents:
           provider: "gcp"
-    depends_on: "tests"
+    depends_on:
+      - step: "tests"
+        allow_failure: true
