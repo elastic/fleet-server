@@ -79,4 +79,6 @@ steps:
           - ".buildkite/scripts/imageprep.sh build-image"
           - ".buildkite/scripts/imageprep.sh push-image"
           - ".buildkite/scripts/imageprep.sh retag-and-push-image"
+        agents:
+          provider: "gcp"
     depends_on: "tests"
