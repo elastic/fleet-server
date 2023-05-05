@@ -69,3 +69,14 @@ steps:
           - "unit-test"
           - "int-test"
     depends_on: "check"
+
+  - group: "Publish docker image"
+    key: "publish"
+    steps:
+      - label: "Build docker image"
+        commands:
+          - "chmod +x .buildkite/scripts/imageprep.sh"
+          - ".buildkite/scripts/imageprep.sh build-image"
+          - ".buildkite/scripts/imageprep.sh push-image"
+          - ".buildkite/scripts/imageprep.sh retag-and-push-image"
+    depends_on: "tests"
