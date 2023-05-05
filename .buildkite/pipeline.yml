@@ -66,8 +66,10 @@ steps:
         agents:
           provider: "gcp"
         depends_on:
-          - "unit-test"
-          - "int-test"
+          - step: "unit-test"
+            allow_failure: true
+          - step: "int-test"
+            allow_failure: true
     depends_on: "check"
 
   - group: "Publish docker image"
