@@ -19,7 +19,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/go-ucfg"
 	"github.com/rs/zerolog/log"
 )
@@ -34,7 +33,7 @@ const (
 )
 
 type clientUnit interface {
-	Expected() (client.UnitState, client.UnitLogLevel, *proto.UnitExpectedConfig)
+	Expected() client.Expected
 	UpdateState(state client.UnitState, message string, payload map[string]interface{}) error
 }
 
@@ -158,10 +157,10 @@ func (a *Agent) UpdateState(state client.UnitState, message string, payload map[
 
 func (a *Agent) unitAdded(ctx context.Context, unit *client.Unit) error {
 	if unit.Type() == client.UnitTypeInput {
-		_, _, cfg := unit.Expected()
-		if cfg.Type != kFleetServer {
+		exp := unit.Expected()
+		if exp.Config.Type != kFleetServer {
 			// not support input type
-			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("%s is an unsupported input type", cfg.Type), nil)
+			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("%s is an unsupported input type", exp.Config.Type), nil)
 			return nil
 		}
 		if a.inputUnit != nil {
@@ -177,10 +176,10 @@ func (a *Agent) unitAdded(ctx context.Context, unit *client.Unit) error {
 		return a.start(ctx)
 	}
 	if unit.Type() == client.UnitTypeOutput {
-		_, _, cfg := unit.Expected()
-		if cfg.Type != kElasticsearch {
+		exp := unit.Expected()
+		if exp.Config.Type != kElasticsearch {
 			// not support output type
-			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("%s is an unsupported output type", cfg.Type), nil)
+			_ = unit.UpdateState(client.UnitStateFailed, fmt.Sprintf("%s is an unsupported output type", exp.Config.Type), nil)
 			return nil
 		}
 		if a.outputUnit != nil {
@@ -199,13 +198,13 @@ func (a *Agent) unitAdded(ctx context.Context, unit *client.Unit) error {
 }
 
 func (a *Agent) unitModified(ctx context.Context, unit *client.Unit) error {
-	state, _, _ := unit.Expected()
+	exp := unit.Expected()
 	if unit.Type() == client.UnitTypeInput {
 		if a.inputUnit != unit {
 			// not our input unit; would have been marked failed in unitAdded; do nothing
 			return nil
 		}
-		if state == client.UnitStateHealthy {
+		if exp.State == client.UnitStateHealthy {
 			if a.outputUnit == nil {
 				// still no output unit; would have been marked starting already; do nothing
 				return nil
@@ -213,19 +212,19 @@ func (a *Agent) unitModified(ctx context.Context, unit *client.Unit) error {
 
 			// configuration modified (should still be running)
 			return a.reconfigure(ctx)
-		} else if state == client.UnitStateStopped {
+		} else if exp.State == client.UnitStateStopped {
 			// unit should be stopped
 			a.stop()
 			return nil
 		}
-		return fmt.Errorf("unknown unit state %v", state)
+		return fmt.Errorf("unknown unit state %v", exp.State)
 	}
 	if unit.Type() == client.UnitTypeOutput {
 		if a.outputUnit != unit {
 			// not our output unit; would have been marked failed in unitAdded; do nothing
 			return nil
 		}
-		if state == client.UnitStateHealthy {
+		if exp.State == client.UnitStateHealthy {
 			if a.inputUnit == nil {
 				// still no input unit; would have been marked starting already; do nothing
 				return nil
@@ -233,12 +232,12 @@ func (a *Agent) unitModified(ctx context.Context, unit *client.Unit) error {
 
 			// configuration modified (should still be running)
 			return a.reconfigure(ctx)
-		} else if state == client.UnitStateStopped {
+		} else if exp.State == client.UnitStateStopped {
 			// unit should be stopped
 			a.stop()
 			return nil
 		}
-		return fmt.Errorf("unknown unit state %v", state)
+		return fmt.Errorf("unknown unit state %v", exp.State)
 	}
 	return fmt.Errorf("unknown unit type %v", unit.Type())
 }
@@ -357,17 +356,17 @@ func (a *Agent) configFromUnits() (*config.Config, error) {
 		agentID = agentInfo.ID
 		agentVersion = agentInfo.Version
 	}
-	_, inputLevel, inputCfg := a.inputUnit.Expected()
-	_, outputLevel, outputCfg := a.outputUnit.Expected()
-	logLevel := inputLevel
-	if outputLevel > logLevel {
-		logLevel = outputLevel
+	expInput := a.inputUnit.Expected()
+	expOutput := a.outputUnit.Expected()
+	logLevel := expInput.LogLevel
+	if expOutput.LogLevel > logLevel {
+		logLevel = expOutput.LogLevel
 	}
 
 	// pass inputs from policy through go-ucfg in order to flatten keys
 	// if inputCfg.Source.AsMap() is passed directly, any additional server.* settings will be missed
 	var input map[string]interface{}
-	inputsConfig, err := ucfg.NewFrom(inputCfg.Source.AsMap(), config.DefaultOptions...)
+	inputsConfig, err := ucfg.NewFrom(expInput.Config.Source.AsMap(), config.DefaultOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +385,7 @@ func (a *Agent) configFromUnits() (*config.Config, error) {
 			},
 		},
 		"output": map[string]interface{}{
-			"elasticsearch": outputCfg.Source.AsMap(),
+			"elasticsearch": expOutput.Config.Source.AsMap(),
 		},
 		"inputs": []interface{}{
 			input,
