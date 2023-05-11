@@ -2,13 +2,24 @@
 
 set -euo pipefail
 
+source .buildkite/scripts/setenv.sh
+
+DOCKER_REGISTRY = 'docker.elastic.co'
+DOCKER_REGISTRY_SECRET_PATH = "kv/ci-shared/platform-ingest/docker_registry_prod"
+
 publish_docker_image() {
     echo "Pushing the docker image "$DOCKER_IMAGE:$DOCKER_IMAGE_TAG" to the ${DOCKER_REGISTRY} registry..."
-#    docker login "$DOCKER_REGISTRY"                    # we don't have docker-registry credentials
-#    docker push "$DOCKER_IMAGE:$DOCKER_IMAGE_TAG"      # we don't have docker-registry credentials
-#    docker logout "$DOCKER_REGISTRY"                   # we don't have docker-registry credentials
+    dockerLogin
+    docker push "$DOCKER_IMAGE:$DOCKER_IMAGE_TAG"
+    docker logout "$DOCKER_REGISTRY"
 }
 
+
+dockerLogin() {
+    DOCKER_USER=$(retry 5 vault kv get -field user ${DOCKER_REGISTRY_SECRET_PATH})
+    DOCKER_PASSWORD=$(retry 5 vault kv get -field password ${DOCKER_REGISTRY_SECRET_PATH})
+    docker login -u "${DOCKER_USER}" -p "${DOCKER_PASSWORD}" "${DOCKER_REGISTRY}" 2>/dev/null
+}
 
 if [ $# -lt 1 ]; then
   echo "Usage: $0 <option>. Examples: "$0 build-image" or "$0 push-image" or "$0 retag-and-push-image" "
@@ -20,11 +31,12 @@ option=$1
 case $option in
   "build-image")
     echo "Building the docker image..."
-#    if ! docker pull -q ${DOCKER_IMAGE}:${DOCKER_IMAGE_SHA_TAG} 2> /dev/null; then     # we don't have docker-registry credentials
+    dockerLogin
+    if ! docker pull -q ${DOCKER_IMAGE}:${DOCKER_IMAGE_SHA_TAG} 2> /dev/null; then
         DOCKER_IMAGE=${DOCKER_IMAGE}
         DOCKER_IMAGE_TAG=${DOCKER_IMAGE_SHA_TAG}
         make build-docker
-#    fi                                                                                 # we don't have docker-registry credentials
+    fi
     ;;
   "push-image")
         DOCKER_IMAGE_TAG=${DOCKER_IMAGE_SHA_TAG}
