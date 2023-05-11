@@ -21,6 +21,9 @@ BENCHMARK_ARGS := -count=8
 BENCHMARK_PACKAGE ?= ./...
 BENCHMARK_FILTER ?= Bench
 
+#Cloud testing env target
+CLOUD_TESTING_BASE=./dev-tools/cloud
+
 ifdef VERSION_QUALIFIER
 DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
 endif
@@ -295,6 +298,15 @@ test-int-set: ## - Run integration tests without setup
 ##################################################
 # Cloud testing targets
 ##################################################
-.PHONY: build-and-push-cloud-image
-build-and-push-cloud-image:
-	GOARCH=amd64 ./dev-tools/cloud/docker/build.sh
+.PHONY: test-cloude2e
+test-cloude2e: prepare-test-context  ## - Run cloude2e tests with full setup (slow!)
+	@make -C ${CLOUD_TESTING_BASE} cloud-deploy
+	$(eval FLEET_SERVER_URL := $(shell make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
+	-@set -o pipefail; $(MAKE) test-cloude2e-set | tee build/test-cloude2e.out
+	@make -C ${CLOUD_TESTING_BASE} cloud-clean
+
+.PHONY: test-cloude2e-set
+test-cloude2e-set: ## Run cloude2e test
+	$(eval FLEET_SERVER_URL := $(shell make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
+	make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url
+	FLEET_SERVER_URL=${FLEET_SERVER_URL} go test -v -tags=cloude2e -count=1 -race -p 1 ./testing/cloude2e
