@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-source .buildkite/scripts/setenv.sh
-
 DOCKER_REGISTRY="docker.elastic.co"
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
 
@@ -18,6 +16,34 @@ docker_login() {
     DOCKER_USER=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
     DOCKER_PASSWORD=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
     docker login -u "${DOCKER_USER}" -p "${DOCKER_PASSWORD}" "${DOCKER_REGISTRY}" 2>/dev/null
+    trap cleanup EXIT
+}
+
+cleanup() {
+    echo "Deleting credentials..."
+    DOCKER_USER=""
+    DOCKER_PASSWORD=""
+    echo "Done."
+}
+
+retry() {
+    local retries=$1
+    shift
+
+    local count=0
+    until "$@"; do
+        exit=$?
+        wait=$((2 ** count))
+        count=$((count + 1))
+        if [ $count -lt "$retries" ]; then
+            >&2 echo "Retry $count/$retries exited $exit, retrying in $wait seconds..."
+            sleep $wait
+        else
+            >&2 echo "Retry $count/$retries exited $exit, no more retries left."
+            return $exit
+        fi
+    done
+    return 0
 }
 
 if [ $# -lt 1 ]; then
@@ -56,7 +82,7 @@ case $option in
     fi
     ;;
   *)
-    echo "unexpected input: $option. Please use build-image or push-image or retag-image options."
+    echo "unexpected input: $option. Please use build-image or push-image or retag-and-push-image options."
     exit 1
     ;;
 esac
