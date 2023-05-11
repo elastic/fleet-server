@@ -22,8 +22,11 @@ locals {
   docker_image_ea = var.elastic_agent_docker_image
 }
 
+resource "random_uuid" "name" {
+}
+
 resource "ec_deployment" "deployment" {
-  name                   = "example"
+  name                   = format("fleet server PR %s", random_uuid.name.result)
   region                 = "gcp-us-west2"
   version                = local.stack_version
   deployment_template_id = "gcp-io-optimized-v2"
