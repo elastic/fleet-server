@@ -147,8 +147,8 @@ github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2 h1:tdlZCpZ/P9DhczC
 github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2/go.mod h1:SqUrOPUnsFjfmXRMNPybcSiG0BgUW2AuFH8PAnS2iTw=
 github.com/dustin/go-humanize v1.0.0 h1:VSnTsYCnlFHaM2/igO1h6X3HA71jcobQuxemgkq4zYo=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
-github.com/elastic/elastic-agent-client/v7 v7.0.3 h1:YqZPnO7Z9rlj25sFZEUaxGGK3mZR4v0uSOcfO8GRv7s=
-github.com/elastic/elastic-agent-client/v7 v7.0.3/go.mod h1:cHviLpA5fAwMbfBIHBVNl16qp90bO7pKHMAQaG+9raU=
+github.com/elastic/elastic-agent-client/v7 v7.1.1 h1:Mob9Nme43P2FGyTQqLWQOWB1d5b54quXc7FPTPyzIic=
+github.com/elastic/elastic-agent-client/v7 v7.1.1/go.mod h1:zz0T6l1XcG3kLyDrW8hY8bpI9fES9qkXI3vanY9e0d8=
 github.com/elastic/elastic-agent-libs v0.3.3 h1:iE8XhqQ0zRBLba+eu6ScZED0DYcVP/r2JvjcVoOkxic=
 github.com/elastic/elastic-agent-libs v0.3.3/go.mod h1:nRkcK96PSJfK232cJRx17n9+/MVAIOzs5ghZdzXJAMo=
 github.com/elastic/elastic-agent-system-metrics v0.4.4 h1:Br3S+TlBhijrLysOvbHscFhgQ00X/trDT5VEnOau0E0=
@@ -196,6 +196,7 @@ github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
 github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/licenseclassifier v0.0.0-20200402202327-879cb1424de0 h1:OggOMmdI0JLwg1FkOKH9S7fVHF0oEm8PX6S8kAdpOps=
+github.com/google/pprof v0.0.0-20230426061923-93006964c1fc h1:AGDHt781oIcL4EFk7cPnvBUYTwU8BEU6GDTO3ZMn1sE=
 github.com/google/uuid v1.1.2 h1:EVhdT+1Kseyi1/pUmXKaFxYsDNy9RQYkMWRH68J/W7Y=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
