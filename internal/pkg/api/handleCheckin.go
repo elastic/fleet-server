@@ -387,7 +387,7 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req C
 				zlog.Debug().Str("token", *ackToken).Msg("revision token not found")
 				err = nil
 				// should be left the ActionSeqNo if no ackToken, otherwise would be overwritten with 0 on a Fleet Server restart
-				return seqno, nil
+				return seqno, err
 			} else {
 				return seqno, fmt.Errorf("resolveSeqNo: %w", err)
 			}
