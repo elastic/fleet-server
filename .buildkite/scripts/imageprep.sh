@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-DOCKER_REGISTRY="docker.elastic.co"
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
 
 publish_docker_image() {
