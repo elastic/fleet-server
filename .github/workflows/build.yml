@@ -48,5 +48,6 @@ jobs:
             build/TEST-*
             build/*.out
             build/*.xml
+            build/pull*
             sonar-project.properties
           if-no-files-found: error
