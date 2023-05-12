@@ -55,8 +55,6 @@ steps:
           - build/*.xml
 
       - label: ":junit: Junit annotate"
-        commands:
-          - "buildkite-agent artifact download 'build/*.xml' build/"
         plugins:
           - junit-annotate#v2.4.1:
               artifacts: "build/*.xml"
