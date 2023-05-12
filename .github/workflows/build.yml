@@ -32,12 +32,14 @@ jobs:
         env:
           TEST_COVERAGE: 'true'
         run: |
-          make test-unit
+          make test-unit junit-report
 
       - uses: actions/upload-artifact@v3
         with:
           name: test-coverage
           path: |
             build/TEST-*
+            build/*.out
+            build/*.xml
             sonar-project.properties
           if-no-files-found: error
