@@ -3,11 +3,11 @@
 env:
   SETUP_GVM_VERSION: 'v0.5.0'
   DOCKER_COMPOSE_VERSION: '1.25.5'
-  DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/tempfleet-server" # needs to rename after tests
+  DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/temp-fleet-server" # needs to rename after tests
   DOCKER_IMAGE_TAG: ""
-  DOCKER_IMAGE_SHA_TAG: "temp${BUILDKITE_COMMIT}" # needs to rename after tests
-  DOCKER_IMAGE_LATEST_TAG: "templatest" # needs to rename after tests
-  DOCKER_IMAGE_GIT_TAG: "temp${BUILDKITE_BRANCH}" # needs to rename after tests
+  DOCKER_IMAGE_SHA_TAG: "${BUILDKITE_COMMIT}" # needs to rename after tests
+  DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename after tests
+  DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename after tests
   GO_AGENT_IMAGE: "golang:1.20.3"
 
 steps:
