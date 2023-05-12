@@ -105,16 +105,14 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
 
-    #   - name: Run Mage
-    #     uses: magefile/mage-action@v2
-    #     env:
-    #       TEST_COVERAGE: 'true'
-    #     with:
-    #       version: latest
-    #       args: unitTest
-
-    #   - name: SonarCloud Scan
-    #     uses: SonarSource/sonarcloud-github-action@master
-    #     env:
-    #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Run Unit tests
+        env:
+          TEST_COVERAGE: 'true'
+        run: |
+          make test-unit junit-report
+  
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

@@ -36,7 +36,6 @@ jobs:
 
       - name: Save PR information
         run: |
-          mkdir -p ./pr
           echo ${{ github.event.number }} > ./build/pull_request_number
           echo ${{ github.event.pull_request.base.ref }} > ./build/pull_request_base
           echo ${{ github.event.pull_request.head.ref }} > ./build/pull_request_branch
