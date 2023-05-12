@@ -1,0 +1,43 @@
+name: CodeCoverage Build
+on:
+  pull_request:
+jobs:
+  coverage:
+    name: CodeCoverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Go cache
+        uses: actions/cache@v3
+        with:
+          # In order:
+          # * Module download cache
+          # * Build cache (Linux)
+          path: |
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-cache-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-cache
+
+      - name: Run Unit tests
+        env:
+          TEST_COVERAGE: 'true'
+        run: |
+          make test-unit
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: test-coverage
+          path: |
+            build/TEST-*
+            sonar-project.properties
+          if-no-files-found: error
