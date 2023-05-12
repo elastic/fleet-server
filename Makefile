@@ -23,7 +23,7 @@ BENCHMARK_FILTER ?= Bench
 
 GO_TEST_FLAG = ""
 ifdef TEST_COVERAGE
-GO_TEST_FLAG = "-covermode=atomic -coverprofile=build/TEST-coverage.cov"
+GO_TEST_FLAG = -covermode=atomic -coverprofile=build/TEST-coverage.cov
 endif
 
 #Cloud testing env target
