@@ -1,6 +1,6 @@
-[![Build Status](https://fleet-ci.elastic.co/job/fleet-server/job/fleet-server-mbp/job/main/badge/icon)](https://fleet-ci.elastic.co/job/Ingest-manager/job/fleet-server/job/main/)
-
 # Fleet Server
+
+[![Build Status](https://fleet-ci.elastic.co/job/fleet-server/job/fleet-server-mbp/job/main/badge/icon)](https://fleet-ci.elastic.co/job/Ingest-manager/job/fleet-server/job/main/)  [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=elastic_fleet-server&metric=coverage)](https://sonarcloud.io/summary/new_code?id=elastic_fleet-server)
 
 Fleet server is the control server to manage a fleet of [elastic-agents](https://github.com/elastic/elastic-agent).
 
@@ -253,3 +253,22 @@ There are some additional parameters that you can use with the `benchmark` targe
 the test BenchmarkXXXX and not unit tests)
 - `BENCHMARK_COUNT`: you can define the number of iterations go test will run. Having larger number helps
 remove run-to-run variations (Default: 8)
+
+#### Testing on cloud 
+
+Elastic employees can create an Elastic Cloud deployment with a locally built Fleet Server.
+
+To deploy it you can use the following commands:
+```bash
+EC_API_KEY=yourapikey make -C dev-tools/cloud cloud-deploy
+```
+
+And then to clean the deployment
+```bash
+EC_API_KEY=yourapikey make -C dev-tools/cloud cloud-clean
+```
+
+For more advanced scenario you can build a custom docker image that you could use in your own terraform.
+```
+make -C dev-tools/cloud build-and-push-cloud-image
+```
