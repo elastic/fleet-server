@@ -217,6 +217,12 @@ make test-unit
 
 This make target will execute the go unit tests and should normally pass without an issue.
 
+To run tests in a package or a function, run like this:
+
+```
+go test -v ./internal/pkg/checkin -run TestBulkSimple
+```
+
 #### Running go benchmark tests
 
 It's a good practice before you start your changes to establish the current baseline of the benchmarks in your machine.
