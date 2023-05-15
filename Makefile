@@ -21,6 +21,11 @@ BENCHMARK_ARGS := -count=8
 BENCHMARK_PACKAGE ?= ./...
 BENCHMARK_FILTER ?= Bench
 
+GO_TEST_FLAG = ""
+ifdef TEST_COVERAGE
+GO_TEST_FLAG = -covermode=atomic -coverprofile=build/TEST-go-fleet-server-coverage.cov
+endif
+
 #Cloud testing env target
 CLOUD_TESTING_BASE=./dev-tools/cloud
 
@@ -138,7 +143,7 @@ test-release:  ## - Check that all release binaries are created
 
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
-	set -o pipefail; go test -v -race ./... | tee build/test-unit.out
+	set -o pipefail; go test ${GO_TEST_FLAG} -v -race ./... | tee build/test-unit.out
 
 .PHONY: benchmark
 benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
