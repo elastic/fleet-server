@@ -97,6 +97,8 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 		"-v", suite.coverPath+":/cover",
 		"-e", "GOCOVERDIR=/cover",
 		"-e", "FLEET_SERVER_ENABLE=1",
+		"-e", "FLEET_URL=https://fleet-server:8200",
+		"-e", "FLEET_CA=/certs/e2e-test-ca.crt",
 		"-e", "FLEET_SERVER_CERT=/certs/fleet-server.crt",
 		"-e", "FLEET_SERVER_CERT_KEY=/certs/fleet-server.key",
 		"-e", "FLEET_SERVER_CERT_KEY_PASSPHRASE=/certs/passphrase",
