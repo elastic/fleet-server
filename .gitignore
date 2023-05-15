@@ -14,6 +14,9 @@ fleet-server.dev.yml
 *.log.*
 
 dev-tools/integration/.env.bck
+dev-tools/cloud/terraform/.terraform
+dev-tools/cloud/terraform/terraform.tfstate*
+dev-tools/cloud/terraform/*.tfvars*
 
 # editor swap files
 *.swp

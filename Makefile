@@ -21,6 +21,14 @@ BENCHMARK_ARGS := -count=8
 BENCHMARK_PACKAGE ?= ./...
 BENCHMARK_FILTER ?= Bench
 
+GO_TEST_FLAG = ""
+ifdef TEST_COVERAGE
+GO_TEST_FLAG = -covermode=atomic -coverprofile=build/TEST-go-fleet-server-coverage.cov
+endif
+
+#Cloud testing env target
+CLOUD_TESTING_BASE=./dev-tools/cloud
+
 ifdef VERSION_QUALIFIER
 DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
 endif
@@ -150,7 +158,7 @@ test-release:  ## - Check that all release binaries are created
 
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
-	set -o pipefail; go test -v -race ./... | tee build/test-unit.out
+	set -o pipefail; go test ${GO_TEST_FLAG} -v -race ./... | tee build/test-unit.out
 
 .PHONY: benchmark
 benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
@@ -351,6 +359,15 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 ##################################################
 # Cloud testing targets
 ##################################################
-.PHONY: build-and-push-cloud-image
-build-and-push-cloud-image:
-	GOARCH=amd64 ./dev-tools/cloud/docker/build.sh
+.PHONY: test-cloude2e
+test-cloude2e: prepare-test-context  ## - Run cloude2e tests with full setup (slow!)
+	@make -C ${CLOUD_TESTING_BASE} cloud-deploy
+	$(eval FLEET_SERVER_URL := $(shell make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
+	-@set -o pipefail; $(MAKE) test-cloude2e-set | tee build/test-cloude2e.out
+	@make -C ${CLOUD_TESTING_BASE} cloud-clean
+
+.PHONY: test-cloude2e-set
+test-cloude2e-set: ## Run cloude2e test
+	$(eval FLEET_SERVER_URL := $(shell make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
+	make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url
+	FLEET_SERVER_URL=${FLEET_SERVER_URL} go test -v -tags=cloude2e -count=1 -race -p 1 ./testing/cloude2e
