@@ -135,6 +135,25 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 	return resp.Body
 }
 
+func copyPath(src, dst string) error {
+	srcF, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcF.Close()
+	dstF, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstF.Close()
+	err = dstF.Chmod(0755)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(dstF, srcF)
+	return err
+}
+
 // extractZip treats the passed Reader as a zip stream and unarchives it to a temp dir
 // fleet-server binary in archive is replaced by a locally compiled version
 // FIXME this method might be broken as it hasn't been tested.
@@ -154,7 +173,7 @@ func (suite *AgentInstallSuite) extractZip(r io.Reader) {
 		} else {
 			dst, err := os.Create(filepath.Join(suite.downloadPath, file.Name))
 			suite.Require().NoError(err)
-			err = dst.Chmod(file.FileInfo().Mode())
+			err = dst.Chmod(0755)
 			suite.Require().NoError(err)
 			src, err := file.Open()
 			suite.Require().NoError(err)
@@ -173,7 +192,7 @@ func (suite *AgentInstallSuite) extractZip(r io.Reader) {
 	suite.Require().NotEmpty(fleetPath, "no fleet-server component detected")
 	err = os.Remove(fleetPath)
 	suite.Require().NoError(err)
-	err = os.Link(suite.binaryPath, fleetPath)
+	err = copyPath(suite.binaryPath, fleetPath)
 	suite.Require().NoError(err)
 }
 
@@ -218,7 +237,7 @@ func (suite *AgentInstallSuite) extractTar(r io.Reader) {
 		} else if err != nil {
 			suite.Require().Failf("unable to create file", "filename: %s, error: %v", header.Name, err)
 		}
-		err = dst.Chmod(header.FileInfo().Mode())
+		err = dst.Chmod(0755)
 		suite.Require().NoError(err)
 		_, err = io.Copy(dst, tarReader)
 		dst.Close() // might be a dirty close
@@ -231,9 +250,10 @@ func (suite *AgentInstallSuite) extractTar(r io.Reader) {
 		// note if elastic-agent has been extracted as a regular file
 		if strings.HasSuffix(header.Name, agentName) {
 			suite.agentPath = filepath.Join(suite.downloadPath, header.Name)
+			agentSrc = filepath.Join(suite.downloadPath, header.Name)
 		}
 		// note the source of the elastic-agent if it has been detected as a symlink
-		if strings.HasSuffix(header.Name, agentLink) {
+		if agentLink != "" && strings.HasSuffix(header.Name, agentLink) {
 			agentSrc = filepath.Join(suite.downloadPath, header.Name)
 		}
 	}
@@ -241,7 +261,7 @@ func (suite *AgentInstallSuite) extractTar(r io.Reader) {
 	suite.Require().NotEmpty(fleetPath, "no fleet-server component detected")
 	err = os.Remove(fleetPath)
 	suite.Require().NoError(err)
-	err = os.Link(suite.binaryPath, fleetPath)
+	err = copyPath(suite.binaryPath, fleetPath)
 	suite.Require().NoError(err)
 
 	// link elastic-agent to the actual binary
@@ -258,6 +278,12 @@ func (suite *AgentInstallSuite) TearDownSuite() {
 	if suite.downloadPath != "" {
 		err := os.RemoveAll(suite.downloadPath)
 		suite.Require().NoErrorf(err, "failed to remove download from %s", suite.downloadPath)
+
+		// FIXME work around for needing to run sudo elastic-agent install
+		err = exec.Command("sudo", "rm", "-rf", suite.downloadPath).Run()
+		if err != nil {
+			suite.T().Logf("unable to remove %q: %v", suite.downloadPath, err)
+		}
 	}
 }
 
@@ -279,7 +305,7 @@ func (suite *AgentInstallSuite) TearDownTest() {
 		suite.T().Logf("unable to detect elastic-agent install on test tear-down: %s", err)
 		return
 	}
-	err = exec.Command(path, "uninstall", "--force").Run()
+	err = exec.Command("sudo", path, "uninstall", "--force").Run()
 	suite.Require().NoError(err, "elastic-agent uninstall failed.")
 }
 
@@ -287,8 +313,8 @@ func (suite *AgentInstallSuite) TestHTTP() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, suite.agentPath, "install",
-		"--fleet-server-es="+suite.esHosts,
+	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
+		"--fleet-server-es=http://"+suite.esHosts,
 		"--fleet-server-service-token="+suite.serviceToken,
 		"--fleet-server-insecure-http=true",
 		"--fleet-server-host=0.0.0.0",
@@ -311,10 +337,10 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, suite.agentPath, "install",
+	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
 		"--url=https://localhost:8200",
 		"--certificate-authorities="+filepath.Join(suite.certPath, "e2e-test-ca.crt"),
-		"--fleet-server-es="+suite.esHosts,
+		"--fleet-server-es=http://"+suite.esHosts,
 		"--fleet-server-service-token-path="+filepath.Join(dir, "service-token"),
 		"--fleet-server-policy=fleet-server-policy",
 		"--fleet-server-cert="+filepath.Join(suite.certPath, "fleet-server.crt"),

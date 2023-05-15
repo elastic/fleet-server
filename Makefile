@@ -278,7 +278,7 @@ export $(shell sed 's/=.*//' ./dev-tools/integration/.env)
 # Start ES with docker without waiting
 .PHONY: int-docker-start-async
 int-docker-start-async:
-	@docker-compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans elasticsearch
+	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans elasticsearch
 
 # Wait for ES to be ready
 .PHONY: int-docker-wait
@@ -294,7 +294,7 @@ int-docker-start: ## - Start docker envronment for integration tests and wait un
 # Stop integration docker setup
 .PHONY: int-docker-stop
 int-docker-stop: ## - Stop docker environment for integration tests
-	@docker-compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env down
+	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env down
 	@rm -f .service_token
 
 # Run integration tests with starting/stopping docker
@@ -333,12 +333,12 @@ e2e-certs: ## - Use openssl to create a CA, encrypted private key, and signed fl
 
 .PHONY: e2e-docker-start
 e2e-docker-start: int-docker-start ## - Start a testing instance of Elasticsearch and Kibana in docker containers
-	@KIBANA_TOKEN=$(shell ./dev-tools/e2e/get-kibana-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans kibana
+	@KIBANA_TOKEN=$(shell ./dev-tools/e2e/get-kibana-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) docker compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans kibana
 	@./dev-tools/e2e/wait-for-kibana.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:5601
 
 .PHONY: e2e-docker-stop
 e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
-	@KIBANA_TOKEN="supress-warning" docker-compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env down
+	@KIBANA_TOKEN="supress-warning" docker compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env down
 	rm -f .kibana_service_token
 	@$(MAKE) int-docker-stop
 
@@ -354,6 +354,7 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
+	CGO_ENABLED=1 \
 	go test -v -tags=e2e -count=1 -race -p 1 ./testing/...
 
 ##################################################
