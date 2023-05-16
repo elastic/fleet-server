@@ -41,21 +41,14 @@ func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) b
 		}
 		tb.Log("Operation match! validating details...")
 
-		type AgentObj struct {
-			Version string `json:"version"`
-		}
-
 		// Decode and match operation
 		// NOTE putting the extra validation here seems strange, maybe we should read the args in the test body intstead?
 		type updateT struct {
-			LastCheckin      string          `json:"last_checkin"`
-			Status           string          `json:"last_checkin_status"`
-			UpdatedAt        string          `json:"updated_at"`
-			Meta             json.RawMessage `json:"local_metadata"`
-			SeqNo            sqn.SeqNo       `json:"action_seq_no"`
-			Agent            json.RawMessage `json:"agent"`
-			UpgradeStartedAt string          `json:"upgrade_started_at"`
-			UpgradedAt       string          `json:"upgraded_at"`
+			LastCheckin string          `json:"last_checkin"`
+			Status      string          `json:"last_checkin_status"`
+			UpdatedAt   string          `json:"updated_at"`
+			Meta        json.RawMessage `json:"local_metadata"`
+			SeqNo       sqn.SeqNo       `json:"action_seq_no"`
 		}
 
 		m := make(map[string]updateT)
@@ -83,19 +76,6 @@ func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) b
 			tb.Error("status mismatch")
 		}
 
-		if c.ver != "" {
-			var agentObj AgentObj
-			if err := json.Unmarshal(sub.Agent, &agentObj); err != nil {
-				tb.Fatalf("unable to validate operation: %v", err)
-			}
-			if c.ver != agentObj.Version {
-				tb.Error("version mismatch")
-			}
-			if sub.UpgradeStartedAt != "" {
-				tb.Error("expected UpgradeStartedAt to be cleared on version update")
-			}
-			validateTimestamp(tb, ts.Truncate(time.Second), sub.UpgradedAt)
-		}
 		return true
 	}
 }

@@ -209,11 +209,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 				fields[dl.FieldAgent] = map[string]interface{}{
 					dl.FieldAgentVersion: pendingData.extra.ver,
 				}
-				// Duplicates the writes done when an upgrade is ack'd by the agent.
-				// This helps eliminate the case where the agent is stuck in upgrading after it's already upgraded if the ack
-				// is never received.
-				fields[dl.FieldUpgradeStartedAt] = nil
-				fields[dl.FieldUpgradedAt] = nowTimestamp
 			}
 
 			// Update local metadata if provided
