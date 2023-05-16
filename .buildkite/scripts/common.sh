@@ -56,8 +56,8 @@ publish_docker_image() {
 }
 
 docker_login() {
-    DOCKER_USER=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
-    DOCKER_USER_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
+#    DOCKER_USER=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
+#    DOCKER_USER_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
     docker login -u "${DOCKER_USER}" -p "${DOCKER_USER_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
 }
 

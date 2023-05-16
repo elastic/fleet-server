@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -euo pipefail
+
+source .buildkite/scripts/common.sh
+
+DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "publish" ]]; then
+  export DOCKER_USER=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
+  export DOCKER_USER_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
+fi
