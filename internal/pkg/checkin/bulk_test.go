@@ -101,15 +101,14 @@ func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) b
 }
 
 type bulkcase struct {
-	desc               string
-	id                 string
-	status             string
-	message            string
-	meta               []byte
-	components         []byte
-	seqno              sqn.SeqNo
-	ver                string
-	upgrade_started_at string
+	desc       string
+	id         string
+	status     string
+	message    string
+	meta       []byte
+	components []byte
+	seqno      sqn.SeqNo
+	ver        string
 }
 
 func TestBulkSimple(t *testing.T) {
@@ -126,7 +125,6 @@ func TestBulkSimple(t *testing.T) {
 			nil,
 			nil,
 			"",
-			"",
 		},
 		{
 			"Singled field case",
@@ -136,7 +134,6 @@ func TestBulkSimple(t *testing.T) {
 			[]byte(`{"hey":"now"}`),
 			[]byte(`[{"id":"winlog-default"}]`),
 			nil,
-			"",
 			"",
 		},
 		{
@@ -148,7 +145,6 @@ func TestBulkSimple(t *testing.T) {
 			[]byte(`[{"id":"winlog-default","type":"winlog"}]`),
 			nil,
 			ver,
-			"started_at",
 		},
 		{
 			"Multi field nested case",
@@ -158,7 +154,6 @@ func TestBulkSimple(t *testing.T) {
 			[]byte(`{"hey":"now","wee":{"little":"doggie"}}`),
 			[]byte(`[{"id":"winlog-default","type":"winlog"}]`),
 			nil,
-			"",
 			"",
 		},
 		{
@@ -170,7 +165,6 @@ func TestBulkSimple(t *testing.T) {
 			nil,
 			sqn.SeqNo{1, 2, 3, 4},
 			ver,
-			"started_at",
 		},
 		{
 			"Field case with seqNo",
@@ -181,7 +175,6 @@ func TestBulkSimple(t *testing.T) {
 			[]byte(`[{"id":"log-default"}]`),
 			sqn.SeqNo{5, 6, 7, 8},
 			ver,
-			"started_at",
 		},
 		{
 			"Unusual status",
@@ -192,7 +185,6 @@ func TestBulkSimple(t *testing.T) {
 			nil,
 			nil,
 			"",
-			"",
 		},
 		{
 			"Empty status",
@@ -202,7 +194,6 @@ func TestBulkSimple(t *testing.T) {
 			nil,
 			nil,
 			nil,
-			"",
 			"",
 		},
 	}
