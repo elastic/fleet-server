@@ -32,11 +32,7 @@ type apiServer struct {
 // ensure api implements the ServerInterface
 var _ ServerInterface = (*apiServer)(nil)
 
-func (a *apiServer) AgentEnroll(w http.ResponseWriter, r *http.Request, id string, params AgentEnrollParams) {
-	if id != kEnrollMod {
-		http.Error(w, "", http.StatusNotFound)
-		return
-	}
+func (a *apiServer) AgentEnroll(w http.ResponseWriter, r *http.Request, params AgentEnrollParams) {
 	zlog := hlog.FromRequest(r).With().Str("mod", kEnrollMod).Logger()
 
 	// Error in the scope for deferred rolback function check
