@@ -66,17 +66,3 @@ steps:
           - step: "int-test"
             allow_failure: true
     depends_on: "check"
-
-  - group: "Publish docker image"
-    key: "publish"
-    steps:
-      - label: "Build docker image"
-        commands:
-          - ".buildkite/scripts/imageprep.sh build-image"
-          - ".buildkite/scripts/imageprep.sh push-image"
-          - ".buildkite/scripts/imageprep.sh retag-and-push-image"
-        agents:
-          provider: "gcp"
-    depends_on:
-      - step: "tests"
-        allow_failure: true

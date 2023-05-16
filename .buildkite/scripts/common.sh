@@ -48,21 +48,3 @@ retry() {
     done
     return 0
 }
-
-publish_docker_image() {
-    echo "Pushing the docker image "$DOCKER_IMAGE":"$DOCKER_IMAGE_TAG" to the "${DOCKER_REGISTRY}" registry..."
-    docker_login
-    docker push "${DOCKER_IMAGE}":"${DOCKER_IMAGE_TAG}"
-}
-
-docker_login() {
-#    DOCKER_USER=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
-#    DOCKER_USER_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
-    docker login -u "${DOCKER_USER}" -p "${DOCKER_USER_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
-}
-
-docker_logout() {
-    echo "Logging out from Docker..."
-    docker logout ${DOCKER_REGISTRY}
-    echo "Done."
-}
