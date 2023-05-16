@@ -7,7 +7,7 @@ source .buildkite/scripts/common.sh
 trap docker_logout EXIT
 
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
-MESSAGE="Usage: $0 <option>. Examples: "$0 build-image" or "$0 push-image" or "$0 retag-and-push-image" "
+MESSAGE="Usage: $0 <option>. Examples: '$0 build-image' or '$0 push-image' or '$0 retag-and-push-image' "
 
 if [ $# -lt 1 ]; then
   echo "${MESSAGE}"
