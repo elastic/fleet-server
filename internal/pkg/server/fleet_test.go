@@ -113,3 +113,45 @@ func Test_configChangedServer(t *testing.T) {
 		})
 	}
 }
+
+func Test_initTracer(t *testing.T) {
+	testcases := []struct {
+		name                 string
+		apmActiveEnvVariable string
+		expectTracer         bool
+		cfg                  config.Instrumentation
+	}{{
+		name:                 "enabled with env variable",
+		apmActiveEnvVariable: "true",
+		expectTracer:         true,
+		cfg:                  config.Instrumentation{},
+	}, {
+		name:                 "enabled with config",
+		apmActiveEnvVariable: "",
+		expectTracer:         true,
+		cfg: config.Instrumentation{
+			Enabled: true,
+		},
+	}, {
+		name:                 "not enabled",
+		apmActiveEnvVariable: "",
+		expectTracer:         false,
+		cfg:                  config.Instrumentation{},
+	}}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := Fleet{}
+			t.Setenv("ELASTIC_APM_ACTIVE", tc.apmActiveEnvVariable)
+			tarcer, err := f.initTracer(tc.cfg)
+			assert.Nil(t, err)
+
+			if tc.expectTracer {
+				assert.NotNil(t, tarcer)
+			} else {
+				assert.Nil(t, tarcer)
+			}
+
+		})
+	}
+}

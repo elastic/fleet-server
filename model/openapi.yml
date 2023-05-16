@@ -91,11 +91,13 @@ components:
         - local
         - tags
       properties:
-        user_provided: # FIXME should we deprecate this attribute?
+        user_provided:
+          deprecated: true
           description: |
             An embedded JSON object that holds user-provided meta-data values.
             Defined in fleet-server as a `json.RawMessage`.
             fleet-server does not use these values on enrollment of an agent.
+
             Defined in the elastic-agent as a `map[string]interface{}` with no way to specify any values.
           type: string
           format: application/json
@@ -128,18 +130,19 @@ components:
         type:
           description: |
             The enrollment type of the agent.
-            The agent only supports the PERMANENT value
+            The agent only supports the PERMANENT value.
+            In the future the enrollment type may be used to indicate agents that use fleet for reporting and monitoring, but do not use policies.
           type: string
-          enum: # FIXME what are the others for? Should this attribute be deprecated?
-            - EPHEMERAL
+          enum:
             - PERMANENT
-            - TEMPORARY
-        shared_id: # FIXME Should this attribute be deprecated?
+        shared_id:
+          deprecated: true
           type: string
           description: |
             The shared ID of the agent.
             To support pre-existing installs.
-            NOT YET IMPLEMENTED.
+
+            Never implemented.
         metadata:
           $ref: '#/components/schemas/enrollMetadata'
     enrollResponseItem:
@@ -162,31 +165,52 @@ components:
         id:
           description: The agent ID
           type: string
-        active: # FIXME We don't support enrolling in the inactive state, i don't know if that's on the roadmap. Is this attribute needed?
-          description: If the agent is active in fleet. Will be set to true upon enrollment.
+        active:
+          deprecated: true
+          description: |
+            If the agent is active in fleet.
+            Set to true upon enrollment.
+
+            Handling of other values never implemented.
           type: boolean
         policy_id:
           description: The policy ID that the agent is enrolled with. Decoded from the API key used in the request.
           type: string
-        type: # FIXME is this needed?
-          description: The enrollment request type.
+        type:
+          deprecated: true
+          description: |
+            The enrollment request type.
+
+            Handling of other values never implemented.
           type: string
         enrolled_at:
           description: The RFC3339 timestamp that the agent was enrolled at.
           type: string
           #format: date-time
-        user_provided_metadata: # FIXME still needed?
-          description: A copy of the user provided metadata from the enrollment request. Currently will be empty.
+        user_provided_metadata:
+          deprecated: true
+          description: |
+            A copy of the user provided metadata from the enrollment request.
+
+            Currently will be empty.
           type: string
           format: application/json
           x-go-type: json.RawMessage
         local_metadata:
-          description: A copy of the (updated) local metadata provided in the enrollment request.
+          deprecated: true
+          description: |
+            A copy of the (updated) local metadata provided in the enrollment request.
+
+            Never used by agent.
           type: string
           format: application/json
           x-go-type: json.RawMessage
-        actions: # FIXME deprecate?
-          description: Defined in fleet-server and elastic-agent as `[]interface{}` but never used.
+        actions:
+          deprecated: true
+          description: |
+            Defined in fleet-server and elastic-agent as `[]interface{}`.
+
+            Never used by agent.
           type: array
           items:
             type: object
@@ -197,8 +221,13 @@ components:
           description: The ApiKey token that fleet-server has generated for the enrolling agent.
           type: string
           format: password
-        status: # FIXME Does this have any value? The UI does other calculations to infer status.
-          description: Agent status from fleet-server. fleet-ui may differ.
+        status:
+          deprecated: true
+          description: |
+            Agent status from fleet-server.
+            fleet-ui may differ.
+
+            Never used by agent.
           type: string
         tags:
           description: A copy of the tags that were sent with the enrollment request.
@@ -230,6 +259,7 @@ components:
             - online
             - error
             - degraded
+            - starting
         message:
           description: State message, may be overridden or use the error message of a failing component.
           type: string
@@ -352,7 +382,7 @@ components:
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
-        input_type: # FIXME not sure why input_type and timeout are not part of data; do we have an explanation?
+        input_type:
           description: The input type of the action for actions with type `INPUT_ACTION`.
           type: string
           x-go-custom-tag: yaml:"input_type" # openapi-generator
@@ -400,16 +430,30 @@ components:
         - started_at
         - completed_at
       properties:
-        type: # FIXME: Deprecate?
-          description: The event type of the ack. Not used by fleet-server. Currently the elastic-agent will only generate ACTION_RESULT events.
+        type:
+          deprecated: true
+          description: |
+            The event type of the ack.
+            Currently the elastic-agent will only generate ACTION_RESULT events.
+
+            Not used by fleet-server.
+            Actions that have errored should use the error attribute to communicate an error status.
+            Additional action status information can be provided in the data attribute.
           type: string
           enum:
             - STATE
             - ERROR
             - ACTION_RESULT
             - ACTION
-        subtype: # FIXME: Deprecate?
-          description: The subtype of the ack event. Not used by fleet-server. Currently the elastic-agent will only generate ACKNOWLEDGED events.
+        subtype:
+          deprecated: true
+          description: |
+            The subtype of the ack event.
+            The elastic-agent will only generate ACKNOWLEDGED events.
+
+            Not used by fleet-server.
+            Actions that have errored should use the error attribute to communicate an error status.
+            Additional action status information can be provided in the data attribute.
           type: string
           enum:
             - RUNNING
@@ -428,13 +472,15 @@ components:
         action_id:
           description: The action ID.
           type: string
-        action_input_type: # FIXME fleet-server will list this in ES, but I'm not sure if it's needed.
+        action_input_type:
           description: The input_type of the action for input actions.
           type: string
-        policy_id: # FIXME: Deprecate?
+        policy_id:
+          deprecated: true
           description: Not used by the fleet-server.
           type: string
-        stream_id: # FIXME Deprecate?
+        stream_id:
+          deprecated: true
           description: Not used by the fleet-server.
           type: string
         timestamp:
@@ -444,7 +490,8 @@ components:
         message:
           description: An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
           type: string
-        payload: # FIXME Deprecate and use data instead?
+        payload:
+          deprecated: true
           description: |
             An embedded JSON object that contains additional information for the fleet-server to process.
             Defined as a json.RawMessage in both the fleet-server and the elastic-agent.
@@ -452,6 +499,8 @@ components:
             Is currently used by UPGRADE actions to signal retries.
             If the error attribute is non empty payload is checked for `retry: bool` and `retry_attempt: int`.
             If retry is true, fleet-serve will mark the agent as retrying, if it's false the upgrade will be marked as failed.
+
+            Additional action status information can be provided in the data attribute.
           type: string
           format: application/json
           x-go-type: json.RawMessage
@@ -810,23 +859,10 @@ paths:
                       number: 8.6.0
                       build_hash: fd6d862bcbebe841f930e8cdd2fa5107922e66e7
                       build_time: 2022-12-01T01:02:03Z
-  /api/fleet/agents/{id}:
-    # FIXME: The fleet-server route has the enroll endpoint created with an id parameter.
-    # However the id is expected to be "enroll" by fleet-server's implementation.
-    # Should this route be changed to reflect that?
+  /api/fleet/agents/enroll:
     post:
       operationId: agentEnroll
       parameters:
-        - name: id
-          in: path
-          description: The id of the enrollment action. Expected to be "enroll".
-          required: true
-          schema:
-            type: string
-          examples:
-            enroll:
-              description: The only accepted value
-              value: enroll
         - $ref: '#/components/parameters/userAgent'
         - $ref: '#/components/parameters/requestId'
       security:
@@ -1068,10 +1104,10 @@ paths:
         '200':
           description: The artifact retrieved from ES.
           content:
-            application/octet-stream: # FIXME: Not sure if this is octet-stream, json (as it's encoded), or just text
+            "*/*":
               schema:
                 type: string
-                format: base64
+                format: binary
         '400':
           $ref: '#/components/responses/badRequest'
         '401':

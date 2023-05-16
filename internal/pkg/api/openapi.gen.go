@@ -27,13 +27,12 @@ const (
 	CheckinRequestStatusDegraded CheckinRequestStatus = "degraded"
 	CheckinRequestStatusError    CheckinRequestStatus = "error"
 	CheckinRequestStatusOnline   CheckinRequestStatus = "online"
+	CheckinRequestStatusStarting CheckinRequestStatus = "starting"
 )
 
 // Defines values for EnrollRequestType.
 const (
-	EPHEMERAL EnrollRequestType = "EPHEMERAL"
 	PERMANENT EnrollRequestType = "PERMANENT"
-	TEMPORARY EnrollRequestType = "TEMPORARY"
 )
 
 // Defines values for EventSubtype.
@@ -214,6 +213,7 @@ type EnrollMetadata struct {
 	// UserProvided An embedded JSON object that holds user-provided meta-data values.
 	// Defined in fleet-server as a `json.RawMessage`.
 	// fleet-server does not use these values on enrollment of an agent.
+	//
 	// Defined in the elastic-agent as a `map[string]interface{}` with no way to specify any values.
 	UserProvided json.RawMessage `json:"user_provided"`
 }
@@ -225,16 +225,19 @@ type EnrollRequest struct {
 
 	// SharedId The shared ID of the agent.
 	// To support pre-existing installs.
-	// NOT YET IMPLEMENTED.
+	//
+	// Never implemented.
 	SharedId string `json:"shared_id"`
 
 	// Type The enrollment type of the agent.
-	// The agent only supports the PERMANENT value
+	// The agent only supports the PERMANENT value.
+	// In the future the enrollment type may be used to indicate agents that use fleet for reporting and monitoring, but do not use policies.
 	Type EnrollRequestType `json:"type"`
 }
 
 // EnrollRequestType The enrollment type of the agent.
-// The agent only supports the PERMANENT value
+// The agent only supports the PERMANENT value.
+// In the future the enrollment type may be used to indicate agents that use fleet for reporting and monitoring, but do not use policies.
 type EnrollRequestType string
 
 // EnrollResponse The enrollment action response.
@@ -254,10 +257,15 @@ type EnrollResponseItem struct {
 	// AccessApiKeyId The id of the ApiKey that fleet-server has generated for the enrolling agent.
 	AccessApiKeyId string `json:"access_api_key_id"`
 
-	// Actions Defined in fleet-server and elastic-agent as `[]interface{}` but never used.
+	// Actions Defined in fleet-server and elastic-agent as `[]interface{}`.
+	//
+	// Never used by agent.
 	Actions []map[string]interface{} `json:"actions"`
 
-	// Active If the agent is active in fleet. Will be set to true upon enrollment.
+	// Active If the agent is active in fleet.
+	// Set to true upon enrollment.
+	//
+	// Handling of other values never implemented.
 	Active bool `json:"active"`
 
 	// EnrolledAt The RFC3339 timestamp that the agent was enrolled at.
@@ -267,21 +275,30 @@ type EnrollResponseItem struct {
 	Id string `json:"id"`
 
 	// LocalMetadata A copy of the (updated) local metadata provided in the enrollment request.
+	//
+	// Never used by agent.
 	LocalMetadata json.RawMessage `json:"local_metadata"`
 
 	// PolicyId The policy ID that the agent is enrolled with. Decoded from the API key used in the request.
 	PolicyId string `json:"policy_id"`
 
-	// Status Agent status from fleet-server. fleet-ui may differ.
+	// Status Agent status from fleet-server.
+	// fleet-ui may differ.
+	//
+	// Never used by agent.
 	Status string `json:"status"`
 
 	// Tags A copy of the tags that were sent with the enrollment request.
 	Tags []string `json:"tags"`
 
 	// Type The enrollment request type.
+	//
+	// Handling of other values never implemented.
 	Type string `json:"type"`
 
-	// UserProvidedMetadata A copy of the user provided metadata from the enrollment request. Currently will be empty.
+	// UserProvidedMetadata A copy of the user provided metadata from the enrollment request.
+	//
+	// Currently will be empty.
 	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata"`
 }
 
@@ -337,6 +354,8 @@ type Event struct {
 	// Is currently used by UPGRADE actions to signal retries.
 	// If the error attribute is non empty payload is checked for `retry: bool` and `retry_attempt: int`.
 	// If retry is true, fleet-serve will mark the agent as retrying, if it's false the upgrade will be marked as failed.
+	//
+	// Additional action status information can be provided in the data attribute.
 	Payload *json.RawMessage `json:"payload,omitempty"`
 
 	// PolicyId Not used by the fleet-server.
@@ -348,20 +367,40 @@ type Event struct {
 	// StreamId Not used by the fleet-server.
 	StreamId string `json:"stream_id"`
 
-	// Subtype The subtype of the ack event. Not used by fleet-server. Currently the elastic-agent will only generate ACKNOWLEDGED events.
+	// Subtype The subtype of the ack event.
+	// The elastic-agent will only generate ACKNOWLEDGED events.
+	//
+	// Not used by fleet-server.
+	// Actions that have errored should use the error attribute to communicate an error status.
+	// Additional action status information can be provided in the data attribute.
 	Subtype EventSubtype `json:"subtype"`
 
 	// Timestamp The timestamp of the acknowledgement event. Has the format of "2006-01-02T15:04:05.99999-07:00"
 	Timestamp string `json:"timestamp"`
 
-	// Type The event type of the ack. Not used by fleet-server. Currently the elastic-agent will only generate ACTION_RESULT events.
+	// Type The event type of the ack.
+	// Currently the elastic-agent will only generate ACTION_RESULT events.
+	//
+	// Not used by fleet-server.
+	// Actions that have errored should use the error attribute to communicate an error status.
+	// Additional action status information can be provided in the data attribute.
 	Type EventType `json:"type"`
 }
 
-// EventSubtype The subtype of the ack event. Not used by fleet-server. Currently the elastic-agent will only generate ACKNOWLEDGED events.
+// EventSubtype The subtype of the ack event.
+// The elastic-agent will only generate ACKNOWLEDGED events.
+//
+// Not used by fleet-server.
+// Actions that have errored should use the error attribute to communicate an error status.
+// Additional action status information can be provided in the data attribute.
 type EventSubtype string
 
-// EventType The event type of the ack. Not used by fleet-server. Currently the elastic-agent will only generate ACTION_RESULT events.
+// EventType The event type of the ack.
+// Currently the elastic-agent will only generate ACTION_RESULT events.
+//
+// Not used by fleet-server.
+// Actions that have errored should use the error attribute to communicate an error status.
+// Additional action status information can be provided in the data attribute.
 type EventType string
 
 // StatusResponse Status response information.
@@ -788,8 +827,8 @@ func (a UploadBeginRequest_File) MarshalJSON() ([]byte, error) {
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (POST /api/fleet/agents/{id})
-	AgentEnroll(w http.ResponseWriter, r *http.Request, id string, params AgentEnrollParams)
+	// (POST /api/fleet/agents/enroll)
+	AgentEnroll(w http.ResponseWriter, r *http.Request, params AgentEnrollParams)
 
 	// (POST /api/fleet/agents/{id}/acks)
 	AgentAcks(w http.ResponseWriter, r *http.Request, id string, params AgentAcksParams)
@@ -827,15 +866,6 @@ func (siw *ServerInterfaceWrapper) AgentEnroll(w http.ResponseWriter, r *http.Re
 	ctx := r.Context()
 
 	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameterWithLocation("simple", false, "id", runtime.ParamLocationPath, chi.URLParam(r, "id"), &id)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
 
 	ctx = context.WithValue(ctx, ApiKeyScopes, []string{""})
 
@@ -887,7 +917,7 @@ func (siw *ServerInterfaceWrapper) AgentEnroll(w http.ResponseWriter, r *http.Re
 	}
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AgentEnroll(w, r, id, params)
+		siw.Handler.AgentEnroll(w, r, params)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1440,7 +1470,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/fleet/agents/{id}", wrapper.AgentEnroll)
+		r.Post(options.BaseURL+"/api/fleet/agents/enroll", wrapper.AgentEnroll)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/fleet/agents/{id}/acks", wrapper.AgentAcks)
