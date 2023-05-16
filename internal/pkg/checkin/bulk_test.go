@@ -41,14 +41,21 @@ func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) b
 		}
 		tb.Log("Operation match! validating details...")
 
+		type AgentObj struct {
+			Version string `json:"version"`
+		}
+
 		// Decode and match operation
 		// NOTE putting the extra validation here seems strange, maybe we should read the args in the test body intstead?
 		type updateT struct {
-			LastCheckin string          `json:"last_checkin"`
-			Status      string          `json:"last_checkin_status"`
-			UpdatedAt   string          `json:"updated_at"`
-			Meta        json.RawMessage `json:"local_metadata"`
-			SeqNo       sqn.SeqNo       `json:"action_seq_no"`
+			LastCheckin      string          `json:"last_checkin"`
+			Status           string          `json:"last_checkin_status"`
+			UpdatedAt        string          `json:"updated_at"`
+			Meta             json.RawMessage `json:"local_metadata"`
+			SeqNo            sqn.SeqNo       `json:"action_seq_no"`
+			Agent            json.RawMessage `json:"agent"`
+			UpgradeStartedAt string          `json:"upgrade_started_at"`
+			UpgradedAt       string          `json:"upgraded_at"`
 		}
 
 		m := make(map[string]updateT)
@@ -75,25 +82,40 @@ func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) b
 		if c.status != sub.Status {
 			tb.Error("status mismatch")
 		}
+
+		if c.ver != "" {
+			var agentObj AgentObj
+			if err := json.Unmarshal(sub.Agent, &agentObj); err != nil {
+				tb.Fatalf("unable to validate operation: %v", err)
+			}
+			if c.ver != agentObj.Version {
+				tb.Error("version mismatch")
+			}
+			if sub.UpgradeStartedAt != "" {
+				tb.Error("expected UpgradeStartedAt to be cleared on version update")
+			}
+			validateTimestamp(tb, ts.Truncate(time.Second), sub.UpgradedAt)
+		}
 		return true
 	}
 }
 
 type bulkcase struct {
-	desc       string
-	id         string
-	status     string
-	message    string
-	meta       []byte
-	components []byte
-	seqno      sqn.SeqNo
-	ver        string
+	desc               string
+	id                 string
+	status             string
+	message            string
+	meta               []byte
+	components         []byte
+	seqno              sqn.SeqNo
+	ver                string
+	upgrade_started_at string
 }
 
 func TestBulkSimple(t *testing.T) {
 	start := time.Now()
 
-	const ver = "8.0.0"
+	const ver = "8.9.0"
 	cases := []bulkcase{
 		{
 			"Simple case",
@@ -103,6 +125,7 @@ func TestBulkSimple(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			"",
 			"",
 		},
 		{
@@ -114,6 +137,7 @@ func TestBulkSimple(t *testing.T) {
 			[]byte(`[{"id":"winlog-default"}]`),
 			nil,
 			"",
+			"",
 		},
 		{
 			"Multi field case",
@@ -124,6 +148,7 @@ func TestBulkSimple(t *testing.T) {
 			[]byte(`[{"id":"winlog-default","type":"winlog"}]`),
 			nil,
 			ver,
+			"started_at",
 		},
 		{
 			"Multi field nested case",
@@ -133,6 +158,7 @@ func TestBulkSimple(t *testing.T) {
 			[]byte(`{"hey":"now","wee":{"little":"doggie"}}`),
 			[]byte(`[{"id":"winlog-default","type":"winlog"}]`),
 			nil,
+			"",
 			"",
 		},
 		{
@@ -144,6 +170,7 @@ func TestBulkSimple(t *testing.T) {
 			nil,
 			sqn.SeqNo{1, 2, 3, 4},
 			ver,
+			"started_at",
 		},
 		{
 			"Field case with seqNo",
@@ -154,6 +181,7 @@ func TestBulkSimple(t *testing.T) {
 			[]byte(`[{"id":"log-default"}]`),
 			sqn.SeqNo{5, 6, 7, 8},
 			ver,
+			"started_at",
 		},
 		{
 			"Unusual status",
@@ -164,6 +192,7 @@ func TestBulkSimple(t *testing.T) {
 			nil,
 			nil,
 			"",
+			"",
 		},
 		{
 			"Empty status",
@@ -173,6 +202,7 @@ func TestBulkSimple(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			"",
 			"",
 		},
 	}
