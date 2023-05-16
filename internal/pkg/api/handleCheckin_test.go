@@ -7,10 +7,19 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/stretchr/testify/assert"
@@ -126,4 +135,42 @@ func TestFilterActions(t *testing.T) {
 			assert.Equal(t, tc.resp, resp)
 		})
 	}
+}
+
+func TestResolveSeqNo(t *testing.T) {
+	tests := []struct {
+		name  string
+		req   CheckinRequest
+		agent *model.Agent
+		resp  sqn.SeqNo
+	}{{
+		name: "empty ackToken",
+		req: CheckinRequest{
+			AckToken: new(string),
+		},
+		agent: &model.Agent{
+			ActionSeqNo: []int64{sqn.UndefinedSeqNo},
+		},
+		resp: []int64{sqn.UndefinedSeqNo},
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup mock CheckinT
+			logger := testlog.SetLogger(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			verCon := mustBuildConstraints("8.0.0")
+			cfg := &config.Server{}
+			c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+			bc := checkin.NewBulk(nil)
+			bulker := ftesting.NewMockBulk()
+			pim := mock.NewMockMonitor()
+			pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
+			ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
+
+			resp, _ := ct.resolveSeqNo(ctx, logger, tc.req, tc.agent)
+			assert.Equal(t, tc.resp, resp)
+		})
+	}
+
 }
