@@ -11,6 +11,7 @@ apt:
   sources:
     docker.list:
       source: deb [arch=amd64] https://download.docker.com/linux/ubuntu $RELEASE stable
+      keyid: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
 groups:
   - docker
 system_info:
@@ -44,5 +45,4 @@ runcmd:
   - [ mkdir, /run/go ]
   - [ wget, https://go.dev/dl/go1.20.4.linux-amd64.tar.gz, -O, /run/go/go.tar.gz ] # FIXME don't hardcode go version
   - [ tar, -xzf, /run/go/go.tar.gz, -C, /usr/local/ ]
-  - [ /usr/local/go/bin/go, env, -w, CGO_ENABLED=1 ]
   - [ rm, -rf, /run/go ]

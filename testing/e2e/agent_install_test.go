@@ -2,6 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// FIXME(ml): test suite is disabled by additional build flag.
+//     I've had issues getting the test to run in Jenkins (lack of tty).
+//     And there also seem to be issues with uninstalling the agent after each test when running in a VM.
+//     We should fix this once we have migrated to buildkite.
+
+//go:build disable
 //go:build e2e
 
 package e2e
