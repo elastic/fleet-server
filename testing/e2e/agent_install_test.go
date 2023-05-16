@@ -7,8 +7,7 @@
 //     And there also seem to be issues with uninstalling the agent after each test when running in a VM.
 //     We should fix this once we have migrated to buildkite.
 
-//go:build disable
-//go:build e2e
+//go:build e2e && ignore
 
 package e2e
 
