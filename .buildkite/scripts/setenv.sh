@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-source ./buildkite/scripts/common.sh
+source .buildkite/scripts/common.sh
 
 MESSAGE="Usage: $0 <option>. Examples: "$0 with-go" or "$0 with-docker-compose" or "$0 with-go-docker-compose" "
 

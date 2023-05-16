@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-source ./buildkite/scripts/common.sh
+source .buildkite/scripts/common.sh
 
 trap docker_logout EXIT
 
