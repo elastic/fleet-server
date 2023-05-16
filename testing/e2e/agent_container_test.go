@@ -53,6 +53,14 @@ func (suite *AgentContainerSuite) SetupTest() {
 
 func (suite *AgentContainerSuite) TearDownTest() {
 	// stop the container when test ends
+	if suite.T().Failed() {
+		p, err := exec.Command(suite.dockerCmd, "logs", "fleet-server").CombinedOutput()
+		if err != nil {
+			suite.T().Logf("unable to get container logs: %v", err)
+		} else {
+			suite.T().Logf("failed test, conainer logs:\n%s", string(p))
+		}
+	}
 	err := exec.Command(suite.dockerCmd, "stop", "fleet-server").Run()
 	suite.Require().NoError(err)
 }
