@@ -19,7 +19,6 @@ with_go() {
     go version
     which go
     export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
-#    echo -e "\nPATH="${PATH}"" >> dev-tools/integration/.env
 }
 
 with_docker_compose() {
@@ -29,7 +28,6 @@ with_docker_compose() {
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
     export PATH="${PATH}:${WORKSPACE}"
-#    echo -e "\nPATH="${PATH}"" >> dev-tools/integration/.env
 }
 
 retry() {
@@ -50,4 +48,20 @@ retry() {
         fi
     done
     return 0
+}
+
+publish_docker_image() {
+    echo "Pushing the docker image "$DOCKER_IMAGE":"$DOCKER_IMAGE_TAG" to the "${DOCKER_REGISTRY}" registry..."
+    docker_login
+    docker push "${DOCKER_IMAGE}":"${DOCKER_IMAGE_TAG}"
+}
+
+docker_login() {
+    echo "Logging to the ${DOCKER_REGISTRY} Docker Registry..."
+    docker login -u "${DOCKER_USER}" -p "${DOCKER_USER_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
+}
+
+docker_logout() {
+    echo "Logging out from Docker..."
+    docker logout ${DOCKER_REGISTRY}
 }
