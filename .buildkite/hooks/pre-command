@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -euo pipefail
+
+#source .buildkite/scripts/common.sh
+
+WORKSPACE="$(pwd)/bin"
+mkdir -p ${WORKSPACE}
+export PATH="${PATH}:${WORKSPACE}"
+echo ${PATH}
