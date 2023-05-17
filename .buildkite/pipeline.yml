@@ -38,7 +38,7 @@ steps:
         key: unit-test
         commands:
 #          - ".buildkite/scripts/setenv.sh with-go"
-          - "make test-unit junit-report"
+          - "with-go make test-unit junit-report"
         agents:
           provider: "gcp"
         artifact_paths:
@@ -48,7 +48,7 @@ steps:
         key: int-test
         commands:
 #          - ".buildkite/scripts/setenv.sh with-go-docker-compose"
-          - "make test-int junit-report"
+          - "with-go with_docker_compose make test-int junit-report"
         agents:
           provider: "gcp"
         artifact_paths:
