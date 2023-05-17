@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -69,8 +68,9 @@ func (suite *AgentContainerSuite) TearDownTest() {
 			rc.Close()
 		}
 	}
-	err := suite.container.Stop(context.Background(), nil)
+	err := suite.container.Terminate(context.Background())
 	suite.Require().NoError(err)
+	suite.container = nil
 }
 
 func (suite *AgentContainerSuite) TestHTTP() {
@@ -90,9 +90,6 @@ func (suite *AgentContainerSuite) TestHTTP() {
 		},
 		ExposedPorts: []string{"8220/tcp"},
 		Networks:     []string{"integration_default"},
-		HostConfigModifier: func(cfg *container.HostConfig) {
-			cfg.AutoRemove = true
-		},
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
 				Source: &testcontainers.GenericBindMountSource{suite.coverPath},
@@ -138,9 +135,6 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 		},
 		ExposedPorts: []string{"8220/tcp"},
 		Networks:     []string{"integration_default"},
-		HostConfigModifier: func(cfg *container.HostConfig) {
-			cfg.AutoRemove = true
-		},
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
 				Source:   &testcontainers.GenericBindMountSource{suite.certPath},

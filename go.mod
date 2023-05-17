@@ -6,7 +6,6 @@ require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/deepmap/oapi-codegen v1.12.4
 	github.com/dgraph-io/ristretto v0.1.1
-	github.com/docker/docker v23.0.5+incompatible
 	github.com/elastic/elastic-agent-client/v7 v7.1.1
 	github.com/elastic/elastic-agent-libs v0.3.7
 	github.com/elastic/elastic-agent-system-metrics v0.6.1
@@ -49,6 +48,7 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
+	github.com/docker/docker v23.0.5+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
