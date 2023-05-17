@@ -6,7 +6,7 @@ WORKSPACE="$(pwd)/bin"
 
 add_bin_path(){
     mkdir -p ${WORKSPACE}
-    export PATH="${WORKSPACE}:${PATH}"
+    export PATH="${PATH}:${WORKSPACE}"
 }
 
 with_go() {
@@ -16,8 +16,8 @@ with_go() {
     eval "$(gvm $(cat .go-version))"
     go version
     which go
-    export PATH="$(go env GOPATH):$(go env GOPATH)/bin:${PATH}"
-    echo -e "\nPATH="${PATH}"" >> dev-tools/integration/.env
+    export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
+#    echo -e "\nPATH="${PATH}"" >> dev-tools/integration/.env
 }
 
 with_docker_compose() {
@@ -25,8 +25,8 @@ with_docker_compose() {
     retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
-    export PATH="${WORKSPACE}:${PATH}"
-    echo -e "\nPATH="${PATH}"" >> dev-tools/integration/.env
+    export PATH="${PATH}:${WORKSPACE}"
+#    echo -e "\nPATH="${PATH}"" >> dev-tools/integration/.env
 }
 
 retry() {
