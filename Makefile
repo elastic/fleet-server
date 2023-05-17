@@ -5,6 +5,7 @@ TARGET_ARCH_386=x86
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
 PLATFORMS ?= darwin/amd64 darwin/arm64 linux/386 linux/amd64 linux/arm64 windows/386 windows/amd64
+DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
 BUILDMODE_linux_amd64=-buildmode=pie
 BUILDMODE_linux_arm64=-buildmode=pie
 BUILDMODE_windows_386=-buildmode=pie
@@ -198,12 +199,14 @@ $(PLATFORM_TARGETS): release-%:
 
 .PHONY: build-docker
 build-docker:
-	docker build \
+	docker buildx create --use
+	docker buildx build --push \
+		--platform $(shell echo ${DOCKER_PLATFORMS} | sed 's/ /,/g') \
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg=GCFLAGS="${GCFLAGS}" \
 		--build-arg=LDFLAGS="${LDFLAGS}" \
 		--build-arg=DEV="$(DEV)" \
-		--build-arg=VERSION="$(VERSION)" \
+		--build-arg=VERSION="$(VERSION)" --push \
 		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
 
 .PHONY: release-docker
