@@ -8,20 +8,24 @@ package e2e
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/suite"
+	"github.com/testcontainers/testcontainers-go"
 )
 
 type AgentContainerSuite struct {
 	BaseE2ETestSuite
 
-	dockerCmd string
 	dockerImg string
+
+	container testcontainers.Container
 }
 
 func TestAgentContainerSuite(t *testing.T) {
@@ -31,14 +35,13 @@ func TestAgentContainerSuite(t *testing.T) {
 func (suite *AgentContainerSuite) SetupSuite() {
 	path, err := exec.LookPath("docker")
 	suite.Require().NoError(err)
-	suite.dockerCmd = path
 
 	v, ok := os.LookupEnv("AGENT_E2E_IMAGE")
 	suite.Require().True(ok, "expected AGENT_E2E_IMAGE to be defined")
 	suite.dockerImg = v
 
 	// Sanity check docker
-	cmd := exec.Command(suite.dockerCmd, "image", "inspect", suite.dockerImg)
+	cmd := exec.Command(path, "image", "inspect", suite.dockerImg)
 	output, err := cmd.CombinedOutput()
 	suite.Require().NoError(err, "unable to run docker, output: ", string(output))
 
@@ -52,16 +55,21 @@ func (suite *AgentContainerSuite) SetupTest() {
 }
 
 func (suite *AgentContainerSuite) TearDownTest() {
+	if suite.container == nil {
+		return
+	}
 	// stop the container when test ends
 	if suite.T().Failed() {
-		p, err := exec.Command(suite.dockerCmd, "logs", "fleet-server").CombinedOutput()
+		rc, err := suite.container.Logs(context.Background())
 		if err != nil {
 			suite.T().Logf("unable to get container logs: %v", err)
 		} else {
-			suite.T().Logf("failed test, conainer logs:\n%s", string(p))
+			p, err := io.ReadAll(rc)
+			suite.T().Logf("failed test log read err: %v, container logs:\n%s", err, string(p))
+			rc.Close()
 		}
 	}
-	err := exec.Command(suite.dockerCmd, "stop", "fleet-server").Run()
+	err := suite.container.Stop(context.Background(), nil)
 	suite.Require().NoError(err)
 }
 
@@ -69,24 +77,40 @@ func (suite *AgentContainerSuite) TestHTTP() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, suite.dockerCmd, "run", "--rm", "-d",
-		"--name", "fleet-server",
-		"-v", suite.coverPath+":/cover",
-		"-e", "GOCOVERDIR=/cover",
-		"-e", "FLEET_SERVER_ENABLE=1",
-		"-e", "FLEET_SERVER_ELASTICSEARCH_HOST=http://elasticsearch:9200",
-		"-e", "FLEET_SERVER_SERVICE_TOKEN="+suite.serviceToken,
-		"-e", "FLEET_SERVER_POLICY_ID=fleet-server-policy",
-		"-e", "FLEET_SERVER_INSECURE_HTTP=true",
-		"-e", "FLEET_SERVER_HOST=0.0.0.0",
-		"-p", "8220:8220",
-		"--network", "integration_default",
-		suite.dockerImg)
+	req := testcontainers.ContainerRequest{
+		Image: suite.dockerImg,
+		Env: map[string]string{
+			"GOCOVERDIR":                      "/cover",
+			"FLEET_SERVER_ENABLE":             "1",
+			"FLEET_SERVER_POLICY_ID":          "fleet-server-policy",
+			"FLEET_SERVER_ELASTICSEARCH_HOST": "http://elasticsearch:9200",
+			"FLEET_SERVER_SERVICE_TOKEN":      suite.serviceToken,
+			"FLEET_SERVER_INSECURE_HTTP":      "true",
+			"FLEET_SERVER_HOST":               "0.0.0.0",
+		},
+		ExposedPorts: []string{"8220/tcp"},
+		Networks:     []string{"integration_default"},
+		HostConfigModifier: func(cfg *container.HostConfig) {
+			cfg.AutoRemove = true
+		},
+		Mounts: testcontainers.ContainerMounts{
+			testcontainers.ContainerMount{
+				Source: &testcontainers.GenericBindMountSource{suite.coverPath},
+				Target: "/cover",
+			},
+		},
+	}
+	fleetC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	suite.Require().NoError(err)
+	suite.container = fleetC
 
-	err := cmd.Run()
+	endpoint, err := fleetC.Endpoint(ctx, "http")
 	suite.Require().NoError(err)
 
-	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+	suite.FleetServerStatusOK(ctx, endpoint)
 }
 
 func (suite *AgentContainerSuite) TestWithSecretFiles() {
@@ -98,27 +122,51 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, suite.dockerCmd, "run", "--rm", "-d",
-		"--name", "fleet-server",
-		"-v", suite.certPath+":/certs:ro",
-		"-v", dir+":/token:ro",
-		"-v", suite.coverPath+":/cover",
-		"-e", "GOCOVERDIR=/cover",
-		"-e", "FLEET_SERVER_ENABLE=1",
-		"-e", "FLEET_URL=https://fleet-server:8200",
-		"-e", "FLEET_CA=/certs/e2e-test-ca.crt",
-		"-e", "FLEET_SERVER_CERT=/certs/fleet-server.crt",
-		"-e", "FLEET_SERVER_CERT_KEY=/certs/fleet-server.key",
-		"-e", "FLEET_SERVER_CERT_KEY_PASSPHRASE=/certs/passphrase",
-		"-e", "FLEET_SERVER_SERVICE_TOKEN_PATH=/token/service-token",
-		"-e", "FLEET_SERVER_ELASTICSEARCH_HOST=http://elasticsearch:9200",
-		"-e", "FLEET_SERVER_POLICY_ID=fleet-server-policy",
-		"-p", "8220:8220",
-		"--network", "integration_default",
-		suite.dockerImg)
+	req := testcontainers.ContainerRequest{
+		Image: suite.dockerImg,
+		Env: map[string]string{
+			"GOCOVERDIR":                       "/cover",
+			"FLEET_SERVER_ENABLE":              "1",
+			"FLEET_URL":                        "https://fleet-server:8200",
+			"FLEET_CA":                         "/certs/e2e-test-ca.crt",
+			"FLEET_SERVER_CERT":                "/certs/fleet-server.crt",
+			"FLEET_SERVER_CERT_KEY":            "/certs/fleet-server.key",
+			"FLEET_SERVER_CERT_KEY_PASSPHRASE": "/certs/passphrase",
+			"FLEET_SERVER_SERVICE_TOKEN_PATH":  "/token/service-token",
+			"FLEET_SERVER_ELASTICSEARCH_HOST":  "http://elasticsearch:9200",
+			"FLEET_SERVER_POLICY_ID":           "fleet-server-policy",
+		},
+		ExposedPorts: []string{"8220/tcp"},
+		Networks:     []string{"integration_default"},
+		HostConfigModifier: func(cfg *container.HostConfig) {
+			cfg.AutoRemove = true
+		},
+		Mounts: testcontainers.ContainerMounts{
+			testcontainers.ContainerMount{
+				Source:   &testcontainers.GenericBindMountSource{suite.certPath},
+				Target:   "/certs",
+				ReadOnly: true,
+			},
+			testcontainers.ContainerMount{
+				Source:   &testcontainers.GenericBindMountSource{dir},
+				Target:   "/token",
+				ReadOnly: true,
+			},
+			testcontainers.ContainerMount{
+				Source: &testcontainers.GenericBindMountSource{suite.coverPath},
+				Target: "/cover",
+			},
+		},
+	}
+	fleetC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	suite.Require().NoError(err)
+	suite.container = fleetC
 
-	err = cmd.Run()
+	endpoint, err := fleetC.Endpoint(ctx, "https")
 	suite.Require().NoError(err)
 
-	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
+	suite.FleetServerStatusOK(ctx, endpoint)
 }
