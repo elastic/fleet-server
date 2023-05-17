@@ -62,3 +62,15 @@ steps:
           - step: "int-test"
             allow_failure: true
     depends_on: "check"
+
+  - label: "Publish docker image"
+    key: "publish"
+    steps:
+      - label: "Build docker image"
+        command: ".buildkite/scripts/build_image.sh"
+        if: "!build.pull_request"
+        agents:
+          provider: "gcp"
+    depends_on:
+      - step: "tests"
+        allow_failure: true
