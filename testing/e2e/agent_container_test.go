@@ -19,6 +19,15 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 )
 
+type logger struct {
+	*testing.T
+}
+
+func (l *logger) Printf(format string, v ...interface{}) {
+	l.Helper()
+	l.Logf(format, v...)
+}
+
 type AgentContainerSuite struct {
 	BaseE2ETestSuite
 
@@ -100,6 +109,7 @@ func (suite *AgentContainerSuite) TestHTTP() {
 	fleetC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
+		Logger:           &logger{suite.T()},
 	})
 	suite.Require().NoError(err)
 	suite.container = fleetC
@@ -155,6 +165,7 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 	fleetC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
+		Logger:           &logger{suite.T()},
 	})
 	suite.Require().NoError(err)
 	suite.container = fleetC
