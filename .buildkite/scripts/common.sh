@@ -5,11 +5,13 @@ set -euo pipefail
 WORKSPACE="$(pwd)/bin"
 
 add_bin_path(){
+    echo "Adding PATH to the environment variables..."
     mkdir -p ${WORKSPACE}
     export PATH="${PATH}:${WORKSPACE}"
 }
 
 with_go() {
+    echo "Setting up the Go environment..."
     mkdir -p ${WORKSPACE}
     retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
     chmod +x ${WORKSPACE}/gvm
@@ -21,6 +23,7 @@ with_go() {
 }
 
 with_docker_compose() {
+    echo "Setting up the Docker-compose environment..."
     mkdir -p ${WORKSPACE}
     retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
     chmod +x ${WORKSPACE}/docker-compose
