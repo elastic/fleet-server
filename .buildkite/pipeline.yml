@@ -67,7 +67,8 @@ steps:
     key: "publish"
     steps:
       - label: "Build docker image"
-        command: ".buildkite/scripts/build_image.sh"
+#        command: ".buildkite/scripts/build_image.sh"
+        command: "echo build.pull_request"
         if: "!build.pull_request"
         agents:
           provider: "gcp"
