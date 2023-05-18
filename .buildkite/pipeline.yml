@@ -65,9 +65,8 @@ steps:
 
   - label: "Publish docker image"
     key: "publish"
-    command: "echo ${BUILDKITE_PULL_REQUEST} && echo build.pull_request"
-#    command: ".buildkite/scripts/build_image.sh"
-#    if: ${BUILDKITE_PULL_REQUEST} == "false"
+    command: ".buildkite/scripts/build_image.sh"
+    if: "!(Boolean(${BUILDKITE_PULL_REQUEST})"
     agents:
       provider: "gcp"
     depends_on:
