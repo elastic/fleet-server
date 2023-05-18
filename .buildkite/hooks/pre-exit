@@ -4,4 +4,4 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-docker_logout
+docker logout ${DOCKER_REGISTRY}
