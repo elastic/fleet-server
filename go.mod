@@ -28,7 +28,8 @@ require (
 	go.elastic.co/apm/module/apmchiv5/v2 v2.3.0
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.3.0
 	go.elastic.co/apm/module/apmhttp/v2 v2.3.0
-	go.elastic.co/apm/v2 v2.3.0
+	go.elastic.co/apm/module/apmprometheus/v2 v2.4.1
+	go.elastic.co/apm/v2 v2.4.1
 	go.elastic.co/ecszerolog v0.1.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.1.0
