@@ -58,7 +58,7 @@ publish_docker_image() {
 
 docker_login() {
     echo "Logging to the ${DOCKER_REGISTRY} Docker Registry..."
-    docker login -u "${DOCKER_USER}" -p "${DOCKER_USER_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
+    docker login -u "${DOCKER_USER_SECRET}" -p "${DOCKER_USER_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
 }
 
 docker_logout() {
