@@ -52,14 +52,14 @@ retry() {
 
 publish_docker_image() {
     echo "Pushing the docker image "$DOCKER_IMAGE":"$DOCKER_IMAGE_TAG" to the "${DOCKER_REGISTRY}" registry..."
-    docker_login
+#    docker_login
     docker push "${DOCKER_IMAGE}":"${DOCKER_IMAGE_TAG}"
 }
 
-docker_login() {
-    echo "Logging to the ${DOCKER_REGISTRY} Docker Registry..."
-    docker login -u "${DOCKER_USER_SECRET}" -p "${DOCKER_USER_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
-}
+#docker_login() {
+#    echo "Logging to the ${DOCKER_REGISTRY} Docker Registry..."
+#    docker login -u "${DOCKER_USER_SECRET}" -p "${DOCKER_USER_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
+#}
 
 docker_logout() {
     echo "Logging out from Docker..."
