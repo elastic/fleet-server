@@ -32,7 +32,7 @@ func TestMetricsEndpoints(t *testing.T) {
 
 	srv, err := InitMetrics(ctx, cfg, bi, nil)
 	require.NoError(t, err, "unable to start metrics server")
-	defer srv.Stop()
+	defer srv.Stop() //nolint:errcheck // test server
 
 	paths := []string{"/stats", "/metrics"}
 	for _, path := range paths {
