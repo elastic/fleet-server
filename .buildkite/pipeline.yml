@@ -65,7 +65,7 @@ steps:
   - label: "Publish docker image"
     key: "publish"
     command: ".buildkite/scripts/build_image.sh"
-    if: build.env("BUILDKITE_PULL_REQUEST") != null   #the condition is temporarily changed to opposite to check and fix the functionality
+    if: build.env("BUILDKITE_PULL_REQUEST") == null
     agents:
       provider: "gcp"
     depends_on:
