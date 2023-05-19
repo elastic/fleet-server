@@ -29,7 +29,7 @@ case $option in
     ;;
   "retag-and-push-image")
     echo "Retagging images..."
-    if ${BUILDKITE_TAG}; then
+    if [ -n "${BUILDKITE_TAG}" ]; then
         docker tag "${DOCKER_IMAGE}":"${DOCKER_IMAGE_SHA_TAG}" "${DOCKER_IMAGE}":"${DOCKER_IMAGE_GIT_TAG}"
         DOCKER_IMAGE_TAG="${DOCKER_IMAGE_GIT_TAG}"
         publish_docker_image
