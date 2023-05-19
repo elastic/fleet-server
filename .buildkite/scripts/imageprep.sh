@@ -16,7 +16,7 @@ option=$1
 case $option in
   "build-image")
     echo "Building the docker image..."
-#    docker_login
+    docker_login
     if ! docker pull -q ${DOCKER_IMAGE}:${DOCKER_IMAGE_SHA_TAG} 2> /dev/null; then
         DOCKER_IMAGE="${DOCKER_IMAGE}"
         DOCKER_IMAGE_TAG="${DOCKER_IMAGE_SHA_TAG}"

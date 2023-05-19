@@ -5,11 +5,11 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
-DOCKER_REGISTRY="docker.elastic.co"
-export DOCKER_REGISTRY="${DOCKER_REGISTRY}"
+#DOCKER_REGISTRY="docker.elastic.co"
+#export DOCKER_REGISTRY="${DOCKER_REGISTRY}"
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "temp-fleet-server" && "$BUILDKITE_STEP_KEY" == "publish" ]]; then #should be changed to "fleet-server" after tests
   export DOCKER_USER_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
   export DOCKER_USER_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
-  docker login -u "${DOCKER_USER_SECRET}" -p "${DOCKER_USER_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
+#  docker login -u "${DOCKER_USER_SECRET}" -p "${DOCKER_USER_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
 fi
