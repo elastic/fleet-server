@@ -1,6 +1,0 @@
-#!/bin/bash
-
-set -euo pipefail
-
-echo "Logging out from Docker..."
-docker logout ${DOCKER_REGISTRY}
