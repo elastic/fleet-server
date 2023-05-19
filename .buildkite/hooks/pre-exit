@@ -1,7 +1,0 @@
-#!/bin/bash
-
-#set -euo pipefail
-
-#source .buildkite/scripts/common.sh
-
-#docker logout ${DOCKER_REGISTRY}
