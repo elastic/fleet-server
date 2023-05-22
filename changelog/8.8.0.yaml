@@ -1,0 +1,168 @@
+version: 8.8.0
+entries:
+    - kind: feature
+      summary: Accept raw errors as a fallback to detailed error type
+      description: ""
+      component: ""
+      pr:
+        - "2079"
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/931
+      timestamp: 1668434027
+      file:
+        name: 1668434027-Accept-raw-errors-as-a-fallback-to-detailed-error-type.yaml
+        checksum: 4a1df54527937c9c9564cb42fa9b59ed69a1287a
+    - kind: bug-fix
+      summary: filter out UPDATE_TAGS and FORCE_UNENROLL actions on agent checkin
+      description: ""
+      component: ""
+      pr:
+        - "2200"
+      issue:
+        - "2199"
+      timestamp: 1671566400
+      file:
+        name: 1671566400-filter-out-UPDATE_TAGS-and-FORCE_UNENROLL.yaml
+        checksum: 29d1bb9ce21e3d6bd41b59c0504664bbc548c1bd
+    - kind: breaking-change
+      summary: Remove automatic agent unenrollment
+      description: ""
+      component: ""
+      pr:
+        - "2096"
+      issue:
+        - "2063"
+      timestamp: 1672689600
+      file:
+        name: 1672689600-remove-automatic-agent-unenrollment.yaml
+        checksum: 29b2b5627b36d4e141ab15a208a4ec2307ced323
+    - kind: feature
+      summary: Replaced upgrade expiration and minimum_execution_duration with rollout_duration_seconds
+      description: ""
+      component: ""
+      pr:
+        - "2243"
+      issue: []
+      timestamp: 1673467200
+      file:
+        name: 1673467200-replaced-upgrade-expiration-and-minimum_execution_time.yaml
+        checksum: 0bb02aae0e23d815b5b822598ae6c92e072b5534
+    - kind: feature
+      summary: Document how to run the fleet server locally.
+      description: ""
+      component: ""
+      pr:
+        - "2212"
+      issue:
+        - "1423"
+      timestamp: 1673553600
+      file:
+        name: 1673553600-document-how-to-run-fleet-server-locally.yaml
+        checksum: e7fc6c2d4d9fc1f056a15b51732bea1fc05b6cf4
+    - kind: feature
+      summary: Fleet server now supports file uploads for a limited subset of integrations.
+      description: ""
+      component: ""
+      pr:
+        - "1902"
+      issue: []
+      timestamp: 1674244800
+      file:
+        name: 1674244800-fleet-server-file-upload.yaml
+        checksum: 33675ca170dde9f42f401a8a5ba54e38668c9ff1
+    - kind: feature
+      summary: pass_action_signature
+      description: Pass "signed" data with the action to the agent
+      component: ""
+      pr:
+        - "2353"
+      issue: []
+      timestamp: 1676500216
+      file:
+        name: 1676500216-pass_action_signature.yaml
+        checksum: df7e1c4ebd4f2f74e365d9122a61e14c4ee360db
+    - kind: bug-fix
+      summary: Fix fleet-server discarding duplicate `server` keys input when creating config from policy.
+      description: ""
+      component: ""
+      pr:
+        - "2354"
+      issue:
+        - "2303"
+      timestamp: 1677009600
+      file:
+        name: 1677009600-fix-fleet-server-discard-keys.yaml
+        checksum: a39d9c541a33ed6f12fc8a8e0f83cdd3637f9e6e
+    - kind: feature
+      summary: Fleet server can be run in stand-alone mode without needing to check into Kibana.
+      description: ""
+      component: ""
+      pr:
+        - "2359"
+      issue:
+        - "2351"
+      timestamp: 1678132800
+      file:
+        name: 1678132800-fleet-server-stand-alone-no-kibana.yaml
+        checksum: 210f5d2dc401524efc2093f6dc77ef1614b7e08b
+    - kind: bug-fix
+      summary: Isolate fleet-server logger level changes
+      description: Fleet-server will no longer restart subsystems like API listeners and the ES client when the log level changes.
+      component: ""
+      pr:
+        - "2454"
+      issue:
+        - "2453"
+      timestamp: 1680807600
+      file:
+        name: 1680807600-isolate-logger-restart.yaml
+        checksum: 6bc20f90807f3484a67793136225d84104b7c19e
+    - kind: feature
+      summary: Add support for gathering secret values from files.
+      description: ""
+      component: ""
+      pr:
+        - "2459"
+      issue: []
+      timestamp: 1680807600
+      file:
+        name: 1680807600-secret-files.yaml
+        checksum: 6a2ebdc101a03061bae3cbab742979c3d7275ffb
+    - kind: enhancement
+      summary: Add poll_timeout to checkin requests
+      description: |
+        Add a poll_duration attribute to checkin requests that the client can use to
+        inform fleet-server of how long the client will hold the polling connection
+        open for. If specified fleet-server will return a checkin response within
+        the specified duration.
+      component: checkin
+      pr:
+        - "2491"
+      issue:
+        - "2337"
+      timestamp: 1681246555
+      file:
+        name: 1681246555-Add-poll_duration-to-checkin-requests.yaml
+        checksum: d12b4b64817054794ca1a4d1fba690397e937f92
+    - kind: feature
+      summary: Action APM tracing.
+      description: ""
+      component: ""
+      pr:
+        - "2472"
+      issue: []
+      timestamp: 1681412400
+      file:
+        name: 1681412400-action-apm-tracing.yaml
+        checksum: 52e7139a413155a607e91d0d7afa696d2ca8c86d
+    - kind: enhancement
+      summary: Added memory_limit to server.runtime config.
+      description: ""
+      component: ""
+      pr:
+        - "2514"
+      issue: []
+      timestamp: 1681906741
+      file:
+        name: 1681906741-memory_limit.yaml
+        checksum: 39f83f12e5cafad5c01d89e926b6593cf1c0bc63
