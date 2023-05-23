@@ -135,22 +135,35 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 			"GOCOVERDIR":                       "/cover",
 			"FLEET_SERVER_ENABLE":              "1",
 			"FLEET_URL":                        "https://fleet-server:8200",
-			"FLEET_CA":                         "/certs/e2e-test-ca.crt",
-			"FLEET_SERVER_CERT":                "/certs/fleet-server.crt",
-			"FLEET_SERVER_CERT_KEY":            "/certs/fleet-server.key",
-			"FLEET_SERVER_CERT_KEY_PASSPHRASE": "/certs/passphrase",
+			"FLEET_CA":                         "/tmp/e2e-test-ca.crt",
+			"FLEET_SERVER_CERT":                "/tmp/fleet-server.crt",
+			"FLEET_SERVER_CERT_KEY":            "/tmp/fleet-server.key",
+			"FLEET_SERVER_CERT_KEY_PASSPHRASE": "/tmp/passphrase",
 			"FLEET_SERVER_SERVICE_TOKEN_PATH":  "/token/service-token",
 			"FLEET_SERVER_ELASTICSEARCH_HOST":  "http://elasticsearch:9200",
 			"FLEET_SERVER_POLICY_ID":           "fleet-server-policy",
 		},
 		ExposedPorts: []string{"8220/tcp"},
 		Networks:     []string{"integration_default"},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.ContainerMount{
-				Source:   &testcontainers.GenericBindMountSource{suite.certPath},
-				Target:   "/certs",
-				ReadOnly: true,
-			},
+		// certs are copied so they can be readable by fleet-server.
+		Files: []testcontainer.ContainderFiles{{
+			HostFilePath:      filepath.Join(suite.certPath, "e2e-test-ca.crt"),
+			ContainerFilePath: "/tmp/e2e-test-ca.crt",
+			FileMode:          644,
+		}, {
+			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.crt"),
+			ContainerFilePath: "/tmp/fleet-server.crt",
+			FileMode:          644,
+		}, {
+			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.key"),
+			ContainerFilePath: "/tmp/fleet-server.key",
+			FileMode:          644,
+		}, {
+			HostFilePath:      filepath.Join(suite.certPath, "passphrase"),
+			ContainerFilePath: "/tmp/passphrase",
+			FileMode:          644,
+		}},
+		Mounts: testcontainers.ContainerMount{
 			testcontainers.ContainerMount{
 				Source:   &testcontainers.GenericBindMountSource{dir},
 				Target:   "/token",
