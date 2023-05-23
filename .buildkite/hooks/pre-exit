@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-if [[ "$BUILDKITE_STEP_KEY" == "publish" ]]; then
-    echo "Logging out from the ${DOCKER_REGISTRY}..."
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "publish" ]]; then
     docker logout ${DOCKER_REGISTRY}
 fi
