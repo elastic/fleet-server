@@ -149,19 +149,19 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 		Files: []testcontainers.ContainerFile{{
 			HostFilePath:      filepath.Join(suite.certPath, "e2e-test-ca.crt"),
 			ContainerFilePath: "/tmp/e2e-test-ca.crt",
-			FileMode:          644,
+			FileMode:          0644,
 		}, {
 			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.crt"),
 			ContainerFilePath: "/tmp/fleet-server.crt",
-			FileMode:          644,
+			FileMode:          0644,
 		}, {
 			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.key"),
 			ContainerFilePath: "/tmp/fleet-server.key",
-			FileMode:          644,
+			FileMode:          0644,
 		}, {
 			HostFilePath:      filepath.Join(suite.certPath, "passphrase"),
 			ContainerFilePath: "/tmp/passphrase",
-			FileMode:          644,
+			FileMode:          0644,
 		}},
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
