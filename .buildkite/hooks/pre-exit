@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-if [[ "$BUILDKITE_STEP_KEY" == "publish" ]]; then
-    echo "Logging out from the ${DOCKER_REGISTRY}..."
+if [[ "$BUILDKITE_STEP_KEY" == "publish" && "$BUILDKITE_STEP_KEY" == "cloud-e2e-test"]]; then
     docker logout ${DOCKER_REGISTRY}
 fi
