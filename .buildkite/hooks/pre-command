@@ -7,7 +7,7 @@ source .buildkite/scripts/common.sh
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
 DOCKER_REGISTRY="docker.elastic.co"
 export DOCKER_REGISTRY="${DOCKER_REGISTRY}"
-EC_KEY_SECRET_PATH='secret/observability-team/ci/elastic-cloud/observability-pro'
+EC_KEY_SECRET_PATH='kv/ci-shared/platform-ingest/platform-ingest-ec-prod'
 
 
 if [[ "$BUILDKITE_STEP_KEY" == "publish" && "$BUILDKITE_STEP_KEY" == "cloud-e2e-test"]]; then
