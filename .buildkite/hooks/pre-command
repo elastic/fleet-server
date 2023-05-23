@@ -9,8 +9,7 @@ DOCKER_REGISTRY="docker.elastic.co"
 export DOCKER_REGISTRY="${DOCKER_REGISTRY}"
 EC_KEY_SECRET_PATH='kv/ci-shared/platform-ingest/platform-ingest-ec-prod'
 
-
-if [[ "$BUILDKITE_STEP_KEY" == "publish" && "$BUILDKITE_STEP_KEY" == "cloud-e2e-test"]]; then
+if [[ "$BUILDKITE_STEP_KEY" == "publish" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
   export DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
   export DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
   docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
