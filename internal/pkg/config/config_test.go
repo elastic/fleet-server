@@ -181,6 +181,15 @@ func TestConfig(t *testing.T) {
 	}
 }
 
+func TestLoadStandaloneAgentMetadata(t *testing.T) {
+	t.Run("generates agent id", func(t *testing.T) {
+		cfg := &Config{}
+		cfg.LoadStandaloneAgentMetadata()
+		assert.NotEmpty(t, cfg.Fleet.Agent.ID)
+		assert.NotEmpty(t, cfg.Fleet.Agent.Version)
+	})
+}
+
 func TestLoadServerLimits(t *testing.T) {
 	t.Run("empty loads limits", func(t *testing.T) {
 		c := &Config{Inputs: []Input{{}}}
