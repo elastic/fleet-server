@@ -94,7 +94,7 @@ func (ut *UploadT) handleUploadBegin(_ zerolog.Logger, w http.ResponseWriter, r 
 	}
 
 	// prepare and write response
-	resp := UploadBeginResponse{
+	resp := UploadBeginAPIResponse{
 		ChunkSize: info.ChunkSize,
 		UploadId:  info.ID,
 	}

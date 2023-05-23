@@ -34,6 +34,7 @@ var _ ServerInterface = (*apiServer)(nil)
 
 func (a *apiServer) AgentEnroll(w http.ResponseWriter, r *http.Request, params AgentEnrollParams) {
 	zlog := hlog.FromRequest(r).With().Str("mod", kEnrollMod).Logger()
+	w.Header().Set("Content-Type", "application/json")
 
 	// Error in the scope for deferred rolback function check
 	var err error
@@ -60,6 +61,7 @@ func (a *apiServer) AgentEnroll(w http.ResponseWriter, r *http.Request, params A
 
 func (a *apiServer) AgentAcks(w http.ResponseWriter, r *http.Request, id string, params AgentAcksParams) {
 	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
+	w.Header().Set("Content-Type", "application/json")
 	if err := a.ack.handleAcks(zlog, w, r, id); err != nil {
 		cntAcks.IncError(err)
 		ErrorResp(w, r, err)
@@ -68,6 +70,7 @@ func (a *apiServer) AgentAcks(w http.ResponseWriter, r *http.Request, id string,
 
 func (a *apiServer) AgentCheckin(w http.ResponseWriter, r *http.Request, id string, params AgentCheckinParams) {
 	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
+	w.Header().Set("Content-Type", "application/json")
 	err := a.ct.handleCheckin(zlog, w, r, id, params.UserAgent)
 	if err != nil {
 		cntCheckin.IncError(err)
@@ -84,6 +87,7 @@ func (a *apiServer) Artifact(w http.ResponseWriter, r *http.Request, id string, 
 
 	err := a.at.handleArtifacts(zlog, w, r, id, sha2)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		cntArtifacts.IncError(err)
 		ErrorResp(w, r, err)
 	}
@@ -91,6 +95,7 @@ func (a *apiServer) Artifact(w http.ResponseWriter, r *http.Request, id string, 
 
 func (a *apiServer) UploadBegin(w http.ResponseWriter, r *http.Request, params UploadBeginParams) {
 	zlog := hlog.FromRequest(r).With().Logger()
+	w.Header().Set("Content-Type", "application/json")
 	err := a.ut.handleUploadBegin(zlog, w, r)
 	if err != nil {
 		cntUploadStart.IncError(err)
@@ -100,6 +105,7 @@ func (a *apiServer) UploadBegin(w http.ResponseWriter, r *http.Request, params U
 
 func (a *apiServer) UploadComplete(w http.ResponseWriter, r *http.Request, id string, params UploadCompleteParams) {
 	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
+	w.Header().Set("Content-Type", "application/json")
 	err := a.ut.handleUploadComplete(zlog, w, r, id)
 	if err != nil {
 		cntUploadEnd.IncError(err)
@@ -109,6 +115,7 @@ func (a *apiServer) UploadComplete(w http.ResponseWriter, r *http.Request, id st
 
 func (a *apiServer) UploadChunk(w http.ResponseWriter, r *http.Request, id string, chunkNum int, params UploadChunkParams) {
 	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
+	w.Header().Set("Content-Type", "application/json")
 
 	if _, err := a.ut.authAPIKey(r, a.bulker, a.ut.cache); err != nil {
 		cntUploadChunk.IncError(err)
@@ -125,6 +132,7 @@ func (a *apiServer) Status(w http.ResponseWriter, r *http.Request, params Status
 	zlog := hlog.FromRequest(r).With().
 		Str("mod", kStatusMod).
 		Logger()
+	w.Header().Set("Content-Type", "application/json")
 	err := a.st.handleStatus(zlog, a.sm, a.bi, r, w)
 	if err != nil {
 		cntStatus.IncError(err)

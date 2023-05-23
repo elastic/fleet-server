@@ -120,3 +120,118 @@ func (suite *StandAloneSuite) TestWithSecretFiles() {
 	cancel()
 	cmd.Wait()
 }
+
+// TestClientAPI run an HTTPS server and use the ClientAPITester which wraps the generated pkg/api client to test endpoints
+func (suite *StandAloneSuite) TestClientAPI() {
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-https.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"Hosts":          suite.esHosts,
+		"ServiceToken":   suite.serviceToken,
+		"CertPath":       filepath.Join(suite.certPath, "fleet-server.crt"),
+		"KeyPath":        filepath.Join(suite.certPath, "fleet-server.key"),
+		"PassphrasePath": filepath.Join(suite.certPath, "passphrase"),
+	})
+	f.Close()
+
+	bCtx, bCancel := context.WithCancel(context.Background())
+	defer bCancel()
+
+	// Run the fleet-server binary, cancelling context should stop process
+	cmd := exec.CommandContext(bCtx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath}
+	err = cmd.Start()
+	suite.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(bCtx, time.Minute)
+	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
+	cancel()
+
+	enrollmentKey := suite.GetEnrollmentTokenForPolicyID(bCtx, "dummy-policy")
+
+	// Run subtests here
+	suite.Run("test status unauthenicated", func() {
+		ctx, cancel := context.WithCancel(bCtx)
+		defer cancel()
+		tester := &ClientAPITester{
+			suite.Suite,
+			ctx,
+			suite.client,
+			"https://localhost:8220",
+		}
+		tester.TestStatus("")
+	})
+
+	suite.Run("test status authenicated", func() {
+		ctx, cancel := context.WithCancel(bCtx)
+		defer cancel()
+		tester := &ClientAPITester{
+			suite.Suite,
+			ctx,
+			suite.client,
+			"https://localhost:8220",
+		}
+		tester.TestStatus(enrollmentKey)
+	})
+
+	suite.Run("test enroll checkin ack", func() {
+		ctx, cancel := context.WithCancel(bCtx)
+		defer cancel()
+		tester := &ClientAPITester{
+			suite.Suite,
+			ctx,
+			suite.client,
+			"https://localhost:8220",
+		}
+
+		suite.T().Log("test enrollment")
+		agentID, agentKey := tester.TestEnroll(enrollmentKey)
+		suite.VerifyAgentInKibana(ctx, agentID)
+
+		suite.T().Logf("test checkin 1: agent %s", agentID)
+		ackToken, actions := tester.TestCheckin(agentKey, agentID, nil, nil)
+		suite.Require().NotEmpty(actions)
+
+		suite.T().Log("test ack")
+		tester.TestAcks(agentKey, agentID, actions)
+
+		suite.T().Logf("test checkin 2: agent %s 3m timout", agentID)
+		dur := "3m"
+		tester.ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
+		defer cancel()
+
+		tester.TestCheckin(agentKey, agentID, ackToken, &dur)
+
+		// sanity check agent status in kibana
+		suite.AgentIsOnline(ctx, agentID)
+	})
+
+	suite.Run("test file upload", func() {
+		ctx, cancel := context.WithCancel(bCtx)
+		defer cancel()
+		tester := &ClientAPITester{
+			suite.Suite,
+			ctx,
+			suite.client,
+			"https://localhost:8220",
+		}
+		agentID, agentKey := tester.TestEnroll(enrollmentKey)
+		actionID := suite.RequestDiagnosticsForAgent(ctx, agentID)
+
+		tester.TestFullFileUpload(agentKey, agentID, actionID, 8192) // 8KiB file
+	})
+
+	// TODO: Not sure how to setup and test (what to use as ID+SHA256 values)
+	suite.Run("test artifact", func() {
+		suite.T().Skip("unimplemented")
+	})
+
+	bCancel()
+	cmd.Wait()
+}

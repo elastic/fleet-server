@@ -10,14 +10,28 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
+	"flag"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/stretchr/testify/suite"
 )
+
+var longFlag bool
+
+func init() {
+	flag.BoolVar(&longFlag, "long", false, "Run long tests.")
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	os.Exit(m.Run())
+}
 
 // BaseE2ETestSuite contains attributes and methods that are applicable to multiple test cases
 type BaseE2ETestSuite struct {
@@ -152,4 +166,179 @@ func (suite *BaseE2ETestSuite) FleetServerStatusOK(ctx context.Context, url stri
 			timer.Reset(time.Second)
 		}
 	}
+}
+
+// AgentIsOnline will check Kibana if the agent specified by the passed id has the online status.
+// The test is marked as failed if the passed context terminates before that.
+func (suite *BaseE2ETestSuite) AgentIsOnline(ctx context.Context, id string) {
+	timer := time.NewTimer(time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			suite.Require().NoError(ctx.Err(), "context expired before agent reported online")
+			return
+		case <-timer.C:
+			req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:5601/api/fleet/agents/"+id, nil)
+			suite.Require().NoError(err)
+			req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+			req.Header.Set("kbn-xsrf", "e2e-setup")
+
+			resp, err := suite.client.Do(req)
+			suite.Require().NoError(err)
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				timer.Reset(time.Second)
+				continue
+			}
+
+			var obj struct {
+				Item struct {
+					Status string `json:"status"`
+				} `json:"item"`
+			}
+			err = json.NewDecoder(resp.Body).Decode(&obj)
+			suite.Require().NoError(err)
+			if obj.Item.Status == "online" {
+				return
+			}
+			timer.Reset(time.Second)
+		}
+	}
+}
+
+// NewFleetIsOnline will check Kibana if the 1st entry in the agents list has the online status.
+// The test is marked as failed if the passed context terminates before that.
+// The associated agent ID is returned.
+// It is intended to be used immediatly after a fleet-server that's managed by an agent is enrolled (as it would be the only item on the list).
+func (suite *BaseE2ETestSuite) NewFleetIsOnline(ctx context.Context) string {
+	timer := time.NewTimer(time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			suite.Require().NoError(ctx.Err(), "context expired before agent reported online")
+			return ""
+		case <-timer.C:
+			status, agents := suite.getAgents(ctx)
+			if status != http.StatusOK {
+				timer.Reset(time.Second)
+				continue
+			}
+
+			if len(agents) < 1 {
+				timer.Reset(time.Second)
+				continue
+			}
+			if agents[0].Status == "online" {
+				return agents[0].ID
+			}
+			timer.Reset(time.Second)
+		}
+	}
+}
+
+// KibanaAgent is the structure used to describe an agent in Kibana
+type KibanaAgent struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
+func (suite *BaseE2ETestSuite) getAgents(ctx context.Context) (int, []KibanaAgent) {
+	// TODO handle pagination if needed in the future
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:5601/api/fleet/agents", nil)
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-setup")
+
+	resp, err := suite.client.Do(req)
+	suite.Require().NoError(err)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return resp.StatusCode, nil
+	}
+
+	var obj struct {
+		Items []KibanaAgent `json:"items"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&obj)
+	suite.Require().NoError(err)
+	return resp.StatusCode, obj.Items
+}
+
+// DeleteAllAgents will remove all agents from Kibana.
+func (suite *BaseE2ETestSuite) DeleteAllAgents(ctx context.Context) {
+	status, agents := suite.getAgents(ctx)
+	suite.Require().Equal(http.StatusOK, status)
+	for _, agent := range agents {
+		req, err := http.NewRequestWithContext(ctx, "DELETE", "http://localhost:5601/api/fleet/agents/"+agent.ID, nil)
+		suite.Require().NoError(err)
+		req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+		req.Header.Set("kbn-xsrf", "e2e-setup")
+
+		resp, err := suite.client.Do(req)
+		suite.Require().NoError(err)
+		resp.Body.Close()
+		suite.Require().Equalf(http.StatusOK, resp.StatusCode, "Unable to delete agent %q", agent.ID)
+	}
+}
+
+// GetEnrollmentTokenForPolicyID will use Kibana's fleet API to return the first enrollment token associated with the specified policy ID.
+func (suite *BaseE2ETestSuite) GetEnrollmentTokenForPolicyID(ctx context.Context, id string) string {
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:5601/api/fleet/enrollment_api_keys", nil)
+	suite.Require().NoError(err)
+
+	req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-setup")
+
+	resp, err := suite.client.Do(req)
+	suite.Require().NoError(err)
+	defer resp.Body.Close()
+
+	suite.Require().Equal(http.StatusOK, resp.StatusCode, "unable to get enrollment keys")
+	var obj struct {
+		Items []struct {
+			APIKey   string `json:"api_key"`
+			PolicyID string `json:"policy_id"`
+		} `json:"items"`
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&obj)
+	suite.Require().NoError(err)
+
+	for _, key := range obj.Items {
+		if key.PolicyID == id {
+			return key.APIKey
+		}
+	}
+	suite.Require().Failf("unable to find enrollment key for ID %s", id)
+	return ""
+}
+
+// RequestDiagnosticsForAgent will use Kibana's fleet API to request a diagnostics action for the specified agent ID and return the associated ActionID.
+func (suite *BaseE2ETestSuite) RequestDiagnosticsForAgent(ctx context.Context, id string) string {
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:5601/api/fleet/agents/"+id+"/request_diagnostics", nil)
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-setup")
+	resp, err := suite.client.Do(req)
+	suite.Require().NoError(err)
+	suite.Require().Equal(http.StatusOK, resp.StatusCode)
+
+	var obj struct {
+		ActionID string `json:"actionId"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&obj)
+	suite.Require().NoError(err)
+	resp.Body.Close()
+	suite.Require().NotEmpty(obj.ActionID)
+	return obj.ActionID
+}
+
+func (suite *BaseE2ETestSuite) VerifyAgentInKibana(ctx context.Context, id string) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:5601/api/fleet/agents/"+id, nil)
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-setup")
+	resp, err := suite.client.Do(req)
+	suite.Require().NoError(err)
+	suite.Require().Equal(http.StatusOK, resp.StatusCode, "expected to find agent in fleet api")
 }
