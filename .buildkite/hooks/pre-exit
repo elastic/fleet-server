@@ -3,5 +3,6 @@
 set -euo pipefail
 
 if [[ "$BUILDKITE_STEP_KEY" == "publish" ]]; then
-   docker logout ${DOCKER_REGISTRY}
+    echo "Logging out from the ${DOCKER_REGISTRY}..."
+    docker logout ${DOCKER_REGISTRY}
 fi
