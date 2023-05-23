@@ -86,7 +86,7 @@ entries:
       checksum: 52e7139a413155a607e91d0d7afa696d2ca8c86d
   - kind: enhancement
     summary: Added memory_limit to server.runtime config.
-    description: ""
+    description: "The memory_limit option sets a soft limit in Go in bytes that helps prevent OOM errors. More info: https://weaviate.io/blog/gomemlimit-a-game-changer-for-high-memory-applications"
     component: ""
     pr:
       - "2514"
