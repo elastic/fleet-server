@@ -146,7 +146,7 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 		ExposedPorts: []string{"8220/tcp"},
 		Networks:     []string{"integration_default"},
 		// certs are copied so they can be readable by fleet-server.
-		Files: []testcontainer.ContainderFiles{{
+		Files: []testcontainers.ContainerFile{{
 			HostFilePath:      filepath.Join(suite.certPath, "e2e-test-ca.crt"),
 			ContainerFilePath: "/tmp/e2e-test-ca.crt",
 			FileMode:          644,
@@ -163,7 +163,7 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 			ContainerFilePath: "/tmp/passphrase",
 			FileMode:          644,
 		}},
-		Mounts: testcontainers.ContainerMount{
+		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
 				Source:   &testcontainers.GenericBindMountSource{dir},
 				Target:   "/token",
