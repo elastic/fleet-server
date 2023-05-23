@@ -75,7 +75,7 @@ entries:
       checksum: d12b4b64817054794ca1a4d1fba690397e937f92
   - kind: feature
     summary: Action APM tracing.
-    description: ""
+    description: "Added tracing on the actions flow between Fleet Server and Agents."
     component: ""
     pr:
       - "2472"
