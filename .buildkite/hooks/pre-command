@@ -16,7 +16,7 @@ if [[ "$BUILDKITE_STEP_KEY" == "publish" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-
 fi
 
 if [[ "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
-  export EC_API_KEY_SECRET=$(retry 5 vault kv get -field apikey "${EC_KEY_SECRET_PATH}")
+  export EC_API_KEY_SECRET=$(retry 5 vault kv get -field apiKey "${EC_KEY_SECRET_PATH}")
   # Environment variables required by the Elastic Cloud service deployer
   export EC_API_KEY=${EC_API_KEY_SECRET}
 fi
