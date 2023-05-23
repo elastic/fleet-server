@@ -59,3 +59,15 @@ docker_logout() {
     echo "Logging out from Docker..."
     docker logout ${DOCKER_REGISTRY}
 }
+
+with_Terraform() {
+    echo "Setting up the Terraform environment..."
+    destFile="terraform.zip"
+    mkdir -p ${WORKSPACE}
+    retry 5 curl -SL -o ${WORKSPACE}/${destFile} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+    unzip -q ${WORKSPACE}/${destFile} -d ${WORKSPACE}/
+    rm ${WORKSPACE}/${destFile}
+    chmod +x ${WORKSPACE}/terraform
+    terraform version
+    export PATH="${PATH}:${WORKSPACE}"
+}
