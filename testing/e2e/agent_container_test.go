@@ -123,7 +123,7 @@ func (suite *AgentContainerSuite) TestHTTP() {
 func (suite *AgentContainerSuite) TestWithSecretFiles() {
 	// Create a service token file in the temp test dir
 	dir := suite.T().TempDir()
-	err := os.WriteFile(filepath.Join(dir, "service-token"), []byte(suite.serviceToken), 0600)
+	err := os.WriteFile(filepath.Join(dir, "service-token"), []byte(suite.serviceToken), 0644)
 	suite.Require().NoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
