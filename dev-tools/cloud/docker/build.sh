@@ -20,10 +20,12 @@ GOARCH="${GOARCH:-$(go env GOARCH)}"
 export DOCKER_BUILDKIT=1
 docker pull --platform linux/$GOARCH $BASE_IMAGE
 
+set -xv
+
 STACK_VERSION=$(docker inspect -f '{{index .Config.Labels "org.label-schema.version"}}' $BASE_IMAGE)
 VCS_REF=$(docker inspect -f '{{index .Config.Labels "org.label-schema.vcs-ref"}}' $BASE_IMAGE)
 
-CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG:-"${STACK_VERSION}-${USER_NAME}-$(date +%s)"} 
+CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG:-"${STACK_VERSION}-${USER_NAME}-$(date +%s)"}
 
 SNAPSHOT=true make -C $REPO_ROOT release-linux/${GOARCH}
 
@@ -38,6 +40,8 @@ docker build \
 
 
 docker push ${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}
+
+set +xv
 
 echo "Image available at:"
 echo "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
