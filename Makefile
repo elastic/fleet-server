@@ -351,11 +351,12 @@ test-e2e: cover-e2e-binaries build-e2e-agent-image e2e-certs ## - Setup and run 
 
 .PHONY: test-e2e-set
 test-e2e-set: ## - Run the blackbox end to end tests without setup.
+	cd testing; \
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
 	CGO_ENABLED=1 \
-	go test -v -tags=e2e -count=1 -race -p 1 ./testing/...
+	go test -v -tags=e2e -count=1 -race -p 1 ./...
 
 ##################################################
 # Cloud testing targets
