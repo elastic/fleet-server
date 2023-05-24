@@ -68,7 +68,8 @@ steps:
         key: "cloud-e2e-test"
         command: ".buildkite/scripts/clud_e2e_test.sh"
         agents:
-          provider: "gcp"
+#          provider: "gcp"
+          image: 'core-ubuntu-2204-1684244210'
         depends_on:
           - step: "unit-test"
             allow_failure: false
