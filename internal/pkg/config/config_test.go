@@ -14,6 +14,7 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/elastic/go-ucfg"
+	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
@@ -185,7 +186,10 @@ func TestLoadStandaloneAgentMetadata(t *testing.T) {
 	t.Run("generates agent id", func(t *testing.T) {
 		cfg := &Config{}
 		cfg.LoadStandaloneAgentMetadata()
-		assert.NotEmpty(t, cfg.Fleet.Agent.ID)
+		assert.Len(t, cfg.Fleet.Agent.ID, 36)
+		_, err := uuid.FromString(cfg.Fleet.Agent.ID)
+		assert.NoError(t, err)
+
 		assert.NotEmpty(t, cfg.Fleet.Agent.Version)
 	})
 }
