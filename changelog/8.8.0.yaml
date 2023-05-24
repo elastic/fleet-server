@@ -1,0 +1,97 @@
+version: 8.8.0
+entries:
+  - kind: feature
+    summary: pass_action_signature
+    description: Pass "signed" data with the action to the agent
+    component: ""
+    pr:
+      - "2353"
+    issue: []
+    timestamp: 1676500216
+    file:
+      name: 1676500216-pass_action_signature.yaml
+      checksum: df7e1c4ebd4f2f74e365d9122a61e14c4ee360db
+  - kind: bug-fix
+    summary: Fix fleet-server discarding duplicate `server` keys input when creating config from policy.
+    description: ""
+    component: ""
+    pr:
+      - "2354"
+    issue:
+      - "2303"
+    timestamp: 1677009600
+    file:
+      name: 1677009600-fix-fleet-server-discard-keys.yaml
+      checksum: a39d9c541a33ed6f12fc8a8e0f83cdd3637f9e6e
+  - kind: feature
+    summary: Add support for gathering secret values from files.
+    description: ""
+    component: ""
+    pr:
+      - "2459"
+    issue: []
+    timestamp: 1680807600
+    file:
+      name: 1680807600-secret-files.yaml
+      checksum: 6a2ebdc101a03061bae3cbab742979c3d7275ffb
+  - kind: bug-fix
+    summary: Isolate fleet-server logger level changes
+    description: Fleet-server will no longer restart subsystems like API listeners and the ES client when the log level changes.
+    component: ""
+    pr:
+      - "2454"
+    issue:
+      - "2453"
+    timestamp: 1680807600
+    file:
+      name: 1680807600-isolate-logger-restart.yaml
+      checksum: 6bc20f90807f3484a67793136225d84104b7c19e
+  - kind: feature
+    summary: Add support for gathering secret values from files.
+    description: ""
+    component: ""
+    pr:
+      - "2459"
+    issue: []
+    timestamp: 1680807600
+    file:
+      name: 1680807600-secret-files.yaml
+      checksum: 6a2ebdc101a03061bae3cbab742979c3d7275ffb
+  - kind: enhancement
+    summary: Add poll_timeout to checkin requests
+    description: |
+      Add a poll_duration attribute to checkin requests that the client can use to
+      inform fleet-server of how long the client will hold the polling connection
+      open for. If specified fleet-server will return a checkin response within
+      the specified duration.
+    component: checkin
+    pr:
+      - "2491"
+    issue:
+      - "2337"
+    timestamp: 1681246555
+    file:
+      name: 1681246555-Add-poll_duration-to-checkin-requests.yaml
+      checksum: d12b4b64817054794ca1a4d1fba690397e937f92
+  - kind: enhancement
+    summary: Action APM tracing.
+    description: "Added tracing on the actions flow between Fleet Server and Agents."
+    component: ""
+    pr:
+      - "2472"
+    issue: []
+    timestamp: 1681412400
+    file:
+      name: 1681412400-action-apm-tracing.yaml
+      checksum: 52e7139a413155a607e91d0d7afa696d2ca8c86d
+  - kind: enhancement
+    summary: Added memory_limit to server.runtime config.
+    description: "The memory_limit option sets a soft limit in Go in bytes that helps prevent OOM errors. More info: https://weaviate.io/blog/gomemlimit-a-game-changer-for-high-memory-applications"
+    component: ""
+    pr:
+      - "2514"
+    issue: []
+    timestamp: 1681906741
+    file:
+      name: 1681906741-memory_limit.yaml
+      checksum: 39f83f12e5cafad5c01d89e926b6593cf1c0bc63
