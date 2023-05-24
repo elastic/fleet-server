@@ -20,3 +20,16 @@ if [[ "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
   # Environment variables required by the Elastic Cloud service deployer
   export EC_API_KEY=${EC_API_KEY_SECRET}
 fi
+
+#TEST SECTION
+if [[ "$BUILDKITE_STEP_KEY" == "check" ]]; then
+  TESTVAR1_SECRET="MY$UpeRPa$$W0RD"
+  export TESTVAR1=${TESTVAR1_SECRET}
+  echo ${TESTVAR1}
+  echo ${TESTVAR1_SECRET}
+
+  export TESTVAR2_SECRET="MY_NOT_$UpeRPa$$W0RD"
+  export TESTVAR2=${TESTVAR2_SECRET}
+  echo ${TESTVAR2}
+  echo ${TESTVAR2_SECRET}
+fi
