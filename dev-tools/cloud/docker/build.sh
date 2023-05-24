@@ -4,7 +4,7 @@
 # with a locally built apm-server binary injected. Additional
 # flags (e.g. -t <name>) will be passed to `docker build`.
 
-set -eux
+set -eu
 
 REPO_ROOT=$(cd $(dirname $(readlink -f "$0"))/../../.. && pwd)
 

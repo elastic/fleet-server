@@ -2,13 +2,6 @@
 
 set -euo pipefail
 
-source .buildkite/scripts/common.sh
-
-DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
-DOCKER_REGISTRY="docker.elastic.co"
-export DOCKER_REGISTRY="${DOCKER_REGISTRY}"
-EC_KEY_SECRET_PATH='kv/ci-shared/platform-ingest/platform-ingest-ec-prod'
-
 if [[ "$BUILDKITE_STEP_KEY" == "publish" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
   export DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
   export DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
@@ -19,25 +12,4 @@ if [[ "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
   export EC_API_KEY_SECRET=$(retry 5 vault kv get -field apiKey "${EC_KEY_SECRET_PATH}")
   # Environment variables required by the Elastic Cloud service deployer
   export EC_API_KEY=${EC_API_KEY_SECRET}
-fi
-
-#TEST SECTION
-if [[ "$BUILDKITE_STEP_KEY" == "check-ci" ]]; then
-  TESTVAR1_SECRET="MY_TEST_PASSWORD1"
-  export TESTVAR1=${TESTVAR1_SECRET}
-  echo "TESTVAR1 = ${TESTVAR1}"
-  echo "TESTVAR1 = $${TESTVAR1}"
-  echo "TESTVAR1_SECRET = ${TESTVAR1_SECRET}"
-  echo "TESTVAR1_SECRET = $$TESTVAR1_SECRET"
-
-  export TESTVAR2_SECRET="MY_TEST_PASSWORD2"
-  export TESTVAR2=${TESTVAR2_SECRET}
-  echo "TESTVAR2 = ${TESTVAR2}"
-  echo "TESTVAR2 = $${TESTVAR2}"
-  echo "TESTVAR2_SECRET = ${TESTVAR2_SECRET}"
-  echo "TESTVAR2_SECRET = $${TESTVAR2_SECRET}"
-
-  export TESTVAR3="MYPASSWORD"
-  echo "TESTVAR3 = ${TESTVAR3}"
-  echo "TESTVAR3 = $${TESTVAR3}"
 fi
