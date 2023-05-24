@@ -4,7 +4,6 @@ env:
   SETUP_GVM_VERSION: 'v0.5.0'
   DOCKER_COMPOSE_VERSION: '1.25.5'
   DOCKER_REGISTRY: "docker.elastic.co"
-  DOCKER_REGISTRY_SECRET_PATH: "kv/ci-shared/platform-ingest/docker_registry_prod"
   EC_KEY_SECRET_PATH: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
   DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/temp-fleet-server" # needs to rename after tests
   DOCKER_IMAGE_SHA_TAG: "temp-${BUILDKITE_COMMIT}" # needs to rename after tests
@@ -68,10 +67,8 @@ steps:
         key: "cloud-e2e-test"
         command: ".buildkite/scripts/clud_e2e_test.sh"
         agents:
-#          provider: "gcp"
+          provider: "gcp"
           image: 'core-ubuntu-2204-1684244210'
-          cpu: "8"
-          memory: "4G"
         depends_on:
           - step: "unit-test"
             allow_failure: false
