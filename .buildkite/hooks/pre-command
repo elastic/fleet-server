@@ -22,7 +22,7 @@ if [[ "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
 fi
 
 #TEST SECTION
-if [[ "$BUILDKITE_STEP_KEY" == "check" ]]; then
+if [[ "$BUILDKITE_STEP_KEY" == "check-ci" ]]; then
   TESTVAR1_SECRET="MY$UpeRPa$$W0RD"
   export TESTVAR1=${TESTVAR1_SECRET}
   echo ${TESTVAR1}
