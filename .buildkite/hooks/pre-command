@@ -36,4 +36,8 @@ if [[ "$BUILDKITE_STEP_KEY" == "check-ci" ]]; then
   echo "TESTVAR2 = $${TESTVAR2}"
   echo "TESTVAR2_SECRET = ${TESTVAR2_SECRET}"
   echo "TESTVAR2_SECRET = $${TESTVAR2_SECRET}"
+
+  export TESTVAR3="MYPASSWORD"
+  echo "TESTVAR3 = ${TESTVAR3}"
+  echo "TESTVAR3 = $${TESTVAR3}"
 fi
