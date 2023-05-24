@@ -3,6 +3,8 @@
 set -euo pipefail
 
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
+DOCKER_REGISTRY="docker.elastic.co"
+export DOCKER_REGISTRY="${DOCKER_REGISTRY}"
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "publish" ]]; then
   export DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
