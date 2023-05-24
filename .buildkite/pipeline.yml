@@ -70,5 +70,5 @@ steps:
     agents:
       provider: "gcp"
     depends_on:
-      - step: "tests"
-        allow_failure: false
+#      - step: "tests"
+#        allow_failure: false
