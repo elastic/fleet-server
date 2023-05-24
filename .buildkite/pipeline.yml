@@ -70,6 +70,8 @@ steps:
         agents:
 #          provider: "gcp"
           image: 'core-ubuntu-2204-1684244210'
+          cpu: "8"
+          memory: "4G"
         depends_on:
           - step: "unit-test"
             allow_failure: false
