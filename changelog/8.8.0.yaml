@@ -73,7 +73,7 @@ entries:
     file:
       name: 1681246555-Add-poll_duration-to-checkin-requests.yaml
       checksum: d12b4b64817054794ca1a4d1fba690397e937f92
-  - kind: feature
+  - kind: enhancement
     summary: Action APM tracing.
     description: "Added tracing on the actions flow between Fleet Server and Agents."
     component: ""
