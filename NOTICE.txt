@@ -31649,39 +31649,6 @@ SOFTWARE.
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/creack/pty
-Version: v1.1.9
-Licence type (autodetected): MIT
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/creack/pty@v1.1.9/LICENSE:
-
-Copyright (c) 2011 Keith Rarick
-
-Permission is hereby granted, free of charge, to any person
-obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute,
-sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall
-be included in all copies or substantial portions of the
-Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
-KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
-PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
---------------------------------------------------------------------------------
 Dependency : github.com/cyphar/filepath-securejoin
 Version: v0.2.3
 Licence type (autodetected): BSD-3-Clause
@@ -32018,11 +31985,11 @@ Apache License
 
 --------------------------------------------------------------------------------
 Dependency : github.com/docker/docker
-Version: v23.0.5+incompatible
+Version: v23.0.3+incompatible
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/docker/docker@v23.0.5+incompatible/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/docker/docker@v23.0.3+incompatible/LICENSE:
 
 
                                  Apache License
@@ -37360,11 +37327,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/kr/pretty
-Version: v0.3.0
+Version: v0.2.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/kr/pretty@v0.3.0/License:
+Contents of probable licence file $GOMODCACHE/github.com/kr/pretty@v0.2.1/License:
 
 Copyright 2012 Keith Rarick
 
@@ -39041,11 +39008,11 @@ Contents of probable licence file $GOMODCACHE/github.com/opencontainers/go-diges
 
 --------------------------------------------------------------------------------
 Dependency : github.com/opencontainers/image-spec
-Version: v1.1.0-rc2
+Version: v1.0.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/opencontainers/image-spec@v1.1.0-rc2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/opencontainers/image-spec@v1.0.2/LICENSE:
 
 
                                  Apache License
@@ -39269,27 +39236,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-
---------------------------------------------------------------------------------
-Dependency : github.com/pkg/diff
-Version: v0.0.0-20210226163009-20ebb0f2a09e
-Licence type (autodetected): BSD-3-Clause
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/pkg/diff@v0.0.0-20210226163009-20ebb0f2a09e/LICENSE:
-
-Copyright 2018 Joshua Bleecher Snyder
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 --------------------------------------------------------------------------------
@@ -39643,81 +39589,6 @@ THE POSSIBILITY OF SUCH DAMAGE.
 The views and conclusions contained in the software and documentation
 are those of the authors and should not be interpreted as representing
 official policies, either expressed or implied, of Richard Crowley.
-
-
---------------------------------------------------------------------------------
-Dependency : github.com/rogpeppe/go-internal
-Version: v1.8.1
-Licence type (autodetected): BSD-3-Clause
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/rogpeppe/go-internal@v1.8.1/LICENSE:
-
-Copyright (c) 2018 The Go Authors. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-   * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-   * Neither the name of Google Inc. nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
---------------------------------------------------------------------------------
-Dependency : github.com/russross/blackfriday
-Version: v1.6.0
-Licence type (autodetected): BSD-2-Clause
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/russross/blackfriday@v1.6.0/LICENSE.txt:
-
-Blackfriday is distributed under the Simplified BSD License:
-
-Copyright © 2011 Russ Ross
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1.  Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
-2.  Redistributions in binary form must reproduce the above
-    copyright notice, this list of conditions and the following
-    disclaimer in the documentation and/or other materials provided with
-    the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGE.
 
 
 --------------------------------------------------------------------------------
@@ -40443,30 +40314,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-
---------------------------------------------------------------------------------
-Dependency : github.com/xeipuuv/gojsonpointer
-Version: v0.0.0-20180127040702-4e3ac2762d5f
-Licence type (autodetected): Apache-2.0
---------------------------------------------------------------------------------
-
-No licence file provided.
-
---------------------------------------------------------------------------------
-Dependency : github.com/xeipuuv/gojsonreference
-Version: v0.0.0-20180127040603-bd5ef7bd5415
-Licence type (autodetected): Apache-2.0
---------------------------------------------------------------------------------
-
-No licence file provided.
-
---------------------------------------------------------------------------------
-Dependency : github.com/xeipuuv/gojsonschema
-Version: v1.2.0
-Licence type (autodetected): Apache-2.0
---------------------------------------------------------------------------------
-
-No licence file provided.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/yuin/goldmark
@@ -41900,42 +41747,6 @@ ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
 LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
---------------------------------------------------------------------------------
-Dependency : gopkg.in/errgo.v2
-Version: v2.1.0
-Licence type (autodetected): BSD-3-Clause
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/gopkg.in/errgo.v2@v2.1.0/LICENSE:
-
-Copyright © 2013, Roger Peppe
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-    * Redistributions of source code must retain the above copyright notice,
-      this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright notice,
-      this list of conditions and the following disclaimer in the documentation
-      and/or other materials provided with the distribution.
-    * Neither the name of this project nor the names of its contributors
-      may be used to endorse or promote products derived from this software
-      without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
-TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
