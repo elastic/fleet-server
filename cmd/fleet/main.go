@@ -107,6 +107,11 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
+			err = cfg.LoadStandaloneAgentMetadata()
+			if err != nil {
+				return err
+			}
+
 			l, err = initLogger(cfg, bi.Version, bi.Commit)
 			if err != nil {
 				return err

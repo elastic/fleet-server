@@ -2,6 +2,6 @@
 
 set -euo pipefail
 
-if [[ "$BUILDKITE_STEP_KEY" == "publish" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "publish" ]]; then
     docker logout ${DOCKER_REGISTRY}
 fi
