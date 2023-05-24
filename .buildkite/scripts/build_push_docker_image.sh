@@ -4,7 +4,7 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-DOCKER_IMAGE_TAG=""
+#trap docker_logout EXIT
 
 echo "Building the docker image..."
 if ! docker pull -q ${DOCKER_IMAGE}:${DOCKER_IMAGE_SHA_TAG} 2> /dev/null; then

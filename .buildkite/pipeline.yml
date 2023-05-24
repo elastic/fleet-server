@@ -3,9 +3,8 @@
 env:
   SETUP_GVM_VERSION: 'v0.5.0'
   DOCKER_COMPOSE_VERSION: '1.25.5'
-  DOCKER_REGISTRY: "docker.elastic.co"
-  DOCKER_REGISTRY_SECRET_PATH: "kv/ci-shared/platform-ingest/docker_registry_prod"
   DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/temp-fleet-server" # needs to rename after tests
+  DOCKER_IMAGE_TAG: ""
   DOCKER_IMAGE_SHA_TAG: "temp-${BUILDKITE_COMMIT}" # needs to rename after tests
   DOCKER_IMAGE_LATEST_TAG: "temp-latest" # needs to rename after tests
   DOCKER_IMAGE_GIT_TAG: "temp-${BUILDKITE_BRANCH}" # needs to rename after tests
@@ -70,5 +69,5 @@ steps:
     agents:
       provider: "gcp"
     depends_on:
-#      - step: "tests"
-#        allow_failure: false
+      - step: "tests"
+        allow_failure: false
