@@ -51,8 +51,8 @@ retry() {
 }
 
 publish_docker_image() {
-    echo "Pushing the docker image "$DOCKER_IMAGE":"$DOCKER_IMAGE_TAG" to the "${DOCKER_REGISTRY}" registry..."
-    docker push "${DOCKER_IMAGE}":"${DOCKER_IMAGE_TAG}"
+    echo "Pushing the docker image "$DOCKER_IMAGE":"$DOCKER_IMAGE_PUBLISH_TAG" to the "${DOCKER_REGISTRY}" registry..."
+    docker push "${DOCKER_IMAGE}":"${DOCKER_IMAGE_PUBLISH_TAG}"
 }
 
 docker_logout() {
