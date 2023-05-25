@@ -346,7 +346,7 @@ e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
 	@$(MAKE) int-docker-stop
 
 .PHONY: test-e2e
-test-e2e: cover-e2e-binaries build-e2e-agent-image e2e-certs ## - Setup and run the blackbox end to end test suite
+test-e2e: docker-cover-e2e-binaries build-e2e-agent-image e2e-certs ## - Setup and run the blackbox end to end test suite
 	@mkdir -p build/e2e-cover
 	@$(MAKE) e2e-docker-start
 	@set -o pipefail; $(MAKE) test-e2e-set | tee build/test-e2e.out
