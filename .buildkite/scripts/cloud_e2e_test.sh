@@ -10,6 +10,6 @@ with_go
 
 with_Terraform
 
-.ci/scripts/install-docker-compose.sh
+with_docker_compose
 
 USER=fleetserverci make test-cloude2e
