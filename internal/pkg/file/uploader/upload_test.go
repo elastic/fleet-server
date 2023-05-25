@@ -14,8 +14,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	itesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
-	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -90,7 +90,7 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 	assert.Equal(t, action, info.ActionID)
 	assert.Equal(t, agent, info.AgentID)
 	assert.Equal(t, src, info.Source)
-	assert.Equal(t, upload.StatusAwaiting, info.Status)
+	assert.Equal(t, file.StatusAwaiting, info.Status)
 	assert.Greaterf(t, info.ChunkSize, int64(0), "server chosen chunk size should be >0")
 	assert.Equal(t, action+"."+agent, info.DocID)
 	assert.WithinDuration(t, time.Now(), info.Start, time.Minute)
@@ -156,15 +156,15 @@ func TestUploadBeginCalculatesCorrectChunkCount(t *testing.T) {
 		Name          string
 	}{
 		{10, 1, "Tiny files take 1 chunk"},
-		{MaxChunkSize, 1, "Precisely 1 chunk size bytes should fit in 1 chunk"},
-		{MaxChunkSize + 1, 2, "ChunkSize+1 bytes takes 2 chunks"},
-		{MaxChunkSize * 3.5, 4, "3.5x chunk size fits in 4 chunks due to remainder"},
+		{file.MaxChunkSize, 1, "Precisely 1 chunk size bytes should fit in 1 chunk"},
+		{file.MaxChunkSize + 1, 2, "ChunkSize+1 bytes takes 2 chunks"},
+		{file.MaxChunkSize * 3.5, 4, "3.5x chunk size fits in 4 chunks due to remainder"},
 		{7534559605, 1797, "7.5Gb file"},
 	}
 
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
-	u := New(nil, fakeBulk, c, MaxChunkSize*3000, time.Hour)
+	u := New(nil, fakeBulk, c, file.MaxChunkSize*3000, time.Hour)
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -272,7 +272,7 @@ func TestUploadRejectsMissingRequiredFields(t *testing.T) {
 
 }
 
-func mockUploadInfoResult(bulker *itesting.MockBulk, info upload.Info) {
+func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 
 	// convert info into how it's stored/returned in ES
 	out, _ := json.Marshal(map[string]interface{}{
@@ -312,9 +312,9 @@ func TestChunkMarksFinal(t *testing.T) {
 		Name       string
 	}{
 		{10, 0, "Small file only chunk is final"},
-		{MaxChunkSize, 0, "1 chunksize only chunk is final"},
-		{MaxChunkSize + 1, 1, "ChunkSize+1 bytes takes 2 chunks"},
-		{MaxChunkSize * 2.5, 2, "2.5x chunk size"},
+		{file.MaxChunkSize, 0, "1 chunksize only chunk is final"},
+		{file.MaxChunkSize + 1, 1, "ChunkSize+1 bytes takes 2 chunks"},
+		{file.MaxChunkSize * 2.5, 2, "2.5x chunk size"},
 		{7534559605, 1796, "7.5Gb file"},
 	}
 
