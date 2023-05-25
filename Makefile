@@ -76,10 +76,9 @@ local: ## - Build local binary for local environment (bin/fleet-server)
 	go build $(if $(DEV),-tags="dev",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
-
 .PHONY: cover-e2e-binaries
 cover-e2e-binaries: ## - Build binaries for the test-e2e target with the go 1.20+ cover flag
-	SNAPSHOT=true $(MAKE) cover-$(shell go env GOOS)/$(shell go env GOARCH) cover-linux/$(shell go env GOARCH)
+	SNAPSHOT=true $(MAKE) $(COVER_TARGETS)
 
 .PHONY: $(COVER_TARGETS)
 $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integration testing
@@ -236,7 +235,11 @@ build-releaser: ## - Build a Docker image to run make package including all buil
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
-	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE)
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) release
+
+.PHONY: docker-cover-e2e-binaries
+docker-cover-e2e-binaries: build-releaser
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) cover-e2e-binaries
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
@@ -322,7 +325,7 @@ test-int-set: ## - Run integration tests without setup
 
 # based off build-and-push-cloud-image
 .PHONY: build-e2e-agent-image
-build-e2e-agent-image: cover-e2e-binaries ## - Build a custom elastic-agent image with the locally build e2e binarty injected into it
+build-e2e-agent-image: docker-cover-e2e-binaries ## - Build a custom elastic-agent image with fleet-server binaries with coverage enabled injected
 	@printf "${CMD_COLOR_ON} Creating test e2e agent image\n${CMD_COLOR_OFF}"
 	GOARCH=amd64 ./dev-tools/e2e/build.sh
 
