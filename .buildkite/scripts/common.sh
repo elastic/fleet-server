@@ -15,10 +15,10 @@ with_go() {
     mkdir -p ${WORKSPACE}
     retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
     chmod +x ${WORKSPACE}/gvm
-    export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
     eval "$(gvm $(cat .go-version))"
     go version
     which go
+    export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
 }
 
 with_docker_compose() {
