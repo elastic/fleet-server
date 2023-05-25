@@ -60,6 +60,18 @@ steps:
             allow_failure: true
           - step: "int-test"
             allow_failure: true
+
+      - label: "Cloud e2e Test"
+        key: "cloud-e2e-test"
+        command: ".buildkite/scripts/clud_e2e_test.sh"
+        agents:
+          provider: "gcp"
+        depends_on:
+          - step: "unit-test"
+            allow_failure: false
+          - step: "int-test"
+            allow_failure: false
+
     depends_on: "check"
 
   - label: "Publish docker image"
@@ -68,6 +80,6 @@ steps:
     if: build.env("BUILDKITE_PULL_REQUEST") != null
     agents:
       provider: "gcp"
-#    depends_on:
-#      - step: "tests"
-#        allow_failure: false
+    depends_on:
+      - step: "tests"
+        allow_failure: false
