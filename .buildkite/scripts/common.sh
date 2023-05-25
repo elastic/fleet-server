@@ -15,10 +15,10 @@ with_go() {
     mkdir -p ${WORKSPACE}
     retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
     chmod +x ${WORKSPACE}/gvm
+    export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
     eval "$(gvm $(cat .go-version))"
     go version
     which go
-    export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
 }
 
 with_docker_compose() {
@@ -26,8 +26,8 @@ with_docker_compose() {
     mkdir -p ${WORKSPACE}
     retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
     chmod +x ${WORKSPACE}/docker-compose
-    docker-compose version
     export PATH="${PATH}:${WORKSPACE}"
+    docker-compose version
 }
 
 retry() {
@@ -68,6 +68,6 @@ with_Terraform() {
     unzip -q ${WORKSPACE}/${destFile} -d ${WORKSPACE}/
     rm ${WORKSPACE}/${destFile}
     chmod +x ${WORKSPACE}/terraform
-    terraform version
     export PATH="${PATH}:${WORKSPACE}"
+    terraform version
 }

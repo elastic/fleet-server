@@ -84,3 +84,12 @@ steps:
     depends_on:
       - step: "tests"
         allow_failure: false
+
+  - label: "Release test"
+    key: "release-test"
+    command: ".buildkite/scripts/release_test.sh"
+    agents:
+      provider: "gcp"
+    depends_on:
+      - step: "tests"
+        allow_failure: false
