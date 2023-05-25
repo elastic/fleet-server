@@ -76,9 +76,9 @@ steps:
   - label: "Publish docker image"
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
-    if: build.env("BUILDKITE_PULL_REQUEST") == null
+    if: build.env("BUILDKITE_PULL_REQUEST") != null
     agents:
       provider: "gcp"
-    depends_on:
-      - step: "tests"
-        allow_failure: false
+#    depends_on:
+#      - step: "tests"
+#        allow_failure: false
