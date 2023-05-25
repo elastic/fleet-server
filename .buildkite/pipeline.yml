@@ -64,7 +64,7 @@ steps:
 
       - label: "Cloud e2e Test"
         key: "cloud-e2e-test"
-        command: ".buildkite/scripts/clud_e2e_test.sh"
+        command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
         depends_on:
