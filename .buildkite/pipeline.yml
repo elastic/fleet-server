@@ -9,6 +9,7 @@ env:
   DOCKER_IMAGE_LATEST_TAG: "temp-latest" # needs to rename after tests
   DOCKER_IMAGE_GIT_TAG: "temp-${BUILDKITE_BRANCH}" # needs to rename after tests
   GO_AGENT_IMAGE: "golang:1.20.3"
+  TERRAFORM_VERSION: '1.4.6'
 
 steps:
   - group: "Check and build"
@@ -60,6 +61,18 @@ steps:
             allow_failure: true
           - step: "int-test"
             allow_failure: true
+
+      - label: "Cloud e2e Test"
+        key: "cloud-e2e-test"
+        command: ".buildkite/scripts/cloud_e2e_test.sh"
+        agents:
+          provider: "gcp"
+        depends_on:
+          - step: "unit-test"
+            allow_failure: false
+          - step: "int-test"
+            allow_failure: false
+
     depends_on: "check"
 
   - label: "Publish docker image"

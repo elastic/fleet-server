@@ -23,7 +23,7 @@ docker pull --platform linux/$GOARCH $BASE_IMAGE
 STACK_VERSION=$(docker inspect -f '{{index .Config.Labels "org.label-schema.version"}}' $BASE_IMAGE)
 VCS_REF=$(docker inspect -f '{{index .Config.Labels "org.label-schema.vcs-ref"}}' $BASE_IMAGE)
 
-CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG:-"${STACK_VERSION}-${USER_NAME}-$(date +%s)"} 
+CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG:-"${STACK_VERSION}-${USER_NAME}-$(date +%s)"}
 
 SNAPSHOT=true make -C $REPO_ROOT release-linux/${GOARCH}
 
