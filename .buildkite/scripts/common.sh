@@ -26,7 +26,6 @@ with_docker_compose() {
     mkdir -p ${WORKSPACE}
     retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
     chmod +x ${WORKSPACE}/docker-compose
-    export PATH="${PATH}:${WORKSPACE}"
     docker-compose version
 }
 
@@ -68,6 +67,5 @@ with_Terraform() {
     unzip -q ${WORKSPACE}/${destFile} -d ${WORKSPACE}/
     rm ${WORKSPACE}/${destFile}
     chmod +x ${WORKSPACE}/terraform
-    export PATH="${PATH}:${WORKSPACE}"
     terraform version
 }
