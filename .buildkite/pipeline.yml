@@ -62,17 +62,6 @@ steps:
             allow_failure: true
           - step: "int-test"
             allow_failure: true
-      - label: ":junit: Junit annotate"
-        plugins:
-          - junit-annotate#v2.4.1:
-              artifacts: "build/*.xml"
-        agents:
-          provider: "gcp"
-        depends_on:
-          - step: "unit-test"
-            allow_failure: true
-          - step: "int-test"
-            allow_failure: true
 
       - label: "Cloud e2e Test"
         key: "cloud-e2e-test"

@@ -14,4 +14,3 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
     unset GOOGLE_APPLICATIONS_CREDENTIALS
     cleanup
 fi
-
