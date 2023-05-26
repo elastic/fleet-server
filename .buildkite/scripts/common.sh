@@ -4,6 +4,7 @@ set -euo pipefail
 
 WORKSPACE="$(pwd)/bin"
 TMP_FOLDER_TEMPLATE_BASE="tmp.fleet-server"
+REPO="fleet-server"
 
 add_bin_path(){
     echo "Adding PATH to the environment variables..."
@@ -76,6 +77,21 @@ google_cloud_auth() {
     echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
     gcloud auth activate-service-account --key-file ${secretFileLocation} 2> /dev/null
     export GOOGLE_APPLICATIONS_CREDENTIALS=${secretFileLocation}
+}
+
+upload_packages_to_gcp_backet() {
+    pattern=${1}
+    baseUrl="gs://${JOB_GCS_BUCKET}/${REPO}"
+    bucketUrlCommit="${baseUrl}"/commits/${BUILDKITE_COMMIT}
+    bucketUrlDefault="${baseUrl}"/snapshots
+
+    if [[ ${BUILDKITE_PULL_REQUEST} != "false" ]]; then
+        bucketUrlDefault="${baseUrl}"/pull-requests/pr-${BUILDKITE_COMMIT}
+    fi
+
+    for variable in "${bucketUrlCommit}" "${bucketUrlDefault}"; do
+        gsutil -m cp -a public-read -r ${pattern} "${JOB_GCS_BUCKET}"
+    done
 }
 
 cleanup() {

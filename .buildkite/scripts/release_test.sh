@@ -18,6 +18,4 @@ make docker-release
 
 google_cloud_auth
 
-gsutil ls gs://${JOB_GCS_BUCKET}
-pwd
-ls -l
+upload_packages_to_gcp_backet "build/distributions/"
