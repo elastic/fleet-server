@@ -27,7 +27,6 @@ with_docker_compose() {
     retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
-    export PATH="${PATH}:${WORKSPACE}"
 }
 
 retry() {
@@ -52,10 +51,21 @@ retry() {
 
 publish_docker_image() {
     echo "Pushing the docker image "$DOCKER_IMAGE":"$DOCKER_IMAGE_TAG" to the "${DOCKER_REGISTRY}" registry..."
-    docker push "${DOCKER_IMAGE}":"${DOCKER_IMAGE_TAG}"
+    DOCKER_IMAGE=${DOCKER_IMAGE} DOCKER_IMAGE_TAG=${DOCKER_IMAGE_TAG} make release-docker
 }
 
 docker_logout() {
     echo "Logging out from Docker..."
     docker logout ${DOCKER_REGISTRY}
+}
+
+with_Terraform() {
+    echo "Setting up the Terraform environment..."
+    destFile="terraform.zip"
+    mkdir -p ${WORKSPACE}
+    retry 5 curl -SL -o ${WORKSPACE}/${destFile} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+    unzip -q ${WORKSPACE}/${destFile} -d ${WORKSPACE}/
+    rm ${WORKSPACE}/${destFile}
+    chmod +x ${WORKSPACE}/terraform
+    terraform version
 }
