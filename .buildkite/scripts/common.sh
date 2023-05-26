@@ -3,6 +3,7 @@
 set -euo pipefail
 
 WORKSPACE="$(pwd)/bin"
+TMP_FOLDER_TEMPLATE_BASE="tmp.fleet-server"
 
 add_bin_path(){
     echo "Adding PATH to the environment variables..."
@@ -70,4 +71,18 @@ with_Terraform() {
     chmod +x ${WORKSPACE}/terraform
     export PATH="${PATH}:${WORKSPACE}"
     terraform version
+}
+
+google_cloud_auth() {
+    secretFileLocation=$(mktemp -d -p . -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
+    echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
+    gcloud auth activate-service-account --key-file ${secretFileLocation} 2> /dev/null
+    export GOOGLE_APPLICATIONS_CREDENTIALS=${secretFileLocation}
+}
+
+cleanup() {
+    echo "Deleting temporal files..."
+    cd ${WORKSPACE}
+    rm -rf ${TMP_FOLDER_TEMPLATE_BASE}.*
+    echo "Done."
 }
