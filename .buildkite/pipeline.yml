@@ -16,7 +16,7 @@ steps:
   - group: "Check and build"
     key: "check"
     steps:
-      - label: ":go: Run check-ci"
+      - label: ":white_check_mark: Run check-ci"
         key: check-ci
         command: "make check-ci"
         agents:
@@ -24,7 +24,7 @@ steps:
           cpu: "8"
           memory: "4G"
 
-      - label: ":go: Run local build"
+      - label: ":building_construction: Run local build"
         key: make-local
         command: "make local"
         agents:
@@ -35,7 +35,7 @@ steps:
   - group: "Run tests"
     key: "tests"
     steps:
-      - label: "Run unit tests"
+      - label: ":smartbear-testexecute: Run unit tests"
         key: unit-test
         command: ".buildkite/scripts/unit_test.sh"
         agents:
@@ -43,7 +43,7 @@ steps:
         artifact_paths:
           - build/*.xml
 
-      - label: "Run integration tests"
+      - label: ":smartbear-testexecute: Run integration tests"
         key: int-test
         command: ".buildkite/scripts/integration_test.sh"
         agents:
@@ -64,7 +64,7 @@ steps:
             allow_failure: true
     depends_on: "check"
 
-  - label: "Cloud e2e Test"
+  - label: ":gcloud: Cloud e2e Test"
     key: "cloud-e2e-test"
     command: ".buildkite/scripts/cloud_e2e_test.sh"
     agents:
@@ -75,7 +75,7 @@ steps:
       - step: "int-test"
         allow_failure: false
 
-  - label: "Publish docker image"
+  - label: ":docker: Publish docker image"
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
     if: build.env("BUILDKITE_PULL_REQUEST") == null
@@ -85,11 +85,29 @@ steps:
       - step: "tests"
         allow_failure: false
 
-  - label: "Release test"
+  - label: ":gcloud: Release test"
     key: "release-test"
     command: ".buildkite/scripts/release_test.sh"
     agents:
       provider: "gcp"
     depends_on:
       - step: "tests"
+        allow_failure: false
+
+  - label: ":jenkins: Release - Package Registry Distribution"
+    key: "release-package-registry"
+    command: echo "Triggering the Jenkins Job 'release-package-registry-distribution'..."
+    agents:
+      provider: "gcp"
+    depends_on:
+      - step: "release-test"
+        allow_failure: false
+
+  - label: ":jenkins: Downstream - Package"
+    key: "downstream-package"
+    command: echo "Triggering the Jenkins Job 'fleet-server/fleet-server-package-mbp/env.JOB_BASE_NAME'..."
+    agents:
+      provider: "gcp"
+    depends_on:
+      - step: "release-package-registry"
         allow_failure: false

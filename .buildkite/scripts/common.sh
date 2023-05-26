@@ -89,16 +89,9 @@ upload_packages_to_gcp_backet() {
         bucketUrlDefault="${baseUrl}"/pull-requests/pr-${BUILDKITE_COMMIT}
     fi
 
-    echo ${bucketUrlDefault}
-    echo ${bucketUrlCommit}
-
     for backetUrl in "${bucketUrlCommit}" "${bucketUrlDefault}"; do
         gsutil -m -q cp -a public-read -r ${pattern} "${backetUrl}"
     done
-
-    echo "Checking the result..."
-    gsutil ls ${bucketUrlDefault}
-    gsutil ls ${bucketUrlCommit}
 }
 
 cleanup() {
