@@ -92,6 +92,10 @@ upload_packages_to_gcp_backet() {
     for variable in "${bucketUrlCommit}" "${bucketUrlDefault}"; do
         gsutil -m cp -a public-read -r ${pattern} "${JOB_GCS_BUCKET}"
     done
+
+    echo "Checking the result..."
+    gsutil ls ${bucketUrlDefault}
+    gsutil ls ${bucketUrlCommit}
 }
 
 cleanup() {
