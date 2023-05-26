@@ -85,7 +85,7 @@ upload_packages_to_gcp_backet() {
     bucketUrlCommit="${baseUrl}"/commits/${BUILDKITE_COMMIT}
     bucketUrlDefault="${baseUrl}"/snapshots
 
-    if [[ ${BUILDKITE_PULL_REQUEST} != "false" ]]; then
+    if [[ build.env("BUILDKITE_PULL_REQUEST") != null ]]; then
         bucketUrlDefault="${baseUrl}"/pull-requests/pr-${BUILDKITE_COMMIT}
     fi
 
@@ -93,7 +93,7 @@ upload_packages_to_gcp_backet() {
     echo ${bucketUrlCommit}
 
     for backetUrl in "${bucketUrlCommit}" "${bucketUrlDefault}"; do
-        gsutil -m cp -a public-read -r ${pattern} "${backetUrl}"
+        gsutil -m -q cp -a public-read -r ${pattern} "${backetUrl}"
     done
 
     echo "Checking the result..."
