@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/go-ucfg"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -54,6 +55,9 @@ type Agent struct {
 	srvCtx       context.Context
 	srvCanceller context.CancelFunc
 	srvDone      chan bool
+
+	l   sync.RWMutex
+	cfg *config.Config
 }
 
 // NewAgent returns an Agent that will gather connection information from the passed reader.
@@ -81,6 +85,23 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 
 // Run starts a Server instance using config from the configured client.
 func (a *Agent) Run(ctx context.Context) error {
+	a.agent.RegisterDiagnosticHook("fleet-server config", "fleet-server's current configuration", "fleet-server.yml", "application/yml", func() []byte {
+		a.l.RLock()
+		if a.cfg == nil {
+			a.l.RUnlock()
+			log.Warn().Msg("Diagnostics hook failure config is nil.")
+			return nil
+		}
+		cfg := a.cfg.Redact()
+		a.l.RUnlock()
+		p, err := yaml.Marshal(cfg)
+		if err != nil {
+			log.Error().Err(err).Msg("Diagnostics hook failure config unable to marshal yaml.")
+			return nil
+		}
+		return p
+	})
+
 	subCtx, subCanceller := context.WithCancel(ctx)
 	defer subCanceller()
 
@@ -313,6 +334,9 @@ func (a *Agent) reconfigure(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	a.l.Lock()
+	a.cfg = cfg
+	a.l.Unlock()
 
 	// reload the generic reloadables
 	for _, r := range a.reloadables {
