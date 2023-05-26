@@ -85,7 +85,7 @@ upload_packages_to_gcp_backet() {
     bucketUrlCommit="${baseUrl}"/commits/${BUILDKITE_COMMIT}
     bucketUrlDefault="${baseUrl}"/snapshots
 
-    if [[ build.env("BUILDKITE_PULL_REQUEST") != null ]]; then
+    if [[ ${BUILDKITE_PULL_REQUEST} != "false" ]]; then
         bucketUrlDefault="${baseUrl}"/pull-requests/pr-${BUILDKITE_COMMIT}
     fi
 
