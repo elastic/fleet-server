@@ -62,6 +62,17 @@ steps:
           - step: "int-test"
             allow_failure: true
 
+      - label: "E2E Test"
+        key: "e2e-test"
+        command: ".buildkite/scripts/e2e_test.sh"
+        agents:
+          provider: "gcp"
+        depends_on:
+          - step: "unit-test"
+            allow_failure: false
+          - step: "int-test"
+            allow_failure: false
+
       - label: "Cloud e2e Test"
         key: "cloud-e2e-test"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
@@ -71,6 +82,8 @@ steps:
           - step: "unit-test"
             allow_failure: false
           - step: "int-test"
+            allow_failure: false
+          - step: "e2e-test"
             allow_failure: false
 
     depends_on: "check"
