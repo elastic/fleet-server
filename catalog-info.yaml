@@ -74,7 +74,7 @@ spec:
       description: Buildkite pipeline for the Elastic Fleet Server package process
     spec:
       repository: elastic/fleet-server
-      pipeline_file: ".buildkite/fleet-server-package-mbp.yml"
+      pipeline_file: ".buildkite/pipeline.package.mbp.yml"
       provider_settings:
         build_pull_request_forks: false
         build_pull_requests: true

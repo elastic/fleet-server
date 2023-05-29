@@ -1,6 +1,4 @@
 name: "fleet server package mbp"
 steps:
-  - label: ":wave: pipelene init"
-    command: echo "hello world!"
-    agents:
-      provider: "gcp"
+  - name: ":pipeline:"
+    command: echo "test-pipeline"
