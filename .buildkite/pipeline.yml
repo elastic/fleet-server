@@ -100,7 +100,7 @@ steps:
 
   - label: ":esbuild: Downstream - Package"
     key: "downstream-package"
-    trigger: "fleet-server-package-mbp"
+    trigger: "pipeline-package-mbp"
     if:  "build.env('BUILDKITE_BRANCH') != null && build.env('BUILDKITE_TAG') == null && build.env('BUILDKITE_PULL_REQUEST') != null"
     depends_on:
       - step: "publish"

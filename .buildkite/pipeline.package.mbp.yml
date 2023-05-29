@@ -1,4 +1,4 @@
-name: "Fleet server package mbp"
+name: "pipeline package mbp"
 steps:
   - label: ":wave: pipelene init"
     command: echo "hello world!"
