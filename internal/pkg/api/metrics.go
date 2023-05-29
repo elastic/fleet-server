@@ -57,9 +57,9 @@ func init() {
 	}
 
 	registry = newMetricsRegistry("http_server")
-	cntHTTPNew = newCounter(registry, "tcp_open_count")
-	cntHTTPClose = newCounter(registry, "tcp_close_count")
-	cntHTTPActive = newGauge(registry, "tcp_active_count")
+	cntHTTPNew = newCounter(registry, "tcp_open")
+	cntHTTPClose = newCounter(registry, "tcp_close")
+	cntHTTPActive = newGauge(registry, "tcp_active")
 
 	routesRegistry := registry.newRegistry("routes")
 
@@ -176,13 +176,13 @@ type routeStats struct {
 
 func (rt *routeStats) Register(registry *metricsRegistry) {
 	rt.active = newGauge(registry, "active")
-	rt.total = newCounter(registry, "total_count")
-	rt.rateLimit = newCounter(registry, "error_limit_rate_count")
-	rt.maxLimit = newCounter(registry, "error_limit_max_count")
-	rt.failure = newCounter(registry, "error_fail_count")
-	rt.drop = newCounter(registry, "error_drop_count")
-	rt.bodyIn = newCounter(registry, "body_in_bytes")
-	rt.bodyOut = newCounter(registry, "body_out_bytes")
+	rt.total = newCounter(registry, "total")
+	rt.rateLimit = newCounter(registry, "limit_rate")
+	rt.maxLimit = newCounter(registry, "limit_max")
+	rt.failure = newCounter(registry, "fail")
+	rt.drop = newCounter(registry, "drop")
+	rt.bodyIn = newCounter(registry, "body_in")
+	rt.bodyOut = newCounter(registry, "body_out")
 }
 
 func (rt *routeStats) IncError(err error) {
@@ -213,8 +213,8 @@ type artifactStats struct {
 
 func (rt *artifactStats) Register(registry *metricsRegistry) {
 	rt.routeStats.Register(registry)
-	rt.notFound = newCounter(registry, "error_not_found")
-	rt.throttle = newCounter(registry, "error_throttle")
+	rt.notFound = newCounter(registry, "not_found")
+	rt.throttle = newCounter(registry, "throttle")
 }
 
 func (rt *artifactStats) IncError(err error) {
