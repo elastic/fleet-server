@@ -1,0 +1,5 @@
+steps:
+  - label: ":wave: pipelene init"
+    command: echo "hello world!"
+    agents:
+      provider: "gcp"
