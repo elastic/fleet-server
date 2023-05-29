@@ -89,8 +89,8 @@ upload_packages_to_gcp_backet() {
         bucketUriDefault="${baseUri}"/pull-requests/pr-${BUILDKITE_COMMIT}
     fi
 
-    for backetUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
-        gsutil -m -q cp -a public-read -r ${pattern} "${backetUri}"
+    for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
+        gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
     done
 }
 
