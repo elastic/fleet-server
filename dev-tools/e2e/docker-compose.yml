@@ -1,0 +1,18 @@
+version: '2.3'
+services:
+  kibana:
+    image: "docker.elastic.co/kibana/kibana:${ELASTICSEARCH_VERSION}-amd64"
+    container_name: kibana
+    environment:
+      - KIBANA_TOKEN=${KIBANA_TOKEN}
+    volumes:
+      - ./kibana.yml:/usr/share/kibana/config/kibana.yml
+    ports:
+      - 127.0.0.1:5601:5601
+    networks:
+      - integration
+# Attach to the integration test network
+networks:
+  integration:
+    name: integration_default
+    external: true

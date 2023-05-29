@@ -24,3 +24,4 @@ dev-tools/cloud/terraform/*.tfvars*
 *.swn
 
 .service_token
+.kibana_service_token
