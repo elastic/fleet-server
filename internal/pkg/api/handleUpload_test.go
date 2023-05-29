@@ -283,13 +283,12 @@ func TestUploadBeginResponse(t *testing.T) {
 	hr.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	var response UploadBeginResponse
+	var response UploadBeginAPIResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &response)
 	assert.NoErrorf(t, err, "upload start should provide valid JSON response")
 
 	assert.NotEmptyf(t, response.UploadId, "upload start response should provide an ID")
 	assert.Greaterf(t, response.ChunkSize, int64(0), "upload start response should provide a chunk size > 0")
-
 }
 
 /*
