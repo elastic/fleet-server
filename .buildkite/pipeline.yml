@@ -97,8 +97,6 @@ steps:
   - label: ":jenkins: Release - Package Registry Distribution"
     key: "release-package-registry"
     command: echo "Triggering the Jenkins Job 'release-package-registry-distribution'..."
-    agents:
-      provider: "gcp"
     depends_on:
       - step: "release-test"
         allow_failure: false
@@ -106,8 +104,6 @@ steps:
   - label: ":jenkins: Downstream - Package"
     key: "downstream-package"
     command: echo "Triggering the Jenkins Job 'fleet-server/fleet-server-package-mbp/env.JOB_BASE_NAME'..."
-    agents:
-      provider: "gcp"
     depends_on:
       - step: "release-package-registry"
         allow_failure: false

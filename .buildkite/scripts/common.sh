@@ -73,7 +73,7 @@ with_Terraform() {
 }
 
 google_cloud_auth() {
-    secretFileLocation=$(mktemp -d -p . -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
+    secretFileLocation=$(mktemp -d -p . -t "${WORKSPACE}/${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
     echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
     gcloud auth activate-service-account --key-file ${secretFileLocation} 2> /dev/null
     export GOOGLE_APPLICATIONS_CREDENTIALS=${secretFileLocation}
@@ -81,16 +81,16 @@ google_cloud_auth() {
 
 upload_packages_to_gcp_backet() {
     pattern=${1}
-    baseUrl="gs://${JOB_GCS_BUCKET}/${REPO}"
-    bucketUrlCommit="${baseUrl}"/commits/${BUILDKITE_COMMIT}
-    bucketUrlDefault="${baseUrl}"/snapshots
+    baseUri="gs://${JOB_GCS_BUCKET}/${REPO}"
+    bucketUriCommit="${baseUri}"/commits/${BUILDKITE_COMMIT}
+    bucketUriDefault="${baseUri}"/snapshots
 
     if [[ ${BUILDKITE_PULL_REQUEST} != "false" ]]; then
-        bucketUrlDefault="${baseUrl}"/pull-requests/pr-${BUILDKITE_COMMIT}
+        bucketUriDefault="${baseUri}"/pull-requests/pr-${BUILDKITE_COMMIT}
     fi
 
-    for backetUrl in "${bucketUrlCommit}" "${bucketUrlDefault}"; do
-        gsutil -m -q cp -a public-read -r ${pattern} "${backetUrl}"
+    for backetUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
+        gsutil -m -q cp -a public-read -r ${pattern} "${backetUri}"
     done
 }
 
