@@ -99,7 +99,7 @@ steps:
         allow_failure: false
 
   - label: "Upload the fleet-server-package-mbp pipeline"
-    command: "buildkite-agent pipeline upload .buildkite/pipeline.deploy.yml"
+    command: "buildkite-agent pipeline upload .buildkite/pipeline.package.mbp.yml"
 #    if:  "build.env('BUILDKITE_BRANCH') != null && build.env('BUILDKITE_TAG') == null && build.env('BUILDKITE_PULL_REQUEST') != null"
     depends_on:
       - step: "publish"
