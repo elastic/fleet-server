@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script builds an image from the elastic-agent image
-# with a locally built apm-server binary injected. Additional
+# with a locally built fleet-server binary injected. Additional
 # flags (e.g. -t <name>) will be passed to `docker build`.
 
 set -eu
@@ -9,9 +9,11 @@ set -eu
 REPO_ROOT=$(cd $(dirname $(readlink -f "$0"))/../../.. && pwd)
 
 USER_NAME=${USER}
-CI_ELASTIC_AGENT_DOCKER_IMAGE=docker.elastic.co/observability-ci/elastic-agent
+CI_ELASTIC_AGENT_DOCKER_IMAGE=${CI_ELASTIC_AGENT_DOCKER_IMAGE:-"docker.elastic.co/observability-ci/elastic-agent"}
 
-DEFAULT_IMAGE_TAG=8.8.0-94522507-SNAPSHOT
+source $REPO_ROOT/dev-tools/integration/.env
+
+DEFAULT_IMAGE_TAG=$ELASTICSEARCH_VERSION
 BASE_IMAGE="${BASE_IMAGE:-docker.elastic.co/cloud-release/elastic-agent-cloud:$DEFAULT_IMAGE_TAG}"
 GOARCH="${GOARCH:-$(go env GOARCH)}"
 
@@ -21,7 +23,7 @@ docker pull --platform linux/$GOARCH $BASE_IMAGE
 STACK_VERSION=$(docker inspect -f '{{index .Config.Labels "org.label-schema.version"}}' $BASE_IMAGE)
 VCS_REF=$(docker inspect -f '{{index .Config.Labels "org.label-schema.vcs-ref"}}' $BASE_IMAGE)
 
-CUSTOM_IMAGE_TAG=${STACK_VERSION}-${USER_NAME}-$(date +%s)
+CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG:-"${STACK_VERSION}-${USER_NAME}-$(date +%s)"}
 
 SNAPSHOT=true make -C $REPO_ROOT release-linux/${GOARCH}
 

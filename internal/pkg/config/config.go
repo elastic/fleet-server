@@ -9,9 +9,11 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/elastic/fleet-server/v7/version"
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/flag"
 	"github.com/elastic/go-ucfg/yaml"
+	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -91,6 +93,25 @@ func (c *Config) LoadServerLimits() error {
 	agentLimits := loadLimits(fleetInput.Server.Limits.MaxAgents)
 	fleetInput.Cache.LoadLimits(agentLimits)
 	fleetInput.Server.Limits.LoadLimits(agentLimits)
+	return nil
+}
+
+// LoadStandaloneAgent should be called after initialization
+// this create a fake agent id and version
+func (c *Config) LoadStandaloneAgentMetadata() error {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	agentID, err := uuid.NewV4()
+	if err != nil {
+		return err
+	}
+
+	c.Fleet.Agent = Agent{
+		ID:      agentID.String(),
+		Version: version.DefaultVersion,
+	}
+
 	return nil
 }
 

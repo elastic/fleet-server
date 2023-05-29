@@ -57,19 +57,23 @@ func TestCLIOverrides(t *testing.T) {
 
 	mockInputUnit := &mockClientUnit{}
 	mockInputUnit.On("Expected").Return(
-		client.UnitStateHealthy,
-		client.UnitLogLevelInfo,
-		&proto.UnitExpectedConfig{
-			Source: sampleInputConfig,
+		client.Expected{
+			State:    client.UnitStateHealthy,
+			LogLevel: client.UnitLogLevelInfo,
+			Config: &proto.UnitExpectedConfig{
+				Source: sampleInputConfig,
+			},
 		},
 	)
 
 	mockOutputUnit := &mockClientUnit{}
 	mockOutputUnit.On("Expected").Return(
-		client.UnitStateHealthy,
-		client.UnitLogLevelInfo,
-		&proto.UnitExpectedConfig{
-			Source: sampleOutputConfig,
+		client.Expected{
+			State:    client.UnitStateHealthy,
+			LogLevel: client.UnitLogLevelInfo,
+			Config: &proto.UnitExpectedConfig{
+				Source: sampleOutputConfig,
+			},
 		},
 	)
 
@@ -126,13 +130,12 @@ type mockClientUnit struct {
 	mock.Mock
 }
 
-func (u *mockClientUnit) Expected() (client.UnitState, client.UnitLogLevel, *proto.UnitExpectedConfig) {
+func (u *mockClientUnit) Expected() client.Expected {
 	args := u.Called()
 
-	return args.Get(0).(client.UnitState),
-		args.Get(1).(client.UnitLogLevel),
-		args.Get(2).(*proto.UnitExpectedConfig)
+	return args.Get(0).(client.Expected)
 }
+
 func (u *mockClientUnit) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
 	args := u.Called()
 	return args.Get(0).(error)
@@ -150,7 +153,12 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		})
 		require.NoError(t, err)
 		mockOutClient := &mockClientUnit{}
-		mockOutClient.On("Expected").Return(client.UnitStateHealthy, client.UnitLogLevelInfo, &proto.UnitExpectedConfig{Source: outStruct})
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
 
 		inStruct, err := structpb.NewStruct(map[string]interface{}{
 			"type": "fleet-server",
@@ -165,7 +173,12 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		})
 		require.NoError(t, err)
 		mockInClient := &mockClientUnit{}
-		mockInClient.On("Expected").Return(client.UnitStateHealthy, client.UnitLogLevelInfo, &proto.UnitExpectedConfig{Source: inStruct})
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+			})
 
 		a := &Agent{
 			cliCfg:     ucfg.New(),
@@ -184,5 +197,4 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, 1000, cfg.Inputs[0].Server.Limits.MaxAgents)
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
 	})
-
 }

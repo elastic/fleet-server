@@ -537,8 +537,10 @@ func (f *Fleet) Reload(ctx context.Context, cfg *config.Config) error {
 	return nil
 }
 
+const envAPMActive = "ELASTIC_APM_ACTIVE"
+
 func (f *Fleet) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
-	if !cfg.Enabled {
+	if !cfg.Enabled && os.Getenv(envAPMActive) != "true" {
 		return nil, nil
 	}
 

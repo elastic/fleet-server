@@ -75,6 +75,7 @@ func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) b
 		if c.status != sub.Status {
 			tb.Error("status mismatch")
 		}
+
 		return true
 	}
 }
@@ -93,7 +94,7 @@ type bulkcase struct {
 func TestBulkSimple(t *testing.T) {
 	start := time.Now()
 
-	const ver = "8.0.0"
+	const ver = "8.9.0"
 	cases := []bulkcase{
 		{
 			"Simple case",
