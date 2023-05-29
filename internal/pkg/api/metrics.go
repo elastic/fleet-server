@@ -248,7 +248,7 @@ func InitMetrics(ctx context.Context, cfg *config.Config, bi build.Info, tracer 
 		return nil, nil
 	}
 
-	// Start local api server; largely for metics.
+	// Start local api server; largely for metrics.
 	zapStub := logger.NewZapStub("fleet-metrics")
 	cfgStub, err := cfglib.NewConfigFrom(&cfg.HTTP)
 	if err != nil {
