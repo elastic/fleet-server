@@ -79,7 +79,7 @@ spec:
       provider_settings:
         build_pull_request_forks: false
         build_pull_requests: true
-        build_tags: true
+        build_tags: false
         filter_enabled: true
         filter_condition: |
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
