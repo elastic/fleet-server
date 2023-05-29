@@ -98,10 +98,17 @@ steps:
       - step: "tests"
         allow_failure: false
 
-  - trigger: "fleet-server-package-mbp"
-    label: ":esbuild: Downstream - Package"
-    key: "downstream-package"
+  - label: "Upload the fleet-server-package-mbp pipeline"
+    command: "buildkite-agent pipeline upload .buildkite/pipeline.deploy.yml"
     if:  "build.env('BUILDKITE_BRANCH') != null && build.env('BUILDKITE_TAG') == null && build.env('BUILDKITE_PULL_REQUEST') != null"
     depends_on:
       - step: "publish"
         allow_failure: false
+
+#  - trigger: "fleet-server-package-mbp"
+#    label: ":esbuild: Downstream - Package"
+#    key: "downstream-package"
+#    if:  "build.env('BUILDKITE_BRANCH') != null && build.env('BUILDKITE_TAG') == null && build.env('BUILDKITE_PULL_REQUEST') != null"
+#    depends_on:
+#      - step: "publish"
+#        allow_failure: false
