@@ -97,3 +97,11 @@ steps:
     depends_on:
       - step: "tests"
         allow_failure: false
+
+  - label: ":esbuild: Downstream - Package"
+    key: "downstream-package"
+    trigger: "buildkite-pipeline-fleet-server-package-mbp"
+    if:  "build.env('BUILDKITE_BRANCH') != null && build.env('BUILDKITE_TAG') == null && build.env('BUILDKITE_PULL_REQUEST') != null"
+    depends_on:
+      - step: "publish"
+        allow_failure: false
