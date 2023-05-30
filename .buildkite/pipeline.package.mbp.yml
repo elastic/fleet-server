@@ -1,13 +1,7 @@
 name: "fleet server package mbp"
 steps:
-  - name: ":pipeline:"
+  - label: ":pipeline: test step"
     command: echo "test-pipeline"
-
-  - name: "step2"
-    command: echo "step2"
-
-  - label: "step3"
-    command: echo "stpe3"
 
   - group: "test group"
     steps:
