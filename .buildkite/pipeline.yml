@@ -116,6 +116,7 @@ steps:
 
 ---
 name: "fleet server package mbp"
+key: "fleet-server-package-mbp"
 steps:
   - name: ":pipeline:"
     command: echo "test-pipeline"
