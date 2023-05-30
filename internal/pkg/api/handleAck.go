@@ -333,10 +333,10 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 			Str("agent.policyId", agent.PolicyID).
 			Int64("agent.revisionIdx", currRev).
 			Int64("agent.coordinatorIdx", currCoord).
-			Str("rev_policyId", rev.PolicyID).
-			Int64("rev_revisionIdx", rev.RevisionIdx).
-			Int64("rev_coordinatorIdx", rev.CoordinatorIdx).
-			Msg("ack policy revision")
+			Str(LogPolicyID, rev.PolicyID).
+			Int64("policyRevision", rev.RevisionIdx).
+			Int64("policyCoordinator", rev.CoordinatorIdx).
+			Msg("searching ack for valid policy revision")
 
 		if ok && rev.PolicyID == agent.PolicyID &&
 			(rev.RevisionIdx > currRev ||
