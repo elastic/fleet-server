@@ -2,11 +2,10 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package uploader
+package file
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -27,7 +26,7 @@ func TestChunkInfoResultsParseCorrectly(t *testing.T) {
 			Hits: []es.HitT{
 				{
 					ID:     baseID + ".0",
-					Index:  fmt.Sprintf(FileDataIndexPattern, "mysrc"),
+					Index:  "",
 					Source: []byte(""),
 					Fields: map[string]interface{}{
 						"bid":  []interface{}{baseID},
@@ -38,7 +37,7 @@ func TestChunkInfoResultsParseCorrectly(t *testing.T) {
 				},
 				{
 					ID:     baseID + ".1",
-					Index:  fmt.Sprintf(FileDataIndexPattern, "mysrc"),
+					Index:  "",
 					Source: []byte(""),
 					Fields: map[string]interface{}{
 						"bid":  []interface{}{baseID},
@@ -51,7 +50,7 @@ func TestChunkInfoResultsParseCorrectly(t *testing.T) {
 		},
 	}, nil)
 
-	chunks, err := GetChunkInfos(context.Background(), fakeBulk, baseID)
+	chunks, err := GetChunkInfos(context.Background(), fakeBulk, "", baseID)
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 2)
 

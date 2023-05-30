@@ -20,9 +20,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file/cbor"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/uploader"
-	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/cbor"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -118,7 +119,7 @@ func (ut *UploadT) handleUploadChunk(zlog zerolog.Logger, w http.ResponseWriter,
 	}
 
 	// prevent over-sized chunks
-	data := http.MaxBytesReader(w, r.Body, uploader.MaxChunkSize)
+	data := http.MaxBytesReader(w, r.Body, file.MaxChunkSize)
 
 	// compute hash as we stream it
 	hash := sha256.New()
