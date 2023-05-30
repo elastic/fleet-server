@@ -15,3 +15,4 @@ inputs:
       timeouts:
         read: 20s
         write: 5s
+        checkin_max_poll: 10m

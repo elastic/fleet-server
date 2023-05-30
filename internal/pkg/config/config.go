@@ -9,9 +9,11 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/elastic/fleet-server/v7/version"
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/flag"
 	"github.com/elastic/go-ucfg/yaml"
+	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -23,7 +25,18 @@ var DefaultOptions = []ucfg.Option{
 	ucfg.FieldReplaceValues("inputs"),
 }
 
+const kRedacted = "[redacted]"
+
 // Config is the global configuration.
+//
+// fleet-server does not provide any builtin env var mappings.
+// The DefaultOptions are set to use env var substitution if it's defined explicitly in go-ucfg's input.
+// For example:
+//
+//	output.elasticsearch.service_token: ${MY_TOKEN_VAR}
+//
+// The env vars that `elastic-agent container` command uses are unrelated.
+// The agent will do all substitutions before sending fleet-server the complete config.
 type Config struct {
 	Fleet   Fleet   `config:"fleet"`
 	Output  Output  `config:"output"`
@@ -41,6 +54,7 @@ var deprecatedConfigOptions = map[string]string{
 func (c *Config) InitDefaults() {
 	c.Inputs = make([]Input, 1)
 	c.Inputs[0].InitDefaults()
+	c.Logging.InitDefaults()
 	c.HTTP.InitDefaults()
 }
 
@@ -82,6 +96,25 @@ func (c *Config) LoadServerLimits() error {
 	return nil
 }
 
+// LoadStandaloneAgent should be called after initialization
+// this create a fake agent id and version
+func (c *Config) LoadStandaloneAgentMetadata() error {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	agentID, err := uuid.NewV4()
+	if err != nil {
+		return err
+	}
+
+	c.Fleet.Agent = Agent{
+		ID:      agentID.String(),
+		Version: version.DefaultVersion,
+	}
+
+	return nil
+}
+
 // Merge merges two configurations together.
 func (c *Config) Merge(other *Config) (*Config, error) {
 	c.m.Lock()
@@ -104,6 +137,62 @@ func (c *Config) Merge(other *Config) (*Config, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+func redactOutput(cfg *Config) Output {
+	redacted := cfg.Output
+
+	if redacted.Elasticsearch.ServiceToken != "" {
+		redacted.Elasticsearch.ServiceToken = kRedacted
+	}
+
+	if redacted.Elasticsearch.TLS != nil {
+		newTLS := *redacted.Elasticsearch.TLS
+
+		if newTLS.Certificate.Key != "" {
+			newTLS.Certificate.Key = kRedacted
+		}
+		if newTLS.Certificate.Passphrase != "" {
+			newTLS.Certificate.Passphrase = kRedacted
+		}
+
+		redacted.Elasticsearch.TLS = &newTLS
+	}
+
+	return redacted
+}
+
+func redactServer(cfg *Config) Server {
+	redacted := cfg.Inputs[0].Server
+
+	if redacted.TLS != nil {
+		newTLS := *redacted.TLS
+
+		if newTLS.Certificate.Key != "" {
+			newTLS.Certificate.Key = kRedacted
+		}
+		if newTLS.Certificate.Passphrase != "" {
+			newTLS.Certificate.Passphrase = kRedacted
+		}
+
+		redacted.TLS = &newTLS
+	}
+
+	return redacted
+}
+
+// Redact returns a copy of the config with all sensitive attributes redacted.
+func (c *Config) Redact() *Config {
+	redacted := &Config{
+		Fleet:   c.Fleet,
+		Output:  c.Output,
+		Inputs:  make([]Input, 1),
+		Logging: c.Logging,
+		HTTP:    c.HTTP,
+	}
+	redacted.Inputs[0].Server = redactServer(c)
+	redacted.Output = redactOutput(c)
+	return redacted
 }
 
 func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {

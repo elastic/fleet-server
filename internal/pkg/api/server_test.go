@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !integration
-// +build !integration
 
 package api
 
@@ -26,7 +25,7 @@ import (
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
-func TestRun(t *testing.T) {
+func Test_server_Run(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -36,9 +35,10 @@ func TestRun(t *testing.T) {
 	cfg.InitDefaults()
 	cfg.Host = "localhost"
 	cfg.Port = port
+	addr := cfg.BindEndpoints()[0]
 
 	verCon := mustBuildConstraints("8.0.0")
-	c, err := cache.New(cache.Config{NumCounters: 100, MaxCost: 100000})
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 	bulker := ftesting.NewMockBulk()
 	pim := mock.NewMockMonitor()
@@ -48,13 +48,13 @@ func TestRun(t *testing.T) {
 	et, err := NewEnrollerT(verCon, cfg, nil, c)
 	require.NoError(t, err)
 
-	router := NewRouter(ctx, bulker, ct, et, nil, nil, nil, nil, nil, fbuild.Info{})
+	srv := NewServer(addr, cfg, ct, et, nil, nil, nil, nil, fbuild.Info{}, nil, nil, nil)
 	errCh := make(chan error)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		err = Run(ctx, router, cfg)
+		err = srv.Run(ctx)
 		wg.Done()
 	}()
 	var errFromChan error

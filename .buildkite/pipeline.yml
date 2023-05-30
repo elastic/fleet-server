@@ -1,0 +1,99 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+env:
+  SETUP_GVM_VERSION: 'v0.5.0'
+  DOCKER_COMPOSE_VERSION: '1.25.5'
+  DOCKER_REGISTRY: "docker.elastic.co"
+  DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/temp-fleet-server" # needs to rename after tests
+  DOCKER_IMAGE_SHA_TAG: "temp-${BUILDKITE_COMMIT}" # needs to rename after tests
+  DOCKER_IMAGE_LATEST_TAG: "temp-latest" # needs to rename after tests
+  DOCKER_IMAGE_GIT_TAG: "temp-${BUILDKITE_BRANCH}" # needs to rename after tests
+  GO_AGENT_IMAGE: "golang:1.20.3"
+  TERRAFORM_VERSION: '1.4.6'
+
+steps:
+  - group: "Check and build"
+    key: "check"
+    steps:
+      - label: ":go: Run check-ci"
+        key: check-ci
+        command: "make check-ci"
+        agents:
+          image: "golang:1.20.3"
+          cpu: "8"
+          memory: "4G"
+
+      - label: ":go: Run local build"
+        key: make-local
+        command: "make local"
+        agents:
+          image: "${GO_AGENT_IMAGE}"
+          cpu: "8"
+          memory: "4G"
+
+  - group: "Run tests"
+    key: "tests"
+    steps:
+      - label: "Run unit tests"
+        key: unit-test
+        command: ".buildkite/scripts/unit_test.sh"
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - build/*.xml
+
+      - label: "Run integration tests"
+        key: int-test
+        command: ".buildkite/scripts/integration_test.sh"
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - build/*.xml
+
+      - label: ":junit: Junit annotate"
+        plugins:
+          - junit-annotate#v2.4.1:
+              artifacts: "build/*.xml"
+        agents:
+          provider: "gcp"
+        depends_on:
+          - step: "unit-test"
+            allow_failure: true
+          - step: "int-test"
+            allow_failure: true
+
+      - label: "E2E Test"
+        key: "e2e-test"
+        command: ".buildkite/scripts/e2e_test.sh"
+        agents:
+          provider: "gcp"
+        depends_on:
+          - step: "unit-test"
+            allow_failure: false
+          - step: "int-test"
+            allow_failure: false
+
+      - label: "Cloud e2e Test"
+        key: "cloud-e2e-test"
+        command: ".buildkite/scripts/cloud_e2e_test.sh"
+        agents:
+          provider: "gcp"
+        depends_on:
+          - step: "unit-test"
+            allow_failure: false
+          - step: "int-test"
+            allow_failure: false
+          - step: "e2e-test"
+            allow_failure: false
+
+    depends_on: "check"
+
+  - label: "Publish docker image"
+    key: "publish"
+    command: ".buildkite/scripts/build_push_docker_image.sh"
+    if: build.env("BUILDKITE_PULL_REQUEST") == null
+    agents:
+      provider: "gcp"
+    depends_on:
+      - step: "tests"
+        allow_failure: false

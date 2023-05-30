@@ -51,6 +51,12 @@ type Action struct {
 	// The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.
 	MinimumExecutionDuration int64 `json:"minimum_execution_duration,omitempty"`
 
+	// The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.
+	RolloutDurationSeconds int64 `json:"rollout_duration_seconds,omitempty"`
+
+	// The action signed data and signature.
+	Signed *Signed `json:"signed,omitempty"`
+
 	// The action start date/time
 	StartTime string `json:"start_time,omitempty"`
 
@@ -59,6 +65,9 @@ type Action struct {
 
 	// Date/time the action was created
 	Timestamp string `json:"@timestamp,omitempty"`
+
+	// APM traceparent for the action.
+	Traceparent string `json:"traceparent,omitempty"`
 
 	// The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.
 	Type string `json:"type,omitempty"`
@@ -124,6 +133,9 @@ type Agent struct {
 	Active bool           `json:"active"`
 	Agent  *AgentMetadata `json:"agent,omitempty"`
 
+	// Elastic Agent components detailed status information
+	Components json.RawMessage `json:"components,omitempty"`
+
 	// Deprecated. Use Outputs instead. API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKey string `json:"default_api_key,omitempty"`
 
@@ -139,7 +151,10 @@ type Agent struct {
 	// Date/time the Elastic Agent checked in last time
 	LastCheckin string `json:"last_checkin,omitempty"`
 
-	// Lst checkin status
+	// Last checkin message
+	LastCheckinMessage string `json:"last_checkin_message,omitempty"`
+
+	// Last checkin status
 	LastCheckinStatus string `json:"last_checkin_status,omitempty"`
 
 	// Date/time the Elastic Agent was last updated
@@ -189,6 +204,9 @@ type Agent struct {
 
 	// Date/time the Elastic Agent started the current upgrade
 	UpgradeStartedAt string `json:"upgrade_started_at,omitempty"`
+
+	// Upgrade status
+	UpgradeStatus string `json:"upgrade_status,omitempty"`
 
 	// Date/time the Elastic Agent was last upgraded
 	UpgradedAt string `json:"upgraded_at,omitempty"`
@@ -244,6 +262,10 @@ type Artifact struct {
 
 // Body Encoded artifact data
 type Body struct {
+}
+
+// Components Elastic Agent components detailed status information
+type Components struct {
 }
 
 // Data The opaque payload.
@@ -365,6 +387,16 @@ type ServerMetadata struct {
 
 	// The version of the Fleet Server
 	Version string `json:"version"`
+}
+
+// Signed The action signed data and signature.
+type Signed struct {
+
+	// The base64 encoded, UTF-8 JSON serialized action bytes that are signed.
+	Data string `json:"data,omitempty"`
+
+	// The base64 encoded signature.
+	Signature string `json:"signature,omitempty"`
 }
 
 // ToRetireAPIKeyIdsItems the Output API Keys that were replaced and should be retired

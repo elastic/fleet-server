@@ -1,0 +1,1251 @@
+openapi: 3.0.0
+info:
+  title: fleet-server API
+  version: 0.0.1
+  license:
+    name: Elastic License 2.0
+    url: https://www.elastic.co/licensing/elastic-license
+  description: |
+    The fleet-server API that is used by agents when enrolled with fleet.
+
+    Note that the current implementations in the fleet-server and elastic-agent may have some difference specifically when it comes to some objects.
+    This is most notable when comparing the `Action` implementations. Fleet-server uses a general template for all actions and the elastic-agent will have more specific representations.
+
+    The implementation of fleet-server by default also includes a connection count limiter, as well as limiters for request body sizes.
+    If an agent attempts to make request but there are no remaining connections, the attempt will be blocked and the agent will get an error.
+    If an agent tries to send a body that is too large the fleet-server will respond with a 400 status code.
+components:
+  securitySchemes:
+    apiKey:
+      description: API key security will check that the API key exists and is enabled, but will not check additional permissions
+      type: apiKey
+      in: header
+      name: ApiKey
+    agentApiKey:
+      description: Agent API key security will check that the API key exists, is enabled, and is assigned to the agent
+      type: apiKey
+      in: header
+      name: ApiKey
+  schemas:
+    error:
+      description: Error processing request.
+      type: object
+      required:
+        - statusCode
+        - error
+      properties:
+        statusCode:
+          type: integer
+          description: The HTTP status code of the error.
+        error:
+          type: string
+          description: Error type.
+        message:
+          type: string
+          description: (optional) Error message.
+    statusResponseVersion:
+      description: Version information included in the response to an authorized status request.
+      type: object
+      properties:
+        number:
+          type: string
+          description: The fleet-server version.
+        build_hash:
+          type: string
+          description: The commit that the fleet-server was built from.
+        build_time:
+          type: string
+          description: The date-time that the fleet-server binary was created.
+          #format: date-time # not using date-time format at the moment because the currently available objects have plain strings
+    statusResponse:
+      description: Status response information.
+      type: object
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+          description: Service name.
+        status:
+          type: string
+          description: |
+            A Unit state that fleet-server may report.
+            Unit state is defined in the elastic-agent-client specification.
+          enum:
+            - starting
+            - configuring
+            - healthy
+            - degraded
+            - failed
+            - stopping
+            - stopped
+            - unknown
+        version:
+          $ref: '#/components/schemas/statusResponseVersion'
+    enrollMetadata:
+      description: Metadata associated with the agent that is enrolling to fleet.
+      type: object
+      required:
+        - user_provided
+        - local
+        - tags
+      properties:
+        user_provided:
+          deprecated: true
+          description: |
+            An embedded JSON object that holds user-provided meta-data values.
+            Defined in fleet-server as a `json.RawMessage`.
+            fleet-server does not use these values on enrollment of an agent.
+
+            Defined in the elastic-agent as a `map[string]interface{}` with no way to specify any values.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        local:
+          description: |
+            An embedded JSON object that holds meta-data values.
+            Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
+            elastic-agent will populate the object with information from the binary and host/system environment.
+            If not empty fleet-server will update the value of `local["elastic"]["agent"]["id"]` to the agent ID (assuming the keys exist).
+            The (possibly updated) value is sent by fleet-server when creating the record for a new agent.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        tags:
+          description: |
+            User provided tags for the agent.
+            fleet-server will pass the tags to the agent record on enrollment.
+          type: array
+          items:
+            type: string
+    enrollRequest:
+      description: A request to enroll a new agent into fleet.
+      type: object
+      required:
+        - type
+        - shared_id
+        - metadata
+      properties:
+        type:
+          description: |
+            The enrollment type of the agent.
+            The agent only supports the PERMANENT value.
+            In the future the enrollment type may be used to indicate agents that use fleet for reporting and monitoring, but do not use policies.
+          type: string
+          enum:
+            - PERMANENT
+        shared_id:
+          deprecated: true
+          type: string
+          description: |
+            The shared ID of the agent.
+            To support pre-existing installs.
+
+            Never implemented.
+        metadata:
+          $ref: '#/components/schemas/enrollMetadata'
+    enrollResponseItem:
+      description: Response to a successful enrollment of an agent into fleet.
+      type: object
+      required:
+        - id
+        - active
+        - policy_id
+        - type
+        - enrolled_at
+        - user_provided_metadata
+        - local_metadata
+        - actions
+        - access_api_key_id
+        - access_api_key
+        - status
+        - tags
+      properties:
+        id:
+          description: The agent ID
+          type: string
+        active:
+          deprecated: true
+          description: |
+            If the agent is active in fleet.
+            Set to true upon enrollment.
+
+            Handling of other values never implemented.
+          type: boolean
+        policy_id:
+          description: The policy ID that the agent is enrolled with. Decoded from the API key used in the request.
+          type: string
+        type:
+          deprecated: true
+          description: |
+            The enrollment request type.
+
+            Handling of other values never implemented.
+          type: string
+        enrolled_at:
+          description: The RFC3339 timestamp that the agent was enrolled at.
+          type: string
+          #format: date-time
+        user_provided_metadata:
+          deprecated: true
+          description: |
+            A copy of the user provided metadata from the enrollment request.
+
+            Currently will be empty.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        local_metadata:
+          deprecated: true
+          description: |
+            A copy of the (updated) local metadata provided in the enrollment request.
+
+            Never used by agent.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        actions:
+          deprecated: true
+          description: |
+            Defined in fleet-server and elastic-agent as `[]interface{}`.
+
+            Never used by agent.
+          type: array
+          items:
+            type: object
+        access_api_key_id:
+          description: The id of the ApiKey that fleet-server has generated for the enrolling agent.
+          type: string
+        access_api_key:
+          description: The ApiKey token that fleet-server has generated for the enrolling agent.
+          type: string
+          format: password
+        status:
+          deprecated: true
+          description: |
+            Agent status from fleet-server.
+            fleet-ui may differ.
+
+            Never used by agent.
+          type: string
+        tags:
+          description: A copy of the tags that were sent with the enrollment request.
+          type: array
+          items:
+            type: string
+    enrollResponse:
+      description: The enrollment action response.
+      type: object
+      required:
+        - action
+        - item
+      properties:
+        action:
+          description: The action result. Will have the value "created".
+          type: string
+        item:
+          $ref: '#/components/schemas/enrollResponseItem'
+    checkinRequest:
+      type: object
+      required:
+        - status
+        - message
+      properties:
+        status:
+          description: The agent state, inferred from agent control protocol states.
+          type: string
+          enum:
+            - online
+            - error
+            - degraded
+            - starting
+        message:
+          description: State message, may be overridden or use the error message of a failing component.
+          type: string
+        ack_token:
+          description: |
+            The ack_token form a previous response if the agent has checked in before.
+            Translated to a sequence number in fleet-server in order to retrieve any new actions for the agent from the last checkin.
+          type: string
+        local_metadata:
+          description: |
+            An embedded JSON object that holds meta-data values.
+            Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
+            elastic-agent will populate the object with information from the binary and host/system environment.
+            fleet-server will update the agent record if a checkin response contains different data from the record.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        components:
+          description: |
+            An embedded JSON object that holds component information that the agent is running.
+            Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
+            fleet-server will update the components in an agent record if they differ from this object.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        poll_timeout:
+          description: |
+            An optional timeout value that informs fleet-server of when a client will time out on it's checkin request.
+            If not specified fleet-server will use the timeout values specified in the config (defaults to 5m polling and a 10m write timeout).
+            The value, if specified is expected to be a string that is parsable by [time.ParseDuration](https://pkg.go.dev/time#ParseDuration).
+            If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
+          type: string
+          format: duration
+    actionSignature:
+      description: Optional action signing data.
+      type: object
+      x-go-custom-tag: yaml:"signed" # openapi-generator
+      x-oapi-codegen-extra-tags: # oapi-codegen tags
+        yaml: "signed"
+      required:
+        - data      # NOTE: work around to avoid a pointer
+        - signature # NOTE: work around to avoid a pointer
+      properties:
+        data:
+          description: The base64 encoded, UTF-8 JSON serialized action bytes that are signed.
+          type: string
+          format: base64
+          x-go-custom-tag: yaml:"data" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "data"
+            json: "data,omitempty"
+        signature:
+          description: The base64 encoded signature.
+          type: string
+          format: base64
+          x-go-custom-tag: yaml:"signature" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "signature"
+            json: "signature,omitempty"
+    action:
+      description: |
+        An action for an elastic-agent.
+        The actions are defined in generic terms on the fleet-server.
+        The elastic-agent will have additional details for what is expected when a specific action-type is recieved.
+        Many attributes in this schema also contain yaml tags so the elastic-agent may serialize them.
+        The structure of the `data` attribute will vary between action types.
+
+        An additional consideration is Scheduled Actions. Scheduled actions are currently defined as actions that have non-empty values for both the `start_time` and `expiration` attributes.
+      type: object
+      required:
+        - agent_id
+        - created_at
+        - data
+        - id
+        - type
+        - input_type
+      properties:
+        agent_id:
+          description: The agent ID.
+          type: string
+        created_at:
+          description: Time when the action was created.
+          type: string
+          #format: date-time
+        start_time:
+          description: The earliest execution time for the action. Agent will not execute the action before this time. Used for scheduled actions.
+          type: string
+          #format: date-time
+          x-go-custom-tag: yaml:"start_time" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "start_time"
+        expiration:
+          description: The latest start time for the action. Actions will be dropped by the agent if execution has not started by this time. Used for scheduled actions.
+          type: string
+          #format: date-time
+          x-go-custom-tag: yaml:"expiration" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "expiration"
+        data:
+          # oapi-codegen type should be: interface{}
+          description: An embedded action-specific object.
+          x-go-custom-tag: yaml:"data"
+          x-oapi-codegen-extra-tags:
+            yaml: "data"
+        id:
+          description: The action ID.
+          type: string
+          x-go-custom-tag: yaml:"action_id" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "action_id"
+        traceparent:
+          description: APM traceparent for the action.
+          type: string
+          x-go-custom-tag: yaml:"traceparent" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "traceparent"
+        type:
+          description: The action type.
+          type: string
+          x-go-custom-tag: yaml:"type" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "type"
+        input_type:
+          description: The input type of the action for actions with type `INPUT_ACTION`.
+          type: string
+          x-go-custom-tag: yaml:"input_type" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "input_type"
+        timeout:
+          description: The timeout value (in seconds) for actions with type `INPUT_ACTION`.
+          type: integer
+          format: int64
+          x-go-custom-tag: yaml:"timeout" # openapi-generator
+          x-oapi-codegen-extra-tags: # oapi-codegen tags
+            yaml: "timeout"
+        signed:
+          $ref: '#/components/schemas/actionSignature'
+
+    checkinResponse:
+      type: object
+      required:
+        - action
+      properties:
+        ack_token:
+          description: The acknowlegment token used to indicate action delivery.
+          type: string
+        action:
+          description: The action result. Set to "checkin".
+          type: string
+        actions:
+          description: A list of actions that the agent must execute.
+          type: array
+          items:
+            $ref: '#/components/schemas/action'
+    event:
+      description: The ack for a specific action that the elastic-agent has executed.
+      type: object
+      required:
+        - type
+        - subtype
+        - agent_id
+        - action_id
+        - action_input_type
+        - policy_id
+        - stream_id
+        - timestamp
+        - message
+        - started_at
+        - completed_at
+      properties:
+        type:
+          deprecated: true
+          description: |
+            The event type of the ack.
+            Currently the elastic-agent will only generate ACTION_RESULT events.
+
+            Not used by fleet-server.
+            Actions that have errored should use the error attribute to communicate an error status.
+            Additional action status information can be provided in the data attribute.
+          type: string
+          enum:
+            - STATE
+            - ERROR
+            - ACTION_RESULT
+            - ACTION
+        subtype:
+          deprecated: true
+          description: |
+            The subtype of the ack event.
+            The elastic-agent will only generate ACKNOWLEDGED events.
+
+            Not used by fleet-server.
+            Actions that have errored should use the error attribute to communicate an error status.
+            Additional action status information can be provided in the data attribute.
+          type: string
+          enum:
+            - RUNNING
+            - STARTING
+            - IN_PROGRESS
+            - CONFIG
+            - FAILED
+            - STOPPING
+            - STOPPED
+            - DATA_DUMP
+            - ACKNOWLEDGED
+            - UNKNOWN
+        agent_id:
+          description: The ID of the agent that executed the action.
+          type: string
+        action_id:
+          description: The action ID.
+          type: string
+        action_input_type:
+          description: The input_type of the action for input actions.
+          type: string
+        policy_id:
+          deprecated: true
+          description: Not used by the fleet-server.
+          type: string
+        stream_id:
+          deprecated: true
+          description: Not used by the fleet-server.
+          type: string
+        timestamp:
+          description: The timestamp of the acknowledgement event. Has the format of "2006-01-02T15:04:05.99999-07:00"
+          type: string
+          #format: date-time
+        message:
+          description: An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
+          type: string
+        payload:
+          deprecated: true
+          description: |
+            An embedded JSON object that contains additional information for the fleet-server to process.
+            Defined as a json.RawMessage in both the fleet-server and the elastic-agent.
+
+            Is currently used by UPGRADE actions to signal retries.
+            If the error attribute is non empty payload is checked for `retry: bool` and `retry_attempt: int`.
+            If retry is true, fleet-serve will mark the agent as retrying, if it's false the upgrade will be marked as failed.
+
+            Additional action status information can be provided in the data attribute.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        started_at:
+          description: The time at which the action was started. Used only when acknowledging input actions.
+          type: string
+          #format: date-time
+        completed_at:
+          description: The time at which the action was completed. Used only when acknowledging input actions
+          type: string
+          #format: date-time
+        action_data:
+          description: The action data for the input action being acknowledged.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        action_response:
+          description: The action response for the input action being acknowledged.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        data:
+          description: |
+            An embedded JSON object that has the data about the ack.
+
+            Used by REQUEST_DIAGNOSTICS actions.
+            Contains a `upload_id` attribute used to communicate the successfullly uploaded diagnostics ID.
+          type: string
+          format: application/json
+          x-go-type: json.RawMessage
+        error:
+          description: |
+            An error message.
+            If this is non-empty an error has occured when executing the action.
+            For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
+          type: string
+    ackRequest:
+      description: The request an elastic-agent sends to fleet-serve to acknowledge the execution of one or more actions.
+      type: object
+      required:
+        - events
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/event'
+    ackResponseItem:
+      description: The results of processing an acknowledgement event.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          description: An HTTP status code that indicates if the event was processed successfully or not.
+          type: integer
+        message:
+          description: HTTP status text.
+          type: string
+    ackResponse:
+      description: Response to processing acknowledgement events.
+      type: object
+      required:
+        - action
+        - items  # NOTE: work around as we don't want a pointer here
+        - errors # NOTE: work around as we don't want a pointer here
+      properties:
+        action:
+          description: The action result. Will have the value "acks".
+          type: string
+        errors:
+          description: A flag to indicate if one or more errors occured when proccessing events.
+          type: boolean
+          nullable: false
+          x-oapi-codegen-extra-tags:
+            json: "errors,omitempty"
+        items:
+          description: The in-order list of results from processing events.
+          type: array
+          nullable: false
+          items:
+            $ref: '#/components/schemas/ackResponseItem'
+          x-oapi-codegen-extra-tags:
+            json: "items,omitempty"
+    uploadBeginRequest:
+      title: "Upload Operation Start request body"
+      type: object
+      additionalProperties: true
+      required:
+        - file
+        - action_id
+        - agent_id
+        - src
+      properties:
+        file:
+          type: object
+          additionalProperties: true
+          properties:
+            Compression:
+              description: "The algorithm used to compress the file. Valid values: br,gzip,deflate,none"
+              type: string
+              example: deflate
+            hash:
+              title: Hash
+              description: Checksums on the file contents
+              type: object
+              properties:
+                sha256:
+                  description: SHA256 of the contents
+                  type: string
+                  example: 04f81394bababa0fb31e6ad2d703c875eb46dc254527e39ff316564c0dc339e2
+            name:
+              description: Name of the file including the extension, without the directory
+              type: string
+              example: yankees-stats.zip
+            mime_type:
+              description: MIME type of the file
+              type: string
+              example: application/zip
+            size:
+              description: Size of the file contents, in bytes
+              type: integer
+              format: int64
+              example: 8276748
+          required:
+            - name
+            - size
+            - mime_type
+        action_id:
+          description: ID of the action that requested this file
+          type: string
+          example: 2f440d31-2ea4-42f8-b0f2-4b6e98e8dc5e
+        agent_id:
+          description: Identifier of the agent uploading. Matches the ID usually found in agent.id
+          type: string
+          example: 9347e918-5e00-48b0-b302-a09f9258a46d
+        src:
+          description: The source integration sending this file
+          type: string
+          enum:
+            - endpoint
+            - agent
+    uploadBeginResponse:
+      description: Response to initiating a file upload
+      type: object
+      required:
+        - upload_id
+        - chunk_size
+      properties:
+        upload_id:
+          description: A unique identifier for the ensuing upload operation
+          type: string
+          example: fbc8e23c-055d-461e-87f7-b0d1b57f14b4
+        chunk_size:
+          description: The required size (in bytes) that the file must be segmented into for each chunk
+          type: integer
+          format: int64
+          example: 4194304
+    uploadCompleteRequest:
+      description: Request to verify and finish an uploaded file
+      type: object
+      required:
+        - transithash
+      properties:
+        transithash:
+          description: the transithash (sha256 of the concatenation of each in-order chunk hash) of the entire file contents
+          type: object
+          required:
+            - sha256
+          properties:
+            sha256:
+              description: SHA256 hash
+              type: string
+              example: 83810fdc61c44290778c212d7829d0c3f0232e81bd551d3943998a920025d14f
+  parameters:
+    requestId:
+      name: X-Request-ID
+      description: The request tracking ID for APM.
+      in: header
+      schema:
+        type: string
+    userAgent:
+      name: User-Agent
+      description: |
+        The user-agent header that is sent.
+        Must have the format "elastic agent X.Y.Z" where "X.Y.Z" indicates the agent version.
+        The agent version must not be greater than the version of the fleet-server.
+      in: header
+      required: true
+      schema:
+        type: string
+      examples:
+        valid:
+          description: A valid User-Agent header from the elastic-agent.
+          value: elastic agent 8.6.0
+        validWithSuffix:
+          description: A version number may include an optional suffix
+          value: elastic agent 8.6.0-SNAPSHOT
+        invalidName:
+          description: The elastic-agent name is not formatted correctly.
+          value: elastic-agent 8.6.0
+        outdatedVersion:
+          description: The version string given is too old.
+          value: elastic agent 7.0.0
+  responses:
+    badRequest:
+      description: |
+        A 400 response for receiving an invalid User-Agent header or version number (checkin and enroll endpoints).
+        Or any other undefined error encounted by the fleet-server. May be returned by any endpoint except /api/fleet/status.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+          examples:
+            badRequest:
+              description: Generic bad request response.
+              value:
+                statusCode: 400
+                error: BadRequest
+    internalServerError:
+      description: |
+        A 500 response for encountering not expected bahavior.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+          examples:
+            internalServerError:
+              description: Generic internal server error response.
+              value:
+                statusCode: 500
+                error: InternalServerError
+    keyNotEnabled:
+      description: 401 response when the API key is not enabled on any endpoint except /api/fleet/status. Or when there are issues updating an inactive agent on the ack endpoint.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+          examples:
+            unauthorized:
+              description: The ApiKey is not enabled
+              value:
+                statusCode: 401
+                error: Unauthorized
+                message: ApiKey not enabled
+    agentNotFound:
+      description: 404 response when the agent is not found. May be returned by checkin endpoint. or endpoints that use the agentApiKey auth scheme
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+          examples:
+            agentNotFound:
+              description: The agent is not found.
+              value:
+                statusCode: 404
+                error: AgentNotFound
+                message: agent could not be found
+    deadline:
+      description: 408 request timeout.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+          examples:
+            requestTimeout:
+              description: Deadline exceeded.
+              value:
+                statusCode: 408
+                error: RequestTimeout
+                message: timeout on request
+    throttle:
+      description: 428 rate limiting request. Only returned by artifacts endpoint.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+          examples:
+            rateLimit:
+              description: Too many requests - rate limit reached.
+              value:
+                statusCode: 428
+                error: TooManyRequests
+                message: too many requests
+    unavailable:
+      description: |
+        503 response when the server is not available for some reason.
+        Such as if a context is cancelled or the connection (to ES) is refused.
+        May be returned by any endpoint.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+          examples:
+            unavailable:
+              description: Service unavailable
+              value:
+                statusCode: 503
+                error: ServiceUnavailable
+                message: Fleet server unable to communicate with Elasticsearch
+
+paths:
+  /api/status:
+    get:
+      operationId: status
+      parameters:
+        - $ref: '#/components/parameters/requestId'
+      security:
+        - {}
+        - apiKey: []
+      description: |
+        Return the fleet-server status.
+        The status code will either be 200 if healthy, or 503 if not.
+        Authentication for this endpoint is optional, if not provided a shorter response body is returned.
+      responses:
+        '200':
+          description: Healthy fleet-server response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/statusResponse'
+              examples:
+                unauthenticated:
+                  description: The short response for unauthenticated requests.
+                  value:
+                    name: fleet-server
+                    status: healthy
+                authenticated:
+                  description: The full response for an authenticated request.
+                  value:
+                    name: fleet-server
+                    status: healthy
+                    version:
+                      number: 8.6.0
+                      build_hash: fd6d862bcbebe841f930e8cdd2fa5107922e66e7
+                      build_time: 2022-12-01T01:02:03Z
+
+        '503':
+          description: Unhealthy fleet-server response.
+          content:
+            text/plain: {}
+            application/json:
+              schema:
+                $ref: '#/components/schemas/statusResponse'
+              examples:
+                unauthenticated:
+                  description: The short response for unauthenticated requests.
+                  value:
+                    name: fleet-server
+                    status: failed
+                authenticated:
+                  description: The full response for an authenticated request.
+                  value:
+                    name: fleet-server
+                    status: failed
+                    version:
+                      number: 8.6.0
+                      build_hash: fd6d862bcbebe841f930e8cdd2fa5107922e66e7
+                      build_time: 2022-12-01T01:02:03Z
+  /api/fleet/agents/enroll:
+    post:
+      operationId: agentEnroll
+      parameters:
+        - $ref: '#/components/parameters/userAgent'
+        - $ref: '#/components/parameters/requestId'
+      security:
+        - apiKey: []
+      description: Enroll a new agent to fleet-server. The agent is enrolled in the policy encoded in the apiKey used.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/enrollRequest'
+            examples:
+              request:
+                description: A request to enroll a new agent.
+                value:
+                  type: PERMANENT
+                  metadata:
+                    local:
+                      elastic:
+                        agent:
+                          id: ""
+                          version: 8.6.0
+                          snapshot: false
+                      host:
+                        hostname: test
+                    tags:
+                      - us-west
+                      - test
+      responses:
+        '200':
+          description: Agent enrolled successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/enrollResponse'
+              examples:
+                success:
+                  description: Agent enrolled successfully.
+                  value:
+                    action: created
+                    item:
+                      id: agent-test-id
+                      active: true
+                      policy_id: agent-policy-id
+                      type: PERMANENT
+                      enrolled_at: 2022-12-01T01:02:03Z
+                      user_provided_metadata: {}
+                      local_metadata:
+                        elastic:
+                          agent:
+                            id: agent-test-id
+                            version: 8.6.0
+                            snapshot: false
+                        host:
+                          hostname: test
+                      access_api_key_id: api-key-id
+                      access_api_key: api-key-token
+                      status: online
+                      tags:
+                        - us-west
+                        - test
+        '400':
+          $ref: '#/components/responses/badRequest'
+        '401':
+          $ref: '#/components/responses/keyNotEnabled'
+        '404':
+          description: Bad request path, expected id to be enroll.
+        '408':
+          $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+        '503':
+          $ref: '#/components/responses/unavailable'
+  /api/fleet/agents/{id}/checkin:
+    post:
+      operationId: agentCheckin
+      description: |
+        The agent checkin endpoint.
+        Clients will long-poll this endpoint.
+        A client may inform fleet-server of it's long-poll timeout in the request body.
+        The fleet-server will return a response if there is a new action for the agent, or if the polling timeout is reached.
+        The fleet-server may also use some jitter to offset the polling timeout, if specified a random amount of the jitter value may be subtracted from the polling timeout.
+        The fleet-sever polling timeout is short-circuited in cases of heavy load where setting up the checkin (ensuring the API key is authed etc) takes longer then the timeout value.
+        Fleet-server sets the poll timeout to 5m by default (with a 10m write timeout), for these values we assume that elastic-agent's request timeout is set to 10m and the cloud-proxy's timeout is longer than 10m.
+      parameters:
+        - name: id
+          in: path
+          description: The agent ID.
+          required: true
+          schema:
+            type: string
+        - name: Accept-Encoding
+          in: header
+          description: |
+            If the agent is able to accept encoded responses.
+            Used to indicate if GZIP compression may be used by the server.
+            The elastic-agent does not use the accept-encoding header.
+          schema:
+            type: string
+        - $ref: '#/components/parameters/userAgent'
+        - $ref: '#/components/parameters/requestId'
+      security:
+        - agentApiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/checkinRequest'
+            examples:
+              request:
+                description: A checkin request from an elastic-agent.
+                value:
+                  status: online
+                  message: ""
+                  ack_token: previous-token
+      responses:
+        '200':
+          description: Agent checkin successful. May include actions.
+          headers:
+            Content-Encoding:
+              description: Responses may be compressed if the accept encoding indicates it. Currently not used by the agent.
+              schema:
+                type: string
+              examples:
+                gzip:
+                  description: Response is gzip encoded as the request headers allowed it.
+                  value: gzip
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/checkinResponse'
+              examples:
+                response:
+                  description: Agent successfully checked in.
+                  value:
+                    action: checkin
+                    ack_token: new-token
+                    actions:
+                      - agent_id: test-agent
+                        created_at: 2022-12-01T01:02:03Z
+                        data:
+                          log_level: debug
+                        id: test-action
+                        type: SETTINGS
+        '400':
+          $ref: '#/components/responses/badRequest'
+        '401':
+          $ref: '#/components/responses/keyNotEnabled'
+        '404':
+          $ref: '#/components/responses/agentNotFound'
+        '408':
+          $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+        '503':
+          $ref: '#/components/responses/unavailable'
+  /api/fleet/agents/{id}/acks:
+    post:
+      operationId: agentAcks
+      description: |
+        The endpoint that an agent uses to acknowledge (and inform fleet-server) of events that it has recieved/executed.
+        A single action may have multiple different events associated with it.
+        Also an action may not have any acks associated with it.
+      parameters:
+        - name: id
+          in: path
+          description: The agent ID.
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/requestId'
+      security:
+        - agentApiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ackRequest'
+            examples:
+              single:
+                description: Send an ack for a single event.
+                value:
+                  events:
+                    - type: ACTION_RESULT
+                      subtype: ACKNOWLEDGED
+                      agent_id: test-agent
+                      action_id: test-action
+                      timestamp: 2022-12-01T01:02:03.00004-07:00
+                      message: Action 'test-action' of type 'TEST' acknowledged.
+      responses:
+        '200':
+          description: Agent ack successfully received.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ackResponse'
+              examples:
+                single:
+                  description: Successfull ack for a single action.
+                  value:
+                    action: acks
+                    errors: false
+                    items:
+                      - status: 200
+                        message: ok
+        '400':
+          $ref: '#/components/responses/badRequest'
+        '401':
+          $ref: '#/components/responses/keyNotEnabled'
+        '404':
+          $ref: '#/components/responses/agentNotFound'
+        '408':
+          $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+        '503':
+          $ref: '#/components/responses/unavailable'
+  /api/fleet/artifacts/{id}/{sha2}:
+    get:
+      operationId: artifact
+      description: The route to retrieve an artifact from Elasticsearch.
+      parameters:
+        - name: id
+          in: path
+          description: The artifact record ID.
+          required: true
+          schema:
+            type: string
+        - name: sha2
+          in: path
+          description: The decoded Sha256 associated with the artifact record.
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/requestId'
+      security:
+        - agentApiKey: []
+      responses:
+        '200':
+          description: The artifact retrieved from ES.
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/badRequest'
+        '401':
+          $ref: '#/components/responses/keyNotEnabled'
+        '404':
+          $ref: '#/components/responses/agentNotFound'
+        '408':
+          $ref: '#/components/responses/deadline'
+        '428':
+          $ref: '#/components/responses/throttle'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+        '503':
+          $ref: '#/components/responses/unavailable'
+  /api/fleet/uploads:
+    post:
+      operationId: uploadBegin
+      summary: Initiate a file upload process
+      description: ""
+      security:
+        - agentApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/requestId'
+      requestBody:
+        required: true
+        description: Information about the file to be uploaded. Minimum required fields are marked as required. Additional fields may be specified and are allowed. For information about the file itself, ECS.file paths are recommended. For archived files, information about the archive should be placed in `file`. Information about the archive members may be placed in a `contents` array.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/uploadBeginRequest'
+      responses:
+        '200':
+          description: Information about the upload procedure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/uploadBeginResponse'
+        '400':
+          $ref: '#/components/responses/badRequest'
+        '401':
+          $ref: '#/components/responses/keyNotEnabled'
+        '408':
+          $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+        '503':
+          $ref: '#/components/responses/unavailable'
+  /api/fleet/uploads/{id}/{chunkNum}:
+    put:
+      operationId: uploadChunk
+      summary: Upload a section of file data
+      description: "Upload portions of the intended file in a piecewise fashion. This route is idempotent in that any successive calls will overwrite previous ones for the same URL parameters. Chunks may be uploaded in any order, and may be uploaded in parallel. The body is the raw contents of the file at the given position matching the chunk number. The body must be the exact chunk size returned from the upload initiation response. All chunks must be this size except for the final one, which is naturally the file remainder."
+      security:
+        - agentApiKey: []
+      parameters:
+        - name: id
+          in: path
+          description: The upload_id as returned in the Upload initiation response
+          required: true
+          schema:
+            type: string
+            example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
+        - name: chunkNum
+          in: path
+          description: the positional index of the chunk within the file. The first chunk is 0, the next 1, etc.
+          required: true
+          schema:
+            type: integer
+            example: 3
+        - name: X-Chunk-SHA2
+          in: header
+          required: true
+          description: the SHA256 hash of the body contents for this request
+          schema:
+            type: string
+            example: 0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1
+        - $ref: '#/components/parameters/requestId'
+      requestBody:
+        description: The chunk contents as bytes
+        required: true
+        content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+      responses:
+        '200':
+          description: Successful chunk upload
+        '400':
+          $ref: '#/components/responses/badRequest'
+        '401':
+          $ref: '#/components/responses/keyNotEnabled'
+        '408':
+          $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+        '503':
+          $ref: '#/components/responses/unavailable'
+  /api/fleet/uploads/{id}:
+    post:
+      operationId: uploadComplete
+      summary: Complete a file upload process
+      description: ""
+      security:
+        - agentApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/uploadCompleteRequest'
+      parameters:
+        - name: id
+          in: path
+          description: The upload_id as returned in the Upload initiation response
+          required: true
+          schema:
+            type: string
+            example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
+        - $ref: '#/components/parameters/requestId'
+      responses:
+        '200':
+          description: success response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+        '400':
+          $ref: '#/components/responses/badRequest'
+        '401':
+          $ref: '#/components/responses/keyNotEnabled'
+        '408':
+          $ref: '#/components/responses/deadline'
+        '500':
+          $ref: '#/components/responses/internalServerError'
+        '503':
+          $ref: '#/components/responses/unavailable'

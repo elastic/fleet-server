@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !integration
-// +build !integration
 
 package config
 
@@ -15,6 +14,7 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/elastic/go-ucfg"
+	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
@@ -117,6 +117,7 @@ func TestConfig(t *testing.T) {
 								CheckinTimestamp: 30 * time.Second,
 								CheckinLongPoll:  5 * time.Minute,
 								CheckinJitter:    30 * time.Second,
+								CheckinMaxPoll:   10 * time.Minute,
 							},
 							Profiler: ServerProfiler{
 								Enabled: false,
@@ -146,7 +147,7 @@ func TestConfig(t *testing.T) {
 			err: "only 1 fleet-server input can be defined",
 		},
 		"bad-logging": {
-			err: "invalid log level; must be one of: trace, debug, info, warning, error",
+			err: "invalid log level; must be one of: trace, debug, info, warn, error",
 		},
 		"bad-output": {
 			err: "can only contain elasticsearch key",
@@ -179,6 +180,50 @@ func TestConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadStandaloneAgentMetadata(t *testing.T) {
+	t.Run("generates agent id", func(t *testing.T) {
+		cfg := &Config{}
+		cfg.LoadStandaloneAgentMetadata()
+		assert.Len(t, cfg.Fleet.Agent.ID, 36)
+		_, err := uuid.FromString(cfg.Fleet.Agent.ID)
+		assert.NoError(t, err)
+
+		assert.NotEmpty(t, cfg.Fleet.Agent.Version)
+	})
+}
+
+func TestLoadServerLimits(t *testing.T) {
+	t.Run("empty loads limits", func(t *testing.T) {
+		c := &Config{Inputs: []Input{{}}}
+		err := c.LoadServerLimits()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(defaultCheckinMaxBody), c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
+		assert.Equal(t, defaultActionTTL, c.Inputs[0].Cache.ActionTTL)
+	})
+	t.Run("existing values are not overridden", func(t *testing.T) {
+		c := &Config{
+			Inputs: []Input{{
+				Server: Server{
+					Limits: ServerLimits{
+						CheckinLimit: Limit{
+							MaxBody: 5 * defaultCheckinMaxBody,
+						},
+					},
+				},
+				Cache: Cache{
+					ActionTTL: time.Minute,
+				},
+			}},
+		}
+		err := c.LoadServerLimits()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(5*defaultCheckinMaxBody), c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
+		assert.Equal(t, defaultCheckinBurst, c.Inputs[0].Server.Limits.CheckinLimit.Burst)
+		assert.Equal(t, time.Minute, c.Inputs[0].Cache.ActionTTL)
+	})
+
 }
 
 // Stub out the defaults so that the above is easier to maintain
@@ -237,12 +282,13 @@ func defaultFleet() Fleet {
 
 func defaultElastic() Elasticsearch {
 	return Elasticsearch{
-		Protocol:       "http",
-		ServiceToken:   "test-token",
-		Hosts:          []string{"localhost:9200"},
-		MaxRetries:     3,
-		MaxConnPerHost: 128,
-		Timeout:        90 * time.Second,
+		Protocol:         "http",
+		ServiceToken:     "test-token",
+		Hosts:            []string{"localhost:9200"},
+		MaxRetries:       3,
+		MaxConnPerHost:   128,
+		MaxContentLength: 104857600,
+		Timeout:          90 * time.Second,
 	}
 }
 
@@ -250,4 +296,13 @@ func defaultServer() Server {
 	var d Server
 	d.InitDefaults()
 	return d
+}
+
+func TestConfigFromEnv(t *testing.T) {
+	t.Setenv("ELASTICSEARCH_SERVICE_TOKEN", "test-val")
+	_ = testlog.SetLogger(t)
+	path := filepath.Join("..", "testing", "fleet-server-testing.yml")
+	c, err := LoadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "test-val", c.Output.Elasticsearch.ServiceToken)
 }

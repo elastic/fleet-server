@@ -39,6 +39,10 @@
           "description": "The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.",
           "type": "integer"
         },
+        "rollout_duration_seconds": {
+          "description": "The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.",
+          "type": "integer"
+        },
         "type": {
           "description": "The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",
           "type": "string"
@@ -55,6 +59,10 @@
           "description": "The ID of the user who created the action.",
           "type": "string"
         },
+        "traceparent": {
+          "description": "APM traceparent for the action.",
+          "type": "string"
+        },
         "agents": {
           "description": "The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids",
           "type": "array",
@@ -66,6 +74,20 @@
           "description": "The opaque payload.",
           "type": "object",
           "format": "raw"
+        },
+        "signed": {
+          "description": "The action signed data and signature.",
+          "type": "object",
+          "properties": {
+            "data": {
+              "description": "The base64 encoded, UTF-8 JSON serialized action bytes that are signed.",
+              "type": "string"
+            },
+            "signature": {
+              "description": "The base64 encoded signature.",
+              "type": "string"
+            }
+          }
         }
       },
       "required": [
@@ -459,6 +481,10 @@
           "type": "string",
           "format": "date-time"
         },
+        "upgrade_status": {
+          "description": "Upgrade status",
+          "type": "string"
+        },
         "access_api_key_id": {
           "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
           "type": "string"
@@ -509,8 +535,21 @@
           "format": "date-time"
         },
         "last_checkin_status": {
-          "description": "Lst checkin status",
+          "description": "Last checkin status",
           "type": "string"
+        },
+        "last_checkin_message": {
+          "description": "Last checkin message",
+          "type": "string"
+        },
+        "last_checkin_message": {
+          "description": "Last checkin message",
+          "type": "string"
+        },
+        "components": {
+          "description": "Elastic Agent components detailed status information",
+          "type": "object",
+          "format": "raw"
         },
         "default_api_key_id": {
           "description": "Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
@@ -601,7 +640,6 @@
       ]
     }
   },
-
   "checkin": {
     "title": "Checkin",
     "description": "An Elastic Agent checkin to Fleet",

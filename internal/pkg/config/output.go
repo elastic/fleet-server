@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -16,7 +17,7 @@ import (
 
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // The timeout would be driven by the server for long poll.
@@ -26,21 +27,28 @@ const schemeHTTP = "http"
 
 var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
+// Output is the output configuration to elasticsearch.
+type Output struct {
+	Elasticsearch Elasticsearch          `config:"elasticsearch"`
+	Extra         map[string]interface{} `config:",inline"`
+}
+
 // Elasticsearch is the configuration for elasticsearch.
 type Elasticsearch struct {
-	Protocol       string            `config:"protocol"`
-	Hosts          []string          `config:"hosts"`
-	Path           string            `config:"path"`
-	Headers        map[string]string `config:"headers"`
-	APIKey         string            `config:"api_key"`
-	ServiceToken   string            `config:"service_token"`
-	ProxyURL       string            `config:"proxy_url"`
-	ProxyDisable   bool              `config:"proxy_disable"`
-	ProxyHeaders   map[string]string `config:"proxy_headers"`
-	TLS            *tlscommon.Config `config:"ssl"`
-	MaxRetries     int               `config:"max_retries"`
-	MaxConnPerHost int               `config:"max_conn_per_host"`
-	Timeout        time.Duration     `config:"timeout"`
+	Protocol         string            `config:"protocol"`
+	Hosts            []string          `config:"hosts"`
+	Path             string            `config:"path"`
+	Headers          map[string]string `config:"headers"`
+	ServiceToken     string            `config:"service_token"`
+	ServiceTokenPath string            `config:"service_token_path"`
+	ProxyURL         string            `config:"proxy_url"`
+	ProxyDisable     bool              `config:"proxy_disable"`
+	ProxyHeaders     map[string]string `config:"proxy_headers"`
+	TLS              *tlscommon.Config `config:"ssl"`
+	MaxRetries       int               `config:"max_retries"`
+	MaxConnPerHost   int               `config:"max_conn_per_host"`
+	Timeout          time.Duration     `config:"timeout"`
+	MaxContentLength int               `config:"max_content_length"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -50,13 +58,11 @@ func (c *Elasticsearch) InitDefaults() {
 	c.Timeout = 90 * time.Second
 	c.MaxRetries = 3
 	c.MaxConnPerHost = 128
+	c.MaxContentLength = 100 * 1024 * 1024
 }
 
 // Validate ensures that the configuration is valid.
 func (c *Elasticsearch) Validate() error {
-	if c.APIKey != "" {
-		return fmt.Errorf("cannot connect to elasticsearch with api_key; must use service_token")
-	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
 		if _, err := urlutil.ParseURL(c.ProxyURL); err != nil {
 			return err
@@ -148,20 +154,23 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	// This eliminates the warning while accessing the system index
 	h.Set("X-elastic-product-origin", "fleet")
 
+	serviceToken := c.ServiceToken
+	if c.ServiceToken == "" && c.ServiceTokenPath != "" {
+		p, err := os.ReadFile(c.ServiceTokenPath)
+		if err != nil {
+			return elasticsearch.Config{}, fmt.Errorf("unable to read service_token_path: %w", err)
+		}
+		serviceToken = string(p)
+	}
+
 	return elasticsearch.Config{
 		Addresses:    addrs,
-		ServiceToken: c.ServiceToken,
+		ServiceToken: serviceToken,
 		Header:       h,
 		Transport:    httpTransport,
 		MaxRetries:   c.MaxRetries,
 		DisableRetry: disableRetry,
 	}, nil
-}
-
-// Output is the output configuration to elasticsearch.
-type Output struct {
-	Elasticsearch Elasticsearch          `config:"elasticsearch"`
-	Extra         map[string]interface{} `config:",inline"`
 }
 
 // Validate validates that only elasticsearch is defined on the output.

@@ -56,6 +56,20 @@ type Fleet struct {
 	Host  Host  `config:"host"`
 }
 
+// CopyNoLogging returns a copy of Fleet without any logging specifiers.
+func (c *Fleet) CopyNoLogging() *Fleet {
+	return &Fleet{
+		Agent: Agent{
+			ID:      c.Agent.ID,
+			Version: c.Agent.Version,
+		},
+		Host: Host{
+			ID:   c.Host.ID,
+			Name: c.Host.Name,
+		},
+	}
+}
+
 func strToLevel(s string) (zerolog.Level, error) {
 	l := zerolog.DebugLevel
 
@@ -67,12 +81,12 @@ func strToLevel(s string) (zerolog.Level, error) {
 		l = zerolog.DebugLevel
 	case "info":
 		l = zerolog.InfoLevel
-	case "warning":
+	case "warn", "warning":
 		l = zerolog.WarnLevel
 	case "error":
 		l = zerolog.ErrorLevel
 	default:
-		return l, fmt.Errorf("invalid log level; must be one of: trace, debug, info, warning, error")
+		return l, fmt.Errorf("invalid log level; must be one of: trace, debug, info, warn, error")
 	}
 
 	return l, nil

@@ -7,7 +7,7 @@ package testing
 import (
 	"context"
 
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -83,7 +83,7 @@ func (m *MockBulk) APIKeyCreate(ctx context.Context, name, ttl string, roles []b
 	return args.Get(0).(*bulk.APIKey), args.Error(1)
 }
 
-func (m *MockBulk) APIKeyRead(ctx context.Context, id string) (*bulk.APIKeyMetadata, error) {
+func (m *MockBulk) APIKeyRead(ctx context.Context, id string, _ bool) (*bulk.APIKeyMetadata, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(*bulk.APIKeyMetadata), args.Error(1)
 }
@@ -96,6 +96,15 @@ func (m *MockBulk) APIKeyAuth(ctx context.Context, key bulk.APIKey) (*bulk.Secur
 func (m *MockBulk) APIKeyInvalidate(ctx context.Context, ids ...string) error {
 	args := m.Called(ctx, ids)
 	return args.Error(0)
+}
+
+func (m *MockBulk) APIKeyUpdate(ctx context.Context, id, outputPolicyHash string, roles []byte) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockBulk) HasTracer() bool {
+	return false
 }
 
 var _ bulk.Bulk = (*MockBulk)(nil)

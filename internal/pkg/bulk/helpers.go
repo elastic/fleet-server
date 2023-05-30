@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 )
 
@@ -30,7 +30,7 @@ func (u UpdateFields) Marshal() ([]byte, error) {
 func parseError(res *esapi.Response) error {
 
 	var e struct {
-		Err *es.ErrorT `json:"error"`
+		Err json.RawMessage `json:"error"`
 	}
 
 	decoder := json.NewDecoder(res.Body)

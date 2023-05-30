@@ -15,11 +15,11 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"go.elastic.co/apm"
 
-	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -46,6 +46,7 @@ type Bulk interface {
 	Delete(ctx context.Context, index, id string, opts ...Opt) error
 	Index(ctx context.Context, index, id string, body []byte, opts ...Opt) (string, error)
 	Search(ctx context.Context, index string, body []byte, opts ...Opt) (*es.ResultT, error)
+	HasTracer() bool
 
 	// Multi Operation API's run in the bulk engine
 	MCreate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
@@ -55,9 +56,10 @@ type Bulk interface {
 
 	// APIKey operations
 	APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*APIKey, error)
-	APIKeyRead(ctx context.Context, id string) (*APIKeyMetadata, error)
+	APIKeyRead(ctx context.Context, id string, withOwner bool) (*APIKeyMetadata, error)
 	APIKeyAuth(ctx context.Context, key APIKey) (*SecurityInfo, error)
 	APIKeyInvalidate(ctx context.Context, ids ...string) error
+	APIKeyUpdate(ctx context.Context, id, outputPolicyHash string, roles []byte) error
 
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
@@ -81,6 +83,7 @@ const (
 	defaultMaxPending        = 32
 	defaultBlockQueueSz      = 32 // Small capacity to allow multiOp to spin fast
 	defaultAPIKeyMaxParallel = 32
+	defaultApikeyMaxReqSize  = 100 * 1024 * 1024
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -136,6 +139,8 @@ func blkToQueueType(blk *bulkT) queueType {
 		} else {
 			queueIdx = kQueueRead
 		}
+	case ActionUpdateAPIKey:
+		queueIdx = kQueueAPIKeyUpdate
 	default:
 		if forceRefresh {
 			queueIdx = kQueueRefreshBulk
@@ -288,6 +293,8 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 			err = b.flushRead(ctx, queue)
 		case kQueueSearch, kQueueFleetSearch:
 			err = b.flushSearch(ctx, queue)
+		case kQueueAPIKeyUpdate:
+			err = b.flushUpdateAPIKey(ctx, queue)
 		default:
 			err = b.flushBulk(ctx, queue)
 		}

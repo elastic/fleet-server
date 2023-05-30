@@ -3,15 +3,16 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build integration
-// +build integration
 
 package cache
 
 import (
 	"time"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
 
-func newCache(_ Config) (Cacher, error) {
+func newCache(_ config.Cache) (Cacher, error) {
 	return &NoCache{}, nil
 }
 

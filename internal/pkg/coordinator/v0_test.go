@@ -3,16 +3,16 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build !integration
-// +build !integration
 
 package coordinator
 
 import (
 	"context"
-	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/gofrs/uuid"
 	"testing"
 	"time"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/gofrs/uuid"
 )
 
 func TestCoordinatorZero(t *testing.T) {

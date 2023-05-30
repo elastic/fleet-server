@@ -13,12 +13,14 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
@@ -124,4 +126,75 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 			assert.Equal(t, wantOutputs, gotAgent.Outputs)
 		})
 	}
+}
+
+func TestPolicyOutputESPrepareRealES(t *testing.T) {
+	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, dl.FleetAgents)
+
+	agentID := createAgent(t, index, bulker)
+	agent, err := dl.FindAgent(
+		context.Background(), bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	if err != nil {
+		require.NoError(t, err, "failed to find agent ID %q", agentID)
+	}
+
+	output := Output{
+		Type: OutputTypeElasticsearch,
+		Name: "test output",
+		Role: &RoleT{
+			Sha2: "new-hash",
+			Raw:  TestPayload,
+		},
+	}
+	policyMap := smap.Map{
+		"test output": map[string]interface{}{},
+	}
+
+	err = output.prepareElasticsearch(
+		context.Background(), zerolog.Nop(), bulker, &agent, policyMap)
+	require.NoError(t, err)
+
+	// need to wait a bit before querying the agent again
+	// TODO: find a better way to query the updated agent
+	time.Sleep(time.Second)
+
+	got, err := dl.FindAgent(
+		context.Background(), bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	if err != nil {
+		require.NoError(t, err, "failed to find agent ID %q", agentID)
+	}
+
+	gotOutput, ok := got.Outputs[output.Name]
+	require.True(t, ok, "no '%s' output fouled on agent document", output.Name)
+
+	assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
+	assert.Equal(t, gotOutput.Type, OutputTypeElasticsearch)
+	assert.Equal(t, gotOutput.PermissionsHash, output.Role.Sha2)
+	assert.NotEmpty(t, gotOutput.APIKey)
+	assert.NotEmpty(t, gotOutput.APIKeyID)
+}
+
+func createAgent(t *testing.T, index string, bulker bulk.Bulk) string {
+	const nowStr = "2022-08-12T16:50:05Z"
+
+	agentID := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
+
+	agentModel := model.Agent{
+		PolicyID:          policyID,
+		Active:            true,
+		LastCheckin:       nowStr,
+		LastCheckinStatus: "",
+		UpdatedAt:         nowStr,
+		EnrolledAt:        nowStr,
+	}
+
+	body, err := json.Marshal(agentModel)
+	require.NoError(t, err)
+
+	_, err = bulker.Create(
+		context.Background(), index, agentID, body, bulk.WithRefresh())
+	require.NoError(t, err)
+
+	return agentID
 }

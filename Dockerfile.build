@@ -1,8 +1,13 @@
 ARG GO_VERSION
-FROM golang:${GO_VERSION}-buster
+FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-main-debian11
 
-RUN apt-get update && apt-get install -y zip
+RUN \
+  apt-get update \
+  && apt-get install -y zip \
+  && mkdir -p /.cache \
+  && chmod 777 /.cache
 
 WORKDIR /go/src/github.com/elastic/fleet-server
 
-ENTRYPOINT [ "make", "release" ]
+ENTRYPOINT [ "make" ]
+CMD [ "release" ]

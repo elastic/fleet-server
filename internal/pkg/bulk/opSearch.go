@@ -13,7 +13,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/mailru/easyjson"
 	"github.com/rs/zerolog/log"
 )
@@ -138,9 +138,7 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 	)
 
 	if queue.ty == kQueueFleetSearch {
-		// Using custom _fleet/_fleet_msearch, possibly temporary
-		// Replace with regular _msearch if _fleet/_fleet_msearch implementation merges with _msearch
-		req := es.FleetMsearchRequest{
+		req := esapi.FleetMsearchRequest{
 			Body: bytes.NewReader(buf.Bytes()),
 		}
 		res, err = req.Do(ctx, b.es)

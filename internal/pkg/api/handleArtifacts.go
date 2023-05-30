@@ -11,6 +11,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -19,15 +21,11 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 
-	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -46,96 +44,45 @@ type ArtifactT struct {
 	bulker     bulk.Bulk
 	cache      cache.Cache
 	esThrottle *throttle.Throttle
-	limit      *limit.Limiter
 }
 
 func NewArtifactT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *ArtifactT {
-	log.Info().
-		Interface("limits", cfg.Limits.ArtifactLimit).
-		Int("maxParallel", defaultMaxParallel).
-		Msg("Artifact install limits")
-
 	return &ArtifactT{
 		bulker:     bulker,
 		cache:      cache,
-		limit:      limit.NewLimiter(&cfg.Limits.ArtifactLimit),
 		esThrottle: throttle.NewThrottle(defaultMaxParallel),
 	}
 }
 
-func (rt Router) handleArtifacts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	start := time.Now()
-
-	var (
-		id   = ps.ByName("id")   // Identifier in the artifact record
-		sha2 = ps.ByName("sha2") // DecodedSha256 in the artifact record
-	)
-
-	reqID := r.Header.Get(logger.HeaderRequestID)
-
-	zlog := log.With().
-		Str(LogAgentID, id).
-		Str(ECSHTTPRequestID, reqID).
-		Str("sha2", sha2).
-		Str("remoteAddr", r.RemoteAddr).
-		Logger()
-
-	rdr, err := rt.at.handleArtifacts(&zlog, r, id, sha2)
-
-	var nWritten int64
-	if err == nil {
-		nWritten, err = io.Copy(w, rdr)
-		zlog.Trace().
-			Err(err).
-			Int64(ECSHTTPResponseBodyBytes, nWritten).
-			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("Response sent")
-
-		cntArtifacts.bodyOut.Add(uint64(nWritten))
-	}
-
-	if err != nil {
-		cntArtifacts.IncError(err)
-		resp := NewHTTPErrResp(err)
-
-		zlog.WithLevel(resp.Level).
-			Err(err).
-			Int(ECSHTTPResponseCode, resp.StatusCode).
-			Int64(ECSHTTPResponseBodyBytes, nWritten).
-			Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
-			Msg("fail artifact")
-
-		if err := resp.Write(w); err != nil {
-			zlog.Error().Err(err).Msg("fail writing error response")
-		}
-	}
-}
-
-func (at ArtifactT) handleArtifacts(zlog *zerolog.Logger, r *http.Request, id, sha2 string) (io.Reader, error) {
-	limitF, err := at.limit.Acquire()
-	if err != nil {
-		return nil, err
-	}
-	defer limitF()
-
+func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, id, sha2 string) error {
 	// Authenticate the APIKey; retrieve agent record.
 	// Note: This is going to be a bit slow even if we hit the cache on the api key.
 	// In order to validate that the agent still has that api key, we fetch the agent record from elastic.
 	agent, err := authAgent(r, nil, at.bulker, at.cache)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// Pointer is passed in to allow UpdateContext by child function
-	zlog.UpdateContext(func(ctx zerolog.Context) zerolog.Context {
-		return ctx.Str(LogAccessAPIKeyID, agent.AccessAPIKeyID)
-	})
+	zlog = zlog.With().Str(LogAccessAPIKeyID, agent.AccessAPIKeyID).Logger()
+	ctx := zlog.WithContext(r.Context())
+	r = r.WithContext(ctx)
 
-	// Metrics; serenity now.
-	dfunc := cntArtifacts.IncStart()
-	defer dfunc()
-
-	return at.processRequest(r.Context(), *zlog, agent, id, sha2)
+	rdr, err := at.processRequest(r.Context(), zlog, agent, id, sha2)
+	if err != nil {
+		return err
+	}
+	n, err := io.Copy(w, rdr)
+	if err != nil {
+		return err
+	}
+	ts, ok := logger.CtxStartTime(r.Context())
+	e := zlog.Trace().Int64(ECSHTTPResponseBodyBytes, n)
+	if ok {
+		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
+	}
+	e.Msg("artifact response sent")
+	cntArtifacts.bodyOut.Add(uint64(n))
+	return nil
 }
 
 func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
@@ -262,7 +209,10 @@ func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, iden
 		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("fetch artifact")
 
-	return artifact, errors.Wrap(err, "fetchArtifact")
+	if err != nil {
+		return artifact, fmt.Errorf("fetchArtifact: %w", err)
+	}
+	return artifact, nil
 }
 
 func validateSha2String(sha2 string) error {
@@ -281,7 +231,7 @@ func validateSha2String(sha2 string) error {
 func validateSha2Data(data []byte, sha2 string) error {
 	src, err := hex.DecodeString(sha2)
 	if err != nil {
-		return errors.Wrap(err, "sha2 hex decode")
+		return fmt.Errorf("sha2 hex decode: %w", err)
 	}
 
 	sum := sha256.Sum256(data)

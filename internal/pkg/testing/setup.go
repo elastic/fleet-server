@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build integration
-// +build integration
 
 package testing
 
@@ -14,7 +13,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/rs/xid"
 
@@ -52,7 +51,7 @@ func SetupES(ctx context.Context, t *testing.T) *elasticsearch.Client {
 
 	cli, err := es.NewClient(ctx, &defaultCfg, false)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Unable to create elasticsearch client: %v", err)
 	}
 
 	return cli
@@ -88,7 +87,6 @@ func SetupIndexWithBulk(ctx context.Context, t *testing.T, mapping string, opts 
 }
 
 func SetupCleanIndex(ctx context.Context, t *testing.T, index string, opts ...bulk.BulkOpt) (string, bulk.Bulk) {
-
 	bulker := SetupBulk(ctx, t, opts...)
 
 	CleanIndex(ctx, t, bulker, index)
@@ -128,7 +126,7 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 	}
 
 	if res.IsError() {
-		err = es.TranslateError(res.StatusCode, &esres.Error)
+		err = es.TranslateError(res.StatusCode, esres.Error)
 		if err != nil {
 			if errors.Is(err, es.ErrIndexNotFound) {
 				err = nil

@@ -6,7 +6,6 @@
 package apikey
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -16,8 +15,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 const (
@@ -36,20 +35,26 @@ var AuthKey = http.CanonicalHeaderKey("Authorization")
 
 // APIKeyMetadata tracks Metadata associated with an APIKey.
 type APIKeyMetadata struct {
-	ID       string
-	Metadata Metadata
+	ID              string
+	Metadata        Metadata
+	RoleDescriptors json.RawMessage
 }
 
 // Read gathers APIKeyMetadata from Elasticsearch using the given client.
-func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKeyMetadata, error) {
+func Read(ctx context.Context, client *elasticsearch.Client, id string, withOwner bool) (*APIKeyMetadata, error) {
+
 	opts := []func(*esapi.SecurityGetAPIKeyRequest){
 		client.Security.GetAPIKey.WithContext(ctx),
 		client.Security.GetAPIKey.WithID(id),
+	}
+	if withOwner {
+		opts = append(opts, client.Security.GetAPIKey.WithOwner(true))
 	}
 
 	res, err := client.Security.GetAPIKey(
 		opts...,
 	)
+
 	if err != nil {
 		return nil, fmt.Errorf("request to elasticsearch failed: %w", err)
 	}
@@ -60,22 +65,19 @@ func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKey
 	}
 
 	type APIKeyResponse struct {
-		ID       string   `json:"id"`
-		Metadata Metadata `json:"metadata"`
+		ID              string          `json:"id"`
+		Metadata        Metadata        `json:"metadata"`
+		RoleDescriptors json.RawMessage `json:"role_descriptors"`
 	}
 	type GetAPIKeyResponse struct {
 		APIKeys []APIKeyResponse `json:"api_keys"`
 	}
 
-	var buff bytes.Buffer
-	if _, err := buff.ReadFrom(res.Body); err != nil {
-		return nil, fmt.Errorf("could not read from response body: %w", err)
-	}
-
 	var resp GetAPIKeyResponse
-	if err = json.Unmarshal(buff.Bytes(), &resp); err != nil {
+	d := json.NewDecoder(res.Body)
+	if err = d.Decode(&resp); err != nil {
 		return nil, fmt.Errorf(
-			"could not Unmarshal elasticsearch GetAPIKeyResponse: %w", err)
+			"could not decode elasticsearch GetAPIKeyResponse: %w", err)
 	}
 
 	if len(resp.APIKeys) == 0 {
@@ -83,9 +85,11 @@ func Read(ctx context.Context, client *elasticsearch.Client, id string) (*APIKey
 	}
 
 	first := resp.APIKeys[0]
+
 	return &APIKeyMetadata{
-		ID:       first.ID,
-		Metadata: first.Metadata,
+		ID:              first.ID,
+		Metadata:        first.Metadata,
+		RoleDescriptors: first.RoleDescriptors,
 	}, nil
 }
 

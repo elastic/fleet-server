@@ -145,20 +145,22 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		bulker.AssertExpectations(t)
 	})
 
-	t.Run("Permission hash != Agent Permission Hash need to regenerate the key", func(t *testing.T) {
+	t.Run("Permission hash != Agent Permission Hash need to regenerate permissions", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
 
 		oldAPIKey := bulk.APIKey{ID: "test_id", Key: "EXISTING-KEY"}
-		wantAPIKey := bulk.APIKey{ID: "abc", Key: "new-key"}
+		wantAPIKey := bulk.APIKey{ID: "test_id", Key: "EXISTING-KEY"}
 		hashPerm := "old-HASH"
 
+		bulker.
+			On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything).
+			Return(&bulk.APIKeyMetadata{ID: "test_id", RoleDescriptors: TestPayload}, nil).
+			Once()
 		bulker.On("Update",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).Once()
-		bulker.On("APIKeyCreate",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(&wantAPIKey, nil).Once()
+		bulker.On("APIKeyUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		output := Output{
 			Type: OutputTypeElasticsearch,

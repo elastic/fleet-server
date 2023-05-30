@@ -58,7 +58,7 @@ type BulkIndexerResponseItem struct {
 	//		Failed     int `json:"failed"`
 	//	} `json:"_shards"`
 
-	Error *es.ErrorT `json:"error,omitempty"`
+	Error json.RawMessage `json:"error,omitempty"`
 }
 
 func (b *BulkIndexerResponseItem) deriveError() error {
@@ -110,7 +110,7 @@ type MsearchResponseItem struct {
 	Hits         es.HitsT                  `json:"hits"`
 	Aggregations map[string]es.Aggregation `json:"aggregations,omitempty"`
 
-	Error *es.ErrorT `json:"error,omitempty"`
+	Error json.RawMessage `json:"error,omitempty"`
 }
 
 //easyjson:json

@@ -3,7 +3,6 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:build integration
-// +build integration
 
 package bulk
 
@@ -14,13 +13,14 @@ import (
 	"time"
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/rs/zerolog/log"
 )
 
 // This runs a series of CRUD operations through elastic.
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
 
 func benchmarkMultiUpdate(n int, b *testing.B) {
-	_ = testlog.SetLogger(b)
+	log.Logger = testlog.SetLogger(b)
 	b.ReportAllocs()
 
 	ctx, cn := context.WithCancel(context.Background())

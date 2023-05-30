@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -74,28 +75,33 @@ func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) b
 		if c.status != sub.Status {
 			tb.Error("status mismatch")
 		}
+
 		return true
 	}
 }
 
 type bulkcase struct {
-	desc   string
-	id     string
-	status string
-	meta   []byte
-	seqno  sqn.SeqNo
-	ver    string
+	desc       string
+	id         string
+	status     string
+	message    string
+	meta       []byte
+	components []byte
+	seqno      sqn.SeqNo
+	ver        string
 }
 
 func TestBulkSimple(t *testing.T) {
 	start := time.Now()
 
-	const ver = "8.0.0"
+	const ver = "8.9.0"
 	cases := []bulkcase{
 		{
 			"Simple case",
 			"simpleId",
 			"online",
+			"message",
+			nil,
 			nil,
 			nil,
 			"",
@@ -104,7 +110,9 @@ func TestBulkSimple(t *testing.T) {
 			"Singled field case",
 			"singleFieldId",
 			"online",
+			"message",
 			[]byte(`{"hey":"now"}`),
+			[]byte(`[{"id":"winlog-default"}]`),
 			nil,
 			"",
 		},
@@ -112,7 +120,9 @@ func TestBulkSimple(t *testing.T) {
 			"Multi field case",
 			"multiFieldId",
 			"online",
+			"message",
 			[]byte(`{"hey":"now","brown":"cow"}`),
+			[]byte(`[{"id":"winlog-default","type":"winlog"}]`),
 			nil,
 			ver,
 		},
@@ -120,7 +130,9 @@ func TestBulkSimple(t *testing.T) {
 			"Multi field nested case",
 			"multiFieldNestedId",
 			"online",
+			"message",
 			[]byte(`{"hey":"now","wee":{"little":"doggie"}}`),
+			[]byte(`[{"id":"winlog-default","type":"winlog"}]`),
 			nil,
 			"",
 		},
@@ -128,6 +140,8 @@ func TestBulkSimple(t *testing.T) {
 			"Simple case with seqNo",
 			"simpleseqno",
 			"online",
+			"message",
+			nil,
 			nil,
 			sqn.SeqNo{1, 2, 3, 4},
 			ver,
@@ -136,7 +150,9 @@ func TestBulkSimple(t *testing.T) {
 			"Field case with seqNo",
 			"simpleseqno",
 			"online",
+			"message",
 			[]byte(`{"uncle":"fester"}`),
+			[]byte(`[{"id":"log-default"}]`),
 			sqn.SeqNo{5, 6, 7, 8},
 			ver,
 		},
@@ -144,6 +160,8 @@ func TestBulkSimple(t *testing.T) {
 			"Unusual status",
 			"singleFieldId",
 			"unusual",
+			"message",
+			nil,
 			nil,
 			nil,
 			"",
@@ -152,6 +170,8 @@ func TestBulkSimple(t *testing.T) {
 			"Empty status",
 			"singleFieldId",
 			"",
+			"message",
+			nil,
 			nil,
 			nil,
 			"",
@@ -160,12 +180,12 @@ func TestBulkSimple(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			_ = testlog.SetLogger(t)
+			log.Logger = testlog.SetLogger(t)
 			mockBulk := ftesting.NewMockBulk()
 			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
 			bc := NewBulk(mockBulk)
 
-			if err := bc.CheckIn(c.id, c.status, c.meta, c.seqno, c.ver); err != nil {
+			if err := bc.CheckIn(c.id, c.status, c.message, c.meta, c.components, c.seqno, c.ver); err != nil {
 				t.Fatal(err)
 			}
 
@@ -187,10 +207,11 @@ func validateTimestamp(tb testing.TB, start time.Time, ts string) {
 }
 
 func benchmarkBulk(n int, flush bool, b *testing.B) {
-	_ = testlog.SetLogger(b)
+	log.Logger = testlog.SetLogger(b)
 	b.ReportAllocs()
 
 	mockBulk := ftesting.NewMockBulk()
+	mockBulk.On("MUpdate", mock.Anything, mock.Anything, []bulk.Opt(nil)).Return([]bulk.BulkIndexerResponseItem{}, nil)
 
 	bc := NewBulk(mockBulk)
 
@@ -203,7 +224,7 @@ func benchmarkBulk(n int, flush bool, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 
 		for _, id := range ids {
-			err := bc.CheckIn(id, "", nil, nil, "")
+			err := bc.CheckIn(id, "", "", nil, nil, nil, "")
 			if err != nil {
 				b.Fatal(err)
 			}

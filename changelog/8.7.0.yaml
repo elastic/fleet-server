@@ -1,0 +1,84 @@
+version: 8.7.0
+entries:
+    - kind: feature
+      summary: Accept raw errors as a fallback to detailed error type
+      description: ""
+      component: ""
+      pr:
+        - "2079"
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/931
+      timestamp: 1668434027
+      file:
+        name: 1668434027-Accept-raw-errors-as-a-fallback-to-detailed-error-type.yaml
+        checksum: 9409686f6ea1d4edc1291531f9e4bfb8b7a0b554
+    - kind: bug-fix
+      summary: filter out UPDATE_TAGS and FORCE_UNENROLL actions on agent checkin
+      description: ""
+      component: ""
+      pr:
+        - "2200"
+      issue:
+        - "2199"
+      timestamp: 1671566400
+      file:
+        name: 1671566400-filter-out-UPDATE_TAGS-and-FORCE_UNENROLL.yaml
+        checksum: d1fb905d44cb56930188a7916cc463363cf1c644
+    - kind: breaking-change
+      summary: Remove automatic agent unenrollment
+      description: ""
+      component: ""
+      pr:
+        - "2096"
+      issue:
+        - "2063"
+      timestamp: 1672689600
+      file:
+        name: 1672689600-remove-automatic-agent-unenrollment.yaml
+        checksum: 39f5d89bc387cca29a2696b3369d7bda02591239
+    - kind: feature
+      summary: Replaced upgrade expiration and minimum_execution_duration with rollout_duration_seconds
+      description: ""
+      component: ""
+      pr:
+        - "2243"
+      issue: []
+      timestamp: 1673467200
+      file:
+        name: 1673467200-replaced-upgrade-expiration-and-minimum_execution_time.yaml
+        checksum: 115fcdac8c8c128bff36489c6e335e872461ad39
+    - kind: feature
+      summary: Document how to run the fleet server locally.
+      description: ""
+      component: ""
+      pr:
+        - "2212"
+      issue:
+        - "1423"
+      timestamp: 1673553600
+      file:
+        name: 1673553600-document-how-to-run-fleet-server-locally.yaml
+        checksum: f702299f22a08d353b2cce789012de5338dc983e
+    - kind: feature
+      summary: Fleet server now supports file uploads for a limited subset of integrations.
+      description: ""
+      component: ""
+      pr:
+        - "1902"
+      issue: []
+      timestamp: 1674244800
+      file:
+        name: 1674244800-fleet-server-file-upload.yaml
+        checksum: e6c3fef52a872e46e8cb0e2a169928a23891f6cf
+    - kind: bug-fix
+      summary: Fix fleet-server discarding duplicate `server` keys input when creating config from policy.
+      description: ""
+      component: ""
+      pr:
+        - "2354"
+      issue:
+        - "2303"
+      timestamp: 1677009600
+      file:
+        name: 1677009600-fix-fleet-server-discard-keys.yaml
+        checksum: 3a6f42e0edf9d9226c2971e6a087792d85f3e7c9

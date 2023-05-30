@@ -12,8 +12,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"github.com/pkg/errors"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -47,6 +46,9 @@ var timeNow = time.Now
 // function is responsible to ensure it only applies the migration if needed,
 // being a no-op otherwise.
 func Migrate(ctx context.Context, bulker bulk.Bulk) error {
+	// WARNING: No new migrations should be added here. We need to implement
+	// a mechanism to perform migrations with standalone mode.
+	// See https://github.com/elastic/fleet-server/pull/2359.
 	for _, fn := range []migrationFn{migrateTov7_15, migrateToV8_5} {
 		if err := fn(ctx, bulker); err != nil {
 			return err
@@ -61,11 +63,16 @@ func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, er
 	for {
 		name, index, body, err := fn()
 		if err != nil {
-			return updatedDocs, fmt.Errorf(": %w", err)
+			return updatedDocs,
+				fmt.Errorf("failed to prepare request for migration %s: %w",
+					name, err)
 		}
 
 		resp, err := applyMigration(ctx, name, index, bulker, body)
 		if err != nil {
+			log.Err(err).
+				Bytes("http.request.body.content", body).
+				Msgf("migration %s failed", name)
 			return updatedDocs, fmt.Errorf("failed to apply migration %q: %w",
 				name, err)
 		}
@@ -111,14 +118,13 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&resp); err != nil {
-		return migrationResponse{}, errors.Wrap(err, "decode UpdateByQuery response")
+		return migrationResponse{}, fmt.Errorf("decode UpdateByQuery response: %w", err)
 	}
 
 	log.Info().
 		Str("fleet.migration.name", name).
 		Int("fleet.migration.es.took", resp.Took).
 		Bool("fleet.migration.es.timed_out", resp.TimedOut).
-		Int("fleet.migration.total", resp.Total).
 		Int("fleet.migration.updated", resp.Updated).
 		Int("fleet.migration.deleted", resp.Deleted).
 		Int("fleet.migration.batches", resp.Batches).
@@ -127,6 +133,7 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 		Int("fleet.migration.retries.bulk", resp.Retries.Bulk).
 		Int("fleet.migration.retries.search", resp.Retries.Search).
 		Dur("fleet.migration.total.duration", time.Since(start)).
+		Int("fleet.migration.total.count", resp.Total).
 		Msgf("migration %s done", name)
 
 	for _, fail := range resp.Failures {
@@ -212,13 +219,14 @@ func migrateToV8_5(ctx context.Context, bulker bulk.Bulk) error {
 // this change fixes.
 func migrateAgentOutputs() (string, string, []byte, error) {
 	const (
-		migrationName  = "AgentOutputs"
-		fieldOutputs   = "outputs"
-		fieldRetiredAt = "retiredAt"
+		migrationName        = "AgentOutputs"
+		fieldOutputs         = "outputs"
+		fieldDefaultAPIKeyID = "default_api_key_id" //nolint:gosec // this is not a credential
+		fieldRetiredAt       = "retiredAt"
 	)
 
 	query := dsl.NewRoot()
-	query.Query().Bool().MustNot().Exists(fieldOutputs)
+	query.Query().Bool().Must().Exists(fieldDefaultAPIKeyID)
 
 	fields := map[string]interface{}{fieldRetiredAt: timeNow().UTC().Format(time.RFC3339)}
 	painless := `
@@ -229,7 +237,9 @@ ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids=new ArrayLi
 
 // copy 'default_api_key_history' to new 'outputs' field
 ctx._source['` + fieldOutputs + `']['default'].type="elasticsearch";
-ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids=ctx._source.default_api_key_history;
+if (ctx._source.default_api_key_history != null && ctx._source.default_api_key_history.length > 0) {
+    ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids=ctx._source.default_api_key_history;
+}
 
 Map map = new HashMap();
 map.put("retired_at", params.` + fieldRetiredAt + `);
@@ -237,16 +247,18 @@ map.put("id", ctx._source.default_api_key_id);
 
 // Make current API key empty, so fleet-server will generate a new one
 // Add current API jey to be retired
-ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids.add(map);
+if (ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids != null) {
+	ctx._source['` + fieldOutputs + `']['default'].to_retire_api_key_ids.add(map);
+}
 ctx._source['` + fieldOutputs + `']['default'].api_key="";
 ctx._source['` + fieldOutputs + `']['default'].api_key_id="";
 ctx._source['` + fieldOutputs + `']['default'].permissions_hash=ctx._source.policy_output_permissions_hash;
 
 // Erase deprecated fields
 ctx._source.default_api_key_history=null;
-ctx._source.default_api_key="";
-ctx._source.default_api_key_id="";
-ctx._source.policy_output_permissions_hash="";
+ctx._source.default_api_key=null;
+ctx._source.default_api_key_id=null;
+ctx._source.policy_output_permissions_hash=null;
 `
 	query.Param("script", map[string]interface{}{
 		"lang":   "painless",
@@ -271,10 +283,13 @@ func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
 
 	query := dsl.NewRoot()
 	query.Query().MatchAll()
-	query.Param("script", `ctx._source.coordinator_idx++;`)
+	painless := `ctx._source.coordinator_idx++;`
+	query.Param("script", painless)
 
 	body, err := query.MarshalJSON()
 	if err != nil {
+		log.Debug().Str("painlessScript", painless).
+			Msgf("%s: failed painless script", migrationName)
 		return migrationName, FleetPolicies, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
 

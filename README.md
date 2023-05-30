@@ -1,166 +1,280 @@
-[![Build Status](https://fleet-ci.elastic.co/job/fleet-server/job/fleet-server-mbp/job/main/badge/icon)](https://fleet-ci.elastic.co/job/Ingest-manager/job/fleet-server/job/main/)
+# Fleet Server
 
-# Fleet Server implementation
+[![Build Status](https://fleet-ci.elastic.co/job/fleet-server/job/fleet-server-mbp/job/main/badge/icon)](https://fleet-ci.elastic.co/job/Ingest-manager/job/fleet-server/job/main/)  [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=elastic_fleet-server&metric=coverage)](https://sonarcloud.io/summary/new_code?id=elastic_fleet-server)
 
-## Development
+Fleet server is the control server to manage a fleet of [elastic-agents](https://github.com/elastic/elastic-agent).
 
-fleet-server is under development. The following are notes to help developers onboarding to the project to quickly get running. These notes might change at any time.
-
-## Setup for fleet-server development
-
-### ES and Kinaba from SNAPSHOTS API
-
-Download them from the snapshots API:
-Edit the version and OS/arch to suit your system, or [check the API](https://artifacts-api.elastic.co/v1/search/8.4-SNAPSHOT) (change the version if needed) if the ones below does not suit you.
- - 8.4.0-SNAPSHOT-linux-x86_64.tar.gz
- - 8.4.0-SNAPSHOT-darwin-aarch64.tar.gz
- - 8.4.0-SNAPSHOT-windows-x86_64.zip
-
-TODO: parse the JSON to get the URL
-```shell
-wget https://snapshots.elastic.co/8.4.0-64eb2b35/downloads/elasticsearch/elasticsearch-8.4.0-SNAPSHOT-linux-x86_64.tar.gz
-wget https://snapshots.elastic.co/8.4.0-64eb2b35/downloads/kibana/kibana-8.4.0-SNAPSHOT-linux-x86_64.tar.gz
-```
-
-Follow the instructions for [ElasticSearch](https://www.elastic.co/downloads/elasticsearch) and [Kibana](https://www.elastic.co/downloads/kibana)
-
-### fleet-server+agent on a Vagrant VM
-
-The Vagrant machine assumes the `elastic-agent`, `beats` and `fleet-server` repos are in the same folder.
-Thus, it mounts `../` to `/vagrant` on the Vagrant machine. The vagrant machine IP address is `192.168.56.43`.
-Use `https://192.168.56.43:8220` as fleet-server host.
-
-### Grab or build the Elastic-Agent
-
-For detailed instructions, check the [Elastic-Agent](https://github.com/elastic/elastic-agent) repo.
-```shell
-cd YOUR_ELASTIC_AGENT_FOLDER
-SNAPSHOT=true EXTERNAL=true PLATFORMS="linux/amd64" PACKAGES="tar.gz" mage -v dev:package # adjust PLATFORMS and PACKAGES to your system and needs.
-```
-
-### Build and Package
-
-Change `release-linux/amd64` to `release-YOUR_OS/platform`. Run `make list-platforms` to check
-out the possible values.
-
-The `DEV=true` will allow the binary to be debugged ~~with a debugger~~.
-
-```shell
-DEV=true SNAPSHOT=true make release-linux/amd64
-
-vagrant up
-vagrant ssh
-```
-
-For the Elastic-Agent to use your build of the fleet-server, unpack the elastic agent and add your fleet-server tar.gz and sha512 to
-`elastic-agent-8.Y.Z-SNAPSHOT-OS-ARCH/data/elastic-agent-*/downloads/`. 
-
-Then go to `Kibana > Managment > Fleet` and follow the instructions there.
-
-#### tl;dr/example:
-```shell
-cp /vagrant/elastic-agent/build/distributions/elastic-agent-8.4.0-SNAPSHOT-linux-x86_64.tar.gz* ./
-tar xzvf elastic-agent-8.4.0-SNAPSHOT-linux-x86_64.tar.gz
-cd elastic-agent-8.4.0-SNAPSHOT-linux-x86_64
-cp /vagrant/fleet-server/build/distributions/fleet-server-8.4.0-SNAPSHOT-linux-x86_64.tar.gz* ./data/elastic-agent-494b79/downloads/
-./elastic-agent install ...
-```
-
-## Setup for Elastic-Agent development
-
-### From source
-To run and test fleet-server, a recent version of Elastic Agent and Kibana are needed. In the following Elastic Agent and Kibana are built from source. The fleet-server itself is not built from source but pulled from the latest snapshot build. It would be possible to also pull Elastic Agent or Kibana from the latest snapshot but the assumption that is made here that whoever is testing this, is likely developing either Elastic Agent or on the Kibana side.
-
-
-### Kibana setup
-
-The source code of Kibana must be checked out. After checkout, the following command must be run:
-
-```
-yarn kbn bootstrap
-```
-
-This will take a while the first time it is run. An error might be return in case not a valid node version is installed. Use nvm to install the correct version.
-
-Now the following two commands must be run in parallel:
-
-```
-# Start ES
-yarn es snapshot -E xpack.security.authc.api_key.enabled=true
-
-# Start KB
-yarn start --no-base-path
-```
-
-As soon as all is running, go to `http://localhost:5601`, enter `elastic/changeme` as credential and navigate to Fleet. Trigger the Fleet setup. As soon as this is completed, copy the `policy id` and `enrollment token` for the fleet-server policy. The policy id can be copied from the URL, the enrollment token can be found in the Enrollment Token list.
-
-NOTE: This step can be skipped if the full command below for the Elastic Agent is used.
-
-Now Kibana is running and ready. The next step is to setup Elastic Agent.
-
-## Elastic-Agent
-
-To build the Elastic Agent from source, check out the [elastic-agent repository](https://github.com/elastic/elastic-agent), then run the following command:
-
-```
-SNAPSHOT=true DEV=true PLATFORMS=linux|darwin|windows mage package
-```
-
-The above assumes you are running on OS X. Set `PLATFORMS` to the one in you are running on. This speeds up packaging as it only builds it for your platform. As soon as this is completed (it might take a while for the first time) navigate to `build/distributions` and unpackage the `.tar.gz`. Change working directory to the elastic-agent directory and start the Elastic Agent:
-
-```
-KIBANA_HOST=http://localhost:5601 KIBANA_USERNAME=elastic KIBANA_PASSWORD=changeme ELASTICSEARCH_HOST=http://localhost:9200 ELASTICSEARCH_USERNAME=elastic ELASTICSEARCH_PASSWORD=changeme KIBANA_FLEET_SETUP=1 FLEET_SERVER_ENABLE=1 sudo ./elastic-agent container
-```
-
-This will start up Elastic Agent with fleet-server and directly enroll it. In addition, Fleet is set up inside Kibana. In case the setup is done already in Kibana manually, the following command can be used:
-
-```
-sudo ./elastic-agent enroll --fleet-server=http://elastic:changeme@localhost:9200 --fleet-server-policy={fleet-server-policy-id} --enrollment-token={policy-enrollment-token}
-```
-
-## Running Elastic Agent with fleet-server in container
-
-If you want to run Elastic Agent and fleet-server in a container but built Kibana from source, you have to add the following to your `config/kibana.dev.yml`:
-
-```
-server.host: 0.0.0.0
-```
-
-This makes sure, Kibana is accessible from the container. Start Kibana as before but for Elasticsearch, run the following command:
-
-```
-yarn es snapshot -E xpack.security.authc.api_key.enabled=true -E http.host=0.0.0.0
-```
-
-This makes sure also Elasticsearch is accessible to the container.
-
-Start the Elastic Agent with the following command:
-
-```
-docker run -e KIBANA_HOST=http://{YOUR-IP}:5601 -e KIBANA_USERNAME=elastic -e KIBANA_PASSWORD=changeme -e ELASTICSEARCH_HOST=http://{YOUR-IP}:9200 -e ELASTICSEARCH_USERNAME=elastic -e ELASTICSEARCH_PASSWORD=changeme -e KIBANA_FLEET_SETUP=1 -e FLEET_SERVER_ENABLE=1 -e FLEET_SERVER_INSECURE_HTTP=1 docker.elastic.co/beats/elastic-agent:8.0.0-SNAPSHOT
-```
-
-Replace {YOUR-IP} with the IP address of your machine.
-
-## fleet-server repo
-
-By default the above will download the most recent snapshot build for fleet-server. To use your own development build, run `make release` in the fleet-server repository, go to `build/distributions` and copy the `.tar.gz` and `sha512` file to the `data/elastic-agent-{hash}/downloads` inside the elastic-agent directory. Now you run with your own build of fleet-server.
-
+For production deployments the fleet-server is supervised and bootstrapped by an elastic-agent.
 
 ## Compatibility and upgrades
 
-Fleet server is always on the exact same version as Elastic Agent running fleet-server. Any Elastic Agent enrolling into a fleet-server must be the same version or older. Fleet-server communicates with Elasticsearch. Elasticsearch must be on the same version or newer. For Kibana it is assumed it is on the same version as Elasticsearch. With this the compatibility looks as following:
-
+Fleet-server communicates with Elasticsearch. Elasticsearch must be on the same version or newer.
+Fleet server is always on the exact same version as the Elastic Agent running fleet-server.
+Any Elastic Agent enrolling into a fleet-server must be the same version or older.
+For Kibana it is assumed it is on the same version as Elasticsearch. With this the compatibility looks as following:
 ```
-Elastic Agent <= Elastic Agent with fleet-server) <= Elasticsearch / Kibana
+Elastic Agent <= Elastic Agent with fleet-server <= Elasticsearch / Kibana
 ```
 
 There might be differences on the bugfix version.
 
-If an upgrade is done, Elasticsearch / Kibana have to be upgraded first, then Elastic Agent with fleet-server and last the Elastic Agents.
-
+For upgrades Elasticsearch/Kibana must be upgraded first, then the Elastic Agent with fleet-server followed by any other Elastic Agents.
 
 ## MacOSX Version
 
 The [golang-crossbuild](https://github.com/elastic/golang-crossbuild) produces images used for testing/building.
 The `golang-crossbuild:1.16.X-darwin-debian10` images expects the minimum MacOSX version to be 10.14+.
+
+## Development
+
+The following are notes to help developers onboarding to the project to quickly get running. These notes might change at any time.
+
+### Changelog
+
+The changelog for fleet-server is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool).
+Read the [installation](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/install.md) and [usage](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md#im-a-developer) instructions to get started.
+
+The changelog tool produces fragment files that are consolidated to generate a changelog for each release
+Each PR containing a change with user impact (new feature, bug fix, etc.) must contain a changelog fragment describing the change.
+
+A simple example of a changelog fragment is below for reference:
+```yaml
+kind: feature
+summary: Accept raw errors as a fallback to detailed error type
+pr: https://github.com/elastic/fleet-server/pull/2079
+issue: https://github.com/elastic/elastic-agent/issues/931
+```
+
+### Development build
+
+To compile the fleet-server in development mode set the env var `DEV=true`.
+When compiled in development mode the fleet-server will support debugging.
+i.e.:
+```shell
+SNAPSHOT=true DEV=true make release-darwin/amd64
+GOOS=darwin GOARCH=amd64 go build -tags="dev" -gcflags="all=-N -l" -ldflags="-X main.Version=8.7.0 -X main.Commit=31668e0 -X main.BuildTime=2022-12-23T20:06:20Z" -buildmode=pie -o build/binaries/fleet-server-8.7.0-darwin-x86_64/fleet-server .
+```
+
+Change `release-darwin/amd64` to `release-YOUR_OS/platform`.
+Run `make list-platforms` to check out the possible values.
+
+The `SNAPSHOT` flag sets the snapshot version flag.
+
+### Docker build
+
+You can build a fleet-server docker image with `make build-docker`. This image
+includes the default `fleet-server.yml` configuration file and can be customized
+with the available environment variables.
+
+This image includes only `fleet-server` and is intended for stand alone mode, see
+the section about stand alone Fleet Server to know more.
+
+You can run this image with the included configuration file with the following
+command:
+```
+docker run -it --rm \
+  -e ELASTICSEARCH_HOSTS="https://elasticsearch:9200" \
+  -e ELASTICSEARCH_SERVICE_TOKEN="someservicetoken" \
+  -e ELASTICSEARCH_CA_TRUSTED_FINGERPRINT="somefingerprint" \
+  docker.elastic.co/fleet-server/fleet-server:8.8.0
+```
+
+You can replace the included configuration by mounting your
+configuration file as a volume in `/etc/fleet-server.yml`.
+```
+docker run -it --rm \
+  -e ELASTICSEARCH_HOSTS="https://elasticsearch:9200" \
+  -e ELASTICSEARCH_SERVICE_TOKEN="someservicetoken" \
+  -e ELASTICSEARCH_CA_TRUSTED_FINGERPRINT="somefingerprint" \
+  -v "/path/to/your/fleet-server.yml:/etc/fleet-server.yml:ro" \
+  docker.elastic.co/fleet-server/fleet-server:8.8.0
+```
+
+### Running a development build
+
+#### ES and Kibana from SNAPSHOTS API on host
+
+Download SNAPSHOT builds for Elasticsearch and Kibana from the snapshots API:
+Edit the version and OS/arch to suit your system, or [check the API](https://artifacts-api.elastic.co/v1/search/8.7-SNAPSHOT) (change the version if needed) if the ones below does not suit you.
+ - 8.7.0-SNAPSHOT-linux-x86_64.tar.gz
+ - 8.7.0-SNAPSHOT-darwin-aarch64.tar.gz
+ - 8.7.0-SNAPSHOT-windows-x86_64.zip
+
+TODO: parse the JSON to get the URL
+```shell
+wget https://snapshots.elastic.co/8.7.0-19f30181/downloads/elasticsearch/elasticsearch-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
+wget https://snapshots.elastic.co/8.7.0-19f30181/downloads/kibana/kibana-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
+```
+
+Generally you will need to unarchive and run the binaries:
+
+```shell
+tar -xzf elasticsearch-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
+cd elasticsearch-8.7.0-SNAPSHOT
+./bin/elasticsearch
+```
+
+The elasticsearch output will output the `elastic` user's password and a Kibana configuration string.
+
+```shell
+tar -xzf kibana-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
+cd kibana-8.7.0-SNAPSHOT
+./bin/kibana
+```
+
+The kibana output will show a URL that will need to be visted in order to configure Kibana with the string elasticsearch provides.
+
+More instructions for setup can be found in the [Elastic Stack Installation Guide](https://www.elastic.co/guide/en/elastic-stack/current/installing-elastic-stack.html).
+
+#### fleet-server stand alone
+
+Fleet UI requires a managed Fleet Server, to be able to use stand alone Fleet
+server, you need to enroll a managed Fleet Server or disable this requirement.
+You can disable this requirement since Kibana 8.8.0, starting it with
+`xpack.fleet.enableExperimental: ['fleetServerStandalone']`. This is only
+supported internally and is not intended for end-users at this time.
+
+Access the Fleet UI on Kibana and generate a fleet-server policy.
+Set the following env vars with the information from Kibana:
+- `ELASTICSEARCH_CA_TRUSTED_FINGERPRINT`
+- `ELASTICSEARCH_SERVICE_TOKEN`
+- `FLEET_SERVER_POLICY_ID`
+
+Create a self-signed TLS CA and cert+key for the fleet-server instance, you can use [elasticsearch-certutil](https://www.elastic.co/guide/en/elasticsearch/reference/current/certutil.html) for this:
+```shell
+# Create a CA
+../elasticsearch/bin/elasticsearch-certutil ca --pem --out stack.zip
+unzip stack.zip
+# Create a cert+key
+../elasticsearch/bin/elasticsearch-certutil cert --pem --ca-cert ca/ca.crt --ca-key ca/ca.key --ip $HOST_IP_ADDR --out cert.zip
+unzip cert.zip
+```
+
+Ensure that `server.ssl.enabled: true` is set as well as the `server.ssl.certificate` and `server.ssl.key` attributes in `fleet-server.yml`
+
+Then run the fleet-server:
+```shell
+./build/binaries/fleet-server-8.7.0-darwin-x86_64/fleet-server -c fleet-server.yml
+```
+By default the fleet-server will attempt to connect to Elasticsearch on `https://localhost:9200`, if this needs to be changed set it with `ELASTICSEARCH_HOSTS`
+The fleet-server should appear as an agent with the ID `dev-fleet-server`.
+
+Any additional agents will need the `ca/ca.crt` file to enroll (or will need to use the `--insecure` flag).
+
+#### fleet-server+agent on a Vagrant VM
+
+The development Vagrant machine assumes the `elastic-agent`, `beats`, and `fleet-server` repos are in the same folder.
+Thus, it mounts `../` to `/vagrant` on the Vagrant machine. The vagrant machine IP address is `192.168.56.43`.
+Use `https://192.168.56.43:8220` as fleet-server host.
+```shell
+vagrant up
+vagrant ssh
+```
+
+##### Build the elastic-agent
+
+Once in the Vagrant VM, and assuming that the repos are correctly mounted in `/vagrant`.
+Build the agent by running:
+```shell
+cd /vagrant/elastic-agent
+SNAPSHOT=true EXTERNAL=true PLATFORMS="linux/amd64" PACKAGES="tar.gz" mage -v dev:package # adjust PLATFORMS and PACKAGES to your system and needs.
+```
+
+For detailed instructions, check the [Elastic-Agent](https://github.com/elastic/elastic-agent) repo.
+
+##### Run the elastic-agent+fleet-server in Vagrant
+
+Copy and unpack the elastic-agent `.tar.gz` file and replace the `fleet-server` binary in `elastic-agent-8.Y.Z-SNAPSHOT-OS-ARCH/data/elastic-agent-*/components/` with the snapshot from the fleet-server repo.
+
+Then go to `Kibana > Managment > Fleet` and follow the instructions there.
+
+The vagrant machine IP address is `192.168.56.43`.
+Use `https://192.168.56.43:8220` as fleet-server host.
+
+##### tl;dr/example:
+
+```shell
+cp /vagrant/elastic-agent/build/distributions/elastic-agent-8.7.0-SNAPSHOT-linux-x86_64.tar.gz* ./
+tar -xzf elastic-agent-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
+cd elastic-agent-8.7.0-SNAPSHOT-linux-x86_64
+cp build/binaries/fleet-server-8.7.0-SNAPSHOT-linux-x86_64/fleet-server ./data/elastic-agent-494b79/components/
+./elastic-agent install ...
+```
+
+
+### Running go test and benchmarks
+
+When developing new features as you write code you would want to make sure your changes are not breaking any pre-existing
+functionality. For this reason as you make changes you might want to run a subset of tests or the full tests before
+you create a pull request.
+
+#### Running go tests
+
+To execute the full unit tests from your local environment you can do the following
+```bash
+make test-unit
+```
+
+This make target will execute the go unit tests and should normally pass without an issue.
+
+To run tests in a package or a function, run like this:
+
+```
+go test -v ./internal/pkg/checkin -run TestBulkSimple
+```
+
+#### Running go benchmark tests
+
+It's a good practice before you start your changes to establish the current baseline of the benchmarks in your machine.
+To establish the baseline benchmark report you can follow the following workflow
+
+__Establish a baseline__
+```bash
+BENCH_BASE=base.out make benchmark
+```
+
+This will execute all the go benchmark test and write the output into the file build/base.out. If you omit the
+`BENCH_BASE` variable it will automatically select the name `build/benchmark-{git_head_sha1}.out`.
+
+__Re-running benchmark after changes__
+
+After applying your changes into the code you can reuse the same command but with different output file.
+```bash
+BENCH_BASE=next.out make benchmark
+```
+
+At this point you can compare the 2 reports using benchstat.
+
+__Comparing the 2 results__
+```bash
+BENCH_BASE=base.out BENCH_NEXT=next.out make benchstat
+```
+
+And this will print the difference between the baseline and next results.
+
+You can read more on the [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) official site.
+
+There are some additional parameters that you can use with the `benchmark` target.
+- `BENCHMARK_FILTER`: you can define the test filter so that you only run a subset of tests (Default: Bench, only run
+the test BenchmarkXXXX and not unit tests)
+- `BENCHMARK_COUNT`: you can define the number of iterations go test will run. Having larger number helps
+remove run-to-run variations (Default: 8)
+
+#### Testing on cloud 
+
+Elastic employees can create an Elastic Cloud deployment with a locally built Fleet Server.
+
+To deploy it you can use the following commands:
+```bash
+EC_API_KEY=yourapikey make -C dev-tools/cloud cloud-deploy
+```
+
+And then to clean the deployment
+```bash
+EC_API_KEY=yourapikey make -C dev-tools/cloud cloud-clean
+```
+
+For more advanced scenario you can build a custom docker image that you could use in your own terraform.
+```
+make -C dev-tools/cloud build-and-push-cloud-image
+```
