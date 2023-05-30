@@ -350,7 +350,7 @@ func (suite *AgentContainerSuite) TestClientAPI() {
 	})
 }
 
-// TestSkeep10m checks if the fleet-server is healthy after 10m
+// TestSleep10m checks if the fleet-server is healthy after 10m
 // skipped unless the "-long" flag is provided.
 func (suite *AgentContainerSuite) TestSleep10m() {
 	if !longFlag {
