@@ -15,9 +15,9 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/elastic/fleet-server/v7/internal/pkg/uploader"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"

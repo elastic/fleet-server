@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/rs/zerolog/log"
 )
 
@@ -21,10 +21,10 @@ var (
 	ErrStatusNoUploads = errors.New("file closed, not accepting uploads")
 )
 
-func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) (upload.Info, error) {
+func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) (file.Info, error) {
 	// make sure document is freshly fetched, not cached
 	// so accurate status checking happens
-	info, err := FetchUploadInfo(ctx, u.bulker, id)
+	info, err := file.GetInfo(ctx, u.bulker, UploadHeaderIndexPattern, id)
 	if err != nil {
 		return info, err
 	}
@@ -38,7 +38,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 		return info, ErrStatusNoUploads
 	}
 
-	chunks, err := GetChunkInfos(ctx, u.bulker, info.DocID)
+	chunks, err := file.GetChunkInfos(ctx, u.bulker, UploadDataIndexPattern, info.DocID)
 	if err != nil {
 		return info, err
 	}
@@ -46,7 +46,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 		return info, ErrMissingChunks
 	}
 	if !u.verifyChunkInfo(info, chunks, transitHash) {
-		if err := SetStatus(ctx, u.bulker, info, upload.StatusFail); err != nil {
+		if err := SetStatus(ctx, u.bulker, info, file.StatusFail); err != nil {
 			log.Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error setting the upload status to failure")
 		}
 		if err := DeleteChunksByQuery(ctx, u.bulker, info.Source, info.DocID); err != nil {
@@ -66,7 +66,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 	return info, nil
 }
 
-func (u *Uploader) allChunksPresent(info upload.Info, chunks []ChunkInfo) bool {
+func (u *Uploader) allChunksPresent(info file.Info, chunks []file.ChunkInfo) bool {
 	// check overall count
 	if len(chunks) != info.Count {
 		log.Warn().Int("expectedCount", info.Count).Int("received", len(chunks)).Interface("chunks", chunks).Msg("mismatch number of chunks")
@@ -88,7 +88,7 @@ func (u *Uploader) allChunksPresent(info upload.Info, chunks []ChunkInfo) bool {
 	return true
 }
 
-func (u *Uploader) verifyChunkInfo(info upload.Info, chunks []ChunkInfo, transitHash string) bool {
+func (u *Uploader) verifyChunkInfo(info file.Info, chunks []file.ChunkInfo, transitHash string) bool {
 	// verify all chunks except last are info.ChunkSize size
 	// verify last: false (or field excluded) for all except final chunk
 	// verify final chunk is last: true

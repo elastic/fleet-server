@@ -14,14 +14,9 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
-	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
-)
-
-const (
-	// specification-designated maximum
-	MaxChunkSize = 4194304 // 4 MiB
 )
 
 var (
@@ -38,46 +33,6 @@ var (
 	ErrInvalidFileSize  = errors.New("invalid filesize")
 	ErrFieldRequired    = errors.New("field required")
 )
-
-type FileData struct {
-	Size      int64  `json:"size"`
-	ChunkSize int64  `json:"ChunkSize"`
-	Status    string `json:"Status"`
-}
-
-type FileMetaDoc struct {
-	ActionID string    `json:"action_id"`
-	AgentID  string    `json:"agent_id"`
-	Source   string    `json:"src"`
-	File     FileData  `json:"file"`
-	UploadID string    `json:"upload_id"`
-	Start    time.Time `json:"upload_start"`
-}
-
-// custom unmarshaller to make unix-epoch values work
-func (f *FileMetaDoc) UnmarshalJSON(b []byte) error {
-	type InnerFile FileMetaDoc // type alias to prevent recursion into this func
-	// override the field to parse as an int, then manually convert to time.time
-	var tmp struct {
-		InnerFile
-		Start int64 `json:"upload_start"`
-	}
-	if err := json.Unmarshal(b, &tmp); err != nil {
-		return err
-	}
-
-	*f = FileMetaDoc(tmp.InnerFile) // copy over all fields
-	f.Start = time.UnixMilli(tmp.Start)
-	return nil
-}
-
-type ChunkInfo struct {
-	Pos  int  // Ordered chunk position in file
-	Last bool // Is this the final chunk in the file
-	SHA2 string
-	Size int
-	BID  string // base id, matches metadata doc's _id
-}
 
 type Uploader struct {
 	cache     cache.Cache // cache of file metadata doc info
@@ -99,9 +54,9 @@ func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, cache cache.Cache,
 }
 
 // Start an upload operation
-func (u *Uploader) Begin(ctx context.Context, data JSDict) (upload.Info, error) {
+func (u *Uploader) Begin(ctx context.Context, data JSDict) (file.Info, error) {
 	if data == nil {
-		return upload.Info{}, ErrPayloadRequired
+		return file.Info{}, ErrPayloadRequired
 	}
 
 	/*
@@ -110,17 +65,17 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (upload.Info, error) 
 
 	// make sure all required fields are present and non-empty
 	if err := validateUploadPayload(data); err != nil {
-		return upload.Info{}, err
+		return file.Info{}, err
 	}
 
 	size, _ := data.Int64("file", "size")
 	if size > u.sizeLimit {
-		return upload.Info{}, ErrFileSizeTooLarge
+		return file.Info{}, ErrFileSizeTooLarge
 	}
 
 	uid, err := uuid.NewV4()
 	if err != nil {
-		return upload.Info{}, fmt.Errorf("unable to generate upload operation ID: %w", err)
+		return file.Info{}, fmt.Errorf("unable to generate upload operation ID: %w", err)
 	}
 	id := uid.String()
 
@@ -130,15 +85,15 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (upload.Info, error) 
 	source, _ := data.Str("src")
 	docID := fmt.Sprintf("%s.%s", actionID, agentID)
 
-	info := upload.Info{
+	info := file.Info{
 		ID:        id,
 		DocID:     docID,
 		AgentID:   agentID,
 		ActionID:  actionID,
-		ChunkSize: MaxChunkSize,
+		ChunkSize: file.MaxChunkSize,
 		Source:    source,
 		Total:     size,
-		Status:    upload.StatusAwaiting,
+		Status:    file.StatusAwaiting,
 		Start:     time.Now(),
 	}
 	chunkCount := info.Total / info.ChunkSize
@@ -152,16 +107,16 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (upload.Info, error) 
 	*/
 
 	if err := data.Put(info.ChunkSize, "file", "ChunkSize"); err != nil {
-		return upload.Info{}, err
+		return file.Info{}, err
 	}
 	if err := data.Put(info.Status, "file", "Status"); err != nil {
-		return upload.Info{}, err
+		return file.Info{}, err
 	}
 	if err := data.Put(id, "upload_id"); err != nil {
-		return upload.Info{}, err
+		return file.Info{}, err
 	}
 	if err := data.Put(info.Start.UnixMilli(), "upload_start"); err != nil {
-		return upload.Info{}, err
+		return file.Info{}, err
 	}
 
 	/*
@@ -169,21 +124,21 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (upload.Info, error) 
 	*/
 	doc, err := json.Marshal(data)
 	if err != nil {
-		return upload.Info{}, err
+		return file.Info{}, err
 	}
 	_, err = CreateFileDoc(ctx, u.bulker, doc, source, docID)
 	if err != nil {
-		return upload.Info{}, err
+		return file.Info{}, err
 	}
 
 	return info, nil
 }
 
-func (u *Uploader) Chunk(ctx context.Context, uplID string, chunkNum int, chunkHash string) (upload.Info, ChunkInfo, error) {
+func (u *Uploader) Chunk(ctx context.Context, uplID string, chunkNum int, chunkHash string) (file.Info, file.ChunkInfo, error) {
 	// find the upload, details, and status associated with the file upload
 	info, err := u.GetUploadInfo(ctx, uplID)
 	if err != nil {
-		return upload.Info{}, ChunkInfo{}, err
+		return file.Info{}, file.ChunkInfo{}, err
 	}
 
 	/*
@@ -191,16 +146,16 @@ func (u *Uploader) Chunk(ctx context.Context, uplID string, chunkNum int, chunkH
 	*/
 
 	if info.Expired(u.timeLimit) {
-		return upload.Info{}, ChunkInfo{}, ErrUploadExpired
+		return file.Info{}, file.ChunkInfo{}, ErrUploadExpired
 	}
 	if !info.StatusCanUpload() {
-		return upload.Info{}, ChunkInfo{}, ErrUploadStopped
+		return file.Info{}, file.ChunkInfo{}, ErrUploadStopped
 	}
 	if chunkNum < 0 || chunkNum >= info.Count {
-		return upload.Info{}, ChunkInfo{}, ErrInvalidChunkNum
+		return file.Info{}, file.ChunkInfo{}, ErrInvalidChunkNum
 	}
 
-	return info, ChunkInfo{
+	return info, file.ChunkInfo{
 		Pos:  chunkNum,
 		BID:  info.DocID,
 		Last: chunkNum == info.Count-1,
@@ -235,7 +190,7 @@ func validateUploadPayload(info JSDict) error {
 
 // GetUploadInfo searches for Upload Metadata document in local memory cache if available
 // otherwise, fetches from elasticsearch and caches for next use
-func (u *Uploader) GetUploadInfo(ctx context.Context, uploadID string) (upload.Info, error) {
+func (u *Uploader) GetUploadInfo(ctx context.Context, uploadID string) (file.Info, error) {
 	// Fetch metadata doc, if not cached
 	info, exist := u.cache.GetUpload(uploadID)
 	if exist {
@@ -243,9 +198,9 @@ func (u *Uploader) GetUploadInfo(ctx context.Context, uploadID string) (upload.I
 	}
 
 	// not found in cache, try fetching
-	info, err := FetchUploadInfo(ctx, u.bulker, uploadID)
+	info, err := file.GetInfo(ctx, u.bulker, UploadHeaderIndexPattern, uploadID)
 	if err != nil {
-		return upload.Info{}, fmt.Errorf("unable to retrieve upload info: %w", err)
+		return file.Info{}, fmt.Errorf("unable to retrieve upload info: %w", err)
 	}
 	u.cache.SetUpload(uploadID, info)
 	return info, nil
