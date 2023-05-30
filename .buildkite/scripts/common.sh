@@ -79,14 +79,14 @@ google_cloud_auth() {
     export GOOGLE_APPLICATIONS_CREDENTIALS=${secretFileLocation}
 }
 
-upload_packages_to_gcp_backet() {
+upload_packages_to_gcp_bucket() {
     pattern=${1}
     baseUri="gs://${JOB_GCS_BUCKET}/${REPO}"
     bucketUriCommit="${baseUri}"/commits/${BUILDKITE_COMMIT}
     bucketUriDefault="${baseUri}"/snapshots
 
     if [[ ${BUILDKITE_PULL_REQUEST} != "false" ]]; then
-        bucketUriDefault="${baseUri}"/pull-requests/pr-${BUILDKITE_COMMIT}
+        bucketUriDefault="${baseUri}"/pull-requests/pr-buildkite-${GITHUB_PR_NUMBER}
     fi
 
     for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
