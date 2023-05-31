@@ -19,8 +19,9 @@
         "set_commit_status": false,
         "build_on_commit": false,
         "build_on_comment": true,
-        "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/package$",
-        "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/package$",
+        "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:package)\\W+(?:this|it))|^/package$",
+        "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:package)\\W+(?:this|it))|^/package$",
+
         "fail_on_not_mergeable": true
       }]
 }
