@@ -117,7 +117,7 @@ steps:
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
-    if:  "build.env('BUILDKITE_BRANCH') != null && build.env('BUILDKITE_TAG') == null && build.env('BUILDKITE_PULL_REQUEST') == null"
+    if:  "build.env('BUILDKITE_BRANCH') != null && build.env('BUILDKITE_TAG') == null && build.env('BUILDKITE_PULL_REQUEST') != null"   #TODO: the value of the build.env('BUILDKITE_PULL_REQUEST') should be changed to "== null" after tests
 #    depends_on:
 #      - step: "release-package-registry"
 #        allow_failure: false
