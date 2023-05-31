@@ -353,6 +353,7 @@ func (suite *BaseE2ETestSuite) RequestDiagnosticsForAgent(ctx context.Context, i
 	return obj.ActionID
 }
 
+// VerifyAgentInKibana checks Kibana's fleet API for the specified agent.
 func (suite *BaseE2ETestSuite) VerifyAgentInKibana(ctx context.Context, id string) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:5601/api/fleet/agents/"+id, nil)
 	suite.Require().NoError(err)
@@ -364,6 +365,9 @@ func (suite *BaseE2ETestSuite) VerifyAgentInKibana(ctx context.Context, id strin
 	suite.Require().Equal(http.StatusOK, resp.StatusCode, "expected to find agent in fleet api")
 }
 
+// AddSecurityContainer ensures that a trusted app list exists for endpoint.
+//
+// This is used to test the artifacts endpoint.
 func (suite *BaseE2ETestSuite) AddSecurityContainer(ctx context.Context) {
 	b := bytes.NewBufferString(`{  "description": "Elastic Defend Trusted Apps List",
             "name": "Elastic Defend Trusted Apps List",
@@ -382,6 +386,9 @@ func (suite *BaseE2ETestSuite) AddSecurityContainer(ctx context.Context) {
 	}
 }
 
+// AddSecurityContainerItem adds an item to endpoint's trusted app list.
+//
+// This is used to test the artifacts endpoint.
 func (suite *BaseE2ETestSuite) AddSecurityContainerItem(ctx context.Context) string {
 	b := bytes.NewBufferString(`{
           "description": "TEST",
@@ -413,6 +420,7 @@ func (suite *BaseE2ETestSuite) AddSecurityContainerItem(ctx context.Context) str
 	return obj.ID
 }
 
+// ArtifactHit represents a hit when searching the .fleet-artifacts-* indices.
 type ArtifactHit struct {
 	Source struct {
 		Identifier    string `json:"identifier"`
@@ -421,6 +429,8 @@ type ArtifactHit struct {
 	} `json:"_source"`
 }
 
+// FleetHasArtifacts searches the .fleet-artifacts indecies for an "endpoint-trustlist-linux-v1" entry and returns when a hit is found.
+// If the passed context terminates before a hit is found the current test is marked as failed.
 func (suite *BaseE2ETestSuite) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 	timer := time.NewTimer(time.Second)
 	for {

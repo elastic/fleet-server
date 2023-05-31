@@ -436,7 +436,7 @@ func (suite *AgentContainerSuite) TestSleep10m() {
 // It uses the dummy-policy (no monitoring or integrations).
 // The test is successful if it reaches the "online" state in Kibana within 5 minutes of the container starting.
 //
-// NOTE: If we wanted to do more tests against an actual agent (such as sending actions or even running integrations) we should make it a test suite.
+// NOTE: This is intended as a sanity check. Additional fleet-server/elastic-agent are not tested.
 func (suite *AgentContainerSuite) TestDockerAgent() {
 	bCtx, bCancel := context.WithCancel(context.Background())
 	defer bCancel()

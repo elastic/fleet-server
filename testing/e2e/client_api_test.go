@@ -140,6 +140,7 @@ func (tester *ClientAPITester) TestAcks(apiKey, agentID string, actions []api.Ac
 	tester.Require().Falsef(acks.Errors, "error in acked items: %v", acks.Items)
 }
 
+// TestFullFileUpload tests the file upload endpoints (begin, chunk, complete).
 func (tester *ClientAPITester) TestFullFileUpload(apiKey, agentID, actionID string, size int64) {
 	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "ApiKey "+apiKey)
@@ -171,7 +172,9 @@ func (tester *ClientAPITester) TestFullFileUpload(apiKey, agentID, actionID stri
 	tHash := sha256.New()
 	for i := 0; i < chunkCount; i++ {
 		var body bytes.Buffer
-		_, err := io.CopyN(&body, rand.Reader, chunkSize)
+		n := int64(math.Min(float64(chunkSize), float64(size)))
+		size = size - n
+		_, err := io.CopyN(&body, rand.Reader, n)
 		tester.Require().NoError(err)
 		hash := sha256.Sum256(body.Bytes())
 		chunkResp, err := client.UploadChunkWithBodyWithResponse(tester.ctx,
@@ -201,7 +204,9 @@ func (tester *ClientAPITester) TestFullFileUpload(apiKey, agentID, actionID stri
 	tester.Require().Equal(http.StatusOK, completeResp.StatusCode())
 }
 
-func (tester *ClientAPITester) TestArtifact(apiKey, id, sha2, encoded string) {
+// TestArtifacts tests the artifact endpoint with the passed id and sha2 values.
+// The hash of the retrieved body is expected to be equal to encodedSHA
+func (tester *ClientAPITester) TestArtifact(apiKey, id, sha2, encodedSHA string) {
 	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "ApiKey "+apiKey)
 		return nil
@@ -216,5 +221,5 @@ func (tester *ClientAPITester) TestArtifact(apiKey, id, sha2, encoded string) {
 	tester.Require().NoError(err)
 	tester.Require().Equal(http.StatusOK, resp.StatusCode())
 	hash := sha256.Sum256(resp.Body)
-	tester.Require().Equal(encoded, fmt.Sprintf("%x", hash[:]))
+	tester.Require().Equal(encodedSHA, fmt.Sprintf("%x", hash[:]))
 }
