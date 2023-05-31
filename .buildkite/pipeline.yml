@@ -114,18 +114,10 @@ steps:
       - step: "release-test"
         allow_failure: false
 
-#  - label: ":jenkins: Downstream - Package"
-#    trigger: "fleet-server-package-mbp"
-#    key: "downstream-package"
-#    command: echo "Triggering the Jenkins Job 'fleet-server/fleet-server-package-mbp/env.JOB_BASE_NAME'..."
-#    depends_on:
-#      - step: "release-package-registry"
-#        allow_failure: false
-
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
-#    if:  "build.env('BUILDKITE_BRANCH') != null && build.env('BUILDKITE_TAG') == null && build.env('BUILDKITE_PULL_REQUEST') != null"
+    if:  "build.env('BUILDKITE_BRANCH') != null && build.env('BUILDKITE_TAG') == null && build.env('BUILDKITE_PULL_REQUEST') == null"
 #    depends_on:
 #      - step: "release-package-registry"
 #        allow_failure: false
