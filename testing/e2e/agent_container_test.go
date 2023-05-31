@@ -358,7 +358,7 @@ func (suite *AgentContainerSuite) TestClientAPI() {
 		suite.AddSecurityContainerItem(ctx)
 
 		hits := suite.FleetHasArtifacts(ctx)
-		tester.TestArtifact(agentKey, hits[0].Source.Identifier, hits[0].Source.DecodedSHA256)
+		tester.TestArtifact(agentKey, hits[0].Source.Identifier, hits[0].Source.DecodedSHA256, hits[0].Source.EncodedSHA256)
 	})
 }
 

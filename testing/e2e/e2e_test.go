@@ -417,15 +417,18 @@ type ArtifactHit struct {
 	Source struct {
 		Identifier    string `json:"identifier"`
 		DecodedSHA256 string `json:"decoded_sha256"`
+		EncodedSHA256 string `json:"encoded_sha256"`
 	} `json:"_source"`
 }
 
 func (suite *BaseE2ETestSuite) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 	timer := time.NewTimer(time.Second)
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:9200/.fleet-artifacts-*/_search", nil)
-	suite.Require().NoError(err)
-	req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
 	for {
+		buf := bytes.NewBufferString(`{"query":{"match":{"identifier":"endpoint-trustlist-linux-v1"}}}`)
+		req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:9200/.fleet-artifacts-*/_search", buf)
+		suite.Require().NoError(err)
+		req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+		req.Header.Set("Content-Type", "application/json")
 		select {
 		case <-ctx.Done():
 			suite.Require().NoError(ctx.Err(), "context expired before artifact was detected in index")
