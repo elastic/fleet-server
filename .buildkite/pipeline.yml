@@ -74,7 +74,7 @@ steps:
           - step: "int-test"
             allow_failure: false
 
-      - label: "Cloud e2e Test"
+      - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
@@ -114,9 +114,18 @@ steps:
       - step: "release-test"
         allow_failure: false
 
-  - label: ":jenkins: Downstream - Package"
+#  - label: ":jenkins: Downstream - Package"
+#    trigger: "fleet-server-package-mbp"
+#    key: "downstream-package"
+#    command: echo "Triggering the Jenkins Job 'fleet-server/fleet-server-package-mbp/env.JOB_BASE_NAME'..."
+#    depends_on:
+#      - step: "release-package-registry"
+#        allow_failure: false
+
+  - trigger: "fleet-server-package-mbp"
+    label: ":esbuild: Downstream - Package"
     key: "downstream-package"
-    command: echo "Triggering the Jenkins Job 'fleet-server/fleet-server-package-mbp/env.JOB_BASE_NAME'..."
-    depends_on:
-      - step: "release-package-registry"
-        allow_failure: false
+#    if:  "build.env('BUILDKITE_BRANCH') != null && build.env('BUILDKITE_TAG') == null && build.env('BUILDKITE_PULL_REQUEST') != null"
+#    depends_on:
+#      - step: "release-package-registry"
+#        allow_failure: false
