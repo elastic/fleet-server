@@ -3,6 +3,8 @@
 set -euo pipefail
 
 WORKSPACE="$(pwd)/bin"
+TMP_FOLDER_TEMPLATE_BASE="tmp.fleet-server"
+REPO="fleet-server"
 
 add_bin_path(){
     echo "Adding PATH to the environment variables..."
@@ -68,4 +70,33 @@ with_Terraform() {
     rm ${WORKSPACE}/${destFile}
     chmod +x ${WORKSPACE}/terraform
     terraform version
+}
+
+google_cloud_auth() {
+    secretFileLocation=$(mktemp -d -p "${WORKSPACE}" -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
+    echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
+    gcloud auth activate-service-account --key-file ${secretFileLocation} 2> /dev/null
+    export GOOGLE_APPLICATIONS_CREDENTIALS=${secretFileLocation}
+}
+
+upload_packages_to_gcp_bucket() {
+    pattern=${1}
+    baseUri="gs://${JOB_GCS_BUCKET}/${REPO}/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    bucketUriCommit="${baseUri}"/commits/${BUILDKITE_COMMIT}
+    bucketUriDefault="${baseUri}"/snapshots
+
+    if [[ ${BUILDKITE_PULL_REQUEST} != "false" ]]; then
+        bucketUriDefault="${baseUri}"/pull-requests/pr-${GITHUB_PR_NUMBER}
+    fi
+
+    for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
+        gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
+    done
+}
+
+cleanup() {
+    echo "Deleting temporal files..."
+    cd ${WORKSPACE}
+    rm -rf ${TMP_FOLDER_TEMPLATE_BASE}.*
+    echo "Done."
 }
