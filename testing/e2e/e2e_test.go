@@ -7,11 +7,13 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"flag"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -119,6 +121,24 @@ func (suite *BaseE2ETestSuite) SetupKibana() {
 	suite.Require().NoError(err)
 	resp.Body.Close()
 	suite.Require().Equal(http.StatusOK, resp.StatusCode, "unable to setup kibana fleet agents")
+
+	// Need to make a call in order to insert the endpoint package into the security-policy so that it sets everything up correctly
+	// If it's defined in the yml it does not load everything, specifically the .fleet-artifacts indices are not created.
+	buf := bytes.NewBufferString(`{"name":"Protect","description":"","namespace":"default","policy_id":"security-policy","enabled":true,"inputs":[{"enabled":true,"streams":[],"type":"ENDPOINT_INTEGRATION_CONFIG","config":{"_config":{"value":{"type":"endpoint","endpointConfig":{"preset":"EDRComplete"}}}}}],"package":{"name":"endpoint","title":"Elastic Defend","version":"8.8.0"}}`) // NOTE: Hardcoded package version here
+
+	req, err = http.NewRequest("POST", "http://localhost:5601/api/fleet/package_policies", buf)
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-setup")
+
+	resp, err = suite.client.Do(req)
+	suite.Require().NoError(err)
+	p, err := io.ReadAll(resp.Body)
+	suite.Require().NoError(err)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
+		suite.Require().Failf("bad status", "expected status of 200 or 409 got %d body %s", resp.StatusCode, string(p))
+	}
 }
 
 // IsFleetServerPortFree will check if port 8220 is free.
@@ -340,5 +360,99 @@ func (suite *BaseE2ETestSuite) VerifyAgentInKibana(ctx context.Context, id strin
 	req.Header.Set("kbn-xsrf", "e2e-setup")
 	resp, err := suite.client.Do(req)
 	suite.Require().NoError(err)
+	resp.Body.Close()
 	suite.Require().Equal(http.StatusOK, resp.StatusCode, "expected to find agent in fleet api")
+}
+
+func (suite *BaseE2ETestSuite) AddSecurityContainer(ctx context.Context) {
+	b := bytes.NewBufferString(`{  "description": "Elastic Defend Trusted Apps List",
+            "name": "Elastic Defend Trusted Apps List",
+            "list_id": "endpoint_trusted_apps",
+            "type": "endpoint",
+            "namespace_type": "agnostic"}`)
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:5601/api/exception_lists", b)
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-setup")
+	resp, err := suite.client.Do(req)
+	suite.Require().NoError(err)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
+		suite.Require().Failf("bad status", "status of 200 or 409 expected got %d", resp.StatusCode)
+	}
+}
+
+func (suite *BaseE2ETestSuite) AddSecurityContainerItem(ctx context.Context) string {
+	b := bytes.NewBufferString(`{
+          "description": "TEST",
+          "entries": [{
+            "field": "process.executable.caseless",
+            "value": "/bin/bash",
+            "type": "match",
+            "operator": "included"
+          }],
+          "list_id": "endpoint_trusted_apps",
+          "name": "TEST",
+          "namespace_type": "agnostic",
+          "os_types": ["linux"],
+          "type": "simple"
+        }`)
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:5601/api/exception_lists/items", b)
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-setup")
+	resp, err := suite.client.Do(req)
+	suite.Require().NoError(err)
+	defer resp.Body.Close()
+	suite.Require().Equal(http.StatusOK, resp.StatusCode)
+	var obj struct {
+		ID string `json:"id"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&obj)
+	suite.Require().NoError(err)
+	return obj.ID
+}
+
+type ArtifactHit struct {
+	Source struct {
+		Identifier    string `json:"identifier"`
+		DecodedSHA256 string `json:"decoded_sha256"`
+	} `json:"_source"`
+}
+
+func (suite *BaseE2ETestSuite) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
+	timer := time.NewTimer(time.Second)
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:9200/.fleet-artifacts-*/_search", nil)
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.elasticUser, suite.elasticPass)
+	for {
+		select {
+		case <-ctx.Done():
+			suite.Require().NoError(ctx.Err(), "context expired before artifact was detected in index")
+			return nil
+		case <-timer.C:
+			resp, err := suite.client.Do(req)
+			suite.Require().NoError(err)
+			if resp.StatusCode != http.StatusOK {
+				timer.Reset(time.Second)
+				continue
+			}
+
+			var obj struct {
+				Hits struct {
+					Hits  []ArtifactHit `json:"hits"`
+					Total struct {
+						Value int `json:"value"`
+					} `json:"total"`
+				} `json:"hits"`
+			}
+			err = json.NewDecoder(resp.Body).Decode(&obj)
+			resp.Body.Close()
+			suite.Require().NoError(err)
+			if obj.Hits.Total.Value > 0 {
+				return obj.Hits.Hits
+			}
+			timer.Reset(time.Second)
+		}
+	}
 }

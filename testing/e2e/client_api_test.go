@@ -200,3 +200,20 @@ func (tester *ClientAPITester) TestFullFileUpload(apiKey, agentID, actionID stri
 	tester.Require().NoError(err)
 	tester.Require().Equal(http.StatusOK, completeResp.StatusCode())
 }
+
+func (tester *ClientAPITester) TestArtifact(apiKey, id, sha2 string) {
+	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+		req.Header.Set("Authorization", "ApiKey "+apiKey)
+		return nil
+	}))
+	tester.Require().NoError(err)
+
+	resp, err := client.ArtifactWithResponse(tester.ctx,
+		id,
+		sha2,
+		&api.ArtifactParams{},
+	)
+	tester.Require().NoError(err)
+	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+	// TODO more validation?
+}

@@ -344,9 +344,21 @@ func (suite *AgentContainerSuite) TestClientAPI() {
 		tester.TestFullFileUpload(agentKey, agentID, actionID, 8192) // 8KiB file
 	})
 
-	// TODO: Not sure how to setup and test (what to use as ID+SHA256 values)
 	suite.Run("test artifact", func() {
-		suite.T().Skip("unimplemented")
+		ctx, cancel := context.WithTimeout(bCtx, 3*time.Minute)
+		defer cancel()
+		tester := &ClientAPITester{
+			suite.Suite,
+			ctx,
+			suite.client,
+			endpoint,
+		}
+		_, agentKey := tester.TestEnroll(enrollmentKey)
+		suite.AddSecurityContainer(ctx)
+		suite.AddSecurityContainerItem(ctx)
+
+		hits := suite.FleetHasArtifacts(ctx)
+		tester.TestArtifact(agentKey, hits[0].Source.Identifier, hits[0].Source.DecodedSHA256)
 	})
 }
 
