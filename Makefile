@@ -21,7 +21,7 @@ BENCHMARK_ARGS := -count=8
 BENCHMARK_PACKAGE ?= ./...
 BENCHMARK_FILTER ?= Bench
 
-GO_TEST_FLAG = ""
+GO_TEST_FLAG =
 ifdef TEST_COVERAGE
 GO_TEST_FLAG = -covermode=atomic -coverprofile=build/TEST-go-fleet-server-coverage.cov
 endif
@@ -44,6 +44,7 @@ DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
+COVER_TARGETS=$(addprefix cover-, $(PLATFORMS))
 COMMIT=$(shell git rev-parse --short HEAD)
 NOW=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
@@ -75,10 +76,23 @@ local: ## - Build local binary for local environment (bin/fleet-server)
 	go build $(if $(DEV),-tags="dev",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
+.PHONY: cover-e2e-binaries
+cover-e2e-binaries: ## - Build binaries for the test-e2e target with the go 1.20+ cover flag
+	SNAPSHOT=true $(MAKE) $(COVER_TARGETS)
+
+.PHONY: $(COVER_TARGETS)
+$(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integration testing
+	@mkdir -p build/cover
+	$(eval $@_OS := $(firstword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
+	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
+	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
+	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(DEV),-tags="dev",) -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+
 .PHONY: clean
 clean: ## - Clean up build artifacts
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
-	rm -rf .service_token ./bin/ ./build/
+	rm -rf .service_token .kibana_service_token ./bin/ ./build/
 
 .PHONY: generate
 generate: ## - Generate schema models
@@ -221,7 +235,11 @@ build-releaser: ## - Build a Docker image to run make package including all buil
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
-	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE)
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) release
+
+.PHONY: docker-cover-e2e-binaries
+docker-cover-e2e-binaries: build-releaser
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) cover-e2e-binaries
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
@@ -263,7 +281,7 @@ export $(shell sed 's/=.*//' ./dev-tools/integration/.env)
 # Start ES with docker without waiting
 .PHONY: int-docker-start-async
 int-docker-start-async:
-	@docker-compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans elasticsearch
+	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans elasticsearch
 
 # Wait for ES to be ready
 .PHONY: int-docker-wait
@@ -279,7 +297,8 @@ int-docker-start: ## - Start docker envronment for integration tests and wait un
 # Stop integration docker setup
 .PHONY: int-docker-stop
 int-docker-stop: ## - Stop docker environment for integration tests
-	@docker-compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env down
+	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env down
+	@rm -f .service_token
 
 # Run integration tests with starting/stopping docker
 .PHONY: test-int
@@ -299,6 +318,48 @@ test-int-set: ## - Run integration tests without setup
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	go test -v -tags=integration -count=1 -race -p 1 ./...
+
+##################################################
+# e2e testing targets
+##################################################
+
+# based off build-and-push-cloud-image
+.PHONY: build-e2e-agent-image
+build-e2e-agent-image: docker-cover-e2e-binaries ## - Build a custom elastic-agent image with fleet-server binaries with coverage enabled injected
+	@printf "${CMD_COLOR_ON} Creating test e2e agent image\n${CMD_COLOR_OFF}"
+	GOARCH=amd64 ./dev-tools/e2e/build.sh
+
+.PHONY: e2e-certs
+e2e-certs: ## - Use openssl to create a CA, encrypted private key, and signed fleet-server cert testing purposes
+	@printf "${CMD_COLOR_ON} Creating test e2e certs\n${CMD_COLOR_OFF}"
+	@./dev-tools/e2e/certs.sh
+
+.PHONY: e2e-docker-start
+e2e-docker-start: int-docker-start ## - Start a testing instance of Elasticsearch and Kibana in docker containers
+	@KIBANA_TOKEN=$(shell ./dev-tools/e2e/get-kibana-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) docker compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans kibana
+	@./dev-tools/e2e/wait-for-kibana.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:5601
+
+.PHONY: e2e-docker-stop
+e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
+	@KIBANA_TOKEN="supress-warning" docker compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env down
+	rm -f .kibana_service_token
+	@$(MAKE) int-docker-stop
+
+.PHONY: test-e2e
+test-e2e: docker-cover-e2e-binaries build-e2e-agent-image e2e-certs ## - Setup and run the blackbox end to end test suite
+	@mkdir -p build/e2e-cover
+	@$(MAKE) e2e-docker-start
+	@set -o pipefail; $(MAKE) test-e2e-set | tee build/test-e2e.out
+	@$(MAKE) e2e-docker-stop
+
+.PHONY: test-e2e-set
+test-e2e-set: ## - Run the blackbox end to end tests without setup.
+	cd testing; \
+	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
+	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
+	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
+	CGO_ENABLED=1 \
+	go test -v -tags=e2e -count=1 -race -p 1 ./...
 
 ##################################################
 # Cloud testing targets

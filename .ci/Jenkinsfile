@@ -111,6 +111,20 @@ pipeline {
         }
       }
     }
+    stage('E2E Test') {
+      options { skipDefaultCheckout() }
+      steps {
+        withGithubNotify(context: "E2E Test", tab: 'tests') {
+          cleanup()
+          dir("${BASE_DIR}"){
+            withGoEnv(){
+              retryWithSleep(retries: 2, seconds: 5, backoff: true){ sh(label: "Install Docker", script: '.ci/scripts/install-docker-compose.sh') }
+              sh(label: 'test', script: 'make test-e2e')
+            }
+          }
+        }
+      }
+    }
     stage('Cloud e2e Test') {
       options { skipDefaultCheckout() }
       steps {
