@@ -154,9 +154,22 @@ func (et *EnrollerT) _enroll(
 	agentID := u.String()
 	if agent.Id != "" {
 		// invalidate previous api key
-		invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
+		err := invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
+		if err != nil {
+			zlog.Debug().
+				Str("SharedId", req.SharedId).
+				Str("AgentId", agent.Id).
+				Str("APIKeyID", agent.AccessAPIKeyID).
+				Msg("Error when trying to invalidate API key of old agent with shared id")
+		}
 		// delete existing agent to recreate with new api key
-		deleteAgent(ctx, zlog, et.bulker, agent.Id)
+		err = deleteAgent(ctx, zlog, et.bulker, agent.Id)
+		if err != nil {
+			zlog.Debug().
+				Str("SharedId", req.SharedId).
+				Str("AgentId", agent.Id).
+				Msg("Error when trying to delete old agent with shared id")
+		}
 	}
 
 	// Update the local metadata agent id

@@ -224,9 +224,7 @@ type EnrollRequest struct {
 	Metadata EnrollMetadata `json:"metadata"`
 
 	// SharedId The shared ID of the agent.
-	// To support pre-existing installs.
-	//
-	// Never implemented.
+	// To replace an agent on enroll fail.
 	SharedId string `json:"shared_id"`
 
 	// Type The enrollment type of the agent.
