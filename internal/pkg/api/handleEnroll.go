@@ -71,7 +71,6 @@ func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bu
 		bulker: bulker,
 		cache:  c,
 	}, nil
-
 }
 
 func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, userAgent string) error {
@@ -88,7 +87,7 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 		return err
 	}
 
-	resp, err := et.processRequest(zlog, w, r, rb, key.ID, ver)
+	resp, err := et.processRequest(zlog, w, r, rb, key, ver)
 	if err != nil {
 		return err
 	}
@@ -97,12 +96,31 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 	return writeResponse(zlog, w, resp, ts)
 }
 
-func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKeyID, ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKey *apikey.APIKey, ver string) (*EnrollResponse, error) {
+	var enrollAPI *model.EnrollmentAPIKey
+	if et.cfg.StaticPolicyTokens.Enabled {
+		// Validate that an enrollment record exists for a key with this id.
+		for _, pt := range et.cfg.StaticPolicyTokens.PolicyTokens {
+			if pt.TokenKey == enrollmentAPIKey.Key {
+				zlog.Debug().Msgf("Found static policy token %s", pt.PolicyID)
+				enrollAPI = &model.EnrollmentAPIKey{
+					PolicyID: pt.PolicyID,
+				}
+				break
+			}
+		}
+	}
 
-	// Validate that an enrollment record exists for a key with this id.
-	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentAPIKeyID)
-	if err != nil {
-		return nil, err
+	// If we didn't find a static policy token, check the database
+	if enrollAPI == nil {
+		zlog.Info().Msgf("Checking enrollment key from database %s", enrollmentAPIKey.Key)
+		// Validate that an enrollment record exists for a key with this id.
+		erec, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentAPIKey.ID)
+		if err != nil {
+			return nil, err
+		}
+		zlog.Info().Msgf("Found enrollment key %s", erec.APIKey)
+		enrollAPI = erec
 	}
 
 	body := r.Body
@@ -122,7 +140,7 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	return et._enroll(r.Context(), rb, zlog, req, erec.PolicyID, ver)
+	return et._enroll(r.Context(), rb, zlog, req, enrollAPI.PolicyID, ver)
 }
 
 func (et *EnrollerT) _enroll(
@@ -131,8 +149,8 @@ func (et *EnrollerT) _enroll(
 	zlog zerolog.Logger,
 	req *EnrollRequest,
 	policyID,
-	ver string) (*EnrollResponse, error) {
-
+	ver string,
+) (*EnrollResponse, error) {
 	var agent model.Agent
 	var enrollmentID string
 	if req.EnrollmentId != nil {
@@ -270,7 +288,6 @@ func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, age
 }
 
 func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, apikeyID string) error {
-
 	// hack-a-rama:  We purposely do not force a "refresh:true" on the Apikey creation
 	// because doing so causes the api call to slow down at scale. It is already very slow.
 	// So we have to wait for the key to become visible until we can invalidate it.
