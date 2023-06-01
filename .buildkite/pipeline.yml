@@ -91,7 +91,7 @@ steps:
   - label: ":docker: Publish docker image"
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
-    if: build.env("BUILDKITE_PULL_REQUEST") == ''
+    if: "build.env('BUILDKITE_PULL_REQUEST') == '' && build.env('BUILDKITE_BRANCH') == 'main'"
     agents:
       provider: "gcp"
     depends_on:
