@@ -152,7 +152,11 @@ func (et *EnrollerT) _enroll(
 	}
 
 	agentID := u.String()
-	if agent.Id != "" {
+	if agent.Id != "" && agent.PolicyRevisionIdx == 0 {
+		zlog.Info().
+			Str("SharedId", req.SharedId).
+			Str("AgentId", agent.Id).
+			Msg("Remove old agent with same shared_id")
 		// invalidate previous api key
 		err := invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
 		if err != nil {
