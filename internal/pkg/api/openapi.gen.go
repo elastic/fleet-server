@@ -220,12 +220,18 @@ type EnrollMetadata struct {
 
 // EnrollRequest A request to enroll a new agent into fleet.
 type EnrollRequest struct {
+	// EnrollmentId The enrollment ID of the agent.
+	// To replace an agent on enroll fail.
+	EnrollmentId *string `json:"enrollment_id,omitempty"`
+
 	// Metadata Metadata associated with the agent that is enrolling to fleet.
 	Metadata EnrollMetadata `json:"metadata"`
 
 	// SharedId The shared ID of the agent.
-	// To replace an agent on enroll fail.
-	SharedId string `json:"shared_id"`
+	// To support pre-existing installs.
+	//
+	// Never implemented.
+	SharedId *string `json:"shared_id,omitempty"`
 
 	// Type The enrollment type of the agent.
 	// The agent only supports the PERMANENT value.

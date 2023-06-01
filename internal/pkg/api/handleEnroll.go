@@ -133,13 +133,13 @@ func (et *EnrollerT) _enroll(
 	ver string) (*EnrollResponse, error) {
 
 	var agent model.Agent
-	if req.SharedId != "" {
+	if req.EnrollmentId != nil {
 		var err error
-		agent, err = dl.FindAgent(ctx, et.bulker, dl.QueryAgentBySharedID, dl.FieldSharedID, req.SharedId)
+		agent, err = dl.FindAgent(ctx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, req.EnrollmentID)
 		if err != nil {
 			zlog.Debug().
-				Str("SharedId", req.SharedId).
-				Msg("SharedId not found")
+				Str("EnrollmentId", *req.EnrollmentId).
+				Msg("EnrollmentId not found")
 		}
 	}
 
@@ -154,14 +154,14 @@ func (et *EnrollerT) _enroll(
 	agentID := u.String()
 	if agent.Id != "" && agent.PolicyRevisionIdx == 0 {
 		zlog.Info().
-			Str("SharedId", req.SharedId).
+			Str("EnrollmentId", *req.EnrollmentId).
 			Str("AgentId", agent.Id).
 			Msg("Remove old agent with same shared_id")
 		// invalidate previous api key
 		err := invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
 		if err != nil {
 			zlog.Debug().
-				Str("SharedId", req.SharedId).
+				Str("EnrollmentId", *req.EnrollmentId).
 				Str("AgentId", agent.Id).
 				Str("APIKeyID", agent.AccessAPIKeyID).
 				Msg("Error when trying to invalidate API key of old agent with shared id")
@@ -170,7 +170,7 @@ func (et *EnrollerT) _enroll(
 		err = deleteAgent(ctx, zlog, et.bulker, agent.Id)
 		if err != nil {
 			zlog.Debug().
-				Str("SharedId", req.SharedId).
+				Str("EnrollmentId", *req.EnrollmentId).
 				Str("AgentId", agent.Id).
 				Msg("Error when trying to delete old agent with shared id")
 		}
@@ -205,8 +205,8 @@ func (et *EnrollerT) _enroll(
 			ID:      agentID,
 			Version: ver,
 		},
-		Tags:     removeDuplicateStr(req.Metadata.Tags),
-		SharedID: req.SharedId,
+		Tags:         removeDuplicateStr(req.Metadata.Tags),
+		EnrollmentID: *req.EnrollmentId,
 	}
 
 	err = createFleetAgent(ctx, et.bulker, agentID, agentData)

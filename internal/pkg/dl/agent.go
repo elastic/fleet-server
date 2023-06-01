@@ -20,7 +20,7 @@ const (
 var (
 	QueryAgentByAssessAPIKeyID = prepareAgentFindByAccessAPIKeyID()
 	QueryAgentByID             = prepareAgentFindByID()
-	QueryAgentBySharedID       = prepareAgentFindBySharedID()
+	QueryAgentByEnrollmentID   = prepareAgentFindByEnrollmentID()
 )
 
 func prepareAgentFindByID() *dsl.Tmpl {
@@ -31,8 +31,8 @@ func prepareAgentFindByAccessAPIKeyID() *dsl.Tmpl {
 	return prepareAgentFindByField(FieldAccessAPIKeyID)
 }
 
-func prepareAgentFindBySharedID() *dsl.Tmpl {
-	return prepareAgentFindByField(FieldSharedID)
+func prepareAgentFindByEnrollmentID() *dsl.Tmpl {
+	return prepareAgentFindByField(FieldEnrollmentID)
 }
 
 func prepareAgentFindByField(field string) *dsl.Tmpl {
