@@ -4,8 +4,9 @@ server.ssl.enabled: false
 elasticsearch.hosts: [ "http://elasticsearch:9200" ]
 elasticsearch.serviceAccountToken: "${KIBANA_TOKEN}"
 
+xpack.securitySolution.packagerTaskInterval: 1s
 xpack.fleet.agents.enabled: true
-xpack.fleet.agents.fleet_server.hosts: ["http://fleet-server:8220"]
+xpack.fleet.agents.fleet_server.hosts: ["https://fleet-server:8220"]
 xpack.fleet.agents.elasticsearch.hosts: ["http://elasticsearch:9200"]
 xpack.fleet.packages:
   - name: elastic_agent
@@ -13,6 +14,16 @@ xpack.fleet.packages:
   - name: fleet_server
     version: latest
 xpack.fleet.agentPolicies:
+  - name: dummy-policy
+    id: dummy-policy
+    namespace: default
+    monitoring_enabled: []
+    package_policies: []
+  - name: security-policy
+    id: security-policy
+    namespace: default
+    monitoring_enabled: []
+    package_policies: []
   - name: fleet-server-policy
     id: fleet-server-policy
     monitoring_enabled: []

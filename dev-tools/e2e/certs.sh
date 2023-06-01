@@ -38,7 +38,7 @@ openssl req -new \
     -key ${CERT_DIR}/fleet-server.key \
     -passin file:${CERT_DIR}/passphrase \
     -subj "/CN=localhost" \
-    -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" \
+    -addext "subjectAltName=IP:127.0.0.1,DNS:localhost,DNS:fleet-server" \
     -out ${CERT_DIR}/fleet-server.csr \
     2>/dev/null
 
@@ -46,7 +46,7 @@ openssl req -new \
 openssl x509 -req \
     -in ${CERT_DIR}/fleet-server.csr \
     -days 356 \
-    -extfile <(printf "subjectAltName=IP:127.0.0.1,DNS:localhost") \
+    -extfile <(printf "subjectAltName=IP:127.0.0.1,DNS:localhost,DNS:fleet-server") \
     -CA ${CERT_DIR}/e2e-test-ca.crt \
     -CAkey ${CERT_DIR}/e2e-test-ca.key \
     -CAcreateserial \

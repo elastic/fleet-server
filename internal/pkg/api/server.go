@@ -164,8 +164,10 @@ func diagConn(c net.Conn, s http.ConnState) {
 	switch s {
 	case http.StateNew:
 		cntHTTPNew.Inc()
+		cntHTTPActive.Inc()
 	case http.StateClosed:
 		cntHTTPClose.Inc()
+		cntHTTPActive.Dec()
 	}
 }
 

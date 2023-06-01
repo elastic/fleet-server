@@ -58,6 +58,7 @@ components:
           description: The date-time that the fleet-server binary was created.
           #format: date-time # not using date-time format at the moment because the currently available objects have plain strings
     statusResponse:
+      x-go-name: StatusAPIResponse
       description: Status response information.
       type: object
       required:
@@ -643,6 +644,7 @@ components:
             - endpoint
             - agent
     uploadBeginResponse:
+      x-go-name: UploadBeginAPIResponse
       description: Response to initiating a file upload
       type: object
       required:
