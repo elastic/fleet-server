@@ -132,9 +132,15 @@ func (et *EnrollerT) _enroll(
 	policyID,
 	ver string) (*EnrollResponse, error) {
 
+	var agent model.Agent
 	if req.SharedId != "" {
-		// TODO: Support pre-existing install
-		return nil, errors.New("preexisting install not yet supported")
+		var err error
+		agent, err = dl.FindAgent(ctx, et.bulker, dl.QueryAgentBySharedID, dl.FieldSharedID, req.SharedId)
+		if err != nil {
+			zlog.Debug().
+				Str("SharedId", req.SharedId).
+				Msg("SharedId not found")
+		}
 	}
 
 	now := time.Now()
@@ -146,6 +152,12 @@ func (et *EnrollerT) _enroll(
 	}
 
 	agentID := u.String()
+	if agent.Id != "" {
+		// invalidate previous api key
+		invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
+		// delete existing agent to recreate with new api key
+		deleteAgent(ctx, zlog, et.bulker, agent.Id)
+	}
 
 	// Update the local metadata agent id
 	localMeta, err := updateLocalMetaAgentID(req.Metadata.Local, agentID)
@@ -176,7 +188,8 @@ func (et *EnrollerT) _enroll(
 			ID:      agentID,
 			Version: ver,
 		},
-		Tags: removeDuplicateStr(req.Metadata.Tags),
+		Tags:     removeDuplicateStr(req.Metadata.Tags),
+		SharedID: req.SharedId,
 	}
 
 	err = createFleetAgent(ctx, et.bulker, agentID, agentData)

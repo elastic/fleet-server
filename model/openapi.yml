@@ -140,9 +140,7 @@ components:
           type: string
           description: |
             The shared ID of the agent.
-            To support pre-existing installs.
-
-            Never implemented.
+            To replace an agent on enroll fail.
         metadata:
           $ref: '#/components/schemas/enrollMetadata'
     enrollResponseItem:

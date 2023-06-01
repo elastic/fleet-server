@@ -56,6 +56,7 @@ const (
 
 	FieldDecodedSha256 = "decoded_sha256"
 	FieldIdentifier    = "identifier"
+	FieldSharedID      = "shared_id"
 )
 
 // Private constants
