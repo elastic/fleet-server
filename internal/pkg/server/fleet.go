@@ -334,8 +334,14 @@ func (f *Fleet) initBulker(ctx context.Context, tracer *apm.Tracer, cfg *config.
 func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	initRuntime(cfg)
 
+	// Create the APM tracer.
+	tracer, err := f.initTracer(cfg.Inputs[0].Server.Instrumentation)
+	if err != nil {
+		return err
+	}
+
 	// The metricsServer is only enabled if http.enabled is set in the config
-	metricsServer, err := api.InitMetrics(ctx, cfg, f.bi)
+	metricsServer, err := api.InitMetrics(ctx, cfg, f.bi, tracer)
 	switch {
 	case err != nil:
 		return err
@@ -350,12 +356,6 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	// This allows the child subsystems to continue to write to the data store while tearing down.
 	bulkCtx, bulkCancel := context.WithCancel(context.Background())
 	defer bulkCancel()
-
-	// Create the APM tracer.
-	tracer, err := f.initTracer(cfg.Inputs[0].Server.Instrumentation)
-	if err != nil {
-		return err
-	}
 
 	// Create the bulker subsystem
 	bulker, err := f.initBulker(bulkCtx, tracer, cfg)
