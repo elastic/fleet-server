@@ -45,16 +45,13 @@ func NewFileDeliveryT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elastic
 }
 
 func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, fileID string) error {
-	/*
-		var agentID string
-		agent, err := authAgent(r, &agentID, ft.bulker, ft.cache)
-		if err != nil {
-			return err
-		}
-	*/
+	agent, err := authAgent(r, nil, ft.bulker, ft.cache)
+	if err != nil {
+		return err
+	}
 
 	// find file
-	info, err := ft.deliverer.FindFileForAgent(r.Context(), fileID, "xyz")
+	info, err := ft.deliverer.FindFileForAgent(r.Context(), fileID, agent.Agent.ID)
 	if err != nil {
 		return err // should be 404
 	}
