@@ -7,6 +7,7 @@ package delivery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -52,17 +53,33 @@ func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID
 
 func (d *Deliverer) SendFile(ctx context.Context, w io.Writer, f file.MetaDoc, fileID string) error {
 
-	body, err := readChunkStream(ctx, d.client, fmt.Sprintf(FileDataIndexPattern, f.Source), fileID+".0")
-	defer func() {
-		if body != nil {
-			body.Close()
-		}
-	}()
+	// find chunk indices behind alias, doc IDs
+	infos, err := file.GetChunkInfos(ctx, d.bulker, FileDataIndexPattern, fileID, file.GetChunkInfoOpt{})
 	if err != nil {
 		return err
 	}
 
-	decode := cbor.NewChunkReader(body)
-	_, err = io.Copy(w, decode)
-	return err
+	for _, chunkInfo := range infos {
+		body, err := readChunkStream(d.client, chunkInfo.Index, chunkInfo.ID)
+		if err != nil {
+			body.Close()
+			return err
+		}
+
+		chunk, err := cbor.NewChunkDecoder(body).Decode()
+		body.Close()
+		if err != nil {
+			return err
+		}
+
+		n, err := w.Write(chunk)
+		if err != nil {
+			return err
+		}
+		if n != len(chunk) {
+			return errors.New("chunk could not be written")
+		}
+	}
+
+	return nil
 }

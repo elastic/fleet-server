@@ -57,7 +57,7 @@ func findFileForAgent(ctx context.Context, bulker bulk.Bulk, fileID string, agen
 	return result, nil
 }
 
-func readChunkStream(ctx context.Context, client *elasticsearch.Client, idx string, docID string) (io.ReadCloser, error) {
+func readChunkStream(client *elasticsearch.Client, idx string, docID string) (io.ReadCloser, error) {
 
 	res, err := client.Get(idx, docID, func(req *esapi.GetRequest) {
 		if req.Header == nil {

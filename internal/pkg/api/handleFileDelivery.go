@@ -5,8 +5,8 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -59,10 +59,6 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 		return err // should be 404
 	}
 
-	fmt.Printf("\n\n%#v\n\n", info)
-
-	// @todo: record bytes out, add logs
-
 	// set headers before writing any chunks!
 
 	// if mime_type was provided, set as Content-Type, otherwise fall back to octet-stream
@@ -70,11 +66,11 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 	if info.File.MimeType != "" {
 		w.Header().Set("Content-Type", info.File.MimeType)
 	}
-	/*
-		if info.File.Size > 0 {
-			w.Header().Set("Content-Length", strconv.FormatInt(info.File.Size, 10))
-		}
-	*/
+
+	if info.File.Size > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(info.File.Size, 10))
+	}
+
 	if info.File.Hash != nil && info.File.Hash.SHA2 != "" {
 		w.Header().Set("X-File-SHA2", info.File.Hash.SHA2)
 	}

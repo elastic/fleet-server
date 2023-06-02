@@ -25,25 +25,28 @@ const (
 )
 
 var (
-	QueryChunkInfo = prepareChunkWithoutData()
-	QueryUploadID  = prepareFindMetaByUploadID()
+	QueryChunkInfoWithSize = prepareChunkInfo(true)
+	QueryChunkInfo         = prepareChunkInfo(false)
+	QueryUploadID          = prepareFindMetaByUploadID()
 )
 
 // get fields other than the byte payload (data)
-func prepareChunkWithoutData() *dsl.Tmpl {
+func prepareChunkInfo(size bool) *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
 	root.Param("_source", false)
 	root.Query().Term(FieldBaseID, tmpl.Bind(FieldBaseID), nil)
 	root.Param("fields", []string{FieldSHA2, FieldLast, FieldBaseID})
-	root.Param("script_fields", map[string]interface{}{
-		"size": map[string]interface{}{
-			"script": map[string]interface{}{
-				"lang":   "painless",
-				"source": "params._source.data.length",
+	if size {
+		root.Param("script_fields", map[string]interface{}{
+			"size": map[string]interface{}{
+				"script": map[string]interface{}{
+					"lang":   "painless",
+					"source": "params._source.data.length",
+				},
 			},
-		},
-	})
+		})
+	}
 	root.Size(10000)
 	tmpl.MustResolve(root)
 	return tmpl
@@ -123,11 +126,21 @@ func GetChunk(ctx context.Context, bulker bulk.Bulk, indexPattern string, source
 	return chunk, err
 }
 
+type GetChunkInfoOpt struct {
+	IncludeSize bool
+	RequireHash bool
+}
+
 // Retrieves a subset of chunk document fields, specifically omitting the Data payload (bytes)
-// but adding the calculated field "size", that is the length, in bytes, of the Data field
-// the chunk's ordered index position (Pos) is also parsed from the document ID
-func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, baseID string) ([]ChunkInfo, error) {
-	query, err := QueryChunkInfo.Render(map[string]interface{}{
+// the chunk's ordered index position (Pos) is also parsed from the document ID.
+// Optionally adding the calculated field "size", that is the length, in bytes, of the Data field.
+// and optionally requiring
+func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, baseID string, opt GetChunkInfoOpt) ([]ChunkInfo, error) {
+	var tpl *dsl.Tmpl = QueryChunkInfo
+	if opt.IncludeSize {
+		tpl = QueryChunkInfoWithSize
+	}
+	query, err := tpl.Render(map[string]interface{}{
 		FieldBaseID: baseID,
 	})
 	if err != nil {
@@ -156,24 +169,25 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 		if last, ok = getResultsFieldBool(h.Fields, FieldLast); !ok {
 			return nil, fmt.Errorf("unable to retrieve %s field from chunk document", FieldLast)
 		}
-		if sha2, ok = getResultsFieldString(h.Fields, FieldSHA2); !ok {
+		if sha2, ok = getResultsFieldString(h.Fields, FieldSHA2); opt.RequireHash && !ok {
 			return nil, fmt.Errorf("unable to retrieve %s field from chunk document", FieldSHA2)
 		}
-		if size, ok = getResultsFieldInt(h.Fields, "size"); !ok {
+		if size, ok = getResultsFieldInt(h.Fields, "size"); opt.IncludeSize && !ok {
 			return nil, errors.New("unable to retrieve size from chunk document")
 		}
-
 		chunkid := strings.TrimPrefix(h.ID, bid+".")
 		chunkNum, err := strconv.Atoi(chunkid)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse chunk number from id %s: %w", h.ID, err)
 		}
 		chunks[i] = ChunkInfo{
-			Pos:  chunkNum,
-			BID:  bid,
-			Last: last,
-			SHA2: sha2,
-			Size: size,
+			Pos:   chunkNum,
+			BID:   bid,
+			Last:  last,
+			SHA2:  sha2,
+			Size:  size,
+			Index: h.Index,
+			ID:    h.ID,
 		}
 	}
 
