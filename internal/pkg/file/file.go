@@ -36,6 +36,12 @@ type FileData struct {
 	Size      int64  `json:"size"`
 	ChunkSize int64  `json:"ChunkSize"`
 	Status    string `json:"Status"`
+	MimeType  string `json:"mime_type,omitempty"`
+	Hash      *Hash  `json:"hash,omitempty"`
+}
+
+type Hash struct {
+	SHA2 string `json:"sha2,omitempty"`
 }
 
 type MetaDoc struct {

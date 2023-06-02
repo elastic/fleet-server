@@ -26,6 +26,7 @@ type apiServer struct {
 	sm     policy.SelfMonitor
 	bi     build.Info
 	ut     *UploadT
+	ft     *FileDeliveryT
 	bulker bulk.Bulk
 }
 
@@ -124,6 +125,14 @@ func (a *apiServer) UploadChunk(w http.ResponseWriter, r *http.Request, id strin
 	}
 	if err := a.ut.handleUploadChunk(zlog, w, r, id, chunkNum, params.XChunkSHA2); err != nil {
 		cntUploadChunk.IncError(err)
+		ErrorResp(w, r, err)
+	}
+}
+
+func (a *apiServer) GetFile(w http.ResponseWriter, r *http.Request, id string) {
+	zlog := hlog.FromRequest(r).With().Logger()
+	if err := a.ft.handleSendFile(zlog, w, r, id); err != nil {
+		cntFileDeliv.IncError(err)
 		ErrorResp(w, r, err)
 	}
 }
