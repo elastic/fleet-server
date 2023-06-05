@@ -9,12 +9,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"net/http"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/cbor"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/rs/zerolog"
+)
+
+var (
+	ErrNoFile = errors.New("file data not found")
 )
 
 type Deliverer struct {
@@ -49,17 +54,26 @@ func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID
 	return fi, nil
 }
 
-func (d *Deliverer) SendFile(ctx context.Context, w io.Writer, f file.MetaDoc, fileID string) error {
+func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w http.ResponseWriter, f file.MetaDoc, fileID string) error {
 
 	// find chunk indices behind alias, doc IDs
 	infos, err := file.GetChunkInfos(ctx, d.bulker, FileDataIndexPattern, fileID, file.GetChunkInfoOpt{})
 	if err != nil {
+		zlog.Error().Err(err).Msg("problem getting infos")
 		return err
 	}
 
+	if len(infos) == 0 {
+		zlog.Warn().Str("fileID", fileID).Msg("chunk documents not found for file")
+		w.WriteHeader(http.StatusNotFound)
+		return ErrNoFile
+	}
+
+	zlog.Trace().Int("number of chunks found", len(infos)).Msg("chunks found")
 	for _, chunkInfo := range infos {
 		body, err := readChunkStream(d.client, chunkInfo.Index, chunkInfo.ID)
 		if err != nil {
+			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error reading chunk stream")
 			body.Close()
 			return err
 		}
@@ -67,14 +81,17 @@ func (d *Deliverer) SendFile(ctx context.Context, w io.Writer, f file.MetaDoc, f
 		chunk, err := cbor.NewChunkDecoder(body).Decode()
 		body.Close()
 		if err != nil {
+			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error decoding chunk")
 			return err
 		}
 
 		n, err := w.Write(chunk)
 		if err != nil {
+			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error writing chunk to output")
 			return err
 		}
 		if n != len(chunk) {
+			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Int("expected length", n).Int("wrote length", len(chunk)).Msg("error decoding chunk")
 			return errors.New("chunk could not be written")
 		}
 	}
