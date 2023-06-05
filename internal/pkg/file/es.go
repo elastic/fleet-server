@@ -167,7 +167,9 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 			return nil, fmt.Errorf("unable to retrieve %s field from chunk document", FieldBaseID)
 		}
 		if last, ok = getResultsFieldBool(h.Fields, FieldLast); !ok {
-			return nil, fmt.Errorf("unable to retrieve %s field from chunk document", FieldLast)
+			// Files written by Kibana omit this field for all intermediate chunks
+			// and only write last:true on final chunk. False by default
+			last = false
 		}
 		if sha2, ok = getResultsFieldString(h.Fields, FieldSHA2); opt.RequireHash && !ok {
 			return nil, fmt.Errorf("unable to retrieve %s field from chunk document", FieldSHA2)
