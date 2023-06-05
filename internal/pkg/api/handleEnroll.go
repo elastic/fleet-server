@@ -135,7 +135,7 @@ func (et *EnrollerT) _enroll(
 	var agent model.Agent
 	if req.EnrollmentId != nil {
 		var err error
-		agent, err = dl.FindAgent(ctx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, req.EnrollmentID)
+		agent, err = dl.FindAgent(ctx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, req.EnrollmentId)
 		if err != nil {
 			zlog.Debug().
 				Str("EnrollmentId", *req.EnrollmentId).
