@@ -136,7 +136,7 @@ type GetChunkInfoOpt struct {
 // Optionally adding the calculated field "size", that is the length, in bytes, of the Data field.
 // and optionally requiring
 func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, baseID string, opt GetChunkInfoOpt) ([]ChunkInfo, error) {
-	var tpl *dsl.Tmpl = QueryChunkInfo
+	tpl := QueryChunkInfo
 	if opt.IncludeSize {
 		tpl = QueryChunkInfoWithSize
 	}
