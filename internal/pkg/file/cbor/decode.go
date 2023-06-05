@@ -10,6 +10,9 @@ import (
 	fxcbor "github.com/fxamacker/cbor/v2"
 )
 
+// a cbor-decoding wrapper that expects an Elasticsearch search
+// result document of a file Chunk, and yields the `data` field
+// when decoded
 type ChunkDecoder struct {
 	dec *fxcbor.Decoder
 }
@@ -34,5 +37,4 @@ func (c *ChunkDecoder) Decode() ([]byte, error) {
 		return nil, err
 	}
 	return p.Fields.Data.RawData, nil
-
 }
