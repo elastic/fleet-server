@@ -543,7 +543,7 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
 }
 
-func Enroll_Agent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) string {
+func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) string {
 	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -562,14 +562,15 @@ func Enroll_Agent(enrollBody string, t *testing.T, ctx context.Context, srv *tse
 	err = json.Unmarshal(p, &obj)
 	require.NoError(t, err)
 
-	item, _ := obj["item"]
-	mm, _ := item.(map[string]interface{})
-	agentId, _ := mm["id"]
-	return agentId.(string)
+	item := obj["item"]
+	mm, ok := item.(map[string]interface{})
+	require.True(t, ok, "expected attribute item to be an object")
+	agentID := mm["id"]
+	return agentID.(string)
 }
 
 func Test_Agent_Enrollment_Id(t *testing.T) {
-	enrollBodyWEnrollmentId := `{
+	enrollBodyWEnrollmentID := `{
 	    "type": "PERMANENT",
 	    "shared_id": "",
 		"enrollment_id": "123456",
@@ -587,23 +588,31 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enroll first agent with the same enrollment_id")
-	firstAgentId := Enroll_Agent(enrollBodyWEnrollmentId, t, ctx, srv)
+	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	t.Log("Enroll an agent with the same enrollment_id")
-	secondAgentId := Enroll_Agent(enrollBodyWEnrollmentId, t, ctx, srv)
+	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	// cleanup
-	defer srv.bulker.Delete(ctx, dl.FleetAgents, secondAgentId)
+	defer func() {
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, secondAgentID)
+		if err != nil {
+			t.Log("could not clean up second agent")
+		}
+		err2 := srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
+		if err2 != nil {
+			t.Log("could not clean up first agent")
+		}
+	}()
 
-	sleep.WithContext(ctx, 500*time.Millisecond)
 	// checking that old agent with enrollment id is deleted
-	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentId)
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
 	t.Log(agent)
 	if err != nil {
 		t.Log("old agent not found as expected")
 	} else {
 		// cleanup
-		defer srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentId)
+		// defer srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
 		t.Fatal("duplicate agent found after enrolling with same enrollment id")
 	}
 }
