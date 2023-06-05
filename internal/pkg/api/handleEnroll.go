@@ -135,7 +135,7 @@ func (et *EnrollerT) _enroll(
 	var agent model.Agent
 	if req.EnrollmentId != nil {
 		var err error
-		agent, err = dl.FindAgent(ctx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, req.EnrollmentId)
+		agent, err = dl.FindAgent(ctx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, *req.EnrollmentId)
 		if err != nil {
 			zlog.Debug().
 				Str("EnrollmentId", *req.EnrollmentId).
@@ -156,7 +156,7 @@ func (et *EnrollerT) _enroll(
 		zlog.Info().
 			Str("EnrollmentId", *req.EnrollmentId).
 			Str("AgentId", agent.Id).
-			Msg("Remove old agent with same shared_id")
+			Msg("Remove existing agent with the same enrollment_id")
 		// invalidate previous api key
 		err := invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
 		if err != nil {

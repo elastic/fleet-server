@@ -543,11 +543,36 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
 }
 
+func Enroll_Agent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) string {
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+
+	cli := cleanhttp.DefaultClient()
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	p, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	var obj map[string]interface{}
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	item, _ := obj["item"]
+	mm, _ := item.(map[string]interface{})
+	agentId, _ := mm["id"]
+	return agentId.(string)
+}
+
 func Test_Agent_Enrollment_Id(t *testing.T) {
 	enrollBodyWEnrollmentId := `{
 	    "type": "PERMANENT",
 	    "shared_id": "",
-		"enrollment_id": "1234",
+		"enrollment_id": "123456",
 	    "metadata": {
 		"user_provided": {},
 		"local": {},
@@ -561,55 +586,24 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	srv, err := startTestServer(t, ctx)
 	require.NoError(t, err)
 
-	cli := cleanhttp.DefaultClient()
+	t.Log("Enroll first agent with the same enrollment_id")
+	firstAgentId := Enroll_Agent(enrollBodyWEnrollmentId, t, ctx, srv)
 
-	// enroll an agent
-	t.Log("Enroll an agent")
-	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBodyWEnrollmentId))
-	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
-	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
-	req.Header.Set("Content-Type", "application/json")
-	res, err := cli.Do(req)
-	require.NoError(t, err)
+	t.Log("Enroll an agent with the same enrollment_id")
+	secondAgentId := Enroll_Agent(enrollBodyWEnrollmentId, t, ctx, srv)
 
-	require.Equal(t, http.StatusOK, res.StatusCode)
+	// cleanup
+	defer srv.bulker.Delete(ctx, dl.FleetAgents, secondAgentId)
 
-	p, _ := io.ReadAll(res.Body)
-	res.Body.Close()
-	var obj map[string]interface{}
-	err = json.Unmarshal(p, &obj)
-	require.NoError(t, err)
-
-	item, ok := obj["item"]
-	require.True(t, ok, "expected attribute item is missing")
-	mm, ok := item.(map[string]interface{})
-	require.True(t, ok, "expected attribute item to be an object")
-
-	agentId, ok := mm["id"]
-	require.True(t, ok, "expected attribute id is missing")
-	str, ok := agentId.(string)
-	require.True(t, ok, "expected attribute id to be a string")
-	require.NotEmpty(t, str)
-
-	// enroll an agent again with same enrollment_id
-	t.Log("Enroll an agent")
-	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBodyWEnrollmentId))
-	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
-	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
-	req.Header.Set("Content-Type", "application/json")
-	res, err = cli.Do(req)
-	require.NoError(t, err)
-
-	require.Equal(t, http.StatusOK, res.StatusCode)
-	t.Log("Agent enrollment successful second time with enrollment id")
-
+	sleep.WithContext(ctx, 500*time.Millisecond)
 	// checking that old agent with enrollment id is deleted
-	_, err = dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, agentId)
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentId)
+	t.Log(agent)
 	if err != nil {
 		t.Log("old agent not found as expected")
 	} else {
+		// cleanup
+		defer srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentId)
 		t.Fatal("duplicate agent found after enrolling with same enrollment id")
 	}
 }
