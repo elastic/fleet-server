@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
@@ -20,7 +19,6 @@ import (
 
 type Deliverer struct {
 	sizeLimit int64
-	timeLimit time.Duration
 
 	client *elasticsearch.Client
 	bulker bulk.Bulk

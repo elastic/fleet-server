@@ -44,7 +44,7 @@ func NewFileDeliveryT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elastic
 	}
 }
 
-func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, fileID string) error {
+func (ft *FileDeliveryT) handleSendFile(_ zerolog.Logger, w http.ResponseWriter, r *http.Request, fileID string) error {
 	agent, err := authAgent(r, nil, ft.bulker, ft.cache)
 	if err != nil {
 		return err
