@@ -41,7 +41,7 @@ type FileData struct {
 }
 
 type Hash struct {
-	SHA2 string `json:"sha2,omitempty"`
+	SHA2 string `json:"sha256,omitempty"`
 }
 
 type MetaDoc struct {
