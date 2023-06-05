@@ -53,7 +53,7 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 	// find file
 	info, err := ft.deliverer.FindFileForAgent(r.Context(), fileID, agent.Agent.ID)
 	if err != nil {
-		return err // should be 404
+		return err
 	}
 
 	// set headers before writing any chunks!

@@ -43,7 +43,7 @@ func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID
 		return file.MetaDoc{}, err
 	}
 	if result == nil || len(result.Hits) == 0 {
-		return file.MetaDoc{}, file.ErrInvalidID
+		return file.MetaDoc{}, ErrNoFile
 	}
 
 	var fi file.MetaDoc
