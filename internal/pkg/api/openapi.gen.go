@@ -233,7 +233,7 @@ type EnrollRequest struct {
 	//
 	// Never implemented.
 	// Deprecated:
-	SharedId string `json:"shared_id"`
+	SharedId *string `json:"shared_id,omitempty"`
 
 	// Type The enrollment type of the agent.
 	// The agent only supports the PERMANENT value.
