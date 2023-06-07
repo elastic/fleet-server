@@ -197,4 +197,39 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, 1000, cfg.Inputs[0].Server.Limits.MaxAgents)
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
 	})
+	t.Run("output has multiple hosts", func(t *testing.T) {
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"service_token": "test-token",
+			"hosts":         []interface{}{"https://localhost:9200", "https://127.0.0.1:9200"},
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+		inStruct, err := structpb.NewStruct(map[string]interface{}{"type": "fleet-server"})
+		require.NoError(t, err)
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+			})
+
+		a := &Agent{
+			cliCfg:     ucfg.New(),
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+		}
+
+		cfg, err := a.configFromUnits()
+		require.NoError(t, err)
+		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
+		require.Len(t, cfg.Output.Elasticsearch.Hosts, 2)
+	})
 }
