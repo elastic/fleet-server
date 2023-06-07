@@ -167,7 +167,7 @@ func (et *EnrollerT) _enroll(
 				Str("EnrollmentId", enrollmentID).
 				Str("AgentId", agent.Id).
 				Str("APIKeyID", agent.AccessAPIKeyID).
-				Msg("Error when trying to invalidate API key of old agent with shared id")
+				Msg("Error when trying to invalidate API key of old agent with enrollment id")
 		}
 		// delete existing agent to recreate with new api key
 		err = deleteAgent(ctx, zlog, et.bulker, agent.Id)
@@ -175,7 +175,7 @@ func (et *EnrollerT) _enroll(
 			zlog.Debug().
 				Str("EnrollmentId", enrollmentID).
 				Str("AgentId", agent.Id).
-				Msg("Error when trying to delete old agent with shared id")
+				Msg("Error when trying to delete old agent with enrollment id")
 		}
 	}
 
