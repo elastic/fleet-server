@@ -29,6 +29,7 @@ func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer)
 	return HandlerWithOptions(si, ChiServerOptions{
 		BaseRouter:       r,
 		ErrorHandlerFunc: ErrorResp,
+		Middlewares:      []MiddlewareFunc{NewApiVersion().middleware},
 		// TODO auth as middleware? - here it takes place after chi router adds scope annotations to the request ctx
 	})
 }
