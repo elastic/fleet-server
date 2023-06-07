@@ -1268,7 +1268,18 @@ paths:
             example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
       responses:
         '200':
-          description: file contents
+          description: File Contents.
+          headers:
+            X-File-Sha2:
+              description: SHA256 digest of the file contents. Only sent when the uploaded file contains a file.hash.sha256 value.
+              schema:
+                type: string
+                example: 0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
         '400':
           $ref: '#/components/responses/badRequest'
         '401':
