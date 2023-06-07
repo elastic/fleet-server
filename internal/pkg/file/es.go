@@ -134,7 +134,7 @@ type GetChunkInfoOpt struct {
 // Retrieves a subset of chunk document fields, specifically omitting the Data payload (bytes)
 // the chunk's ordered index position (Pos) is also parsed from the document ID.
 // Optionally adding the calculated field "size", that is the length, in bytes, of the Data field.
-// and optionally requiring
+// and optionally validating that a hash field is present
 func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, baseID string, opt GetChunkInfoOpt) ([]ChunkInfo, error) {
 	tpl := QueryChunkInfo
 	if opt.IncludeSize {
