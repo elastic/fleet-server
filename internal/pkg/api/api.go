@@ -133,6 +133,7 @@ func (a *apiServer) GetFile(w http.ResponseWriter, r *http.Request, id string) {
 	zlog := hlog.FromRequest(r).With().Logger()
 	if err := a.ft.handleSendFile(zlog, w, r, id); err != nil {
 		cntFileDeliv.IncError(err)
+		w.Header().Set("Content-Type", "application/json")
 		ErrorResp(w, r, err)
 	}
 }

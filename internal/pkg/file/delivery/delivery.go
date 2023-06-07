@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
+	"io"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
@@ -54,23 +54,25 @@ func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID
 	return fi, nil
 }
 
-func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w http.ResponseWriter, f file.MetaDoc, fileID string) error {
-
+func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileID string) ([]file.ChunkInfo, error) {
 	// find chunk indices behind alias, doc IDs
 	infos, err := file.GetChunkInfos(ctx, d.bulker, FileDataIndexPattern, fileID, file.GetChunkInfoOpt{})
 	if err != nil {
 		zlog.Error().Err(err).Msg("problem getting infos")
-		return err
+		return nil, err
 	}
 
 	if len(infos) == 0 {
 		zlog.Warn().Str("fileID", fileID).Msg("chunk documents not found for file")
-		w.WriteHeader(http.StatusNotFound)
-		return ErrNoFile
+		return nil, ErrNoFile
 	}
-
 	zlog.Trace().Int("number of chunks found", len(infos)).Msg("chunks found")
-	for _, chunkInfo := range infos {
+
+	return infos, nil
+}
+
+func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w io.Writer, chunks []file.ChunkInfo, fileID string) error {
+	for _, chunkInfo := range chunks {
 		body, err := readChunkStream(d.client, chunkInfo.Index, chunkInfo.ID)
 		if err != nil {
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error reading chunk stream")

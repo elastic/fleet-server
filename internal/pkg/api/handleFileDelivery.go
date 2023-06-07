@@ -56,6 +56,15 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 		return err
 	}
 
+	chunks, err := ft.deliverer.LocateChunks(r.Context(), zlog, fileID)
+	if err == delivery.ErrNoFile {
+		w.WriteHeader(http.StatusNotFound)
+		return err
+	}
+	if err != nil {
+		return err
+	}
+
 	// set headers before writing any chunks!
 
 	// if mime_type was provided, set as Content-Type, otherwise fall back to octet-stream
