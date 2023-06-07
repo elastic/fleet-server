@@ -1,7 +1,7 @@
 version: 8.8.1
 entries:
     - kind: enhancement
-      summary: Add Fleet config to Elastic Agent diagnostics
+      summary: Add Fleet configuration file to Elastic Agent diagnostics bundle
       description: Gather Fleet Server's config when Elastic Agent requests diagnostics information.
       component: ""
       pr:
