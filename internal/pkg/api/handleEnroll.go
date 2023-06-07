@@ -154,7 +154,8 @@ func (et *EnrollerT) _enroll(
 	}
 
 	agentID := u.String()
-	if agent.Id != "" && agent.PolicyRevisionIdx == 0 {
+	// only delete existing agent if it never checked in
+	if agent.Id != "" && agent.LastCheckin == "" {
 		zlog.Info().
 			Str("EnrollmentId", enrollmentID).
 			Str("AgentId", agent.Id).
