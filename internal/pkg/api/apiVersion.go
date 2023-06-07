@@ -29,7 +29,7 @@ var isValidVersionRegex = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
 type apiVersion struct {
 }
 
-func NewApiVersion() *apiVersion {
+func NewAPIVersion() *apiVersion {
 	return &apiVersion{}
 }
 
