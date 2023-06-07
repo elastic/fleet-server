@@ -5,6 +5,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -57,7 +58,7 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 	}
 
 	chunks, err := ft.deliverer.LocateChunks(r.Context(), zlog, fileID)
-	if err == delivery.ErrNoFile {
+	if errors.Is(err, delivery.ErrNoFile) {
 		w.WriteHeader(http.StatusNotFound)
 		return err
 	}
@@ -82,5 +83,5 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 	}
 
 	// stream the chunks out
-	return ft.deliverer.SendFile(r.Context(), zlog, w, info, fileID)
+	return ft.deliverer.SendFile(r.Context(), zlog, w, chunks, fileID)
 }
