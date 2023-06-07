@@ -1,0 +1,30 @@
+// begin 8.8.1 relnotes
+
+[[release-notes-8.8.1]]
+==  8.8.1
+
+Review important information about the  8.8.1 release.
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.8.1]]
+=== Enhancements
+
+
+
+
+* Add Fleet Config To Elastic Agent Diagnostics. {-pull}2632[#2632] {-issue}2623[#2623]
+
+
+
+// end 8.8.1 relnotes
