@@ -18,29 +18,29 @@ func TestAPIVersion_middleware(t *testing.T) {
 
 	tests := []struct {
 		name                       string
-		requestApiVersionHeader    string
+		requestAPIVersionHeader    string
 		expectRespStatus           string
-		expectRespApiVersionHeader string
+		expectRespAPIVersionHeader string
 	}{
 		{
 			name:                    "with a misformatted elastic-api-version header",
-			requestApiVersionHeader: "iamnotvalid",
+			requestAPIVersionHeader: "iamnotvalid",
 			expectRespStatus:        "400 Bad Request",
 		},
 		{
 			name:                    "with an invalid elastic-api-version header",
-			requestApiVersionHeader: "1990-01-01",
+			requestAPIVersionHeader: "1990-01-01",
 			expectRespStatus:        "400 Bad Request",
 		},
 		{
 			name:                       "with a valid elastic-api-version header",
-			requestApiVersionHeader:    "2022-02-01",
-			expectRespApiVersionHeader: "2022-02-01",
+			requestAPIVersionHeader:    "2022-02-01",
+			expectRespAPIVersionHeader: "2022-02-01",
 			expectRespStatus:           "200 OK",
 		},
 		{
 			name:                       "without elastic-api-version header",
-			expectRespApiVersionHeader: "2022-03-01",
+			expectRespAPIVersionHeader: "2022-03-01",
 			expectRespStatus:           "200 OK",
 		},
 	}
@@ -54,22 +54,26 @@ func TestAPIVersion_middleware(t *testing.T) {
 			}
 
 			resp := httptest.NewRecorder()
+
 			req := httptest.NewRequest("GET", "/api/test", nil)
 
 			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
-			if tc.requestApiVersionHeader != "" {
-				req.Header.Set(ElasticAPIVersionHeader, tc.requestApiVersionHeader)
+			if tc.requestAPIVersionHeader != "" {
+				req.Header.Set(ElasticAPIVersionHeader, tc.requestAPIVersionHeader)
 			}
 
 			apiVersion.middleware(nextHandler).ServeHTTP(resp, req)
 
+			respResult := resp.Result()
+			defer respResult.Body.Close()
+
 			if tc.expectRespStatus != "" {
-				assert.Equal(t, tc.expectRespStatus, resp.Result().Status)
+				assert.Equal(t, tc.expectRespStatus, respResult.Status)
 			}
 
-			if tc.expectRespApiVersionHeader != "" {
-				assert.Equal(t, tc.expectRespApiVersionHeader, resp.Header().Get(ElasticAPIVersionHeader))
+			if tc.expectRespAPIVersionHeader != "" {
+				assert.Equal(t, tc.expectRespAPIVersionHeader, resp.Header().Get(ElasticAPIVersionHeader))
 			}
 		})
 	}
