@@ -573,7 +573,7 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	enrollBodyWEnrollmentID := `{
 	    "type": "PERMANENT",
 	    "shared_id": "",
-		"enrollment_id": "123456",
+	    "enrollment_id": "123456",
 	    "metadata": {
 		"user_provided": {},
 		"local": {},
