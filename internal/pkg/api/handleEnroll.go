@@ -139,7 +139,7 @@ func (et *EnrollerT) _enroll(
 		var err error
 		agent, err = dl.FindAgent(ctx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, enrollmentID)
 		if err != nil {
-			zlog.Debug().
+			zlog.Debug().Err(err).
 				Str("EnrollmentId", enrollmentID).
 				Msg("Agent with EnrollmentId not found")
 		}
