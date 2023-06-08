@@ -68,7 +68,7 @@ func (a *apiVersion) middleware(next http.Handler) http.Handler {
 
 			if !a.isVersionSupported(headerValue) {
 				w.Header().Add(ElasticAPIVersionHeader, a.defaultVersion)
-				ErrorResp(w, r, fmt.Errorf("received \"%s\", is not supported. supported versions are: %s %w", headerValue, strings.Join(a.supportedVersions, ", "), ErrUnsupportedAPIVersion))
+				ErrorResp(w, r, fmt.Errorf("received %q, is not supported. supported versions are: [%s] %w", headerValue, strings.Join(a.supportedVersions, ", "), ErrUnsupportedAPIVersion))
 				return
 			}
 			w.Header().Add(ElasticAPIVersionHeader, headerValue)
