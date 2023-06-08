@@ -4,6 +4,19 @@ queue_rules:
       - check-success=fleet-server/pr-merge
 
 pull_request_rules:
+  - name: forward-port patches to main branch
+    conditions:
+      - merged
+      - label=forwardport-main
+    actions:
+      backport:
+        assignees:
+          - "{{ author }}"
+        branches:
+          - "main"
+        labels:
+          - "backport"
+        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
   - name: ask to resolve conflict
     conditions:
       - -merged
