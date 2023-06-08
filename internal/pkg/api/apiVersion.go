@@ -18,7 +18,7 @@ var (
 )
 
 const (
-	ElasticAPIVersionHeader = "elastic-api-version"
+	ElasticAPIVersionHeader = "Elastic-Api-Version"
 	DefaultVersion          = "2023-06-01"
 )
 
@@ -38,12 +38,12 @@ func NewAPIVersion() *apiVersion {
 	}
 }
 
-func (a *apiVersion) validateVersionFormat(version string) (string, error) {
+func (a *apiVersion) validateVersionFormat(version string) error {
 	if !isValidVersionRegex.MatchString(version) {
-		return version, fmt.Errorf("received \"%s\", expected a valid date string formatted as YYYY-MM-DD. %w", version, ErrUnsupportedAPIVersion)
+		return fmt.Errorf("received \"%s\", expected a valid date string formatted as YYYY-MM-DD. %w", version, ErrInvalidAPIVersionFormat)
 	}
 
-	return version, nil
+	return nil
 }
 
 func (a *apiVersion) isVersionSupported(version string) bool {
@@ -60,7 +60,7 @@ func (a *apiVersion) middleware(next http.Handler) http.Handler {
 
 		headerValue := r.Header.Get(ElasticAPIVersionHeader)
 		if headerValue != "" {
-			_, err := a.validateVersionFormat(headerValue)
+			err := a.validateVersionFormat(headerValue)
 			if err != nil {
 				ErrorResp(w, r, err)
 				return
@@ -68,7 +68,7 @@ func (a *apiVersion) middleware(next http.Handler) http.Handler {
 
 			if !a.isVersionSupported(headerValue) {
 				w.Header().Add(ElasticAPIVersionHeader, a.defaultVersion)
-				ErrorResp(w, r, fmt.Errorf("received \"%s\", is not supported. supported versions are: %s %w", headerValue, strings.Join(a.supportedVersions, ", "), ErrInvalidAPIVersionFormat))
+				ErrorResp(w, r, fmt.Errorf("received \"%s\", is not supported. supported versions are: %s %w", headerValue, strings.Join(a.supportedVersions, ", "), ErrUnsupportedAPIVersion))
 				return
 			}
 			w.Header().Add(ElasticAPIVersionHeader, headerValue)

@@ -5,6 +5,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,25 +22,28 @@ func TestAPIVersion_middleware(t *testing.T) {
 		requestAPIVersionHeader    string
 		expectRespStatus           string
 		expectRespAPIVersionHeader string
+		expectErr                  string
 	}{
 		{
-			name:                    "with a misformatted elastic-api-version header",
+			name:                    "with a misformatted Elastic-Api-Version header",
 			requestAPIVersionHeader: "iamnotvalid",
 			expectRespStatus:        "400 Bad Request",
+			expectErr:               "ErrInvalidAPIVersionFormat",
 		},
 		{
-			name:                    "with an invalid elastic-api-version header",
+			name:                    "with an invalid Elastic-Api-Version header",
 			requestAPIVersionHeader: "1990-01-01",
 			expectRespStatus:        "400 Bad Request",
+			expectErr:               "ErrUnsupportedAPIVersion",
 		},
 		{
-			name:                       "with a valid elastic-api-version header",
+			name:                       "with a valid Elastic-Api-Version header",
 			requestAPIVersionHeader:    "2022-02-01",
 			expectRespAPIVersionHeader: "2022-02-01",
 			expectRespStatus:           "200 OK",
 		},
 		{
-			name:                       "without elastic-api-version header",
+			name:                       "without Elastic-Api-Version header",
 			expectRespAPIVersionHeader: "2022-03-01",
 			expectRespStatus:           "200 OK",
 		},
@@ -74,6 +78,15 @@ func TestAPIVersion_middleware(t *testing.T) {
 
 			if tc.expectRespAPIVersionHeader != "" {
 				assert.Equal(t, tc.expectRespAPIVersionHeader, resp.Header().Get(ElasticAPIVersionHeader))
+			}
+
+			if tc.expectErr != "" {
+				errorResp := &Error{}
+				dec := json.NewDecoder(resp.Body)
+				err := dec.Decode(&errorResp)
+
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectErr, errorResp.Error)
 			}
 		})
 	}

@@ -715,7 +715,7 @@ components:
   responses:
     badRequest:
       description: |
-        A 400 response for receiving an invalid User-Agent header or version number (checkin and enroll endpoints).
+        A 400 response for receiving an invalid User-Agent, Elastic-Api-Version header or version number (checkin and enroll endpoints).
         Or any other undefined error encounted by the fleet-server. May be returned by any endpoint except /api/fleet/status.
       content:
         application/json:
@@ -845,7 +845,8 @@ paths:
                       number: 8.6.0
                       build_hash: fd6d862bcbebe841f930e8cdd2fa5107922e66e7
                       build_time: 2022-12-01T01:02:03Z
-
+        "400":
+          $ref: "#/components/responses/badRequest"
         "503":
           description: Unhealthy fleet-server response.
           content:
