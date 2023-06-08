@@ -27,10 +27,15 @@ var SupportedVersions = []string{DefaultVersion}
 var isValidVersionRegex = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
 
 type apiVersion struct {
+	supportedVersions []string
+	defaultVersion    string
 }
 
 func NewAPIVersion() *apiVersion {
-	return &apiVersion{}
+	return &apiVersion{
+		supportedVersions: SupportedVersions,
+		defaultVersion:    DefaultVersion,
+	}
 }
 
 func (a *apiVersion) validateVersionFormat(version string) (string, error) {
@@ -42,7 +47,7 @@ func (a *apiVersion) validateVersionFormat(version string) (string, error) {
 }
 
 func (a *apiVersion) isVersionSupported(version string) bool {
-	for _, vers := range SupportedVersions {
+	for _, vers := range a.supportedVersions {
 		if vers == version {
 			return true
 		}
@@ -62,13 +67,13 @@ func (a *apiVersion) middleware(next http.Handler) http.Handler {
 			}
 
 			if !a.isVersionSupported(headerValue) {
-				w.Header().Add(ElasticAPIVersionHeader, DefaultVersion)
-				ErrorResp(w, r, fmt.Errorf("received \"%s\", is not supported. supported versions are: %s %w", headerValue, strings.Join(SupportedVersions, ", "), ErrInvalidAPIVersionFormat))
+				w.Header().Add(ElasticAPIVersionHeader, a.defaultVersion)
+				ErrorResp(w, r, fmt.Errorf("received \"%s\", is not supported. supported versions are: %s %w", headerValue, strings.Join(a.supportedVersions, ", "), ErrInvalidAPIVersionFormat))
 				return
 			}
 			w.Header().Add(ElasticAPIVersionHeader, headerValue)
 		} else {
-			w.Header().Add(ElasticAPIVersionHeader, DefaultVersion)
+			w.Header().Add(ElasticAPIVersionHeader, a.defaultVersion)
 		}
 
 		next.ServeHTTP(w, r)
