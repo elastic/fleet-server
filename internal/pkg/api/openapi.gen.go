@@ -223,6 +223,7 @@ type EnrollMetadata struct {
 type EnrollRequest struct {
 	// EnrollmentId The enrollment ID of the agent.
 	// To replace an agent on enroll fail.
+	// The existing agent with a matching enrollment_id will be deleted if it never checked in. The new agent will be enrolled with the enrollment_id.
 	EnrollmentId *string `json:"enrollment_id,omitempty"`
 
 	// Metadata Metadata associated with the agent that is enrolling to fleet.

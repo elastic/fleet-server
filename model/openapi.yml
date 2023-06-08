@@ -140,6 +140,7 @@ components:
           description: |
             The enrollment ID of the agent.
             To replace an agent on enroll fail. 
+            The existing agent with a matching enrollment_id will be deleted if it never checked in. The new agent will be enrolled with the enrollment_id.
         shared_id:
           deprecated: true
           type: string
