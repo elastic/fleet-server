@@ -160,10 +160,11 @@ func (et *EnrollerT) _enroll(
 	agentID := u.String()
 	// only delete existing agent if it never checked in
 	if agent.Id != "" && agent.LastCheckin == "" {
-		zlog.Info().
+		zlog.Debug().
 			Str("EnrollmentId", enrollmentID).
 			Str("AgentId", agent.Id).
-			Msg("Remove existing agent with the same enrollment_id")
+			Str("APIKeyID", agent.AccessAPIKeyID).
+			Msg("Invalidate old api key and remove existing agent with the same enrollment_id")
 		// invalidate previous api key
 		err := invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
 		if err != nil {
