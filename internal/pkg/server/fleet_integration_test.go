@@ -554,13 +554,15 @@ func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tser
 	res, err := cli.Do(req)
 	require.NoError(t, err)
 
-	require.Equal(t, http.StatusOK, res.StatusCode)
-
 	p, _ := io.ReadAll(res.Body)
 	res.Body.Close()
 	var obj map[string]interface{}
 	err = json.Unmarshal(p, &obj)
 	require.NoError(t, err)
+
+	t.Log(obj)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
 
 	item := obj["item"]
 	mm, ok := item.(map[string]interface{})
@@ -587,10 +589,10 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	srv, err := startTestServer(t, ctx)
 	require.NoError(t, err)
 
-	t.Log("Enroll first agent with the same enrollment_id")
+	t.Log("Enroll the first agent with enrollment_id")
 	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
-	t.Log("Enroll an agent with the same enrollment_id")
+	t.Log("Enroll the second agent with the same enrollment_id")
 	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	// cleanup
