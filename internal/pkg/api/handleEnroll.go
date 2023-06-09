@@ -167,7 +167,7 @@ func (et *EnrollerT) _enroll(
 		// invalidate previous api key
 		err := invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
 		if err != nil {
-			zlog.Error().
+			zlog.Error().Err(err).
 				Str("EnrollmentId", enrollmentID).
 				Str("AgentId", agent.Id).
 				Str("APIKeyID", agent.AccessAPIKeyID).
@@ -177,7 +177,7 @@ func (et *EnrollerT) _enroll(
 		// delete existing agent to recreate with new api key
 		err = deleteAgent(ctx, zlog, et.bulker, agent.Id)
 		if err != nil {
-			zlog.Error().
+			zlog.Error().Err(err).
 				Str("EnrollmentId", enrollmentID).
 				Str("AgentId", agent.Id).
 				Msg("Error when trying to delete old agent with enrollment id")
