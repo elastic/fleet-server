@@ -1,0 +1,14 @@
+version: 8.8.1
+entries:
+    - kind: enhancement
+      summary: Add Fleet configuration file to Elastic Agent diagnostics bundle
+      description: Gather Fleet Server's config when Elastic Agent requests diagnostics information.
+      component: ""
+      pr:
+        - "2632"
+      issue:
+        - "2623"
+      timestamp: 1685037431
+      file:
+        name: 1685037431-Add-config-diagnostics-hook.yaml
+        checksum: 964a562b0ff000d1c050cf6d53d2b784f0cc9b60
