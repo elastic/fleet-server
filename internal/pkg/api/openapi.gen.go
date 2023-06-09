@@ -851,6 +851,9 @@ type ServerInterface interface {
 
 	// (GET /api/fleet/artifacts/{id}/{sha2})
 	Artifact(w http.ResponseWriter, r *http.Request, id string, sha2 string, params ArtifactParams)
+	// retrieve stored file for integration
+	// (GET /api/fleet/file/{id})
+	GetFile(w http.ResponseWriter, r *http.Request, id string)
 	// Initiate a file upload process
 	// (POST /api/fleet/uploads)
 	UploadBegin(w http.ResponseWriter, r *http.Request, params UploadBeginParams)
@@ -1138,6 +1141,34 @@ func (siw *ServerInterfaceWrapper) Artifact(w http.ResponseWriter, r *http.Reque
 
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Artifact(w, r, id, sha2, params)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetFile operation middleware
+func (siw *ServerInterfaceWrapper) GetFile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "id", runtime.ParamLocationPath, chi.URLParam(r, "id"), &id)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, AgentApiKeyScopes, []string{})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFile(w, r, id)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1493,6 +1524,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/fleet/artifacts/{id}/{sha2}", wrapper.Artifact)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/fleet/file/{id}", wrapper.GetFile)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/fleet/uploads", wrapper.UploadBegin)
