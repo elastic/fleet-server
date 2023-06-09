@@ -142,6 +142,9 @@ func (et *EnrollerT) _enroll(
 			zlog.Debug().Err(err).
 				Str("EnrollmentId", enrollmentID).
 				Msg("Agent with EnrollmentId not found")
+			if !errors.Is(err, dl.ErrNotFound) {
+				return nil, err
+			}
 		}
 	}
 
@@ -163,19 +166,21 @@ func (et *EnrollerT) _enroll(
 		// invalidate previous api key
 		err := invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
 		if err != nil {
-			zlog.Debug().
+			zlog.Error().
 				Str("EnrollmentId", enrollmentID).
 				Str("AgentId", agent.Id).
 				Str("APIKeyID", agent.AccessAPIKeyID).
 				Msg("Error when trying to invalidate API key of old agent with enrollment id")
+			return nil, err
 		}
 		// delete existing agent to recreate with new api key
 		err = deleteAgent(ctx, zlog, et.bulker, agent.Id)
 		if err != nil {
-			zlog.Debug().
+			zlog.Error().
 				Str("EnrollmentId", enrollmentID).
 				Str("AgentId", agent.Id).
 				Msg("Error when trying to delete old agent with enrollment id")
+			return nil, err
 		}
 	}
 
