@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/str"
@@ -142,7 +143,7 @@ func (et *EnrollerT) _enroll(
 			zlog.Debug().Err(err).
 				Str("EnrollmentId", enrollmentID).
 				Msg("Agent with EnrollmentId not found")
-			if !errors.Is(err, dl.ErrNotFound) {
+			if !errors.Is(err, dl.ErrNotFound) && !strings.Contains(err.Error(), "no such index") {
 				return nil, err
 			}
 		}
