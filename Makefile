@@ -99,7 +99,7 @@ generate: ## - Generate schema models
 	@printf "${CMD_COLOR_ON} Installing module for go generate\n${CMD_COLOR_OFF}"
 	env GOBIN=${GOBIN} go install github.com/elastic/go-json-schema-generate/cmd/schema-generate@ec19b88f6b5ef7825a928df8274a99337b855d1f
 	@printf "${CMD_COLOR_ON} Installing module for oapi-codegen\n${CMD_COLOR_OFF}"
-	env GOBIN=${GOBIN} go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4
+	env GOBIN=${GOBIN} go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.13.0
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
 	env PATH="${GOBIN}:${PATH}" go generate ./...
 
