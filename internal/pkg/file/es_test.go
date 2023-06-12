@@ -50,7 +50,7 @@ func TestChunkInfoResultsParseCorrectly(t *testing.T) {
 		},
 	}, nil)
 
-	chunks, err := GetChunkInfos(context.Background(), fakeBulk, "", baseID)
+	chunks, err := GetChunkInfos(context.Background(), fakeBulk, "", baseID, GetChunkInfoOpt{IncludeSize: true})
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 2)
 

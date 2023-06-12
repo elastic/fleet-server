@@ -98,6 +98,21 @@ steps:
       - step: "tests"
         allow_failure: false
 
+  - label: ":argo: Update image tag for Fleet Server"
+    trigger: serverless-gitops-update-stack-image-tag
+    async: true
+    branches: main
+    build:
+      env:
+        IMAGE_TAG: "$BUILDKITE_COMMIT"
+        SERVICE: fleet-controller
+        NAMESPACE: observability-ci
+        IMAGE_NAME: fleet-server
+        COMMIT_MESSAGE: "gitops: update fleet-server tag to elastic/fleet-server@$BUILDKITE_COMMIT"
+    depends_on:
+      - step: "publish"
+        allow_failure: false
+
   - label: ":gcloud: Release test"
     key: "release-test"
     command: ".buildkite/scripts/release_test.sh"

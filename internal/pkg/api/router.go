@@ -45,6 +45,7 @@ type limiter struct {
 	uploadBegin    *limit.Limiter
 	uploadChunk    *limit.Limiter
 	uploadComplete *limit.Limiter
+	deliverFile    *limit.Limiter
 }
 
 func Limiter(cfg *config.ServerLimits) *limiter {
@@ -57,6 +58,7 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 		uploadBegin:    limit.NewLimiter(&cfg.UploadStartLimit),
 		uploadChunk:    limit.NewLimiter(&cfg.UploadChunkLimit),
 		uploadComplete: limit.NewLimiter(&cfg.UploadEndLimit),
+		deliverFile:    limit.NewLimiter(&cfg.DeliverFileLimit),
 	}
 }
 
@@ -79,6 +81,8 @@ func pathToOperation(path string) string {
 				return "enroll"
 			} else if pp[2] == "uploads" {
 				return "uploadComplete"
+			} else if pp[2] == "file" {
+				return "deliverFile"
 			}
 		} else if len(pp) == 5 {
 			if pp[2] == "agents" {
@@ -112,6 +116,8 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 			l.uploadComplete.Wrap("uploadComplete", &cntUploadEnd, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "uploadChunk":
 			l.uploadChunk.Wrap("uploadChunk", &cntUploadChunk, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+		case "deliverFile":
+			l.deliverFile.Wrap("deliverFile", &cntFileDeliv, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "status":
 			l.status.Wrap("status", &cntStatus, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		default:

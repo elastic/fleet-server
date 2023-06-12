@@ -15,6 +15,8 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file/delivery"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -383,6 +385,25 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				http.StatusBadRequest,
 				"ErrFieldRequired",
 				"",
+				zerolog.InfoLevel,
+			},
+		},
+		// file
+		{
+			delivery.ErrNoFile,
+			HTTPErrResp{
+				http.StatusNotFound,
+				"ErrNoFile",
+				"file not found",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			file.ErrInvalidID,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrInvalidFileID",
+				"ErrInvalidID",
 				zerolog.InfoLevel,
 			},
 		},
