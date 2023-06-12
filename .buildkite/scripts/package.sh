@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
+VERSION=$(awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
 WORKSPACE="$(pwd)"
 PATH="${PATH}:${WORKSPACE}/bin"
 HOME="${WORKSPACE}"
