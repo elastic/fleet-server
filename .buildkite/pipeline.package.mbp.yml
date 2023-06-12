@@ -1,12 +1,13 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 name: "fleet server package mbp"
 steps:
-  - label: ":pipeline: test step"
-    command: echo "test-pipeline"
-
-  - group: "test group"
-    steps:
-      - label: "step1 of the group"
-        command: echo "step1 of the group"
-
-      - label: "step2 of the group"
-        command: echo "step2 of the group"
+  - label: "Package"
+    command: ".buildkite/scripts/package.sh"
+    matrix:
+      setup:
+        platform:
+        - "ubuntu-20 && immutable"
+        - "arm"
+        type:
+        - "snapshot"
+        - "staging"
