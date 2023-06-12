@@ -42,6 +42,7 @@ var (
 	cntUploadStart routeStats
 	cntUploadChunk routeStats
 	cntUploadEnd   routeStats
+	cntFileDeliv   routeStats
 	cntArtifacts   artifactStats
 
 	infoReg sync.Once
@@ -71,6 +72,8 @@ func init() {
 	cntUploadStart.Register(routesRegistry.newRegistry("uploadStart"))
 	cntUploadChunk.Register(routesRegistry.newRegistry("uploadChunk"))
 	cntUploadEnd.Register(routesRegistry.newRegistry("uploadEnd"))
+	cntFileDeliv.Register(routesRegistry.newRegistry("deliverFile"))
+
 }
 
 // metricsRegistry wraps libbeat and prometheus registries

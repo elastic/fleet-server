@@ -111,6 +111,9 @@ type ClientInterface interface {
 	// Artifact request
 	Artifact(ctx context.Context, id string, sha2 string, params *ArtifactParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetFile request
+	GetFile(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UploadBegin request with any body
 	UploadBeginWithBody(ctx context.Context, params *UploadBeginParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -202,6 +205,18 @@ func (c *Client) AgentCheckin(ctx context.Context, id string, params *AgentCheck
 
 func (c *Client) Artifact(ctx context.Context, id string, sha2 string, params *ArtifactParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewArtifactRequest(c.Server, id, sha2, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetFile(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFileRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -576,6 +591,40 @@ func NewArtifactRequest(server string, id string, sha2 string, params *ArtifactP
 	return req, nil
 }
 
+// NewGetFileRequest generates requests for GetFile
+func NewGetFileRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/fleet/file/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewUploadBeginRequest calls the generic UploadBegin builder with application/json body
 func NewUploadBeginRequest(server string, params *UploadBeginParams, body UploadBeginJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -891,6 +940,9 @@ type ClientWithResponsesInterface interface {
 	// Artifact request
 	ArtifactWithResponse(ctx context.Context, id string, sha2 string, params *ArtifactParams, reqEditors ...RequestEditorFn) (*ArtifactResponse, error)
 
+	// GetFile request
+	GetFileWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetFileResponse, error)
+
 	// UploadBegin request with any body
 	UploadBeginWithBodyWithResponse(ctx context.Context, params *UploadBeginParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadBeginResponse, error)
 
@@ -1013,6 +1065,32 @@ func (r ArtifactResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ArtifactResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+	JSON503      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFileResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1183,6 +1261,15 @@ func (c *ClientWithResponses) ArtifactWithResponse(ctx context.Context, id strin
 		return nil, err
 	}
 	return ParseArtifactResponse(rsp)
+}
+
+// GetFileWithResponse request returning *GetFileResponse
+func (c *ClientWithResponses) GetFileWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetFileResponse, error) {
+	rsp, err := c.GetFile(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFileResponse(rsp)
 }
 
 // UploadBeginWithBodyWithResponse request with arbitrary body returning *UploadBeginResponse
@@ -1482,6 +1569,60 @@ func ParseArtifactResponse(rsp *http.Response) (*ArtifactResponse, error) {
 			return nil, err
 		}
 		response.JSON428 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetFileResponse parses an HTTP response from a GetFileWithResponse call
+func ParseGetFileResponse(rsp *http.Response) (*GetFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
