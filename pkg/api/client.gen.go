@@ -356,6 +356,17 @@ func NewAgentEnrollRequestWithBody(server string, params *AgentEnrollParams, con
 		req.Header.Set("X-Request-ID", headerParam1)
 	}
 
+	if params.ElasticApiVersion != nil {
+		var headerParam2 string
+
+		headerParam2, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("elastic-api-version", headerParam2)
+	}
+
 	return req, nil
 }
 
@@ -412,6 +423,17 @@ func NewAgentAcksRequestWithBody(server string, id string, params *AgentAcksPara
 		}
 
 		req.Header.Set("X-Request-ID", headerParam0)
+	}
+
+	if params.ElasticApiVersion != nil {
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("elastic-api-version", headerParam1)
 	}
 
 	return req, nil
@@ -492,6 +514,17 @@ func NewAgentCheckinRequestWithBody(server string, id string, params *AgentCheck
 		req.Header.Set("X-Request-ID", headerParam2)
 	}
 
+	if params.ElasticApiVersion != nil {
+		var headerParam3 string
+
+		headerParam3, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("elastic-api-version", headerParam3)
+	}
+
 	return req, nil
 }
 
@@ -542,6 +575,17 @@ func NewArtifactRequest(server string, id string, sha2 string, params *ArtifactP
 		}
 
 		req.Header.Set("X-Request-ID", headerParam0)
+	}
+
+	if params.ElasticApiVersion != nil {
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("elastic-api-version", headerParam1)
 	}
 
 	return req, nil
@@ -629,6 +673,17 @@ func NewUploadBeginRequestWithBody(server string, params *UploadBeginParams, con
 		req.Header.Set("X-Request-ID", headerParam0)
 	}
 
+	if params.ElasticApiVersion != nil {
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("elastic-api-version", headerParam1)
+	}
+
 	return req, nil
 }
 
@@ -685,6 +740,17 @@ func NewUploadCompleteRequestWithBody(server string, id string, params *UploadCo
 		}
 
 		req.Header.Set("X-Request-ID", headerParam0)
+	}
+
+	if params.ElasticApiVersion != nil {
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("elastic-api-version", headerParam1)
 	}
 
 	return req, nil
@@ -750,6 +816,17 @@ func NewUploadChunkRequestWithBody(server string, id string, chunkNum int, param
 		req.Header.Set("X-Request-ID", headerParam1)
 	}
 
+	if params.ElasticApiVersion != nil {
+		var headerParam2 string
+
+		headerParam2, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("elastic-api-version", headerParam2)
+	}
+
 	return req, nil
 }
 
@@ -786,6 +863,17 @@ func NewStatusRequest(server string, params *StatusParams) (*http.Request, error
 		}
 
 		req.Header.Set("X-Request-ID", headerParam0)
+	}
+
+	if params.ElasticApiVersion != nil {
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("elastic-api-version", headerParam1)
 	}
 
 	return req, nil
@@ -1095,6 +1183,7 @@ type StatusResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *StatusAPIResponse
+	JSON400      *Error
 	JSON503      *StatusAPIResponse
 }
 
@@ -1752,6 +1841,13 @@ func ParseStatusResponse(rsp *http.Response) (*StatusResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
 		var dest StatusAPIResponse

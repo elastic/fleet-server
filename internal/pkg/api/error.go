@@ -388,6 +388,25 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		// Version
+		{
+			ErrInvalidAPIVersionFormat,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrInvalidAPIVersionFormat",
+				"",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			ErrUnsupportedAPIVersion,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrUnsupportedAPIVersion",
+				"",
+				zerolog.InfoLevel,
+			},
+		},
 		// file
 		{
 			delivery.ErrNoFile,
