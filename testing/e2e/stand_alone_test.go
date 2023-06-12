@@ -179,7 +179,7 @@ func (suite *StandAloneSuite) TestClientAPI() {
 			}
 		}
 		// Run subtests here
-		suite.Run("test status unauthenicated", func() {
+		suite.Run(fmt.Sprintf("version %s test status unauthenicated", version), func() {
 			ctx, cancel := context.WithCancel(bCtx)
 			defer cancel()
 			tester := createTester(ctx)
@@ -193,8 +193,8 @@ func (suite *StandAloneSuite) TestClientAPI() {
 			tester.TestStatus(enrollmentKey)
 		})
 
-		suite.Run("test enroll checkin ack", func() {
-			ctx, cancel := context.WithTimeout(ctx, 4*time.Minute)
+		suite.Run(fmt.Sprintf("version %s test enroll checkin ack", version), func() {
+			ctx, cancel := context.WithTimeout(bCtx, 4*time.Minute)
 			defer cancel()
 			tester := createTester(ctx)
 
@@ -218,7 +218,7 @@ func (suite *StandAloneSuite) TestClientAPI() {
 			suite.AgentIsOnline(ctx, agentID)
 		})
 
-		suite.Run("test file upload", func() {
+		suite.Run(fmt.Sprintf("version %s test file upload", version), func() {
 			ctx, cancel := context.WithCancel(bCtx)
 			defer cancel()
 			tester := createTester(ctx)
@@ -228,7 +228,7 @@ func (suite *StandAloneSuite) TestClientAPI() {
 			tester.TestFullFileUpload(agentKey, agentID, actionID, 8192) // 8KiB file
 		})
 
-		suite.Run("test artifact", func() {
+		suite.Run(fmt.Sprintf("version %s test artifact", version), func() {
 			ctx, cancel := context.WithTimeout(bCtx, 3*time.Minute)
 			defer cancel()
 			tester := createTester(ctx)
