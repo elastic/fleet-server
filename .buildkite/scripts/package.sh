@@ -11,13 +11,13 @@ HOME="${WORKSPACE}"
 PLATFORM_TYPE=$(uname -m)
 PLATFORMS=""
 PACKAGES=""
-if [[${PLATFORM_TYPE} == "arm" || ${PLATFORM_TYPE} == "aarch64"]]; then
+if [[ ${PLATFORM_TYPE} == "arm" || ${PLATFORM_TYPE} == "aarch64" ]]; then
     PLATFORMS="linux/arm64"
     PACKAGES="docker"
 fi
 
-echo "Platform: $1"
-echo "Type: $2"
+echo "Platform: '$1'"
+echo "Type: '$2'"
 
 echo ${VERSION}
 echo ${PLATFORM_TYPE}
