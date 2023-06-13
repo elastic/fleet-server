@@ -21,3 +21,4 @@ echo "Type: '$2'"
 
 echo ${VERSION}
 echo ${PLATFORM_TYPE}
+echo $(uname)
