@@ -21,4 +21,3 @@ echo "Type: $2"
 
 echo ${VERSION}
 echo ${PLATFORM_TYPE}
-echo " {{matrix.platform}} {{matrix.type}}"
