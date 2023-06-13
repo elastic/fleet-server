@@ -6,7 +6,6 @@ package es
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -92,28 +91,4 @@ type InfoResponse struct {
 	Version     struct {
 		Number string `json:"number"`
 	} `json:"version"`
-}
-
-func info(_ context.Context, es *elasticsearch.Client) (*InfoResponse, error) {
-	// Validate the connection
-	res, err := es.Info()
-
-	if err != nil {
-		return nil, err
-	}
-
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return nil, fmt.Errorf("info fail %v", res)
-	}
-
-	var resp InfoResponse
-
-	d := json.NewDecoder(res.Body)
-	if err = d.Decode(&resp); err != nil {
-		return nil, err
-	}
-
-	return &resp, err
 }
