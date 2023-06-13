@@ -8,6 +8,14 @@ PATH="${PATH}:${WORKSPACE}/bin"
 HOME="${WORKSPACE}"
 
 #setEnvVar('IS_BRANCH_AVAILABLE', isBranchUnifiedReleaseAvailable(env.BRANCH_NAME))
+PLATFORM_TYPE=$(uname -m)
+PLATFORMS=""
+PACKAGES=""
+if [[${PLATFORM_TYPE} == "arm" || ${PLATFORM_TYPE} == "aarch64"]] ; then
+    PLATFORMS="linux/arm64"
+    PACKAGES="docker"
+fi
 
-echo {{matrix.platform}} {{matrix.type}}
-echo "${WORKSPACE}, ${PATH}, ${HOME}"
+echo ${VERSION}
+echo ${PLATFORM_TYPE}
+echo "${matrix.platform} ${matrix.type}"
