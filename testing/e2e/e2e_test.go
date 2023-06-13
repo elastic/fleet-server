@@ -13,6 +13,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -21,7 +22,11 @@ import (
 	"testing"
 	"time"
 
+	toxiproxy "github.com/Shopify/toxiproxy/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/stretchr/testify/suite"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 var longFlag bool
@@ -160,6 +165,32 @@ func (suite *BaseE2ETestSuite) IsFleetServerPortFree() bool {
 // FleetServerStatusOK will poll fleet-server's status endpoint every second and return when it responds with a 200 status code
 // if the passed context terminates before a 200 is returned the current test will be marked as failed.
 func (suite *BaseE2ETestSuite) FleetServerStatusOK(ctx context.Context, url string) {
+	suite.FleetServerStatusCondition(ctx, url, func(resp *http.Response) bool {
+		return resp.StatusCode == http.StatusOK
+	})
+}
+
+// FleetServerStatusIs will poll fleet-server's status endpoint every second and return when it returns the expected state.
+// If the passed context terminates before a 200 is returned the current test will be marked as failed.
+func (suite *BaseE2ETestSuite) FleetServerStatusIs(ctx context.Context, url string, state client.UnitState) {
+	suite.FleetServerStatusCondition(ctx, url, func(resp *http.Response) bool {
+		var status struct {
+			Status string `json:"status"`
+		}
+		d, err := io.ReadAll(resp.Body)
+		suite.Require().NoError(err)
+
+		err = json.Unmarshal(d, &status)
+		suite.Require().NoError(err)
+
+		return status.Status == state.String()
+	})
+}
+
+// FleetServerStatusCondition will poll fleet-server's status till the response satisfies the given
+// condition.
+// If the passed context terminates before, the current test will be marked as failed.
+func (suite *BaseE2ETestSuite) FleetServerStatusCondition(ctx context.Context, url string, condition func(resp *http.Response) bool) {
 	timer := time.NewTimer(time.Second)
 	for {
 		select {
@@ -176,12 +207,14 @@ func (suite *BaseE2ETestSuite) FleetServerStatusOK(ctx context.Context, url stri
 				timer.Reset(time.Second)
 				continue
 			}
-			resp.Body.Close()
 
 			// on success
-			if resp.StatusCode == http.StatusOK {
+			if condition(resp) {
+				resp.Body.Close()
 				return
 			}
+			resp.Body.Close()
+
 			// fail, try after a wait
 			timer.Reset(time.Second)
 		}
@@ -468,4 +501,34 @@ func (suite *BaseE2ETestSuite) FleetHasArtifacts(ctx context.Context) []Artifact
 			timer.Reset(time.Second)
 		}
 	}
+}
+
+func (suite *BaseE2ETestSuite) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
+	req := testcontainers.ContainerRequest{
+		Image:        "ghcr.io/shopify/toxiproxy:2.5.0",
+		ExposedPorts: []string{"8474/tcp"},
+		WaitingFor:   wait.ForHTTP("/version").WithPort("8474/tcp"),
+		NetworkMode:  "host",
+	}
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	suite.Require().NoError(err)
+
+	suite.T().Cleanup(func() {
+		err := container.Terminate(context.Background())
+		if err != nil {
+			suite.T().Log("could not terminate toxiproxy container")
+		}
+	})
+
+	mappedPort, err := container.MappedPort(ctx, "8474")
+	suite.Require().NoError(err)
+
+	hostIP, err := container.Host(ctx)
+	suite.Require().NoError(err)
+
+	endpoint := fmt.Sprintf("%s:%s", hostIP, mappedPort.Port())
+	return toxiproxy.NewClient(endpoint)
 }

@@ -18,9 +18,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/version"
-
+	toxiproxy "github.com/Shopify/toxiproxy/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/elastic/fleet-server/v7/version"
 )
 
 type StandAloneSuite struct {
@@ -78,6 +80,53 @@ func (suite *StandAloneSuite) TestHTTP() {
 	suite.Require().NoError(err)
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+	cancel()
+	cmd.Wait()
+}
+
+// TestWithElasticsearchConnectionFailures checks the behaviour of stand alone Fleet Server
+// when Elasticsearch is not reachable.
+func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+
+	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.esHosts)
+	suite.Require().NoError(err)
+
+	// Create a config file from a template in the test temp dir
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-http.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"Hosts":        "http://" + proxy.Listen,
+		"ServiceToken": suite.serviceToken,
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath}
+	err = cmd.Start()
+	suite.Require().NoError(err)
+
+	// Wait to check that it is healthy.
+	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
+
+	// Provoke timeouts and wait for the healthcheck to fail.
+	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 1.0, toxiproxy.Attributes{})
+	suite.Require().NoError(err)
+	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateDegraded)
+
+	// Recover the network and wait for the healthcheck to be healthy again.
+	err = proxy.RemoveToxic("force_timeout")
+	suite.Require().NoError(err)
+	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
+
 	cancel()
 	cmd.Wait()
 }

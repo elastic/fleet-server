@@ -5,6 +5,8 @@ go 1.20
 replace github.com/elastic/fleet-server/v7 => ../
 
 require (
+	github.com/Shopify/toxiproxy v2.1.4+incompatible
+	github.com/elastic/elastic-agent-client/v7 v7.1.2
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.8.3
 	github.com/testcontainers/testcontainers-go v0.20.1
