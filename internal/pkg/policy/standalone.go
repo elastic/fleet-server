@@ -32,6 +32,7 @@ type standAloneSelfMonitorT struct {
 	policyF       policyFetcher
 	policiesIndex string
 	checkTime     time.Duration
+	checkTimeout  time.Duration
 }
 
 // NewStandAloneSelfMonitor creates the self policy monitor for an stand-alone Fleet Server.
@@ -46,6 +47,7 @@ func NewStandAloneSelfMonitor(bulker bulk.Bulk, reporter state.Reporter) *standA
 		policyF:       dl.QueryLatestPolicies,
 		policiesIndex: dl.FleetPolicies,
 		checkTime:     DefaultCheckTime,
+		checkTimeout:  DefaultCheckTimeout,
 	}
 }
 
@@ -82,6 +84,9 @@ func (m *standAloneSelfMonitorT) State() client.UnitState {
 }
 
 func (m *standAloneSelfMonitorT) check(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, m.checkTimeout)
+	defer cancel()
+
 	_, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if errors.Is(err, es.ErrIndexNotFound) {
 		m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
