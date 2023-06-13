@@ -517,9 +517,10 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ut := api.NewUploadT(&cfg.Inputs[0].Server, bulker, monCli, f.cache) // uses no-retry client for bufferless chunk upload
+	ft := api.NewFileDeliveryT(&cfg.Inputs[0].Server, bulker, monCli, f.cache)
 
 	for _, endpoint := range (&cfg.Inputs[0].Server).BindEndpoints() {
-		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server, ct, et, at, ack, st, sm, f.bi, ut, bulker, tracer)
+		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server, ct, et, at, ack, st, sm, f.bi, ut, ft, bulker, tracer)
 		g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 			return apiServer.Run(ctx)
 		}))

@@ -83,7 +83,7 @@ components:
             - stopped
             - unknown
         version:
-          $ref: '#/components/schemas/statusResponseVersion'
+          $ref: "#/components/schemas/statusResponseVersion"
     enrollMetadata:
       description: Metadata associated with the agent that is enrolling to fleet.
       type: object
@@ -150,7 +150,7 @@ components:
 
             Never implemented.   
         metadata:
-          $ref: '#/components/schemas/enrollMetadata'
+          $ref: "#/components/schemas/enrollMetadata"
     enrollResponseItem:
       description: Response to a successful enrollment of an agent into fleet.
       type: object
@@ -251,7 +251,7 @@ components:
           description: The action result. Will have the value "created".
           type: string
         item:
-          $ref: '#/components/schemas/enrollResponseItem'
+          $ref: "#/components/schemas/enrollResponseItem"
     checkinRequest:
       type: object
       required:
@@ -306,7 +306,7 @@ components:
       x-oapi-codegen-extra-tags: # oapi-codegen tags
         yaml: "signed"
       required:
-        - data      # NOTE: work around to avoid a pointer
+        - data # NOTE: work around to avoid a pointer
         - signature # NOTE: work around to avoid a pointer
       properties:
         data:
@@ -402,7 +402,7 @@ components:
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "timeout"
         signed:
-          $ref: '#/components/schemas/actionSignature'
+          $ref: "#/components/schemas/actionSignature"
 
     checkinResponse:
       type: object
@@ -419,7 +419,7 @@ components:
           description: A list of actions that the agent must execute.
           type: array
           items:
-            $ref: '#/components/schemas/action'
+            $ref: "#/components/schemas/action"
     event:
       description: The ack for a specific action that the elastic-agent has executed.
       type: object
@@ -552,7 +552,7 @@ components:
         events:
           type: array
           items:
-            $ref: '#/components/schemas/event'
+            $ref: "#/components/schemas/event"
     ackResponseItem:
       description: The results of processing an acknowledgement event.
       type: object
@@ -570,7 +570,7 @@ components:
       type: object
       required:
         - action
-        - items  # NOTE: work around as we don't want a pointer here
+        - items # NOTE: work around as we don't want a pointer here
         - errors # NOTE: work around as we don't want a pointer here
       properties:
         action:
@@ -587,7 +587,7 @@ components:
           type: array
           nullable: false
           items:
-            $ref: '#/components/schemas/ackResponseItem'
+            $ref: "#/components/schemas/ackResponseItem"
           x-oapi-codegen-extra-tags:
             json: "items,omitempty"
     uploadBeginRequest:
@@ -688,6 +688,12 @@ components:
       in: header
       schema:
         type: string
+    apiVersion:
+      name: elastic-api-version
+      description: The API version to use, format should be "YYYY-MM-DD"
+      in: header
+      schema:
+        type: string
     userAgent:
       name: User-Agent
       description: |
@@ -714,12 +720,12 @@ components:
   responses:
     badRequest:
       description: |
-        A 400 response for receiving an invalid User-Agent header or version number (checkin and enroll endpoints).
+        A 400 response for receiving an invalid User-Agent, Elastic-Api-Version header or version number (checkin and enroll endpoints).
         Or any other undefined error encounted by the fleet-server. May be returned by any endpoint except /api/fleet/status.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/error'
+            $ref: "#/components/schemas/error"
           examples:
             badRequest:
               description: Generic bad request response.
@@ -732,7 +738,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/error'
+            $ref: "#/components/schemas/error"
           examples:
             internalServerError:
               description: Generic internal server error response.
@@ -744,7 +750,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/error'
+            $ref: "#/components/schemas/error"
           examples:
             unauthorized:
               description: The ApiKey is not enabled
@@ -757,7 +763,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/error'
+            $ref: "#/components/schemas/error"
           examples:
             agentNotFound:
               description: The agent is not found.
@@ -770,7 +776,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/error'
+            $ref: "#/components/schemas/error"
           examples:
             requestTimeout:
               description: Deadline exceeded.
@@ -783,7 +789,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/error'
+            $ref: "#/components/schemas/error"
           examples:
             rateLimit:
               description: Too many requests - rate limit reached.
@@ -799,7 +805,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/error'
+            $ref: "#/components/schemas/error"
           examples:
             unavailable:
               description: Service unavailable
@@ -813,7 +819,8 @@ paths:
     get:
       operationId: status
       parameters:
-        - $ref: '#/components/parameters/requestId'
+        - $ref: "#/components/parameters/requestId"
+        - $ref: "#/components/parameters/apiVersion"
       security:
         - {}
         - apiKey: []
@@ -822,12 +829,12 @@ paths:
         The status code will either be 200 if healthy, or 503 if not.
         Authentication for this endpoint is optional, if not provided a shorter response body is returned.
       responses:
-        '200':
+        "200":
           description: Healthy fleet-server response.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/statusResponse'
+                $ref: "#/components/schemas/statusResponse"
               examples:
                 unauthenticated:
                   description: The short response for unauthenticated requests.
@@ -843,14 +850,15 @@ paths:
                       number: 8.6.0
                       build_hash: fd6d862bcbebe841f930e8cdd2fa5107922e66e7
                       build_time: 2022-12-01T01:02:03Z
-
-        '503':
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "503":
           description: Unhealthy fleet-server response.
           content:
             text/plain: {}
             application/json:
               schema:
-                $ref: '#/components/schemas/statusResponse'
+                $ref: "#/components/schemas/statusResponse"
               examples:
                 unauthenticated:
                   description: The short response for unauthenticated requests.
@@ -870,8 +878,9 @@ paths:
     post:
       operationId: agentEnroll
       parameters:
-        - $ref: '#/components/parameters/userAgent'
-        - $ref: '#/components/parameters/requestId'
+        - $ref: "#/components/parameters/userAgent"
+        - $ref: "#/components/parameters/requestId"
+        - $ref: "#/components/parameters/apiVersion"
       security:
         - apiKey: []
       description: Enroll a new agent to fleet-server. The agent is enrolled in the policy encoded in the apiKey used.
@@ -879,7 +888,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/enrollRequest'
+              $ref: "#/components/schemas/enrollRequest"
             examples:
               request:
                 description: A request to enroll a new agent.
@@ -898,12 +907,12 @@ paths:
                       - us-west
                       - test
       responses:
-        '200':
+        "200":
           description: Agent enrolled successfully.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/enrollResponse'
+                $ref: "#/components/schemas/enrollResponse"
               examples:
                 success:
                   description: Agent enrolled successfully.
@@ -930,18 +939,18 @@ paths:
                       tags:
                         - us-west
                         - test
-        '400':
-          $ref: '#/components/responses/badRequest'
-        '401':
-          $ref: '#/components/responses/keyNotEnabled'
-        '404':
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "401":
+          $ref: "#/components/responses/keyNotEnabled"
+        "404":
           description: Bad request path, expected id to be enroll.
-        '408':
-          $ref: '#/components/responses/deadline'
-        '500':
-          $ref: '#/components/responses/internalServerError'
-        '503':
-          $ref: '#/components/responses/unavailable'
+        "408":
+          $ref: "#/components/responses/deadline"
+        "500":
+          $ref: "#/components/responses/internalServerError"
+        "503":
+          $ref: "#/components/responses/unavailable"
   /api/fleet/agents/{id}/checkin:
     post:
       operationId: agentCheckin
@@ -968,15 +977,16 @@ paths:
             The elastic-agent does not use the accept-encoding header.
           schema:
             type: string
-        - $ref: '#/components/parameters/userAgent'
-        - $ref: '#/components/parameters/requestId'
+        - $ref: "#/components/parameters/userAgent"
+        - $ref: "#/components/parameters/requestId"
+        - $ref: "#/components/parameters/apiVersion"
       security:
         - agentApiKey: []
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/checkinRequest'
+              $ref: "#/components/schemas/checkinRequest"
             examples:
               request:
                 description: A checkin request from an elastic-agent.
@@ -985,7 +995,7 @@ paths:
                   message: ""
                   ack_token: previous-token
       responses:
-        '200':
+        "200":
           description: Agent checkin successful. May include actions.
           headers:
             Content-Encoding:
@@ -1000,7 +1010,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/checkinResponse'
+                $ref: "#/components/schemas/checkinResponse"
               examples:
                 response:
                   description: Agent successfully checked in.
@@ -1014,18 +1024,18 @@ paths:
                           log_level: debug
                         id: test-action
                         type: SETTINGS
-        '400':
-          $ref: '#/components/responses/badRequest'
-        '401':
-          $ref: '#/components/responses/keyNotEnabled'
-        '404':
-          $ref: '#/components/responses/agentNotFound'
-        '408':
-          $ref: '#/components/responses/deadline'
-        '500':
-          $ref: '#/components/responses/internalServerError'
-        '503':
-          $ref: '#/components/responses/unavailable'
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "401":
+          $ref: "#/components/responses/keyNotEnabled"
+        "404":
+          $ref: "#/components/responses/agentNotFound"
+        "408":
+          $ref: "#/components/responses/deadline"
+        "500":
+          $ref: "#/components/responses/internalServerError"
+        "503":
+          $ref: "#/components/responses/unavailable"
   /api/fleet/agents/{id}/acks:
     post:
       operationId: agentAcks
@@ -1040,14 +1050,15 @@ paths:
           required: true
           schema:
             type: string
-        - $ref: '#/components/parameters/requestId'
+        - $ref: "#/components/parameters/requestId"
+        - $ref: "#/components/parameters/apiVersion"
       security:
         - agentApiKey: []
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ackRequest'
+              $ref: "#/components/schemas/ackRequest"
             examples:
               single:
                 description: Send an ack for a single event.
@@ -1060,12 +1071,12 @@ paths:
                       timestamp: 2022-12-01T01:02:03.00004-07:00
                       message: Action 'test-action' of type 'TEST' acknowledged.
       responses:
-        '200':
+        "200":
           description: Agent ack successfully received.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ackResponse'
+                $ref: "#/components/schemas/ackResponse"
               examples:
                 single:
                   description: Successfull ack for a single action.
@@ -1075,18 +1086,18 @@ paths:
                     items:
                       - status: 200
                         message: ok
-        '400':
-          $ref: '#/components/responses/badRequest'
-        '401':
-          $ref: '#/components/responses/keyNotEnabled'
-        '404':
-          $ref: '#/components/responses/agentNotFound'
-        '408':
-          $ref: '#/components/responses/deadline'
-        '500':
-          $ref: '#/components/responses/internalServerError'
-        '503':
-          $ref: '#/components/responses/unavailable'
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "401":
+          $ref: "#/components/responses/keyNotEnabled"
+        "404":
+          $ref: "#/components/responses/agentNotFound"
+        "408":
+          $ref: "#/components/responses/deadline"
+        "500":
+          $ref: "#/components/responses/internalServerError"
+        "503":
+          $ref: "#/components/responses/unavailable"
   /api/fleet/artifacts/{id}/{sha2}:
     get:
       operationId: artifact
@@ -1104,31 +1115,32 @@ paths:
           required: true
           schema:
             type: string
-        - $ref: '#/components/parameters/requestId'
+        - $ref: "#/components/parameters/requestId"
+        - $ref: "#/components/parameters/apiVersion"
       security:
         - agentApiKey: []
       responses:
-        '200':
+        "200":
           description: The artifact retrieved from ES.
           content:
             "*/*":
               schema:
                 type: string
                 format: binary
-        '400':
-          $ref: '#/components/responses/badRequest'
-        '401':
-          $ref: '#/components/responses/keyNotEnabled'
-        '404':
-          $ref: '#/components/responses/agentNotFound'
-        '408':
-          $ref: '#/components/responses/deadline'
-        '428':
-          $ref: '#/components/responses/throttle'
-        '500':
-          $ref: '#/components/responses/internalServerError'
-        '503':
-          $ref: '#/components/responses/unavailable'
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "401":
+          $ref: "#/components/responses/keyNotEnabled"
+        "404":
+          $ref: "#/components/responses/agentNotFound"
+        "408":
+          $ref: "#/components/responses/deadline"
+        "428":
+          $ref: "#/components/responses/throttle"
+        "500":
+          $ref: "#/components/responses/internalServerError"
+        "503":
+          $ref: "#/components/responses/unavailable"
   /api/fleet/uploads:
     post:
       operationId: uploadBegin
@@ -1137,31 +1149,32 @@ paths:
       security:
         - agentApiKey: []
       parameters:
-        - $ref: '#/components/parameters/requestId'
+        - $ref: "#/components/parameters/requestId"
+        - $ref: "#/components/parameters/apiVersion"
       requestBody:
         required: true
         description: Information about the file to be uploaded. Minimum required fields are marked as required. Additional fields may be specified and are allowed. For information about the file itself, ECS.file paths are recommended. For archived files, information about the archive should be placed in `file`. Information about the archive members may be placed in a `contents` array.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/uploadBeginRequest'
+              $ref: "#/components/schemas/uploadBeginRequest"
       responses:
-        '200':
+        "200":
           description: Information about the upload procedure
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/uploadBeginResponse'
-        '400':
-          $ref: '#/components/responses/badRequest'
-        '401':
-          $ref: '#/components/responses/keyNotEnabled'
-        '408':
-          $ref: '#/components/responses/deadline'
-        '500':
-          $ref: '#/components/responses/internalServerError'
-        '503':
-          $ref: '#/components/responses/unavailable'
+                $ref: "#/components/schemas/uploadBeginResponse"
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "401":
+          $ref: "#/components/responses/keyNotEnabled"
+        "408":
+          $ref: "#/components/responses/deadline"
+        "500":
+          $ref: "#/components/responses/internalServerError"
+        "503":
+          $ref: "#/components/responses/unavailable"
   /api/fleet/uploads/{id}/{chunkNum}:
     put:
       operationId: uploadChunk
@@ -1191,28 +1204,29 @@ paths:
           schema:
             type: string
             example: 0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1
-        - $ref: '#/components/parameters/requestId'
+        - $ref: "#/components/parameters/requestId"
+        - $ref: "#/components/parameters/apiVersion"
       requestBody:
         description: The chunk contents as bytes
         required: true
         content:
-            "*/*":
-              schema:
-                type: string
-                format: binary
+          "*/*":
+            schema:
+              type: string
+              format: binary
       responses:
-        '200':
+        "200":
           description: Successful chunk upload
-        '400':
-          $ref: '#/components/responses/badRequest'
-        '401':
-          $ref: '#/components/responses/keyNotEnabled'
-        '408':
-          $ref: '#/components/responses/deadline'
-        '500':
-          $ref: '#/components/responses/internalServerError'
-        '503':
-          $ref: '#/components/responses/unavailable'
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "401":
+          $ref: "#/components/responses/keyNotEnabled"
+        "408":
+          $ref: "#/components/responses/deadline"
+        "500":
+          $ref: "#/components/responses/internalServerError"
+        "503":
+          $ref: "#/components/responses/unavailable"
   /api/fleet/uploads/{id}:
     post:
       operationId: uploadComplete
@@ -1225,7 +1239,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/uploadCompleteRequest'
+              $ref: "#/components/schemas/uploadCompleteRequest"
       parameters:
         - name: id
           in: path
@@ -1234,9 +1248,10 @@ paths:
           schema:
             type: string
             example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
-        - $ref: '#/components/parameters/requestId'
+        - $ref: "#/components/parameters/requestId"
+        - $ref: "#/components/parameters/apiVersion"
       responses:
-        '200':
+        "200":
           description: success response
           content:
             application/json:
@@ -1246,13 +1261,65 @@ paths:
                   status:
                     type: string
                     example: "ok"
-        '400':
-          $ref: '#/components/responses/badRequest'
-        '401':
-          $ref: '#/components/responses/keyNotEnabled'
-        '408':
-          $ref: '#/components/responses/deadline'
-        '500':
-          $ref: '#/components/responses/internalServerError'
-        '503':
-          $ref: '#/components/responses/unavailable'
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "401":
+          $ref: "#/components/responses/keyNotEnabled"
+        "408":
+          $ref: "#/components/responses/deadline"
+        "500":
+          $ref: "#/components/responses/internalServerError"
+        "503":
+          $ref: "#/components/responses/unavailable"
+  /api/fleet/file/{id}:
+    get:
+      operationId: getFile
+      summary: retrieve stored file for integration
+      description: "Stream out file contents to an agent or integration, provided there is a matching and authorized file stored in elasticsearch."
+      security:
+        - agentApiKey: []
+      parameters:
+        - name: id
+          in: path
+          description: The file_id as provided to the integration
+          required: true
+          schema:
+            type: string
+            example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
+      responses:
+        "200":
+          description: File Contents.
+          headers:
+            X-File-Sha2:
+              description: SHA256 digest of the file contents. Only sent when the uploaded file contains a file.hash.sha256 value.
+              schema:
+                type: string
+                example: 0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "401":
+          $ref: "#/components/responses/keyNotEnabled"
+        "403":
+          description: The requesting entity is not permitted to access the requested file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+              examples:
+                unauthorized:
+                  description: The file is not accessible
+                  value:
+                    statusCode: 403
+                    error: Forbidden
+                    message: Client is not authorized
+        "404":
+          description: bad path, file not found
+        "500":
+          $ref: "#/components/responses/internalServerError"
+        "503":
+          $ref: "#/components/responses/unavailable"

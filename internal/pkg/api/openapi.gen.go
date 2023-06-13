@@ -507,6 +507,9 @@ type UploadCompleteRequest struct {
 	} `json:"transithash"`
 }
 
+// ApiVersion defines model for apiVersion.
+type ApiVersion = string
+
 // RequestId defines model for requestId.
 type RequestId = string
 
@@ -543,12 +546,18 @@ type AgentEnrollParams struct {
 
 	// XRequestID The request tracking ID for APM.
 	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
 
 // AgentAcksParams defines parameters for AgentAcks.
 type AgentAcksParams struct {
 	// XRequestID The request tracking ID for APM.
 	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
 
 // AgentCheckinParams defines parameters for AgentCheckin.
@@ -565,24 +574,36 @@ type AgentCheckinParams struct {
 
 	// XRequestID The request tracking ID for APM.
 	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
 
 // ArtifactParams defines parameters for Artifact.
 type ArtifactParams struct {
 	// XRequestID The request tracking ID for APM.
 	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
 
 // UploadBeginParams defines parameters for UploadBegin.
 type UploadBeginParams struct {
 	// XRequestID The request tracking ID for APM.
 	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
 
 // UploadCompleteParams defines parameters for UploadComplete.
 type UploadCompleteParams struct {
 	// XRequestID The request tracking ID for APM.
 	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
 
 // UploadChunkParams defines parameters for UploadChunk.
@@ -592,12 +613,18 @@ type UploadChunkParams struct {
 
 	// XRequestID The request tracking ID for APM.
 	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
 
 // StatusParams defines parameters for Status.
 type StatusParams struct {
 	// XRequestID The request tracking ID for APM.
 	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
 
 // AgentEnrollJSONRequestBody defines body for AgentEnroll for application/json ContentType.
@@ -856,6 +883,9 @@ type ServerInterface interface {
 
 	// (GET /api/fleet/artifacts/{id}/{sha2})
 	Artifact(w http.ResponseWriter, r *http.Request, id string, sha2 string, params ArtifactParams)
+	// retrieve stored file for integration
+	// (GET /api/fleet/file/{id})
+	GetFile(w http.ResponseWriter, r *http.Request, id string)
 	// Initiate a file upload process
 	// (POST /api/fleet/uploads)
 	UploadBegin(w http.ResponseWriter, r *http.Request, params UploadBeginParams)
@@ -934,6 +964,25 @@ func (siw *ServerInterfaceWrapper) AgentEnroll(w http.ResponseWriter, r *http.Re
 
 	}
 
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
+
+	}
+
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AgentEnroll(w, r, params)
 	})
@@ -983,6 +1032,25 @@ func (siw *ServerInterfaceWrapper) AgentAcks(w http.ResponseWriter, r *http.Requ
 		}
 
 		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
 
 	}
 
@@ -1080,6 +1148,25 @@ func (siw *ServerInterfaceWrapper) AgentCheckin(w http.ResponseWriter, r *http.R
 
 	}
 
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
+
+	}
+
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AgentCheckin(w, r, id, params)
 	})
@@ -1141,8 +1228,55 @@ func (siw *ServerInterfaceWrapper) Artifact(w http.ResponseWriter, r *http.Reque
 
 	}
 
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
+
+	}
+
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Artifact(w, r, id, sha2, params)
+	})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetFile operation middleware
+func (siw *ServerInterfaceWrapper) GetFile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "id", runtime.ParamLocationPath, chi.URLParam(r, "id"), &id)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, AgentApiKeyScopes, []string{})
+
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFile(w, r, id)
 	})
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1181,6 +1315,25 @@ func (siw *ServerInterfaceWrapper) UploadBegin(w http.ResponseWriter, r *http.Re
 		}
 
 		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
 
 	}
 
@@ -1233,6 +1386,25 @@ func (siw *ServerInterfaceWrapper) UploadComplete(w http.ResponseWriter, r *http
 		}
 
 		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
 
 	}
 
@@ -1320,6 +1492,25 @@ func (siw *ServerInterfaceWrapper) UploadChunk(w http.ResponseWriter, r *http.Re
 
 	}
 
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
+
+	}
+
 	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UploadChunk(w, r, id, chunkNum, params)
 	})
@@ -1360,6 +1551,25 @@ func (siw *ServerInterfaceWrapper) Status(w http.ResponseWriter, r *http.Request
 		}
 
 		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
 
 	}
 
@@ -1498,6 +1708,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/fleet/artifacts/{id}/{sha2}", wrapper.Artifact)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/fleet/file/{id}", wrapper.GetFile)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/fleet/uploads", wrapper.UploadBegin)
