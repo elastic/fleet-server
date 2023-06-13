@@ -107,10 +107,24 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 		return ctx.Err()
 	}
 
+	// Start timer loop to ensure leadership
+	lT := time.NewTimer(m.checkInterval)
+	defer lT.Stop()
+
 	// Ensure leadership on startup
-	err = m.ensureLeadership(ctx)
-	if err != nil {
-		return err
+	for {
+		err = m.ensureLeadership(ctx)
+		if err != nil {
+			m.log.Warn().Err(err).Msg("error ensuring leadership, will retry")
+			select {
+			case <-lT.C:
+				continue
+			case <-ctx.Done():
+				m.releaseLeadership()
+				return ctx.Err()
+			}
+		}
+		break
 	}
 
 	// Subscribe to the monitor for policies
@@ -120,10 +134,6 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 	// Start timer to update metadata (mainly for updated IP addresses of the host)
 	mT := time.NewTimer(m.metadataInterval)
 	defer mT.Stop()
-
-	// Start timer loop to ensure leadership
-	lT := time.NewTimer(m.checkInterval)
-	defer lT.Stop()
 
 	// Keep track of errored statuses
 	erroredOnLastRequest := false

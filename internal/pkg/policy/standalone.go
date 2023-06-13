@@ -51,25 +51,21 @@ func NewStandAloneSelfMonitor(bulker bulk.Bulk, reporter state.Reporter) *standA
 
 // Run runs the monitor.
 func (m *standAloneSelfMonitorT) Run(ctx context.Context) error {
-	cT := time.NewTicker(m.checkTime)
-	defer cT.Stop()
+	ticker := time.NewTicker(m.checkTime)
+	defer ticker.Stop()
 
 	for {
-		state := m.check(ctx)
-		if state == client.UnitStateHealthy {
-			// running; can stop
-			return nil
-		}
+		m.check(ctx)
 
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-cT.C:
+		case <-ticker.C:
 		}
 	}
 }
 
-func (m *standAloneSelfMonitorT) updateState(state client.UnitState, reason string) client.UnitState {
+func (m *standAloneSelfMonitorT) updateState(state client.UnitState, reason string) {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
@@ -77,8 +73,6 @@ func (m *standAloneSelfMonitorT) updateState(state client.UnitState, reason stri
 		m.reporter.UpdateState(state, reason, nil) //nolint:errcheck // not clear what to do in failure cases
 		m.state = state
 	}
-
-	return state
 }
 
 func (m *standAloneSelfMonitorT) State() client.UnitState {
@@ -87,17 +81,27 @@ func (m *standAloneSelfMonitorT) State() client.UnitState {
 	return m.state
 }
 
-func (m *standAloneSelfMonitorT) check(ctx context.Context) client.UnitState {
+func (m *standAloneSelfMonitorT) check(ctx context.Context) {
 	_, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
-	if err != nil {
-		if errors.Is(err, es.ErrIndexNotFound) {
-			m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
-			return m.updateState(client.UnitStateHealthy, "Running: Policies not available yet")
-		}
-		if err != nil {
-			return m.updateState(client.UnitStateFailed, fmt.Sprintf("Failed to request policies: %s", err))
-		}
+	if errors.Is(err, es.ErrIndexNotFound) {
+		m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
+		m.updateState(client.UnitStateHealthy, "Running: Policies not available yet")
+		return
 	}
 
-	return m.updateState(client.UnitStateHealthy, "Running")
+	if err != nil {
+		state := client.UnitStateFailed
+		current := m.State()
+		switch current {
+		case client.UnitStateHealthy, client.UnitStateDegraded:
+			state = client.UnitStateDegraded
+		case client.UnitStateStarting:
+			state = client.UnitStateStarting
+		}
+
+		m.updateState(state, fmt.Sprintf("Failed to request policies: %s", err))
+		return
+	}
+
+	m.updateState(client.UnitStateHealthy, "Running")
 }

@@ -48,19 +48,6 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 		return nil, err
 	}
 
-	// Validate connection
-	resp, err := info(ctx, es)
-	if err != nil {
-		zlog.Error().Err(err).Msg("fail elasticsearch info")
-		return nil, err
-	}
-
-	zlog.Info().
-		Str("cluster.name", resp.ClusterName).
-		Str("cluster.uuid", resp.ClusterUUID).
-		Str("cluster.version", resp.Version.Number).
-		Msg("elasticsearch cluster info")
-
 	return es, nil
 }
 
