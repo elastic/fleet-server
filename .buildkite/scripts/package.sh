@@ -16,6 +16,11 @@ if [[${PLATFORM_TYPE} == "arm" || ${PLATFORM_TYPE} == "aarch64"]]; then
     PACKAGES="docker"
 fi
 
+echo $1
+echo $2
+echo $3
+echo $4
+
 echo ${VERSION}
 echo ${PLATFORM_TYPE}
-echo "${BUILDKITE_MATRIX_PLATFORM} ${BUILDKITE_MATRIX_TYPE}"
+echo " {{matrix.platform}} {{matrix.type}}"
