@@ -2,7 +2,7 @@
 name: "fleet server package mbp"
 steps:
   - label: "Package"
-    command: ".buildkite/scripts/package.sh {{matrix}}"
+    command: ".buildkite/scripts/package.sh {{matrix.platform}} {{matrix.type}}"
     matrix:
       setup:
         platform:

@@ -16,10 +16,8 @@ if [[${PLATFORM_TYPE} == "arm" || ${PLATFORM_TYPE} == "aarch64"]]; then
     PACKAGES="docker"
 fi
 
-echo $1
-echo $2
-echo $3
-echo $4
+echo "Platform: $1"
+echo "Type: $2"
 
 echo ${VERSION}
 echo ${PLATFORM_TYPE}
