@@ -1,7 +1,12 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 name: "fleet server package mbp"
+env:
+  REPO: 'fleet-server'
+  BASE_DIR: "src/github.com/elastic/${REPO}"
+
 steps:
   - label: "Package"
+    key: "package"
     command: ".buildkite/scripts/package.sh {{matrix.platform}} {{matrix.type}}"
     matrix:
       setup:
