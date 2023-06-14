@@ -23,7 +23,7 @@ steps:
         provider: “gcp”
         cpu: "8"
         memory: "4G"
-        image: “core-ubuntu-2004"
+        image: “family/core-ubuntu-2004"
 
     - label: "Package Ubuntu-20 aarch64"
       key: "package-arm"
@@ -39,4 +39,4 @@ steps:
         provider: “aws”
         cpu: "8"
         memory: "4G"
-        image: “core-ubuntu-2004-aarch64"
+        image: “family/core-ubuntu-2004-aarch64"
