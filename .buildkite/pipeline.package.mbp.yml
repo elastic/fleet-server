@@ -21,9 +21,6 @@ steps:
           - "staging"
       agents:
         provider: “gcp”
-        imagePrefix: “family/core-ubuntu-2004"
-        cpu: "8"
-        memory: "4G"
 
     - label: "Package Ubuntu-20 aarch64"
       key: "package-arm"
@@ -37,6 +34,6 @@ steps:
           - "staging"
       agents:
         provider: “aws”
-        imagePrefix: “family/core-ubuntu-2004-aarch64"
+        image: “core-ubuntu-2004-aarch64"
         cpu: "8"
         memory: "4G"
