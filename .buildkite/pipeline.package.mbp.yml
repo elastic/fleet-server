@@ -20,10 +20,10 @@ steps:
           - "snapshot"
           - "staging"
       agents:
-        provider: “gcp”
+#        provider: “gcp”
+        image: “family/core-ubuntu-2004"
         cpu: "8"
         memory: "4G"
-        image: “family/core-ubuntu-2004"
 
     - label: "Package Ubuntu-20 aarch64"
       key: "package-arm"
@@ -36,7 +36,7 @@ steps:
           - "snapshot"
           - "staging"
       agents:
-        provider: “aws”
+#        provider: “aws”
+        image: “family/core-ubuntu-2004-aarch64"
         cpu: "8"
         memory: "4G"
-        image: “family/core-ubuntu-2004-aarch64"
