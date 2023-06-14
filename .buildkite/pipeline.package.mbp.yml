@@ -13,7 +13,7 @@ steps:
       key: "package-x86-64"
       command: ".buildkite/scripts/package.sh {{matrix.type}}"
       agents:
-        provider: “gcp”
+        provider: "gcp"
       matrix:
         setup:
           type:
