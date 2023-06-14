@@ -6,14 +6,37 @@ env:
   SETUP_GVM_VERSION: 'v0.5.0'
 
 steps:
-  - label: "Package"
-    key: "package"
-    command: ".buildkite/scripts/package.sh {{matrix.platform}} {{matrix.type}}"
-    matrix:
-      setup:
-        platform:
-        - "ubuntu-20"
-        - "arm"
-        type:
-        - "snapshot"
-        - "staging"
+  - group: "Package and Publish"
+    key: "package-publish"
+    steps:
+    - label: "Package Ubuntu-20 x86_64"
+      key: "package"
+      command: ".buildkite/scripts/package.sh {{matrix.platform}} {{matrix.type}}"
+      matrix:
+        setup:
+          platform:
+          - "ubuntu-20"
+          type:
+          - "snapshot"
+          - "staging"
+      agents:
+        provider: “gcp”
+        cpu: "8"
+        memory: "4G"
+        image: “core-ubuntu-2004"
+
+    - label: "Package Ubuntu-20 aarch64"
+      key: "package"
+      command: ".buildkite/scripts/package.sh {{matrix.platform}} {{matrix.type}}"
+      matrix:
+        setup:
+          platform:
+          - "arm"
+          type:
+          - "snapshot"
+          - "staging"
+      agents:
+        provider: “aws”
+        cpu: "8"
+        memory: "4G"
+        image: “core-ubuntu-2004-aarch64"
