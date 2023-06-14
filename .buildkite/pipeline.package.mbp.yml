@@ -20,8 +20,8 @@ steps:
           - "snapshot"
           - "staging"
       agents:
-#        provider: “gcp”
-        image: “family/core-ubuntu-2004"
+        provider: “gcp”
+        imagePrefix: “family/core-ubuntu-2004"
         cpu: "8"
         memory: "4G"
 
@@ -36,7 +36,7 @@ steps:
           - "snapshot"
           - "staging"
       agents:
-#        provider: “aws”
-        image: “family/core-ubuntu-2004-aarch64"
+        provider: “aws”
+        imagePrefix: “family/core-ubuntu-2004-aarch64"
         cpu: "8"
         memory: "4G"
