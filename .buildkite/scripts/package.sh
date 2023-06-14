@@ -41,7 +41,7 @@ else
             "gotest.tools/gotestsum"
     )
 
-    for pckg in "${install_packages}"; do
+    for pckg in "${install_packages[@]}"; do
     go install "${pckg}@latest"
     done
 
