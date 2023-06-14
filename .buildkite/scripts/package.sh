@@ -26,7 +26,6 @@ else
         MAKEGOAL="release-manager-snapshot"
     fi
 
-    cd ${WORKSPACE}
     add_bin_path
     with_go
 
