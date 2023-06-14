@@ -30,6 +30,7 @@ else
     fi
 
     cd ${WORKSPACE}
+    add_bin_path
     with_go
 
     install_packages=(
