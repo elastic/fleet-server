@@ -13,9 +13,7 @@ steps:
       key: "package-x86-64"
       command: ".buildkite/scripts/package.sh {{matrix.type}}"
       agents:
-          image: "golang:1.20.3"
-          cpu: "8"
-          memory: "4G"
+        provider: “gcp”
       matrix:
         setup:
           type:
