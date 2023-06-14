@@ -2,7 +2,7 @@
 name: "fleet server package mbp"
 env:
   REPO: 'fleet-server'
-  BASE_DIR: "src/github.com/elastic/${REPO}"
+  JOB_GCS_BUCKET: 'fleet-ci-artifacts'
 
 steps:
   - label: "Package"

@@ -94,6 +94,20 @@ upload_packages_to_gcp_bucket() {
     done
 }
 
+upload_mbp_packages_to_gcp_bucket() {
+    pattern=${1}
+    type=${2}
+    baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    bucketUri="${baseUri}"/${path}/${BUILDKITE_COMMIT}
+
+    if [[ ${type} == "snapshot" ]]; then
+        bucketUri="${baseUri}"/commits/${BUILDKITE_COMMIT}
+    else
+        bucketUri="${baseUri}"/${type}/${BUILDKITE_COMMIT}
+    fi
+    gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
+}
+
 cleanup() {
     echo "Deleting temporal files..."
     cd ${WORKSPACE}

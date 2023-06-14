@@ -7,8 +7,8 @@ source .buildkite/scripts/common.sh
 VERSION=$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')
 WORKSPACE="$(pwd)"
 PATH="${PATH}:${WORKSPACE}/bin"
-HOME="${WORKSPACE}"
-IS_BRANCH_AVAILABLE=${BUILDKITE_BRANCH}
+#HOME="${WORKSPACE}"
+#IS_BRANCH_AVAILABLE=${BUILDKITE_BRANCH}
 PLATFORM_TYPE=$(uname -m)
 MATRIX_PLATFORM="$1"
 MATRIX_TYPE="$2"
@@ -29,7 +29,7 @@ else
         MAKEGOAL="release-manager-snapshot"
     fi
 
-    cd ${BASE_DIR}
+    cd ${WORKSPACE}
     with_go
 
     install_packages=(
@@ -41,7 +41,7 @@ else
     )
 
     for pckg in "${install_packages}"; do
-    go install ${pckg}@latest
+    go install "${pckg}@latest"
     done
 
     make ${MAKEGOAL}
@@ -55,5 +55,5 @@ else
     else
         MAKEGOAL="release-manager-snapshot"
     fi
-    echo "uploading artifacts..."
+    upload_mbp_packages_to_gcp_bucket "build/distributions/" "${MATRIX_TYPE}"
 fi
