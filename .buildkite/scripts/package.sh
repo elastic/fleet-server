@@ -1,13 +1,10 @@
 #!/bin/bash
 
-set -euo pipefail
+set -euox pipefail
 
 source .buildkite/scripts/common.sh
 
 VERSION=$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')
-WORKSPACE="$(pwd)"
-PATH="${PATH}:${WORKSPACE}/bin"
-#HOME="${WORKSPACE}"
 #IS_BRANCH_AVAILABLE=${BUILDKITE_BRANCH}
 PLATFORM_TYPE=$(uname -m)
 #MATRIX_PLATFORM="$1"
