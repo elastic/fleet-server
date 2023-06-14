@@ -25,7 +25,7 @@ steps:
       command: ".buildkite/scripts/package.sh {{matrix.type}}"
       agents:
         provider: “aws”
-        image: “core-ubuntu-2004-aarch64"
+        imagePrefix: “core-ubuntu-2004-aarch64"
       matrix:
         setup:
           type:
