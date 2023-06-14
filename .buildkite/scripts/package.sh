@@ -10,8 +10,8 @@ PATH="${PATH}:${WORKSPACE}/bin"
 #HOME="${WORKSPACE}"
 #IS_BRANCH_AVAILABLE=${BUILDKITE_BRANCH}
 PLATFORM_TYPE=$(uname -m)
-MATRIX_PLATFORM="$1"
-MATRIX_TYPE="$2"
+#MATRIX_PLATFORM="$1"
+MATRIX_TYPE="$1"
 
 if [[ ${BUILDKITE_BRANCH} == "main" && ${MATRIX_TYPE} == "staging" ]]; then
     echo "INFO: staging artifacts for the main branch are not required."

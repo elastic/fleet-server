@@ -11,29 +11,23 @@ steps:
     steps:
     - label: "Package Ubuntu-20 x86_64"
       key: "package-x8664"
-      command: ".buildkite/scripts/package.sh {{matrix.platform}} {{matrix.type}}"
+      command: ".buildkite/scripts/package.sh {{matrix.type}}"
+      agents:
+        provider: "gcp"
       matrix:
         setup:
-          platform:
-          - "ubuntu-20"
           type:
           - "snapshot"
           - "staging"
-      agents:
-        provider: “gcp”
 
     - label: "Package Ubuntu-20 aarch64"
       key: "package-arm"
-      command: ".buildkite/scripts/package.sh {{matrix.platform}} {{matrix.type}}"
-      matrix:
-        setup:
-          platform:
-          - "arm"
-          type:
-          - "snapshot"
-          - "staging"
+      command: ".buildkite/scripts/package.sh {{matrix.type}}"
       agents:
         provider: “aws”
         image: “core-ubuntu-2004-aarch64"
-        cpu: "8"
-        memory: "4G"
+      matrix:
+        setup:
+          type:
+          - "snapshot"
+          - "staging"
