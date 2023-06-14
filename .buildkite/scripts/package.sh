@@ -34,10 +34,10 @@ else
     with_go
 
     install_packages=(
-            "github.com/magefile/mage",
-            "github.com/elastic/go-licenser",
-            "golang.org/x/tools/cmd/goimports",
-            "github.com/jstemmer/go-junit-report",
+            "github.com/magefile/mage"
+            "github.com/elastic/go-licenser"
+            "golang.org/x/tools/cmd/goimports"
+            "github.com/jstemmer/go-junit-report"
             "gotest.tools/gotestsum"
     )
 
