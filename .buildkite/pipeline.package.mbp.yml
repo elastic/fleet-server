@@ -14,7 +14,7 @@ steps:
       command: ".buildkite/scripts/package.sh {{matrix.type}}"
       agents:
         provider: "gcp"
-        image: “core-ubuntu-2004"
+        image: "core-ubuntu-2004"
       matrix:
         setup:
           type:
@@ -26,7 +26,7 @@ steps:
       command: ".buildkite/scripts/package.sh {{matrix.type}}"
       agents:
         provider: "aws"
-        image: “core-ubuntu-2004-aarch64"
+        image: "core-ubuntu-2004-aarch64"
       matrix:
         setup:
           type:
