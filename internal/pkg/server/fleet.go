@@ -130,10 +130,10 @@ func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
 	)
 
 	started := false
+	ech := make(chan error, 2)
 
 LOOP:
 	for {
-		ech := make(chan error, 2)
 		if started {
 			f.reporter.UpdateState(client.UnitStateConfiguring, "Re-configuring", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		} else {
