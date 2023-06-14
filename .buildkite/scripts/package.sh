@@ -25,8 +25,8 @@ else
         MAKEGOAL="release-manager-snapshot"
     fi
 
-#    add_bin_path
-#    with_go
+    add_bin_path
+    with_go
 
     install_packages=(
             "github.com/magefile/mage"
