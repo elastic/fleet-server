@@ -619,6 +619,63 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	}
 }
 
+func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
+	enrollBodyWEnrollmentID := `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "enrollment_id": "123456invalidated",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx)
+	require.NoError(t, err)
+
+	t.Log("Enroll the first agent with enrollment_id")
+	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+
+	// invalidate first api key to verify if second enroll works like this
+	t.Log("invalidate the first agent api key")
+	t.Log(agent.AccessAPIKeyID)
+	if err = srv.bulker.APIKeyInvalidate(ctx, agent.AccessAPIKeyID); err != nil {
+		t.Fatal("Could not invalidate API key")
+	}
+
+	t.Log("Enroll the second agent with the same enrollment_id")
+	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+
+	// cleanup
+	defer func() {
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, secondAgentID)
+		if err != nil {
+			t.Log("could not clean up second agent")
+		}
+		err2 := srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
+		if err2 != nil {
+			t.Log("could not clean up first agent")
+		}
+	}()
+
+	// checking that old agent with enrollment id is deleted
+	agent, err = dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	t.Log(agent)
+	if err != nil {
+		t.Log("old agent not found as expected")
+	} else {
+		// cleanup
+		defer srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
+		t.Fatal("duplicate agent found after enrolling with same enrollment id")
+	}
+}
+
 func Test_Agent_Auth_errors(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
