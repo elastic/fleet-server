@@ -5,6 +5,7 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 
 VERSION=$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')
+GO_VERSION=$(cat '.go-version')
 #IS_BRANCH_AVAILABLE=${BUILDKITE_BRANCH}
 PLATFORM_TYPE=$(uname -m)
 #MATRIX_PLATFORM="$1"
