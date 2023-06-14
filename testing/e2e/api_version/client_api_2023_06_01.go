@@ -68,11 +68,11 @@ func (tester *ClientAPITester20230601) TestStatus(apiKey string) {
 		resp, err = client.StatusWithResponse(tester.ctx, &api.StatusParams{})
 	}
 	tester.Require().NoError(err)
-	tester.Require().Equal(http.StatusOK, resp.StatusCode())
-	tester.Require().NotEmpty(resp.JSON200.Name)
-	tester.Require().NotEmpty(resp.JSON200.Status)
+	tester.Assert().Equal(http.StatusOK, resp.StatusCode())
+	tester.Assert().NotEmpty(resp.JSON200.Name)
+	tester.Assert().NotEmpty(resp.JSON200.Status)
 	if apiKey != "" {
-		tester.Require().NotNil(resp.JSON200.Version)
+		tester.Assert().NotNil(resp.JSON200.Version)
 	}
 }
 
@@ -95,11 +95,11 @@ func (tester *ClientAPITester20230601) TestEnroll(apiKey string) (string, string
 		},
 	)
 	tester.Require().NoError(err)
-	tester.Require().Equal(http.StatusOK, enrollResp.StatusCode())
+	tester.Assert().Equal(http.StatusOK, enrollResp.StatusCode())
 
 	enroll := enrollResp.JSON200
-	tester.Require().NotEmpty(enroll.Item.Id, "expected agent ID in response")
-	tester.Require().NotEmpty(enroll.Item.AccessApiKey, "expected agent API key in response")
+	tester.Assert().NotEmpty(enroll.Item.Id, "expected agent ID in response")
+	tester.Assert().NotEmpty(enroll.Item.AccessApiKey, "expected agent API key in response")
 	return enroll.Item.Id, enroll.Item.AccessApiKey
 }
 
@@ -122,10 +122,10 @@ func (tester *ClientAPITester20230601) TestCheckin(apiKey, agentID string, ackTo
 		},
 	)
 	tester.Require().NoError(err)
-	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+	tester.Assert().Equal(http.StatusOK, resp.StatusCode())
 	checkin := resp.JSON200
-	tester.Require().NotNil(checkin.AckToken, "expected to recieve ack token from checkin")
-	tester.Require().NotNil(checkin.Actions, "expected to actions from checkin")
+	tester.Assert().NotNil(checkin.AckToken, "expected to recieve ack token from checkin")
+	tester.Assert().NotNil(checkin.Actions, "expected to actions from checkin")
 
 	actionIds := make([]string, len(*checkin.Actions))
 	for i, action := range *checkin.Actions {
@@ -159,10 +159,10 @@ func (tester *ClientAPITester20230601) TestAcks(apiKey, agentID string, actionsI
 		},
 	)
 	tester.Require().NoError(err)
-	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+	tester.Assert().Equal(http.StatusOK, resp.StatusCode())
 
 	acks := resp.JSON200
-	tester.Require().Falsef(acks.Errors, "error in acked items: %v", acks.Items)
+	tester.Assert().Falsef(acks.Errors, "error in acked items: %v", acks.Items)
 }
 
 // TestFullFileUpload tests the file upload endpoints (begin, chunk, complete).
