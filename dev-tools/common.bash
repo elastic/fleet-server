@@ -40,11 +40,11 @@ get_go_version() {
 install_gvm() {
   # Install gvm
   if [ ! -f "/usr/local/bin/gvm" ]; then
-    curl -sL -o /tmp/gvm https://github.com/andrewkroh/gvm/releases/download/v0.3.0/gvm-linux-amd64
-    chmod +x /tmp/gvm
+    curl -sL -o ~/bin/gvm https://github.com/andrewkroh/gvm/releases/download/v0.3.0/gvm-linux-amd64
+    chmod +x /usr/local/bin/gvm
   fi
 
-  GVM="/tmp/gvm"
+  GVM="/usr/local/bin/gvm"
   debug "Gvm version $(${GVM} --version)"
 }
 

@@ -108,6 +108,20 @@ upload_mbp_packages_to_gcp_bucket() {
     gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
 }
 
+with_mage() {
+    install_packages=(
+            "github.com/magefile/mage"
+            "github.com/elastic/go-licenser"
+            "golang.org/x/tools/cmd/goimports"
+            "github.com/jstemmer/go-junit-report"
+            "gotest.tools/gotestsum"
+    )
+
+    for pckg in "${install_packages[@]}"; do
+    go install "${pckg}@latest"
+    done
+}
+
 cleanup() {
     echo "Deleting temporal files..."
     cd ${WORKSPACE}

@@ -5,7 +5,7 @@
 #
 # Example usage: ./run_with_go_ver go version
 #
-set -ex
+set -e
 
 # Script directory:
 SDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

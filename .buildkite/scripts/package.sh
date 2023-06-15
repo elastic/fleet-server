@@ -19,26 +19,15 @@ else
         PACKAGES="docker"
     fi
 
-    if [[ ${MATRIX_TYPE} == "staging" ]]; then
-        MAKEGOAL="release-manager-release"
-    else
-        MAKEGOAL="release-manager-snapshot"
-    fi
-
     add_bin_path
     with_go
+    with_mage
 
-    install_packages=(
-            "github.com/magefile/mage"
-            "github.com/elastic/go-licenser"
-            "golang.org/x/tools/cmd/goimports"
-            "github.com/jstemmer/go-junit-report"
-            "gotest.tools/gotestsum"
-    )
-
-    for pckg in "${install_packages[@]}"; do
-    go install "${pckg}@latest"
-    done
+    if [[ ${MATRIX_TYPE} == "staging" ]]; then
+        make release
+    else
+        make SNAPSHOT=true release
+    fi
 
     make ${MAKEGOAL}
 fi
@@ -46,10 +35,5 @@ fi
 if [[ ${BUILDKITE_BRANCH} == "main" && ${MATRIX_TYPE} == "staging" ]]; then
     echo "INFO: staging artifacts for the main branch are not required."
 else
-    if [[ ${MATRIX_TYPE} == "staging" ]]; then
-        MAKEGOAL="release-manager-release"
-    else
-        MAKEGOAL="release-manager-snapshot"
-    fi
     upload_mbp_packages_to_gcp_bucket "build/distributions/" "${MATRIX_TYPE}"
 fi
