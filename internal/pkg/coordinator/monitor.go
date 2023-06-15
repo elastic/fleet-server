@@ -118,6 +118,7 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 			m.log.Warn().Err(err).Msg("error ensuring leadership, will retry")
 			select {
 			case <-lT.C:
+				lT.Reset(m.checkInterval)
 				continue
 			case <-ctx.Done():
 				m.releaseLeadership()
