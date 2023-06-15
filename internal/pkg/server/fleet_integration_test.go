@@ -613,8 +613,6 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	if err != nil {
 		t.Log("old agent not found as expected")
 	} else {
-		// cleanup
-		// defer srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
 		t.Fatal("duplicate agent found after enrolling with same enrollment id")
 	}
 }
@@ -670,8 +668,6 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	if err != nil {
 		t.Log("old agent not found as expected")
 	} else {
-		// cleanup
-		defer srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
 		t.Fatal("duplicate agent found after enrolling with same enrollment id")
 	}
 }
