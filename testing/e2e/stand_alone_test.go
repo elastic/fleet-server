@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/testing/e2e/api_version"
 	"github.com/elastic/fleet-server/v7/version"
 
 	"github.com/stretchr/testify/suite"
@@ -155,94 +156,91 @@ func (suite *StandAloneSuite) TestClientAPI() {
 
 	enrollmentKey := suite.GetEnrollmentTokenForPolicyID(bCtx, "dummy-policy")
 
-	// Run subtests here
-	suite.Run("test status unauthenicated", func() {
-		ctx, cancel := context.WithCancel(bCtx)
-		defer cancel()
-		tester := &ClientAPITester{
-			suite.Suite,
-			ctx,
-			suite.client,
-			"https://localhost:8220",
+	versions := []string{"current", "2022-06-01"}
+
+	for _, version := range versions {
+		createTester := func(ctx context.Context) api_version.ClientAPITesterInterface {
+			switch version {
+			case "current":
+				return api_version.NewClientAPITesterCurrent(
+					suite.Suite,
+					ctx,
+					suite.client,
+					"https://localhost:8220",
+				)
+			case "2022-06-01":
+				return api_version.NewClientAPITester20230601(suite.Suite,
+					ctx,
+					suite.client,
+					"https://localhost:8220",
+				)
+			default:
+				panic(1)
+			}
 		}
-		tester.TestStatus("")
-	})
+		// Run subtests here
+		suite.Run(fmt.Sprintf("version %s test status unauthenicated", version), func() {
+			ctx, cancel := context.WithCancel(bCtx)
+			defer cancel()
+			tester := createTester(ctx)
+			tester.TestStatus("")
+		})
 
-	suite.Run("test status authenicated", func() {
-		ctx, cancel := context.WithCancel(bCtx)
-		defer cancel()
-		tester := &ClientAPITester{
-			suite.Suite,
-			ctx,
-			suite.client,
-			"https://localhost:8220",
-		}
-		tester.TestStatus(enrollmentKey)
-	})
+		suite.Run(fmt.Sprintf("version %s test status authenicated", version), func() {
+			ctx, cancel := context.WithCancel(bCtx)
+			defer cancel()
+			tester := createTester(ctx)
+			tester.TestStatus(enrollmentKey)
+		})
 
-	suite.Run("test enroll checkin ack", func() {
-		ctx, cancel := context.WithCancel(bCtx)
-		defer cancel()
-		tester := &ClientAPITester{
-			suite.Suite,
-			ctx,
-			suite.client,
-			"https://localhost:8220",
-		}
+		suite.Run(fmt.Sprintf("version %s test enroll checkin ack", version), func() {
+			ctx, cancel := context.WithTimeout(bCtx, 4*time.Minute)
+			defer cancel()
+			tester := createTester(ctx)
 
-		suite.T().Log("test enrollment")
-		agentID, agentKey := tester.TestEnroll(enrollmentKey)
-		suite.VerifyAgentInKibana(ctx, agentID)
+			suite.T().Log("test enrollment")
+			agentID, agentKey := tester.TestEnroll(enrollmentKey)
+			suite.VerifyAgentInKibana(ctx, agentID)
 
-		suite.T().Logf("test checkin 1: agent %s", agentID)
-		ackToken, actions := tester.TestCheckin(agentKey, agentID, nil, nil)
-		suite.Require().NotEmpty(actions)
+			suite.T().Logf("test checkin 1: agent %s", agentID)
+			ackToken, actions := tester.TestCheckin(agentKey, agentID, nil, nil)
+			suite.Require().NotEmpty(actions)
 
-		suite.T().Log("test ack")
-		tester.TestAcks(agentKey, agentID, actions)
+			suite.T().Log("test ack")
+			tester.TestAcks(agentKey, agentID, actions)
 
-		suite.T().Logf("test checkin 2: agent %s 3m timout", agentID)
-		dur := "3m"
-		tester.ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
-		defer cancel()
+			suite.T().Logf("test checkin 2: agent %s 3m timout", agentID)
+			dur := "3m"
 
-		tester.TestCheckin(agentKey, agentID, ackToken, &dur)
+			tester.TestCheckin(agentKey, agentID, ackToken, &dur)
 
-		// sanity check agent status in kibana
-		suite.AgentIsOnline(ctx, agentID)
-	})
+			// sanity check agent status in kibana
+			suite.AgentIsOnline(ctx, agentID)
+		})
 
-	suite.Run("test file upload", func() {
-		ctx, cancel := context.WithCancel(bCtx)
-		defer cancel()
-		tester := &ClientAPITester{
-			suite.Suite,
-			ctx,
-			suite.client,
-			"https://localhost:8220",
-		}
-		agentID, agentKey := tester.TestEnroll(enrollmentKey)
-		actionID := suite.RequestDiagnosticsForAgent(ctx, agentID)
+		suite.Run(fmt.Sprintf("version %s test file upload", version), func() {
+			ctx, cancel := context.WithCancel(bCtx)
+			defer cancel()
+			tester := createTester(ctx)
+			agentID, agentKey := tester.TestEnroll(enrollmentKey)
+			actionID := suite.RequestDiagnosticsForAgent(ctx, agentID)
 
-		tester.TestFullFileUpload(agentKey, agentID, actionID, 8192) // 8KiB file
-	})
+			tester.TestFullFileUpload(agentKey, agentID, actionID, 8192) // 8KiB file
+		})
 
-	suite.Run("test artifact", func() {
-		ctx, cancel := context.WithTimeout(bCtx, 3*time.Minute)
-		defer cancel()
-		tester := &ClientAPITester{
-			suite.Suite,
-			ctx,
-			suite.client,
-			"https://localhost:8220",
-		}
-		_, agentKey := tester.TestEnroll(enrollmentKey)
-		suite.AddSecurityContainer(ctx)
-		suite.AddSecurityContainerItem(ctx)
+		suite.Run(fmt.Sprintf("version %s test artifact", version), func() {
+			ctx, cancel := context.WithTimeout(bCtx, 3*time.Minute)
+			defer cancel()
+			tester := createTester(ctx)
+			_, agentKey := tester.TestEnroll(enrollmentKey)
+			suite.AddSecurityContainer(ctx)
+			suite.AddSecurityContainerItem(ctx)
 
-		hits := suite.FleetHasArtifacts(ctx)
-		tester.TestArtifact(agentKey, hits[0].Source.Identifier, hits[0].Source.DecodedSHA256, hits[0].Source.EncodedSHA256)
-	})
+			hits := suite.FleetHasArtifacts(ctx)
+			tester.TestArtifact(agentKey, hits[0].Source.Identifier, hits[0].Source.DecodedSHA256, hits[0].Source.EncodedSHA256)
+		})
+
+	}
 
 	bCancel()
 	cmd.Wait()

@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package e2e
+package api_version
 
 import (
 	"bytes"
@@ -20,11 +20,6 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// enrollMetadataTpl is the template for enrollement metadata
-// It defines elastic.agent.version as that attribute is required by Kibana to successfully request diagnostics from an agent.
-// A diagnostics request is used when testing the file-upload endpoints.
-const enrollMetadataTpl = `{"elastic":{"agent":{"version":"%s"}}}`
-
 // ClientAPITester provides methods to test API endpoints
 type ClientAPITester struct {
 	suite.Suite
@@ -32,6 +27,15 @@ type ClientAPITester struct {
 	ctx      context.Context
 	client   *http.Client
 	endpoint string
+}
+
+func NewClientAPITesterCurrent(suite suite.Suite, ctx context.Context, client *http.Client, endpoint string) *ClientAPITester {
+	return &ClientAPITester{
+		suite,
+		ctx,
+		client,
+		endpoint,
+	}
 }
 
 // TestStatus tests the status endpoint, if an apiKey is given the authenticated response if verfied.
@@ -86,7 +90,7 @@ func (tester *ClientAPITester) TestEnroll(apiKey string) (string, string) {
 
 // TestCheckin tests the checkin endpoint.
 // Returns the new ack token and the list of actions.
-func (tester *ClientAPITester) TestCheckin(apiKey, agentID string, ackToken, dur *string) (*string, []api.Action) {
+func (tester *ClientAPITester) TestCheckin(apiKey, agentID string, ackToken, dur *string) (*string, []string) {
 	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "ApiKey "+apiKey)
 		return nil
@@ -107,21 +111,27 @@ func (tester *ClientAPITester) TestCheckin(apiKey, agentID string, ackToken, dur
 	checkin := resp.JSON200
 	tester.Require().NotNil(checkin.AckToken, "expected to recieve ack token from checkin")
 	tester.Require().NotNil(checkin.Actions, "expected to actions from checkin")
-	return checkin.AckToken, *checkin.Actions
+
+	actionIds := make([]string, len(*checkin.Actions))
+	for i, action := range *checkin.Actions {
+		actionIds[i] = action.Id
+	}
+
+	return checkin.AckToken, actionIds
 }
 
 // TestAcks tests the acks endpoint
-func (tester *ClientAPITester) TestAcks(apiKey, agentID string, actions []api.Action) {
+func (tester *ClientAPITester) TestAcks(apiKey, agentID string, actionsIDs []string) {
 	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "ApiKey "+apiKey)
 		return nil
 	}))
 	tester.Require().NoError(err)
 
-	events := make([]api.Event, 0, len(actions))
-	for _, action := range actions {
+	events := make([]api.Event, 0, len(actionsIDs))
+	for _, actionId := range actionsIDs {
 		events = append(events, api.Event{
-			ActionId: action.Id,
+			ActionId: actionId,
 			AgentId:  agentID,
 		})
 	}
