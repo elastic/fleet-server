@@ -84,11 +84,3 @@ func userAgent(name string, bi build.Info) string {
 		bi.Version, runtime.GOOS, runtime.GOARCH,
 		bi.Commit, bi.BuildTime)
 }
-
-type InfoResponse struct {
-	ClusterName string `json:"cluster_name"`
-	ClusterUUID string `json:"cluster_uuid"`
-	Version     struct {
-		Number string `json:"number"`
-	} `json:"version"`
-}
