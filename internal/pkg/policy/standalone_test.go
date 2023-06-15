@@ -89,7 +89,7 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 			sm.check(context.Background())
 			state := sm.State()
 
-			assert.Equal(t, state, c.expectedState)
+			assert.Equal(t, c.expectedState, state)
 			assert.Equal(t, state, reporter.state, "reported state should be the same")
 		})
 	}
