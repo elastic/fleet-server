@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/testing/e2e/api_version"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -276,36 +277,36 @@ func (suite *AgentContainerSuite) TestClientAPI() {
 	suite.Run("test status unauthenicated", func() {
 		ctx, cancel := context.WithCancel(bCtx)
 		defer cancel()
-		tester := &ClientAPITester{
+		tester := api_version.NewClientAPITesterCurrent(
 			suite.Suite,
 			ctx,
 			suite.client,
 			endpoint,
-		}
+		)
 		tester.TestStatus("")
 	})
 
 	suite.Run("test status authenicated", func() {
 		ctx, cancel := context.WithCancel(bCtx)
 		defer cancel()
-		tester := &ClientAPITester{
+		tester := api_version.NewClientAPITesterCurrent(
 			suite.Suite,
 			ctx,
 			suite.client,
 			endpoint,
-		}
+		)
 		tester.TestStatus(enrollmentKey)
 	})
 
 	suite.Run("test enroll checkin ack", func() {
-		ctx, cancel := context.WithCancel(bCtx)
+		ctx, cancel := context.WithTimeout(bCtx, 3*time.Minute)
 		defer cancel()
-		tester := &ClientAPITester{
+		tester := api_version.NewClientAPITesterCurrent(
 			suite.Suite,
 			ctx,
 			suite.client,
 			endpoint,
-		}
+		)
 
 		suite.T().Log("test enrollment")
 		agentID, agentKey := tester.TestEnroll(enrollmentKey)
@@ -320,7 +321,7 @@ func (suite *AgentContainerSuite) TestClientAPI() {
 
 		suite.T().Logf("test checkin 2: agent %s 3m timout", agentID)
 		dur := "3m"
-		tester.ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
+
 		defer cancel()
 
 		tester.TestCheckin(agentKey, agentID, ackToken, &dur)
@@ -332,12 +333,12 @@ func (suite *AgentContainerSuite) TestClientAPI() {
 	suite.Run("test file upload", func() {
 		ctx, cancel := context.WithCancel(bCtx)
 		defer cancel()
-		tester := &ClientAPITester{
+		tester := api_version.NewClientAPITesterCurrent(
 			suite.Suite,
 			ctx,
 			suite.client,
 			endpoint,
-		}
+		)
 		agentID, agentKey := tester.TestEnroll(enrollmentKey)
 		actionID := suite.RequestDiagnosticsForAgent(ctx, agentID)
 
@@ -347,12 +348,12 @@ func (suite *AgentContainerSuite) TestClientAPI() {
 	suite.Run("test artifact", func() {
 		ctx, cancel := context.WithTimeout(bCtx, 3*time.Minute)
 		defer cancel()
-		tester := &ClientAPITester{
+		tester := api_version.NewClientAPITesterCurrent(
 			suite.Suite,
 			ctx,
 			suite.client,
 			endpoint,
-		}
+		)
 		_, agentKey := tester.TestEnroll(enrollmentKey)
 		suite.AddSecurityContainer(ctx)
 		suite.AddSecurityContainerItem(ctx)

@@ -71,9 +71,9 @@ func (a *apiVersion) middleware(next http.Handler) http.Handler {
 				ErrorResp(w, r, fmt.Errorf("received %q, is not supported. supported versions are: [%s] %w", headerValue, strings.Join(a.supportedVersions, ", "), ErrUnsupportedAPIVersion))
 				return
 			}
-			w.Header().Add(ElasticAPIVersionHeader, headerValue)
+			w.Header().Set(ElasticAPIVersionHeader, headerValue)
 		} else {
-			w.Header().Add(ElasticAPIVersionHeader, a.defaultVersion)
+			w.Header().Set(ElasticAPIVersionHeader, a.defaultVersion)
 		}
 
 		next.ServeHTTP(w, r)

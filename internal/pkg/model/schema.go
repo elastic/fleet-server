@@ -148,6 +148,9 @@ type Agent struct {
 	// Date/time the Elastic Agent enrolled
 	EnrolledAt string `json:"enrolled_at"`
 
+	// Enrollment ID
+	EnrollmentID string `json:"enrollment_id,omitempty"`
+
 	// Date/time the Elastic Agent checked in last time
 	LastCheckin string `json:"last_checkin,omitempty"`
 
