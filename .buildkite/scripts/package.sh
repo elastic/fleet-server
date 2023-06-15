@@ -28,8 +28,6 @@ else
     else
         make SNAPSHOT=true release
     fi
-
-    make ${MAKEGOAL}
 fi
 
 if [[ ${BUILDKITE_BRANCH} == "main" && ${MATRIX_TYPE} == "staging" ]]; then
