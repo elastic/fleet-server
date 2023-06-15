@@ -639,6 +639,9 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	if err != nil {
+		t.Log("first agent not found")
+	}
 
 	// invalidate first api key to verify if second enroll works like this
 	t.Log("invalidate the first agent api key")
