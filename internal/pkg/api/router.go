@@ -5,24 +5,30 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/module/apmchiv5/v2"
 	"go.elastic.co/apm/v2"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 )
 
-func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer) http.Handler {
+func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer, sm policy.SelfMonitor) http.Handler {
 	r := chi.NewRouter()
 	r.Use(logger.Middleware) // Attach middlewares to router directly so the occur before any request parsing/validation
 	r.Use(middleware.Recoverer)
 	r.Use(Limiter(cfg).middleware)
+	r.Use(statusChecker(sm))
 	if tracer != nil {
 		r.Use(apmchiv5.Middleware(apmchiv5.WithTracer(tracer)))
 	}
@@ -127,4 +133,33 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 		}
 	}
 	return http.HandlerFunc(fn)
+}
+
+// statusChecker is a middleware that returns 503 and interrupts the request chain
+// if the service is not healthy.
+func statusChecker(sm policy.SelfMonitor) func(next http.Handler) http.Handler {
+	message := "unavailable service"
+	statusCode := http.StatusServiceUnavailable
+	errorBody, err := json.Marshal(Error{
+		Message:    &message,
+		StatusCode: statusCode,
+	})
+	if err != nil {
+		// This should never fail.
+		panic(fmt.Sprintf("marshalling error failed, this is probably a bug: %v", err))
+	}
+
+	return func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			if pathToOperation(r.URL.Path) != "status" {
+				if sm.State() != client.UnitStateHealthy {
+					http.Error(w, string(errorBody), statusCode)
+					return
+				}
+			}
+
+			next.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(fn)
+	}
 }
