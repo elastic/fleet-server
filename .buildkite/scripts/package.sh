@@ -4,9 +4,9 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
+VERSION=$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')
 #IS_BRANCH_AVAILABLE=${BUILDKITE_BRANCH}
 PLATFORM_TYPE=$(uname -m)
-#MATRIX_PLATFORM="$1"
 MATRIX_TYPE="$1"
 
 if [[ ${BUILDKITE_BRANCH} == "main" && ${MATRIX_TYPE} == "staging" ]]; then
@@ -33,5 +33,6 @@ fi
 if [[ ${BUILDKITE_BRANCH} == "main" && ${MATRIX_TYPE} == "staging" ]]; then
     echo "INFO: staging artifacts for the main branch are not required."
 else
+    google_cloud_auth
     upload_mbp_packages_to_gcp_bucket "build/distributions/" "${MATRIX_TYPE}"
 fi
