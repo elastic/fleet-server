@@ -127,9 +127,9 @@ check_repofile_exist() {
     fileName=${3}
     response=$(curl -s https://api.github.com/repos/elastic/${repoName}/contents/${fileName}?ref=${branchName} | grep -c "\"path\"\: \"${fileName}\"")
     if [[ ${response} -ge 1 ]]; then
-        export IS_BRANCH_AVAILABLE=true
+        return 0
     else
-        export IS_BRANCH_AVAILABLE=false
+        return 1
     fi
 }
 
