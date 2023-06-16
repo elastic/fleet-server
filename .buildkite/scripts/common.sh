@@ -121,7 +121,7 @@ with_mage() {
     done
 }
 
-check_repofile_exist () {
+check_repofile_exist() {
     repoName=${1}
     branchName=${2}
     fileName=${3}
