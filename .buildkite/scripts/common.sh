@@ -4,7 +4,7 @@ set -euo pipefail
 
 WORKSPACE="$(pwd)/bin"
 TMP_FOLDER_TEMPLATE_BASE="tmp.fleet-server"
-VERSION=$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')
+VERSION="$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')"
 REPO="fleet-server"
 
 add_bin_path(){
