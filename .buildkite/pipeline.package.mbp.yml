@@ -39,7 +39,7 @@ steps:
     command: ".buildkite/scripts/dra_snapshot.sh"
     agents:
       provider: "gcp"
-    if: ${IS_BRANCH_AVAILABLE} == "true"
+    #if: ${IS_BRANCH_AVAILABLE} == "true"
     # depends_on:
     #   - step: "package-x86-64"
     #     allow_failure: false
