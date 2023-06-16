@@ -5,9 +5,9 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 
 VERSION=$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')
-#IS_BRANCH_AVAILABLE=${BUILDKITE_BRANCH}
 PLATFORM_TYPE=$(uname -m)
 MATRIX_TYPE="$1"
+INFRA_REPO="https://github.com/repos/elastic/infra/contents"
 
 if [[ ${BUILDKITE_BRANCH} == "main" && ${MATRIX_TYPE} == "staging" ]]; then
     echo "INFO: staging artifacts for the main branch are not required."
