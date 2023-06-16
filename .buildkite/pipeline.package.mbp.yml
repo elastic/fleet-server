@@ -39,6 +39,7 @@ steps:
     command: ".buildkite/scripts/dra_snapshot.sh"
     agents:
       provider: "gcp"
+      image: "family/core-ubuntu-2004"
     #if: ${IS_BRANCH_AVAILABLE} == "true"
     # depends_on:
     #   - step: "package-x86-64"
