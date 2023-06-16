@@ -107,6 +107,19 @@ upload_mbp_packages_to_gcp_bucket() {
     gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
 }
 
+download_mbp_packages_from_gcp_bucket() {
+    pattern=${1}
+    type=${2}
+    baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    if [[ ${type} == "snapshot" ]]; then
+        folder="commits"
+    else
+        folder="${type}"
+    fi
+    bucketUri="${baseUri}/${folder}/${BUILDKITE_COMMIT}"
+    gsutil -m cp -r "${bucketUri}" "${pattern}"
+}
+
 with_mage() {
     install_packages=(
             "github.com/magefile/mage"
