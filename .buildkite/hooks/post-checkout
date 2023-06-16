@@ -32,6 +32,20 @@ checkout_merge() {
     }
 }
 
+check_repofile_exist() {
+    repoName="fleet-server"
+    branchName="main"
+    fileName="Makefile"
+    response=$(curl -s https://api.github.com/repos/elastic/${repoName}/contents/${fileName}?ref=${branchName} | grep -c "\"path\"\: \"${fileName}\"")
+    if [[ ${response} -ge 1 ]]; then
+        export IS_BRANCH_AVAILABLE="true"
+    else
+        export IS_BRANCH_AVAILABLE="false"
+    fi
+}
+
+check_repofile_exist
+
 pull_request="${BUILDKITE_PULL_REQUEST:-false}"
 
 if [[ "${pull_request}" == "false" ]]; then

@@ -4,6 +4,7 @@ env:
   REPO: 'fleet-server'
   JOB_GCS_BUCKET: 'fleet-ci-artifacts'
   SETUP_GVM_VERSION: 'v0.3.0'
+  DRA_OUTPUT: 'release-manager.out'
 
 steps:
   # - group: "Package and Publish"
@@ -38,6 +39,7 @@ steps:
     command: ".buildkite/scripts/dra_snapshot.sh"
     agents:
       provider: "gcp"
+    if: ${IS_BRANCH_AVAILABLE} == "true"
     # depends_on:
     #   - step: "package-x86-64"
     #     allow_failure: false
