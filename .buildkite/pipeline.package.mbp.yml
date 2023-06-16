@@ -38,8 +38,8 @@ steps:
     command: ".buildkite/scripts/dra_snapshot.sh"
     agents:
       provider: "gcp"
-    depends_on:
-      - step: "package-x86-64"
-        allow_failure: false
-      - step: "package-arm"
-        allow_failure: false
+    # depends_on:
+    #   - step: "package-x86-64"
+    #     allow_failure: false
+    #   - step: "package-arm"
+    #     allow_failure: false
