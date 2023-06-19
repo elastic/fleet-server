@@ -177,6 +177,12 @@ LOOP:
 			if srvCancel != nil {
 				log.Info().Msg("stopping server on configuration change")
 				stop(srvCancel, srvEg)
+				select {
+				case err := <-ech:
+					log.Debug().Err(err).Msg("Server stopped intercepted expected context cancel error.")
+				case <-time.After(time.Second * 5):
+					log.Warn().Msg("Server stopped expected context cancel error missing.")
+				}
 			}
 			log.Info().Msg("starting server on configuration change")
 			srvEg, srvCancel = start(ctx, func(ctx context.Context, cfg *config.Config) error {
