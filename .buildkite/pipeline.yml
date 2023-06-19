@@ -4,6 +4,6 @@ steps:
   - label: "temporary test step"
     trigger: "package-registry-release-package-registry-distribution"
     build:
-      branch: "${BUILDKITE_BRANCH}"
+      branch: "main"
       meta_data:
         DOCKER_TAG: "v0.0.0-test"
