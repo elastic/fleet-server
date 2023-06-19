@@ -128,12 +128,12 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 	suite.Run("enrollment should be unavailable", func() {
 		ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
-		tester := &ClientAPITester{
-			Suite:    suite.Suite,
-			ctx:      ctx,
-			client:   suite.client,
-			endpoint: "http://localhost:8220",
-		}
+		tester := api_version.NewClientAPITesterCurrent(
+			suite.Suite,
+			ctx,
+			suite.client,
+			"http://localhost:8220",
+		)
 		tester.TestEnrollUnavailable(enrollmentKey)
 	})
 
@@ -146,12 +146,12 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 	suite.Run("enrollment should work", func() {
 		ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
-		tester := &ClientAPITester{
-			Suite:    suite.Suite,
-			ctx:      ctx,
-			client:   suite.client,
-			endpoint: "http://localhost:8220",
-		}
+		tester := api_version.NewClientAPITesterCurrent(
+			suite.Suite,
+			ctx,
+			suite.client,
+			"http://localhost:8220",
+		)
 		tester.TestEnroll(enrollmentKey)
 	})
 

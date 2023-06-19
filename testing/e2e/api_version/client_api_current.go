@@ -107,8 +107,9 @@ func (tester *ClientAPITester) TestEnrollUnavailable(apiKey string) {
 	)
 	tester.Require().NoError(err)
 
-	tester.T().Logf("status code found: %v", status)
-	tester.Assert().GreaterOrEqual(enrollResp.StatusCode(), http.StatusInternalServerError)
+	statusFound := enrollResp.StatusCode()
+	tester.T().Logf("status code found: %v", statusFound)
+	tester.Assert().GreaterOrEqual(statusFound, http.StatusInternalServerError)
 }
 
 // TestCheckin tests the checkin endpoint.
