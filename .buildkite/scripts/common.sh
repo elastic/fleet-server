@@ -95,9 +95,10 @@ upload_packages_to_gcp_bucket() {
 }
 
 upload_mbp_packages_to_gcp_bucket() {
-    pattern=${1}
-    type=${2}
-    baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    local pattern=${1}
+    local type=${2}
+    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    local bucketUri=""
 
     if [[ ${type} == "snapshot" ]]; then
         bucketUri="${baseUri}"/commits/${BUILDKITE_COMMIT}
