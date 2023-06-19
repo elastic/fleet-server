@@ -45,8 +45,8 @@ steps:
       cpu: "8"
       memory: "4G"
     #if: ${IS_BRANCH_AVAILABLE} == "true"
-    # depends_on:
-    #   - step: "package-x86-64"
-    #     allow_failure: false
-    #   - step: "package-arm"
-    #     allow_failure: false
+      depends_on:
+       - step: "package-x86-64"
+         allow_failure: false
+       - step: "package-arm"
+         allow_failure: false
