@@ -140,7 +140,7 @@ func TestStatusChecker(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			checker := statusChecker(&dummyStatusChecker{tt.state})
 			handler := checker(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte("ok"))
+				fmt.Fprint(w, "ok")
 			}))
 
 			w := httptest.NewRecorder()
