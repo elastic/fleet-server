@@ -4,45 +4,31 @@ env:
   REPO: 'fleet-server'
   JOB_GCS_BUCKET: 'fleet-ci-artifacts'
   SETUP_GVM_VERSION: 'v0.3.0'
-  DRA_OUTPUT: 'release-manager.out'
 
 steps:
-  # - group: "Package and Publish"
-  #   key: "package-publish"
-  #   steps:
-  #   - label: "Package Ubuntu-20 x86_64"
-  #     key: "package-x86-64"
-  #     command: ".buildkite/scripts/package.sh {{matrix.type}}"
-  #     agents:
-  #       provider: "gcp"
-  #       image: "family/core-ubuntu-2004"
-  #     matrix:
-  #       setup:
-  #         type:
-  #         - "snapshot"
-  #         - "staging"
+  - group: "Package and Publish"
+    key: "package-publish"
+    steps:
+    - label: "Package Ubuntu-20 x86_64"
+      key: "package-x86-64"
+      command: ".buildkite/scripts/package.sh {{matrix.type}}"
+      agents:
+        provider: "gcp"
+        image: "family/core-ubuntu-2004"
+      matrix:
+        setup:
+          type:
+          - "snapshot"
+          - "staging"
 
-  #   - label: "Package Ubuntu-20 aarch64"
-  #     key: "package-arm"
-  #     command: ".buildkite/scripts/package.sh {{matrix.type}}"
-  #     agents:
-  #       provider: "aws"
-  #       image: "core-ubuntu-2004-aarch64"
-  #     matrix:
-  #       setup:
-  #         type:
-  #         - "snapshot"
-  #         - "staging"
-
-  - label: "DRA snapshot"
-    key: "rda-snapshot"
-    command: ".buildkite/scripts/dra_snapshot.sh"
-    agents:
-      provider: "gcp"
-      image: "family/core-ubuntu-2004"
-    #if: ${IS_BRANCH_AVAILABLE} == "true"
-    # depends_on:
-    #   - step: "package-x86-64"
-    #     allow_failure: false
-    #   - step: "package-arm"
-    #     allow_failure: false
+    - label: "Package Ubuntu-20 aarch64"
+      key: "package-arm"
+      command: ".buildkite/scripts/package.sh {{matrix.type}}"
+      agents:
+        provider: "aws"
+        image: "core-ubuntu-2004-aarch64"
+      matrix:
+        setup:
+          type:
+          - "snapshot"
+          - "staging"
