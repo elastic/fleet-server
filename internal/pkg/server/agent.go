@@ -118,7 +118,7 @@ func (a *Agent) Run(ctx context.Context) error {
 				return
 			case err := <-a.agent.Errors():
 				if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
-					log.Error().Err(err).Msg("Agent wrapper recieved error.")
+					log.Error().Err(err).Msg("Agent wrapper received error.")
 				}
 			case change := <-a.agent.UnitChanges():
 				switch change.Type {

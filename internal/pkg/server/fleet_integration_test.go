@@ -46,6 +46,7 @@ import (
 
 const (
 	serverVersion = "8.0.0"
+	localhost     = "localhost"
 
 	testWaitServerUp = 3 * time.Second
 
@@ -181,7 +182,7 @@ func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserve
 	srvcfg := &config.Server{}
 	srvcfg.InitDefaults()
 	srvcfg.Timeouts.CheckinMaxPoll = 2 * time.Minute // set to a short value for tests
-	srvcfg.Host = "localhost"
+	srvcfg.Host = localhost
 	srvcfg.Port = port
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
@@ -324,7 +325,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 	srvcfg := &config.Server{}
 	srvcfg.InitDefaults()
 	srvcfg.Timeouts.CheckinMaxPoll = 2 * time.Minute // set to a short value for tests
-	srvcfg.Host = "localhost"
+	srvcfg.Host = localhost
 	srvcfg.Port = port
 	cfg.Inputs[0].Server = *srvcfg
 	newCfg.Inputs[0].Server = *srvcfg
