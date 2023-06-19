@@ -36,6 +36,7 @@ steps:
           type:
           - "snapshot"
           - "staging"
+
   - label: "DRA snapshot"
     key: "rda-snapshot"
     command: ".buildkite/scripts/dra_snapshot.sh"
@@ -46,7 +47,5 @@ steps:
       memory: "4G"
     #if: ${IS_BRANCH_AVAILABLE} == "true"
       depends_on:
-       - step: "package-x86-64"
-         allow_failure: false
-       - step: "package-arm"
-         allow_failure: false
+      - step: "package-publish"
+        allow_failure: false
