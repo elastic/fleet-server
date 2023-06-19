@@ -35,6 +35,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -70,6 +71,7 @@ type tserver struct {
 	g         *errgroup.Group
 	srv       *Fleet
 	enrollKey string
+	bulker    bulk.Bulk
 }
 
 func (s *tserver) baseURL() string {
@@ -204,7 +206,7 @@ func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserve
 		return srv.Run(ctx, cfg)
 	})
 
-	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token()}
+	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
 	err = tsrv.waitServerUp(ctx, testWaitServerUp)
 	if err != nil {
 		return nil, fmt.Errorf("unable to start server: %w", err)
@@ -677,6 +679,138 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	// When decoding to a (typed) struct, the default will implicitly be false if it's missing
 	_, ok = ackObj["errors"]
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
+}
+
+func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) string {
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+
+	cli := cleanhttp.DefaultClient()
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+
+	p, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	var obj map[string]interface{}
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	t.Log(obj)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	item := obj["item"]
+	mm, ok := item.(map[string]interface{})
+	require.True(t, ok, "expected attribute item to be an object")
+	agentID := mm["id"]
+	return agentID.(string)
+}
+
+func Test_Agent_Enrollment_Id(t *testing.T) {
+	enrollBodyWEnrollmentID := `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "enrollment_id": "123456",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx)
+	require.NoError(t, err)
+
+	t.Log("Enroll the first agent with enrollment_id")
+	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+
+	t.Log("Enroll the second agent with the same enrollment_id")
+	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+
+	// cleanup
+	defer func() {
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, secondAgentID)
+		if err != nil {
+			t.Log("could not clean up second agent")
+		}
+		err2 := srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
+		if err2 != nil {
+			t.Log("could not clean up first agent")
+		}
+	}()
+
+	// checking that old agent with enrollment id is deleted
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	t.Log(agent)
+	if err != nil {
+		t.Log("old agent not found as expected")
+	} else {
+		t.Fatal("duplicate agent found after enrolling with same enrollment id")
+	}
+}
+
+func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
+	enrollBodyWEnrollmentID := `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "enrollment_id": "123456invalidated",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx)
+	require.NoError(t, err)
+
+	t.Log("Enroll the first agent with enrollment_id")
+	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	if err != nil {
+		t.Log("first agent not found")
+	}
+
+	// invalidate first api key to verify if second enroll works like this
+	t.Log("invalidate the first agent api key")
+	t.Log(agent.AccessAPIKeyID)
+	if err = srv.bulker.APIKeyInvalidate(ctx, agent.AccessAPIKeyID); err != nil {
+		t.Fatal("Could not invalidate API key")
+	}
+
+	t.Log("Enroll the second agent with the same enrollment_id")
+	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+
+	// cleanup
+	defer func() {
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, secondAgentID)
+		if err != nil {
+			t.Log("could not clean up second agent")
+		}
+		err2 := srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
+		if err2 != nil {
+			t.Log("could not clean up first agent")
+		}
+	}()
+
+	// checking that old agent with enrollment id is deleted
+	agent, err = dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	t.Log(agent)
+	if err != nil {
+		t.Log("old agent not found as expected")
+	} else {
+		t.Fatal("duplicate agent found after enrolling with same enrollment id")
+	}
 }
 
 func Test_Agent_Auth_errors(t *testing.T) {
