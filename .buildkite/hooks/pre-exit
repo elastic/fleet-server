@@ -21,3 +21,8 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
     cleanup
   fi
 fi
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" && "$BUILDKITE_STEP_KEY" == "rda-snapshot" ]]; then
+    unset GOOGLE_APPLICATIONS_CREDENTIALS
+    cleanup
+fi

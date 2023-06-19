@@ -98,12 +98,12 @@ upload_mbp_packages_to_gcp_bucket() {
     pattern=${1}
     type=${2}
     baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
-
     if [[ ${type} == "snapshot" ]]; then
-        bucketUri="${baseUri}"/commits/${BUILDKITE_COMMIT}
+        folder="commits"
     else
-        bucketUri="${baseUri}"/${type}/${BUILDKITE_COMMIT}
+        folder="${type}"
     fi
+    bucketUri="${baseUri}"/${folder}/${BUILDKITE_COMMIT}
     gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
 }
 
