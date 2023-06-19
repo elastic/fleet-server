@@ -31,3 +31,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
     export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
   fi
 fi
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" && "$BUILDKITE_STEP_KEY" == "rda-snapshot" ]]; then
+  export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
+fi
