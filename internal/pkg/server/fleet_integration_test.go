@@ -328,6 +328,7 @@ func TestServerInstrumentation(t *testing.T) {
 	tracerConnected := make(chan struct{}, 1)
 	tracerDisconnected := make(chan struct{}, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		t.Logf("Tracing server recieved request to: %s", req.URL.Path)
 		if req.URL.Path != "/intake/v2/events" {
 			return
 		}
