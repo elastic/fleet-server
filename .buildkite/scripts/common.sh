@@ -94,30 +94,31 @@ upload_packages_to_gcp_bucket() {
     done
 }
 
-upload_mbp_packages_to_gcp_bucket() {
-    pattern=${1}
-    type=${2}
-    baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+get_bucket_uri() {
+    type=${1}
+    baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"
     if [[ ${type} == "snapshot" ]]; then
         folder="commits"
     else
         folder="${type}"
     fi
-    bucketUri="${baseUri}"/${folder}/${BUILDKITE_COMMIT}
-    gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
+    bucketUri="${baseUri}/${folder}/${BUILDKITE_COMMIT}"
+    return ${bucketUri}
+}
+
+upload_mbp_packages_to_gcp_bucket() {
+    pattern=${1}
+    type=${2}
+    bucketUri=$(get_bucket_uri "${type}")
+    gsutil -m -q cp -a public-read -r ${pattern} ${bucketUri}
 }
 
 download_mbp_packages_from_gcp_bucket() {
     pattern=${1}
     type=${2}
-    baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
-    if [[ ${type} == "snapshot" ]]; then
-        folder="commits"
-    else
-        folder="${type}"
-    fi
-    bucketUri="${baseUri}"/${folder}/${BUILDKITE_COMMIT}
-    gsutil -m cp -r "${bucketUri}" ${pattern}
+    bucketUri=$(get_bucket_uri ${type})
+    mkdir -p ${WORKSPACE}/${pattern}
+    gsutil -m cp -r ${bucketUri} ${WORKSPACE}/${pattern}
 }
 
 with_mage() {

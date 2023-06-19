@@ -11,7 +11,7 @@ add_bin_path
 
 google_cloud_auth
 
-download_mbp_packages_from_gcp_bucket "/build/distributions/" "snapshot"
+download_mbp_packages_from_gcp_bucket "build/distributions" "snapshot"
 
 with_go
 
