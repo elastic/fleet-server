@@ -108,7 +108,7 @@ upload_mbp_packages_to_gcp_bucket() {
 }
 
 with_mage() {
-    install_packages=(
+    local install_packages=(
             "github.com/magefile/mage"
             "github.com/elastic/go-licenser"
             "golang.org/x/tools/cmd/goimports"
