@@ -116,8 +116,8 @@ with_mage() {
             "gotest.tools/gotestsum"
     )
 
-    for pckg in "${install_packages[@]}"; do
-    go install "${pckg}@latest"
+    for pkg in "${install_packages[@]}"; do
+        go install "${pkg}@latest"
     done
 }
 
