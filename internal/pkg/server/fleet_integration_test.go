@@ -199,7 +199,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		}
 		resp, err := cli.Do(req)
 		if err != nil {
-			return false, nil
+			return false, nil //nolint:nilerr // we want to ignore the error in this case.
 		}
 		defer resp.Body.Close()
 
