@@ -103,21 +103,20 @@ get_bucket_uri() {
         folder="${type}"
     fi
     bucketUri="${baseUri}/${folder}/${BUILDKITE_COMMIT}"
-    return ${bucketUri}
 }
 
 upload_mbp_packages_to_gcp_bucket() {
     pattern=${1}
     type=${2}
-    bucketUri=$(get_bucket_uri "${type}")
+    get_bucket_uri
     gsutil -m -q cp -a public-read -r ${pattern} ${bucketUri}
 }
 
 download_mbp_packages_from_gcp_bucket() {
     pattern=${1}
     type=${2}
-    bucketUri=$(get_bucket_uri ${type})
     mkdir -p ${WORKSPACE}/${pattern}
+    get_bucket_uri
     gsutil -m cp -r ${bucketUri} ${WORKSPACE}/${pattern}
 }
 
