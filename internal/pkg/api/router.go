@@ -135,9 +135,13 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
+type clientStateChecker interface {
+	State() client.UnitState
+}
+
 // statusChecker is a middleware that returns 503 and interrupts the request chain
 // if the service is not healthy.
-func statusChecker(sm policy.SelfMonitor) func(next http.Handler) http.Handler {
+func statusChecker(sm clientStateChecker) func(next http.Handler) http.Handler {
 	message := "unavailable service"
 	statusCode := http.StatusServiceUnavailable
 	errorBody, err := json.Marshal(Error{
@@ -153,7 +157,9 @@ func statusChecker(sm policy.SelfMonitor) func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			if pathToOperation(r.URL.Path) != "status" {
 				if sm.State() != client.UnitStateHealthy {
-					http.Error(w, string(errorBody), statusCode)
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(statusCode)
+					fmt.Fprintln(w, string(errorBody))
 					return
 				}
 			}
