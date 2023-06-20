@@ -265,6 +265,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// don't use startTestServer as we need failing initial config.
 	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
 	require.NoError(t, err)
 	newCfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
@@ -353,10 +354,6 @@ func TestServerConfigErrorReload(t *testing.T) {
 	// send good config
 	err = srv.Reload(ctx, newCfg)
 	require.NoError(t, err)
-
-	// Run server with bad config - it should fail, then work on the restart?
-	//err = srv.Run(ctx, cfg)
-	//require.NoError(t, err)
 
 	// Run server with the healthy reload
 	g, ctx := errgroup.WithContext(ctx)
