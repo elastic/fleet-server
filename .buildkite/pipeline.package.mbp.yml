@@ -39,7 +39,7 @@ steps:
     agents:
       provider: "gcp"
       image: "family/core-ubuntu-2004"
-    if: ${IS_BRANCH_AVAILABLE}
+    if: ${IS_FILE_EXISTS_IN_REPO}
     depends_on:
       - step: "package-publish"
         allow_failure: false

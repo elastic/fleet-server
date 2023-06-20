@@ -32,15 +32,24 @@ checkout_merge() {
     }
 }
 
+# Usage:
+#check_if_file_exist_in_repo "repository" "branch" "path_to_file"
+#Returns IS_FILE_EXISTS_IN_REPO=true if file exists and IS_FILE_EXISTS_IN_REPO=false if not exists
 check_if_file_exist_in_repo() {
-    local repoName="fleet-server"
-    local branchName="main"
-    local fileName="Makefil"
-    local response=$(curl -s https://api.github.com/repos/elastic/${repoName}/contents/${fileName}?ref=${branchName} | grep -c "\"path\"\: \"${fileName}\"")
-    if [[ ${response} -ge 1 ]]; then
-        export IS_BRANCH_AVAILABLE=true
+    local repoName=${1}
+    local branch=${2}
+    local path_to_file=${3}
+    local branchName=""
+    if [[ $branch == "main" ]]; then
+        branchName="master"
     else
-        export IS_BRANCH_AVAILABLE=false
+        branchName="${BUILDKITE_BRANCH}"
+    fi
+    local response=$(curl -s https://api.github.com/repos/elastic/${repoName}/contents/${path_to_file}?ref=${branchName} | grep -c "\"path\"\: \"${fileName}\"")
+    if [[ ${response} -ge 1 ]]; then
+        export IS_FILE_EXISTS_IN_REPO=true
+    else
+        export IS_FILE_EXISTS_IN_REPO=false
     fi
 }
 
@@ -64,4 +73,4 @@ git log --format=%B -n 1
 # Ensure buildkite groups are rendered
 echo ""
 
-check_if_file_exist_in_repo
+check_if_file_exist_in_repo "fleet-server" "main" "dev-tools/e2e/main/Dockerfile"
