@@ -57,18 +57,19 @@ retry() {
 GITHUB_REPO_TOKEN=$(retry 5 vault kv get -field token ${GITHUB_TOKEN_VAULT_PATH})
 
 # Usage:
-#check_if_file_exist_in_repo "repository" "branch" "path_to_file"
+#check_if_file_exist_in_repo "infra" "main" "cd/release/release-manager/project-configs" "build.gradle"
 #Returns IS_FILE_EXISTS_IN_REPO=true if file exists and IS_FILE_EXISTS_IN_REPO=false if not exists
 check_if_file_exist_in_repo() {
     local repoName=${1}
     local branch=${2}
-    local path_to_file=${3}
+    local path_to_configs=${3}
+    local fileName=${4}
     if [[ $branch == "main" ]]; then
         branchName="master"
     else
         branchName="${BUILDKITE_BRANCH}"
     fi
-    local response=$(curl -s -u $GITHUB_REPO_TOKEN:x-oauth-basic https://api.github.com/repos/elastic/${repoName}/contents/${path_to_file}| grep -c "\"path\"\: \"${path_to_file}\"")
+    local response=$(curl -s -u $GITHUB_REPO_TOKEN:x-oauth-basic https://api.github.com/repos/elastic/${repoName}/contents/${path_to_configs}/${branchName}/${fileName}| grep -c "\"path\"\: \"${path_to_file}\"")
     if [[ ${response} -ge 1 ]]; then
         export IS_FILE_EXISTS_IN_REPO=true
     else
@@ -96,4 +97,4 @@ git log --format=%B -n 1
 # Ensure buildkite groups are rendered
 echo ""
 
-check_if_file_exist_in_repo "infra" "main" "cd/release/release-manager/project-configs/master/build.gradle"
+check_if_file_exist_in_repo "infra" "main" "cd/release/release-manager/project-configs" "build.gradle"
