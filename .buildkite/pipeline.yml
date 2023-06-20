@@ -8,7 +8,7 @@ env:
   DOCKER_IMAGE_SHA_TAG: "temp-${BUILDKITE_COMMIT}" # needs to rename after tests
   DOCKER_IMAGE_LATEST_TAG: "temp-latest" # needs to rename after tests
   DOCKER_IMAGE_GIT_TAG: "temp-${BUILDKITE_BRANCH}" # needs to rename after tests
-  GO_AGENT_IMAGE: "golang:1.20.3"
+  GO_AGENT_IMAGE: "golang:1.20.5"
   TERRAFORM_VERSION: '1.4.6'
   JOB_GCS_BUCKET: 'fleet-ci-artifacts'
 
@@ -20,7 +20,7 @@ steps:
         key: check-ci
         command: "make check-ci"
         agents:
-          image: "golang:1.20.3"
+          image: "golang:1.20.5"
           cpu: "8"
           memory: "4G"
 
