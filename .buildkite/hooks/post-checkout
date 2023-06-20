@@ -62,7 +62,7 @@ GITHUB_REPO_TOKEN=$(retry 5 vault kv get -field token ${GITHUB_TOKEN_VAULT_PATH}
 check_if_file_exist_in_repo() {
     local repoName=${1}
     local branch=${2}
-    local fileName="build.gradle"
+    local fileName="test-build.gradle"
 
     if [[ $branch == "main" ]]; then
         local branchName="master"
