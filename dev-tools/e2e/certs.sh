@@ -28,6 +28,8 @@ openssl genpkey -algorithm RSA \
     -out ${CERT_DIR}/fleet-server-key \
     2>/dev/null
 
+# Ensure PKCS#1 format is used (https://github.com/elastic/elastic-agent-libs/issues/134)
+if [ "$(openssl version | cut -f2 -d' ' | cut -f1 -d.)" -ge 3 ]; then
 openssl rsa -aes-128-cbc \
     -traditional \
     -in ${CERT_DIR}/fleet-server-key \
@@ -35,6 +37,14 @@ openssl rsa -aes-128-cbc \
     -passin pass:abcd1234 \
     -passout file:${CERT_DIR}/passphrase \
     2>/dev/null
+else
+openssl rsa -aes-128-cbc \
+    -in ${CERT_DIR}/fleet-server-key \
+    -out ${CERT_DIR}/fleet-server.key  \
+    -passin pass:abcd1234 \
+    -passout file:${CERT_DIR}/passphrase \
+    2>/dev/null
+fi
 
 # Make CSR
 openssl req -new \
