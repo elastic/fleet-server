@@ -116,4 +116,4 @@ targets:
     spec:
       content: '{{ source "latestGoVersion" }}'
       file: .buildkite/pipeline.yml
-      matchpattern: 'golang:\d+.\d+\d+'
+      matchpattern: 'golang:\d+.\d+.\d+'
