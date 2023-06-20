@@ -27,6 +27,7 @@ openssl genpkey -algorithm RSA \
     2>/dev/null
 
 openssl rsa -aes-128-cbc \
+    -traditional \
     -in ${CERT_DIR}/fleet-server-key \
     -out ${CERT_DIR}/fleet-server.key  \
     -passin pass:abcd1234 \
