@@ -37,14 +37,14 @@ checkout_merge() {
 #Returns IS_FILE_EXISTS_IN_REPO=true if file exists and IS_FILE_EXISTS_IN_REPO=false if not exists
 check_if_file_exist_in_repo() {
     local repoName=${1}
-    local branch=${2}
+#    local branch=${2}
     local path_to_file=${3}
-    local branchName=""
-    if [[ $branch == "main" ]]; then
-        branchName="master"
-    else
-        branchName="${BUILDKITE_BRANCH}"
-    fi
+    local branchName=${2}
+#    if [[ $branch == "main" ]]; then
+#        branchName="master"
+#    else
+#        branchName="${BUILDKITE_BRANCH}"
+#    fi
     local response=$(curl -s https://api.github.com/repos/elastic/${repoName}/contents/${path_to_file}?ref=${branchName} | grep -c "\"path\"\: \"${fileName}\"")
     if [[ ${response} -ge 1 ]]; then
         export IS_FILE_EXISTS_IN_REPO=true
