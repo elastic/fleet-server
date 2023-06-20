@@ -35,7 +35,7 @@ checkout_merge() {
 check_if_file_exist_in_repo() {
     local repoName="fleet-server"
     local branchName="main"
-    local fileName="Makefile"
+    local fileName="Makefil"
     local response=$(curl -s https://api.github.com/repos/elastic/${repoName}/contents/${fileName}?ref=${branchName} | grep -c "\"path\"\: \"${fileName}\"")
     if [[ ${response} -ge 1 ]]; then
         export IS_BRANCH_AVAILABLE=true
