@@ -15,8 +15,6 @@ steps:
       agents:
         provider: "gcp"
         image: "family/core-ubuntu-2004"
-        cpu: "8"
-        memory: "4G"
       matrix:
         setup:
           type:
@@ -29,8 +27,6 @@ steps:
       agents:
         provider: "aws"
         image: "core-ubuntu-2004-aarch64"
-        cpu: "8"
-        memory: "4G"
       matrix:
         setup:
           type:
@@ -43,9 +39,7 @@ steps:
     agents:
       provider: "gcp"
       image: "family/core-ubuntu-2004"
-      cpu: "8"
-      memory: "4G"
-    #if: ${IS_BRANCH_AVAILABLE} == "true"
+    if: ${IS_BRANCH_AVAILABLE} == "true"
     depends_on:
       - step: "package-publish"
         allow_failure: false

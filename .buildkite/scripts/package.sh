@@ -11,6 +11,7 @@ INFRA_REPO="https://github.com/repos/elastic/infra/contents"
 
 if [[ ${BUILDKITE_BRANCH} == "main" && ${MATRIX_TYPE} == "staging" ]]; then
     echo "INFO: staging artifacts for the main branch are not required."
+    exit 0
 else
     PLATFORMS=""
     PACKAGES=""
@@ -28,11 +29,6 @@ else
     else
         make SNAPSHOT=true release
     fi
-fi
-
-if [[ ${BUILDKITE_BRANCH} == "main" && ${MATRIX_TYPE} == "staging" ]]; then
-    echo "INFO: staging artifacts for the main branch are not required."
-else
     google_cloud_auth
     upload_mbp_packages_to_gcp_bucket "build/distributions/" "${MATRIX_TYPE}"
 fi

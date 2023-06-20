@@ -32,6 +32,18 @@ checkout_merge() {
     }
 }
 
+check_if_file_exist_in_repo() {
+    local repoName="fleet-server"
+    local branchName="main"
+    local fileName="Makefile"
+    local response=$(curl -s https://api.github.com/repos/elastic/${repoName}/contents/${fileName}?ref=${branchName} | grep -c "\"path\"\: \"${fileName}\"")
+    if [[ ${response} -ge 1 ]]; then
+        export IS_BRANCH_AVAILABLE="true"
+    else
+        export IS_BRANCH_AVAILABLE="false"
+    fi
+}
+
 pull_request="${BUILDKITE_PULL_REQUEST:-false}"
 
 if [[ "${pull_request}" == "false" ]]; then
@@ -51,3 +63,5 @@ git log --format=%B -n 1
 
 # Ensure buildkite groups are rendered
 echo ""
+
+check_if_file_exist_in_repo
