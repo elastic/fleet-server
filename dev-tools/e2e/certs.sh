@@ -2,6 +2,8 @@
 
 set -eu
 
+openssl version -a
+
 REPO_ROOT=$(cd $(dirname $(readlink -f "$0"))/../.. && pwd)
 CERT_DIR=${REPO_ROOT}/build/e2e-certs
 
