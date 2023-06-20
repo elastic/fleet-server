@@ -61,3 +61,5 @@ openssl verify -verbose \
 openssl rsa -check -noout \
     -in ${CERT_DIR}/fleet-server.key \
     -passin file:${CERT_DIR}/passphrase
+
+go run ./dev-tools/e2e/validatecerts.go ${CERT_DIR}
