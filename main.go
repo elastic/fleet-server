@@ -4,8 +4,12 @@
 
 //go:generate schema-generate -esdoc -s -cm "{\"Api\": \"API\", \"Id\": \"ID\"}" -o internal/pkg/model/schema.go -p model model/schema.json
 //go:generate oapi-codegen --config model/oapi-cfg.yml model/openapi.yml
+//go:generate oapi-codegen -generate types -package api -o pkg/api/types.gen.go  model/openapi.yml
+//go:generate oapi-codegen -generate client -package api -o pkg/api/client.gen.go  model/openapi.yml
 //go:generate go fmt internal/pkg/model/schema.go
 //go:generate go fmt internal/pkg/api/openapi.gen.go
+//go:generate go fmt pkg/api/types.gen.go
+//go:generate go fmt pkg/api/client.gen.go
 
 package main
 

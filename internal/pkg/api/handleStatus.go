@@ -68,7 +68,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 	}
 
 	state := sm.State()
-	resp := StatusResponse{
+	resp := StatusAPIResponse{
 		Name:   build.ServiceName,
 		Status: StatusResponseStatus(state.String()), // TODO try to make the oapi codegen less verbose here
 	}

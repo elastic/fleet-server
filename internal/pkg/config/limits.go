@@ -29,6 +29,7 @@ type ServerLimits struct {
 	UploadStartLimit Limit `config:"upload_start_limit"`
 	UploadEndLimit   Limit `config:"upload_end_limit"`
 	UploadChunkLimit Limit `config:"upload_chunk_limit"`
+	DeliverFileLimit Limit `config:"file_delivery_limit"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -57,6 +58,7 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	c.UploadStartLimit = mergeEnvLimit(c.UploadStartLimit, l.UploadStartLimit)
 	c.UploadEndLimit = mergeEnvLimit(c.UploadEndLimit, l.UploadEndLimit)
 	c.UploadChunkLimit = mergeEnvLimit(c.UploadChunkLimit, l.UploadChunkLimit)
+	c.DeliverFileLimit = mergeEnvLimit(c.DeliverFileLimit, l.DeliverFileLimit)
 }
 
 func mergeEnvLimit(L Limit, l limit) Limit {
