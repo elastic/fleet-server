@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+// validatecerts is a script to ensure that certs used in e2e tests can be parsed by tlscommon
 package main
 
 import (
