@@ -65,8 +65,9 @@ check_if_file_exist_in_repo() {
     local fileName="build.gradle"
 
     if [[ $branch == "main" ]]; then
-        branchName="master"
+        local branchName="master"
     fi
+
     local path_to_file="cd/release/release-manager/project-configs/${branchName}/${fileName}"
     local response=$(curl -s -u $GITHUB_REPO_TOKEN:x-oauth-basic https://api.github.com/repos/elastic/${repoName}/contents/${path_to_file}| grep -c "\"path\"\: \"${path_to_file}\"")
     if [[ ${response} -ge 1 ]]; then
@@ -96,4 +97,4 @@ git log --format=%B -n 1
 # Ensure buildkite groups are rendered
 echo ""
 
-check_if_file_exist_in_repo "infra" "main" #TODO should be changed to ${BUILDKITE_BRANCH}
+check_if_file_exist_in_repo "infra" "main" #TODO should be changed to ${BUILDKITE_BRANCH} before prod...
