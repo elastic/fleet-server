@@ -532,3 +532,24 @@ func (suite *BaseE2ETestSuite) StartToxiproxy(ctx context.Context) *toxiproxy.Cl
 	endpoint := fmt.Sprintf("%s:%s", hostIP, mappedPort.Port())
 	return toxiproxy.NewClient(endpoint)
 }
+
+func containerWaitForHealthyStatus() *wait.HTTPStrategy {
+	matcher := func(body io.Reader) bool {
+		d, err := io.ReadAll(body)
+		if err != nil {
+			return false
+		}
+		var status struct {
+			Status string `json:"status"`
+		}
+		err = json.Unmarshal(d, &status)
+		if err != nil {
+			return false
+		}
+		return status.Status == "HEALTHY"
+	}
+	return wait.ForHTTP("/api/status").
+		WithResponseMatcher(matcher).
+		WithAllowInsecure(true).
+		WithPort("8220/tcp")
+}
