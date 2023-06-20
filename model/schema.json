@@ -443,6 +443,10 @@
           "description": "Shared ID",
           "type": "string"
         },
+        "enrollment_id": {
+          "description": "Enrollment ID",
+          "type": "string"
+        },
         "type": {
           "description": "Type",
           "type": "string"
