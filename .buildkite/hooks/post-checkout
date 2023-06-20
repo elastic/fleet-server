@@ -73,4 +73,4 @@ git log --format=%B -n 1
 # Ensure buildkite groups are rendered
 echo ""
 
-check_if_file_exist_in_repo "fleet-server" "main" "dev-tools/e2e/main/Dockerfile"
+check_if_file_exist_in_repo "fleet-server" "main" "dev-tools/e2e/Dockerfile"
