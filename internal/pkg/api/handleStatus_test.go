@@ -108,7 +108,7 @@ func TestHandleStatus(t *testing.T) {
 
 					assert.Equal(t, expectedCode, w.Code)
 
-					var res StatusResponse
+					var res StatusAPIResponse
 					err := json.Unmarshal(w.Body.Bytes(), &res)
 					require.NoError(t, err)
 
