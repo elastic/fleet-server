@@ -10,7 +10,6 @@ env:
   DOCKER_IMAGE_GIT_TAG: "temp-${BUILDKITE_BRANCH}" # needs to rename after tests
   GO_AGENT_IMAGE: "golang:1.20.3"
   TERRAFORM_VERSION: '1.4.6'
-  JOB_GCS_BUCKET: 'fleet-ci-artifacts'
 
 steps:
   - group: "Check and build"
