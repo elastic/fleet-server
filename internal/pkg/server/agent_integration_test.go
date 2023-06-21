@@ -141,6 +141,7 @@ func TestAgent(t *testing.T) {
 
 	// reconfigure with agent ID set
 	agentID := uuid.Must(uuid.NewV4()).String()
+	t.Logf("Generated new agentID: %s", agentID)
 	expected = makeExpected(agentID, 1, inputSource, 1, outputSource)
 	control.Expected(expected)
 
