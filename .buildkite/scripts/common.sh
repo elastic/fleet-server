@@ -95,29 +95,29 @@ upload_packages_to_gcp_bucket() {
 }
 
 get_bucket_uri() {
-    type=${1}
-    baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"
+    local type=${1}
+    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"
     if [[ ${type} == "snapshot" ]]; then
-        folder="commits"
+        local folder="commits"
     else
-        folder="${type}"
+        local folder="${type}"
     fi
     bucketUri="${baseUri}/${folder}/${BUILDKITE_COMMIT}"
 }
 
 upload_mbp_packages_to_gcp_bucket() {
-    pattern=${1}
-    type=${2}
+    local pattern=${1}
+    local type=${2}
     get_bucket_uri "${type}"
     gsutil -m -q cp -a public-read -r ${pattern} ${bucketUri}
 }
 
 download_mbp_packages_from_gcp_bucket() {
-    pattern=${1}
-    type=${2}
+    local pattern=${1}
+    local type=${2}
     mkdir -p ${WORKSPACE}/${pattern}
     get_bucket_uri "${type}"
-    gsutil -m cp -r ${bucketUri} ${WORKSPACE}/${pattern}
+    gsutil -m -q cp -r ${bucketUri} ${WORKSPACE}/${pattern}
 }
 
 with_mage() {
@@ -135,7 +135,7 @@ with_mage() {
 }
 
 cleanup() {
-    echo "Deleting temporal files..."
+    echo "Deleting temporary files..."
     cd ${WORKSPACE}
     rm -rf ${TMP_FOLDER_TEMPLATE_BASE}.*
     echo "Done."
