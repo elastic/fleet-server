@@ -20,7 +20,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type standAloneSelfMonitorT struct {
+type StandAloneSelfMonitor struct {
 	log zerolog.Logger
 
 	mut   sync.RWMutex
@@ -38,8 +38,8 @@ type standAloneSelfMonitorT struct {
 // NewStandAloneSelfMonitor creates the self policy monitor for an stand-alone Fleet Server.
 //
 // Checks that this Fleet Server has access to the policies index.
-func NewStandAloneSelfMonitor(bulker bulk.Bulk, reporter state.Reporter) *standAloneSelfMonitorT {
-	return &standAloneSelfMonitorT{
+func NewStandAloneSelfMonitor(bulker bulk.Bulk, reporter state.Reporter) *StandAloneSelfMonitor {
+	return &StandAloneSelfMonitor{
 		log:           log.With().Str("ctx", "policy self monitor").Logger(),
 		bulker:        bulker,
 		state:         client.UnitStateStarting,
@@ -52,7 +52,7 @@ func NewStandAloneSelfMonitor(bulker bulk.Bulk, reporter state.Reporter) *standA
 }
 
 // Run runs the monitor.
-func (m *standAloneSelfMonitorT) Run(ctx context.Context) error {
+func (m *StandAloneSelfMonitor) Run(ctx context.Context) error {
 	ticker := time.NewTicker(m.checkTime)
 	defer ticker.Stop()
 
@@ -67,7 +67,7 @@ func (m *standAloneSelfMonitorT) Run(ctx context.Context) error {
 	}
 }
 
-func (m *standAloneSelfMonitorT) updateState(state client.UnitState, reason string) {
+func (m *StandAloneSelfMonitor) updateState(state client.UnitState, reason string) {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
@@ -75,13 +75,13 @@ func (m *standAloneSelfMonitorT) updateState(state client.UnitState, reason stri
 	m.state = state
 }
 
-func (m *standAloneSelfMonitorT) State() client.UnitState {
+func (m *StandAloneSelfMonitor) State() client.UnitState {
 	m.mut.RLock()
 	defer m.mut.RUnlock()
 	return m.state
 }
 
-func (m *standAloneSelfMonitorT) check(ctx context.Context) {
+func (m *StandAloneSelfMonitor) check(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, m.checkTimeout)
 	defer cancel()
 

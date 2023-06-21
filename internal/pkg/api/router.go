@@ -28,7 +28,14 @@ func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer,
 	r.Use(logger.Middleware) // Attach middlewares to router directly so the occur before any request parsing/validation
 	r.Use(middleware.Recoverer)
 	r.Use(Limiter(cfg).middleware)
-	r.Use(statusChecker(sm))
+
+	// In managed mode, fleet-server is expected to be able to operate normally during startup,
+	// so the agent managing it can enroll. So attach the statusChecker middleware only on
+	// stand-alone mode.
+	if _, isStandAlone := sm.(*policy.StandAloneSelfMonitor); isStandAlone {
+		r.Use(statusChecker(sm))
+	}
+
 	if tracer != nil {
 		r.Use(apmchiv5.Middleware(apmchiv5.WithTracer(tracer)))
 	}
