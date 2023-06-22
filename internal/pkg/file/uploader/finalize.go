@@ -38,7 +38,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 		return info, ErrStatusNoUploads
 	}
 
-	chunks, err := file.GetChunkInfos(ctx, u.bulker, UploadDataIndexPattern, info.DocID)
+	chunks, err := file.GetChunkInfos(ctx, u.bulker, UploadDataIndexPattern, info.DocID, file.GetChunkInfoOpt{IncludeSize: true, RequireHash: true})
 	if err != nil {
 		return info, err
 	}

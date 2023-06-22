@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -21,17 +22,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -43,6 +47,7 @@ import (
 
 const (
 	serverVersion = "8.0.0"
+	localhost     = "localhost"
 
 	testWaitServerUp = 3 * time.Second
 
@@ -66,6 +71,7 @@ type tserver struct {
 	g         *errgroup.Group
 	srv       *Fleet
 	enrollKey string
+	bulker    bulk.Bulk
 }
 
 func (s *tserver) baseURL() string {
@@ -79,10 +85,26 @@ func (s *tserver) baseURL() string {
 }
 
 func (s *tserver) waitExit() error {
-	return s.g.Wait()
+	err := s.g.Wait()
+	if errors.Is(err, context.Canceled) {
+		return nil
+	}
+	return err
 }
 
-func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
+type Option func(cfg *config.Config) error
+
+func WithAPM(url string) Option {
+	return func(cfg *config.Config) error {
+		cfg.Inputs[0].Server.Instrumentation = config.Instrumentation{
+			Enabled: true,
+			Hosts:   []string{url},
+		}
+		return nil
+	}
+}
+
+func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserver, error) {
 	t.Helper()
 
 	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
@@ -162,10 +184,16 @@ func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 	srvcfg := &config.Server{}
 	srvcfg.InitDefaults()
 	srvcfg.Timeouts.CheckinMaxPoll = 2 * time.Minute // set to a short value for tests
-	srvcfg.Host = "localhost"
+	srvcfg.Host = localhost
 	srvcfg.Port = port
 	cfg.Inputs[0].Server = *srvcfg
 	log.Info().Uint16("port", port).Msg("Test fleet server")
+
+	for _, opt := range opts {
+		if err := opt(cfg); err != nil {
+			return nil, err
+		}
+	}
 
 	srv, err := NewFleet(build.Info{Version: serverVersion}, state.NewLog(), false)
 	if err != nil {
@@ -178,7 +206,7 @@ func startTestServer(t *testing.T, ctx context.Context) (*tserver, error) {
 		return srv.Run(ctx, cfg)
 	})
 
-	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token()}
+	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
 	err = tsrv.waitServerUp(ctx, testWaitServerUp)
 	if err != nil {
 		return nil, fmt.Errorf("unable to start server: %w", err)
@@ -222,6 +250,120 @@ func (s *tserver) buildURL(id string, cmd string) string {
 	}
 
 	return s.baseURL() + ur
+}
+
+type MockReporter struct {
+	mock.Mock
+}
+
+func (m *MockReporter) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
+	args := m.Called(state, message, payload)
+	return args.Error(0)
+}
+
+func TestServerConfigErrorReload(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// don't use startTestServer as we need failing initial config.
+	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
+	require.NoError(t, err)
+	newCfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
+	require.NoError(t, err)
+
+	logger.Init(cfg, "fleet-server") //nolint:errcheck // test logging setup
+	bulker := ftesting.SetupBulk(ctx, t)
+
+	policyID := uuid.Must(uuid.NewV4()).String()
+	_, err = dl.CreatePolicy(ctx, bulker, model.Policy{
+		PolicyID:           policyID,
+		RevisionIdx:        1,
+		DefaultFleetServer: true,
+		Data:               policyData,
+	})
+	require.NoError(t, err)
+
+	// In order to create a functional enrollement token we need to use the ES endpoint to create a new api key
+	// then add the key (id/value) to the enrollment index
+	esCfg := elasticsearch.Config{
+		Username: "elastic",
+		Password: "changeme",
+	}
+	es, err := elasticsearch.NewClient(esCfg)
+	require.NoError(t, err)
+	key, err := apikey.Create(ctx, es, "default", "", "true", []byte(`{
+	    "fleet-apikey-enroll": {
+		"cluster": [],
+		"index": [],
+		"applications": [{
+		    "application": "fleet",
+		    "privileges": ["no-privileges"],
+		    "resources": ["*"]
+		}]
+	    }
+	}`), map[string]interface{}{
+		"managed_by": "fleet",
+		"managed":    true,
+		"type":       "enroll",
+		"policy_id":  policyID,
+	})
+	require.NoError(t, err)
+
+	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentAPIKey{
+		Name:     "Default",
+		APIKey:   key.Key,
+		APIKeyID: key.ID,
+		PolicyID: policyID,
+		Active:   true,
+	})
+	require.NoError(t, err)
+	// sanity check
+	tokens, err := dl.FindEnrollmentAPIKeys(ctx, bulker, dl.QueryEnrollmentAPIKeyByPolicyID, dl.FieldPolicyID, policyID)
+	require.NoError(t, err)
+	require.NotZero(t, len(tokens), "no enrollment tokens found")
+
+	port, err := ftesting.FreePort()
+	require.NoError(t, err)
+
+	srvcfg := &config.Server{}
+	srvcfg.InitDefaults()
+	srvcfg.Timeouts.CheckinMaxPoll = 2 * time.Minute // set to a short value for tests
+	srvcfg.Host = localhost
+	srvcfg.Port = port
+	cfg.Inputs[0].Server = *srvcfg
+	newCfg.Inputs[0].Server = *srvcfg
+	cfg.HTTP.Enabled = false
+	newCfg.HTTP.Enabled = false
+	log.Info().Uint16("port", port).Msg("Test fleet server")
+
+	mReporter := &MockReporter{}
+	srv, err := NewFleet(build.Info{Version: serverVersion}, mReporter, false)
+	require.NoError(t, err)
+
+	mReporter.On("UpdateState", client.UnitStateStarting, mock.Anything, mock.Anything).Return(nil)
+	mReporter.On("UpdateState", client.UnitStateConfiguring, mock.Anything, mock.Anything).Return(nil)
+	mReporter.On("UpdateState", client.UnitStateHealthy, mock.Anything, mock.Anything).Run(func(_ mock.Arguments) {
+		// Call cancel to stop the server once it's healthy
+		cancel()
+	}).Return(nil)
+	mReporter.On("UpdateState", client.UnitStateStopping, mock.Anything, mock.Anything).Return(nil)
+
+	// set bad config
+	cfg.Output.Elasticsearch.ServiceToken = "incorrect"
+
+	// send good config
+	err = srv.Reload(ctx, newCfg)
+	require.NoError(t, err)
+
+	// Run server with the healthy reload
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		return srv.Run(ctx, cfg)
+	})
+
+	err = g.Wait()
+	require.NoError(t, err)
+	mReporter.AssertExpectations(t)
 }
 
 func TestServerUnauthorized(t *testing.T) {
@@ -328,6 +470,7 @@ func TestServerInstrumentation(t *testing.T) {
 	tracerConnected := make(chan struct{}, 1)
 	tracerDisconnected := make(chan struct{}, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		t.Logf("Tracing server received request to: %s", req.URL.Path)
 		if req.URL.Path != "/intake/v2/events" {
 			return
 		}
@@ -337,8 +480,8 @@ func TestServerInstrumentation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// Start test server
-	srv, err := startTestServer(t, ctx)
+	// Start test server with instrumentation
+	srv, err := startTestServer(t, ctx, WithAPM(server.URL))
 	require.NoError(t, err)
 
 	newInstrumentationCfg := func(cfg config.Config, instr config.Instrumentation) { //nolint:govet // mutex should not be copied in operation (hopefully)
@@ -349,12 +492,6 @@ func TestServerInstrumentation(t *testing.T) {
 
 		require.NoError(t, srv.srv.Reload(ctx, newCfg))
 	}
-
-	// Enable instrumentation
-	newInstrumentationCfg(*srv.cfg, config.Instrumentation{ //nolint:govet // mutex should not be copied in operation (hopefully)
-		Enabled: true,
-		Hosts:   []string{server.URL},
-	})
 
 	stopClient := make(chan struct{})
 	cli := cleanhttp.DefaultClient()
@@ -539,6 +676,138 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	// When decoding to a (typed) struct, the default will implicitly be false if it's missing
 	_, ok = ackObj["errors"]
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
+}
+
+func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) string {
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+
+	cli := cleanhttp.DefaultClient()
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+
+	p, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	var obj map[string]interface{}
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	t.Log(obj)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	item := obj["item"]
+	mm, ok := item.(map[string]interface{})
+	require.True(t, ok, "expected attribute item to be an object")
+	agentID := mm["id"]
+	return agentID.(string)
+}
+
+func Test_Agent_Enrollment_Id(t *testing.T) {
+	enrollBodyWEnrollmentID := `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "enrollment_id": "123456",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx)
+	require.NoError(t, err)
+
+	t.Log("Enroll the first agent with enrollment_id")
+	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+
+	t.Log("Enroll the second agent with the same enrollment_id")
+	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+
+	// cleanup
+	defer func() {
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, secondAgentID)
+		if err != nil {
+			t.Log("could not clean up second agent")
+		}
+		err2 := srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
+		if err2 != nil {
+			t.Log("could not clean up first agent")
+		}
+	}()
+
+	// checking that old agent with enrollment id is deleted
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	t.Log(agent)
+	if err != nil {
+		t.Log("old agent not found as expected")
+	} else {
+		t.Fatal("duplicate agent found after enrolling with same enrollment id")
+	}
+}
+
+func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
+	enrollBodyWEnrollmentID := `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "enrollment_id": "123456invalidated",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx)
+	require.NoError(t, err)
+
+	t.Log("Enroll the first agent with enrollment_id")
+	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	if err != nil {
+		t.Log("first agent not found")
+	}
+
+	// invalidate first api key to verify if second enroll works like this
+	t.Log("invalidate the first agent api key")
+	t.Log(agent.AccessAPIKeyID)
+	if err = srv.bulker.APIKeyInvalidate(ctx, agent.AccessAPIKeyID); err != nil {
+		t.Fatal("Could not invalidate API key")
+	}
+
+	t.Log("Enroll the second agent with the same enrollment_id")
+	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+
+	// cleanup
+	defer func() {
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, secondAgentID)
+		if err != nil {
+			t.Log("could not clean up second agent")
+		}
+		err2 := srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
+		if err2 != nil {
+			t.Log("could not clean up first agent")
+		}
+	}()
+
+	// checking that old agent with enrollment id is deleted
+	agent, err = dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	t.Log(agent)
+	if err != nil {
+		t.Log("old agent not found as expected")
+	} else {
+		t.Fatal("duplicate agent found after enrolling with same enrollment id")
+	}
 }
 
 func Test_Agent_Auth_errors(t *testing.T) {

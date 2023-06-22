@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -283,13 +284,12 @@ func TestUploadBeginResponse(t *testing.T) {
 	hr.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	var response UploadBeginResponse
+	var response UploadBeginAPIResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &response)
 	assert.NoErrorf(t, err, "upload start should provide valid JSON response")
 
 	assert.NotEmptyf(t, response.UploadId, "upload start response should provide an ID")
 	assert.Greaterf(t, response.ChunkSize, int64(0), "upload start response should provide a chunk size > 0")
-
 }
 
 /*
@@ -858,7 +858,7 @@ func TestUploadCompleteIncorrectTransitHash(t *testing.T) {
 func prepareUploaderMock(t *testing.T) (http.Handler, apiServer, *itesting.MockBulk) {
 	// chunk index operations skip the bulker in order to send binary docs directly
 	// so a mock *elasticsearch.Client needs to be be prepared
-	es := mockESClient(t)
+	es, _ := mockESClient(t)
 
 	fakebulk := itesting.NewMockBulk()
 	fakebulk.On("Create",
@@ -1025,13 +1025,9 @@ func (t *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.RoundTripFn(req)
 }
 
-func mockESClient(t *testing.T) *elasticsearch.Client {
+func mockESClient(t *testing.T) (*elasticsearch.Client, *MockTransport) {
 	mocktrans := MockTransport{
-		Response: &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(strings.NewReader(`{}`)),
-			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
-		},
+		Response: sendBodyString("{}"), //nolint:bodyclose // nopcloser is used, linter does not see it
 	}
 
 	mocktrans.RoundTripFn = func(req *http.Request) (*http.Response, error) { return mocktrans.Response, nil }
@@ -1039,5 +1035,18 @@ func mockESClient(t *testing.T) *elasticsearch.Client {
 		Transport: &mocktrans,
 	})
 	require.NoError(t, err)
-	return client
+	return client, &mocktrans
+}
+
+func sendBodyString(body string) *http.Response { return sendBody(strings.NewReader(body)) }
+func sendBodyBytes(body []byte) *http.Response  { return sendBody(bytes.NewReader(body)) }
+func sendBody(body io.Reader) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(body),
+		Header: http.Header{
+			"X-Elastic-Product": []string{"Elasticsearch"},
+			"Content-Type":      []string{"application/cbor"},
+		},
+	}
 }

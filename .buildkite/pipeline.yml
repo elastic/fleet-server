@@ -8,7 +8,7 @@ env:
   DOCKER_IMAGE_SHA_TAG: "temp-${BUILDKITE_COMMIT}" # needs to rename after tests
   DOCKER_IMAGE_LATEST_TAG: "temp-latest" # needs to rename after tests
   DOCKER_IMAGE_GIT_TAG: "temp-${BUILDKITE_BRANCH}" # needs to rename after tests
-  GO_AGENT_IMAGE: "golang:1.20.3"
+  GO_AGENT_IMAGE: "golang:1.20.5"
   TERRAFORM_VERSION: '1.4.6'
 
 steps:
@@ -19,7 +19,7 @@ steps:
         key: check-ci
         command: "make check-ci"
         agents:
-          image: "golang:1.20.3"
+          image: "golang:1.20.5"
           cpu: "8"
           memory: "4G"
 
@@ -90,11 +90,26 @@ steps:
   - label: ":docker: Publish docker image"
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
-    if: build.env("BUILDKITE_PULL_REQUEST") == null
+    if: "build.env('BUILDKITE_PULL_REQUEST') == '' && build.env('BUILDKITE_BRANCH') == 'main'"
     agents:
       provider: "gcp"
     depends_on:
       - step: "tests"
+        allow_failure: false
+
+  - label: ":argo: Update image tag for Fleet Server"
+    trigger: serverless-gitops-update-stack-image-tag
+    async: true
+    branches: main
+    build:
+      env:
+        IMAGE_TAG: "$BUILDKITE_COMMIT"
+        SERVICE: fleet-controller
+        NAMESPACE: observability-ci
+        IMAGE_NAME: fleet-server
+        COMMIT_MESSAGE: "gitops: update fleet-server tag to elastic/fleet-server@$BUILDKITE_COMMIT"
+    depends_on:
+      - step: "publish"
         allow_failure: false
 
   - label: ":gcloud: Release test"

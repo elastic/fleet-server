@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/str"
@@ -132,9 +133,20 @@ func (et *EnrollerT) _enroll(
 	policyID,
 	ver string) (*EnrollResponse, error) {
 
-	if req.SharedId != "" {
-		// TODO: Support pre-existing install
-		return nil, errors.New("preexisting install not yet supported")
+	var agent model.Agent
+	var enrollmentID string
+	if req.EnrollmentId != nil {
+		enrollmentID = *req.EnrollmentId
+		var err error
+		agent, err = dl.FindAgent(ctx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, enrollmentID)
+		if err != nil {
+			zlog.Debug().Err(err).
+				Str("EnrollmentId", enrollmentID).
+				Msg("Agent with EnrollmentId not found")
+			if !errors.Is(err, dl.ErrNotFound) && !strings.Contains(err.Error(), "no such index") {
+				return nil, err
+			}
+		}
 	}
 
 	now := time.Now()
@@ -146,6 +158,33 @@ func (et *EnrollerT) _enroll(
 	}
 
 	agentID := u.String()
+	// only delete existing agent if it never checked in
+	if agent.Id != "" && agent.LastCheckin == "" {
+		zlog.Debug().
+			Str("EnrollmentId", enrollmentID).
+			Str("AgentId", agent.Id).
+			Str("APIKeyID", agent.AccessAPIKeyID).
+			Msg("Invalidate old api key and remove existing agent with the same enrollment_id")
+		// invalidate previous api key
+		err := invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
+		if err != nil {
+			zlog.Error().Err(err).
+				Str("EnrollmentId", enrollmentID).
+				Str("AgentId", agent.Id).
+				Str("APIKeyID", agent.AccessAPIKeyID).
+				Msg("Error when trying to invalidate API key of old agent with enrollment id")
+			return nil, err
+		}
+		// delete existing agent to recreate with new api key
+		err = deleteAgent(ctx, zlog, et.bulker, agent.Id)
+		if err != nil {
+			zlog.Error().Err(err).
+				Str("EnrollmentId", enrollmentID).
+				Str("AgentId", agent.Id).
+				Msg("Error when trying to delete old agent with enrollment id")
+			return nil, err
+		}
+	}
 
 	// Update the local metadata agent id
 	localMeta, err := updateLocalMetaAgentID(req.Metadata.Local, agentID)
@@ -176,7 +215,8 @@ func (et *EnrollerT) _enroll(
 			ID:      agentID,
 			Version: ver,
 		},
-		Tags: removeDuplicateStr(req.Metadata.Tags),
+		Tags:         removeDuplicateStr(req.Metadata.Tags),
+		EnrollmentID: enrollmentID,
 	}
 
 	err = createFleetAgent(ctx, et.bulker, agentID, agentData)
@@ -242,7 +282,7 @@ func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk
 LOOP:
 	for {
 
-		_, err := bulker.APIKeyRead(ctx, apikeyID, false)
+		_, err := bulker.APIKeyRead(ctx, apikeyID, true)
 
 		switch {
 		case err == nil:

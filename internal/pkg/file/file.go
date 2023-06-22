@@ -36,6 +36,12 @@ type FileData struct {
 	Size      int64  `json:"size"`
 	ChunkSize int64  `json:"ChunkSize"`
 	Status    string `json:"Status"`
+	MimeType  string `json:"mime_type,omitempty"`
+	Hash      *Hash  `json:"hash,omitempty"`
+}
+
+type Hash struct {
+	SHA2 string `json:"sha256,omitempty"`
 }
 
 type MetaDoc struct {
@@ -65,11 +71,13 @@ func (m *MetaDoc) UnmarshalJSON(b []byte) error {
 }
 
 type ChunkInfo struct {
-	Pos  int  // Ordered chunk position in file
-	Last bool // Is this the final chunk in the file
-	SHA2 string
-	Size int
-	BID  string // base id, matches metadata doc's _id
+	Pos   int  // Ordered chunk position in file
+	Last  bool // Is this the final chunk in the file
+	SHA2  string
+	Size  int
+	BID   string // base id, matches metadata doc's _id
+	Index string
+	ID    string // chunk _id
 }
 
 type Info struct {
