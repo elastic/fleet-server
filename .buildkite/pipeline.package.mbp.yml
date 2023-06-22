@@ -50,7 +50,7 @@ steps:
     agents:
       provider: "gcp"
       image: "family/core-ubuntu-2004"
-    if: "${IS_FILE_EXISTS_IN_REPO} && ${BUILDKITE_BRANCH} != 'main'"
+    if: "${IS_FILE_EXISTS_IN_REPO} == true && build.env('BUILDKITE_BRANCH') != 'main'"
     depends_on:
       - step: "rda-snapshot"
         allow_failure: false
