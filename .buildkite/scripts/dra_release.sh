@@ -5,11 +5,11 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 
 VERSION="$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')"
-BASE_DIR="${WORKSPACE}/${FOLDER}"
+FOLDER_PATH="build/distributions"
+BASE_DIR="${WORKSPACE}/${FOLDER_PATH}"
 DRA_OUTPUT="release-manager.out"
 PROJECT="fleet-server"
 TYPE=${1}
-FOLDER="build/distributions"
 BRANCH="${BUILDKITE_BRANCH}"
 
 if [[ "${VERSION}" == *"-SNAPSHOT"* || "${VERSION}" == "" ]]; then
@@ -26,7 +26,7 @@ add_bin_path
 
 google_cloud_auth
 
-download_mbp_packages_from_gcp_bucket "${FOLDER}" "${TYPE}"
+download_mbp_packages_from_gcp_bucket "${FOLDER_PATH}" "${TYPE}"
 
 with_go
 
