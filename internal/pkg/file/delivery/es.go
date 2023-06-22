@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
@@ -24,6 +25,7 @@ const (
 
 	FieldDocID        = "_id"
 	FieldTargetAgents = "file.Meta.target_agents"
+	FieldStatus       = "file.Status"
 )
 
 var (
@@ -36,6 +38,7 @@ func prepareQueryMetaByIDAndAgent() *dsl.Tmpl {
 	node := root.Query().Bool().Must()
 	node.Term(FieldDocID, tmpl.Bind(FieldDocID), nil)
 	node.Term(FieldTargetAgents, tmpl.Bind("target_agents"), nil)
+	node.Term(FieldStatus, file.StatusDone, nil)
 	tmpl.MustResolve(root)
 	return tmpl
 }

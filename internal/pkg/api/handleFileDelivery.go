@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -26,7 +25,6 @@ type FileDeliveryT struct {
 	chunkClient *elasticsearch.Client
 	deliverer   *delivery.Deliverer
 	authAgent   func(*http.Request, *string, bulk.Bulk, cache.Cache) (*model.Agent, error) // injectable for testing purposes
-	authAPIKey  func(*http.Request, bulk.Bulk, cache.Cache) (*apikey.APIKey, error)        // as above
 }
 
 func NewFileDeliveryT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *FileDeliveryT {
@@ -41,12 +39,11 @@ func NewFileDeliveryT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elastic
 		cache:       cache,
 		deliverer:   delivery.New(chunkClient, bulker, maxFileSize),
 		authAgent:   authAgent,
-		authAPIKey:  authAPIKey,
 	}
 }
 
 func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, fileID string) error {
-	agent, err := authAgent(r, nil, ft.bulker, ft.cache)
+	agent, err := ft.authAgent(r, nil, ft.bulker, ft.cache)
 	if err != nil {
 		return err
 	}
