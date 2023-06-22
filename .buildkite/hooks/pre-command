@@ -41,7 +41,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" && "$BUILDKITE_ST
     export DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
     export DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
     docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
-    local DRA_CREDS=$(retry 5 vault kv get -field=data -format=json "${DRA_SECRET_PATH}")
+    DRA_CREDS=$(retry 5 vault kv get -field=data -format=json "${DRA_SECRET_PATH}")
     export VAULT_ADDR=$(echo ${DRA_CREDS} | jq -r '.vault_addr')
     export VAULT_ROLE_ID=$(echo ${DRA_CREDS} | jq -r '.vault_role_id')
     export VAULT_SECRET_ID=$(echo ${DRA_CREDS} | jq -r '.vault_secret_id')

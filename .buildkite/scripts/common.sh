@@ -6,15 +6,21 @@ WORKSPACE="$(pwd)/bin"
 TMP_FOLDER_TEMPLATE_BASE="tmp.fleet-server"
 REPO="fleet-server"
 
-add_bin_path(){
-    echo "Adding PATH to the environment variables..."
+create_workspace() {
+    if [[ ! -d "${WORKSPACE}" ]]; then
     mkdir -p ${WORKSPACE}
+    fi
+}
+
+add_bin_path() {
+    echo "Adding PATH to the environment variables..."
+    create_workspace
     export PATH="${PATH}:${WORKSPACE}"
 }
 
 with_go() {
     echo "Setting up the Go environment..."
-    mkdir -p ${WORKSPACE}
+    create_workspace
     retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
     chmod +x ${WORKSPACE}/gvm
     eval "$(gvm $(cat .go-version))"
@@ -25,7 +31,7 @@ with_go() {
 
 with_docker_compose() {
     echo "Setting up the Docker-compose environment..."
-    mkdir -p ${WORKSPACE}
+    create_workspace
     retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
@@ -64,7 +70,7 @@ docker_logout() {
 with_Terraform() {
     echo "Setting up the Terraform environment..."
     destFile="terraform.zip"
-    mkdir -p ${WORKSPACE}
+    create_workspace
     retry 5 curl -SL -o ${WORKSPACE}/${destFile} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
     unzip -q ${WORKSPACE}/${destFile} -d ${WORKSPACE}/
     rm ${WORKSPACE}/${destFile}
@@ -121,22 +127,23 @@ download_mbp_packages_from_gcp_bucket() {
 }
 
 with_mage() {
-    install_packages=(
+    local install_packages=(
             "github.com/magefile/mage"
             "github.com/elastic/go-licenser"
             "golang.org/x/tools/cmd/goimports"
             "github.com/jstemmer/go-junit-report"
             "gotest.tools/gotestsum"
     )
-
-    for pckg in "${install_packages[@]}"; do
-    go install "${pckg}@latest"
+    create_workspace
+    for pkg in "${install_packages[@]}"; do
+    go install "${pkg}@latest"
     done
 }
 
 cleanup() {
     echo "Deleting temporary files..."
-    cd ${WORKSPACE}
-    rm -rf ${TMP_FOLDER_TEMPLATE_BASE}.*
+    if [[ ! -d "${WORKSPACE}/${TMP_FOLDER_TEMPLATE_BASE}.*" ]]; then
+        rm -rf ${WORKSPACE}/${TMP_FOLDER_TEMPLATE_BASE}.*
+    fi
     echo "Done."
 }
