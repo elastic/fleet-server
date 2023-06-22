@@ -130,10 +130,10 @@ func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
 	)
 
 	started := false
+	ech := make(chan error, 2)
 
 LOOP:
 	for {
-		ech := make(chan error, 2)
 		if started {
 			f.reporter.UpdateState(client.UnitStateConfiguring, "Re-configuring", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		} else {
@@ -177,6 +177,12 @@ LOOP:
 			if srvCancel != nil {
 				log.Info().Msg("stopping server on configuration change")
 				stop(srvCancel, srvEg)
+				select {
+				case err := <-ech:
+					log.Debug().Err(err).Msg("Server stopped intercepted expected context cancel error.")
+				case <-time.After(time.Second * 5):
+					log.Warn().Msg("Server stopped expected context cancel error missing.")
+				}
 			}
 			log.Info().Msg("starting server on configuration change")
 			srvEg, srvCancel = start(ctx, func(ctx context.Context, cfg *config.Config) error {
