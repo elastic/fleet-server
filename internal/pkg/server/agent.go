@@ -118,7 +118,7 @@ func (a *Agent) Run(ctx context.Context) error {
 				return
 			case err := <-a.agent.Errors():
 				if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
-					log.Error().Err(err)
+					log.Error().Err(err).Msg("Agent wrapper received error.")
 				}
 			case change := <-a.agent.UnitChanges():
 				switch change.Type {
@@ -145,8 +145,8 @@ func (a *Agent) Run(ctx context.Context) error {
 					// Agent ID is not set for the component.
 					t.Stop()
 					err := a.reconfigure(subCtx)
-					if err != nil {
-						log.Error().Err(err)
+					if err != nil && !errors.Is(err, context.Canceled) {
+						log.Error().Err(err).Msg("Bootstrap error when reconfiguring")
 					}
 				}
 			}
