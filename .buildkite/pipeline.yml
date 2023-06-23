@@ -123,7 +123,12 @@ steps:
 
   - label: ":jenkins: Release - Package Registry Distribution"
     key: "release-package-registry"
-    command: echo "Triggering the Jenkins Job 'release-package-registry-distribution'..."
+    trigger: "package-registry-release-package-registry-distribution"
+    build:
+      branch: "main"
+      meta_data:
+        DOCKER_TAG: "${BUILDKITE_TAG}"
+    if: "build.env('BUILDKITE_TAG') != ''"
     depends_on:
       - step: "release-test"
         allow_failure: false
