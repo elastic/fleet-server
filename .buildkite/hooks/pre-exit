@@ -16,7 +16,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "package-x86-64" || "$BUILDKITE_STEP_KEY" == "package-arm" || "$BUILDKITE_STEP_KEY" == "rda-snapshot" && "$BUILDKITE_STEP_KEY" == "rda-staging" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "package-x86-64" || "$BUILDKITE_STEP_KEY" == "package-arm" || "$BUILDKITE_STEP_KEY" == "dra-snapshot" && "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
     unset GOOGLE_APPLICATIONS_CREDENTIALS
     docker logout ${DOCKER_REGISTRY}
     cleanup
