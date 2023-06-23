@@ -37,7 +37,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   fi
 fi
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" && "$BUILDKITE_STEP_KEY" == "rda-snapshot" && "$BUILDKITE_STEP_KEY" == "rda-staging" ]]; then
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" && "$BUILDKITE_STEP_KEY" == "dra-snapshot" && "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
     export DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
     export DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
     docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
