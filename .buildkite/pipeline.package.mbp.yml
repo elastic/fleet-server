@@ -21,7 +21,7 @@ steps:
           type:
           - "snapshot"
           - "staging"
-
+          
     - label: "Package Ubuntu-20 aarch64"
       key: "package-arm"
       command: ".buildkite/scripts/package.sh {{matrix.type}}"
@@ -35,7 +35,7 @@ steps:
           - "staging"
 
   - label: "DRA snapshot"
-    key: "rda-snapshot"
+    key: "dra-snapshot"
     command: ".buildkite/scripts/dra_snapshot.sh"
     agents:
       provider: "gcp"

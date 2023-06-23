@@ -10,7 +10,6 @@ env:
   DOCKER_IMAGE_GIT_TAG: "temp-${BUILDKITE_BRANCH}" # needs to rename after tests
   GO_AGENT_IMAGE: "golang:1.20.5"
   TERRAFORM_VERSION: '1.4.6'
-  JOB_GCS_BUCKET: 'fleet-ci-artifacts'
 
 steps:
   - group: "Check and build"
@@ -124,7 +123,12 @@ steps:
 
   - label: ":jenkins: Release - Package Registry Distribution"
     key: "release-package-registry"
-    command: echo "Triggering the Jenkins Job 'release-package-registry-distribution'..."
+    trigger: "package-registry-release-package-registry-distribution"
+    build:
+      branch: "main"
+      meta_data:
+        DOCKER_TAG: "${BUILDKITE_TAG}"
+    if: "build.env('BUILDKITE_TAG') != ''"
     depends_on:
       - step: "release-test"
         allow_failure: false
@@ -132,7 +136,7 @@ steps:
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
-    if:  "build.env('BUILDKITE_BRANCH') != '' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_PULL_REQUEST') != ''"   #TODO: the value of the build.env('BUILDKITE_PULL_REQUEST') should be changed to "== ''" after tests
-#    depends_on:
-#      - step: "release-package-registry"
-#        allow_failure: false
+    if:  "build.env('BUILDKITE_BRANCH') != '' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_PULL_REQUEST') == ''"
+    depends_on:
+      - step: "release-package-registry"
+        allow_failure: false
