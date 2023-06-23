@@ -45,7 +45,7 @@ steps:
         allow_failure: false
 
   - label: "DRA release staging"
-    key: "rda-staging"
+    key: "dra-staging"
     command: ".buildkite/scripts/dra_release.sh staging"
     agents:
       provider: "gcp"
