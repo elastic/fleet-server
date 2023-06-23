@@ -102,7 +102,7 @@ upload_packages_to_gcp_bucket() {
 
 get_bucket_uri() {
     local type=${1}
-    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"
+    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
     if [[ ${type} == "snapshot" ]]; then
         local folder="commits"
     else
@@ -136,7 +136,7 @@ with_mage() {
     )
     create_workspace
     for pkg in "${install_packages[@]}"; do
-    go install "${pkg}@latest"
+        go install "${pkg}@latest"
     done
 }
 

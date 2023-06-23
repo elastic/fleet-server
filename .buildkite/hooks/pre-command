@@ -10,7 +10,6 @@ PRIVATE_CI_GCS_CREDENTIALS_PATH="kv/ci-shared/platform-ingest/private_ci_artifac
 DRA_SECRET_PATH="kv/ci-shared/release/dra-role"
 JOB_GCS_BUCKET_SECRET_PATH="kv/ci-shared/platform-ingest/fleet_gcs_bucket"
 
-
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "publish" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
     export DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
@@ -31,7 +30,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "package-x86-64" || "$BUILDKITE_STEP_KEY" == "package-arm" || "$BUILDKITE_STEP_KEY" == "rda-snapshot" && "$BUILDKITE_STEP_KEY" == "rda-staging" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "package-x86-64" || "$BUILDKITE_STEP_KEY" == "package-arm" || "$BUILDKITE_STEP_KEY" == "dra-snapshot" && "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
     export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
     export JOB_GCS_BUCKET=$(retry 5 vault kv get -field plaintext ${JOB_GCS_BUCKET_SECRET_PATH})
   fi
@@ -45,4 +44,11 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" && "$BUILDKITE_ST
     export VAULT_ADDR=$(echo ${DRA_CREDS} | jq -r '.vault_addr')
     export VAULT_ROLE_ID=$(echo ${DRA_CREDS} | jq -r '.vault_role_id')
     export VAULT_SECRET_ID=$(echo ${DRA_CREDS} | jq -r '.vault_secret_id')
+fi
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "package-x86-64" || "$BUILDKITE_STEP_KEY" == "package-arm" ]]; then
+    export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
+    export JOB_GCS_BUCKET=$(retry 5 vault kv get -field plaintext ${JOB_GCS_BUCKET_SECRET_PATH})
+  fi
 fi
