@@ -10,7 +10,6 @@ env:
   DOCKER_IMAGE_GIT_TAG: "temp-${BUILDKITE_BRANCH}" # needs to rename after tests
   GO_AGENT_IMAGE: "golang:1.20.5"
   TERRAFORM_VERSION: '1.4.6'
-  JOB_GCS_BUCKET: 'fleet-ci-artifacts'
 
 steps:
   - group: "Check and build"
@@ -74,7 +73,7 @@ steps:
           - step: "int-test"
             allow_failure: false
 
-      - label: "Cloud e2e Test"
+      - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
@@ -134,9 +133,10 @@ steps:
       - step: "release-test"
         allow_failure: false
 
-  - label: ":jenkins: Downstream - Package"
+  - trigger: "fleet-server-package-mbp"
+    label: ":esbuild: Downstream - Package"
     key: "downstream-package"
-    command: echo "Triggering the Jenkins Job 'fleet-server/fleet-server-package-mbp/env.JOB_BASE_NAME'..."
+    if:  "build.env('BUILDKITE_BRANCH') != '' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_PULL_REQUEST') == ''"
     depends_on:
       - step: "release-package-registry"
         allow_failure: false
