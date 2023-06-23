@@ -34,7 +34,7 @@ steps:
           - "staging"
 
   - label: "DRA snapshot"
-    key: "rda-snapshot"
+    key: "dra-snapshot"
     command: ".buildkite/scripts/dra_release.sh snapshot"
     agents:
       provider: "gcp"
