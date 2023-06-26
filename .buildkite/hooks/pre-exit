@@ -14,3 +14,10 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
     unset GOOGLE_APPLICATIONS_CREDENTIALS
     cleanup
 fi
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "package-x86-64" || "$BUILDKITE_STEP_KEY" == "package-arm" ]]; then
+    unset GOOGLE_APPLICATIONS_CREDENTIALS
+    cleanup
+  fi
+fi
