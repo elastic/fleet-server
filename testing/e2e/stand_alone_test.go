@@ -117,43 +117,16 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 
 	// Wait to check that it is healthy.
 	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
-	enrollmentKey := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
 
 	// Provoke timeouts and wait for the healthcheck to fail.
 	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 1.0, toxiproxy.Attributes{})
 	suite.Require().NoError(err)
 	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateDegraded)
 
-	// Enrollment endpoint should also fail.
-	suite.Run("enrollment should be unavailable", func() {
-		ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		defer cancel()
-		tester := api_version.NewClientAPITesterCurrent(
-			suite.Suite,
-			ctx,
-			suite.client,
-			"http://localhost:8220",
-		)
-		tester.TestEnrollUnavailable(enrollmentKey)
-	})
-
 	// Recover the network and wait for the healthcheck to be healthy again.
 	err = proxy.RemoveToxic("force_timeout")
 	suite.Require().NoError(err)
 	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
-
-	// Enrollment endpoint should work now.
-	suite.Run("enrollment should work", func() {
-		ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		defer cancel()
-		tester := api_version.NewClientAPITesterCurrent(
-			suite.Suite,
-			ctx,
-			suite.client,
-			"http://localhost:8220",
-		)
-		tester.TestEnroll(enrollmentKey)
-	})
 
 	cancel()
 	cmd.Wait()

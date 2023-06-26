@@ -21,7 +21,7 @@ description: |-
   the service will keep returning an "Starting" state.
   If the service loses connectivity with Elasticsearch after being healthy, it will go to a degraded
   state.
-  While Fleet Server is not healthy, all its non-status endpoints will respond with a 503 error.
+  For any non healthy state, the status endpoint responds with a 503 HTTP status code.
 
 # Affected component; a word indicating the component this changeset affects.
 component: ""

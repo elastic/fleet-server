@@ -88,30 +88,6 @@ func (tester *ClientAPITester) TestEnroll(apiKey string) (string, string) {
 	return enroll.Item.Id, enroll.Item.AccessApiKey
 }
 
-// TestEnrollUnavailable tests that the enroll endpoint is unavailable.
-func (tester *ClientAPITester) TestEnrollUnavailable(apiKey string) {
-	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-		req.Header.Set("Authorization", "ApiKey "+apiKey)
-		return nil
-	}))
-	tester.Require().NoError(err)
-
-	enrollResp, err := client.AgentEnrollWithResponse(tester.ctx,
-		&api.AgentEnrollParams{UserAgent: "elastic agent " + version.DefaultVersion},
-		api.AgentEnrollJSONRequestBody{
-			Metadata: api.EnrollMetadata{
-				Local: json.RawMessage(fmt.Sprintf(enrollMetadataTpl, version.DefaultVersion)),
-			},
-			Type: api.PERMANENT,
-		},
-	)
-	tester.Require().NoError(err)
-
-	statusFound := enrollResp.StatusCode()
-	tester.T().Logf("status code found: %v", statusFound)
-	tester.Assert().GreaterOrEqual(statusFound, http.StatusInternalServerError)
-}
-
 // TestCheckin tests the checkin endpoint.
 // Returns the new ack token and the list of actions.
 func (tester *ClientAPITester) TestCheckin(apiKey, agentID string, ackToken, dur *string) (*string, []string) {

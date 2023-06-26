@@ -50,7 +50,7 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 	return &server{
 		addr:    addr,
 		cfg:     cfg,
-		handler: newRouter(&cfg.Limits, a, tracer, sm),
+		handler: newRouter(&cfg.Limits, a, tracer),
 	}
 }
 

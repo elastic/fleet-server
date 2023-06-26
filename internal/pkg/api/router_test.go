@@ -5,19 +5,15 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestPathToOperation(t *testing.T) {
@@ -104,75 +100,4 @@ func TestLimiter(t *testing.T) {
 			assert.Equal(t, tt.status, resp.StatusCode)
 		})
 	}
-}
-
-func TestStatusChecker(t *testing.T) {
-	tests := []struct {
-		name           string
-		path           string
-		state          client.UnitState
-		interrupt      bool
-		expectedStatus int
-	}{
-		{
-			name:           "healthy",
-			path:           "/",
-			state:          client.UnitStateHealthy,
-			expectedStatus: http.StatusOK,
-		},
-		{
-			name:           "degraded",
-			path:           "/",
-			state:          client.UnitStateDegraded,
-			expectedStatus: http.StatusServiceUnavailable,
-			interrupt:      true,
-		},
-		{
-			name:           "degraded request to healthcheck",
-			path:           "/api/status",
-			state:          client.UnitStateDegraded,
-			expectedStatus: http.StatusOK,
-			interrupt:      false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			checker := statusChecker(&dummyStatusChecker{tt.state})
-			handler := checker(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				fmt.Fprint(w, "ok")
-			}))
-
-			w := httptest.NewRecorder()
-			r := httptest.NewRequest(http.MethodGet, tt.path, nil)
-			handler.ServeHTTP(w, r)
-
-			resp := w.Result()
-			defer resp.Body.Close()
-
-			d, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-			if tt.interrupt {
-				assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
-				var respError Error
-				err := json.Unmarshal(d, &respError)
-				if assert.NoError(t, err) {
-					assert.Equal(t, "unavailable service", *respError.Message)
-					assert.Equal(t, tt.expectedStatus, respError.StatusCode)
-				}
-			} else {
-				assert.Equal(t, "ok", string(d))
-			}
-
-			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
-		})
-	}
-}
-
-type dummyStatusChecker struct {
-	state client.UnitState
-}
-
-func (c *dummyStatusChecker) State() client.UnitState {
-	return c.state
 }
