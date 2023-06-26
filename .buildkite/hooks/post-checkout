@@ -50,8 +50,8 @@ echo "Commit information"
 
 git --no-pager log --format=%B -n 1
 
-read -r GO_VERSION < ".go-version"
-export ${GO_VERSION}
+
+export GO_VERSION="$(< .go-version)"
 
 # Ensure buildkite groups are rendered
 echo ""
