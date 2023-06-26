@@ -43,8 +43,6 @@ steps:
     depends_on:
       - step: "package-publish"
         allow_failure: false
-    artifact_paths:
-      - build/*.*
 
   - label: "DRA release staging"
     key: "dra-staging"
@@ -56,5 +54,3 @@ steps:
     depends_on:
       - step: "rda-snapshot"
         allow_failure: false
-    artifact_paths:
-      - build/*.*
