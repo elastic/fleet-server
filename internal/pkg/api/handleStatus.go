@@ -88,7 +88,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 	}
 
 	code := http.StatusServiceUnavailable
-	if state == client.UnitStateDegraded || state == client.UnitStateHealthy {
+	if state == client.UnitStateHealthy {
 		code = http.StatusOK
 	}
 	w.WriteHeader(code)
