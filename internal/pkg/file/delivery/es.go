@@ -20,8 +20,8 @@ import (
 
 const (
 	// integration name is substituted in
-	FileHeaderIndexPattern = ".fleet-filedelivery-meta-%s"
-	FileDataIndexPattern   = ".fleet-filedelivery-data-%s"
+	FileHeaderIndexPattern = ".fleet-fileds-tohost-meta-%s"
+	FileDataIndexPattern   = ".fleet-fileds-tohost-data-%s"
 
 	FieldDocID        = "_id"
 	FieldTargetAgents = "file.Meta.target_agents"
