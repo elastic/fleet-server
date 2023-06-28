@@ -5,11 +5,11 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 
 VERSION="$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')"
+FOLDER="build/distributions"
 BASE_DIR="${WORKSPACE}/${FOLDER}"
 DRA_OUTPUT="release-manager.out"
 PROJECT="fleet-server"
 TYPE="snapshot"
-FOLDER="build/distributions"
 BRANCH="${BUILDKITE_BRANCH}"
 
 if [[ "${VERSION}" == *"-SNAPSHOT"* || "${VERSION}" == "" ]]; then
