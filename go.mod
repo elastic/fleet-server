@@ -30,6 +30,7 @@ require (
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.3.0
 	go.elastic.co/apm/module/apmhttp/v2 v2.3.0
 	go.elastic.co/apm/module/apmprometheus/v2 v2.4.1
+	go.elastic.co/apm/module/apmzerolog/v2 v2.4.3
 	go.elastic.co/apm/v2 v2.4.3
 	go.elastic.co/ecszerolog v0.1.0
 	go.uber.org/zap v1.24.0

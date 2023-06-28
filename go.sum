@@ -701,6 +701,8 @@ go.elastic.co/apm/module/apmhttp/v2 v2.3.0 h1:yGZyp26uJXUCfRTwvMmDt1d1jJrHgTBBnc
 go.elastic.co/apm/module/apmhttp/v2 v2.3.0/go.mod h1:JCszLIey4ndJGuUUu5FQjNOiTfaln1dqCqXnRcXVxVc=
 go.elastic.co/apm/module/apmprometheus/v2 v2.4.1 h1:7y16Lw8FYLAIi6pUQtYQ/bNHVH5Ev6F/Bgx4uQWIgHY=
 go.elastic.co/apm/module/apmprometheus/v2 v2.4.1/go.mod h1:zVTDV0vW7+i4ot05Yc1CTLhEjDVQerXWAT/g/7X+IDY=
+go.elastic.co/apm/module/apmzerolog/v2 v2.4.3 h1:IGPfMId8740yzo3xaADrawmEE+DkA1l4dGWOjesE/Eo=
+go.elastic.co/apm/module/apmzerolog/v2 v2.4.3/go.mod h1:ZFuCQrcC9BKl7+aE2bNKfrHiJr1RIHvkjr3GwcB+olQ=
 go.elastic.co/apm/v2 v2.3.0/go.mod h1:HdwVuAeoJMmoqAZZBNN2YVzj3UVLebtqoRCCydyCP+Q=
 go.elastic.co/apm/v2 v2.4.1/go.mod h1:HdwVuAeoJMmoqAZZBNN2YVzj3UVLebtqoRCCydyCP+Q=
 go.elastic.co/apm/v2 v2.4.3 h1:k6mj63O7IIyqqn3S52C2vBXvaSK9M5FHp0aZHpPH/as=
