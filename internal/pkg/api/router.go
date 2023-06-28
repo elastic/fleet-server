@@ -20,12 +20,12 @@ import (
 
 func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer) http.Handler {
 	r := chi.NewRouter()
-	r.Use(logger.Middleware) // Attach middlewares to router directly so the occur before any request parsing/validation
-	r.Use(middleware.Recoverer)
-	r.Use(Limiter(cfg).middleware)
 	if tracer != nil {
 		r.Use(apmchiv5.Middleware(apmchiv5.WithTracer(tracer)))
 	}
+	r.Use(logger.Middleware) // Attach middlewares to router directly so the occur before any request parsing/validation
+	r.Use(middleware.Recoverer)
+	r.Use(Limiter(cfg).middleware)
 	return HandlerWithOptions(si, ChiServerOptions{
 		BaseRouter:       r,
 		ErrorHandlerFunc: ErrorResp,
