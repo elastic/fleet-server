@@ -945,7 +945,7 @@ func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 
 	bulker.On("Search",
 		mock.Anything,
-		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-files-") }),
+		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-fileds-fromhost-meta-") }),
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
@@ -979,7 +979,7 @@ func mockChunkResult(bulker *itesting.MockBulk, chunks []file.ChunkInfo) string 
 
 	bulker.On("Search",
 		mock.Anything,
-		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-file-data-") }),
+		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-fileds-fromhost-data-") }),
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
