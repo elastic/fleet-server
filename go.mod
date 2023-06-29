@@ -25,12 +25,13 @@ require (
 	github.com/rs/xid v1.4.0
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/cobra v1.7.0
-	github.com/stretchr/testify v1.8.3
-	go.elastic.co/apm/module/apmchiv5/v2 v2.3.0
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.3.0
-	go.elastic.co/apm/module/apmhttp/v2 v2.3.0
-	go.elastic.co/apm/module/apmprometheus/v2 v2.4.1
-	go.elastic.co/apm/v2 v2.4.1
+	github.com/stretchr/testify v1.8.4
+	go.elastic.co/apm/module/apmchiv5/v2 v2.4.3
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.4.3
+	go.elastic.co/apm/module/apmhttp/v2 v2.4.3
+	go.elastic.co/apm/module/apmprometheus/v2 v2.4.3
+	go.elastic.co/apm/module/apmzerolog/v2 v2.4.3
+	go.elastic.co/apm/v2 v2.4.3
 	go.elastic.co/ecszerolog v0.1.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.2.0
@@ -51,7 +52,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.2.0 // indirect
-	github.com/elastic/go-licenser v0.4.1 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-sysinfo v1.10.1 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
@@ -71,7 +71,6 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/jcchavezs/porto v0.4.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
