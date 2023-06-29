@@ -142,8 +142,6 @@ with_mage() {
 
 cleanup() {
     echo "Deleting temporary files..."
-    if [[ -d "${WORKSPACE}/${TMP_FOLDER_TEMPLATE_BASE}.*" ]]; then
-        rm -rf ${WORKSPACE}/${TMP_FOLDER_TEMPLATE_BASE}.*
-    fi
+    rm -rf ${WORKSPACE}/${TMP_FOLDER_TEMPLATE_BASE}.*
     echo "Done."
 }
