@@ -21,6 +21,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"go.elastic.co/apm/module/apmzerolog/v2"
 )
 
 const (
@@ -217,10 +218,13 @@ func Middleware(next http.Handler) http.Handler {
 		// get the server bound addr from the req ctx
 		addr, _ := r.Context().Value(http.LocalAddrContextKey).(string)
 
+		// Add trace correlation fields
+		ctx := r.Context()
+		zlog := log.Hook(apmzerolog.TraceContextHook(ctx))
 		// Update request context
 		// NOTE this injects the request id and addr into all logs that use the request logger
-		zlog := log.With().Str(ECSHTTPRequestID, reqID).Str(ECSServerAddress, addr).Logger()
-		ctx := zlog.WithContext(r.Context())
+		zlog = zlog.With().Str(ECSHTTPRequestID, reqID).Str(ECSServerAddress, addr).Logger()
+		ctx = zlog.WithContext(ctx)
 		ctx = context.WithValue(ctx, ctxTSKey{}, start)
 		r = r.WithContext(ctx)
 
@@ -237,7 +241,7 @@ func Middleware(next http.Handler) http.Handler {
 		wrCounter := NewResponseCounter(w)
 
 		if log.Debug().Enabled() {
-			d := log.Debug()
+			d := zlog.Debug()
 			httpMeta(r, d)
 			httpDebug(r, d)
 			d.Msg("HTTP start")

@@ -6,7 +6,7 @@ replace github.com/elastic/fleet-server/v7 => ../
 
 require (
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	github.com/testcontainers/testcontainers-go v0.20.1
 )
 
