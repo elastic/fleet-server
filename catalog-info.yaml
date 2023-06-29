@@ -119,7 +119,6 @@ spec:
     spec:
       repository: elastic/fleet-server
       pipeline_file: .buildkite/pipeline.service-tests.yml
-      trigger_mode: none
       teams:
         cloud-k8s-region:
           access_level: MANAGE_BUILD_AND_READ
