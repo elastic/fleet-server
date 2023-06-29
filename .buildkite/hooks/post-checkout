@@ -44,9 +44,10 @@ check_if_file_exist_in_repo() {
     local repoName=${1}
     local branch=${2}
     local fileName="build.gradle"
+    local branchName=${branch}
 
     if [[ $branch == "main" ]]; then
-        local branchName="master"
+        branchName="master"
     fi
 
     local path_to_file="cd/release/release-manager/project-configs/${branchName}/${fileName}"
