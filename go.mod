@@ -26,10 +26,10 @@ require (
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.4
-	go.elastic.co/apm/module/apmchiv5/v2 v2.3.0
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.3.0
-	go.elastic.co/apm/module/apmhttp/v2 v2.3.0
-	go.elastic.co/apm/module/apmprometheus/v2 v2.4.1
+	go.elastic.co/apm/module/apmchiv5/v2 v2.4.3
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.4.3
+	go.elastic.co/apm/module/apmhttp/v2 v2.4.3
+	go.elastic.co/apm/module/apmprometheus/v2 v2.4.3
 	go.elastic.co/apm/module/apmzerolog/v2 v2.4.3
 	go.elastic.co/apm/v2 v2.4.3
 	go.elastic.co/ecszerolog v0.1.0
