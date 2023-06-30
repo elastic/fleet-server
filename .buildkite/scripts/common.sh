@@ -6,15 +6,21 @@ WORKSPACE="$(pwd)/bin"
 TMP_FOLDER_TEMPLATE_BASE="tmp.fleet-server"
 REPO="fleet-server"
 
-add_bin_path(){
-    echo "Adding PATH to the environment variables..."
+create_workspace() {
+    if [[ ! -d "${WORKSPACE}" ]]; then
     mkdir -p ${WORKSPACE}
+    fi
+}
+
+add_bin_path() {
+    echo "Adding PATH to the environment variables..."
+    create_workspace
     export PATH="${PATH}:${WORKSPACE}"
 }
 
 with_go() {
     echo "Setting up the Go environment..."
-    mkdir -p ${WORKSPACE}
+    create_workspace
     retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
     chmod +x ${WORKSPACE}/gvm
     eval "$(gvm $(cat .go-version))"
@@ -25,7 +31,7 @@ with_go() {
 
 with_docker_compose() {
     echo "Setting up the Docker-compose environment..."
-    mkdir -p ${WORKSPACE}
+    create_workspace
     retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
@@ -64,7 +70,7 @@ docker_logout() {
 with_Terraform() {
     echo "Setting up the Terraform environment..."
     destFile="terraform.zip"
-    mkdir -p ${WORKSPACE}
+    create_workspace
     retry 5 curl -SL -o ${WORKSPACE}/${destFile} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
     unzip -q ${WORKSPACE}/${destFile} -d ${WORKSPACE}/
     rm ${WORKSPACE}/${destFile}
@@ -94,18 +100,30 @@ upload_packages_to_gcp_bucket() {
     done
 }
 
+get_bucket_uri() {
+    local type=${1}
+    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"               #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    if [[ ${type} == "snapshot" ]]; then
+        local folder="commits"
+    else
+        local folder="${type}"
+    fi
+    bucketUri="${baseUri}/${folder}/${BUILDKITE_COMMIT}"
+}
+
 upload_mbp_packages_to_gcp_bucket() {
     local pattern=${1}
     local type=${2}
-    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
-    local bucketUri=""
+    get_bucket_uri "${type}"
+    gsutil -m -q cp -a public-read -r ${pattern} ${bucketUri}
+}
 
-    if [[ ${type} == "snapshot" ]]; then
-        bucketUri="${baseUri}"/commits/${BUILDKITE_COMMIT}
-    else
-        bucketUri="${baseUri}"/${type}/${BUILDKITE_COMMIT}
-    fi
-    gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
+download_mbp_packages_from_gcp_bucket() {
+    local pattern=${1}
+    local type=${2}
+    mkdir -p ${WORKSPACE}/${pattern}
+    get_bucket_uri "${type}"
+    gsutil -m -q cp -r ${bucketUri} ${WORKSPACE}/${pattern}
 }
 
 with_mage() {
@@ -116,15 +134,14 @@ with_mage() {
             "github.com/jstemmer/go-junit-report"
             "gotest.tools/gotestsum"
     )
-
+    create_workspace
     for pkg in "${install_packages[@]}"; do
         go install "${pkg}@latest"
     done
 }
 
 cleanup() {
-    echo "Deleting temporal files..."
-    cd ${WORKSPACE}
-    rm -rf ${TMP_FOLDER_TEMPLATE_BASE}.*
+    echo "Deleting temporary files..."
+    rm -rf ${WORKSPACE}/${TMP_FOLDER_TEMPLATE_BASE}.*
     echo "Done."
 }
