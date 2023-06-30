@@ -109,6 +109,17 @@ get_bucket_uri() {
     bucketUri="${baseUri}/${folder}/${BUILDKITE_COMMIT}"
 }
 
+get_bucket_uri() {
+    local type=${1}
+    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"               #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    if [[ ${type} == "snapshot" ]]; then
+        local folder="commits"
+    else
+        local folder="${type}"
+    fi
+    bucketUri="${baseUri}/${folder}/${BUILDKITE_COMMIT}"
+}
+
 upload_mbp_packages_to_gcp_bucket() {
     local pattern=${1}
     local type=${2}
@@ -140,8 +151,6 @@ with_mage() {
 
 cleanup() {
     echo "Deleting temporary files..."
-    if [[ -d "${WORKSPACE}/${TMP_FOLDER_TEMPLATE_BASE}.*" ]]; then
-        rm -rf ${WORKSPACE}/${TMP_FOLDER_TEMPLATE_BASE}.*
-    fi
+    rm -rf ${WORKSPACE}/${TMP_FOLDER_TEMPLATE_BASE}.*
     echo "Done."
 }
