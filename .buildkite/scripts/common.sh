@@ -94,6 +94,34 @@ upload_packages_to_gcp_bucket() {
     done
 }
 
+upload_mbp_packages_to_gcp_bucket() {
+    local pattern=${1}
+    local type=${2}
+    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    local bucketUri=""
+
+    if [[ ${type} == "snapshot" ]]; then
+        bucketUri="${baseUri}"/commits/${BUILDKITE_COMMIT}
+    else
+        bucketUri="${baseUri}"/${type}/${BUILDKITE_COMMIT}
+    fi
+    gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
+}
+
+with_mage() {
+    local install_packages=(
+            "github.com/magefile/mage"
+            "github.com/elastic/go-licenser"
+            "golang.org/x/tools/cmd/goimports"
+            "github.com/jstemmer/go-junit-report"
+            "gotest.tools/gotestsum"
+    )
+
+    for pkg in "${install_packages[@]}"; do
+        go install "${pkg}@latest"
+    done
+}
+
 cleanup() {
     echo "Deleting temporal files..."
     cd ${WORKSPACE}
