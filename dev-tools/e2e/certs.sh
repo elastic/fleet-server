@@ -28,8 +28,11 @@ openssl genpkey -algorithm RSA \
     -out ${CERT_DIR}/fleet-server-key \
     2>/dev/null
 
+OPENSSL_TOOLKIT="$(openssl version | cut -f1 -d' ')"
+OPENSSL_MAJOR="$(openssl version | cut -f2 -d' ' | cut -f1 -d.)"
+
 # Ensure PKCS#1 format is used (https://github.com/elastic/elastic-agent-libs/issues/134)
-if [ "$(openssl version | cut -f2 -d' ' | cut -f1 -d.)" -ge 3 ]; then
+if [ "$OPENSSL_TOOLKIT" = "OpenSSL" -a "$OPENSSL_MAJOR" -ge 3 ]; then
 openssl rsa -aes-128-cbc \
     -traditional \
     -in ${CERT_DIR}/fleet-server-key \
