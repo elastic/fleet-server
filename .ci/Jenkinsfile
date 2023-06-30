@@ -151,7 +151,7 @@ pipeline {
         not { changeRequest() }
       }
       environment {
-        DOCKER_IMAGE_SHA_TAG = "${env.GIT_BASE_COMMIT}"
+        DOCKER_IMAGE_SHA_TAG = "git-${env.GIT_BASE_COMMIT.substring(0, 12)}"
         DOCKER_IMAGE_LATEST_TAG = "latest"
         DOCKER_IMAGE_GIT_TAG = "${env.BRANCH_NAME}"
       }
