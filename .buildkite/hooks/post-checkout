@@ -77,8 +77,6 @@ echo "Commit information"
 
 git --no-pager log --format=%B -n 1
 
-export GO_VERSION="$(< .go-version)"
-
 # Ensure buildkite groups are rendered
 echo ""
 
