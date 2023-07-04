@@ -6,8 +6,6 @@ source .buildkite/scripts/common.sh
 
 GITHUB_TOKEN_VAULT_PATH="kv/ci-shared/platform-ingest/github_token"
 GITHUB_REPO_TOKEN=$(retry 5 vault kv get -field token ${GITHUB_TOKEN_VAULT_PATH})
-#export GO_VERSION=$(retry 5 curl -s https://api.github.com/repos/elastic/fleet-server/contents/.go-version\?ref=main | jq -r ".content" | base64 --decode)
-#export GO_VERSION=$(retry 5 curl -s -H 'Accept: application/vnd.github.v3.raw' https://api.github.com/repos/elastic/fleet-server/contents/.go-version)
 export GO_VERSION=$(cat .go-version)
 
 
