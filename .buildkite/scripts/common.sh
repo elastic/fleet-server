@@ -93,9 +93,9 @@ upload_packages_to_gcp_bucket() {
     if [[ ${BUILDKITE_PULL_REQUEST} != "false" ]]; then
         bucketUriDefault="${baseUri}"/pull-requests/pr-${GITHUB_PR_NUMBER}
     fi
-        for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
-            gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
-        done
+    for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
+        gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
+    done
 }
 
 get_bucket_uri() {
