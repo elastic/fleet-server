@@ -11,6 +11,8 @@ export GO_VERSION=$(retry 5 curl -s -H 'Accept: application/vnd.github.v3.raw' h
 
 ls -alr
 
+cat .go-version
+
 checkout_merge() {
     local target_branch=$1
     local pr_commit=$2
