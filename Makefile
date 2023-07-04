@@ -76,10 +76,6 @@ local: ## - Build local binary for local environment (bin/fleet-server)
 	go build $(if $(DEV),-tags="dev",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
-.PHONY: cover-e2e-binaries
-cover-e2e-binaries: ## - Build binaries for the test-e2e target with the go 1.20+ cover flag
-	SNAPSHOT=true $(MAKE) $(COVER_TARGETS)
-
 .PHONY: $(COVER_TARGETS)
 $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integration testing
 	@mkdir -p build/cover
@@ -239,7 +235,8 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser
-	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) cover-e2e-binaries
+	## Build for local architecture and for linux/amd64 for docker images.
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(BUILDER_IMAGE) cover-linux/amd64 cover-$(shell go env GOOS)/$(shell go env GOARCH)
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
