@@ -185,7 +185,7 @@ func TestEnrollerT_fetchStaticTokenPolicy(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "not found",
+			name: "policy not found",
 			fields: fields{
 				staticPolicyTokens: config.StaticPolicyTokens{
 					Enabled: true,
