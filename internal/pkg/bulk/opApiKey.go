@@ -42,8 +42,6 @@ func (b *Bulker) APIKeyAuth(ctx context.Context, key APIKey) (*SecurityInfo, err
 	defer b.apikeyLimit.Release(1)
 	for _, pt := range b.opts.policyTokens {
 		if pt.TokenKey == key.Key {
-			// TODO: Set static information about the user
-			// to be used later for debbuging purposes
 			return &SecurityInfo{Enabled: true}, nil
 		}
 	}
