@@ -98,7 +98,16 @@ steps:
       - step: "tests"
         allow_failure: false
 
-  - label: ":argo: Update image tag for Fleet Server"
+  - label: ":argo: Update fleet image tag for fleet-controller using gpctl"
+    async: true
+    branches: main
+    trigger: gpctl-promote
+    build:
+      env:
+        SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
+        REMOTE_SERVICE_CONFIG: https://raw.githubusercontent.com/elastic/serverless-gitops/main/gen/gpctl/fleet/config.yaml
+
+  - label: ":argo: Update image tag for Fleet Server using the legacy script (QA/Staging)"
     trigger: serverless-gitops-update-stack-image-tag
     async: true
     branches: main
