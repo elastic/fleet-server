@@ -118,6 +118,9 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (file.Info, error) {
 	if err := data.Put(info.Start.UnixMilli(), "upload_start"); err != nil {
 		return file.Info{}, err
 	}
+	if err := data.Put(info.Start.UnixMilli(), "@timestamp"); err != nil {
+		return file.Info{}, err
+	}
 
 	/*
 		Write to storage

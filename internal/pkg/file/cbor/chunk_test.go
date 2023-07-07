@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,9 @@ func TestChunkWriter(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := []byte{
-		0xA4,                           // object with 4 keys
+		0xA5,                                                   // object with 5 keys
+		0x6A, '@', 't', 'i', 'm', 'e', 's', 't', 'a', 'm', 'p', // "@timestamp"
+		0x1B, 0, 0, 0, 0, 0, 0, 0, 0, // 8-byte uint64, placeholder 0's
 		0x64, 'l', 'a', 's', 't', 0xF4, // last: false
 		0x63, 'b', 'i', 'd', 0x78, 0x06, 'f', 'o', 'o', 'b', 'a', 'r', // "bid": "foobar"
 		0x64, 's', 'h', 'a', '2', 0x78, 0x04, '5', '6', 'a', 'b', // "sha2": "56ab"
@@ -35,7 +38,11 @@ func TestChunkWriter(t *testing.T) {
 		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, // contents
 	}
 
-	assert.Equal(t, expected, outbuf)
+	assert.Equal(t, expected[:13], outbuf[:13]) // up to 0x1b after timestamp
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(int64(binary.BigEndian.Uint64(outbuf[13:]))), time.Second*5)
+
+	assert.Equal(t, expected[21:], outbuf[21:])
+
 }
 
 func TestChunkWriterLastChunk(t *testing.T) {
@@ -49,7 +56,9 @@ func TestChunkWriterLastChunk(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := []byte{
-		0xA4,                           // object with 4 keys
+		0xA5,                                                   // object with 5 keys
+		0x6A, '@', 't', 'i', 'm', 'e', 's', 't', 'a', 'm', 'p', // "@timestamp"
+		0x1B, 0, 0, 0, 0, 0, 0, 0, 0, // 8-byte uint64, placeholder 0's
 		0x64, 'l', 'a', 's', 't', 0xF5, // last: true
 		0x63, 'b', 'i', 'd', 0x78, 0x06, 'f', 'o', 'o', 'b', 'a', 'r', // "bid": "foobar"
 		0x64, 's', 'h', 'a', '2', 0x78, 0x04, 'f', 'a', 'c', 'e', // "sha2": "face"
@@ -58,7 +67,9 @@ func TestChunkWriterLastChunk(t *testing.T) {
 	}
 
 	// assert equality up to the constant set point
-	assert.Equal(t, expected, outbuf[:len(expected)])
+	assert.Equal(t, expected[:13], outbuf[:13])
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(int64(binary.BigEndian.Uint64(outbuf[13:]))), time.Second*5)
+	assert.Equal(t, expected[21:], outbuf[21:len(expected)])
 	assert.Equal(t, uint8(0xFF), outbuf[len(outbuf)-1]) // final byte MUST be a 0xFF terminating byte when using indeterminate-length style
 
 	// some light parsing, since this is variable depending on how Read() sizes its buffers internally
@@ -93,7 +104,9 @@ func TestChunkWriterLargeLastChunk(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := []byte{
-		0xA4,                           // object with 4 keys
+		0xA5,                                                   // object with 5 keys
+		0x6A, '@', 't', 'i', 'm', 'e', 's', 't', 'a', 'm', 'p', // "@timestamp"
+		0x1B, 0, 0, 0, 0, 0, 0, 0, 0, // 8-byte uint64, placeholder 0's
 		0x64, 'l', 'a', 's', 't', 0xF5, // last: true
 		0x63, 'b', 'i', 'd', 0x78, 0x06, 'f', 'o', 'o', 'b', 'a', 'r', // "bid": "foobar"
 		0x64, 's', 'h', 'a', '2', 0x78, 0x04, 'f', 'a', 'c', 'e', // "sha2": "face"
@@ -102,7 +115,9 @@ func TestChunkWriterLargeLastChunk(t *testing.T) {
 	}
 
 	// assert equality up to the constant set point
-	assert.Equal(t, expected, outbuf[:len(expected)])
+	assert.Equal(t, expected[:13], outbuf[:13])
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(int64(binary.BigEndian.Uint64(outbuf[13:]))), time.Second*5)
+	assert.Equal(t, expected[21:], outbuf[21:len(expected)])
 	assert.Equal(t, uint8(0xFF), outbuf[len(outbuf)-1]) // final byte MUST be a 0xFF terminating byte when using indeterminate-length style
 
 	// some light parsing, since this is variable depending on how Read() sizes its buffers internally

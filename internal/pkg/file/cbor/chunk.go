@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"time"
 )
 
 // This is a trimmed-down special purpose writer
@@ -39,6 +40,7 @@ func NewChunkWriter(chunkData io.Reader, finalChunk bool, baseID string, chunkHa
 // Writes the start of a CBOR object (equiv. JSON object)
 //
 //	{
+//		"@timestamp": 1687891588,
 //		"last": true/false,
 //		"bid": "baseID",
 //		"sha2": "...",
@@ -63,27 +65,41 @@ func encodePreambleToCBOR(final bool, baseID string, chunkHash string, chunkSize
 		chunkLen = 1
 	}
 
-	preamble := make([]byte, 11+bidLen+2+5+hashLen+2+chunkLen+5)
-	preamble[0] = 0xA4 // Object with 4 keys
-	preamble[1] = 0x64 // string with 4 chars (key: last)
-	preamble[2] = 'l'
-	preamble[3] = 'a'
-	preamble[4] = 's'
-	preamble[5] = 't'
+	preamble := make([]byte, 31+bidLen+2+5+hashLen+2+chunkLen+5)
+	preamble[0] = 0xA5 // Object with 5 keys
+	preamble[1] = 0x6a // string with 10 characters (@timestamp)
+	preamble[2] = '@'
+	preamble[3] = 't'
+	preamble[4] = 'i'
+	preamble[5] = 'm'
+	preamble[6] = 'e'
+	preamble[7] = 's'
+	preamble[8] = 't'
+	preamble[9] = 'a'
+	preamble[10] = 'm'
+	preamble[11] = 'p'
+	preamble[12] = 0x1b // uint64 to follow
+	// occupies 8 bytes, indexes 13-20
+	binary.BigEndian.PutUint64(preamble[13:], uint64(time.Now().UnixMilli()))
+	preamble[21] = 0x64 // string with 4 chars (key: last)
+	preamble[22] = 'l'
+	preamble[23] = 'a'
+	preamble[24] = 's'
+	preamble[25] = 't'
 	if final {
-		preamble[6] = 0xF5 // bool true
+		preamble[26] = 0xF5 // bool true
 	} else {
-		preamble[6] = 0xF4 // bool false
+		preamble[26] = 0xF4 // bool false
 	}
-	preamble[7] = 0x63 // string with 3 chars (key: bid)
-	preamble[8] = 'b'
-	preamble[9] = 'i'
-	preamble[10] = 'd'
-	i := 11
+	preamble[27] = 0x63 // string with 3 chars (key: bid)
+	preamble[28] = 'b'
+	preamble[29] = 'i'
+	preamble[30] = 'd'
+	i := 31
 	if n, err := writeString(preamble[i:], baseID); err != nil {
 		return nil
 	} else {
-		i = 11 + n
+		i += n
 	}
 	if n, err := writeKey(preamble[i:], "sha2"); err != nil {
 		return nil
