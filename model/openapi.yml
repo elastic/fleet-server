@@ -827,6 +827,8 @@ paths:
       description: |
         Return the fleet-server status.
         The status code will either be 200 if healthy, or 503 if not.
+        Service is considered healthy if it has access to Elasticsearch, but the policies index
+        does not exist. This is equivalent to a deployment without any policy.
         Authentication for this endpoint is optional, if not provided a shorter response body is returned.
       responses:
         "200":
