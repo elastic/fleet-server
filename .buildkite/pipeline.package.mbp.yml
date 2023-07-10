@@ -4,6 +4,8 @@ env:
   REPO: 'fleet-server'
   SETUP_GVM_VERSION: 'v0.3.0'
   DOCKER_REGISTRY: "docker.elastic.co"
+  IMAGE_UBUNTU_X86_64: "family/core-ubuntu-2004"
+  IMAGE_UBUNTU_ARM_64: "core-ubuntu-2004-aarch64"
 
 steps:
   - group: "Package and Publish"
@@ -14,7 +16,7 @@ steps:
       command: ".buildkite/scripts/package.sh {{matrix.type}}"
       agents:
         provider: "gcp"
-        image: "family/core-ubuntu-2004"
+        image: "${IMAGE_UBUNTU_X86_64}"
       matrix:
         setup:
           type:
@@ -26,7 +28,7 @@ steps:
       command: ".buildkite/scripts/package.sh {{matrix.type}}"
       agents:
         provider: "aws"
-        image: "core-ubuntu-2004-aarch64"
+        image: "${IMAGE_UBUNTU_ARM_64}"
       matrix:
         setup:
           type:
@@ -35,11 +37,22 @@ steps:
 
   - label: "DRA snapshot"
     key: "dra-snapshot"
-    command: ".buildkite/scripts/dra_snapshot.sh"
+    command: ".buildkite/scripts/dra_release.sh snapshot"
     agents:
       provider: "gcp"
-      image: "family/core-ubuntu-2004"
+      image: "${IMAGE_UBUNTU_X86_64}"
     if: ${FILE_EXISTS_IN_REPO}
     depends_on:
       - step: "package-publish"
+        allow_failure: false
+
+  - label: "DRA release staging"
+    key: "dra-staging"
+    command: ".buildkite/scripts/dra_release.sh staging"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+    if: "${FILE_EXISTS_IN_REPO} == true && build.env('BUILDKITE_BRANCH') != 'main'"
+    depends_on:
+      - step: "dra-snapshot"
         allow_failure: false

@@ -40,7 +40,6 @@ with_docker_compose() {
 retry() {
     local retries=$1
     shift
-
     local count=0
     until "$@"; do
         exit=$?
@@ -69,35 +68,45 @@ docker_logout() {
 
 with_Terraform() {
     echo "Setting up the Terraform environment..."
-    destFile="terraform.zip"
+    local path_to_file="${WORKSPACE}/terraform.zip"
     create_workspace
-    retry 5 curl -SL -o ${WORKSPACE}/${destFile} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
-    unzip -q ${WORKSPACE}/${destFile} -d ${WORKSPACE}/
-    rm ${WORKSPACE}/${destFile}
+    retry 5 curl -SL -o ${path_to_file} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+    unzip -q ${path_to_file} -d ${WORKSPACE}/
+    rm ${path_to_file}
     chmod +x ${WORKSPACE}/terraform
     terraform version
 }
 
 google_cloud_auth() {
-    secretFileLocation=$(mktemp -d -p "${WORKSPACE}" -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
+    local secretFileLocation=$(mktemp -d -p "${WORKSPACE}" -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
     echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
     gcloud auth activate-service-account --key-file ${secretFileLocation} 2> /dev/null
     export GOOGLE_APPLICATIONS_CREDENTIALS=${secretFileLocation}
 }
 
 upload_packages_to_gcp_bucket() {
-    pattern=${1}
-    baseUri="gs://${JOB_GCS_BUCKET}/${REPO}/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
-    bucketUriCommit="${baseUri}"/commits/${BUILDKITE_COMMIT}
-    bucketUriDefault="${baseUri}"/snapshots
+    local pattern=${1}
+    local baseUri="gs://${JOB_GCS_BUCKET}/${REPO}/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    local bucketUriCommit="${baseUri}"/commits/${BUILDKITE_COMMIT}
+    local bucketUriDefault="${baseUri}"/snapshots
 
     if [[ ${BUILDKITE_PULL_REQUEST} != "false" ]]; then
         bucketUriDefault="${baseUri}"/pull-requests/pr-${GITHUB_PR_NUMBER}
     fi
-
     for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
         gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
     done
+}
+
+get_bucket_uri() {
+    local type=${1}
+    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    if [[ ${type} == "snapshot" ]]; then
+        local folder="commits"
+    else
+        local folder="${type}"
+    fi
+    bucketUri="${baseUri}/${folder}/${BUILDKITE_COMMIT}"
 }
 
 get_bucket_uri() {

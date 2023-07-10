@@ -108,12 +108,3 @@ targets:
       content: 'go {{ source "gomod" }}'
       file: go.mod
       matchpattern: 'go \d+.\d+'
-  update-main-buildkite-pipeline:
-    name: "Update main Buildkite pipeline"
-    sourceid: latestGoVersion
-    scmid: githubConfig
-    kind: file
-    spec:
-      content: '{{ source "latestGoVersion" }}'
-      file: .buildkite/pipeline.yml
-      matchpattern: 'golang:\d+.\d+.\d+'
