@@ -6,7 +6,6 @@ package es
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -48,19 +47,6 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 		return nil, err
 	}
 
-	// Validate connection
-	resp, err := info(ctx, es)
-	if err != nil {
-		zlog.Error().Err(err).Msg("fail elasticsearch info")
-		return nil, err
-	}
-
-	zlog.Info().
-		Str("cluster.name", resp.ClusterName).
-		Str("cluster.uuid", resp.ClusterUUID).
-		Str("cluster.version", resp.Version.Number).
-		Msg("elasticsearch cluster info")
-
 	return es, nil
 }
 
@@ -97,36 +83,4 @@ func userAgent(name string, bi build.Info) string {
 		name,
 		bi.Version, runtime.GOOS, runtime.GOARCH,
 		bi.Commit, bi.BuildTime)
-}
-
-type InfoResponse struct {
-	ClusterName string `json:"cluster_name"`
-	ClusterUUID string `json:"cluster_uuid"`
-	Version     struct {
-		Number string `json:"number"`
-	} `json:"version"`
-}
-
-func info(_ context.Context, es *elasticsearch.Client) (*InfoResponse, error) {
-	// Validate the connection
-	res, err := es.Info()
-
-	if err != nil {
-		return nil, err
-	}
-
-	defer res.Body.Close()
-
-	if res.IsError() {
-		return nil, fmt.Errorf("info fail %v", res)
-	}
-
-	var resp InfoResponse
-
-	d := json.NewDecoder(res.Body)
-	if err = d.Decode(&resp); err != nil {
-		return nil, err
-	}
-
-	return &resp, err
 }

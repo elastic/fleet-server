@@ -827,6 +827,8 @@ paths:
       description: |
         Return the fleet-server status.
         The status code will either be 200 if healthy, or 503 if not.
+        Service is considered healthy if it has access to Elasticsearch, but the policies index
+        does not exist. This is equivalent to a deployment without any policy.
         Authentication for this endpoint is optional, if not provided a shorter response body is returned.
       responses:
         "200":
@@ -1179,7 +1181,7 @@ paths:
     put:
       operationId: uploadChunk
       summary: Upload a section of file data
-      description: "Upload portions of the intended file in a piecewise fashion. This route is idempotent in that any successive calls will overwrite previous ones for the same URL parameters. Chunks may be uploaded in any order, and may be uploaded in parallel. The body is the raw contents of the file at the given position matching the chunk number. The body must be the exact chunk size returned from the upload initiation response. All chunks must be this size except for the final one, which is naturally the file remainder."
+      description: "Upload portions of the intended file in a piecewise fashion. Chunks may be uploaded in any order, and may be uploaded in parallel. The body is the raw contents of the file at the given position matching the chunk number. The body must be the exact chunk size returned from the upload initiation response. All chunks must be this size except for the final one, which is naturally the file remainder."
       security:
         - agentApiKey: []
       parameters:

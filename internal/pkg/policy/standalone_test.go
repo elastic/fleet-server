@@ -25,6 +25,7 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 		title         string
 		searchResult  *es.ResultT
 		searchErr     error
+		initialState  client.UnitState
 		expectedState client.UnitState
 	}{
 		{
@@ -34,19 +35,43 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 					dl.FieldPolicyID: es.Aggregation{},
 				},
 			},
+			initialState:  client.UnitStateStarting,
 			expectedState: client.UnitStateHealthy,
 		},
 		{
 			title:         "index not found",
 			searchResult:  nil,
 			searchErr:     es.ErrIndexNotFound,
+			initialState:  client.UnitStateStarting,
+			expectedState: client.UnitStateHealthy,
+		},
+		{
+			title:         "index not found after being degraded",
+			searchResult:  nil,
+			searchErr:     es.ErrIndexNotFound,
+			initialState:  client.UnitStateDegraded,
 			expectedState: client.UnitStateHealthy,
 		},
 		{
 			title:         "failed to connect with Elasticsearch",
 			searchResult:  nil,
 			searchErr:     errors.New("some unexpected error"),
-			expectedState: client.UnitStateFailed,
+			initialState:  client.UnitStateStarting,
+			expectedState: client.UnitStateStarting,
+		},
+		{
+			title:         "failed to connect with Elasticsearch after being healthy",
+			searchResult:  nil,
+			searchErr:     errors.New("some unexpected error"),
+			initialState:  client.UnitStateHealthy,
+			expectedState: client.UnitStateDegraded,
+		},
+		{
+			title:         "failed to connect with Elasticsearch after being degraded",
+			searchResult:  nil,
+			searchErr:     errors.New("some unexpected error"),
+			initialState:  client.UnitStateDegraded,
+			expectedState: client.UnitStateDegraded,
 		},
 	}
 
@@ -59,11 +84,12 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 			reporter := &FakeReporter{}
 
 			sm := NewStandAloneSelfMonitor(bulker, reporter)
-			assert.Equal(t, sm.State(), client.UnitStateStarting)
+			sm.updateState(c.initialState, "test")
 
-			state := sm.check(context.Background())
+			sm.check(context.Background())
+			state := sm.State()
 
-			assert.Equal(t, state, c.expectedState)
+			assert.Equal(t, c.expectedState, state)
 			assert.Equal(t, state, reporter.state, "reported state should be the same")
 		})
 	}

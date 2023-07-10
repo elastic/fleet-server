@@ -40,7 +40,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
@@ -215,26 +214,48 @@ func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserve
 }
 
 func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
-	start := time.Now()
+	ctx, cancel := context.WithTimeout(ctx, dur)
+	defer cancel()
+
 	cli := cleanhttp.DefaultClient()
-	for {
+	isHealthy := func() (bool, error) {
 		req, err := http.NewRequestWithContext(ctx, "GET", s.baseURL()+"/api/status", nil)
+		if err != nil {
+			return false, err
+		}
+		resp, err := cli.Do(req)
+		if err != nil {
+			return false, nil //nolint:nilerr // we want to ignore the error in this case.
+		}
+		defer resp.Body.Close()
+
+		d, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return false, err
+		}
+
+		var status api.StatusAPIResponse
+		err = json.Unmarshal(d, &status)
+		if err != nil {
+			return false, err
+		}
+
+		return status.Status == "HEALTHY", nil
+	}
+
+	for {
+		healthy, err := isHealthy()
 		if err != nil {
 			return err
 		}
-		res, err := cli.Do(req)
-		if err != nil {
-			if time.Since(start) > dur {
-				return err
-			}
-		} else {
-			defer res.Body.Close()
+		if healthy {
 			return nil
 		}
 
-		err = sleep.WithContext(ctx, 100*time.Millisecond)
-		if err != nil {
-			return err
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
 		}
 	}
 
