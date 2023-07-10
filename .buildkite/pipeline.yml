@@ -97,21 +97,15 @@ steps:
       - step: "tests"
         allow_failure: false
 
-  - label: ":argo: Update image tag for Fleet Server"
-    trigger: serverless-gitops-update-stack-image-tag
+  - label: ":argo: Update fleet image tag for fleet-controller using gpctl"
     async: true
     branches: main
+    trigger: gpctl-promote
     build:
       env:
-        IMAGE_TAG: "$BUILDKITE_COMMIT"
-        SERVICE: fleet-controller
-        NAMESPACE: observability-ci
-        IMAGE_NAME: fleet-server
-        COMMIT_MESSAGE: "gitops: update fleet-server tag to elastic/fleet-server@$BUILDKITE_COMMIT"
-    depends_on:
-      - step: "publish"
-        allow_failure: false
-
+        SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
+        REMOTE_SERVICE_CONFIG: https://raw.githubusercontent.com/elastic/serverless-gitops/main/gen/gpctl/fleet/config.yaml
+        
   - label: ":gcloud: Release test"
     key: "release-test"
     command: ".buildkite/scripts/release_test.sh"
