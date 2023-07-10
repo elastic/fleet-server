@@ -74,10 +74,10 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 
 	fakeBulk.On("Create",
 		mock.MatchedBy(func(_ context.Context) bool { return true }), // match context.Context
-		".fleet-files-"+src, // index
-		action+"."+agent,    // document ID
-		mock.Anything,       // ES document
-		mock.Anything,       // bulker options
+		".fleet-fileds-fromhost-meta-"+src,                           // index
+		action+"."+agent,                                             // document ID
+		mock.Anything,                                                // ES document
+		mock.Anything,                                                // bulker options
 	).Return("", nil)
 
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
@@ -118,10 +118,10 @@ func TestUploadBeginWritesDocumentFromInputs(t *testing.T) {
 
 	fakeBulk.On("Create",
 		mock.MatchedBy(func(_ context.Context) bool { return true }), // match context.Context
-		".fleet-files-"+src, // index
-		action+"."+agent,    // document ID
-		mock.Anything,       // ES document
-		mock.Anything,       // bulker options
+		".fleet-fileds-fromhost-meta-"+src,                           // index
+		action+"."+agent,                                             // document ID
+		mock.Anything,                                                // ES document
+		mock.Anything,                                                // bulker options
 	).Return("", nil)
 
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
