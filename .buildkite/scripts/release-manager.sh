@@ -33,10 +33,10 @@ docker images --filter=reference=${IMAGE}
 
 run_release_manager() {
     echo "+++ Generate checksum files and upload to GCS..."
-    local dry_run="--dry-run"
-#    if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
-#        dry_run="--dry-run"
-#    fi
+    local dry_run=""
+    if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
+        dry_run="--dry-run"
+    fi
     docker run --rm \
     --name release-manager \
     -e VAULT_ADDR \
