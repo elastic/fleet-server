@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -24,10 +25,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	itesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
-	"github.com/elastic/fleet-server/v7/internal/pkg/uploader"
-	"github.com/elastic/fleet-server/v7/internal/pkg/uploader/upload"
 	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,7 @@ import (
 const RouteUploadBegin = "/api/fleet/uploads"
 
 func TestUploadBeginValidation(t *testing.T) {
-	hr, _, _ := prepareUploaderMock(t)
+	hr, _, _, _ := prepareUploaderMock(t)
 
 	// test empty body
 	rec := httptest.NewRecorder()
@@ -242,7 +243,7 @@ func TestUploadBeginAuth(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 
-			hr, rt, _ := prepareUploaderMock(t)
+			hr, rt, _, _ := prepareUploaderMock(t)
 			if !tc.AuthSuccess {
 				rt.ut.authAPIKey = func(r *http.Request, b bulk.Bulk, c cache.Cache) (*apikey.APIKey, error) {
 					return nil, apikey.ErrInvalidToken
@@ -277,19 +278,64 @@ func TestUploadBeginAuth(t *testing.T) {
 }
 
 func TestUploadBeginResponse(t *testing.T) {
-	hr, _, _ := prepareUploaderMock(t)
+	hr, _, _, _ := prepareUploaderMock(t)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockStartBodyWithAgent("foo")))
 	hr.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	var response UploadBeginResponse
+	var response UploadBeginAPIResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &response)
 	assert.NoErrorf(t, err, "upload start should provide valid JSON response")
 
 	assert.NotEmptyf(t, response.UploadId, "upload start response should provide an ID")
 	assert.Greaterf(t, response.ChunkSize, int64(0), "upload start response should provide a chunk size > 0")
+}
 
+func TestUploadBeginWritesTimestampToMeta(t *testing.T) {
+	hr, _, fakebulk, _ := prepareUploaderMock(t)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockStartBodyWithAgent("foo")))
+	hr.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	fakebulk.AssertCalled(t, "Create",
+		mock.Anything, // context
+		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-fileds-fromhost-meta") }), // index
+		mock.Anything, // file document ID -- generated, so can be any value
+		mock.MatchedBy(func(body []byte) bool {
+			doc := make(map[string]interface{})
+
+			err := json.Unmarshal(body, &doc)
+			require.NoError(t, err)
+			if err != nil {
+				return false
+			}
+
+			assert.Contains(t, doc, "@timestamp")
+
+			var ts int64
+			switch n := doc["@timestamp"].(type) {
+			case string:
+				ts, err = strconv.ParseInt(n, 10, 64)
+				require.NoError(t, err)
+			case uint64:
+				ts = int64(n)
+			case int64:
+				ts = n
+			case int:
+				ts = int64(n)
+			case float64:
+				ts = int64(n)
+			default:
+				assert.Failf(t, "unknown @timestamp", "type was: %T", doc["@timestamp"])
+			}
+			assert.WithinDuration(t, time.Now(), time.UnixMilli(ts), 5*time.Second)
+			return true
+		}),
+		mock.Anything, // upload Opts
+	)
 }
 
 /*
@@ -319,15 +365,15 @@ func TestChunkUploadRouteParams(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 
-			hr, _, fakebulk := prepareUploaderMock(t)
-			mockUploadInfoResult(fakebulk, upload.Info{
+			hr, _, fakebulk, _ := prepareUploaderMock(t)
+			mockUploadInfoResult(fakebulk, file.Info{
 				DocID:     "bar.foo",
 				ID:        mockUploadID,
 				ChunkSize: maxFileSize,
-				Total:     uploader.MaxChunkSize + 1,
+				Total:     file.MaxChunkSize + 1,
 				Count:     2, // this is a 2-chunk "file" based on size above
 				Start:     time.Now(),
-				Status:    upload.StatusProgress,
+				Status:    file.StatusProgress,
 				Source:    "agent",
 				AgentID:   "foo",
 				ActionID:  "bar",
@@ -352,15 +398,15 @@ func TestChunkUploadRequiresChunkHashHeader(t *testing.T) {
 	data := []byte("filedata")
 	mockUploadID := "abc123"
 
-	hr, _, fakebulk := prepareUploaderMock(t)
-	mockUploadInfoResult(fakebulk, upload.Info{
+	hr, _, fakebulk, _ := prepareUploaderMock(t)
+	mockUploadInfoResult(fakebulk, file.Info{
 		DocID:     "bar.foo",
 		ID:        mockUploadID,
 		ChunkSize: maxFileSize,
 		Total:     10,
 		Count:     1,
 		Start:     time.Now(),
-		Status:    upload.StatusProgress,
+		Status:    file.StatusProgress,
 		Source:    "agent",
 		AgentID:   "foo",
 		ActionID:  "bar",
@@ -386,22 +432,22 @@ func TestChunkUploadStatus(t *testing.T) {
 
 	tests := []struct {
 		Name              string
-		Status            upload.Status
+		Status            file.Status
 		ExpectStatus      int
 		ExpectErrContains string
 	}{
-		{"Can upload for Status Awaiting", upload.StatusAwaiting, http.StatusOK, ""},
-		{"Can upload for in progress", upload.StatusProgress, http.StatusOK, ""},
-		{"Status Delete Files cannot upload", upload.StatusDel, http.StatusBadRequest, "stopped"},
-		{"Status Complete File cannot upload", upload.StatusDone, http.StatusBadRequest, "stopped"},
-		{"Status Failure File cannot upload", upload.StatusFail, http.StatusBadRequest, "stopped"},
+		{"Can upload for Status Awaiting", file.StatusAwaiting, http.StatusOK, ""},
+		{"Can upload for in progress", file.StatusProgress, http.StatusOK, ""},
+		{"Status Delete Files cannot upload", file.StatusDel, http.StatusBadRequest, "stopped"},
+		{"Status Complete File cannot upload", file.StatusDone, http.StatusBadRequest, "stopped"},
+		{"Status Failure File cannot upload", file.StatusFail, http.StatusBadRequest, "stopped"},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 
-			hr, _, fakebulk := prepareUploaderMock(t)
-			mockUploadInfoResult(fakebulk, upload.Info{
+			hr, _, fakebulk, _ := prepareUploaderMock(t)
+			mockUploadInfoResult(fakebulk, file.Info{
 				DocID:     "bar.foo",
 				ID:        mockUploadID,
 				ChunkSize: maxFileSize,
@@ -451,15 +497,15 @@ func TestChunkUploadExpiry(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 
-			hr, _, fakebulk := prepareUploaderMock(t)
-			mockUploadInfoResult(fakebulk, upload.Info{
+			hr, _, fakebulk, _ := prepareUploaderMock(t)
+			mockUploadInfoResult(fakebulk, file.Info{
 				DocID:     "bar.foo",
 				ID:        mockUploadID,
 				ChunkSize: maxFileSize,
 				Total:     10,
 				Count:     1,
 				Start:     tc.StartTime,
-				Status:    upload.StatusAwaiting,
+				Status:    file.StatusAwaiting,
 				Source:    "agent",
 				AgentID:   "foo",
 				ActionID:  "bar",
@@ -478,6 +524,44 @@ func TestChunkUploadExpiry(t *testing.T) {
 		})
 	}
 
+}
+
+func TestChunkUploadWritesTimestamp(t *testing.T) {
+	data := []byte("filedata")
+	hasher := sha256.New()
+	_, err := hasher.Write(data)
+	require.NoError(t, err)
+	hash := hex.EncodeToString(hasher.Sum(nil))
+
+	mockUploadID := "abc123"
+
+	hr, _, fakebulk, mtx := prepareUploaderMock(t)
+	mockUploadInfoResult(fakebulk, file.Info{
+		DocID:     "bar.foo",
+		ID:        mockUploadID,
+		ChunkSize: maxFileSize,
+		Total:     10,
+		Count:     1,
+		Start:     time.Now(),
+		Status:    file.StatusAwaiting,
+		Source:    "agent",
+		AgentID:   "foo",
+		ActionID:  "bar",
+	})
+
+	mtx.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+
+		assert.True(t, bytes.Contains(body, []byte("@timestamp")), "@timestamp should exist in chunk body")
+		return mtx.Response, nil
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
+	req.Header.Set("X-Chunk-SHA2", hash)
+
+	hr.ServeHTTP(rec, req)
 }
 
 /*
@@ -501,21 +585,21 @@ func TestUploadCompleteRequiresMatchingAuth(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 
-			hr, rt, fakebulk := prepareUploaderMock(t)
-			mockInfo := upload.Info{
+			hr, rt, fakebulk, _ := prepareUploaderMock(t)
+			mockInfo := file.Info{
 				DocID:     "bar." + tc.AgentInFileRecord,
 				ID:        mockUploadID,
 				ChunkSize: maxFileSize,
 				Total:     10,
 				Count:     1,
 				Start:     time.Now().Add(-time.Minute),
-				Status:    upload.StatusAwaiting,
+				Status:    file.StatusAwaiting,
 				Source:    "agent",
 				AgentID:   tc.AgentInFileRecord,
 				ActionID:  "bar",
 			}
 
-			transit := mockUploadedFile(fakebulk, mockInfo, []uploader.ChunkInfo{{
+			transit := mockUploadedFile(fakebulk, mockInfo, []file.ChunkInfo{{
 				Last: true,
 				Pos:  0,
 				SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
@@ -557,25 +641,25 @@ func TestUploadCompleteRequiresValidStatus(t *testing.T) {
 
 	tests := []struct {
 		Name              string
-		Status            upload.Status
+		Status            file.Status
 		ExpectStatus      int
 		ExpectErrContains string
 	}{
-		{"Can finalize Status Awaiting", upload.StatusAwaiting, http.StatusOK, ""},
-		{"Can finalize Status in progress", upload.StatusProgress, http.StatusOK, ""},
-		{"Cannot finalize Status Deleted", upload.StatusDel, http.StatusBadRequest, "closed"},
-		{"Cannot finalize Status Complete", upload.StatusDone, http.StatusBadRequest, "closed"},
-		{"Cannot finalize Status Failure", upload.StatusFail, http.StatusBadRequest, "closed"},
+		{"Can finalize Status Awaiting", file.StatusAwaiting, http.StatusOK, ""},
+		{"Can finalize Status in progress", file.StatusProgress, http.StatusOK, ""},
+		{"Cannot finalize Status Deleted", file.StatusDel, http.StatusBadRequest, "closed"},
+		{"Cannot finalize Status Complete", file.StatusDone, http.StatusBadRequest, "closed"},
+		{"Cannot finalize Status Failure", file.StatusFail, http.StatusBadRequest, "closed"},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 
-			hr, _, fakebulk := prepareUploaderMock(t)
-			mockInfo := upload.Info{
+			hr, _, fakebulk, _ := prepareUploaderMock(t)
+			mockInfo := file.Info{
 				DocID:     "bar.foo",
 				ID:        mockUploadID,
-				ChunkSize: uploader.MaxChunkSize,
+				ChunkSize: file.MaxChunkSize,
 				Total:     10,
 				Count:     1,
 				Start:     time.Now().Add(-time.Minute),
@@ -585,7 +669,7 @@ func TestUploadCompleteRequiresValidStatus(t *testing.T) {
 				ActionID:  "bar",
 			}
 
-			transit := mockUploadedFile(fakebulk, mockInfo, []uploader.ChunkInfo{{
+			transit := mockUploadedFile(fakebulk, mockInfo, []file.ChunkInfo{{
 				Last: true,
 				BID:  mockInfo.DocID,
 				Size: int(mockInfo.Total),
@@ -609,25 +693,25 @@ func TestUploadCompleteRequiresValidStatus(t *testing.T) {
 func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
 	mockUploadID := "abc123"
 
-	hr, _, fakebulk := prepareUploaderMock(t)
-	mockInfo := upload.Info{
+	hr, _, fakebulk, _ := prepareUploaderMock(t)
+	mockInfo := file.Info{
 		DocID:     "bar.foo",
 		ID:        mockUploadID,
-		ChunkSize: uploader.MaxChunkSize,
-		Total:     uploader.MaxChunkSize * 3,
+		ChunkSize: file.MaxChunkSize,
+		Total:     file.MaxChunkSize * 3,
 		Count:     3,
 		Start:     time.Now().Add(-time.Minute),
-		Status:    upload.StatusProgress,
+		Status:    file.StatusProgress,
 		Source:    "agent",
 		AgentID:   "foo",
 		ActionID:  "bar",
 	}
 
-	transit := mockUploadedFile(fakebulk, mockInfo, []uploader.ChunkInfo{
+	transit := mockUploadedFile(fakebulk, mockInfo, []file.ChunkInfo{
 		{
 			Last: false,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  0,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
@@ -635,7 +719,7 @@ func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
 		{
 			Last: true,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  2,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
@@ -653,39 +737,39 @@ func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
 func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
 	mockUploadID := "abc123"
 
-	hr, _, fakebulk := prepareUploaderMock(t)
-	mockInfo := upload.Info{
+	hr, _, fakebulk, _ := prepareUploaderMock(t)
+	mockInfo := file.Info{
 		DocID:     "bar.foo",
 		ID:        mockUploadID,
-		ChunkSize: uploader.MaxChunkSize,
-		Total:     uploader.MaxChunkSize * 3,
+		ChunkSize: file.MaxChunkSize,
+		Total:     file.MaxChunkSize * 3,
 		Count:     3,
 		Start:     time.Now().Add(-time.Minute),
-		Status:    upload.StatusProgress,
+		Status:    file.StatusProgress,
 		Source:    "agent",
 		AgentID:   "foo",
 		ActionID:  "bar",
 	}
 
-	transit := mockUploadedFile(fakebulk, mockInfo, []uploader.ChunkInfo{
+	transit := mockUploadedFile(fakebulk, mockInfo, []file.ChunkInfo{
 		{
 			Last: false,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  0,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
 		{
 			Last: false,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  1,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
 		{
 			Last: false,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  2,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
@@ -703,39 +787,39 @@ func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
 func TestUploadCompleteNonFinalChunkMarkedFinal(t *testing.T) {
 	mockUploadID := "abc123"
 
-	hr, _, fakebulk := prepareUploaderMock(t)
-	mockInfo := upload.Info{
+	hr, _, fakebulk, _ := prepareUploaderMock(t)
+	mockInfo := file.Info{
 		DocID:     "bar.foo",
 		ID:        mockUploadID,
-		ChunkSize: uploader.MaxChunkSize,
-		Total:     uploader.MaxChunkSize * 3,
+		ChunkSize: file.MaxChunkSize,
+		Total:     file.MaxChunkSize * 3,
 		Count:     3,
 		Start:     time.Now().Add(-time.Minute),
-		Status:    upload.StatusProgress,
+		Status:    file.StatusProgress,
 		Source:    "agent",
 		AgentID:   "foo",
 		ActionID:  "bar",
 	}
 
-	transit := mockUploadedFile(fakebulk, mockInfo, []uploader.ChunkInfo{
+	transit := mockUploadedFile(fakebulk, mockInfo, []file.ChunkInfo{
 		{
 			Last: false,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  0,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
 		{
 			Last: true,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  1,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
 		{
 			Last: true,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  2,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
@@ -753,39 +837,39 @@ func TestUploadCompleteNonFinalChunkMarkedFinal(t *testing.T) {
 func TestUploadCompleteUndersizedChunk(t *testing.T) {
 	mockUploadID := "abc123"
 
-	hr, _, fakebulk := prepareUploaderMock(t)
-	mockInfo := upload.Info{
+	hr, _, fakebulk, _ := prepareUploaderMock(t)
+	mockInfo := file.Info{
 		DocID:     "bar.foo",
 		ID:        mockUploadID,
-		ChunkSize: uploader.MaxChunkSize,
-		Total:     uploader.MaxChunkSize * 3,
+		ChunkSize: file.MaxChunkSize,
+		Total:     file.MaxChunkSize * 3,
 		Count:     3,
 		Start:     time.Now().Add(-time.Minute),
-		Status:    upload.StatusProgress,
+		Status:    file.StatusProgress,
 		Source:    "agent",
 		AgentID:   "foo",
 		ActionID:  "bar",
 	}
 
-	transit := mockUploadedFile(fakebulk, mockInfo, []uploader.ChunkInfo{
+	transit := mockUploadedFile(fakebulk, mockInfo, []file.ChunkInfo{
 		{
 			Last: false,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  0,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
 		{
 			Last: false,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize) - 5,
+			Size: int(file.MaxChunkSize) - 5,
 			Pos:  1,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
 		{
 			Last: true,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  2,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
@@ -803,39 +887,39 @@ func TestUploadCompleteUndersizedChunk(t *testing.T) {
 func TestUploadCompleteIncorrectTransitHash(t *testing.T) {
 	mockUploadID := "abc123"
 
-	hr, _, fakebulk := prepareUploaderMock(t)
-	mockInfo := upload.Info{
+	hr, _, fakebulk, _ := prepareUploaderMock(t)
+	mockInfo := file.Info{
 		DocID:     "bar.foo",
 		ID:        mockUploadID,
-		ChunkSize: uploader.MaxChunkSize,
-		Total:     uploader.MaxChunkSize * 3,
+		ChunkSize: file.MaxChunkSize,
+		Total:     file.MaxChunkSize * 3,
 		Count:     3,
 		Start:     time.Now().Add(-time.Minute),
-		Status:    upload.StatusProgress,
+		Status:    file.StatusProgress,
 		Source:    "agent",
 		AgentID:   "foo",
 		ActionID:  "bar",
 	}
 
-	mockUploadedFile(fakebulk, mockInfo, []uploader.ChunkInfo{
+	mockUploadedFile(fakebulk, mockInfo, []file.ChunkInfo{
 		{
 			Last: false,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  0,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
 		{
 			Last: false,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize) - 5,
+			Size: int(file.MaxChunkSize) - 5,
 			Pos:  1,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
 		{
 			Last: true,
 			BID:  mockInfo.DocID,
-			Size: int(uploader.MaxChunkSize),
+			Size: int(file.MaxChunkSize),
 			Pos:  2,
 			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
 		},
@@ -855,10 +939,10 @@ func TestUploadCompleteIncorrectTransitHash(t *testing.T) {
 */
 
 // prepareUploaderMock sets up common dependencies and registers upload routes to a returned router
-func prepareUploaderMock(t *testing.T) (http.Handler, apiServer, *itesting.MockBulk) {
+func prepareUploaderMock(t *testing.T) (http.Handler, apiServer, *itesting.MockBulk, *MockTransport) {
 	// chunk index operations skip the bulker in order to send binary docs directly
 	// so a mock *elasticsearch.Client needs to be be prepared
-	es := mockESClient(t)
+	es, tx := mockESClient(t)
 
 	fakebulk := itesting.NewMockBulk()
 	fakebulk.On("Create",
@@ -909,7 +993,7 @@ func prepareUploaderMock(t *testing.T) (http.Handler, apiServer, *itesting.MockB
 		},
 	}
 
-	return Handler(&si), si, fakebulk
+	return Handler(&si), si, fakebulk, tx
 }
 
 // mockStartBodyWithAgent returns the minimum required JSON payload for beginning an upload, with agent set as input
@@ -927,7 +1011,7 @@ func mockStartBodyWithAgent(agent string) string {
 }
 
 // mockUploadInfoResult sets up the MockBulk to return file metadata in the proper format
-func mockUploadInfoResult(bulker *itesting.MockBulk, info upload.Info) {
+func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 
 	// convert info into how it's stored/returned in ES
 	out, _ := json.Marshal(map[string]interface{}{
@@ -945,7 +1029,7 @@ func mockUploadInfoResult(bulker *itesting.MockBulk, info upload.Info) {
 
 	bulker.On("Search",
 		mock.Anything,
-		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-files-") }),
+		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-fileds-fromhost-meta-") }),
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
@@ -962,24 +1046,24 @@ func mockUploadInfoResult(bulker *itesting.MockBulk, info upload.Info) {
 
 // mockChunkResult sets up the MockBulk to return Chunk Data in the expected format from Elasticsearch
 // it returns the transithash for the provided chunks
-func mockChunkResult(bulker *itesting.MockBulk, chunks []uploader.ChunkInfo) string {
+func mockChunkResult(bulker *itesting.MockBulk, chunks []file.ChunkInfo) string {
 
 	results := make([]es.HitT, len(chunks))
 	for i, chunk := range chunks {
 		results[i] = es.HitT{
 			ID: chunk.BID + "." + strconv.Itoa(chunk.Pos),
 			Fields: map[string]interface{}{
-				uploader.FieldBaseID: []interface{}{chunk.BID},
-				uploader.FieldSHA2:   []interface{}{chunk.SHA2},
-				uploader.FieldLast:   []interface{}{chunk.Last},
-				"size":               []interface{}{chunk.Size},
+				file.FieldBaseID: []interface{}{chunk.BID},
+				file.FieldSHA2:   []interface{}{chunk.SHA2},
+				file.FieldLast:   []interface{}{chunk.Last},
+				"size":           []interface{}{chunk.Size},
 			},
 		}
 	}
 
 	bulker.On("Search",
 		mock.Anything,
-		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-file-data-") }),
+		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-fileds-fromhost-data-") }),
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
@@ -993,13 +1077,13 @@ func mockChunkResult(bulker *itesting.MockBulk, chunks []uploader.ChunkInfo) str
 // mockUploadedFile places the expected data (file metadata and chunks) into the bulker
 // to emulate an uploaded file
 // it returns the transithash for the provided chunks
-func mockUploadedFile(bulker *itesting.MockBulk, info upload.Info, chunks []uploader.ChunkInfo) string {
+func mockUploadedFile(bulker *itesting.MockBulk, info file.Info, chunks []file.ChunkInfo) string {
 	mockUploadInfoResult(bulker, info) // one result from the cache for agent ID check
 	mockUploadInfoResult(bulker, info) // second for a cache-busting fetch for up-to-date status
 	return mockChunkResult(bulker, chunks)
 }
 
-func calcTransitHash(chunks []uploader.ChunkInfo) string {
+func calcTransitHash(chunks []file.ChunkInfo) string {
 	hasher := sha256.New()
 	for _, c := range chunks {
 		out, err := hex.DecodeString(c.SHA2)
@@ -1025,13 +1109,9 @@ func (t *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.RoundTripFn(req)
 }
 
-func mockESClient(t *testing.T) *elasticsearch.Client {
+func mockESClient(t *testing.T) (*elasticsearch.Client, *MockTransport) {
 	mocktrans := MockTransport{
-		Response: &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(strings.NewReader(`{}`)),
-			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
-		},
+		Response: sendBodyString("{}"), //nolint:bodyclose // nopcloser is used, linter does not see it
 	}
 
 	mocktrans.RoundTripFn = func(req *http.Request) (*http.Response, error) { return mocktrans.Response, nil }
@@ -1039,5 +1119,18 @@ func mockESClient(t *testing.T) *elasticsearch.Client {
 		Transport: &mocktrans,
 	})
 	require.NoError(t, err)
-	return client
+	return client, &mocktrans
+}
+
+func sendBodyString(body string) *http.Response { return sendBody(strings.NewReader(body)) }
+func sendBodyBytes(body []byte) *http.Response  { return sendBody(bytes.NewReader(body)) }
+func sendBody(body io.Reader) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(body),
+		Header: http.Header{
+			"X-Elastic-Product": []string{"Elasticsearch"},
+			"Content-Type":      []string{"application/cbor"},
+		},
+	}
 }

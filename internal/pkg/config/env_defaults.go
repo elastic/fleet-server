@@ -65,6 +65,11 @@ const (
 	defaultUploadChunkBurst    = 10
 	defaultUploadChunkMax      = 5
 	defaultUploadChunkMaxBody  = 1024 * 1024 * 4 // this is also enforced in handler, a chunk MAY NOT be larger than 4 MiB
+
+	defaultFileDelivInterval = time.Millisecond * 100
+	defaultFileDelivBurst    = 8
+	defaultFileDelivMax      = 5
+	defaultFileDelivMaxBody  = 1024 * 1024 * 5
 )
 
 type valueRange struct {
@@ -121,6 +126,7 @@ type serverLimitDefaults struct {
 	UploadStartLimit limit `config:"upload_start_limit"`
 	UploadEndLimit   limit `config:"upload_end_limit"`
 	UploadChunkLimit limit `config:"upload_chunk_limit"`
+	DeliverFileLimit limit `config:"file_delivery_limit"`
 }
 
 func defaultserverLimitDefaults() *serverLimitDefaults {
@@ -175,6 +181,12 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Burst:    defaultUploadChunkBurst,
 			Max:      defaultUploadChunkMax,
 			MaxBody:  defaultUploadChunkMaxBody,
+		},
+		DeliverFileLimit: limit{
+			Interval: defaultFileDelivInterval,
+			Burst:    defaultFileDelivBurst,
+			Max:      defaultFileDelivMax,
+			MaxBody:  defaultFileDelivMaxBody,
 		},
 	}
 }

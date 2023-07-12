@@ -68,7 +68,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 	}
 
 	state := sm.State()
-	resp := StatusResponse{
+	resp := StatusAPIResponse{
 		Name:   build.ServiceName,
 		Status: StatusResponseStatus(state.String()), // TODO try to make the oapi codegen less verbose here
 	}
@@ -88,7 +88,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 	}
 
 	code := http.StatusServiceUnavailable
-	if state == client.UnitStateDegraded || state == client.UnitStateHealthy {
+	if state == client.UnitStateHealthy {
 		code = http.StatusOK
 	}
 	w.WriteHeader(code)

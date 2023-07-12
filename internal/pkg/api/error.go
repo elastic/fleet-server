@@ -15,9 +15,11 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file/delivery"
+	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/elastic/fleet-server/v7/internal/pkg/uploader"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
@@ -383,6 +385,44 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				http.StatusBadRequest,
 				"ErrFieldRequired",
 				"",
+				zerolog.InfoLevel,
+			},
+		},
+		// Version
+		{
+			ErrInvalidAPIVersionFormat,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrInvalidAPIVersionFormat",
+				"",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			ErrUnsupportedAPIVersion,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrUnsupportedAPIVersion",
+				"",
+				zerolog.InfoLevel,
+			},
+		},
+		// file
+		{
+			delivery.ErrNoFile,
+			HTTPErrResp{
+				http.StatusNotFound,
+				"ErrNoFile",
+				"file not found",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			file.ErrInvalidID,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrInvalidFileID",
+				"ErrInvalidID",
 				zerolog.InfoLevel,
 			},
 		},

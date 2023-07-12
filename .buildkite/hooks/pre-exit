@@ -2,8 +2,23 @@
 
 set -euo pipefail
 
+source .buildkite/scripts/common.sh
+
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "publish" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
     docker logout ${DOCKER_REGISTRY}
+  fi
+fi
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "release-test" ]]; then
+    unset GOOGLE_APPLICATIONS_CREDENTIALS
+    cleanup
+fi
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "package-x86-64" || "$BUILDKITE_STEP_KEY" == "package-arm" || "$BUILDKITE_STEP_KEY" == "dra-snapshot" && "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
+    unset GOOGLE_APPLICATIONS_CREDENTIALS
+    docker logout ${DOCKER_REGISTRY}
+    cleanup
   fi
 fi

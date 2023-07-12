@@ -29,6 +29,9 @@ import (
 // DefaultCheckTime is the default interval for self to check for its policy.
 const DefaultCheckTime = 5 * time.Second
 
+// DefaultCheckTimeout is the default timeout when checking for policies.
+const DefaultCheckTimeout = 30 * time.Second
+
 type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error)
 
 type SelfMonitor interface {

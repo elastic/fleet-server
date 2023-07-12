@@ -5,25 +5,25 @@ env:
   DOCKER_COMPOSE_VERSION: '1.25.5'
   DOCKER_REGISTRY: "docker.elastic.co"
   DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/temp-fleet-server" # needs to rename after tests
-  DOCKER_IMAGE_SHA_TAG: "temp-${BUILDKITE_COMMIT}" # needs to rename after tests
+  DOCKER_IMAGE_SHA_TAG: "temp-${BUILDKITE_COMMIT}" # needs to rename after tests, should be "git-${BUILDKITE_COMMIT:0:12}"
   DOCKER_IMAGE_LATEST_TAG: "temp-latest" # needs to rename after tests
   DOCKER_IMAGE_GIT_TAG: "temp-${BUILDKITE_BRANCH}" # needs to rename after tests
-  GO_AGENT_IMAGE: "golang:1.20.3"
+  GO_AGENT_IMAGE: "golang:${GO_VERSION}"
   TERRAFORM_VERSION: '1.4.6'
 
 steps:
   - group: "Check and build"
     key: "check"
     steps:
-      - label: ":go: Run check-ci"
+      - label: ":white_check_mark: Run check-ci"
         key: check-ci
         command: "make check-ci"
         agents:
-          image: "golang:1.20.3"
+          image: "${GO_AGENT_IMAGE}"
           cpu: "8"
           memory: "4G"
 
-      - label: ":go: Run local build"
+      - label: ":building_construction: Run local build"
         key: make-local
         command: "make local"
         agents:
@@ -34,7 +34,7 @@ steps:
   - group: "Run tests"
     key: "tests"
     steps:
-      - label: "Run unit tests"
+      - label: ":smartbear-testexecute: Run unit tests"
         key: unit-test
         command: ".buildkite/scripts/unit_test.sh"
         agents:
@@ -42,7 +42,7 @@ steps:
         artifact_paths:
           - build/*.xml
 
-      - label: "Run integration tests"
+      - label: ":smartbear-testexecute: Run integration tests"
         key: int-test
         command: ".buildkite/scripts/integration_test.sh"
         agents:
@@ -73,7 +73,7 @@ steps:
           - step: "int-test"
             allow_failure: false
 
-      - label: "Cloud e2e Test"
+      - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
@@ -85,15 +85,52 @@ steps:
             allow_failure: false
           - step: "e2e-test"
             allow_failure: false
-
     depends_on: "check"
 
-  - label: "Publish docker image"
+  - label: ":docker: Publish docker image"
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
-    if: build.env("BUILDKITE_PULL_REQUEST") == null
+    if: "build.env('BUILDKITE_PULL_REQUEST') == '' && build.env('BUILDKITE_BRANCH') == 'main'"
     agents:
       provider: "gcp"
     depends_on:
       - step: "tests"
+        allow_failure: false
+
+  - label: ":argo: Update fleet image tag for fleet-controller using gpctl"
+    async: true
+    branches: main
+    trigger: gpctl-promote
+    build:
+      env:
+        SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
+        REMOTE_SERVICE_CONFIG: https://raw.githubusercontent.com/elastic/serverless-gitops/main/gen/gpctl/fleet/config.yaml
+
+  - label: ":gcloud: Release test"
+    key: "release-test"
+    command: ".buildkite/scripts/release_test.sh"
+    agents:
+      provider: "gcp"
+    depends_on:
+      - step: "tests"
+        allow_failure: false
+
+  - label: ":jenkins: Release - Package Registry Distribution"
+    key: "release-package-registry"
+    trigger: "package-registry-release-package-registry-distribution"
+    build:
+      branch: "main"
+      meta_data:
+        DOCKER_TAG: "${BUILDKITE_TAG}"
+    if: "build.env('BUILDKITE_TAG') != ''"
+    depends_on:
+      - step: "release-test"
+        allow_failure: false
+
+  - trigger: "fleet-server-package-mbp"
+    label: ":esbuild: Downstream - Package"
+    key: "downstream-package"
+    if:  "build.env('BUILDKITE_BRANCH') != '' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_PULL_REQUEST') == ''"
+    depends_on:
+      - step: "release-package-registry"
         allow_failure: false
