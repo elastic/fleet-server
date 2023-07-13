@@ -29,6 +29,7 @@ func createActionResult(ctx context.Context, bulker bulk.Bulk, index string, acr
 	}
 
 	_, err = bulker.Create(ctx, index, acr.ActionID+":"+acr.AgentID, body, bulk.WithRefresh())
+	// ignoring version conflict in case the same action result is tried to be created multiple times (unique id with actionID and agentID)
 	if errors.Is(err, es.ErrElasticVersionConflict) {
 		return nil
 	}
