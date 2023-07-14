@@ -319,7 +319,7 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 	acr := eventToActionResult(agent.Id, ev)
 
 	// Save action result document
-	if _, err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
+	if err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
 		zlog.Error().Err(err).Msg("create action result")
 		return err
 	}
