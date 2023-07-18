@@ -127,6 +127,7 @@ func (suite *AgentContainerSuite) TestHTTP() {
 				Target: "/cover",
 			},
 		},
+		WaitingFor: containerWaitForHealthyStatus(),
 	}
 	fleetC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -197,6 +198,7 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 				Target: "/cover",
 			},
 		},
+		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}
 	fleetC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -257,6 +259,7 @@ func (suite *AgentContainerSuite) TestClientAPI() {
 				Target: "/cover",
 			},
 		},
+		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}
 	fleetC, err := testcontainers.GenericContainer(bCtx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -413,6 +416,7 @@ func (suite *AgentContainerSuite) TestSleep10m() {
 				Target: "/cover",
 			},
 		},
+		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}
 	fleetC, err := testcontainers.GenericContainer(bCtx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -483,6 +487,7 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 				Target: "/cover",
 			},
 		},
+		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}
 	fleetC, err := testcontainers.GenericContainer(bCtx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,

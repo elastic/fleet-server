@@ -102,7 +102,7 @@ func TestHandleStatus(t *testing.T) {
 					hr.ServeHTTP(w, req)
 
 					expectedCode := http.StatusServiceUnavailable
-					if state == client.UnitStateDegraded || state == client.UnitStateHealthy {
+					if state == client.UnitStateHealthy {
 						expectedCode = http.StatusOK
 					}
 

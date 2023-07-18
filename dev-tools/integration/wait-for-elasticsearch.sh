@@ -26,7 +26,7 @@ done
 health="$(curl -fsSL "$host/_cat/health?h=status")"
 health="$(echo "$health" | tr -d '[:space:]')"
 
-until [ "$health" = 'green' ]; do
+until [ "$health" = 'green' -o "$health" = 'yellow' ]; do
     health="$(curl -fsSL "$host/_cat/health?h=status")"
     echo $health
     health="$(echo "$health" | tr -d '[:space:]')"

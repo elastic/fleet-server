@@ -14,7 +14,6 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
-	"github.com/rs/xid"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
@@ -45,13 +44,15 @@ func createRandomActionResults() ([]model.ActionResult, error) {
 		if r.Bool() {
 			errmsg = "random error " + uuid.Must(uuid.NewV4()).String()
 		}
+		agentID := uuid.Must(uuid.NewV4()).String()
+		actionID := uuid.Must(uuid.NewV4()).String()
 		result := model.ActionResult{
 			ESDocument: model.ESDocument{
-				Id: xid.New().String(),
+				Id: actionID + ":" + agentID,
 			},
 			Timestamp: r.Time(now, 2, 5, time.Second, rnd.TimeBefore).Format(time.RFC3339),
-			AgentID:   uuid.Must(uuid.NewV4()).String(),
-			ActionID:  uuid.Must(uuid.NewV4()).String(),
+			AgentID:   agentID,
+			ActionID:  actionID,
 			Error:     errmsg,
 			Data:      data,
 		}
@@ -68,7 +69,7 @@ func storeRandomActionResults(ctx context.Context, bulker bulk.Bulk, index strin
 	}
 
 	for _, result := range results {
-		_, err = createActionResult(ctx, bulker, index, result)
+		err = createActionResult(ctx, bulker, index, result)
 		if err != nil {
 			return nil, err
 		}

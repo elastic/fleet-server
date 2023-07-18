@@ -3,7 +3,6 @@
 env:
   SETUP_GVM_VERSION: 'v0.5.0'
   DOCKER_COMPOSE_VERSION: '1.25.5'
-  GO_VERSION: "1.20.5"
   DOCKER_REGISTRY: "docker.elastic.co"
   DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/temp-fleet-server" # needs to rename after tests
   DOCKER_IMAGE_SHA_TAG: "temp-${BUILDKITE_COMMIT}" # needs to rename after tests, should be "git-${BUILDKITE_COMMIT:0:12}"
@@ -98,20 +97,14 @@ steps:
       - step: "tests"
         allow_failure: false
 
-  - label: ":argo: Update image tag for Fleet Server"
-    trigger: serverless-gitops-update-stack-image-tag
+  - label: ":argo: Update fleet image tag for fleet-controller using gpctl"
     async: true
     branches: main
+    trigger: gpctl-promote
     build:
       env:
-        IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
-        SERVICE: fleet-controller
-        NAMESPACE: observability-ci
-        IMAGE_NAME: fleet-server
-        COMMIT_MESSAGE: "gitops: update fleet-server tag to elastic/fleet-server@git-${BUILDKITE_COMMIT:0:12}"
-    depends_on:
-      - step: "publish"
-        allow_failure: false
+        SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
+        REMOTE_SERVICE_CONFIG: https://raw.githubusercontent.com/elastic/serverless-gitops/main/gen/gpctl/fleet/config.yaml
 
   - label: ":gcloud: Release test"
     key: "release-test"

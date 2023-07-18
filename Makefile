@@ -356,7 +356,7 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
 	CGO_ENABLED=1 \
-	go test -v -tags=e2e -count=1 -race -p 1 ./...
+	go test -v -timeout 30m -tags=e2e -count=1 -race -p 1 ./...
 
 ##################################################
 # Cloud testing targets

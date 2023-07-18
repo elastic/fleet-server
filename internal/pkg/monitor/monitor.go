@@ -204,14 +204,22 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 	}()
 
 	// Get initial global checkpoint
-	var checkpoint sqn.SeqNo
-	checkpoint, err = gcheckpt.Query(ctx, m.monCli, m.index)
-	if err != nil {
-		m.log.Error().Err(err).Msg("failed to initialize the global checkpoints")
-		return err
+	for {
+		checkpoint, err := gcheckpt.Query(ctx, m.monCli, m.index)
+		if err != nil {
+			m.log.Warn().Err(err).Msg("failed to initialize the global checkpoints, will retry")
+			err = sleep.WithContext(ctx, retryDelay)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		m.storeCheckpoint(checkpoint)
+		m.log.Debug().Ints64("checkpoint", checkpoint).Msg("initial checkpoint")
+
+		break
 	}
-	m.storeCheckpoint(checkpoint)
-	m.log.Debug().Ints64("checkpoint", checkpoint).Msg("initial checkpoint")
 
 	// Signal the monitor is ready
 	if m.readyCh != nil {

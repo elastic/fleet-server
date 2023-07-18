@@ -20,9 +20,6 @@ set -uexo pipefail
 readonly TYPE=${TYPE:-snapshot}
 readonly OUTPUT_FILE=${OUTPUT_FILE:-release-manager-report.out}
 
-# shellcheck source=/dev/null
-source /usr/local/bin/bash_standard_lib.sh
-
 # set required permissions on artifacts and directory
 chmod -R a+r "$FOLDER"/*
 chmod -R a+w "$FOLDER"
