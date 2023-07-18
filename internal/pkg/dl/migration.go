@@ -95,7 +95,6 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 	opts := []func(*esapi.UpdateByQueryRequest){
 		client.UpdateByQuery.WithBody(reader),
 		client.UpdateByQuery.WithContext(ctx),
-		client.UpdateByQuery.WithRefresh(true),
 		client.UpdateByQuery.WithConflicts("proceed"),
 	}
 

@@ -80,12 +80,6 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 		Body: bytes.NewReader(payload),
 	}
 
-	var refresh bool
-	if queue.ty == kQueueRefreshRead {
-		refresh = true
-		req.Refresh = &refresh
-	}
-
 	res, err := req.Do(ctx, b.es)
 
 	if err != nil {
@@ -121,7 +115,6 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 
 	log.Trace().
 		Err(err).
-		Bool("refresh", refresh).
 		Str("mod", kModBulk).
 		Dur("rtt", time.Since(start)).
 		Int("cnt", len(blk.Items)).

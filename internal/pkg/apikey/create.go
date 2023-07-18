@@ -15,6 +15,8 @@ import (
 )
 
 // Create generates a new APIKey in Elasticsearch using the given client.
+//
+// NOTE this is always invoked with refresh="false"
 func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refresh string, roles []byte, meta interface{}) (*APIKey, error) {
 	payload := struct {
 		Name       string          `json:"name,omitempty"`

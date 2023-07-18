@@ -392,7 +392,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Err(ctx.Err()).
 			Str("mod", kModBulk).
 			Str("action", blk.action.String()).
-			Bool("refresh", blk.flags.Has(flagRefresh)).
+			Bool("refresh", blk.flags.Has(flagRefresh)). // TODO change refresh to string and fix mapping
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort queue")
 		return respT{err: ctx.Err()}
@@ -405,7 +405,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Err(resp.err).
 			Str("mod", kModBulk).
 			Str("action", blk.action.String()).
-			Bool("refresh", blk.flags.Has(flagRefresh)).
+			Bool("refresh", blk.flags.Has(flagRefresh)). // TODO change refresh to string and fix mapping
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch OK")
 
@@ -415,7 +415,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Err(ctx.Err()).
 			Str("mod", kModBulk).
 			Str("action", blk.action.String()).
-			Bool("refresh", blk.flags.Has(flagRefresh)).
+			Bool("refresh", blk.flags.Has(flagRefresh)). // TODO change refresh to string and fix mapping
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort response")
 	}

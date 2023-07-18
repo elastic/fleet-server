@@ -189,7 +189,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	}
 
 	if queue.ty == kQueueRefreshBulk {
-		req.Refresh = "true"
+		req.Refresh = "wait_for"
 	}
 
 	res, err := req.Do(ctx, b.es)
@@ -238,7 +238,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 
 	log.Trace().
 		Err(err).
-		Bool("refresh", queue.ty == kQueueRefreshBulk).
+		Bool("refresh", queue.ty == kQueueRefreshBulk). // TODO we may want to switch this to string, but we will need to ensure that the attribute mapping is correct
 		Str("mod", kModBulk).
 		Int("took", blk.Took).
 		Dur("rtt", time.Since(start)).
