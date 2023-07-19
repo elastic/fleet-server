@@ -44,12 +44,13 @@ var (
 
 // FIXME Should we use the structs in openapi.gen.go instead of the generic ones? Will need to rework the uploader if we do
 type UploadT struct {
-	bulker      bulk.Bulk
-	chunkClient *elasticsearch.Client
-	cache       cache.Cache
-	uploader    *uploader.Uploader
-	authAgent   func(*http.Request, *string, bulk.Bulk, cache.Cache) (*model.Agent, error) // injectable for testing purposes
-	authAPIKey  func(*http.Request, bulk.Bulk, cache.Cache) (*apikey.APIKey, error)        // as above
+	bulker       bulk.Bulk
+	chunkClient  *elasticsearch.Client
+	cache        cache.Cache
+	uploader     *uploader.Uploader
+	authAgent    func(*http.Request, *string, bulk.Bulk, cache.Cache) (*model.Agent, error) // injectable for testing purposes
+	authAPIKey   func(*http.Request, bulk.Bulk, cache.Cache) (*apikey.APIKey, error)        // as above
+	refreshParam string
 }
 
 func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *UploadT {
@@ -59,12 +60,13 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 		Msg("upload limits")
 
 	return &UploadT{
-		chunkClient: chunkClient,
-		bulker:      bulker,
-		cache:       cache,
-		uploader:    uploader.New(chunkClient, bulker, cache, maxFileSize, maxUploadTimer),
-		authAgent:   authAgent,
-		authAPIKey:  authAPIKey,
+		chunkClient:  chunkClient,
+		bulker:       bulker,
+		cache:        cache,
+		uploader:     uploader.New(chunkClient, bulker, cache, maxFileSize, maxUploadTimer),
+		authAgent:    authAgent,
+		authAPIKey:   authAPIKey,
+		refreshParam: string(cfg.Bulk.Refresh),
 	}
 }
 
@@ -126,7 +128,7 @@ func (ut *UploadT) handleUploadChunk(zlog zerolog.Logger, w http.ResponseWriter,
 	copier := io.TeeReader(data, hash)
 
 	ce := cbor.NewChunkWriter(copier, chunkInfo.Last, chunkInfo.BID, chunkInfo.SHA2, upinfo.ChunkSize)
-	if err := uploader.IndexChunk(r.Context(), ut.chunkClient, ce, upinfo.Source, chunkInfo.BID, chunkInfo.Pos); err != nil {
+	if err := uploader.IndexChunk(r.Context(), ut.chunkClient, ce, upinfo.Source, chunkInfo.BID, chunkInfo.Pos, ut.refreshParam); err != nil {
 		return err
 	}
 

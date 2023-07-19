@@ -63,6 +63,7 @@ type bulkOptT struct {
 	blockQueueSz      int
 	apikeyMaxParallel int
 	apikeyMaxReqSize  int
+	refreshParam      string
 }
 
 type BulkOpt func(*bulkOptT)
@@ -118,6 +119,12 @@ func WithAPIKeyMaxRequestSize(maxBytes int) BulkOpt {
 	}
 }
 
+func WithRefreshParam(refresh config.Refresh) BulkOpt {
+	return func(opt *bulkOptT) {
+		opt.refreshParam = string(refresh)
+	}
+}
+
 func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 	bopt := bulkOptT{
 		flushInterval:     defaultFlushInterval,
@@ -127,6 +134,7 @@ func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		apikeyMaxParallel: defaultAPIKeyMaxParallel,
 		blockQueueSz:      defaultBlockQueueSz,
 		apikeyMaxReqSize:  defaultApikeyMaxReqSize,
+		refreshParam:      defaultRefreshParam,
 	}
 
 	for _, f := range opts {
@@ -165,5 +173,6 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 		WithMaxPending(bulkCfg.FlushMaxPending),
 		WithAPIKeyMaxParallel(maxKeyParallel),
 		WithAPIKeyMaxRequestSize(cfg.Output.Elasticsearch.MaxContentLength),
+		WithRefreshParam(bulkCfg.Refresh),
 	}
 }

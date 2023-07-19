@@ -11,12 +11,12 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: Change refresh=true to refresh=wait_for
+summary: Add refresh param config
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: Change the refresh param from "true" to "wait_for" to better support upcoming serverless offering. Remove refresh param from mget requests.
+description: Add a parameter that allows for the change of the refresh param from "true" to "wait_for" that effects file upload and bulk creation calls.
 
 # Affected component; a word indicating the component this changeset affects.
 component:

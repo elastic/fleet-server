@@ -95,6 +95,7 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 	opts := []func(*esapi.UpdateByQueryRequest){
 		client.UpdateByQuery.WithBody(reader),
 		client.UpdateByQuery.WithContext(ctx),
+		client.UpdateByQuery.WithRefresh(true), // FIXME change to wait_for once the API supports it.
 		client.UpdateByQuery.WithConflicts("proceed"),
 	}
 

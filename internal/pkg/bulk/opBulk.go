@@ -189,7 +189,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	}
 
 	if queue.ty == kQueueRefreshBulk {
-		req.Refresh = "wait_for"
+		req.Refresh = b.opts.refreshParam
 	}
 
 	res, err := req.Do(ctx, b.es)

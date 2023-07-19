@@ -192,6 +192,7 @@ fleet:
 #           flush_threshold_cnt: 2048
 #           flush_threshold_size: 1048567 # 1MiB
 #           flush_max_pending: 8
+#           refresh: "true" # The refresh param, must be one of [true, false, wait_for], defaults to "true"
 #
 #         # gc controls fleet-server index garbage collection operations
 #         # currently manages actions cleanup

@@ -42,11 +42,26 @@ type ServerTLS struct {
 	Cert string `config:"cert"`
 }
 
+// Refresh represents the refresh parameter used in Elasticsearch requests
+type Refresh string
+
+// Possible values of the refresh param as defined by [Elasticsearch Docs].
+// Note that not all operations support all values.
+// For example mget requests still define the refresh param as a boolean.
+//
+// [Elasticsearch Docs]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-refresh.html
+const (
+	RefreshTrue    = "true"
+	RefreshFalse   = "false"
+	RefreshWaitFor = "wait_for"
+)
+
 type ServerBulk struct {
 	FlushInterval       time.Duration `config:"flush_interval"`
 	FlushThresholdCount int           `config:"flush_threshold_cnt"`
 	FlushThresholdSize  int           `config:"flush_threshold_size"`
 	FlushMaxPending     int           `config:"flush_max_pending"`
+	Refresh             Refresh       `config:"refresh"`
 }
 
 func (c *ServerBulk) InitDefaults() {
@@ -54,6 +69,7 @@ func (c *ServerBulk) InitDefaults() {
 	c.FlushThresholdCount = 2048
 	c.FlushThresholdSize = 1024 * 1024
 	c.FlushMaxPending = 8
+	c.Refresh = RefreshTrue
 }
 
 // Server is the configuration for the server

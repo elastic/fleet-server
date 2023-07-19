@@ -114,7 +114,7 @@ func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID 
 	Chunk Operations
 */
 
-func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, fileID string, chunkNum int) error {
+func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, fileID string, chunkNum int, refreshParam string) error {
 	chunkDocID := fmt.Sprintf("%s.%d", fileID, chunkNum)
 	resp, err := client.Create(fmt.Sprintf(UploadDataIndexPattern, source), chunkDocID, body, func(req *esapi.CreateRequest) {
 		req.DocumentID = chunkDocID
@@ -123,7 +123,7 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 		}
 		req.Header.Set("Content-Type", "application/cbor")
 		req.Header.Set("Accept", "application/json")
-		req.Refresh = "wait_for"
+		req.Refresh = refreshParam
 	})
 	if err != nil {
 		return err

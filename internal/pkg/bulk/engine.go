@@ -84,6 +84,7 @@ const (
 	defaultBlockQueueSz      = 32 // Small capacity to allow multiOp to spin fast
 	defaultAPIKeyMaxParallel = 32
 	defaultApikeyMaxReqSize  = 100 * 1024 * 1024
+	defaultRefreshParam      = "true"
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
