@@ -19,6 +19,8 @@ const kDefaultInternalHost = "localhost"
 const kDefaultInternalPort = 8221
 const fleetInputType = "fleet-server"
 
+var ErrBulkerRefresh = fmt.Errorf("bulker.refresh setting is invalid")
+
 // Policy is the configuration policy to use.
 type Policy struct {
 	ID string `config:"id"`
@@ -42,9 +44,6 @@ type ServerTLS struct {
 	Cert string `config:"cert"`
 }
 
-// Refresh represents the refresh parameter used in Elasticsearch requests
-type Refresh string
-
 // Possible values of the refresh param as defined by [Elasticsearch Docs].
 // Note that not all operations support all values.
 // For example mget requests still define the refresh param as a boolean.
@@ -61,7 +60,7 @@ type ServerBulk struct {
 	FlushThresholdCount int           `config:"flush_threshold_cnt"`
 	FlushThresholdSize  int           `config:"flush_threshold_size"`
 	FlushMaxPending     int           `config:"flush_max_pending"`
-	Refresh             Refresh       `config:"refresh"`
+	Refresh             string        `config:"refresh"`
 }
 
 func (c *ServerBulk) InitDefaults() {
@@ -70,6 +69,15 @@ func (c *ServerBulk) InitDefaults() {
 	c.FlushThresholdSize = 1024 * 1024
 	c.FlushMaxPending = 8
 	c.Refresh = RefreshTrue
+}
+
+func (c *ServerBulk) Validate() error {
+	switch c.Refresh {
+	case RefreshTrue, RefreshFalse, RefreshWaitFor:
+	default:
+		return fmt.Errorf("%w: value=%s", ErrBulkerRefresh, c.Refresh)
+	}
+	return nil
 }
 
 // Server is the configuration for the server

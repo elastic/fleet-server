@@ -119,9 +119,9 @@ func WithAPIKeyMaxRequestSize(maxBytes int) BulkOpt {
 	}
 }
 
-func WithRefreshParam(refresh config.Refresh) BulkOpt {
+func WithRefreshParam(refresh string) BulkOpt {
 	return func(opt *bulkOptT) {
-		opt.refreshParam = string(refresh)
+		opt.refreshParam = refresh
 	}
 }
 
