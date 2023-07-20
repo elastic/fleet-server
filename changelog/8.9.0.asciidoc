@@ -1,0 +1,86 @@
+version: 8.9.0
+entries:
+    - kind: security
+      summary: Use verified base image for building Fleet Server binaries
+      description: ""
+      component: ""
+      pr:
+        - "2339"
+      issue: []
+      timestamp: 1682696415
+      file:
+        name: 1682696415-crossbuild.yaml
+        checksum: 159350f6e8e2e60912b5ca57c2d0ee3fe10b1026
+    - kind: breaking-change
+      summary: API default error is now 500
+      description: Up until now when any not expected error was encountered it resulted int Bad Request response.\n This is changing and any not expected error will return Internal Server Error while keeping most of the current behavior\n unchanged and returning Bad Request on expected failure paths (e.g. Agent Inactive, Missing Agent ID, Missing Auth Header).
+      component: ""
+      pr:
+        - "2531"
+      issue:
+        - "2417"
+      timestamp: 1683024407
+      file:
+        name: 1683024407-API-default-error-is-now-500.yaml
+        checksum: 6db2475a1815378713dd450298d696612f02cf7c
+    - kind: bug-fix
+      summary: fix-action-seq-no
+      description: Fix for a bug where agent `action_seq_no` was overwritten with 0 if the `ackToken` was not provided.
+      component: ""
+      pr:
+        - "2582"
+      issue:
+        - "2519"
+      timestamp: 1684151814
+      file:
+        name: 1684151814-fix-action-seq-no.yaml
+        checksum: aac8471c8947618ba2e4c5fb1b21887118e923ef
+    - kind: enhancement
+      summary: Expose prometheus metrics
+      description: |
+        Expose prometheus metrics on metrics listener (when enabled).
+        Ship prometheus metrics with apm.Tracer when tracer is enabled.
+      component: ""
+      pr:
+        - "2610"
+      issue:
+        - "2542"
+      timestamp: 1684437851
+      file:
+        name: 1684437851-Expose-prometheus-metrics.yaml
+        checksum: 000a7d7ed2bcdc226fe90a8bd69017d9283ee2f2
+    - kind: feature
+      summary: File Delivery to integrations
+      description: ""
+      component: ""
+      pr:
+        - "2666"
+      issue: []
+      timestamp: 1685985303
+      file:
+        name: 1685985303-file-delivery.yaml
+        checksum: 6deab19091b7ba365fcd13a97116e9e4bec980ab
+    - kind: bug-fix
+      summary: Fix issue causing Fleet Server Agent to go offline after reboot
+      description: ""
+      component: ""
+      pr: []
+      issue:
+        - "2431"
+      timestamp: 1686780651
+      file:
+        name: 1686780651-reuse-error-channel.yaml
+        checksum: f751708694ae58d8fc8ca9824955f00e4469b75c
+    - kind: feature
+      summary: Add elastic-api-version header support
+      description: |
+        Introduce a new middleware that support elastic-apiversion header to allow versioning of the Fleet server APIs.
+        If the header is not provided we fallback to a default version.
+      component: ""
+      pr:
+        - "2677"
+      issue: []
+      timestamp: 1686781749
+      file:
+        name: 1686781749-Add-elastic-api-version-header-support.yaml
+        checksum: 92552debd29fc1ac10f3035641be24e037866779
