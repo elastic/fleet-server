@@ -29,7 +29,7 @@ steps:
       agents:
         provider: "aws"
         imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
-        instanceType: "aarch64"
+        instanceType: "t4g.xlarge"
       matrix:
         setup:
           type:
