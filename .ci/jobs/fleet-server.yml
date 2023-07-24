@@ -5,7 +5,7 @@
     description: Jenkins pipeline for the Elastic Fleet Server project
     view: Beats
     project-type: multibranch
-    script-path: .ci/Jenkinsfile
+#    script-path: .ci/Jenkinsfile
     scm:
     - github:
         branch-discovery: no-pr

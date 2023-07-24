@@ -37,7 +37,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  check_if_file_exist_in_repo "infra" "main"                  #TODO should be changed to ${BUILDKITE_BRANCH} before prod...
+  check_if_file_exist_in_repo "infra" "${BUILDKITE_BRANCH}"                  #TODO should be changed to "main" for rollback...
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
