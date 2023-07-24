@@ -294,3 +294,53 @@ func (suite *StandAloneSuite) TestClientAPI() {
 	bCancel()
 	cmd.Wait()
 }
+
+func (suite *StandAloneSuite) TestStaticTokenAuthentication() {
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-https.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]interface{}{
+		"Hosts":                    suite.esHosts,
+		"ServiceToken":             suite.serviceToken,
+		"CertPath":                 filepath.Join(suite.certPath, "fleet-server.crt"),
+		"KeyPath":                  filepath.Join(suite.certPath, "fleet-server.key"),
+		"PassphrasePath":           filepath.Join(suite.certPath, "passphrase"),
+		"StaticPolicyTokenEnabled": true,
+		"StaticTokenKey":           "abcdefg",
+		"StaticPolicyID":           "dummy-policy",
+	})
+	suite.Require().NoError(err)
+	f.Close()
+
+	bCtx, bCancel := context.WithCancel(context.Background())
+	defer bCancel()
+	suite.T().Log("testing fleet-server binary")
+	// Run the fleet-server binary, cancelling context should stop process
+	cmd := exec.CommandContext(bCtx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath}
+	err = cmd.Start()
+	suite.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(bCtx, time.Minute)
+	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
+
+	// echo -n "01234:abcdefg" | base64
+	// the id does not matter, the key is the important part
+	enrollmentToken := "MDEyMzQ6YWJjZGVmZw=="
+
+	defer cancel()
+	tester := api_version.NewClientAPITesterCurrent(
+		suite.Suite,
+		ctx,
+		suite.client,
+		"https://localhost:8220",
+	)
+	tester.TestEnroll(enrollmentToken)
+}

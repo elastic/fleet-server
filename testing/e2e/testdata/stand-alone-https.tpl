@@ -13,6 +13,12 @@ inputs:
       certificate: {{ .CertPath }}
       key: {{ .KeyPath }}
       key_passphrase_path: {{ .PassphrasePath }}
-
+  {{ if .StaticPolicyTokenEnabled }}
+    static_policy_tokens:
+      enabled: {{ .StaticPolicyTokenEnabled }}
+      policy_tokens:
+        - token_key: {{ .StaticTokenKey }}
+          policy_id: {{ .StaticPolicyID }}
+  {{ end }}
 logging:
   to_stderr: true

@@ -8,16 +8,20 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -90,5 +94,134 @@ func TestEnroll(t *testing.T) {
 	if resp.Action != "created" {
 		t.Fatal("enroll failed")
 	}
+}
 
+func TestEnrollerT_fetchStaticTokenPolicy(t *testing.T) {
+	bulkerBuilder := func(policies ...model.Policy) func() bulk.Bulk {
+		return func() bulk.Bulk {
+			bulker := ftesting.NewMockBulk()
+
+			hits := []es.HitT{}
+			for _, p := range policies {
+				b, _ := json.Marshal(p)
+				hits = append(hits, es.HitT{
+					Source: b,
+				})
+			}
+			res := &es.ResultT{
+				HitsT: es.HitsT{},
+				Aggregations: map[string]es.Aggregation{
+					"policy_id": {
+						Buckets: []es.Bucket{
+							{
+								Aggregations: map[string]es.HitsT{
+									"revision_idx": {
+										Hits: hits,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(res, nil)
+			return bulker
+		}
+	}
+	type fields struct {
+		staticPolicyTokens config.StaticPolicyTokens
+		bulker             func() bulk.Bulk
+	}
+	type args struct {
+		enrollmentAPIKey *apikey.APIKey
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *model.EnrollmentAPIKey
+		wantErr bool
+	}{
+		{
+			name: "disabled",
+			fields: fields{
+				staticPolicyTokens: config.StaticPolicyTokens{
+					Enabled: false,
+				},
+				bulker: bulkerBuilder(),
+			},
+			args: args{
+				enrollmentAPIKey: &apikey.APIKey{},
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "found in es",
+			fields: fields{
+				staticPolicyTokens: config.StaticPolicyTokens{
+					Enabled: true,
+					PolicyTokens: []config.PolicyToken{
+						{
+							TokenKey: "abcdefg",
+							PolicyID: "dummy-policy",
+						},
+					},
+				},
+				bulker: bulkerBuilder(model.Policy{
+					PolicyID: "dummy-policy",
+				}),
+			},
+			args: args{
+				enrollmentAPIKey: &apikey.APIKey{
+					Key: "abcdefg",
+				},
+			},
+			want: &model.EnrollmentAPIKey{
+				APIKey:   "abcdefg",
+				Active:   true,
+				PolicyID: "dummy-policy",
+			},
+			wantErr: false,
+		},
+		{
+			name: "policy not found",
+			fields: fields{
+				staticPolicyTokens: config.StaticPolicyTokens{
+					Enabled: true,
+					PolicyTokens: []config.PolicyToken{
+						{
+							TokenKey: "abcdefg",
+							PolicyID: "dummy-policy",
+						},
+					},
+				},
+				bulker: bulkerBuilder(),
+			},
+			args: args{
+				enrollmentAPIKey: &apikey.APIKey{
+					Key: "abcdefg",
+				},
+			},
+			want:    &model.EnrollmentAPIKey{},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			et := &EnrollerT{
+				cfg: &config.Server{
+					StaticPolicyTokens: tt.fields.staticPolicyTokens,
+				},
+				bulker: tt.fields.bulker(),
+			}
+			got, err := et.fetchStaticTokenPolicy(context.Background(), zerolog.Logger{}, tt.args.enrollmentAPIKey)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

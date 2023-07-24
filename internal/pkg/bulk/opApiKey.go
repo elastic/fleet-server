@@ -40,7 +40,11 @@ func (b *Bulker) APIKeyAuth(ctx context.Context, key APIKey) (*SecurityInfo, err
 		return nil, err
 	}
 	defer b.apikeyLimit.Release(1)
-
+	for _, pt := range b.opts.policyTokens {
+		if pt.TokenKey == key.Key {
+			return &SecurityInfo{Enabled: true}, nil
+		}
+	}
 	return key.Authenticate(ctx, b.Client())
 }
 
