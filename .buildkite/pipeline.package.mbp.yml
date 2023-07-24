@@ -29,6 +29,7 @@ steps:
       agents:
         provider: "aws"
         imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+        instanceType: "aarch64"
       matrix:
         setup:
           type:
