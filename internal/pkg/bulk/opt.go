@@ -63,6 +63,7 @@ type bulkOptT struct {
 	blockQueueSz      int
 	apikeyMaxParallel int
 	apikeyMaxReqSize  int
+	policyTokens      []config.PolicyToken
 }
 
 type BulkOpt func(*bulkOptT)
@@ -118,6 +119,13 @@ func WithAPIKeyMaxRequestSize(maxBytes int) BulkOpt {
 	}
 }
 
+// WithStaticPolicyTokens sets the static policy tokens. Default is empty
+func WithPolicyTokens(tokens []config.PolicyToken) BulkOpt {
+	return func(opt *bulkOptT) {
+		opt.policyTokens = tokens
+	}
+}
+
 func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 	bopt := bulkOptT{
 		flushInterval:     defaultFlushInterval,
@@ -127,6 +135,7 @@ func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		apikeyMaxParallel: defaultAPIKeyMaxParallel,
 		blockQueueSz:      defaultBlockQueueSz,
 		apikeyMaxReqSize:  defaultApikeyMaxReqSize,
+		policyTokens:      []config.PolicyToken{}, // default is empty
 	}
 
 	for _, f := range opts {
@@ -149,7 +158,6 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 // BulkOptsFromCfg transforms config to a slize of BulkOpt
 // used to bridge to configuration subsystem
 func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
-
 	bulkCfg := cfg.Inputs[0].Server.Bulk
 
 	// Attempt to slice the max number of connections to leave room for the bulk flush queues
@@ -157,7 +165,10 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 	if cfg.Output.Elasticsearch.MaxConnPerHost > bulkCfg.FlushMaxPending {
 		maxKeyParallel = cfg.Output.Elasticsearch.MaxConnPerHost - bulkCfg.FlushMaxPending
 	}
-
+	policyTokens := []config.PolicyToken{}
+	if cfg.Inputs[0].Server.StaticPolicyTokens.Enabled {
+		policyTokens = cfg.Inputs[0].Server.StaticPolicyTokens.PolicyTokens
+	}
 	return []BulkOpt{
 		WithFlushInterval(bulkCfg.FlushInterval),
 		WithFlushThresholdCount(bulkCfg.FlushThresholdCount),
@@ -165,5 +176,6 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 		WithMaxPending(bulkCfg.FlushMaxPending),
 		WithAPIKeyMaxParallel(maxKeyParallel),
 		WithAPIKeyMaxRequestSize(cfg.Output.Elasticsearch.MaxContentLength),
+		WithPolicyTokens(policyTokens),
 	}
 }

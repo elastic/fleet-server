@@ -55,6 +55,7 @@ const kFleetAccessRolesJSON = `
 var (
 	ErrUnknownEnrollType     = errors.New("unknown enroll request type")
 	ErrInactiveEnrollmentKey = errors.New("inactive enrollment key")
+	ErrPolicyNotFound        = errors.New("policy not found")
 )
 
 type EnrollerT struct {
@@ -71,7 +72,6 @@ func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bu
 		bulker: bulker,
 		cache:  c,
 	}, nil
-
 }
 
 func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, userAgent string) error {
@@ -88,7 +88,7 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 		return err
 	}
 
-	resp, err := et.processRequest(zlog, w, r, rb, key.ID, ver)
+	resp, err := et.processRequest(zlog, w, r, rb, key, ver)
 	if err != nil {
 		return err
 	}
@@ -97,14 +97,23 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 	return writeResponse(zlog, w, resp, ts)
 }
 
-func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKeyID, ver string) (*EnrollResponse, error) {
-
+func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKey *apikey.APIKey, ver string) (*EnrollResponse, error) {
 	// Validate that an enrollment record exists for a key with this id.
-	erec, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentAPIKeyID)
+	var enrollAPI *model.EnrollmentAPIKey
+	enrollAPI, err := et.fetchStaticTokenPolicy(r.Context(), zlog, enrollmentAPIKey)
 	if err != nil {
 		return nil, err
 	}
 
+	if enrollAPI == nil {
+		zlog.Info().Msgf("Checking enrollment key from database %s", enrollmentAPIKey.Key)
+		key, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentAPIKey.ID)
+		if err != nil {
+			return nil, err
+		}
+		zlog.Info().Msgf("Found enrollment key %s", key.APIKey)
+		enrollAPI = key
+	}
 	body := r.Body
 
 	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
@@ -122,7 +131,55 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	return et._enroll(r.Context(), rb, zlog, req, erec.PolicyID, ver)
+	return et._enroll(r.Context(), rb, zlog, req, enrollAPI.PolicyID, ver)
+}
+
+// fetchEnrollmentKeyRecord fetches the enrollment key record from the database.
+// If the static policy token feature was not enabled, nothing is returns (nil, nil)
+// otherwise either an error or the enrollment key record is returned.
+func (et *EnrollerT) fetchStaticTokenPolicy(ctx context.Context, zlog zerolog.Logger, enrollmentAPIKey *apikey.APIKey) (*model.EnrollmentAPIKey, error) {
+	if !et.cfg.StaticPolicyTokens.Enabled {
+		return nil, nil
+	}
+
+	zlog.Debug().Msgf("Checking static enrollment token %s", enrollmentAPIKey.Key)
+	for _, pt := range et.cfg.StaticPolicyTokens.PolicyTokens {
+		if pt.TokenKey != enrollmentAPIKey.Key {
+			continue
+		}
+
+		p, err := et.fetchPolicy(ctx, pt.PolicyID)
+		if err != nil {
+			return nil, err
+		}
+
+		return &model.EnrollmentAPIKey{
+			PolicyID: p.PolicyID,
+			APIKey:   pt.TokenKey,
+			Active:   true,
+		}, nil
+
+	}
+	// no error, just not found
+	return nil, ErrPolicyNotFound
+}
+
+func (et *EnrollerT) fetchPolicy(ctx context.Context, policyID string) (model.Policy, error) {
+	policies, err := dl.QueryLatestPolicies(ctx, et.bulker)
+	if err != nil {
+		return model.Policy{}, err
+	}
+
+	var policy model.Policy
+	for _, p := range policies {
+		if p.PolicyID == policyID {
+			policy = p
+		}
+	}
+	if policy.PolicyID != policyID {
+		return model.Policy{}, ErrPolicyNotFound
+	}
+	return policy, nil
 }
 
 func (et *EnrollerT) _enroll(
@@ -131,8 +188,8 @@ func (et *EnrollerT) _enroll(
 	zlog zerolog.Logger,
 	req *EnrollRequest,
 	policyID,
-	ver string) (*EnrollResponse, error) {
-
+	ver string,
+) (*EnrollResponse, error) {
 	var agent model.Agent
 	var enrollmentID string
 	if req.EnrollmentId != nil {
@@ -270,7 +327,6 @@ func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, age
 }
 
 func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, apikeyID string) error {
-
 	// hack-a-rama:  We purposely do not force a "refresh:true" on the Apikey creation
 	// because doing so causes the api call to slow down at scale. It is already very slow.
 	// So we have to wait for the key to become visible until we can invalidate it.
