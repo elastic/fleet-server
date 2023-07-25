@@ -1,15 +1,24 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
 env:
-  SETUP_GVM_VERSION: 'v0.5.0'
-  DOCKER_COMPOSE_VERSION: '1.25.5'
+  SETUP_GVM_VERSION: "v0.5.0"
+  DOCKER_COMPOSE_VERSION: "1.25.5"
   DOCKER_REGISTRY: "docker.elastic.co"
+<<<<<<< HEAD
   DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/temp-fleet-server" # needs to rename after tests
   DOCKER_IMAGE_SHA_TAG: "temp-${BUILDKITE_COMMIT}" # needs to rename after tests
   DOCKER_IMAGE_LATEST_TAG: "temp-latest" # needs to rename after tests
   DOCKER_IMAGE_GIT_TAG: "temp-${BUILDKITE_BRANCH}" # needs to rename after tests
   GO_AGENT_IMAGE: "golang:1.20.5"
   TERRAFORM_VERSION: '1.4.6'
+=======
+  DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/fleet-server" # needs to rename for rollback
+  DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
+  DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
+  DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
+  GO_AGENT_IMAGE: "golang:${GO_VERSION}"
+  TERRAFORM_VERSION: "1.4.6"
+>>>>>>> 5cce568 ([Fleet] Fix docker publish step in buildkite (#2815))
 
 steps:
   - group: "Check and build"
@@ -90,7 +99,7 @@ steps:
   - label: ":docker: Publish docker image"
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
-    if: "build.env('BUILDKITE_PULL_REQUEST') == '' && build.env('BUILDKITE_BRANCH') == 'main'"
+    if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_BRANCH') == 'main'"
     agents:
       provider: "gcp"
     depends_on:
@@ -105,7 +114,13 @@ steps:
       env:
         SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
         REMOTE_SERVICE_CONFIG: https://raw.githubusercontent.com/elastic/serverless-gitops/main/gen/gpctl/fleet/config.yaml
+<<<<<<< HEAD
         
+=======
+    depends_on:
+      - step: "publish"
+
+>>>>>>> 5cce568 ([Fleet] Fix docker publish step in buildkite (#2815))
   - label: ":gcloud: Release test"
     key: "release-test"
     command: ".buildkite/scripts/release_test.sh"
@@ -130,7 +145,7 @@ steps:
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
-    if:  "build.env('BUILDKITE_BRANCH') != '' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_PULL_REQUEST') == ''"
+    if: "build.env('BUILDKITE_BRANCH') != '' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_PULL_REQUEST') == ''"
     depends_on:
       - step: "release-package-registry"
         allow_failure: false
