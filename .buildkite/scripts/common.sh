@@ -20,9 +20,9 @@ add_bin_path() {
 
 with_go() {
     echo "Setting up the Go environment..."
-    create_workspace
     local platform_type=$(uname)
     local hw_type=$(uname -m)
+    create_workspace
     case "$hw_type" in
         "x86_64")
             arch_type="amd64"
@@ -47,6 +47,8 @@ with_go() {
 
 with_docker_compose() {
     echo "Setting up the Docker-compose environment..."
+    local platform_type=$(uname)
+    local hw_type=$(uname -m)
     create_workspace
     retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${platform_type,,}${hw_type}"
     chmod +x ${WORKSPACE}/docker-compose
