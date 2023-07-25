@@ -39,7 +39,7 @@ entries:
       summary: Expose prometheus metrics
       description: |
         Expose prometheus metrics on metrics listener (when enabled).
-        Ship prometheus metrics with apm.Tracer when tracer is enabled.
+        Ship prometheus metrics with 'apm.Tracer' when tracer is enabled.
       component: ""
       pr:
         - "2610"
