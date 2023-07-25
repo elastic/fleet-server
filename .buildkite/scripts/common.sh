@@ -21,7 +21,47 @@ add_bin_path() {
 with_go() {
     echo "Setting up the Go environment..."
     create_workspace
-    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
+    local platform_type=$(uname)
+    local hw_type=$(uname -m)
+    local platform=""
+    case "$platform_type" in
+        "Linux")
+            case "$hw_type" in
+                "x86_64")
+                    platform="linux-amd64"
+                    ;;
+                "i386")
+                    platform="linux-386"
+                    ;;
+                "aarch64")
+                    platform="linux-arm64"
+                    ;;
+                "armv7l")
+                    platform="linux-arm"
+                    ;;
+                *)
+                    echo "The current type of OS is unsupported yet"
+                    ;;
+            esac
+            ;;
+        "Darwin")
+            case "$hw_type" in
+                "x86_64")
+                    platform="darwin-amd64"
+                    ;;
+                "arm64")
+                    platform="darwin-arm64"
+                    ;;
+                *)
+                    echo "The current type of OS is unsupported yet"
+                    ;;
+            esac
+            ;;
+        *)
+        echo "The current type of OS is unsupported yet"
+        ;;
+    esac
+    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform}"
     chmod +x ${WORKSPACE}/gvm
     eval "$(gvm $(cat .go-version))"
     go version
