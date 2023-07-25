@@ -97,6 +97,17 @@ steps:
       - step: "tests"
         allow_failure: false
 
+  - label: ":docker: Publish docker image"
+    key: "publish"
+    steps:
+      - label: ":buildkite:"
+        agents:
+          image: "docker.elastic.co/ci-agent-images/serverless-docker-builder:0.0.6"
+        commands: make -C /agent generate-docker-images
+    depends_on:
+      - step: "tests"
+        allow_failure: false
+
   - label: ":argo: Update fleet image tag for fleet-controller using gpctl"
     async: true
     branches: main
