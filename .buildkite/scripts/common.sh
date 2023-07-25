@@ -94,7 +94,7 @@ with_Terraform() {
     local path_to_file="${WORKSPACE}/terraform.zip"
     create_workspace
     check_platform_architeture
-    retry 5 curl -sL -o ${path_to_file} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_${platform_type,,}_${arch_type}.zip"
+    retry 5 curl -sSL -o ${path_to_file} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_${platform_type,,}_${arch_type}.zip"
     unzip -q ${path_to_file} -d ${WORKSPACE}/
     rm ${path_to_file}
     chmod +x ${WORKSPACE}/terraform
