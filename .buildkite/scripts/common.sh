@@ -110,7 +110,7 @@ google_cloud_auth() {
 
 upload_packages_to_gcp_bucket() {
     local pattern=${1}
-    local baseUri="gs://${JOB_GCS_BUCKET}/${REPO}/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    local baseUri="gs://${JOB_GCS_BUCKET}/${REPO}"              #TODO: needs to add the "/buildkite" for rollback
     local bucketUriCommit="${baseUri}"/commits/${BUILDKITE_COMMIT}
     local bucketUriDefault="${baseUri}"/snapshots
 
@@ -124,7 +124,7 @@ upload_packages_to_gcp_bucket() {
 
 get_bucket_uri() {
     local type=${1}
-    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"              #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    local baseUri="gs://${JOB_GCS_BUCKET}/jobs"              #TODO: needs to add the "/buildkite" for rollback
     if [[ ${type} == "snapshot" ]]; then
         local folder="commits"
     else
@@ -135,7 +135,7 @@ get_bucket_uri() {
 
 get_bucket_uri() {
     local type=${1}
-    local baseUri="gs://${JOB_GCS_BUCKET}/jobs/buildkite"               #TODO: needs to delete the "/buildkite" part after the migration from Jenkins
+    local baseUri="gs://${JOB_GCS_BUCKET}/jobs"               #TODO: needs to add the "/buildkite" for rollback
     if [[ ${type} == "snapshot" ]]; then
         local folder="commits"
     else

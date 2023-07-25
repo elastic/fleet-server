@@ -77,7 +77,14 @@ fleet:
 #      # the internal_port specifies the port the internal api will bind to on localhost.
 #      # the internal api is used if by elastic-agent to communicate to fleet-server if the agent is running a fleet-server instance.
 #      internal_port: 8221
-#
+#      static_policy_tokens:
+#        enabled: true
+#        policy_tokens:
+#        -
+#          # policy_id is the id of the policy the token is associated with.
+#          policy_id: "${FLEET_SERVER_POLICY_ID:fleet-server-policy}"
+#          # token_key is the key used to authenticate the token.
+#          token_key: "${FLEET_SERVER_POLICY_TOKEN_KEY:fleet-server-policy-token}"
 #      # ssl controls all ssl settings of the fleet-server apis (internal and external).
 #      ssl:
 #        enabled: false
