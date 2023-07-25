@@ -55,7 +55,7 @@ with_docker_compose() {
     local platform_type=$(uname)
     local hw_type=$(uname -m)
     create_workspace
-    retry 5 curl -sL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${platform_type,,}-${hw_type}"
+    retry 5 curl -sSL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${platform_type,,}-${hw_type}"
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
 }
