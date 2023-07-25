@@ -5,6 +5,27 @@ set -euo pipefail
 WORKSPACE="$(pwd)/bin"
 TMP_FOLDER_TEMPLATE_BASE="tmp.fleet-server"
 REPO="fleet-server"
+platform_type="$(uname)"
+platform_type_lowercase="${platform_type,,}"
+hw_type="$(uname -m)"
+
+check_platform_architeture() {
+# for downloading the GVM and Terraform packages
+  case "${hw_type}" in
+   "x86_64")
+        arch_type="amd64"
+        ;;
+    "aarch64")
+        arch_type="arm64"
+        ;;
+    "arm64")
+        arch_type="arm64"
+        ;;
+    *)
+    echo "The current platform/OS type is unsupported yet"
+    ;;
+  esac
+}
 
 create_workspace() {
     if [[ ! -d "${WORKSPACE}" ]]; then
@@ -21,7 +42,8 @@ add_bin_path() {
 with_go() {
     echo "Setting up the Go environment..."
     create_workspace
-    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-linux-amd64"
+    check_platform_architeture
+    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform_type_lowercase}-${arch_type}"
     chmod +x ${WORKSPACE}/gvm
     eval "$(gvm $(cat .go-version))"
     go version
@@ -32,7 +54,7 @@ with_go() {
 with_docker_compose() {
     echo "Setting up the Docker-compose environment..."
     create_workspace
-    retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
+    retry 5 curl -sSL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${platform_type_lowercase}-${hw_type}"
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
 }
@@ -70,7 +92,8 @@ with_Terraform() {
     echo "Setting up the Terraform environment..."
     local path_to_file="${WORKSPACE}/terraform.zip"
     create_workspace
-    retry 5 curl -SL -o ${path_to_file} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+    check_platform_architeture
+    retry 5 curl -sSL -o ${path_to_file} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_${platform_type_lowercase}_${arch_type}.zip"
     unzip -q ${path_to_file} -d ${WORKSPACE}/
     rm ${path_to_file}
     chmod +x ${WORKSPACE}/terraform
