@@ -23,45 +23,21 @@ with_go() {
     create_workspace
     local platform_type=$(uname)
     local hw_type=$(uname -m)
-    local platform=""
-    case "$platform_type" in
-        "Linux")
-            case "$hw_type" in
-                "x86_64")
-                    platform="linux-amd64"
-                    ;;
-                "i386")
-                    platform="linux-386"
-                    ;;
-                "aarch64")
-                    platform="linux-arm64"
-                    ;;
-                "armv7l")
-                    platform="linux-arm"
-                    ;;
-                *)
-                    echo "The current type of OS is unsupported yet"
-                    ;;
-            esac
+    case "$hw_type" in
+        "x86_64")
+            arch_type="amd64"
             ;;
-        "Darwin")
-            case "$hw_type" in
-                "x86_64")
-                    platform="darwin-amd64"
-                    ;;
-                "arm64")
-                    platform="darwin-arm64"
-                    ;;
-                *)
-                    echo "The current type of OS is unsupported yet"
-                    ;;
-            esac
+        "aarch64")
+            arch_type="arm64"
+            ;;
+        "arm64")
+            arch_type="arm64"
             ;;
         *)
         echo "The current type of OS is unsupported yet"
         ;;
     esac
-    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform}"
+    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform_type,,}${arch_type}"
     chmod +x ${WORKSPACE}/gvm
     eval "$(gvm $(cat .go-version))"
     go version
@@ -72,7 +48,7 @@ with_go() {
 with_docker_compose() {
     echo "Setting up the Docker-compose environment..."
     create_workspace
-    retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
+    retry 5 curl -SL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${platform_type,,}${hw_type}"
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
 }
