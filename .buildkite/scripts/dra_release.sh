@@ -4,13 +4,14 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-VERSION="$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')"
 FOLDER_PATH="build/distributions"
 BASE_DIR="${WORKSPACE}/${FOLDER_PATH}"
 DRA_OUTPUT="release-manager.out"
 PROJECT="fleet-server"
 TYPE=${1}
 BRANCH="${BUILDKITE_BRANCH}"
+
+VERSION=$(make get-version)
 
 if [[ "${VERSION}" == *"-SNAPSHOT"* || "${VERSION}" == "" ]]; then
     echo "The 'version' parameter is required and it cannot contain the suffix '-SNAPSHOT'."
@@ -40,6 +41,6 @@ mkdir -p ${BASE_DIR}/reports
 ./dev-tools/dependencies-report --csv ${BASE_DIR}/reports/dependencies-${VERSION}.csv
 cd ${BASE_DIR}/reports && shasum -a 512 dependencies-${VERSION}.csv > dependencies-${VERSION}.csv.sha512
 
-cd ${BASE_DIR}
-echo ${BASE_DIR}
-./.buildkite/scripts/release-manager.sh          
+cd $(dirname ${WORKSPACE})
+./.buildkite/scripts/release-manager.sh          #TODO use "echo" for rollback
+
