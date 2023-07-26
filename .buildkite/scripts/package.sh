@@ -25,11 +25,17 @@ add_bin_path
 with_go
 with_mage
 
-if [[ ${MATRIX_TYPE} == "staging" ]]; then
-    make release
-else
-    make SNAPSHOT=true release
-fi
+case "${TYPE}" in
+    "snapshot")
+        make release-manager-snapshot
+        ;;
+    "staging")
+        make release-manager-release
+        ;;
+    *)
+    echo "The option is unsupported yet"
+    ;;
+esac
 
 google_cloud_auth
 upload_mbp_packages_to_gcp_bucket "build/distributions/" "${MATRIX_TYPE}"
