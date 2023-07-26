@@ -8,10 +8,12 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -95,14 +97,22 @@ func (suite *StandAloneContainerSuite) startFleetServer(ctx context.Context, opt
 		networks = nil
 	}
 
+	targetOs := "linux"
+	targetArch := runtime.GOARCH
+	targetPlatform := fmt.Sprintf("%s/%s", targetOs, targetArch)
+
 	// Run the fleet server container.
 	req := testcontainers.ContainerRequest{
 		Hostname: "fleet-server",
 		FromDockerfile: testcontainers.FromDockerfile{
 			Context: rootDir,
 			BuildArgs: map[string]*string{
-				"GO_VERSION": &goVersion,
-				"VERSION":    &serverVersion,
+				"GO_VERSION":     &goVersion,
+				"VERSION":        &serverVersion,
+				"BUILDPLATFORM":  &targetPlatform,
+				"TARGETOS":       &targetOs,
+				"TARGETARCH":     &targetArch,
+				"TARGETPLATFORM": &targetPlatform,
 			},
 			PrintBuildLog: true,
 		},

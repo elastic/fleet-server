@@ -1,4 +1,5 @@
 ARG GO_VERSION
+ARG BUILDPLATFORM
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-buster AS builder
 
 WORKDIR /usr/src/fleet-server
@@ -22,6 +23,6 @@ ARG TARGETOS
 ARG TARGETARCH
 
 COPY fleet-server.yml /etc/fleet-server.yml
-COPY --from=builder /usr/src/fleet-server/build/binaries/fleet-server-${VERSION}-${TARGETOS}-*/fleet-server /usr/bin/fleet-server
+COPY --from=builder /usr/src/fleet-server/build/binaries/fleet-server-${VERSION}-${TARGETOS}-{TARGETARCH}/fleet-server /usr/bin/fleet-server
 
 CMD /usr/bin/fleet-server -c /etc/fleet-server.yml
