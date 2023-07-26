@@ -8,7 +8,7 @@ FOLDER_PATH="build/distributions"
 BASE_DIR="${WORKSPACE}/${FOLDER_PATH}"
 DRA_OUTPUT="release-manager.out"
 export PROJECT="fleet-server"
-TYPE=${1}
+export TYPE=${1}
 export BRANCH="${BUILDKITE_BRANCH}"
 export VERSION=$(make get-version)
 
