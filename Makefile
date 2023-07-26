@@ -199,9 +199,7 @@ $(PLATFORM_TARGETS): release-%:
 
 .PHONY: build-docker
 build-docker:
-	docker buildx create --use
-	docker buildx build \
-		--platform $(shell echo ${DOCKER_PLATFORMS} | sed 's/ /,/g') \
+	DOCKER_BUILDKIT=1 docker build \
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg=GCFLAGS="${GCFLAGS}" \
 		--build-arg=LDFLAGS="${LDFLAGS}" \
@@ -353,7 +351,7 @@ e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
 	@$(MAKE) int-docker-stop
 
 .PHONY: test-e2e
-test-e2e: e2e-certs ## - Setup and run the blackbox end to end test suite
+test-e2e: docker-cover-e2e-binaries build-e2e-agent-image e2e-certs build-docker ## - Setup and run the blackbox end to end test suite
 	@mkdir -p build/e2e-cover
 	@$(MAKE) e2e-docker-start
 	@set -o pipefail; $(MAKE) test-e2e-set | tee build/test-e2e.out
@@ -365,6 +363,7 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
+	STANDALONE_E2E_IMAGE=$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) \
 	CGO_ENABLED=1 \
 	go test -v -timeout 30m -tags=e2e -count=1 -race -p 1 ./... -run StandAloneContainer
 

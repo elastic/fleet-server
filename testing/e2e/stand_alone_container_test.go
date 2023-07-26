@@ -8,13 +8,10 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"html/template"
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -23,14 +20,14 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
-
-	"github.com/elastic/fleet-server/v7/version"
 )
 
 type StandAloneContainerSuite struct {
 	BaseE2ETestSuite
 
 	container testcontainers.Container
+
+	dockerImg string
 }
 
 func TestStandAloneContainerSuite(t *testing.T) {
@@ -74,12 +71,6 @@ type standaloneContainerOptions struct {
 }
 
 func (suite *StandAloneContainerSuite) startFleetServer(ctx context.Context, options standaloneContainerOptions) {
-	rootDir := filepath.Join("..", "..")
-	d, err := os.ReadFile(filepath.Join(rootDir, ".go-version"))
-	suite.Require().NoError(err)
-	goVersion := strings.TrimSpace(string(d))
-	serverVersion := version.DefaultVersion
-
 	// Create a config file from a template in the test temp dir
 	dir := suite.T().TempDir()
 	tpl, err := template.ParseFiles(filepath.Join("testdata", options.Template))
@@ -97,25 +88,14 @@ func (suite *StandAloneContainerSuite) startFleetServer(ctx context.Context, opt
 		networks = nil
 	}
 
-	targetOs := "linux"
-	targetArch := runtime.GOARCH
-	targetPlatform := fmt.Sprintf("%s/%s", targetOs, targetArch)
+	v, ok := os.LookupEnv("STANDALONE_E2E_IMAGE")
+	suite.Require().True(ok, "expected STANDALONE_E2E_IMAGE to be defined")
+	suite.dockerImg = v
 
 	// Run the fleet server container.
 	req := testcontainers.ContainerRequest{
-		Hostname: "fleet-server",
-		FromDockerfile: testcontainers.FromDockerfile{
-			Context: rootDir,
-			BuildArgs: map[string]*string{
-				"GO_VERSION":     &goVersion,
-				"VERSION":        &serverVersion,
-				"BUILDPLATFORM":  &targetPlatform,
-				"TARGETOS":       &targetOs,
-				"TARGETARCH":     &targetArch,
-				"TARGETPLATFORM": &targetPlatform,
-			},
-			PrintBuildLog: true,
-		},
+		Hostname:     "fleet-server",
+		Image:        suite.dockerImg,
 		ExposedPorts: []string{"8220/tcp"},
 		Networks:     networks,
 		NetworkMode:  networkMode,
