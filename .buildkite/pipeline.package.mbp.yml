@@ -1,12 +1,34 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 name: "fleet server package mbp"
+env:
+  REPO: 'fleet-server'
+  JOB_GCS_BUCKET: 'fleet-ci-artifacts'
+  SETUP_GVM_VERSION: 'v0.3.0'
+
 steps:
-  - label: ":pipeline: test step"
-    command: echo "test-pipeline"
-
-  - group: "test group"
+  - group: "Package and Publish"
+    key: "package-publish"
     steps:
-      - label: "step1 of the group"
-        command: echo "step1 of the group"
+    - label: "Package Ubuntu-20 x86_64"
+      key: "package-x86-64"
+      command: ".buildkite/scripts/package.sh {{matrix.type}}"
+      agents:
+        provider: "gcp"
+        image: "family/core-ubuntu-2004"
+      matrix:
+        setup:
+          type:
+          - "snapshot"
+          - "staging"
 
-      - label: "step2 of the group"
-        command: echo "step2 of the group"
+    - label: "Package Ubuntu-20 aarch64"
+      key: "package-arm"
+      command: ".buildkite/scripts/package.sh {{matrix.type}}"
+      agents:
+        provider: "aws"
+        image: "core-ubuntu-2004-aarch64"
+      matrix:
+        setup:
+          type:
+          - "snapshot"
+          - "staging"
