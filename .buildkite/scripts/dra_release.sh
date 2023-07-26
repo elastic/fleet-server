@@ -42,4 +42,5 @@ mkdir -p ${BASE_DIR}/reports
 cd ${BASE_DIR}/reports && shasum -a 512 dependencies-${VERSION}.csv > dependencies-${VERSION}.csv.sha512
 
 cd $(dirname ${WORKSPACE})
-./buildkite/scripts/release-manager.sh          #TODO use "echo" for rollback
+./.buildkite/scripts/release-manager.sh          #TODO use "echo" for rollback
+
