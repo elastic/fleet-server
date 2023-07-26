@@ -35,11 +35,9 @@ with_mage
 case "${TYPE}" in
     "snapshot")
         make release-manager-dependencies-snapshot
-        make release-manager-snapshot
         ;;
     "staging")
         make release-manager-dependencies-release
-        make release-manager-release
         ;;
     *)
     echo "The option is unsupported yet"
