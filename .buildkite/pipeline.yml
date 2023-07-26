@@ -105,13 +105,9 @@ steps:
       env:
         SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
         REMOTE_SERVICE_CONFIG: https://raw.githubusercontent.com/elastic/serverless-gitops/main/gen/gpctl/fleet/config.yaml
-<<<<<<< HEAD
     depends_on:
       - step: "publish"
 
-=======
-        
->>>>>>> 71625b6 ([Release] 8.9.0 changelog (#2806))
   - label: ":gcloud: Release test"
     key: "release-test"
     command: ".buildkite/scripts/release_test.sh"
