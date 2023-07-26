@@ -13,11 +13,13 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
-const kDefaultHost = "0.0.0.0"
-const kDefaultPort = 8220
-const kDefaultInternalHost = "localhost"
-const kDefaultInternalPort = 8221
-const fleetInputType = "fleet-server"
+const (
+	kDefaultHost         = "0.0.0.0"
+	kDefaultPort         = 8220
+	kDefaultInternalHost = "localhost"
+	kDefaultInternalPort = 8221
+	fleetInputType       = "fleet-server"
+)
 
 // Policy is the configuration policy to use.
 type Policy struct {
@@ -57,21 +59,37 @@ func (c *ServerBulk) InitDefaults() {
 }
 
 // Server is the configuration for the server
-type Server struct {
-	Host              string                  `config:"host"`
-	Port              uint16                  `config:"port"`
-	InternalPort      uint16                  `config:"internal_port"`
-	TLS               *tlscommon.ServerConfig `config:"ssl"`
-	Timeouts          ServerTimeouts          `config:"timeouts"`
-	Profiler          ServerProfiler          `config:"profiler"`
-	CompressionLevel  int                     `config:"compression_level"`
-	CompressionThresh int                     `config:"compression_threshold"`
-	Limits            ServerLimits            `config:"limits"`
-	Runtime           Runtime                 `config:"runtime"`
-	Bulk              ServerBulk              `config:"bulk"`
-	GC                GC                      `config:"gc"`
-	Instrumentation   Instrumentation         `config:"instrumentation"`
-}
+type (
+	Server struct {
+		Host               string                  `config:"host"`
+		Port               uint16                  `config:"port"`
+		InternalPort       uint16                  `config:"internal_port"`
+		TLS                *tlscommon.ServerConfig `config:"ssl"`
+		Timeouts           ServerTimeouts          `config:"timeouts"`
+		Profiler           ServerProfiler          `config:"profiler"`
+		CompressionLevel   int                     `config:"compression_level"`
+		CompressionThresh  int                     `config:"compression_threshold"`
+		Limits             ServerLimits            `config:"limits"`
+		Runtime            Runtime                 `config:"runtime"`
+		Bulk               ServerBulk              `config:"bulk"`
+		GC                 GC                      `config:"gc"`
+		Instrumentation    Instrumentation         `config:"instrumentation"`
+		StaticPolicyTokens StaticPolicyTokens      `config:"static_policy_tokens"`
+	}
+
+	StaticPolicyTokens struct {
+		// Enabled is a flag to enable static policy tokens
+		Enabled bool `config:"enabled"`
+		// PolicyTokens is a list of policy tokens
+		PolicyTokens []PolicyToken `config:"policy_tokens"`
+	}
+
+	// PolicyToken is a static token for single policy
+	PolicyToken struct {
+		TokenKey string `config:"token_key"`
+		PolicyID string `config:"policy_id"`
+	}
+)
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *Server) InitDefaults() {
