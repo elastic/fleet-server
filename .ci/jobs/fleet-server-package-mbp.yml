@@ -14,7 +14,7 @@
         discover-pr-origin: merge-current
         discover-tags: false
         disable-pr-notifications: true
-        head-filter-regex: '(7\.17|8\.9\.\d+|PR-.*)'
+        head-filter-regex: '(7\.17|8\.9|PR-.*)'
         notification-context: 'fleet-server-package'
         repo: fleet-server
         repo-owner: elastic
