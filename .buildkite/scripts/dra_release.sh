@@ -7,11 +7,10 @@ source .buildkite/scripts/common.sh
 FOLDER_PATH="build/distributions"
 BASE_DIR="${WORKSPACE}/${FOLDER_PATH}"
 DRA_OUTPUT="release-manager.out"
-PROJECT="fleet-server"
+export PROJECT="fleet-server"
 TYPE=${1}
-BRANCH="${BUILDKITE_BRANCH}"
-
-VERSION=$(make get-version)
+export BRANCH="${BUILDKITE_BRANCH}"
+export VERSION=$(make get-version)
 
 if [[ "${VERSION}" == *"-SNAPSHOT"* || "${VERSION}" == "" ]]; then
     echo "The 'version' parameter is required and it cannot contain the suffix '-SNAPSHOT'."
@@ -34,7 +33,7 @@ with_go
 with_mage
 
 if [[ "${TYPE}" == "snapshot" ]]; then
-    SNAPSHOT=true
+    export SNAPSHOT=true
 fi
 
 mkdir -p ${BASE_DIR}/reports
