@@ -5,7 +5,7 @@
     description: Jenkins pipeline for the Elastic Fleet Server package process
     project-type: multibranch
     concurrent: true
-#    script-path: .ci/packaging.groovy
+    script-path: .ci/packaging.groovy
     scm:
     - github:
         branch-discovery: no-pr
@@ -14,7 +14,7 @@
         discover-pr-origin: merge-current
         discover-tags: false
         disable-pr-notifications: true
-        head-filter-regex: '(main|7\.17|8\.\d+|PR-.*)'
+        head-filter-regex: '(7\.17|8\.9\.\d+|PR-.*)'
         notification-context: 'fleet-server-package'
         repo: fleet-server
         repo-owner: elastic
