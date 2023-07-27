@@ -78,11 +78,6 @@ retry() {
     return 0
 }
 
-publish_docker_image() {
-    echo "Pushing the docker image "$DOCKER_IMAGE":"$DOCKER_IMAGE_TAG" to the "${DOCKER_REGISTRY}" registry..."
-    DOCKER_IMAGE=${DOCKER_IMAGE} DOCKER_IMAGE_TAG=${DOCKER_IMAGE_TAG} make release-docker
-}
-
 docker_logout() {
     echo "Logging out from Docker..."
     docker logout ${DOCKER_REGISTRY}

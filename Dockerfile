@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM golang:${GO_VERSION}-buster AS builder
+FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-buster AS builder
 
 WORKDIR /usr/src/fleet-server
 
@@ -12,12 +12,16 @@ COPY . .
 ARG GCFLAGS=""
 ARG LDFLAGS=""
 ARG DEV=""
-RUN GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" DEV="${DEV}" make release-linux/amd64
+ARG TARGETPLATFORM
+
+RUN GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" DEV="${DEV}" make release-${TARGETPLATFORM}
 
 FROM ubuntu:20.04
 ARG VERSION
+ARG TARGETOS
+ARG TARGETARCH
 
 COPY fleet-server.yml /etc/fleet-server.yml
-COPY --from=builder /usr/src/fleet-server/build/binaries/fleet-server-${VERSION}-linux-x86_64/fleet-server /usr/bin/fleet-server
+COPY --from=builder /usr/src/fleet-server/build/binaries/fleet-server-${VERSION}-${TARGETOS:-linux}-*/fleet-server /usr/bin/fleet-server
 
 CMD /usr/bin/fleet-server -c /etc/fleet-server.yml
