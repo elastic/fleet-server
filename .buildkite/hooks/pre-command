@@ -7,7 +7,7 @@ source .buildkite/scripts/common.sh
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
 EC_KEY_SECRET_PATH="kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
 PRIVATE_CI_GCS_CREDENTIALS_PATH="kv/ci-shared/platform-ingest/private_ci_artifacts_gcs_credentials"
-DRA_SECRET_PATH="kv/ci-shared/release/dra-role"
+CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 JOB_GCS_BUCKET_SECRET_PATH="kv/ci-shared/platform-ingest/fleet_gcs_bucket"
 GITHUB_TOKEN_VAULT_PATH="kv/ci-shared/platform-ingest/github_token"
 GITHUB_REPO_TOKEN=$(retry 5 vault kv get -field token ${GITHUB_TOKEN_VAULT_PATH})
@@ -71,10 +71,10 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
     export DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
     export DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
     docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
-    DRA_CREDS=$(retry 5 vault kv get -field=data -format=json "${DRA_SECRET_PATH}")
-    export VAULT_ADDR=$(echo ${DRA_CREDS} | jq -r '.vault_addr')
-    export VAULT_ROLE_ID=$(echo ${DRA_CREDS} | jq -r '.vault_role_id')
-    export VAULT_SECRET_ID=$(echo ${DRA_CREDS} | jq -r '.vault_secret_id')
+    DRA_CREDS_SECRET=$(retry 5 vault kv get -field=data -format=json ${CI_DRA_ROLE_PATH})
+    export VAULT_ADDR_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.vault_addr')
+    export VAULT_ROLE_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.role_id')
+    export VAULT_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.secret_id')
   fi
 fi
 
