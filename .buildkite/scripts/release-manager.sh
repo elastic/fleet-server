@@ -35,9 +35,6 @@ docker images --filter=reference=${IMAGE}
 
 # Generate checksum files and upload to GCS
 
-ls -la ${FOLDER}
-echo $PWD
-
 run_release_manager() {
     echo "+++ Generate checksum files and upload to GCS..."
     local dry_run=""
