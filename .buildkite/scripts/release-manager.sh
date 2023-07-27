@@ -15,7 +15,10 @@
 # It uses env variables to help to run this script with a simpler jenkins
 # pipeline call.
 #
-set -uexo pipefail
+
+source .buildkite/scripts/common.sh
+
+set -ueo pipefail
 
 readonly TYPE=${TYPE:-snapshot}
 readonly OUTPUT_FILE=${OUTPUT_FILE:-release-manager-report.out}
