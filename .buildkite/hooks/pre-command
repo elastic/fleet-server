@@ -74,7 +74,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
     DRA_CREDS_SECRET=$(retry 5 vault kv get -field=data -format=json ${CI_DRA_ROLE_PATH})
     export VAULT_ADDR_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.vault_addr')
     export VAULT_ROLE_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.role_id')
-    export VAULT_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.secret_id')
+    export VAULT_SECRET_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.secret_id')
   fi
 fi
 
