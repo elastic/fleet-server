@@ -32,9 +32,11 @@ with_go
 
 with_mage
 
+export RM_VERSION="${VERSION}"
 
 if [[ ${TYPE} == "snapshot" ]]; then
     export SNAPSHOT=true
+    VERSION="${VERSION}-SNAPSHOT"
 fi
 
 mkdir -p ${BASE_DIR}/reports

@@ -54,7 +54,7 @@ run_release_manager() {
         --commit "$(git rev-parse HEAD)" \
         --workflow "${TYPE}" \
         --artifact-set main \
-        --version "${VERSION}" \
+        --version "${RM_VERSION}" \
         $dry_run 2>&1 | tee "$OUTPUT_FILE" \
         #
 }
