@@ -78,6 +78,11 @@ retry() {
     return 0
 }
 
+publish_docker_image() {
+    echo "Pushing the docker image "$DOCKER_IMAGE":"$DOCKER_IMAGE_TAG" to the "${DOCKER_REGISTRY}" registry..."
+    DOCKER_IMAGE=${DOCKER_IMAGE} DOCKER_IMAGE_TAG=${DOCKER_IMAGE_TAG} make release-docker
+}
+
 docker_logout() {
     echo "Logging out from Docker..."
     docker logout ${DOCKER_REGISTRY}
@@ -142,7 +147,7 @@ upload_mbp_packages_to_gcp_bucket() {
     local pattern=${1}
     local type=${2}
     get_bucket_uri "${type}"
-    gsutil -m -q cp -a public-read -r ${pattern} ${bucketUri}
+    gsutil -m cp -a public-read -r ${pattern} ${bucketUri}
 }
 
 download_mbp_packages_from_gcp_bucket() {
@@ -150,7 +155,7 @@ download_mbp_packages_from_gcp_bucket() {
     local type=${2}
     mkdir -p ${WORKSPACE}/${pattern}
     get_bucket_uri "${type}"
-    gsutil -m -q cp -r ${bucketUri}/* ${WORKSPACE}/${pattern}
+    gsutil -m -q cp -r ${bucketUri} ${WORKSPACE}/${pattern}
 }
 
 with_mage() {

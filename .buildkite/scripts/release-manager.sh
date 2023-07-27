@@ -15,6 +15,9 @@
 # It uses env variables to help to run this script with a simpler jenkins
 # pipeline call.
 #
+
+source .buildkite/scripts/common.sh
+
 set -uexo pipefail
 
 readonly TYPE=${TYPE:-snapshot}
