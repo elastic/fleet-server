@@ -21,8 +21,8 @@ readonly TYPE=${TYPE:-snapshot}
 readonly OUTPUT_FILE=${OUTPUT_FILE:-release-manager-report.out}
 
 # set required permissions on artifacts and directory
-chmod -R a+r "$FOLDER"/*
-chmod -R a+w "$FOLDER"
+chmod -R a+r "${WORKSPACE}"/"$FOLDER"/*
+chmod -R a+w "${WORKSPACE}"/"$FOLDER"
 
 # ensure the latest image has been pulled
 IMAGE=docker.elastic.co/infra/release-manager:latest
