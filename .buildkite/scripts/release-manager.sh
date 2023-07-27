@@ -32,6 +32,11 @@ docker images --filter=reference=${IMAGE}
 
 # Generate checksum files and upload to GCS
 
+pwd
+ls -la
+ls -la /
+echo $PWD
+
 run_release_manager() {
     echo "+++ Generate checksum files and upload to GCS..."
     local dry_run=""
@@ -43,7 +48,7 @@ run_release_manager() {
     -e VAULT_ADDR \
     -e VAULT_ROLE_ID \
     -e VAULT_SECRET_ID \
-    --mount type=bind,readonly=false,src="$PWD",target=. \
+    --mount type=bind,readonly=false,src="$PWD",target=/artifacts \
     "$IMAGE" \
       cli collect \
         --project "${PROJECT}" \
