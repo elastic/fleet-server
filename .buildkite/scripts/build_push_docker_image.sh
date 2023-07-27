@@ -11,11 +11,7 @@ if ! docker pull -q ${DOCKER_IMAGE}:${DOCKER_IMAGE_SHA_TAG} 2> /dev/null; then
 fi
 
 if [ -n "${BUILDKITE_TAG}" ]; then
-    docker tag "${DOCKER_IMAGE}":"${DOCKER_IMAGE_SHA_TAG}" "${DOCKER_IMAGE}":"${DOCKER_IMAGE_GIT_TAG}"
-    DOCKER_IMAGE_TAG="${DOCKER_IMAGE_GIT_TAG}"
-    make build-and-push-docker
+    DOCKER_IMAGE=${DOCKER_IMAGE} DOCKER_IMAGE_TAG="${DOCKER_IMAGE_GIT_TAG}" make build-and-push-docker
 else
-    docker tag "${DOCKER_IMAGE}":"${DOCKER_IMAGE_SHA_TAG}" "${DOCKER_IMAGE}":"${DOCKER_IMAGE_LATEST_TAG}"
-    DOCKER_IMAGE_TAG="${DOCKER_IMAGE_LATEST_TAG}"
-    make build-and-push-docker
+    DOCKER_IMAGE=${DOCKER_IMAGE} DOCKER_IMAGE_TAG="${DOCKER_IMAGE_LATEST_TAG}" make build-and-push-docker
 fi
