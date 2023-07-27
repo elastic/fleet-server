@@ -219,6 +219,11 @@ build-and-push-docker:
 		--build-arg=VERSION="$(VERSION)" \
 		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
 
+.PHONY: release-docker
+release-docker:
+	docker push \
+		$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,)
+
 .PHONY: package-target
 package-target: build/distributions
 ifeq ($(OS),windows)
