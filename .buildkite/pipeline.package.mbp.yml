@@ -8,33 +8,33 @@ env:
   IMAGE_UBUNTU_ARM_64: "core-ubuntu-2004-aarch64"
 
 steps:
-  # - group: "Package and Publish"
-  #   key: "package-publish"
-  #   steps:
-  #   - label: "Package Ubuntu-20 x86_64"
-  #     key: "package-x86-64"
-  #     command: ".buildkite/scripts/package.sh {{matrix.type}}"
-  #     agents:
-  #       provider: "gcp"
-  #       image: "${IMAGE_UBUNTU_X86_64}"
-  #     matrix:
-  #       setup:
-  #         type:
-  #         - "snapshot"
-  #         - "staging"
+  - group: "Package and Publish"
+    key: "package-publish"
+    steps:
+    - label: "Package Ubuntu-20 x86_64"
+      key: "package-x86-64"
+      command: ".buildkite/scripts/package.sh {{matrix.type}}"
+      agents:
+        provider: "gcp"
+        image: "${IMAGE_UBUNTU_X86_64}"
+      matrix:
+        setup:
+          type:
+          - "snapshot"
+          - "staging"
 
-  #   - label: "Package Ubuntu-20 aarch64"
-  #     key: "package-arm"
-  #     command: ".buildkite/scripts/package.sh {{matrix.type}}"
-  #     agents:
-  #       provider: "aws"
-  #       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
-  #       instanceType: "t4g.medium"
-  #     matrix:
-  #       setup:
-  #         type:
-  #         - "snapshot"
-  #         - "staging"
+    - label: "Package Ubuntu-20 aarch64"
+      key: "package-arm"
+      command: ".buildkite/scripts/package.sh {{matrix.type}}"
+      agents:
+        provider: "aws"
+        imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+        instanceType: "t4g.medium"
+      matrix:
+        setup:
+          type:
+          - "snapshot"
+          - "staging"
 
   - label: "DRA snapshot"
     key: "dra-snapshot"
@@ -43,9 +43,9 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
 #    if: ${FILE_EXISTS_IN_REPO}
-    # depends_on:
-    #   - step: "package-publish"
-    #     allow_failure: false
+     depends_on:
+       - step: "package-publish"
+         allow_failure: false
 
   # - label: "DRA release staging"
   #   key: "dra-staging"
