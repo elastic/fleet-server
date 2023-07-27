@@ -42,7 +42,7 @@ steps:
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
-    if: ${FILE_EXISTS_IN_REPO}
+#    if: ${FILE_EXISTS_IN_REPO}
     depends_on:
       - step: "package-publish"
         allow_failure: false
@@ -53,7 +53,7 @@ steps:
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
-    if: "${FILE_EXISTS_IN_REPO} == true && build.env('BUILDKITE_BRANCH') != 'main'"
+#    if: "${FILE_EXISTS_IN_REPO} == true && build.env('BUILDKITE_BRANCH') != 'main'"
     depends_on:
       - step: "dra-snapshot"
         allow_failure: false

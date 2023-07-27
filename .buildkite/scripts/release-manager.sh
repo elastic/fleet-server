@@ -43,7 +43,7 @@ run_release_manager() {
     -e VAULT_ADDR \
     -e VAULT_ROLE_ID \
     -e VAULT_SECRET_ID \
-    --mount type=bind,readonly=false,src="$PWD",target=/artifacts \
+    --mount type=bind,readonly=false,src="$PWD",target=. \
     "$IMAGE" \
       cli collect \
         --project "${PROJECT}" \
