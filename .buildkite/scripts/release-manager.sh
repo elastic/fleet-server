@@ -18,7 +18,7 @@
 
 source .buildkite/scripts/common.sh
 
-set -ueox pipefail
+set -ueo pipefail
 
 readonly TYPE=${TYPE:-snapshot}
 readonly OUTPUT_FILE=${OUTPUT_FILE:-release-manager-report.out}
@@ -40,7 +40,6 @@ run_release_manager() {
     local dry_run=""
     if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
         dry_run="--dry-run"
-        BRANCH="main"           #TODO remove the line after tests
     fi
     docker run --rm \
     --name release-manager \
