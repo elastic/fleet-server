@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -euox pipefail
 
 source .buildkite/scripts/common.sh
 
