@@ -43,9 +43,9 @@ run_release_manager() {
     fi
     docker run --rm \
     --name release-manager \
-    -e VAULT_ADDR \
-    -e VAULT_ROLE_ID \
-    -e VAULT_SECRET_ID \
+    -e VAULT_ADDR_SECRET \
+    -e VAULT_ROLE_ID_SECRET \
+    -e VAULT_SECRET_ID_SECRET \
     --mount type=bind,readonly=false,src="$PWD",target=/artifacts \
     "$IMAGE" \
       cli collect \
