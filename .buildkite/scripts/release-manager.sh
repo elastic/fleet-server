@@ -18,7 +18,7 @@
 
 source .buildkite/scripts/common.sh
 
-set -ueo pipefail
+set -ueox pipefail
 
 readonly TYPE=${TYPE:-snapshot}
 readonly OUTPUT_FILE=${OUTPUT_FILE:-release-manager-report.out}
