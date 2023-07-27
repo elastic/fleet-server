@@ -43,9 +43,9 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
 #    if: ${FILE_EXISTS_IN_REPO}
-     depends_on:
-       - step: "package-publish"
-         allow_failure: false
+    depends_on:
+      - step: "package-publish"
+        allow_failure: false
 
   # - label: "DRA release staging"
   #   key: "dra-staging"

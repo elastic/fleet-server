@@ -147,7 +147,7 @@ upload_mbp_packages_to_gcp_bucket() {
     local pattern=${1}
     local type=${2}
     get_bucket_uri "${type}"
-    gsutil -m cp -a public-read -r ${pattern} ${bucketUri}
+    gsutil -m -q cp -a public-read -r ${pattern} ${bucketUri}
 }
 
 download_mbp_packages_from_gcp_bucket() {
@@ -155,7 +155,7 @@ download_mbp_packages_from_gcp_bucket() {
     local type=${2}
     mkdir -p ${WORKSPACE}/${pattern}
     get_bucket_uri "${type}"
-    gsutil -m -q cp -r ${bucketUri} ${WORKSPACE}/${pattern}
+    gsutil -m cp -r ${bucketUri} ${WORKSPACE}/${pattern}
 }
 
 with_mage() {
