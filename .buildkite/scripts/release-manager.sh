@@ -15,7 +15,10 @@
 # It uses env variables to help to run this script with a simpler jenkins
 # pipeline call.
 #
+source .buildkite/scripts/common.sh
+
 set -uexo pipefail
+
 
 readonly TYPE=${TYPE:-snapshot}
 readonly OUTPUT_FILE=${OUTPUT_FILE:-release-manager-report.out}
@@ -27,7 +30,7 @@ chmod -R a+w "$FOLDER"
 
 # ensure the latest image has been pulled
 IMAGE=docker.elastic.co/infra/release-manager:latest
-(retry 3 docker pull --quiet "${IMAGE}") || echo "Error pulling ${IMAGE} Docker image, we continue"
+(retry 3 echo docker pull --quiet "${IMAGE}") || echo "Error pulling ${IMAGE} Docker image, we continue"
 docker images --filter=reference=${IMAGE}
 
 # Generate checksum files and upload to GCS
@@ -38,7 +41,7 @@ run_release_manager() {
     if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
         dry_run="--dry-run"
     fi
-    docker run --rm \
+    echo docker run --rm \
     --name release-manager \
     -e VAULT_ADDR \
     -e VAULT_ROLE_ID \
