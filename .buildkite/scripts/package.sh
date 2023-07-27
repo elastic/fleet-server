@@ -6,10 +6,10 @@ source .buildkite/scripts/common.sh
 
 VERSION=$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')
 PLATFORM_TYPE=$(uname -m)
-MATRIX_TYPE="$1"
+TYPE="$1"
 INFRA_REPO="https://github.com/repos/elastic/infra/contents"
 
-if [[ ${BUILDKITE_BRANCH} == "main" && ${MATRIX_TYPE} == "staging" ]]; then
+if [[ ${BUILDKITE_BRANCH} == "main" && ${TYPE} == "staging" ]]; then
     echo "INFO: staging artifacts for the main branch are not required."
     exit 0
 fi
@@ -25,11 +25,18 @@ add_bin_path
 with_go
 with_mage
 
-if [[ ${MATRIX_TYPE} == "staging" ]]; then
-    make release
-else
-    make SNAPSHOT=true release
-fi
+case "${TYPE}" in
+    "snapshot")
+        export SNAPSHOT=true
+        make release
+        ;;
+    "staging")
+        make release
+        ;;
+    *)
+    echo "The option is unsupported yet"
+    ;;
+esac
 
 google_cloud_auth
-upload_mbp_packages_to_gcp_bucket "build/distributions/" "${MATRIX_TYPE}"
+upload_mbp_packages_to_gcp_bucket "build/distributions/" "${TYPE}"

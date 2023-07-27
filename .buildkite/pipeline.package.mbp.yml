@@ -28,7 +28,8 @@ steps:
       command: ".buildkite/scripts/package.sh {{matrix.type}}"
       agents:
         provider: "aws"
-        image: "${IMAGE_UBUNTU_ARM_64}"
+        imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+        instanceType: "t4g.medium"
       matrix:
         setup:
           type:
