@@ -40,6 +40,7 @@ run_release_manager() {
     local dry_run=""
     if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
         dry_run="--dry-run"
+        BRANCH="main"           #TODO remove the line after tests
     fi
     docker run --rm \
     --name release-manager \
@@ -54,7 +55,7 @@ run_release_manager() {
         --commit "$(git rev-parse HEAD)" \
         --workflow "${TYPE}" \
         --artifact-set main \
-        --version "${VERSION}" \
+        --version "${RM_VERSION}" \
         $dry_run 2>&1 | tee "$OUTPUT_FILE" \
         #
 }

@@ -12,6 +12,7 @@ export TYPE=${1}
 export BRANCH="${BUILDKITE_BRANCH}"
 export VERSION="$(make get-version)"
 
+
 if [[ "${VERSION}" == *"-SNAPSHOT"* || "${VERSION}" == "" ]]; then
     echo "The 'version' parameter is required and it cannot contain the suffix '-SNAPSHOT'."
     exit 1
@@ -32,9 +33,11 @@ with_go
 
 with_mage
 
+export RM_VERSION="${VERSION}"
 
 if [[ ${TYPE} == "snapshot" ]]; then
     export SNAPSHOT=true
+    VERSION="$(make get-version)"
 fi
 
 mkdir -p ${BASE_DIR}/reports
