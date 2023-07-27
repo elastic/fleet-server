@@ -16,9 +16,9 @@
 # pipeline call.
 #
 
-source .buildkite/scripts/common.sh
+set -ueo pipefail
 
-set -uexo pipefail
+source .buildkite/scripts/common.sh
 
 readonly TYPE=${TYPE:-snapshot}
 readonly OUTPUT_FILE=${OUTPUT_FILE:-release-manager-report.out}
