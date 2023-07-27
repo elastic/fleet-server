@@ -11,6 +11,7 @@ export PROJECT="fleet-server"
 export TYPE=${1}
 export BRANCH="${BUILDKITE_BRANCH}"
 export VERSION="$(make get-version)"
+export WORKSPACE
 
 if [[ "${VERSION}" == *"-SNAPSHOT"* || "${VERSION}" == "" ]]; then
     echo "The 'version' parameter is required and it cannot contain the suffix '-SNAPSHOT'."
