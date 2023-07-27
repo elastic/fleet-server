@@ -32,17 +32,14 @@ with_go
 
 with_mage
 
-case "${TYPE}" in
-    "snapshot")
-        make release-manager-dependencies-snapshot
-        ;;
-    "staging")
-        make release-manager-dependencies-release
-        ;;
-    *)
-    echo "The option is unsupported yet"
-    ;;
-esac
+
+if [[ ${TYPE} == "snapshot" ]]; then
+    export SNAPSHOT=true
+fi
+
+mkdir -p ${BASE_DIR}/reports
+./dev-tools/dependencies-report --csv ${BASE_DIR}/reports/dependencies-${VERSION}.csv
+cd ${BASE_DIR}/reports && shasum -a 512 dependencies-${VERSION}.csv > dependencies-${VERSION}.csv.sha512
 
 cd $(dirname ${WORKSPACE})
 export FOLDER="${FOLDER_PATH}"
