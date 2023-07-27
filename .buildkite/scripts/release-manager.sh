@@ -21,6 +21,7 @@ readonly TYPE=${TYPE:-snapshot}
 readonly OUTPUT_FILE=${OUTPUT_FILE:-release-manager-report.out}
 
 # set required permissions on artifacts and directory
+cd ${WORKSPACE}
 chmod -R a+r "$FOLDER"/*
 chmod -R a+w "$FOLDER"
 
