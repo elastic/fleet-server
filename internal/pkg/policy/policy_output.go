@@ -25,6 +25,7 @@ import (
 const (
 	OutputTypeElasticsearch = "elasticsearch"
 	OutputTypeLogstash      = "logstash"
+	OutputTypeKafka         = "kafka"
 )
 
 var (
@@ -54,6 +55,9 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	case OutputTypeLogstash:
 		zlog.Debug().Msg("preparing logstash output")
 		zlog.Info().Msg("no actions required for logstash output preparation")
+	case OutputTypeKafka:
+		zlog.Debug().Msg("preparing kafka output")
+		zlog.Info().Msg("no actions required for logstash kafka preparation")
 	default:
 		zlog.Error().Msgf("unknown output type: %s; skipping preparation", p.Type)
 		return fmt.Errorf("encountered unexpected output type while preparing outputs: %s", p.Type)

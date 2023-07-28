@@ -69,6 +69,37 @@ func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 	bulker.AssertExpectations(t)
 }
 
+func TestPolicyKafkaOutputPrepare(t *testing.T) {
+	logger := testlog.SetLogger(t)
+	bulker := ftesting.NewMockBulk()
+	po := Output{
+		Type: OutputTypeKafka,
+		Name: "test output",
+		Role: &RoleT{
+			Sha2: "fake sha",
+			Raw:  TestPayload,
+		},
+	}
+
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, smap.Map{})
+	require.Nil(t, err, "expected prepare to pass")
+	bulker.AssertExpectations(t)
+}
+func TestPolicyKafkaOutputPrepareNoRole(t *testing.T) {
+	logger := testlog.SetLogger(t)
+	bulker := ftesting.NewMockBulk()
+	po := Output{
+		Type: OutputTypeKafka,
+		Name: "test output",
+		Role: nil,
+	}
+
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, smap.Map{})
+	// No permissions are required by kafka currently
+	require.Nil(t, err, "expected prepare to pass")
+	bulker.AssertExpectations(t)
+}
+
 func TestPolicyESOutputPrepareNoRole(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
