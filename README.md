@@ -1,6 +1,6 @@
 # Fleet Server
 
-[![Build Status](https://fleet-ci.elastic.co/job/fleet-server/job/fleet-server-mbp/job/main/badge/icon)](https://fleet-ci.elastic.co/job/Ingest-manager/job/fleet-server/job/main/)  [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=elastic_fleet-server&metric=coverage)](https://sonarcloud.io/summary/new_code?id=elastic_fleet-server)
+[![Build status](https://badge.buildkite.com/e97572322f4d22804d550aa300c7d4cfe807f3463c999e8c8f.svg?branch=main)](https://buildkite.com/elastic/fleet-server) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=elastic_fleet-server&metric=coverage)](https://sonarcloud.io/summary/new_code?id=elastic_fleet-server)
 
 Fleet server is the control server to manage a fleet of [elastic-agents](https://github.com/elastic/elastic-agent).
 
@@ -260,7 +260,7 @@ the test BenchmarkXXXX and not unit tests)
 - `BENCHMARK_COUNT`: you can define the number of iterations go test will run. Having larger number helps
 remove run-to-run variations (Default: 8)
 
-#### Testing on cloud 
+#### Testing on cloud
 
 Elastic employees can create an Elastic Cloud deployment with a locally built Fleet Server.
 
