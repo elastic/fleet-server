@@ -51,7 +51,7 @@ spec:
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       env:
         ELASTIC_SLACK_NOTIFICATIONS_ENABLED: 'true'
-        SLACK_NOTIFICATIONS_CHANNEL: '#ingest-notifications'
+        SLACK_NOTIFICATIONS_CHANNEL: '#fleet-notifications'
         SLACK_NOTIFICATIONS_ALL_BRANCHES: 'false'
         SLACK_NOTIFICATIONS_ON_SUCCESS: 'false'
       teams:
@@ -94,7 +94,7 @@ spec:
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       env:
         ELASTIC_SLACK_NOTIFICATIONS_ENABLED: 'true'
-        SLACK_NOTIFICATIONS_CHANNEL: '#ingest-notifications'
+        SLACK_NOTIFICATIONS_CHANNEL: '#fleet-notifications'
         SLACK_NOTIFICATIONS_ALL_BRANCHES: 'false'
         SLACK_NOTIFICATIONS_ON_SUCCESS: 'false'
       cancel_intermediate_builds: true

@@ -15,12 +15,16 @@
 # It uses env variables to help to run this script with a simpler jenkins
 # pipeline call.
 #
-set -uexo pipefail
+
+source .buildkite/scripts/common.sh
+
+set -ueo pipefail
 
 readonly TYPE=${TYPE:-snapshot}
 readonly OUTPUT_FILE=${OUTPUT_FILE:-release-manager-report.out}
 
 # set required permissions on artifacts and directory
+cd ${WORKSPACE}
 chmod -R a+r "$FOLDER"/*
 chmod -R a+w "$FOLDER"
 
@@ -39,9 +43,9 @@ run_release_manager() {
     fi
     docker run --rm \
     --name release-manager \
-    -e VAULT_ADDR \
-    -e VAULT_ROLE_ID \
-    -e VAULT_SECRET_ID \
+    -e VAULT_ADDR="${VAULT_ADDR_SECRET}" \
+    -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
+    -e VAULT_SECRET_ID="${VAULT_SECRET_ID_SECRET}" \
     --mount type=bind,readonly=false,src="$PWD",target=/artifacts \
     "$IMAGE" \
       cli collect \
@@ -50,7 +54,7 @@ run_release_manager() {
         --commit "$(git rev-parse HEAD)" \
         --workflow "${TYPE}" \
         --artifact-set main \
-        --version "${VERSION}" \
+        --version "${RM_VERSION}" \
         $dry_run 2>&1 | tee "$OUTPUT_FILE" \
         #
 }

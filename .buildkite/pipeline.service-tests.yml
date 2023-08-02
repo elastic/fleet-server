@@ -1,5 +1,5 @@
 env:
-  ENVIRONMENT: ${ENVIRONMENT?}
+  ENVIRONMENT: ${ENVIRONMENT}
 
 steps:
   - label: ":grey_question: Trigger Tests for ${ENVIRONMENT}"
