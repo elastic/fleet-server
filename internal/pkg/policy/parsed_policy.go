@@ -7,7 +7,6 @@ package policy
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"regexp"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -99,10 +98,6 @@ func NewParsedPolicy(p model.Policy, client *elasticsearch.Client) (*ParsedPolic
 		},
 		Inputs: policyInputs,
 	}
-
-	// TODO remove before merge
-	inputsJson, _ := json.MarshalIndent(policyInputs, "", "  ")
-	fmt.Println(string(inputsJson))
 
 	return pp, nil
 }
