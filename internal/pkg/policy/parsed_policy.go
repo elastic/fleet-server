@@ -7,12 +7,10 @@ package policy
 import (
 	"encoding/json"
 	"errors"
-	"regexp"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
-	"github.com/elastic/go-elasticsearch/v8"
 )
 
 const (
@@ -41,10 +39,6 @@ type ParsedPolicyDefaults struct {
 	Name string
 }
 
-type SecretReference struct {
-	Id string `json:"id"`
-}
-
 type ParsedPolicy struct {
 	Policy  model.Policy
 	Fields  map[string]json.RawMessage
@@ -54,7 +48,7 @@ type ParsedPolicy struct {
 	Inputs  []map[string]interface{}
 }
 
-func NewParsedPolicy(p model.Policy, client *elasticsearch.Client) (*ParsedPolicy, error) {
+func NewParsedPolicy(p model.Policy, bulker bulk.Bulk) (*ParsedPolicy, error) {
 	var err error
 
 	var fields map[string]json.RawMessage
@@ -84,8 +78,7 @@ func NewParsedPolicy(p model.Policy, client *elasticsearch.Client) (*ParsedPolic
 	if err != nil {
 		return nil, err
 	}
-	secretReferences, err := getSecretReferences(fields["secret_references"], client)
-	policyInputs, err := getPolicyInputsWithSecrets(fields["inputs"], secretReferences)
+	policyInputs, err := getPolicyInputsWithSecrets(fields, bulker)
 
 	// We are cool and the gang
 	pp := &ParsedPolicy{
@@ -100,87 +93,6 @@ func NewParsedPolicy(p model.Policy, client *elasticsearch.Client) (*ParsedPolic
 	}
 
 	return pp, nil
-}
-
-// returns secrets as id:value map
-func getSecretReferences(secretRefsRaw json.RawMessage, client *elasticsearch.Client) (map[string]string, error) {
-	if secretRefsRaw == nil {
-		return nil, nil
-	}
-	var secretReferences []SecretReference
-	err := json.Unmarshal([]byte(secretRefsRaw), &secretReferences)
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[string]string)
-	for _, ref := range secretReferences {
-		value, err := dl.ReadSecret(client, ref.Id)
-		if err != nil {
-			return nil, err
-		}
-		result[ref.Id] = value
-	}
-	return result, nil
-}
-
-func getPolicyInputsWithSecrets(inputsRaw json.RawMessage, secretReferences map[string]string) ([]map[string]interface{}, error) {
-	if secretReferences == nil {
-		return nil, nil
-	}
-	var inputs []map[string]interface{}
-	err := json.Unmarshal([]byte(inputsRaw), &inputs)
-	if err != nil {
-		return nil, err
-	}
-	var result []map[string]interface{}
-	for _, input := range inputs {
-		newInput := make(map[string]interface{})
-		for k, v := range input {
-			if k == "streams" {
-				if streams, ok := input[k].([]any); ok {
-					newStreams := make([]any, 0)
-					for _, stream := range streams {
-						if streamMap, ok := stream.(map[string]interface{}); ok {
-							newStream := make(map[string]interface{})
-							for streamKey, streamVal := range streamMap {
-								if streamRef, ok := streamMap[streamKey].(string); ok {
-									replacedVal := replaceSecretRef(streamRef, secretReferences)
-									newStream[streamKey] = replacedVal
-								} else {
-									newStream[streamKey] = streamVal
-								}
-							}
-							newStreams = append(newStreams, newStream)
-						} else {
-							newStreams = append(newStreams, stream)
-						}
-						newInput[k] = newStreams
-
-					}
-				}
-			} else if ref, ok := input[k].(string); ok {
-				val := replaceSecretRef(ref, secretReferences)
-				newInput[k] = val
-			}
-			if _, ok := newInput[k]; !ok {
-				newInput[k] = v
-			}
-		}
-		result = append(result, newInput)
-	}
-	return result, nil
-}
-
-func replaceSecretRef(ref string, secretReferences map[string]string) string {
-	regexp := regexp.MustCompile(`\$co\.elastic\.secret{(.*)}`)
-	matches := regexp.FindStringSubmatch(ref)
-	if len(matches) > 1 {
-		secretRef := matches[1]
-		if val, ok := secretReferences[secretRef]; ok {
-			return val
-		}
-	}
-	return ref
 }
 
 func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) (map[string]Output, error) {

@@ -27,7 +27,7 @@ func TestNewParsedPolicy(t *testing.T) {
 
 		m.Data = json.RawMessage(testPolicy)
 
-		pp, err := NewParsedPolicy(m)
+		pp, err := NewParsedPolicy(m, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +83,7 @@ func TestNewParsedPolicyNoES(t *testing.T) {
 
 	m.Data = json.RawMessage(logstashOutputPolicy)
 
-	pp, err := NewParsedPolicy(m)
+	pp, err := NewParsedPolicy(m, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

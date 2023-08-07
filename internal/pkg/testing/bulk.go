@@ -78,6 +78,14 @@ func (m *MockBulk) Client() *elasticsearch.Client {
 	return args.Get(0).(*elasticsearch.Client)
 }
 
+func (m *MockBulk) ReadSecrets(secretIds []string) (map[string]string, error) {
+	result := make(map[string]string)
+	for _, id := range secretIds {
+		result[id] = id + "_value"
+	}
+	return result, nil
+}
+
 func (m *MockBulk) APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*bulk.APIKey, error) {
 	args := m.Called(ctx, name, ttl, roles, meta)
 	return args.Get(0).(*bulk.APIKey), args.Error(1)
