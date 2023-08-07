@@ -525,6 +525,13 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// Update only the output fields to avoid duping the whole map
 	fields[outputsProperty] = json.RawMessage(outputRaw)
 
+	inputsRaw, err := json.Marshal(pp.Inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	fields["inputs"] = json.RawMessage(inputsRaw)
+
 	rewrittenPolicy := struct {
 		Policy map[string]json.RawMessage `json:"policy"`
 	}{fields}
