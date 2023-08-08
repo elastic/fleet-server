@@ -38,19 +38,24 @@ func getSecretReferences(ctx context.Context, secretRefsRaw json.RawMessage, bul
 }
 
 func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawMessage, bulker bulk.Bulk) ([]map[string]interface{}, error) {
-	if fields["secret_references"] == nil || fields["inputs"] == nil {
+	if fields["inputs"] == nil {
 		return nil, nil
 	}
+	var inputs []map[string]interface{}
+	err := json.Unmarshal([]byte(fields["inputs"]), &inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	if fields["secret_references"] == nil {
+		return inputs, nil
+	}
+
 	secretReferences, err := getSecretReferences(ctx, fields["secret_references"], bulker)
 	if err != nil {
 		return nil, err
 	}
 
-	var inputs []map[string]interface{}
-	err = json.Unmarshal([]byte(fields["inputs"]), &inputs)
-	if err != nil {
-		return nil, err
-	}
 	result := make([]map[string]interface{}, 0)
 	for _, input := range inputs {
 		newInput := make(map[string]interface{})
