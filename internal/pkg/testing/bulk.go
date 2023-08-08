@@ -78,7 +78,7 @@ func (m *MockBulk) Client() *elasticsearch.Client {
 	return args.Get(0).(*elasticsearch.Client)
 }
 
-func (m *MockBulk) ReadSecrets(secretIds []string) (map[string]string, error) {
+func (m *MockBulk) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
 	result := make(map[string]string)
 	for _, id := range secretIds {
 		result[id] = id + "_value"

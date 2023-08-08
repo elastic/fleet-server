@@ -5,6 +5,7 @@
 package policy
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 
@@ -48,7 +49,7 @@ type ParsedPolicy struct {
 	Inputs  []map[string]interface{}
 }
 
-func NewParsedPolicy(p model.Policy, bulker bulk.Bulk) (*ParsedPolicy, error) {
+func NewParsedPolicy(ctx context.Context, p model.Policy, bulker bulk.Bulk) (*ParsedPolicy, error) {
 	var err error
 
 	var fields map[string]json.RawMessage
@@ -78,7 +79,10 @@ func NewParsedPolicy(p model.Policy, bulker bulk.Bulk) (*ParsedPolicy, error) {
 	if err != nil {
 		return nil, err
 	}
-	policyInputs, err := getPolicyInputsWithSecrets(fields, bulker)
+	policyInputs, err := getPolicyInputsWithSecrets(ctx, fields, bulker)
+	if err != nil {
+		return nil, err
+	}
 
 	// We are cool and the gang
 	pp := &ParsedPolicy{

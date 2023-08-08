@@ -5,6 +5,7 @@
 package policy
 
 import (
+	"context"
 	"encoding/json"
 	"regexp"
 
@@ -12,11 +13,11 @@ import (
 )
 
 type SecretReference struct {
-	Id string `json:"id"`
+	ID string `json:"id"`
 }
 
 // returns secrets as id:value map
-func getSecretReferences(secretRefsRaw json.RawMessage, bulker bulk.Bulk) (map[string]string, error) {
+func getSecretReferences(ctx context.Context, secretRefsRaw json.RawMessage, bulker bulk.Bulk) (map[string]string, error) {
 	if secretRefsRaw == nil {
 		return nil, nil
 	}
@@ -27,17 +28,17 @@ func getSecretReferences(secretRefsRaw json.RawMessage, bulker bulk.Bulk) (map[s
 	}
 	ids := make([]string, 0)
 	for _, ref := range secretReferences {
-		ids = append(ids, ref.Id)
+		ids = append(ids, ref.ID)
 	}
-	results, err := bulker.ReadSecrets(ids)
+	results, err := bulker.ReadSecrets(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
 	return results, nil
 }
 
-func getPolicyInputsWithSecrets(fields map[string]json.RawMessage, bulker bulk.Bulk) ([]map[string]interface{}, error) {
-	secretReferences, err := getSecretReferences(fields["secret_references"], bulker)
+func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawMessage, bulker bulk.Bulk) ([]map[string]interface{}, error) {
+	secretReferences, err := getSecretReferences(ctx, fields["secret_references"], bulker)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func getPolicyInputsWithSecrets(fields map[string]json.RawMessage, bulker bulk.B
 	if err != nil {
 		return nil, err
 	}
-	var result []map[string]interface{}
+	result := make([]map[string]interface{}, 0)
 	for _, input := range inputs {
 		newInput := make(map[string]interface{})
 		for k, v := range input {

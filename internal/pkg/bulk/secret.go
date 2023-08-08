@@ -5,11 +5,11 @@
 package bulk
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 type ExtendedClient struct {
@@ -22,8 +22,8 @@ type ExtendedAPI struct {
 }
 
 // GET /_fleet/secret/secretId
-func (c *ExtendedAPI) Read(secretId string) (*esapi.Response, error) {
-	req, err := http.NewRequest("GET", "/_fleet/secret/"+secretId, nil)
+func (c *ExtendedAPI) Read(ctx context.Context, secretID string) (*SecretResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "/_fleet/secret/"+secretID, nil)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	if err != nil {
@@ -34,25 +34,28 @@ func (c *ExtendedAPI) Read(secretId string) (*esapi.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &esapi.Response{StatusCode: res.StatusCode, Body: res.Body, Header: res.Header}, nil
-}
-
-type SecretResponse struct {
-	Id    string
-	Value string
-}
-
-func ReadSecret(client *elasticsearch.Client, secretId string) (string, error) {
-	es := ExtendedClient{Client: client, Custom: &ExtendedAPI{client}}
-	res, err := es.Custom.Read(secretId)
-	var secretResp SecretResponse
-
 	defer res.Body.Close()
+	var secretResp SecretResponse
 
 	err = json.NewDecoder(res.Body).Decode(&secretResp)
 	if err != nil {
+		return nil, err
+	}
+	return &secretResp, nil
+}
+
+type SecretResponse struct {
+	Value string
+}
+
+func ReadSecret(ctx context.Context, client *elasticsearch.Client, secretID string) (string, error) {
+	es := ExtendedClient{Client: client, Custom: &ExtendedAPI{client}}
+	res, err := es.Custom.Read(ctx, secretID)
+	if err != nil {
 		return "", err
 	}
-
-	return secretResp.Value, err
+	if res == nil {
+		return "", nil
+	}
+	return (*res).Value, err
 }

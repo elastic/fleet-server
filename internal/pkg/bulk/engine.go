@@ -64,7 +64,7 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
-	ReadSecrets(secretIds []string) (map[string]string, error)
+	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
 
 const kModBulk = "bulk"
@@ -114,11 +114,11 @@ func (b *Bulker) Client() *elasticsearch.Client {
 	return client
 }
 
-func (b *Bulker) ReadSecrets(secretIds []string) (map[string]string, error) {
+func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
 	result := make(map[string]string)
 	esClient := b.Client()
 	for _, id := range secretIds {
-		val, err := ReadSecret(esClient, id)
+		val, err := ReadSecret(ctx, esClient, id)
 		if err != nil {
 			return nil, err
 		}

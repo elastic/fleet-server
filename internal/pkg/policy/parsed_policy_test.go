@@ -5,6 +5,7 @@
 package policy
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestNewParsedPolicy(t *testing.T) {
 
 		m.Data = json.RawMessage(testPolicy)
 
-		pp, err := NewParsedPolicy(m, nil)
+		pp, err := NewParsedPolicy(context.TODO(), m, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +84,7 @@ func TestNewParsedPolicyNoES(t *testing.T) {
 
 	m.Data = json.RawMessage(logstashOutputPolicy)
 
-	pp, err := NewParsedPolicy(m, nil)
+	pp, err := NewParsedPolicy(context.TODO(), m, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
