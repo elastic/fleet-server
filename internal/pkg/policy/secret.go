@@ -38,6 +38,9 @@ func getSecretReferences(ctx context.Context, secretRefsRaw json.RawMessage, bul
 }
 
 func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawMessage, bulker bulk.Bulk) ([]map[string]interface{}, error) {
+	if fields["secret_references"] == nil || fields["inputs"] == nil {
+		return nil, nil
+	}
 	secretReferences, err := getSecretReferences(ctx, fields["secret_references"], bulker)
 	if err != nil {
 		return nil, err
