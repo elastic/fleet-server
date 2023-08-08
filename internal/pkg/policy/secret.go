@@ -16,7 +16,7 @@ type SecretReference struct {
 	ID string `json:"id"`
 }
 
-// returns secrets as id:value map
+// read secret values that belong to the agent policy's secret references, returns secrets as id:value map
 func getSecretReferences(ctx context.Context, secretRefsRaw json.RawMessage, bulker bulk.Bulk) (map[string]string, error) {
 	if secretRefsRaw == nil {
 		return nil, nil
@@ -37,6 +37,8 @@ func getSecretReferences(ctx context.Context, secretRefsRaw json.RawMessage, bul
 	return results, nil
 }
 
+// read inputs and secret_references from agent policy
+// replace values of secret refs in inputs and input streams properties
 func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawMessage, bulker bulk.Bulk) ([]map[string]interface{}, error) {
 	if fields["inputs"] == nil {
 		return nil, nil
@@ -95,8 +97,9 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 	return result, nil
 }
 
+// replace values mathing a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
 func replaceSecretRef(ref string, secretReferences map[string]string) string {
-	regexp := regexp.MustCompile(`\$co\.elastic\.secret{(.*)}`)
+	regexp := regexp.MustCompile(`^\$co\.elastic\.secret{(.*)}$`)
 	matches := regexp.FindStringSubmatch(ref)
 	if len(matches) > 1 {
 		secretRef := matches[1]

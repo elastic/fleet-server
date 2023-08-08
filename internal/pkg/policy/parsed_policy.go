@@ -49,7 +49,7 @@ type ParsedPolicy struct {
 	Inputs  []map[string]interface{}
 }
 
-func NewParsedPolicy(ctx context.Context, p model.Policy, bulker bulk.Bulk) (*ParsedPolicy, error) {
+func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*ParsedPolicy, error) {
 	var err error
 
 	var fields map[string]json.RawMessage

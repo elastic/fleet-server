@@ -21,6 +21,7 @@ type ExtendedAPI struct {
 	*elasticsearch.Client
 }
 
+// Read secret values with custom ES API added in Fleet ES plugin, there is no direct access to secrets index
 // GET /_fleet/secret/secretId
 func (c *ExtendedAPI) Read(ctx context.Context, secretID string) (*SecretResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "/_fleet/secret/"+secretID, nil)

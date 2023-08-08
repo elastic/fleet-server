@@ -268,7 +268,7 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
-		pp, err := NewParsedPolicy(ctx, policy, m.bulker)
+		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
 		if err != nil {
 			return err
 		}

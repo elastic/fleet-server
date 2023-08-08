@@ -114,6 +114,7 @@ func (b *Bulker) Client() *elasticsearch.Client {
 	return client
 }
 
+// read secrets one by one as there is no bulk API yet to read them in one request
 func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
 	result := make(map[string]string)
 	esClient := b.Client()
