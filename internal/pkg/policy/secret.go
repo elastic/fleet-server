@@ -72,32 +72,17 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 	for _, input := range inputs {
 		newInput := make(map[string]interface{})
 		for k, v := range input {
+			// replace secret refs in input stream fields
 			if k == "streams" {
 				if streams, ok := input[k].([]any); ok {
-					newStreams := make([]any, 0)
-					for _, stream := range streams {
-						if streamMap, ok := stream.(map[string]interface{}); ok {
-							newStream := make(map[string]interface{})
-							for streamKey, streamVal := range streamMap {
-								if streamRef, ok := streamMap[streamKey].(string); ok {
-									replacedVal := replaceSecretRef(streamRef, secretValues)
-									newStream[streamKey] = replacedVal
-								} else {
-									newStream[streamKey] = streamVal
-								}
-							}
-							newStreams = append(newStreams, newStream)
-						} else {
-							newStreams = append(newStreams, stream)
-						}
-						newInput[k] = newStreams
-
-					}
+					newInput[k] = processStreams(streams, secretValues)
 				}
+				// replace secret refs in input fields
 			} else if ref, ok := input[k].(string); ok {
 				val := replaceSecretRef(ref, secretValues)
 				newInput[k] = val
 			}
+			// if any field was not processed, add back as is
 			if _, ok := newInput[k]; !ok {
 				newInput[k] = v
 			}
@@ -105,6 +90,33 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 		result = append(result, newInput)
 	}
 	return result, nil
+}
+
+func processStreams(streams []any, secretValues map[string]string) []any {
+	newStreams := make([]any, 0)
+	for _, stream := range streams {
+		if streamMap, ok := stream.(map[string]interface{}); ok {
+			newStream := replaceSecretsInStream(streamMap, secretValues)
+			newStreams = append(newStreams, newStream)
+		} else {
+			newStreams = append(newStreams, stream)
+		}
+	}
+	return newStreams
+}
+
+// if field values are secret refs, replace with secret value, otherwise noop
+func replaceSecretsInStream(streamMap map[string]interface{}, secretValues map[string]string) map[string]interface{} {
+	newStream := make(map[string]interface{})
+	for streamKey, streamVal := range streamMap {
+		if streamRef, ok := streamMap[streamKey].(string); ok {
+			replacedVal := replaceSecretRef(streamRef, secretValues)
+			newStream[streamKey] = replacedVal
+		} else {
+			newStream[streamKey] = streamVal
+		}
+	}
+	return newStream
 }
 
 // replace values mathing a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
