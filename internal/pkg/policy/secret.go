@@ -47,6 +47,7 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 	if fields["inputs"] == nil {
 		return nil, nil
 	}
+
 	var inputs []map[string]interface{}
 	err := json.Unmarshal([]byte(fields["inputs"]), &inputs)
 	if err != nil {
