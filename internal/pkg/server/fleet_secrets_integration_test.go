@@ -38,16 +38,32 @@ func createSecret(t *testing.T, ctx context.Context, bulker bulk.Bulk) string {
 	t.Log("Setup secret for fleet integration test")
 	esClient := bulker.Client()
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "/_fleet/secret/", bytes.NewBuffer([]byte("{\"value\":\"secret_value\"}")))
+	// create user with kibana_system role to create secret
+	req, err := http.NewRequestWithContext(ctx, "PUT", "/_security/user/kibana_test", bytes.NewBuffer([]byte(`{ "password": "changeme", "roles": [ "kibana_system" ] }`)))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	// kibana_system:changeme base64 encoded
-	req.Header.Set("Authorization", "Basic a2liYW5hX3N5c3RlbTpjaGFuZ2VtZQ==")
+	// elastic:changeme base64 encoded
+	req.Header.Set("Authorization", "Basic ZWxhc3RpYzpjaGFuZ2VtZQ==")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	res, err := esClient.Perform(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	req, err = http.NewRequestWithContext(ctx, "POST", "/_fleet/secret/", bytes.NewBuffer([]byte("{\"value\":\"secret_value\"}")))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	// kibana_test:changeme base64 encoded
+	req.Header.Set("Authorization", "Basic a2liYW5hX3Rlc3Q6Y2hhbmdlbWU=")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err = esClient.Perform(req)
 	if err != nil {
 		t.Fatal(err)
 	}

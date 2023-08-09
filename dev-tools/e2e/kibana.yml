@@ -4,8 +4,6 @@ server.ssl.enabled: false
 elasticsearch.hosts: [ "http://elasticsearch:9200" ]
 elasticsearch.serviceAccountToken: "${KIBANA_TOKEN}"
 
-elasticsearch.username: "kibana_system"
-elasticsearch.password: "changeme"  
 
 xpack.securitySolution.packagerTaskInterval: 1s
 xpack.fleet.agents.enabled: true
