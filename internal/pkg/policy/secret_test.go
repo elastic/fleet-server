@@ -21,6 +21,14 @@ func TestReplaceSecretRef(t *testing.T) {
 	assert.Equal(t, "value1", val)
 }
 
+func TestReplaceSecretRefPartial(t *testing.T) {
+	secretRefs := map[string]string{
+		"abcd": "value1",
+	}
+	val := replaceSecretRef("partial $co.elastic.secret{abcd}", secretRefs)
+	assert.Equal(t, "partial value1", val)
+}
+
 func TestReplaceSecretRefNotASecret(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
@@ -37,12 +45,12 @@ func TestReplaceSecretRefNotFound(t *testing.T) {
 	assert.Equal(t, "$co.elastic.secret{other}", val)
 }
 
-func TestGetSecretReferences(t *testing.T) {
+func TestGetSecretValues(t *testing.T) {
 	secretRefsJSON := []SecretReference{{ID: "ref1"}, {ID: "ref2"}}
 	secretRefsRaw, _ := json.Marshal(secretRefsJSON)
 	bulker := ftesting.NewMockBulk()
 
-	secretRefs, _ := getSecretReferences(context.TODO(), secretRefsRaw, bulker)
+	secretRefs, _ := getSecretValues(context.TODO(), secretRefsRaw, bulker)
 
 	expectedRefs := map[string]string{
 		"ref1": "ref1_value",
