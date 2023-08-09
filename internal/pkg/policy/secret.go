@@ -21,19 +21,23 @@ func getSecretReferences(ctx context.Context, secretRefsRaw json.RawMessage, bul
 	if secretRefsRaw == nil {
 		return nil, nil
 	}
+
 	var secretReferences []SecretReference
 	err := json.Unmarshal([]byte(secretRefsRaw), &secretReferences)
 	if err != nil {
 		return nil, err
 	}
+
 	ids := make([]string, 0)
 	for _, ref := range secretReferences {
 		ids = append(ids, ref.ID)
 	}
+
 	results, err := bulker.ReadSecrets(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
+
 	return results, nil
 }
 
