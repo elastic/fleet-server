@@ -24,6 +24,8 @@ import (
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
+var TestPayload []byte
+
 func TestRenderUpdatePainlessScript(t *testing.T) {
 	tts := []struct {
 		name string
