@@ -261,14 +261,14 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 	return m.processPolicies(ctx, policies)
 }
 
-func (m *monitorT) processPolicies(_ context.Context, policies []model.Policy) error {
+func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy) error {
 	if len(policies) == 0 {
 		return nil
 	}
 
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
-		pp, err := NewParsedPolicy(policy)
+		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
 		if err != nil {
 			return err
 		}
