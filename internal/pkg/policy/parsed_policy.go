@@ -5,9 +5,11 @@
 package policy
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
@@ -44,9 +46,10 @@ type ParsedPolicy struct {
 	Roles   RoleMapT
 	Outputs map[string]Output
 	Default ParsedPolicyDefaults
+	Inputs  []map[string]interface{}
 }
 
-func NewParsedPolicy(p model.Policy) (*ParsedPolicy, error) {
+func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*ParsedPolicy, error) {
 	var err error
 
 	var fields map[string]json.RawMessage
@@ -76,6 +79,10 @@ func NewParsedPolicy(p model.Policy) (*ParsedPolicy, error) {
 	if err != nil {
 		return nil, err
 	}
+	policyInputs, err := getPolicyInputsWithSecrets(ctx, fields, bulker)
+	if err != nil {
+		return nil, err
+	}
 
 	// We are cool and the gang
 	pp := &ParsedPolicy{
@@ -86,6 +93,7 @@ func NewParsedPolicy(p model.Policy) (*ParsedPolicy, error) {
 		Default: ParsedPolicyDefaults{
 			Name: defaultName,
 		},
+		Inputs: policyInputs,
 	}
 
 	return pp, nil

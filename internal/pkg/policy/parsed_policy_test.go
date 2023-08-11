@@ -2,9 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build !integration
+
 package policy
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -27,7 +30,7 @@ func TestNewParsedPolicy(t *testing.T) {
 
 		m.Data = json.RawMessage(testPolicy)
 
-		pp, err := NewParsedPolicy(m)
+		pp, err := NewParsedPolicy(context.TODO(), nil, m)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +86,7 @@ func TestNewParsedPolicyNoES(t *testing.T) {
 
 	m.Data = json.RawMessage(logstashOutputPolicy)
 
-	pp, err := NewParsedPolicy(m)
+	pp, err := NewParsedPolicy(context.TODO(), nil, m)
 	if err != nil {
 		t.Fatal(err)
 	}
