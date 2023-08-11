@@ -1,9 +1,5 @@
 ARG GO_VERSION
-<<<<<<< HEAD
-FROM golang:${GO_VERSION}-buster AS builder
-=======
 FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-bullseye AS builder
->>>>>>> f76576d (Change dockerfile from golang-buster tp golang-bullseye (#2867))
 
 WORKDIR /usr/src/fleet-server
 
