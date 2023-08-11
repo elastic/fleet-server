@@ -63,6 +63,8 @@ type Bulk interface {
 
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
+
+	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
 
 const kModBulk = "bulk"
@@ -110,6 +112,20 @@ func (b *Bulker) Client() *elasticsearch.Client {
 		panic("Client is not an elastic search pointer")
 	}
 	return client
+}
+
+// read secrets one by one as there is no bulk API yet to read them in one request
+func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
+	result := make(map[string]string)
+	esClient := b.Client()
+	for _, id := range secretIds {
+		val, err := ReadSecret(ctx, esClient, id)
+		if err != nil {
+			return nil, err
+		}
+		result[id] = val
+	}
+	return result, nil
 }
 
 // Stop timer, but don't stall on channel.

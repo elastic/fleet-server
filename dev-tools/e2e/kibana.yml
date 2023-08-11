@@ -4,6 +4,7 @@ server.ssl.enabled: false
 elasticsearch.hosts: [ "http://elasticsearch:9200" ]
 elasticsearch.serviceAccountToken: "${KIBANA_TOKEN}"
 
+
 xpack.securitySolution.packagerTaskInterval: 1s
 xpack.fleet.agents.enabled: true
 xpack.fleet.agents.fleet_server.hosts: ["https://fleet-server:8220"]
