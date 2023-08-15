@@ -31,6 +31,14 @@ func TestReplaceSecretRefPartial(t *testing.T) {
 	assert.Equal(t, "partial value1", val)
 }
 
+func TestReplaceSecretRefPartial2(t *testing.T) {
+	secretRefs := map[string]string{
+		"abcd": "http://localhost",
+	}
+	val := replaceSecretRef("$co.elastic.secret{abcd}/services", secretRefs)
+	assert.Equal(t, "http://localhost/services", val)
+}
+
 func TestReplaceSecretRefNotASecret(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
@@ -97,6 +105,9 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 	result, _ := getPolicyInputsWithSecrets(context.TODO(), fields, bulker)
 
 	assert.Equal(t, expectedResult, result)
+	var refs any
+	json.Unmarshal(fields["secret_references"], &refs)
+	assert.Equal(t, nil, refs)
 }
 
 func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
