@@ -31,6 +31,14 @@ func TestReplaceSecretRefPartial(t *testing.T) {
 	assert.Equal(t, "partial value1", val)
 }
 
+func TestReplaceSecretRefPartial2(t *testing.T) {
+	secretRefs := map[string]string{
+		"abcd": "http://localhost",
+	}
+	val := replaceSecretRef("$co.elastic.secret{abcd}/services", secretRefs)
+	assert.Equal(t, "http://localhost/services", val)
+}
+
 func TestReplaceSecretRefNotASecret(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
