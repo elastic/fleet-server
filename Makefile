@@ -135,6 +135,10 @@ notice: ## - Generates the NOTICE.txt file.
 		-noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
 		-noticeOut NOTICE.txt \
 		-depsOut ""
+	@# Ensure the go.mod file is left unchanged after go mod download all runs.
+	@# go mod download will modify go.sum in a way that conflicts with go mod tidy.
+	@# https://github.com/golang/go/issues/43994#issuecomment-770053099
+	@go mod tidy
 
 .PHONY: check-no-changes
 check-no-changes:
