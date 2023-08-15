@@ -96,55 +96,6 @@ func TestEnroll(t *testing.T) {
 	}
 }
 
-func TestEnrollWithStaticPolicyTokensConfigured(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	rb := &rollback.Rollback{}
-	zlog := zerolog.Logger{}
-	enrollmentID := "1234"
-	req := &EnrollRequest{
-		Type:         "PERMANENT",
-		EnrollmentId: &enrollmentID,
-		Metadata: EnrollMetadata{
-			UserProvided: []byte("{}"),
-			Local:        []byte("{}"),
-		},
-	}
-	verCon := mustBuildConstraints("8.9.0")
-	cfg := &config.Server{
-		StaticPolicyTokens: config.StaticPolicyTokens{
-			Enabled: true,
-			PolicyTokens: []config.PolicyToken{
-				{
-					TokenKey: "abcdefg",
-					PolicyID: "dummy-policy",
-				},
-			},
-		},
-	}
-	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
-	bulker := ftesting.NewMockBulk()
-	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
-
-	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: make([]es.HitT, 0),
-		},
-	}, nil)
-	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
-		&apikey.APIKey{
-			ID:  "1234",
-			Key: "1234",
-		}, nil)
-	bulker.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
-		"", nil)
-	resp, _ := et._enroll(ctx, rb, zlog, req, "1234", "8.9.0")
-
-	if resp.Action != "created" {
-		t.Fatal("enroll failed")
-	}
-}
-
 func TestEnrollerT_fetchStaticTokenPolicy(t *testing.T) {
 	bulkerBuilder := func(policies ...model.Policy) func() bulk.Bulk {
 		return func() bulk.Bulk {
@@ -254,6 +205,28 @@ func TestEnrollerT_fetchStaticTokenPolicy(t *testing.T) {
 			},
 			want:    &model.EnrollmentAPIKey{},
 			wantErr: true,
+		},
+		{
+			name: "static token not found",
+			fields: fields{
+				staticPolicyTokens: config.StaticPolicyTokens{
+					Enabled: true,
+					PolicyTokens: []config.PolicyToken{
+						{
+							TokenKey: "abcdefg",
+							PolicyID: "dummy-policy",
+						},
+					},
+				},
+				bulker: bulkerBuilder(),
+			},
+			args: args{
+				enrollmentAPIKey: &apikey.APIKey{
+					Key: "idonotexists",
+				},
+			},
+			want:    nil,
+			wantErr: false, // Should not error as we want to search this in DB
 		},
 	}
 	for _, tt := range tests {
