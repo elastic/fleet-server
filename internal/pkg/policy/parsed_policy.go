@@ -83,7 +83,6 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	if err != nil {
 		return nil, err
 	}
-	fields["secret_references"] = nil
 
 	// We are cool and the gang
 	pp := &ParsedPolicy{

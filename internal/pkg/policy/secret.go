@@ -89,6 +89,7 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 		}
 		result = append(result, newInput)
 	}
+	delete(fields, "secret_references")
 	return result, nil
 }
 
