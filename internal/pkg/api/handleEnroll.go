@@ -100,7 +100,7 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKey *apikey.APIKey, ver string) (*EnrollResponse, error) {
 	// Validate that an enrollment record exists for a key with this id.
 	var enrollAPI *model.EnrollmentAPIKey
-	enrollAPI, err := et.fetchStaticTokenPolicy(r.Context(), zlog, enrollmentAPIKey)
+	enrollAPI, err := et.retrieveStaticTokenEnrollmentToken(r.Context(), zlog, enrollmentAPIKey)
 	if err != nil {
 		return nil, err
 	}
@@ -134,10 +134,10 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	return et._enroll(r.Context(), rb, zlog, req, enrollAPI.PolicyID, ver)
 }
 
-// fetchEnrollmentKeyRecord fetches the enrollment key record from the database.
+// retrieveStaticTokenEnrollmentToken fetches the enrollment key record from the config static tokens.
 // If the static policy token feature was not enabled, nothing is returns (nil, nil)
 // otherwise either an error or the enrollment key record is returned.
-func (et *EnrollerT) fetchStaticTokenPolicy(ctx context.Context, zlog zerolog.Logger, enrollmentAPIKey *apikey.APIKey) (*model.EnrollmentAPIKey, error) {
+func (et *EnrollerT) retrieveStaticTokenEnrollmentToken(ctx context.Context, zlog zerolog.Logger, enrollmentAPIKey *apikey.APIKey) (*model.EnrollmentAPIKey, error) {
 	if !et.cfg.StaticPolicyTokens.Enabled {
 		return nil, nil
 	}

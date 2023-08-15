@@ -96,7 +96,7 @@ func TestEnroll(t *testing.T) {
 	}
 }
 
-func TestEnrollerT_fetchStaticTokenPolicy(t *testing.T) {
+func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 	bulkerBuilder := func(policies ...model.Policy) func() bulk.Bulk {
 		return func() bulk.Bulk {
 			bulker := ftesting.NewMockBulk()
@@ -237,7 +237,7 @@ func TestEnrollerT_fetchStaticTokenPolicy(t *testing.T) {
 				},
 				bulker: tt.fields.bulker(),
 			}
-			got, err := et.fetchStaticTokenPolicy(context.Background(), zerolog.Logger{}, tt.args.enrollmentAPIKey)
+			got, err := et.retrieveStaticTokenEnrollmentToken(context.Background(), zerolog.Logger{}, tt.args.enrollmentAPIKey)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
