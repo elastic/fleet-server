@@ -161,7 +161,7 @@ func (et *EnrollerT) fetchStaticTokenPolicy(ctx context.Context, zlog zerolog.Lo
 
 	}
 	// no error, just not found
-	return nil, ErrPolicyNotFound
+	return nil, nil
 }
 
 func (et *EnrollerT) fetchPolicy(ctx context.Context, policyID string) (model.Policy, error) {
