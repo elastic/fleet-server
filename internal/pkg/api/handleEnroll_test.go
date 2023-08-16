@@ -96,7 +96,7 @@ func TestEnroll(t *testing.T) {
 	}
 }
 
-func TestEnrollerT_fetchStaticTokenPolicy(t *testing.T) {
+func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 	bulkerBuilder := func(policies ...model.Policy) func() bulk.Bulk {
 		return func() bulk.Bulk {
 			bulker := ftesting.NewMockBulk()
@@ -206,6 +206,28 @@ func TestEnrollerT_fetchStaticTokenPolicy(t *testing.T) {
 			want:    &model.EnrollmentAPIKey{},
 			wantErr: true,
 		},
+		{
+			name: "static token not found",
+			fields: fields{
+				staticPolicyTokens: config.StaticPolicyTokens{
+					Enabled: true,
+					PolicyTokens: []config.PolicyToken{
+						{
+							TokenKey: "abcdefg",
+							PolicyID: "dummy-policy",
+						},
+					},
+				},
+				bulker: bulkerBuilder(),
+			},
+			args: args{
+				enrollmentAPIKey: &apikey.APIKey{
+					Key: "idonotexists",
+				},
+			},
+			want:    nil,
+			wantErr: false, // Should not error as we want to search this in DB
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -215,7 +237,7 @@ func TestEnrollerT_fetchStaticTokenPolicy(t *testing.T) {
 				},
 				bulker: tt.fields.bulker(),
 			}
-			got, err := et.fetchStaticTokenPolicy(context.Background(), zerolog.Logger{}, tt.args.enrollmentAPIKey)
+			got, err := et.retrieveStaticTokenEnrollmentToken(context.Background(), zerolog.Logger{}, tt.args.enrollmentAPIKey)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
