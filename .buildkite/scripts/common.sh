@@ -99,7 +99,7 @@ google_cloud_auth() {
     local secretFileLocation=$(mktemp -d -p "${WORKSPACE}" -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
     echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
     gcloud auth activate-service-account --key-file ${secretFileLocation} 2> /dev/null
-    export GOOGLE_APPLICATIONS_CREDENTIALS=${secretFileLocation}
+    export GOOGLE_APPLICATION_CREDENTIALS=${secretFileLocation}
 }
 
 upload_packages_to_gcp_bucket() {
