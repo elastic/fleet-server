@@ -40,6 +40,7 @@ run_release_manager() {
     local dry_run=""
     if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
         dry_run="--dry-run"
+        BRANCH="7.17"
     fi
     docker run --rm \
     --name release-manager \
