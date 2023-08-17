@@ -4,7 +4,7 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-VERSION=$(awk '/const DefaultVersion/{print $NF}' version/version.go | tr -d '"')
+VERSION="$(make get-version)"
 PLATFORM_TYPE=$(uname -m)
 TYPE="$1"
 INFRA_REPO="https://github.com/repos/elastic/infra/contents"

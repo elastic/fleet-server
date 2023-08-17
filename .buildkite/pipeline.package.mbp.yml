@@ -44,7 +44,7 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
-    if: ${FILE_EXISTS_IN_REPO}
+#    if: "${FILE_EXISTS_IN_REPO}"
     depends_on:
       - step: "package-publish"
         allow_failure: false
