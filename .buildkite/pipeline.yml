@@ -132,7 +132,11 @@ steps:
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
+<<<<<<< HEAD
     if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_BRANCH') == 'main'"
+=======
+    if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
+>>>>>>> 82fa7e2 (Update condition for downstream package (#2890))
     depends_on:
       - step: "release-package-registry"
         allow_failure: false
