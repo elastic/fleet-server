@@ -10,7 +10,7 @@ steps:
     key: "check"
     steps:
       - label: ":white_check_mark: Run check"
-        key: check
+        key: make-check
         command: "make check"
         agents:
           image: "${GO_AGENT_IMAGE}"
