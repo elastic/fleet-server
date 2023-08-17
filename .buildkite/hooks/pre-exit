@@ -4,12 +4,6 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "publish" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
-    docker logout ${DOCKER_REGISTRY}
-  fi
-fi
-
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "release-test" ]]; then
     unset GOOGLE_APPLICATION_CREDENTIALS
     cleanup

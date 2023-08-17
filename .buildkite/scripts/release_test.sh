@@ -21,5 +21,3 @@ google_cloud_auth
 upload_packages_to_gcp_bucket "build/distributions/"
 
 make test-release
-
-make build-docker
