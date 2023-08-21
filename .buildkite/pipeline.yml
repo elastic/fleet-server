@@ -70,7 +70,10 @@ steps:
     key: "downstream-package"
     if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
     build:
-      branch: "${BUILDKITE_BRANCH}"
+      # branch: "${BUILDKITE_BRANCH}"
+      env:
+        BUILDKITE_REFSPEC: "refs/pull/${BUILDKITE_PULL_REQUEST}/head"
+        BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
     depends_on:
       - step: "release-test"
         allow_failure: false
