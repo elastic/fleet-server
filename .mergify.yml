@@ -132,7 +132,7 @@ pull_request_rules:
   - name: automatic merge for 7\. or 8\. branches when CI passes
 >>>>>>> 9af3b21 (update main references (#1112))
     conditions:
-      - check-success=fleet-server/pr-merge
+      - check-success=buildkite/fleet-server
       - check-success=CLA
       - base~=^7\.
       - label=backport
@@ -143,7 +143,7 @@ pull_request_rules:
         strict: smart+fasttrack
   - name: automatic merge when CI passes and the file dev-tools/integration/.env is modified.
     conditions:
-      - check-success=fleet-server/pr-merge
+      - check-success=buildkite/fleet-server
       - label=automation
       - files~=^dev-tools/integration/.env$
     actions:
