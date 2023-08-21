@@ -70,5 +70,5 @@ steps:
     key: "downstream-package"
     if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
     depends_on:
-      - step: "release-package-registry"
+      - step: "release-test"
         allow_failure: false
