@@ -1147,6 +1147,9 @@ paths:
         The endpoint that an agent uses to acknowledge (and inform fleet-server) of events that it has recieved/executed.
         A single action may have multiple different events associated with it.
         Also an action may not have any acks associated with it.
+
+        Note that using this endpoint for an `UPGRADE` action is deprecated behaviour.
+        `UPGRADE` status should use the `upgrade_details` attribute of the checkin request body.
       parameters:
         - name: id
           in: path

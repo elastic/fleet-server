@@ -167,10 +167,8 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin. // FIXME verify version
 	// Older agents will communicate any issues with upgrades via the Ack endpoint.
-	if req.UpgradeDetails != nil {
-		if err := ct.processUpgradeDetails(ctx, agent, req.UpgradeDetails); err != nil {
-			return fmt.Errorf("failed to update upgrade_details: %w", err)
-		}
+	if err := ct.processUpgradeDetails(ctx, agent, req.UpgradeDetails); err != nil {
+		return fmt.Errorf("failed to update upgrade_details: %w", err)
 	}
 
 	// Compare agent_components content and update if different
@@ -283,6 +281,12 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 }
 
 func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) error {
+	// if the checkin had no details update agent doc so details are null
+	if details == nil {
+		return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, []byte(`{"doc":{"upgrade_details":null}}`), bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+	}
+
+	// marshal and update agent doc with details
 	p, err := json.Marshal(details)
 	if err != nil {
 		return err
