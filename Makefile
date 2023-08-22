@@ -144,7 +144,7 @@ ifeq ($(OS),windows)
 	@cd build/binaries && zip -q -r ../distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH).zip fleet-server-$(VERSION)-$(OS)-$(ARCH)
 	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-$(ARCH).zip > fleet-server-$(VERSION)-$(OS)-$(ARCH).zip.sha512
 else ifeq ($(OS)-$(ARCH),darwin-arm64)
-	@mv build/binaries/fleet-server-$(VERSION)-$(OS)-$(ARCH) build/binaries/fleet-server-$(VERSION)-$(OS)-aarch64
+	@cp build/binaries/fleet-server-$(VERSION)-$(OS)-$(ARCH) build/binaries/fleet-server-$(VERSION)-$(OS)-aarch64
 	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz fleet-server-$(VERSION)-$(OS)-aarch64
 	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz > fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz.sha512
 else
