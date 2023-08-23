@@ -2,10 +2,10 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package testing
+package cache
 
 import (
-	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	corecache "github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
@@ -34,11 +34,11 @@ func (m *MockCache) GetAction(id string) (model.Action, bool) {
 	return args.Get(0).(model.Action), args.Bool(1)
 }
 
-func (m *MockCache) SetAPIKey(key cache.APIKey, enabled bool) {
+func (m *MockCache) SetAPIKey(key corecache.APIKey, enabled bool) {
 	m.Called(key, enabled)
 }
 
-func (m *MockCache) ValidAPIKey(key cache.APIKey) bool {
+func (m *MockCache) ValidAPIKey(key corecache.APIKey) bool {
 	args := m.Called(key)
 	return args.Bool(0)
 }

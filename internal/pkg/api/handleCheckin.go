@@ -310,7 +310,7 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			return fmt.Errorf("unable to find upgrade_details action: %w", err)
 		}
 		if len(actions) == 0 {
-			return fmt.Errorf("upgrade_details no action for id %q found.", details.ActionId)
+			return fmt.Errorf("upgrade_details no action for id %q found", details.ActionId)
 		}
 		action = actions[0]
 		ct.cache.SetAction(action)

@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testcache "github.com/elastic/fleet-server/v7/internal/pkg/testing/cache"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/stretchr/testify/assert"
@@ -185,7 +186,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		agent   *model.Agent
 		details *UpgradeDetails
 		bulk    func() *ftesting.MockBulk
-		cache   func() *ftesting.MockCache
+		cache   func() *testcache.MockCache
 		err     error
 	}{{
 		name:    "agent and checkin details are nil",
@@ -194,8 +195,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk()
 		},
-		cache: func() *ftesting.MockCache {
-			return ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
 		},
 		err: nil,
 	}, {
@@ -216,8 +217,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
-		cache: func() *ftesting.MockCache {
-			return ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
 		},
 		err: nil,
 	}, {
@@ -229,8 +230,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},
@@ -252,8 +253,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, false)
 			mCache.On("SetAction", mock.Anything)
 			return mCache
@@ -268,8 +269,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(&es.ResultT{}, es.ErrNotFound)
 			return mBulk
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, false)
 			return mCache
 		},
@@ -287,8 +288,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},
@@ -304,8 +305,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk()
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},
@@ -321,8 +322,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk()
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},
@@ -337,8 +338,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk()
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},
@@ -356,8 +357,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},
@@ -375,8 +376,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},
@@ -393,8 +394,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},
@@ -412,8 +413,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},
@@ -431,8 +432,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},
@@ -448,8 +449,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk()
 		},
-		cache: func() *ftesting.MockCache {
-			mCache := ftesting.NewMockCache()
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
 			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 			return mCache
 		},

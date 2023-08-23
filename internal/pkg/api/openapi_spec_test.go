@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:dupl // don't care about repitition for tests
 package api
 
 // Test json encoding/decoding for all req/resp items
