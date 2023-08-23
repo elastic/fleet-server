@@ -6,7 +6,7 @@ WORKSPACE="$(pwd)/bin"
 TMP_FOLDER_TEMPLATE_BASE="tmp.fleet-server"
 REPO="fleet-server"
 platform_type_test="$(uname)"
-platform_type_lowercase_test="${platform_type,,}"
+platform_type_lowercase_test="${platform_type_test,,}"
 hw_type_test="$(uname -m)"
 
 check_platform_architeture() {
