@@ -281,10 +281,25 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 }
 
 func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) error {
-	// if the checkin had no details update agent doc so details are null
 	if details == nil {
-		return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, []byte(`{"doc":{"upgrade_details":null}}`), bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+		// nop if there are no checkin details, and the agent has no details
+		if len(agent.UpgradeDetails) == 0 {
+			return nil
+		}
+		// if the checkin had no details, but agent has details treat like a successful upgrade
+		doc := bulk.UpdateFields{
+			dl.FieldUpgradeDetails:   nil,
+			dl.FieldUpgradeStartedAt: nil,
+			dl.FieldUpgradeStatus:    nil,
+			dl.FieldUpgradedAt:       time.Now().UTC().Format(time.RFC3339),
+		}
+		body, err := doc.Marshal()
+		if err != nil {
+			return err
+		}
+		return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 	}
+	// update docs with in progress details
 
 	// marshal and update agent doc with details
 	p, err := json.Marshal(details)
