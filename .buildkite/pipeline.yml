@@ -69,7 +69,8 @@ steps:
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
     #if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
-    branch: "build.env('BUILDKITE_BRANCH')"
+    build:
+      branch: "build.env('BUILDKITE_BRANCH')"
     depends_on:
       - step: "release-test"
         allow_failure: false
