@@ -45,8 +45,6 @@ mkdir -p ${BASE_DIR}/reports
 ./dev-tools/dependencies-report --csv ${BASE_DIR}/reports/dependencies-${VERSION}.csv
 cd ${BASE_DIR}/reports && shasum -a 512 dependencies-${VERSION}.csv > dependencies-${VERSION}.csv.sha512
 
-cat ${BASE_DIR}/reports/dependencies-${VERSION}.csv
-
 cd $(dirname ${WORKSPACE})
 export FOLDER="${FOLDER_PATH}"
 export OUTPUT_FILE="${DRA_OUTPUT}"
