@@ -509,8 +509,8 @@ type UpgradeMetadataDownloading struct {
 
 // UpgradeMetadataFailed Upgrade metadata for an upgrade that has failed.
 type UpgradeMetadataFailed struct {
-	// ErrorMessage The error message associated with a failed state.
-	ErrorMessage string `json:"error_message"`
+	// ErrorMsg The error message associated with a failed state.
+	ErrorMsg string `json:"error_msg"`
 
 	// FailedState The state where the upgrade failed.
 	FailedState UpgradeMetadataFailedFailedState `json:"failed_state"`

@@ -215,14 +215,14 @@ func Test_UpgradeDetailsMetadata_Downloading(t *testing.T) {
 	}, {
 		name: "extra attributes",
 		md: &UpgradeDetails_Metadata{
-			union: json.RawMessage(`{"download_percent":1,"error_message":"string","key":"value"}`),
+			union: json.RawMessage(`{"download_percent":1,"error_msg":"string","key":"value"}`),
 		},
 		err: nil,
 		pct: 1,
 	}, {
 		name: "invalid extra object",
 		md: &UpgradeDetails_Metadata{
-			union: json.RawMessage(`{"download_percent":1,"error_message":1}`),
+			union: json.RawMessage(`{"download_percent":1,"error_msg":1}`),
 		},
 		err: nil,
 		pct: 1,
@@ -256,27 +256,27 @@ func Test_UpgradeDetailsMetadata_Failed(t *testing.T) {
 	}, {
 		name: "valid object",
 		md: &UpgradeDetails_Metadata{
-			union: json.RawMessage(`{"error_message":"fail"}`),
+			union: json.RawMessage(`{"error_msg":"fail"}`),
 		},
 		err: nil,
 		msg: "fail",
 	}, {
 		name: "invalid object",
 		md: &UpgradeDetails_Metadata{
-			union: json.RawMessage(`{"error_message":1}`),
+			union: json.RawMessage(`{"error_msg":1}`),
 		},
 		err: &json.UnsupportedValueError{},
 	}, {
 		name: "extra attributes",
 		md: &UpgradeDetails_Metadata{
-			union: json.RawMessage(`{"download_percent":1,"error_message":"fail","key":"value"}`),
+			union: json.RawMessage(`{"download_percent":1,"error_msg":"fail","key":"value"}`),
 		},
 		err: nil,
 		msg: "fail",
 	}, {
 		name: "invalid extra object",
 		md: &UpgradeDetails_Metadata{
-			union: json.RawMessage(`{"download_percent":"potato","error_message":"fail"}`),
+			union: json.RawMessage(`{"download_percent":"potato","error_msg":"fail"}`),
 		},
 		err: nil,
 		msg: "fail",
@@ -286,7 +286,7 @@ func Test_UpgradeDetailsMetadata_Failed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataFailed()
 			if tc.err == nil {
-				assert.Equal(t, tc.msg, meta.ErrorMessage)
+				assert.Equal(t, tc.msg, meta.ErrorMsg)
 			} else {
 				assert.ErrorAsf(t, err, &tc.err, "error is %v", err)
 			}
@@ -367,7 +367,7 @@ func TestUpgradeDetailsSerialization(t *testing.T) {
 	}, {
 		ActionId: "test-action",
 		Metadata: &UpgradeDetails_Metadata{
-			union: json.RawMessage(`{"error_message":"fail","failed_state":"UPG_WATCHING"}`),
+			union: json.RawMessage(`{"error_msg":"fail","failed_state":"UPG_WATCHING"}`),
 		},
 		State:         UpgradeDetailsStateUPGFAILED,
 		TargetVersion: "1.2.3",

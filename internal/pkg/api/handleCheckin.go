@@ -354,8 +354,8 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		if err != nil {
 			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
-		if meta.ErrorMessage == "" {
-			return fmt.Errorf("%w: %s metadata contains empty error_message attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
+		if meta.ErrorMsg == "" {
+			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
 		}
 	case UpgradeDetailsStateUPGSCHEDULED:
 		if details.Metadata == nil {

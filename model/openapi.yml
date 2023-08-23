@@ -275,7 +275,7 @@ components:
       description: Upgrade metadata for an upgrade that has failed.
       required:
         - failed_state
-        - error_message
+        - error_msg
       properties:
         failed_state:
           description: The state where the upgrade failed.
@@ -288,7 +288,7 @@ components:
             - UPG_REPLACING
             - UPG_RESTARTING
             - UPG_WATCHING
-        error_message:
+        error_msg:
           description: The error message associated with a failed state.
           type: string
     upgrade_details:

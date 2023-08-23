@@ -424,7 +424,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		details: &UpgradeDetails{
 			ActionId: "test-action",
 			State:    UpgradeDetailsStateUPGFAILED,
-			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_message":"failed"}`)},
+			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
 		},
 		bulk: func() *ftesting.MockBulk {
 			mBulk := ftesting.NewMockBulk()
@@ -438,12 +438,12 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		},
 		err: nil,
 	}, {
-		name:  "upgrade failed action in cache empty error_message",
+		name:  "upgrade failed action in cache empty error_msg",
 		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
 		details: &UpgradeDetails{
 			ActionId: "test-action",
 			State:    UpgradeDetailsStateUPGFAILED,
-			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_message":""}`)},
+			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":""}`)},
 		},
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk()
