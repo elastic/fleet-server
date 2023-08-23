@@ -567,6 +567,14 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// Update only the output fields to avoid duping the whole map
 	fields[outputsProperty] = json.RawMessage(outputRaw)
 
+	// replace agent policy inputs with the processed inputs where the secret references were replaced with the secret values
+	inputsRaw, err := json.Marshal(pp.Inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	fields["inputs"] = json.RawMessage(inputsRaw)
+
 	rewrittenPolicy := struct {
 		Policy map[string]json.RawMessage `json:"policy"`
 	}{fields}

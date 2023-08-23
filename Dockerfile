@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-buster AS builder
+FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-bullseye AS builder
 
 WORKDIR /usr/src/fleet-server
 

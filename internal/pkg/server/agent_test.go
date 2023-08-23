@@ -99,6 +99,9 @@ type mockClientV2 struct {
 func (*mockClientV2) RegisterDiagnosticHook(name string, description string, filename string, contentType string, hook client.DiagnosticHook) {
 }
 
+func (c *mockClientV2) RegisterOptionalDiagnosticHook(paramTag string, name string, description string, filename string, contentType string, hook client.DiagnosticHook) {
+}
+
 func (c *mockClientV2) Start(ctx context.Context) error {
 	args := c.Called()
 	return args.Get(0).(error)
