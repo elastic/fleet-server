@@ -38,9 +38,10 @@ import (
 )
 
 var (
-	ErrAgentNotFound    = errors.New("agent not found")
-	ErrNoPolicyOutput   = errors.New("output section not found")
-	ErrFailInjectAPIKey = errors.New("failure to inject api key")
+	ErrAgentNotFound          = errors.New("agent not found")
+	ErrNoPolicyOutput         = errors.New("output section not found")
+	ErrFailInjectAPIKey       = errors.New("failure to inject api key")
+	ErrInvalidUpgradeMetadata = errors.New("invalid upgrade metadata")
 )
 
 const (
@@ -300,6 +301,76 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 	}
 	// update docs with in progress details
+
+	// verify action exists
+	action, ok := ct.cache.GetAction(details.ActionId)
+	if !ok {
+		actions, err := dl.FindAction(ctx, ct.bulker, details.ActionId)
+		if err != nil {
+			return fmt.Errorf("unable to find upgrade_details action: %w", err)
+		}
+		if len(actions) == 0 {
+			return fmt.Errorf("upgrade_details no action for id %q found.", details.ActionId)
+		}
+		action = actions[0]
+		ct.cache.SetAction(action)
+	}
+
+	// link action with APM spans
+	var links []apm.SpanLink
+	if ct.bulker.HasTracer() && action.Traceparent != "" {
+		traceCtx, err := apmhttp.ParseTraceparentHeader(action.Traceparent)
+		if err != nil {
+			zerolog.Ctx(ctx).Trace().Err(err).Msgf("Error parsing traceparent: %s %s", action.Traceparent, err)
+		} else {
+			links = []apm.SpanLink{
+				{
+					Trace: traceCtx.Trace,
+					Span:  traceCtx.Span,
+				},
+			}
+		}
+	}
+	span, ctx := apm.StartSpanOptions(ctx, "Process upgrade details", "app", apm.SpanOptions{Links: links})
+	span.Context.SetLabel("action_id", details.ActionId)
+	span.Context.SetLabel("agent_id", agent.Agent.ID)
+	defer span.End()
+
+	// validate metadata with state
+	switch details.State {
+	case UpgradeDetailsStateUPGDOWNLOADING:
+		if details.Metadata == nil {
+			break // no validation
+		}
+		_, err := details.Metadata.AsUpgradeMetadataDownloading()
+		if err != nil {
+			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
+		}
+	case UpgradeDetailsStateUPGFAILED:
+		if details.Metadata == nil {
+			return fmt.Errorf("%w: metadata missing", ErrInvalidUpgradeMetadata)
+		}
+		meta, err := details.Metadata.AsUpgradeMetadataFailed()
+		if err != nil {
+			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
+		}
+		if meta.ErrorMessage == "" {
+			return fmt.Errorf("%w: %s metadata contains empty error_message attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
+		}
+	case UpgradeDetailsStateUPGSCHEDULED:
+		if details.Metadata == nil {
+			return fmt.Errorf("%w: metadata missing", ErrInvalidUpgradeMetadata)
+		}
+		meta, err := details.Metadata.AsUpgradeMetadataScheduled()
+		if err != nil {
+			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGSCHEDULED, err)
+		}
+		if meta.ScheduledAt.IsZero() {
+			return fmt.Errorf("%w: %s metadata contains empty scheduled_at attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGSCHEDULED)
+
+		}
+	default:
+	}
 
 	// marshal and update agent doc with details
 	p, err := json.Marshal(details)

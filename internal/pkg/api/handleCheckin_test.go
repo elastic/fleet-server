@@ -15,14 +15,17 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
+	mockmonitor "github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestConvertActions(t *testing.T) {
@@ -164,7 +167,7 @@ func TestResolveSeqNo(t *testing.T) {
 			c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 			bc := checkin.NewBulk(nil)
 			bulker := ftesting.NewMockBulk()
-			pim := mock.NewMockMonitor()
+			pim := mockmonitor.NewMockMonitor()
 			pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
 			ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
 
@@ -173,4 +176,304 @@ func TestResolveSeqNo(t *testing.T) {
 		})
 	}
 
+}
+
+func TestProcessUpgradeDetails(t *testing.T) {
+	esd := model.ESDocument{Id: "doc-ID"}
+	tests := []struct {
+		name    string
+		agent   *model.Agent
+		details *UpgradeDetails
+		bulk    func() *ftesting.MockBulk
+		cache   func() *ftesting.MockCache
+		err     error
+	}{{
+		name:    "agent and checkin details are nil",
+		agent:   &model.Agent{ESDocument: esd},
+		details: nil,
+		bulk: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk()
+		},
+		cache: func() *ftesting.MockCache {
+			return ftesting.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has details checkin details are nil",
+		agent:   &model.Agent{ESDocument: esd, UpgradeDetails: json.RawMessage(`{"action_id":"test"}`)},
+		details: nil,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]interface{} `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradeStatus] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *ftesting.MockCache {
+			return ftesting.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "upgrade requested action in cache",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{ActionId: "test-action", State: UpgradeDetailsStateUPGREQUESTED},
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: nil,
+	}, {
+		name:    "upgrade requested action not in cache",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{ActionId: "test-action", State: UpgradeDetailsStateUPGREQUESTED},
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(
+				&es.ResultT{
+					HitsT: es.HitsT{
+						Hits: []es.HitT{
+							{Source: []byte(`{"action_id": "test-action"}`)},
+						},
+					},
+				}, nil)
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, false)
+			mCache.On("SetAction", mock.Anything)
+			return mCache
+		},
+		err: nil,
+	}, {
+		name:    "upgrade requested action invalid",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{ActionId: "test-action", State: UpgradeDetailsStateUPGREQUESTED},
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(&es.ResultT{}, es.ErrNotFound)
+			return mBulk
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, false)
+			return mCache
+		},
+		err: es.ErrNotFound,
+	}, {
+		name:  "upgrade scheduled action in cache",
+		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGSCHEDULED,
+			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"scheduled_at":"2023-01-02T12:00:00Z"}`)},
+		},
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: nil,
+	}, {
+		name:  "upgrade scheduled action in cache invalid time",
+		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGSCHEDULED,
+			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"scheduled_at":"2023:01:02T12:00:00Z"}`)},
+		},
+		bulk: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk()
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: ErrInvalidUpgradeMetadata,
+	}, {
+		name:  "upgrade scheduled action in cache empty time",
+		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGSCHEDULED,
+			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"scheduled_at":""}`)},
+		},
+		bulk: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk()
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: ErrInvalidUpgradeMetadata,
+	}, {
+		name:  "upgrade scheduled action in cache no metadata",
+		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGSCHEDULED,
+		},
+		bulk: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk()
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: ErrInvalidUpgradeMetadata,
+	}, {
+		name:  "upgrade scheduled action in cache with additional metadata attribute",
+		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGSCHEDULED,
+			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"scheduled_at":"2023-01-02T12:00:00Z","download_percent":12.3}`)},
+		},
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: nil,
+	}, {
+		name:  "upgrade downloading action in cache",
+		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGDOWNLOADING,
+			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"download_percent":12.3}`)},
+		},
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: nil,
+	}, {
+		name:  "upgrade downloading action in cache no metadata",
+		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGDOWNLOADING,
+		},
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: nil,
+	}, {
+		name:  "upgrade downloading action in cache wrong metadata attribute present",
+		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGDOWNLOADING,
+			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"scheduled_at":"2023-01-02T12:00:00Z"}`)},
+		},
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: nil,
+	}, {
+		name:  "upgrade failed action in cache",
+		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGFAILED,
+			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_message":"failed"}`)},
+		},
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: nil,
+	}, {
+		name:  "upgrade failed action in cache empty error_message",
+		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGFAILED,
+			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_message":""}`)},
+		},
+		bulk: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk()
+		},
+		cache: func() *ftesting.MockCache {
+			mCache := ftesting.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+			return mCache
+		},
+		err: ErrInvalidUpgradeMetadata,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mBulk := tc.bulk()
+			mCache := tc.cache()
+
+			ct := &CheckinT{
+				cache:  mCache,
+				bulker: mBulk,
+			}
+
+			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details)
+			if tc.err == nil {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorIs(t, err, tc.err)
+			}
+			mBulk.AssertExpectations(t)
+			mCache.AssertExpectations(t)
+		})
+	}
 }
