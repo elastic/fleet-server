@@ -28,7 +28,7 @@ google_cloud_auth
 
 download_mbp_packages_from_gcp_bucket "${FOLDER_PATH}" "${TYPE}"
 
-ls -la $FOLDER_PATH
+ls -la $WORKSPACE/$FOLDER_PATH
 
 with_go
 
