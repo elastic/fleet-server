@@ -11,7 +11,7 @@
 # Docs: https://docs.elastic.dev/serverless/qualitygates
 
 env:
-  ENVIRONMENT: ${ENVIRONMENT}
+  ENVIRONMENT: ${ENVIRONMENT?}
   TEAM_CHANNEL: "#fleet-cloud-services"
 
 steps:
