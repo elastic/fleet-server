@@ -106,7 +106,7 @@ test: prepare-test-context  ## - Run all tests
 
 .PHONY: test-release
 test-release:  ## - Check that all release binaries are created
-	./.ci/scripts/test-release.sh $(DEFAULT_VERSION)
+	./.buildkite/scripts/makefile_test-release.sh $(DEFAULT_VERSION)
 
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
