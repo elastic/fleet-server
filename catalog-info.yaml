@@ -115,7 +115,7 @@ metadata:
   description: Pipeline tests the service integration in a specific environment
   links:
     - title: Pipeline
-      url: https://buildkite.com/elastic/fleet-server
+      url: https://buildkite.com/elastic/fleet-server-tests
 spec:
   type: buildkite-pipeline
   owner: group:fleet
@@ -128,10 +128,11 @@ spec:
       description: fleet-server environment tests
     spec:
       repository: elastic/fleet-server
-      pipeline_file: .buildkite/pipeline.service-tests.yml
+      pipeline_file: .buildkite/pipeline.service-tests.yaml
       branch_configuration: "main"
       provider_settings:
         build_pull_requests: false
+        trigger_mode: none
       teams:
         cloud-k8s-region:
           access_level: MANAGE_BUILD_AND_READ
