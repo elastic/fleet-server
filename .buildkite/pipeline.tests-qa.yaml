@@ -4,7 +4,7 @@
 
 steps:
   - label: ":rocket: Run Smoke tests"
-    trigger: "observability-perf-serverless"
+    trigger: "fleet-smoke-tests"
     build:
       message: "${BUILDKITE_MESSAGE}"
       env:
