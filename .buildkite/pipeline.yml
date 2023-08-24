@@ -6,55 +6,55 @@ env:
   GO_AGENT_IMAGE: "golang:${GO_VERSION}"
 
 steps:
-  # - group: "Check and build"
-  #   key: "check"
-  #   steps:
-  #     - label: ":white_check_mark: Run check"
-  #       key: make-check
-  #       command: "make check"
-  #       agents:
-  #         image: "${GO_AGENT_IMAGE}"
-  #         cpu: "8"
-  #         memory: "4G"
+  - group: "Check and build"
+    key: "check"
+    steps:
+      - label: ":white_check_mark: Run check"
+        key: make-check
+        command: "make check"
+        agents:
+          image: "${GO_AGENT_IMAGE}"
+          cpu: "8"
+          memory: "4G"
 
-  #     - label: ":building_construction: Run local build"
-  #       key: make-local
-  #       command: "make local"
-  #       agents:
-  #         image: "${GO_AGENT_IMAGE}"
-  #         cpu: "8"
-  #         memory: "4G"
+      - label: ":building_construction: Run local build"
+        key: make-local
+        command: "make local"
+        agents:
+          image: "${GO_AGENT_IMAGE}"
+          cpu: "8"
+          memory: "4G"
 
-  # - group: "Run tests"
-  #   key: "tests"
-  #   steps:
-  #     - label: ":smartbear-testexecute: Run unit tests"
-  #       key: unit-test
-  #       command: ".buildkite/scripts/unit_test.sh"
-  #       agents:
-  #         provider: "gcp"
-  #       artifact_paths:
-  #         - build/*.xml
+  - group: "Run tests"
+    key: "tests"
+    steps:
+      - label: ":smartbear-testexecute: Run unit tests"
+        key: unit-test
+        command: ".buildkite/scripts/unit_test.sh"
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - build/*.xml
 
-  #     - label: ":smartbear-testexecute: Run integration tests"
-  #       key: int-test
-  #       command: ".buildkite/scripts/integration_test.sh"
-  #       agents:
-  #         provider: "gcp"
-  #       artifact_paths:
-  #         - build/*.xml
+      - label: ":smartbear-testexecute: Run integration tests"
+        key: int-test
+        command: ".buildkite/scripts/integration_test.sh"
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - build/*.xml
 
-  #     - label: ":junit: Junit annotate"
-  #       plugins:
-  #         - junit-annotate#v2.4.1:
-  #             artifacts: "build/*.xml"
-  #       agents:
-  #         provider: "gcp"
-  #       depends_on:
-  #         - step: "unit-test"
-  #           allow_failure: true
-  #         - step: "int-test"
-  #           allow_failure: true
+      - label: ":junit: Junit annotate"
+        plugins:
+          - junit-annotate#v2.4.1:
+              artifacts: "build/*.xml"
+        agents:
+          provider: "gcp"
+        depends_on:
+          - step: "unit-test"
+            allow_failure: true
+          - step: "int-test"
+            allow_failure: true
 
   - label: ":gcloud: Release test"
     key: "release-test"
@@ -62,16 +62,16 @@ steps:
     agents:
       provider: "gcp"
       machineType: "c2-standard-16"
-    # depends_on:
-    #   - step: "tests"
-    #     allow_failure: false
+    depends_on:
+      - step: "tests"
+        allow_failure: false
 
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
 #    if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
     build:
-      # branch: "${BUILDKITE_BRANCH}"
+      branch: "7.17"
       env:
         BUILDKITE_REFSPEC: "refs/pull/${BUILDKITE_PULL_REQUEST}/head"
         BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
