@@ -1,4 +1,4 @@
-# These pipeline steps constitute the quality gate for your service within the QA environment.
+# These pipeline steps constitute the quality gate for your service within the Staging environment.
 # Incorporate any necessary additional logic to validate the service's integrity. A failure in
 # this pipeline build will prevent further progression to the subsequent stage.
 
