@@ -134,7 +134,7 @@ spec:
         build_pull_requests: false
         trigger_mode: none
       teams:
-        cloud-k8s-region:
+        ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
         cloud-tooling:
           access_level: MANAGE_BUILD_AND_READ
