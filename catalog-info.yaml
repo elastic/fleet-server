@@ -128,7 +128,7 @@ spec:
       description: fleet-server environment tests
     spec:
       repository: elastic/fleet-server
-      pipeline_file: .buildkite/pipeline.service-tests.yaml
+      pipeline_file: .buildkite/pipeline.fleet-server-tests.yaml
       branch_configuration: "main"
       provider_settings:
         build_pull_requests: false
