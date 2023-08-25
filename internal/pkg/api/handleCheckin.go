@@ -166,7 +166,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		return err
 	}
 
-	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin. // FIXME verify version
+	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
 	// Older agents will communicate any issues with upgrades via the Ack endpoint.
 	if err := ct.processUpgradeDetails(ctx, agent, req.UpgradeDetails); err != nil {
 		return fmt.Errorf("failed to update upgrade_details: %w", err)
@@ -281,6 +281,10 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	return ct.writeResponse(zlog, w, r, agent, resp)
 }
 
+// processUpgradeDetails will verify and set the upgrade_details section of an agent document based on checkin value.
+// if the agent doc and checkin details are both nil the method is a nop
+// if the checkin upgrade_details is nil but there was a previous value in the agent doc, fleet-server treats it as a successful upgrade
+// otherwise the details are validated; action_id is checked and upgrade_details.metadata is validated based on upgrade_details.state and the agent doc is updated.
 func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) error {
 	if details == nil {
 		// nop if there are no checkin details, and the agent has no details
