@@ -590,6 +590,11 @@
           "items": {
             "type": "integer"
           }
+        },
+        "upgrade_details": {
+            "description": "Additional upgrade status details.",
+            "type": "object",
+            "format": "raw"
         }
       },
       "required": [

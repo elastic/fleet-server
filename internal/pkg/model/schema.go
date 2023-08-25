@@ -205,6 +205,9 @@ type Agent struct {
 	// Date/time the Elastic Agent was last updated
 	UpdatedAt string `json:"updated_at,omitempty"`
 
+	// Additional upgrade status details.
+	UpgradeDetails json.RawMessage `json:"upgrade_details,omitempty"`
+
 	// Date/time the Elastic Agent started the current upgrade
 	UpgradeStartedAt string `json:"upgrade_started_at,omitempty"`
 
@@ -410,6 +413,10 @@ type ToRetireAPIKeyIdsItems struct {
 
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`
+}
+
+// UpgradeDetails Additional upgrade status details.
+type UpgradeDetails struct {
 }
 
 // UserProvidedMetadata User provided metadata information for the Elastic Agent

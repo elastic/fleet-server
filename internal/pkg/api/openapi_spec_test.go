@@ -2,12 +2,14 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//nolint:dupl // don't care about repitition for tests
 package api
 
 // Test json encoding/decoding for all req/resp items
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -181,6 +183,216 @@ func validateSerialization(t *testing.T, action Action) {
 		assert.True(t, ok)
 		assert.Equal(t, action.Signed.Data, sm["data"])
 		assert.Equal(t, action.Signed.Signature, sm["signature"])
+	}
+
+}
+
+func Test_UpgradeDetailsMetadata_Downloading(t *testing.T) {
+	tests := []struct {
+		name string
+		md   *UpgradeDetails_Metadata
+		err  error
+		pct  float64
+	}{{
+		name: "empty object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{}`),
+		},
+		err: nil,
+		pct: 0,
+	}, {
+		name: "valid object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"download_percent":1}`),
+		},
+		err: nil,
+		pct: 1,
+	}, {
+		name: "invalid object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"download_percent":"potato"}`),
+		},
+		err: &json.UnsupportedValueError{},
+	}, {
+		name: "extra attributes",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"download_percent":1,"error_msg":"string","key":"value"}`),
+		},
+		err: nil,
+		pct: 1,
+	}, {
+		name: "invalid extra object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"download_percent":1,"error_msg":1}`),
+		},
+		err: nil,
+		pct: 1,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			meta, err := tc.md.AsUpgradeMetadataDownloading()
+			if tc.err == nil {
+				assert.Equal(t, tc.pct, meta.DownloadPercent)
+			} else {
+				assert.ErrorAsf(t, err, &tc.err, "error is %v", err)
+			}
+		})
+	}
+}
+
+func Test_UpgradeDetailsMetadata_Failed(t *testing.T) {
+	tests := []struct {
+		name string
+		md   *UpgradeDetails_Metadata
+		err  error
+		msg  string
+	}{{
+		name: "empty object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{}`),
+		},
+		err: nil,
+		msg: "",
+	}, {
+		name: "valid object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"error_msg":"fail"}`),
+		},
+		err: nil,
+		msg: "fail",
+	}, {
+		name: "invalid object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"error_msg":1}`),
+		},
+		err: &json.UnsupportedValueError{},
+	}, {
+		name: "extra attributes",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"download_percent":1,"error_msg":"fail","key":"value"}`),
+		},
+		err: nil,
+		msg: "fail",
+	}, {
+		name: "invalid extra object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"download_percent":"potato","error_msg":"fail"}`),
+		},
+		err: nil,
+		msg: "fail",
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			meta, err := tc.md.AsUpgradeMetadataFailed()
+			if tc.err == nil {
+				assert.Equal(t, tc.msg, meta.ErrorMsg)
+			} else {
+				assert.ErrorAsf(t, err, &tc.err, "error is %v", err)
+			}
+		})
+	}
+}
+
+func Test_UpgradeDetailsMetadata_Scheduled(t *testing.T) {
+	ts := time.Now().UTC().Truncate(time.Second)
+	tests := []struct {
+		name string
+		md   *UpgradeDetails_Metadata
+		err  error
+		ts   time.Time
+	}{{
+		name: "empty object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{}`),
+		},
+		err: nil,
+		ts:  time.Time{},
+	}, {
+		name: "valid object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"scheduled_at":"` + ts.Format(time.RFC3339) + `"}`),
+		},
+		err: nil,
+		ts:  ts,
+	}, {
+		name: "invalid object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"scheduled_at":"potato"}`),
+		},
+		err: &json.UnsupportedValueError{},
+	}, {
+		name: "extra attributes",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"scheduled_at":"` + ts.Format(time.RFC3339) + `","key":"value","download_percent":1}`),
+		},
+		err: nil,
+		ts:  ts,
+	}, {
+		name: "invalid extra object",
+		md: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"scheduled_at":"` + ts.Format(time.RFC3339) + `","download_percent":"potato"}`),
+		},
+		err: nil,
+		ts:  ts,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			meta, err := tc.md.AsUpgradeMetadataScheduled()
+			if tc.err == nil {
+				assert.Equal(t, tc.ts, meta.ScheduledAt)
+			} else {
+				assert.ErrorAsf(t, err, &tc.err, "error is %v", err)
+			}
+		})
+	}
+}
+
+func TestUpgradeDetailsSerialization(t *testing.T) {
+	details := []UpgradeDetails{{
+		ActionId: "test-action",
+		Metadata: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"key":"value"}`),
+		},
+		State:         UpgradeDetailsStateUPGREQUESTED,
+		TargetVersion: "1.2.3",
+	}, {
+		ActionId: "test-action",
+		Metadata: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"download_percent":1}`),
+		},
+		State:         UpgradeDetailsStateUPGDOWNLOADING,
+		TargetVersion: "1.2.3",
+	}, {
+		ActionId: "test-action",
+		Metadata: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"error_msg":"fail","failed_state":"UPG_WATCHING"}`),
+		},
+		State:         UpgradeDetailsStateUPGFAILED,
+		TargetVersion: "1.2.3",
+	}, {
+		ActionId: "test-action",
+		Metadata: &UpgradeDetails_Metadata{
+			union: json.RawMessage(`{"scheduled_at":"2022-01-02T12:00:00Z"}`),
+		},
+		State:         UpgradeDetailsStateUPGSCHEDULED,
+		TargetVersion: "1.2.3",
+	}}
+	for _, d := range details {
+		t.Run(string(d.State), func(t *testing.T) {
+			p, err := json.Marshal(d)
+			require.NoError(t, err)
+			dd := UpgradeDetails{}
+			err = json.Unmarshal(p, &dd)
+			require.NoError(t, err)
+
+			assert.Equal(t, d.ActionId, dd.ActionId)
+			assert.Equal(t, d.State, dd.State)
+			assert.Equal(t, d.TargetVersion, dd.TargetVersion)
+			assert.Equal(t, string(d.Metadata.union), string(dd.Metadata.union))
+		})
 	}
 
 }

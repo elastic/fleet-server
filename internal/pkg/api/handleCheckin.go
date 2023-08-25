@@ -38,9 +38,10 @@ import (
 )
 
 var (
-	ErrAgentNotFound    = errors.New("agent not found")
-	ErrNoPolicyOutput   = errors.New("output section not found")
-	ErrFailInjectAPIKey = errors.New("failure to inject api key")
+	ErrAgentNotFound          = errors.New("agent not found")
+	ErrNoPolicyOutput         = errors.New("output section not found")
+	ErrFailInjectAPIKey       = errors.New("failure to inject api key")
+	ErrInvalidUpgradeMetadata = errors.New("invalid upgrade metadata")
 )
 
 const (
@@ -165,6 +166,12 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		return err
 	}
 
+	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
+	// Older agents will communicate any issues with upgrades via the Ack endpoint.
+	if err := ct.processUpgradeDetails(ctx, agent, req.UpgradeDetails); err != nil {
+		return fmt.Errorf("failed to update upgrade_details: %w", err)
+	}
+
 	// Compare agent_components content and update if different
 	rawComponents, err := parseComponents(zlog, agent, &req)
 	if err != nil {
@@ -272,6 +279,116 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	}
 
 	return ct.writeResponse(zlog, w, r, agent, resp)
+}
+
+// processUpgradeDetails will verify and set the upgrade_details section of an agent document based on checkin value.
+// if the agent doc and checkin details are both nil the method is a nop
+// if the checkin upgrade_details is nil but there was a previous value in the agent doc, fleet-server treats it as a successful upgrade
+// otherwise the details are validated; action_id is checked and upgrade_details.metadata is validated based on upgrade_details.state and the agent doc is updated.
+func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) error {
+	if details == nil {
+		// nop if there are no checkin details, and the agent has no details
+		if len(agent.UpgradeDetails) == 0 {
+			return nil
+		}
+		// if the checkin had no details, but agent has details treat like a successful upgrade
+		doc := bulk.UpdateFields{
+			dl.FieldUpgradeDetails:   nil,
+			dl.FieldUpgradeStartedAt: nil,
+			dl.FieldUpgradeStatus:    nil,
+			dl.FieldUpgradedAt:       time.Now().UTC().Format(time.RFC3339),
+		}
+		body, err := doc.Marshal()
+		if err != nil {
+			return err
+		}
+		return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+	}
+	// update docs with in progress details
+
+	// verify action exists
+	action, ok := ct.cache.GetAction(details.ActionId)
+	if !ok {
+		actions, err := dl.FindAction(ctx, ct.bulker, details.ActionId)
+		if err != nil {
+			return fmt.Errorf("unable to find upgrade_details action: %w", err)
+		}
+		if len(actions) == 0 {
+			return fmt.Errorf("upgrade_details no action for id %q found", details.ActionId)
+		}
+		action = actions[0]
+		ct.cache.SetAction(action)
+	}
+
+	// link action with APM spans
+	var links []apm.SpanLink
+	if ct.bulker.HasTracer() && action.Traceparent != "" {
+		traceCtx, err := apmhttp.ParseTraceparentHeader(action.Traceparent)
+		if err != nil {
+			zerolog.Ctx(ctx).Trace().Err(err).Msgf("Error parsing traceparent: %s %s", action.Traceparent, err)
+		} else {
+			links = []apm.SpanLink{
+				{
+					Trace: traceCtx.Trace,
+					Span:  traceCtx.Span,
+				},
+			}
+		}
+	}
+	span, ctx := apm.StartSpanOptions(ctx, "Process upgrade details", "app", apm.SpanOptions{Links: links})
+	span.Context.SetLabel("action_id", details.ActionId)
+	span.Context.SetLabel("agent_id", agent.Agent.ID)
+	defer span.End()
+
+	// validate metadata with state
+	switch details.State {
+	case UpgradeDetailsStateUPGDOWNLOADING:
+		if details.Metadata == nil {
+			break // no validation
+		}
+		_, err := details.Metadata.AsUpgradeMetadataDownloading()
+		if err != nil {
+			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
+		}
+	case UpgradeDetailsStateUPGFAILED:
+		if details.Metadata == nil {
+			return fmt.Errorf("%w: metadata missing", ErrInvalidUpgradeMetadata)
+		}
+		meta, err := details.Metadata.AsUpgradeMetadataFailed()
+		if err != nil {
+			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
+		}
+		if meta.ErrorMsg == "" {
+			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
+		}
+	case UpgradeDetailsStateUPGSCHEDULED:
+		if details.Metadata == nil {
+			return fmt.Errorf("%w: metadata missing", ErrInvalidUpgradeMetadata)
+		}
+		meta, err := details.Metadata.AsUpgradeMetadataScheduled()
+		if err != nil {
+			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGSCHEDULED, err)
+		}
+		if meta.ScheduledAt.IsZero() {
+			return fmt.Errorf("%w: %s metadata contains empty scheduled_at attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGSCHEDULED)
+
+		}
+	default:
+	}
+
+	// marshal and update agent doc with details
+	p, err := json.Marshal(details)
+	if err != nil {
+		return err
+	}
+	doc := bulk.UpdateFields{
+		dl.FieldUpgradeDetails: p,
+	}
+	body, err := doc.Marshal()
+	if err != nil {
+		return err
+	}
+	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
 func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
