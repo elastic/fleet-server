@@ -16,7 +16,7 @@ For Kibana it is assumed it is on the same version as Elasticsearch. With this t
 Elastic Agent <= Elastic Agent with fleet-server <= Elasticsearch / Kibana
 ```
 
-There might be differences on the bugfix version.
+There might be differences on the bugfix version.a
 
 For upgrades Elasticsearch/Kibana must be upgraded first, then the Elastic Agent with fleet-server followed by any other Elastic Agents.
 
