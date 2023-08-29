@@ -7,6 +7,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -113,7 +114,7 @@ func TestValidateUserAgent(t *testing.T) {
 	}
 	for _, tr := range tests {
 		t.Run(tr.userAgent, func(t *testing.T) {
-			_, res := validateUserAgent(zerolog.Nop(), tr.userAgent, tr.verCon)
+			_, res := validateUserAgent(context.Background(), zerolog.Nop(), tr.userAgent, tr.verCon)
 			if !errors.Is(tr.err, res) {
 				t.Fatalf("err mismatch: %v != %v", tr.err, res)
 			}

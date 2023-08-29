@@ -72,13 +72,13 @@ func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, 
 	if err != nil {
 		return err
 	}
-	span, ctx := apm.StartSpan(ctx, "response", "write")
+	span, ctx := apm.StartSpan(r.Context(), "response", "write")
 	defer span.End()
 	n, err := io.Copy(w, rdr)
 	if err != nil {
 		return err
 	}
-	ts, ok := logger.CtxStartTime(r.Context())
+	ts, ok := logger.CtxStartTime(ctx)
 	e := zlog.Trace().Int64(ECSHTTPResponseBodyBytes, n)
 	if ok {
 		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
@@ -142,7 +142,7 @@ func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, age
 //
 // Initial implementation is dependent on security by obscurity; ie.
 // it should be difficult for an attacker to guess a guid.
-func (at ArtifactT) authorizeArtifact(ctx context.Context, agent *model.Agent, ident, sha2 string) error {
+func (at ArtifactT) authorizeArtifact(ctx context.Context, _ *model.Agent, _, _ string) error { //nolint:unparam // remove if this is implemented
 	span, _ := apm.StartSpan(ctx, "authorizeArtifacts", "auth") // TODO return and use span ctx if this is ever not a nop
 	defer span.End()
 	return nil // TODO
