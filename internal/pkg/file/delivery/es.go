@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -44,14 +45,18 @@ func prepareQueryMetaByIDAndAgent() *dsl.Tmpl {
 }
 
 func findFileForAgent(ctx context.Context, bulker bulk.Bulk, fileID string, agentID string) (*es.ResultT, error) {
+	mSpan, _ := apm.StartSpan(ctx, "encodeSearch", "serialization")
 	q, err := MetaByIDAndAgent.Render(map[string]interface{}{
 		FieldDocID:      fileID,
 		"target_agents": agentID,
 	})
+	mSpan.End()
 	if err != nil {
 		return nil, err
 	}
 
+	span, ctx := apm.StartSpan(ctx, "searchFile", "search")
+	defer span.End()
 	result, err := bulker.Search(ctx, fmt.Sprintf(FileHeaderIndexPattern, "*"), q)
 	if err != nil {
 		return nil, err
@@ -61,7 +66,6 @@ func findFileForAgent(ctx context.Context, bulker bulk.Bulk, fileID string, agen
 }
 
 func readChunkStream(client *elasticsearch.Client, idx string, docID string) (io.ReadCloser, error) {
-
 	res, err := client.Get(idx, docID, func(req *esapi.GetRequest) {
 		if req.Header == nil {
 			req.Header = make(http.Header)

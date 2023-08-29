@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/cbor"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
 )
 
 var (
@@ -38,6 +39,8 @@ func New(client *elasticsearch.Client, bulker bulk.Bulk, sizeLimit int64) *Deliv
 }
 
 func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID string) (file.MetaDoc, error) {
+	span, ctx := apm.StartSpan(ctx, "findFile", "process")
+	defer span.End()
 	result, err := findFileForAgent(ctx, d.bulker, fileID, agentID)
 	if err != nil {
 		return file.MetaDoc{}, err
@@ -47,6 +50,8 @@ func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID
 	}
 
 	var fi file.MetaDoc
+	mSpan, _ := apm.StartSpan(ctx, "decodeFile", "serialization")
+	defer mSpan.End()
 	if err := json.Unmarshal(result.Hits[0].Source, &fi); err != nil {
 		return file.MetaDoc{}, fmt.Errorf("file meta doc parsing error: %w", err)
 	}
@@ -72,15 +77,22 @@ func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileI
 }
 
 func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w io.Writer, chunks []file.ChunkInfo, fileID string) error {
+	span, ctx := apm.StartSpan(ctx, "response", "write")
+	defer span.End()
 	for _, chunkInfo := range chunks {
+		gSpan, _ := apm.StartSpan(ctx, "getChunk", "get")
+		gSpan.Context.SetLabel("chunk_id", chunkInfo.ID)
 		body, err := readChunkStream(d.client, chunkInfo.Index, chunkInfo.ID)
+		gSpan.End()
 		if err != nil {
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error reading chunk stream")
 			body.Close()
 			return err
 		}
 
+		mSpan, _ := apm.StartSpan(ctx, "decodeChunk", "serialization")
 		chunk, err := cbor.NewChunkDecoder(body).Decode()
+		mSpan.End()
 		body.Close()
 		if err != nil {
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error decoding chunk")

@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
+	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
 )
@@ -71,6 +72,8 @@ func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, 
 	if err != nil {
 		return err
 	}
+	span, ctx := apm.StartSpan(ctx, "response", "write")
+	defer span.End()
 	n, err := io.Copy(w, rdr)
 	if err != nil {
 		return err
@@ -86,11 +89,13 @@ func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, 
 }
 
 func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
-
+	vSpan, _ := apm.StartSpan(ctx, "checkRequest", "serialization")
 	// Input validation
 	if err := validateSha2String(sha2); err != nil {
+		vSpan.End()
 		return nil, err
 	}
+	vSpan.End()
 
 	// Determine whether the agent should have access to this artifact
 	if err := at.authorizeArtifact(ctx, agent, id, sha2); err != nil {
@@ -138,12 +143,16 @@ func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, age
 // Initial implementation is dependent on security by obscurity; ie.
 // it should be difficult for an attacker to guess a guid.
 func (at ArtifactT) authorizeArtifact(ctx context.Context, agent *model.Agent, ident, sha2 string) error {
+	span, _ := apm.StartSpan(ctx, "authorizeArtifacts", "auth") // TODO return and use span ctx if this is ever not a nop
+	defer span.End()
 	return nil // TODO
 }
 
 // Return artifact from cache by sha2 or fetch directly from Elastic.
 // Update cache on successful retrieval from Elastic.
 func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident, sha2 string) (*model.Artifact, error) {
+	span, ctx := apm.StartSpan(ctx, "getArtifact", "process")
+	defer span.End()
 
 	// Check the cache; return immediately if found.
 	if artifact, ok := at.cache.GetArtifact(ident, sha2); ok {
@@ -152,15 +161,16 @@ func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident,
 
 	// Fetch the artifact from elastic
 	art, err := at.fetchArtifact(ctx, zlog, ident, sha2)
-
 	if err != nil {
 		zlog.Info().Err(err).Msg("Fail retrieve artifact")
 		return nil, err
 	}
 
 	// The 'Body' field type is Raw; extract to string.
+	mSpan, _ := apm.StartSpan(ctx, "decodeArtifact", "serialization")
 	var srcPayload string
 	if err = json.Unmarshal(art.Body, &srcPayload); err != nil {
+		mSpan.End()
 		zlog.Error().Err(err).Msg("Cannot unmarshal artifact payload")
 		return nil, err
 	}
@@ -170,15 +180,20 @@ func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident,
 	// to avoid having to decode on each cache hit.
 	dstPayload, err := base64.StdEncoding.DecodeString(srcPayload)
 	if err != nil {
+		mSpan.End()
 		zlog.Error().Err(err).Msg("Fail base64 decode artifact")
 		return nil, err
 	}
+	mSpan.End()
 
 	// Validate the sha256 hash; this is just good hygiene.
+	vSpan, _ := apm.StartSpan(ctx, "validateArtifact", "validate")
 	if err = validateSha2Data(dstPayload, art.EncodedSha256); err != nil {
+		vSpan.End()
 		zlog.Error().Err(err).Msg("Fail sha2 hash validation")
 		return nil, err
 	}
+	vSpan.End()
 
 	// Reassign decoded payload before adding to cache, avoid base64 decode on cache hit.
 	art.Body = dstPayload
@@ -194,6 +209,8 @@ func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident,
 // Perhaps have a cache of the most recently used hashes available, and items that aren't
 // in the cache can do a lookup but throttle as below.  We could update the cache every 10m or so.
 func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, ident, sha2 string) (*model.Artifact, error) {
+	span, ctx := apm.StartSpan(ctx, "fetchArtifact", "read")
+	defer span.End()
 	// Throttle prevents more than N outstanding requests to elastic globally and per sha2.
 	if token := at.esThrottle.Acquire(sha2, defaultThrottleTTL); token == nil {
 		return nil, ErrorThrottle

@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -61,10 +62,13 @@ func prepareFindMetaByUploadID() *dsl.Tmpl {
 }
 
 func GetMetadata(ctx context.Context, bulker bulk.Bulk, indexPattern string, uploadID string) ([]es.HitT, error) {
-
+	span, ctx := apm.StartSpan(ctx, "getUploadMetadata", "search")
+	defer span.End()
+	mSpan, _ := apm.StartSpan(ctx, "encodeQuery", "serialization")
 	query, err := QueryUploadID.Render(map[string]interface{}{
 		FieldUploadID: uploadID,
 	})
+	mSpan.End()
 	if err != nil {
 		return nil, err
 	}
@@ -91,9 +95,12 @@ func GetInfo(ctx context.Context, bulker bulk.Bulk, indexPattern string, uploadI
 	}
 
 	var fi MetaDoc
+	mSpan, _ := apm.StartSpan(ctx, "decodeMetadata", "serialization")
 	if err := json.Unmarshal(results[0].Source, &fi); err != nil {
+		mSpan.End()
 		return Info{}, fmt.Errorf("file meta doc parsing error: %w", err)
 	}
+	mSpan.End()
 
 	// calculate number of chunks required
 	cnt := fi.File.Size / fi.File.ChunkSize
@@ -136,18 +143,24 @@ type GetChunkInfoOpt struct {
 // Optionally adding the calculated field "size", that is the length, in bytes, of the Data field.
 // and optionally validating that a hash field is present
 func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, baseID string, opt GetChunkInfoOpt) ([]ChunkInfo, error) {
+	span, ctx := apm.StartSpan(ctx, "getChunksInfo", "process")
+	defer span.End()
 	tpl := QueryChunkInfo
 	if opt.IncludeSize {
 		tpl = QueryChunkInfoWithSize
 	}
+	mSpan, _ := apm.StartSpan(ctx, "encodeSearch", "serialization")
 	query, err := tpl.Render(map[string]interface{}{
 		FieldBaseID: baseID,
 	})
+	mSpan.End()
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := bulker.Search(ctx, fmt.Sprintf(indexPattern, "*"), query)
+	rSpan, rCtx := apm.StartSpan(ctx, "searchChunksInfo", "search")
+	res, err := bulker.Search(rCtx, fmt.Sprintf(indexPattern, "*"), query)
+	rSpan.End()
 	if err != nil {
 		return nil, err
 	}
@@ -162,6 +175,8 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 		ok   bool
 	)
 
+	vSpan, _ := apm.StartSpan(ctx, "validateChunksInfo", "validate")
+	defer vSpan.End()
 	for i, h := range res.HitsT.Hits {
 		if bid, ok = getResultsFieldString(h.Fields, FieldBaseID); !ok {
 			return nil, fmt.Errorf("unable to retrieve %s field from chunk document", FieldBaseID)

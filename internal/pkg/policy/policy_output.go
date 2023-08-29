@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -42,6 +43,9 @@ type Output struct {
 // Prepare prepares the output p to be sent to the elastic-agent
 // The agent might be mutated for an elasticsearch output
 func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
+	span, ctx := apm.StartSpan(ctx, "prepareOutput", "process")
+	defer span.End()
+	span.Context.SetLabel("output_type", p.Type)
 	zlog = zlog.With().
 		Str("fleet.agent.id", agent.Id).
 		Str("fleet.policy.output.name", p.Name).Logger()
@@ -129,7 +133,9 @@ func (p *Output) prepareElasticsearch(
 		}
 
 		// merge roles with p.Role
+		mSpan, _ := apm.StartSpan(ctx, "mergeRoles", "serialization")
 		newRoles, err := mergeRoles(zlog, currentRoles, p.Role)
+		mSpan.End()
 		if err != nil {
 			zlog.Error().
 				Str("apiKeyID", output.APIKeyID).
@@ -156,7 +162,9 @@ func (p *Output) prepareElasticsearch(
 		}
 
 		// Using painless script to update permission hash for updated key
+		mSpan, _ = apm.StartSpan(ctx, "renderPainlessScript", "serialization")
 		body, err := renderUpdatePainlessScript(p.Name, fields)
+		mSpan.End()
 		if err != nil {
 			return err
 		}
@@ -205,7 +213,9 @@ func (p *Output) prepareElasticsearch(
 		}
 
 		// Using painless script to append the old keys to the history
+		mSpan, _ := apm.StartSpan(ctx, "renderPainlessScript", "serialization")
 		body, err := renderUpdatePainlessScript(p.Name, fields)
+		mSpan.End()
 		if err != nil {
 			return fmt.Errorf("could no tupdate painless script: %w", err)
 		}
@@ -242,12 +252,16 @@ func (p *Output) prepareElasticsearch(
 }
 
 func fetchAPIKeyRoles(ctx context.Context, b bulk.Bulk, apiKeyID string) (*RoleT, error) {
+	span, ctx := apm.StartSpan(ctx, "fetchAPIKeyRoles", "auth")
+	defer span.End()
 	res, err := b.APIKeyRead(ctx, apiKeyID, true)
 	if err != nil {
 		return nil, err
 	}
 
+	mSpan, _ := apm.StartSpan(ctx, "decodeRoles", "serialization")
 	roleMap, err := smap.Parse(res.RoleDescriptors)
+	mSpan.End()
 	if err != nil {
 		return nil, err
 	}
@@ -395,6 +409,8 @@ func generateOutputAPIKey(
 	agentID,
 	outputName string,
 	roles []byte) (*apikey.APIKey, error) {
+	span, ctx := apm.StartSpan(ctx, "generateOutputAPIKey", "auth")
+	defer span.End()
 	name := fmt.Sprintf("%s:%s", agentID, outputName)
 	zerolog.Ctx(ctx).Info().Msgf("generating output API key %s for agent ID %s",
 		name, agentID)

@@ -89,6 +89,9 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 // authAgent ensures that the requested API-Key is associated with the correct agent.
 // If all succeeds, it returns the agent associated with id.
 func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
+	span, ctx := apm.StartSpan(r.Context(), "authAgent", "auth")
+	defer span.End()
+	r = r.WithContext(ctx)
 	start := time.Now()
 
 	// authenticate

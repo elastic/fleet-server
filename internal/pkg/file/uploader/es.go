@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -69,6 +70,8 @@ func prepareUpdateMetaDoc() *dsl.Tmpl {
 */
 
 func CreateFileDoc(ctx context.Context, bulker bulk.Bulk, doc []byte, source string, fileID string) (string, error) {
+	span, ctx := apm.StartSpan(ctx, "createUpload", "create")
+	defer span.End()
 	return bulker.Create(ctx, fmt.Sprintf(UploadHeaderIndexPattern, source), fileID, doc, bulk.WithRefresh())
 }
 
@@ -115,6 +118,8 @@ func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID 
 */
 
 func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, fileID string, chunkNum int) error {
+	span, ctx := apm.StartSpan(ctx, "indexChunk", "index")
+	defer span.End()
 	chunkDocID := fmt.Sprintf("%s.%d", fileID, chunkNum)
 	resp, err := client.Create(fmt.Sprintf(UploadDataIndexPattern, source), chunkDocID, body, func(req *esapi.CreateRequest) {
 		req.DocumentID = chunkDocID
@@ -130,9 +135,12 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 	}
 
 	var response ChunkUploadResponse
+	mSpan, _ := apm.StartSpan(ctx, "decodeResponse", "serialization")
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		mSpan.End()
 		return err
 	}
+	mSpan.End()
 	log.Trace().Int("statuscode", resp.StatusCode).Interface("chunk-response", response).Msg("uploaded chunk")
 
 	if response.Error.Type != "" {
@@ -155,9 +163,13 @@ type ChunkUploadResponse struct {
 }
 
 func DeleteChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkNum int) error {
+	span, ctx := apm.StartSpan(ctx, "deleteChunk", "delete")
+	defer span.End()
+	mSpan, _ := apm.StartSpan(ctx, "renderQuery", "serialize")
 	q, err := MatchChunkByDocument.Render(map[string]interface{}{
 		"_id": fmt.Sprintf("%s.%d", fileID, chunkNum),
 	})
+	mSpan.End()
 	if err != nil {
 		return err
 	}

@@ -117,16 +117,21 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 
 	cntAcks.bodyIn.Add(uint64(len(raw)))
 
+	mSpan, _ := apm.StartSpan(r.Context(), "decode", "serialization")
 	var req AckRequest
 	if err := json.Unmarshal(raw, &req); err != nil {
+		mSpan.End()
 		return fmt.Errorf("handleAcks unmarshal: %w", err)
 	}
+	mSpan.End()
 
 	zlog.Trace().RawJSON("raw", raw).Msg("Ack request")
 
 	zlog = zlog.With().Int("nEvents", len(req.Events)).Logger()
 
 	resp, err := ack.handleAckEvents(r.Context(), zlog, agent, req.Events)
+	span, ctx := apm.StartSpan(r.Context(), "response", "write")
+	defer span.End()
 	if err != nil {
 		var herr *HTTPError
 		if errors.As(err, &herr) {
@@ -138,10 +143,13 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 	}
 
 	// Always write response body even if the error HTTP status code was set
+	mSpan, _ = apm.StartSpan(ctx, "encode", "serialization")
 	data, err := json.Marshal(&resp)
 	if err != nil {
+		mSpan.End()
 		return fmt.Errorf("handleAcks marshal response: %w", err)
 	}
+	mSpan.End()
 
 	var nWritten int
 	if nWritten, err = w.Write(data); err != nil {
@@ -203,6 +211,8 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	}
 
 	for n, ev := range events {
+		span, ctx := apm.StartSpan(ctx, "ackEvent", "ack")
+		span.Context.SetLabel("action_id", ev.ActionId)
 		log := zlog.With().
 			Str("actionType", string(ev.Type)).
 			Str("actionSubType", string(ev.Subtype)).
@@ -210,13 +220,13 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			Str("agentId", ev.AgentId).
 			Str("timestamp", ev.Timestamp).
 			Int("n", n).Logger()
-
 		log.Info().Msg("ack event")
 
 		// Check agent id mismatch
 		if ev.AgentId != "" && ev.AgentId != agent.Id {
 			log.Error().Msg("agent id mismatch")
 			setResult(n, http.StatusBadRequest)
+			span.End()
 			continue
 		}
 
@@ -230,18 +240,22 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			}
 			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
 			setResult(n, http.StatusOK)
+			span.End()
 			continue
 		}
 
 		// Process non-policy change actions
 		// Find matching action by action ID
+		aSpan, aCtx := apm.StartSpan(ctx, "ackAction", "validate")
 		action, ok := ack.cache.GetAction(ev.ActionId)
 		if !ok {
 			// Find action by ID
-			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionId)
+			actions, err := dl.FindAction(aCtx, ack.bulk, ev.ActionId)
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
 				setError(n, err)
+				aSpan.End()
+				span.End()
 				continue
 			}
 
@@ -249,11 +263,14 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			if len(actions) == 0 {
 				log.Error().Msg("no matching action")
 				setResult(n, http.StatusNotFound)
+				aSpan.End()
+				span.End()
 				continue
 			}
 			action = actions[0]
 			ack.cache.SetAction(action)
 		}
+		aSpan.End()
 
 		if err := ack.handleActionResult(ctx, zlog, agent, action, ev); err != nil {
 			setError(n, err)
@@ -264,6 +281,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		if ev.Error == nil && action.Type == TypeUnenroll {
 			unenrollIdxs = append(unenrollIdxs, n)
 		}
+		span.End()
 	}
 
 	// Process policy acks
@@ -335,6 +353,8 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 }
 
 func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, actionIds ...string) error {
+	span, ctx := apm.StartSpan(ctx, "ackPolicyChanges", "ack")
+	defer span.End()
 	// If more than one, pick the winner;
 	// 0) Correct policy id
 	// 1) Highest revision/coordinator number
@@ -342,6 +362,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	found := false
 	currRev := agent.PolicyRevisionIdx
 	currCoord := agent.PolicyCoordinatorIdx
+	rSpan, _ := apm.StartSpan(ctx, "checkPolicyActions", "validate")
 	for _, a := range actionIds {
 		rev, ok := policy.RevisionFromString(a)
 
@@ -363,23 +384,27 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		}
 	}
 
+	rSpan.End()
 	if !found {
 		return nil
 	}
 
+	rSpan, rCtx := apm.StartSpan(ctx, "updateOutputs", "auth")
 	for _, output := range agent.Outputs {
 		if output.Type != policy.OutputTypeElasticsearch {
 			continue
 		}
 
-		err := ack.updateAPIKey(ctx,
+		err := ack.updateAPIKey(rCtx,
 			zlog,
 			agent.Id,
 			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
 		if err != nil {
+			rSpan.End()
 			return err
 		}
 	}
+	rSpan.End()
 
 	err := ack.updateAgentDoc(ctx, zlog,
 		agent.Id,
@@ -397,6 +422,9 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	agentID string,
 	apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
+	span, ctx := apm.StartSpan(ctx, "updateAPIKey", "auth")
+	defer span.End()
+	span.Context.SetLabel("api_key_id", apiKeyID)
 
 	if apiKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
@@ -449,11 +477,15 @@ func (ack *AckT) updateAgentDoc(ctx context.Context,
 	currRev, currCoord int64,
 	policyID string,
 ) error {
+	span, ctx := apm.StartSpan(ctx, "updateAgentDoc", "update")
+	defer span.End()
+	mSpan, _ := apm.StartSpan(ctx, "buildDoc", "serialization")
 	body := makeUpdatePolicyBody(
 		policyID,
 		currRev,
 		currCoord,
 	)
+	mSpan.End()
 
 	err := ack.bulk.Update(
 		ctx,
@@ -522,13 +554,18 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 }
 
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
+	span, ctx := apm.StartSpan(ctx, "ackUnenroll", "ack")
+	defer span.End()
 	apiKeys := agent.APIKeyIDs()
 	if len(apiKeys) > 0 {
+		span, ctx := apm.StartSpan(ctx, "invalidateAPIKeys", "auth")
 		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
 
 		if err := ack.bulk.APIKeyInvalidate(ctx, apiKeys...); err != nil {
+			span.End()
 			return fmt.Errorf("handleUnenroll invalidate apikey: %w", err)
 		}
+		span.End()
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -538,10 +575,13 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 		dl.FieldUpdatedAt:    now,
 	}
 
+	mSpan, _ := apm.StartSpan(ctx, "unenrollEncoding", "serialization")
 	body, err := doc.Marshal()
 	if err != nil {
+		mSpan.End()
 		return fmt.Errorf("handleUnenroll marshal: %w", err)
 	}
+	mSpan.End()
 
 	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 		return fmt.Errorf("handleUnenroll update: %w", err)
@@ -552,6 +592,8 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 }
 
 func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event Event) error {
+	span, ctx := apm.StartSpan(ctx, "ackUpgrade", "ack")
+	defer span.End()
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{}
 	if event.Error != nil {
@@ -560,10 +602,12 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 			Retry   bool `json:"retry"`
 			Attempt int  `json:"retry_attempt"`
 		}
+		mSpan, _ := apm.StartSpan(ctx, "decodePayload", "serialization")
 		err := json.Unmarshal(fromPtr(event.Payload), &pl)
 		if err != nil {
 			zlog.Error().Err(err).Msg("unable to unmarshal upgrade event payload")
 		}
+		mSpan.End()
 
 		// if the payload indicates a retry, mark change the upgrade status to retrying.
 		if pl.Retry {
@@ -584,10 +628,13 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 		}
 	}
 
+	mSpan, _ := apm.StartSpan(ctx, "upgradeEncoding", "serialization")
 	body, err := doc.Marshal()
 	if err != nil {
+		mSpan.End()
 		return fmt.Errorf("handleUpgrade marshal: %w", err)
 	}
+	mSpan.End()
 
 	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 		return fmt.Errorf("handleUpgrade update: %w", err)
@@ -633,7 +680,6 @@ const kUpdatePolicyPrefix = `{"script":{"lang":"painless","source":"if (ctx._sou
 	` = params.ts;} else {ctx.op = \"noop\";}","params": {"id":"`
 
 func makeUpdatePolicyBody(policyID string, newRev, coordIdx int64) []byte {
-
 	var buf bytes.Buffer
 	buf.Grow(410)
 
