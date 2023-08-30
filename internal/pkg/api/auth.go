@@ -117,12 +117,12 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 			Msg("authApiKey slow")
 	}
 
-	agent, err := findAgentByAPIKeyID(r.Context(), bulker, key.ID)
+	agent, err := findAgentByAPIKeyID(ctx, bulker, key.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := apm.TransactionFromContext(r.Context())
+	tx := apm.TransactionFromContext(ctx)
 	if tx != nil {
 		tx.Context.SetLabel("agent_id", agent.Id)
 	}

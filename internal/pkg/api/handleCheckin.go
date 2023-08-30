@@ -641,7 +641,11 @@ func convertActions(agentID string, actions []model.Action) ([]Action, string) {
 //   - Generate and update default ApiKey if roles have changed.
 //   - Rewrite the policy for delivery to the agent injecting the key material.
 func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string, pp *policy.ParsedPolicy) (*Action, error) {
-	span, ctx := apm.StartSpan(ctx, "processPolicy", "process")
+	var links []apm.SpanLink
+	if err := pp.Links.Trace.Validate(); err == nil {
+		links = []apm.SpanLink{pp.Links}
+	}
+	span, ctx := apm.StartSpanOptions(ctx, "processPolicy", "process", apm.SpanOptions{Links: links})
 	defer span.End()
 	zlog = zlog.With().
 		Str("fleet.ctx", "processPolicy").
@@ -723,6 +727,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 }
 
 func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {
+	span, ctx := apm.StartSpan(ctx, "findAgentByID", "search")
+	defer span.End()
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByAssessAPIKeyID, dl.FieldAccessAPIKeyID, id)
 	if err != nil {
 		if errors.Is(err, dl.ErrNotFound) {

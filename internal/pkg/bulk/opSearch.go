@@ -16,14 +16,11 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/mailru/easyjson"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 )
 
 func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...Opt) (*es.ResultT, error) {
-	var opt optionsT
-	if len(opts) > 0 {
-		opt = b.parseOpts(opts...)
-	}
-
+	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 	action := ActionSearch
 
 	// Use /_fleet/_fleet_msearch fleet plugin endpoint if need to wait for checkpoints
@@ -42,6 +39,14 @@ func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...
 
 	if err := b.writeMsearchBody(&blk.buf, body); err != nil {
 		return nil, err
+	}
+
+	if blk.setLinks {
+		var span *apm.Span
+		span, ctx = apm.StartSpanOptions(ctx, "search", "bulkAction", apm.SpanOptions{
+			Links: []apm.SpanLink{blk.spanLinks},
+		})
+		defer span.End()
 	}
 
 	// Process response
@@ -125,10 +130,13 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 	buf.Grow(bufSz)
 
 	queueCnt := 0
+	links := []apm.SpanLink{}
 	for n := queue.head; n != nil; n = n.next {
 		buf.Write(n.buf.Bytes())
-
 		queueCnt += 1
+		if n.setLinks {
+			links = append(links, n.spanLinks)
+		}
 	}
 
 	// Do actual bulk request; and send response on chan
@@ -136,6 +144,14 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 		res *esapi.Response
 		err error
 	)
+
+	if len(links) > 0 {
+		var span *apm.Span
+		span, ctx = apm.StartSpanOptions(ctx, "flushSearch", "bulkActions", apm.SpanOptions{
+			Links: links,
+		})
+		defer span.End()
+	}
 
 	if queue.ty == kQueueFleetSearch {
 		req := esapi.FleetMsearchRequest{

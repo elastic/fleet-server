@@ -9,6 +9,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/stretchr/testify/mock"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -113,6 +114,10 @@ func (m *MockBulk) APIKeyUpdate(ctx context.Context, id, outputPolicyHash string
 
 func (m *MockBulk) HasTracer() bool {
 	return false
+}
+
+func (m *MockBulk) StartTransaction(name, transactionType string) *apm.Transaction {
+	return nil
 }
 
 var _ bulk.Bulk = (*MockBulk)(nil)

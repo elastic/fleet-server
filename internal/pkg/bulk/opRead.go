@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/mailru/easyjson"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -21,11 +22,7 @@ const (
 )
 
 func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byte, error) {
-	var opt optionsT
-	if len(opts) > 0 {
-		opt = b.parseOpts(opts...)
-	}
-
+	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 	blk := b.newBlk(ActionRead, opt)
 
 	// Serialize request
@@ -34,6 +31,14 @@ func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byt
 
 	if err := b.writeMget(&blk.buf, index, id); err != nil {
 		return nil, err
+	}
+
+	if blk.setLinks {
+		var span *apm.Span
+		span, ctx = apm.StartSpanOptions(ctx, "read", "bulkAction", apm.SpanOptions{
+			Links: []apm.SpanLink{blk.spanLinks},
+		})
+		defer span.End()
 	}
 
 	// Process response
@@ -66,9 +71,13 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 
 	// Each item a JSON array element followed by comma
 	queueCnt := 0
+	links := []apm.SpanLink{}
 	for n := queue.head; n != nil; n = n.next {
 		buf.Write(n.buf.Bytes())
 		queueCnt += 1
+		if n.setLinks {
+			links = append(links, n.spanLinks)
+		}
 	}
 
 	// Need to strip the last element and append the suffix
@@ -84,6 +93,14 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	if queue.ty == kQueueRefreshRead {
 		refresh = true
 		req.Refresh = &refresh
+	}
+
+	if len(links) > 0 {
+		var span *apm.Span
+		span, ctx = apm.StartSpanOptions(ctx, "flushRead", "bulkActions", apm.SpanOptions{
+			Links: links,
+		})
+		defer span.End()
 	}
 
 	res, err := req.Do(ctx, b.es)

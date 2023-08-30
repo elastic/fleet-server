@@ -5,10 +5,12 @@
 package bulk
 
 import (
+	"context"
 	"strconv"
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
@@ -21,6 +23,8 @@ type optionsT struct {
 	RetryOnConflict    string
 	Indices            []string
 	WaitForCheckpoints []int64
+	setLinks           bool
+	spanLinks          apm.SpanLink
 }
 
 type Opt func(*optionsT)
@@ -49,6 +53,21 @@ func WithIndex(idx string) Opt {
 func WithWaitForCheckpoints(checkpoints []int64) Opt {
 	return func(opt *optionsT) {
 		opt.WaitForCheckpoints = checkpoints
+	}
+}
+
+func withAPMLinkedContext(ctx context.Context) Opt {
+	return func(opt *optionsT) {
+		trace := apm.TransactionFromContext(ctx)
+		if trace == nil {
+			return
+		}
+		opt.setLinks = true
+		tCtx := trace.TraceContext()
+		opt.spanLinks = apm.SpanLink{
+			Trace: tCtx.Trace,
+			Span:  tCtx.Span,
+		}
 	}
 }
 
