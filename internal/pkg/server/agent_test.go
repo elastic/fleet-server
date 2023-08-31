@@ -126,6 +126,14 @@ func (c *mockClientV2) AgentInfo() *client.AgentInfo {
 	return args.Get(0).(*client.AgentInfo)
 }
 
+func (c *mockClientV2) RegisterOptionalDiagnosticHook(paramTag string,
+	name string,
+	description string,
+	filename string,
+	contentType string,
+	hook client.DiagnosticHook) {
+}
+
 type mockClientUnit struct {
 	mock.Mock
 }
