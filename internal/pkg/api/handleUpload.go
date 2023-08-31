@@ -5,6 +5,7 @@
 package api
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -68,25 +69,32 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 	}
 }
 
-func (ut *UploadT) handleUploadBegin(_ zerolog.Logger, w http.ResponseWriter, r *http.Request) error {
-	// decode early to match agentID in the payload
-	vSpan, _ := apm.StartSpan(r.Context(), "validateRequest", "validate")
-	payload, err := uploader.ReadDict(r.Body)
+func (ut *UploadT) validateUploadBeginRequest(ctx context.Context, reader io.Reader) (uploader.JSDict, string, error) {
+	span, _ := apm.StartSpan(ctx, "validateRequest", "validate")
+	defer span.End()
+
+	payload, err := uploader.ReadDict(reader)
 	if err != nil {
-		vSpan.End()
 		if errors.Is(err, io.EOF) {
-			return fmt.Errorf("%w: %w", ErrFileInfoBodyRequired, err)
+			return nil, "", fmt.Errorf("%w: %w", ErrFileInfoBodyRequired, err)
 		}
-		return err
+		return nil, "", err
 	}
 
 	// check API key matches payload agent ID
 	agentID, ok := payload.Str("agent_id")
 	if !ok || agentID == "" {
-		vSpan.End()
-		return ErrAgentIDMissing
+		return nil, "", ErrAgentIDMissing
 	}
-	vSpan.End()
+	return payload, agentID, nil
+}
+
+func (ut *UploadT) handleUploadBegin(_ zerolog.Logger, w http.ResponseWriter, r *http.Request) error {
+	// decode early to match agentID in the payload
+	payload, agentID, err := ut.validateUploadBeginRequest(r.Context(), r.Body)
+	if err != nil {
+		return err
+	}
 
 	_, err = ut.authAgent(r, &agentID, ut.bulker, ut.cache)
 	if err != nil {
@@ -162,34 +170,39 @@ func (ut *UploadT) handleUploadChunk(zlog zerolog.Logger, w http.ResponseWriter,
 	return nil
 }
 
-func (ut *UploadT) handleUploadComplete(_ zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
-	vSpan, vCtx := apm.StartSpan(r.Context(), "validateRequest", "validate")
-	info, err := ut.uploader.GetUploadInfo(vCtx, uplID)
+func (ut *UploadT) validateUploadCompleteRequest(r *http.Request, id string) (string, error) {
+	span, ctx := apm.StartSpan(r.Context(), "validateRequest", "validate")
+	defer span.End()
+
+	info, err := ut.uploader.GetUploadInfo(ctx, id)
 	if err != nil {
-		vSpan.End()
-		return err
+		return "", err
 	}
 	// need to auth that it matches the ID in the initial
 	// doc, but that means we had to doc-lookup early
 	if _, err := ut.authAgent(r, &info.AgentID, ut.bulker, ut.cache); err != nil {
-		vSpan.End()
-		return fmt.Errorf("error authenticating for upload finalization: %w", err)
+		return "", fmt.Errorf("error authenticating for upload finalization: %w", err)
 	}
 
 	var req UploadCompleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		vSpan.End()
-		return errors.New("unable to parse request body")
+		return "", errors.New("unable to parse request body")
 	}
 
 	hash := strings.TrimSpace(req.Transithash.Sha256)
 	if hash == "" {
-		vSpan.End()
-		return ErrTransitHashRequired
+		return "", ErrTransitHashRequired
 	}
-	vSpan.End()
+	return hash, nil
+}
 
-	info, err = ut.uploader.Complete(r.Context(), uplID, hash)
+func (ut *UploadT) handleUploadComplete(_ zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
+	hash, err := ut.validateUploadCompleteRequest(r, uplID)
+	if err != nil {
+		return err
+	}
+
+	_, err = ut.uploader.Complete(r.Context(), uplID, hash)
 	if err != nil {
 		return err
 	}

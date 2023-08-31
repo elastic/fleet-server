@@ -88,7 +88,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 	}
 	span.End()
 
-	span, ctx = apm.StartSpan(r.Context(), "response", "write")
+	span, _ = apm.StartSpan(r.Context(), "response", "write")
 	defer span.End()
 
 	data, err := json.Marshal(&resp)

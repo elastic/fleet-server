@@ -125,13 +125,10 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	readCounter := datacounter.NewReaderCounter(body)
 
 	// Parse the request body
-	span, _ := apm.StartSpan(r.Context(), "validateRequest", "validate")
-	req, err := decodeEnrollRequest(readCounter)
+	req, err := validateRequest(r.Context(), readCounter)
 	if err != nil {
-		span.End()
 		return nil, err
 	}
-	span.End()
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
@@ -389,7 +386,7 @@ LOOP:
 }
 
 func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, start time.Time) error {
-	span, ctx := apm.StartSpan(ctx, "response", "write")
+	span, _ := apm.StartSpan(ctx, "response", "write")
 	defer span.End()
 
 	data, err := json.Marshal(resp)
@@ -523,7 +520,10 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	return &rec, nil
 }
 
-func decodeEnrollRequest(data io.Reader) (*EnrollRequest, error) {
+func validateRequest(ctx context.Context, data io.Reader) (*EnrollRequest, error) {
+	span, _ := apm.StartSpan(ctx, "validateRequest", "validate")
+	defer span.End()
+
 	var req EnrollRequest
 	decoder := json.NewDecoder(data)
 	if err := decoder.Decode(&req); err != nil {

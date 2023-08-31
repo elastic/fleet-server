@@ -103,30 +103,10 @@ func (ack *AckT) handleAcks(zlog zerolog.Logger, w http.ResponseWriter, r *http.
 }
 
 func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent) error {
-	vSpan, _ := apm.StartSpan(r.Context(), "validateRequest", "validate")
-	body := r.Body
-
-	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
-	if ack.cfg.Limits.AckLimit.MaxBody > 0 {
-		body = http.MaxBytesReader(w, body, ack.cfg.Limits.AckLimit.MaxBody)
-	}
-
-	raw, err := io.ReadAll(body)
+	req, err := ack.validateRequest(zlog, w, r)
 	if err != nil {
-		vSpan.End()
-		return fmt.Errorf("handleAcks read body: %w", err)
+		return err
 	}
-
-	cntAcks.bodyIn.Add(uint64(len(raw)))
-
-	var req AckRequest
-	if err := json.Unmarshal(raw, &req); err != nil {
-		vSpan.End()
-		return fmt.Errorf("handleAcks unmarshal: %w", err)
-	}
-	vSpan.End()
-
-	zlog.Trace().RawJSON("raw", raw).Msg("Ack request")
 
 	zlog = zlog.With().Int("nEvents", len(req.Events)).Logger()
 
@@ -157,6 +137,32 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 	cntAcks.bodyOut.Add(uint64(nWritten))
 
 	return nil
+}
+
+func (ack *AckT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request) (*AckRequest, error) {
+	span, _ := apm.StartSpan(r.Context(), "validateRequest", "validate")
+	defer span.End()
+
+	body := r.Body
+
+	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
+	if ack.cfg.Limits.AckLimit.MaxBody > 0 {
+		body = http.MaxBytesReader(w, body, ack.cfg.Limits.AckLimit.MaxBody)
+	}
+
+	raw, err := io.ReadAll(body)
+	if err != nil {
+		return nil, fmt.Errorf("handleAcks read body: %w", err)
+	}
+
+	cntAcks.bodyIn.Add(uint64(len(raw)))
+
+	var req AckRequest
+	if err := json.Unmarshal(raw, &req); err != nil {
+		return nil, fmt.Errorf("handleAcks unmarshal: %w", err)
+	}
+	zlog.Trace().RawJSON("raw", raw).Msg("Ack request")
+	return &req, err
 }
 
 func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {

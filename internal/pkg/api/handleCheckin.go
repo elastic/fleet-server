@@ -111,8 +111,18 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 	return ct.ProcessRequest(zlog, w, r, start, agent, newVer)
 }
 
-func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
-	vSpan, vCtx := apm.StartSpan(r.Context(), "validateRequest", "validate")
+// validatedCheckin is a struct to wrap all the things that validateRequest returns.
+type validatedCheckin struct {
+	req     *CheckinRequest
+	dur     time.Duration
+	rawMeta []byte
+	rawComp []byte
+	seqno   sqn.SeqNo
+}
+
+func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent) (validatedCheckin, error) {
+	span, ctx := apm.StartSpan(r.Context(), "validateRequest", "validate")
+	defer span.End()
 
 	body := r.Body
 	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
@@ -121,11 +131,11 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	}
 	readCounter := datacounter.NewReaderCounter(body)
 
+	var val validatedCheckin
 	var req CheckinRequest
 	decoder := json.NewDecoder(readCounter)
 	if err := decoder.Decode(&req); err != nil {
-		vSpan.End()
-		return fmt.Errorf("decode checkin request: %w", err)
+		return val, fmt.Errorf("decode checkin request: %w", err)
 	}
 	cntCheckin.bodyIn.Add(readCounter.Count())
 
@@ -134,8 +144,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	if req.PollTimeout != nil {
 		pDur, err = time.ParseDuration(*req.PollTimeout)
 		if err != nil {
-			vSpan.End()
-			return fmt.Errorf("poll_timeout cannot be parsed as duration: %w", err)
+			return val, fmt.Errorf("poll_timeout cannot be parsed as duration: %w", err)
 		}
 	}
 
@@ -165,24 +174,40 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	// Compare local_metadata content and update if different
 	rawMeta, err := parseMeta(zlog, agent, &req)
 	if err != nil {
-		vSpan.End()
-		return err
+		return val, err
 	}
 
 	// Compare agent_components content and update if different
 	rawComponents, err := parseComponents(zlog, agent, &req)
 	if err != nil {
-		vSpan.End()
-		return err
+		return val, err
 	}
 
 	// Resolve AckToken from request, fallback on the agent record
-	seqno, err := ct.resolveSeqNo(vCtx, zlog, req, agent)
+	seqno, err := ct.resolveSeqNo(ctx, zlog, req, agent)
 	if err != nil {
-		vSpan.End()
+		return val, err
+	}
+
+	return validatedCheckin{
+		req:     &req,
+		dur:     pollDuration,
+		rawMeta: rawMeta,
+		rawComp: rawComponents,
+		seqno:   seqno,
+	}, nil
+}
+
+func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
+	validated, err := ct.validateRequest(zlog, w, r, start, agent)
+	if err != nil {
 		return err
 	}
-	vSpan.End()
+	req := validated.req
+	pollDuration := validated.dur
+	rawMeta := validated.rawMeta
+	rawComponents := validated.rawComp
+	seqno := validated.seqno
 
 	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
 	// Older agents will communicate any issues with upgrades via the Ack endpoint.
@@ -220,7 +245,6 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		Dur("setupDuration", setupDuration).
 		Dur("jitter", jitter).
 		Dur("pollDuration", pollDuration).
-		Uint64("bodyCount", readCounter.Count()).
 		Msg("checkin start long poll")
 
 	// Chill out for a bit. Long poll.

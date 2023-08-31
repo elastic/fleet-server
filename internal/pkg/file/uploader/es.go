@@ -120,7 +120,7 @@ func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID 
 */
 
 func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, fileID string, chunkNum int) error {
-	span, ctx := apm.StartSpan(ctx, "createChunk", "create")
+	span, _ := apm.StartSpan(ctx, "createChunk", "create")
 	defer span.End()
 	chunkDocID := fmt.Sprintf("%s.%d", fileID, chunkNum)
 	resp, err := client.Create(fmt.Sprintf(UploadDataIndexPattern, source), chunkDocID, body, func(req *esapi.CreateRequest) {

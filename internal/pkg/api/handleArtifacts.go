@@ -68,6 +68,10 @@ func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, 
 	ctx := zlog.WithContext(r.Context())
 	r = r.WithContext(ctx)
 
+	if err := at.validateRequest(r.Context(), sha2); err != nil {
+		return err
+	}
+
 	rdr, err := at.processRequest(r.Context(), zlog, agent, id, sha2)
 	if err != nil {
 		return err
@@ -88,15 +92,15 @@ func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, 
 	return nil
 }
 
-func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
-	vSpan, _ := apm.StartSpan(ctx, "validateRequest", "validate")
-	// Input validation
-	if err := validateSha2String(sha2); err != nil {
-		vSpan.End()
-		return nil, err
-	}
-	vSpan.End()
+func (at ArtifactT) validateRequest(ctx context.Context, sha2 string) error {
+	span, _ := apm.StartSpan(ctx, "validateRequest", "validate")
+	defer span.End()
 
+	// Input validation
+	return validateSha2String(sha2)
+}
+
+func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
 	// Determine whether the agent should have access to this artifact
 	if err := at.authorizeArtifact(ctx, agent, id, sha2); err != nil {
 		zlog.Warn().Err(err).Msg("Unauthorized GET on artifact")
