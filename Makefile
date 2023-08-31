@@ -158,7 +158,7 @@ test-release:  ## - Check that all release binaries are created
 
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
-	set -o pipefail; go test ${GO_TEST_FLAG} -v -race ./... | tee build/test-unit.out
+	set -o pipefail; go test ${GO_TEST_FLAG} -v -race -coverprofile=build/coverage.out ./... | tee build/test-unit.out
 
 .PHONY: benchmark
 benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
