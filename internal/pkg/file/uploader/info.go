@@ -9,7 +9,6 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
-	"go.elastic.co/apm/v2"
 )
 
 func SetStatus(ctx context.Context, bulker bulk.Bulk, info file.Info, status file.Status) error {
@@ -17,7 +16,5 @@ func SetStatus(ctx context.Context, bulker bulk.Bulk, info file.Info, status fil
 }
 
 func MarkComplete(ctx context.Context, bulker bulk.Bulk, info file.Info, hash string) error {
-	span, ctx := apm.StartSpan(ctx, "markUploadComplete", "update")
-	defer span.End()
 	return UpdateFileDoc(ctx, bulker, info.Source, info.DocID, file.StatusDone, hash)
 }

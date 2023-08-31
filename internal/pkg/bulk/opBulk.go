@@ -64,7 +64,7 @@ func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id s
 
 	if blk.setLinks {
 		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "bulker", "bulkAction", apm.SpanOptions{
+		span, ctx = apm.StartSpanOptions(ctx, "action", action.String(), apm.SpanOptions{
 			Links: []apm.SpanLink{blk.spanLinks},
 		})
 		defer span.End()
@@ -203,7 +203,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 
 	if len(links) > 0 {
 		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "flushBulker", "bulkActions", apm.SpanOptions{
+		span, ctx = apm.StartSpanOptions(ctx, "flushQueue", queue.Type(), apm.SpanOptions{
 			Links: links,
 		})
 		defer span.End()

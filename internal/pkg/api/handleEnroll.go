@@ -125,7 +125,7 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	readCounter := datacounter.NewReaderCounter(body)
 
 	// Parse the request body
-	span, _ := apm.StartSpan(r.Context(), "decode", "serialization")
+	span, _ := apm.StartSpan(r.Context(), "validateRequest", "validate")
 	req, err := decodeEnrollRequest(readCounter)
 	if err != nil {
 		span.End()
@@ -199,26 +199,25 @@ func (et *EnrollerT) _enroll(
 	var agent model.Agent
 	var enrollmentID string
 
-	rSpan, rCtx := apm.StartSpan(ctx, "request", "validate")
+	span, ctx := apm.StartSpan(ctx, "enroll", "process")
+	defer span.End()
+
 	if req.EnrollmentId != nil {
+		vSpan, vCtx := apm.StartSpan(ctx, "checkEnrollmentID", "validate")
 		enrollmentID = *req.EnrollmentId
 		var err error
-		agent, err = dl.FindAgent(rCtx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, enrollmentID)
+		agent, err = dl.FindAgent(vCtx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, enrollmentID)
 		if err != nil {
 			zlog.Debug().Err(err).
 				Str("EnrollmentId", enrollmentID).
 				Msg("Agent with EnrollmentId not found")
 			if !errors.Is(err, dl.ErrNotFound) && !strings.Contains(err.Error(), "no such index") {
-				rSpan.End()
+				vSpan.End()
 				return nil, err
 			}
 		}
+		vSpan.End()
 	}
-	rSpan.End()
-
-	span, ctx := apm.StartSpan(ctx, "enroll", "process")
-	defer span.End()
-
 	now := time.Now()
 
 	// Generate an ID here so we can pre-create the api key and avoid a round trip
@@ -257,13 +256,10 @@ func (et *EnrollerT) _enroll(
 	}
 
 	// Update the local metadata agent id
-	mSpan, _ := apm.StartSpan(ctx, "updateMetadata", "serialization")
 	localMeta, err := updateLocalMetaAgentID(req.Metadata.Local, agentID)
 	if err != nil {
-		mSpan.End()
 		return nil, err
 	}
-	mSpan.End()
 
 	// Generate the Fleet Agent access api key
 	accessAPIKey, err := generateAccessAPIKey(ctx, et.bulker, agentID)
@@ -333,6 +329,7 @@ func removeDuplicateStr(strSlice []string) []string {
 
 func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string) error {
 	span, ctx := apm.StartSpan(ctx, "deleteAgent", "delete")
+	span.Context.SetLabel("agent_id", agentID)
 	defer span.End()
 	zlog = zlog.With().Str(LogAgentID, agentID).Logger()
 
@@ -348,7 +345,6 @@ func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk
 	// hack-a-rama:  We purposely do not force a "refresh:true" on the Apikey creation
 	// because doing so causes the api call to slow down at scale. It is already very slow.
 	// So we have to wait for the key to become visible until we can invalidate it.
-
 	span, ctx := apm.StartSpan(ctx, "invalidateAPIKey", "auth")
 	defer span.End()
 	zlog = zlog.With().Str(LogAPIKeyID, apikeyID).Logger()
@@ -396,9 +392,7 @@ func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWrit
 	span, ctx := apm.StartSpan(ctx, "response", "write")
 	defer span.End()
 
-	mSpan, _ := apm.StartSpan(ctx, "encode", "serialization")
 	data, err := json.Marshal(resp)
-	mSpan.End()
 	if err != nil {
 		return fmt.Errorf("marshal enrollResponse: %w", err)
 	}
@@ -479,12 +473,10 @@ func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 }
 
 func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent) error {
-	span, ctx := apm.StartSpan(ctx, "createAgent", "write")
+	span, ctx := apm.StartSpan(ctx, "createAgent", "create")
 	defer span.End()
 
-	mSpan, _ := apm.StartSpan(ctx, "encode", "serialization")
 	data, err := json.Marshal(agent)
-	mSpan.End()
 	if err != nil {
 		return err
 	}

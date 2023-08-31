@@ -154,7 +154,7 @@ func (m *selfMonitorT) waitStart(ctx context.Context) error { //nolint:unused //
 
 func (m *selfMonitorT) process(ctx context.Context) (client.UnitState, error) {
 	if m.bulker.HasTracer() {
-		trans := m.bulker.StartTransaction("selfMonitor", "bulker")
+		trans := m.bulker.StartTransaction("Check self monitor", "bulker")
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}

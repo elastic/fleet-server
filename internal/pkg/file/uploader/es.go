@@ -70,12 +70,14 @@ func prepareUpdateMetaDoc() *dsl.Tmpl {
 */
 
 func CreateFileDoc(ctx context.Context, bulker bulk.Bulk, doc []byte, source string, fileID string) (string, error) {
-	span, ctx := apm.StartSpan(ctx, "createUpload", "create")
+	span, ctx := apm.StartSpan(ctx, "createFileInfo", "create")
 	defer span.End()
 	return bulker.Create(ctx, fmt.Sprintf(UploadHeaderIndexPattern, source), fileID, doc, bulk.WithRefresh())
 }
 
 func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID string, status file.Status, hash string) error {
+	span, ctx := apm.StartSpan(ctx, "updateFileInfo", "update_by_query")
+	defer span.End()
 	client := bulker.Client()
 
 	q, err := UpdateMetaDocByID.Render(map[string]interface{}{
@@ -118,7 +120,7 @@ func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID 
 */
 
 func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, fileID string, chunkNum int) error {
-	span, ctx := apm.StartSpan(ctx, "indexChunk", "index")
+	span, ctx := apm.StartSpan(ctx, "createChunk", "create")
 	defer span.End()
 	chunkDocID := fmt.Sprintf("%s.%d", fileID, chunkNum)
 	resp, err := client.Create(fmt.Sprintf(UploadDataIndexPattern, source), chunkDocID, body, func(req *esapi.CreateRequest) {
@@ -135,12 +137,9 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 	}
 
 	var response ChunkUploadResponse
-	mSpan, _ := apm.StartSpan(ctx, "decodeResponse", "serialization")
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		mSpan.End()
 		return err
 	}
-	mSpan.End()
 	log.Trace().Int("statuscode", resp.StatusCode).Interface("chunk-response", response).Msg("uploaded chunk")
 
 	if response.Error.Type != "" {
@@ -163,13 +162,11 @@ type ChunkUploadResponse struct {
 }
 
 func DeleteChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkNum int) error {
-	span, ctx := apm.StartSpan(ctx, "deleteChunk", "delete")
+	span, ctx := apm.StartSpan(ctx, "deleteChunk", "delete_by_query")
 	defer span.End()
-	mSpan, _ := apm.StartSpan(ctx, "renderQuery", "serialize")
 	q, err := MatchChunkByDocument.Render(map[string]interface{}{
 		"_id": fmt.Sprintf("%s.%d", fileID, chunkNum),
 	})
-	mSpan.End()
 	if err != nil {
 		return err
 	}

@@ -246,7 +246,7 @@ func (m *monitorT) dispatchPending() bool {
 
 func (m *monitorT) loadPolicies(ctx context.Context) error {
 	if m.bulker.HasTracer() {
-		trans := m.bulker.StartTransaction("loadPolicies", "bulker")
+		trans := m.bulker.StartTransaction("Load policies", "bulker")
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}

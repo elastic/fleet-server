@@ -45,12 +45,10 @@ func prepareQueryMetaByIDAndAgent() *dsl.Tmpl {
 }
 
 func findFileForAgent(ctx context.Context, bulker bulk.Bulk, fileID string, agentID string) (*es.ResultT, error) {
-	mSpan, _ := apm.StartSpan(ctx, "encodeSearch", "serialization")
 	q, err := MetaByIDAndAgent.Render(map[string]interface{}{
 		FieldDocID:      fileID,
 		"target_agents": agentID,
 	})
-	mSpan.End()
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +63,12 @@ func findFileForAgent(ctx context.Context, bulker bulk.Bulk, fileID string, agen
 	return result, nil
 }
 
-func readChunkStream(client *elasticsearch.Client, idx string, docID string) (io.ReadCloser, error) {
-	res, err := client.Get(idx, docID, func(req *esapi.GetRequest) {
+func readChunkStream(ctx context.Context, client *elasticsearch.Client, idx string, docID string) (io.ReadCloser, error) {
+	span, ctx := apm.StartSpan(ctx, "getChunk", "get")
+	span.Context.SetLabel("index", idx)
+	span.Context.SetLabel("chunk", docID)
+	defer span.End()
+	res, err := client.Get(idx, docID, client.Get.WithContext(ctx), func(req *esapi.GetRequest) {
 		if req.Header == nil {
 			req.Header = make(http.Header)
 		}

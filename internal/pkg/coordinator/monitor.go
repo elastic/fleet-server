@@ -214,7 +214,7 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 // ensureLeadership ensures leadership is held or needs to be taken over.
 func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	if m.bulker.HasTracer() {
-		trans := m.bulker.StartTransaction("ensureLeadership", "bulker")
+		trans := m.bulker.StartTransaction("Ensure leadership", "bulker")
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}

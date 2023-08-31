@@ -35,7 +35,7 @@ func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byt
 
 	if blk.setLinks {
 		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "read", "bulkAction", apm.SpanOptions{
+		span, ctx = apm.StartSpanOptions(ctx, "action", "read", apm.SpanOptions{
 			Links: []apm.SpanLink{blk.spanLinks},
 		})
 		defer span.End()
@@ -97,7 +97,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 
 	if len(links) > 0 {
 		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "flushRead", "bulkActions", apm.SpanOptions{
+		span, ctx = apm.StartSpanOptions(ctx, "flushQueue", "read", apm.SpanOptions{
 			Links: links,
 		})
 		defer span.End()

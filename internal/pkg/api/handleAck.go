@@ -103,6 +103,7 @@ func (ack *AckT) handleAcks(zlog zerolog.Logger, w http.ResponseWriter, r *http.
 }
 
 func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent) error {
+	vSpan, _ := apm.StartSpan(r.Context(), "validateRequest", "validate")
 	body := r.Body
 
 	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
@@ -112,25 +113,25 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 
 	raw, err := io.ReadAll(body)
 	if err != nil {
+		vSpan.End()
 		return fmt.Errorf("handleAcks read body: %w", err)
 	}
 
 	cntAcks.bodyIn.Add(uint64(len(raw)))
 
-	mSpan, _ := apm.StartSpan(r.Context(), "decode", "serialization")
 	var req AckRequest
 	if err := json.Unmarshal(raw, &req); err != nil {
-		mSpan.End()
+		vSpan.End()
 		return fmt.Errorf("handleAcks unmarshal: %w", err)
 	}
-	mSpan.End()
+	vSpan.End()
 
 	zlog.Trace().RawJSON("raw", raw).Msg("Ack request")
 
 	zlog = zlog.With().Int("nEvents", len(req.Events)).Logger()
 
 	resp, err := ack.handleAckEvents(r.Context(), zlog, agent, req.Events)
-	span, ctx := apm.StartSpan(r.Context(), "response", "write")
+	span, _ := apm.StartSpan(r.Context(), "response", "write")
 	defer span.End()
 	if err != nil {
 		var herr *HTTPError
@@ -143,13 +144,10 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 	}
 
 	// Always write response body even if the error HTTP status code was set
-	mSpan, _ = apm.StartSpan(ctx, "encode", "serialization")
 	data, err := json.Marshal(&resp)
 	if err != nil {
-		mSpan.End()
 		return fmt.Errorf("handleAcks marshal response: %w", err)
 	}
-	mSpan.End()
 
 	var nWritten int
 	if nWritten, err = w.Write(data); err != nil {
@@ -179,7 +177,7 @@ func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
 // 1. AckResponse and nil error, when the whole request is successful
 // 2. AckResponse and non-nil error, when the request items had errors
 func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) (AckResponse, error) {
-	span, ctx := apm.StartSpan(ctx, "handleAckEvents", "ack")
+	span, ctx := apm.StartSpan(ctx, "handleAckEvents", "process")
 	defer span.End()
 	var policyAcks []string
 
@@ -211,7 +209,8 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	}
 
 	for n, ev := range events {
-		span, ctx := apm.StartSpan(ctx, "ackEvent", "ack")
+		span, ctx := apm.StartSpan(ctx, "ackEvent", "process")
+		span.Context.SetLabel("agent_id", agent.Agent.ID)
 		span.Context.SetLabel("action_id", ev.ActionId)
 		log := zlog.With().
 			Str("actionType", string(ev.Type)).
@@ -246,15 +245,15 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 		// Process non-policy change actions
 		// Find matching action by action ID
-		aSpan, aCtx := apm.StartSpan(ctx, "ackAction", "validate")
+		vSpan, vCtx := apm.StartSpan(ctx, "ackAction", "validate")
 		action, ok := ack.cache.GetAction(ev.ActionId)
 		if !ok {
 			// Find action by ID
-			actions, err := dl.FindAction(aCtx, ack.bulk, ev.ActionId)
+			actions, err := dl.FindAction(vCtx, ack.bulk, ev.ActionId)
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
 				setError(n, err)
-				aSpan.End()
+				vSpan.End()
 				span.End()
 				continue
 			}
@@ -263,14 +262,14 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			if len(actions) == 0 {
 				log.Error().Msg("no matching action")
 				setResult(n, http.StatusNotFound)
-				aSpan.End()
+				vSpan.End()
 				span.End()
 				continue
 			}
 			action = actions[0]
 			ack.cache.SetAction(action)
 		}
-		aSpan.End()
+		vSpan.End()
 
 		if err := ack.handleActionResult(ctx, zlog, agent, action, ev); err != nil {
 			setError(n, err)
@@ -328,7 +327,7 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 		}
 	}
 
-	span, ctx := apm.StartSpanOptions(ctx, fmt.Sprintf("Process action result %s", action.Type), "app", apm.SpanOptions{Links: links})
+	span, ctx := apm.StartSpanOptions(ctx, fmt.Sprintf("Process action result %s", action.Type), "process", apm.SpanOptions{Links: links})
 	span.Context.SetLabel("action_id", action.Id)
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
@@ -353,7 +352,7 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 }
 
 func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, actionIds ...string) error {
-	span, ctx := apm.StartSpan(ctx, "ackPolicyChanges", "ack")
+	span, ctx := apm.StartSpan(ctx, "ackPolicyChanges", "process")
 	defer span.End()
 	// If more than one, pick the winner;
 	// 0) Correct policy id
@@ -362,7 +361,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	found := false
 	currRev := agent.PolicyRevisionIdx
 	currCoord := agent.PolicyCoordinatorIdx
-	rSpan, _ := apm.StartSpan(ctx, "checkPolicyActions", "validate")
+	vSpan, _ := apm.StartSpan(ctx, "checkPolicyActions", "validate")
 	for _, a := range actionIds {
 		rev, ok := policy.RevisionFromString(a)
 
@@ -384,27 +383,27 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		}
 	}
 
-	rSpan.End()
+	vSpan.End()
 	if !found {
 		return nil
 	}
 
-	rSpan, rCtx := apm.StartSpan(ctx, "updateOutputs", "auth")
+	aSpan, aCtx := apm.StartSpan(ctx, "updateOutputs", "auth")
 	for _, output := range agent.Outputs {
 		if output.Type != policy.OutputTypeElasticsearch {
 			continue
 		}
 
-		err := ack.updateAPIKey(rCtx,
+		err := ack.updateAPIKey(aCtx,
 			zlog,
 			agent.Id,
 			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
 		if err != nil {
-			rSpan.End()
+			aSpan.End()
 			return err
 		}
 	}
-	rSpan.End()
+	aSpan.End()
 
 	err := ack.updateAgentDoc(ctx, zlog,
 		agent.Id,
@@ -423,8 +422,8 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
 	span, ctx := apm.StartSpan(ctx, "updateAPIKey", "auth")
-	defer span.End()
 	span.Context.SetLabel("api_key_id", apiKeyID)
+	defer span.End()
 
 	if apiKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
@@ -479,13 +478,11 @@ func (ack *AckT) updateAgentDoc(ctx context.Context,
 ) error {
 	span, ctx := apm.StartSpan(ctx, "updateAgentDoc", "update")
 	defer span.End()
-	mSpan, _ := apm.StartSpan(ctx, "buildDoc", "serialization")
 	body := makeUpdatePolicyBody(
 		policyID,
 		currRev,
 		currCoord,
 	)
-	mSpan.End()
 
 	err := ack.bulk.Update(
 		ctx,
@@ -554,7 +551,7 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 }
 
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
-	span, ctx := apm.StartSpan(ctx, "ackUnenroll", "ack")
+	span, ctx := apm.StartSpan(ctx, "ackUnenroll", "process")
 	defer span.End()
 	apiKeys := agent.APIKeyIDs()
 	if len(apiKeys) > 0 {
@@ -575,13 +572,10 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 		dl.FieldUpdatedAt:    now,
 	}
 
-	mSpan, _ := apm.StartSpan(ctx, "unenrollEncoding", "serialization")
 	body, err := doc.Marshal()
 	if err != nil {
-		mSpan.End()
 		return fmt.Errorf("handleUnenroll marshal: %w", err)
 	}
-	mSpan.End()
 
 	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 		return fmt.Errorf("handleUnenroll update: %w", err)
@@ -592,7 +586,7 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 }
 
 func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event Event) error {
-	span, ctx := apm.StartSpan(ctx, "ackUpgrade", "ack")
+	span, ctx := apm.StartSpan(ctx, "ackUpgrade", "process")
 	defer span.End()
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{}
@@ -602,12 +596,10 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 			Retry   bool `json:"retry"`
 			Attempt int  `json:"retry_attempt"`
 		}
-		mSpan, _ := apm.StartSpan(ctx, "decodePayload", "serialization")
 		err := json.Unmarshal(fromPtr(event.Payload), &pl)
 		if err != nil {
 			zlog.Error().Err(err).Msg("unable to unmarshal upgrade event payload")
 		}
-		mSpan.End()
 
 		// if the payload indicates a retry, mark change the upgrade status to retrying.
 		if pl.Retry {
@@ -628,13 +620,10 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 		}
 	}
 
-	mSpan, _ := apm.StartSpan(ctx, "upgradeEncoding", "serialization")
 	body, err := doc.Marshal()
 	if err != nil {
-		mSpan.End()
 		return fmt.Errorf("handleUpgrade marshal: %w", err)
 	}
-	mSpan.End()
 
 	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 		return fmt.Errorf("handleUpgrade update: %w", err)

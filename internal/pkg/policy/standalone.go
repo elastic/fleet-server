@@ -87,7 +87,7 @@ func (m *standAloneSelfMonitorT) check(ctx context.Context) {
 	defer cancel()
 
 	if m.bulker.HasTracer() {
-		trans := m.bulker.StartTransaction("standAlone", "bulker")
+		trans := m.bulker.StartTransaction("Check standalone", "bulker")
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}

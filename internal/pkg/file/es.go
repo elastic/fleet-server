@@ -62,13 +62,11 @@ func prepareFindMetaByUploadID() *dsl.Tmpl {
 }
 
 func GetMetadata(ctx context.Context, bulker bulk.Bulk, indexPattern string, uploadID string) ([]es.HitT, error) {
-	span, ctx := apm.StartSpan(ctx, "getUploadMetadata", "search")
+	span, ctx := apm.StartSpan(ctx, "getFileInfo", "search")
 	defer span.End()
-	mSpan, _ := apm.StartSpan(ctx, "encodeQuery", "serialization")
 	query, err := QueryUploadID.Render(map[string]interface{}{
 		FieldUploadID: uploadID,
 	})
-	mSpan.End()
 	if err != nil {
 		return nil, err
 	}
@@ -95,12 +93,9 @@ func GetInfo(ctx context.Context, bulker bulk.Bulk, indexPattern string, uploadI
 	}
 
 	var fi MetaDoc
-	mSpan, _ := apm.StartSpan(ctx, "decodeMetadata", "serialization")
 	if err := json.Unmarshal(results[0].Source, &fi); err != nil {
-		mSpan.End()
 		return Info{}, fmt.Errorf("file meta doc parsing error: %w", err)
 	}
-	mSpan.End()
 
 	// calculate number of chunks required
 	cnt := fi.File.Size / fi.File.ChunkSize
@@ -149,18 +144,16 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 	if opt.IncludeSize {
 		tpl = QueryChunkInfoWithSize
 	}
-	mSpan, _ := apm.StartSpan(ctx, "encodeSearch", "serialization")
 	query, err := tpl.Render(map[string]interface{}{
 		FieldBaseID: baseID,
 	})
-	mSpan.End()
 	if err != nil {
 		return nil, err
 	}
 
-	rSpan, rCtx := apm.StartSpan(ctx, "searchChunksInfo", "search")
-	res, err := bulker.Search(rCtx, fmt.Sprintf(indexPattern, "*"), query)
-	rSpan.End()
+	bSpan, bCtx := apm.StartSpan(ctx, "searchChunksInfo", "search")
+	res, err := bulker.Search(bCtx, fmt.Sprintf(indexPattern, "*"), query)
+	bSpan.End()
 	if err != nil {
 		return nil, err
 	}

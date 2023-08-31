@@ -133,9 +133,7 @@ func (p *Output) prepareElasticsearch(
 		}
 
 		// merge roles with p.Role
-		mSpan, _ := apm.StartSpan(ctx, "mergeRoles", "serialization")
 		newRoles, err := mergeRoles(zlog, currentRoles, p.Role)
-		mSpan.End()
 		if err != nil {
 			zlog.Error().
 				Str("apiKeyID", output.APIKeyID).
@@ -162,9 +160,7 @@ func (p *Output) prepareElasticsearch(
 		}
 
 		// Using painless script to update permission hash for updated key
-		mSpan, _ = apm.StartSpan(ctx, "renderPainlessScript", "serialization")
 		body, err := renderUpdatePainlessScript(p.Name, fields)
-		mSpan.End()
 		if err != nil {
 			return err
 		}
@@ -213,9 +209,7 @@ func (p *Output) prepareElasticsearch(
 		}
 
 		// Using painless script to append the old keys to the history
-		mSpan, _ := apm.StartSpan(ctx, "renderPainlessScript", "serialization")
 		body, err := renderUpdatePainlessScript(p.Name, fields)
-		mSpan.End()
 		if err != nil {
 			return fmt.Errorf("could no tupdate painless script: %w", err)
 		}
@@ -259,9 +253,7 @@ func fetchAPIKeyRoles(ctx context.Context, b bulk.Bulk, apiKeyID string) (*RoleT
 		return nil, err
 	}
 
-	mSpan, _ := apm.StartSpan(ctx, "decodeRoles", "serialization")
 	roleMap, err := smap.Parse(res.RoleDescriptors)
-	mSpan.End()
 	if err != nil {
 		return nil, err
 	}

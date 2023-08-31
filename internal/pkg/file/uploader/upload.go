@@ -56,7 +56,7 @@ func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, cache cache.Cache,
 
 // Start an upload operation
 func (u *Uploader) Begin(ctx context.Context, data JSDict) (file.Info, error) {
-	vSpan, _ := apm.StartSpan(ctx, "validateUpload", "validate")
+	vSpan, _ := apm.StartSpan(ctx, "validateFileInfo", "validate")
 	if data == nil {
 		vSpan.End()
 		return file.Info{}, ErrPayloadRequired
@@ -131,9 +131,7 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (file.Info, error) {
 	/*
 		Write to storage
 	*/
-	mSpan, _ := apm.StartSpan(ctx, "encodeUpload", "serialization")
 	doc, err := json.Marshal(data)
-	mSpan.End()
 	if err != nil {
 		return file.Info{}, err
 	}
@@ -202,7 +200,7 @@ func validateUploadPayload(info JSDict) error {
 // GetUploadInfo searches for Upload Metadata document in local memory cache if available
 // otherwise, fetches from elasticsearch and caches for next use
 func (u *Uploader) GetUploadInfo(ctx context.Context, uploadID string) (file.Info, error) {
-	span, ctx := apm.StartSpan(ctx, "getUploadInfo", "process")
+	span, ctx := apm.StartSpan(ctx, "getFileInfo", "process")
 	defer span.End()
 	// Fetch metadata doc, if not cached
 	info, exist := u.cache.GetUpload(uploadID)

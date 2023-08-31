@@ -89,7 +89,7 @@ func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, 
 }
 
 func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
-	vSpan, _ := apm.StartSpan(ctx, "checkRequest", "serialization")
+	vSpan, _ := apm.StartSpan(ctx, "validateRequest", "validate")
 	// Input validation
 	if err := validateSha2String(sha2); err != nil {
 		vSpan.End()
@@ -167,10 +167,8 @@ func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident,
 	}
 
 	// The 'Body' field type is Raw; extract to string.
-	mSpan, _ := apm.StartSpan(ctx, "decodeArtifact", "serialization")
 	var srcPayload string
 	if err = json.Unmarshal(art.Body, &srcPayload); err != nil {
-		mSpan.End()
 		zlog.Error().Err(err).Msg("Cannot unmarshal artifact payload")
 		return nil, err
 	}
@@ -180,11 +178,9 @@ func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident,
 	// to avoid having to decode on each cache hit.
 	dstPayload, err := base64.StdEncoding.DecodeString(srcPayload)
 	if err != nil {
-		mSpan.End()
 		zlog.Error().Err(err).Msg("Fail base64 decode artifact")
 		return nil, err
 	}
-	mSpan.End()
 
 	// Validate the sha256 hash; this is just good hygiene.
 	vSpan, _ := apm.StartSpan(ctx, "validateArtifact", "validate")
@@ -209,7 +205,7 @@ func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident,
 // Perhaps have a cache of the most recently used hashes available, and items that aren't
 // in the cache can do a lookup but throttle as below.  We could update the cache every 10m or so.
 func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, ident, sha2 string) (*model.Artifact, error) {
-	span, ctx := apm.StartSpan(ctx, "fetchArtifact", "read")
+	span, ctx := apm.StartSpan(ctx, "fetchArtifact", "search")
 	defer span.End()
 	// Throttle prevents more than N outstanding requests to elastic globally and per sha2.
 	if token := at.esThrottle.Acquire(sha2, defaultThrottleTTL); token == nil {

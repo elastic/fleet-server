@@ -43,7 +43,7 @@ func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...
 
 	if blk.setLinks {
 		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "search", "bulkAction", apm.SpanOptions{
+		span, ctx = apm.StartSpanOptions(ctx, "action", "search", apm.SpanOptions{
 			Links: []apm.SpanLink{blk.spanLinks},
 		})
 		defer span.End()
@@ -147,7 +147,7 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 
 	if len(links) > 0 {
 		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "flushSearch", "bulkActions", apm.SpanOptions{
+		span, ctx = apm.StartSpanOptions(ctx, "flushQueue", "search", apm.SpanOptions{
 			Links: links,
 		})
 		defer span.End()

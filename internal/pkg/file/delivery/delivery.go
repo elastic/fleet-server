@@ -50,8 +50,6 @@ func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID
 	}
 
 	var fi file.MetaDoc
-	mSpan, _ := apm.StartSpan(ctx, "decodeFile", "serialization")
-	defer mSpan.End()
 	if err := json.Unmarshal(result.Hits[0].Source, &fi); err != nil {
 		return file.MetaDoc{}, fmt.Errorf("file meta doc parsing error: %w", err)
 	}
@@ -80,19 +78,14 @@ func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w io.Writ
 	span, ctx := apm.StartSpan(ctx, "response", "write")
 	defer span.End()
 	for _, chunkInfo := range chunks {
-		gSpan, _ := apm.StartSpan(ctx, "getChunk", "get")
-		gSpan.Context.SetLabel("chunk_id", chunkInfo.ID)
-		body, err := readChunkStream(d.client, chunkInfo.Index, chunkInfo.ID)
-		gSpan.End()
+		body, err := readChunkStream(ctx, d.client, chunkInfo.Index, chunkInfo.ID)
 		if err != nil {
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error reading chunk stream")
 			body.Close()
 			return err
 		}
 
-		mSpan, _ := apm.StartSpan(ctx, "decodeChunk", "serialization")
 		chunk, err := cbor.NewChunkDecoder(body).Decode()
-		mSpan.End()
 		body.Close()
 		if err != nil {
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error decoding chunk")

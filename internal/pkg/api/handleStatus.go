@@ -69,7 +69,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 		authed = false
 	}
 
-	span, ctx := apm.StartSpan(r.Context(), "getState", "read")
+	span, ctx := apm.StartSpan(r.Context(), "getState", "process")
 	state := sm.State()
 	resp := StatusAPIResponse{
 		Name:   build.ServiceName,
@@ -77,27 +77,24 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 	}
 
 	if authed {
-		vSpan, _ := apm.StartSpan(ctx, "getVersion", "read")
+		sSpan, _ := apm.StartSpan(ctx, "getVersion", "process")
 		bt := bi.BuildTime.Format(time.RFC3339)
 		resp.Version = &StatusResponseVersion{
 			Number:    &bi.Version,
 			BuildHash: &bi.Commit,
 			BuildTime: &bt,
 		}
-		vSpan.End()
+		sSpan.End()
 	}
 	span.End()
 
 	span, ctx = apm.StartSpan(r.Context(), "response", "write")
 	defer span.End()
 
-	mSpan, _ := apm.StartSpan(ctx, "encode", "serialization")
 	data, err := json.Marshal(&resp)
 	if err != nil {
-		mSpan.End()
 		return err
 	}
-	mSpan.End()
 
 	code := http.StatusServiceUnavailable
 	if state == client.UnitStateHealthy {
