@@ -32,6 +32,7 @@ var (
 // An additional check must be executed to validate it is not a random api key.
 func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKey, error) {
 	span, ctx := apm.StartSpan(r.Context(), "authKey", "auth")
+	defer span.End()
 	start := time.Now()
 
 	key, err := apikey.ExtractAPIKey(r)
