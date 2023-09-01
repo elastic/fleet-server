@@ -100,11 +100,14 @@ steps:
   - label: ":argo: Update fleet image tag for fleet-controller using gpctl"
     async: true
     branches: main
-    trigger: gpctl-promote
+    trigger: gpctl-promote-with-e2e-tests
     build:
       env:
         SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
         REMOTE_SERVICE_CONFIG: https://raw.githubusercontent.com/elastic/serverless-gitops/main/gen/gpctl/fleet/config.yaml
+        IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+        NAMESPACE: observability-ci
+        IMAGE_NAME: fleet-server
     depends_on:
       - step: "publish"
 
