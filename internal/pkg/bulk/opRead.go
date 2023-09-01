@@ -22,6 +22,8 @@ const (
 )
 
 func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byte, error) {
+	span, ctx := apm.StartSpan(ctx, "action", "read")
+	defer span.End()
 	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 	blk := b.newBlk(ActionRead, opt)
 
@@ -33,20 +35,14 @@ func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byt
 		return nil, err
 	}
 
-	if blk.setLinks {
-		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "action", "read", apm.SpanOptions{
-			Links: []apm.SpanLink{blk.spanLinks},
-		})
-		defer span.End()
-	}
-
 	// Process response
 	resp := b.dispatch(ctx, blk)
 	if resp.err != nil {
 		return nil, resp.err
 	}
 	b.freeBlk(blk)
+
+	// TODO if we can ever set span links after creation we can inject the flushQueue span into resp and link to the action span here.
 
 	// Interpret response, looking for generated id
 	r, ok := resp.data.(*MgetResponseItem)
@@ -75,8 +71,8 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	for n := queue.head; n != nil; n = n.next {
 		buf.Write(n.buf.Bytes())
 		queueCnt += 1
-		if n.setLinks {
-			links = append(links, n.spanLinks)
+		if n.spanLink != nil {
+			links = append(links, *n.spanLink)
 		}
 	}
 

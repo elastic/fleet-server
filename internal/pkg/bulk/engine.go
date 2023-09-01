@@ -358,8 +358,7 @@ func (b *Bulker) newBlk(action actionT, opts optionsT) *bulkT {
 	if opts.Refresh {
 		blk.flags.Set(flagRefresh)
 	}
-	blk.spanLinks = opts.spanLinks
-	blk.setLinks = opts.setLinks
+	blk.spanLink = opts.spanLink
 
 	return blk
 }

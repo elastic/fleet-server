@@ -47,6 +47,8 @@ func (b *Bulker) Delete(ctx context.Context, index, id string, opts ...Opt) erro
 }
 
 func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id string, body []byte, opts ...Opt) (*BulkIndexerResponseItem, error) {
+	span, ctx := apm.StartSpan(ctx, "action", action.String())
+	defer span.End()
 	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 	blk := b.newBlk(action, opt)
 
@@ -62,20 +64,14 @@ func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id s
 		return nil, err
 	}
 
-	if blk.setLinks {
-		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "action", action.String(), apm.SpanOptions{
-			Links: []apm.SpanLink{blk.spanLinks},
-		})
-		defer span.End()
-	}
-
 	// Dispatch and wait for response
 	resp := b.dispatch(ctx, blk)
 	if resp.err != nil {
 		return nil, resp.err
 	}
 	b.freeBlk(blk)
+
+	// TODO if we can ever set span links after creation we can inject the flushQueue span into resp and link to the action span here.
 
 	r, ok := resp.data.(*BulkIndexerResponseItem)
 	if !ok {
@@ -187,8 +183,8 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	for n := queue.head; n != nil; n = n.next {
 		buf.Write(n.buf.Bytes())
 		queueCnt += 1
-		if n.setLinks {
-			links = append(links, n.spanLinks)
+		if n.spanLink != nil {
+			links = append(links, *n.spanLink)
 		}
 	}
 

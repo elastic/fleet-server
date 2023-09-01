@@ -6,6 +6,7 @@ package bulk
 
 import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/danger"
+
 	"go.elastic.co/apm/v2"
 )
 
@@ -15,14 +16,13 @@ type Buf = danger.Buf
 // However, the multiOp API's will allocate directly in large blocks.
 
 type bulkT struct {
-	action    actionT    // requested actions
-	flags     flagsT     // execution flags
-	idx       int32      // idx of originating request, used in mulitOp
-	ch        chan respT // response channel, caller is waiting synchronously
-	buf       Buf        // json payload to be sent to elastic
-	next      *bulkT     // pointer to next bulkT, used for fast internal queueing
-	setLinks  bool
-	spanLinks apm.SpanLink // TODO benchmark haveing setLinks+spanLinks vs making spanLinks *apm.SpanLinks
+	action   actionT    // requested actions
+	flags    flagsT     // execution flags
+	idx      int32      // idx of originating request, used in mulitOp
+	ch       chan respT // response channel, caller is waiting synchronously
+	buf      Buf        // json payload to be sent to elastic
+	next     *bulkT     // pointer to next bulkT, used for fast internal queueing
+	spanLink *apm.SpanLink
 }
 
 type flagsT int8

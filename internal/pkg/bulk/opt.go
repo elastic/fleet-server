@@ -23,8 +23,7 @@ type optionsT struct {
 	RetryOnConflict    string
 	Indices            []string
 	WaitForCheckpoints []int64
-	setLinks           bool
-	spanLinks          apm.SpanLink
+	spanLink           *apm.SpanLink
 }
 
 type Opt func(*optionsT)
@@ -62,9 +61,8 @@ func withAPMLinkedContext(ctx context.Context) Opt {
 		if trace == nil {
 			return
 		}
-		opt.setLinks = true
 		tCtx := trace.TraceContext()
-		opt.spanLinks = apm.SpanLink{
+		opt.spanLink = &apm.SpanLink{
 			Trace: tCtx.Trace,
 			Span:  tCtx.Span,
 		}
