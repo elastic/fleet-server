@@ -31,6 +31,7 @@ var (
 // WARNING: This does not validate that the api key is valid for the Fleet Domain.
 // An additional check must be executed to validate it is not a random api key.
 func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKey, error) {
+	span, ctx := apm.StartSpan(r.Context(), "authKey", "auth")
 	start := time.Now()
 
 	key, err := apikey.ExtractAPIKey(r)

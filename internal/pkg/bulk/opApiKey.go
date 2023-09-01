@@ -85,7 +85,7 @@ func (b *Bulker) APIKeyInvalidate(ctx context.Context, ids ...string) error {
 }
 
 func (b *Bulker) APIKeyUpdate(ctx context.Context, id, outputPolicyHash string, roles []byte) error {
-	span, ctx := apm.StartSpan(ctx, "updateAPIKey", "auth") // NOTE: this is tracked as updateAPIKey/auth instead of action/update_api_key to be consistent with other auth actions that don't use a queue.
+	span, ctx := apm.StartSpan(ctx, "updateAPIKey", "auth") // NOTE: this is tracked as updateAPIKey/auth instead of update_api_key/bulker to be consistent with other auth actions that don't use a queue.
 	span.Context.SetLabel("api_key_id", id)
 	defer span.End()
 	req := &apiKeyUpdateRequest{
@@ -157,12 +157,13 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		}
 	}
 
-	if len(links) > 0 {
-		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "flushQueue", "apiKeyUpdate", apm.SpanOptions{
-			Links: links,
-		})
+	if len(links) == 0 {
+		links = nil
 	}
+	span, ctx := apm.StartSpanOptions(ctx, "Flush: apiKeyUpdate", "apiKeyUpdate", apm.SpanOptions{
+		Links: links,
+	})
+	defer span.End()
 
 	for id, roleHash := range rolePerID {
 		delete(rolePerID, id)

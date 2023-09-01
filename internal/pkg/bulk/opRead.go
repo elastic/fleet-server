@@ -22,7 +22,7 @@ const (
 )
 
 func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byte, error) {
-	span, ctx := apm.StartSpan(ctx, "action", "read")
+	span, ctx := apm.StartSpan(ctx, "Bulker: read", "bulker")
 	defer span.End()
 	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 	blk := b.newBlk(ActionRead, opt)
@@ -75,6 +75,13 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 			links = append(links, *n.spanLink)
 		}
 	}
+	if len(links) == 0 {
+		links = nil
+	}
+	span, ctx := apm.StartSpanOptions(ctx, "Flush: read", "read", apm.SpanOptions{
+		Links: links,
+	})
+	defer span.End()
 
 	// Need to strip the last element and append the suffix
 	payload := buf.Bytes()
@@ -89,14 +96,6 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	if queue.ty == kQueueRefreshRead {
 		refresh = true
 		req.Refresh = &refresh
-	}
-
-	if len(links) > 0 {
-		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "flushQueue", "read", apm.SpanOptions{
-			Links: links,
-		})
-		defer span.End()
 	}
 
 	res, err := req.Do(ctx, b.es)

@@ -47,7 +47,7 @@ func (b *Bulker) Delete(ctx context.Context, index, id string, opts ...Opt) erro
 }
 
 func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id string, body []byte, opts ...Opt) (*BulkIndexerResponseItem, error) {
-	span, ctx := apm.StartSpan(ctx, "action", action.String())
+	span, ctx := apm.StartSpan(ctx, fmt.Sprintf("Bulker: %s", action.String()), "bulker")
 	defer span.End()
 	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 	blk := b.newBlk(action, opt)
@@ -188,6 +188,16 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 		}
 	}
 
+	// We should not encounter a case outside of testing where blk instances have no links
+	// but just in case, set to nil to preserve default behavior
+	if len(links) == 0 {
+		links = nil
+	}
+	span, ctx := apm.StartSpanOptions(ctx, fmt.Sprintf("Flush: %s", queue.Type()), queue.Type(), apm.SpanOptions{
+		Links: links,
+	})
+	defer span.End()
+
 	// Do actual bulk request; defer to the client
 	req := esapi.BulkRequest{
 		Body: bytes.NewReader(buf.Bytes()),
@@ -195,14 +205,6 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 
 	if queue.ty == kQueueRefreshBulk {
 		req.Refresh = "true"
-	}
-
-	if len(links) > 0 {
-		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "flushQueue", queue.Type(), apm.SpanOptions{
-			Links: links,
-		})
-		defer span.End()
 	}
 
 	res, err := req.Do(ctx, b.es)

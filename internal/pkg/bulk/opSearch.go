@@ -20,7 +20,7 @@ import (
 )
 
 func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...Opt) (*es.ResultT, error) {
-	span, ctx := apm.StartSpan(ctx, "action", "search")
+	span, ctx := apm.StartSpan(ctx, "Bulker: search", "bulker")
 	defer span.End()
 	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 	action := ActionSearch
@@ -134,20 +134,19 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 			links = append(links, *n.spanLink)
 		}
 	}
+	if len(links) == 0 {
+		links = nil
+	}
+	span, ctx := apm.StartSpanOptions(ctx, "Flush: search", "search", apm.SpanOptions{
+		Links: links,
+	})
+	defer span.End()
 
 	// Do actual bulk request; and send response on chan
 	var (
 		res *esapi.Response
 		err error
 	)
-
-	if len(links) > 0 {
-		var span *apm.Span
-		span, ctx = apm.StartSpanOptions(ctx, "flushQueue", "search", apm.SpanOptions{
-			Links: links,
-		})
-		defer span.End()
-	}
 
 	if queue.ty == kQueueFleetSearch {
 		req := esapi.FleetMsearchRequest{
