@@ -52,7 +52,7 @@ steps:
           - "buildkite-agent artifact download build/coverage.out ."
           - "/scan-source-code.sh"
         depends_on:
-          - "tests"
+          - "unit-test"
 
       - label: ":smartbear-testexecute: Run integration tests"
         key: int-test
