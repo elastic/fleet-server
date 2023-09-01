@@ -342,8 +342,6 @@ func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk
 	// hack-a-rama:  We purposely do not force a "refresh:true" on the Apikey creation
 	// because doing so causes the api call to slow down at scale. It is already very slow.
 	// So we have to wait for the key to become visible until we can invalidate it.
-	span, ctx := apm.StartSpan(ctx, "invalidateAPIKey", "auth")
-	defer span.End()
 	zlog = zlog.With().Str(LogAPIKeyID, apikeyID).Logger()
 
 	start := time.Now()
@@ -486,8 +484,6 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 }
 
 func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (*apikey.APIKey, error) {
-	span, ctx := apm.StartSpan(ctx, "generateAPIKey", "auth")
-	defer span.End()
 	return bulk.APIKeyCreate(
 		ctx,
 		agentID,

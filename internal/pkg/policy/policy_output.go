@@ -246,8 +246,6 @@ func (p *Output) prepareElasticsearch(
 }
 
 func fetchAPIKeyRoles(ctx context.Context, b bulk.Bulk, apiKeyID string) (*RoleT, error) {
-	span, ctx := apm.StartSpan(ctx, "fetchAPIKeyRoles", "auth")
-	defer span.End()
 	res, err := b.APIKeyRead(ctx, apiKeyID, true)
 	if err != nil {
 		return nil, err
@@ -401,8 +399,6 @@ func generateOutputAPIKey(
 	agentID,
 	outputName string,
 	roles []byte) (*apikey.APIKey, error) {
-	span, ctx := apm.StartSpan(ctx, "generateOutputAPIKey", "auth")
-	defer span.End()
 	name := fmt.Sprintf("%s:%s", agentID, outputName)
 	zerolog.Ctx(ctx).Info().Msgf("generating output API key %s for agent ID %s",
 		name, agentID)

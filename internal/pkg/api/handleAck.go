@@ -394,22 +394,19 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
-	aSpan, aCtx := apm.StartSpan(ctx, "updateOutputs", "auth")
 	for _, output := range agent.Outputs {
 		if output.Type != policy.OutputTypeElasticsearch {
 			continue
 		}
 
-		err := ack.updateAPIKey(aCtx,
+		err := ack.updateAPIKey(ctx,
 			zlog,
 			agent.Id,
 			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
 		if err != nil {
-			aSpan.End()
 			return err
 		}
 	}
-	aSpan.End()
 
 	err := ack.updateAgentDoc(ctx, zlog,
 		agent.Id,
@@ -427,10 +424,6 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	agentID string,
 	apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
-	span, ctx := apm.StartSpan(ctx, "updateAPIKey", "auth")
-	span.Context.SetLabel("api_key_id", apiKeyID)
-	defer span.End()
-
 	if apiKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
@@ -561,14 +554,11 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 	defer span.End()
 	apiKeys := agent.APIKeyIDs()
 	if len(apiKeys) > 0 {
-		span, ctx := apm.StartSpan(ctx, "invalidateAPIKeys", "auth")
 		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
 
 		if err := ack.bulk.APIKeyInvalidate(ctx, apiKeys...); err != nil {
-			span.End()
 			return fmt.Errorf("handleUnenroll invalidate apikey: %w", err)
 		}
-		span.End()
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
