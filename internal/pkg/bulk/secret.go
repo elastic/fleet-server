@@ -51,7 +51,7 @@ type SecretResponse struct {
 }
 
 func ReadSecret(ctx context.Context, client *elasticsearch.Client, secretID string) (string, error) {
-	span, ctx := apm.StartSpan(ctx, "action", "readSecret")
+	span, ctx := apm.StartSpan(ctx, "readSecret", "elasticsearch")
 	defer span.End()
 	es := ExtendedClient{Client: client, Custom: &ExtendedAPI{client}}
 	res, err := es.Custom.Read(ctx, secretID)

@@ -648,7 +648,7 @@ func convertActions(agentID string, actions []model.Action) ([]Action, string) {
 //   - Generate and update default ApiKey if roles have changed.
 //   - Rewrite the policy for delivery to the agent injecting the key material.
 func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string, pp *policy.ParsedPolicy) (*Action, error) {
-	var links []apm.SpanLink
+	var links []apm.SpanLink = nil // set to a nil array to preserve default behaviour if no policy links are found
 	if err := pp.Links.Trace.Validate(); err == nil {
 		links = []apm.SpanLink{pp.Links}
 	}

@@ -98,6 +98,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		Inputs: policyInputs,
 	}
 	if trace := apm.TransactionFromContext(ctx); trace != nil {
+		// Pass current transaction link (should be a monitor transaction) to caller (likely a client request).
 		tCtx := trace.TraceContext()
 		pp.Links = apm.SpanLink{
 			Trace: tCtx.Trace,
