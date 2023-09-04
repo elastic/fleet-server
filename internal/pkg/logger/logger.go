@@ -150,7 +150,7 @@ func configure(cfg *config.Config, svcName string) (lg zerolog.Logger, wr Writer
 	lg = lg.Level(zerolog.TraceLevel)
 
 	if svcName != "" {
-		lg = lg.With().Str(ECSServiceName, svcName).Logger()
+		lg = lg.With().Str(ECSServiceName, svcName).Str(ECSServiceType, svcName).Logger()
 	}
 
 	return //nolint:nakedret // short function
