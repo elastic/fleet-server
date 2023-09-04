@@ -9,3 +9,9 @@ steps:
       message: "${BUILDKITE_MESSAGE}"
       env:
         ENVIRONMENT: ${ENVIRONMENT}
+  - label: ":rocket: Run Scale tests"
+    trigger: "fleet-scale-tests"
+    build:
+      message: "${BUILDKITE_MESSAGE}"
+      env:
+        ENVIRONMENT: ${ENVIRONMENT}
