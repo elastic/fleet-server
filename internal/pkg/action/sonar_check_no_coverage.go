@@ -5,7 +5,7 @@ import (
 	"math"
 )
 
-func main() {
+func asd() {
 	// Calculate the square root of a number
 	num := 16.0
 	sqrt := math.Sqrt(num)
