@@ -14,6 +14,7 @@ steps:
         SERVICE: fleet
         CHECK_LOG_ERROR_RATE: true
         CHECK_CONTAINER_RESTART_COUNT: true
+        CONTAINER_NAME: fleet
         CHECK_API_REQUEST_METRICS: true
   - label: ":rocket: Run Smoke tests"
     trigger: "fleet-smoke-tests"
