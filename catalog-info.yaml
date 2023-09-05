@@ -6,6 +6,8 @@ kind: Component
 metadata:
   name: fleet-server
   description: fleet-server - The control server for managing a fleet of elastic-agents
+  annotations:
+    sonarqube.org/project-key: elastic_fleet-server_AYpL8BsVaV3I-igkX4hx
 
 spec:
   type: tool
