@@ -54,6 +54,7 @@ const (
 
 	// Service
 	ECSServiceName = "service.name"
+	ECSServiceType = "service.type"
 )
 
 // Non ECS compliant contants used in logging
