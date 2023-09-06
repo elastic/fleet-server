@@ -47,6 +47,7 @@ type Bulk interface {
 	Index(ctx context.Context, index, id string, body []byte, opts ...Opt) (string, error)
 	Search(ctx context.Context, index string, body []byte, opts ...Opt) (*es.ResultT, error)
 	HasTracer() bool
+	StartTransaction(name, transactionType string) *apm.Transaction
 
 	// Multi Operation API's run in the bulk engine
 	MCreate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
@@ -357,6 +358,8 @@ func (b *Bulker) newBlk(action actionT, opts optionsT) *bulkT {
 	if opts.Refresh {
 		blk.flags.Set(flagRefresh)
 	}
+	blk.spanLink = opts.spanLink
+
 	return blk
 }
 

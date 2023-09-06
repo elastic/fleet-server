@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -52,6 +53,8 @@ func findFileForAgent(ctx context.Context, bulker bulk.Bulk, fileID string, agen
 		return nil, err
 	}
 
+	span, ctx := apm.StartSpan(ctx, "searchFile", "search")
+	defer span.End()
 	result, err := bulker.Search(ctx, fmt.Sprintf(FileHeaderIndexPattern, "*"), q)
 	if err != nil {
 		return nil, err
@@ -60,9 +63,12 @@ func findFileForAgent(ctx context.Context, bulker bulk.Bulk, fileID string, agen
 	return result, nil
 }
 
-func readChunkStream(client *elasticsearch.Client, idx string, docID string) (io.ReadCloser, error) {
-
-	res, err := client.Get(idx, docID, func(req *esapi.GetRequest) {
+func readChunkStream(ctx context.Context, client *elasticsearch.Client, idx string, docID string) (io.ReadCloser, error) {
+	span, ctx := apm.StartSpan(ctx, "getChunk", "get")
+	span.Context.SetLabel("index", idx)
+	span.Context.SetLabel("chunk", docID)
+	defer span.End()
+	res, err := client.Get(idx, docID, client.Get.WithContext(ctx), func(req *esapi.GetRequest) {
 		if req.Header == nil {
 			req.Header = make(http.Header)
 		}

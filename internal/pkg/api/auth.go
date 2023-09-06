@@ -31,7 +31,7 @@ var (
 // WARNING: This does not validate that the api key is valid for the Fleet Domain.
 // An additional check must be executed to validate it is not a random api key.
 func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKey, error) {
-	span, ctx := apm.StartSpan(r.Context(), "authAPIKey", "auth")
+	span, ctx := apm.StartSpan(r.Context(), "authKey", "auth")
 	defer span.End()
 	start := time.Now()
 
@@ -89,6 +89,9 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 // authAgent ensures that the requested API-Key is associated with the correct agent.
 // If all succeeds, it returns the agent associated with id.
 func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
+	span, ctx := apm.StartSpan(r.Context(), "authAgent", "auth")
+	defer span.End()
+	r = r.WithContext(ctx)
 	start := time.Now()
 
 	// authenticate
@@ -114,12 +117,12 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 			Msg("authApiKey slow")
 	}
 
-	agent, err := findAgentByAPIKeyID(r.Context(), bulker, key.ID)
+	agent, err := findAgentByAPIKeyID(ctx, bulker, key.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := apm.TransactionFromContext(r.Context())
+	tx := apm.TransactionFromContext(ctx)
 	if tx != nil {
 		tx.Context.SetLabel("agent_id", agent.Id)
 	}

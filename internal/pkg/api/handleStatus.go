@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -67,6 +69,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 		authed = false
 	}
 
+	span, ctx := apm.StartSpan(r.Context(), "getState", "process")
 	state := sm.State()
 	resp := StatusAPIResponse{
 		Name:   build.ServiceName,
@@ -74,13 +77,19 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 	}
 
 	if authed {
+		sSpan, _ := apm.StartSpan(ctx, "getVersion", "process")
 		bt := bi.BuildTime.Format(time.RFC3339)
 		resp.Version = &StatusResponseVersion{
 			Number:    &bi.Version,
 			BuildHash: &bi.Commit,
 			BuildTime: &bt,
 		}
+		sSpan.End()
 	}
+	span.End()
+
+	span, _ = apm.StartSpan(r.Context(), "response", "write")
+	defer span.End()
 
 	data, err := json.Marshal(&resp)
 	if err != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -69,10 +70,14 @@ func prepareUpdateMetaDoc() *dsl.Tmpl {
 */
 
 func CreateFileDoc(ctx context.Context, bulker bulk.Bulk, doc []byte, source string, fileID string) (string, error) {
+	span, ctx := apm.StartSpan(ctx, "createFileInfo", "create")
+	defer span.End()
 	return bulker.Create(ctx, fmt.Sprintf(UploadHeaderIndexPattern, source), fileID, doc, bulk.WithRefresh())
 }
 
 func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID string, status file.Status, hash string) error {
+	span, ctx := apm.StartSpan(ctx, "updateFileInfo", "update_by_query")
+	defer span.End()
 	client := bulker.Client()
 
 	q, err := UpdateMetaDocByID.Render(map[string]interface{}{
@@ -115,6 +120,8 @@ func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID 
 */
 
 func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.ChunkEncoder, source string, fileID string, chunkNum int) error {
+	span, _ := apm.StartSpan(ctx, "createChunk", "create")
+	defer span.End()
 	chunkDocID := fmt.Sprintf("%s.%d", fileID, chunkNum)
 	resp, err := client.Create(fmt.Sprintf(UploadDataIndexPattern, source), chunkDocID, body, func(req *esapi.CreateRequest) {
 		req.DocumentID = chunkDocID
@@ -155,6 +162,8 @@ type ChunkUploadResponse struct {
 }
 
 func DeleteChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkNum int) error {
+	span, ctx := apm.StartSpan(ctx, "deleteChunk", "delete_by_query")
+	defer span.End()
 	q, err := MatchChunkByDocument.Render(map[string]interface{}{
 		"_id": fmt.Sprintf("%s.%d", fileID, chunkNum),
 	})

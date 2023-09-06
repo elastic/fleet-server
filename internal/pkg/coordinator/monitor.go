@@ -16,6 +16,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -212,6 +213,11 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 
 // ensureLeadership ensures leadership is held or needs to be taken over.
 func (m *monitorT) ensureLeadership(ctx context.Context) error {
+	if m.bulker.HasTracer() {
+		trans := m.bulker.StartTransaction("Ensure leadership", "bulker")
+		ctx = apm.ContextWithTransaction(ctx, trans)
+		defer trans.End()
+	}
 	m.log.Debug().Msg("ensuring leadership of policies")
 	err := dl.EnsureServer(ctx, m.bulker, m.version, m.agentMetadata, m.hostMetadata, dl.WithIndexName(m.serversIndex))
 

@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -36,6 +37,8 @@ type esAPIKeyBulkUpdateRequest struct {
 }
 
 func (b *Bulker) APIKeyAuth(ctx context.Context, key APIKey) (*SecurityInfo, error) {
+	span, ctx := apm.StartSpan(ctx, "authAPIKey", "auth")
+	defer span.End()
 	if err := b.apikeyLimit.Acquire(ctx, 1); err != nil {
 		return nil, err
 	}
@@ -49,6 +52,8 @@ func (b *Bulker) APIKeyAuth(ctx context.Context, key APIKey) (*SecurityInfo, err
 }
 
 func (b *Bulker) APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*APIKey, error) {
+	span, ctx := apm.StartSpan(ctx, "createAPIKey", "auth")
+	defer span.End()
 	if err := b.apikeyLimit.Acquire(ctx, 1); err != nil {
 		return nil, err
 	}
@@ -58,6 +63,8 @@ func (b *Bulker) APIKeyCreate(ctx context.Context, name, ttl string, roles []byt
 }
 
 func (b *Bulker) APIKeyRead(ctx context.Context, id string, withOwner bool) (*APIKeyMetadata, error) {
+	span, ctx := apm.StartSpan(ctx, "readAPIKey", "auth")
+	defer span.End()
 	if err := b.apikeyLimit.Acquire(ctx, 1); err != nil {
 		return nil, err
 	}
@@ -67,6 +74,8 @@ func (b *Bulker) APIKeyRead(ctx context.Context, id string, withOwner bool) (*AP
 }
 
 func (b *Bulker) APIKeyInvalidate(ctx context.Context, ids ...string) error {
+	span, ctx := apm.StartSpan(ctx, "invalidateAPIKey", "auth")
+	defer span.End()
 	if err := b.apikeyLimit.Acquire(ctx, 1); err != nil {
 		return err
 	}
@@ -76,6 +85,9 @@ func (b *Bulker) APIKeyInvalidate(ctx context.Context, ids ...string) error {
 }
 
 func (b *Bulker) APIKeyUpdate(ctx context.Context, id, outputPolicyHash string, roles []byte) error {
+	span, ctx := apm.StartSpan(ctx, "updateAPIKey", "auth") // NOTE: this is tracked as updateAPIKey/auth instead of update_api_key/bulker to be consistent with other auth actions that don't use a queue.
+	span.Context.SetLabel("api_key_id", id)
+	defer span.End()
 	req := &apiKeyUpdateRequest{
 		ID:        id,
 		Roles:     roles,
@@ -105,6 +117,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 	idxToID := make(map[int32]string)
 	IDToResponse := make(map[string]int)
 	maxKeySize := 0
+	links := []apm.SpanLink{}
 
 	// merge ids
 	for n := queue.head; n != nil; n = n.next {
@@ -139,7 +152,18 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		if maxKeySize < len(req.ID) {
 			maxKeySize = len(req.ID)
 		}
+		if n.spanLink != nil {
+			links = append(links, *n.spanLink)
+		}
 	}
+
+	if len(links) == 0 {
+		links = nil
+	}
+	span, ctx := apm.StartSpanOptions(ctx, "Flush: apiKeyUpdate", "apiKeyUpdate", apm.SpanOptions{
+		Links: links,
+	})
+	defer span.End()
 
 	for id, roleHash := range rolePerID {
 		delete(rolePerID, id)

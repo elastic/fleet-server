@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/cbor"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
 )
 
 var (
@@ -38,6 +39,8 @@ func New(client *elasticsearch.Client, bulker bulk.Bulk, sizeLimit int64) *Deliv
 }
 
 func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID string) (file.MetaDoc, error) {
+	span, ctx := apm.StartSpan(ctx, "findFile", "process")
+	defer span.End()
 	result, err := findFileForAgent(ctx, d.bulker, fileID, agentID)
 	if err != nil {
 		return file.MetaDoc{}, err
@@ -72,8 +75,10 @@ func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileI
 }
 
 func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w io.Writer, chunks []file.ChunkInfo, fileID string) error {
+	span, ctx := apm.StartSpan(ctx, "response", "write")
+	defer span.End()
 	for _, chunkInfo := range chunks {
-		body, err := readChunkStream(d.client, chunkInfo.Index, chunkInfo.ID)
+		body, err := readChunkStream(ctx, d.client, chunkInfo.Index, chunkInfo.ID)
 		if err != nil {
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error reading chunk stream")
 			body.Close()

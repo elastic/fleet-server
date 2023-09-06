@@ -5,6 +5,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -57,7 +59,9 @@ func maximizePatch(ver *version.Version) string {
 
 // validateUserAgent validates that the User-Agent of the connecting Elastic Agent is valid and that the version is
 // supported for this Fleet Server.
-func validateUserAgent(zlog zerolog.Logger, userAgent string, verConst version.Constraints) (string, error) {
+func validateUserAgent(ctx context.Context, zlog zerolog.Logger, userAgent string, verConst version.Constraints) (string, error) {
+	span, _ := apm.StartSpan(ctx, "userAgent", "validate")
+	defer span.End()
 	zlog = zlog.With().Str("userAgent", userAgent).Logger()
 
 	if userAgent == "" {

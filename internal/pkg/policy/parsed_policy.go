@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -47,6 +48,7 @@ type ParsedPolicy struct {
 	Outputs map[string]Output
 	Default ParsedPolicyDefaults
 	Inputs  []map[string]interface{}
+	Links   apm.SpanLink
 }
 
 func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*ParsedPolicy, error) {
@@ -94,6 +96,14 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 			Name: defaultName,
 		},
 		Inputs: policyInputs,
+	}
+	if trace := apm.TransactionFromContext(ctx); trace != nil {
+		// Pass current transaction link (should be a monitor transaction) to caller (likely a client request).
+		tCtx := trace.TraceContext()
+		pp.Links = apm.SpanLink{
+			Trace: tCtx.Trace,
+			Span:  tCtx.Span,
+		}
 	}
 
 	return pp, nil

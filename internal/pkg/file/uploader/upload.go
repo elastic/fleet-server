@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
+	"go.elastic.co/apm/v2"
 )
 
 var (
@@ -55,7 +56,9 @@ func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, cache cache.Cache,
 
 // Start an upload operation
 func (u *Uploader) Begin(ctx context.Context, data JSDict) (file.Info, error) {
+	vSpan, _ := apm.StartSpan(ctx, "validateFileInfo", "validate")
 	if data == nil {
+		vSpan.End()
 		return file.Info{}, ErrPayloadRequired
 	}
 
@@ -65,15 +68,18 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (file.Info, error) {
 
 	// make sure all required fields are present and non-empty
 	if err := validateUploadPayload(data); err != nil {
+		vSpan.End()
 		return file.Info{}, err
 	}
 
 	size, _ := data.Int64("file", "size")
 	if size > u.sizeLimit {
+		vSpan.End()
 		return file.Info{}, ErrFileSizeTooLarge
 	}
 
 	uid, err := uuid.NewV4()
+	vSpan.End()
 	if err != nil {
 		return file.Info{}, fmt.Errorf("unable to generate upload operation ID: %w", err)
 	}
@@ -194,6 +200,8 @@ func validateUploadPayload(info JSDict) error {
 // GetUploadInfo searches for Upload Metadata document in local memory cache if available
 // otherwise, fetches from elasticsearch and caches for next use
 func (u *Uploader) GetUploadInfo(ctx context.Context, uploadID string) (file.Info, error) {
+	span, ctx := apm.StartSpan(ctx, "getFileInfo", "process")
+	defer span.End()
 	// Fetch metadata doc, if not cached
 	info, exist := u.cache.GetUpload(uploadID)
 	if exist {

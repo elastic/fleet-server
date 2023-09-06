@@ -101,7 +101,7 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 	ctx := zlog.WithContext(r.Context())
 	r = r.WithContext(ctx)
 
-	ver, err := validateUserAgent(zlog, userAgent, ct.verCon)
+	ver, err := validateUserAgent(r.Context(), zlog, userAgent, ct.verCon)
 	if err != nil {
 		return err
 	}
@@ -111,8 +111,18 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 	return ct.ProcessRequest(zlog, w, r, start, agent, newVer)
 }
 
-func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
-	ctx := r.Context()
+// validatedCheckin is a struct to wrap all the things that validateRequest returns.
+type validatedCheckin struct {
+	req     *CheckinRequest
+	dur     time.Duration
+	rawMeta []byte
+	rawComp []byte
+	seqno   sqn.SeqNo
+}
+
+func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent) (validatedCheckin, error) {
+	span, ctx := apm.StartSpan(r.Context(), "validateRequest", "validate")
+	defer span.End()
 
 	body := r.Body
 	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
@@ -121,10 +131,11 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	}
 	readCounter := datacounter.NewReaderCounter(body)
 
+	var val validatedCheckin
 	var req CheckinRequest
 	decoder := json.NewDecoder(readCounter)
 	if err := decoder.Decode(&req); err != nil {
-		return fmt.Errorf("decode checkin request: %w", err)
+		return val, fmt.Errorf("decode checkin request: %w", err)
 	}
 	cntCheckin.bodyIn.Add(readCounter.Count())
 
@@ -133,7 +144,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	if req.PollTimeout != nil {
 		pDur, err = time.ParseDuration(*req.PollTimeout)
 		if err != nil {
-			return fmt.Errorf("poll_timeout cannot be parsed as duration: %w", err)
+			return val, fmt.Errorf("poll_timeout cannot be parsed as duration: %w", err)
 		}
 	}
 
@@ -163,25 +174,45 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	// Compare local_metadata content and update if different
 	rawMeta, err := parseMeta(zlog, agent, &req)
 	if err != nil {
-		return err
-	}
-
-	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
-	// Older agents will communicate any issues with upgrades via the Ack endpoint.
-	if err := ct.processUpgradeDetails(ctx, agent, req.UpgradeDetails); err != nil {
-		return fmt.Errorf("failed to update upgrade_details: %w", err)
+		return val, err
 	}
 
 	// Compare agent_components content and update if different
 	rawComponents, err := parseComponents(zlog, agent, &req)
 	if err != nil {
-		return err
+		return val, err
 	}
 
 	// Resolve AckToken from request, fallback on the agent record
 	seqno, err := ct.resolveSeqNo(ctx, zlog, req, agent)
 	if err != nil {
+		return val, err
+	}
+
+	return validatedCheckin{
+		req:     &req,
+		dur:     pollDuration,
+		rawMeta: rawMeta,
+		rawComp: rawComponents,
+		seqno:   seqno,
+	}, nil
+}
+
+func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
+	validated, err := ct.validateRequest(zlog, w, r, start, agent)
+	if err != nil {
 		return err
+	}
+	req := validated.req
+	pollDuration := validated.dur
+	rawMeta := validated.rawMeta
+	rawComponents := validated.rawComp
+	seqno := validated.seqno
+
+	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
+	// Older agents will communicate any issues with upgrades via the Ack endpoint.
+	if err := ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails); err != nil {
+		return fmt.Errorf("failed to update upgrade_details: %w", err)
 	}
 
 	// Subscribe to actions dispatcher
@@ -214,7 +245,6 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		Dur("setupDuration", setupDuration).
 		Dur("jitter", jitter).
 		Dur("pollDuration", pollDuration).
-		Uint64("bodyCount", readCounter.Count()).
 		Msg("checkin start long poll")
 
 	// Chill out for a bit. Long poll.
@@ -234,18 +264,20 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	)
 
 	// Check agent pending actions first
-	pendingActions, err := ct.fetchAgentPendingActions(ctx, seqno, agent.Id)
+	pendingActions, err := ct.fetchAgentPendingActions(r.Context(), seqno, agent.Id)
 	if err != nil {
 		return err
 	}
 	pendingActions = filterActions(zlog, agent.Id, pendingActions)
 	actions, ackToken = convertActions(agent.Id, pendingActions)
 
+	span, ctx := apm.StartSpan(r.Context(), "longPoll", "process")
 	if len(actions) == 0 {
 	LOOP:
 		for {
 			select {
 			case <-ctx.Done():
+				span.End()
 				return ctx.Err()
 			case acdocs := <-actCh:
 				var acs []Action
@@ -256,6 +288,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 			case policy := <-sub.Output():
 				actionResp, err := processPolicy(ctx, zlog, ct.bulker, agent.Id, policy)
 				if err != nil {
+					span.End()
 					return fmt.Errorf("processPolicy: %w", err)
 				}
 				actions = append(actions, *actionResp)
@@ -271,6 +304,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 			}
 		}
 	}
+	span.End()
 
 	resp := CheckinResponse{
 		AckToken: &ackToken,
@@ -291,6 +325,9 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		if len(agent.UpgradeDetails) == 0 {
 			return nil
 		}
+		span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
+		span.Context.SetLabel("agent_id", agent.Agent.ID)
+		defer span.End()
 		// if the checkin had no details, but agent has details treat like a successful upgrade
 		doc := bulk.UpdateFields{
 			dl.FieldUpgradeDetails:   nil,
@@ -307,25 +344,29 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	// update docs with in progress details
 
 	// verify action exists
+	vSpan, vCtx := apm.StartSpan(ctx, "Check update action", "validate")
 	action, ok := ct.cache.GetAction(details.ActionId)
 	if !ok {
-		actions, err := dl.FindAction(ctx, ct.bulker, details.ActionId)
+		actions, err := dl.FindAction(vCtx, ct.bulker, details.ActionId)
 		if err != nil {
+			vSpan.End()
 			return fmt.Errorf("unable to find upgrade_details action: %w", err)
 		}
 		if len(actions) == 0 {
+			vSpan.End()
 			return fmt.Errorf("upgrade_details no action for id %q found", details.ActionId)
 		}
 		action = actions[0]
 		ct.cache.SetAction(action)
 	}
+	vSpan.End()
 
 	// link action with APM spans
 	var links []apm.SpanLink
 	if ct.bulker.HasTracer() && action.Traceparent != "" {
 		traceCtx, err := apmhttp.ParseTraceparentHeader(action.Traceparent)
 		if err != nil {
-			zerolog.Ctx(ctx).Trace().Err(err).Msgf("Error parsing traceparent: %s %s", action.Traceparent, err)
+			zerolog.Ctx(vCtx).Trace().Err(err).Msgf("Error parsing traceparent: %s %s", action.Traceparent, err)
 		} else {
 			links = []apm.SpanLink{
 				{
@@ -335,46 +376,56 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			}
 		}
 	}
-	span, ctx := apm.StartSpanOptions(ctx, "Process upgrade details", "app", apm.SpanOptions{Links: links})
+	span, ctx := apm.StartSpanOptions(ctx, "Process upgrade details", "process", apm.SpanOptions{Links: links})
 	span.Context.SetLabel("action_id", details.ActionId)
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
 
 	// validate metadata with state
+	vSpan, _ = apm.StartSpan(ctx, "validateUpgradeMetadata", "validate")
 	switch details.State {
 	case UpgradeDetailsStateUPGDOWNLOADING:
 		if details.Metadata == nil {
+			vSpan.End()
 			break // no validation
 		}
 		_, err := details.Metadata.AsUpgradeMetadataDownloading()
 		if err != nil {
+			vSpan.End()
 			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
 		}
 	case UpgradeDetailsStateUPGFAILED:
 		if details.Metadata == nil {
+			vSpan.End()
 			return fmt.Errorf("%w: metadata missing", ErrInvalidUpgradeMetadata)
 		}
 		meta, err := details.Metadata.AsUpgradeMetadataFailed()
 		if err != nil {
+			vSpan.End()
 			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
 		if meta.ErrorMsg == "" {
+			vSpan.End()
 			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
 		}
 	case UpgradeDetailsStateUPGSCHEDULED:
 		if details.Metadata == nil {
+			vSpan.End()
 			return fmt.Errorf("%w: metadata missing", ErrInvalidUpgradeMetadata)
 		}
 		meta, err := details.Metadata.AsUpgradeMetadataScheduled()
 		if err != nil {
+			vSpan.End()
 			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGSCHEDULED, err)
 		}
 		if meta.ScheduledAt.IsZero() {
+			vSpan.End()
 			return fmt.Errorf("%w: %s metadata contains empty scheduled_at attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGSCHEDULED)
 
 		}
 	default:
 	}
+	vSpan.End()
 
 	// marshal and update agent doc with details
 	p, err := json.Marshal(details)
@@ -392,6 +443,7 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 }
 
 func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
+	ctx := r.Context()
 	var links []apm.SpanLink
 	if ct.bulker.HasTracer() {
 		for _, a := range fromPtr(resp.Actions) {
@@ -413,7 +465,8 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	}
 
 	if len(fromPtr(resp.Actions)) > 0 {
-		span, _ := apm.StartSpanOptions(r.Context(), "action delivery", "fleet-server", apm.SpanOptions{
+		var span *apm.Span
+		span, ctx = apm.StartSpanOptions(ctx, "action delivery", "fleet-server", apm.SpanOptions{
 			Links: links,
 		})
 		span.Context.SetLabel("action_count", len(fromPtr(resp.Actions)))
@@ -431,6 +484,8 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 			Int64("timeout", fromPtr(action.Timeout)).
 			Msg("Action delivered to agent on checkin")
 	}
+	rSpan, _ := apm.StartSpan(ctx, "response", "write")
+	defer rSpan.End()
 
 	payload, err := json.Marshal(&resp)
 	if err != nil {
@@ -441,7 +496,6 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	compressThreshold := ct.cfg.CompressionThresh
 
 	if len(payload) > compressThreshold && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
-
 		wrCounter := datacounter.NewWriterCounter(w)
 
 		zipper, err := gzip.NewWriterLevel(wrCounter, compressionLevel)
@@ -491,6 +545,8 @@ func acceptsEncoding(r *http.Request, encoding string) bool {
 
 // Resolve AckToken from request, fallback on the agent record
 func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req CheckinRequest, agent *model.Agent) (sqn.SeqNo, error) {
+	span, ctx := apm.StartSpan(ctx, "resolveSeqNo", "validate")
+	defer span.End()
 	var err error
 	// Resolve AckToken from request, fallback on the agent record
 	ackToken := req.AckToken
@@ -515,7 +571,6 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req C
 }
 
 func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentID string) ([]model.Action, error) {
-
 	actions, err := dl.FindAgentActions(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentID)
 
 	if err != nil {
@@ -593,6 +648,12 @@ func convertActions(agentID string, actions []model.Action) ([]Action, string) {
 //   - Generate and update default ApiKey if roles have changed.
 //   - Rewrite the policy for delivery to the agent injecting the key material.
 func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string, pp *policy.ParsedPolicy) (*Action, error) {
+	var links []apm.SpanLink = nil // set to a nil array to preserve default behaviour if no policy links are found
+	if err := pp.Links.Trace.Validate(); err == nil {
+		links = []apm.SpanLink{pp.Links}
+	}
+	span, ctx := apm.StartSpanOptions(ctx, "processPolicy", "process", apm.SpanOptions{Links: links})
+	defer span.End()
 	zlog = zlog.With().
 		Str("fleet.ctx", "processPolicy").
 		Int64("fleet.policyRevision", pp.Policy.RevisionIdx).
@@ -601,7 +662,9 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Logger()
 
 	// Repull and decode the agent object. Do not trust the cache.
-	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
+	bSpan, bCtx := apm.StartSpan(ctx, "findAgent", "search")
+	agent, err := dl.FindAgent(bCtx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
+	bSpan.End()
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail find agent record")
 		return nil, err
@@ -667,6 +730,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 }
 
 func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {
+	span, ctx := apm.StartSpan(ctx, "findAgentByID", "search")
+	defer span.End()
 	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByAssessAPIKeyID, dl.FieldAccessAPIKeyID, id)
 	if err != nil {
 		if errors.Is(err, dl.ErrNotFound) {

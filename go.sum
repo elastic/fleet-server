@@ -245,8 +245,8 @@ go.elastic.co/apm/module/apmprometheus/v2 v2.4.3 h1:86U5zbPaJP05aBpBObluZwalalnF
 go.elastic.co/apm/module/apmprometheus/v2 v2.4.3/go.mod h1:959F94I7aBnB3IGJZb9hFzqg40FEo5pF/2LajF90xOw=
 go.elastic.co/apm/module/apmzerolog/v2 v2.4.3 h1:IGPfMId8740yzo3xaADrawmEE+DkA1l4dGWOjesE/Eo=
 go.elastic.co/apm/module/apmzerolog/v2 v2.4.3/go.mod h1:ZFuCQrcC9BKl7+aE2bNKfrHiJr1RIHvkjr3GwcB+olQ=
-go.elastic.co/apm/v2 v2.4.3 h1:k6mj63O7IIyqqn3S52C2vBXvaSK9M5FHp0aZHpPH/as=
-go.elastic.co/apm/v2 v2.4.3/go.mod h1:+CiBUdrrAGnGCL9TNx7tQz3BrfYV23L8Ljvotoc87so=
+go.elastic.co/apm/v2 v2.4.4 h1:KGbmUEtLNQ6sCFGpqTMhfRjqDOKP8IliO+efErKY5lU=
+go.elastic.co/apm/v2 v2.4.4/go.mod h1:+CiBUdrrAGnGCL9TNx7tQz3BrfYV23L8Ljvotoc87so=
 go.elastic.co/ecszap v1.0.1 h1:mBxqEJAEXBlpi5+scXdzL7LTFGogbuxipJC0KTZicyA=
 go.elastic.co/ecszap v1.0.1/go.mod h1:SVjazT+QgNeHSGOCUHvRgN+ZRj5FkB7IXQQsncdF57A=
 go.elastic.co/ecszerolog v0.1.0 h1:oNjqYwytG+jt6Lrz/GQlt53oh5KTBi81q0ebmQvHTGY=

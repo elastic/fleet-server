@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/mailru/easyjson"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -21,11 +22,9 @@ const (
 )
 
 func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byte, error) {
-	var opt optionsT
-	if len(opts) > 0 {
-		opt = b.parseOpts(opts...)
-	}
-
+	span, ctx := apm.StartSpan(ctx, "Bulker: read", "bulker")
+	defer span.End()
+	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 	blk := b.newBlk(ActionRead, opt)
 
 	// Serialize request
@@ -42,6 +41,8 @@ func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byt
 		return nil, resp.err
 	}
 	b.freeBlk(blk)
+
+	// TODO if we can ever set span links after creation we can inject the flushQueue span into resp and link to the action span here.
 
 	// Interpret response, looking for generated id
 	r, ok := resp.data.(*MgetResponseItem)
@@ -66,10 +67,21 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 
 	// Each item a JSON array element followed by comma
 	queueCnt := 0
+	links := []apm.SpanLink{}
 	for n := queue.head; n != nil; n = n.next {
 		buf.Write(n.buf.Bytes())
 		queueCnt += 1
+		if n.spanLink != nil {
+			links = append(links, *n.spanLink)
+		}
 	}
+	if len(links) == 0 {
+		links = nil
+	}
+	span, ctx := apm.StartSpanOptions(ctx, "Flush: read", "read", apm.SpanOptions{
+		Links: links,
+	})
+	defer span.End()
 
 	// Need to strip the last element and append the suffix
 	payload := buf.Bytes()

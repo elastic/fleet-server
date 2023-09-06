@@ -466,6 +466,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	pim, err := monitor.New(dl.FleetPolicies, esCli, monCli,
 		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
 		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
+		monitor.WithAPMTracer(tracer),
 	)
 	if err != nil {
 		return err
@@ -497,6 +498,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 		monitor.WithExpiration(true),
 		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
 		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
+		monitor.WithAPMTracer(tracer),
 	)
 	if err != nil {
 		return err

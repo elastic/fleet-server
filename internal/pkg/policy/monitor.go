@@ -12,6 +12,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -244,6 +245,11 @@ func (m *monitorT) dispatchPending() bool {
 }
 
 func (m *monitorT) loadPolicies(ctx context.Context) error {
+	if m.bulker.HasTracer() {
+		trans := m.bulker.StartTransaction("Load policies", "bulker")
+		ctx = apm.ContextWithTransaction(ctx, trans)
+		defer trans.End()
+	}
 	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {

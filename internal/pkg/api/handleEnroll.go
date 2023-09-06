@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	"go.elastic.co/apm/v2"
 
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-version"
@@ -83,7 +84,7 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 	ctx := zlog.WithContext(r.Context())
 	r = r.WithContext(ctx)
 
-	ver, err := validateUserAgent(zlog, userAgent, et.verCon)
+	ver, err := validateUserAgent(r.Context(), zlog, userAgent, et.verCon)
 	if err != nil {
 		return err
 	}
@@ -94,7 +95,7 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 	}
 
 	ts, _ := logger.CtxStartTime(r.Context())
-	return writeResponse(zlog, w, resp, ts)
+	return writeResponse(r.Context(), zlog, w, resp, ts)
 }
 
 func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKey *apikey.APIKey, ver string) (*EnrollResponse, error) {
@@ -124,7 +125,7 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	readCounter := datacounter.NewReaderCounter(body)
 
 	// Parse the request body
-	req, err := decodeEnrollRequest(readCounter)
+	req, err := validateRequest(r.Context(), readCounter)
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +139,8 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 // If the static policy token feature was not enabled, nothing is returns (nil, nil)
 // otherwise either an error or the enrollment key record is returned.
 func (et *EnrollerT) retrieveStaticTokenEnrollmentToken(ctx context.Context, zlog zerolog.Logger, enrollmentAPIKey *apikey.APIKey) (*model.EnrollmentAPIKey, error) {
+	span, ctx := apm.StartSpan(ctx, "staticTokenCheck", "auth")
+	defer span.End()
 	if !et.cfg.StaticPolicyTokens.Enabled {
 		return nil, nil
 	}
@@ -192,20 +195,26 @@ func (et *EnrollerT) _enroll(
 ) (*EnrollResponse, error) {
 	var agent model.Agent
 	var enrollmentID string
+
+	span, ctx := apm.StartSpan(ctx, "enroll", "process")
+	defer span.End()
+
 	if req.EnrollmentId != nil {
+		vSpan, vCtx := apm.StartSpan(ctx, "checkEnrollmentID", "validate")
 		enrollmentID = *req.EnrollmentId
 		var err error
-		agent, err = dl.FindAgent(ctx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, enrollmentID)
+		agent, err = dl.FindAgent(vCtx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, enrollmentID)
 		if err != nil {
 			zlog.Debug().Err(err).
 				Str("EnrollmentId", enrollmentID).
 				Msg("Agent with EnrollmentId not found")
 			if !errors.Is(err, dl.ErrNotFound) && !strings.Contains(err.Error(), "no such index") {
+				vSpan.End()
 				return nil, err
 			}
 		}
+		vSpan.End()
 	}
-
 	now := time.Now()
 
 	// Generate an ID here so we can pre-create the api key and avoid a round trip
@@ -316,6 +325,9 @@ func removeDuplicateStr(strSlice []string) []string {
 }
 
 func deleteAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string) error {
+	span, ctx := apm.StartSpan(ctx, "deleteAgent", "delete")
+	span.Context.SetLabel("agent_id", agentID)
+	defer span.End()
 	zlog = zlog.With().Str(LogAgentID, agentID).Logger()
 
 	if err := bulker.Delete(ctx, dl.FleetAgents, agentID); err != nil {
@@ -330,7 +342,6 @@ func invalidateAPIKey(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk
 	// hack-a-rama:  We purposely do not force a "refresh:true" on the Apikey creation
 	// because doing so causes the api call to slow down at scale. It is already very slow.
 	// So we have to wait for the key to become visible until we can invalidate it.
-
 	zlog = zlog.With().Str(LogAPIKeyID, apikeyID).Logger()
 
 	start := time.Now()
@@ -372,7 +383,10 @@ LOOP:
 	return nil
 }
 
-func writeResponse(zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, start time.Time) error {
+func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, start time.Time) error {
+	span, _ := apm.StartSpan(ctx, "response", "write")
+	defer span.End()
+
 	data, err := json.Marshal(resp)
 	if err != nil {
 		return fmt.Errorf("marshal enrollResponse: %w", err)
@@ -454,6 +468,9 @@ func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 }
 
 func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent) error {
+	span, ctx := apm.StartSpan(ctx, "createAgent", "create")
+	defer span.End()
+
 	data, err := json.Marshal(agent)
 	if err != nil {
 		return err
@@ -477,6 +494,8 @@ func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (
 }
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentAPIKey, error) {
+	span, ctx := apm.StartSpan(ctx, "tokenCheck", "auth")
+	defer span.End()
 	if key, ok := et.cache.GetEnrollmentAPIKey(id); ok {
 		return &key, nil
 	}
@@ -497,7 +516,10 @@ func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*
 	return &rec, nil
 }
 
-func decodeEnrollRequest(data io.Reader) (*EnrollRequest, error) {
+func validateRequest(ctx context.Context, data io.Reader) (*EnrollRequest, error) {
+	span, _ := apm.StartSpan(ctx, "validateRequest", "validate")
+	defer span.End()
+
 	var req EnrollRequest
 	decoder := json.NewDecoder(data)
 	if err := decoder.Decode(&req); err != nil {

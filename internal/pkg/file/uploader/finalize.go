@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 )
 
 var (
@@ -22,6 +23,8 @@ var (
 )
 
 func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) (file.Info, error) {
+	span, ctx := apm.StartSpan(ctx, "completeUpload", "process")
+	defer span.End()
 	// make sure document is freshly fetched, not cached
 	// so accurate status checking happens
 	info, err := file.GetInfo(ctx, u.bulker, UploadHeaderIndexPattern, id)
@@ -42,7 +45,9 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 	if err != nil {
 		return info, err
 	}
+	vSpan, _ := apm.StartSpan(ctx, "validateUpload", "validate")
 	if !u.allChunksPresent(info, chunks) {
+		vSpan.End()
 		return info, ErrMissingChunks
 	}
 	if !u.verifyChunkInfo(info, chunks, transitHash) {
@@ -52,8 +57,10 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 		if err := DeleteAllChunksForFile(ctx, u.bulker, info.Source, info.DocID); err != nil {
 			log.Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error deleting left-behind chunk data")
 		}
+		vSpan.End()
 		return info, ErrFailValidation
 	}
+	vSpan.End()
 
 	/*
 		Upload OK. Update status and save valid transithash

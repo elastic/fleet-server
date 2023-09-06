@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.elastic.co/apm/v2"
 )
 
 type standAloneSelfMonitorT struct {
@@ -84,6 +85,12 @@ func (m *standAloneSelfMonitorT) State() client.UnitState {
 func (m *standAloneSelfMonitorT) check(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, m.checkTimeout)
 	defer cancel()
+
+	if m.bulker.HasTracer() {
+		trans := m.bulker.StartTransaction("Check standalone", "bulker")
+		ctx = apm.ContextWithTransaction(ctx, trans)
+		defer trans.End()
+	}
 
 	current := m.State()
 	state := client.UnitStateHealthy

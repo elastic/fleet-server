@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -152,6 +153,11 @@ func (m *selfMonitorT) waitStart(ctx context.Context) error { //nolint:unused //
 }
 
 func (m *selfMonitorT) process(ctx context.Context) (client.UnitState, error) {
+	if m.bulker.HasTracer() {
+		trans := m.bulker.StartTransaction("Check self monitor", "bulker")
+		ctx = apm.ContextWithTransaction(ctx, trans)
+		defer trans.End()
+	}
 	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if err != nil {
 		if !errors.Is(err, es.ErrIndexNotFound) {

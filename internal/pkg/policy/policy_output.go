@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -42,6 +43,9 @@ type Output struct {
 // Prepare prepares the output p to be sent to the elastic-agent
 // The agent might be mutated for an elasticsearch output
 func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
+	span, ctx := apm.StartSpan(ctx, "prepareOutput", "process")
+	defer span.End()
+	span.Context.SetLabel("output_type", p.Type)
 	zlog = zlog.With().
 		Str("fleet.agent.id", agent.Id).
 		Str("fleet.policy.output.name", p.Name).Logger()

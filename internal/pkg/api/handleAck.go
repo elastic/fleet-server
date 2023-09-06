@@ -103,30 +103,16 @@ func (ack *AckT) handleAcks(zlog zerolog.Logger, w http.ResponseWriter, r *http.
 }
 
 func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent) error {
-	body := r.Body
-
-	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
-	if ack.cfg.Limits.AckLimit.MaxBody > 0 {
-		body = http.MaxBytesReader(w, body, ack.cfg.Limits.AckLimit.MaxBody)
-	}
-
-	raw, err := io.ReadAll(body)
+	req, err := ack.validateRequest(zlog, w, r)
 	if err != nil {
-		return fmt.Errorf("handleAcks read body: %w", err)
+		return err
 	}
-
-	cntAcks.bodyIn.Add(uint64(len(raw)))
-
-	var req AckRequest
-	if err := json.Unmarshal(raw, &req); err != nil {
-		return fmt.Errorf("handleAcks unmarshal: %w", err)
-	}
-
-	zlog.Trace().RawJSON("raw", raw).Msg("Ack request")
 
 	zlog = zlog.With().Int("nEvents", len(req.Events)).Logger()
 
 	resp, err := ack.handleAckEvents(r.Context(), zlog, agent, req.Events)
+	span, _ := apm.StartSpan(r.Context(), "response", "write")
+	defer span.End()
 	if err != nil {
 		var herr *HTTPError
 		if errors.As(err, &herr) {
@@ -153,6 +139,32 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 	return nil
 }
 
+func (ack *AckT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request) (*AckRequest, error) {
+	span, _ := apm.StartSpan(r.Context(), "validateRequest", "validate")
+	defer span.End()
+
+	body := r.Body
+
+	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
+	if ack.cfg.Limits.AckLimit.MaxBody > 0 {
+		body = http.MaxBytesReader(w, body, ack.cfg.Limits.AckLimit.MaxBody)
+	}
+
+	raw, err := io.ReadAll(body)
+	if err != nil {
+		return nil, fmt.Errorf("handleAcks read body: %w", err)
+	}
+
+	cntAcks.bodyIn.Add(uint64(len(raw)))
+
+	var req AckRequest
+	if err := json.Unmarshal(raw, &req); err != nil {
+		return nil, fmt.Errorf("handleAcks unmarshal: %w", err)
+	}
+	zlog.Trace().RawJSON("raw", raw).Msg("Ack request")
+	return &req, err
+}
+
 func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
 	return model.ActionResult{
 		ActionID:        ev.ActionId,
@@ -171,7 +183,7 @@ func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
 // 1. AckResponse and nil error, when the whole request is successful
 // 2. AckResponse and non-nil error, when the request items had errors
 func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) (AckResponse, error) {
-	span, ctx := apm.StartSpan(ctx, "handleAckEvents", "ack")
+	span, ctx := apm.StartSpan(ctx, "handleAckEvents", "process")
 	defer span.End()
 	var policyAcks []string
 
@@ -203,6 +215,9 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	}
 
 	for n, ev := range events {
+		span, ctx := apm.StartSpan(ctx, "ackEvent", "process")
+		span.Context.SetLabel("agent_id", agent.Agent.ID)
+		span.Context.SetLabel("action_id", ev.ActionId)
 		log := zlog.With().
 			Str("actionType", string(ev.Type)).
 			Str("actionSubType", string(ev.Subtype)).
@@ -210,13 +225,13 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			Str("agentId", ev.AgentId).
 			Str("timestamp", ev.Timestamp).
 			Int("n", n).Logger()
-
 		log.Info().Msg("ack event")
 
 		// Check agent id mismatch
 		if ev.AgentId != "" && ev.AgentId != agent.Id {
 			log.Error().Msg("agent id mismatch")
 			setResult(n, http.StatusBadRequest)
+			span.End()
 			continue
 		}
 
@@ -230,18 +245,22 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			}
 			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
 			setResult(n, http.StatusOK)
+			span.End()
 			continue
 		}
 
 		// Process non-policy change actions
 		// Find matching action by action ID
+		vSpan, vCtx := apm.StartSpan(ctx, "ackAction", "validate")
 		action, ok := ack.cache.GetAction(ev.ActionId)
 		if !ok {
 			// Find action by ID
-			actions, err := dl.FindAction(ctx, ack.bulk, ev.ActionId)
+			actions, err := dl.FindAction(vCtx, ack.bulk, ev.ActionId)
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
 				setError(n, err)
+				vSpan.End()
+				span.End()
 				continue
 			}
 
@@ -249,11 +268,14 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			if len(actions) == 0 {
 				log.Error().Msg("no matching action")
 				setResult(n, http.StatusNotFound)
+				vSpan.End()
+				span.End()
 				continue
 			}
 			action = actions[0]
 			ack.cache.SetAction(action)
 		}
+		vSpan.End()
 
 		if err := ack.handleActionResult(ctx, zlog, agent, action, ev); err != nil {
 			setError(n, err)
@@ -264,6 +286,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		if ev.Error == nil && action.Type == TypeUnenroll {
 			unenrollIdxs = append(unenrollIdxs, n)
 		}
+		span.End()
 	}
 
 	// Process policy acks
@@ -310,7 +333,7 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 		}
 	}
 
-	span, ctx := apm.StartSpanOptions(ctx, fmt.Sprintf("Process action result %s", action.Type), "app", apm.SpanOptions{Links: links})
+	span, ctx := apm.StartSpanOptions(ctx, fmt.Sprintf("Process action result %s", action.Type), "process", apm.SpanOptions{Links: links})
 	span.Context.SetLabel("action_id", action.Id)
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
@@ -335,6 +358,8 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 }
 
 func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, actionIds ...string) error {
+	span, ctx := apm.StartSpan(ctx, "ackPolicyChanges", "process")
+	defer span.End()
 	// If more than one, pick the winner;
 	// 0) Correct policy id
 	// 1) Highest revision/coordinator number
@@ -342,6 +367,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	found := false
 	currRev := agent.PolicyRevisionIdx
 	currCoord := agent.PolicyCoordinatorIdx
+	vSpan, _ := apm.StartSpan(ctx, "checkPolicyActions", "validate")
 	for _, a := range actionIds {
 		rev, ok := policy.RevisionFromString(a)
 
@@ -363,6 +389,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		}
 	}
 
+	vSpan.End()
 	if !found {
 		return nil
 	}
@@ -397,7 +424,6 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	agentID string,
 	apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
-
 	if apiKeyID != "" {
 		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
@@ -449,6 +475,8 @@ func (ack *AckT) updateAgentDoc(ctx context.Context,
 	currRev, currCoord int64,
 	policyID string,
 ) error {
+	span, ctx := apm.StartSpan(ctx, "updateAgentDoc", "update")
+	defer span.End()
 	body := makeUpdatePolicyBody(
 		policyID,
 		currRev,
@@ -522,6 +550,8 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 }
 
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
+	span, ctx := apm.StartSpan(ctx, "ackUnenroll", "process")
+	defer span.End()
 	apiKeys := agent.APIKeyIDs()
 	if len(apiKeys) > 0 {
 		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
@@ -552,6 +582,8 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 }
 
 func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event Event) error {
+	span, ctx := apm.StartSpan(ctx, "ackUpgrade", "process")
+	defer span.End()
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{}
 	if event.Error != nil {
@@ -633,7 +665,6 @@ const kUpdatePolicyPrefix = `{"script":{"lang":"painless","source":"if (ctx._sou
 	` = params.ts;} else {ctx.op = \"noop\";}","params": {"id":"`
 
 func makeUpdatePolicyBody(policyID string, newRev, coordIdx int64) []byte {
-
 	var buf bytes.Buffer
 	buf.Grow(410)
 

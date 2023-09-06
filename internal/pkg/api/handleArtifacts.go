@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
+	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
 )
@@ -67,15 +68,21 @@ func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, 
 	ctx := zlog.WithContext(r.Context())
 	r = r.WithContext(ctx)
 
+	if err := at.validateRequest(r.Context(), sha2); err != nil {
+		return err
+	}
+
 	rdr, err := at.processRequest(r.Context(), zlog, agent, id, sha2)
 	if err != nil {
 		return err
 	}
+	span, ctx := apm.StartSpan(r.Context(), "response", "write")
+	defer span.End()
 	n, err := io.Copy(w, rdr)
 	if err != nil {
 		return err
 	}
-	ts, ok := logger.CtxStartTime(r.Context())
+	ts, ok := logger.CtxStartTime(ctx)
 	e := zlog.Trace().Int64(ECSHTTPResponseBodyBytes, n)
 	if ok {
 		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
@@ -85,13 +92,15 @@ func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, 
 	return nil
 }
 
-func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
+func (at ArtifactT) validateRequest(ctx context.Context, sha2 string) error {
+	span, _ := apm.StartSpan(ctx, "validateRequest", "validate")
+	defer span.End()
 
 	// Input validation
-	if err := validateSha2String(sha2); err != nil {
-		return nil, err
-	}
+	return validateSha2String(sha2)
+}
 
+func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, id, sha2 string) (io.Reader, error) {
 	// Determine whether the agent should have access to this artifact
 	if err := at.authorizeArtifact(ctx, agent, id, sha2); err != nil {
 		zlog.Warn().Err(err).Msg("Unauthorized GET on artifact")
@@ -137,13 +146,17 @@ func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, age
 //
 // Initial implementation is dependent on security by obscurity; ie.
 // it should be difficult for an attacker to guess a guid.
-func (at ArtifactT) authorizeArtifact(ctx context.Context, agent *model.Agent, ident, sha2 string) error {
+func (at ArtifactT) authorizeArtifact(ctx context.Context, _ *model.Agent, _, _ string) error { //nolint:unparam // remove if this is implemented
+	span, _ := apm.StartSpan(ctx, "authorizeArtifacts", "auth") // TODO return and use span ctx if this is ever not a nop
+	defer span.End()
 	return nil // TODO
 }
 
 // Return artifact from cache by sha2 or fetch directly from Elastic.
 // Update cache on successful retrieval from Elastic.
 func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident, sha2 string) (*model.Artifact, error) {
+	span, ctx := apm.StartSpan(ctx, "getArtifact", "process")
+	defer span.End()
 
 	// Check the cache; return immediately if found.
 	if artifact, ok := at.cache.GetArtifact(ident, sha2); ok {
@@ -152,7 +165,6 @@ func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident,
 
 	// Fetch the artifact from elastic
 	art, err := at.fetchArtifact(ctx, zlog, ident, sha2)
-
 	if err != nil {
 		zlog.Info().Err(err).Msg("Fail retrieve artifact")
 		return nil, err
@@ -175,10 +187,13 @@ func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident,
 	}
 
 	// Validate the sha256 hash; this is just good hygiene.
+	vSpan, _ := apm.StartSpan(ctx, "validateArtifact", "validate")
 	if err = validateSha2Data(dstPayload, art.EncodedSha256); err != nil {
+		vSpan.End()
 		zlog.Error().Err(err).Msg("Fail sha2 hash validation")
 		return nil, err
 	}
+	vSpan.End()
 
 	// Reassign decoded payload before adding to cache, avoid base64 decode on cache hit.
 	art.Body = dstPayload
@@ -194,6 +209,8 @@ func (at ArtifactT) getArtifact(ctx context.Context, zlog zerolog.Logger, ident,
 // Perhaps have a cache of the most recently used hashes available, and items that aren't
 // in the cache can do a lookup but throttle as below.  We could update the cache every 10m or so.
 func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, ident, sha2 string) (*model.Artifact, error) {
+	span, ctx := apm.StartSpan(ctx, "fetchArtifact", "search")
+	defer span.End()
 	// Throttle prevents more than N outstanding requests to elastic globally and per sha2.
 	if token := at.esThrottle.Acquire(sha2, defaultThrottleTTL); token == nil {
 		return nil, ErrorThrottle

@@ -10,6 +10,8 @@ import (
 	"math"
 )
 
+// TODO: Are multi requests used by anything? a quick grep shows no hits outside the bulk package.
+
 func (b *Bulker) MCreate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
 	return b.multiWaitBulkOp(ctx, ActionCreate, ops)
 }
@@ -35,7 +37,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 		return nil, errors.New("too many bulk ops")
 	}
 
-	opt := b.parseOpts(opts...)
+	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 
 	// Contract is that consumer never blocks, so must preallocate.
 	// Could consider making the response channel *respT to limit memory usage.
