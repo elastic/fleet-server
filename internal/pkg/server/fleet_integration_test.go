@@ -527,8 +527,8 @@ func TestServerInstrumentation(t *testing.T) {
 		for {
 			req, _ := http.NewRequestWithContext(ctx, "POST", checkinURL, bytes.NewBuffer([]byte("{}")))
 			req.Header.Set("Content-Type", "application/json")
-			res, err := cli.Do(req) //nolint:staticcheck // error check work around
-			if err == nil {         // return on successful request
+			res, err := cli.Do(req)
+			if err == nil { // return on successful request
 				if res.Body != nil {
 					res.Body.Close()
 				}
