@@ -508,6 +508,9 @@ func TestServerInstrumentation(t *testing.T) {
 	srv, err := startTestServer(t, ctx, WithAPM(server.URL))
 	require.NoError(t, err)
 
+	agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
+	checkinURL := srv.buildURL(agentID, "checkin")
+
 	newInstrumentationCfg := func(cfg config.Config, instr config.Instrumentation) { //nolint:govet // mutex should not be copied in operation (hopefully)
 		cfg.Inputs[0].Server.Instrumentation = instr
 
@@ -517,24 +520,24 @@ func TestServerInstrumentation(t *testing.T) {
 		require.NoError(t, srv.srv.Reload(ctx, newCfg))
 	}
 
-	stopClient := make(chan struct{})
 	cli := cleanhttp.DefaultClient()
 	callCheckinFunc := func() {
 		var Err error
 		defer require.NoError(t, Err)
 		for {
-			agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
-			req, _ := http.NewRequestWithContext(ctx, "POST", srv.buildURL(agentID, "checkin"), bytes.NewBuffer([]byte("{}")))
+			req, _ := http.NewRequestWithContext(ctx, "POST", checkinURL, bytes.NewBuffer([]byte("{}")))
 			req.Header.Set("Content-Type", "application/json")
 			res, err := cli.Do(req) //nolint:staticcheck // error check work around
-			if res != nil && res.Body != nil {
-				res.Body.Close()
+			if err == nil {         // return on successful request
+				if res.Body != nil {
+					res.Body.Close()
+				}
+				return
 			}
 			Err = err //nolint:ineffassign,staticcheck // ugly work around for error checking
+			// retry after wait or cancel
 			select {
 			case <-ctx.Done():
-				return
-			case <-stopClient:
 				return
 			case <-time.After(time.Second):
 			}
@@ -546,7 +549,6 @@ func TestServerInstrumentation(t *testing.T) {
 	// Errors if the tracer doesn't establish a connection within 5 seconds.
 	select {
 	case <-tracerConnected:
-		stopClient <- struct{}{}
 	case <-time.After(5 * time.Second):
 		t.Error("did not receive any data from the instrumented fleet-server")
 	}
@@ -574,8 +576,6 @@ func TestServerInstrumentation(t *testing.T) {
 	case <-time.After(5 * time.Second):
 	}
 
-	stopClient <- struct{}{}
-	close(stopClient)
 	cancel()
 	require.NoError(t, srv.waitExit())
 }
