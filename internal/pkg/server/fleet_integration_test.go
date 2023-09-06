@@ -545,7 +545,7 @@ func TestServerInstrumentation(t *testing.T) {
 			}
 		}
 	}
-	go callCheckinFunc()
+	callCheckinFunc()
 
 	// Verify the APM tracer connects to the mocked APM Server.
 	// Errors if the tracer doesn't establish a connection within 5 seconds.
@@ -562,6 +562,9 @@ func TestServerInstrumentation(t *testing.T) {
 		Hosts:   []string{server.URL},
 	})
 
+	// wait to hopefully allow change to propagate in the server
+	time.Sleep(time.Second)
+
 	// Verify the APM Tracer closes the connection to the mocked APM Server.
 	// Errors if the hasn't closed the connection after 5 seconds.
 	select {
@@ -571,7 +574,7 @@ func TestServerInstrumentation(t *testing.T) {
 		t.Error("APM tracer still connected after server restart, bug in the tracing code")
 	}
 
-	go callCheckinFunc()
+	callCheckinFunc()
 
 	// Verify the APM Tracer doesn't connect to the mocked APM Server.
 	select {
