@@ -522,6 +522,8 @@ func TestServerInstrumentation(t *testing.T) {
 
 	cli := cleanhttp.DefaultClient()
 	callCheckinFunc := func() {
+		t.Log("Starting checkin call loop")
+		defer t.Log("Exiting checkin call loop")
 		var Err error
 		defer require.NoError(t, Err)
 		for {
@@ -549,6 +551,7 @@ func TestServerInstrumentation(t *testing.T) {
 	// Errors if the tracer doesn't establish a connection within 5 seconds.
 	select {
 	case <-tracerConnected:
+		t.Log("Successfully receieved tracer data")
 	case <-time.After(5 * time.Second):
 		t.Error("did not receive any data from the instrumented fleet-server")
 	}
@@ -563,6 +566,7 @@ func TestServerInstrumentation(t *testing.T) {
 	// Errors if the hasn't closed the connection after 5 seconds.
 	select {
 	case <-tracerDisconnected:
+		t.Log("tracer loop disconnect detected")
 	case <-time.After(5 * time.Second):
 		t.Error("APM tracer still connected after server restart, bug in the tracing code")
 	}
