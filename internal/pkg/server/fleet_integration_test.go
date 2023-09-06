@@ -491,13 +491,16 @@ func TestServerInstrumentation(t *testing.T) {
 	tracerConnected := make(chan struct{}, 1)
 	tracerDisconnected := make(chan struct{}, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer req.Body.Close()
 		t.Logf("Tracing server received request to: %s", req.URL.Path)
 		if req.URL.Path != "/intake/v2/events" {
 			return
 		}
 		tracerConnected <- struct{}{}
 		io.Copy(io.Discard, req.Body) //nolint:errcheck // test case
+		t.Log("body drained")
 		tracerDisconnected <- struct{}{}
+		t.Log("events request done")
 	}))
 	defer server.Close()
 

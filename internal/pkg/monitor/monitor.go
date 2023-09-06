@@ -25,7 +25,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.elastic.co/apm/v2"
-	"go.elastic.co/apm/v2/transport"
 )
 
 const (
@@ -105,17 +104,11 @@ type Option func(SimpleMonitor)
 
 // NewSimple creates new SimpleMonitor.
 func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option) (SimpleMonitor, error) {
-	// Create a nop tracer to use in case none is set through an Option.
-	// this allows us to avoid a lot if checks around creating transactions.
-	tracer, _ := apm.NewTracerOptions(apm.TracerOptions{
-		Transport: transport.NewDiscardTransport(nil),
-	})
-
 	m := &simpleMonitorT{
 		index:          index,
 		esCli:          esCli,
 		monCli:         monCli,
-		tracer:         tracer,
+		tracer:         nil,
 		pollTimeout:    defaultPollTimeout,
 		withExpiration: defaultWithExpiration,
 		fetchSize:      defaultFetchSize,
@@ -176,9 +169,6 @@ func WithReadyChan(readyCh chan error) Option {
 
 func WithAPMTracer(tracer *apm.Tracer) Option {
 	return func(m SimpleMonitor) {
-		if tracer == nil {
-			return // if tracer is nil do not use
-		}
 		m.(*simpleMonitorT).tracer = tracer
 	}
 }
@@ -223,9 +213,12 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 	}()
 
 	// Get initial global checkpoint
+	var trans *apm.Transaction
 	for {
-		trans := m.tracer.StartTransaction("Query fleet global checkpoint", "monitor")
-		ctx := apm.ContextWithTransaction(ctx, trans)
+		if m.tracer != nil {
+			trans = m.tracer.StartTransaction("Query fleet global checkpoint", "monitor")
+			ctx = apm.ContextWithTransaction(ctx, trans)
+		}
 		span, sCtx := apm.StartSpan(ctx, "global_checkpoint", "fleet_global_checkpoints")
 		checkpoint, err := gcheckpt.Query(sCtx, m.monCli, m.index)
 		span.End()
@@ -233,17 +226,23 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			m.log.Warn().Err(err).Msg("failed to initialize the global checkpoints, will retry")
 			err = sleep.WithContext(ctx, retryDelay)
 			if err != nil {
-				trans.End()
+				if m.tracer != nil {
+					trans.End()
+				}
 				return err
 			}
-			trans.End()
+			if m.tracer != nil {
+				trans.End()
+			}
 			continue
 		}
 
 		m.storeCheckpoint(checkpoint)
 		m.log.Debug().Ints64("checkpoint", checkpoint).Msg("initial checkpoint")
 
-		trans.End()
+		if m.tracer != nil {
+			trans.End()
+		}
 		break
 	}
 
@@ -254,8 +253,10 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 	}
 
 	for {
-		trans := m.tracer.StartTransaction(fmt.Sprintf("Monitor index %s", m.index), "monitor")
-		ctx := apm.ContextWithTransaction(ctx, trans)
+		if m.tracer != nil {
+			trans = m.tracer.StartTransaction(fmt.Sprintf("Monitor index %s", m.index), "monitor")
+			ctx = apm.ContextWithTransaction(ctx, trans)
+		}
 		checkpoint := m.loadCheckpoint()
 
 		// Wait for checkpoint advance, long poll.
@@ -272,12 +273,16 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 				// Timed out, wait again
 				m.log.Debug().Msg("timeout on global checkpoints advance, poll again")
 				// Loop back to the checkpoint "wait advance" without delay
-				trans.End()
+				if m.tracer != nil {
+					trans.End()
+				}
 				continue
 			} else if errors.Is(err, context.Canceled) {
 				m.log.Info().Msg("context closed waiting for global checkpoints advance")
 				// Exit run
-				trans.End()
+				if m.tracer != nil {
+					trans.End()
+				}
 				return err
 			} else {
 				// Log the error and keep trying
@@ -287,11 +292,15 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			// Delay next attempt
 			err = sleep.WithContext(ctx, retryDelay)
 			if err != nil {
-				trans.End()
+				if m.tracer != nil {
+					trans.End()
+				}
 				return err
 			}
 			// Loop back to the checkpoint "wait advance" after the retry delay
-			trans.End()
+			if m.tracer != nil {
+				trans.End()
+			}
 			continue
 		}
 
@@ -315,7 +324,9 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			hits, err := m.fetch(ctx, checkpoint, newCheckpoint)
 			if err != nil {
 				m.log.Error().Err(err).Msg("failed checking new documents")
-				trans.End()
+				if m.tracer != nil {
+					trans.End()
+				}
 				break
 			}
 
@@ -340,7 +351,9 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 				m.storeCheckpoint(newCheckpoint)
 			}
 		}
-		trans.End()
+		if m.tracer != nil {
+			trans.End()
+		}
 	}
 }
 
