@@ -93,10 +93,10 @@ func (s *tserver) waitExit() error {
 
 type Option func(cfg *config.Config) error
 
-func WithAPM(url string) Option {
+func WithAPM(url string, enabled bool) Option {
 	return func(cfg *config.Config) error {
 		cfg.Inputs[0].Server.Instrumentation = config.Instrumentation{
-			Enabled: true,
+			Enabled: enabled,
 			Hosts:   []string{url},
 		}
 		return nil
@@ -489,7 +489,6 @@ func TestServerInstrumentation(t *testing.T) {
 	defer cancel()
 
 	tracerConnected := make(chan struct{}, 1)
-	tracerDisconnected := make(chan struct{}, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		t.Logf("Tracing server received request to: %s", req.URL.Path)
@@ -498,14 +497,12 @@ func TestServerInstrumentation(t *testing.T) {
 		}
 		tracerConnected <- struct{}{}
 		io.Copy(io.Discard, req.Body) //nolint:errcheck // test case
-		t.Log("body drained")
-		tracerDisconnected <- struct{}{}
-		t.Log("events request done")
+		t.Log("Tracing server request complete")
 	}))
 	defer server.Close()
 
-	// Start test server with instrumentation
-	srv, err := startTestServer(t, ctx, WithAPM(server.URL))
+	// Start test server with instrumentation diabled
+	srv, err := startTestServer(t, ctx, WithAPM(server.URL, false))
 	require.NoError(t, err)
 
 	agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
@@ -522,8 +519,6 @@ func TestServerInstrumentation(t *testing.T) {
 
 	cli := cleanhttp.DefaultClient()
 	callCheckinFunc := func() {
-		t.Log("Starting checkin call loop")
-		defer t.Log("Exiting checkin call loop")
 		var Err error
 		defer require.NoError(t, Err)
 		for {
@@ -531,6 +526,7 @@ func TestServerInstrumentation(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			res, err := cli.Do(req)
 			if err == nil { // return on successful request
+				t.Log("Checkin request successful")
 				if res.Body != nil {
 					res.Body.Close()
 				}
@@ -545,42 +541,33 @@ func TestServerInstrumentation(t *testing.T) {
 			}
 		}
 	}
+
+	// Force a transaction (fleet-server should be sending tranactions from the coordinator and monitor)
 	callCheckinFunc()
 
-	// Verify the APM tracer connects to the mocked APM Server.
-	// Errors if the tracer doesn't establish a connection within 5 seconds.
-	select {
-	case <-tracerConnected:
-		t.Log("Successfully receieved tracer data")
-	case <-time.After(5 * time.Second):
-		t.Error("did not receive any data from the instrumented fleet-server")
-	}
-
-	// Turn instrumentation off
-	newInstrumentationCfg(*srv.cfg, config.Instrumentation{ //nolint:govet // mutex should not be copied in operation (hopefully)
-		Enabled: false,
-		Hosts:   []string{server.URL},
-	})
-
-	// wait to hopefully allow change to propagate in the server
-	time.Sleep(time.Second)
-
-	// Verify the APM Tracer closes the connection to the mocked APM Server.
-	// Errors if the hasn't closed the connection after 5 seconds.
-	select {
-	case <-tracerDisconnected:
-		t.Log("tracer loop disconnect detected")
-	case <-time.After(5 * time.Second):
-		t.Error("APM tracer still connected after server restart, bug in the tracing code")
-	}
-
-	callCheckinFunc()
-
-	// Verify the APM Tracer doesn't connect to the mocked APM Server.
+	// Verify the APM tracer does not connect to the mocked APM Server.
 	select {
 	case <-tracerConnected:
 		t.Error("APM Tracer connected to APM Server, bug in the tracing code")
 	case <-time.After(5 * time.Second):
+		t.Log("No APM data when tracer is disabled")
+	}
+
+	// Turn instrumentation on
+	newInstrumentationCfg(*srv.cfg, config.Instrumentation{ //nolint:govet // mutex should not be copied in operation (hopefully)
+		Enabled: true,
+		Hosts:   []string{server.URL},
+	})
+
+	// Force a transaction
+	callCheckinFunc()
+
+	// Verify that the server now sends APM data
+	select {
+	case <-tracerConnected:
+		t.Log("tracer connection detected")
+	case <-time.After(5 * time.Second):
+		t.Error("APM tracer connection undetected, bug in the tracing code")
 	}
 
 	cancel()
