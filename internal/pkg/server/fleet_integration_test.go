@@ -501,7 +501,7 @@ func TestServerInstrumentation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// Start test server with instrumentation diabled
+	// Start test server with instrumentation disabled
 	srv, err := startTestServer(t, ctx, WithAPM(server.URL, false))
 	require.NoError(t, err)
 
