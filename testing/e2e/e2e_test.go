@@ -129,7 +129,7 @@ func (suite *BaseE2ETestSuite) SetupKibana() {
 
 	// Need to make a call in order to insert the endpoint package into the security-policy so that it sets everything up correctly
 	// If it's defined in the yml it does not load everything, specifically the .fleet-artifacts indices are not created.
-	buf := bytes.NewBufferString(`{"name":"Protect","description":"","namespace":"default","policy_id":"security-policy","enabled":true,"inputs":[{"enabled":true,"streams":[],"type":"ENDPOINT_INTEGRATION_CONFIG","config":{"_config":{"value":{"type":"endpoint","endpointConfig":{"preset":"EDRComplete"}}}}}],"package":{"name":"endpoint","title":"Elastic Defend","version":"8.8.0"}}`) // NOTE: Hardcoded package version here
+	buf := bytes.NewBufferString(`{"name":"Protect","description":"","namespace":"default","policy_id":"security-policy","enabled":true,"inputs":[{"enabled":true,"streams":[],"type":"ENDPOINT_INTEGRATION_CONFIG","config":{"_config":{"value":{"type":"endpoint","endpointConfig":{"preset":"EDRComplete"}}}}}],"package":{"name":"endpoint","title":"Elastic Defend","version":"8.10.2"}}`) // NOTE: Hardcoded package version here
 
 	req, err = http.NewRequest("POST", "http://localhost:5601/api/fleet/package_policies", buf)
 	suite.Require().NoError(err)
