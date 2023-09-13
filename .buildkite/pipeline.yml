@@ -59,11 +59,6 @@ steps:
         artifact_paths:
           - build/*.xml
           - build/e2e-coverage.out
-        depends_on:
-          - step: "unit-test"
-            allow_failure: false
-          - step: "int-test"
-            allow_failure: false
 
       - label: ":junit: Junit annotate"
         plugins:
