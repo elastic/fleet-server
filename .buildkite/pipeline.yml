@@ -43,17 +43,6 @@ steps:
           - build/*.xml
           - build/coverage.out
 
-      - label: ":sonarqube: Continuous Code Inspection"
-        env:
-          VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/fleet-server/sonar-analyze-token"
-        agents:
-          image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-        command:
-          - "buildkite-agent artifact download build/coverage.out ."
-          - "/scan-source-code.sh"
-        depends_on:
-          - "unit-test"
-
       - label: ":smartbear-testexecute: Run integration tests"
         key: int-test
         command: ".buildkite/scripts/integration_test.sh"
@@ -61,6 +50,20 @@ steps:
           provider: "gcp"
         artifact_paths:
           - build/*.xml
+
+      - label: "E2E Test"
+        key: "e2e-test"
+        command: ".buildkite/scripts/e2e_test.sh"
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - build/*.xml
+          - build/e2e-coverage.out
+        depends_on:
+          - step: "unit-test"
+            allow_failure: false
+          - step: "int-test"
+            allow_failure: false
 
       - label: ":junit: Junit annotate"
         plugins:
@@ -73,17 +76,19 @@ steps:
             allow_failure: true
           - step: "int-test"
             allow_failure: true
+          - step: "e2e-test"
+            allow_failure: true
 
-      - label: "E2E Test"
-        key: "e2e-test"
-        command: ".buildkite/scripts/e2e_test.sh"
+      - label: ":sonarqube: Continuous Code Inspection"
+        env:
+          VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/fleet-server/sonar-analyze-token"
         agents:
-          provider: "gcp"
+          image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
+        command:
+          - "buildkite-agent artifact download build/*coverage.out ."
+          - "/scan-source-code.sh"
         depends_on:
-          - step: "unit-test"
-            allow_failure: false
-          - step: "int-test"
-            allow_failure: false
+          - "unit-test"
 
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
