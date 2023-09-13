@@ -11,4 +11,4 @@ with_go
 with_docker_compose
 
 echo "Starting the E2E tests..."
-make test-e2e
+make test-e2e junit-report

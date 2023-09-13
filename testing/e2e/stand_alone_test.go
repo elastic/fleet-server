@@ -47,7 +47,8 @@ func (suite *StandAloneSuite) SetupSuite() {
 	_, err = os.Stat(suite.binaryPath)
 	suite.Require().NoError(err)
 
-	suite.Setup() // base setup
+	suite.Setup()       // base setup
+	suite.SetupKibana() // load the defender integration for artifacts endpoint testing
 }
 
 func (suite *StandAloneSuite) SetupTest() {
