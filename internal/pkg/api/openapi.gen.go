@@ -1034,6 +1034,9 @@ func (t *UpgradeDetails_Metadata) UnmarshalJSON(b []byte) error {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// retrieve a PGP key from the fleet-server's local storage.
+	// (GET /api/agents/upgrades/{major}.{minor}.{patch}/pgp-public-key)
+	GetPGPKey(w http.ResponseWriter, r *http.Request, major int, minor int, patch int)
 
 	// (POST /api/fleet/agents/enroll)
 	AgentEnroll(w http.ResponseWriter, r *http.Request, params AgentEnrollParams)
@@ -1066,6 +1069,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// retrieve a PGP key from the fleet-server's local storage.
+// (GET /api/agents/upgrades/{major}.{minor}.{patch}/pgp-public-key)
+func (_ Unimplemented) GetPGPKey(w http.ResponseWriter, r *http.Request, major int, minor int, patch int) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // (POST /api/fleet/agents/enroll)
 func (_ Unimplemented) AgentEnroll(w http.ResponseWriter, r *http.Request, params AgentEnrollParams) {
@@ -1124,6 +1133,52 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetPGPKey operation middleware
+func (siw *ServerInterfaceWrapper) GetPGPKey(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "major" -------------
+	var major int
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "major", runtime.ParamLocationPath, chi.URLParam(r, "major"), &major)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "major", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "minor" -------------
+	var minor int
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "minor", runtime.ParamLocationPath, chi.URLParam(r, "minor"), &minor)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "minor", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "patch" -------------
+	var patch int
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "patch", runtime.ParamLocationPath, chi.URLParam(r, "patch"), &patch)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "patch", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, ApiKeyScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPGPKey(w, r, major, minor, patch)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // AgentEnroll operation middleware
 func (siw *ServerInterfaceWrapper) AgentEnroll(w http.ResponseWriter, r *http.Request) {
@@ -1913,6 +1968,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/agents/upgrades/{major}.{minor}.{patch}/pgp-public-key", wrapper.GetPGPKey)
+	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/fleet/agents/enroll", wrapper.AgentEnroll)
 	})
