@@ -365,6 +365,7 @@ test-e2e: docker-cover-e2e-binaries build-e2e-agent-image e2e-certs build-docker
 	@$(MAKE) e2e-docker-start
 	@set -o pipefail; $(MAKE) test-e2e-set | tee build/test-e2e.out
 	@$(MAKE) e2e-docker-stop
+	@go tool covdata textfmt -i=build/e2e-cover -o=build/e2e-coverage.out
 
 .PHONY: test-e2e-set
 test-e2e-set: ## - Run the blackbox end to end tests without setup.
@@ -374,7 +375,7 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
 	STANDALONE_E2E_IMAGE=$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) \
 	CGO_ENABLED=1 \
-	go test -v -timeout 30m -tags=e2e -count=1 -race -p 1 ./... -run StandAloneContainer
+	go test -v -timeout 30m -tags=e2e -count=1 -race -p 1 ./... -run StandAlone
 
 ##################################################
 # Cloud testing targets
