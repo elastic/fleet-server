@@ -70,6 +70,10 @@ const (
 	defaultFileDelivBurst    = 8
 	defaultFileDelivMax      = 5
 	defaultFileDelivMaxBody  = 1024 * 1024 * 5
+
+	defaultPGPRetrievalInterval = time.Millisecond * 10
+	defaultPGPRetrievalBurst    = 100
+	defaultPGPRetrievalMax      = 50
 )
 
 type valueRange struct {
@@ -127,6 +131,7 @@ type serverLimitDefaults struct {
 	UploadEndLimit   limit `config:"upload_end_limit"`
 	UploadChunkLimit limit `config:"upload_chunk_limit"`
 	DeliverFileLimit limit `config:"file_delivery_limit"`
+	GetPGPKeyLimit   limit `config:"pgp_retrieval_limit"`
 }
 
 func defaultserverLimitDefaults() *serverLimitDefaults {
@@ -187,6 +192,12 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Burst:    defaultFileDelivBurst,
 			Max:      defaultFileDelivMax,
 			MaxBody:  defaultFileDelivMaxBody,
+		},
+		GetPGPKeyLimit: limit{
+			Interval: defaultPGPRetrievalInterval,
+			Burst:    defaultPGPRetrievalBurst,
+			Max:      defaultPGPRetrievalMax,
+			MaxBody:  0,
 		},
 	}
 }

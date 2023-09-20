@@ -75,6 +75,7 @@ type (
 		GC                 GC                      `config:"gc"`
 		Instrumentation    Instrumentation         `config:"instrumentation"`
 		StaticPolicyTokens StaticPolicyTokens      `config:"static_policy_tokens"`
+		PGP                PGP                     `config:"pgp"`
 	}
 
 	StaticPolicyTokens struct {
@@ -104,6 +105,7 @@ func (c *Server) InitDefaults() {
 	c.Runtime.InitDefaults()
 	c.Bulk.InitDefaults()
 	c.GC.InitDefaults()
+	c.PGP.InitDefaults()
 }
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.
