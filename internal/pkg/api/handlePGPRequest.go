@@ -1,8 +1,13 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package api
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -16,11 +21,15 @@ import (
 	"go.elastic.co/apm/v2"
 )
 
-const defaultKeyName = "default.pgp"
+const (
+	defaultKeyName        = "default.pgp"
+	defaultKeyPermissions = 0o0600
+)
 
 var (
 	ErrTLSRequired    = errors.New("api call requires a TLS connection")
-	ErrPGPPermissions = errors.New("pgp key permissions are not 0700")
+	ErrPGPPermissions = fmt.Errorf("pgp key permissions are not %#o", defaultKeyPermissions)
+	ErrUpstreamStatus = errors.New("upstream http server status error")
 )
 
 type PGPRetrieverT struct {
@@ -47,7 +56,6 @@ func (pt *PGPRetrieverT) handlePGPKey(zlog zerolog.Logger, w http.ResponseWriter
 	}
 	zlog = zlog.With().Str(LogEnrollAPIKeyID, key.ID).Logger()
 	ctx := zlog.WithContext(r.Context())
-	r = r.WithContext(ctx)
 
 	p, err := pt.getPGPKey(ctx, zlog)
 	if err != nil {
@@ -61,10 +69,8 @@ func (pt *PGPRetrieverT) handlePGPKey(zlog zerolog.Logger, w http.ResponseWriter
 // getPGPKey will return the PGP key bytes
 //
 // First the local cache will be checked
-//
 // If it's not found in the cache, we attempt to read from disk
 // If it's found we set the cache and return the bytes
-//
 // If it's not found on disk we attempt to retrieve the upstream key
 // If that succeeds we set the cache then write to disk (with best effort).
 func (pt *PGPRetrieverT) getPGPKey(ctx context.Context, zlog zerolog.Logger) ([]byte, error) {
@@ -81,7 +87,7 @@ func (pt *PGPRetrieverT) getPGPKey(ctx context.Context, zlog zerolog.Logger) ([]
 	}
 	p, err := pt.getPGPFromDir(ctx, key)
 
-	// sucessfully retrieved from disk
+	// successfully retrieved from disk
 	if err == nil {
 		pt.cache.SetPGPKey(key, p)
 		return p, nil
@@ -106,14 +112,14 @@ func (pt *PGPRetrieverT) getPGPKey(ctx context.Context, zlog zerolog.Logger) ([]
 //
 // Key contents are only returned if the key has valid permission bits.
 func (pt *PGPRetrieverT) getPGPFromDir(ctx context.Context, key string) ([]byte, error) {
-	span, ctx := apm.StartSpan(ctx, "getPGPFromDir", "process")
+	span, _ := apm.StartSpan(ctx, "getPGPFromDir", "process")
 	defer span.End()
 
 	stat, err := os.Stat(filepath.Join(pt.cfg.Dir, key))
 	if err != nil {
 		return nil, err
 	}
-	if stat.Mode().Perm() != 0700 { // TODO determine what permission bits we want to check
+	if stat.Mode().Perm() != defaultKeyPermissions { // TODO determine what permission bits we want to check
 		return nil, ErrPGPPermissions
 	}
 	return os.ReadFile(filepath.Join(pt.cfg.Dir, key))
@@ -134,6 +140,9 @@ func (pt *PGPRetrieverT) getPGPFromUpstream(ctx context.Context) ([]byte, error)
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: %d", ErrUpstreamStatus, resp.StatusCode)
+	}
 	return io.ReadAll(resp.Body)
 }
 
@@ -142,7 +151,7 @@ func (pt *PGPRetrieverT) getPGPFromUpstream(ctx context.Context) ([]byte, error)
 // If the directory does not exist it will create it
 // Otherwise it is treated as a best-effort attempt
 func (pt *PGPRetrieverT) writeKeyToDir(ctx context.Context, zlog zerolog.Logger, key string, p []byte) {
-	span, ctx := apm.StartSpan(ctx, "writeKeyToDir", "process")
+	span, _ := apm.StartSpan(ctx, "writeKeyToDir", "process")
 	defer span.End()
 
 	_, err := os.Stat(pt.cfg.Dir)
@@ -158,7 +167,7 @@ func (pt *PGPRetrieverT) writeKeyToDir(ctx context.Context, zlog zerolog.Logger,
 		}
 	}
 
-	err = os.WriteFile(filepath.Join(pt.cfg.Dir, key), p, 0700)
+	err = os.WriteFile(filepath.Join(pt.cfg.Dir, key), p, defaultKeyPermissions)
 	if err != nil {
 		zlog.Error().Err(err).Str("path", filepath.Join(pt.cfg.Dir, key)).Msg("Unable to write file.")
 		return

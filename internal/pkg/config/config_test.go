@@ -128,6 +128,10 @@ func TestConfig(t *testing.T) {
 							Limits:            generateServerLimits(12500),
 							Bulk:              defaultServerBulk(),
 							GC:                defaultServerGC(),
+							PGP: PGP{
+								UpstreamURL: defaultPGPUpstreamURL,
+								Dir:         filepath.Join(retrieveExecutableDir(), defaultPGPDirectoryName),
+							},
 						},
 						Cache: generateCache(12500),
 						Monitor: Monitor{
