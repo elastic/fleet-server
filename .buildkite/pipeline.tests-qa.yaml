@@ -22,10 +22,10 @@ steps:
         CHECK_API_REQUEST_METRICS: true
         SERVICE_TYPE_FIELD: service.name
         SERVICE_VERSION: ${SERVICE_VERSION:0:12}
+        SERVICE_REPOSITORY: docker.elastic.co/observability-ci/fleet-server
   - label: ":rocket: Run Smoke tests"
     trigger: "fleet-smoke-tests"
     build:
       message: "${BUILDKITE_MESSAGE}"
       env:
         ENVIRONMENT: ${ENVIRONMENT}
-
