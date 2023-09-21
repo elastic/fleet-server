@@ -63,7 +63,7 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		},
 		dirSetup: func(t *testing.T) string {
 			dir := t.TempDir()
-			err := os.WriteFile(filepath.Join(dir, defaultKeyName), []byte("test"), 0o0660)
+			err := os.WriteFile(filepath.Join(dir, defaultKeyName), []byte("test"), 0o0660) //nolint:gosec // we are testing for incorrect permissions
 			require.NoError(t, err)
 			return dir
 		},
@@ -106,7 +106,7 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 			dir := tc.dirSetup(t)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tc.upstreamStatus)
-				w.Write([]byte(`test`))
+				_, _ = w.Write([]byte(`test`))
 			}))
 			defer server.Close()
 

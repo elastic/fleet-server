@@ -19,24 +19,21 @@ import (
 	"time"
 
 	toxiproxy "github.com/Shopify/toxiproxy/client"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/testing/e2e/api_version"
+	"github.com/elastic/fleet-server/testing/e2e/scaffold"
 	"github.com/elastic/fleet-server/v7/version"
 )
 
-type StandAloneSuite struct {
-	BaseE2ETestSuite
+type StandAloneBase struct {
+	scaffold.Scaffold
 
 	binaryPath string
 }
 
-func TestStandAloneRunningSuite(t *testing.T) {
-	suite.Run(t, new(StandAloneSuite))
-}
-
-func (suite *StandAloneSuite) SetupSuite() {
+func (suite *StandAloneBase) SetupSuite() {
 	arch := runtime.GOARCH
 	if arch == "amd64" {
 		arch = "x86_64"
@@ -51,11 +48,25 @@ func (suite *StandAloneSuite) SetupSuite() {
 	suite.SetupKibana() // load the defender integration for artifacts endpoint testing
 }
 
+// StandAloneSuite mainly tests getting a stand-alone binary running with different configuration
+type StandAloneSuite struct {
+	StandAloneBase
+}
+
+func TestStandAloneRunningSuite(t *testing.T) {
+	suite.Run(t, new(StandAloneSuite))
+}
+
+func (suite *StandAloneSuite) SetupSuite() {
+	suite.StandAloneBase.SetupSuite()
+}
+
 func (suite *StandAloneSuite) SetupTest() {
 	portFree := suite.IsFleetServerPortFree()
 	suite.Require().True(portFree, "port 8220 must not be in use for test to start")
 }
 
+// TestHTTP ensures that a basic http configuration functions
 func (suite *StandAloneSuite) TestHTTP() {
 	// Create a config file from a template in the test temp dir
 	dir := suite.T().TempDir()
@@ -64,8 +75,8 @@ func (suite *StandAloneSuite) TestHTTP() {
 	f, err := os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]string{
-		"Hosts":        suite.esHosts,
-		"ServiceToken": suite.serviceToken,
+		"Hosts":        suite.ESHosts,
+		"ServiceToken": suite.ServiceToken,
 	})
 	f.Close()
 	suite.Require().NoError(err)
@@ -77,7 +88,7 @@ func (suite *StandAloneSuite) TestHTTP() {
 	cmd.Cancel = func() error {
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}
-	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	err = cmd.Start()
 	suite.Require().NoError(err)
 
@@ -91,7 +102,7 @@ func (suite *StandAloneSuite) TestHTTP() {
 func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
-	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.esHosts)
+	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.ESHosts)
 	suite.Require().NoError(err)
 
 	// Create a config file from a template in the test temp dir
@@ -102,7 +113,7 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]string{
 		"Hosts":        "http://" + proxy.Listen,
-		"ServiceToken": suite.serviceToken,
+		"ServiceToken": suite.ServiceToken,
 	})
 	f.Close()
 	suite.Require().NoError(err)
@@ -112,7 +123,7 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 	cmd.Cancel = func() error {
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}
-	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	err = cmd.Start()
 	suite.Require().NoError(err)
 
@@ -137,7 +148,7 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 func (suite *StandAloneSuite) TestWithSecretFiles() {
 	// Create a service token file in the temp test dir
 	dir := suite.T().TempDir()
-	err := os.WriteFile(filepath.Join(dir, "service-token"), []byte(suite.serviceToken), 0600)
+	err := os.WriteFile(filepath.Join(dir, "service-token"), []byte(suite.ServiceToken), 0600)
 	suite.Require().NoError(err)
 
 	// Create a config file from a template in the test temp dir
@@ -146,11 +157,11 @@ func (suite *StandAloneSuite) TestWithSecretFiles() {
 	f, err := os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]string{
-		"Hosts":            suite.esHosts,
+		"Hosts":            suite.ESHosts,
 		"ServiceTokenPath": filepath.Join(dir, "service-token"),
-		"CertPath":         filepath.Join(suite.certPath, "fleet-server.crt"),
-		"KeyPath":          filepath.Join(suite.certPath, "fleet-server.key"),
-		"PassphrasePath":   filepath.Join(suite.certPath, "passphrase"),
+		"CertPath":         filepath.Join(suite.CertPath, "fleet-server.crt"),
+		"KeyPath":          filepath.Join(suite.CertPath, "fleet-server.key"),
+		"PassphrasePath":   filepath.Join(suite.CertPath, "passphrase"),
 	})
 	f.Close()
 	suite.Require().NoError(err)
@@ -163,7 +174,7 @@ func (suite *StandAloneSuite) TestWithSecretFiles() {
 	cmd.Cancel = func() error {
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}
-	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	err = cmd.Start()
 	suite.Require().NoError(err)
 
@@ -172,130 +183,8 @@ func (suite *StandAloneSuite) TestWithSecretFiles() {
 	cmd.Wait()
 }
 
-// TestClientAPI run an HTTPS server and use the ClientAPITester which wraps the generated pkg/api client to test endpoints
-func (suite *StandAloneSuite) TestClientAPI() {
-	dir := suite.T().TempDir()
-	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-https.tpl"))
-	suite.Require().NoError(err)
-	f, err := os.Create(filepath.Join(dir, "config.yml"))
-	suite.Require().NoError(err)
-	err = tpl.Execute(f, map[string]string{
-		"Hosts":          suite.esHosts,
-		"ServiceToken":   suite.serviceToken,
-		"CertPath":       filepath.Join(suite.certPath, "fleet-server.crt"),
-		"KeyPath":        filepath.Join(suite.certPath, "fleet-server.key"),
-		"PassphrasePath": filepath.Join(suite.certPath, "passphrase"),
-	})
-	f.Close()
-
-	bCtx, bCancel := context.WithCancel(context.Background())
-	defer bCancel()
-
-	// Run the fleet-server binary, cancelling context should stop process
-	cmd := exec.CommandContext(bCtx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
-	cmd.Cancel = func() error {
-		return cmd.Process.Signal(syscall.SIGTERM)
-	}
-	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath}
-	err = cmd.Start()
-	suite.Require().NoError(err)
-
-	ctx, cancel := context.WithTimeout(bCtx, time.Minute)
-	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
-	cancel()
-
-	enrollmentKey := suite.GetEnrollmentTokenForPolicyID(bCtx, "dummy-policy")
-
-	versions := []string{"current", "2022-06-01"}
-
-	for _, version := range versions {
-		createTester := func(ctx context.Context) api_version.ClientAPITesterInterface {
-			switch version {
-			case "current":
-				return api_version.NewClientAPITesterCurrent(
-					suite.Suite,
-					ctx,
-					suite.client,
-					"https://localhost:8220",
-				)
-			case "2022-06-01":
-				return api_version.NewClientAPITester20230601(suite.Suite,
-					ctx,
-					suite.client,
-					"https://localhost:8220",
-				)
-			default:
-				panic(1)
-			}
-		}
-		// Run subtests here
-		suite.Run(fmt.Sprintf("version %s test status unauthenicated", version), func() {
-			ctx, cancel := context.WithCancel(bCtx)
-			defer cancel()
-			tester := createTester(ctx)
-			tester.TestStatus("")
-		})
-
-		suite.Run(fmt.Sprintf("version %s test status authenicated", version), func() {
-			ctx, cancel := context.WithCancel(bCtx)
-			defer cancel()
-			tester := createTester(ctx)
-			tester.TestStatus(enrollmentKey)
-		})
-
-		suite.Run(fmt.Sprintf("version %s test enroll checkin ack", version), func() {
-			ctx, cancel := context.WithTimeout(bCtx, 4*time.Minute)
-			defer cancel()
-			tester := createTester(ctx)
-
-			suite.T().Log("test enrollment")
-			agentID, agentKey := tester.TestEnroll(enrollmentKey)
-			suite.VerifyAgentInKibana(ctx, agentID)
-
-			suite.T().Logf("test checkin 1: agent %s", agentID)
-			ackToken, actions := tester.TestCheckin(agentKey, agentID, nil, nil)
-			suite.Require().NotEmpty(actions)
-
-			suite.T().Log("test ack")
-			tester.TestAcks(agentKey, agentID, actions)
-
-			suite.T().Logf("test checkin 2: agent %s 3m timout", agentID)
-			dur := "3m"
-
-			tester.TestCheckin(agentKey, agentID, ackToken, &dur)
-
-			// sanity check agent status in kibana
-			suite.AgentIsOnline(ctx, agentID)
-		})
-
-		suite.Run(fmt.Sprintf("version %s test file upload", version), func() {
-			ctx, cancel := context.WithCancel(bCtx)
-			defer cancel()
-			tester := createTester(ctx)
-			agentID, agentKey := tester.TestEnroll(enrollmentKey)
-			actionID := suite.RequestDiagnosticsForAgent(ctx, agentID)
-
-			tester.TestFullFileUpload(agentKey, agentID, actionID, 8192) // 8KiB file
-		})
-
-		suite.Run(fmt.Sprintf("version %s test artifact", version), func() {
-			ctx, cancel := context.WithTimeout(bCtx, 3*time.Minute)
-			defer cancel()
-			tester := createTester(ctx)
-			_, agentKey := tester.TestEnroll(enrollmentKey)
-			suite.AddSecurityContainer(ctx)
-			suite.AddSecurityContainerItem(ctx)
-
-			hits := suite.FleetHasArtifacts(ctx)
-			tester.TestArtifact(agentKey, hits[0].Source.Identifier, hits[0].Source.DecodedSHA256, hits[0].Source.EncodedSHA256)
-		})
-
-	}
-
-	bCancel()
-	cmd.Wait()
-}
-
+// TestStaticTokenAuthentication tests using static token configuration.
+// A call to the enroll endpoint is made with static token configuration to ensure functionality as well as a non-static token call.
 func (suite *StandAloneSuite) TestStaticTokenAuthentication() {
 	dir := suite.T().TempDir()
 	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-https.tpl"))
@@ -303,11 +192,11 @@ func (suite *StandAloneSuite) TestStaticTokenAuthentication() {
 	f, err := os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]interface{}{
-		"Hosts":                    suite.esHosts,
-		"ServiceToken":             suite.serviceToken,
-		"CertPath":                 filepath.Join(suite.certPath, "fleet-server.crt"),
-		"KeyPath":                  filepath.Join(suite.certPath, "fleet-server.key"),
-		"PassphrasePath":           filepath.Join(suite.certPath, "passphrase"),
+		"Hosts":                    suite.ESHosts,
+		"ServiceToken":             suite.ServiceToken,
+		"CertPath":                 filepath.Join(suite.CertPath, "fleet-server.crt"),
+		"KeyPath":                  filepath.Join(suite.CertPath, "fleet-server.key"),
+		"PassphrasePath":           filepath.Join(suite.CertPath, "passphrase"),
 		"StaticPolicyTokenEnabled": true,
 		"StaticTokenKey":           "abcdefg",
 		"StaticPolicyID":           "dummy-policy",
@@ -325,7 +214,7 @@ func (suite *StandAloneSuite) TestStaticTokenAuthentication() {
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	err = cmd.Start()
 	suite.Require().NoError(err)
 
@@ -338,10 +227,18 @@ func (suite *StandAloneSuite) TestStaticTokenAuthentication() {
 
 	defer cancel()
 	tester := api_version.NewClientAPITesterCurrent(
-		suite.Suite,
-		ctx,
-		suite.client,
+		suite.Scaffold,
 		"https://localhost:8220",
+		enrollmentToken,
 	)
-	tester.TestEnroll(enrollmentToken)
+	tester.Enroll(ctx, enrollmentToken)
+
+	// Make sure a normal token works here as well
+	enrollmentToken = suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+	tester = api_version.NewClientAPITesterCurrent(
+		suite.Scaffold,
+		"https://localhost:8220",
+		enrollmentToken,
+	)
+	tester.Enroll(ctx, enrollmentToken)
 }
