@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/cache"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,7 +31,7 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		name: "found in cache",
 		cache: func() *cache.MockCache {
 			m := cache.NewMockCache()
-			m.On("GetPGPKey", defaultKeyName).Return([]byte("test"), true).Once()
+			m.On("GetPGPKey", mock.Anything).Return([]byte("test"), true).Once()
 			return m
 		},
 		dirSetup: func(t *testing.T) string {
@@ -42,8 +43,8 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		name: "found in dir",
 		cache: func() *cache.MockCache {
 			m := cache.NewMockCache()
-			m.On("GetPGPKey", defaultKeyName).Return([]byte{}, false).Once()
-			m.On("SetPGPKey", defaultKeyName, []byte("test")).Once()
+			m.On("GetPGPKey", mock.Anything).Return([]byte{}, false).Once()
+			m.On("SetPGPKey", mock.Anything, []byte("test")).Once()
 			return m
 		},
 		dirSetup: func(t *testing.T) string {
@@ -58,7 +59,7 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		name: "found in dir with incorrect permissions",
 		cache: func() *cache.MockCache {
 			m := cache.NewMockCache()
-			m.On("GetPGPKey", defaultKeyName).Return([]byte{}, false).Once()
+			m.On("GetPGPKey", mock.Anything).Return([]byte{}, false).Once()
 			return m
 		},
 		dirSetup: func(t *testing.T) string {
@@ -73,7 +74,7 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		name: "failed upstream request",
 		cache: func() *cache.MockCache {
 			m := cache.NewMockCache()
-			m.On("GetPGPKey", defaultKeyName).Return([]byte{}, false).Once()
+			m.On("GetPGPKey", mock.Anything).Return([]byte{}, false).Once()
 			return m
 		},
 		dirSetup: func(t *testing.T) string {
@@ -87,8 +88,8 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		name: "upstream request succeeded",
 		cache: func() *cache.MockCache {
 			m := cache.NewMockCache()
-			m.On("GetPGPKey", defaultKeyName).Return([]byte{}, false).Once()
-			m.On("SetPGPKey", defaultKeyName, []byte("test")).Once()
+			m.On("GetPGPKey", mock.Anything).Return([]byte{}, false).Once()
+			m.On("SetPGPKey", mock.Anything, []byte("test")).Once()
 			return m
 		},
 		dirSetup: func(t *testing.T) string {

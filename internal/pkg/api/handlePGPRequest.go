@@ -75,7 +75,7 @@ func (pt *PGPRetrieverT) handlePGPKey(zlog zerolog.Logger, w http.ResponseWriter
 // If that succeeds we set the cache then write to disk (with best effort).
 func (pt *PGPRetrieverT) getPGPKey(ctx context.Context, zlog zerolog.Logger) ([]byte, error) {
 	// key that will be retrieved, if this ever changes we should ensure that it can't be used as part of an injection attack as it is joined as part of the filepath for operations.
-	key := defaultKeyName
+	key := filepath.Join(pt.cfg.Dir, defaultKeyName)
 
 	span, ctx := apm.StartSpan(ctx, "getPGPKey", "process")
 	span.Context.SetLabel("key", key)
@@ -115,14 +115,14 @@ func (pt *PGPRetrieverT) getPGPFromDir(ctx context.Context, key string) ([]byte,
 	span, _ := apm.StartSpan(ctx, "getPGPFromDir", "process")
 	defer span.End()
 
-	stat, err := os.Stat(filepath.Join(pt.cfg.Dir, key))
+	stat, err := os.Stat(key)
 	if err != nil {
 		return nil, err
 	}
 	if stat.Mode().Perm() != defaultKeyPermissions { // TODO determine what permission bits we want to check
 		return nil, ErrPGPPermissions
 	}
-	return os.ReadFile(filepath.Join(pt.cfg.Dir, key))
+	return os.ReadFile(key)
 }
 
 // getPGPFromUpstream returns the PGP key contentents from the key specified in the upstream URL.
@@ -150,7 +150,7 @@ func (pt *PGPRetrieverT) getPGPFromUpstream(ctx context.Context) ([]byte, error)
 //
 // If the directory does not exist it will create it
 // Otherwise it is treated as a best-effort attempt
-func (pt *PGPRetrieverT) writeKeyToDir(ctx context.Context, zlog zerolog.Logger, key string, p []byte) {
+func (pt *PGPRetrieverT) writeKeyToDir(ctx context.Context, zlog zerolog.Logger, fullPath string, p []byte) {
 	span, _ := apm.StartSpan(ctx, "writeKeyToDir", "process")
 	defer span.End()
 
@@ -167,11 +167,11 @@ func (pt *PGPRetrieverT) writeKeyToDir(ctx context.Context, zlog zerolog.Logger,
 		}
 	}
 
-	err = os.WriteFile(filepath.Join(pt.cfg.Dir, key), p, defaultKeyPermissions)
+	err = os.WriteFile(fullPath, p, defaultKeyPermissions)
 	if err != nil {
-		zlog.Error().Err(err).Str("path", filepath.Join(pt.cfg.Dir, key)).Msg("Unable to write file.")
+		zlog.Error().Err(err).Str("path", fullPath).Msg("Unable to write file.")
 		return
 	}
-	zlog.Info().Str("path", filepath.Join(pt.cfg.Dir, key)).Msg("Key written to storage.")
+	zlog.Info().Str("path", fullPath).Msg("Key written to storage.")
 
 }
