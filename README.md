@@ -99,7 +99,7 @@ Start by following the instructions to create a [development build](#development
 #### ES and Kibana from SNAPSHOTS API on host
 
 In order to run a development/snapshot fleet-server binary the corresponding SNAPSHOT builds of Elasticsearch and Kibana should be used:
-The artifacts can be found with the artrifacts API, for example here's the [URL for 8,7-SNAPSHOT](https://artifacts-api.elastic.co/v1/search/8.7-SNAPSHOT) artifacts.
+The artifacts can be found with the artrifacts API, for example here's the [URL for 8.7-SNAPSHOT](https://artifacts-api.elastic.co/v1/search/8.7-SNAPSHOT) artifacts.
 
 The request will result in a JSON blob that descibes all artifacts.
 You will need to gather the URLs for Elasticsearch and Kibana that match your distribution, for example `linux/amd64`.
