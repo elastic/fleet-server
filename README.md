@@ -90,15 +90,19 @@ docker run -it --rm \
   docker.elastic.co/fleet-server/fleet-server:8.8.0
 ```
 
-### Running a development build
+### Running a local stack for development
+
+Fleet-server can be ran locally in stand-alone mode alongside Elasticsearch and Kibana for development/testing.
+
+Start by following the instructions to create a [development build](#development-build).
 
 #### ES and Kibana from SNAPSHOTS API on host
 
-Download SNAPSHOT builds for Elasticsearch and Kibana from the snapshots API:
-Edit the version and OS/arch to suit your system, or [check the API](https://artifacts-api.elastic.co/v1/search/8.7-SNAPSHOT) (change the version if needed) if the ones below does not suit you.
- - 8.7.0-SNAPSHOT-linux-x86_64.tar.gz
- - 8.7.0-SNAPSHOT-darwin-aarch64.tar.gz
- - 8.7.0-SNAPSHOT-windows-x86_64.zip
+In order to run a development/snapshot fleet-server binary the corresponding SNAPSHOT builds of Elasticsearch and Kibana should be used:
+The artifacts can be found with the artrifacts API, for example here's the [URL for 8,7-SNAPSHOT](https://artifacts-api.elastic.co/v1/search/8.7-SNAPSHOT) artifacts.
+
+The request will result in a JSON blob that descibes all artifacts.
+You will need to gather the URLs for Elasticsearch and Kibana that match your distribution, for example `linux/amd64`.
 
 TODO: parse the JSON to get the URL
 ```shell
@@ -111,6 +115,7 @@ Generally you will need to unarchive and run the binaries:
 ```shell
 tar -xzf elasticsearch-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
 cd elasticsearch-8.7.0-SNAPSHOT
+# elasticsearch.yml can be edited if required
 ./bin/elasticsearch
 ```
 
@@ -119,6 +124,7 @@ The elasticsearch output will output the `elastic` user's password and a Kibana 
 ```shell
 tar -xzf kibana-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
 cd kibana-8.7.0-SNAPSHOT
+# kibana.yml can be edited if required
 ./bin/kibana
 ```
 
@@ -126,19 +132,38 @@ The kibana output will show a URL that will need to be visted in order to config
 
 More instructions for setup can be found in the [Elastic Stack Installation Guide](https://www.elastic.co/guide/en/elastic-stack/current/installing-elastic-stack.html).
 
+##### Elasticsearch configuration
+
+Elasticsearch configuration generally does not need to be changed when running a single-instance cluster for local testing.
+See our [integration elasticsearch.yml](./dev-tools/integration/elasticsearch.yml) for an example of what is used for our testing configuration.
+
+##### Kibana configuration
+
+Custom Kibana configuration can be used to preload fleet with integrations and policies (by using the `xpack.fleet,packages` and `xpack.fleet.agentPolicies` attributes).
+It can also be used to set fleet-settings such as the fleet-server hosts (`xpack.fleet.agents.fleet_server.hosts`) and outputs (`xpack.fleet`).
+Please see our e2e tests [kibana.yml configuration](./dev-tools/e2e/kibana.yml) for a complete example.
+
+Note that our tests run the Elasticsearch container on a Docker network where the host is called `elasticsearch`, the and the fleet-server container is called `fleet-server`.
+
 #### fleet-server stand alone
 
-Fleet UI requires a managed Fleet Server, to be able to use stand alone Fleet
-server, you need to enroll a managed Fleet Server or disable this requirement.
-You can disable this requirement since Kibana 8.8.0, starting it with
-`xpack.fleet.enableExperimental: ['fleetServerStandalone']`. This is only
-supported internally and is not intended for end-users at this time.
+Fleet in Kibana requires a managed fleet-server (generally the one you enroll with the elastic-agent instructions).
+To disable this requirement for a local fleet-server instance use:
+`xpack.fleet.enableExperimental: ['fleetServerStandalone']` (available since `v8.8.0`).
+This is only supported internally and is not intended for end-users at this time.
+
+##### fleet-server configuration
 
 Access the Fleet UI on Kibana and generate a fleet-server policy.
 Set the following env vars with the information from Kibana:
 - `ELASTICSEARCH_CA_TRUSTED_FINGERPRINT`
 - `ELASTICSEARCH_SERVICE_TOKEN`
 - `FLEET_SERVER_POLICY_ID`
+or edit `fleet-server.yml` to include these details directly.
+
+Note the `fleet-server.reference.yml` contains a full configuration reference.
+
+##### fleet-server certificates
 
 Create a self-signed TLS CA and cert+key for the fleet-server instance, you can use [elasticsearch-certutil](https://www.elastic.co/guide/en/elasticsearch/reference/current/certutil.html) for this:
 ```shell
