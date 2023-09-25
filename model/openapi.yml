@@ -1437,3 +1437,45 @@ paths:
           $ref: "#/components/responses/internalServerError"
         "503":
           $ref: "#/components/responses/unavailable"
+  /api/agents/upgrades/{major}.{minor}.{patch}/pgp-public-key:
+    get:
+      operationId: getPGPKey
+      summary: retrieve a PGP key from the fleet-server's local storage.
+      description: "Get a PGP key that can be used to verify agent upgrades. Key is stored on (fleet-server's) disk."
+      security:
+        - apiKey: [] # TODO: verify that we want security on this endpoint.
+      parameters:
+        - name: major
+          in: path
+          description: The major version number.
+          required: true
+          schema:
+            type: integer
+        - name: minor
+          in: path
+          description: The minor version number.
+          required: true
+          schema:
+            type: integer
+        - name: patch
+          in: path
+          description: The patch version number.
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The PGP key bytes.
+          content:
+            "application/octet-stream":
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "401":
+          $ref: "#/components/responses/keyNotEnabled"
+        "500":
+          description: The server has an error retrieving or reading the local key.
+        "501":
+          description: The server will not serve the request without a TLS connection.

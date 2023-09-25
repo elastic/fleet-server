@@ -36,6 +36,9 @@ type Cache interface {
 
 	SetUpload(id string, info file.Info)
 	GetUpload(id string) (file.Info, bool)
+
+	SetPGPKey(id string, p []byte)
+	GetPGPKey(id string) ([]byte, bool)
 }
 
 type APIKey = apikey.APIKey
@@ -308,4 +311,36 @@ func (c *CacheT) GetUpload(id string) (file.Info, bool) { //nolint:dupl // a lit
 
 	log.Trace().Str("id", id).Msg("upload info cache MISS")
 	return file.Info{}, false
+}
+
+func (c *CacheT) SetPGPKey(id string, p []byte) {
+	c.mut.RLock()
+	defer c.mut.RUnlock()
+
+	scopedKey := "pgp:" + id
+	ttl := 30 * time.Minute // @todo: add to configurable
+	ok := c.cache.SetWithTTL(scopedKey, p, int64(len(p)), ttl)
+	log.Trace().
+		Bool("ok", ok).
+		Str("id", id).
+		Int("cost", len(p)).
+		Dur("ttl", ttl).
+		Msg("PGP key cache SET")
+
+}
+func (c *CacheT) GetPGPKey(id string) ([]byte, bool) {
+	c.mut.RLock()
+	defer c.mut.RUnlock()
+
+	scopedKey := "pgp:" + id
+	if v, ok := c.cache.Get(scopedKey); ok {
+		log.Trace().Str("id", id).Msg("PGP key cache HIT")
+		key, ok := v.([]byte)
+		if !ok {
+			log.Error().Str("id", id).Msg("upload info cache cast fail")
+			return nil, false
+		}
+		return key, ok
+	}
+	return nil, false
 }

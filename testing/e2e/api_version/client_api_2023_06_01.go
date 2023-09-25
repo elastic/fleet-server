@@ -16,33 +16,40 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"time"
 
+	"github.com/elastic/fleet-server/testing/e2e/scaffold"
 	"github.com/elastic/fleet-server/v7/pkg/api/versions/2022_06_01/api"
 
 	"github.com/elastic/fleet-server/v7/version"
-	"github.com/stretchr/testify/suite"
 )
 
 // ClientAPITester20230601 provides methods to test API endpoints
 type ClientAPITester20230601 struct {
-	suite.Suite
+	*scaffold.Scaffold
 
-	ctx      context.Context
-	client   *http.Client
-	endpoint string
+	endpoint      string
+	enrollmentKey string
 }
 
-func NewClientAPITester20230601(suite suite.Suite, ctx context.Context, client *http.Client, endpoint string) *ClientAPITester20230601 {
+func NewClientAPITester20230601(scaffold scaffold.Scaffold, endpoint, enrollmentKey string) *ClientAPITester20230601 {
 	return &ClientAPITester20230601{
-		suite,
-		ctx,
-		client,
+		&scaffold,
 		endpoint,
+		enrollmentKey,
 	}
 }
 
+func (tester *ClientAPITester20230601) SetEndpoint(endpoint string) {
+	tester.endpoint = endpoint
+}
+
+func (tester *ClientAPITester20230601) SetKey(key string) {
+	tester.enrollmentKey = key
+}
+
 func (tester *ClientAPITester20230601) getAPIClient(withRequestEditorFn api.RequestEditorFn) (api.ClientWithResponsesInterface, error) {
-	return api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+	return api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.Client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("elastic-api-version", "2023-06-01")
 
 		if withRequestEditorFn != nil {
@@ -53,19 +60,19 @@ func (tester *ClientAPITester20230601) getAPIClient(withRequestEditorFn api.Requ
 	}))
 }
 
-// TestStatus tests the status endpoint, if an apiKey is given the authenticated response if verfied.
-func (tester *ClientAPITester20230601) TestStatus(apiKey string) {
+// Status tests the status endpoint, if an apiKey is given the authenticated response if verfied.
+func (tester *ClientAPITester20230601) Status(ctx context.Context, apiKey string) {
 	client, err := tester.getAPIClient(nil)
 	tester.Require().NoError(err)
 
 	var resp *api.StatusResponse
 	if apiKey != "" {
-		resp, err = client.StatusWithResponse(tester.ctx, &api.StatusParams{}, func(ctx context.Context, req *http.Request) error {
+		resp, err = client.StatusWithResponse(ctx, &api.StatusParams{}, func(ctx context.Context, req *http.Request) error {
 			req.Header.Set("Authorization", "ApiKey "+apiKey)
 			return nil
 		})
 	} else {
-		resp, err = client.StatusWithResponse(tester.ctx, &api.StatusParams{})
+		resp, err = client.StatusWithResponse(ctx, &api.StatusParams{})
 	}
 	tester.Require().NoError(err)
 	tester.Assert().Equal(http.StatusOK, resp.StatusCode())
@@ -76,16 +83,16 @@ func (tester *ClientAPITester20230601) TestStatus(apiKey string) {
 	}
 }
 
-// TestEnroll tests the enroll endpoint with the given apiKey.
+// Enroll tests the enroll endpoint with the given apiKey.
 // Returns the agentID and agentAPIKey.
-func (tester *ClientAPITester20230601) TestEnroll(apiKey string) (string, string) {
+func (tester *ClientAPITester20230601) Enroll(ctx context.Context, apiKey string) (string, string) {
 	client, err := tester.getAPIClient(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "ApiKey "+apiKey)
 		return nil
 	})
 	tester.Require().NoError(err)
 
-	enrollResp, err := client.AgentEnrollWithResponse(tester.ctx,
+	enrollResp, err := client.AgentEnrollWithResponse(ctx,
 		&api.AgentEnrollParams{UserAgent: "elastic agent " + version.DefaultVersion},
 		api.AgentEnrollJSONRequestBody{
 			Metadata: api.EnrollMetadata{
@@ -103,16 +110,16 @@ func (tester *ClientAPITester20230601) TestEnroll(apiKey string) (string, string
 	return enroll.Item.Id, enroll.Item.AccessApiKey
 }
 
-// TestCheckin tests the checkin endpoint.
+// Checkin tests the checkin endpoint.
 // Returns the new ack token and the list of actions.
-func (tester *ClientAPITester20230601) TestCheckin(apiKey, agentID string, ackToken, dur *string) (*string, []string) {
+func (tester *ClientAPITester20230601) Checkin(ctx context.Context, apiKey, agentID string, ackToken, dur *string) (*string, []string) {
 	client, err := tester.getAPIClient(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "ApiKey "+apiKey)
 		return nil
 	})
 	tester.Require().NoError(err)
 
-	resp, err := client.AgentCheckinWithResponse(tester.ctx,
+	resp, err := client.AgentCheckinWithResponse(ctx,
 		agentID,
 		&api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion},
 		api.AgentCheckinJSONRequestBody{
@@ -135,8 +142,8 @@ func (tester *ClientAPITester20230601) TestCheckin(apiKey, agentID string, ackTo
 	return checkin.AckToken, actionIds
 }
 
-// TestAcks tests the acks endpoint
-func (tester *ClientAPITester20230601) TestAcks(apiKey, agentID string, actionsIDs []string) {
+// Acks tests the acks endpoint
+func (tester *ClientAPITester20230601) Acks(ctx context.Context, apiKey, agentID string, actionsIDs []string) {
 	client, err := tester.getAPIClient(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "ApiKey "+apiKey)
 		return nil
@@ -151,7 +158,7 @@ func (tester *ClientAPITester20230601) TestAcks(apiKey, agentID string, actionsI
 		})
 	}
 
-	resp, err := client.AgentAcksWithResponse(tester.ctx,
+	resp, err := client.AgentAcksWithResponse(ctx,
 		agentID,
 		&api.AgentAcksParams{},
 		api.AgentAcksJSONRequestBody{
@@ -165,15 +172,15 @@ func (tester *ClientAPITester20230601) TestAcks(apiKey, agentID string, actionsI
 	tester.Assert().Falsef(acks.Errors, "error in acked items: %v", acks.Items)
 }
 
-// TestFullFileUpload tests the file upload endpoints (begin, chunk, complete).
-func (tester *ClientAPITester20230601) TestFullFileUpload(apiKey, agentID, actionID string, size int64) {
+// FullFileUpload tests the file upload endpoints (begin, chunk, complete).
+func (tester *ClientAPITester20230601) FullFileUpload(ctx context.Context, apiKey, agentID, actionID string, size int64) {
 	client, err := tester.getAPIClient(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "ApiKey "+apiKey)
 		return nil
 	})
 	tester.Require().NoError(err)
 
-	beginResp, err := client.UploadBeginWithResponse(tester.ctx,
+	beginResp, err := client.UploadBeginWithResponse(ctx,
 		&api.UploadBeginParams{},
 		api.UploadBeginJSONRequestBody{
 			ActionId: actionID,
@@ -202,7 +209,7 @@ func (tester *ClientAPITester20230601) TestFullFileUpload(apiKey, agentID, actio
 		_, err := io.CopyN(&body, rand.Reader, n)
 		tester.Require().NoError(err)
 		hash := sha256.Sum256(body.Bytes())
-		chunkResp, err := client.UploadChunkWithBodyWithResponse(tester.ctx,
+		chunkResp, err := client.UploadChunkWithBodyWithResponse(ctx,
 			uploadID,
 			i,
 			&api.UploadChunkParams{XChunkSHA2: fmt.Sprintf("%x", hash[:])},
@@ -214,7 +221,7 @@ func (tester *ClientAPITester20230601) TestFullFileUpload(apiKey, agentID, actio
 		tHash.Write(hash[:])
 	}
 
-	completeResp, err := client.UploadCompleteWithResponse(tester.ctx,
+	completeResp, err := client.UploadCompleteWithResponse(ctx,
 		uploadID,
 		&api.UploadCompleteParams{},
 		api.UploadCompleteJSONRequestBody{
@@ -229,16 +236,16 @@ func (tester *ClientAPITester20230601) TestFullFileUpload(apiKey, agentID, actio
 	tester.Require().Equal(http.StatusOK, completeResp.StatusCode())
 }
 
-// TestArtifacts tests the artifact endpoint with the passed id and sha2 values.
+// Artifact tests the artifact endpoint with the passed id and `sha2 values.
 // The hash of the retrieved body is expected to be equal to encodedSHA
-func (tester *ClientAPITester20230601) TestArtifact(apiKey, id, sha2, encodedSHA string) {
+func (tester *ClientAPITester20230601) Artifact(ctx context.Context, apiKey, id, sha2, encodedSHA string) {
 	client, err := tester.getAPIClient(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "ApiKey "+apiKey)
 		return nil
 	})
 	tester.Require().NoError(err)
 
-	resp, err := client.ArtifactWithResponse(tester.ctx,
+	resp, err := client.ArtifactWithResponse(ctx,
 		id,
 		sha2,
 		&api.ArtifactParams{},
@@ -247,4 +254,62 @@ func (tester *ClientAPITester20230601) TestArtifact(apiKey, id, sha2, encodedSHA
 	tester.Require().Equal(http.StatusOK, resp.StatusCode())
 	hash := sha256.Sum256(resp.Body)
 	tester.Require().Equal(encodedSHA, fmt.Sprintf("%x", hash[:]))
+}
+
+func (tester *ClientAPITester20230601) TestStatus_Unauthenticated() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tester.Status(ctx, "")
+}
+
+func (tester *ClientAPITester20230601) TestStatus_Authenticated() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tester.Status(ctx, tester.enrollmentKey)
+}
+
+func (tester *ClientAPITester20230601) TestEnrollCheckinAck() {
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+
+	tester.T().Log("test enrollment")
+	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	tester.VerifyAgentInKibana(ctx, agentID)
+
+	tester.T().Logf("test checkin 1: agent %s", agentID)
+	ackToken, actions := tester.Checkin(ctx, agentKey, agentID, nil, nil)
+	tester.Require().NotEmpty(actions)
+
+	tester.T().Log("test ack")
+	tester.Acks(ctx, agentKey, agentID, actions)
+
+	tester.T().Logf("test checkin 2: agent %s 3m timout", agentID)
+	dur := "3m"
+
+	tester.Checkin(ctx, agentKey, agentID, ackToken, &dur)
+
+	// sanity check agent status in kibana
+	tester.AgentIsOnline(ctx, agentID)
+}
+
+func (tester *ClientAPITester20230601) TestFullFileUpload() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	actionID := tester.RequestDiagnosticsForAgent(ctx, agentID)
+
+	tester.FullFileUpload(ctx, agentKey, agentID, actionID, 8192) // 8KiB file
+}
+
+func (tester *ClientAPITester20230601) TestArtifact() {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	_, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	tester.AddSecurityContainer(ctx)
+	tester.AddSecurityContainerItem(ctx)
+
+	hits := tester.FleetHasArtifacts(ctx)
+	tester.Artifact(ctx, agentKey, hits[0].Source.Identifier, hits[0].Source.DecodedSHA256, hits[0].Source.EncodedSHA256)
 }

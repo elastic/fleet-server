@@ -93,6 +93,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// GetPGPKey request
+	GetPGPKey(ctx context.Context, major int, minor int, patch int, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AgentEnrollWithBody request with any body
 	AgentEnrollWithBody(ctx context.Context, params *AgentEnrollParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -129,6 +132,18 @@ type ClientInterface interface {
 
 	// Status request
 	Status(ctx context.Context, params *StatusParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) GetPGPKey(ctx context.Context, major int, minor int, patch int, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPGPKeyRequest(c.Server, major, minor, patch)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) AgentEnrollWithBody(ctx context.Context, params *AgentEnrollParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -297,6 +312,54 @@ func (c *Client) Status(ctx context.Context, params *StatusParams, reqEditors ..
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewGetPGPKeyRequest generates requests for GetPGPKey
+func NewGetPGPKeyRequest(server string, major int, minor int, patch int) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "major", runtime.ParamLocationPath, major)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "minor", runtime.ParamLocationPath, minor)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "patch", runtime.ParamLocationPath, patch)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/agents/upgrades/%s.%s.%s/pgp-public-key", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewAgentEnrollRequest calls the generic AgentEnroll builder with application/json body
@@ -954,6 +1017,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// GetPGPKeyWithResponse request
+	GetPGPKeyWithResponse(ctx context.Context, major int, minor int, patch int, reqEditors ...RequestEditorFn) (*GetPGPKeyResponse, error)
+
 	// AgentEnrollWithBodyWithResponse request with any body
 	AgentEnrollWithBodyWithResponse(ctx context.Context, params *AgentEnrollParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AgentEnrollResponse, error)
 
@@ -990,6 +1056,29 @@ type ClientWithResponsesInterface interface {
 
 	// StatusWithResponse request
 	StatusWithResponse(ctx context.Context, params *StatusParams, reqEditors ...RequestEditorFn) (*StatusResponse, error)
+}
+
+type GetPGPKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *BadRequest
+	JSON401      *KeyNotEnabled
+}
+
+// Status returns HTTPResponse.Status
+func (r GetPGPKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetPGPKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type AgentEnrollResponse struct {
@@ -1235,6 +1324,15 @@ func (r StatusResponse) StatusCode() int {
 	return 0
 }
 
+// GetPGPKeyWithResponse request returning *GetPGPKeyResponse
+func (c *ClientWithResponses) GetPGPKeyWithResponse(ctx context.Context, major int, minor int, patch int, reqEditors ...RequestEditorFn) (*GetPGPKeyResponse, error) {
+	rsp, err := c.GetPGPKey(ctx, major, minor, patch, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetPGPKeyResponse(rsp)
+}
+
 // AgentEnrollWithBodyWithResponse request with arbitrary body returning *AgentEnrollResponse
 func (c *ClientWithResponses) AgentEnrollWithBodyWithResponse(ctx context.Context, params *AgentEnrollParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AgentEnrollResponse, error) {
 	rsp, err := c.AgentEnrollWithBody(ctx, params, contentType, body, reqEditors...)
@@ -1354,6 +1452,39 @@ func (c *ClientWithResponses) StatusWithResponse(ctx context.Context, params *St
 		return nil, err
 	}
 	return ParseStatusResponse(rsp)
+}
+
+// ParseGetPGPKeyResponse parses an HTTP response from a GetPGPKeyWithResponse call
+func ParseGetPGPKeyResponse(rsp *http.Response) (*GetPGPKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPGPKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest KeyNotEnabled
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseAgentEnrollResponse parses an HTTP response from a AgentEnrollWithResponse call

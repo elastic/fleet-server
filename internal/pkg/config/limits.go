@@ -30,6 +30,7 @@ type ServerLimits struct {
 	UploadEndLimit   Limit `config:"upload_end_limit"`
 	UploadChunkLimit Limit `config:"upload_chunk_limit"`
 	DeliverFileLimit Limit `config:"file_delivery_limit"`
+	GetPGPKey        Limit `config:"pgp_retrieval_limit"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -59,6 +60,7 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	c.UploadEndLimit = mergeEnvLimit(c.UploadEndLimit, l.UploadEndLimit)
 	c.UploadChunkLimit = mergeEnvLimit(c.UploadChunkLimit, l.UploadChunkLimit)
 	c.DeliverFileLimit = mergeEnvLimit(c.DeliverFileLimit, l.DeliverFileLimit)
+	c.GetPGPKey = mergeEnvLimit(c.GetPGPKey, l.GetPGPKeyLimit)
 }
 
 func mergeEnvLimit(L Limit, l limit) Limit {

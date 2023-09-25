@@ -43,6 +43,7 @@ var (
 	cntUploadChunk routeStats
 	cntUploadEnd   routeStats
 	cntFileDeliv   routeStats
+	cntGetPGP      routeStats
 	cntArtifacts   artifactStats
 
 	infoReg sync.Once
@@ -73,6 +74,7 @@ func init() {
 	cntUploadChunk.Register(routesRegistry.newRegistry("uploadChunk"))
 	cntUploadEnd.Register(routesRegistry.newRegistry("uploadEnd"))
 	cntFileDeliv.Register(routesRegistry.newRegistry("deliverFile"))
+	cntGetPGP.Register(routesRegistry.newRegistry("getPGPKey"))
 
 }
 

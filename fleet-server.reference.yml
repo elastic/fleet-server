@@ -187,6 +187,16 @@ fleet:
 #         burst: 5
 #         max: 2
 #         max_body_byte_size: 1024
+#       file_delivery_limit:
+#         interval: 100ms
+#         burst: 8
+#         max: 5
+#         max_body_byte_size: 5242880 # 5MiB
+#       pgp_retrieval_limit:
+#         interval: 10ms
+#         burst: 100
+#         max: 50
+#         max_body_byte_size: 0
 #
 #         # go runtime limits
 #         runtime:
@@ -221,6 +231,19 @@ fleet:
 #           hosts: []
 #           global_labels: ""
 #           transaction_sample_rate: ""
+#
+#         # Add static token values to fleet-server
+#         static_policy_tokens:
+#           enabled: false
+#           policy_tokens:
+#             - token_key: "value"
+#               policy_id: "value"
+#
+#         # configuration for pgp key endpoint
+#         pgp:
+#           upstream_url: "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
+#           # By default dir is the directory containing the fleet-server executable (following symlinks) joined with elastic-agent-upgrade-keys
+#           dir: ./elastic-agent-upgrade-keys
 
 ##############################
 # Logging configuration
