@@ -48,7 +48,7 @@ func Test_server_Run(t *testing.T) {
 	et, err := NewEnrollerT(verCon, cfg, nil, c)
 	require.NoError(t, err)
 
-	srv := NewServer(addr, cfg, ct, et, nil, nil, nil, nil, fbuild.Info{}, nil, nil, nil, nil)
+	srv := NewServer(addr, cfg, ct, et, nil, nil, nil, nil, fbuild.Info{}, nil, nil, nil, nil, nil)
 	errCh := make(chan error)
 
 	var wg sync.WaitGroup

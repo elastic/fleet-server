@@ -27,6 +27,7 @@ type apiServer struct {
 	bi     build.Info
 	ut     *UploadT
 	ft     *FileDeliveryT
+	pt     *PGPRetrieverT
 	bulker bulk.Bulk
 }
 
@@ -133,6 +134,15 @@ func (a *apiServer) GetFile(w http.ResponseWriter, r *http.Request, id string) {
 	zlog := hlog.FromRequest(r).With().Logger()
 	if err := a.ft.handleSendFile(zlog, w, r, id); err != nil {
 		cntFileDeliv.IncError(err)
+		w.Header().Set("Content-Type", "application/json")
+		ErrorResp(w, r, err)
+	}
+}
+
+func (a *apiServer) GetPGPKey(w http.ResponseWriter, r *http.Request, major, minor, patch int) {
+	zlog := hlog.FromRequest(r).With().Logger()
+	if err := a.pt.handlePGPKey(zlog, w, r, major, minor, patch); err != nil {
+		cntGetPGP.IncError(err)
 		w.Header().Set("Content-Type", "application/json")
 		ErrorResp(w, r, err)
 	}

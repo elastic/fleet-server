@@ -69,3 +69,12 @@ func (m *MockCache) GetUpload(id string) (file.Info, bool) {
 	args := m.Called(id)
 	return args.Get(0).(file.Info), args.Bool(1)
 }
+
+func (m *MockCache) SetPGPKey(id string, p []byte) {
+	m.Called(id, p)
+}
+
+func (m *MockCache) GetPGPKey(id string) ([]byte, bool) {
+	args := m.Called(id)
+	return args.Get(0).([]byte), args.Bool(1)
+}

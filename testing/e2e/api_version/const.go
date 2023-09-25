@@ -8,12 +8,3 @@ package api_version
 // It defines elastic.agent.version as that attribute is required by Kibana to successfully request diagnostics from an agent.
 // A diagnostics request is used when testing the file-upload endpoints.
 const enrollMetadataTpl = `{"elastic":{"agent":{"version":"%s"}}}`
-
-type ClientAPITesterInterface interface {
-	TestStatus(apiKey string)
-	TestEnroll(apiKey string) (string, string)
-	TestCheckin(apiKey, agentID string, ackToken, dur *string) (*string, []string)
-	TestAcks(apiKey, agentID string, actionsIds []string)
-	TestArtifact(apiKey, id, sha2, encodedSHA string)
-	TestFullFileUpload(apiKey, agentID, actionID string, size int64)
-}

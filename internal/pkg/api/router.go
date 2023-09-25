@@ -6,6 +6,7 @@ package api
 
 import (
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -47,6 +48,7 @@ type limiter struct {
 	uploadChunk    *limit.Limiter
 	uploadComplete *limit.Limiter
 	deliverFile    *limit.Limiter
+	getPGPKey      *limit.Limiter
 }
 
 func Limiter(cfg *config.ServerLimits) *limiter {
@@ -60,8 +62,11 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 		uploadChunk:    limit.NewLimiter(&cfg.UploadChunkLimit),
 		uploadComplete: limit.NewLimiter(&cfg.UploadEndLimit),
 		deliverFile:    limit.NewLimiter(&cfg.DeliverFileLimit),
+		getPGPKey:      limit.NewLimiter(&cfg.GetPGPKey),
 	}
 }
+
+var pgpReg = regexp.MustCompile(`\/api\/agents\/upgrades\/[0-9]+\.[0-9]+\.[0-9]+\/pgp-public-key`)
 
 // pathToOperation determines the endpoint passed on the request path.
 // idealy we would be able to use chi's route context, but it is not ready this early in the stack
@@ -75,6 +80,10 @@ func pathToOperation(path string) string {
 	if path == "/api/fleet/uploads" {
 		return "uploadBegin"
 	}
+	if pgpReg.MatchString(path) {
+		return "getPGPKey"
+	}
+
 	if strings.HasPrefix(path, "/api/fleet/") {
 		pp := strings.Split(strings.TrimPrefix(path, "/"), "/")
 		if len(pp) == 4 {
@@ -119,6 +128,8 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 			l.uploadChunk.Wrap("uploadChunk", &cntUploadChunk, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "deliverFile":
 			l.deliverFile.Wrap("deliverFile", &cntFileDeliv, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+		case "getPGPKey":
+			l.getPGPKey.Wrap("getPGPKey", &cntGetPGP, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "status":
 			l.status.Wrap("status", &cntStatus, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		default:

@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/fleet-server/testing/e2e/api_version"
+	"github.com/elastic/fleet-server/testing/e2e/scaffold"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -30,7 +30,7 @@ func (l *logger) Printf(format string, v ...interface{}) {
 }
 
 type AgentContainerSuite struct {
-	BaseE2ETestSuite
+	scaffold.Scaffold
 
 	dockerImg string
 
@@ -115,7 +115,7 @@ func (suite *AgentContainerSuite) TestHTTP() {
 			"FLEET_SERVER_ENABLE":             "1",
 			"FLEET_SERVER_POLICY_ID":          "fleet-server-policy",
 			"FLEET_SERVER_ELASTICSEARCH_HOST": "http://elasticsearch:9200",
-			"FLEET_SERVER_SERVICE_TOKEN":      suite.serviceToken,
+			"FLEET_SERVER_SERVICE_TOKEN":      suite.ServiceToken,
 			"FLEET_SERVER_INSECURE_HTTP":      "true",
 			"FLEET_SERVER_HOST":               "0.0.0.0",
 		},
@@ -123,7 +123,7 @@ func (suite *AgentContainerSuite) TestHTTP() {
 		Networks:     []string{"integration_default"},
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.coverPath},
+				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
 				Target: "/cover",
 			},
 		},
@@ -146,7 +146,7 @@ func (suite *AgentContainerSuite) TestHTTP() {
 func (suite *AgentContainerSuite) TestWithSecretFiles() {
 	// Create a service token file in the temp test dir
 	dir := suite.T().TempDir()
-	err := os.WriteFile(filepath.Join(dir, "service-token"), []byte(suite.serviceToken), 0644)
+	err := os.WriteFile(filepath.Join(dir, "service-token"), []byte(suite.ServiceToken), 0644)
 	suite.Require().NoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -171,19 +171,19 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 		Networks:     []string{"integration_default"},
 		// certs are copied so they can be readable by fleet-server.
 		Files: []testcontainers.ContainerFile{{
-			HostFilePath:      filepath.Join(suite.certPath, "e2e-test-ca.crt"),
+			HostFilePath:      filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
 			ContainerFilePath: "/tmp/e2e-test-ca.crt",
 			FileMode:          0644,
 		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.crt"),
+			HostFilePath:      filepath.Join(suite.CertPath, "fleet-server.crt"),
 			ContainerFilePath: "/tmp/fleet-server.crt",
 			FileMode:          0644,
 		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.key"),
+			HostFilePath:      filepath.Join(suite.CertPath, "fleet-server.key"),
 			ContainerFilePath: "/tmp/fleet-server.key",
 			FileMode:          0644,
 		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "passphrase"),
+			HostFilePath:      filepath.Join(suite.CertPath, "passphrase"),
 			ContainerFilePath: "/tmp/passphrase",
 			FileMode:          0644,
 		}},
@@ -194,7 +194,7 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 				ReadOnly: true,
 			},
 			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.coverPath},
+				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
 				Target: "/cover",
 			},
 		},
@@ -212,158 +212,6 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 	suite.Require().NoError(err)
 
 	suite.FleetIsHealthy(ctx, endpoint)
-}
-
-func (suite *AgentContainerSuite) TestClientAPI() {
-	bCtx, bCancel := context.WithCancel(context.Background())
-	defer bCancel()
-
-	req := testcontainers.ContainerRequest{
-		Hostname: "fleet-server",
-		Image:    suite.dockerImg,
-		Env: map[string]string{
-			"GOCOVERDIR":                       "/cover",
-			"FLEET_SERVER_ENABLE":              "1",
-			"FLEET_URL":                        "https://fleet-server:8220",
-			"FLEET_CA":                         "/tmp/e2e-test-ca.crt",
-			"FLEET_SERVER_CERT":                "/tmp/fleet-server.crt",
-			"FLEET_SERVER_CERT_KEY":            "/tmp/fleet-server.key",
-			"FLEET_SERVER_CERT_KEY_PASSPHRASE": "/tmp/passphrase",
-			"FLEET_SERVER_SERVICE_TOKEN":       suite.serviceToken,
-			"FLEET_SERVER_ELASTICSEARCH_HOST":  "http://elasticsearch:9200",
-			"FLEET_SERVER_POLICY_ID":           "fleet-server-policy",
-		},
-		ExposedPorts: []string{"8220/tcp"},
-		Networks:     []string{"integration_default"},
-		// certs are copied so they can be readable by fleet-server.
-		Files: []testcontainers.ContainerFile{{
-			HostFilePath:      filepath.Join(suite.certPath, "e2e-test-ca.crt"),
-			ContainerFilePath: "/tmp/e2e-test-ca.crt",
-			FileMode:          0644,
-		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.crt"),
-			ContainerFilePath: "/tmp/fleet-server.crt",
-			FileMode:          0644,
-		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.key"),
-			ContainerFilePath: "/tmp/fleet-server.key",
-			FileMode:          0644,
-		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "passphrase"),
-			ContainerFilePath: "/tmp/passphrase",
-			FileMode:          0644,
-		}},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.coverPath},
-				Target: "/cover",
-			},
-		},
-		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
-	}
-	fleetC, err := testcontainers.GenericContainer(bCtx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-		Logger:           &logger{suite.T()},
-	})
-	suite.Require().NoError(err)
-	suite.container = fleetC
-
-	endpoint, err := fleetC.Endpoint(bCtx, "https")
-	suite.Require().NoError(err)
-
-	suite.FleetIsHealthy(bCtx, endpoint)
-
-	enrollmentKey := suite.GetEnrollmentTokenForPolicyID(bCtx, "dummy-policy")
-
-	// Run subtests
-	suite.Run("test status unauthenicated", func() {
-		ctx, cancel := context.WithCancel(bCtx)
-		defer cancel()
-		tester := api_version.NewClientAPITesterCurrent(
-			suite.Suite,
-			ctx,
-			suite.client,
-			endpoint,
-		)
-		tester.TestStatus("")
-	})
-
-	suite.Run("test status authenicated", func() {
-		ctx, cancel := context.WithCancel(bCtx)
-		defer cancel()
-		tester := api_version.NewClientAPITesterCurrent(
-			suite.Suite,
-			ctx,
-			suite.client,
-			endpoint,
-		)
-		tester.TestStatus(enrollmentKey)
-	})
-
-	suite.Run("test enroll checkin ack", func() {
-		ctx, cancel := context.WithTimeout(bCtx, 3*time.Minute)
-		defer cancel()
-		tester := api_version.NewClientAPITesterCurrent(
-			suite.Suite,
-			ctx,
-			suite.client,
-			endpoint,
-		)
-
-		suite.T().Log("test enrollment")
-		agentID, agentKey := tester.TestEnroll(enrollmentKey)
-		suite.VerifyAgentInKibana(ctx, agentID)
-
-		suite.T().Logf("test checkin 1: agent %s", agentID)
-		ackToken, actions := tester.TestCheckin(agentKey, agentID, nil, nil)
-		suite.Require().NotEmpty(actions)
-
-		suite.T().Log("test ack")
-		tester.TestAcks(agentKey, agentID, actions)
-
-		suite.T().Logf("test checkin 2: agent %s 3m timout", agentID)
-		dur := "3m"
-
-		defer cancel()
-
-		tester.TestCheckin(agentKey, agentID, ackToken, &dur)
-
-		// sanity check agent status in kibana
-		suite.AgentIsOnline(ctx, agentID)
-	})
-
-	suite.Run("test file upload", func() {
-		ctx, cancel := context.WithCancel(bCtx)
-		defer cancel()
-		tester := api_version.NewClientAPITesterCurrent(
-			suite.Suite,
-			ctx,
-			suite.client,
-			endpoint,
-		)
-		agentID, agentKey := tester.TestEnroll(enrollmentKey)
-		actionID := suite.RequestDiagnosticsForAgent(ctx, agentID)
-
-		tester.TestFullFileUpload(agentKey, agentID, actionID, 8192) // 8KiB file
-	})
-
-	suite.Run("test artifact", func() {
-		ctx, cancel := context.WithTimeout(bCtx, 3*time.Minute)
-		defer cancel()
-		tester := api_version.NewClientAPITesterCurrent(
-			suite.Suite,
-			ctx,
-			suite.client,
-			endpoint,
-		)
-		_, agentKey := tester.TestEnroll(enrollmentKey)
-		suite.AddSecurityContainer(ctx)
-		suite.AddSecurityContainerItem(ctx)
-
-		hits := suite.FleetHasArtifacts(ctx)
-		tester.TestArtifact(agentKey, hits[0].Source.Identifier, hits[0].Source.DecodedSHA256, hits[0].Source.EncodedSHA256)
-	})
 }
 
 // TestSleep10m checks if the fleet-server is healthy after 10m
@@ -386,7 +234,7 @@ func (suite *AgentContainerSuite) TestSleep10m() {
 			"FLEET_SERVER_CERT":                "/tmp/fleet-server.crt",
 			"FLEET_SERVER_CERT_KEY":            "/tmp/fleet-server.key",
 			"FLEET_SERVER_CERT_KEY_PASSPHRASE": "/tmp/passphrase",
-			"FLEET_SERVER_SERVICE_TOKEN":       suite.serviceToken,
+			"FLEET_SERVER_SERVICE_TOKEN":       suite.ServiceToken,
 			"FLEET_SERVER_ELASTICSEARCH_HOST":  "http://elasticsearch:9200",
 			"FLEET_SERVER_POLICY_ID":           "fleet-server-policy",
 		},
@@ -394,25 +242,25 @@ func (suite *AgentContainerSuite) TestSleep10m() {
 		Networks:     []string{"integration_default"},
 		// certs are copied so they can be readable by fleet-server.
 		Files: []testcontainers.ContainerFile{{
-			HostFilePath:      filepath.Join(suite.certPath, "e2e-test-ca.crt"),
+			HostFilePath:      filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
 			ContainerFilePath: "/tmp/e2e-test-ca.crt",
 			FileMode:          0644,
 		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.crt"),
+			HostFilePath:      filepath.Join(suite.CertPath, "fleet-server.crt"),
 			ContainerFilePath: "/tmp/fleet-server.crt",
 			FileMode:          0644,
 		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.key"),
+			HostFilePath:      filepath.Join(suite.CertPath, "fleet-server.key"),
 			ContainerFilePath: "/tmp/fleet-server.key",
 			FileMode:          0644,
 		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "passphrase"),
+			HostFilePath:      filepath.Join(suite.CertPath, "passphrase"),
 			ContainerFilePath: "/tmp/passphrase",
 			FileMode:          0644,
 		}},
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.coverPath},
+				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
 				Target: "/cover",
 			},
 		},
@@ -457,7 +305,7 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 			"FLEET_SERVER_CERT":                "/tmp/fleet-server.crt",
 			"FLEET_SERVER_CERT_KEY":            "/tmp/fleet-server.key",
 			"FLEET_SERVER_CERT_KEY_PASSPHRASE": "/tmp/passphrase",
-			"FLEET_SERVER_SERVICE_TOKEN":       suite.serviceToken,
+			"FLEET_SERVER_SERVICE_TOKEN":       suite.ServiceToken,
 			"FLEET_SERVER_ELASTICSEARCH_HOST":  "http://elasticsearch:9200",
 			"FLEET_SERVER_POLICY_ID":           "fleet-server-policy",
 		},
@@ -465,25 +313,25 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 		Networks:     []string{"integration_default"},
 		// certs are copied so they can be readable by fleet-server.
 		Files: []testcontainers.ContainerFile{{
-			HostFilePath:      filepath.Join(suite.certPath, "e2e-test-ca.crt"),
+			HostFilePath:      filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
 			ContainerFilePath: "/tmp/e2e-test-ca.crt",
 			FileMode:          0644,
 		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.crt"),
+			HostFilePath:      filepath.Join(suite.CertPath, "fleet-server.crt"),
 			ContainerFilePath: "/tmp/fleet-server.crt",
 			FileMode:          0644,
 		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "fleet-server.key"),
+			HostFilePath:      filepath.Join(suite.CertPath, "fleet-server.key"),
 			ContainerFilePath: "/tmp/fleet-server.key",
 			FileMode:          0644,
 		}, {
-			HostFilePath:      filepath.Join(suite.certPath, "passphrase"),
+			HostFilePath:      filepath.Join(suite.CertPath, "passphrase"),
 			ContainerFilePath: "/tmp/passphrase",
 			FileMode:          0644,
 		}},
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.coverPath},
+				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
 				Target: "/cover",
 			},
 		},
@@ -515,13 +363,13 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 		Networks: []string{"integration_default"},
 		// certs are copied so they can be readable by fleet-server.
 		Files: []testcontainers.ContainerFile{{
-			HostFilePath:      filepath.Join(suite.certPath, "e2e-test-ca.crt"),
+			HostFilePath:      filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
 			ContainerFilePath: "/tmp/e2e-test-ca.crt",
 			FileMode:          0644,
 		}},
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.coverPath},
+				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
 				Target: "/cover",
 			},
 		},
@@ -563,7 +411,7 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 			// on the 1st iteration of the loop we don't know the agent ID that the container agent uses
 			if agentID == "" {
 				// getAgents should (eventually) return the fleet-server and the agent
-				status, agents := suite.getAgents(ctx)
+				status, agents := suite.GetAgents(ctx)
 				if status != 200 {
 					timer.Reset(time.Second)
 					continue

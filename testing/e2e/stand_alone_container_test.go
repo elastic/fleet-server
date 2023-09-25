@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/testing/e2e/scaffold"
+
 	toxiproxy "github.com/Shopify/toxiproxy/client"
 	"github.com/docker/docker/api/types/container"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -23,7 +25,7 @@ import (
 )
 
 type StandAloneContainerSuite struct {
-	BaseE2ETestSuite
+	scaffold.Scaffold
 
 	container testcontainers.Container
 
@@ -124,7 +126,7 @@ func (suite *StandAloneContainerSuite) TestHTTP() {
 		Template: "stand-alone-http.tpl",
 		TemplateData: map[string]string{
 			"Hosts":        "http://elasticsearch:9200",
-			"ServiceToken": suite.serviceToken,
+			"ServiceToken": suite.ServiceToken,
 		},
 	})
 
@@ -140,7 +142,7 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.esHosts)
+	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.ESHosts)
 	suite.Require().NoError(err)
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{
@@ -148,7 +150,7 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 		NetworkMode: "host",
 		TemplateData: map[string]string{
 			"Hosts":        "http://" + proxy.Listen,
-			"ServiceToken": suite.serviceToken,
+			"ServiceToken": suite.ServiceToken,
 		},
 	})
 

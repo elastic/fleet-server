@@ -285,6 +285,17 @@ the test BenchmarkXXXX and not unit tests)
 - `BENCHMARK_COUNT`: you can define the number of iterations go test will run. Having larger number helps
 remove run-to-run variations (Default: 8)
 
+#### E2E Tests
+
+All E2E tests are located in `testing/e2e`.
+
+To execute them run:
+```bash
+make test-e2e
+```
+
+Refer to the [e2e README](./testing/e2e/README.md) for information on how to write new tests.
+
 #### Testing on cloud
 
 Elastic employees can create an Elastic Cloud deployment with a locally built Fleet Server.

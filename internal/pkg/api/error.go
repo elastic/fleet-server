@@ -215,6 +215,24 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		{
+			ErrTLSRequired,
+			HTTPErrResp{
+				http.StatusNotImplemented,
+				"ErrTLSRequired",
+				"server must run with tls to use this endpoint",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			ErrPGPPermissions,
+			HTTPErrResp{
+				http.StatusInternalServerError,
+				"ErrPGPPermissions",
+				"fleet-server PGP key has incorrect permissions",
+				zerolog.ErrorLevel,
+			},
+		},
 		// apikey
 		{
 			apikey.ErrNoAuthHeader,

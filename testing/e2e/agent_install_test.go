@@ -30,13 +30,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/testing/e2e/scaffold"
 	"github.com/elastic/fleet-server/v7/version"
 
 	"github.com/stretchr/testify/suite"
 )
 
 type AgentInstallSuite struct {
-	BaseE2ETestSuite
+	scaffold.Scaffold
 
 	installDetected bool   // Flag to skip tests if an agent is detected
 	agentPath       string // path to extracted elastic-agent binary (or symlink)
@@ -111,7 +112,7 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s-SNAPSHOT", version.DefaultVersion), nil)
 	suite.Require().NoError(err)
 
-	resp, err := suite.client.Do(req)
+	resp, err := suite.Client.Do(req)
 	suite.Require().NoError(err)
 
 	var body SearchResp
@@ -135,7 +136,7 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 
 	req, err = http.NewRequestWithContext(ctx, "GET", pkg.URL, nil)
 	suite.Require().NoError(err)
-	resp, err = suite.client.Do(req)
+	resp, err = suite.Client.Do(req)
 	suite.Require().NoError(err)
 	return resp.Body
 }
@@ -319,13 +320,13 @@ func (suite *AgentInstallSuite) TestHTTP() {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
-		"--fleet-server-es=http://"+suite.esHosts,
-		"--fleet-server-service-token="+suite.serviceToken,
+		"--fleet-server-es=http://"+suite.ESHosts,
+		"--fleet-server-service-token="+suite.ServiceToken,
 		"--fleet-server-insecure-http=true",
 		"--fleet-server-host=0.0.0.0",
 		"--fleet-server-policy=fleet-server-policy",
 		"--non-interactive")
-	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath} // TODO Check if this env var will be passed by the agent to fleet-server
 	cmd.Dir = filepath.Dir(suite.agentPath)
 
 	output, err := cmd.CombinedOutput()
@@ -336,7 +337,7 @@ func (suite *AgentInstallSuite) TestHTTP() {
 
 func (suite *AgentInstallSuite) TestWithSecretFiles() {
 	dir := suite.T().TempDir()
-	err := os.WriteFile(filepath.Join(dir, "service-token"), []byte(suite.serviceToken), 0600)
+	err := os.WriteFile(filepath.Join(dir, "service-token"), []byte(suite.ServiceToken), 0600)
 	suite.Require().NoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
@@ -344,15 +345,15 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
 		"--url=https://localhost:8200",
-		"--certificate-authorities="+filepath.Join(suite.certPath, "e2e-test-ca.crt"),
-		"--fleet-server-es=http://"+suite.esHosts,
+		"--certificate-authorities="+filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
+		"--fleet-server-es=http://"+suite.ESHosts,
 		"--fleet-server-service-token-path="+filepath.Join(dir, "service-token"),
 		"--fleet-server-policy=fleet-server-policy",
-		"--fleet-server-cert="+filepath.Join(suite.certPath, "fleet-server.crt"),
-		"--fleet-server-cert-key="+filepath.Join(suite.certPath, "fleet-server.key"),
-		"--fleet-server-cert-key-passphrase="+filepath.Join(suite.certPath, "passphrase"),
+		"--fleet-server-cert="+filepath.Join(suite.CertPath, "fleet-server.crt"),
+		"--fleet-server-cert-key="+filepath.Join(suite.CertPath, "fleet-server.key"),
+		"--fleet-server-cert-key-passphrase="+filepath.Join(suite.CertPath, "passphrase"),
 		"--non-interactive")
-	cmd.Env = []string{"GOCOVERDIR=" + suite.coverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath} // TODO Check if this env var will be passed by the agent to fleet-server
 	cmd.Dir = filepath.Dir(suite.agentPath)
 
 	output, err := cmd.CombinedOutput()
