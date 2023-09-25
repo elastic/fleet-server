@@ -3,7 +3,7 @@ run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   timeout: 1m
   build-tags: integration
-  go: "1.20.7"
+  go: "1.20.8"
 
 issues:
   # Maximum count of issues with the same text.
