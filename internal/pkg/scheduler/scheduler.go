@@ -8,7 +8,6 @@ package scheduler
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"math/rand"
@@ -129,11 +128,7 @@ func runSchedule(ctx context.Context, log zerolog.Logger, schedule Schedule) {
 
 	err := schedule.WorkFn(ctx)
 	if err != nil {
-		if strings.Contains(err.Error(), "no such host") {
-			log.Warn().Err(err).Msg("scheduler.runSchedule: failed running schedule function, no such host")
-		} else {
-			log.Error().Err(err).Msg("scheduler.runSchedule: failed running schedule function")
-		}
+		log.Warn().Err(err).Msg("scheduler.runSchedule: failed running schedule function")
 	}
 
 	log.Debug().Msg("finished")

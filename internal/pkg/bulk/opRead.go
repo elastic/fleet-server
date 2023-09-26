@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -102,11 +101,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	res, err := req.Do(ctx, b.es)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "no such host") {
-			log.Warn().Err(err).Str("mod", kModBulk).Msg("bulker.flushRead: Error sending mget request to Elasticsearch, no such host")
-		} else {
-			log.Error().Err(err).Str("mod", kModBulk).Msg("bulker.flushRead: Error sending mget request to Elasticsearch")
-		}
+		log.Warn().Err(err).Str("mod", kModBulk).Msg("bulker.flushRead: Error sending mget request to Elasticsearch")
 		return err
 	}
 
@@ -115,11 +110,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	}
 
 	if res.IsError() {
-		if strings.Contains(res.String(), "503 Service Unavailable") || strings.Contains(res.String(), "404 Not Found") {
-			log.Warn().Str("mod", kModBulk).Str("err", res.String()).Msg("bulker.flushRead: Error in mget request result to Elasticsearch")
-		} else {
-			log.Error().Str("mod", kModBulk).Str("err", res.String()).Msg("bulker.flushRead: Error in mget request result to Elasticsearch")
-		}
+		log.Warn().Str("mod", kModBulk).Str("err", res.String()).Msg("bulker.flushRead: Error in mget request result to Elasticsearch")
 		return parseError(res)
 	}
 
