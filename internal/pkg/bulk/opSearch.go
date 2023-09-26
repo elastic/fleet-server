@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -169,7 +170,11 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 	}
 
 	if res.IsError() {
-		log.Error().Err(err).Str("mod", kModBulk).Msg("Fail writeMsearchBody")
+		if strings.Contains(res.String(), "503 Service Unavailable") || strings.Contains(res.String(), "404 Not Found") {
+			log.Warn().Str("mod", kModBulk).Str("err", res.String()).Msg("bulker.flushSearch: Fail writeMsearchBody")
+		} else {
+			log.Error().Str("mod", kModBulk).Str("err", res.String()).Msg("bulker.flushSearch: Fail writeMsearchBody")
+		}
 		return parseError(res)
 	}
 
