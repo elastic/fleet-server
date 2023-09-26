@@ -12,9 +12,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
@@ -60,6 +62,7 @@ type CheckinT struct {
 	gcp    monitor.GlobalCheckpointProvider
 	ad     *action.Dispatcher
 	tr     *action.TokenResolver
+	gwPool sync.Pool
 	bulker bulk.Bulk
 }
 
@@ -83,6 +86,15 @@ func NewCheckinT(
 		gcp:    gcp,
 		ad:     ad,
 		tr:     tr,
+		gwPool: sync.Pool{
+			New: func() any {
+				zipper, err := gzip.NewWriterLevel(io.Discard, cfg.CompressionLevel)
+				if err != nil {
+					panic(err)
+				}
+				return zipper
+			},
+		},
 		bulker: bulker,
 	}
 
@@ -498,13 +510,11 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	if len(payload) > compressThreshold && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
 		wrCounter := datacounter.NewWriterCounter(w)
 
-		zipper, err := gzip.NewWriterLevel(wrCounter, compressionLevel)
-		if err != nil {
-			return fmt.Errorf("writeResponse new gzip: %w", err)
-		}
+		zipper := ct.gwPool.Get().(*gzip.Writer)
+		defer ct.gwPool.Put(zipper)
+		zipper.Reset(wrCounter)
 
 		w.Header().Set("Content-Encoding", kEncodingGzip)
-
 		if _, err = zipper.Write(payload); err != nil {
 			return fmt.Errorf("writeResponse gzip write: %w", err)
 		}

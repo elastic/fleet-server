@@ -7,8 +7,11 @@
 package api
 
 import (
+	"compress/flate"
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -27,6 +30,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConvertActions(t *testing.T) {
@@ -475,6 +479,47 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			}
 			mBulk.AssertExpectations(t)
 			mCache.AssertExpectations(t)
+		})
+	}
+}
+
+func Test_CheckinT_writeResponse(t *testing.T) {
+	tests := []struct {
+		name       string
+		req        *http.Request
+		respHeader string
+	}{{
+		name:       "no compression",
+		req:        &http.Request{},
+		respHeader: "",
+	}, {
+		name: "with compression",
+		req: &http.Request{
+			Header: http.Header{
+				"Accept-Encoding": []string{"gzip"},
+			},
+		},
+		respHeader: "gzip",
+	}}
+
+	verCon := mustBuildConstraints("8.0.0")
+	cfg := &config.Server{
+		CompressionLevel:  flate.BestSpeed,
+		CompressionThresh: 1,
+	}
+
+	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			wr := httptest.NewRecorder()
+			err := ct.writeResponse(testlog.SetLogger(t), wr, test.req, &model.Agent{}, CheckinResponse{
+				Action: "checkin",
+			})
+			resp := wr.Result()
+			defer resp.Body.Close()
+			require.NoError(t, err)
+			assert.Equal(t, test.respHeader, resp.Header.Get("Content-Encoding"))
 		})
 	}
 }
