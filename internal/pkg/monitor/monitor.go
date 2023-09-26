@@ -45,7 +45,7 @@ const (
 	// 1. Index is not found (index is created only on the first document save)
 	// 2. Any other error waiting on global checkpoint, except timeouts.
 	// For the long poll timeout, start a new request as soon as possible.
-	retryDelay = 3 * time.Second
+	retryDelay = 10 * time.Second
 )
 
 const (

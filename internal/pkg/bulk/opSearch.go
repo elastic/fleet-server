@@ -169,7 +169,7 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 	}
 
 	if res.IsError() {
-		log.Error().Err(err).Str("mod", kModBulk).Msg("Fail writeMsearchBody")
+		log.Warn().Str("mod", kModBulk).Str("err", res.String()).Msg("bulker.flushSearch: Fail writeMsearchBody")
 		return parseError(res)
 	}
 
