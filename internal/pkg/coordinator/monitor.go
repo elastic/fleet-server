@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -347,7 +348,11 @@ func (m *monitorT) releaseLeadership() {
 			err := dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l := m.log.With().Str(dl.FieldPolicyID, pt.id).Logger()
-				l.Err(err).Msg("failed to release leadership")
+				if strings.Contains(err.Error(), "elastic fail 503") {
+					l.Warn().Err(err).Msg("monitor.releaseLeadership: failed to release leadership, elastic fail 503")
+				} else {
+					l.Err(err).Msg("monitor.releaseLeadership: failed to release leadership")
+				}
 			}
 			wg.Done()
 		}(pt)

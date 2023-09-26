@@ -11,6 +11,7 @@ import (
 	slog "log"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
@@ -102,7 +103,11 @@ func (s *server) Run(ctx context.Context) error {
 	defer func() {
 		err := ln.Close()
 		if err != nil {
-			log.Error().Err(err).Msg("error while closing listener.")
+			if strings.Contains(err.Error(), "use of closed network connection") {
+				log.Warn().Err(err).Msg("server.Run: error while closing listener, closed network connection.")
+			} else {
+				log.Error().Err(err).Msg("server.Run: error while closing listener.")
+			}
 		}
 	}()
 
