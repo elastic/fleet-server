@@ -282,7 +282,11 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 			l := m.log.With().Str(dl.FieldPolicyID, pt.id).Logger()
 			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.version, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
-				l.Err(err).Msg("failed to take ownership")
+				if strings.Contains(err.Error(), "elastic fail 503") {
+					l.Warn().Err(err).Msg("monitor.ensureLeadership: failed to take ownership, elastic fail 503")
+				} else {
+					l.Err(err).Msg("monitor.ensureLeadership: failed to take ownership")
+				}
 				if pt.cord != nil {
 					pt.cord = nil
 				}
