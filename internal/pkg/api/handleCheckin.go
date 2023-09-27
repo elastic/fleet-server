@@ -519,8 +519,8 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 			return fmt.Errorf("writeResponse gzip write: %w", err)
 		}
 
-		if err = zipper.Close(); err != nil {
-			err = fmt.Errorf("writeResponse gzip close: %w", err)
+		if err = zipper.Flush(); err != nil {
+			err = fmt.Errorf("writeResponse gzip flush: %w", err)
 		}
 
 		cntCheckin.bodyOut.Add(wrCounter.Count())
