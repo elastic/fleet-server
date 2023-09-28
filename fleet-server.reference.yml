@@ -120,6 +120,10 @@ fleet:
 #       # checkin_jitter time may be subtracted from the long_poll time.
 #       # a 0 value disables jitter
 #       checkin_jitter: 30s
+#       # checkin_response_jitter is added as a random delay before the checkin method starts writing a response to a checkin
+#       # should never me more then 2m to prevent edge cases with assumptions around poll-times and server writes from becoming invalid
+#       # a 0 value disables jitter
+#       checkin_response_jitter: 100ms
 #       # checkin_max_poll is the maximum long_poll value a client can request.
 #       checkin_max_poll: 1h
 #
