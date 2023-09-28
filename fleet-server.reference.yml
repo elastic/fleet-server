@@ -120,10 +120,6 @@ fleet:
 #       # checkin_jitter time may be subtracted from the long_poll time.
 #       # a 0 value disables jitter
 #       checkin_jitter: 30s
-#       # checkin_response_jitter is added as a random delay before the checkin method starts writing a response to a checkin
-#       # should never me more then 2m to prevent edge cases with assumptions around poll-times and server writes from becoming invalid
-#       # a 0 value disables jitter
-#       checkin_response_jitter: 100ms
 #       # checkin_max_poll is the maximum long_poll value a client can request.
 #       checkin_max_poll: 1h
 #
@@ -145,6 +141,11 @@ fleet:
 #       max_agents: 0
 #       # policy_throttle is the duration that the fleet-server will wait in between attempts to dispatch policy updates to polling agents # TODO verify this
 #       policy_throttle: 5ms # 1ms min is forced
+#       # action_throttle is added as a delay before the in checkin requests to help space response writes
+#       # This is done in order to be able to reuse gzip writers if gzip is requested as allocating new writers is expensive
+#       # should never me more then 2m to prevent edge cases with assumptions around poll-times and server writes from becoming invalid
+#       # a 0 value disables the throttle (default behavior)
+#       action_throttle: 0
 #       # max_header_byte_size is the request header size limit
 #       max_header_byte_size: 8192 # 8Kib
 #       # max_connections is the maximum number of connnections per API endpoint
