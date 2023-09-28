@@ -129,7 +129,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 		},
 	}, {
 		name:     "three agent action with throttle",
-		throttle: time.Duration(1 * time.Second),
+		throttle: 1 * time.Second,
 		getMock: func() *mockMonitor {
 			m := &mockMonitor{}
 			ch := make(chan []es.HitT)

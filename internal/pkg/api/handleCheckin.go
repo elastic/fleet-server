@@ -510,7 +510,8 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	if len(payload) > compressThreshold && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
 		wrCounter := datacounter.NewWriterCounter(w)
 
-		zipper := ct.gwPool.Get().(*gzip.Writer)
+		zipper, _ := ct.gwPool.Get().(*gzip.Writer)
+
 		defer ct.gwPool.Put(zipper)
 		zipper.Reset(wrCounter)
 
