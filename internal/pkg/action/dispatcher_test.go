@@ -38,7 +38,7 @@ func (m *mockMonitor) GetCheckpoint() sqn.SeqNo {
 
 func TestNewDispatcher(t *testing.T) {
 	m := &mockMonitor{}
-	d := NewDispatcher(m)
+	d := NewDispatcher(m, 0)
 
 	assert.NotNil(t, d.am)
 	assert.NotNil(t, d.subs)

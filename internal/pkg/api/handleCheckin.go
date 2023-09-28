@@ -499,16 +499,6 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	rSpan, _ := apm.StartSpan(ctx, "response", "write")
 	defer rSpan.End()
 
-	// use CheckinResponseJitter to randomly delay writes
-	if ct.cfg.Timeouts.CheckinResponseJitter > 0 {
-		jitter := time.Duration(rand.Int63n(int64(ct.cfg.Limits.CheckinJitter)))
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(jitter):
-		}
-	}
-
 	payload, err := json.Marshal(&resp)
 	if err != nil {
 		return fmt.Errorf("writeResponse marshal: %w", err)
@@ -529,8 +519,8 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 			return fmt.Errorf("writeResponse gzip write: %w", err)
 		}
 
-		if err = zipper.Flush(); err != nil {
-			err = fmt.Errorf("writeResponse gzip flush: %w", err)
+		if err = zipper.Close(); err != nil {
+			err = fmt.Errorf("writeResponse gzip close: %w", err)
 		}
 
 		cntCheckin.bodyOut.Add(wrCounter.Count())

@@ -10,15 +10,14 @@ import (
 
 // ServerTimeouts is the configuration for the server timeouts
 type ServerTimeouts struct {
-	Read                  time.Duration `config:"read"`
-	Write                 time.Duration `config:"write"`
-	Idle                  time.Duration `config:"idle"`
-	ReadHeader            time.Duration `config:"read_header"`
-	CheckinTimestamp      time.Duration `config:"checkin_timestamp"`
-	CheckinLongPoll       time.Duration `config:"checkin_long_poll"`
-	CheckinJitter         time.Duration `config:"checkin_jitter"`
-	CheckinResponseJitter time.Duration `config:"checkin_response_jitter"`
-	CheckinMaxPoll        time.Duration `config:"checkin_max_poll"`
+	Read             time.Duration `config:"read"`
+	Write            time.Duration `config:"write"`
+	Idle             time.Duration `config:"idle"`
+	ReadHeader       time.Duration `config:"read_header"`
+	CheckinTimestamp time.Duration `config:"checkin_timestamp"`
+	CheckinLongPoll  time.Duration `config:"checkin_long_poll"`
+	CheckinJitter    time.Duration `config:"checkin_jitter"`
+	CheckinMaxPoll   time.Duration `config:"checkin_max_poll"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -60,9 +59,6 @@ func (c *ServerTimeouts) InitDefaults() {
 
 	// Jitter subtracted from c.CheckinLongPoll. Disabled if zero.
 	c.CheckinJitter = 30 * time.Second
-
-	// Jitter added as a random delay before checkin responses are written. Disabled if zero.
-	c.CheckinResponseJitter = 100 * time.Millisecond
 
 	// MaxPoll is the maximum allowed value for a long poll when the client specified poll_timeout value is used.
 	// The long poll value is poll_timeout-2m, and the request's write timeout is set to poll_timeout-1m

@@ -33,17 +33,19 @@ func (s Sub) Ch() chan []model.Action {
 
 // Dispatcher tracks agent subscriptions and emits actions to the subscriptions.
 type Dispatcher struct {
-	am monitor.SimpleMonitor
+	am       monitor.SimpleMonitor
+	throttle time.Duration
 
 	mx   sync.RWMutex
 	subs map[string]Sub
 }
 
 // NewDispatcher creates a Dispatcher using the provided monitor.
-func NewDispatcher(am monitor.SimpleMonitor) *Dispatcher {
+func NewDispatcher(am monitor.SimpleMonitor, throttle time.Duration) *Dispatcher {
 	return &Dispatcher{
-		am:   am,
-		subs: make(map[string]Sub),
+		am:       am,
+		throttle: throttle,
+		subs:     make(map[string]Sub),
 	}
 }
 
@@ -122,6 +124,14 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	}
 
 	for agentID, actions := range agentActions {
+		if d.throttle != 0 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(d.throttle):
+			}
+		}
+
 		d.dispatch(ctx, agentID, actions)
 	}
 }
