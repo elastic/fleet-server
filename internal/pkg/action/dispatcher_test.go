@@ -67,9 +67,10 @@ func compareActions(t *testing.T, expects, results []model.Action) {
 
 func Test_Dispatcher_Run(t *testing.T) {
 	tests := []struct {
-		name    string
-		getMock func() *mockMonitor
-		expect  map[string][]model.Action
+		name     string
+		throttle time.Duration
+		getMock  func() *mockMonitor
+		expect   map[string][]model.Action
 	}{{
 		name: "one agent action",
 		getMock: func() *mockMonitor {
@@ -94,6 +95,41 @@ func Test_Dispatcher_Run(t *testing.T) {
 		},
 	}, {
 		name: "three agent action",
+		getMock: func() *mockMonitor {
+			m := &mockMonitor{}
+			ch := make(chan []es.HitT)
+			go func() {
+				ch <- []es.HitT{es.HitT{
+					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1","agent2","agent3"],"data":{"key":"value"},"type":"upgrade"}`),
+				}}
+			}()
+			var rch <-chan []es.HitT = ch
+			m.On("Output").Return(rch)
+			return m
+		},
+		expect: map[string][]model.Action{
+			"agent1": []model.Action{model.Action{
+				ActionID: "test-action",
+				Agents:   nil,
+				Data:     json.RawMessage(`{"key":"value"}`),
+				Type:     "upgrade",
+			}},
+			"agent2": []model.Action{model.Action{
+				ActionID: "test-action",
+				Agents:   nil,
+				Data:     json.RawMessage(`{"key":"value"}`),
+				Type:     "upgrade",
+			}},
+			"agent3": []model.Action{model.Action{
+				ActionID: "test-action",
+				Agents:   nil,
+				Data:     json.RawMessage(`{"key":"value"}`),
+				Type:     "upgrade",
+			}},
+		},
+	}, {
+		name:     "three agent action with throttle",
+		throttle: time.Duration(1 * time.Second),
 		getMock: func() *mockMonitor {
 			m := &mockMonitor{}
 			ch := make(chan []es.HitT)
@@ -199,7 +235,8 @@ func Test_Dispatcher_Run(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := tt.getMock()
 			d := &Dispatcher{
-				am: m,
+				am:       m,
+				throttle: tt.throttle,
 				subs: map[string]Sub{
 					"agent1": Sub{
 						agentID: "agent1",
@@ -216,6 +253,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				},
 			}
 
+			now := time.Now()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			go func() {
@@ -224,9 +262,13 @@ func Test_Dispatcher_Run(t *testing.T) {
 			}()
 
 			ticker := time.NewTicker(time.Second * 5)
+
 			select {
 			case actions := <-d.subs["agent1"].Ch():
 				compareActions(t, tt.expect["agent1"], actions)
+				if tt.throttle != 0 {
+					assert.Greater(t, time.Now(), now.Add(1*tt.throttle))
+				}
 			case <-ticker.C:
 				t.Fatal("timeout waiting for subscription on agent1")
 			}
@@ -236,6 +278,9 @@ func Test_Dispatcher_Run(t *testing.T) {
 				select {
 				case actions := <-d.subs["agent2"].Ch():
 					compareActions(t, expect, actions)
+					if tt.throttle != 0 {
+						assert.Greater(t, time.Now(), now.Add(2*tt.throttle))
+					}
 				case <-ticker.C:
 					t.Fatal("timeout waiting for subscription on agent2")
 				}
@@ -246,10 +291,14 @@ func Test_Dispatcher_Run(t *testing.T) {
 				select {
 				case actions := <-d.subs["agent3"].Ch():
 					compareActions(t, expect, actions)
+					if tt.throttle != 0 {
+						assert.Greater(t, time.Now(), now.Add(3*tt.throttle))
+					}
 				case <-ticker.C:
 					t.Fatal("timeout waiting for subscription on agent3")
 				}
 			}
+
 		})
 	}
 }
