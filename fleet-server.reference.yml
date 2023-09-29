@@ -141,15 +141,18 @@ fleet:
 #       max_agents: 0
 #       # policy_throttle is the duration that the fleet-server will wait in between attempts to dispatch policy updates to polling agents # TODO verify this
 #       policy_throttle: 5ms # 1ms min is forced
-#       # action_throttle is added as a delay before the in checkin requests to help space response writes
-#       # This is done in order to be able to reuse gzip writers if gzip is requested as allocating new writers is expensive
-#       # should never me more then 2m to prevent edge cases with assumptions around poll-times and server writes from becoming invalid
-#       # a 0 value disables the throttle (default behavior)
-#       action_throttle: 0
 #       # max_header_byte_size is the request header size limit
 #       max_header_byte_size: 8192 # 8Kib
 #       # max_connections is the maximum number of connnections per API endpoint
 #       max_connections: 0
+#
+#       # action_limit is a limiter for the action dispatcher, it is added to control how fast the checkin endpoint reponds when an action effecting multiple agents is detected.
+#       # This is done in order to be able to reuse gzip writers if gzip is requested as allocating new writers is expensive
+#       # If the value is too high it may effect the server/request write times (generally 2m higher then checkin poll times).
+#       # a 0 value disables the limiter by using an infinite value instead (default behavior)
+#       action_limit:
+#         interval: 0
+#         burst: 10
 #
 #       # endpoint specific limits below
 #       checkin_limit:

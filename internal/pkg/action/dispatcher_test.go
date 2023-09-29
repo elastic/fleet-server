@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"golang.org/x/time/rate"
 )
 
 type mockMonitor struct {
@@ -38,7 +39,7 @@ func (m *mockMonitor) GetCheckpoint() sqn.SeqNo {
 
 func TestNewDispatcher(t *testing.T) {
 	m := &mockMonitor{}
-	d := NewDispatcher(m, 0)
+	d := NewDispatcher(m, 0, 0)
 
 	assert.NotNil(t, d.am)
 	assert.NotNil(t, d.subs)
@@ -128,7 +129,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 			}},
 		},
 	}, {
-		name:     "three agent action with throttle",
+		name:     "three agent action with limiter",
 		throttle: 1 * time.Second,
 		getMock: func() *mockMonitor {
 			m := &mockMonitor{}
@@ -234,9 +235,13 @@ func Test_Dispatcher_Run(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := tt.getMock()
+			throttle := rate.Inf
+			if tt.throttle > 0 {
+				throttle = rate.Every(tt.throttle)
+			}
 			d := &Dispatcher{
-				am:       m,
-				throttle: tt.throttle,
+				am:    m,
+				limit: rate.NewLimiter(throttle, 1),
 				subs: map[string]Sub{
 					"agent1": Sub{
 						agentID: "agent1",
@@ -266,9 +271,6 @@ func Test_Dispatcher_Run(t *testing.T) {
 			select {
 			case actions := <-d.subs["agent1"].Ch():
 				compareActions(t, tt.expect["agent1"], actions)
-				if tt.throttle != 0 {
-					assert.Greater(t, time.Now(), now.Add(1*tt.throttle))
-				}
 			case <-ticker.C:
 				t.Fatal("timeout waiting for subscription on agent1")
 			}
@@ -279,7 +281,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				case actions := <-d.subs["agent2"].Ch():
 					compareActions(t, expect, actions)
 					if tt.throttle != 0 {
-						assert.Greater(t, time.Now(), now.Add(2*tt.throttle))
+						assert.Greater(t, time.Now(), now.Add(1*tt.throttle))
 					}
 				case <-ticker.C:
 					t.Fatal("timeout waiting for subscription on agent2")
@@ -292,7 +294,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				case actions := <-d.subs["agent3"].Ch():
 					compareActions(t, expect, actions)
 					if tt.throttle != 0 {
-						assert.Greater(t, time.Now(), now.Add(3*tt.throttle))
+						assert.Greater(t, time.Now(), now.Add(2*tt.throttle))
 					}
 				case <-ticker.C:
 					t.Fatal("timeout waiting for subscription on agent3")
