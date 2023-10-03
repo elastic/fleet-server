@@ -271,6 +271,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 			select {
 			case actions := <-d.subs["agent1"].Ch():
 				compareActions(t, tt.expect["agent1"], actions)
+				// NOTE: agent1 is not rate limited if the action limmiter is enabled for these tests.
 			case <-ticker.C:
 				t.Fatal("timeout waiting for subscription on agent1")
 			}
@@ -281,7 +282,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				case actions := <-d.subs["agent2"].Ch():
 					compareActions(t, expect, actions)
 					if tt.throttle != 0 {
-						assert.Greater(t, time.Now(), now.Add(1*tt.throttle))
+						assert.GreaterOrEqual(t, time.Now(), now.Add(1*tt.throttle))
 					}
 				case <-ticker.C:
 					t.Fatal("timeout waiting for subscription on agent2")
@@ -294,7 +295,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 				case actions := <-d.subs["agent3"].Ch():
 					compareActions(t, expect, actions)
 					if tt.throttle != 0 {
-						assert.Greater(t, time.Now(), now.Add(2*tt.throttle))
+						assert.GreaterOrEqual(t, time.Now(), now.Add(2*tt.throttle))
 					}
 				case <-ticker.C:
 					t.Fatal("timeout waiting for subscription on agent3")

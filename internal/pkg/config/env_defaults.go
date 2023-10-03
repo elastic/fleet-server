@@ -27,7 +27,7 @@ const (
 	defaultPolicyThrottle = time.Millisecond * 5
 
 	defaultActionInterval = 0 // no throttle
-	defaultActionBurst    = 10
+	defaultActionBurst    = 5
 
 	defaultCheckinInterval = time.Millisecond
 	defaultCheckinBurst    = 1000

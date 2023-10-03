@@ -62,6 +62,10 @@ type CheckinT struct {
 	gcp    monitor.GlobalCheckpointProvider
 	ad     *action.Dispatcher
 	tr     *action.TokenResolver
+
+	// gwPool is a gzip.Writer pool intended to lower the amount of writers created when responding to checkin requests.
+	// gzip.Writer allocations are expensive (~1.2MB each) and can exhaust an instance's memory if a lot of concurrent responses are sent (this occurs when a mass-action such as an upgrade is detected).
+	// effectiveness of the pool is controlled by rate limiter configured through the limit.action_limit attribute.
 	gwPool sync.Pool
 	bulker bulk.Bulk
 }
