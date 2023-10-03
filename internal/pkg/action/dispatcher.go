@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	"golang.org/x/time/rate"
 
 	"github.com/rs/zerolog/log"
 )
@@ -33,17 +34,23 @@ func (s Sub) Ch() chan []model.Action {
 
 // Dispatcher tracks agent subscriptions and emits actions to the subscriptions.
 type Dispatcher struct {
-	am monitor.SimpleMonitor
+	am    monitor.SimpleMonitor
+	limit *rate.Limiter
 
 	mx   sync.RWMutex
 	subs map[string]Sub
 }
 
 // NewDispatcher creates a Dispatcher using the provided monitor.
-func NewDispatcher(am monitor.SimpleMonitor) *Dispatcher {
+func NewDispatcher(am monitor.SimpleMonitor, throttle time.Duration, i int) *Dispatcher {
+	r := rate.Inf
+	if throttle > 0 {
+		r = rate.Every(throttle)
+	}
 	return &Dispatcher{
-		am:   am,
-		subs: make(map[string]Sub),
+		am:    am,
+		limit: rate.NewLimiter(r, i),
+		subs:  make(map[string]Sub),
 	}
 }
 
@@ -122,6 +129,10 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	}
 
 	for agentID, actions := range agentActions {
+		if err := d.limit.Wait(ctx); err != nil {
+			log.Error().Err(err).Msg("action dispatcher rate limit error")
+			return
+		}
 		d.dispatch(ctx, agentID, actions)
 	}
 }

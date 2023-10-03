@@ -505,7 +505,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	}
 	g.Go(loggedRunFunc(ctx, "Revision monitor", am.Run))
 
-	ad = action.NewDispatcher(am)
+	ad = action.NewDispatcher(am, cfg.Inputs[0].Server.Limits.ActionLimit.Interval, cfg.Inputs[0].Server.Limits.ActionLimit.Burst)
 	g.Go(loggedRunFunc(ctx, "Revision dispatcher", ad.Run))
 	tr, err = action.NewTokenResolver(bulker)
 	if err != nil {

@@ -57,7 +57,7 @@ func (c *ServerTimeouts) InitDefaults() {
 	// Long poll timeout, will be short-circuited on policy change
 	c.CheckinLongPoll = 5 * time.Minute
 
-	// Jitter subtracted from c.CheckinLongPoll.  Disabled if zero.
+	// Jitter subtracted from c.CheckinLongPoll. Disabled if zero.
 	c.CheckinJitter = 30 * time.Second
 
 	// MaxPoll is the maximum allowed value for a long poll when the client specified poll_timeout value is used.
