@@ -74,10 +74,10 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			context.Canceled,
 			HTTPErrResp{
-				http.StatusClientClosedRequest,
+				499,
 				"StatusClientClosedRequest",
 				"server is stopping",
-				zerolog.WarnLevel,
+				zerolog.InfoLevel,
 			},
 		},
 		{
