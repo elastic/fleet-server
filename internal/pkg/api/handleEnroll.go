@@ -145,7 +145,7 @@ func (et *EnrollerT) retrieveStaticTokenEnrollmentToken(ctx context.Context, zlo
 		return nil, nil
 	}
 
-	zlog.Debug().Msgf("Checking static enrollment token %s", enrollmentAPIKey.Key)
+	zlog.Debug().Msgf("Checking static enrollment token %s", enrollmentAPIKey.ID)
 	for _, pt := range et.cfg.StaticPolicyTokens.PolicyTokens {
 		if pt.TokenKey != enrollmentAPIKey.Key {
 			continue
