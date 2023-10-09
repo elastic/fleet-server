@@ -12,9 +12,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
@@ -60,6 +62,11 @@ type CheckinT struct {
 	gcp    monitor.GlobalCheckpointProvider
 	ad     *action.Dispatcher
 	tr     *action.TokenResolver
+
+	// gwPool is a gzip.Writer pool intended to lower the amount of writers created when responding to checkin requests.
+	// gzip.Writer allocations are expensive (~1.2MB each) and can exhaust an instance's memory if a lot of concurrent responses are sent (this occurs when a mass-action such as an upgrade is detected).
+	// effectiveness of the pool is controlled by rate limiter configured through the limit.action_limit attribute.
+	gwPool sync.Pool
 	bulker bulk.Bulk
 }
 
@@ -83,6 +90,15 @@ func NewCheckinT(
 		gcp:    gcp,
 		ad:     ad,
 		tr:     tr,
+		gwPool: sync.Pool{
+			New: func() any {
+				zipper, err := gzip.NewWriterLevel(io.Discard, cfg.CompressionLevel)
+				if err != nil {
+					panic(err)
+				}
+				return zipper
+			},
+		},
 		bulker: bulker,
 	}
 
@@ -498,13 +514,12 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	if len(payload) > compressThreshold && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
 		wrCounter := datacounter.NewWriterCounter(w)
 
-		zipper, err := gzip.NewWriterLevel(wrCounter, compressionLevel)
-		if err != nil {
-			return fmt.Errorf("writeResponse new gzip: %w", err)
-		}
+		zipper, _ := ct.gwPool.Get().(*gzip.Writer)
+
+		defer ct.gwPool.Put(zipper)
+		zipper.Reset(wrCounter)
 
 		w.Header().Set("Content-Encoding", kEncodingGzip)
-
 		if _, err = zipper.Write(payload); err != nil {
 			return fmt.Errorf("writeResponse gzip write: %w", err)
 		}

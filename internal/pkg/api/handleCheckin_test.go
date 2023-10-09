@@ -7,8 +7,11 @@
 package api
 
 import (
+	"compress/flate"
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -27,6 +30,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConvertActions(t *testing.T) {
@@ -477,4 +481,100 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mCache.AssertExpectations(t)
 		})
 	}
+}
+
+func Test_CheckinT_writeResponse(t *testing.T) {
+	tests := []struct {
+		name       string
+		req        *http.Request
+		respHeader string
+	}{{
+		name:       "no compression",
+		req:        &http.Request{},
+		respHeader: "",
+	}, {
+		name: "with compression",
+		req: &http.Request{
+			Header: http.Header{
+				"Accept-Encoding": []string{"gzip"},
+			},
+		},
+		respHeader: "gzip",
+	}}
+
+	verCon := mustBuildConstraints("8.0.0")
+	cfg := &config.Server{
+		CompressionLevel:  flate.BestSpeed,
+		CompressionThresh: 1,
+	}
+
+	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			wr := httptest.NewRecorder()
+			err := ct.writeResponse(testlog.SetLogger(t), wr, test.req, &model.Agent{}, CheckinResponse{
+				Action: "checkin",
+			})
+			resp := wr.Result()
+			defer resp.Body.Close()
+			require.NoError(t, err)
+			assert.Equal(t, test.respHeader, resp.Header.Get("Content-Encoding"))
+		})
+	}
+}
+
+func Benchmark_CheckinT_writeResponse(b *testing.B) {
+	verCon := mustBuildConstraints("8.0.0")
+	cfg := &config.Server{
+		CompressionLevel:  flate.BestSpeed,
+		CompressionThresh: 1,
+	}
+	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
+
+	logger := testlog.SetLogger(b)
+	req := &http.Request{
+		Header: http.Header{
+			"Accept-Encoding": []string{"gzip"},
+		},
+	}
+	agent := &model.Agent{}
+	resp := CheckinResponse{
+		Action: "checkin",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := ct.writeResponse(logger, httptest.NewRecorder(), req, agent, resp)
+		require.NoError(b, err)
+	}
+}
+
+func BenchmarkParallel_CheckinT_writeResponse(b *testing.B) {
+	verCon := mustBuildConstraints("8.0.0")
+	cfg := &config.Server{
+		CompressionLevel:  flate.BestSpeed,
+		CompressionThresh: 1,
+	}
+	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
+
+	logger := testlog.SetLogger(b)
+	req := &http.Request{
+		Header: http.Header{
+			"Accept-Encoding": []string{"gzip"},
+		},
+	}
+	agent := &model.Agent{}
+	resp := CheckinResponse{
+		Action: "checkin",
+	}
+
+	b.ResetTimer()
+	b.SetParallelism(100)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			err := ct.writeResponse(logger, httptest.NewRecorder(), req, agent, resp)
+			require.NoError(b, err)
+		}
+	})
 }

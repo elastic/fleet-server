@@ -107,12 +107,12 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	}
 
 	if enrollAPI == nil {
-		zlog.Info().Msgf("Checking enrollment key from database %s", enrollmentAPIKey.Key)
+		zlog.Debug().Msgf("Checking enrollment key from database %s", enrollmentAPIKey.ID)
 		key, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentAPIKey.ID)
 		if err != nil {
 			return nil, err
 		}
-		zlog.Info().Msgf("Found enrollment key %s", key.APIKey)
+		zlog.Debug().Msgf("Found enrollment key %s", key.APIKeyID)
 		enrollAPI = key
 	}
 	body := r.Body
@@ -145,7 +145,7 @@ func (et *EnrollerT) retrieveStaticTokenEnrollmentToken(ctx context.Context, zlo
 		return nil, nil
 	}
 
-	zlog.Debug().Msgf("Checking static enrollment token %s", enrollmentAPIKey.Key)
+	zlog.Debug().Msgf("Checking static enrollment token %s", enrollmentAPIKey.ID)
 	for _, pt := range et.cfg.StaticPolicyTokens.PolicyTokens {
 		if pt.TokenKey != enrollmentAPIKey.Key {
 			continue

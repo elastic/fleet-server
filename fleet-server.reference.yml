@@ -146,6 +146,15 @@ fleet:
 #       # max_connections is the maximum number of connnections per API endpoint
 #       max_connections: 0
 #
+#       # action_limit is a limiter for the action dispatcher, it is added to control how fast the checkin endpoint writes responses when an action effecting multiple agents is detected.
+#       # This is done in order to be able to reuse gzip writers if gzip is requested as allocating new writers is expensive (around 1.2MB for a new allocation).
+#       # If the interval is too high it may negativly effect assumtions around server write timeouts and poll poll durations, if used we expect the value to be around 5ms.
+#       # An interval value of 0 disables the limiter by using an infinite rate limit (default behavior).
+#       # Burst controls concurrency and has a larger influence on the gzip writer pool size (default 5).
+#       action_limit:
+#         interval: 0
+#         burst: 5
+#
 #       # endpoint specific limits below
 #       checkin_limit:
 #         interval: 1ms

@@ -26,6 +26,9 @@ const (
 	defaultMaxConnections = 0 // no limit
 	defaultPolicyThrottle = time.Millisecond * 5
 
+	defaultActionInterval = 0 // no throttle
+	defaultActionBurst    = 5
+
 	defaultCheckinInterval = time.Millisecond
 	defaultCheckinBurst    = 1000
 	defaultCheckinMax      = 0
@@ -122,6 +125,7 @@ type serverLimitDefaults struct {
 	PolicyThrottle time.Duration `config:"policy_throttle"`
 	MaxConnections int           `config:"max_connections"`
 
+	ActionLimit      limit `config:"action_limit"`
 	CheckinLimit     limit `config:"checkin_limit"`
 	ArtifactLimit    limit `config:"artifact_limit"`
 	EnrollLimit      limit `config:"enroll_limit"`
@@ -139,6 +143,10 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 		PolicyThrottle: defaultPolicyThrottle,
 		MaxConnections: defaultMaxConnections,
 
+		ActionLimit: limit{
+			Interval: defaultActionInterval,
+			Burst:    defaultActionBurst,
+		},
 		CheckinLimit: limit{
 			Interval: defaultCheckinInterval,
 			Burst:    defaultCheckinBurst,
