@@ -142,6 +142,8 @@ linters-settings:
     blocked:
       # List of blocked modules.
       modules:
+        - github.com/bytedance/sonic:
+            reason: "Federal restriction on bytedance"
         - github.com/elastic/beats/v7:
             reason: "There must be no Beats dependency, use elastic-agent-libs instead."
         - github.com/elastic/beats/elastic-agent:
