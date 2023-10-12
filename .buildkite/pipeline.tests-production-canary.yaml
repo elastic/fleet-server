@@ -7,7 +7,7 @@ steps:
     build:
       env:
         REGION_ID: aws-us-east-1
-        NAME_PREFIX: ci_test_kibana-promotion_
+        NAME_PREFIX: ci_test_fleet-promotion_
       message: "${BUILDKITE_MESSAGE} (triggered by pipeline.tests-production-canary.yaml)"
   - label: ":cookie: 1h bake period before continuing promotion"
     command: "sleep 3600"
