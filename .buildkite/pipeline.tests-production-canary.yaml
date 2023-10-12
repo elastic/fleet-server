@@ -22,3 +22,5 @@ steps:
         SERVICE_TYPE_FIELD: service.name
         SERVICE_VERSION: ${SERVICE_VERSION:0:12}
         SERVICE_REPOSITORY: docker.elastic.co/observability-ci/fleet-server
+  - label: ":cookie: 1h bake period before continuing promotion"
+    command: "sleep 3600"
