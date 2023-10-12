@@ -176,7 +176,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		idsPerBatch := b.getIDsCountPerBatch(len(role), maxKeySize)
 		ids := idsPerRole[hash]
 		if idsPerBatch <= 0 {
-			log.Error().Str("err", "request too large").Msg("No API Key ID could fit request size for bulk update")
+			log.Error().Str("error.message", "request too large").Msg("No API Key ID could fit request size for bulk update")
 			log.Debug().
 				RawJSON("role", role).
 				Strs("ids", ids).
@@ -224,7 +224,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 				defer res.Body.Close()
 			}
 			if res.IsError() {
-				log.Error().Str("err", res.String()).Msg("Error in bulk API Key update result to Elasticsearch")
+				log.Error().Str("error.message", res.String()).Msg("Error in bulk API Key update result to Elasticsearch")
 				return parseError(res)
 			}
 
