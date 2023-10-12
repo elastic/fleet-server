@@ -218,7 +218,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	}
 
 	if res.IsError() {
-		log.Error().Str("mod", kModBulk).Str("err", res.String()).Msg("Fail BulkRequest result")
+		log.Error().Str("mod", kModBulk).Str("error.message", res.String()).Msg("Fail BulkRequest result")
 		return parseError(res)
 	}
 
