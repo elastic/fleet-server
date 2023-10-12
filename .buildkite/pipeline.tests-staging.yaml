@@ -3,9 +3,8 @@
 # this pipeline build will prevent further progression to the subsequent stage.
 
 steps:
-  - command:
-      - echo "Waiting for 10m for indicative health metrics"
-      - sleep 600
+  - label: ":cookie: 30m bake period before continuing promotion"
+    command: "sleep 1800"
   - wait
   - label: ":rocket: Run observability gates"
     trigger: "serverless-quality-gates"
