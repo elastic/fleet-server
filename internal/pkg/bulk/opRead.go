@@ -110,7 +110,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	}
 
 	if res.IsError() {
-		log.Warn().Str("mod", kModBulk).Str("err", res.String()).Msg("bulker.flushRead: Error in mget request result to Elasticsearch")
+		log.Warn().Str("mod", kModBulk).Str("error.message", res.String()).Msg("bulker.flushRead: Error in mget request result to Elasticsearch")
 		return parseError(res)
 	}
 
