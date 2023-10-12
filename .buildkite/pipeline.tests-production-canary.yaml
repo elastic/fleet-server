@@ -2,9 +2,8 @@
 # A failure in this pipeline build will prevent further progression to the subsequent stage.
 
 steps:
-  - command:
-      - echo "Waiting for 10m for indicative health metrics"
-      - sleep 600
+  - label: ":cookie: 1h bake period before continuing promotion"
+    command: "sleep 3600"
   - wait
   - label: ":rocket: Run observability gates"
     trigger: "serverless-quality-gates"
@@ -22,5 +21,3 @@ steps:
         SERVICE_TYPE_FIELD: service.name
         SERVICE_VERSION: ${SERVICE_VERSION:0:12}
         SERVICE_REPOSITORY: docker.elastic.co/observability-ci/fleet-server
-  - label: ":cookie: 1h bake period before continuing promotion"
-    command: "sleep 3600"
