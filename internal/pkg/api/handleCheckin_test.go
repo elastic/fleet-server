@@ -28,6 +28,7 @@ import (
 	testcache "github.com/elastic/fleet-server/v7/internal/pkg/testing/cache"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
+	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -577,4 +578,12 @@ func BenchmarkParallel_CheckinT_writeResponse(b *testing.B) {
 			require.NoError(b, err)
 		}
 	})
+}
+
+func mustBuildConstraints(verStr string) version.Constraints {
+	con, err := BuildVersionConstraint(verStr)
+	if err != nil {
+		panic(err)
+	}
+	return con
 }
