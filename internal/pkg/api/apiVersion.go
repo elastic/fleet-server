@@ -62,6 +62,7 @@ func (a *apiVersion) middleware(next http.Handler) http.Handler {
 		if headerValue != "" {
 			err := a.validateVersionFormat(headerValue)
 			if err != nil {
+				w.Header().Add(ElasticAPIVersionHeader, a.defaultVersion)
 				ErrorResp(w, r, err)
 				return
 			}
