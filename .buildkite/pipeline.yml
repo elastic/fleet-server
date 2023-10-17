@@ -144,9 +144,6 @@ steps:
       meta_data:
         DOCKER_TAG: "${BUILDKITE_TAG}"
     if: "build.env('BUILDKITE_TAG') != ''"
-    depends_on:
-      - step: "release-test"
-        allow_failure: true
 
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
@@ -156,5 +153,5 @@ steps:
     build:
       branch: "${BUILDKITE_BRANCH}"
     depends_on:
-      - step: "release-package-registry"
+      - step: "release-test"
         allow_failure: false
