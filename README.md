@@ -58,7 +58,9 @@ GOOS=darwin GOARCH=amd64 go build -tags="dev" -gcflags="all=-N -l" -ldflags="-X 
 Change `release-darwin/amd64` to `release-YOUR_OS/platform`.
 Run `make list-platforms` to check out the possible values.
 
-The `SNAPSHOT` flag sets the snapshot version flag.
+The `SNAPSHOT` flag sets the snapshot version flag and relaxes client version checks.
+When `SNAPSHOT` is set we allow clients of the next version to communicate with fleet-server.
+For example, if fleet-server is running version `8.11.0` on a `SNAPSHOT` build, clients can communiate with versions up to `8.12.0`.
 
 ### Docker build
 

@@ -7,7 +7,6 @@ package api
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -28,17 +27,6 @@ var (
 	ErrInvalidUserAgent   = errors.New("user-agent is invalid")
 	ErrUnsupportedVersion = errors.New("version is not supported")
 )
-
-// BuildVersionConstraint turns the version into a constraint to ensure that the connecting Elastic Agent's are
-// a supported version.
-func BuildVersionConstraint(verStr string) (version.Constraints, error) {
-	ver, err := version.NewVersion(verStr)
-	if err != nil {
-		return nil, err
-	}
-	verStr = maximizePatch(ver)
-	return version.NewConstraint(fmt.Sprintf(">= %s, <= %s", MinVersion, verStr))
-}
 
 // maximizePatch turns the version into a string that has the patch value set to the maximum integer.
 //
