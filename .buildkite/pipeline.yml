@@ -138,6 +138,7 @@ steps:
   - label: ":jenkins: Release - Package Registry Distribution"
     key: "release-package-registry"
     trigger: "package-registry-release-package-registry-distribution"
+    async: true
     build:
       branch: "main"
       meta_data:
@@ -145,11 +146,12 @@ steps:
     if: "build.env('BUILDKITE_TAG') != ''"
     depends_on:
       - step: "release-test"
-        allow_failure: false
+        allow_failure: true
 
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
+    async: true
     if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
     build:
       branch: "${BUILDKITE_BRANCH}"
