@@ -94,7 +94,7 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 	// GetPGPKey request
-	GetPGPKey(ctx context.Context, major int, minor int, patch int, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetPGPKey(ctx context.Context, major int, minor int, patch int, params *GetPGPKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AgentEnrollWithBody request with any body
 	AgentEnrollWithBody(ctx context.Context, params *AgentEnrollParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -115,7 +115,7 @@ type ClientInterface interface {
 	Artifact(ctx context.Context, id string, sha2 string, params *ArtifactParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetFile request
-	GetFile(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetFile(ctx context.Context, id string, params *GetFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadBeginWithBody request with any body
 	UploadBeginWithBody(ctx context.Context, params *UploadBeginParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -134,8 +134,8 @@ type ClientInterface interface {
 	Status(ctx context.Context, params *StatusParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) GetPGPKey(ctx context.Context, major int, minor int, patch int, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetPGPKeyRequest(c.Server, major, minor, patch)
+func (c *Client) GetPGPKey(ctx context.Context, major int, minor int, patch int, params *GetPGPKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPGPKeyRequest(c.Server, major, minor, patch, params)
 	if err != nil {
 		return nil, err
 	}
@@ -230,8 +230,8 @@ func (c *Client) Artifact(ctx context.Context, id string, sha2 string, params *A
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetFile(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetFileRequest(c.Server, id)
+func (c *Client) GetFile(ctx context.Context, id string, params *GetFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFileRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func (c *Client) Status(ctx context.Context, params *StatusParams, reqEditors ..
 }
 
 // NewGetPGPKeyRequest generates requests for GetPGPKey
-func NewGetPGPKeyRequest(server string, major int, minor int, patch int) (*http.Request, error) {
+func NewGetPGPKeyRequest(server string, major int, minor int, patch int, params *GetPGPKeyParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -357,6 +357,32 @@ func NewGetPGPKeyRequest(server string, major int, minor int, patch int) (*http.
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		if params.ElasticApiVersion != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("elastic-api-version", headerParam0)
+		}
+
+		if params.XRequestId != nil {
+			var headerParam1 string
+
+			headerParam1, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("X-Request-Id", headerParam1)
+		}
+
 	}
 
 	return req, nil
@@ -410,15 +436,15 @@ func NewAgentEnrollRequestWithBody(server string, params *AgentEnrollParams, con
 
 		req.Header.Set("User-Agent", headerParam0)
 
-		if params.XRequestID != nil {
+		if params.XRequestId != nil {
 			var headerParam1 string
 
-			headerParam1, err = runtime.StyleParamWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, *params.XRequestID)
+			headerParam1, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
 			if err != nil {
 				return nil, err
 			}
 
-			req.Header.Set("X-Request-ID", headerParam1)
+			req.Header.Set("X-Request-Id", headerParam1)
 		}
 
 		if params.ElasticApiVersion != nil {
@@ -483,15 +509,15 @@ func NewAgentAcksRequestWithBody(server string, id string, params *AgentAcksPara
 
 	if params != nil {
 
-		if params.XRequestID != nil {
+		if params.XRequestId != nil {
 			var headerParam0 string
 
-			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, *params.XRequestID)
+			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
 			if err != nil {
 				return nil, err
 			}
 
-			req.Header.Set("X-Request-ID", headerParam0)
+			req.Header.Set("X-Request-Id", headerParam0)
 		}
 
 		if params.ElasticApiVersion != nil {
@@ -576,15 +602,15 @@ func NewAgentCheckinRequestWithBody(server string, id string, params *AgentCheck
 
 		req.Header.Set("User-Agent", headerParam1)
 
-		if params.XRequestID != nil {
+		if params.XRequestId != nil {
 			var headerParam2 string
 
-			headerParam2, err = runtime.StyleParamWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, *params.XRequestID)
+			headerParam2, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
 			if err != nil {
 				return nil, err
 			}
 
-			req.Header.Set("X-Request-ID", headerParam2)
+			req.Header.Set("X-Request-Id", headerParam2)
 		}
 
 		if params.ElasticApiVersion != nil {
@@ -643,15 +669,15 @@ func NewArtifactRequest(server string, id string, sha2 string, params *ArtifactP
 
 	if params != nil {
 
-		if params.XRequestID != nil {
+		if params.XRequestId != nil {
 			var headerParam0 string
 
-			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, *params.XRequestID)
+			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
 			if err != nil {
 				return nil, err
 			}
 
-			req.Header.Set("X-Request-ID", headerParam0)
+			req.Header.Set("X-Request-Id", headerParam0)
 		}
 
 		if params.ElasticApiVersion != nil {
@@ -671,7 +697,7 @@ func NewArtifactRequest(server string, id string, sha2 string, params *ArtifactP
 }
 
 // NewGetFileRequest generates requests for GetFile
-func NewGetFileRequest(server string, id string) (*http.Request, error) {
+func NewGetFileRequest(server string, id string, params *GetFileParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -699,6 +725,32 @@ func NewGetFileRequest(server string, id string) (*http.Request, error) {
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		if params.ElasticApiVersion != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("elastic-api-version", headerParam0)
+		}
+
+		if params.XRequestId != nil {
+			var headerParam1 string
+
+			headerParam1, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("X-Request-Id", headerParam1)
+		}
+
 	}
 
 	return req, nil
@@ -743,15 +795,15 @@ func NewUploadBeginRequestWithBody(server string, params *UploadBeginParams, con
 
 	if params != nil {
 
-		if params.XRequestID != nil {
+		if params.XRequestId != nil {
 			var headerParam0 string
 
-			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, *params.XRequestID)
+			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
 			if err != nil {
 				return nil, err
 			}
 
-			req.Header.Set("X-Request-ID", headerParam0)
+			req.Header.Set("X-Request-Id", headerParam0)
 		}
 
 		if params.ElasticApiVersion != nil {
@@ -816,15 +868,15 @@ func NewUploadCompleteRequestWithBody(server string, id string, params *UploadCo
 
 	if params != nil {
 
-		if params.XRequestID != nil {
+		if params.XRequestId != nil {
 			var headerParam0 string
 
-			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, *params.XRequestID)
+			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
 			if err != nil {
 				return nil, err
 			}
 
-			req.Header.Set("X-Request-ID", headerParam0)
+			req.Header.Set("X-Request-Id", headerParam0)
 		}
 
 		if params.ElasticApiVersion != nil {
@@ -894,15 +946,15 @@ func NewUploadChunkRequestWithBody(server string, id string, chunkNum int, param
 
 		req.Header.Set("X-Chunk-SHA2", headerParam0)
 
-		if params.XRequestID != nil {
+		if params.XRequestId != nil {
 			var headerParam1 string
 
-			headerParam1, err = runtime.StyleParamWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, *params.XRequestID)
+			headerParam1, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
 			if err != nil {
 				return nil, err
 			}
 
-			req.Header.Set("X-Request-ID", headerParam1)
+			req.Header.Set("X-Request-Id", headerParam1)
 		}
 
 		if params.ElasticApiVersion != nil {
@@ -947,15 +999,15 @@ func NewStatusRequest(server string, params *StatusParams) (*http.Request, error
 
 	if params != nil {
 
-		if params.XRequestID != nil {
+		if params.XRequestId != nil {
 			var headerParam0 string
 
-			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, *params.XRequestID)
+			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
 			if err != nil {
 				return nil, err
 			}
 
-			req.Header.Set("X-Request-ID", headerParam0)
+			req.Header.Set("X-Request-Id", headerParam0)
 		}
 
 		if params.ElasticApiVersion != nil {
@@ -1018,7 +1070,7 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 	// GetPGPKeyWithResponse request
-	GetPGPKeyWithResponse(ctx context.Context, major int, minor int, patch int, reqEditors ...RequestEditorFn) (*GetPGPKeyResponse, error)
+	GetPGPKeyWithResponse(ctx context.Context, major int, minor int, patch int, params *GetPGPKeyParams, reqEditors ...RequestEditorFn) (*GetPGPKeyResponse, error)
 
 	// AgentEnrollWithBodyWithResponse request with any body
 	AgentEnrollWithBodyWithResponse(ctx context.Context, params *AgentEnrollParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AgentEnrollResponse, error)
@@ -1039,7 +1091,7 @@ type ClientWithResponsesInterface interface {
 	ArtifactWithResponse(ctx context.Context, id string, sha2 string, params *ArtifactParams, reqEditors ...RequestEditorFn) (*ArtifactResponse, error)
 
 	// GetFileWithResponse request
-	GetFileWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetFileResponse, error)
+	GetFileWithResponse(ctx context.Context, id string, params *GetFileParams, reqEditors ...RequestEditorFn) (*GetFileResponse, error)
 
 	// UploadBeginWithBodyWithResponse request with any body
 	UploadBeginWithBodyWithResponse(ctx context.Context, params *UploadBeginParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadBeginResponse, error)
@@ -1325,8 +1377,8 @@ func (r StatusResponse) StatusCode() int {
 }
 
 // GetPGPKeyWithResponse request returning *GetPGPKeyResponse
-func (c *ClientWithResponses) GetPGPKeyWithResponse(ctx context.Context, major int, minor int, patch int, reqEditors ...RequestEditorFn) (*GetPGPKeyResponse, error) {
-	rsp, err := c.GetPGPKey(ctx, major, minor, patch, reqEditors...)
+func (c *ClientWithResponses) GetPGPKeyWithResponse(ctx context.Context, major int, minor int, patch int, params *GetPGPKeyParams, reqEditors ...RequestEditorFn) (*GetPGPKeyResponse, error) {
+	rsp, err := c.GetPGPKey(ctx, major, minor, patch, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -1394,8 +1446,8 @@ func (c *ClientWithResponses) ArtifactWithResponse(ctx context.Context, id strin
 }
 
 // GetFileWithResponse request returning *GetFileResponse
-func (c *ClientWithResponses) GetFileWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetFileResponse, error) {
-	rsp, err := c.GetFile(ctx, id, reqEditors...)
+func (c *ClientWithResponses) GetFileWithResponse(ctx context.Context, id string, params *GetFileParams, reqEditors ...RequestEditorFn) (*GetFileResponse, error) {
+	rsp, err := c.GetFile(ctx, id, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

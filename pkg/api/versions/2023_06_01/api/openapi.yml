@@ -1,7 +1,7 @@
-openapi: 3.1.0
+openapi: 3.0.0
 info:
   title: fleet-server API
-  version: 0000-00-00
+  version: 2023-06-01
   license:
     name: Elastic License 2.0
     url: https://www.elastic.co/licensing/elastic-license
@@ -137,6 +137,7 @@ components:
       type: object
       required:
         - type
+        - shared_id
         - metadata
       properties:
         type:
@@ -147,12 +148,6 @@ components:
           type: string
           enum:
             - PERMANENT
-        enrollment_id:
-          type: string
-          description: |
-            The enrollment ID of the agent.
-            To replace an agent on enroll fail.
-            The existing agent with a matching enrollment_id will be deleted if it never checked in. The new agent will be enrolled with the enrollment_id.
         shared_id:
           deprecated: true
           type: string
@@ -264,79 +259,6 @@ components:
           type: string
         item:
           $ref: "#/components/schemas/enrollResponseItem"
-    upgrade_metadata_scheduled:
-      description: Upgrade metadata for an upgrade that has been scheduled.
-      type: object
-      required:
-        - scheduled_at
-      properties:
-        scheduled_at:
-          description: The RFC3339 timestamp the upgrade is scheduled to start at.
-          type: string
-          format: date-time
-    upgrade_metadata_downloading:
-      description: Upgrade metadata for an upgrade that is downloading.
-      required:
-        - download_percent
-      properties:
-        download_percent:
-          description: The artifact download progress as a percentage.
-          type: number
-          format: double
-    upgrade_metadata_failed:
-      description: Upgrade metadata for an upgrade that has failed.
-      required:
-        - failed_state
-        - error_msg
-      properties:
-        failed_state:
-          description: The state where the upgrade failed.
-          type: string
-          enum:
-            - UPG_REQUESTED
-            - UPG_SCHEDULED
-            - UPG_DOWNLOADING
-            - UPG_EXTRACTING
-            - UPG_REPLACING
-            - UPG_RESTARTING
-            - UPG_WATCHING
-        error_msg:
-          description: The error message associated with a failed state.
-          type: string
-    upgrade_details:
-      description: |
-        Additional details describing the status of an UPGRADE action delivered by the client (agent) on checkin.
-      type: object
-      required:
-        - target_version
-        - action_id
-        - state
-      properties:
-        target_version:
-          description: The version the agent should upgrade to.
-          type: string
-        action_id:
-          description: The upgrade action ID the details are associated with.
-          type: string
-        state:
-          description: The upgrade state.
-          type: string
-          enum:
-            - UPG_REQUESTED
-            - UPG_SCHEDULED
-            - UPG_DOWNLOADING
-            - UPG_EXTRACTING
-            - UPG_REPLACING
-            - UPG_RESTARTING
-            - UPG_WATCHING
-            - UPG_ROLLBACK
-            - UPG_FAILED
-        metadata:
-          description: Upgrade status metadata. Determined by state.
-          oneOf:
-            - $ref: "#/components/schemas/upgrade_metadata_scheduled"
-            - $ref: "#/components/schemas/upgrade_metadata_downloading"
-            - $ref: "#/components/schemas/upgrade_metadata_failed"
     checkinRequest:
       type: object
       required:
@@ -384,8 +306,6 @@ components:
             If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
           type: string
           format: duration
-        upgrade_details:
-          $ref: "#/components/schemas/upgrade_details"
     actionSignature:
       description: Optional action signing data.
       type: object
@@ -666,11 +586,13 @@ components:
         errors:
           description: A flag to indicate if one or more errors occured when proccessing events.
           type: boolean
+          nullable: false
           x-oapi-codegen-extra-tags:
             json: "errors,omitempty"
         items:
           description: The in-order list of results from processing events.
           type: array
+          nullable: false
           items:
             $ref: "#/components/schemas/ackResponseItem"
           x-oapi-codegen-extra-tags:
@@ -692,8 +614,7 @@ components:
             Compression:
               description: "The algorithm used to compress the file. Valid values: br,gzip,deflate,none"
               type: string
-              examples:
-                - deflate
+              example: deflate
             hash:
               title: Hash
               description: Checksums on the file contents
@@ -702,24 +623,20 @@ components:
                 sha256:
                   description: SHA256 of the contents
                   type: string
-                  examples:
-                    - 04f81394bababa0fb31e6ad2d703c875eb46dc254527e39ff316564c0dc339e2
+                  example: 04f81394bababa0fb31e6ad2d703c875eb46dc254527e39ff316564c0dc339e2
             name:
               description: Name of the file including the extension, without the directory
               type: string
-              examples:
-                - yankees-stats.zip
+              example: yankees-stats.zip
             mime_type:
               description: MIME type of the file
               type: string
-              examples:
-                - application/zip
+              example: application/zip
             size:
               description: Size of the file contents, in bytes
               type: integer
               format: int64
-              examples:
-                - 8276748
+              example: 8276748
           required:
             - name
             - size
@@ -727,13 +644,11 @@ components:
         action_id:
           description: ID of the action that requested this file
           type: string
-          examples:
-            - 2f440d31-2ea4-42f8-b0f2-4b6e98e8dc5e
+          example: 2f440d31-2ea4-42f8-b0f2-4b6e98e8dc5e
         agent_id:
           description: Identifier of the agent uploading. Matches the ID usually found in agent.id
           type: string
-          examples:
-            - 9347e918-5e00-48b0-b302-a09f9258a46d
+          example: 9347e918-5e00-48b0-b302-a09f9258a46d
         src:
           description: The source integration sending this file
           type: string
@@ -751,14 +666,12 @@ components:
         upload_id:
           description: A unique identifier for the ensuing upload operation
           type: string
-          examples:
-            - fbc8e23c-055d-461e-87f7-b0d1b57f14b4
+          example: fbc8e23c-055d-461e-87f7-b0d1b57f14b4
         chunk_size:
           description: The required size (in bytes) that the file must be segmented into for each chunk
           type: integer
           format: int64
-          examples:
-            - 4194304
+          example: 4194304
     uploadCompleteRequest:
       description: Request to verify and finish an uploaded file
       type: object
@@ -774,8 +687,7 @@ components:
             sha256:
               description: SHA256 hash
               type: string
-              examples:
-                - 83810fdc61c44290778c212d7829d0c3f0232e81bd551d3943998a920025d14f
+              example: 83810fdc61c44290778c212d7829d0c3f0232e81bd551d3943998a920025d14f
   parameters:
     requestId:
       name: X-Request-Id
@@ -784,7 +696,7 @@ components:
       schema:
         type: string
     apiVersion:
-      name: elastic-api-version
+      name: Elastic-Api-Version
       description: The API version to use, format should be "YYYY-MM-DD"
       in: header
       schema:
@@ -829,8 +741,7 @@ components:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: "#/components/schemas/error"
+            $ref: "#/components/schemas/error"
           examples:
             badRequest:
               description: Generic bad request response.
@@ -848,8 +759,7 @@ components:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: "#/components/schemas/error"
+            $ref: "#/components/schemas/error"
           examples:
             internalServerError:
               description: Generic internal server error response.
@@ -866,8 +776,7 @@ components:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: "#/components/schemas/error"
+            $ref: "#/components/schemas/error"
           examples:
             unauthorized:
               description: The ApiKey is not enabled
@@ -885,8 +794,7 @@ components:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: "#/components/schemas/error"
+            $ref: "#/components/schemas/error"
           examples:
             agentNotFound:
               description: The agent is not found.
@@ -904,8 +812,7 @@ components:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: "#/components/schemas/error"
+            $ref: "#/components/schemas/error"
           examples:
             requestTimeout:
               description: Deadline exceeded.
@@ -914,7 +821,7 @@ components:
                 error: RequestTimeout
                 message: timeout on request
     throttle:
-      description: 428 rate limiting request.
+      description: 428 rate limiting request. Only returned by artifacts endpoint.
       headers:
         # throttle is checked before api version header is validated
         X-Request-Id:
@@ -922,8 +829,7 @@ components:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: "#/components/schemas/error"
+            $ref: "#/components/schemas/error"
           examples:
             rateLimit:
               description: Too many requests - rate limit reached.
@@ -944,8 +850,7 @@ components:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: "#/components/schemas/error"
+            $ref: "#/components/schemas/error"
           examples:
             unavailable:
               description: Service unavailable
@@ -967,8 +872,6 @@ paths:
       description: |
         Return the fleet-server status.
         The status code will either be 200 if healthy, or 503 if not.
-        Service is considered healthy if it has access to Elasticsearch, but the policies index
-        does not exist. This is equivalent to a deployment without any policy.
         Authentication for this endpoint is optional, if not provided a shorter response body is returned.
       responses:
         "200":
@@ -1149,18 +1052,6 @@ paths:
                   status: online
                   message: ""
                   ack_token: previous-token
-              withCheckinDetails:
-                description: A checking request from an elastic-agent that is downloading a new version.
-                value:
-                  status: online
-                  message: ""
-                  ack_token: previous-token
-                  upgrade_details:
-                    action_id: upgrade-action-id
-                    target_version: X.Y.Z
-                    state: UPG_DOWNLOADING
-                    metadata:
-                      download_percent: 12.3
       responses:
         "200":
           description: Agent checkin successful. May include actions.
@@ -1213,9 +1104,6 @@ paths:
         The endpoint that an agent uses to acknowledge (and inform fleet-server) of events that it has recieved/executed.
         A single action may have multiple different events associated with it.
         Also an action may not have any acks associated with it.
-
-        Note that using this endpoint for an `UPGRADE` action is deprecated behaviour.
-        `UPGRADE` status should use the `upgrade_details` attribute of the checkin request body.
       parameters:
         - name: id
           in: path
@@ -1367,7 +1255,7 @@ paths:
     put:
       operationId: uploadChunk
       summary: Upload a section of file data
-      description: "Upload portions of the intended file in a piecewise fashion. Chunks may be uploaded in any order, and may be uploaded in parallel. The body is the raw contents of the file at the given position matching the chunk number. The body must be the exact chunk size returned from the upload initiation response. All chunks must be this size except for the final one, which is naturally the file remainder."
+      description: "Upload portions of the intended file in a piecewise fashion. This route is idempotent in that any successive calls will overwrite previous ones for the same URL parameters. Chunks may be uploaded in any order, and may be uploaded in parallel. The body is the raw contents of the file at the given position matching the chunk number. The body must be the exact chunk size returned from the upload initiation response. All chunks must be this size except for the final one, which is naturally the file remainder."
       security:
         - agentApiKey: []
       parameters:
@@ -1377,24 +1265,21 @@ paths:
           required: true
           schema:
             type: string
-            examples:
-              - ecb30383-6dd1-4b1d-bed0-2386b4e5df51
+            example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
         - name: chunkNum
           in: path
           description: the positional index of the chunk within the file. The first chunk is 0, the next 1, etc.
           required: true
           schema:
             type: integer
-            examples:
-              - 3
+            example: 3
         - name: X-Chunk-SHA2
           in: header
           required: true
           description: the SHA256 hash of the body contents for this request
           schema:
             type: string
-            examples:
-              - 0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1
+            example: 0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1
         - $ref: "#/components/parameters/requestId"
         - $ref: "#/components/parameters/apiVersion"
       requestBody:
@@ -1443,8 +1328,7 @@ paths:
           required: true
           schema:
             type: string
-            examples:
-              - ecb30383-6dd1-4b1d-bed0-2386b4e5df51
+            example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
         - $ref: "#/components/parameters/requestId"
         - $ref: "#/components/parameters/apiVersion"
       responses:
@@ -1462,8 +1346,7 @@ paths:
                 properties:
                   status:
                     type: string
-                    examples:
-                      - "ok"
+                    example: "ok"
         "400":
           $ref: "#/components/responses/badRequest"
         "401":
@@ -1488,10 +1371,9 @@ paths:
           required: true
           schema:
             type: string
-            examples:
-              - ecb30383-6dd1-4b1d-bed0-2386b4e5df51
-        - $ref: "#/components/parameters/apiVersion"
+            example: ecb30383-6dd1-4b1d-bed0-2386b4e5df51
         - $ref: "#/components/parameters/requestId"
+        - $ref: "#/components/parameters/apiVersion"
       responses:
         "200":
           description: File Contents.
@@ -1500,8 +1382,7 @@ paths:
               description: SHA256 digest of the file contents. Only sent when the uploaded file contains a file.hash.sha256 value.
               schema:
                 type: string
-                examples:
-                  - 0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1
+                example: 0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1
             Elastic-Api-Version:
               $ref: "#/components/headers/apiVersion"
             X-Request-Id:
@@ -1544,62 +1425,3 @@ paths:
           $ref: "#/components/responses/internalServerError"
         "503":
           $ref: "#/components/responses/unavailable"
-  /api/agents/upgrades/{major}.{minor}.{patch}/pgp-public-key:
-    get:
-      operationId: getPGPKey
-      summary: retrieve a PGP key from the fleet-server's local storage.
-      description: "Get a PGP key that can be used to verify agent upgrades. Key is stored on (fleet-server's) disk."
-      security:
-        - apiKey: []
-      parameters:
-        - name: major
-          in: path
-          description: The major version number.
-          required: true
-          schema:
-            type: integer
-        - name: minor
-          in: path
-          description: The minor version number.
-          required: true
-          schema:
-            type: integer
-        - name: patch
-          in: path
-          description: The patch version number.
-          required: true
-          schema:
-            type: integer
-        - $ref: "#/components/parameters/apiVersion"
-        - $ref: "#/components/parameters/requestId"
-      responses:
-        "200":
-          description: The PGP key bytes.
-          headers:
-            Elastic-Api-Version:
-              $ref: "#/components/headers/apiVersion"
-            X-Request-Id:
-              $ref: "#/components/headers/requestID"
-          content:
-            "application/octet-stream":
-              schema:
-                type: string
-                format: binary
-        "400":
-          $ref: "#/components/responses/badRequest"
-        "401":
-          $ref: "#/components/responses/keyNotEnabled"
-        "500":
-          description: The server has an error retrieving or reading the local key.
-          headers:
-            Elastic-Api-Version:
-              $ref: "#/components/headers/apiVersion"
-            X-Request-Id:
-              $ref: "#/components/headers/requestID"
-        "501":
-          description: The server will not serve the request without a TLS connection.
-          headers:
-            Elastic-Api-Version:
-              $ref: "#/components/headers/apiVersion"
-            X-Request-Id:
-              $ref: "#/components/headers/requestID"

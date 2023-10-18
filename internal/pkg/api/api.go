@@ -130,7 +130,7 @@ func (a *apiServer) UploadChunk(w http.ResponseWriter, r *http.Request, id strin
 	}
 }
 
-func (a *apiServer) GetFile(w http.ResponseWriter, r *http.Request, id string) {
+func (a *apiServer) GetFile(w http.ResponseWriter, r *http.Request, id string, params GetFileParams) {
 	zlog := hlog.FromRequest(r).With().Logger()
 	if err := a.ft.handleSendFile(zlog, w, r, id); err != nil {
 		cntFileDeliv.IncError(err)
@@ -139,7 +139,7 @@ func (a *apiServer) GetFile(w http.ResponseWriter, r *http.Request, id string) {
 	}
 }
 
-func (a *apiServer) GetPGPKey(w http.ResponseWriter, r *http.Request, major, minor, patch int) {
+func (a *apiServer) GetPGPKey(w http.ResponseWriter, r *http.Request, major, minor, patch int, params GetPGPKeyParams) {
 	zlog := hlog.FromRequest(r).With().Logger()
 	if err := a.pt.handlePGPKey(zlog, w, r, major, minor, patch); err != nil {
 		cntGetPGP.IncError(err)

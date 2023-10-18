@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
-	"github.com/elastic/fleet-server/v7/pkg/api/versions/2022_06_01/api"
+	"github.com/elastic/fleet-server/v7/pkg/api/versions/2023_06_01/api"
 
 	"github.com/elastic/fleet-server/v7/version"
 )
