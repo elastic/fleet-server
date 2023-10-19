@@ -72,26 +72,33 @@
         },
         "data": {
           "description": "The opaque payload.",
-          "type": "object",
           "format": "raw"
         },
         "signed": {
-          "description": "The action signed data and signature.",
-          "type": "object",
-          "properties": {
-            "data": {
-              "description": "The base64 encoded, UTF-8 JSON serialized action bytes that are signed.",
-              "type": "string"
-            },
-            "signature": {
-              "description": "The base64 encoded signature.",
-              "type": "string"
-            }
-          }
+            "$ref": "#/definitions/signed"
         }
       },
       "required": [
         "id"
+      ]
+    },
+
+    "signed": {
+      "description": "The action signed data and signature.",
+      "type": "object",
+      "properties": {
+        "data": {
+          "description": "The base64 encoded, UTF-8 JSON serialized action bytes that are signed.",
+          "type": "string"
+        },
+        "signature": {
+          "description": "The base64 encoded signature.",
+          "type": "string"
+        }
+      },
+      "required": [
+          "data",
+          "signature"
       ]
     },
 
@@ -129,12 +136,10 @@
         },
         "action_data": {
           "description": "The opaque payload.",
-          "type": "object",
           "format": "raw"
         },
         "action_response": {
           "description": "The custom action response payload.",
-          "type": "object",
           "format": "raw"
         },
         "error": {
@@ -143,7 +148,6 @@
         },
         "data": {
           "description": "The opaque payload.",
-          "type": "object",
           "format": "raw"
         }
       },
@@ -215,7 +219,6 @@
         },
         "body": {
           "description": "Encoded artifact data",
-          "type": "object",
           "format": "raw"
         },
         "package_name": {
@@ -334,7 +337,6 @@
         },
         "data": {
           "description": "The opaque payload.",
-          "type": "object",
           "format": "raw"
         },
         "default_fleet_server": {
@@ -496,7 +498,6 @@
         "agent": { "$ref": "#/definitions/agent-metadata" },
         "user_provided_metadata": {
           "description": "User provided metadata information for the Elastic Agent",
-          "type": "object",
           "format": "raw"
         },
         "tags": {
@@ -508,7 +509,6 @@
         },
         "local_metadata": {
           "description": "Local metadata information for the Elastic Agent",
-          "type": "object",
           "format": "raw"
         },
         "policy_id": {
@@ -552,7 +552,6 @@
         },
         "components": {
           "description": "Elastic Agent components detailed status information",
-          "type": "object",
           "format": "raw"
         },
         "default_api_key_id": {
@@ -593,7 +592,6 @@
         },
         "upgrade_details": {
             "description": "Additional upgrade status details.",
-            "type": "object",
             "format": "raw"
         }
       },
@@ -647,99 +645,152 @@
         "api_key_id",
         "api_key"
       ]
-    }
-  },
-  "checkin": {
-    "title": "Checkin",
-    "description": "An Elastic Agent checkin to Fleet",
-    "type": "object",
-    "properties": {
-      "_id": {
-        "description": "The unique identifier for the Elastic Agent checkin",
-        "type": "string",
-        "format": "uuid"
+    },
+
+    "checkin": {
+      "title": "Checkin",
+      "description": "An Elastic Agent checkin to Fleet",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "The unique identifier for the Elastic Agent checkin",
+          "type": "string",
+          "format": "uuid"
+        },
+        "@timestamp": {
+          "description": "Date/time the checkin was created",
+          "type": "string",
+          "format": "date-time"
+        },
+        "agent": { "$ref": "#/definitions/agent-metadata" },
+        "host": { "$ref": "#/definitions/host-metadata" },
+        "server": { "$ref": "#/definitions/server-metadata" },
+        "status": {
+          "description": "The current overall status of the Elastic Agent",
+          "type": "string",
+          "enum": ["enrolling", "healthy", "error", "degraded", "offline", "unenrolling", "upgrading"]
+        },
+        "message": {
+          "description": "The current overall status message of the Elastic Agent",
+          "type": "string"
+        },
+        "policy": {
+          "title": "Checkin Policy",
+          "description": "The current status of the applied policy",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "The ID for the policy",
+              "type": "string",
+              "format": "uuid"
+            },
+            "revision": {
+              "description": "The revision of the policy",
+              "type": "integer"
+            },
+            "inputs": {
+              "title": "Checkin Policy Input",
+              "description": "The current input status per policy",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "The ID for the input",
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "template_id": {
+                    "description": "The template ID for the input",
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "status": {
+                    "description": "The current status of the input",
+                    "type": "string",
+                    "enum": ["healthy", "error", "degraded"]
+                  },
+                  "message": {
+                    "description": "The current status message of the intput",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "template_id",
+                  "status",
+                  "message"
+                ]
+              }
+            }
+          },
+          "required": [
+            "id",
+            "revision",
+            "inputs"
+          ]
+        }
       },
-      "@timestamp": {
-        "description": "Date/time the checkin was created",
-        "type": "string",
-        "format": "date-time"
-      },
-      "agent": { "$ref": "#/definitions/agent-metadata" },
-      "host": { "$ref": "#/definitions/host-metadata" },
-      "server": { "$ref": "#/definitions/server-metadata" },
-      "status": {
-        "description": "The current overall status of the Elastic Agent",
-        "type": "string",
-        "enum": ["enrolling", "healthy", "error", "degraded", "offline", "unenrolling", "upgrading"]
-      },
-      "message": {
-        "description": "The current overall status message of the Elastic Agent",
-        "type": "string"
-      },
-      "policy": {
-        "title": "Checkin Policy",
-        "description": "The current status of the applied policy",
+      "required": [
+        "_id",
+        "agent",
+        "status",
+        "message",
+        "enrolled_at",
+        "updated_at"
+      ]
+    },
+
+    "policy-data": {
+        "title": "Policy Data",
+        "description": "The policy data that an agent needs to run",
         "type": "object",
         "properties": {
-          "id": {
-            "description": "The ID for the policy",
-            "type": "string",
-            "format": "uuid"
-          },
-          "revision": {
-            "description": "The revision of the policy",
-            "type": "integer"
-          },
-          "inputs": {
-            "title": "Checkin Policy Input",
-            "description": "The current input status per policy",
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "description": "The ID for the input",
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "template_id": {
-                  "description": "The template ID for the input",
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "status": {
-                  "description": "The current status of the input",
-                  "type": "string",
-                  "enum": ["healthy", "error", "degraded"]
-                },
-                "message": {
-                  "description": "The current status message of the intput",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "template_id",
-                "status",
-                "message"
-              ]
+            "id": {
+                "description": "The policy's ID",
+                "type": "string"
+            },
+            "outputs": {
+                "description": "A map of all outputs that the agent running the policy can use to send data to.",
+                "format": "raw"
+            },
+            "inputs": {
+                "description": "A list of all inputs the agent should run",
+                "format": "raw"
+            },
+            "secret_references": {
+                "description": "A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.",
+                "format": "raw"
+            },
+            "revision": {
+                "description": "The policy revision number. Should match revision_idx",
+                "type": "integer"
+            },
+            "agent": {
+                "description": "The policy's agent configuration details",
+                "format": "raw"
+            },
+            "signed": {
+                "$ref": "#/definitions/signed"
+            },
+            "output_permissions": {
+                "description": "The Elasticsearch permissions needed to run the policy",
+                "format": "raw"
+            },
+            "fleet": {
+                "description": "The policy's fleet configuration details",
+                "format": "raw"
             }
-          }
         },
         "required": [
-          "id",
-          "revision",
-          "inputs"
+            "id",
+            "outputs",
+            "inputs",
+            "revision",
+            "agent",
+            "output_permissions",
+            "fleet"
         ]
-      }
-    },
-    "required": [
-      "_id",
-      "agent",
-      "status",
-      "message",
-      "enrolled_at",
-      "updated_at"
-    ]
+    }
   }
 }

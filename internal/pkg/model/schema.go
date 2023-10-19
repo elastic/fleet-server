@@ -52,10 +52,8 @@ type Action struct {
 	MinimumExecutionDuration int64 `json:"minimum_execution_duration,omitempty"`
 
 	// The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.
-	RolloutDurationSeconds int64 `json:"rollout_duration_seconds,omitempty"`
-
-	// The action signed data and signature.
-	Signed *Signed `json:"signed,omitempty"`
+	RolloutDurationSeconds int64   `json:"rollout_duration_seconds,omitempty"`
+	Signed                 *Signed `json:"signed,omitempty"`
 
 	// The action start date/time
 	StartTime string `json:"start_time,omitempty"`
@@ -74,14 +72,6 @@ type Action struct {
 
 	// The ID of the user who created the action.
 	UserID string `json:"user_id,omitempty"`
-}
-
-// ActionData The opaque payload.
-type ActionData struct {
-}
-
-// ActionResponse The custom action response payload.
-type ActionResponse struct {
 }
 
 // ActionResult An Elastic Agent action results
@@ -266,16 +256,53 @@ type Artifact struct {
 	PackageName string `json:"package_name,omitempty"`
 }
 
-// Body Encoded artifact data
-type Body struct {
+// Checkin An Elastic Agent checkin to Fleet
+type Checkin struct {
+	ESDocument
+	Agent *AgentMetadata `json:"agent"`
+	Host  *HostMetadata  `json:"host,omitempty"`
+
+	// The current overall status message of the Elastic Agent
+	Message string `json:"message"`
+
+	// The current status of the applied policy
+	Policy *CheckinPolicy  `json:"policy,omitempty"`
+	Server *ServerMetadata `json:"server,omitempty"`
+
+	// The current overall status of the Elastic Agent
+	Status string `json:"status"`
+
+	// Date/time the checkin was created
+	Timestamp string `json:"@timestamp,omitempty"`
 }
 
-// Components Elastic Agent components detailed status information
-type Components struct {
+// CheckinPolicy The current status of the applied policy
+type CheckinPolicy struct {
+
+	// The ID for the policy
+	ID string `json:"id"`
+
+	// The current input status per policy
+	Inputs []CheckinPolicyInputItems `json:"inputs"`
+
+	// The revision of the policy
+	Revision int64 `json:"revision"`
 }
 
-// Data The opaque payload.
-type Data struct {
+// CheckinPolicyInputItems
+type CheckinPolicyInputItems struct {
+
+	// The ID for the input
+	ID string `json:"id"`
+
+	// The current status message of the intput
+	Message string `json:"message"`
+
+	// The current status of the input
+	Status string `json:"status"`
+
+	// The template ID for the input
+	TemplateID string `json:"template_id"`
 }
 
 // EnrollmentAPIKey An Elastic Agent enrollment API key
@@ -315,10 +342,6 @@ type HostMetadata struct {
 	Name string `json:"name"`
 }
 
-// LocalMetadata Local metadata information for the Elastic Agent
-type LocalMetadata struct {
-}
-
 // Policy A policy that an Elastic Agent is attached to
 type Policy struct {
 	ESDocument
@@ -343,6 +366,36 @@ type Policy struct {
 
 	// Timeout (seconds) that an Elastic Agent should be un-enrolled.
 	UnenrollTimeout int64 `json:"unenroll_timeout,omitempty"`
+}
+
+// PolicyData The policy data that an agent needs to run
+type PolicyData struct {
+	ESDocument
+
+	// The policy's agent configuration details
+	Agent json.RawMessage `json:"agent"`
+
+	// The policy's fleet configuration details
+	Fleet json.RawMessage `json:"fleet"`
+
+	// The policy's ID
+	ID string `json:"id"`
+
+	// A list of all inputs the agent should run
+	Inputs json.RawMessage `json:"inputs"`
+
+	// The Elasticsearch permissions needed to run the policy
+	OutputPermissions json.RawMessage `json:"output_permissions"`
+
+	// A map of all outputs that the agent running the policy can use to send data to.
+	Outputs json.RawMessage `json:"outputs"`
+
+	// The policy revision number. Should match revision_idx
+	Revision int64 `json:"revision"`
+
+	// A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.
+	SecretReferences json.RawMessage `json:"secret_references,omitempty"`
+	Signed           *Signed         `json:"signed,omitempty"`
 }
 
 // PolicyLeader The current leader Fleet Server for a policy
@@ -399,10 +452,10 @@ type ServerMetadata struct {
 type Signed struct {
 
 	// The base64 encoded, UTF-8 JSON serialized action bytes that are signed.
-	Data string `json:"data,omitempty"`
+	Data string `json:"data"`
 
 	// The base64 encoded signature.
-	Signature string `json:"signature,omitempty"`
+	Signature string `json:"signature"`
 }
 
 // ToRetireAPIKeyIdsItems the Output API Keys that were replaced and should be retired
@@ -413,12 +466,4 @@ type ToRetireAPIKeyIdsItems struct {
 
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`
-}
-
-// UpgradeDetails Additional upgrade status details.
-type UpgradeDetails struct {
-}
-
-// UserProvidedMetadata User provided metadata information for the Elastic Agent
-type UserProvidedMetadata struct {
 }
