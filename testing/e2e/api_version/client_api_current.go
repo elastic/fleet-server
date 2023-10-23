@@ -249,7 +249,7 @@ func (tester *ClientAPITester) GetPGPKey(ctx context.Context, apiKey string) []b
 	}))
 	tester.Require().NoError(err)
 
-	resp, err := client.GetPGPKeyWithResponse(ctx, 1, 2, 3)
+	resp, err := client.GetPGPKeyWithResponse(ctx, 1, 2, 3, nil)
 	tester.Require().NoError(err)
 	if strings.HasPrefix(tester.endpoint, "https") {
 		tester.Require().Equal(http.StatusOK, resp.StatusCode())

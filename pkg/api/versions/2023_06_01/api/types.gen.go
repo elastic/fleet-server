@@ -534,20 +534,20 @@ type AgentEnrollParams struct {
 	// The agent version must not be greater than the version of the fleet-server.
 	UserAgent UserAgent `json:"User-Agent"`
 
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
-	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+	ElasticApiVersion *ApiVersion `json:"Elastic-Api-Version,omitempty"`
 }
 
 // AgentAcksParams defines parameters for AgentAcks.
 type AgentAcksParams struct {
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
-	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+	ElasticApiVersion *ApiVersion `json:"Elastic-Api-Version,omitempty"`
 }
 
 // AgentCheckinParams defines parameters for AgentCheckin.
@@ -562,38 +562,47 @@ type AgentCheckinParams struct {
 	// The agent version must not be greater than the version of the fleet-server.
 	UserAgent UserAgent `json:"User-Agent"`
 
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
-	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+	ElasticApiVersion *ApiVersion `json:"Elastic-Api-Version,omitempty"`
 }
 
 // ArtifactParams defines parameters for Artifact.
 type ArtifactParams struct {
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
-	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+	ElasticApiVersion *ApiVersion `json:"Elastic-Api-Version,omitempty"`
+}
+
+// GetFileParams defines parameters for GetFile.
+type GetFileParams struct {
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"Elastic-Api-Version,omitempty"`
 }
 
 // UploadBeginParams defines parameters for UploadBegin.
 type UploadBeginParams struct {
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
-	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+	ElasticApiVersion *ApiVersion `json:"Elastic-Api-Version,omitempty"`
 }
 
 // UploadCompleteParams defines parameters for UploadComplete.
 type UploadCompleteParams struct {
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
-	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+	ElasticApiVersion *ApiVersion `json:"Elastic-Api-Version,omitempty"`
 }
 
 // UploadChunkParams defines parameters for UploadChunk.
@@ -601,20 +610,20 @@ type UploadChunkParams struct {
 	// XChunkSHA2 the SHA256 hash of the body contents for this request
 	XChunkSHA2 string `json:"X-Chunk-SHA2"`
 
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
-	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+	ElasticApiVersion *ApiVersion `json:"Elastic-Api-Version,omitempty"`
 }
 
 // StatusParams defines parameters for Status.
 type StatusParams struct {
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
-	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+	ElasticApiVersion *ApiVersion `json:"Elastic-Api-Version,omitempty"`
 }
 
 // AgentEnrollJSONRequestBody defines body for AgentEnroll for application/json ContentType.

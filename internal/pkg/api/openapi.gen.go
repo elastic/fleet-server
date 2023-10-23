@@ -612,6 +612,15 @@ type Throttle = Error
 // Unavailable Error processing request.
 type Unavailable = Error
 
+// GetPGPKeyParams defines parameters for GetPGPKey.
+type GetPGPKeyParams struct {
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
+}
+
 // AgentEnrollParams defines parameters for AgentEnroll.
 type AgentEnrollParams struct {
 	// UserAgent The user-agent header that is sent.
@@ -619,8 +628,8 @@ type AgentEnrollParams struct {
 	// The agent version must not be greater than the version of the fleet-server.
 	UserAgent UserAgent `json:"User-Agent"`
 
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
@@ -628,8 +637,8 @@ type AgentEnrollParams struct {
 
 // AgentAcksParams defines parameters for AgentAcks.
 type AgentAcksParams struct {
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
@@ -647,8 +656,8 @@ type AgentCheckinParams struct {
 	// The agent version must not be greater than the version of the fleet-server.
 	UserAgent UserAgent `json:"User-Agent"`
 
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
@@ -656,17 +665,26 @@ type AgentCheckinParams struct {
 
 // ArtifactParams defines parameters for Artifact.
 type ArtifactParams struct {
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
 
+// GetFileParams defines parameters for GetFile.
+type GetFileParams struct {
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
+}
+
 // UploadBeginParams defines parameters for UploadBegin.
 type UploadBeginParams struct {
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
@@ -674,8 +692,8 @@ type UploadBeginParams struct {
 
 // UploadCompleteParams defines parameters for UploadComplete.
 type UploadCompleteParams struct {
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
@@ -686,8 +704,8 @@ type UploadChunkParams struct {
 	// XChunkSHA2 the SHA256 hash of the body contents for this request
 	XChunkSHA2 string `json:"X-Chunk-SHA2"`
 
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
@@ -695,8 +713,8 @@ type UploadChunkParams struct {
 
 // StatusParams defines parameters for Status.
 type StatusParams struct {
-	// XRequestID The request tracking ID for APM.
-	XRequestID *RequestId `json:"X-Request-ID,omitempty"`
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
@@ -1036,7 +1054,7 @@ func (t *UpgradeDetails_Metadata) UnmarshalJSON(b []byte) error {
 type ServerInterface interface {
 	// retrieve a PGP key from the fleet-server's local storage.
 	// (GET /api/agents/upgrades/{major}.{minor}.{patch}/pgp-public-key)
-	GetPGPKey(w http.ResponseWriter, r *http.Request, major int, minor int, patch int)
+	GetPGPKey(w http.ResponseWriter, r *http.Request, major int, minor int, patch int, params GetPGPKeyParams)
 
 	// (POST /api/fleet/agents/enroll)
 	AgentEnroll(w http.ResponseWriter, r *http.Request, params AgentEnrollParams)
@@ -1051,7 +1069,7 @@ type ServerInterface interface {
 	Artifact(w http.ResponseWriter, r *http.Request, id string, sha2 string, params ArtifactParams)
 	// retrieve stored file for integration
 	// (GET /api/fleet/file/{id})
-	GetFile(w http.ResponseWriter, r *http.Request, id string)
+	GetFile(w http.ResponseWriter, r *http.Request, id string, params GetFileParams)
 	// Initiate a file upload process
 	// (POST /api/fleet/uploads)
 	UploadBegin(w http.ResponseWriter, r *http.Request, params UploadBeginParams)
@@ -1072,7 +1090,7 @@ type Unimplemented struct{}
 
 // retrieve a PGP key from the fleet-server's local storage.
 // (GET /api/agents/upgrades/{major}.{minor}.{patch}/pgp-public-key)
-func (_ Unimplemented) GetPGPKey(w http.ResponseWriter, r *http.Request, major int, minor int, patch int) {
+func (_ Unimplemented) GetPGPKey(w http.ResponseWriter, r *http.Request, major int, minor int, patch int, params GetPGPKeyParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1098,7 +1116,7 @@ func (_ Unimplemented) Artifact(w http.ResponseWriter, r *http.Request, id strin
 
 // retrieve stored file for integration
 // (GET /api/fleet/file/{id})
-func (_ Unimplemented) GetFile(w http.ResponseWriter, r *http.Request, id string) {
+func (_ Unimplemented) GetFile(w http.ResponseWriter, r *http.Request, id string, params GetFileParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1169,8 +1187,51 @@ func (siw *ServerInterfaceWrapper) GetPGPKey(w http.ResponseWriter, r *http.Requ
 
 	ctx = context.WithValue(ctx, ApiKeyScopes, []string{})
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetPGPKeyParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
+
+	}
+
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
+			return
+		}
+
+		params.XRequestId = &XRequestId
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetPGPKey(w, r, major, minor, patch)
+		siw.Handler.GetPGPKey(w, r, major, minor, patch, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1216,22 +1277,22 @@ func (siw *ServerInterfaceWrapper) AgentEnroll(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// ------------- Optional header parameter "X-Request-ID" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
-		var XRequestID RequestId
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
 		n := len(valueList)
 		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-ID", Count: n})
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, valueList[0], &XRequestID)
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
 		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-ID", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
 			return
 		}
 
-		params.XRequestID = &XRequestID
+		params.XRequestId = &XRequestId
 
 	}
 
@@ -1287,22 +1348,22 @@ func (siw *ServerInterfaceWrapper) AgentAcks(w http.ResponseWriter, r *http.Requ
 
 	headers := r.Header
 
-	// ------------- Optional header parameter "X-Request-ID" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
-		var XRequestID RequestId
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
 		n := len(valueList)
 		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-ID", Count: n})
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, valueList[0], &XRequestID)
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
 		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-ID", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
 			return
 		}
 
-		params.XRequestID = &XRequestID
+		params.XRequestId = &XRequestId
 
 	}
 
@@ -1400,22 +1461,22 @@ func (siw *ServerInterfaceWrapper) AgentCheckin(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// ------------- Optional header parameter "X-Request-ID" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
-		var XRequestID RequestId
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
 		n := len(valueList)
 		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-ID", Count: n})
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, valueList[0], &XRequestID)
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
 		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-ID", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
 			return
 		}
 
-		params.XRequestID = &XRequestID
+		params.XRequestId = &XRequestId
 
 	}
 
@@ -1480,22 +1541,22 @@ func (siw *ServerInterfaceWrapper) Artifact(w http.ResponseWriter, r *http.Reque
 
 	headers := r.Header
 
-	// ------------- Optional header parameter "X-Request-ID" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
-		var XRequestID RequestId
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
 		n := len(valueList)
 		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-ID", Count: n})
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, valueList[0], &XRequestID)
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
 		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-ID", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
 			return
 		}
 
-		params.XRequestID = &XRequestID
+		params.XRequestId = &XRequestId
 
 	}
 
@@ -1546,8 +1607,51 @@ func (siw *ServerInterfaceWrapper) GetFile(w http.ResponseWriter, r *http.Reques
 
 	ctx = context.WithValue(ctx, AgentApiKeyScopes, []string{})
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetFileParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
+
+	}
+
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
+			return
+		}
+
+		params.XRequestId = &XRequestId
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetFile(w, r, id)
+		siw.Handler.GetFile(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1570,22 +1674,22 @@ func (siw *ServerInterfaceWrapper) UploadBegin(w http.ResponseWriter, r *http.Re
 
 	headers := r.Header
 
-	// ------------- Optional header parameter "X-Request-ID" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
-		var XRequestID RequestId
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
 		n := len(valueList)
 		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-ID", Count: n})
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, valueList[0], &XRequestID)
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
 		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-ID", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
 			return
 		}
 
-		params.XRequestID = &XRequestID
+		params.XRequestId = &XRequestId
 
 	}
 
@@ -1641,22 +1745,22 @@ func (siw *ServerInterfaceWrapper) UploadComplete(w http.ResponseWriter, r *http
 
 	headers := r.Header
 
-	// ------------- Optional header parameter "X-Request-ID" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
-		var XRequestID RequestId
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
 		n := len(valueList)
 		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-ID", Count: n})
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, valueList[0], &XRequestID)
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
 		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-ID", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
 			return
 		}
 
-		params.XRequestID = &XRequestID
+		params.XRequestId = &XRequestId
 
 	}
 
@@ -1744,22 +1848,22 @@ func (siw *ServerInterfaceWrapper) UploadChunk(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// ------------- Optional header parameter "X-Request-ID" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
-		var XRequestID RequestId
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
 		n := len(valueList)
 		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-ID", Count: n})
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, valueList[0], &XRequestID)
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
 		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-ID", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
 			return
 		}
 
-		params.XRequestID = &XRequestID
+		params.XRequestId = &XRequestId
 
 	}
 
@@ -1806,22 +1910,22 @@ func (siw *ServerInterfaceWrapper) Status(w http.ResponseWriter, r *http.Request
 
 	headers := r.Header
 
-	// ------------- Optional header parameter "X-Request-ID" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
-		var XRequestID RequestId
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
 		n := len(valueList)
 		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-ID", Count: n})
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-ID", runtime.ParamLocationHeader, valueList[0], &XRequestID)
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
 		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-ID", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
 			return
 		}
 
-		params.XRequestID = &XRequestID
+		params.XRequestId = &XRequestId
 
 	}
 

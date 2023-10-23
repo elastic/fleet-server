@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build !integration
+//go:build !integration && !snapshot
 
 package api
 
@@ -120,12 +120,4 @@ func TestValidateUserAgent(t *testing.T) {
 			}
 		})
 	}
-}
-
-func mustBuildConstraints(verStr string) version.Constraints {
-	con, err := BuildVersionConstraint(verStr)
-	if err != nil {
-		panic(err)
-	}
-	return con
 }
