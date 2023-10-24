@@ -103,7 +103,7 @@ type APIKey struct {
 func NewAPIKeyFromToken(token string) (*APIKey, error) {
 	d, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrInvalidToken, err)
 	}
 	if !utf8.Valid(d) {
 		return nil, ErrInvalidToken
