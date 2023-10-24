@@ -448,9 +448,6 @@ func generateRemoteOutputAPIKey(ctx context.Context,
 	agentID string,
 	output *Output,
 	hosts []string,
-	// p.Name, p.Role.Raw, p.ServiceToken
-	// outputName string,
-	// roles []byte, serviceToken string
 ) (*apikey.APIKey, error) {
 	name := fmt.Sprintf("%s:%s", agentID, output.Name)
 	cfg := config.Config{
@@ -461,7 +458,6 @@ func generateRemoteOutputAPIKey(ctx context.Context,
 			},
 		},
 	}
-	// cfg.Output.Elasticsearch.Hosts
 	es, err := es.NewClient(ctx, &cfg, false)
 
 	if err != nil {
