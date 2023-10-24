@@ -17,16 +17,19 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
 const (
-	OutputTypeElasticsearch = "elasticsearch"
-	OutputTypeLogstash      = "logstash"
-	OutputTypeKafka         = "kafka"
+	OutputTypeElasticsearch       = "elasticsearch"
+	OutputTypeRemoteElasticsearch = "remote-elasticsearch"
+	OutputTypeLogstash            = "logstash"
+	OutputTypeKafka               = "kafka"
 )
 
 var (
@@ -35,9 +38,10 @@ var (
 )
 
 type Output struct {
-	Name string
-	Type string
-	Role *RoleT
+	Name         string
+	Type         string
+	ServiceToken string `json:"service_token,omitempty"`
+	Role         *RoleT
 }
 
 // Prepare prepares the output p to be sent to the elastic-agent
@@ -229,6 +233,35 @@ func (p *Output) prepareElasticsearch(
 		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
 	}
 
+	if outputMap.GetMap(p.Name).GetString("type") == OutputTypeRemoteElasticsearch {
+		om, _ := outputMap.GetMap(p.Name).Marshal()
+		var outputObj map[string]any
+		json.Unmarshal(om, &outputObj)
+		hosts := outputObj["hosts"].([]interface{})
+		outputAPIKey, err :=
+			generateRemoteOutputAPIKey(ctx, agent.Id, p, []string{hosts[0].(string)})
+		if err != nil {
+			return fmt.Errorf("failed generate output API key: %w", err)
+		}
+
+		// TODO update agent doc like above
+		// TODO what about update flow?
+
+		output.APIKey = outputAPIKey.Agent()
+		output.APIKeyID = outputAPIKey.ID
+		output.PermissionsHash = p.Role.Sha2
+
+		zlog.Debug().
+			Str("outputAPIKey.ID", outputAPIKey.ID).
+			Msg("generated remote output api key")
+
+			// replace type remote-elasticsearch with elasticsearch as agent doesn't recognize remote-elasticsearch
+		if err := setMapObj(outputMap, OutputTypeElasticsearch, p.Name, "type"); err != nil {
+			return err
+		}
+		// TODO remove the service token from the agent policy sent to the agent
+	}
+
 	// Always insert the `api_key` as part of the output block, this is required
 	// because only fleet server knows the api key for the specific agent, if we don't
 	// add it the agent will not receive the `api_key` and will not be able to connect
@@ -409,6 +442,32 @@ func generateOutputAPIKey(
 		roles,
 		apikey.NewMetadata(agentID, outputName, apikey.TypeOutput),
 	)
+}
+
+func generateRemoteOutputAPIKey(ctx context.Context,
+	agentID string,
+	output *Output,
+	hosts []string,
+	// p.Name, p.Role.Raw, p.ServiceToken
+	// outputName string,
+	// roles []byte, serviceToken string
+) (*apikey.APIKey, error) {
+	name := fmt.Sprintf("%s:%s", agentID, output.Name)
+	cfg := config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Hosts:        hosts,
+				ServiceToken: output.ServiceToken,
+			},
+		},
+	}
+	// cfg.Output.Elasticsearch.Hosts
+	es, err := es.NewClient(ctx, &cfg, false)
+
+	if err != nil {
+		return nil, err
+	}
+	return apikey.Create(ctx, es, name, "", "false", output.Role.Raw, apikey.NewMetadata(agentID, output.Name, apikey.TypeOutput))
 }
 
 func setMapObj(obj map[string]interface{}, val interface{}, keys ...string) error {
