@@ -120,7 +120,7 @@ func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserve
 		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
-		Data:               policyData,
+		Data:               &policyData,
 	})
 	if err != nil {
 		return nil, err
@@ -300,7 +300,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
-		Data:               policyData,
+		Data:               &policyData,
 	})
 	require.NoError(t, err)
 

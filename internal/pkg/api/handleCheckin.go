@@ -28,7 +28,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
-	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/hashicorp/go-version"
@@ -685,54 +684,32 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, err
 	}
 
-	// Parse the outputs maps in order to prepare the outputs
-	const outputsProperty = "outputs"
-	outputs, err := smap.Parse(pp.Fields[outputsProperty])
-	if err != nil {
-		return nil, err
-	}
-
-	if outputs == nil {
+	if len(pp.Policy.Data.Outputs) == 0 {
 		return nil, ErrNoPolicyOutput
 	}
 
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, outputs)
+		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, pp.Policy.Data.Outputs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare output %q:: %w",
 				policyOutput.Name, err)
 		}
 	}
+	// Add replace inputs with prepared version
+	pp.Policy.Data.Inputs = pp.Inputs
 
-	outputRaw, err := json.Marshal(outputs)
+	p, err := json.Marshal(pp.Policy.Data)
 	if err != nil {
 		return nil, err
 	}
-
-	// Dupe field map; pp is immutable
-	fields := make(map[string]json.RawMessage, len(pp.Fields))
-
-	for k, v := range pp.Fields {
-		fields[k] = v
-	}
-
-	// Update only the output fields to avoid duping the whole map
-	fields[outputsProperty] = json.RawMessage(outputRaw)
-
-	// replace agent policy inputs with the processed inputs where the secret references were replaced with the secret values
-	inputsRaw, err := json.Marshal(pp.Inputs)
-	if err != nil {
-		return nil, err
-	}
-
-	fields["inputs"] = json.RawMessage(inputsRaw)
 
 	rewrittenPolicy := struct {
-		Policy map[string]json.RawMessage `json:"policy"`
-	}{fields}
+		Policy json.RawMessage `json:"policy"`
+	}{p}
 
 	r := policy.RevisionFromPolicy(pp.Policy)
+	// FIXME use better action definition from open api spec
 	resp := Action{
 		AgentId:   agent.Id,
 		CreatedAt: pp.Policy.Timestamp,

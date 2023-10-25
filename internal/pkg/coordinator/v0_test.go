@@ -23,7 +23,7 @@ func TestCoordinatorZero(t *testing.T) {
 	policy := model.Policy{
 		PolicyID:       policyId,
 		CoordinatorIdx: 0,
-		Data:           []byte("{}"),
+		Data:           nil,
 		RevisionIdx:    1,
 	}
 	coord, err := NewCoordinatorZero(policy)
@@ -55,7 +55,7 @@ func TestCoordinatorZero(t *testing.T) {
 	policy = model.Policy{
 		PolicyID:       policyId,
 		CoordinatorIdx: 0,
-		Data:           []byte("{}"),
+		Data:           nil,
 		RevisionIdx:    2,
 	}
 	if err := coord.Update(ctx, policy); err != nil {
@@ -77,7 +77,7 @@ func TestCoordinatorZero(t *testing.T) {
 	policy = model.Policy{
 		PolicyID:       policyId,
 		CoordinatorIdx: 1,
-		Data:           []byte("{}"),
+		Data:           nil,
 		RevisionIdx:    2,
 	}
 	if err := coord.Update(ctx, policy); err != nil {

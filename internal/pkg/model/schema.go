@@ -347,10 +347,8 @@ type Policy struct {
 	ESDocument
 
 	// The coordinator index of the policy
-	CoordinatorIdx int64 `json:"coordinator_idx"`
-
-	// The opaque payload.
-	Data json.RawMessage `json:"data"`
+	CoordinatorIdx int64       `json:"coordinator_idx"`
+	Data           *PolicyData `json:"data"`
 
 	// True when this policy is the default policy to start Fleet Server
 	DefaultFleetServer bool `json:"default_fleet_server"`
@@ -370,32 +368,31 @@ type Policy struct {
 
 // PolicyData The policy data that an agent needs to run
 type PolicyData struct {
-	ESDocument
 
 	// The policy's agent configuration details
-	Agent json.RawMessage `json:"agent"`
+	Agent json.RawMessage `json:"agent,omitempty"`
 
 	// The policy's fleet configuration details
-	Fleet json.RawMessage `json:"fleet"`
+	Fleet json.RawMessage `json:"fleet,omitempty"`
 
 	// The policy's ID
 	ID string `json:"id"`
 
 	// A list of all inputs the agent should run
-	Inputs json.RawMessage `json:"inputs"`
+	Inputs []map[string]interface{} `json:"inputs,omitempty"`
 
 	// The Elasticsearch permissions needed to run the policy
-	OutputPermissions json.RawMessage `json:"output_permissions"`
+	OutputPermissions json.RawMessage `json:"output_permissions,omitempty"`
 
 	// A map of all outputs that the agent running the policy can use to send data to.
-	Outputs json.RawMessage `json:"outputs"`
+	Outputs map[string]map[string]interface{} `json:"outputs"`
 
 	// The policy revision number. Should match revision_idx
 	Revision int64 `json:"revision"`
 
 	// A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.
-	SecretReferences json.RawMessage `json:"secret_references,omitempty"`
-	Signed           *Signed         `json:"signed,omitempty"`
+	SecretReferences []SecretReferencesItems `json:"secret_references,omitempty"`
+	Signed           *Signed                 `json:"signed,omitempty"`
 }
 
 // PolicyLeader The current leader Fleet Server for a policy
@@ -425,6 +422,11 @@ type PolicyOutput struct {
 
 	// Type is the output type. Currently only Elasticsearch is supported.
 	Type string `json:"type"`
+}
+
+// SecretReferencesItems
+type SecretReferencesItems struct {
+	ID string `json:"id"`
 }
 
 // Server A Fleet Server

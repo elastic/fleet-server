@@ -336,8 +336,7 @@
           "type": "integer"
         },
         "data": {
-          "description": "The opaque payload.",
-          "format": "raw"
+          "$ref": "#/definitions/policy-data"
         },
         "default_fleet_server": {
           "description": "True when this policy is the default policy to start Fleet Server",
@@ -752,15 +751,38 @@
             },
             "outputs": {
                 "description": "A map of all outputs that the agent running the policy can use to send data to.",
-                "format": "raw"
+                "type": "object",
+                "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$comment": "results in map[string]map[string]interface{}. We use a dynamic output objects because it would be a larger task to define the properties we need to support for each output type, this may be done as future work"
+                    }
+                }
             },
             "inputs": {
                 "description": "A list of all inputs the agent should run",
-                "format": "raw"
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties":{
+                        "$comment": "embedded additionalProperties type results in `outputs map[string]interface{}`"
+                    }
+                }
             },
             "secret_references": {
                 "description": "A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.",
-                "format": "raw"
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "id"
+                    ]
+                }
             },
             "revision": {
                 "description": "The policy revision number. Should match revision_idx",
@@ -784,12 +806,8 @@
         },
         "required": [
             "id",
-            "outputs",
-            "inputs",
             "revision",
-            "agent",
-            "output_permissions",
-            "fleet"
+            "outputs"
         ]
     }
   }

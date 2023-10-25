@@ -82,30 +82,27 @@ func createSecret(t *testing.T, ctx context.Context, bulker bulk.Bulk) string {
 
 func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk.Bulk, secretID string, secretRef string) string {
 	policyID := uuid.Must(uuid.NewV4()).String()
-	var policyDataWSecrets = map[string]interface{}{
-		"name": "TestPolicy " + policyID,
-		"outputs": map[string]interface{}{
-			"default": map[string]string{
+	var policyData = model.PolicyData{
+		Outputs: map[string]map[string]interface{}{
+			"default": {
 				"type": "elasticsearch",
-			}},
-		"output_permissions": map[string]interface{}{
-			"default": map[string]string{},
+			},
 		},
-		"inputs": []map[string]string{{
+		OutputPermissions: json.RawMessage(`{"default":{}}`),
+		Inputs: []map[string]interface{}{{
 			"type":               "fleet-server",
 			"package_var_secret": secretRef,
 		}},
-		"secret_references": []map[string]string{{
-			"id": secretID,
+		SecretReferences: []model.SecretReferencesItems{{
+			ID: secretID,
 		}},
 	}
-	policyDataJSON, _ := json.Marshal(policyDataWSecrets)
 
 	_, err := dl.CreatePolicy(ctx, bulker, model.Policy{
 		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
-		Data:               policyDataJSON,
+		Data:               &policyData,
 	})
 	if err != nil {
 		t.Fatal(err)
