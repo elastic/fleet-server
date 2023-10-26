@@ -79,6 +79,14 @@ func (m *MockBulk) Client() *elasticsearch.Client {
 	return args.Get(0).(*elasticsearch.Client)
 }
 
+func (m *MockBulk) GetRemoteClient(name string) *elasticsearch.Client {
+	args := m.Called()
+	return args.Get(0).(*elasticsearch.Client)
+}
+
+func (m *MockBulk) SetRemoteClient(name string, es *elasticsearch.Client) {
+}
+
 func (m *MockBulk) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
 	result := make(map[string]string)
 	for _, id := range secretIds {

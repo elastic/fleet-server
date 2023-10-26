@@ -40,7 +40,7 @@ var (
 type Output struct {
 	Name         string
 	Type         string
-	ServiceToken string `json:"service_token,omitempty"`
+	ServiceToken string
 	Role         *RoleT
 }
 
@@ -243,10 +243,11 @@ func (p *Output) prepareElasticsearch(
 	if p.Type == OutputTypeRemoteElasticsearch {
 
 		// replace type remote-elasticsearch with elasticsearch as agent doesn't recognize remote-elasticsearch
-		if err := setMapObj(outputMap, OutputTypeElasticsearch, p.Name, "type"); err != nil {
+		if err := setMapObj(outputMap, OutputTypeElasticsearch, p.Name, FieldOutputType); err != nil {
 			return err
 		}
-		// TODO remove the service token from the agent policy sent to the agent
+		// remove the service token from the agent policy sent to the agent
+		delete(outputMap.GetMap(p.Name), FieldOutputServiceToken)
 	}
 
 	// Always insert the `api_key` as part of the output block, this is required
