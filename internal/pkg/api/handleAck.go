@@ -165,24 +165,46 @@ func (ack *AckT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *
 	return &req, err
 }
 
-func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
-	return model.ActionResult{
-		ActionID:        ev.ActionId,
-		AgentID:         agentID,
-		ActionInputType: ev.ActionInputType,
-		StartedAt:       ev.StartedAt,
-		CompletedAt:     ev.CompletedAt,
-		ActionData:      fromPtr(ev.ActionData),
-		ActionResponse:  fromPtr(ev.ActionResponse),
-		Data:            fromPtr(ev.Data),
-		Error:           fromPtr(ev.Error),
+func eventToActionResult(agentID, aType string, ev AckRequest_Events_Item) (acr model.ActionResult) {
+	switch aType {
+	case string(REQUESTDIAGNOSTICS):
+		event, _ := ev.AsDiagnosticsEvent()
+		p, _ := json.Marshal(event.Data)
+		return model.ActionResult{
+			ActionID:  event.ActionId,
+			AgentID:   agentID,
+			Data:      p,
+			Error:     fromPtr(event.Error),
+			Timestamp: event.Timestamp.Format(time.RFC3339),
+		}
+	case string(INPUTACTION):
+		event, _ := ev.AsInputEvent()
+		return model.ActionResult{
+			ActionID:        event.ActionId,
+			AgentID:         agentID,
+			ActionInputType: event.ActionInputType,
+			StartedAt:       event.StartedAt.Format(time.RFC3339),
+			CompletedAt:     event.CompletedAt.Format(time.RFC3339),
+			ActionData:      event.ActionData,
+			ActionResponse:  event.ActionResponse,
+			Error:           fromPtr(event.Error),
+			Timestamp:       event.Timestamp.Format(time.RFC3339),
+		}
+	default: // UPGRADE action acks are also handled by handelUpgrade (deprecated func)
+		event, _ := ev.AsGenericEvent()
+		return model.ActionResult{
+			ActionID:  event.ActionId,
+			AgentID:   agentID,
+			Error:     fromPtr(event.Error),
+			Timestamp: event.Timestamp.Format(time.RFC3339),
+		}
 	}
 }
 
 // handleAckEvents can return:
 // 1. AckResponse and nil error, when the whole request is successful
 // 2. AckResponse and non-nil error, when the request items had errors
-func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) (AckResponse, error) {
+func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []AckRequest_Events_Item) (AckResponse, error) {
 	span, ctx := apm.StartSpan(ctx, "handleAckEvents", "process")
 	defer span.End()
 	var policyAcks []string
@@ -215,20 +237,19 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	}
 
 	for n, ev := range events {
+		event, _ := ev.AsGenericEvent()
 		span, ctx := apm.StartSpan(ctx, "ackEvent", "process")
 		span.Context.SetLabel("agent_id", agent.Agent.ID)
-		span.Context.SetLabel("action_id", ev.ActionId)
+		span.Context.SetLabel("action_id", event.ActionId)
 		log := zlog.With().
-			Str("actionType", string(ev.Type)).
-			Str("actionSubType", string(ev.Subtype)).
-			Str("actionId", ev.ActionId).
-			Str("agentId", ev.AgentId).
-			Str("timestamp", ev.Timestamp).
+			Str("actionId", event.ActionId).
+			Str("agentId", event.AgentId).
+			Time("timestamp", event.Timestamp).
 			Int("n", n).Logger()
 		log.Info().Msg("ack event")
 
 		// Check agent id mismatch
-		if ev.AgentId != "" && ev.AgentId != agent.Id {
+		if event.AgentId != "" && event.AgentId != agent.Id {
 			log.Error().Msg("agent id mismatch")
 			setResult(n, http.StatusBadRequest)
 			span.End()
@@ -237,10 +258,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 		// Check if this is the policy change ack
 		// The policy change acks are handled after actions
-		if strings.HasPrefix(ev.ActionId, "policy:") {
-			if ev.Error == nil {
+		if strings.HasPrefix(event.ActionId, "policy:") {
+			if event.Error == nil {
 				// only added if no error on action
-				policyAcks = append(policyAcks, ev.ActionId)
+				policyAcks = append(policyAcks, event.ActionId)
 				policyIdxs = append(policyIdxs, n)
 			}
 			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
@@ -252,10 +273,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		// Process non-policy change actions
 		// Find matching action by action ID
 		vSpan, vCtx := apm.StartSpan(ctx, "ackAction", "validate")
-		action, ok := ack.cache.GetAction(ev.ActionId)
+		action, ok := ack.cache.GetAction(event.ActionId)
 		if !ok {
 			// Find action by ID
-			actions, err := dl.FindAction(vCtx, ack.bulk, ev.ActionId)
+			actions, err := dl.FindAction(vCtx, ack.bulk, event.ActionId)
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
 				setError(n, err)
@@ -283,7 +304,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			setResult(n, http.StatusOK)
 		}
 
-		if ev.Error == nil && action.Type == TypeUnenroll {
+		if event.Error == nil && action.Type == TypeUnenroll {
 			unenrollIdxs = append(unenrollIdxs, n)
 		}
 		span.End()
@@ -316,7 +337,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	return res, nil
 }
 
-func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, action model.Action, ev Event) error {
+func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, action model.Action, ev AckRequest_Events_Item) error {
 	// Build span links for actions
 	var links []apm.SpanLink
 	if ack.bulk.HasTracer() && action.Traceparent != "" {
@@ -339,7 +360,7 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 	defer span.End()
 
 	// Convert ack event to action result document
-	acr := eventToActionResult(agent.Id, ev)
+	acr := eventToActionResult(agent.Id, action.Type, ev)
 
 	// Save action result document
 	if err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
@@ -348,7 +369,8 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	if action.Type == TypeUpgrade {
-		if err := ack.handleUpgrade(ctx, zlog, agent, ev); err != nil {
+		event, _ := ev.AsUpgradeEvent()
+		if err := ack.handleUpgrade(ctx, zlog, agent, event); err != nil {
 			zlog.Error().Err(err).Msg("handle upgrade event")
 			return err
 		}
@@ -581,28 +603,18 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 	return nil
 }
 
-func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event Event) error {
+func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event UpgradeEvent) error {
 	span, ctx := apm.StartSpan(ctx, "ackUpgrade", "process")
 	defer span.End()
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{}
 	if event.Error != nil {
-		// unmarshal event payload
-		var pl struct {
-			Retry   bool `json:"retry"`
-			Attempt int  `json:"retry_attempt"`
-		}
-		err := json.Unmarshal(fromPtr(event.Payload), &pl)
-		if err != nil {
-			zlog.Error().Err(err).Msg("unable to unmarshal upgrade event payload")
-		}
-
 		// if the payload indicates a retry, mark change the upgrade status to retrying.
-		if pl.Retry {
-			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as retrying")
+		if event.Payload.Retry {
+			zlog.Info().Int("retry_attempt", event.Payload.RetryAttempt).Msg("marking agent upgrade as retrying")
 			doc[dl.FieldUpgradeStatus] = "retrying" // Keep FieldUpgradeStatedAt abd FieldUpgradeded at to original values
 		} else {
-			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as failed, agent logs contain failure message")
+			zlog.Info().Int("retry_attempt", event.Payload.RetryAttempt).Msg("marking agent upgrade as failed, agent logs contain failure message")
 			doc = bulk.UpdateFields{
 				dl.FieldUpgradeStartedAt: nil,
 				dl.FieldUpgradeStatus:    "failed",

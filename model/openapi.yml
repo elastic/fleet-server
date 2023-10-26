@@ -647,7 +647,7 @@ components:
         - ACKNOWLEDGED
         - UNKNOWN
     genericEvent:
-      description: A generic ack event for an action.
+      description: A generic ack event for an action. Includes an optional error attribute.
       type: object
       required:
         - type
@@ -674,52 +674,39 @@ components:
           description: The timestamp of the acknowledgement event. Has the format of "2006-01-02T15:04:05.99999-07:00"
           type: string
           format: date-time
-    errorEvent:
-      description: The ack for an action that has resulted in an error
+        error:
+          description: |
+            An error message.
+            If this is non-empty an error has occured when executing the action.
+            For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
+          type: string
+    upgradeEvent:
+      description: The ack event for an upgrade action
       allOf:
         - $ref: "#/components/schemas/genericEvent"
         - type: object
-          required:
-            - error
+          deprecated: true # replaced by upgrade_details in checkin requests in more recent agent releases.
           properties:
-            error:
+            payload:
+              deprecated: true
               description: |
-                An error message.
-                If this is non-empty an error has occured when executing the action.
-                For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
-              type: string
-    upgradeEvent:
-      description: The ack event for an upgrade action
-      oneOf:
-        - $ref: "#/components/schemas/genericEvent"
-        - allOf:
-          - $ref: "#/components/schemas/errorEvent"
-          - type: object
-            deprecated: true # replaced by upgrade_details in checkin requests in more recent agent releases.
-            required:
-              - payload
-            properties:
-              payload:
-                deprecated: true
-                description: |
-                  If the payload is part of an upgrade event action ack it will include information about if the agent  will retry the upgrade.
-                  Payload is only used by upgrade acks and has been replaced in more recent versions by the checkin's upgrade_details attribute.
-                type: object
-                required:
-                  - retry
-                  - retry_attempt
-                properties:
-                  retry:
-                    description: If the agent will retry the upgrade or not.
-                    type: boolean
-                  retry_attempt:
-                    description: The number of attempts the agent has made so far, -1 indicates no future attempts and that the upgrade has failed.
-                    type: integer
+                If the payload is part of an upgrade event action ack it will include information about if the agent  will retry the upgrade.
+                Payload is only used by upgrade acks and has been replaced in more recent versions by the checkin's upgrade_details attribute.
+              type: object
+              required:
+                - retry
+                - retry_attempt
+              properties:
+                retry:
+                  description: If the agent will retry the upgrade or not.
+                  type: boolean
+                retry_attempt:
+                  description: The number of attempts the agent has made so far, -1 indicates no future attempts and that the upgrade has failed.
+                  type: integer
     diagnosticsEvent:
       description: The ack event for a request diagnostics action.
       allOf:
         - $ref: "#/components/schemas/genericEvent"
-        - $ref: "#/components/schemas/errorEvent"
         - type: object
           properties:
             data:
@@ -734,7 +721,6 @@ components:
       description: The ack event for an input action.
       allOf:
         - $ref: "#/components/schemas/genericEvent"
-        - $ref: "#/components/schemas/errorEvent" # NOTE: error is option, included here to avoid *string
         - type: object
           required:
           - action_input_type
@@ -775,7 +761,6 @@ components:
           items:
             anyOf:
               - $ref: "#/components/schemas/genericEvent"
-              - $ref: "#/components/schemas/errorEvent"
               - $ref: "#/components/schemas/upgradeEvent"
               - $ref: "#/components/schemas/diagnosticsEvent"
               - $ref: "#/components/schemas/inputEvent"

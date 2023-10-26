@@ -314,7 +314,7 @@ type DiagnosticsEvent struct {
 	// Error An error message.
 	// If this is non-empty an error has occured when executing the action.
 	// For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
-	Error string `json:"error"`
+	Error *string `json:"error,omitempty"`
 
 	// Message An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
 	Message string `json:"message"`
@@ -471,44 +471,6 @@ type Error struct {
 	StatusCode int `json:"statusCode"`
 }
 
-// ErrorEvent defines model for errorEvent.
-type ErrorEvent struct {
-	// ActionId The action ID.
-	ActionId string `json:"action_id"`
-
-	// AgentId The ID of the agent that executed the action.
-	AgentId string `json:"agent_id"`
-
-	// Error An error message.
-	// If this is non-empty an error has occured when executing the action.
-	// For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
-	Error string `json:"error"`
-
-	// Message An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
-	Message string `json:"message"`
-
-	// Subtype The subtype of the ack event.
-	// The elastic-agent will only generate ACKNOWLEDGED events.
-	//
-	// Not used by fleet-server.
-	// Actions that have errored should use the error attribute to communicate an error status.
-	// Additional action status information can be provided in the data attribute.
-	// Deprecated:
-	Subtype EventSubtype `json:"subtype"`
-
-	// Timestamp The timestamp of the acknowledgement event. Has the format of "2006-01-02T15:04:05.99999-07:00"
-	Timestamp time.Time `json:"timestamp"`
-
-	// Type The event type of the ack.
-	// Currently the elastic-agent will only generate ACTION_RESULT events.
-	//
-	// Not used by fleet-server.
-	// Actions that have errored should use the error attribute to communicate an error status.
-	// Additional action status information can be provided in the data attribute.
-	// Deprecated:
-	Type EventType `json:"type"`
-}
-
 // EventSubtype The subtype of the ack event.
 // The elastic-agent will only generate ACKNOWLEDGED events.
 //
@@ -525,13 +487,18 @@ type EventSubtype string
 // Additional action status information can be provided in the data attribute.
 type EventType string
 
-// GenericEvent A generic ack event for an action.
+// GenericEvent A generic ack event for an action. Includes an optional error attribute.
 type GenericEvent struct {
 	// ActionId The action ID.
 	ActionId string `json:"action_id"`
 
 	// AgentId The ID of the agent that executed the action.
 	AgentId string `json:"agent_id"`
+
+	// Error An error message.
+	// If this is non-empty an error has occured when executing the action.
+	// For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
+	Error *string `json:"error,omitempty"`
 
 	// Message An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
 	Message string `json:"message"`
@@ -581,7 +548,7 @@ type InputEvent struct {
 	// Error An error message.
 	// If this is non-empty an error has occured when executing the action.
 	// For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
-	Error string `json:"error"`
+	Error *string `json:"error,omitempty"`
 
 	// Message An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
 	Message string `json:"message"`
@@ -667,13 +634,8 @@ type StatusResponseVersion struct {
 	Number *string `json:"number,omitempty"`
 }
 
-// UpgradeEvent The ack event for an upgrade action
+// UpgradeEvent defines model for upgradeEvent.
 type UpgradeEvent struct {
-	union json.RawMessage
-}
-
-// UpgradeEvent1 defines model for .
-type UpgradeEvent1 struct {
 	// ActionId The action ID.
 	ActionId string `json:"action_id"`
 
@@ -683,7 +645,7 @@ type UpgradeEvent1 struct {
 	// Error An error message.
 	// If this is non-empty an error has occured when executing the action.
 	// For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
-	Error string `json:"error"`
+	Error *string `json:"error,omitempty"`
 
 	// Message An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
 	Message string `json:"message"`
@@ -691,13 +653,13 @@ type UpgradeEvent1 struct {
 	// Payload If the payload is part of an upgrade event action ack it will include information about if the agent  will retry the upgrade.
 	// Payload is only used by upgrade acks and has been replaced in more recent versions by the checkin's upgrade_details attribute.
 	// Deprecated:
-	Payload struct {
+	Payload *struct {
 		// Retry If the agent will retry the upgrade or not.
 		Retry bool `json:"retry"`
 
 		// RetryAttempt The number of attempts the agent has made so far, -1 indicates no future attempts and that the upgrade has failed.
 		RetryAttempt int `json:"retry_attempt"`
-	} `json:"payload"`
+	} `json:"payload,omitempty"`
 
 	// Subtype The subtype of the ack event.
 	// The elastic-agent will only generate ACKNOWLEDGED events.
@@ -1231,32 +1193,6 @@ func (t *AckRequest_Events_Item) MergeGenericEvent(v GenericEvent) error {
 	return err
 }
 
-// AsErrorEvent returns the union data inside the AckRequest_Events_Item as a ErrorEvent
-func (t AckRequest_Events_Item) AsErrorEvent() (ErrorEvent, error) {
-	var body ErrorEvent
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromErrorEvent overwrites any union data inside the AckRequest_Events_Item as the provided ErrorEvent
-func (t *AckRequest_Events_Item) FromErrorEvent(v ErrorEvent) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeErrorEvent performs a merge with any union data inside the AckRequest_Events_Item, using the provided ErrorEvent
-func (t *AckRequest_Events_Item) MergeErrorEvent(v ErrorEvent) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JsonMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
 // AsUpgradeEvent returns the union data inside the AckRequest_Events_Item as a UpgradeEvent
 func (t AckRequest_Events_Item) AsUpgradeEvent() (UpgradeEvent, error) {
 	var body UpgradeEvent
@@ -1585,68 +1521,6 @@ func (t Action_Data) MarshalJSON() ([]byte, error) {
 }
 
 func (t *Action_Data) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsGenericEvent returns the union data inside the UpgradeEvent as a GenericEvent
-func (t UpgradeEvent) AsGenericEvent() (GenericEvent, error) {
-	var body GenericEvent
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromGenericEvent overwrites any union data inside the UpgradeEvent as the provided GenericEvent
-func (t *UpgradeEvent) FromGenericEvent(v GenericEvent) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeGenericEvent performs a merge with any union data inside the UpgradeEvent, using the provided GenericEvent
-func (t *UpgradeEvent) MergeGenericEvent(v GenericEvent) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JsonMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsUpgradeEvent1 returns the union data inside the UpgradeEvent as a UpgradeEvent1
-func (t UpgradeEvent) AsUpgradeEvent1() (UpgradeEvent1, error) {
-	var body UpgradeEvent1
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromUpgradeEvent1 overwrites any union data inside the UpgradeEvent as the provided UpgradeEvent1
-func (t *UpgradeEvent) FromUpgradeEvent1(v UpgradeEvent1) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeUpgradeEvent1 performs a merge with any union data inside the UpgradeEvent, using the provided UpgradeEvent1
-func (t *UpgradeEvent) MergeUpgradeEvent1(v UpgradeEvent1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JsonMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t UpgradeEvent) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *UpgradeEvent) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
