@@ -62,7 +62,10 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 		}
 	case OutputTypeRemoteElasticsearch:
 		zlog.Debug().Msg("preparing remote elasticsearch output")
-		p.createRemoteEsClientIfNotExists(ctx, bulker, outputMap)
+		err := p.createRemoteEsClientIfNotExists(ctx, bulker, outputMap)
+		if err != nil {
+			return err
+		}
 		if err := p.prepareElasticsearch(ctx, zlog, bulker, agent, outputMap); err != nil {
 			return fmt.Errorf("failed to prepare remote elasticsearch output %q: %w", p.Name, err)
 		}
