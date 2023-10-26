@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
@@ -18,6 +19,7 @@ import (
 const (
 	FieldOutputs            = "outputs"
 	FieldOutputType         = "type"
+	FieldOutputSecrets      = "secrets"
 	FieldOutputFleetServer  = "fleet_server"
 	FieldOutputServiceToken = "service_token"
 	FieldOutputPermissions  = "output_permissions"
@@ -77,6 +79,35 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	if err != nil {
 		return nil, err
 	}
+
+	// mutate fields with outputs
+	outputsMap, err := smap.Parse(outputs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, policyOutput := range policyOutputs {
+		outputSecrets, err := getOutputsSecrets(ctx, policyOutput, bulker)
+		if err != nil {
+			return nil, err
+		}
+		// fmt.Printf("OUTPUT SECRET %v+ %v+", .SecretsValues, v.Secrets)
+		for secretName, secretValue := range outputSecrets {
+			fmt.Printf("SET SECRET %v+", secretName)
+			outputMap := outputsMap.GetMap(policyOutput.Name)
+			delete(outputMap, FieldOutputSecrets)
+			err = setMapObj(outputsMap, secretValue, policyOutput.Name, secretName)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	fields[FieldOutputs], err = outputsMap.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
 	defaultName, err := findDefaultOutputName(outputs)
 	if err != nil {
 		return nil, err
@@ -119,10 +150,33 @@ func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) 
 
 	for k := range outputsMap {
 		v := outputsMap.GetMap(k)
+		var secretReferences map[string]SecretReference
+		secretsVal := v.GetMap(FieldOutputSecrets)
+
+		if len(secretsVal) > 0 {
+			secretsRaw, err := secretsVal.Marshal()
+
+			if err != nil {
+				return result, err
+			}
+
+			err = json.Unmarshal(secretsRaw, &secretReferences)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		delete(v, FieldOutputSecrets)
+		rawValue, err := v.Marshal()
+		if err != nil {
+			return result, err
+		}
 
 		p := Output{
-			Name: k,
-			Type: v.GetString(FieldOutputType),
+			Name:    k,
+			Type:    v.GetString(FieldOutputType),
+			Secrets: secretReferences,
+			Raw:     rawValue,
 		}
 
 		if role, ok := roles[k]; ok {

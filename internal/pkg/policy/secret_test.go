@@ -57,10 +57,9 @@ func TestReplaceSecretRefNotFound(t *testing.T) {
 
 func TestGetSecretValues(t *testing.T) {
 	secretRefsJSON := []SecretReference{{ID: "ref1"}, {ID: "ref2"}}
-	secretRefsRaw, _ := json.Marshal(secretRefsJSON)
 	bulker := ftesting.NewMockBulk()
 
-	secretRefs, _ := getSecretValues(context.TODO(), secretRefsRaw, bulker)
+	secretRefs, _ := getSecretValues(context.TODO(), secretRefsJSON, bulker)
 
 	expectedRefs := map[string]string{
 		"ref1": "ref1_value",

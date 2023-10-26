@@ -35,9 +35,12 @@ var (
 )
 
 type Output struct {
-	Name string
-	Type string
-	Role *RoleT
+	Name          string
+	Type          string
+	Role          *RoleT
+	Secrets       map[string]SecretReference
+	SecretsValues map[string]string
+	Raw           json.RawMessage
 }
 
 // Prepare prepares the output p to be sent to the elastic-agent

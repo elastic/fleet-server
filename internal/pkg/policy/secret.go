@@ -22,17 +22,7 @@ var (
 )
 
 // read secret values that belong to the agent policy's secret references, returns secrets as id:value map
-func getSecretValues(ctx context.Context, secretRefsRaw json.RawMessage, bulker bulk.Bulk) (map[string]string, error) {
-	if secretRefsRaw == nil {
-		return nil, nil
-	}
-
-	var secretValues []SecretReference
-	err := json.Unmarshal([]byte(secretRefsRaw), &secretValues)
-	if err != nil {
-		return nil, err
-	}
-
+func getSecretValues(ctx context.Context, secretValues []SecretReference, bulker bulk.Bulk) (map[string]string, error) {
 	ids := make([]string, 0)
 	for _, ref := range secretValues {
 		ids = append(ids, ref.ID)
@@ -63,7 +53,13 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 		return inputs, nil
 	}
 
-	secretValues, err := getSecretValues(ctx, fields["secret_references"], bulker)
+	var secretReferences []SecretReference
+	err = json.Unmarshal([]byte(fields["secret_references"]), &secretReferences)
+	if err != nil {
+		return nil, err
+	}
+
+	secretValues, err := getSecretValues(ctx, secretReferences, bulker)
 	if err != nil {
 		return nil, err
 	}
@@ -90,6 +86,29 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 		result = append(result, newInput)
 	}
 	delete(fields, "secret_references")
+	return result, nil
+}
+
+// read inputs and secret_references from agent policy
+// replace values of secret refs in inputs and input streams properties
+func getOutputsSecrets(ctx context.Context, output Output, bulker bulk.Bulk) (map[string]string, error) {
+
+	result := map[string]string{}
+	secretReferences := make([]SecretReference, 0)
+	for _, secretReference := range output.Secrets {
+		secretReferences = append(secretReferences, secretReference)
+	}
+	if len(secretReferences) == 0 {
+		return result, nil
+	}
+	secretValues, err := getSecretValues(ctx, secretReferences, bulker)
+	if err != nil {
+		return nil, err
+	}
+	for k, secretReference := range output.Secrets {
+		secretValue := secretValues[secretReference.ID]
+		result[k] = secretValue
+	}
 	return result, nil
 }
 
