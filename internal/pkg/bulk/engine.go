@@ -74,13 +74,13 @@ type Bulk interface {
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es           esapi.Transport
-	remoteEsList map[string]esapi.Transport
-	ch           chan *bulkT
-	opts         bulkOptT
-	blkPool      sync.Pool
-	apikeyLimit  *semaphore.Weighted
-	tracer       *apm.Tracer
+	es              esapi.Transport
+	remoteEsClients map[string]*elasticsearch.Client
+	ch              chan *bulkT
+	opts            bulkOptT
+	blkPool         sync.Pool
+	apikeyLimit     *semaphore.Weighted
+	tracer          *apm.Tracer
 }
 
 const (
@@ -102,13 +102,13 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 	}
 
 	return &Bulker{
-		opts:         bopts,
-		es:           es,
-		remoteEsList: make(map[string]esapi.Transport),
-		ch:           make(chan *bulkT, bopts.blockQueueSz),
-		blkPool:      sync.Pool{New: poolFunc},
-		apikeyLimit:  semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
-		tracer:       tracer,
+		opts:            bopts,
+		es:              es,
+		remoteEsClients: make(map[string]*elasticsearch.Client),
+		ch:              make(chan *bulkT, bopts.blockQueueSz),
+		blkPool:         sync.Pool{New: poolFunc},
+		apikeyLimit:     semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
+		tracer:          tracer,
 	}
 }
 
@@ -121,19 +121,15 @@ func (b *Bulker) Client() *elasticsearch.Client {
 }
 
 func (b *Bulker) GetRemoteClient(name string) *elasticsearch.Client {
-	remoteEs := b.remoteEsList[name]
+	remoteEs := b.remoteEsClients[name]
 	if remoteEs == nil {
 		return nil
 	}
-	client, ok := remoteEs.(*elasticsearch.Client)
-	if !ok {
-		panic("Client is not an elastic search pointer")
-	}
-	return client
+	return remoteEs
 }
 
 func (b *Bulker) SetRemoteClient(name string, es *elasticsearch.Client) {
-	b.remoteEsList[name] = es
+	b.remoteEsClients[name] = es
 }
 
 // read secrets one by one as there is no bulk API yet to read them in one request
