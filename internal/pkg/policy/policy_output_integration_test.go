@@ -20,7 +20,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
@@ -148,7 +147,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 			Raw:  TestPayload,
 		},
 	}
-	policyMap := smap.Map{
+	policyMap := map[string]map[string]interface{}{
 		"test output": map[string]interface{}{},
 	}
 

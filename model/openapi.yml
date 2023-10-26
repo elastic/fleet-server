@@ -490,7 +490,42 @@ components:
             yaml: "timeout"
         signed:
           $ref: "#/components/schemas/actionSignature"
-
+    policyData:
+      type: object
+      description: The full policy that an agent should run after combining with local configuration/env vars.
+      properties:
+        id:
+          description: The policy's ID.
+          type: string
+        outputs:
+          description: A map of all outputs that the agent running the policy can use to send data to.
+          type: object
+        inputs:
+          description: A list of all inputs that the agent should run.
+          type: array
+          items:
+            type: object
+        secret_references:
+          description: |
+            A list of secrets that the fleet-server must inject into the policy before sending the policy to the agent.
+            The secret_references attribute is not communicated to agents.
+          type: array
+          items:
+            type: object
+        revision:
+          description: The revision number of the policy. Should match revision_idx.
+          type: integer
+        agent:
+          description: Agent configuration details associated with the policy. May include configuration toggling monitoring, uninstallation protection, etc.
+          type: object
+        signed:
+          $ref: "#/components/schemas/actionSignature"
+        output_permissions:
+          description: Elasticsearch permissions that the agent requires in order to run the policy.
+          type: object
+        fleet:
+          description: Agent configuration to describe how to connect to fleet-server.
+          type: object
     checkinResponse:
       type: object
       required:

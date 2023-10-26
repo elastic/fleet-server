@@ -54,7 +54,7 @@ func TestMonitorLeadership(t *testing.T) {
 	policy1 := model.Policy{
 		PolicyID:       policy1Id,
 		CoordinatorIdx: 0,
-		Data:           []byte("{}"),
+		Data:           nil,
 		RevisionIdx:    1,
 	}
 	_, err = dl.CreatePolicy(ctx, bulker, policy1, dl.WithIndexName(policiesIndex))
@@ -85,7 +85,7 @@ func TestMonitorLeadership(t *testing.T) {
 	policy2 := model.Policy{
 		PolicyID:       policy2Id,
 		CoordinatorIdx: 0,
-		Data:           []byte("{}"),
+		Data:           nil,
 		RevisionIdx:    1,
 	}
 	_, err = dl.CreatePolicy(ctx, bulker, policy2, dl.WithIndexName(policiesIndex))

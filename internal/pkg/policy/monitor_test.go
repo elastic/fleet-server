@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -27,7 +28,13 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
-var policyBytes = []byte(`{"outputs":{"default":{"type":"elasticsearch"}}}`)
+var policyDataDefault = &model.PolicyData{
+	Outputs: map[string]map[string]interface{}{
+		"default": map[string]interface{}{
+			"type": "elasticsearch",
+		},
+	},
+}
 
 func TestMonitor_NewPolicy(t *testing.T) {
 	_ = testlog.SetLogger(t)
@@ -57,17 +64,14 @@ func TestMonitor_NewPolicy(t *testing.T) {
 		merr = monitor.Run(ctx)
 	}()
 
-	if err := monitor.(*monitorT).waitStart(ctx); err != nil {
-		t.Fatal(err)
-	}
+	err := monitor.(*monitorT).waitStart(ctx)
+	require.NoError(t, err)
 
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyID := uuid.Must(uuid.NewV4()).String()
 	s, err := monitor.Subscribe(agentId, policyID, 0, 0)
 	defer monitor.Unsubscribe(s)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	rId := xid.New().String()
 	policy := model.Policy{
@@ -78,13 +82,12 @@ func TestMonitor_NewPolicy(t *testing.T) {
 		},
 		PolicyID:       policyID,
 		CoordinatorIdx: 1,
-		Data:           policyBytes,
+		Data:           policyDataDefault,
 		RevisionIdx:    1,
 	}
 	policyData, err := json.Marshal(&policy)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	chHitT <- []es.HitT{{
 		ID:      rId,
 		SeqNo:   1,
@@ -98,9 +101,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	case subPolicy := <-s.Output():
 		tm.Stop()
 		diff := cmp.Diff(policy, subPolicy.Policy)
-		if diff != "" {
-			t.Fatal(diff)
-		}
+		require.Empty(t, diff)
 	case <-tm.C:
 		timedout = true
 	}
@@ -110,9 +111,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	if merr != nil && merr != context.Canceled {
 		t.Fatal(merr)
 	}
-	if timedout {
-		t.Fatal("never got policy update; timed out after 2s")
-	}
+	require.False(t, timedout, "never got policy update; timed out after 2s")
 	ms.AssertExpectations(t)
 	mm.AssertExpectations(t)
 }
@@ -149,9 +148,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	policyId := uuid.Must(uuid.NewV4()).String()
 	s, err := monitor.Subscribe(agentId, policyId, 1, 1)
 	defer monitor.Unsubscribe(s)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	rId := xid.New().String()
 	policy := model.Policy{
@@ -162,13 +159,12 @@ func TestMonitor_SamePolicy(t *testing.T) {
 		},
 		PolicyID:       policyId,
 		CoordinatorIdx: 1,
-		Data:           policyBytes,
+		Data:           policyDataDefault,
 		RevisionIdx:    1,
 	}
 	policyData, err := json.Marshal(&policy)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	chHitT <- []es.HitT{{
 		ID:      rId,
 		SeqNo:   1,
@@ -190,9 +186,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	if merr != nil && merr != context.Canceled {
 		t.Fatal(merr)
 	}
-	if gotPolicy {
-		t.Fatal("got policy update when it was the same rev/coord idx")
-	}
+	require.False(t, gotPolicy, "got policy update when it was the same rev/coord idx")
 	ms.AssertExpectations(t)
 	mm.AssertExpectations(t)
 }
@@ -229,9 +223,7 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 	policyId := uuid.Must(uuid.NewV4()).String()
 	s, err := monitor.Subscribe(agentId, policyId, 1, 1)
 	defer monitor.Unsubscribe(s)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	rId := xid.New().String()
 	policy := model.Policy{
@@ -242,13 +234,12 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 		},
 		PolicyID:       policyId,
 		CoordinatorIdx: 0,
-		Data:           policyBytes,
+		Data:           policyDataDefault,
 		RevisionIdx:    2,
 	}
 	policyData, err := json.Marshal(&policy)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	chHitT <- []es.HitT{{
 		ID:      rId,
 		SeqNo:   1,
@@ -270,9 +261,7 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 	if merr != nil && merr != context.Canceled {
 		t.Fatal(merr)
 	}
-	if gotPolicy {
-		t.Fatal("got policy update when it had coordinator_idx set to 0")
-	}
+	require.False(t, gotPolicy, "got policy update when it had coordinator_idx set to 0")
 	ms.AssertExpectations(t)
 	mm.AssertExpectations(t)
 }
@@ -325,7 +314,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 		},
 		PolicyID:       policyId,
 		CoordinatorIdx: 1,
-		Data:           policyBytes,
+		Data:           policyDataDefault,
 		RevisionIdx:    2,
 	}
 
@@ -344,9 +333,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 
 	s, err := monitor.Subscribe(agentId, policyId, 1, 1)
 	defer monitor.Unsubscribe(s)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	timedout := false
 	tm := time.NewTimer(2 * time.Second)
@@ -354,9 +341,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	case subPolicy := <-s.Output():
 		tm.Stop()
 		diff := cmp.Diff(policy, subPolicy.Policy)
-		if diff != "" {
-			t.Fatal(diff)
-		}
+		require.Empty(t, diff)
 	case <-tm.C:
 		timedout = true
 	}
@@ -366,7 +351,5 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	if merr != nil && merr != context.Canceled {
 		t.Fatal(merr)
 	}
-	if timedout {
-		t.Fatal("never got policy update; timed out after 500ms")
-	}
+	require.False(t, timedout, "never got policy update; timed out after 500ms")
 }

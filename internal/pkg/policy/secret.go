@@ -6,35 +6,25 @@ package policy
 
 import (
 	"context"
-	"encoding/json"
 	"regexp"
 	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
-
-type SecretReference struct {
-	ID string `json:"id"`
-}
 
 var (
 	secretRegex = regexp.MustCompile(`\$co\.elastic\.secret{(.*)}`)
 )
 
 // read secret values that belong to the agent policy's secret references, returns secrets as id:value map
-func getSecretValues(ctx context.Context, secretRefsRaw json.RawMessage, bulker bulk.Bulk) (map[string]string, error) {
-	if secretRefsRaw == nil {
+func getSecretValues(ctx context.Context, secretRefs []model.SecretReferencesItems, bulker bulk.Bulk) (map[string]string, error) {
+	if len(secretRefs) == 0 {
 		return nil, nil
 	}
 
-	var secretValues []SecretReference
-	err := json.Unmarshal([]byte(secretRefsRaw), &secretValues)
-	if err != nil {
-		return nil, err
-	}
-
-	ids := make([]string, 0)
-	for _, ref := range secretValues {
+	ids := make([]string, 0, len(secretRefs))
+	for _, ref := range secretRefs {
 		ids = append(ids, ref.ID)
 	}
 
@@ -48,33 +38,27 @@ func getSecretValues(ctx context.Context, secretRefsRaw json.RawMessage, bulker 
 
 // read inputs and secret_references from agent policy
 // replace values of secret refs in inputs and input streams properties
-func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawMessage, bulker bulk.Bulk) ([]map[string]interface{}, error) {
-	if fields["inputs"] == nil {
+func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bulker bulk.Bulk) ([]map[string]interface{}, error) {
+	if len(data.Inputs) == 0 {
 		return nil, nil
 	}
 
-	var inputs []map[string]interface{}
-	err := json.Unmarshal([]byte(fields["inputs"]), &inputs)
-	if err != nil {
-		return nil, err
+	if len(data.SecretReferences) == 0 {
+		return data.Inputs, nil
 	}
 
-	if fields["secret_references"] == nil {
-		return inputs, nil
-	}
-
-	secretValues, err := getSecretValues(ctx, fields["secret_references"], bulker)
+	secretValues, err := getSecretValues(ctx, data.SecretReferences, bulker)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]map[string]interface{}, 0)
-	for _, input := range inputs {
+	for _, input := range data.Inputs {
 		newInput := make(map[string]interface{})
 		for k, v := range input {
 			// replace secret refs in input stream fields
 			if k == "streams" {
-				if streams, ok := input[k].([]any); ok {
+				if streams, ok := v.([]any); ok {
 					newInput[k] = processStreams(streams, secretValues)
 				}
 				// replace secret refs in input fields
@@ -89,7 +73,7 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 		}
 		result = append(result, newInput)
 	}
-	delete(fields, "secret_references")
+	data.SecretReferences = nil
 	return result, nil
 }
 
