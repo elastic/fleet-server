@@ -65,18 +65,22 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
+	GetRemoteClient(name string) *elasticsearch.Client
+	SetRemoteClient(name string, es *elasticsearch.Client)
+
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
 
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es          esapi.Transport
-	ch          chan *bulkT
-	opts        bulkOptT
-	blkPool     sync.Pool
-	apikeyLimit *semaphore.Weighted
-	tracer      *apm.Tracer
+	es           esapi.Transport
+	remoteEsList map[string]esapi.Transport
+	ch           chan *bulkT
+	opts         bulkOptT
+	blkPool      sync.Pool
+	apikeyLimit  *semaphore.Weighted
+	tracer       *apm.Tracer
 }
 
 const (
@@ -98,12 +102,13 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 	}
 
 	return &Bulker{
-		opts:        bopts,
-		es:          es,
-		ch:          make(chan *bulkT, bopts.blockQueueSz),
-		blkPool:     sync.Pool{New: poolFunc},
-		apikeyLimit: semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
-		tracer:      tracer,
+		opts:         bopts,
+		es:           es,
+		remoteEsList: make(map[string]esapi.Transport),
+		ch:           make(chan *bulkT, bopts.blockQueueSz),
+		blkPool:      sync.Pool{New: poolFunc},
+		apikeyLimit:  semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
+		tracer:       tracer,
 	}
 }
 
@@ -113,6 +118,22 @@ func (b *Bulker) Client() *elasticsearch.Client {
 		panic("Client is not an elastic search pointer")
 	}
 	return client
+}
+
+func (b *Bulker) GetRemoteClient(name string) *elasticsearch.Client {
+	remoteEs := b.remoteEsList[name]
+	if remoteEs == nil {
+		return nil
+	}
+	client, ok := remoteEs.(*elasticsearch.Client)
+	if !ok {
+		panic("Client is not an elastic search pointer")
+	}
+	return client
+}
+
+func (b *Bulker) SetRemoteClient(name string, es *elasticsearch.Client) {
+	b.remoteEsList[name] = es
 }
 
 // read secrets one by one as there is no bulk API yet to read them in one request

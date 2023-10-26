@@ -60,6 +60,12 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 		if err := p.prepareElasticsearch(ctx, zlog, bulker, agent, outputMap); err != nil {
 			return fmt.Errorf("failed to prepare elasticsearch output %q: %w", p.Name, err)
 		}
+	case OutputTypeRemoteElasticsearch:
+		zlog.Debug().Msg("preparing remote elasticsearch output")
+		p.createRemoteEsClientIfNotExists(ctx, bulker, outputMap)
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, agent, outputMap); err != nil {
+			return fmt.Errorf("failed to prepare remote elasticsearch output %q: %w", p.Name, err)
+		}
 	case OutputTypeLogstash:
 		zlog.Debug().Msg("preparing logstash output")
 		zlog.Info().Msg("no actions required for logstash output preparation")
@@ -145,6 +151,7 @@ func (p *Output) prepareElasticsearch(
 			return err
 		}
 
+		// TODO use remote es for api key update
 		// hash provided is only for merging request together and not persisted
 		err = bulker.APIKeyUpdate(ctx, output.APIKeyID, newRoles.Sha2, newRoles.Raw)
 		if err != nil {
@@ -183,7 +190,7 @@ func (p *Output) prepareElasticsearch(
 
 		ctx := zlog.WithContext(ctx)
 		outputAPIKey, err :=
-			generateOutputAPIKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw)
+			generateOutputAPIKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw, p.Type)
 		if err != nil {
 			return fmt.Errorf("failed generate output API key: %w", err)
 		}
@@ -233,29 +240,9 @@ func (p *Output) prepareElasticsearch(
 		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
 	}
 
-	if outputMap.GetMap(p.Name).GetString("type") == OutputTypeRemoteElasticsearch {
-		om, _ := outputMap.GetMap(p.Name).Marshal()
-		var outputObj map[string]any
-		json.Unmarshal(om, &outputObj)
-		hosts := outputObj["hosts"].([]interface{})
-		outputAPIKey, err :=
-			generateRemoteOutputAPIKey(ctx, agent.Id, p, []string{hosts[0].(string)})
-		if err != nil {
-			return fmt.Errorf("failed generate output API key: %w", err)
-		}
+	if p.Type == OutputTypeRemoteElasticsearch {
 
-		// TODO update agent doc like above
-		// TODO what about update flow?
-
-		output.APIKey = outputAPIKey.Agent()
-		output.APIKeyID = outputAPIKey.ID
-		output.PermissionsHash = p.Role.Sha2
-
-		zlog.Debug().
-			Str("outputAPIKey.ID", outputAPIKey.ID).
-			Msg("generated remote output api key")
-
-			// replace type remote-elasticsearch with elasticsearch as agent doesn't recognize remote-elasticsearch
+		// replace type remote-elasticsearch with elasticsearch as agent doesn't recognize remote-elasticsearch
 		if err := setMapObj(outputMap, OutputTypeElasticsearch, p.Name, "type"); err != nil {
 			return err
 		}
@@ -275,6 +262,43 @@ func (p *Output) prepareElasticsearch(
 		return err
 	}
 
+	return nil
+}
+
+func (p *Output) createRemoteEsClientIfNotExists(ctx context.Context, bulker bulk.Bulk, outputMap smap.Map) error {
+	remoteEs := bulker.GetRemoteClient(p.Name)
+	if remoteEs != nil {
+		// TODO replace if hosts or service token changed?
+		return nil
+	}
+	om, _ := outputMap.GetMap(p.Name).Marshal()
+	var outputObj map[string]any
+	err := json.Unmarshal(om, &outputObj)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal output: %w", err)
+	}
+	hosts, ok := outputObj["hosts"].([]interface{})
+	if !ok {
+		return fmt.Errorf("failed to get hsots from output: %w", err)
+	}
+	hostsStrings := make([]string, len(hosts))
+	for i, host := range hosts {
+		hostsStrings[i] = host.(string)
+	}
+
+	cfg := config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Hosts:        hostsStrings,
+				ServiceToken: p.ServiceToken,
+			},
+		},
+	}
+	es, err := es.NewClient(ctx, &cfg, false)
+	if err != nil {
+		return err
+	}
+	bulker.SetRemoteClient(p.Name, es)
 	return nil
 }
 
@@ -431,39 +455,22 @@ func generateOutputAPIKey(
 	bulk bulk.Bulk,
 	agentID,
 	outputName string,
-	roles []byte) (*apikey.APIKey, error) {
+	roles []byte, outputType string) (*apikey.APIKey, error) {
 	name := fmt.Sprintf("%s:%s", agentID, outputName)
 	zerolog.Ctx(ctx).Info().Msgf("generating output API key %s for agent ID %s",
 		name, agentID)
-	return bulk.APIKeyCreate(
-		ctx,
-		name,
-		"",
-		roles,
-		apikey.NewMetadata(agentID, outputName, apikey.TypeOutput),
-	)
-}
-
-func generateRemoteOutputAPIKey(ctx context.Context,
-	agentID string,
-	output *Output,
-	hosts []string,
-) (*apikey.APIKey, error) {
-	name := fmt.Sprintf("%s:%s", agentID, output.Name)
-	cfg := config.Config{
-		Output: config.Output{
-			Elasticsearch: config.Elasticsearch{
-				Hosts:        hosts,
-				ServiceToken: output.ServiceToken,
-			},
-		},
+	if outputType == OutputTypeRemoteElasticsearch {
+		name := fmt.Sprintf("%s:%s", agentID, outputName)
+		return apikey.Create(ctx, bulk.GetRemoteClient(outputName), name, "", "false", roles, apikey.NewMetadata(agentID, outputName, apikey.TypeOutput))
+	} else {
+		return bulk.APIKeyCreate(
+			ctx,
+			name,
+			"",
+			roles,
+			apikey.NewMetadata(agentID, outputName, apikey.TypeOutput),
+		)
 	}
-	es, err := es.NewClient(ctx, &cfg, false)
-
-	if err != nil {
-		return nil, err
-	}
-	return apikey.Create(ctx, es, name, "", "false", output.Role.Raw, apikey.NewMetadata(agentID, output.Name, apikey.TypeOutput))
 }
 
 func setMapObj(obj map[string]interface{}, val interface{}, keys ...string) error {

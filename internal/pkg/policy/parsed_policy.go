@@ -131,7 +131,6 @@ func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) 
 
 		if p.Type == OutputTypeRemoteElasticsearch {
 			p.ServiceToken = v.GetString(FieldOutputServiceToken)
-			p.Type = OutputTypeElasticsearch
 		}
 
 		result[k] = p
