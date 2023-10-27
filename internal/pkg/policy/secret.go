@@ -49,7 +49,6 @@ func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bul
 	}
 
 	secretValues, err := getSecretValues(ctx, data.SecretReferences, bulker)
-
 	if err != nil {
 		return nil, err
 	}

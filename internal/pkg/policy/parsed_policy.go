@@ -66,7 +66,6 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	}
 	for _, policyOutput := range p.Data.Outputs {
 		err := processOutputSecret(ctx, policyOutput, bulker)
-
 		if err != nil {
 			return nil, err
 		}
