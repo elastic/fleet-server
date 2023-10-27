@@ -79,34 +79,32 @@ func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bul
 	return result, nil
 }
 
-// read inputs and secret_references from agent policy
-// replace values of secret refs in inputs and input streams properties
-func getOutputsSecrets(ctx context.Context, output smap.Map, bulker bulk.Bulk) (map[string]string, error) {
-	result := map[string]string{}
+// Read secret from output and mutate output with secret value
+func processOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) error {
 	secrets := output.GetMap(FieldOutputSecrets)
 
 	delete(output, FieldOutputSecrets)
 	secretReferences := make([]model.SecretReferencesItems, 0)
 
-	for k := range secrets {
-		secretID := secrets.GetMap(k).GetString("id")
+	for secretKey := range secrets {
+		secretID := secrets.GetMap(secretKey).GetString("id")
 		secretReferences = append(secretReferences, model.SecretReferencesItems{
 			ID: secretID,
 		})
 	}
 	if len(secretReferences) == 0 {
-		return result, nil
+		return nil
 	}
 	secretValues, err := getSecretValues(ctx, secretReferences, bulker)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	for k := range secrets {
-		secretID := secrets.GetMap(k).GetString("id")
+	for secretKey := range secrets {
+		secretID := secrets.GetMap(secretKey).GetString("id")
 		secretValue := secretValues[secretID]
-		output[k] = secretValue
+		output[secretKey] = secretValue
 	}
-	return result, nil
+	return nil
 }
 
 func processStreams(streams []any, secretValues map[string]string) []any {

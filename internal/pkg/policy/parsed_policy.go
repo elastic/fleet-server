@@ -65,23 +65,11 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		return nil, err
 	}
 	for _, policyOutput := range p.Data.Outputs {
-		outputSecrets, err := getOutputsSecrets(ctx, policyOutput, bulker)
+		err := processOutputSecret(ctx, policyOutput, bulker)
 
-		fmt.Printf("\nOUTPUT AFTER %v+", policyOutput)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("\nTEST %v+", outputSecrets)
-		// fmt.Printf("OUTPUT SECRET %v+ %v+", .SecretsValues, v.Secrets)
-		// for secretName, secretValue := range outputSecrets {
-		// 	fmt.Printf("SET SECRET %v+", secretName)
-		// 	outputMap := outputsMap.GetMap(policyOutput.Name)
-		// 	delete(outputMap, FieldOutputSecrets)
-		// 	err = setMapObj(outputsMap, secretValue, policyOutput.Name, secretName)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// }
 	}
 	defaultName, err := findDefaultOutputName(p.Data.Outputs)
 	if err != nil {
