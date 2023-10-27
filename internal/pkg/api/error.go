@@ -515,7 +515,7 @@ func ErrorResp(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	e.Msg("HTTP request error")
 
-	if (resp.StatusCode >= 500) {
+	if resp.StatusCode >= 500 {
 		apm.CaptureError(r.Context(), err).Send()
 	}
 

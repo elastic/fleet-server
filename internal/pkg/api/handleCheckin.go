@@ -653,14 +653,6 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		}
 		err = ad.FromActionPolicyReassign(d)
 		return
-	case REQUESTDIAGNOSTICS:
-		d := new(ActionRequestDiagnostics) // ActionRequestDiagnostics is interface{}
-		err = json.Unmarshal(raw, d)
-		if err != nil {
-			return
-		}
-		err = ad.FromActionRequestDiagnostics(d)
-		return
 	case SETTINGS:
 		d := ActionSettings{}
 		err = json.Unmarshal(raw, &d)
@@ -668,14 +660,6 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 			return
 		}
 		err = ad.FromActionSettings(d)
-		return
-	case UNENROLL:
-		d := new(ActionUnenroll) // ActionUnenroll is inteface{}
-		err = json.Unmarshal(raw, d)
-		if err != nil {
-			return
-		}
-		err = ad.FromActionUnenroll(d)
 		return
 	case UPGRADE:
 		d := ActionUpgrade{}
@@ -685,6 +669,8 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		}
 		err = ad.FromActionUpgrade(d)
 		return
+	case REQUESTDIAGNOSTICS, UNENROLL: // Action types with no data
+		return ad, nil
 	default:
 		return ad, fmt.Errorf("data conversion unsupported action type: %s", aType)
 	}

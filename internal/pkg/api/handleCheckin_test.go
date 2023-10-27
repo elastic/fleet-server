@@ -47,43 +47,51 @@ func TestConvertActions(t *testing.T) {
 		token:   "",
 	}, {
 		name:    "single action",
-		actions: []model.Action{{ActionID: "1234"}},
+		actions: []model.Action{{ActionID: "1234", Type: "REQUEST_DIAGNOSTICS"}},
 		resp: []Action{{
 			AgentId: "agent-id",
 			Id:      "1234",
-			Data:    json.RawMessage(nil),
+			Type:    REQUESTDIAGNOSTICS,
 		}},
 		token: "",
 	}, {
 		name:    "single action signed",
-		actions: []model.Action{{ActionID: "1234", Signed: &model.Signed{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="}}},
+		actions: []model.Action{{ActionID: "1234", Signed: &model.Signed{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="}, Type: "REQUEST_DIAGNOSTICS"}},
 		resp: []Action{{
 			AgentId: "agent-id",
 			Id:      "1234",
-			Data:    json.RawMessage(nil),
+			Type:    REQUESTDIAGNOSTICS,
 			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="},
 		}},
 		token: "",
 	}, {name: "multiple actions",
 		actions: []model.Action{
-			{ActionID: "1234"},
-			{ActionID: "5678", Signed: &model.Signed{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="}},
+			{
+				ActionID: "1234",
+				Type:     "REQUEST_DIAGNOSTICS",
+			},
+			{
+				ActionID: "5678",
+				Type:     "REQUEST_DIAGNOSTICS",
+				Signed:   &model.Signed{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="},
+			},
 		},
 		resp: []Action{{
 			AgentId: "agent-id",
 			Id:      "1234",
-			Data:    json.RawMessage(nil),
+			Type:    REQUESTDIAGNOSTICS,
 		}, {
 			AgentId: "agent-id",
 			Id:      "5678",
-			Data:    json.RawMessage(nil),
 			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="},
+			Type:    REQUESTDIAGNOSTICS,
 		}},
 		token: "",
 	}}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			resp, token := convertActions("agent-id", tc.actions)
+			logger := testlog.SetLogger(t)
+			resp, token := convertActions(logger, "agent-id", tc.actions)
 			assert.Equal(t, tc.resp, resp)
 			assert.Equal(t, tc.token, token)
 		})
@@ -103,37 +111,49 @@ func TestFilterActions(t *testing.T) {
 		name: "nothing filtered",
 		actions: []model.Action{{
 			ActionID: "1234",
+			Type:     "UPGRADE",
 		}, {
 			ActionID: "5678",
+			Type:     "UNENROLL",
 		}},
 		resp: []model.Action{{
 			ActionID: "1234",
+			Type:     "UPGRADE",
 		}, {
 			ActionID: "5678",
+			Type:     "UNENROLL",
 		}},
 	}, {
 		name: "filter POLICY_CHANGE action",
 		actions: []model.Action{{
 			ActionID: "1234",
-			Type:     TypePolicyChange,
+			Type:     "POLICY_CHANGE",
 		}, {
 			ActionID: "5678",
+			Type:     "UNENROLL",
 		}},
 		resp: []model.Action{{
 			ActionID: "5678",
+			Type:     "UNENROLL",
 		}},
 	}, {
 		name: "filter UPDATE_TAGS action",
 		actions: []model.Action{{
 			ActionID: "1234",
-			Type:     TypeUpdateTags,
+			Type:     "UPDATE_TAGS",
 		}},
 		resp: []model.Action{},
 	}, {
 		name: "filter FORCE_UNENROLL action",
 		actions: []model.Action{{
 			ActionID: "1234",
-			Type:     TypeForceUnenroll,
+			Type:     "FORCE_UNENROLL",
+		}},
+		resp: []model.Action{},
+	}, {
+		name: "No type is filterd",
+		actions: []model.Action{{
+			ActionID: "1234",
 		}},
 		resp: []model.Action{},
 	}}

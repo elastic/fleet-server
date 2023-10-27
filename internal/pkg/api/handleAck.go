@@ -175,7 +175,7 @@ func eventToActionResult(agentID, aType string, ev AckRequest_Events_Item) (acr 
 			AgentID:   agentID,
 			Data:      p,
 			Error:     fromPtr(event.Error),
-			Timestamp: event.Timestamp.Format(time.RFC3339),
+			Timestamp: event.Timestamp.Format(time.RFC3339Nano),
 		}
 	case string(INPUTACTION):
 		event, _ := ev.AsInputEvent()
@@ -183,12 +183,12 @@ func eventToActionResult(agentID, aType string, ev AckRequest_Events_Item) (acr 
 			ActionID:        event.ActionId,
 			AgentID:         agentID,
 			ActionInputType: event.ActionInputType,
-			StartedAt:       event.StartedAt.Format(time.RFC3339),
-			CompletedAt:     event.CompletedAt.Format(time.RFC3339),
+			StartedAt:       event.StartedAt.Format(time.RFC3339Nano),
+			CompletedAt:     event.CompletedAt.Format(time.RFC3339Nano),
 			ActionData:      event.ActionData,
 			ActionResponse:  event.ActionResponse,
 			Error:           fromPtr(event.Error),
-			Timestamp:       event.Timestamp.Format(time.RFC3339),
+			Timestamp:       event.Timestamp.Format(time.RFC3339Nano),
 		}
 	default: // UPGRADE action acks are also handled by handelUpgrade (deprecated func)
 		event, _ := ev.AsGenericEvent()
@@ -196,7 +196,7 @@ func eventToActionResult(agentID, aType string, ev AckRequest_Events_Item) (acr 
 			ActionID:  event.ActionId,
 			AgentID:   agentID,
 			Error:     fromPtr(event.Error),
-			Timestamp: event.Timestamp.Format(time.RFC3339),
+			Timestamp: event.Timestamp.Format(time.RFC3339Nano),
 		}
 	}
 }
@@ -610,7 +610,13 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 	doc := bulk.UpdateFields{}
 	if event.Error != nil {
 		// if the payload indicates a retry, mark change the upgrade status to retrying.
-		if event.Payload.Retry {
+		if event.Payload == nil {
+			zlog.Info().Msg("marking agent upgrade as failed, agent logs contain failure message")
+			doc = bulk.UpdateFields{
+				dl.FieldUpgradeStartedAt: nil,
+				dl.FieldUpgradeStatus:    "failed",
+			}
+		} else if event.Payload.Retry {
 			zlog.Info().Int("retry_attempt", event.Payload.RetryAttempt).Msg("marking agent upgrade as retrying")
 			doc[dl.FieldUpgradeStatus] = "retrying" // Keep FieldUpgradeStatedAt abd FieldUpgradeded at to original values
 		} else {
