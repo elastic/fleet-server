@@ -199,9 +199,6 @@ type ActionCancel struct {
 	TargetId string `json:"target_id"`
 }
 
-// ActionGeneric Raw action data for backwards compatibility for Elastic-Api-Version 2022-06-01.
-type ActionGeneric = interface{}
-
 // ActionInputAction The INPUT_ACTION action data.
 type ActionInputAction = map[string]interface{}
 
@@ -1275,32 +1272,6 @@ func (t AckRequest_Events_Item) MarshalJSON() ([]byte, error) {
 
 func (t *AckRequest_Events_Item) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsActionGeneric returns the union data inside the Action_Data as a ActionGeneric
-func (t Action_Data) AsActionGeneric() (ActionGeneric, error) {
-	var body ActionGeneric
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromActionGeneric overwrites any union data inside the Action_Data as the provided ActionGeneric
-func (t *Action_Data) FromActionGeneric(v ActionGeneric) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeActionGeneric performs a merge with any union data inside the Action_Data, using the provided ActionGeneric
-func (t *Action_Data) MergeActionGeneric(v ActionGeneric) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JsonMerge(t.union, b)
-	t.union = merged
 	return err
 }
 

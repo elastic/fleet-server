@@ -454,7 +454,6 @@ components:
           x-oapi-codegen-extra-tags:
             yaml: "data"
           oneOf:
-            - $ref: "#/components/schemas/actionGeneric"
             - $ref: "#/components/schemas/actionPolicyReassign"
             - $ref: "#/components/schemas/actionPolicyChange"
             - $ref: "#/components/schemas/actionUpgrade"
@@ -534,8 +533,6 @@ components:
         fleet:
           description: Agent configuration to describe how to connect to fleet-server.
           type: object
-    actionGeneric:
-      description: Raw action data for backwards compatibility for Elastic-Api-Version 2022-06-01.
     actionUnenroll:
       description: The UNENROLL action data.
       # unenroll actions have no `data` attribute

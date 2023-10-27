@@ -323,7 +323,7 @@ func TestHandleAckEvents(t *testing.T) {
 			events: []AckRequest_Events_Item{{
 				json.RawMessage(`{
 				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
-			    }`),
+			    }`), // an UPGRADE action
 			}},
 			res: newAckResponse(true, []AckResponseItem{{
 				Status:  http.StatusServiceUnavailable,
@@ -347,32 +347,32 @@ func TestHandleAckEvents(t *testing.T) {
 				{
 					json.RawMessage(`{
 				    "action_id": "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:1"
-				}`),
+				}`), // POLICY_CHANGE action
 				},
 				{
 					json.RawMessage(`{
 				    "action_id": "1b12dcd8-bde0-4045-92dc-c4b27668d731"
-				}`),
+				}`), // UNENROLL action
 				},
 				{
 					json.RawMessage(`{
 				    "action_id": "1b12dcd8-bde0-4045-92dc-c4b27668d733"
-				}`),
+				}`), // no matching action
 				},
 				{
 					json.RawMessage(`{
 				    "action_id": "ab12dcd8-bde0-4045-92dc-c4b27668d73a"
-				}`),
+				}`), // UPGRADE action
 				},
 				{
 					json.RawMessage(`{
 				    "action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
-				}`),
+				}`), // untyped action
 				},
 				{
 					json.RawMessage(`{
 				    "action_id": "policy:2b12dcd8-bde0-4045-92dc-c4b27668d733:1:2"
-				}`),
+				}`), // POLICY_CHANGE
 				},
 			},
 			res: newAckResponse(true, []AckResponseItem{
