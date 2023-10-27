@@ -8,6 +8,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -43,23 +44,17 @@ var biInfo = build.Info{
 	Commit:  "integration",
 }
 
-var policyData = []byte(`
-{
-	"outputs": {
+var policyData = model.PolicyData{
+	Outputs: map[string]map[string]interface{}{
 		"default": {
-			"type": "elasticsearch"
-		}
+			"type": "elasticsearch",
+		},
 	},
-	"output_permissions": {
-	    "default": {}
-	},
-	"inputs": [
-		{
-			"type": "fleet-server"
-		}
-	]
+	OutputPermissions: json.RawMessage(`{"default": {}}`),
+	Inputs: []map[string]interface{}{{
+		"type": "fleet-server",
+	}},
 }
-`)
 
 func TestAgent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -74,7 +69,7 @@ func TestAgent(t *testing.T) {
 		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
-		Data:               policyData,
+		Data:               &policyData,
 	})
 	require.NoError(t, err)
 

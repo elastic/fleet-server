@@ -16,7 +16,6 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
@@ -35,7 +34,7 @@ func TestPolicyLogstashOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, smap.Map{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
 }
@@ -48,7 +47,7 @@ func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, smap.Map{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
 	// No permissions are required by logstash currently
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
@@ -66,7 +65,7 @@ func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, smap.Map{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
 }
@@ -83,7 +82,7 @@ func TestPolicyKafkaOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, smap.Map{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
 }
@@ -96,7 +95,7 @@ func TestPolicyKafkaOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, smap.Map{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
 	// No permissions are required by kafka currently
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
@@ -111,7 +110,7 @@ func TestPolicyESOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, smap.Map{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
 	require.NotNil(t, err, "expected prepare to error")
 	bulker.AssertExpectations(t)
 }
@@ -133,7 +132,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			},
 		}
 
-		policyMap := smap.Map{
+		policyMap := map[string]map[string]interface{}{
 			"test output": map[string]interface{}{},
 		}
 
@@ -153,7 +152,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
-		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
+		key, ok := policyMap[output.Name]["api_key"].(string)
 		gotOutput := testAgent.Outputs[output.Name]
 
 		require.True(t, ok, "api key not present on policy map")
@@ -204,7 +203,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			},
 		}
 
-		policyMap := smap.Map{
+		policyMap := map[string]map[string]interface{}{
 			"test output": map[string]interface{}{},
 		}
 
@@ -224,7 +223,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
-		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
+		key, ok := policyMap[output.Name]["api_key"].(string)
 		gotOutput := testAgent.Outputs[output.Name]
 
 		require.True(t, ok, "unable to case api key")
@@ -266,7 +265,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			},
 		}
 
-		policyMap := smap.Map{
+		policyMap := map[string]map[string]interface{}{
 			"test output": map[string]interface{}{},
 		}
 
@@ -275,7 +274,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.NoError(t, err, "expected prepare to pass")
 
-		key, ok := policyMap.GetMap(output.Name)["api_key"].(string)
+		key, ok := policyMap[output.Name]["api_key"].(string)
 		gotOutput := testAgent.Outputs[output.Name]
 
 		require.True(t, ok, "unable to case api key")

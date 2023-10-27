@@ -173,7 +173,6 @@ LOOP:
 }
 
 func unmarshalHits(hits []es.HitT) ([]model.Policy, error) {
-
 	policies := make([]model.Policy, len(hits))
 	for i, hit := range hits {
 		err := hit.Unmarshal(&policies[i])

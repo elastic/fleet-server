@@ -45,7 +45,6 @@ type ParsedPolicyDefaults struct {
 
 type ParsedPolicy struct {
 	Policy  model.Policy
-	Fields  map[string]json.RawMessage
 	Roles   RoleMapT
 	Outputs map[string]Output
 	Default ParsedPolicyDefaults
@@ -55,64 +54,40 @@ type ParsedPolicy struct {
 
 func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*ParsedPolicy, error) {
 	var err error
-
-	var fields map[string]json.RawMessage
-	if err = json.Unmarshal(p.Data, &fields); err != nil {
-		return nil, err
-	}
-
 	// Interpret the output permissions if available
 	var roles map[string]RoleT
-	if perms := fields[FieldOutputPermissions]; len(perms) != 0 {
-		if roles, err = parsePerms(perms); err != nil {
-			return nil, err
-		}
-	}
-
-	// Find the default role.
-	outputs, ok := fields[FieldOutputs]
-	if !ok {
-		return nil, ErrOutputsNotFound
-	}
-
-	policyOutputs, err := constructPolicyOutputs(outputs, roles)
-	if err != nil {
+	if roles, err = parsePerms(p.Data.OutputPermissions); err != nil {
 		return nil, err
 	}
 
-	// mutate fields with outputs
-	outputsMap, err := smap.Parse(outputs)
+	policyOutputs, err := constructPolicyOutputs(p.Data.Outputs, roles)
 	if err != nil {
 		return nil, err
 	}
-
-	for _, policyOutput := range policyOutputs {
+	for _, policyOutput := range p.Data.Outputs {
 		outputSecrets, err := getOutputsSecrets(ctx, policyOutput, bulker)
+
+		fmt.Printf("\nOUTPUT AFTER %v+", policyOutput)
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("\nTEST %v+", outputSecrets)
 		// fmt.Printf("OUTPUT SECRET %v+ %v+", .SecretsValues, v.Secrets)
-		for secretName, secretValue := range outputSecrets {
-			fmt.Printf("SET SECRET %v+", secretName)
-			outputMap := outputsMap.GetMap(policyOutput.Name)
-			delete(outputMap, FieldOutputSecrets)
-			err = setMapObj(outputsMap, secretValue, policyOutput.Name, secretName)
-			if err != nil {
-				return nil, err
-			}
-		}
+		// for secretName, secretValue := range outputSecrets {
+		// 	fmt.Printf("SET SECRET %v+", secretName)
+		// 	outputMap := outputsMap.GetMap(policyOutput.Name)
+		// 	delete(outputMap, FieldOutputSecrets)
+		// 	err = setMapObj(outputsMap, secretValue, policyOutput.Name, secretName)
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+		// }
 	}
-
-	fields[FieldOutputs], err = outputsMap.Marshal()
+	defaultName, err := findDefaultOutputName(p.Data.Outputs)
 	if err != nil {
 		return nil, err
 	}
-
-	defaultName, err := findDefaultOutputName(outputs)
-	if err != nil {
-		return nil, err
-	}
-	policyInputs, err := getPolicyInputsWithSecrets(ctx, fields, bulker)
+	policyInputs, err := getPolicyInputsWithSecrets(ctx, p.Data, bulker)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +95,6 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	// We are cool and the gang
 	pp := &ParsedPolicy{
 		Policy:  p,
-		Fields:  fields,
 		Roles:   roles,
 		Outputs: policyOutputs,
 		Default: ParsedPolicyDefaults{
@@ -140,43 +114,17 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	return pp, nil
 }
 
-func constructPolicyOutputs(outputsRaw json.RawMessage, roles map[string]RoleT) (map[string]Output, error) {
-	result := make(map[string]Output)
+func constructPolicyOutputs(outputs map[string]map[string]interface{}, roles map[string]RoleT) (map[string]Output, error) {
+	result := make(map[string]Output, len(outputs))
 
-	outputsMap, err := smap.Parse(outputsRaw)
-	if err != nil {
-		return result, err
-	}
-
-	for k := range outputsMap {
-		v := outputsMap.GetMap(k)
-		var secretReferences map[string]SecretReference
-		secretsVal := v.GetMap(FieldOutputSecrets)
-
-		if len(secretsVal) > 0 {
-			secretsRaw, err := secretsVal.Marshal()
-
-			if err != nil {
-				return result, err
-			}
-
-			err = json.Unmarshal(secretsRaw, &secretReferences)
-			if err != nil {
-				return nil, err
-			}
+	for k, v := range outputs {
+		typeStr, ok := v["type"].(string)
+		if !ok {
+			return nil, fmt.Errorf("missing or invalid output type: %+v", v)
 		}
-
-		delete(v, FieldOutputSecrets)
-		rawValue, err := v.Marshal()
-		if err != nil {
-			return result, err
-		}
-
 		p := Output{
-			Name:    k,
-			Type:    v.GetString(FieldOutputType),
-			Secrets: secretReferences,
-			Raw:     rawValue,
+			Name: k,
+			Type: typeStr,
 		}
 
 		if role, ok := roles[k]; ok {
@@ -220,34 +168,33 @@ func parsePerms(permsRaw json.RawMessage) (RoleMapT, error) {
 	return m, nil
 }
 
-func findDefaultOutputName(outputsRaw json.RawMessage) (string, error) {
-	outputsMap, err := smap.Parse(outputsRaw)
-	if err != nil {
-		return "", err
-	}
-
+// findDefaultName returns the name of the 1st output with the "elasticsearch" type or falls back to behaviour that relies on deprecated fields.
+//
+// Previous fleet-server and elastic-agent released had a default output which was removed Sept 2021.
+func findDefaultOutputName(outputs map[string]map[string]interface{}) (string, error) {
 	// iterate across the keys finding the defaults
 	var defaults []string
 	var ESdefaults []string
-	for k := range outputsMap {
-
-		v := outputsMap.GetMap(k)
-
+	for k, v := range outputs {
 		if v != nil {
-			outputType := v.GetString(FieldOutputType)
-			if outputType == OutputTypeElasticsearch {
+			typeStr, ok := v["type"].(string)
+			if ok && typeStr == OutputTypeElasticsearch {
 				ESdefaults = append(ESdefaults, k)
 				continue
 			}
-			fleetServer := v.GetMap(FieldOutputFleetServer)
-			if fleetServer == nil {
+
+			fleetServer, ok := v[FieldOutputFleetServer]
+			if !ok {
 				defaults = append(defaults, k)
 				continue
 			}
-			serviceToken := fleetServer.GetString(FieldOutputServiceToken)
-			if serviceToken == "" {
-				defaults = append(defaults, k)
-				continue
+			fsMap, ok := fleetServer.(map[string]interface{})
+			if ok {
+				str, ok := fsMap[FieldOutputServiceToken].(string)
+				if ok && str == "" {
+					defaults = append(defaults, k)
+					continue
+				}
 			}
 		}
 	}
