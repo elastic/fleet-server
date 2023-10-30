@@ -85,9 +85,7 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 	for _, m := range d.Inputs {
 		res.Inputs = append(res.Inputs, maps.Clone(m))
 	}
-	for _, s := range d.SecretReferences {
-		res.SecretReferences = append(res.SecretReferences, s)
-	}
+	res.SecretReferences = append(res.SecretReferences, d.SecretReferences...)
 	if d.Signed != nil {
 		res.Signed = &Signed{
 			Data:      d.Signed.Data,
