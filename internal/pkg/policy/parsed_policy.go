@@ -19,6 +19,7 @@ import (
 const (
 	FieldOutputs            = "outputs"
 	FieldOutputType         = "type"
+	FieldOutputSecrets      = "secrets"
 	FieldOutputFleetServer  = "fleet_server"
 	FieldOutputServiceToken = "service_token"
 	FieldOutputPermissions  = "output_permissions"
@@ -62,6 +63,12 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	policyOutputs, err := constructPolicyOutputs(p.Data.Outputs, roles)
 	if err != nil {
 		return nil, err
+	}
+	for _, policyOutput := range p.Data.Outputs {
+		err := processOutputSecret(ctx, policyOutput, bulker)
+		if err != nil {
+			return nil, err
+		}
 	}
 	defaultName, err := findDefaultOutputName(p.Data.Outputs)
 	if err != nil {
