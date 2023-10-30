@@ -112,7 +112,11 @@ func constructPolicyOutputs(outputs map[string]map[string]interface{}, roles map
 		}
 
 		if p.Type == OutputTypeRemoteElasticsearch {
-			p.ServiceToken = v.GetString(FieldOutputServiceToken)
+			serviceTokenStr, ok := v[FieldOutputServiceToken].(string)
+			if !ok {
+				return nil, fmt.Errorf("missing or invalid service token: %+v", v)
+			}
+			p.ServiceToken = serviceTokenStr
 		}
 
 		result[k] = p

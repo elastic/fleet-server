@@ -250,11 +250,9 @@ func (p *Output) prepareElasticsearch(
 	if p.Type == OutputTypeRemoteElasticsearch {
 
 		// replace type remote-elasticsearch with elasticsearch as agent doesn't recognize remote-elasticsearch
-		if err := setMapObj(outputMap, OutputTypeElasticsearch, p.Name, FieldOutputType); err != nil {
-			return err
-		}
+		outputMap[p.Name][FieldOutputType] = OutputTypeElasticsearch
 		// remove the service token from the agent policy sent to the agent
-		delete(outputMap.GetMap(p.Name), FieldOutputServiceToken)
+		delete(outputMap[p.Name], FieldOutputServiceToken)
 	}
 
 	// Always insert the `api_key` as part of the output block, this is required
@@ -270,27 +268,22 @@ func (p *Output) prepareElasticsearch(
 	return nil
 }
 
-func (p *Output) createRemoteEsClientIfNotExists(ctx context.Context, bulker bulk.Bulk, outputMap smap.Map) error {
+func (p *Output) createRemoteEsClientIfNotExists(ctx context.Context, bulker bulk.Bulk, outputMap map[string]map[string]interface{}) error {
 	remoteEs := bulker.GetRemoteClient(p.Name)
 	if remoteEs != nil {
 		// TODO replace if hosts or service token changed?
 		return nil
 	}
-	om, _ := outputMap.GetMap(p.Name).Marshal()
-	var outputObj map[string]any
-	err := json.Unmarshal(om, &outputObj)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal output: %w", err)
-	}
-	hosts, ok := outputObj["hosts"].([]interface{})
+	hostsObj := outputMap[p.Name]["hosts"]
+	hosts, ok := hostsObj.([]interface{})
 	if !ok {
-		return fmt.Errorf("failed to get hosts from output: %w", err)
+		return fmt.Errorf("failed to get hosts from output: %w", hostsObj)
 	}
 	hostsStrings := make([]string, len(hosts))
 	for i, host := range hosts {
 		hostsStrings[i], ok = host.(string)
 		if !ok {
-			return fmt.Errorf("failed to get hosts from output: %w", err)
+			return fmt.Errorf("failed to get hosts from output: %w", host)
 		}
 	}
 
