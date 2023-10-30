@@ -28,7 +28,7 @@ import (
 
 const (
 	OutputTypeElasticsearch       = "elasticsearch"
-	OutputTypeRemoteElasticsearch = "remote-elasticsearch"
+	OutputTypeRemoteElasticsearch = "remote_elasticsearch"
 	OutputTypeLogstash            = "logstash"
 	OutputTypeKafka               = "kafka"
 )
@@ -252,7 +252,7 @@ func (p *Output) prepareElasticsearch(
 
 	if p.Type == OutputTypeRemoteElasticsearch {
 
-		// replace type remote-elasticsearch with elasticsearch as agent doesn't recognize remote-elasticsearch
+		// replace type remote_elasticsearch with elasticsearch as agent doesn't recognize remote_elasticsearch
 		outputMap[p.Name][FieldOutputType] = OutputTypeElasticsearch
 		// remove the service token from the agent policy sent to the agent
 		delete(outputMap[p.Name], FieldOutputServiceToken)
