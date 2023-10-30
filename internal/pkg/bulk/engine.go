@@ -68,6 +68,8 @@ type Bulk interface {
 	GetRemoteClient(name string) *elasticsearch.Client
 	SetRemoteClient(name string, es *elasticsearch.Client)
 
+	Opts() BulkOpt
+
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
 
@@ -118,6 +120,12 @@ func (b *Bulker) Client() *elasticsearch.Client {
 		panic("Client is not an elastic search pointer")
 	}
 	return client
+}
+
+func (b *Bulker) Opts() BulkOpt {
+	return func(o *bulkOptT) {
+		o = &b.opts
+	}
 }
 
 func (b *Bulker) GetRemoteClient(name string) *elasticsearch.Client {

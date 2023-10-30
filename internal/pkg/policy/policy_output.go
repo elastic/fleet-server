@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 const (
@@ -35,6 +36,8 @@ const (
 var (
 	ErrNoOutputPerms    = errors.New("output permission sections not found")
 	ErrFailInjectAPIKey = errors.New("fail inject api key")
+	// TODO clean up bulkers when a remote output is removed
+	bulkerMap = make(map[string]bulk.Bulk)
 )
 
 type Output struct {
@@ -57,16 +60,16 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	switch p.Type {
 	case OutputTypeElasticsearch:
 		zlog.Debug().Msg("preparing elasticsearch output")
-		if err := p.prepareElasticsearch(ctx, zlog, bulker, agent, outputMap); err != nil {
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, bulker, agent, outputMap); err != nil {
 			return fmt.Errorf("failed to prepare elasticsearch output %q: %w", p.Name, err)
 		}
 	case OutputTypeRemoteElasticsearch:
 		zlog.Debug().Msg("preparing remote elasticsearch output")
-		err := p.createRemoteEsClientIfNotExists(ctx, bulker, outputMap)
+		newBulker, err := p.createAndGetBulker(ctx, bulker, outputMap)
 		if err != nil {
 			return err
 		}
-		if err := p.prepareElasticsearch(ctx, zlog, bulker, agent, outputMap); err != nil {
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, newBulker, agent, outputMap); err != nil {
 			return fmt.Errorf("failed to prepare remote elasticsearch output %q: %w", p.Name, err)
 		}
 	case OutputTypeLogstash:
@@ -86,6 +89,7 @@ func (p *Output) prepareElasticsearch(
 	ctx context.Context,
 	zlog zerolog.Logger,
 	bulker bulk.Bulk,
+	outputBulker bulk.Bulk,
 	agent *model.Agent,
 	outputMap map[string]map[string]interface{}) error {
 	// The role is required to do api key management
@@ -141,7 +145,7 @@ func (p *Output) prepareElasticsearch(
 			Msg("Generating a new API key")
 
 		// query current api key for roles so we don't lose permissions in the meantime
-		currentRoles, err := fetchAPIKeyRoles(ctx, bulker, output.APIKeyID)
+		currentRoles, err := fetchAPIKeyRoles(ctx, outputBulker, output.APIKeyID)
 		if err != nil {
 			zlog.Error().
 				Str("apiKeyID", output.APIKeyID).
@@ -158,9 +162,8 @@ func (p *Output) prepareElasticsearch(
 			return err
 		}
 
-		// TODO use remote es for api key update
 		// hash provided is only for merging request together and not persisted
-		err = bulker.APIKeyUpdate(ctx, output.APIKeyID, newRoles.Sha2, newRoles.Raw)
+		err = outputBulker.APIKeyUpdate(ctx, output.APIKeyID, newRoles.Sha2, newRoles.Raw)
 		if err != nil {
 			zlog.Error().Err(err).Msg("fail generate output key")
 			zlog.Debug().RawJSON("roles", newRoles.Raw).Str("sha", newRoles.Sha2).Err(err).Msg("roles not updated")
@@ -197,7 +200,7 @@ func (p *Output) prepareElasticsearch(
 
 		ctx := zlog.WithContext(ctx)
 		outputAPIKey, err :=
-			generateOutputAPIKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw, p.Type)
+			generateOutputAPIKey(ctx, outputBulker, agent.Id, p.Name, p.Role.Raw, p.Type)
 		if err != nil {
 			return fmt.Errorf("failed generate output API key: %w", err)
 		}
@@ -268,22 +271,53 @@ func (p *Output) prepareElasticsearch(
 	return nil
 }
 
-func (p *Output) createRemoteEsClientIfNotExists(ctx context.Context, bulker bulk.Bulk, outputMap map[string]map[string]interface{}) error {
-	remoteEs := bulker.GetRemoteClient(p.Name)
-	if remoteEs != nil {
+func (p *Output) createAndGetBulker(ctx context.Context, mainBulker bulk.Bulk, outputMap map[string]map[string]interface{}) (bulk.Bulk, error) {
+	bulker := bulkerMap[p.Name]
+	if bulker != nil {
 		// TODO replace if hosts or service token changed?
-		return nil
+		return bulker, nil
 	}
+	bulkCtx, bulkCancel := context.WithCancel(context.Background())
+	defer bulkCancel()
+	es, err := p.createRemoteEsClient(bulkCtx, outputMap)
+	if err != nil {
+		return nil, err
+	}
+	// starting a new bulker to create/update API keys for remote ES output
+	newBulker := bulk.NewBulker(es, nil, mainBulker.Opts())
+	bulkerMap[p.Name] = newBulker
+
+	errCh := make(chan error)
+	go func() {
+		runFunc := func() (err error) {
+			return newBulker.Run(bulkCtx)
+		}
+
+		errCh <- runFunc()
+	}()
+	go func() (err error) {
+		select {
+		case err = <-errCh:
+		case <-bulkCtx.Done():
+			err = bulkCtx.Err()
+		}
+		return
+	}()
+
+	return newBulker, nil
+}
+
+func (p *Output) createRemoteEsClient(ctx context.Context, outputMap map[string]map[string]interface{}) (*elasticsearch.Client, error) {
 	hostsObj := outputMap[p.Name]["hosts"]
 	hosts, ok := hostsObj.([]interface{})
 	if !ok {
-		return fmt.Errorf("failed to get hosts from output: %v", hostsObj)
+		return nil, fmt.Errorf("failed to get hosts from output: %v", hostsObj)
 	}
 	hostsStrings := make([]string, len(hosts))
 	for i, host := range hosts {
 		hostsStrings[i], ok = host.(string)
 		if !ok {
-			return fmt.Errorf("failed to get hosts from output: %v", host)
+			return nil, fmt.Errorf("failed to get hosts from output: %v", host)
 		}
 	}
 
@@ -297,10 +331,9 @@ func (p *Output) createRemoteEsClientIfNotExists(ctx context.Context, bulker bul
 	}
 	es, err := es.NewClient(ctx, &cfg, false)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	bulker.SetRemoteClient(p.Name, es)
-	return nil
+	return es, nil
 }
 
 func fetchAPIKeyRoles(ctx context.Context, b bulk.Bulk, apiKeyID string) (*RoleT, error) {
@@ -460,16 +493,11 @@ func generateOutputAPIKey(
 	name := fmt.Sprintf("%s:%s", agentID, outputName)
 	zerolog.Ctx(ctx).Info().Msgf("generating output API key %s for agent ID %s",
 		name, agentID)
-	if outputType == OutputTypeRemoteElasticsearch {
-		name := fmt.Sprintf("%s:%s", agentID, outputName)
-		return apikey.Create(ctx, bulk.GetRemoteClient(outputName), name, "", "false", roles, apikey.NewMetadata(agentID, outputName, apikey.TypeOutput))
-	} else {
-		return bulk.APIKeyCreate(
-			ctx,
-			name,
-			"",
-			roles,
-			apikey.NewMetadata(agentID, outputName, apikey.TypeOutput),
-		)
-	}
+	return bulk.APIKeyCreate(
+		ctx,
+		name,
+		"",
+		roles,
+		apikey.NewMetadata(agentID, outputName, apikey.TypeOutput),
+	)
 }
