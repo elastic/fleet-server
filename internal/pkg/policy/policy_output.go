@@ -200,7 +200,7 @@ func (p *Output) prepareElasticsearch(
 
 		ctx := zlog.WithContext(ctx)
 		outputAPIKey, err :=
-			generateOutputAPIKey(ctx, outputBulker, agent.Id, p.Name, p.Role.Raw, p.Type)
+			generateOutputAPIKey(ctx, outputBulker, agent.Id, p.Name, p.Role.Raw)
 		if err != nil {
 			return fmt.Errorf("failed generate output API key: %w", err)
 		}
@@ -489,7 +489,7 @@ func generateOutputAPIKey(
 	bulk bulk.Bulk,
 	agentID,
 	outputName string,
-	roles []byte, outputType string) (*apikey.APIKey, error) {
+	roles []byte) (*apikey.APIKey, error) {
 	name := fmt.Sprintf("%s:%s", agentID, outputName)
 	zerolog.Ctx(ctx).Info().Msgf("generating output API key %s for agent ID %s",
 		name, agentID)

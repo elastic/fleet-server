@@ -65,9 +65,7 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
-	GetRemoteClient(name string) *elasticsearch.Client
-	SetRemoteClient(name string, es *elasticsearch.Client)
-
+	// Reusing opts to create bulker for remote ES outputs
 	Opts() BulkOpt
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
@@ -76,13 +74,12 @@ type Bulk interface {
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es              esapi.Transport
-	remoteEsClients map[string]*elasticsearch.Client
-	ch              chan *bulkT
-	opts            bulkOptT
-	blkPool         sync.Pool
-	apikeyLimit     *semaphore.Weighted
-	tracer          *apm.Tracer
+	es          esapi.Transport
+	ch          chan *bulkT
+	opts        bulkOptT
+	blkPool     sync.Pool
+	apikeyLimit *semaphore.Weighted
+	tracer      *apm.Tracer
 }
 
 const (
@@ -104,13 +101,12 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 	}
 
 	return &Bulker{
-		opts:            bopts,
-		es:              es,
-		remoteEsClients: make(map[string]*elasticsearch.Client),
-		ch:              make(chan *bulkT, bopts.blockQueueSz),
-		blkPool:         sync.Pool{New: poolFunc},
-		apikeyLimit:     semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
-		tracer:          tracer,
+		opts:        bopts,
+		es:          es,
+		ch:          make(chan *bulkT, bopts.blockQueueSz),
+		blkPool:     sync.Pool{New: poolFunc},
+		apikeyLimit: semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
+		tracer:      tracer,
 	}
 }
 
@@ -126,18 +122,6 @@ func (b *Bulker) Opts() BulkOpt {
 	return func(o *bulkOptT) {
 		o = &b.opts
 	}
-}
-
-func (b *Bulker) GetRemoteClient(name string) *elasticsearch.Client {
-	remoteEs := b.remoteEsClients[name]
-	if remoteEs == nil {
-		return nil
-	}
-	return remoteEs
-}
-
-func (b *Bulker) SetRemoteClient(name string, es *elasticsearch.Client) {
-	b.remoteEsClients[name] = es
 }
 
 // read secrets one by one as there is no bulk API yet to read them in one request
