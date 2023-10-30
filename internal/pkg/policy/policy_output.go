@@ -277,13 +277,13 @@ func (p *Output) createRemoteEsClientIfNotExists(ctx context.Context, bulker bul
 	hostsObj := outputMap[p.Name]["hosts"]
 	hosts, ok := hostsObj.([]interface{})
 	if !ok {
-		return fmt.Errorf("failed to get hosts from output: %w", hostsObj)
+		return fmt.Errorf("failed to get hosts from output: %v", hostsObj)
 	}
 	hostsStrings := make([]string, len(hosts))
 	for i, host := range hosts {
 		hostsStrings[i], ok = host.(string)
 		if !ok {
-			return fmt.Errorf("failed to get hosts from output: %w", host)
+			return fmt.Errorf("failed to get hosts from output: %v", host)
 		}
 	}
 
