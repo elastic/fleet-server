@@ -335,6 +335,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 
 		if err != nil {
 			failQueue(queue, err)
+			apm.CaptureError(ctx, err).Send()
 		}
 
 		log.Trace().

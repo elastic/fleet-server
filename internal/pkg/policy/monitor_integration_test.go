@@ -21,7 +21,13 @@ import (
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
-var policyBytes = []byte(`{"outputs":{"default":{"type":"elasticsearch"}}}`)
+var intPolData = model.PolicyData{
+	Outputs: map[string]map[string]interface{}{
+		"default": {
+			"type": "elasticsearch",
+		},
+	},
+}
 
 func TestMonitor_Integration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -75,7 +81,7 @@ func TestMonitor_Integration(t *testing.T) {
 	policy := model.Policy{
 		PolicyID:       policyID,
 		CoordinatorIdx: 1,
-		Data:           policyBytes,
+		Data:           &intPolData,
 		RevisionIdx:    1,
 	}
 	ch := make(chan error, 1)

@@ -46,7 +46,7 @@ type Output struct {
 
 // Prepare prepares the output p to be sent to the elastic-agent
 // The agent might be mutated for an elasticsearch output
-func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap smap.Map) error {
+func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap map[string]map[string]interface{}) error {
 	span, ctx := apm.StartSpan(ctx, "prepareOutput", "process")
 	defer span.End()
 	span.Context.SetLabel("output_type", p.Type)
@@ -87,12 +87,16 @@ func (p *Output) prepareElasticsearch(
 	zlog zerolog.Logger,
 	bulker bulk.Bulk,
 	agent *model.Agent,
-	outputMap smap.Map) error {
+	outputMap map[string]map[string]interface{}) error {
 	// The role is required to do api key management
 	if p.Role == nil {
 		zlog.Error().
 			Msg("policy does not contain required output permission section")
 		return ErrNoOutputPerms
+	}
+	if _, ok := outputMap[p.Name]; !ok {
+		zlog.Error().Err(ErrFailInjectAPIKey).Msg("Unable to find output in map")
+		return ErrFailInjectAPIKey
 	}
 
 	output, foundOutput := agent.Outputs[p.Name]
@@ -262,10 +266,7 @@ func (p *Output) prepareElasticsearch(
 	// in place to reduce number of agent policy allocation when sending the updated
 	// agent policy to multiple agents.
 	// See: https://github.com/elastic/fleet-server/issues/1301
-	if err := setMapObj(outputMap, output.APIKey, p.Name, "api_key"); err != nil {
-		return err
-	}
-
+	outputMap[p.Name]["api_key"] = output.APIKey
 	return nil
 }
 
@@ -478,29 +479,4 @@ func generateOutputAPIKey(
 			apikey.NewMetadata(agentID, outputName, apikey.TypeOutput),
 		)
 	}
-}
-
-func setMapObj(obj map[string]interface{}, val interface{}, keys ...string) error {
-	if len(keys) == 0 {
-		return fmt.Errorf("no key to be updated: %w", ErrFailInjectAPIKey)
-	}
-
-	for _, k := range keys[:len(keys)-1] {
-		v, ok := obj[k]
-		if !ok {
-			return fmt.Errorf("no key %q not present on MapObj: %w",
-				k, ErrFailInjectAPIKey)
-		}
-
-		obj, ok = v.(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("cannot cast %T to map[string]interface{}: %w",
-				obj, ErrFailInjectAPIKey)
-		}
-	}
-
-	k := keys[len(keys)-1]
-	obj[k] = val
-
-	return nil
 }
