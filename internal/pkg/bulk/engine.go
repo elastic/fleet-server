@@ -120,7 +120,6 @@ func (b *Bulker) Client() *elasticsearch.Client {
 
 func (b *Bulker) Opts() BulkOpt {
 	return func(o *bulkOptT) {
-		o = &b.opts
 	}
 }
 
