@@ -80,7 +80,7 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		OutputPermissions: d.OutputPermissions,
 		Outputs:           cloneMap(d.Outputs),
 		Revision:          d.Revision,
-		SecretReferences:  make([]SecretRefereneceItems, 0, len(d.SecretReferences)),
+		SecretReferences:  make([]SecretReferencesItems, 0, len(d.SecretReferences)),
 	}
 	for _, m := range d.Inputs {
 		res.Inputs = append(res.Inputs, maps.Clone(m))
