@@ -625,7 +625,6 @@ func filterActions(zlog zerolog.Logger, agentID string, actions []model.Action) 
 //
 // raw is first parsed into the action-specific data struct then passed into Action_Data in order to remove any undefined keys.
 //
-// TODO: Do we need to have a less-strict return for the 2023-06-01 api version?
 // TODO: There is a lot of repitition in this method we should try to clean up.
 func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, err error) {
 	switch aType {
@@ -753,20 +752,20 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, ErrNoPolicyOutput
 	}
 
+	data := model.ClonePolicyData(pp.Policy.Data)
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, pp.Policy.Data.Outputs)
+		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, data.Outputs)
 		if err != nil {
-			return nil, fmt.Errorf("failed to prepare output %q:: %w",
+			return nil, fmt.Errorf("failed to prepare output %q: %w",
 				policyOutput.Name, err)
 		}
 	}
-	// Add replace inputs with prepared version
-	pp.Policy.Data.Inputs = pp.Inputs
+	// Add replace inputs with agent prepared version.
+	data.Inputs = pp.Inputs
 
 	// JSON transformations to turn a model.PolicyData into an Action.data
-	// TODO: Do we need to have a less-strict return for the 2023-06-01 api version?
-	p, err := json.Marshal(pp.Policy.Data)
+	p, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}

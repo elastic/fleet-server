@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 
 	"github.com/stretchr/testify/assert"
@@ -130,4 +131,68 @@ func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 	result, _ := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
 
 	assert.Equal(t, expectedResult, result)
+}
+
+func TestProcessOutputSecret(t *testing.T) {
+	tests := []struct {
+		name             string
+		outputJSON       string
+		expectOutputJSON string
+	}{
+		{
+			name:             "Output without secrets",
+			outputJSON:       `{"password": "test"}`,
+			expectOutputJSON: `{"password": "test"}`,
+		},
+		{
+			name: "Output with secrets",
+			outputJSON: `{
+				"secrets": {
+					"password": {"id": "passwordid"}	
+				}
+			}`,
+			expectOutputJSON: `{
+				"password": "passwordid_value"
+			}`,
+		},
+		{
+			name: "Output with nested secrets",
+			outputJSON: `{
+				"secrets": {
+					"ssl": { "key" : { "id": "sslkey" }	}
+				}
+			}`,
+			expectOutputJSON: `{
+				"ssl": {"key": "sslkey_value"}
+			}`,
+		},
+		{
+			name: "Output with multiple secrets",
+			outputJSON: `{
+				"secrets": {
+					"ssl": { "key" : { "id": "sslkey" }, "other": {"id": "sslother"}	}
+				}
+			}`,
+			expectOutputJSON: `{
+				"ssl": {"key": "sslkey_value", "other": "sslother_value"}
+			}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			output, err := smap.Parse([]byte(tc.outputJSON))
+			assert.NoError(t, err)
+
+			expectOutput, err := smap.Parse([]byte(tc.expectOutputJSON))
+			assert.NoError(t, err)
+
+			err = processOutputSecret(context.Background(), output, bulker)
+			assert.NoError(t, err)
+
+			assert.Equal(t, expectOutput, output)
+
+		})
+	}
 }
