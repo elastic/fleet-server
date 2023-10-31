@@ -688,18 +688,19 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, ErrNoPolicyOutput
 	}
 
+	data := model.ClonePolicyData(pp.Policy.Data)
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, pp.Policy.Data.Outputs)
+		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, data.Outputs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare output %q:: %w",
 				policyOutput.Name, err)
 		}
 	}
-	// Add replace inputs with prepared version
-	pp.Policy.Data.Inputs = pp.Inputs
+	// Add replace inputs with agent prepared version.
+	data.Inputs = pp.Inputs
 
-	p, err := json.Marshal(pp.Policy.Data)
+	p, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
