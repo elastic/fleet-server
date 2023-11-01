@@ -445,6 +445,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		{
+			ErrPolicyNotFound,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrPolicyNotFound",
+				"ErrPolicyNotFound",
+				zerolog.InfoLevel,
+			},
+		},
 	}
 
 	for _, e := range errTable {
