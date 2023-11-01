@@ -216,23 +216,13 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 
 	// expect 1 POLICY_CHANGE action
 	assert.Equal(t, 1, len(*checkinResponse.Actions))
-	var actionDataRaw interface{}
-	for _, action := range *checkinResponse.Actions {
-		actionDataRaw = action.Data
-		assert.Equal(t, "POLICY_CHANGE", action.Type)
-	}
+	assert.Equal(t, api.POLICYCHANGE, (*checkinResponse.Actions)[0].Type)
+	actionData, err := (*checkinResponse.Actions)[0].Data.AsActionPolicyChange()
+	require.NoError(t, err)
+	require.NotNil(t, actionData.Policy.Inputs)
+	require.NotNil(t, (*actionData.Policy.Inputs)[0])
 
-	actionData, ok := actionDataRaw.(map[string]interface{})
-	require.True(t, ok, "expected attribute action.Data to be an object")
-
-	policy, ok := actionData["policy"].(map[string]interface{})
-	require.True(t, ok, "expected attribute policy to be an object")
-	inputs, ok := policy["inputs"].([]interface{})
-	require.True(t, ok, "expected attribute inputs to be an array")
-
-	input, ok := inputs[0].(map[string]interface{})
-	require.True(t, ok, "expected first input to be an object")
-
+	input := (*actionData.Policy.Inputs)[0]
 	// expect secret reference replaced with secret value
 	assert.Equal(t, map[string]interface{}{
 		"package_var_secret": "secret_value",
