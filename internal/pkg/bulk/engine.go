@@ -65,8 +65,8 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
-	// Reusing opts to create bulker for remote ES outputs
-	Opts() BulkOpt
+	// Reusing tracer to create bulker for remote ES outputs
+	Tracer() *apm.Tracer
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
@@ -118,9 +118,8 @@ func (b *Bulker) Client() *elasticsearch.Client {
 	return client
 }
 
-func (b *Bulker) Opts() BulkOpt {
-	return func(o *bulkOptT) {
-	}
+func (b *Bulker) Tracer() *apm.Tracer {
+	return b.tracer
 }
 
 // read secrets one by one as there is no bulk API yet to read them in one request

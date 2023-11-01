@@ -79,9 +79,9 @@ func (m *MockBulk) Client() *elasticsearch.Client {
 	return args.Get(0).(*elasticsearch.Client)
 }
 
-func (m *MockBulk) Opts() bulk.BulkOpt {
+func (m *MockBulk) Tracer() *apm.Tracer {
 	args := m.Called()
-	return args.Get(0).(bulk.BulkOpt)
+	return args.Get(0).(*apm.Tracer)
 }
 
 func (m *MockBulk) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {

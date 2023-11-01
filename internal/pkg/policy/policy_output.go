@@ -284,7 +284,7 @@ func (p *Output) createAndGetBulker(ctx context.Context, mainBulker bulk.Bulk, o
 		return nil, err
 	}
 	// starting a new bulker to create/update API keys for remote ES output
-	newBulker := bulk.NewBulker(es, nil, mainBulker.Opts())
+	newBulker := bulk.NewBulker(es, mainBulker.Tracer())
 	bulkerMap[p.Name] = newBulker
 
 	errCh := make(chan error)
