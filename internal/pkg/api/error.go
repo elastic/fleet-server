@@ -445,6 +445,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		{
+			ErrPolicyNotFound,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrPolicyNotFound",
+				"ErrPolicyNotFound",
+				zerolog.InfoLevel,
+			},
+		},
 	}
 
 	for _, e := range errTable {
@@ -515,7 +524,7 @@ func ErrorResp(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	e.Msg("HTTP request error")
 
-	if (resp.StatusCode >= 500) {
+	if resp.StatusCode >= 500 {
 		apm.CaptureError(r.Context(), err).Send()
 	}
 
