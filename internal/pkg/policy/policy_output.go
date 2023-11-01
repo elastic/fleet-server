@@ -16,6 +16,7 @@ import (
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -329,11 +330,21 @@ func (p *Output) createRemoteEsClient(ctx context.Context, outputMap map[string]
 			},
 		},
 	}
-	es, err := es.NewClient(ctx, &cfg, false)
+	es, err := es.NewClient(ctx, &cfg, false, elasticsearchOptions(
+		true, build.Info{},
+	)...)
 	if err != nil {
 		return nil, err
 	}
 	return es, nil
+}
+
+func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
+	options := []es.ConfigOption{es.WithUserAgent("Remote-Fleet-Server", bi)}
+	if instumented {
+		options = append(options, es.InstrumentRoundTripper())
+	}
+	return options
 }
 
 func fetchAPIKeyRoles(ctx context.Context, b bulk.Bulk, apiKeyID string) (*RoleT, error) {
