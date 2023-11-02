@@ -53,7 +53,6 @@ type ParsedPolicy struct {
 }
 
 func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*ParsedPolicy, error) {
-	fmt.Printf("%+v", p)
 	var err error
 	// Interpret the output permissions if available
 	var roles map[string]RoleT

@@ -8,6 +8,7 @@ package dl
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -21,11 +22,20 @@ import (
 
 func createRandomPolicy(id string, revisionIdx int) model.Policy {
 	now := time.Now().UTC()
+	var policyData = model.PolicyData{
+		Outputs: map[string]map[string]interface{}{
+			"default": {
+				"type": "elasticsearch",
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {}}`),
+		Inputs:            []map[string]interface{}{},
+	}
 	return model.Policy{
 		PolicyID:           id,
 		RevisionIdx:        int64(revisionIdx),
 		CoordinatorIdx:     0,
-		Data:               nil,
+		Data:               &policyData,
 		DefaultFleetServer: false,
 		Timestamp:          now.Format(time.RFC3339),
 	}
