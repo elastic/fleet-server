@@ -19,78 +19,65 @@ func TestAckRequest(t *testing.T) {
 	ar := AckRequest{}
 	err := json.Unmarshal([]byte(`{
 	"events": [{
+	    "type": "ACTION_RESULT",
+	    "subtype": "ACKNOWLEDGED",
+	    "timestamp": "2023-10-31T12:00:00.000Z",
 	    "action_id": "test-action-1",
-	    "action_input_type": "input-type-1",
 	    "agent_id": "test-agent-1",
-	    "completed_at": "time-1",
-	    "message": "event-message",
-	    "policy_id": "policy-1",
-	    "started_at": "time-2",
-	    "stream_id": "stream-1",
-	    "subtype": "ACKNOWLEDGED",
-	    "timestamp": "time-3",
-	    "type": "ACTION_RESULT"
+	    "message": "event-message"
 	}, {
-	    "action_data": {"key1": "value1"},
-	    "action_id": "test-action-2",
-	    "action_input_type": "input-type-2",
-	    "action_response": {"key2": "value2"},
-	    "agent_id": "test-agent-2",
-	    "completed_at": "time-4",
-	    "data": {"key3": "value3"},
-	    "error": "error-1",
-	    "message": "event-message",
-	    "payload": {"key3": "value3"},
-	    "policy_id": "policy-2",
-	    "started_at": "time-5",
-	    "stream_id": "stream-2",
+	    "type": "ACTION_RESULT",
 	    "subtype": "ACKNOWLEDGED",
-	    "timestamp": "time-6",
-	    "type": "ACTION_RESULT"
+	    "timestamp": "2023-10-31T12:00:00.000Z",
+	    "action_id": "test-action-2",
+	    "agent_id": "test-agent-2",
+	    "message": "event-message",
+	    "action_input_type": "input-type-2",
+	    "action_data": {"key1": "value1"},
+	    "action_response": {"key2": "value2"},
+	    "started_at": "2023-10-31T11:00:00.000Z",
+	    "completed_at": "2023-10-31T12:00:00.000Z",
+	    "error": "error-1"
+	}, {
+	    "type": "ACTION_RESULT",
+	    "subtype": "ACKNOWLEDGED",
+	    "timestamp": "2023-10-31T12:00:00.000Z",
+	    "action_id": "test-action-3",
+	    "agent_id": "test-agent-3",
+	    "message": "event-message",
+	    "payload":{"retry": true, "retry_attempt": 2},
+	    "error": "error-2"
 	}]
     }`), &ar)
 	require.NoError(t, err)
-	assert.Len(t, ar.Events, 2)
+	assert.Len(t, ar.Events, 3)
+	ts, err := time.Parse(time.RFC3339, "2023-10-31T12:00:00.000Z")
+	require.NoError(t, err)
 
-	ev := ar.Events[0]
-	assert.Nil(t, ev.ActionData)
+	ev, err := ar.Events[0].AsGenericEvent()
+	require.NoError(t, err)
 	assert.Equal(t, "test-action-1", ev.ActionId)
-	assert.Equal(t, "input-type-1", ev.ActionInputType)
-	assert.Nil(t, ev.ActionResponse)
 	assert.Equal(t, "test-agent-1", ev.AgentId)
-	assert.Equal(t, "time-1", ev.CompletedAt)
-	assert.Nil(t, ev.Data)
+	assert.Equal(t, "event-message", ev.Message)
+	assert.Equal(t, ts, ev.Timestamp)
 	assert.Nil(t, ev.Error)
-	assert.Equal(t, "event-message", ev.Message)
-	assert.Nil(t, ev.Payload)
-	assert.Equal(t, "policy-1", ev.PolicyId)
-	assert.Equal(t, "time-2", ev.StartedAt)
-	assert.Equal(t, "stream-1", ev.StreamId)
-	assert.Equal(t, ACKNOWLEDGED, ev.Subtype)
-	assert.Equal(t, "time-3", ev.Timestamp)
-	assert.Equal(t, ACTIONRESULT, ev.Type)
 
-	ev = ar.Events[1]
-	assert.NotNil(t, ev.ActionData)
-	assert.Equal(t, "test-action-2", ev.ActionId)
-	assert.Equal(t, "input-type-2", ev.ActionInputType)
-	assert.NotNil(t, ev.ActionResponse)
-	assert.Equal(t, "test-agent-2", ev.AgentId)
-	assert.Equal(t, "time-4", ev.CompletedAt)
-	assert.NotNil(t, ev.Data)
-	assert.NotNil(t, ev.Error)
-	assert.Equal(t, "event-message", ev.Message)
-	assert.NotNil(t, ev.Payload)
-	assert.Equal(t, "policy-2", ev.PolicyId)
-	assert.Equal(t, "time-5", ev.StartedAt)
-	assert.Equal(t, "stream-2", ev.StreamId)
-	assert.Equal(t, ACKNOWLEDGED, ev.Subtype)
-	assert.Equal(t, "time-6", ev.Timestamp)
-	assert.Equal(t, ACTIONRESULT, ev.Type)
+	inputEvent, err := ar.Events[1].AsInputEvent()
+	require.NoError(t, err)
+	assert.Equal(t, ts, inputEvent.Timestamp)
+	assert.Equal(t, "test-action-2", inputEvent.ActionId)
+	assert.Equal(t, "test-agent-2", inputEvent.AgentId)
+	assert.Equal(t, "event-message", inputEvent.Message)
+	assert.Equal(t, "input-type-2", inputEvent.ActionInputType)
+	assert.NotNil(t, inputEvent.ActionData)
+	assert.NotNil(t, inputEvent.ActionResponse)
+	assert.Equal(t, ts, inputEvent.CompletedAt)
+	assert.Equal(t, ts.Add(-1*time.Hour), inputEvent.StartedAt)
+	assert.NotNil(t, inputEvent.Error)
 
 	// Sanity check embedded *json.RawMessage here
 	var obj map[string]interface{}
-	err = json.Unmarshal(*ev.ActionData, &obj)
+	err = json.Unmarshal(inputEvent.ActionData, &obj)
 	require.NoError(t, err)
 	v, ok := obj["key1"]
 	require.True(t, ok)
@@ -99,6 +86,16 @@ func TestAckRequest(t *testing.T) {
 	p, err := json.Marshal(&ar)
 	require.NoError(t, err)
 	require.NotEmpty(t, p)
+
+	upgEvent, err := ar.Events[2].AsUpgradeEvent()
+	require.NoError(t, err)
+	assert.Equal(t, ts, upgEvent.Timestamp)
+	assert.Equal(t, "test-action-3", upgEvent.ActionId)
+	assert.Equal(t, "test-agent-3", upgEvent.AgentId)
+	assert.Equal(t, "event-message", upgEvent.Message)
+	assert.True(t, upgEvent.Payload.Retry, "expected retry to be true")
+	assert.Equal(t, 2, upgEvent.Payload.RetryAttempt)
+	assert.NotNil(t, upgEvent.Error)
 }
 
 func TestUploadBeginRequest(t *testing.T) {
