@@ -66,7 +66,7 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 		}
 	case OutputTypeRemoteElasticsearch:
 		zlog.Debug().Msg("preparing remote elasticsearch output")
-		newBulker, err := p.createAndGetBulker(ctx, bulker, outputMap)
+		newBulker, err := p.createAndGetBulker(bulker, outputMap)
 		if err != nil {
 			return err
 		}
@@ -272,10 +272,10 @@ func (p *Output) prepareElasticsearch(
 	return nil
 }
 
-func (p *Output) createAndGetBulker(ctx context.Context, mainBulker bulk.Bulk, outputMap map[string]map[string]interface{}) (bulk.Bulk, error) {
+func (p *Output) createAndGetBulker(mainBulker bulk.Bulk, outputMap map[string]map[string]interface{}) (bulk.Bulk, error) {
+	mainBulker.CheckRemoteOutputChanged(p.Name, outputMap[p.Name])
 	bulker := bulkerMap[p.Name]
 	if bulker != nil {
-		mainBulker.CheckRemoteOutputChanged(p.Name, outputMap[p.Name])
 		return bulker, nil
 	}
 	bulkCtx, bulkCancel := context.WithCancel(context.Background())
@@ -296,7 +296,7 @@ func (p *Output) createAndGetBulker(ctx context.Context, mainBulker bulk.Bulk, o
 
 		errCh <- runFunc()
 	}()
-	go func() (err error) {
+	go func() {
 		select {
 		case err = <-errCh:
 		case <-bulkCtx.Done():

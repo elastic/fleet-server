@@ -421,11 +421,11 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 		return err
 	}
 
-	select {
-	case outputChanged := <-bulker.RemoteOutputCh():
+	go func() {
+		outputChanged := <-bulker.RemoteOutputCh()
 		f.outputCh <- outputChanged
 		log.Info().Msg("Remote output configuration update")
-	}
+	}()
 
 	return g.Wait()
 }

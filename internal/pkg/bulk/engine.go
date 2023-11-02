@@ -135,11 +135,18 @@ func (b *Bulker) Tracer() *apm.Tracer {
 func (b *Bulker) CheckRemoteOutputChanged(name string, newCfg map[string]interface{}) {
 	curCfg := b.remoteOutputConfigMap[name]
 
+	// ignore output sent to agents where type is set to elasticsearch
+	if newCfg["type"] == "elasticsearch" {
+		return
+	}
+	b.remoteOutputConfigMap[name] = newCfg
+	if curCfg == nil {
+		return
+	}
 	if !reflect.DeepEqual(curCfg, newCfg) {
-		log.Info().Str("name", name).Msg("remote output configuration has changed")
+		log.Info().Str("name", name).Any("curCfg", curCfg).Any("newCfg", newCfg).Msg("remote output configuration has changed")
 		b.remoteOutputCh <- true
 	}
-	b.remoteOutputConfigMap[name] = curCfg
 }
 
 func (b *Bulker) RemoteOutputCh() chan bool {
