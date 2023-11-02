@@ -139,14 +139,11 @@ func (b *Bulker) CheckRemoteOutputChanged(name string, newCfg map[string]interfa
 	if newCfg["type"] == "elasticsearch" {
 		return
 	}
-	b.remoteOutputConfigMap[name] = newCfg
-	if curCfg == nil {
-		return
-	}
-	if !reflect.DeepEqual(curCfg, newCfg) {
-		log.Info().Str("name", name).Any("curCfg", curCfg).Any("newCfg", newCfg).Msg("remote output configuration has changed")
+	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
+		log.Info().Str("name", name).Msg("remote output configuration has changed")
 		b.remoteOutputCh <- true
 	}
+	b.remoteOutputConfigMap[name] = newCfg
 }
 
 func (b *Bulker) RemoteOutputCh() chan bool {
