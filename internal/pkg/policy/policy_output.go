@@ -302,7 +302,6 @@ func (p *Output) createAndGetBulker(mainBulker bulk.Bulk, outputMap map[string]m
 		case <-bulkCtx.Done():
 			err = bulkCtx.Err()
 		}
-		return
 	}()
 
 	return newBulker, nil
