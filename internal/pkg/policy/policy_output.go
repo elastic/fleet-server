@@ -275,7 +275,7 @@ func (p *Output) prepareElasticsearch(
 func (p *Output) createAndGetBulker(ctx context.Context, mainBulker bulk.Bulk, outputMap map[string]map[string]interface{}) (bulk.Bulk, error) {
 	bulker := bulkerMap[p.Name]
 	if bulker != nil {
-		// TODO replace if hosts or service token changed?
+		mainBulker.CheckRemoteOutputChanged(p.Name, outputMap[p.Name])
 		return bulker, nil
 	}
 	bulkCtx, bulkCancel := context.WithCancel(context.Background())

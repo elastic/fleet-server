@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -68,18 +69,24 @@ type Bulk interface {
 	// Reusing tracer to create bulker for remote ES outputs
 	Tracer() *apm.Tracer
 
+	CheckRemoteOutputChanged(name string, newCfg map[string]interface{})
+
+	RemoteOutputCh() chan bool
+
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
 
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es          esapi.Transport
-	ch          chan *bulkT
-	opts        bulkOptT
-	blkPool     sync.Pool
-	apikeyLimit *semaphore.Weighted
-	tracer      *apm.Tracer
+	es                    esapi.Transport
+	ch                    chan *bulkT
+	opts                  bulkOptT
+	blkPool               sync.Pool
+	apikeyLimit           *semaphore.Weighted
+	tracer                *apm.Tracer
+	remoteOutputConfigMap map[string]map[string]interface{}
+	remoteOutputCh        chan bool
 }
 
 const (
@@ -101,12 +108,14 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 	}
 
 	return &Bulker{
-		opts:        bopts,
-		es:          es,
-		ch:          make(chan *bulkT, bopts.blockQueueSz),
-		blkPool:     sync.Pool{New: poolFunc},
-		apikeyLimit: semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
-		tracer:      tracer,
+		opts:                  bopts,
+		es:                    es,
+		ch:                    make(chan *bulkT, bopts.blockQueueSz),
+		blkPool:               sync.Pool{New: poolFunc},
+		apikeyLimit:           semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
+		tracer:                tracer,
+		remoteOutputConfigMap: make(map[string]map[string]interface{}),
+		remoteOutputCh:        make(chan bool, 1),
 	}
 }
 
@@ -120,6 +129,21 @@ func (b *Bulker) Client() *elasticsearch.Client {
 
 func (b *Bulker) Tracer() *apm.Tracer {
 	return b.tracer
+}
+
+// check if remote output cfg changed, and signal to remoteOutputCh channel if so
+func (b *Bulker) CheckRemoteOutputChanged(name string, newCfg map[string]interface{}) {
+	curCfg := b.remoteOutputConfigMap[name]
+
+	if !reflect.DeepEqual(curCfg, newCfg) {
+		log.Info().Str("name", name).Msg("remote output configuration has changed")
+		b.remoteOutputCh <- true
+	}
+	b.remoteOutputConfigMap[name] = curCfg
+}
+
+func (b *Bulker) RemoteOutputCh() chan bool {
+	return b.remoteOutputCh
 }
 
 // read secrets one by one as there is no bulk API yet to read them in one request

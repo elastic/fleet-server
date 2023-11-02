@@ -84,6 +84,14 @@ func (m *MockBulk) Tracer() *apm.Tracer {
 	return args.Get(0).(*apm.Tracer)
 }
 
+func (m *MockBulk) CheckRemoteOutputChanged(name string, newCfg map[string]interface{}) {
+}
+
+func (m *MockBulk) RemoteOutputCh() chan bool {
+	args := m.Called()
+	return args.Get(0).(chan bool)
+}
+
 func (m *MockBulk) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
 	result := make(map[string]string)
 	for _, id := range secretIds {
