@@ -152,7 +152,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	}
 
 	err = output.prepareElasticsearch(
-		context.Background(), zerolog.Nop(), bulker, &agent, policyMap)
+		context.Background(), zerolog.Nop(), bulker, bulker, &agent, policyMap)
 	require.NoError(t, err)
 
 	// need to wait a bit before querying the agent again
