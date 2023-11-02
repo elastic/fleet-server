@@ -73,6 +73,18 @@ type tserver struct {
 	bulker    bulk.Bulk
 }
 
+var policyData = model.PolicyData{
+	Outputs: map[string]map[string]interface{}{
+		"default": {
+			"type": "elasticsearch",
+		},
+	},
+	OutputPermissions: json.RawMessage(`{"default": {}}`),
+	Inputs: []map[string]interface{}{{
+		"type": "fleet-server",
+	}},
+}
+
 func (s *tserver) baseURL() string {
 	input, _ := s.cfg.GetFleetInput()
 	tls := input.Server.TLS
