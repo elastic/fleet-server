@@ -20,6 +20,7 @@ func TestValidateUserAgent(t *testing.T) {
 		userAgent string
 		verCon    version.Constraints
 		err       error
+		repVer   string
 	}{
 		{
 			userAgent: "",
@@ -55,16 +56,19 @@ func TestValidateUserAgent(t *testing.T) {
 			userAgent: "eLaStIc AGeNt v7.13.0",
 			verCon:    mustBuildConstraints("7.13.0"),
 			err:       nil,
+			repVer:    "7.13.0",
 		},
 		{
 			userAgent: "eLaStIc AGeNt v7.13.0",
 			verCon:    mustBuildConstraints("7.13.1"),
 			err:       nil,
+			repVer:    "7.13.0",
 		},
 		{
 			userAgent: "eLaStIc AGeNt v7.13.1",
 			verCon:    mustBuildConstraints("7.13.0"),
 			err:       nil,
+			repVer:    "7.13.1",
 		},
 		{
 			userAgent: "eLaStIc AGeNt v7.14.0",
@@ -80,43 +84,64 @@ func TestValidateUserAgent(t *testing.T) {
 			userAgent: "eLaStIc AGeNt v7.13.0",
 			verCon:    mustBuildConstraints("8.0.0"),
 			err:       nil,
+			repVer:    "7.13.0",
 		},
 		{
 			userAgent: "eLaStIc AGeNt v7.13.0",
 			verCon:    mustBuildConstraints("8.0.0-alpha1"),
 			err:       nil,
+			repVer:    "7.13.0",
 		},
 		{
 			userAgent: "eLaStIc AGeNt v8.0.0-alpha1",
 			verCon:    mustBuildConstraints("8.0.0-alpha1"),
 			err:       nil,
+			repVer:    "8.0.0",
 		},
 		{
 			userAgent: "eLaStIc AGeNt v8.0.0-alpha1",
 			verCon:    mustBuildConstraints("8.0.0"),
 			err:       nil,
+			repVer:    "8.0.0",
 		},
 		{
 			userAgent: "eLaStIc AGeNt v8.0.0-anything",
 			verCon:    mustBuildConstraints("8.0.0"),
 			err:       nil,
+			repVer:    "8.0.0",
 		},
 		{
 			userAgent: "eLaStIc AGeNt v7.15.0-anything",
 			verCon:    mustBuildConstraints("8.0.0"),
 			err:       nil,
+			repVer:    "7.15.0",
 		},
 		{
 			userAgent: "eLaStIc AGeNt v7.15.0-anything",
 			verCon:    mustBuildConstraints("8.0.0-beta1"),
 			err:       nil,
+			repVer:    "7.15.0",
+		},
+		{
+			userAgent: "Elastic Agent v8.10.0+build1234",
+			verCon:    mustBuildConstraints("8.10.0"),
+			err:       nil,
+			repVer:	  "8.10.0+build1234",
+		},
+		{
+			userAgent: "Elastic Agent v8.10.0+build1234",
+			verCon:    mustBuildConstraints("8.9.0"),
+			err:       ErrUnsupportedVersion,
 		},
 	}
 	for _, tr := range tests {
 		t.Run(tr.userAgent, func(t *testing.T) {
-			_, res := validateUserAgent(context.Background(), zerolog.Nop(), tr.userAgent, tr.verCon)
+			repVer, res := validateUserAgent(context.Background(), zerolog.Nop(), tr.userAgent, tr.verCon)
 			if !errors.Is(tr.err, res) {
 				t.Fatalf("err mismatch: %v != %v", tr.err, res)
+			}
+			if tr.repVer != "" && tr.repVer != repVer {
+				t.Fatalf("version mismatch: %v != %v", tr.repVer, repVer)
 			}
 		})
 	}
