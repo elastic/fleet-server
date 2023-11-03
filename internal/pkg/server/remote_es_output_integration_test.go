@@ -52,16 +52,22 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	typeRaw := action["type"]
 	require.Equal(t, "POLICY_CHANGE", typeRaw)
 	dataRaw := action["data"]
-	data := dataRaw.(map[string]interface{})
-	policy := data["policy"].(map[string]interface{})
-	outputs := policy["outputs"].(map[string]interface{})
-	remoteES := outputs["remoteES"].(map[string]interface{})
+	data, ok := dataRaw.(map[string]interface{})
+	require.True(t, ok, "expected data to be map")
+	policy, ok := data["policy"].(map[string]interface{})
+	require.True(t, ok, "expected policy to be map")
+	outputs, ok := policy["outputs"].(map[string]interface{})
+	require.True(t, ok, "expected outputs to be map")
+	remoteES, ok := outputs["remoteES"].(map[string]interface{})
+	require.True(t, ok, "expected remoteES to be map")
 	oType := remoteES["type"].(string)
+	require.True(t, ok, "expected type to be string")
 	require.Equal(t, "elasticsearch", oType)
 	serviceToken := remoteES["service_token"]
 	require.Equal(t, nil, serviceToken)
 	remoteAPIKey := remoteES["api_key"]
-	defaultOutput := outputs["default"].(map[string]interface{})
+	defaultOutput, ok := outputs["default"].(map[string]interface{})
+	require.True(t, ok, "expected default to be map")
 	defaultAPIKey := defaultOutput["api_key"]
 	require.False(t, remoteAPIKey == defaultAPIKey, "expected remote api key to be different than default")
 
