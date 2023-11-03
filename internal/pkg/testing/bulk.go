@@ -80,8 +80,7 @@ func (m *MockBulk) Client() *elasticsearch.Client {
 }
 
 func (m *MockBulk) Tracer() *apm.Tracer {
-	args := m.Called()
-	return args.Get(0).(*apm.Tracer)
+	return nil
 }
 
 func (m *MockBulk) CheckRemoteOutputChanged(name string, newCfg map[string]interface{}) {
