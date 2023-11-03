@@ -103,7 +103,7 @@ func WithAPM(url string, enabled bool) Option {
 	}
 }
 
-func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserver, error) {
+func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData, opts ...Option) (*tserver, error) {
 	t.Helper()
 
 	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
@@ -120,7 +120,7 @@ func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserve
 		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
-		Data:               &policyData,
+		Data:               &policyD,
 	})
 	if err != nil {
 		return nil, err
@@ -392,7 +392,7 @@ func TestServerUnauthorized(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
@@ -502,7 +502,7 @@ func TestServerInstrumentation(t *testing.T) {
 	defer server.Close()
 
 	// Start test server with instrumentation disabled
-	srv, err := startTestServer(t, ctx, WithAPM(server.URL, false))
+	srv, err := startTestServer(t, ctx, policyData, WithAPM(server.URL, false))
 	require.NoError(t, err)
 
 	agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
@@ -586,7 +586,7 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 
 	cli := cleanhttp.DefaultClient()
@@ -696,7 +696,7 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
 }
 
-func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) string {
+func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) (string, string) {
 	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -721,7 +721,14 @@ func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tser
 	mm, ok := item.(map[string]interface{})
 	require.True(t, ok, "expected attribute item to be an object")
 	agentID := mm["id"]
-	return agentID.(string)
+
+	apiKey, ok := mm["access_api_key"]
+	require.True(t, ok, "expected attribute access_api_key is missing")
+	key, ok := apiKey.(string)
+	require.True(t, ok, "expected attribute access_api_key to be a string")
+	require.NotEmpty(t, key)
+
+	return agentID.(string), key
 }
 
 func Test_Agent_Enrollment_Id(t *testing.T) {
@@ -739,14 +746,14 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 
 	t.Log("Enroll the first agent with enrollment_id")
-	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	t.Log("Enroll the second agent with the same enrollment_id")
-	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	secondAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	// cleanup
 	defer func() {
@@ -785,11 +792,11 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 
 	t.Log("Enroll the first agent with enrollment_id")
-	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
 	if err != nil {
@@ -804,7 +811,7 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	}
 
 	t.Log("Enroll the second agent with the same enrollment_id")
-	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	secondAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	// cleanup
 	defer func() {
@@ -833,7 +840,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 
 	cli := cleanhttp.DefaultClient()
@@ -953,7 +960,7 @@ func Test_Agent_request_errors(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 
 	cli := cleanhttp.DefaultClient()
@@ -1028,7 +1035,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 
 	cli := cleanhttp.DefaultClient()
