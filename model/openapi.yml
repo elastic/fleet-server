@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: fleet-server API
-  version: 0000-00-00
+  version: "0000-00-00"
   license:
     name: Elastic License 2.0
     url: https://www.elastic.co/licensing/elastic-license
@@ -415,12 +415,8 @@ components:
     action:
       description: |
         An action for an elastic-agent.
-        The actions are defined in generic terms on the fleet-server.
-        The elastic-agent will have additional details for what is expected when a specific action-type is recieved.
-        Many attributes in this schema also contain yaml tags so the elastic-agent may serialize them.
         The structure of the `data` attribute will vary between action types.
-
-        An additional consideration is Scheduled Actions. Scheduled actions are currently defined as actions that have non-empty values for both the `start_time` and `expiration` attributes.
+        model/schema.json has a looser definition of actions and it define's fleet-server's interactions with Elasticsearch when retrieving actions.
       type: object
       required:
         - agent_id
@@ -457,6 +453,15 @@ components:
           x-go-custom-tag: yaml:"data"
           x-oapi-codegen-extra-tags:
             yaml: "data"
+          oneOf:
+            - $ref: "#/components/schemas/actionPolicyReassign"
+            - $ref: "#/components/schemas/actionPolicyChange"
+            - $ref: "#/components/schemas/actionUpgrade"
+            - $ref: "#/components/schemas/actionUnenroll"
+            - $ref: "#/components/schemas/actionSettings"
+            - $ref: "#/components/schemas/actionCancel"
+            - $ref: "#/components/schemas/actionRequestDiagnostics"
+            - $ref: "#/components/schemas/actionInputAction"
         id:
           description: The action ID.
           type: string
@@ -470,8 +475,17 @@ components:
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "traceparent"
         type:
-          description: The action type.
+          description: The action type. If fleet-server encounters an action that does not have a type listed below it will be filtered out and an error will be logged.
           type: string
+          enum:
+            - "UPGRADE"
+            - "UNENROLL"
+            - "POLICY_CHANGE"
+            - "POLICY_REASSIGN"
+            - "SETTINGS"
+            - "INPUT_ACTION"
+            - "CANCEL"
+            - "REQUEST_DIAGNOSTICS"
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
@@ -490,7 +504,93 @@ components:
             yaml: "timeout"
         signed:
           $ref: "#/components/schemas/actionSignature"
-
+    policyData:
+      type: object
+      description: The full policy that an agent should run after combining with local configuration/env vars.
+      properties:
+        id:
+          description: The policy's ID.
+          type: string
+        outputs:
+          description: A map of all outputs that the agent running the policy can use to send data to.
+          type: object
+        inputs:
+          description: A list of all inputs that the agent should run.
+          type: array
+          items:
+            type: object
+        revision:
+          description: The revision number of the policy. Should match revision_idx.
+          type: integer
+        agent:
+          description: Agent configuration details associated with the policy. May include configuration toggling monitoring, uninstallation protection, etc.
+          type: object
+        signed:
+          $ref: "#/components/schemas/actionSignature"
+        output_permissions:
+          description: Elasticsearch permissions that the agent requires in order to run the policy.
+          type: object
+        fleet:
+          description: Agent configuration to describe how to connect to fleet-server.
+          type: object
+    actionUnenroll:
+      description: The UNENROLL action data.
+      # unenroll actions have no `data` attribute
+    actionRequestDiagnostics:
+      description: The REQUEST_DIAGNOSTICS action data.
+      # diagnostics actions have no `data` attribute
+    actionPolicyReassign:
+      description: The POLICY_REASSIGN action data.
+      type: object
+      required:
+        - policy_id
+      properties:
+        policy_id:
+          desription: The policy ID the agent has been reassigned to.
+          type: string
+    actionPolicyChange:
+      description: The POLICY_CHANGE action data.
+      type: object
+      required:
+        - policy
+      properties:
+        policy:
+          $ref:  "#/components/schemas/policyData"
+    actionUpgrade:
+      description: the UPGRADE action data.
+      type: object
+      required:
+        - version
+      properties:
+        version:
+          description: The version number that the agent should upgrade to.
+          type: string
+        source_uri:
+          description: The source of the upgrade artifact.
+          type: string
+    actionSettings:
+      description: The SETTINGS action data.
+      type: object
+      properties:
+        log_level:
+          type: string
+          enum:
+            - debug
+            - info
+            - warning
+            - error
+    actionCancel:
+      description: The CANCEL action data.
+      type: object
+      required:
+        - target_id
+      properties:
+        target_id:
+          decription: The action to attempt to cancel.
+          type: string
+    actionInputAction:
+      description: The INPUT_ACTION action data.
+      type: object # FIXME: needs security team to define fields as the action is passed from the agent to their componenets.
     checkinResponse:
       type: object
       required:
@@ -507,129 +607,146 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/action"
-    event:
-      description: The ack for a specific action that the elastic-agent has executed.
+    eventType:
+      deprecated: true
+      description: |
+        The event type of the ack.
+        Currently the elastic-agent will only generate ACTION_RESULT events.
+
+        Not used by fleet-server.
+        Actions that have errored should use the error attribute to communicate an error status.
+        Additional action status information can be provided in the data attribute.
+      type: string
+      enum:
+        - STATE
+        - ERROR
+        - ACTION_RESULT
+        - ACTION
+    eventSubtype:
+      deprecated: true
+      description: |
+        The subtype of the ack event.
+        The elastic-agent will only generate ACKNOWLEDGED events.
+
+        Not used by fleet-server.
+        Actions that have errored should use the error attribute to communicate an error status.
+        Additional action status information can be provided in the data attribute.
+      type: string
+      enum:
+        - RUNNING
+        - STARTING
+        - IN_PROGRESS
+        - CONFIG
+        - FAILED
+        - STOPPING
+        - STOPPED
+        - DATA_DUMP
+        - ACKNOWLEDGED
+        - UNKNOWN
+    genericEvent:
+      description: A generic ack event for an action. Includes an optional error attribute.
       type: object
       required:
         - type
         - subtype
         - agent_id
         - action_id
-        - action_input_type
-        - policy_id
-        - stream_id
-        - timestamp
         - message
-        - started_at
-        - completed_at
+        - timestamp
       properties:
         type:
-          deprecated: true
-          description: |
-            The event type of the ack.
-            Currently the elastic-agent will only generate ACTION_RESULT events.
-
-            Not used by fleet-server.
-            Actions that have errored should use the error attribute to communicate an error status.
-            Additional action status information can be provided in the data attribute.
-          type: string
-          enum:
-            - STATE
-            - ERROR
-            - ACTION_RESULT
-            - ACTION
+          $ref: "#/components/schemas/eventType"
         subtype:
-          deprecated: true
-          description: |
-            The subtype of the ack event.
-            The elastic-agent will only generate ACKNOWLEDGED events.
-
-            Not used by fleet-server.
-            Actions that have errored should use the error attribute to communicate an error status.
-            Additional action status information can be provided in the data attribute.
-          type: string
-          enum:
-            - RUNNING
-            - STARTING
-            - IN_PROGRESS
-            - CONFIG
-            - FAILED
-            - STOPPING
-            - STOPPED
-            - DATA_DUMP
-            - ACKNOWLEDGED
-            - UNKNOWN
+          $ref: "#/components/schemas/eventSubtype"
         agent_id:
           description: The ID of the agent that executed the action.
           type: string
         action_id:
           description: The action ID.
           type: string
-        action_input_type:
-          description: The input_type of the action for input actions.
-          type: string
-        policy_id:
-          deprecated: true
-          description: Not used by the fleet-server.
-          type: string
-        stream_id:
-          deprecated: true
-          description: Not used by the fleet-server.
+        message:
+          description: An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
           type: string
         timestamp:
           description: The timestamp of the acknowledgement event. Has the format of "2006-01-02T15:04:05.99999-07:00"
           type: string
-          #format: date-time
-        message:
-          description: An acknowlegement message. The elastic-agent inserts the action ID and action type into this message.
-          type: string
-        payload:
-          deprecated: true
-          description: |
-            An embedded JSON object that contains additional information for the fleet-server to process.
-            Defined as a json.RawMessage in both the fleet-server and the elastic-agent.
-
-            Is currently used by UPGRADE actions to signal retries.
-            If the error attribute is non empty payload is checked for `retry: bool` and `retry_attempt: int`.
-            If retry is true, fleet-serve will mark the agent as retrying, if it's false the upgrade will be marked as failed.
-
-            Additional action status information can be provided in the data attribute.
-          type: string
-          format: application/json
-          x-go-type: json.RawMessage
-        started_at:
-          description: The time at which the action was started. Used only when acknowledging input actions.
-          type: string
-          #format: date-time
-        completed_at:
-          description: The time at which the action was completed. Used only when acknowledging input actions
-          type: string
-          #format: date-time
-        action_data:
-          description: The action data for the input action being acknowledged.
-          type: string
-          format: application/json
-          x-go-type: json.RawMessage
-        action_response:
-          description: The action response for the input action being acknowledged.
-          type: string
-          format: application/json
-          x-go-type: json.RawMessage
-        data:
-          description: |
-            An embedded JSON object that has the data about the ack.
-
-            Used by REQUEST_DIAGNOSTICS actions.
-            Contains a `upload_id` attribute used to communicate the successfullly uploaded diagnostics ID.
-          type: string
-          format: application/json
-          x-go-type: json.RawMessage
+          format: date-time
         error:
           description: |
             An error message.
             If this is non-empty an error has occured when executing the action.
             For some actions (such as UPGRADE actions) it may result in the action being marked as failed.
           type: string
+    upgradeEvent:
+      description: The ack event for an upgrade action
+      allOf:
+        - $ref: "#/components/schemas/genericEvent"
+        - type: object
+          deprecated: true # replaced by upgrade_details in checkin requests in more recent agent releases.
+          properties:
+            payload:
+              deprecated: true
+              description: |
+                If the payload is part of an upgrade event action ack it will include information about if the agent  will retry the upgrade.
+                Payload is only used by upgrade acks and has been replaced in more recent versions by the checkin's upgrade_details attribute.
+              type: object
+              required:
+                - retry
+                - retry_attempt
+              properties:
+                retry:
+                  description: If the agent will retry the upgrade or not.
+                  type: boolean
+                retry_attempt:
+                  description: The number of attempts the agent has made so far, -1 indicates no future attempts and that the upgrade has failed.
+                  type: integer
+    diagnosticsEvent:
+      description: The ack event for a request diagnostics action.
+      allOf:
+        - $ref: "#/components/schemas/genericEvent"
+        - type: object
+          properties:
+            data:
+              type: object
+              required:
+                - upload_id
+              properties:
+                upload_id:
+                  description: The upload ID for the diagnostics bundle.
+                  type: string
+    inputEvent:
+      description: The ack event for an input action.
+      allOf:
+        - $ref: "#/components/schemas/genericEvent"
+        - type: object
+          required:
+          - action_input_type
+          - action_data
+          - action_response
+          - started_at
+          - completed_at
+          properties:
+            action_input_type:
+              description: The input_type of the action for input actions.
+              type: string
+            action_data:
+              description: The action data for the input action being acknowledged.
+              type: string
+              format: application/json
+              x-go-type: json.RawMessage
+            action_response:
+              description: The action response for the input action being acknowledged.
+              type: string
+              format: application/json
+              x-go-type: json.RawMessage
+            started_at:
+              description: The time at which the action was started.
+              type: string
+              format: date-time
+            completed_at:
+              description: The time at which the action was completed.
+              type: string
+              format: date-time
     ackRequest:
       description: The request an elastic-agent sends to fleet-serve to acknowledge the execution of one or more actions.
       type: object
@@ -639,7 +756,11 @@ components:
         events:
           type: array
           items:
-            $ref: "#/components/schemas/event"
+            anyOf:
+              - $ref: "#/components/schemas/genericEvent"
+              - $ref: "#/components/schemas/upgradeEvent"
+              - $ref: "#/components/schemas/diagnosticsEvent"
+              - $ref: "#/components/schemas/inputEvent"
     ackResponseItem:
       description: The results of processing an acknowledgement event.
       type: object

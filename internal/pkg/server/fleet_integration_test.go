@@ -120,7 +120,7 @@ func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserve
 		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
-		Data:               policyData,
+		Data:               &policyData,
 	})
 	if err != nil {
 		return nil, err
@@ -300,7 +300,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
-		Data:               policyData,
+		Data:               &policyData,
 	})
 	require.NoError(t, err)
 
@@ -1072,15 +1072,19 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Ack actions for agent %s", agentID)
-	events := make([]api.Event, 0, len(*checkinResponse.Actions))
+	events := make([]api.AckRequest_Events_Item, 0, len(*checkinResponse.Actions))
 	for _, action := range *checkinResponse.Actions {
-		events = append(events, api.Event{
+		event := api.GenericEvent{
 			ActionId: action.Id,
 			AgentId:  agentID,
 			Message:  "test-message",
 			Type:     api.ACTIONRESULT,
 			Subtype:  api.ACKNOWLEDGED,
-		})
+		}
+		ev := api.AckRequest_Events_Item{}
+		err := ev.FromGenericEvent(event)
+		require.NoError(t, err)
+		events = append(events, ev)
 	}
 	p, err := json.Marshal(api.AckRequest{Events: events})
 	require.NoError(t, err)

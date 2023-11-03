@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
@@ -444,6 +445,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		{
+			ErrPolicyNotFound,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrPolicyNotFound",
+				"ErrPolicyNotFound",
+				zerolog.InfoLevel,
+			},
+		},
 	}
 
 	for _, e := range errTable {
@@ -513,6 +523,11 @@ func ErrorResp(w http.ResponseWriter, r *http.Request, err error) {
 		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
 	}
 	e.Msg("HTTP request error")
+
+	if resp.StatusCode >= 500 {
+		apm.CaptureError(r.Context(), err).Send()
+	}
+
 	if rerr := resp.Write(w); rerr != nil {
 		zlog.Error().Err(rerr).Msg("fail writing error response")
 	}

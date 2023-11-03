@@ -6,7 +6,6 @@ package policy
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -209,12 +208,7 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 		return client.UnitStateStarting, nil
 	}
 
-	var data policyData
-	err := json.Unmarshal(m.policy.Data, &data)
-	if err != nil {
-		return client.UnitStateFailed, err
-	}
-	if !data.HasType("fleet-server") {
+	if !HasFleetServerInput(m.policy.Data.Inputs) {
 		// no fleet-server input
 		m.state = client.UnitStateStarting
 		if m.policyID == "" {
@@ -260,17 +254,13 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 	return state, nil
 }
 
-type policyData struct {
-	Inputs []policyInput `json:"inputs"`
-}
-
-type policyInput struct {
-	Type string `json:"type"`
-}
-
-func (d *policyData) HasType(val string) bool {
-	for _, input := range d.Inputs {
-		if input.Type == val {
+func HasFleetServerInput(inputs []map[string]interface{}) bool {
+	for _, input := range inputs {
+		attr, ok := input["type"].(string)
+		if !ok {
+			return false
+		}
+		if attr == "fleet-server" {
 			return true
 		}
 	}

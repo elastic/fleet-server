@@ -6,35 +6,26 @@ package policy
 
 import (
 	"context"
-	"encoding/json"
 	"regexp"
 	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
-
-type SecretReference struct {
-	ID string `json:"id"`
-}
 
 var (
 	secretRegex = regexp.MustCompile(`\$co\.elastic\.secret{(.*)}`)
 )
 
 // read secret values that belong to the agent policy's secret references, returns secrets as id:value map
-func getSecretValues(ctx context.Context, secretRefsRaw json.RawMessage, bulker bulk.Bulk) (map[string]string, error) {
-	if secretRefsRaw == nil {
+func getSecretValues(ctx context.Context, secretRefs []model.SecretReferencesItems, bulker bulk.Bulk) (map[string]string, error) {
+	if len(secretRefs) == 0 {
 		return nil, nil
 	}
 
-	var secretValues []SecretReference
-	err := json.Unmarshal([]byte(secretRefsRaw), &secretValues)
-	if err != nil {
-		return nil, err
-	}
-
-	ids := make([]string, 0)
-	for _, ref := range secretValues {
+	ids := make([]string, 0, len(secretRefs))
+	for _, ref := range secretRefs {
 		ids = append(ids, ref.ID)
 	}
 
@@ -48,33 +39,27 @@ func getSecretValues(ctx context.Context, secretRefsRaw json.RawMessage, bulker 
 
 // read inputs and secret_references from agent policy
 // replace values of secret refs in inputs and input streams properties
-func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawMessage, bulker bulk.Bulk) ([]map[string]interface{}, error) {
-	if fields["inputs"] == nil {
+func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bulker bulk.Bulk) ([]map[string]interface{}, error) {
+	if len(data.Inputs) == 0 {
 		return nil, nil
 	}
 
-	var inputs []map[string]interface{}
-	err := json.Unmarshal([]byte(fields["inputs"]), &inputs)
-	if err != nil {
-		return nil, err
+	if len(data.SecretReferences) == 0 {
+		return data.Inputs, nil
 	}
 
-	if fields["secret_references"] == nil {
-		return inputs, nil
-	}
-
-	secretValues, err := getSecretValues(ctx, fields["secret_references"], bulker)
+	secretValues, err := getSecretValues(ctx, data.SecretReferences, bulker)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]map[string]interface{}, 0)
-	for _, input := range inputs {
+	for _, input := range data.Inputs {
 		newInput := make(map[string]interface{})
 		for k, v := range input {
 			// replace secret refs in input stream fields
 			if k == "streams" {
-				if streams, ok := input[k].([]any); ok {
+				if streams, ok := v.([]any); ok {
 					newInput[k] = processStreams(streams, secretValues)
 				}
 				// replace secret refs in input fields
@@ -89,8 +74,92 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 		}
 		result = append(result, newInput)
 	}
-	delete(fields, "secret_references")
+	data.SecretReferences = nil
 	return result, nil
+}
+
+type OutputSecret struct {
+	Path []string
+	ID   string
+}
+
+func getSecretIDAndPath(secret smap.Map) ([]OutputSecret, error) {
+	outputSecrets := make([]OutputSecret, 0)
+
+	secretID := secret.GetString("id")
+	if secretID != "" {
+		outputSecrets = append(outputSecrets, OutputSecret{
+			Path: make([]string, 0),
+			ID:   secretID,
+		})
+
+		return outputSecrets, nil
+	}
+
+	for secretKey := range secret {
+		newOutputSecrets, err := getSecretIDAndPath(secret.GetMap(secretKey))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, secret := range newOutputSecrets {
+			path := append([]string{secretKey}, secret.Path...)
+			outputSecrets = append(outputSecrets, OutputSecret{
+				Path: path,
+				ID:   secret.ID,
+			})
+		}
+	}
+
+	return outputSecrets, nil
+}
+
+func setSecretPath(output smap.Map, secretValue string, secretPaths []string) error {
+	// Break the recursion
+	if len(secretPaths) == 1 {
+		output[secretPaths[0]] = secretValue
+
+		return nil
+	}
+	path, secretPaths := secretPaths[0], secretPaths[1:]
+
+	if output.GetMap(path) == nil {
+		output[path] = make(map[string]interface{})
+	}
+
+	return setSecretPath(output.GetMap(path), secretValue, secretPaths)
+}
+
+// Read secret from output and mutate output with secret value
+func processOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) error {
+	secrets := output.GetMap(FieldOutputSecrets)
+
+	delete(output, FieldOutputSecrets)
+	secretReferences := make([]model.SecretReferencesItems, 0)
+	outputSecrets, err := getSecretIDAndPath(secrets)
+	if err != nil {
+		return err
+	}
+
+	for _, secret := range outputSecrets {
+		secretReferences = append(secretReferences, model.SecretReferencesItems{
+			ID: secret.ID,
+		})
+	}
+	if len(secretReferences) == 0 {
+		return nil
+	}
+	secretValues, err := getSecretValues(ctx, secretReferences, bulker)
+	if err != nil {
+		return err
+	}
+	for _, secret := range outputSecrets {
+		err = setSecretPath(output, secretValues[secret.ID], secret.Path)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func processStreams(streams []any, secretValues map[string]string) []any {

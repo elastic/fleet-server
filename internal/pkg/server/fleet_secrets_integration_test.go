@@ -82,30 +82,27 @@ func createSecret(t *testing.T, ctx context.Context, bulker bulk.Bulk) string {
 
 func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk.Bulk, secretID string, secretRef string) string {
 	policyID := uuid.Must(uuid.NewV4()).String()
-	var policyDataWSecrets = map[string]interface{}{
-		"name": "TestPolicy " + policyID,
-		"outputs": map[string]interface{}{
-			"default": map[string]string{
+	var policyData = model.PolicyData{
+		Outputs: map[string]map[string]interface{}{
+			"default": {
 				"type": "elasticsearch",
-			}},
-		"output_permissions": map[string]interface{}{
-			"default": map[string]string{},
+			},
 		},
-		"inputs": []map[string]string{{
+		OutputPermissions: json.RawMessage(`{"default":{}}`),
+		Inputs: []map[string]interface{}{{
 			"type":               "fleet-server",
 			"package_var_secret": secretRef,
 		}},
-		"secret_references": []map[string]string{{
-			"id": secretID,
+		SecretReferences: []model.SecretReferencesItems{{
+			ID: secretID,
 		}},
 	}
-	policyDataJSON, _ := json.Marshal(policyDataWSecrets)
 
 	_, err := dl.CreatePolicy(ctx, bulker, model.Policy{
 		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
-		Data:               policyDataJSON,
+		Data:               &policyData,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -219,23 +216,13 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 
 	// expect 1 POLICY_CHANGE action
 	assert.Equal(t, 1, len(*checkinResponse.Actions))
-	var actionDataRaw interface{}
-	for _, action := range *checkinResponse.Actions {
-		actionDataRaw = action.Data
-		assert.Equal(t, "POLICY_CHANGE", action.Type)
-	}
+	assert.Equal(t, api.POLICYCHANGE, (*checkinResponse.Actions)[0].Type)
+	actionData, err := (*checkinResponse.Actions)[0].Data.AsActionPolicyChange()
+	require.NoError(t, err)
+	require.NotNil(t, actionData.Policy.Inputs)
+	require.NotNil(t, (*actionData.Policy.Inputs)[0])
 
-	actionData, ok := actionDataRaw.(map[string]interface{})
-	require.True(t, ok, "expected attribute action.Data to be an object")
-
-	policy, ok := actionData["policy"].(map[string]interface{})
-	require.True(t, ok, "expected attribute policy to be an object")
-	inputs, ok := policy["inputs"].([]interface{})
-	require.True(t, ok, "expected attribute inputs to be an array")
-
-	input, ok := inputs[0].(map[string]interface{})
-	require.True(t, ok, "expected first input to be an object")
-
+	input := (*actionData.Policy.Inputs)[0]
 	// expect secret reference replaced with secret value
 	assert.Equal(t, map[string]interface{}{
 		"package_var_secret": "secret_value",

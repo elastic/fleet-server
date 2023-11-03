@@ -80,10 +80,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	policyID := uuid.Must(uuid.NewV4()).String()
 	rId := xid.New().String()
-	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	pData := model.PolicyData{Inputs: []map[string]interface{}{}}
 	policy := model.Policy{
 		ESDocument: model.ESDocument{
 			Id:      rId,
@@ -92,11 +89,11 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		},
 		PolicyID:           policyID,
 		CoordinatorIdx:     1,
-		Data:               policyContents,
+		Data:               &pData,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
 	}
-	pData, err := json.Marshal(&policy)
+	p, err := json.Marshal(&policy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +101,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		ID:      rId,
 		SeqNo:   1,
 		Version: 1,
-		Source:  pData,
+		Source:  p,
 	}}
 
 	// should still be set to starting
@@ -120,14 +117,11 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	})
 
 	rId = xid.New().String()
-	policyContents, err = json.Marshal(&policyData{Inputs: []policyInput{
+	pData = model.PolicyData{Inputs: []map[string]interface{}{
 		{
-			Type: "fleet-server",
+			"type": "fleet-server",
 		},
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	}}
 	policy = model.Policy{
 		ESDocument: model.ESDocument{
 			Id:      rId,
@@ -136,11 +130,11 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		},
 		PolicyID:           policyID,
 		CoordinatorIdx:     1,
-		Data:               policyContents,
+		Data:               &pData,
 		RevisionIdx:        2,
 		DefaultFleetServer: true,
 	}
-	pData, err = json.Marshal(&policy)
+	p, err = json.Marshal(&policy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +142,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		ID:      rId,
 		SeqNo:   2,
 		Version: 1,
-		Source:  pData,
+		Source:  p,
 	}}
 
 	// should now be set to healthy
@@ -236,14 +230,11 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	policyID := uuid.Must(uuid.NewV4()).String()
 	rId := xid.New().String()
-	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{
+	pData := model.PolicyData{Inputs: []map[string]interface{}{
 		{
-			Type: "fleet-server",
+			"type": "fleet-server",
 		},
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	}}
 	policy := model.Policy{
 		ESDocument: model.ESDocument{
 			Id:      rId,
@@ -252,7 +243,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		},
 		PolicyID:           policyID,
 		CoordinatorIdx:     1,
-		Data:               policyContents,
+		Data:               &pData,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
 	}
@@ -381,10 +372,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	rId := xid.New().String()
-	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	pData := model.PolicyData{Inputs: []map[string]interface{}{}}
 	policy := model.Policy{
 		ESDocument: model.ESDocument{
 			Id:      rId,
@@ -393,11 +381,11 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		},
 		PolicyID:           policyID,
 		CoordinatorIdx:     1,
-		Data:               policyContents,
+		Data:               &pData,
 		RevisionIdx:        2,
 		DefaultFleetServer: true,
 	}
-	pData, err := json.Marshal(&policy)
+	p, err := json.Marshal(&policy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +393,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		ID:      rId,
 		SeqNo:   1,
 		Version: 1,
-		Source:  pData,
+		Source:  p,
 	}}
 
 	// should still be set to starting
@@ -421,14 +409,11 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	rId = xid.New().String()
-	policyContents, err = json.Marshal(&policyData{Inputs: []policyInput{
+	pData = model.PolicyData{Inputs: []map[string]interface{}{
 		{
-			Type: "fleet-server",
+			"type": "fleet-server",
 		},
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	}}
 	policy = model.Policy{
 		ESDocument: model.ESDocument{
 			Id:      rId,
@@ -437,11 +422,11 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		},
 		PolicyID:           policyID,
 		CoordinatorIdx:     1,
-		Data:               policyContents,
+		Data:               &pData,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
 	}
-	pData, err = json.Marshal(&policy)
+	p, err = json.Marshal(&policy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -449,7 +434,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		ID:      rId,
 		SeqNo:   2,
 		Version: 1,
-		Source:  pData,
+		Source:  p,
 	}}
 
 	// should now be set to healthy
@@ -537,14 +522,11 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	rId := xid.New().String()
-	policyContents, err := json.Marshal(&policyData{Inputs: []policyInput{
+	pData := model.PolicyData{Inputs: []map[string]interface{}{
 		{
-			Type: "fleet-server",
+			"type": "fleet-server",
 		},
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	}}
 	policy := model.Policy{
 		ESDocument: model.ESDocument{
 			Id:      rId,
@@ -553,7 +535,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		},
 		PolicyID:           policyID,
 		CoordinatorIdx:     1,
-		Data:               policyContents,
+		Data:               &pData,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
 	}

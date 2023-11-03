@@ -8,10 +8,12 @@ package policy
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -56,11 +58,10 @@ func TestReplaceSecretRefNotFound(t *testing.T) {
 }
 
 func TestGetSecretValues(t *testing.T) {
-	secretRefsJSON := []SecretReference{{ID: "ref1"}, {ID: "ref2"}}
-	secretRefsRaw, _ := json.Marshal(secretRefsJSON)
+	refs := []model.SecretReferencesItems{{ID: "ref1"}, {ID: "ref2"}}
 	bulker := ftesting.NewMockBulk()
 
-	secretRefs, _ := getSecretValues(context.TODO(), secretRefsRaw, bulker)
+	secretRefs, _ := getSecretValues(context.TODO(), refs, bulker)
 
 	expectedRefs := map[string]string{
 		"ref1": "ref1_value",
@@ -70,13 +71,12 @@ func TestGetSecretValues(t *testing.T) {
 }
 
 func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
-	secretRefsJSON := []SecretReference{{ID: "ref1"}, {ID: "ref2"}, {ID: "ref3"}}
-	secretRefsRaw, _ := json.Marshal(secretRefsJSON)
-	inputsJSON := []map[string]interface{}{
+	refs := []model.SecretReferencesItems{{ID: "ref1"}, {ID: "ref2"}, {ID: "ref3"}}
+	inputs := []map[string]interface{}{
 		{"id": "input1", "package_var_secret": "$co.elastic.secret{ref1}",
 			"input_var_secret": "$co.elastic.secret{ref2}"},
-		{"id": "input2", "streams": []map[string]interface{}{
-			{
+		{"id": "input2", "streams": []interface{}{
+			map[string]interface{}{
 				"id":                 "stream1",
 				"package_var_secret": "$co.elastic.secret{ref1}",
 				"input_var_secret":   "$co.elastic.secret{ref2}",
@@ -84,10 +84,9 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 			},
 		}},
 	}
-	inputsRaw, _ := json.Marshal(inputsJSON)
-	fields := map[string]json.RawMessage{
-		"secret_references": secretRefsRaw,
-		"inputs":            inputsRaw,
+	pData := model.PolicyData{
+		SecretReferences: refs,
+		Inputs:           inputs,
 	}
 	bulker := ftesting.NewMockBulk()
 	expectedStream := map[string]interface{}{
@@ -102,26 +101,23 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 		{"id": "input2", "streams": []interface{}{expectedStream}},
 	}
 
-	result, _ := getPolicyInputsWithSecrets(context.TODO(), fields, bulker)
+	result, _ := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
 
 	assert.Equal(t, expectedResult, result)
-	var refs any
-	json.Unmarshal(fields["secret_references"], &refs)
-	assert.Equal(t, nil, refs)
+	assert.Nil(t, pData.SecretReferences)
 }
 
 func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
-	inputsJSON := []map[string]interface{}{
+	inputs := []map[string]interface{}{
 		{"id": "input1"},
-		{"id": "input2", "streams": []map[string]interface{}{
-			{
+		{"id": "input2", "streams": []interface{}{
+			map[string]interface{}{
 				"id": "stream1",
 			},
 		}},
 	}
-	inputsRaw, _ := json.Marshal(inputsJSON)
-	fields := map[string]json.RawMessage{
-		"inputs": inputsRaw,
+	pData := model.PolicyData{
+		Inputs: inputs,
 	}
 	bulker := ftesting.NewMockBulk()
 	expectedStream := map[string]interface{}{
@@ -132,7 +128,71 @@ func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 		{"id": "input2", "streams": []interface{}{expectedStream}},
 	}
 
-	result, _ := getPolicyInputsWithSecrets(context.TODO(), fields, bulker)
+	result, _ := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
 
 	assert.Equal(t, expectedResult, result)
+}
+
+func TestProcessOutputSecret(t *testing.T) {
+	tests := []struct {
+		name             string
+		outputJSON       string
+		expectOutputJSON string
+	}{
+		{
+			name:             "Output without secrets",
+			outputJSON:       `{"password": "test"}`,
+			expectOutputJSON: `{"password": "test"}`,
+		},
+		{
+			name: "Output with secrets",
+			outputJSON: `{
+				"secrets": {
+					"password": {"id": "passwordid"}	
+				}
+			}`,
+			expectOutputJSON: `{
+				"password": "passwordid_value"
+			}`,
+		},
+		{
+			name: "Output with nested secrets",
+			outputJSON: `{
+				"secrets": {
+					"ssl": { "key" : { "id": "sslkey" }	}
+				}
+			}`,
+			expectOutputJSON: `{
+				"ssl": {"key": "sslkey_value"}
+			}`,
+		},
+		{
+			name: "Output with multiple secrets",
+			outputJSON: `{
+				"secrets": {
+					"ssl": { "key" : { "id": "sslkey" }, "other": {"id": "sslother"}	}
+				}
+			}`,
+			expectOutputJSON: `{
+				"ssl": {"key": "sslkey_value", "other": "sslother_value"}
+			}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			output, err := smap.Parse([]byte(tc.outputJSON))
+			assert.NoError(t, err)
+
+			expectOutput, err := smap.Parse([]byte(tc.expectOutputJSON))
+			assert.NoError(t, err)
+
+			err = processOutputSecret(context.Background(), output, bulker)
+			assert.NoError(t, err)
+
+			assert.Equal(t, expectOutput, output)
+
+		})
+	}
 }
