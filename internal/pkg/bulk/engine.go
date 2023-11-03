@@ -136,14 +136,15 @@ func (b *Bulker) CheckRemoteOutputChanged(name string, newCfg map[string]interfa
 	curCfg := b.remoteOutputConfigMap[name]
 
 	// ignore output sent to agents where type is set to elasticsearch
-	if newCfg["type"] == "elasticsearch" {
-		return
-	}
 	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
 		log.Info().Str("name", name).Msg("remote output configuration has changed")
 		b.remoteOutputCh <- true
 	}
-	b.remoteOutputConfigMap[name] = newCfg
+	newCfgCopy := make(map[string]interface{})
+	for k, v := range newCfg {
+		newCfgCopy[k] = v
+	}
+	b.remoteOutputConfigMap[name] = newCfgCopy
 }
 
 func (b *Bulker) RemoteOutputCh() chan bool {
