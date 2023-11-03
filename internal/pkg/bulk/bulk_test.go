@@ -252,8 +252,6 @@ func TestCancelCtx(t *testing.T) {
 		},
 	}
 
-	log.Logger = testlog.SetLogger(t)
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancelF := context.WithCancel(context.Background())
