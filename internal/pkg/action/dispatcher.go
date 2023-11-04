@@ -15,9 +15,9 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
-	"golang.org/x/time/rate"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
+	"golang.org/x/time/rate"
 )
 
 // Sub is an action subscription that will give a single agent all of it's actions.
@@ -84,7 +84,7 @@ func (d *Dispatcher) Subscribe(agentID string, seqNo sqn.SeqNo) *Sub {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentID, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
+	zerolog.Ctx(context.Background()).Trace().Str(logger.AgentID, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
 
 	return &sub
 }
@@ -101,7 +101,7 @@ func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
+	zerolog.Ctx(context.Background()).Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
 // process gathers actions from the monitor and dispatches them to the corresponding subscriptions.
@@ -114,14 +114,14 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 		var action model.Action
 		err := hit.Unmarshal(&action)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to unmarshal action document")
+			zerolog.Ctx(ctx).Error().Err(err).Msg("Failed to unmarshal action document")
 			break
 		}
 		numAgents := len(action.Agents)
 		for i, agentID := range action.Agents {
 			arr := agentActions[agentID]
 			actionNoAgents := action
-			actionNoAgents.StartTime = offsetStartTime(action.StartTime, action.RolloutDurationSeconds, i, numAgents)
+			actionNoAgents.StartTime = offsetStartTime(ctx, action.StartTime, action.RolloutDurationSeconds, i, numAgents)
 			actionNoAgents.Agents = nil
 			arr = append(arr, actionNoAgents)
 			agentActions[agentID] = arr
@@ -130,7 +130,7 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 
 	for agentID, actions := range agentActions {
 		if err := d.limit.Wait(ctx); err != nil {
-			log.Error().Err(err).Msg("action dispatcher rate limit error")
+			zerolog.Ctx(ctx).Error().Err(err).Msg("action dispatcher rate limit error")
 			return
 		}
 		d.dispatch(ctx, agentID, actions)
@@ -139,14 +139,14 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 
 // offsetStartTime will return a new start time between start:start+dur based on index i and the total number of agents
 // As we expect i < total  the latest return time will always be < start+dur
-func offsetStartTime(start string, dur int64, i, total int) string {
+func offsetStartTime(ctx context.Context, start string, dur int64, i, total int) string {
 
 	if start == "" {
 		return ""
 	}
 	startTS, err := time.Parse(time.RFC3339, start)
 	if err != nil {
-		log.Error().Err(err).Msg("unable to parse start_time string")
+		zerolog.Ctx(ctx).Error().Err(err).Msg("unable to parse start_time string")
 		return ""
 	}
 	d := time.Second * time.Duration(dur)
@@ -164,10 +164,10 @@ func (d *Dispatcher) getSub(agentID string) (Sub, bool) {
 
 // dispatch passes the actions into the subscription channel as a non-blocking operation.
 // It may drop actions that will be re-sent to the agent on its next check in.
-func (d *Dispatcher) dispatch(_ context.Context, agentID string, acdocs []model.Action) {
+func (d *Dispatcher) dispatch(ctx context.Context, agentID string, acdocs []model.Action) {
 	sub, ok := d.getSub(agentID)
 	if !ok {
-		log.Debug().Str(logger.AgentID, agentID).Msg("Agent is not currently connected. Not dispatching actions.")
+		zerolog.Ctx(ctx).Debug().Str(logger.AgentID, agentID).Msg("Agent is not currently connected. Not dispatching actions.")
 		return
 	}
 	select {

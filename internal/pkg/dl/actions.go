@@ -16,7 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -155,7 +155,7 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 		err = es.TranslateError(res.StatusCode, esres.Error)
 		if err != nil {
 			if errors.Is(err, es.ErrIndexNotFound) {
-				log.Debug().Str("index", index).Msg(es.ErrIndexNotFound.Error())
+				zerolog.Ctx(ctx).Debug().Str("index", index).Msg(es.ErrIndexNotFound.Error())
 				err = nil
 			}
 			return
@@ -189,7 +189,7 @@ func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, inde
 	res, err := Search(ctx, bulker, tmpl, index, params, ops...)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
-			log.Debug().Str("index", index).Msg(es.ErrIndexNotFound.Error())
+			zerolog.Ctx(ctx).Debug().Str("index", index).Msg(es.ErrIndexNotFound.Error())
 			err = nil
 		}
 		return nil, err

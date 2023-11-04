@@ -27,7 +27,6 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -42,6 +41,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 const (
@@ -105,6 +105,7 @@ func WithAPM(url string, enabled bool) Option {
 
 func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserver, error) {
 	t.Helper()
+	log := testlog.SetLogger(t)
 
 	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
 	if err != nil {
@@ -285,6 +286,7 @@ func (m *MockReporter) UpdateState(state client.UnitState, message string, paylo
 func TestServerConfigErrorReload(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	log := testlog.SetLogger(t)
 
 	// don't use startTestServer as we need failing initial config.
 	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")

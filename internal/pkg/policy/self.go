@@ -15,7 +15,6 @@ import (
 	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -69,7 +68,6 @@ type selfMonitorT struct {
 // has a Fleet Server input defined.
 func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monitor, policyID string, reporter state.Reporter) SelfMonitor {
 	return &selfMonitorT{
-		log:              log.With().Str("ctx", "policy self monitor").Logger(),
 		fleet:            fleet,
 		bulker:           bulker,
 		monitor:          monitor,
@@ -86,6 +84,7 @@ func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monito
 
 // Run runs the monitor.
 func (m *selfMonitorT) Run(ctx context.Context) error {
+	m.log = zerolog.Ctx(ctx).With().Str("ctx", "policy self monitor").Logger()
 	s := m.monitor.Subscribe()
 	defer m.monitor.Unsubscribe(s)
 

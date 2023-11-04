@@ -17,7 +17,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"go.elastic.co/apm/v2"
 )
 
@@ -41,7 +40,6 @@ type standAloneSelfMonitorT struct {
 // Checks that this Fleet Server has access to the policies index.
 func NewStandAloneSelfMonitor(bulker bulk.Bulk, reporter state.Reporter) *standAloneSelfMonitorT {
 	return &standAloneSelfMonitorT{
-		log:           log.With().Str("ctx", "policy self monitor").Logger(),
 		bulker:        bulker,
 		state:         client.UnitStateStarting,
 		reporter:      reporter,
@@ -54,6 +52,7 @@ func NewStandAloneSelfMonitor(bulker bulk.Bulk, reporter state.Reporter) *standA
 
 // Run runs the monitor.
 func (m *standAloneSelfMonitorT) Run(ctx context.Context) error {
+	m.log = zerolog.Ctx(ctx).With().Str("ctx", "policy self monitor").Logger()
 	ticker := time.NewTicker(m.checkTime)
 	defer ticker.Stop()
 

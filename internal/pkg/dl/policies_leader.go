@@ -15,7 +15,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -52,7 +52,7 @@ func SearchPolicyLeaders(ctx context.Context, bulker bulk.Bulk, ids []string, op
 	res, err := bulker.Search(ctx, o.indexName, data)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
-			log.Debug().Str("index", o.indexName).Msg(es.ErrIndexNotFound.Error())
+			zerolog.Ctx(ctx).Debug().Str("index", o.indexName).Msg(es.ErrIndexNotFound.Error())
 			err = nil
 		}
 		return

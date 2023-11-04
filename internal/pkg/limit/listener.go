@@ -5,12 +5,12 @@
 package limit
 
 import (
+	"context"
 	"net"
 	"sync"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 // Derived from netutil.LimitListener but works slightly differently.
@@ -59,7 +59,7 @@ func (l *limitListener) Accept() (net.Conn, error) {
 
 	// If we cannot acquire the semaphore, close the connection
 	if acquired := l.acquire(); !acquired {
-		zlog := log.Warn()
+		zlog := zerolog.Ctx(context.Background()).Warn()
 
 		var err error
 		if c != nil {

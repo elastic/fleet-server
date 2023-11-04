@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 )
 
@@ -52,10 +52,10 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 	}
 	if !u.verifyChunkInfo(info, chunks, transitHash) {
 		if err := SetStatus(ctx, u.bulker, info, file.StatusFail); err != nil {
-			log.Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error setting the upload status to failure")
+			zerolog.Ctx(ctx).Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error setting the upload status to failure")
 		}
 		if err := DeleteAllChunksForFile(ctx, u.bulker, info.Source, info.DocID); err != nil {
-			log.Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error deleting left-behind chunk data")
+			zerolog.Ctx(ctx).Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error deleting left-behind chunk data")
 		}
 		vSpan.End()
 		return info, ErrFailValidation
@@ -74,6 +74,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 }
 
 func (u *Uploader) allChunksPresent(info file.Info, chunks []file.ChunkInfo) bool {
+	log := zerolog.Ctx(context.Background())
 	// check overall count
 	if len(chunks) != info.Count {
 		log.Warn().Int("expectedCount", info.Count).Int("received", len(chunks)).Interface("chunks", chunks).Msg("mismatch number of chunks")
@@ -96,6 +97,7 @@ func (u *Uploader) allChunksPresent(info file.Info, chunks []file.ChunkInfo) boo
 }
 
 func (u *Uploader) verifyChunkInfo(info file.Info, chunks []file.ChunkInfo, transitHash string) bool {
+	log := zerolog.Ctx(context.Background())
 	// verify all chunks except last are info.ChunkSize size
 	// verify last: false (or field excluded) for all except final chunk
 	// verify final chunk is last: true

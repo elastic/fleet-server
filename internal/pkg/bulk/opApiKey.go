@@ -12,7 +12,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 )
 
@@ -125,7 +125,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		metaMap := make(map[string]interface{})
 		dec := json.NewDecoder(bytes.NewReader(content))
 		if err := dec.Decode(&metaMap); err != nil {
-			log.Error().
+			zerolog.Ctx(ctx).Error().
 				Err(err).
 				Str("mod", kModBulk).
 				Msg("Failed to unmarshal api key update meta map")
@@ -134,7 +134,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 
 		var req *apiKeyUpdateRequest
 		if err := dec.Decode(&req); err != nil {
-			log.Error().
+			zerolog.Ctx(ctx).Error().
 				Err(err).
 				Str("mod", kModBulk).
 				Str("request", string(content)).
@@ -176,8 +176,8 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		idsPerBatch := b.getIDsCountPerBatch(len(role), maxKeySize)
 		ids := idsPerRole[hash]
 		if idsPerBatch <= 0 {
-			log.Error().Str("error.message", "request too large").Msg("No API Key ID could fit request size for bulk update")
-			log.Debug().
+			zerolog.Ctx(ctx).Error().Str("error.message", "request too large").Msg("No API Key ID could fit request size for bulk update")
+			zerolog.Ctx(ctx).Debug().
 				RawJSON("role", role).
 				Strs("ids", ids).
 				Msg("IDs could not fit into a message")
@@ -217,18 +217,18 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 
 			res, err := req.Do(ctx, b.es)
 			if err != nil {
-				log.Error().Err(err).Msg("Error sending bulk API Key update request to Elasticsearch")
+				zerolog.Ctx(ctx).Error().Err(err).Msg("Error sending bulk API Key update request to Elasticsearch")
 				return err
 			}
 			if res.Body != nil {
 				defer res.Body.Close()
 			}
 			if res.IsError() {
-				log.Error().Str("error.message", res.String()).Msg("Error in bulk API Key update result to Elasticsearch")
-				return parseError(res)
+				zerolog.Ctx(ctx).Error().Str("error.message", res.String()).Msg("Error in bulk API Key update result to Elasticsearch")
+				return parseError(res, zerolog.Ctx(ctx))
 			}
 
-			log.Debug().Strs("IDs", bulkReq.IDs).RawJSON("role", role).Msg("API Keys updated.")
+			zerolog.Ctx(ctx).Debug().Strs("IDs", bulkReq.IDs).RawJSON("role", role).Msg("API Keys updated.")
 
 			responses[responseIdx] = res.StatusCode
 			for _, id := range idsInBatch {

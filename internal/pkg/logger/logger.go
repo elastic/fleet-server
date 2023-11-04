@@ -57,6 +57,7 @@ func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 			return err
 		}
 		log.Logger = logger
+		zerolog.DefaultContextLogger = &logger
 		l.sync = w
 	}
 	l.cfg = cfg
@@ -84,6 +85,7 @@ func Init(cfg *config.Config, svcName string) (*Logger, error) {
 		}
 
 		log.Logger = l
+		zerolog.DefaultContextLogger = &l
 		gLogger = &Logger{
 			cfg:  cfg,
 			sync: w,

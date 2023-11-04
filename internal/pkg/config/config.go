@@ -6,6 +6,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/elastic/go-ucfg/flag"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/gofrs/uuid"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 // DefaultOptions defaults options used to read the configuration
@@ -85,7 +86,7 @@ func (c *Config) LoadServerLimits() error {
 	defer c.m.Unlock()
 	err := c.Validate()
 	if err != nil {
-		log.Error().Msgf("failed to validate while calculating limits, %s", err.Error())
+		zerolog.Ctx(context.Background()).Error().Err(err).Msgf("failed to validate while calculating limits")
 		return err
 	}
 
@@ -198,7 +199,7 @@ func (c *Config) Redact() *Config {
 func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
 	for opt, message := range deprecatedOpts {
 		if c.HasField(opt) {
-			log.Warn().Msg(message)
+			zerolog.Ctx(context.Background()).Warn().Msg(message)
 		}
 	}
 }

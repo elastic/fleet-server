@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -93,7 +92,6 @@ type monitorT struct {
 // NewMonitor creates the policy monitor for subscribing agents.
 func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duration) Monitor {
 	return &monitorT{
-		log:           log.With().Str("ctx", "policy agent monitor").Logger(),
 		bulker:        bulker,
 		monitor:       monitor,
 		kickCh:        make(chan struct{}, 1),
@@ -109,6 +107,7 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duratio
 
 // Run runs the monitor.
 func (m *monitorT) Run(ctx context.Context) error {
+	m.log = zerolog.Ctx(ctx).With().Str("ctx", "policy agent monitor").Logger()
 	m.log.Info().
 		Dur("throttle", m.throttle).
 		Msg("run policy monitor")
@@ -187,14 +186,14 @@ func unmarshalHits(hits []es.HitT) ([]model.Policy, error) {
 func (m *monitorT) processHits(ctx context.Context, hits []es.HitT) error {
 	policies, err := unmarshalHits(hits)
 	if err != nil {
-		m.log.Error().Err(err).Msg("fail unmarshal hits")
+		zerolog.Ctx(ctx).Error().Err(err).Msg("fail unmarshal hits")
 		return err
 	}
 
 	return m.processPolicies(ctx, policies)
 }
 
-func (m *monitorT) waitStart(ctx context.Context) error { //nolint:unused // not sure if this is used in tests
+func (m *monitorT) waitStart(ctx context.Context) error { //nolint:unused // used in tests to ensure the loop in Run has started.
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

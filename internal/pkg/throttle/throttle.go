@@ -8,10 +8,11 @@
 package throttle
 
 import (
+	"context"
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 // Token indicates successful access.
@@ -51,6 +52,7 @@ func (tt *Throttle) Acquire(key string, ttl time.Duration) *Token {
 	tt.mut.Lock()
 	defer tt.mut.Unlock()
 
+	log := zerolog.Ctx(context.Background())
 	if tt.checkAtMaxPending(key) {
 		log.Trace().
 			Str("key", key).
@@ -107,6 +109,7 @@ func (tt *Throttle) checkAtMaxPending(key string) bool {
 
 	now := time.Now()
 
+	log := zerolog.Ctx(context.Background())
 	// Try to eject the target key first
 	if state, ok := tt.tokenMap[key]; ok && state.expire.Before(now) {
 		delete(tt.tokenMap, key)
@@ -138,6 +141,7 @@ func (tt *Throttle) release(id uint64, key string) bool {
 	tt.mut.Lock()
 	defer tt.mut.Unlock()
 
+	log := zerolog.Ctx(context.Background())
 	state, ok := tt.tokenMap[key]
 	if !ok {
 		log.Trace().Uint64("id", id).Str("key", key).Msg("Token not found to release")

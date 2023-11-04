@@ -12,14 +12,14 @@ import (
 	"net/http/pprof"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 // RunProfiler exposes /debug/pprof on the passed address by staring a server.
 func RunProfiler(ctx context.Context, addr string) error {
 
 	if addr == "" {
-		log.Info().Msg("Profiler disabled")
+		zerolog.Ctx(ctx).Info().Msg("Profiler disabled")
 		return nil
 	}
 
@@ -46,9 +46,9 @@ func RunProfiler(ctx context.Context, addr string) error {
 		IdleTimeout:       cfg.Idle,
 	}
 
-	log.Info().Str("bind", addr).Msg("Installing profiler")
+	zerolog.Ctx(ctx).Info().Str("bind", addr).Msg("Installing profiler")
 	if err := server.ListenAndServe(); err != nil {
-		log.Error().Err(err).Str("bind", addr).Msg("Fail install profiler")
+		zerolog.Ctx(ctx).Error().Err(err).Str("bind", addr).Msg("Fail install profiler")
 		return err
 	}
 

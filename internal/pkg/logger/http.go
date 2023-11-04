@@ -18,7 +18,6 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"go.elastic.co/apm/module/apmzerolog/v2"
@@ -220,7 +219,7 @@ func Middleware(next http.Handler) http.Handler {
 
 		// Add trace correlation fields
 		ctx := r.Context()
-		zlog := log.Hook(apmzerolog.TraceContextHook(ctx))
+		zlog := zerolog.Ctx(ctx).Hook(apmzerolog.TraceContextHook(ctx))
 		// Update request context
 		// NOTE this injects the request id and addr into all logs that use the request logger
 		zlog = zlog.With().Str(ECSHTTPRequestID, reqID).Str(ECSServerAddress, addr).Logger()
@@ -240,7 +239,7 @@ func Middleware(next http.Handler) http.Handler {
 
 		wrCounter := NewResponseCounter(w)
 
-		if log.Debug().Enabled() {
+		if zlog.Debug().Enabled() {
 			d := zlog.Debug()
 			httpMeta(r, d)
 			httpDebug(r, d)
@@ -250,7 +249,7 @@ func Middleware(next http.Handler) http.Handler {
 		next.ServeHTTP(wrCounter, r)
 		httpMeta(r, e)
 
-		if log.Debug().Enabled() || (wrCounter.statusCode < 200 && wrCounter.statusCode >= 300) {
+		if zlog.Debug().Enabled() || (wrCounter.statusCode < 200 && wrCounter.statusCode >= 300) {
 			e.Uint64(ECSHTTPRequestBodyBytes, rdCounter.Count())
 			e.Uint64(ECSHTTPResponseBodyBytes, wrCounter.Count())
 			e.Int(ECSHTTPResponseCode, wrCounter.statusCode)

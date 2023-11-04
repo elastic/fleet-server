@@ -11,12 +11,13 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 // HandleInterrupt will wrap and return a context that is cancelled when the process receives a SIGINT or SIGTERM.
 func HandleInterrupt(ctx context.Context) context.Context {
 	ctx, cfunc := context.WithCancel(ctx)
+	log := zerolog.Ctx(ctx)
 
 	log.Debug().Msg("Install signal handlers for SIGINT and SIGTERM")
 	sigs := make(chan os.Signal, 1)
