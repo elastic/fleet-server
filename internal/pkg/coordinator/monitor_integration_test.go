@@ -23,10 +23,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func TestMonitorLeadership(t *testing.T) {
 	parentCtx := context.Background()
+	parentCtx = testlog.SetLogger(t).WithContext(parentCtx)
 	bulkCtx, bulkCn := context.WithCancel(parentCtx)
 	defer bulkCn()
 	ctx, cn := context.WithCancel(parentCtx)

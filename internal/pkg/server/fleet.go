@@ -283,8 +283,9 @@ func safeWait(g *errgroup.Group, to time.Duration) error {
 }
 
 func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error {
+	log := zerolog.Ctx(ctx)
 	return func() error {
-		zerolog.Ctx(ctx).Debug().Msg(tag + " started")
+		log.Debug().Msg(tag + " started")
 
 		err := runfn(ctx)
 
@@ -297,7 +298,7 @@ func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error 
 			lvl = zerolog.ErrorLevel
 		}
 
-		zerolog.Ctx(ctx).WithLevel(lvl).Err(err).Msg(tag + " exited")
+		log.WithLevel(lvl).Err(err).Msg(tag + " exited")
 		return err
 	}
 }
