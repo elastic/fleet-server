@@ -193,7 +193,9 @@ func (m *monitorT) processHits(ctx context.Context, hits []es.HitT) error {
 	return m.processPolicies(ctx, policies)
 }
 
-func (m *monitorT) waitStart(ctx context.Context) error { //nolint:unused // used in tests to ensure the loop in Run has started.
+// waitStart returns once Run has started
+// It's used in tests.
+func (m *monitorT) waitStart(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

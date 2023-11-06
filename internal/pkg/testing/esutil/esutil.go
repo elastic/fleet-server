@@ -105,7 +105,7 @@ func parseResponseError(res *esapi.Response) (*errorResponse, error) {
 
 		// Unexpected error, probably from the cloud deployment, not elasticsearch API response
 		if eres.Status == 0 {
-			zerolog.Ctx(context.Background()).Warn().
+			zerolog.Ctx(context.TODO()).Warn().
 				Int("status", eres.Status).
 				Str("type", eres.Error.Type).
 				Str("reason", eres.Error.Reason).Msg("ES client response error")

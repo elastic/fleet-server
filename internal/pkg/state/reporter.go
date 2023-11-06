@@ -28,7 +28,7 @@ func NewLog() *Log {
 
 // UpdateState triggers updating the state.
 func (l *Log) UpdateState(state client.UnitState, message string, _ map[string]interface{}) error {
-	zerolog.Ctx(context.Background()).Info().Str("state", state.String()).Msg(message)
+	zerolog.Ctx(context.TODO()).Info().Str("state", state.String()).Msg(message)
 	return nil
 }
 

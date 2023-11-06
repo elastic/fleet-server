@@ -84,7 +84,7 @@ func (d *Dispatcher) Subscribe(agentID string, seqNo sqn.SeqNo) *Sub {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	zerolog.Ctx(context.Background()).Trace().Str(logger.AgentID, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
+	zerolog.Ctx(context.TODO()).Trace().Str(logger.AgentID, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
 
 	return &sub
 }
@@ -101,7 +101,7 @@ func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	zerolog.Ctx(context.Background()).Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
+	zerolog.Ctx(context.TODO()).Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
 // process gathers actions from the monitor and dispatches them to the corresponding subscriptions.

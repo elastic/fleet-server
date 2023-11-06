@@ -275,7 +275,7 @@ func safeWait(g *errgroup.Group, to time.Duration) error {
 	select {
 	case err = <-waitCh:
 	case <-time.After(to):
-		zerolog.Ctx(context.Background()).Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
+		zerolog.Ctx(context.TODO()).Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
 		err = errors.New("group wait timeout")
 	}
 
@@ -307,7 +307,7 @@ func initRuntime(cfg *config.Config) {
 	if gcPercent != 0 {
 		old := debug.SetGCPercent(gcPercent)
 
-		zerolog.Ctx(context.Background()).Info().
+		zerolog.Ctx(context.TODO()).Info().
 			Int("old", old).
 			Int("new", gcPercent).
 			Msg("SetGCPercent")
@@ -316,7 +316,7 @@ func initRuntime(cfg *config.Config) {
 	if memoryLimit != 0 {
 		old := debug.SetMemoryLimit(memoryLimit)
 
-		zerolog.Ctx(context.Background()).Info().
+		zerolog.Ctx(context.TODO()).Info().
 			Int64("old", old).
 			Int64("new", memoryLimit).
 			Msg("SetMemoryLimit")

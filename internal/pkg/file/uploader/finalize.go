@@ -74,7 +74,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 }
 
 func (u *Uploader) allChunksPresent(info file.Info, chunks []file.ChunkInfo) bool {
-	log := zerolog.Ctx(context.Background())
+	log := zerolog.Ctx(context.TODO())
 	// check overall count
 	if len(chunks) != info.Count {
 		log.Warn().Int("expectedCount", info.Count).Int("received", len(chunks)).Interface("chunks", chunks).Msg("mismatch number of chunks")
@@ -97,7 +97,7 @@ func (u *Uploader) allChunksPresent(info file.Info, chunks []file.ChunkInfo) boo
 }
 
 func (u *Uploader) verifyChunkInfo(info file.Info, chunks []file.ChunkInfo, transitHash string) bool {
-	log := zerolog.Ctx(context.Background())
+	log := zerolog.Ctx(context.TODO())
 	// verify all chunks except last are info.ChunkSize size
 	// verify last: false (or field excluded) for all except final chunk
 	// verify final chunk is last: true

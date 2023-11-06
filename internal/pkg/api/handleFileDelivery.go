@@ -28,7 +28,7 @@ type FileDeliveryT struct {
 }
 
 func NewFileDeliveryT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *FileDeliveryT {
-	zerolog.Ctx(context.Background()).Info().
+	zerolog.Ctx(context.TODO()).Info().
 		Interface("limits", cfg.Limits.ArtifactLimit).
 		Int64("maxFileSize", maxFileSize).
 		Msg("upload limits")

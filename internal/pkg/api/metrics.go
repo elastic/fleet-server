@@ -55,7 +55,7 @@ var (
 func init() {
 	err := report.SetupMetrics(logger.NewZapStub("instance-metrics"), build.ServiceName, version.DefaultVersion)
 	if err != nil {
-		zerolog.Ctx(context.Background()).Error().Err(err).Msg("unable to initialize metrics")
+		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics")
 	}
 
 	registry = newMetricsRegistry("http_server")

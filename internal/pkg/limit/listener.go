@@ -59,7 +59,7 @@ func (l *limitListener) Accept() (net.Conn, error) {
 
 	// If we cannot acquire the semaphore, close the connection
 	if acquired := l.acquire(); !acquired {
-		zlog := zerolog.Ctx(context.Background()).Warn()
+		zlog := zerolog.Ctx(context.TODO()).Warn()
 
 		var err error
 		if c != nil {

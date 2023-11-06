@@ -256,7 +256,7 @@ func loadLimitsForAgents(agentLimit int) *envLimits {
 	if agentLimit == 0 {
 		return defaultEnvLimits()
 	}
-	log := zerolog.Ctx(context.Background())
+	log := zerolog.Ctx(context.TODO())
 	for _, l := range defaults {
 		// get nearest limits for configured agent numbers
 		if l.Agents.Min < agentLimit && agentLimit <= l.Agents.Max {

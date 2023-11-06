@@ -86,7 +86,7 @@ func (c *Config) LoadServerLimits() error {
 	defer c.m.Unlock()
 	err := c.Validate()
 	if err != nil {
-		zerolog.Ctx(context.Background()).Error().Err(err).Msgf("failed to validate while calculating limits")
+		zerolog.Ctx(context.TODO()).Error().Err(err).Msgf("failed to validate while calculating limits")
 		return err
 	}
 
@@ -199,7 +199,7 @@ func (c *Config) Redact() *Config {
 func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
 	for opt, message := range deprecatedOpts {
 		if c.HasField(opt) {
-			zerolog.Ctx(context.Background()).Warn().Msg(message)
+			zerolog.Ctx(context.TODO()).Warn().Msg(message)
 		}
 	}
 }

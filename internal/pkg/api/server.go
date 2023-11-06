@@ -157,7 +157,7 @@ func diagConn(c net.Conn, s http.ConnState) {
 		return
 	}
 
-	zerolog.Ctx(context.Background()).Trace().
+	zerolog.Ctx(context.TODO()).Trace().
 		Str("local", c.LocalAddr().String()).
 		Str("remote", c.RemoteAddr().String()).
 		Str("state", s.String()).

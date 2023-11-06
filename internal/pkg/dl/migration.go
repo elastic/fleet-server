@@ -288,7 +288,7 @@ func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
 
 	body, err := query.MarshalJSON()
 	if err != nil {
-		zerolog.Ctx(context.Background()).Debug().Str("painlessScript", painless).
+		zerolog.Ctx(context.TODO()).Debug().Str("painlessScript", painless).
 			Msgf("%s: failed painless script", migrationName)
 		return migrationName, FleetPolicies, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}
