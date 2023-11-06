@@ -60,7 +60,7 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	require.True(t, ok, "expected outputs to be map")
 	remoteES, ok := outputs["remoteES"].(map[string]interface{})
 	require.True(t, ok, "expected remoteES to be map")
-	oType := remoteES["type"].(string)
+	oType, ok := remoteES["type"].(string)
 	require.True(t, ok, "expected type to be string")
 	require.Equal(t, "elasticsearch", oType)
 	serviceToken := remoteES["service_token"]
