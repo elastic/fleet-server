@@ -21,11 +21,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 const nowStr = "2022-08-12T16:50:05Z"
 
-func createSomeAgents(t *testing.T, n int, apiKey bulk.APIKey, index string, bulker bulk.Bulk) []string {
+func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIKey, index string, bulker bulk.Bulk) []string {
 	t.Helper()
 
 	var createdAgents []string
@@ -61,7 +62,7 @@ func createSomeAgents(t *testing.T, n int, apiKey bulk.APIKey, index string, bul
 		require.NoError(t, err)
 
 		_, err = bulker.Create(
-			context.Background(), index, agentID, body, bulk.WithRefresh())
+			ctx, index, agentID, body, bulk.WithRefresh())
 		require.NoError(t, err)
 
 		createdAgents = append(createdAgents, agentID)
@@ -70,7 +71,7 @@ func createSomeAgents(t *testing.T, n int, apiKey bulk.APIKey, index string, bul
 	return createdAgents
 }
 
-func createSomePolicies(t *testing.T, n int, index string, bulker bulk.Bulk) []string {
+func createSomePolicies(ctx context.Context, t *testing.T, n int, index string, bulker bulk.Bulk) []string {
 	t.Helper()
 
 	var created []string
@@ -94,7 +95,7 @@ func createSomePolicies(t *testing.T, n int, index string, bulker bulk.Bulk) []s
 		require.NoError(t, err)
 
 		policyDocID, err := bulker.Create(
-			context.Background(), index, "", body, bulk.WithRefresh())
+			ctx, index, "", body, bulk.WithRefresh())
 		require.NoError(t, err)
 
 		created = append(created, policyDocID)
@@ -104,18 +105,22 @@ func createSomePolicies(t *testing.T, n int, index string, bulker bulk.Bulk) []s
 }
 
 func TestPolicyCoordinatorIdx(t *testing.T) {
-	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetPolicies)
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
-	docIDs := createSomePolicies(t, 25, index, bulker)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
-	migrated, err := migrate(context.Background(), bulker, migratePolicyCoordinatorIdx)
+	docIDs := createSomePolicies(ctx, t, 25, index, bulker)
+
+	migrated, err := migrate(ctx, bulker, migratePolicyCoordinatorIdx)
 	require.NoError(t, err)
 
 	require.Equal(t, len(docIDs), migrated)
 
 	for i := range docIDs {
 		policies, err := QueryLatestPolicies(
-			context.Background(), bulker, WithIndexName(index))
+			ctx, bulker, WithIndexName(index))
 		if err != nil {
 			assert.NoError(t, err, "failed to query latest policies") // we want to continue even if a single agent fails
 			continue
@@ -133,21 +138,25 @@ func TestPolicyCoordinatorIdx(t *testing.T) {
 }
 
 func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
 	now, err := time.Parse(time.RFC3339, nowStr)
 	require.NoError(t, err, "could not parse time "+nowStr)
 	timeNow = func() time.Time {
 		return now
 	}
 
-	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
 	apiKey := bulk.APIKey{
 		ID:  "testAgent_",
 		Key: "testAgent_key_",
 	}
 
-	agentIDs := createSomeAgents(t, 25, apiKey, index, bulker)
+	agentIDs := createSomeAgents(ctx, t, 25, apiKey, index, bulker)
 
-	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
+	migratedAgents, err := migrate(ctx, bulker, migrateAgentOutputs)
 	require.NoError(t, err)
 
 	assert.Equal(t, len(agentIDs), migratedAgents)
@@ -155,7 +164,7 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 	for i, id := range agentIDs {
 		wantOutputType := "elasticsearch" //nolint:goconst // test cases have some duplication
 
-		res, err := SearchWithOneParam(context.Background(), bulker, QueryAgentByID, index, FieldID, id)
+		res, err := SearchWithOneParam(ctx, bulker, QueryAgentByID, index, FieldID, id)
 		require.NoError(t, err)
 		require.Len(t, res.Hits, 1)
 
@@ -221,31 +230,39 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 }
 
 func TestMigrateOutputs_dontMigrateTwice(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
 	now, err := time.Parse(time.RFC3339, nowStr)
 	require.NoError(t, err, "could not parse time "+nowStr)
 	timeNow = func() time.Time {
 		return now
 	}
 
-	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
 	apiKey := bulk.APIKey{
 		ID:  "testAgent_",
 		Key: "testAgent_key_",
 	}
 
-	agentIDs := createSomeAgents(t, 25, apiKey, index, bulker)
+	agentIDs := createSomeAgents(ctx, t, 25, apiKey, index, bulker)
 
-	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
+	migratedAgents, err := migrate(ctx, bulker, migrateAgentOutputs)
 	require.NoError(t, err)
 	assert.Equal(t, len(agentIDs), migratedAgents)
 
-	migratedAgents2, err := migrate(context.Background(), bulker, migrateAgentOutputs)
+	migratedAgents2, err := migrate(ctx, bulker, migrateAgentOutputs)
 	require.NoError(t, err)
 
 	assert.Equal(t, 0, migratedAgents2)
 }
 
 func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
 	wantOutputType := "elasticsearch"
 
 	now, err := time.Parse(time.RFC3339, nowStr)
@@ -254,7 +271,7 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 		return now
 	}
 
-	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
 	apiKey := bulk.APIKey{
 		ID:  "testAgent_",
 		Key: "testAgent_key_",
@@ -285,14 +302,14 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = bulker.Create(
-		context.Background(), index, agentID, body, bulk.WithRefresh())
+		ctx, index, agentID, body, bulk.WithRefresh())
 	require.NoError(t, err)
 
-	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
+	migratedAgents, err := migrate(ctx, bulker, migrateAgentOutputs)
 	require.NoError(t, err)
 
 	res, err := SearchWithOneParam(
-		context.Background(), bulker, QueryAgentByID, index, FieldID, agentID)
+		ctx, bulker, QueryAgentByID, index, FieldID, agentID)
 	require.NoError(t, err, "failed to find agent ID %q", agentID)
 	require.Len(t, res.Hits, 1)
 
@@ -343,15 +360,19 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 }
 
 func TestMigrateOutputs_no_agent_document(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
 	now, err := time.Parse(time.RFC3339, nowStr)
 	require.NoError(t, err, "could not parse time "+nowStr)
 	timeNow = func() time.Time {
 		return now
 	}
 
-	_, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
+	_, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
 
-	migratedAgents, err := migrate(context.Background(), bulker, migrateAgentOutputs)
+	migratedAgents, err := migrate(ctx, bulker, migrateAgentOutputs)
 	require.NoError(t, err)
 
 	assert.Equal(t, 0, migratedAgents)

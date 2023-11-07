@@ -5,6 +5,7 @@
 package esutil
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -104,7 +105,7 @@ func parseResponseError(res *esapi.Response) (*errorResponse, error) {
 
 		// Unexpected error, probably from the cloud deployment, not elasticsearch API response
 		if eres.Status == 0 {
-			log.Warn().
+			zerolog.Ctx(context.TODO()).Warn().
 				Int("status", eres.Status).
 				Str("type", eres.Error.Type).
 				Str("reason", eres.Error.Reason).Msg("ES client response error")

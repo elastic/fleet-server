@@ -12,7 +12,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/mailru/easyjson"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 )
 
@@ -101,7 +101,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	res, err := req.Do(ctx, b.es)
 
 	if err != nil {
-		log.Warn().Err(err).Str("mod", kModBulk).Msg("bulker.flushRead: Error sending mget request to Elasticsearch")
+		zerolog.Ctx(ctx).Warn().Err(err).Str("mod", kModBulk).Msg("bulker.flushRead: Error sending mget request to Elasticsearch")
 		return err
 	}
 
@@ -110,8 +110,8 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	}
 
 	if res.IsError() {
-		log.Warn().Str("mod", kModBulk).Str("error.message", res.String()).Msg("bulker.flushRead: Error in mget request result to Elasticsearch")
-		return parseError(res)
+		zerolog.Ctx(ctx).Warn().Str("mod", kModBulk).Str("error.message", res.String()).Msg("bulker.flushRead: Error in mget request result to Elasticsearch")
+		return parseError(res, zerolog.Ctx(ctx))
 	}
 
 	// Reuse buffer
@@ -119,7 +119,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 
 	bodySz, err := buf.ReadFrom(res.Body)
 	if err != nil {
-		log.Error().Err(err).Str("mod", kModBulk).Msg("Response error")
+		zerolog.Ctx(ctx).Error().Err(err).Str("mod", kModBulk).Msg("Response error")
 	}
 
 	// prealloc slice
@@ -127,11 +127,11 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	blk.Items = make([]MgetResponseItem, 0, queueCnt)
 
 	if err = easyjson.Unmarshal(buf.Bytes(), &blk); err != nil {
-		log.Error().Err(err).Str("mod", kModBulk).Msg("Unmarshal error")
+		zerolog.Ctx(ctx).Error().Err(err).Str("mod", kModBulk).Msg("Unmarshal error")
 		return err
 	}
 
-	log.Trace().
+	zerolog.Ctx(ctx).Trace().
 		Err(err).
 		Bool("refresh", refresh).
 		Str("mod", kModBulk).

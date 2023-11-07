@@ -11,6 +11,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +38,8 @@ func TestWriteError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 
-			err := writeError(w, tt.err)
+			log := testlog.SetLogger(t)
+			err := writeError(&log, w, tt.err)
 			require.NoError(t, err)
 			resp := w.Result()
 			defer resp.Body.Close()

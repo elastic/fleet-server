@@ -21,7 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"go.elastic.co/apm/v2"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 type server struct {
@@ -71,7 +71,7 @@ func (s *server) Run(ctx context.Context) error {
 		IdleTimeout:       idle,
 		MaxHeaderBytes:    mhbz,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
-		ErrorLog:          errLogger(),
+		ErrorLog:          errLogger(ctx),
 		ConnState:         diagConn,
 	}
 
@@ -82,13 +82,13 @@ func (s *server) Run(ctx context.Context) error {
 	go func() {
 		select {
 		case <-ctx.Done():
-			log.Debug().Msg("force server close on ctx.Done()")
+			zerolog.Ctx(ctx).Debug().Msg("force server close on ctx.Done()")
 			err := srv.Close()
 			if err != nil {
-				log.Error().Err(err).Msg("error while closing server")
+				zerolog.Ctx(ctx).Error().Err(err).Msg("error while closing server")
 			}
 		case <-forceCh:
-			log.Debug().Msg("go routine forced closed on exit")
+			zerolog.Ctx(ctx).Debug().Msg("go routine forced closed on exit")
 		}
 	}()
 
@@ -102,7 +102,7 @@ func (s *server) Run(ctx context.Context) error {
 	defer func() {
 		err := ln.Close()
 		if err != nil {
-			log.Warn().Err(err).Msg("server.Run: error while closing listener.")
+			zerolog.Ctx(ctx).Warn().Err(err).Msg("server.Run: error while closing listener.")
 		}
 	}()
 
@@ -127,15 +127,15 @@ func (s *server) Run(ctx context.Context) error {
 		ln = tls.NewListener(ln, srv.TLSConfig)
 
 	} else {
-		log.Warn().Msg("Exposed over insecure HTTP; enablement of TLS is strongly recommended")
+		zerolog.Ctx(ctx).Warn().Msg("Exposed over insecure HTTP; enablement of TLS is strongly recommended")
 	}
 
 	errCh := make(chan error)
 	baseCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go func(_ context.Context, errCh chan error, ln net.Listener) {
-		log.Info().Msgf("Listening on %s", s.addr)
+	go func(ctx context.Context, errCh chan error, ln net.Listener) {
+		zerolog.Ctx(ctx).Info().Msgf("Listening on %s", s.addr)
 		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -157,7 +157,7 @@ func diagConn(c net.Conn, s http.ConnState) {
 		return
 	}
 
-	log.Trace().
+	zerolog.Ctx(context.TODO()).Trace().
 		Str("local", c.LocalAddr().String()).
 		Str("remote", c.RemoteAddr().String()).
 		Str("state", s.String()).
@@ -173,31 +173,33 @@ func diagConn(c net.Conn, s http.ConnState) {
 	}
 }
 
-func wrapConnLimitter(_ context.Context, ln net.Listener, cfg *config.Server) net.Listener {
+func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) net.Listener {
 	hardLimit := cfg.Limits.MaxConnections
 
 	if hardLimit != 0 {
-		log.Info().
+		zerolog.Ctx(ctx).Info().
 			Int("hardConnLimit", hardLimit).
 			Msg("server hard connection limiter installed")
 
 		ln = limit.Listener(ln, hardLimit)
 	} else {
-		log.Info().Msg("server hard connection limiter disabled")
+		zerolog.Ctx(ctx).Info().Msg("server hard connection limiter disabled")
 	}
 
 	return ln
 }
 
 type stubLogger struct {
+	log zerolog.Logger
 }
 
 func (s *stubLogger) Write(p []byte) (n int, err error) {
-	log.Error().Bytes(logger.ECSMessage, p).Send()
+	s.log.Error().Bytes(logger.ECSMessage, p).Send()
 	return len(p), nil
 }
 
-func errLogger() *slog.Logger {
-	stub := &stubLogger{}
+func errLogger(ctx context.Context) *slog.Logger {
+	log := zerolog.Ctx(ctx)
+	stub := &stubLogger{*log}
 	return slog.New(stub, "", 0)
 }

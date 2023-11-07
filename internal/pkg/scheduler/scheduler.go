@@ -13,7 +13,6 @@ import (
 	"math/rand"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -34,8 +33,6 @@ type Schedule struct {
 
 // Scheduler tracks scheduled functions.
 type Scheduler struct {
-	log zerolog.Logger
-
 	splayPercent  int
 	firstRunDelay time.Duration // Interval to run the scheduled function for the first time since the scheduler started, splayed as well.
 
@@ -70,7 +67,6 @@ func WithFirstRunDelay(delay time.Duration) OptFunc {
 // Schedules may not be added to a scheduler after creation.
 func New(schedules []Schedule, opts ...OptFunc) (*Scheduler, error) {
 	s := &Scheduler{
-		log:           log.With().Str("ctx", "elasticsearch CG scheduler").Logger(),
 		splayPercent:  defaultSplayPercent,
 		firstRunDelay: defaultFirstRunDelay,
 		rand:          rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec // used for timing offsets
@@ -91,6 +87,8 @@ func New(schedules []Schedule, opts ...OptFunc) (*Scheduler, error) {
 // Schedule Interval times are guaranteed minium values (if the execution takes a very long time, the scheduler will wait Interval before running the function again).
 func (s *Scheduler) Run(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
+	log := zerolog.Ctx(ctx).With().Str("ctx", "elasticsearch CG scheduler").Logger()
+	ctx = log.WithContext(ctx)
 
 	for _, schedule := range s.schedules {
 		g.Go(s.getRunScheduleFunc(ctx, schedule))
@@ -100,7 +98,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 
 func (s *Scheduler) getRunScheduleFunc(ctx context.Context, schedule Schedule) func() error {
 	return func() error {
-		log := log.With().Str("schedule", schedule.Name).Logger()
+		log := zerolog.Ctx(ctx).With().Str("schedule", schedule.Name).Logger()
 
 		t := time.NewTimer(s.intervalWithSplay(s.firstRunDelay)) // Initial schedule to run right away with splayed randomly delay
 		defer t.Stop()

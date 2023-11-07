@@ -17,10 +17,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/go-ucfg"
-	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 )
 
@@ -85,6 +85,7 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 
 // Run starts a Server instance using config from the configured client.
 func (a *Agent) Run(ctx context.Context) error {
+	log := zerolog.Ctx(ctx)
 	a.agent.RegisterDiagnosticHook("fleet-server config", "fleet-server's current configuration", "fleet-server.yml", "application/yml", func() []byte {
 		a.l.RLock()
 		if a.cfg == nil {

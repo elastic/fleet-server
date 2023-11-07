@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func createRandomEnrollmentAPIKey(policyID string, active bool) model.EnrollmentAPIKey {
@@ -54,6 +55,7 @@ func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index st
 func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetEnrollmentAPIKeys)
 
@@ -86,6 +88,7 @@ func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
 	t.Skip("Flaky test see https://github.com/elastic/fleet-server/issues/1289")
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetEnrollmentAPIKeys)
 
@@ -117,6 +120,7 @@ func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
 func TestSearchEnrollmentAPIKeyByPolicyIDWithInactiveIDs(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetEnrollmentAPIKeys)
 

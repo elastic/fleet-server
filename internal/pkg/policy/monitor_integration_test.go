@@ -14,11 +14,13 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 var intPolData = model.PolicyData{
@@ -32,6 +34,7 @@ var intPolData = model.PolicyData{
 func TestMonitor_Integration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetPolicies)
 
@@ -69,6 +72,8 @@ func TestMonitor_Integration(t *testing.T) {
 			merr = nil
 		}
 	}()
+	err = m.(*monitorT).waitStart(ctx)
+	require.NoError(t, err)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
 	policyID := uuid.Must(uuid.NewV4()).String()

@@ -37,6 +37,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 var biInfo = build.Info{
@@ -57,15 +58,22 @@ var policyData = model.PolicyData{
 }
 
 func TestAgent(t *testing.T) {
+	l, err := logger.Init(&config.Config{}, "test")
+	require.NoError(t, err)
+
+	lg := testlog.SetLogger(t)
+	zerolog.DefaultContextLogger = &lg
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ctx = lg.WithContext(ctx)
 
 	t.Log("Setup agent integration test")
 	bulker := ftesting.SetupBulk(ctx, t)
 
 	// add a real default fleet server policy
 	policyID := uuid.Must(uuid.NewV4()).String()
-	_, err := dl.CreatePolicy(ctx, bulker, model.Policy{
+	_, err = dl.CreatePolicy(ctx, bulker, model.Policy{
 		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
@@ -107,9 +115,6 @@ func TestAgent(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		l, err := logger.Init(&config.Config{}, "test")
-		require.NoError(t, err)
 
 		a := &Agent{
 			cliCfg:      ucfg.New(),

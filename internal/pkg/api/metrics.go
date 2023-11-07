@@ -16,7 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	apmprometheus "go.elastic.co/apm/module/apmprometheus/v2"
 	"go.elastic.co/apm/v2"
 
@@ -55,7 +55,7 @@ var (
 func init() {
 	err := report.SetupMetrics(logger.NewZapStub("instance-metrics"), build.ServiceName, version.DefaultVersion)
 	if err != nil {
-		log.Error().Err(err).Msg("unable to initialize metrics")
+		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics")
 	}
 
 	registry = newMetricsRegistry("http_server")

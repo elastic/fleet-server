@@ -12,9 +12,9 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -148,7 +148,7 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 				select {
 				case s.c <- hits:
 				case <-lc.Done():
-					log.Error().
+					zerolog.Ctx(ctx).Error().
 						Err(lc.Err()).
 						Str("ctx", "subscription monitor").
 						Dur("timeout", m.subTimeout).

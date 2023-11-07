@@ -91,12 +91,32 @@ func Test_Logger_Reload(t *testing.T) {
 
 		cfg := stderrcfg()
 		cfg.Logging.ToStderr = false
-		cfg.Logging.Level = "debug"
+		cfg.Logging.Level = "warn"
 		err := logger.Reload(context.Background(), cfg)
 		require.NoError(t, err)
 		log.Info().Msg("Hello, World!")
 
-		assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel())
+		assert.Equal(t, zerolog.WarnLevel, zerolog.GlobalLevel())
 		assert.Empty(t, b, "write went to original logger")
+	})
+	t.Run("Check context logger", func(t *testing.T) {
+		var b bytes.Buffer
+		l := zerolog.New(&b)
+		zerolog.DefaultContextLogger = &l
+		logger.cfg = stderrcfg()
+		logger.sync = &nopSync{}
+
+		zerolog.Ctx(context.Background()).Error().Msg("Hello, World!")
+		assert.NotEmpty(t, b, "expected something to be written")
+		b.Reset()
+
+		cfg := stderrcfg()
+		cfg.Logging.Level = "debug"
+		err := logger.Reload(context.Background(), cfg)
+		require.NoError(t, err)
+		zerolog.Ctx(context.Background()).Error().Msg("Hello, World!")
+
+		assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel())
+		assert.NotEmpty(t, b, "expected something to be written")
 	})
 }

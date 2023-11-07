@@ -7,17 +7,13 @@ package coordinator
 import (
 	"context"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+
+	"github.com/rs/zerolog"
 )
 
 // coordinatorZeroT is V0 coordinator that just takes a subscribed policy and outputs the same policy.
 type coordinatorZeroT struct {
-	log zerolog.Logger
-
 	policy model.Policy
 	in     chan model.Policy
 	out    chan model.Policy
@@ -26,7 +22,6 @@ type coordinatorZeroT struct {
 // NewCoordinatorZero creates a V0 coordinator.
 func NewCoordinatorZero(policy model.Policy) (Coordinator, error) {
 	return &coordinatorZeroT{
-		log:    log.With().Str("ctx", "coordinator v0").Str(logger.PolicyID, policy.PolicyID).Logger(),
 		policy: policy,
 		in:     make(chan model.Policy),
 		out:    make(chan model.Policy),
@@ -42,7 +37,7 @@ func (c *coordinatorZeroT) Name() string {
 func (c *coordinatorZeroT) Run(ctx context.Context) error {
 	err := c.updatePolicy(c.policy)
 	if err != nil {
-		c.log.Err(err).Msg("failed to handle policy")
+		zerolog.Ctx(ctx).Error().Err(err).Msg("failed to handle policy")
 	}
 
 	for {
@@ -50,7 +45,7 @@ func (c *coordinatorZeroT) Run(ctx context.Context) error {
 		case p := <-c.in:
 			err = c.updatePolicy(p)
 			if err != nil {
-				c.log.Err(err).Msg("failed to handle policy")
+				zerolog.Ctx(ctx).Error().Err(err).Msg("failed to handle policy")
 				continue
 			}
 		case <-ctx.Done():

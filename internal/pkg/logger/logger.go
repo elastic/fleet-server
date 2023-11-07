@@ -39,6 +39,7 @@ type Logger struct {
 	cfg  *config.Config
 	sync WriterSync
 	name string
+	log  zerolog.Logger
 }
 
 // Reload reloads the logger configuration.
@@ -48,16 +49,18 @@ func (l *Logger) Reload(_ context.Context, cfg *config.Config) error {
 		zerolog.SetGlobalLevel(level(cfg))
 	}
 	if !l.cfg.Logging.EqualExcludeLevel(cfg.Logging) {
-		// sync before reload
+		// sync before set
 		l.Sync()
 
-		// reload the logger
-		logger, w, err := configure(cfg, l.name)
+		out, wr, err := getOutput(cfg)
 		if err != nil {
 			return err
 		}
-		log.Logger = logger
-		l.sync = w
+		l.log = l.log.Output(out)
+		l.sync = wr
+
+		log.Logger = l.log
+		zerolog.DefaultContextLogger = &l.log // introduces race conditions in integration test?
 	}
 	l.cfg = cfg
 	return nil
@@ -76,18 +79,22 @@ func Init(cfg *config.Config, svcName string) (*Logger, error) {
 	once.Do(func() {
 		zerolog.SetGlobalLevel(level(cfg))
 
-		var l zerolog.Logger
-		var w WriterSync
-		l, w, err = configure(cfg, svcName)
+		out, wr, err := getOutput(cfg)
 		if err != nil {
 			return
 		}
+		l := ecszerolog.New(out)
+		if svcName != "" {
+			l = l.With().Str(ECSServiceName, svcName).Str(ECSServiceType, svcName).Logger()
+		}
 
 		log.Logger = l
+		zerolog.DefaultContextLogger = &l
 		gLogger = &Logger{
 			cfg:  cfg,
-			sync: w,
+			sync: wr,
 			name: svcName,
+			log:  l,
 		}
 	})
 	return gLogger, err
@@ -107,16 +114,16 @@ func level(cfg *config.Config) zerolog.Level {
 	return cfg.Logging.LogLevel()
 }
 
-func configureStderrLogger(cfg *config.Config) (zerolog.Logger, WriterSync) {
+func stderrOut(cfg *config.Config) (io.Writer, WriterSync) {
 	out := io.Writer(os.Stderr)
 	if cfg.Logging.Pretty {
 		out = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}
 	}
 
-	return ecszerolog.New(out), os.Stderr
+	return out, os.Stderr
 }
 
-func configureFileRotatorLogger(cfg *config.Config) (zerolog.Logger, WriterSync, error) {
+func fileRotatorOut(cfg *config.Config) (io.Writer, WriterSync, error) {
 	files := cfg.Logging.Files
 	if files == nil {
 		files = &config.LoggingFiles{}
@@ -132,25 +139,20 @@ func configureFileRotatorLogger(cfg *config.Config) (zerolog.Logger, WriterSync,
 		file.RedirectStderr(files.RedirectStderr),
 	)
 	if err != nil {
-		return zerolog.Logger{}, nil, err
+		return nil, nil, err
 	}
-	return ecszerolog.New(rotator), rotator, nil
+	return rotator, rotator, nil
 }
 
-func configure(cfg *config.Config, svcName string) (lg zerolog.Logger, wr WriterSync, err error) {
+func getOutput(cfg *config.Config) (out io.Writer, wr WriterSync, err error) {
 	switch {
 	case cfg.Logging.ToStderr:
-		lg, wr = configureStderrLogger(cfg)
+		out, wr = stderrOut(cfg)
 	case cfg.Logging.ToFiles:
-		lg, wr, err = configureFileRotatorLogger(cfg)
+		out, wr, err = fileRotatorOut(cfg)
 	default:
-		lg = ecszerolog.New(io.Discard)
+		out = io.Discard
 		wr = &nopSync{}
-	}
-	lg = lg.Level(zerolog.TraceLevel)
-
-	if svcName != "" {
-		lg = lg.With().Str(ECSServiceName, svcName).Str(ECSServiceType, svcName).Logger()
 	}
 
 	return //nolint:nakedret // short function
