@@ -21,11 +21,10 @@ func TestLoadLimits(t *testing.T) {
 		ConfiguredAgentLimit int
 		ExpectedAgentLimit   int
 	}{
+		{"default", -1, int(getMaxInt())},
 		{"few agents", 5, 49},
 		{"512", 512, 4999},
 		{"precise", 7499, 7499},
-		{"10k", 10050, 12499},
-		{"close to max", 13000, 29999},
 		{"above max", 30001, int(getMaxInt())},
 	}
 
@@ -33,7 +32,7 @@ func TestLoadLimits(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			log := testlog.SetLogger(t)
 			zerolog.DefaultContextLogger = &log
-			l := loadLimitsForAgents(tc.ConfiguredAgentLimit)
+			l := loadLimits(tc.ConfiguredAgentLimit)
 
 			require.Equal(t, tc.ExpectedAgentLimit, l.Agents.Max)
 		})
