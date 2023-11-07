@@ -37,9 +37,9 @@ var policyDataDefault = &model.PolicyData{
 }
 
 func TestMonitor_NewPolicy(t *testing.T) {
-	_ = testlog.SetLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	chHitT := make(chan []es.HitT, 1)
 	defer close(chHitT)
@@ -117,9 +117,9 @@ func TestMonitor_NewPolicy(t *testing.T) {
 }
 
 func TestMonitor_SamePolicy(t *testing.T) {
-	_ = testlog.SetLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	chHitT := make(chan []es.HitT, 1)
 	defer close(chHitT)
@@ -143,6 +143,9 @@ func TestMonitor_SamePolicy(t *testing.T) {
 		defer mwg.Done()
 		merr = monitor.Run(ctx)
 	}()
+
+	err := monitor.(*monitorT).waitStart(ctx)
+	require.NoError(t, err)
 
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
@@ -192,9 +195,9 @@ func TestMonitor_SamePolicy(t *testing.T) {
 }
 
 func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
-	_ = testlog.SetLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	chHitT := make(chan []es.HitT, 1)
 	defer close(chHitT)
@@ -218,6 +221,9 @@ func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
 		defer mwg.Done()
 		merr = monitor.Run(ctx)
 	}()
+
+	err := monitor.(*monitorT).waitStart(ctx)
+	require.NoError(t, err)
 
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
@@ -281,7 +287,6 @@ func TestMonitor_NewPolicyExists(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_ = testlog.SetLogger(t)
 			runTestMonitor_NewPolicyExists(t, tc.delay)
 		})
 	}
@@ -290,6 +295,7 @@ func TestMonitor_NewPolicyExists(t *testing.T) {
 func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	chHitT := make(chan []es.HitT, 1)
 	defer close(chHitT)
@@ -330,6 +336,9 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 		defer mwg.Done()
 		merr = monitor.Run(ctx)
 	}()
+
+	err := monitor.(*monitorT).waitStart(ctx)
+	require.NoError(t, err)
 
 	s, err := monitor.Subscribe(agentId, policyId, 1, 1)
 	defer monitor.Unsubscribe(s)

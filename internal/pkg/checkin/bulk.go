@@ -15,7 +15,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 const defaultFlushInterval = 10 * time.Second
@@ -139,7 +139,7 @@ LOOP:
 		select {
 		case <-tick.C:
 			if err = bc.flush(ctx); err != nil {
-				log.Error().Err(err).Msg("Eat bulk checkin error; Keep on truckin'")
+				zerolog.Ctx(ctx).Error().Err(err).Msg("Eat bulk checkin error; Keep on truckin'")
 			}
 
 		case <-ctx.Done():
@@ -251,7 +251,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 
 	_, err = bc.bulker.MUpdate(ctx, updates, opts...)
 
-	log.Trace().
+	zerolog.Ctx(ctx).Trace().
 		Err(err).
 		Dur("rtt", time.Since(start)).
 		Int("cnt", len(updates)).

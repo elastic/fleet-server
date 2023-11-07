@@ -35,7 +35,6 @@ type zapStub struct {
 }
 
 func (z zapStub) Enabled(zapLevel zapcore.Level) bool {
-
 	zeroLevel := log.Logger.GetLevel()
 
 	switch zapLevel {
@@ -61,23 +60,22 @@ func (z zapStub) Sync() error {
 }
 
 func (z zapStub) Write(p []byte) (n int, err error) {
-
 	// Unwrap the zap object for logging
 	m := make(map[string]interface{})
 	if err := json.Unmarshal(p, &m); err != nil {
 		return 0, err
 	}
 
-	ctx := log.Log()
+	e := log.Log()
 	for key, val := range m {
 
 		// Don't dupe the timestamp, use the fleet formatted timestamp.
 		if key != ECSTimestamp {
-			ctx.Interface(key, val)
+			e.Interface(key, val)
 		}
 	}
 
-	ctx.Send()
+	e.Send()
 	return 0, nil
 }
 

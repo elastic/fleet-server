@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/rnd"
 )
 
@@ -102,6 +103,7 @@ func (acrs ActionsResults) find(ar model.ActionResult) *model.ActionResult {
 func TestActionsResultsStored(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker, acrs := setupActionResults(ctx, t)
 

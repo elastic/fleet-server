@@ -11,7 +11,7 @@ import (
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 func CreateIndex(ctx context.Context, cli *elasticsearch.Client, name string) error {
@@ -28,7 +28,7 @@ func CreateIndex(ctx context.Context, cli *elasticsearch.Client, name string) er
 	err = checkResponseError(res)
 	if err != nil {
 		if errors.Is(err, ErrResourceAlreadyExists) {
-			log.Info().Str("name", name).Msg("Index already exists")
+			zerolog.Ctx(ctx).Info().Str("name", name).Msg("Index already exists")
 			return nil
 		}
 		return err

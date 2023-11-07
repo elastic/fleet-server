@@ -15,11 +15,13 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/gcheckpt"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func TestSearchActionsQuery(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	now := time.Now().UTC()
 
