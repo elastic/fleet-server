@@ -176,7 +176,7 @@ func processOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk)
 	return nil
 }
 
-// replaceStringRef replaces values mathing a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
+// replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
 func replaceStringRef(ref string, secretValues map[string]string) string {
 	matches := secretRegex.FindStringSubmatch(ref)
 	if len(matches) > 1 {
