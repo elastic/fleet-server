@@ -71,25 +71,23 @@ func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bul
 // go's generic parameters are not a good fit for rewriting this method as the typeswitch will not work.
 func replaceAnyRef(ref any, secrets map[string]string) any {
 	var r any
-	switch ref.(type) {
+	switch val := ref.(type) {
 	case string:
-		r = replaceStringRef(ref.(string), secrets)
+		r = replaceStringRef(val, secrets)
 	case map[string]any:
-		obj := ref.(map[string]any)
-		result := make(map[string]any)
-		for k, v := range obj {
-			result[k] = replaceAnyRef(v, secrets)
+		obj := make(map[string]any)
+		for k, v := range val {
+			obj[k] = replaceAnyRef(v, secrets)
 		}
-		r = result
+		r = obj
 	case []any:
-		arr := ref.([]any)
-		result := make([]any, len(arr))
-		for i, v := range arr {
-			result[i] = replaceAnyRef(v, secrets)
+		arr := make([]any, len(val))
+		for i, v := range val {
+			arr[i] = replaceAnyRef(v, secrets)
 		}
-		r = result
+		r = arr
 	default:
-		r = ref
+		r = val
 	}
 	return r
 }
