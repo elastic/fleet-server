@@ -64,6 +64,7 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 		if err != nil {
 			return err
 		}
+		// the outputBulker is different for remote ES, it is used to create/update Api keys in the remote ES client
 		if err := p.prepareElasticsearch(ctx, zlog, bulker, newBulker, agent, outputMap); err != nil {
 			return fmt.Errorf("failed to prepare remote elasticsearch output %q: %w", p.Name, err)
 		}
@@ -157,6 +158,9 @@ func (p *Output) prepareElasticsearch(
 				"source": fmt.Sprintf("ctx._source['outputs'].remove(\"%s\")", removedOutputKey),
 			},
 		})
+		if err != nil {
+			return fmt.Errorf("could not create request body to update agent: %w", err)
+		}
 
 		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 			zlog.Error().Err(err).Msg("fail update agent record")

@@ -193,7 +193,6 @@ func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.P
 	return groupByLatest(policies)
 }
 
-// UnitStateDegraded / Failed
 func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error) {
 	m.mut.Lock()
 	defer m.mut.Unlock()
