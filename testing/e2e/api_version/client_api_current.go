@@ -136,12 +136,15 @@ func (tester *ClientAPITester) Acks(ctx context.Context, apiKey, agentID string,
 	}))
 	tester.Require().NoError(err)
 
-	events := make([]api.Event, 0, len(actionsIDs))
+	events := make([]api.AckRequest_Events_Item, 0, len(actionsIDs))
 	for _, actionId := range actionsIDs {
-		events = append(events, api.Event{
+		event := api.AckRequest_Events_Item{}
+		err := event.FromGenericEvent(api.GenericEvent{
 			ActionId: actionId,
 			AgentId:  agentID,
 		})
+		tester.Require().NoError(err)
+		events = append(events, event)
 	}
 
 	resp, err := client.AgentAcksWithResponse(ctx,

@@ -4,7 +4,10 @@
 
 package model
 
-import "time"
+import (
+	"maps"
+	"time"
+)
 
 // Time returns the time for the current leader.
 func (m *PolicyLeader) Time() (time.Time, error) {
@@ -63,4 +66,44 @@ func (a *Agent) APIKeyIDs() []string {
 
 	return keys
 
+}
+
+func ClonePolicyData(d *PolicyData) *PolicyData {
+	if d == nil {
+		return nil
+	}
+	res := &PolicyData{
+		Agent:             d.Agent,
+		Fleet:             d.Fleet,
+		ID:                d.ID,
+		Inputs:            make([]map[string]interface{}, 0, len(d.Inputs)),
+		OutputPermissions: d.OutputPermissions,
+		Outputs:           cloneMap(d.Outputs),
+		Revision:          d.Revision,
+		SecretReferences:  make([]SecretReferencesItems, 0, len(d.SecretReferences)),
+	}
+	for _, m := range d.Inputs {
+		res.Inputs = append(res.Inputs, maps.Clone(m))
+	}
+	res.SecretReferences = append(res.SecretReferences, d.SecretReferences...)
+	if d.Signed != nil {
+		res.Signed = &Signed{
+			Data:      d.Signed.Data,
+			Signature: d.Signed.Signature,
+		}
+	}
+	return res
+}
+
+// cloneMap does a deep copy on a map of objects
+// TODO generics?
+func cloneMap(m map[string]map[string]interface{}) map[string]map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	r := make(map[string]map[string]interface{})
+	for k, v := range m {
+		r[k] = maps.Clone(v)
+	}
+	return r
 }
