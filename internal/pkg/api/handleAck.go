@@ -556,16 +556,23 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 
 func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
 	ids := make([]string, 0, len(toRetireAPIKeyIDs))
+	output := ""
 	for _, k := range toRetireAPIKeyIDs {
 		if k.ID == skip || k.ID == "" {
 			continue
 		}
 		ids = append(ids, k.ID)
+		output = k.Output
+	}
+	// using remote es bulker to invalidate api key - supposing all retire api keky ids belong to the same remote es
+	bulk := ack.bulk
+	if output != "" {
+		bulk = ack.bulk.GetBulker(output)
 	}
 
 	if len(ids) > 0 {
 		zlog.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
-		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
+		if err := bulk.APIKeyInvalidate(ctx, ids...); err != nil {
 			zlog.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
 		}
 	}

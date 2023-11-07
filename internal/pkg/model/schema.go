@@ -468,4 +468,6 @@ type ToRetireAPIKeyIdsItems struct {
 
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`
+
+	Output string `json:"output,omitempty"`
 }

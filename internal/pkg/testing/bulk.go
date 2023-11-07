@@ -79,8 +79,14 @@ func (m *MockBulk) Client() *elasticsearch.Client {
 	return args.Get(0).(*elasticsearch.Client)
 }
 
-func (m *MockBulk) Tracer() *apm.Tracer {
-	return nil
+func (m *MockBulk) GetBulker(outputName string) bulk.Bulk {
+	args := m.Called()
+	return args.Get(0).(bulk.Bulk)
+}
+
+func (m *MockBulk) CreateAndGetBulker(outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (bulk.Bulk, error) {
+	args := m.Called(outputName, serviceToken, outputMap)
+	return args.Get(0).(bulk.Bulk), args.Error(1)
 }
 
 func (m *MockBulk) CheckRemoteOutputChanged(name string, newCfg map[string]interface{}) {

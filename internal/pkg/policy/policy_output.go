@@ -16,15 +16,11 @@ import (
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
-	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
-	"github.com/elastic/go-elasticsearch/v8"
 )
 
 const (
@@ -37,8 +33,6 @@ const (
 var (
 	ErrNoOutputPerms    = errors.New("output permission sections not found")
 	ErrFailInjectAPIKey = errors.New("fail inject api key")
-	// TODO clean up bulkers when a remote output is removed
-	bulkerMap = make(map[string]bulk.Bulk)
 )
 
 type Output struct {
@@ -66,7 +60,7 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 		}
 	case OutputTypeRemoteElasticsearch:
 		zlog.Debug().Msg("preparing remote elasticsearch output")
-		newBulker, err := p.createAndGetBulker(bulker, outputMap)
+		newBulker, err := bulker.CreateAndGetBulker(p.Name, p.ServiceToken, outputMap)
 		if err != nil {
 			return err
 		}
@@ -113,6 +107,61 @@ func (p *Output) prepareElasticsearch(
 		zlog.Debug().Msgf("creating agent.Outputs[%s]", p.Name)
 		output = &model.PolicyOutput{}
 		agent.Outputs[p.Name] = output
+	}
+
+	// retire api key of removed remote output
+	var toRetireAPIKeys *model.ToRetireAPIKeyIdsItems
+	var removedOutputKey string
+	// find the first output that is removed - supposing one output can be removed at a time
+	for agentOutputKey, agentOutput := range agent.Outputs {
+		found := false
+		for outputMapKey := range outputMap {
+			if agentOutputKey == outputMapKey {
+				found = true
+			}
+		}
+		if !found {
+			zlog.Info().Str("APIKeyID", agentOutput.APIKeyID).Str("output", agentOutputKey).Msg("Output removed, will retire API key")
+			toRetireAPIKeys = &model.ToRetireAPIKeyIdsItems{
+				ID:        agentOutput.APIKeyID,
+				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+				Output:    agentOutputKey,
+			}
+			removedOutputKey = agentOutputKey
+			break
+		}
+	}
+
+	if toRetireAPIKeys != nil {
+
+		// adding remote API key to new output toRetireAPIKeys
+		fields := map[string]interface{}{
+			dl.FieldPolicyOutputToRetireAPIKeyIDs: *toRetireAPIKeys,
+		}
+
+		// Using painless script to append the old keys to the history
+		body, err := renderUpdatePainlessScript(p.Name, fields)
+		if err != nil {
+			return fmt.Errorf("could not update painless script: %w", err)
+		}
+
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+			zlog.Error().Err(err).Msg("fail update agent record")
+			return fmt.Errorf("fail update agent record: %w", err)
+		}
+
+		// remove output from agent doc
+		body, err = json.Marshal(map[string]interface{}{
+			"script": map[string]interface{}{
+				"lang":   "painless",
+				"source": fmt.Sprintf("ctx._source['outputs'].remove(\"%s\")", removedOutputKey),
+			},
+		})
+
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+			zlog.Error().Err(err).Msg("fail update agent record")
+			return fmt.Errorf("fail update agent record: %w", err)
+		}
 	}
 
 	// Determine whether we need to generate an output ApiKey.
@@ -227,6 +276,7 @@ func (p *Output) prepareElasticsearch(
 			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeyIdsItems{
 				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+				Output:    p.Name,
 			}
 		}
 
@@ -270,80 +320,6 @@ func (p *Output) prepareElasticsearch(
 	// See: https://github.com/elastic/fleet-server/issues/1301
 	outputMap[p.Name]["api_key"] = output.APIKey
 	return nil
-}
-
-func (p *Output) createAndGetBulker(mainBulker bulk.Bulk, outputMap map[string]map[string]interface{}) (bulk.Bulk, error) {
-	mainBulker.CheckRemoteOutputChanged(p.Name, outputMap[p.Name])
-	bulker := bulkerMap[p.Name]
-	if bulker != nil {
-		return bulker, nil
-	}
-	bulkCtx, bulkCancel := context.WithCancel(context.Background())
-	defer bulkCancel()
-	es, err := p.createRemoteEsClient(bulkCtx, outputMap)
-	if err != nil {
-		return nil, err
-	}
-	// starting a new bulker to create/update API keys for remote ES output
-	newBulker := bulk.NewBulker(es, mainBulker.Tracer())
-	bulkerMap[p.Name] = newBulker
-
-	errCh := make(chan error)
-	go func() {
-		runFunc := func() (err error) {
-			return newBulker.Run(bulkCtx)
-		}
-
-		errCh <- runFunc()
-	}()
-	go func() {
-		select {
-		case err = <-errCh:
-		case <-bulkCtx.Done():
-			err = bulkCtx.Err()
-		}
-	}()
-
-	return newBulker, nil
-}
-
-func (p *Output) createRemoteEsClient(ctx context.Context, outputMap map[string]map[string]interface{}) (*elasticsearch.Client, error) {
-	hostsObj := outputMap[p.Name]["hosts"]
-	hosts, ok := hostsObj.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to get hosts from output: %v", hostsObj)
-	}
-	hostsStrings := make([]string, len(hosts))
-	for i, host := range hosts {
-		hostsStrings[i], ok = host.(string)
-		if !ok {
-			return nil, fmt.Errorf("failed to get hosts from output: %v", host)
-		}
-	}
-
-	cfg := config.Config{
-		Output: config.Output{
-			Elasticsearch: config.Elasticsearch{
-				Hosts:        hostsStrings,
-				ServiceToken: p.ServiceToken,
-			},
-		},
-	}
-	es, err := es.NewClient(ctx, &cfg, false, elasticsearchOptions(
-		true, build.Info{},
-	)...)
-	if err != nil {
-		return nil, err
-	}
-	return es, nil
-}
-
-func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
-	options := []es.ConfigOption{es.WithUserAgent("Remote-Fleet-Server", bi)}
-	if instumented {
-		options = append(options, es.InstrumentRoundTripper())
-	}
-	return options
 }
 
 func fetchAPIKeyRoles(ctx context.Context, b bulk.Bulk, apiKeyID string) (*RoleT, error) {

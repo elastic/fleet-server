@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -66,12 +68,12 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
-	// Reusing tracer to create bulker for remote ES outputs
-	Tracer() *apm.Tracer
-
 	CheckRemoteOutputChanged(name string, newCfg map[string]interface{})
 
 	RemoteOutputCh() chan bool
+
+	CreateAndGetBulker(outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, error)
+	GetBulker(outputName string) Bulk
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
@@ -87,6 +89,7 @@ type Bulker struct {
 	tracer                *apm.Tracer
 	remoteOutputConfigMap map[string]map[string]interface{}
 	remoteOutputCh        chan bool
+	bulkerMap             map[string]Bulk
 }
 
 const (
@@ -116,7 +119,86 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		tracer:                tracer,
 		remoteOutputConfigMap: make(map[string]map[string]interface{}),
 		remoteOutputCh:        make(chan bool, 1),
+		bulkerMap:             make(map[string]Bulk),
 	}
+}
+
+func (b *Bulker) GetBulker(outputName string) Bulk {
+	return b.bulkerMap[outputName]
+}
+
+func (b *Bulker) CreateAndGetBulker(outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, error) {
+	b.CheckRemoteOutputChanged(outputName, outputMap[outputName])
+	bulker := b.bulkerMap[outputName]
+	if bulker != nil {
+		return bulker, nil
+	}
+	bulkCtx, bulkCancel := context.WithCancel(context.Background())
+	defer bulkCancel()
+	es, err := b.createRemoteEsClient(bulkCtx, outputName, serviceToken, outputMap)
+	if err != nil {
+		return nil, err
+	}
+	// starting a new bulker to create/update API keys for remote ES output
+	newBulker := NewBulker(es, b.tracer)
+	b.bulkerMap[outputName] = newBulker
+
+	errCh := make(chan error)
+	go func() {
+		runFunc := func() (err error) {
+			return newBulker.Run(bulkCtx)
+		}
+
+		errCh <- runFunc()
+	}()
+	go func() {
+		select {
+		case err = <-errCh:
+		case <-bulkCtx.Done():
+			err = bulkCtx.Err()
+		}
+	}()
+
+	return newBulker, nil
+}
+
+func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (*elasticsearch.Client, error) {
+	hostsObj := outputMap[outputName]["hosts"]
+	hosts, ok := hostsObj.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("failed to get hosts from output: %v", hostsObj)
+	}
+	hostsStrings := make([]string, len(hosts))
+	for i, host := range hosts {
+		hostsStrings[i], ok = host.(string)
+		if !ok {
+			return nil, fmt.Errorf("failed to get hosts from output: %v", host)
+		}
+	}
+
+	cfg := config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Hosts:        hostsStrings,
+				ServiceToken: serviceToken,
+			},
+		},
+	}
+	es, err := es.NewClient(ctx, &cfg, false, elasticsearchOptions(
+		true, build.Info{},
+	)...)
+	if err != nil {
+		return nil, err
+	}
+	return es, nil
+}
+
+func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
+	options := []es.ConfigOption{es.WithUserAgent("Remote-Fleet-Server", bi)}
+	if instumented {
+		options = append(options, es.InstrumentRoundTripper())
+	}
+	return options
 }
 
 func (b *Bulker) Client() *elasticsearch.Client {
