@@ -19,11 +19,13 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func TestMonitorEmptyIndex(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetActions)
 	runMonitorTest(t, ctx, index, bulker)
@@ -32,6 +34,7 @@ func TestMonitorEmptyIndex(t *testing.T) {
 func TestMonitorNonEmptyIndex(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker, _ := ftesting.SetupActions(ctx, t, 1, 12)
 	runMonitorTest(t, ctx, index, bulker)

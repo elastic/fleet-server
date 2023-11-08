@@ -8,11 +8,10 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -54,7 +53,7 @@ func FindArtifact(ctx context.Context, bulker bulk.Bulk, ident, sha2 string) (*m
 	}
 
 	if len(res.Hits) > 1 {
-		log.Warn().
+		zerolog.Ctx(ctx).Warn().
 			Str("ident", ident).
 			Str("sha2", sha2).
 			Int("cnt", len(res.Hits)).

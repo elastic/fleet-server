@@ -27,7 +27,6 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -42,6 +41,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 const (
@@ -186,7 +186,7 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 	srvcfg.Host = localhost
 	srvcfg.Port = port
 	cfg.Inputs[0].Server = *srvcfg
-	log.Info().Uint16("port", port).Msg("Test fleet server")
+	t.Logf("Test fleet server port=%d", port)
 
 	for _, opt := range opts {
 		if err := opt(cfg); err != nil {
@@ -293,6 +293,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 	require.NoError(t, err)
 
 	logger.Init(cfg, "fleet-server") //nolint:errcheck // test logging setup
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 	bulker := ftesting.SetupBulk(ctx, t)
 
 	policyID := uuid.Must(uuid.NewV4()).String()
@@ -355,7 +356,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 	newCfg.Inputs[0].Server = *srvcfg
 	cfg.HTTP.Enabled = false
 	newCfg.HTTP.Enabled = false
-	log.Info().Uint16("port", port).Msg("Test fleet server")
+	t.Logf("Test fleet server port=%d", port)
 
 	mReporter := &MockReporter{}
 	srv, err := NewFleet(build.Info{Version: serverVersion}, mReporter, false)
@@ -394,6 +395,7 @@ func TestServerUnauthorized(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
 	cli := cleanhttp.DefaultClient()
@@ -412,6 +414,7 @@ func TestServerUnauthorized(t *testing.T) {
 	// Not sure if this is right response, just capturing what we have so far
 	// TODO: revisit error response format
 	t.Run("no auth header", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		for _, u := range allurls {
 			req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewBuffer([]byte("{}")))
 			if err != nil {
@@ -447,6 +450,7 @@ func TestServerUnauthorized(t *testing.T) {
 
 	// Unauthorized, expecting error from /_security/_authenticate
 	t.Run("unauthorized", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		for _, u := range agenturls {
 			req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewBuffer([]byte("{}")))
 			require.NoError(t, err)
@@ -504,6 +508,7 @@ func TestServerInstrumentation(t *testing.T) {
 	// Start test server with instrumentation disabled
 	srv, err := startTestServer(t, ctx, policyData, WithAPM(server.URL, false))
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
 	checkinURL := srv.buildURL(agentID, "checkin")
@@ -588,6 +593,7 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 
@@ -748,6 +754,7 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	t.Log("Enroll the first agent with enrollment_id")
 	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
@@ -794,6 +801,7 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	t.Log("Enroll the first agent with enrollment_id")
 	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
@@ -842,6 +850,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 
@@ -880,6 +889,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 	require.NotEmpty(t, id)
 
 	t.Run("use enroll key for checkin", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -892,6 +902,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, res.StatusCode) // NOTE this is a 404 and not a 400
 	})
 	t.Run("wrong agent ID", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/bad-agent-id/checkin", strings.NewReader(checkinBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+key)
@@ -904,6 +915,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 	t.Run("use another agent's api key", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -943,6 +955,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 	t.Run("use api key for enrollment", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+key)
@@ -962,9 +975,11 @@ func Test_Agent_request_errors(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 	t.Run("no auth", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
@@ -975,6 +990,7 @@ func Test_Agent_request_errors(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 	t.Run("bad path", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/temporary", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -986,6 +1002,7 @@ func Test_Agent_request_errors(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, res.StatusCode)
 	})
 	t.Run("wrong method", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "PUT", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -997,6 +1014,7 @@ func Test_Agent_request_errors(t *testing.T) {
 		require.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
 	})
 	t.Run("no body", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", nil)
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -1008,6 +1026,7 @@ func Test_Agent_request_errors(t *testing.T) {
 		require.Equal(t, http.StatusInternalServerError, res.StatusCode)
 	})
 	t.Run("no user agent", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -1018,6 +1037,7 @@ func Test_Agent_request_errors(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 	t.Run("bad user agent", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -1037,6 +1057,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 

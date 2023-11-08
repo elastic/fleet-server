@@ -17,7 +17,6 @@ import (
 	"time"
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
-	"github.com/rs/zerolog/log"
 )
 
 // TODO:
@@ -252,11 +251,10 @@ func TestCancelCtx(t *testing.T) {
 		},
 	}
 
-	log.Logger = testlog.SetLogger(t)
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancelF := context.WithCancel(context.Background())
+			ctx = testlog.SetLogger(t).WithContext(ctx)
 
 			var wg sync.WaitGroup
 			wg.Add(1)
@@ -276,12 +274,11 @@ func TestCancelCtx(t *testing.T) {
 
 func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 	b.ReportAllocs()
-	log.Logger = testlog.SetLogger(b)
-
 	mock := &mockBulkTransport{}
 
 	ctx, cancelF := context.WithCancel(context.Background())
 	defer cancelF()
+	ctx = testlog.SetLogger(b).WithContext(ctx)
 
 	n := len(samples)
 	bulker := NewBulker(mock, nil, WithFlushThresholdCount(n))

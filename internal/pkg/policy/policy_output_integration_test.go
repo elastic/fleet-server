@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 var TestPayload []byte
@@ -47,7 +48,8 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 			outputName := "output_" + tt.name
 			outputAPIKey := bulk.APIKey{ID: "new_ID", Key: "new-key"}
 
-			index, bulker := ftesting.SetupCleanIndex(context.Background(), t, dl.FleetAgents)
+			ctx := testlog.SetLogger(t).WithContext(context.Background())
+			index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
 			now := time.Now().UTC()
 			nowStr := now.Format(time.RFC3339)
@@ -97,7 +99,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 			require.NoError(t, err)
 
 			_, err = bulker.Create(
-				context.Background(), index, agentID, body, bulk.WithRefresh())
+				ctx, index, agentID, body, bulk.WithRefresh())
 			require.NoError(t, err)
 
 			fields := map[string]interface{}{
@@ -111,7 +113,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 			got, err := renderUpdatePainlessScript(outputName, fields)
 			require.NoError(t, err, "renderUpdatePainlessScript returned an unexpected error")
 
-			err = bulker.Update(context.Background(), dl.FleetAgents, agentID, got)
+			err = bulker.Update(ctx, dl.FleetAgents, agentID, got)
 			require.NoError(t, err, "bulker.Update failed")
 
 			// there is some refresh thing that needs time, I didn't manage to find
@@ -119,7 +121,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 			time.Sleep(time.Second)
 
 			gotAgent, err := dl.FindAgent(
-				context.Background(), bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+				ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
 			require.NoError(t, err)
 
 			assert.Equal(t, agentID, gotAgent.Id)
@@ -130,11 +132,12 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 }
 
 func TestPolicyOutputESPrepareRealES(t *testing.T) {
-	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, dl.FleetAgents)
+	ctx := testlog.SetLogger(t).WithContext(context.Background())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
-	agentID := createAgent(t, index, bulker)
+	agentID := createAgent(ctx, t, index, bulker)
 	agent, err := dl.FindAgent(
-		context.Background(), bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
 	if err != nil {
 		require.NoError(t, err, "failed to find agent ID %q", agentID)
 	}
@@ -152,7 +155,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	}
 
 	err = output.prepareElasticsearch(
-		context.Background(), zerolog.Nop(), bulker, bulker, &agent, policyMap)
+		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap)
 	require.NoError(t, err)
 
 	// need to wait a bit before querying the agent again
@@ -160,7 +163,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	time.Sleep(time.Second)
 
 	got, err := dl.FindAgent(
-		context.Background(), bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
 	if err != nil {
 		require.NoError(t, err, "failed to find agent ID %q", agentID)
 	}
@@ -175,7 +178,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	assert.NotEmpty(t, gotOutput.APIKeyID)
 }
 
-func createAgent(t *testing.T, index string, bulker bulk.Bulk) string {
+func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bulk) string {
 	const nowStr = "2022-08-12T16:50:05Z"
 
 	agentID := uuid.Must(uuid.NewV4()).String()
@@ -194,7 +197,7 @@ func createAgent(t *testing.T, index string, bulker bulk.Bulk) string {
 	require.NoError(t, err)
 
 	_, err = bulker.Create(
-		context.Background(), index, agentID, body, bulk.WithRefresh())
+		ctx, index, agentID, body, bulk.WithRefresh())
 	require.NoError(t, err)
 
 	return agentID

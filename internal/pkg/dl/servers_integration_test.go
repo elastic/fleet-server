@@ -16,11 +16,13 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func TestEnsureServer(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetServers)
 

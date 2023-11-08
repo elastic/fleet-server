@@ -9,7 +9,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -19,7 +19,7 @@ var (
 
 // writeError recreates the behaviour of api/error.go.
 // It is defined separately here to stop a circular import
-func writeError(w http.ResponseWriter, err error) error {
+func writeError(log *zerolog.Logger, w http.ResponseWriter, err error) error {
 	resp := struct {
 		Status  int    `json:"statusCode"`
 		Error   string `json:"error"`

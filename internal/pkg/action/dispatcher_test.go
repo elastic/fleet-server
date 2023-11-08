@@ -366,7 +366,7 @@ func Test_offsetStartTime(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := offsetStartTime(tt.start, tt.dur, tt.i, tt.total)
+			r := offsetStartTime(context.Background(), tt.start, tt.dur, tt.i, tt.total)
 			assert.Equal(t, tt.result, r)
 		})
 	}

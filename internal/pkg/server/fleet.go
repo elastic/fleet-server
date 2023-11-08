@@ -38,7 +38,6 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -79,6 +78,7 @@ type runFuncCfg func(context.Context, *config.Config) error
 
 // Run runs the fleet server
 func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
+	log := zerolog.Ctx(ctx)
 	err := initCfg.LoadServerLimits()
 	if err != nil {
 		return fmt.Errorf("encountered error while loading server limits: %w", err)
@@ -177,7 +177,7 @@ LOOP:
 		}
 
 		// Start or restart server
-		if configChangedServer(curCfg, newCfg) || outputChanged {
+		if configChangedServer(*log, curCfg, newCfg) || outputChanged {
 			if srvCancel != nil {
 				log.Info().Msg("stopping server on configuration change")
 				stop(srvCancel, srvEg)
@@ -246,7 +246,7 @@ func configCacheChanged(curCfg, newCfg *config.Config) bool {
 	return curCfg.Inputs[0].Cache != newCfg.Inputs[0].Cache
 }
 
-func configChangedServer(curCfg, newCfg *config.Config) bool {
+func configChangedServer(log zerolog.Logger, curCfg, newCfg *config.Config) bool {
 	zlog := log.With().Interface("new", newCfg.Redact()).Logger()
 
 	changed := true
@@ -282,7 +282,7 @@ func safeWait(g *errgroup.Group, to time.Duration) error {
 	select {
 	case err = <-waitCh:
 	case <-time.After(to):
-		log.Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
+		zerolog.Ctx(context.TODO()).Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
 		err = errors.New("group wait timeout")
 	}
 
@@ -290,8 +290,8 @@ func safeWait(g *errgroup.Group, to time.Duration) error {
 }
 
 func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error {
+	log := zerolog.Ctx(ctx)
 	return func() error {
-
 		log.Debug().Msg(tag + " started")
 
 		err := runfn(ctx)
@@ -315,7 +315,7 @@ func initRuntime(cfg *config.Config) {
 	if gcPercent != 0 {
 		old := debug.SetGCPercent(gcPercent)
 
-		log.Info().
+		zerolog.Ctx(context.TODO()).Info().
 			Int("old", old).
 			Int("new", gcPercent).
 			Msg("SetGCPercent")
@@ -324,7 +324,7 @@ func initRuntime(cfg *config.Config) {
 	if memoryLimit != 0 {
 		old := debug.SetMemoryLimit(memoryLimit)
 
-		log.Info().
+		zerolog.Ctx(context.TODO()).Info().
 			Int64("old", old).
 			Int64("new", memoryLimit).
 			Msg("SetMemoryLimit")
@@ -348,7 +348,7 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	initRuntime(cfg)
 
 	// Create the APM tracer.
-	tracer, err := f.initTracer(cfg.Inputs[0].Server.Instrumentation)
+	tracer, err := f.initTracer(ctx, cfg.Inputs[0].Server.Instrumentation)
 	if err != nil {
 		return err
 	}
@@ -411,7 +411,7 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	if tracer != nil {
 		go func() {
 			<-ctx.Done()
-			log.Info().Msg("flushing instrumentation tracer...")
+			zerolog.Ctx(ctx).Info().Msg("flushing instrumentation tracer...")
 			tracer.Flush(nil)
 			tracer.Close()
 		}()
@@ -562,12 +562,12 @@ func (f *Fleet) Reload(ctx context.Context, cfg *config.Config) error {
 
 const envAPMActive = "ELASTIC_APM_ACTIVE"
 
-func (f *Fleet) initTracer(cfg config.Instrumentation) (*apm.Tracer, error) {
+func (f *Fleet) initTracer(ctx context.Context, cfg config.Instrumentation) (*apm.Tracer, error) {
 	if !cfg.Enabled && os.Getenv(envAPMActive) != "true" {
 		return nil, nil
 	}
 
-	log.Info().Msg("fleet-server instrumentation is enabled")
+	zerolog.Ctx(ctx).Info().Msg("fleet-server instrumentation is enabled")
 
 	// Use env vars to configure additional APM settings.
 	const (

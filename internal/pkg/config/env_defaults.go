@@ -5,6 +5,7 @@
 package config
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io"
@@ -16,7 +17,7 @@ import (
 
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/pbnjay/memory"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -255,6 +256,7 @@ func loadLimitsForAgents(agentLimit int) *envLimits {
 	if agentLimit == 0 {
 		return defaultEnvLimits()
 	}
+	log := zerolog.Ctx(context.TODO())
 	for _, l := range defaults {
 		// get nearest limits for configured agent numbers
 		if l.Agents.Min < agentLimit && agentLimit <= l.Agents.Max {

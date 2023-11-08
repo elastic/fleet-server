@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func createRandomPolicy(id string, revisionIdx int) model.Policy {
@@ -57,6 +58,7 @@ func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string) (mod
 func TestQueryLatestPolicies(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
@@ -87,6 +89,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 func TestCreatePolicy(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 

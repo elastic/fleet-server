@@ -18,7 +18,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/cbor"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 )
 
@@ -106,7 +106,7 @@ func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID 
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return err
 	}
-	log.Trace().Int("statuscode", resp.StatusCode).Interface("response", response).Msg("updated file metadata document")
+	zerolog.Ctx(ctx).Trace().Int("status_code", resp.StatusCode).Interface("response", response).Msg("updated file metadata document")
 
 	if response.Error.Type != "" {
 		return fmt.Errorf("%s: %s caused by %s: %s", response.Error.Type, response.Error.Reason, response.Error.Cause.Type, response.Error.Cause.Reason)
@@ -140,7 +140,7 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return err
 	}
-	log.Trace().Int("statuscode", resp.StatusCode).Interface("chunk-response", response).Msg("uploaded chunk")
+	zerolog.Ctx(ctx).Trace().Int("status_code", resp.StatusCode).Interface("chunk-response", response).Msg("uploaded chunk")
 
 	if response.Error.Type != "" {
 		return fmt.Errorf("%s: %s caused by %s: %s", response.Error.Type, response.Error.Reason, response.Error.Cause.Type, response.Error.Cause.Reason)

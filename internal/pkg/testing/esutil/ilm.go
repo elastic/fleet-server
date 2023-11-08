@@ -14,7 +14,6 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 // Can be cleaner but it's temporary bootstrap until it's moved to the elasticseach system index plugin
@@ -37,7 +36,7 @@ const (
 func EnsureILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string) error {
 	policy := GetILMPolicyName(name)
 
-	lg := log.With().Str("policy", policy).Logger()
+	lg := zerolog.Ctx(ctx).With().Str("policy", policy).Logger()
 
 	res, err := cli.ILM.GetLifecycle(
 		cli.ILM.GetLifecycle.WithPolicy(policy),
@@ -148,7 +147,7 @@ func createILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 
 	// The elastic will respond with an error if the ILM policy doesn't exists
 	// in that case let's just create the ILM policy
-	log.Debug().Str("policy", policy).Str("body", body).Msg("Creating ILM policy")
+	zerolog.Ctx(ctx).Debug().Str("policy", policy).Str("body", body).Msg("Creating ILM policy")
 
 	res, err := cli.ILM.PutLifecycle(policy,
 		cli.ILM.PutLifecycle.WithBody(strings.NewReader(body)),

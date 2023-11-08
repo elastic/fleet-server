@@ -13,18 +13,17 @@ import (
 	"time"
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
-	"github.com/rs/zerolog/log"
 )
 
 // This runs a series of CRUD operations through elastic.
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
 
 func benchmarkMultiUpdate(n int, b *testing.B) {
-	log.Logger = testlog.SetLogger(b)
 	b.ReportAllocs()
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(b).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, b, testPolicy, WithFlushThresholdCount(n), WithFlushInterval(time.Millisecond*10))
 

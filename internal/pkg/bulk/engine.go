@@ -21,7 +21,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 	"golang.org/x/sync/semaphore"
 )
@@ -288,7 +288,7 @@ func blkToQueueType(blk *bulkT) queueType {
 func (b *Bulker) Run(ctx context.Context) error {
 	var err error
 
-	log.Info().Interface("opts", &b.opts).Msg("Run bulker with options")
+	zerolog.Ctx(ctx).Info().Interface("opts", &b.opts).Msg("Run bulker with options")
 
 	// Create timer in stopped state
 	timer := time.NewTimer(b.opts.flushInterval)
@@ -360,7 +360,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 			// Threshold test, short circuit timer on pending count
 			if itemCnt >= b.opts.flushThresholdCnt || byteCnt >= b.opts.flushThresholdSz {
-				log.Trace().
+				zerolog.Ctx(ctx).Trace().
 					Str("mod", kModBulk).
 					Int("itemCnt", itemCnt).
 					Int("byteCnt", byteCnt).
@@ -372,7 +372,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 			}
 
 		case <-timer.C:
-			log.Trace().
+			zerolog.Ctx(ctx).Trace().
 				Str("mod", kModBulk).
 				Int("itemCnt", itemCnt).
 				Int("byteCnt", byteCnt).
@@ -390,7 +390,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue queueT) error {
 	start := time.Now()
-	log.Trace().
+	zerolog.Ctx(ctx).Trace().
 		Str("mod", kModBulk).
 		Int("cnt", queue.cnt).
 		Int("szPending", queue.pending).
@@ -401,7 +401,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		return err
 	}
 
-	log.Trace().
+	zerolog.Ctx(ctx).Trace().
 		Str("mod", kModBulk).
 		Int("cnt", queue.cnt).
 		Dur("tdiff", time.Since(start)).
@@ -439,7 +439,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 			apm.CaptureError(ctx, err).Send()
 		}
 
-		log.Trace().
+		zerolog.Ctx(ctx).Trace().
 			Err(err).
 			Str("mod", kModBulk).
 			Int("cnt", queue.cnt).
@@ -526,7 +526,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 	select {
 	case b.ch <- blk:
 	case <-ctx.Done():
-		log.Error().
+		zerolog.Ctx(ctx).Error().
 			Err(ctx.Err()).
 			Str("mod", kModBulk).
 			Str("action", blk.action.String()).
@@ -539,7 +539,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 	// Wait for response
 	select {
 	case resp := <-blk.ch:
-		log.Trace().
+		zerolog.Ctx(ctx).Trace().
 			Err(resp.err).
 			Str("mod", kModBulk).
 			Str("action", blk.action.String()).
@@ -549,7 +549,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 
 		return resp
 	case <-ctx.Done():
-		log.Error().
+		zerolog.Ctx(ctx).Error().
 			Err(ctx.Err()).
 			Str("mod", kModBulk).
 			Str("action", blk.action.String()).
