@@ -229,7 +229,7 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 	}
 	if hasError {
 		m.state = client.UnitStateDegraded
-		m.reporter.UpdateState(client.UnitStateDegraded, "Could not connect to remote ES output", remoteESPayload)
+		m.reporter.UpdateState(client.UnitStateDegraded, "Could not connect to remote ES output", remoteESPayload) //nolint:errcheck // not clear what to do in failure cases
 		return client.UnitStateDegraded, nil
 	}
 
