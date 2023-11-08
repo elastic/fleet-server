@@ -68,11 +68,11 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
-	CheckRemoteOutputChanged(name string, newCfg map[string]interface{})
+	CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{})
 
 	RemoteOutputCh() chan bool
 
-	CreateAndGetBulker(outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, error)
+	CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, error)
 	GetBulker(outputName string) Bulk
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
@@ -127,8 +127,8 @@ func (b *Bulker) GetBulker(outputName string) Bulk {
 	return b.bulkerMap[outputName]
 }
 
-func (b *Bulker) CreateAndGetBulker(outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, error) {
-	b.CheckRemoteOutputChanged(outputName, outputMap[outputName])
+func (b *Bulker) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, error) {
+	b.CheckRemoteOutputChanged(zlog, outputName, outputMap[outputName])
 	bulker := b.bulkerMap[outputName]
 	if bulker != nil {
 		return bulker, nil
@@ -214,12 +214,12 @@ func (b *Bulker) Tracer() *apm.Tracer {
 }
 
 // check if remote output cfg changed, and signal to remoteOutputCh channel if so
-func (b *Bulker) CheckRemoteOutputChanged(name string, newCfg map[string]interface{}) {
+func (b *Bulker) CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) {
 	curCfg := b.remoteOutputConfigMap[name]
 
 	// ignore output sent to agents where type is set to elasticsearch
 	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
-		log.Info().Str("name", name).Msg("remote output configuration has changed")
+		zlog.Info().Str("name", name).Msg("remote output configuration has changed")
 		b.remoteOutputCh <- true
 	}
 	newCfgCopy := make(map[string]interface{})

@@ -60,7 +60,7 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 		}
 	case OutputTypeRemoteElasticsearch:
 		zlog.Debug().Msg("preparing remote elasticsearch output")
-		newBulker, err := bulker.CreateAndGetBulker(p.Name, p.ServiceToken, outputMap)
+		newBulker, err := bulker.CreateAndGetBulker(zlog, p.Name, p.ServiceToken, outputMap)
 		if err != nil {
 			return err
 		}

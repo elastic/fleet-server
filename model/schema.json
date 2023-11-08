@@ -387,6 +387,10 @@
             "description": "Date/time the API key was retired",
             "type": "string",
             "format": "date-time"
+          },
+          "output": {
+            "description": "Output name where the API Key belongs",
+            "type": "string"
           }
         }
       }
@@ -539,10 +543,6 @@
         },
         "last_checkin_status": {
           "description": "Last checkin status",
-          "type": "string"
-        },
-        "last_checkin_message": {
-          "description": "Last checkin message",
           "type": "string"
         },
         "last_checkin_message": {

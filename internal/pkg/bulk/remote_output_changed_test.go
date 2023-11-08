@@ -9,6 +9,7 @@ package bulk
 import (
 	"testing"
 
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -79,9 +80,10 @@ func Test_CheckRemoteOutputChanged(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			log := testlog.SetLogger(t)
 			bulker := NewBulker(nil, nil)
 			bulker.remoteOutputConfigMap["remote1"] = tc.cfg
-			bulker.CheckRemoteOutputChanged("remote1", tc.newCfg)
+			bulker.CheckRemoteOutputChanged(log, "remote1", tc.newCfg)
 
 			if tc.changed {
 				expectedCount++

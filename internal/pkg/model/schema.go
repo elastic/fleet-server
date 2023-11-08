@@ -466,8 +466,9 @@ type ToRetireAPIKeyIdsItems struct {
 	// API Key identifier
 	ID string `json:"id,omitempty"`
 
+	// Output name where the API Key belongs
+	Output string `json:"output,omitempty"`
+
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`
-
-	Output string `json:"output,omitempty"`
 }

@@ -421,6 +421,8 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 		return err
 	}
 
+	log := zerolog.Ctx(ctx)
+
 	go func() {
 		outputChanged := <-bulker.RemoteOutputCh()
 		f.outputCh <- outputChanged

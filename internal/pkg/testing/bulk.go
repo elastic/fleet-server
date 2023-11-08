@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"go.elastic.co/apm/v2"
 
@@ -84,12 +85,12 @@ func (m *MockBulk) GetBulker(outputName string) bulk.Bulk {
 	return args.Get(0).(bulk.Bulk)
 }
 
-func (m *MockBulk) CreateAndGetBulker(outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (bulk.Bulk, error) {
-	args := m.Called(outputName, serviceToken, outputMap)
+func (m *MockBulk) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (bulk.Bulk, error) {
+	args := m.Called(zlog, outputName, serviceToken, outputMap)
 	return args.Get(0).(bulk.Bulk), args.Error(1)
 }
 
-func (m *MockBulk) CheckRemoteOutputChanged(name string, newCfg map[string]interface{}) {
+func (m *MockBulk) CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) {
 }
 
 func (m *MockBulk) RemoteOutputCh() chan bool {
