@@ -74,6 +74,8 @@ type Bulk interface {
 
 	CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, error)
 	GetBulker(outputName string) Bulk
+	GetRemoteOutputErrorMap() map[string]string
+	SetRemoteOutputError(name string, status string)
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
@@ -90,6 +92,7 @@ type Bulker struct {
 	remoteOutputConfigMap map[string]map[string]interface{}
 	remoteOutputCh        chan bool
 	bulkerMap             map[string]Bulk
+	remoteOutputErrorMap  map[string]string
 }
 
 const (
@@ -120,7 +123,16 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		remoteOutputConfigMap: make(map[string]map[string]interface{}),
 		remoteOutputCh:        make(chan bool, 1),
 		bulkerMap:             make(map[string]Bulk),
+		remoteOutputErrorMap:  make(map[string]string),
 	}
+}
+
+func (b *Bulker) GetRemoteOutputErrorMap() map[string]string {
+	return b.remoteOutputErrorMap
+}
+
+func (b *Bulker) SetRemoteOutputError(name string, status string) {
+	b.remoteOutputErrorMap[name] = status
 }
 
 func (b *Bulker) GetBulker(outputName string) Bulk {

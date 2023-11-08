@@ -112,6 +112,20 @@ func (m *standAloneSelfMonitorT) check(ctx context.Context) {
 		message = fmt.Sprintf("Failed to request policies: %s", err)
 	}
 
+	remoteOutputErrorMap := m.bulker.GetRemoteOutputErrorMap()
+	hasError := false
+	remoteESPayload := make(map[string]interface{})
+	for key, value := range remoteOutputErrorMap {
+		if value != "" {
+			hasError = true
+			remoteESPayload[key] = value
+		}
+	}
+	if hasError {
+		state = client.UnitStateDegraded
+		message = fmt.Sprintf("Could not connect to remote ES output: %+v", remoteESPayload)
+	}
+
 	if current != state {
 		m.updateState(state, message)
 	}

@@ -255,6 +255,21 @@ func (p *Output) prepareElasticsearch(
 		ctx := zlog.WithContext(ctx)
 		outputAPIKey, err :=
 			generateOutputAPIKey(ctx, outputBulker, agent.Id, p.Name, p.Role.Raw)
+			// reporting output error status to self monitor and not returning the error to keep fleet-server running
+		if outputAPIKey == nil && p.Type == OutputTypeRemoteElasticsearch {
+			if err != nil {
+				zerolog.Ctx(ctx).Warn().Msg("Could not create API key in remote ES")
+				bulker.SetRemoteOutputError(p.Name, err.Error())
+			} else {
+				bulker.SetRemoteOutputError(p.Name, "")
+			}
+
+			// replace type remote_elasticsearch with elasticsearch as agent doesn't recognize remote_elasticsearch
+			outputMap[p.Name][FieldOutputType] = OutputTypeElasticsearch
+			// remove the service token from the agent policy sent to the agent
+			delete(outputMap[p.Name], FieldOutputServiceToken)
+			return nil
+		}
 		if err != nil {
 			return fmt.Errorf("failed generate output API key: %w", err)
 		}

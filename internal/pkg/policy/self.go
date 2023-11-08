@@ -218,6 +218,21 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 		return client.UnitStateStarting, nil
 	}
 
+	remoteOutputErrorMap := m.bulker.GetRemoteOutputErrorMap()
+	hasError := false
+	remoteESPayload := make(map[string]interface{})
+	for key, value := range remoteOutputErrorMap {
+		if value != "" {
+			hasError = true
+			remoteESPayload[key] = value
+		}
+	}
+	if hasError {
+		m.state = client.UnitStateDegraded
+		m.reporter.UpdateState(client.UnitStateDegraded, "Could not connect to remote ES output", remoteESPayload)
+		return client.UnitStateDegraded, nil
+	}
+
 	state := client.UnitStateHealthy
 	extendMsg := ""
 	var payload map[string]interface{}

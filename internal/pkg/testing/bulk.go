@@ -93,6 +93,13 @@ func (m *MockBulk) CreateAndGetBulker(zlog zerolog.Logger, outputName string, se
 func (m *MockBulk) CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) {
 }
 
+func (m *MockBulk) GetRemoteOutputErrorMap() map[string]string {
+	args := m.Called()
+	return args.Get(0).(map[string]string)
+}
+
+func (m *MockBulk) SetRemoteOutputError(name string, status string) {}
+
 func (m *MockBulk) RemoteOutputCh() chan bool {
 	args := m.Called()
 	return args.Get(0).(chan bool)
