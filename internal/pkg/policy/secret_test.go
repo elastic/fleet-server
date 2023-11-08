@@ -13,45 +13,46 @@ import (
 
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestReplaceSecretRef(t *testing.T) {
+func TestReplaceStringRef(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceSecretRef("$co.elastic.secret{abcd}", secretRefs)
+	val := replaceStringRef("$co.elastic.secret{abcd}", secretRefs)
 	assert.Equal(t, "value1", val)
 }
 
-func TestReplaceSecretRefPartial(t *testing.T) {
+func TestReplaceStringRefPartial(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceSecretRef("partial $co.elastic.secret{abcd}", secretRefs)
+	val := replaceStringRef("partial $co.elastic.secret{abcd}", secretRefs)
 	assert.Equal(t, "partial value1", val)
 }
 
-func TestReplaceSecretRefPartial2(t *testing.T) {
+func TestReplaceStringRefPartial2(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "http://localhost",
 	}
-	val := replaceSecretRef("$co.elastic.secret{abcd}/services", secretRefs)
+	val := replaceStringRef("$co.elastic.secret{abcd}/services", secretRefs)
 	assert.Equal(t, "http://localhost/services", val)
 }
 
-func TestReplaceSecretRefNotASecret(t *testing.T) {
+func TestReplaceStringRefNotASecret(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceSecretRef("abcd", secretRefs)
+	val := replaceStringRef("abcd", secretRefs)
 	assert.Equal(t, "abcd", val)
 }
 
-func TestReplaceSecretRefNotFound(t *testing.T) {
+func TestReplaceStringRefNotFound(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceSecretRef("$co.elastic.secret{other}", secretRefs)
+	val := replaceStringRef("$co.elastic.secret{other}", secretRefs)
 	assert.Equal(t, "$co.elastic.secret{other}", val)
 }
 
@@ -110,6 +111,53 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 	assert.Equal(t, nil, refs)
 }
 
+func TestPolicyInputSteamsEmbedded(t *testing.T) {
+	refs := []model.SecretReferencesItems{{ID: "ref1"}}
+	inputs := []map[string]interface{}{
+		{"id": "input1", "streams": []interface{}{
+			map[string]interface{}{
+				"id":  "stream1",
+				"key": "val",
+				"embedded": map[string]interface{}{
+					"embedded-key": "embedded-val",
+					"embedded-arr": []interface{}{
+						map[string]interface{}{
+							"embedded-secret": "$co.elastic.secret{ref1}",
+						},
+					}},
+			},
+		}},
+	}
+
+	pData := model.PolicyData{
+		SecretReferences: refs,
+		Inputs:           inputs,
+	}
+	bulker := ftesting.NewMockBulk()
+	expected := []map[string]interface{}{{
+		"id": "input1",
+		"streams": []interface{}{
+			map[string]interface{}{
+				"id":  "stream1",
+				"key": "val",
+				"embedded": map[string]interface{}{
+					"embedded-key": "embedded-val",
+					"embedded-arr": []interface{}{
+						map[string]interface{}{
+							"embedded-secret": "ref1_value",
+						},
+					}},
+			},
+		}},
+	}
+
+	result, err := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	require.NoError(t, err)
+
+	assert.Equal(t, expected, result)
+
+}
+
 func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 	inputsJSON := []map[string]interface{}{
 		{"id": "input1"},
@@ -136,3 +184,70 @@ func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 
 	assert.Equal(t, expectedResult, result)
 }
+<<<<<<< HEAD
+=======
+
+func TestProcessOutputSecret(t *testing.T) {
+	tests := []struct {
+		name             string
+		outputJSON       string
+		expectOutputJSON string
+	}{
+		{
+			name:             "Output without secrets",
+			outputJSON:       `{"password": "test"}`,
+			expectOutputJSON: `{"password": "test"}`,
+		},
+		{
+			name: "Output with secrets",
+			outputJSON: `{
+				"secrets": {
+					"password": {"id": "passwordid"}
+				}
+			}`,
+			expectOutputJSON: `{
+				"password": "passwordid_value"
+			}`,
+		},
+		{
+			name: "Output with nested secrets",
+			outputJSON: `{
+				"secrets": {
+					"ssl": { "key" : { "id": "sslkey" }	}
+				}
+			}`,
+			expectOutputJSON: `{
+				"ssl": {"key": "sslkey_value"}
+			}`,
+		},
+		{
+			name: "Output with multiple secrets",
+			outputJSON: `{
+				"secrets": {
+					"ssl": { "key" : { "id": "sslkey" }, "other": {"id": "sslother"}	}
+				}
+			}`,
+			expectOutputJSON: `{
+				"ssl": {"key": "sslkey_value", "other": "sslother_value"}
+			}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			output, err := smap.Parse([]byte(tc.outputJSON))
+			assert.NoError(t, err)
+
+			expectOutput, err := smap.Parse([]byte(tc.expectOutputJSON))
+			assert.NoError(t, err)
+
+			err = processOutputSecret(context.Background(), output, bulker)
+			assert.NoError(t, err)
+
+			assert.Equal(t, expectOutput, output)
+
+		})
+	}
+}
+>>>>>>> 0718a55 (Replace all secret references in input map (#3086))

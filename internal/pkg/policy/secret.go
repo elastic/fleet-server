@@ -72,6 +72,7 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 	for _, input := range inputs {
 		newInput := make(map[string]interface{})
 		for k, v := range input {
+<<<<<<< HEAD
 			// replace secret refs in input stream fields
 			if k == "streams" {
 				if streams, ok := input[k].([]any); ok {
@@ -86,6 +87,9 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 			if _, ok := newInput[k]; !ok {
 				newInput[k] = v
 			}
+=======
+			newInput[k] = replaceAnyRef(v, secretValues)
+>>>>>>> 0718a55 (Replace all secret references in input map (#3086))
 		}
 		result = append(result, newInput)
 	}
@@ -93,6 +97,7 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 	return result, nil
 }
 
+<<<<<<< HEAD
 func processStreams(streams []any, secretValues map[string]string) []any {
 	newStreams := make([]any, 0)
 	for _, stream := range streams {
@@ -122,6 +127,121 @@ func replaceSecretsInStream(streamMap map[string]interface{}, secretValues map[s
 
 // replace values mathing a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
 func replaceSecretRef(ref string, secretValues map[string]string) string {
+=======
+// replaceAnyRef is a generic approach to replacing any secret references in the passed item.
+// It will go through any slices or maps and replace any secret references.
+//
+// go's generic parameters are not a good fit for rewriting this method as the typeswitch will not work.
+func replaceAnyRef(ref any, secrets map[string]string) any {
+	var r any
+	switch val := ref.(type) {
+	case string:
+		r = replaceStringRef(val, secrets)
+	case map[string]any:
+		obj := make(map[string]any)
+		for k, v := range val {
+			obj[k] = replaceAnyRef(v, secrets)
+		}
+		r = obj
+	case []any:
+		arr := make([]any, len(val))
+		for i, v := range val {
+			arr[i] = replaceAnyRef(v, secrets)
+		}
+		r = arr
+	default:
+		r = val
+	}
+	return r
+}
+
+type OutputSecret struct {
+	Path []string
+	ID   string
+}
+
+func getSecretIDAndPath(secret smap.Map) ([]OutputSecret, error) {
+	outputSecrets := make([]OutputSecret, 0)
+
+	secretID := secret.GetString("id")
+	if secretID != "" {
+		outputSecrets = append(outputSecrets, OutputSecret{
+			Path: make([]string, 0),
+			ID:   secretID,
+		})
+
+		return outputSecrets, nil
+	}
+
+	for secretKey := range secret {
+		newOutputSecrets, err := getSecretIDAndPath(secret.GetMap(secretKey))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, secret := range newOutputSecrets {
+			path := append([]string{secretKey}, secret.Path...)
+			outputSecrets = append(outputSecrets, OutputSecret{
+				Path: path,
+				ID:   secret.ID,
+			})
+		}
+	}
+
+	return outputSecrets, nil
+}
+
+func setSecretPath(output smap.Map, secretValue string, secretPaths []string) error {
+	// Break the recursion
+	if len(secretPaths) == 1 {
+		output[secretPaths[0]] = secretValue
+
+		return nil
+	}
+	path, secretPaths := secretPaths[0], secretPaths[1:]
+
+	if output.GetMap(path) == nil {
+		output[path] = make(map[string]interface{})
+	}
+
+	return setSecretPath(output.GetMap(path), secretValue, secretPaths)
+}
+
+// Read secret from output and mutate output with secret value
+func processOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) error {
+	secrets := output.GetMap(FieldOutputSecrets)
+
+	delete(output, FieldOutputSecrets)
+	secretReferences := make([]model.SecretReferencesItems, 0)
+	outputSecrets, err := getSecretIDAndPath(secrets)
+	if err != nil {
+		return err
+	}
+
+	for _, secret := range outputSecrets {
+		secretReferences = append(secretReferences, model.SecretReferencesItems{
+			ID: secret.ID,
+		})
+	}
+	if len(secretReferences) == 0 {
+		return nil
+	}
+	secretValues, err := getSecretValues(ctx, secretReferences, bulker)
+	if err != nil {
+		return err
+	}
+	for _, secret := range outputSecrets {
+		err = setSecretPath(output, secretValues[secret.ID], secret.Path)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
+func replaceStringRef(ref string, secretValues map[string]string) string {
+>>>>>>> 0718a55 (Replace all secret references in input map (#3086))
 	matches := secretRegex.FindStringSubmatch(ref)
 	if len(matches) > 1 {
 		secretRef := matches[1]
