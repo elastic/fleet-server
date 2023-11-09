@@ -112,8 +112,9 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 }
 
 func TestPolicyInputSteamsEmbedded(t *testing.T) {
-	refs := []model.SecretReferencesItems{{ID: "ref1"}}
-	inputs := []map[string]interface{}{
+	secretRefsJSON := []SecretReference{{ID: "ref1"}}
+	secretRefsRaw, _ := json.Marshal(secretRefsJSON)
+	inputsJSON := []map[string]interface{}{
 		{"id": "input1", "streams": []interface{}{
 			map[string]interface{}{
 				"id":  "stream1",
@@ -128,10 +129,11 @@ func TestPolicyInputSteamsEmbedded(t *testing.T) {
 			},
 		}},
 	}
+	inputsRaw, _ := json.Marshal(inputsJSON)
 
-	pData := model.PolicyData{
-		SecretReferences: refs,
-		Inputs:           inputs,
+	fields := map[string]json.RawMessage{
+		"secret_references": secretRefsRaw,
+		"inputs":            inputsRaw,
 	}
 	bulker := ftesting.NewMockBulk()
 	expected := []map[string]interface{}{{
@@ -151,7 +153,7 @@ func TestPolicyInputSteamsEmbedded(t *testing.T) {
 		}},
 	}
 
-	result, err := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	result, err := getPolicyInputsWithSecrets(context.TODO(), fields, bulker)
 	require.NoError(t, err)
 
 	assert.Equal(t, expected, result)
