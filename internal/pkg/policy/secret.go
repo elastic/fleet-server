@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
 type SecretReference struct {
@@ -106,90 +105,6 @@ func replaceAnyRef(ref any, secrets map[string]string) any {
 		r = val
 	}
 	return r
-}
-
-type OutputSecret struct {
-	Path []string
-	ID   string
-}
-
-func getSecretIDAndPath(secret smap.Map) ([]OutputSecret, error) {
-	outputSecrets := make([]OutputSecret, 0)
-
-	secretID := secret.GetString("id")
-	if secretID != "" {
-		outputSecrets = append(outputSecrets, OutputSecret{
-			Path: make([]string, 0),
-			ID:   secretID,
-		})
-
-		return outputSecrets, nil
-	}
-
-	for secretKey := range secret {
-		newOutputSecrets, err := getSecretIDAndPath(secret.GetMap(secretKey))
-		if err != nil {
-			return nil, err
-		}
-
-		for _, secret := range newOutputSecrets {
-			path := append([]string{secretKey}, secret.Path...)
-			outputSecrets = append(outputSecrets, OutputSecret{
-				Path: path,
-				ID:   secret.ID,
-			})
-		}
-	}
-
-	return outputSecrets, nil
-}
-
-func setSecretPath(output smap.Map, secretValue string, secretPaths []string) error {
-	// Break the recursion
-	if len(secretPaths) == 1 {
-		output[secretPaths[0]] = secretValue
-
-		return nil
-	}
-	path, secretPaths := secretPaths[0], secretPaths[1:]
-
-	if output.GetMap(path) == nil {
-		output[path] = make(map[string]interface{})
-	}
-
-	return setSecretPath(output.GetMap(path), secretValue, secretPaths)
-}
-
-// Read secret from output and mutate output with secret value
-func processOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) error {
-	secrets := output.GetMap(FieldOutputSecrets)
-
-	delete(output, FieldOutputSecrets)
-	secretReferences := make([]model.SecretReferencesItems, 0)
-	outputSecrets, err := getSecretIDAndPath(secrets)
-	if err != nil {
-		return err
-	}
-
-	for _, secret := range outputSecrets {
-		secretReferences = append(secretReferences, model.SecretReferencesItems{
-			ID: secret.ID,
-		})
-	}
-	if len(secretReferences) == 0 {
-		return nil
-	}
-	secretValues, err := getSecretValues(ctx, secretReferences, bulker)
-	if err != nil {
-		return err
-	}
-	for _, secret := range outputSecrets {
-		err = setSecretPath(output, secretValues[secret.ID], secret.Path)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
