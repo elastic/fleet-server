@@ -184,8 +184,6 @@ func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 
 	assert.Equal(t, expectedResult, result)
 }
-<<<<<<< HEAD
-=======
 
 func TestProcessOutputSecret(t *testing.T) {
 	tests := []struct {
@@ -250,4 +248,3 @@ func TestProcessOutputSecret(t *testing.T) {
 		})
 	}
 }
->>>>>>> 0718a55 (Replace all secret references in input map (#3086))

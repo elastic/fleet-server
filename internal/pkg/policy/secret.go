@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
 type SecretReference struct {
@@ -72,24 +73,7 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 	for _, input := range inputs {
 		newInput := make(map[string]interface{})
 		for k, v := range input {
-<<<<<<< HEAD
-			// replace secret refs in input stream fields
-			if k == "streams" {
-				if streams, ok := input[k].([]any); ok {
-					newInput[k] = processStreams(streams, secretValues)
-				}
-				// replace secret refs in input fields
-			} else if ref, ok := input[k].(string); ok {
-				val := replaceSecretRef(ref, secretValues)
-				newInput[k] = val
-			}
-			// if any field was not processed, add back as is
-			if _, ok := newInput[k]; !ok {
-				newInput[k] = v
-			}
-=======
 			newInput[k] = replaceAnyRef(v, secretValues)
->>>>>>> 0718a55 (Replace all secret references in input map (#3086))
 		}
 		result = append(result, newInput)
 	}
@@ -97,37 +81,6 @@ func getPolicyInputsWithSecrets(ctx context.Context, fields map[string]json.RawM
 	return result, nil
 }
 
-<<<<<<< HEAD
-func processStreams(streams []any, secretValues map[string]string) []any {
-	newStreams := make([]any, 0)
-	for _, stream := range streams {
-		if streamMap, ok := stream.(map[string]interface{}); ok {
-			newStream := replaceSecretsInStream(streamMap, secretValues)
-			newStreams = append(newStreams, newStream)
-		} else {
-			newStreams = append(newStreams, stream)
-		}
-	}
-	return newStreams
-}
-
-// if field values are secret refs, replace with secret value, otherwise noop
-func replaceSecretsInStream(streamMap map[string]interface{}, secretValues map[string]string) map[string]interface{} {
-	newStream := make(map[string]interface{})
-	for streamKey, streamVal := range streamMap {
-		if streamRef, ok := streamMap[streamKey].(string); ok {
-			replacedVal := replaceSecretRef(streamRef, secretValues)
-			newStream[streamKey] = replacedVal
-		} else {
-			newStream[streamKey] = streamVal
-		}
-	}
-	return newStream
-}
-
-// replace values mathing a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
-func replaceSecretRef(ref string, secretValues map[string]string) string {
-=======
 // replaceAnyRef is a generic approach to replacing any secret references in the passed item.
 // It will go through any slices or maps and replace any secret references.
 //
@@ -241,7 +194,6 @@ func processOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk)
 
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
 func replaceStringRef(ref string, secretValues map[string]string) string {
->>>>>>> 0718a55 (Replace all secret references in input map (#3086))
 	matches := secretRegex.FindStringSubmatch(ref)
 	if len(matches) > 1 {
 		secretRef := matches[1]
