@@ -87,7 +87,7 @@ func (m *MockBulk) GetBulker(outputName string) bulk.Bulk {
 
 func (m *MockBulk) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (bulk.Bulk, error) {
 	args := m.Called(zlog, outputName, serviceToken, outputMap)
-	return args.Get(0).(bulk.Bulk), args.Error(1)
+	return args.Get(0).(bulk.Bulk), nil
 }
 
 func (m *MockBulk) CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) {

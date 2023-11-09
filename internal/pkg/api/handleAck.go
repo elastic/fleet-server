@@ -564,7 +564,7 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 		ids = append(ids, k.ID)
 		output = k.Output
 	}
-	// using remote es bulker to invalidate api key - supposing all retire api keky ids belong to the same remote es
+	// using remote es bulker to invalidate api key - supposing all retire api key ids belong to the same remote es
 	bulk := ack.bulk
 	if output != "" {
 		bulk = ack.bulk.GetBulker(output)

@@ -304,6 +304,8 @@ func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
 		Name: "test output",
 		Role: nil,
 	}
+	outputBulker := ftesting.NewMockBulk()
+	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker).Once()
 
 	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
 	require.NotNil(t, err, "expected prepare to error")
@@ -326,6 +328,9 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 				Raw:  TestPayload,
 			},
 		}
+
+		outputBulker := ftesting.NewMockBulk()
+		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker).Once()
 
 		policyMap := map[string]map[string]interface{}{
 			"test output": map[string]interface{}{
@@ -386,7 +391,7 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 			Return(nil).Once()
 
 		outputBulker := ftesting.NewMockBulk()
-		bulkerMap["test output"] = outputBulker
+		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker).Once()
 
 		outputBulker.
 			On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything).
@@ -456,7 +461,7 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 		outputBulker.On("APIKeyCreate",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&apiKey, nil).Once()
-		bulkerMap["test output"] = outputBulker
+		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker).Once()
 
 		output := Output{
 			Type: OutputTypeRemoteElasticsearch,
