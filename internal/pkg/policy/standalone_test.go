@@ -80,7 +80,8 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 		t.Run(c.title, func(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
 			bulker.On("Search", searchArguments...).Return(c.searchResult, c.searchErr)
-
+			emptyMap := make(map[string]string)
+			bulker.On("GetRemoteOutputErrorMap").Return(emptyMap)
 			reporter := &FakeReporter{}
 
 			sm := NewStandAloneSelfMonitor(bulker, reporter)
