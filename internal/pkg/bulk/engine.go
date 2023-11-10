@@ -68,14 +68,13 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
-	CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{})
+	CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool
 
-	RemoteOutputCh() chan bool
-
-	CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, error)
+	CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
 	GetBulker(outputName string) Bulk
 	GetRemoteOutputErrorMap() map[string]string
 	SetRemoteOutputError(name string, status string)
+	CancelFn() context.CancelFunc
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
@@ -90,9 +89,9 @@ type Bulker struct {
 	apikeyLimit           *semaphore.Weighted
 	tracer                *apm.Tracer
 	remoteOutputConfigMap map[string]map[string]interface{}
-	remoteOutputCh        chan bool
 	bulkerMap             map[string]Bulk
 	remoteOutputErrorMap  map[string]string
+	cancelFn              context.CancelFunc
 }
 
 const (
@@ -121,7 +120,6 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		apikeyLimit:           semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
 		tracer:                tracer,
 		remoteOutputConfigMap: make(map[string]map[string]interface{}),
-		remoteOutputCh:        make(chan bool, 1),
 		bulkerMap:             make(map[string]Bulk),
 		remoteOutputErrorMap:  make(map[string]string),
 	}
@@ -139,25 +137,34 @@ func (b *Bulker) GetBulker(outputName string) Bulk {
 	return b.bulkerMap[outputName]
 }
 
-func (b *Bulker) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, error) {
-	b.CheckRemoteOutputChanged(zlog, outputName, outputMap[outputName])
+func (b *Bulker) CancelFn() context.CancelFunc {
+	return b.cancelFn
+}
+
+func (b *Bulker) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, bool, error) {
+	hasConfigChanged := b.CheckRemoteOutputChanged(zlog, outputName, outputMap[outputName])
 	bulker := b.bulkerMap[outputName]
-	if bulker != nil {
-		return bulker, nil
+	if bulker != nil && !hasConfigChanged {
+		return bulker, false, nil
+	}
+	if bulker != nil && hasConfigChanged {
+		bulker.CancelFn()
 	}
 	bulkCtx, bulkCancel := context.WithCancel(context.Background())
-	defer bulkCancel()
 	es, err := b.createRemoteEsClient(bulkCtx, outputName, serviceToken, outputMap)
 	if err != nil {
-		return nil, err
+		defer bulkCancel()
+		return nil, hasConfigChanged, err
 	}
 	// starting a new bulker to create/update API keys for remote ES output
 	newBulker := NewBulker(es, b.tracer)
+	newBulker.cancelFn = bulkCancel
 	b.bulkerMap[outputName] = newBulker
 
 	errCh := make(chan error)
 	go func() {
 		runFunc := func() (err error) {
+			zlog.Debug().Str("outputName", outputName).Msg("Bulker started")
 			return newBulker.Run(bulkCtx)
 		}
 
@@ -167,11 +174,12 @@ func (b *Bulker) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serv
 		select {
 		case err = <-errCh:
 		case <-bulkCtx.Done():
+			zlog.Debug().Str("outputName", outputName).Msg("Bulk context done")
 			err = bulkCtx.Err()
 		}
 	}()
 
-	return newBulker, nil
+	return newBulker, hasConfigChanged, nil
 }
 
 func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (*elasticsearch.Client, error) {
@@ -226,23 +234,22 @@ func (b *Bulker) Tracer() *apm.Tracer {
 }
 
 // check if remote output cfg changed, and signal to remoteOutputCh channel if so
-func (b *Bulker) CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) {
+func (b *Bulker) CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
 	curCfg := b.remoteOutputConfigMap[name]
+
+	hasChanged := false
 
 	// ignore output sent to agents where type is set to elasticsearch
 	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
 		zlog.Info().Str("name", name).Msg("remote output configuration has changed")
-		b.remoteOutputCh <- true
+		hasChanged = true
 	}
 	newCfgCopy := make(map[string]interface{})
 	for k, v := range newCfg {
 		newCfgCopy[k] = v
 	}
 	b.remoteOutputConfigMap[name] = newCfgCopy
-}
-
-func (b *Bulker) RemoteOutputCh() chan bool {
-	return b.remoteOutputCh
+	return hasChanged
 }
 
 // read secrets one by one as there is no bulk API yet to read them in one request

@@ -55,17 +55,17 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	switch p.Type {
 	case OutputTypeElasticsearch:
 		zlog.Debug().Msg("preparing elasticsearch output")
-		if err := p.prepareElasticsearch(ctx, zlog, bulker, bulker, agent, outputMap); err != nil {
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, bulker, agent, outputMap, false); err != nil {
 			return fmt.Errorf("failed to prepare elasticsearch output %q: %w", p.Name, err)
 		}
 	case OutputTypeRemoteElasticsearch:
 		zlog.Debug().Msg("preparing remote elasticsearch output")
-		newBulker, err := bulker.CreateAndGetBulker(zlog, p.Name, p.ServiceToken, outputMap)
+		newBulker, hasConfigChanged, err := bulker.CreateAndGetBulker(zlog, p.Name, p.ServiceToken, outputMap)
 		if err != nil {
 			return err
 		}
 		// the outputBulker is different for remote ES, it is used to create/update Api keys in the remote ES client
-		if err := p.prepareElasticsearch(ctx, zlog, bulker, newBulker, agent, outputMap); err != nil {
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, newBulker, agent, outputMap, hasConfigChanged); err != nil {
 			return fmt.Errorf("failed to prepare remote elasticsearch output %q: %w", p.Name, err)
 		}
 	case OutputTypeLogstash:
@@ -87,7 +87,8 @@ func (p *Output) prepareElasticsearch(
 	bulker bulk.Bulk,
 	outputBulker bulk.Bulk,
 	agent *model.Agent,
-	outputMap map[string]map[string]interface{}) error {
+	outputMap map[string]map[string]interface{},
+	hasConfigChanged bool) error {
 	// The role is required to do api key management
 	if p.Role == nil {
 		zlog.Error().
@@ -180,6 +181,9 @@ func (p *Output) prepareElasticsearch(
 	case output.APIKey == "":
 		zlog.Debug().Msg("must generate api key as default API key is not present")
 		needNewKey = true
+	case hasConfigChanged:
+		zlog.Debug().Msg("must generate api key as remote output config changed")
+		needNewKey = true
 	case p.Role.Sha2 != output.PermissionsHash:
 		// the is actually the OutputPermissionsHash for the default hash. The Agent
 		// document on ES does not have OutputPermissionsHash for any other output
@@ -269,6 +273,8 @@ func (p *Output) prepareElasticsearch(
 			// remove the service token from the agent policy sent to the agent
 			delete(outputMap[p.Name], FieldOutputServiceToken)
 			return nil
+		} else if p.Type == OutputTypeRemoteElasticsearch {
+			bulker.SetRemoteOutputError(p.Name, "")
 		}
 		if err != nil {
 			return fmt.Errorf("failed generate output API key: %w", err)

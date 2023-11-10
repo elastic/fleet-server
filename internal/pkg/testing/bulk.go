@@ -85,12 +85,14 @@ func (m *MockBulk) GetBulker(outputName string) bulk.Bulk {
 	return args.Get(0).(bulk.Bulk)
 }
 
-func (m *MockBulk) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (bulk.Bulk, error) {
+func (m *MockBulk) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (bulk.Bulk, bool, error) {
 	args := m.Called(zlog, outputName, serviceToken, outputMap)
-	return args.Get(0).(bulk.Bulk), nil
+	return args.Get(0).(bulk.Bulk), args.Get(1).(bool), nil
 }
 
-func (m *MockBulk) CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) {
+func (m *MockBulk) CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+	args := m.Called()
+	return args.Get(0).(bool)
 }
 
 func (m *MockBulk) GetRemoteOutputErrorMap() map[string]string {
@@ -100,9 +102,9 @@ func (m *MockBulk) GetRemoteOutputErrorMap() map[string]string {
 
 func (m *MockBulk) SetRemoteOutputError(name string, status string) {}
 
-func (m *MockBulk) RemoteOutputCh() chan bool {
+func (m *MockBulk) CancelFn() context.CancelFunc {
 	args := m.Called()
-	return args.Get(0).(chan bool)
+	return args.Get(0).(context.CancelFunc)
 }
 
 func (m *MockBulk) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {

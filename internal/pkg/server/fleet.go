@@ -52,7 +52,6 @@ type Fleet struct {
 	cfgCh    chan *config.Config
 	cache    cache.Cache
 	reporter state.Reporter
-	outputCh chan bool
 }
 
 // NewFleet creates the actual fleet server service.
@@ -68,7 +67,6 @@ func NewFleet(bi build.Info, reporter state.Reporter, standAlone bool) (*Fleet, 
 		verCon:     verCon,
 		cfgCh:      make(chan *config.Config, 1),
 		reporter:   reporter,
-		outputCh:   make(chan bool, 1),
 	}, nil
 }
 
@@ -200,8 +198,6 @@ LOOP:
 		select {
 		case newCfg = <-f.cfgCh:
 			log.Info().Msg("Server configuration update")
-		case outputChanged = <-f.outputCh:
-			log.Info().Msg("Remote output configuration update")
 		case err := <-ech:
 			f.reporter.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			log.Error().Err(err).Msg("Fleet Server failed")
@@ -420,14 +416,6 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	if err = f.runSubsystems(ctx, cfg, g, bulker, tracer); err != nil {
 		return err
 	}
-
-	log := zerolog.Ctx(ctx)
-
-	go func() {
-		outputChanged := <-bulker.RemoteOutputCh()
-		f.outputCh <- outputChanged
-		log.Info().Msg("Remote output configuration update")
-	}()
 
 	return g.Wait()
 }
