@@ -75,26 +75,13 @@ func Test_CheckRemoteOutputChanged(t *testing.T) {
 			changed: true,
 		}}
 
-	expectedCount := 0
-	channelCount := 0
-
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			log := testlog.SetLogger(t)
 			bulker := NewBulker(nil, nil)
 			bulker.remoteOutputConfigMap["remote1"] = tc.cfg
-			bulker.CheckRemoteOutputChanged(log, "remote1", tc.newCfg)
-
-			if tc.changed {
-				expectedCount++
-			}
-
-			close(bulker.remoteOutputCh)
-			for _ = range bulker.remoteOutputCh {
-				channelCount++
-			}
+			hasChanged := bulker.CheckRemoteOutputChanged(log, "remote1", tc.newCfg)
+			assert.Equal(t, tc.changed, hasChanged)
 		})
 	}
-
-	assert.Equal(t, expectedCount, channelCount)
 }
