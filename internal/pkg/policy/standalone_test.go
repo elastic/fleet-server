@@ -81,7 +81,7 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
 			bulker.On("Search", searchArguments...).Return(c.searchResult, c.searchErr)
 			emptyMap := make(map[string]string)
-			bulker.On("GetRemoteOutputErrorMap").Return(emptyMap)
+			bulker.On("GetRemoteOutputErrorMap").Return(emptyMap).Once()
 			reporter := &FakeReporter{}
 
 			sm := NewStandAloneSelfMonitor(bulker, reporter)
@@ -94,4 +94,41 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 			assert.Equal(t, state, reporter.state, "reported state should be the same")
 		})
 	}
+}
+
+func TestStandAloneSelfMonitorRemoteOutput(t *testing.T) {
+
+	searchArguments := []any{mock.Anything, ".fleet-policies", mock.Anything, mock.Anything}
+
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Search", searchArguments...).Return(&es.ResultT{
+		Aggregations: map[string]es.Aggregation{
+			dl.FieldPolicyID: es.Aggregation{},
+		},
+	}, nil)
+
+	errorMap := make(map[string]string)
+	errorMap["remote output"] = "error connecting to remote output"
+	bulker.On("GetRemoteOutputErrorMap").Return(errorMap).Once()
+
+	emptyMap := make(map[string]string)
+	bulker.On("GetRemoteOutputErrorMap").Return(emptyMap).Once()
+
+	reporter := &FakeReporter{}
+
+	sm := NewStandAloneSelfMonitor(bulker, reporter)
+	sm.updateState(client.UnitStateStarting, "test")
+
+	sm.check(context.Background())
+	state := sm.State()
+
+	assert.Equal(t, client.UnitStateDegraded, state)
+	assert.Equal(t, state, reporter.state, "reported state should be the same")
+
+	// back to healthy
+	sm.check(context.Background())
+	state = sm.State()
+
+	assert.Equal(t, client.UnitStateHealthy, state)
+	assert.Equal(t, state, reporter.state, "reported state should be the same")
 }
