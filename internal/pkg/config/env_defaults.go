@@ -273,7 +273,7 @@ func loadLimits(agentLimit int) *envLimits {
 	log := zerolog.Ctx(context.TODO())
 	for _, l := range defaults {
 		// get nearest limits for configured agent numbers
-		if l.Agents.Min < agentLimit && agentLimit <= l.Agents.Max {
+		if l.Agents.Min <= agentLimit && agentLimit <= l.Agents.Max {
 			log.Info().Msgf("Using system limits for %d to %d agents for a configured value of %d agents", l.Agents.Min, l.Agents.Max, agentLimit)
 			ramSize := int(memory.TotalMemory() / 1024 / 1024)
 			if ramSize < l.RecommendedRAM {
