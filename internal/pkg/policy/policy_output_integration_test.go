@@ -135,7 +135,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(context.Background())
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
-	agentID := createAgent(ctx, t, index, bulker)
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
 	agent, err := dl.FindAgent(
 		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
 	if err != nil {
@@ -169,7 +169,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	}
 
 	gotOutput, ok := got.Outputs[output.Name]
-	require.True(t, ok, "no '%s' output fouled on agent document", output.Name)
+	require.True(t, ok, "no '%s' output found on agent document", output.Name)
 
 	assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
 	assert.Equal(t, gotOutput.Type, OutputTypeElasticsearch)
@@ -178,7 +178,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	assert.NotEmpty(t, gotOutput.APIKeyID)
 }
 
-func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bulk) string {
+func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bulk, outputs map[string]*model.PolicyOutput) string {
 	const nowStr = "2022-08-12T16:50:05Z"
 
 	agentID := uuid.Must(uuid.NewV4()).String()
@@ -191,6 +191,7 @@ func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bu
 		LastCheckinStatus: "",
 		UpdatedAt:         nowStr,
 		EnrolledAt:        nowStr,
+		Outputs:           outputs,
 	}
 
 	body, err := json.Marshal(agentModel)
@@ -201,4 +202,109 @@ func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bu
 	require.NoError(t, err)
 
 	return agentID
+}
+
+func TestPolicyOutputESPrepareRemoteES(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(context.Background())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+	agent, err := dl.FindAgent(
+		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	if err != nil {
+		require.NoError(t, err, "failed to find agent ID %q", agentID)
+	}
+
+	output := Output{
+		Type:         OutputTypeRemoteElasticsearch,
+		Name:         "test remote output",
+		ServiceToken: "token1",
+		Role: &RoleT{
+			Sha2: "new-hash",
+			Raw:  TestPayload,
+		},
+	}
+	policyMap := map[string]map[string]interface{}{
+		"test remote output": map[string]interface{}{
+			"hosts": []interface{}{"http://localhost:9200"},
+		},
+	}
+
+	err = output.prepareElasticsearch(
+		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false)
+	require.NoError(t, err)
+
+	// need to wait a bit before querying the agent again
+	// TODO: find a better way to query the updated agent
+	time.Sleep(time.Second)
+
+	got, err := dl.FindAgent(
+		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	if err != nil {
+		require.NoError(t, err, "failed to find agent ID %q", agentID)
+	}
+
+	gotOutput, ok := got.Outputs[output.Name]
+	require.True(t, ok, "no '%s' output found on agent document", output.Name)
+
+	assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
+	assert.Equal(t, gotOutput.Type, OutputTypeElasticsearch)
+	assert.Equal(t, gotOutput.PermissionsHash, output.Role.Sha2)
+	assert.NotEmpty(t, gotOutput.APIKey)
+	assert.NotEmpty(t, gotOutput.APIKeyID)
+}
+
+func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(context.Background())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+	// simulate a previous remote output, that is removed from outputMap
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{
+		"remote output": &model.PolicyOutput{
+			APIKey:   "apiKey1:value",
+			APIKeyID: "apiKey1",
+		},
+	})
+	agent, err := dl.FindAgent(
+		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	if err != nil {
+		require.NoError(t, err, "failed to find agent ID %q", agentID)
+	}
+
+	output := Output{
+		Type: OutputTypeElasticsearch,
+		Name: "test output",
+		Role: &RoleT{
+			Sha2: "new-hash",
+			Raw:  TestPayload,
+		},
+	}
+	policyMap := map[string]map[string]interface{}{
+		"test output": map[string]interface{}{},
+	}
+
+	err = output.prepareElasticsearch(
+		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false)
+	require.NoError(t, err)
+
+	// need to wait a bit before querying the agent again
+	// TODO: find a better way to query the updated agent
+	time.Sleep(time.Second)
+
+	got, err := dl.FindAgent(
+		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	if err != nil {
+		require.NoError(t, err, "failed to find agent ID %q", agentID)
+	}
+
+	gotOutput, ok := got.Outputs[output.Name]
+	require.True(t, ok, "no '%s' output found on agent document", output.Name)
+
+	assert.Equal(t, len(gotOutput.ToRetireAPIKeyIds), 1)
+	assert.Equal(t, gotOutput.ToRetireAPIKeyIds[0].ID, "apiKey1")
+	assert.Equal(t, gotOutput.ToRetireAPIKeyIds[0].Output, "remote output")
+	assert.Equal(t, gotOutput.Type, OutputTypeElasticsearch)
+	assert.Equal(t, gotOutput.PermissionsHash, output.Role.Sha2)
+	assert.NotEmpty(t, gotOutput.APIKey)
+	assert.NotEmpty(t, gotOutput.APIKeyID)
 }
