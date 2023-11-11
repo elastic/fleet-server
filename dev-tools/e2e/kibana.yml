@@ -1,14 +1,13 @@
 server.name: kibana
 server.host: "0.0.0.0"
 server.ssl.enabled: false
-elasticsearch.hosts: [ "http://elasticsearch:9200" ]
+elasticsearch.hosts: ["http://elasticsearch:9200"]
 elasticsearch.serviceAccountToken: "${KIBANA_TOKEN}"
 
 
 xpack.securitySolution.packagerTaskInterval: 1s
 xpack.fleet.agents.enabled: true
 xpack.fleet.agents.fleet_server.hosts: ["https://fleet-server:8220"]
-xpack.fleet.agents.elasticsearch.hosts: ["http://elasticsearch:9200"]
 xpack.fleet.packages:
   - name: elastic_agent
     version: latest
@@ -40,6 +39,6 @@ xpack.fleet.outputs:
   - id: fleet-default-output
     name: default
     type: elasticsearch
-    hosts: [ http://elasticsearch:9200 ]
+    hosts: [http://elasticsearch:9200]
     is_default: true
     is_default_monitoring: true
