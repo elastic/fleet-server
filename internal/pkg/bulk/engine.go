@@ -72,7 +72,7 @@ type Bulk interface {
 
 	CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
 	GetBulker(outputName string) Bulk
-	GetBulkerMap() map[string]Bulk 
+	GetBulkerMap() map[string]Bulk
 	GetRemoteOutputErrorMap() map[string]string
 	SetRemoteOutputError(name string, status string)
 	CancelFn() context.CancelFunc
@@ -140,7 +140,7 @@ func (b *Bulker) GetBulker(outputName string) Bulk {
 
 func (b *Bulker) GetBulkerMap() map[string]Bulk {
 	return b.bulkerMap
-} 
+}
 
 func (b *Bulker) CancelFn() context.CancelFunc {
 	return b.cancelFn
