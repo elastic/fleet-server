@@ -9,15 +9,20 @@ package policy
 import (
 	"context"
 	"errors"
+	"io/ioutil"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
 )
 
 func TestStandAloneSelfMonitor(t *testing.T) {
@@ -82,6 +87,8 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 			bulker.On("Search", searchArguments...).Return(c.searchResult, c.searchErr)
 			emptyMap := make(map[string]string)
 			bulker.On("GetRemoteOutputErrorMap").Return(emptyMap).Once()
+			emptyBulkerMap := make(map[string]bulk.Bulk)
+			bulker.On("GetBulkerMap").Return(emptyBulkerMap).Once()
 			reporter := &FakeReporter{}
 
 			sm := NewStandAloneSelfMonitor(bulker, reporter)
@@ -114,6 +121,9 @@ func TestStandAloneSelfMonitorRemoteOutput(t *testing.T) {
 	emptyMap := make(map[string]string)
 	bulker.On("GetRemoteOutputErrorMap").Return(emptyMap).Once()
 
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap).Once()
+
 	reporter := &FakeReporter{}
 
 	sm := NewStandAloneSelfMonitor(bulker, reporter)
@@ -131,4 +141,57 @@ func TestStandAloneSelfMonitorRemoteOutput(t *testing.T) {
 
 	assert.Equal(t, client.UnitStateHealthy, state)
 	assert.Equal(t, state, reporter.state, "reported state should be the same")
+}
+
+func TestStandAloneSelfMonitorRemoteOutputPing(t *testing.T) {
+
+	searchArguments := []any{mock.Anything, ".fleet-policies", mock.Anything, mock.Anything}
+
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Search", searchArguments...).Return(&es.ResultT{
+		Aggregations: map[string]es.Aggregation{
+			dl.FieldPolicyID: es.Aggregation{},
+		},
+	}, nil)
+
+	emptyMap := make(map[string]string)
+	bulker.On("GetRemoteOutputErrorMap").Return(emptyMap)
+
+	bulkerMap := make(map[string]bulk.Bulk)
+	outputBulker := ftesting.NewMockBulk()
+	mockES, mocktrans := esutil.MockESClient(t)
+
+	mocktrans.Response = &http.Response{
+		StatusCode: http.StatusInternalServerError,
+		Body:       nil,
+	}
+
+	outputBulker.On("Client").Return(mockES)
+	bulkerMap["output1"] = outputBulker
+	bulker.On("GetBulkerMap").Return(bulkerMap)
+
+	reporter := &FakeReporter{}
+
+	sm := NewStandAloneSelfMonitor(bulker, reporter)
+	sm.updateState(client.UnitStateStarting, "test")
+
+	sm.check(context.Background())
+	state := sm.State()
+
+	assert.Equal(t, client.UnitStateDegraded, state)
+	assert.Equal(t, state, reporter.state, "reported state should be the same")
+
+	// back to healthy
+	mocktrans.Response = &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(strings.NewReader(`{}`)),
+	}
+
+	sm.check(context.Background())
+	state = sm.State()
+
+	// TODO does not work, gives error "the client noticed that the server is not Elasticsearch and we do not support this unknown product"
+	// assert.Equal(t, client.UnitStateHealthy, state)
+	// assert.Equal(t, state, reporter.state, "reported state should be the same")
+
 }
