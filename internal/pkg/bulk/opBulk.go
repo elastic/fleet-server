@@ -13,7 +13,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/mailru/easyjson"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -209,7 +209,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 
 	res, err := req.Do(ctx, b.es)
 	if err != nil {
-		log.Error().Err(err).Str("mod", kModBulk).Msg("Fail BulkRequest req.Do")
+		zerolog.Ctx(ctx).Error().Err(err).Str("mod", kModBulk).Msg("Fail BulkRequest req.Do")
 		return err
 	}
 
@@ -218,8 +218,8 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	}
 
 	if res.IsError() {
-		log.Error().Str("mod", kModBulk).Str("error.message", res.String()).Msg("Fail BulkRequest result")
-		return parseError(res)
+		zerolog.Ctx(ctx).Error().Str("mod", kModBulk).Str("error.message", res.String()).Msg("Fail BulkRequest result")
+		return parseError(res, zerolog.Ctx(ctx))
 	}
 
 	// Reuse buffer
@@ -227,7 +227,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 
 	bodySz, err := buf.ReadFrom(res.Body)
 	if err != nil {
-		log.Error().
+		zerolog.Ctx(ctx).Error().
 			Err(err).
 			Str("mod", kModBulk).
 			Msg("Response error")
@@ -240,7 +240,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	// TODO: We're loosing information abut the errors, we should check a way
 	// to return the full error ES returns
 	if err = easyjson.Unmarshal(buf.Bytes(), &blk); err != nil {
-		log.Err(err).
+		zerolog.Ctx(ctx).Error().Err(err).
 			Str("mod", kModBulk).
 			Msg("flushBulk failed, could not unmarshal ES response")
 		return fmt.Errorf("flushBulk failed, could not unmarshal ES response: %w", err)
@@ -248,10 +248,10 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	if blk.HasErrors {
 		// We lack information to properly correlate this error with what has failed.
 		// Thus, for now it'd be more noise than information outside an investigation.
-		log.Debug().Err(errors.New(buf.String())).Msg("Bulk call: Es returned an error")
+		zerolog.Ctx(ctx).Debug().Err(errors.New(buf.String())).Msg("Bulk call: Es returned an error")
 	}
 
-	log.Trace().
+	zerolog.Ctx(ctx).Trace().
 		Err(err).
 		Bool("refresh", queue.ty == kQueueRefreshBulk).
 		Str("mod", kModBulk).

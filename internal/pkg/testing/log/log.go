@@ -15,7 +15,6 @@ import (
 func SetLogger(tb testing.TB) zerolog.Logger {
 	tb.Helper()
 	tw := zerolog.TestWriter{T: tb, Frame: 4}
-	logger := zerolog.New(tw).Level(zerolog.DebugLevel)
-	//zl.Logger = logger // causing data races
-	return logger
+	log := zerolog.New(tw).Level(zerolog.DebugLevel)
+	return log
 }

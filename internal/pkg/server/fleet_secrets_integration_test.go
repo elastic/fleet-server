@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 type SecretResponse struct {
@@ -158,6 +159,7 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	// create secret with kibana_system user
 	secretID := createSecret(t, ctx, srv.bulker)

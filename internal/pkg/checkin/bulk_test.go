@@ -19,7 +19,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -180,7 +179,7 @@ func TestBulkSimple(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			log.Logger = testlog.SetLogger(t)
+			ctx := testlog.SetLogger(t).WithContext(context.Background())
 			mockBulk := ftesting.NewMockBulk()
 			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
 			bc := NewBulk(mockBulk)
@@ -189,7 +188,7 @@ func TestBulkSimple(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := bc.flush(context.Background()); err != nil {
+			if err := bc.flush(ctx); err != nil {
 				t.Fatal(err)
 			}
 
@@ -207,7 +206,7 @@ func validateTimestamp(tb testing.TB, start time.Time, ts string) {
 }
 
 func benchmarkBulk(n int, flush bool, b *testing.B) {
-	log.Logger = testlog.SetLogger(b)
+	ctx := testlog.SetLogger(b).WithContext(context.Background())
 	b.ReportAllocs()
 
 	mockBulk := ftesting.NewMockBulk()
@@ -231,7 +230,7 @@ func benchmarkBulk(n int, flush bool, b *testing.B) {
 		}
 
 		if flush {
-			err := bc.flush(context.Background())
+			err := bc.flush(ctx)
 			if err != nil {
 				b.Fatal(err)
 			}

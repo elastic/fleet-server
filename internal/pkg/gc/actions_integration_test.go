@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func TestCleanupActions(t *testing.T) {
@@ -52,6 +53,7 @@ func testCleanupActionsWithSelectSize(t *testing.T, _ int) {
 	)
 
 	ctx := context.Background()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetActions)
 

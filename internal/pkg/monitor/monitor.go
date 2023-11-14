@@ -23,7 +23,6 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"go.elastic.co/apm/v2"
 )
 
@@ -120,8 +119,6 @@ func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option
 		opt(m)
 	}
 
-	m.log = log.With().Str("index", m.index).Str("ctx", "index monitor").Logger()
-
 	tmplCheck, err := m.prepareCheckQuery()
 	if err != nil {
 		return nil, err
@@ -198,6 +195,7 @@ func (m *simpleMonitorT) loadCheckpoint() sqn.SeqNo {
 
 // Run runs monitor.
 func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
+	m.log = zerolog.Ctx(ctx).With().Str("index", m.index).Str("ctx", "index monitor").Logger()
 	m.log.Info().Msg("starting index monitor")
 	defer func() {
 		if errors.Is(err, context.Canceled) {

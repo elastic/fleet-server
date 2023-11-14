@@ -5,15 +5,19 @@
 package logger
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func TestMiddleware(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(context.Background())
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ts, ok := CtxStartTime(r.Context())
 		require.True(t, ok, "expected context to have start time")
@@ -24,7 +28,7 @@ func TestMiddleware(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/", nil)
+	req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
 
 	Middleware(h).ServeHTTP(w, req)
 	res := w.Result()

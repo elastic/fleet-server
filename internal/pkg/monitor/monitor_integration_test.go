@@ -30,6 +30,7 @@ import (
 func TestSimpleMonitorEmptyIndex(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetActions)
 
@@ -39,6 +40,7 @@ func TestSimpleMonitorEmptyIndex(t *testing.T) {
 func TestSimpleMonitorNonEmptyIndex(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker, _ := ftesting.SetupActions(ctx, t, 1, 12)
 
@@ -46,9 +48,9 @@ func TestSimpleMonitorNonEmptyIndex(t *testing.T) {
 }
 
 func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
-	log := testlog.SetLogger(t)
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker, _ := ftesting.SetupActions(ctx, t, 1, 12)
 
@@ -90,8 +92,7 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 	checkpoint, err = gcheckpt.Query(ctx, bulker.Client(), index)
 	require.NoError(t, err)
 
-	log.Debug().Int64("checkpoint", checkpoint.Value()).Msg("checkpoint before test action delete")
-
+	t.Logf("Checkpoint before test action delete checkpoint=%d", checkpoint.Value())
 	// Delete an action to emulate the gap between the fleet server tracking checkpoint and the index checkpoint
 	// The delete causes the checkpoint increment and the fleet-server was not updating it's checkpoint tracked value correctly
 	// in these cases.
@@ -101,7 +102,7 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 
 	checkpoint, err = gcheckpt.Query(ctx, bulker.Client(), index)
 	require.NoError(t, err)
-	log.Debug().Int64("checkpoint", checkpoint.Value()).Msg("checkpoint after test action delete")
+	t.Logf("Checkpoint after test action delete checkpoint=%d", checkpoint.Value())
 
 	// Wait for fleet server monitor checkpoint to be incremented after delete
 	m, _ := mon.(*simpleMonitorT)
@@ -109,7 +110,7 @@ func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
 	start := time.Now()
 	for {
 		monCheckpoint = m.loadCheckpoint()
-		log.Debug().Int64("wait checkpoint", checkpoint.Value()).Int64("got checkpoint", monCheckpoint.Value()).Msg("monitor checkpoint")
+		t.Logf("Monitor checkpoint wait_checkpoint=%d got_checkpoint=%d", checkpoint.Value(), monCheckpoint.Value())
 		if checkpoint.Value() == monCheckpoint.Value() {
 			break
 		}

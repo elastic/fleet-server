@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -88,17 +88,17 @@ func EnsureTemplate(ctx context.Context, cli *elasticsearch.Client, name, mappin
 	}
 
 	// Check settings
-	log.Debug().Interface("settings", template.Settings).Msg("Found existing settings")
+	zerolog.Ctx(ctx).Debug().Interface("settings", template.Settings).Msg("Found existing settings")
 
 	if template.Version >= templateVersion {
-		log.Info().
+		zerolog.Ctx(ctx).Info().
 			Int("current templated version", template.Version).
 			Int("new template version", templateVersion).
 			Msg("Skipping template creation because upstream version")
 		return nil
 	}
 
-	log.Info().
+	zerolog.Ctx(ctx).Info().
 		Int("current templated version", template.Version).
 		Int("new template version", templateVersion).
 		Msg("Creating template")
@@ -107,8 +107,7 @@ func EnsureTemplate(ctx context.Context, cli *elasticsearch.Client, name, mappin
 }
 
 func createTemplate(ctx context.Context, cli *elasticsearch.Client, name string, templateVersion int, settings, mapping string, ilm bool) error {
-
-	log.Info().Str("name", name).Msg("Create template")
+	zerolog.Ctx(ctx).Info().Str("name", name).Msg("Create template")
 
 	datastream := ""
 	if ilm {
@@ -128,7 +127,7 @@ func createTemplate(ctx context.Context, cli *elasticsearch.Client, name string,
 	err = checkResponseError(res)
 	if err != nil {
 		if errors.Is(err, ErrResourceAlreadyExists) {
-			log.Info().Str("name", name).Msg("Index template already exists")
+			zerolog.Ctx(ctx).Info().Str("name", name).Msg("Index template already exists")
 			return nil
 		}
 		return err

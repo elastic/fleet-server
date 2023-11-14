@@ -10,7 +10,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 type UpdateFields map[string]interface{}
@@ -27,7 +27,11 @@ func (u UpdateFields) Marshal() ([]byte, error) {
 
 // Attempt to interpret the response as an elastic error,
 // otherwise return generic elastic error.
-func parseError(res *esapi.Response) error {
+func parseError(res *esapi.Response, log *zerolog.Logger) error {
+	if log == nil {
+		l := zerolog.Nop()
+		log = &l
+	}
 
 	var e struct {
 		Err json.RawMessage `json:"error"`

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
@@ -70,7 +70,7 @@ func migrate(ctx context.Context, bulker bulk.Bulk, fn migrationBodyFn) (int, er
 
 		resp, err := applyMigration(ctx, name, index, bulker, body)
 		if err != nil {
-			log.Err(err).
+			zerolog.Ctx(ctx).Err(err).
 				Bytes("http.request.body.content", body).
 				Msgf("migration %s failed", name)
 			return updatedDocs, fmt.Errorf("failed to apply migration %q: %w",
@@ -121,7 +121,7 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 		return migrationResponse{}, fmt.Errorf("decode UpdateByQuery response: %w", err)
 	}
 
-	log.Info().
+	zerolog.Ctx(ctx).Info().
 		Str("fleet.migration.name", name).
 		Int("fleet.migration.es.took", resp.Took).
 		Bool("fleet.migration.es.timed_out", resp.TimedOut).
@@ -137,7 +137,7 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 		Msgf("migration %s done", name)
 
 	for _, fail := range resp.Failures {
-		log.Error().RawJSON("failure", fail).Msgf("failed applying %s migration", name)
+		zerolog.Ctx(ctx).Error().RawJSON("failure", fail).Msgf("failed applying %s migration", name)
 	}
 
 	return resp, err
@@ -145,7 +145,7 @@ func applyMigration(ctx context.Context, name string, index string, bulker bulk.
 
 // ============================== V7.15 migration ==============================
 func migrateTov7_15(ctx context.Context, bulker bulk.Bulk) error {
-	log.Debug().Msg("applying migration to v7.15")
+	zerolog.Ctx(ctx).Debug().Msg("applying migration to v7.15")
 	_, err := migrate(ctx, bulker, migrateAgentMetadata)
 	if err != nil {
 		return fmt.Errorf("v7.15.0 data migration failed: %w", err)
@@ -185,7 +185,7 @@ func migrateAgentMetadata() (string, string, []byte, error) {
 // https://github.com/elastic/fleet-server/issues/1672
 
 func migrateToV8_5(ctx context.Context, bulker bulk.Bulk) error {
-	log.Debug().Msg("applying migration to v8.5.0")
+	zerolog.Ctx(ctx).Debug().Msg("applying migration to v8.5.0")
 	migrated, err := migrate(ctx, bulker, migrateAgentOutputs)
 	if err != nil {
 		return fmt.Errorf("v8.5.0 data migration failed: %w", err)
@@ -288,7 +288,7 @@ func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
 
 	body, err := query.MarshalJSON()
 	if err != nil {
-		log.Debug().Str("painlessScript", painless).
+		zerolog.Ctx(context.TODO()).Debug().Str("painlessScript", painless).
 			Msgf("%s: failed painless script", migrationName)
 		return migrationName, FleetPolicies, nil, fmt.Errorf("could not marshal ES query: %w", err)
 	}

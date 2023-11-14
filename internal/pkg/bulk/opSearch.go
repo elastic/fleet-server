@@ -15,7 +15,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/mailru/easyjson"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 )
 
@@ -169,8 +169,8 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 	}
 
 	if res.IsError() {
-		log.Warn().Str("mod", kModBulk).Str("error.message", res.String()).Msg("bulker.flushSearch: Fail writeMsearchBody")
-		return parseError(res)
+		zerolog.Ctx(ctx).Warn().Str("mod", kModBulk).Str("error.message", res.String()).Msg("bulker.flushSearch: Fail writeMsearchBody")
+		return parseError(res, zerolog.Ctx(ctx))
 	}
 
 	// Reuse buffer
@@ -178,7 +178,7 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 
 	bodySz, err := buf.ReadFrom(res.Body)
 	if err != nil {
-		log.Error().Err(err).Str("mod", kModBulk).Msg("MsearchResponse error")
+		zerolog.Ctx(ctx).Error().Err(err).Str("mod", kModBulk).Msg("MsearchResponse error")
 		return err
 	}
 
@@ -187,11 +187,11 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 	blk.Responses = make([]MsearchResponseItem, 0, queueCnt)
 
 	if err = easyjson.Unmarshal(buf.Bytes(), &blk); err != nil {
-		log.Error().Err(err).Str("mod", kModBulk).Msg("Unmarshal error")
+		zerolog.Ctx(ctx).Error().Err(err).Str("mod", kModBulk).Msg("Unmarshal error")
 		return err
 	}
 
-	log.Trace().
+	zerolog.Ctx(ctx).Trace().
 		Err(err).
 		Str("mod", kModBulk).
 		Dur("rtt", time.Since(start)).

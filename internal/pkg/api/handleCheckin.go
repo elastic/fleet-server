@@ -452,13 +452,8 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	}
 	vSpan.End()
 
-	// marshal and update agent doc with details
-	p, err := json.Marshal(details)
-	if err != nil {
-		return err
-	}
 	doc := bulk.UpdateFields{
-		dl.FieldUpgradeDetails: p,
+		dl.FieldUpgradeDetails: details,
 	}
 	body, err := doc.Marshal()
 	if err != nil {
