@@ -120,6 +120,7 @@ func (m *standAloneSelfMonitorT) check(ctx context.Context) {
 		if value != "" {
 			hasError = true
 			remoteESPayload[key] = value
+			break
 		}
 	}
 	if hasError {
@@ -134,13 +135,12 @@ func (m *standAloneSelfMonitorT) check(ctx context.Context) {
 				m.log.Error().Err(err).Msg("error calling remote es ping")
 				state = client.UnitStateDegraded
 				message = fmt.Sprintf("Could not ping remote ES: %s, error: %s", outputName, err.Error())
+				break
 			} else if res.StatusCode != 200 {
 				state = client.UnitStateDegraded
 				message = fmt.Sprintf("Could not connect to remote ES output: %s, status code: %d", outputName, res.StatusCode)
 				m.log.Debug().Msg(message)
-			} else {
-				state = client.UnitStateHealthy
-				message = ""
+				break
 			}
 		}
 	}
