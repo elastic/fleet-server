@@ -1,7 +1,6 @@
 package esutil
 
 import (
-	"bytes"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -42,7 +41,6 @@ func MockESClient(t *testing.T) (*elasticsearch.Client, *MockTransport) {
 func sendBodyString(body string) *http.Response {
 	return sendBody(strings.NewReader(body))
 }
-func sendBodyBytes(body []byte) *http.Response { return sendBody(bytes.NewReader(body)) }
 func sendBody(body io.Reader) *http.Response {
 	return &http.Response{
 		StatusCode: http.StatusOK,
