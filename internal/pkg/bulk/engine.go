@@ -238,13 +238,14 @@ func (b *Bulker) Tracer() *apm.Tracer {
 	return b.tracer
 }
 
-// check if remote output cfg changed, and signal to remoteOutputCh channel if so
+// check if remote output cfg changed
 func (b *Bulker) CheckRemoteOutputChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
 	curCfg := b.remoteOutputConfigMap[name]
 
 	hasChanged := false
 
-	// ignore output sent to agents where type is set to elasticsearch
+	// TODO remoteOutputConfigMap empty when FS restarts - won't detect changes
+	// when output config first added, not reporting change
 	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
 		zlog.Info().Str("name", name).Msg("remote output configuration has changed")
 		hasChanged = true

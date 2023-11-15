@@ -132,8 +132,6 @@ func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
 	started := false
 	ech := make(chan error, 2)
 
-	outputChanged := false
-
 LOOP:
 	for {
 		if started {
@@ -175,7 +173,7 @@ LOOP:
 		}
 
 		// Start or restart server
-		if configChangedServer(*log, curCfg, newCfg) || outputChanged {
+		if configChangedServer(*log, curCfg, newCfg) {
 			if srvCancel != nil {
 				log.Info().Msg("stopping server on configuration change")
 				stop(srvCancel, srvEg)
@@ -193,7 +191,6 @@ LOOP:
 		}
 
 		curCfg = newCfg
-		outputChanged = false
 
 		select {
 		case newCfg = <-f.cfgCh:
