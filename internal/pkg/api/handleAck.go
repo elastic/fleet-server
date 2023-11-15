@@ -416,7 +416,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
-	for _, output := range agent.Outputs {
+	for outputName, output := range agent.Outputs {
 		if output.Type != policy.OutputTypeElasticsearch {
 			continue
 		}
@@ -424,7 +424,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		err := ack.updateAPIKey(ctx,
 			zlog,
 			agent.Id,
-			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
+			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName)
 		if err != nil {
 			return err
 		}
@@ -445,20 +445,31 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	zlog zerolog.Logger,
 	agentID string,
 	apiKeyID, permissionHash string,
-	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
+	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, outputName string) error {
+	bulk := ack.bulk
+	// use output bulker if exists
+	if outputName != "" {
+		outputBulk := ack.bulk.GetBulker(outputName)
+		if outputBulk != nil {
+			zlog.Debug().Str("outputName", outputName).Msg("Using output bulker in updateAPIKey")
+			bulk = outputBulk
+		}
+	}
 	if apiKeyID != "" {
-		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
+		res, err := bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
 			if isAgentActive(ctx, zlog, ack.bulk, agentID) {
 				zlog.Error().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
+					Str("outputName", outputName).
 					Msg("Failed to read API Key roles")
 			} else {
 				// race when API key was invalidated before acking
 				zlog.Info().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
+					Str("outputName", outputName).
 					Msg("Failed to read invalidated API Key roles")
 
 				// prevents future checks
@@ -473,14 +484,15 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 					Str(LogAPIKeyID, apiKeyID).
 					Msg("Failed to cleanup roles")
 			} else if removedRolesCount > 0 {
-				if err := ack.bulk.APIKeyUpdate(ctx, apiKeyID, permissionHash, clean); err != nil {
-					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, apiKeyID).Msg("Failed to update API Key")
+				if err := bulk.APIKeyUpdate(ctx, apiKeyID, permissionHash, clean); err != nil {
+					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, apiKeyID).Str("outputName", outputName).Msg("Failed to update API Key")
 				} else {
 					zlog.Debug().
 						Str("hash.sha256", permissionHash).
 						Str(LogAPIKeyID, apiKeyID).
 						RawJSON("roles", clean).
 						Int("removedRoles", removedRolesCount).
+						Str("outputName", outputName).
 						Msg("Updating agent record to pick up reduced roles.")
 				}
 			}
