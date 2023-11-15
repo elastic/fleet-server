@@ -13,45 +13,46 @@ import (
 
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestReplaceSecretRef(t *testing.T) {
+func TestReplaceStringRef(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceSecretRef("$co.elastic.secret{abcd}", secretRefs)
+	val := replaceStringRef("$co.elastic.secret{abcd}", secretRefs)
 	assert.Equal(t, "value1", val)
 }
 
-func TestReplaceSecretRefPartial(t *testing.T) {
+func TestReplaceStringRefPartial(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceSecretRef("partial $co.elastic.secret{abcd}", secretRefs)
+	val := replaceStringRef("partial $co.elastic.secret{abcd}", secretRefs)
 	assert.Equal(t, "partial value1", val)
 }
 
-func TestReplaceSecretRefPartial2(t *testing.T) {
+func TestReplaceStringRefPartial2(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "http://localhost",
 	}
-	val := replaceSecretRef("$co.elastic.secret{abcd}/services", secretRefs)
+	val := replaceStringRef("$co.elastic.secret{abcd}/services", secretRefs)
 	assert.Equal(t, "http://localhost/services", val)
 }
 
-func TestReplaceSecretRefNotASecret(t *testing.T) {
+func TestReplaceStringRefNotASecret(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceSecretRef("abcd", secretRefs)
+	val := replaceStringRef("abcd", secretRefs)
 	assert.Equal(t, "abcd", val)
 }
 
-func TestReplaceSecretRefNotFound(t *testing.T) {
+func TestReplaceStringRefNotFound(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceSecretRef("$co.elastic.secret{other}", secretRefs)
+	val := replaceStringRef("$co.elastic.secret{other}", secretRefs)
 	assert.Equal(t, "$co.elastic.secret{other}", val)
 }
 
@@ -108,6 +109,55 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 	var refs any
 	json.Unmarshal(fields["secret_references"], &refs)
 	assert.Equal(t, nil, refs)
+}
+
+func TestPolicyInputSteamsEmbedded(t *testing.T) {
+	secretRefsJSON := []SecretReference{{ID: "ref1"}}
+	secretRefsRaw, _ := json.Marshal(secretRefsJSON)
+	inputsJSON := []map[string]interface{}{
+		{"id": "input1", "streams": []interface{}{
+			map[string]interface{}{
+				"id":  "stream1",
+				"key": "val",
+				"embedded": map[string]interface{}{
+					"embedded-key": "embedded-val",
+					"embedded-arr": []interface{}{
+						map[string]interface{}{
+							"embedded-secret": "$co.elastic.secret{ref1}",
+						},
+					}},
+			},
+		}},
+	}
+	inputsRaw, _ := json.Marshal(inputsJSON)
+
+	fields := map[string]json.RawMessage{
+		"secret_references": secretRefsRaw,
+		"inputs":            inputsRaw,
+	}
+	bulker := ftesting.NewMockBulk()
+	expected := []map[string]interface{}{{
+		"id": "input1",
+		"streams": []interface{}{
+			map[string]interface{}{
+				"id":  "stream1",
+				"key": "val",
+				"embedded": map[string]interface{}{
+					"embedded-key": "embedded-val",
+					"embedded-arr": []interface{}{
+						map[string]interface{}{
+							"embedded-secret": "ref1_value",
+						},
+					}},
+			},
+		}},
+	}
+
+	result, err := getPolicyInputsWithSecrets(context.TODO(), fields, bulker)
+	require.NoError(t, err)
+
+	assert.Equal(t, expected, result)
+
 }
 
 func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
