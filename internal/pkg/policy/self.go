@@ -225,12 +225,36 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 		if value != "" {
 			hasError = true
 			remoteESPayload[key] = value
+			break
 		}
 	}
 	if hasError {
 		m.state = client.UnitStateDegraded
 		m.reporter.UpdateState(client.UnitStateDegraded, "Could not connect to remote ES output", remoteESPayload) //nolint:errcheck // not clear what to do in failure cases
 		return client.UnitStateDegraded, nil
+	} else {
+		bulkerMap := m.bulker.GetBulkerMap()
+		for outputName, outputBulker := range bulkerMap {
+			res, err := outputBulker.Client().Ping(outputBulker.Client().Ping.WithContext(ctx))
+			if err != nil {
+				m.log.Error().Err(err).Msg("error calling remote es ping")
+				m.state = client.UnitStateDegraded
+				message := fmt.Sprintf("Could not ping remote ES: %s, error: %s", outputName, err.Error())
+				m.reporter.UpdateState(m.state, message, nil) //nolint:errcheck // not clear what to do in failure cases
+				hasError = true
+				break
+			} else if res.StatusCode != 200 {
+				m.state = client.UnitStateDegraded
+				message := fmt.Sprintf("Could not connect to remote ES output: %s, status code: %d", outputName, res.StatusCode)
+				m.log.Debug().Msg(message)
+				m.reporter.UpdateState(m.state, message, nil) //nolint:errcheck // not clear what to do in failure cases
+				hasError = true
+				break
+			}
+		}
+		if hasError {
+			return m.state, nil
+		}
 	}
 
 	state := client.UnitStateHealthy

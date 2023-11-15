@@ -189,7 +189,7 @@ func (p *Output) prepareElasticsearch(
 		// document on ES does not have OutputPermissionsHash for any other output
 		// besides the default one. It seems to me error-prone to rely on the default
 		// output permissions hash to generate new API keys for other outputs.
-		zlog.Debug().Msg("must generate api key as policy output permissions changed")
+		zlog.Debug().Msg("must update api key as policy output permissions changed")
 		needUpdateKey = true
 	default:
 		zlog.Debug().Msg("policy output permissions are the same")

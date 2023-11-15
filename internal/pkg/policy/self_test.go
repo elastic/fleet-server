@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	mmock "github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
 )
 
 func TestSelfMonitor_DefaultPolicy(t *testing.T) {
@@ -49,6 +51,8 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 	emptyMap := make(map[string]string)
 	bulker.On("GetRemoteOutputErrorMap").Return(emptyMap)
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
@@ -188,6 +192,8 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	emptyMap := make(map[string]string)
 	bulker.On("GetRemoteOutputErrorMap").Return(emptyMap)
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
@@ -347,6 +353,8 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 	emptyMap := make(map[string]string)
 	bulker.On("GetRemoteOutputErrorMap").Return(emptyMap)
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
@@ -485,6 +493,8 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 	emptyMap := make(map[string]string)
 	bulker.On("GetRemoteOutputErrorMap").Return(emptyMap)
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
@@ -665,6 +675,8 @@ func TestSelfMonitor_RemoteOutput_Degraded(t *testing.T) {
 	errorMap := make(map[string]string)
 	errorMap["remote output"] = "error connecting to remote output"
 	bulker.On("GetRemoteOutputErrorMap").Return(errorMap)
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
@@ -793,6 +805,9 @@ func TestSelfMonitor_RemoteOutput_Back_To_Healthy(t *testing.T) {
 	emptyMap := make(map[string]string)
 	bulker.On("GetRemoteOutputErrorMap").Return(emptyMap).Once()
 
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
+
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.checkTime = 100 * time.Millisecond
@@ -884,6 +899,141 @@ func TestSelfMonitor_RemoteOutput_Back_To_Healthy(t *testing.T) {
 		}
 		return nil
 	})
+
+	cancel()
+	mwg.Wait()
+	if merr != nil && merr != context.Canceled {
+		t.Fatal(merr)
+	}
+}
+
+func TestSelfMonitor_RemoteOutput_Ping_Degraded(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cfg := config.Fleet{
+		Agent: config.Agent{
+			ID: "agent-id",
+		},
+	}
+	reporter := &FakeReporter{}
+
+	chHitT := make(chan []es.HitT, 1)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
+	emptyMap := make(map[string]string)
+	bulker.On("GetRemoteOutputErrorMap").Return(emptyMap)
+
+	bulkerMap := make(map[string]bulk.Bulk)
+	outputBulker := ftesting.NewMockBulk()
+	mockES, mocktrans := esutil.MockESClient(t)
+
+	mocktrans.Response = &http.Response{
+		StatusCode: http.StatusInternalServerError,
+		Body:       nil,
+	}
+
+	outputBulker.On("Client").Return(mockES)
+	bulkerMap["output1"] = outputBulker
+	bulker.On("GetBulkerMap").Return(bulkerMap)
+
+	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
+	sm := monitor.(*selfMonitorT)
+	sm.checkTime = 100 * time.Millisecond
+
+	var policyLock sync.Mutex
+	var policyResult []model.Policy
+	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+		policyLock.Lock()
+		defer policyLock.Unlock()
+		return policyResult, nil
+	}
+
+	var tokenLock sync.Mutex
+	var tokenResult []model.EnrollmentAPIKey
+	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
+		tokenLock.Lock()
+		defer tokenLock.Unlock()
+		return tokenResult, nil
+	}
+
+	var merr error
+	var mwg sync.WaitGroup
+	mwg.Add(1)
+	go func() {
+		defer mwg.Done()
+		merr = monitor.Run(ctx)
+	}()
+
+	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// should be set to starting
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateStarting {
+			return fmt.Errorf("should be reported as starting; instead its %s", state)
+		}
+		if msg != "Waiting on default policy with Fleet Server integration" {
+			return fmt.Errorf("should be matching with default policy")
+		}
+		return nil
+	}, ftesting.RetrySleep(1*time.Second))
+
+	policyID := uuid.Must(uuid.NewV4()).String()
+	rId := xid.New().String()
+	pData := model.PolicyData{Inputs: []map[string]interface{}{
+		{
+			"type": "fleet-server",
+		},
+	}}
+	policy := model.Policy{
+		ESDocument: model.ESDocument{
+			Id:      rId,
+			Version: 1,
+			SeqNo:   1,
+		},
+		PolicyID:           policyID,
+		CoordinatorIdx:     1,
+		Data:               &pData,
+		RevisionIdx:        1,
+		DefaultFleetServer: true,
+	}
+	policyData, err := json.Marshal(&policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		chHitT <- []es.HitT{{
+			ID:      rId,
+			SeqNo:   1,
+			Version: 1,
+			Source:  policyData,
+		}}
+		policyLock.Lock()
+		defer policyLock.Unlock()
+		policyResult = append(policyResult, policy)
+	}()
+
+	// should be set to degraded because of remote output error
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateDegraded {
+			return fmt.Errorf("should be reported as degraded; instead its %s", state)
+		}
+		if msg != "Could not connect to remote ES output: output1, status code: 500" {
+			return fmt.Errorf("expected remote ES error")
+		}
+		return nil
+	}, ftesting.RetrySleep(1*time.Second))
 
 	cancel()
 	mwg.Wait()
