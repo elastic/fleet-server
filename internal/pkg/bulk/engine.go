@@ -153,7 +153,10 @@ func (b *Bulker) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serv
 		return bulker, false, nil
 	}
 	if bulker != nil && hasConfigChanged {
-		bulker.CancelFn()
+		cancelFn := bulker.CancelFn()
+		if cancelFn != nil {
+			cancelFn()
+		}
 	}
 	bulkCtx, bulkCancel := context.WithCancel(context.Background())
 	es, err := b.createRemoteEsClient(bulkCtx, outputName, serviceToken, outputMap)

@@ -85,3 +85,62 @@ func Test_CheckRemoteOutputChanged(t *testing.T) {
 		})
 	}
 }
+
+func Test_CreateAndGetBulkerNew(t *testing.T) {
+	log := testlog.SetLogger(t)
+	bulker := NewBulker(nil, nil)
+	outputMap := make(map[string]map[string]interface{})
+	outputMap["remote1"] = map[string]interface{}{
+		"type":          "remote_elasticsearch",
+		"hosts":         []interface{}{"https://remote-es:443"},
+		"service_token": "token1",
+	}
+	newBulker, hasChanged, err := bulker.CreateAndGetBulker(log, "remote1", "token1", outputMap)
+	assert.NotNil(t, newBulker)
+	assert.Equal(t, false, hasChanged)
+	assert.Nil(t, err)
+}
+
+func Test_CreateAndGetBulkerExisting(t *testing.T) {
+	log := testlog.SetLogger(t)
+	bulker := NewBulker(nil, nil)
+	outputBulker := NewBulker(nil, nil)
+	bulker.bulkerMap["remote1"] = outputBulker
+	outputMap := make(map[string]map[string]interface{})
+	cfg := map[string]interface{}{
+		"type":          "remote_elasticsearch",
+		"hosts":         []interface{}{"https://remote-es:443"},
+		"service_token": "token1",
+	}
+	bulker.remoteOutputConfigMap["remote1"] = cfg
+	outputMap["remote1"] = cfg
+	newBulker, hasChanged, err := bulker.CreateAndGetBulker(log, "remote1", "token1", outputMap)
+	assert.Equal(t, outputBulker, newBulker)
+	assert.Equal(t, false, hasChanged)
+	assert.Nil(t, err)
+}
+
+func Test_CreateAndGetBulkerChanged(t *testing.T) {
+	log := testlog.SetLogger(t)
+	bulker := NewBulker(nil, nil)
+	outputBulker := NewBulker(nil, nil)
+	bulker.bulkerMap["remote1"] = outputBulker
+	outputMap := make(map[string]map[string]interface{})
+	bulker.remoteOutputConfigMap["remote1"] = map[string]interface{}{
+		"type":          "remote_elasticsearch",
+		"hosts":         []interface{}{"https://remote-es:443"},
+		"service_token": "token1",
+	}
+	outputMap["remote1"] = map[string]interface{}{
+		"type":          "remote_elasticsearch",
+		"hosts":         []interface{}{"https://remote-es:443"},
+		"service_token": "token2",
+	}
+	cancelFnCalled := false
+	outputBulker.cancelFn = func() { cancelFnCalled = true }
+	newBulker, hasChanged, err := bulker.CreateAndGetBulker(log, "remote1", "token2", outputMap)
+	assert.NotEqual(t, outputBulker, newBulker)
+	assert.Equal(t, true, hasChanged)
+	assert.Nil(t, err)
+	assert.Equal(t, true, cancelFnCalled)
+}
