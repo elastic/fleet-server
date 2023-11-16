@@ -572,44 +572,36 @@ func TestInvalidateAPIKeys(t *testing.T) {
 }
 
 func TestInvalidateAPIKeysRemoteOutput(t *testing.T) {
-	toRetire1 := []model.ToRetireAPIKeyIdsItems{{
+	toRetire := []model.ToRetireAPIKeyIdsItems{{
 		ID:     "toRetire1",
 		Output: "remote1",
+	}, {
+		ID:     "toRetire11",
+		Output: "remote1",
+	}, {
+		ID:     "toRetire2",
+		Output: "remote2",
 	}}
 
-	wants := map[string][]string{
-		"1": {"toRetire1"},
-	}
+	bulker := ftesting.NewMockBulk()
+	remoteBulker := ftesting.NewMockBulk()
+	remoteBulker2 := ftesting.NewMockBulk()
+	bulker.On("GetBulker", "remote1").Return(remoteBulker)
+	bulker.On("GetBulker", "remote2").Return(remoteBulker2)
 
-	agent := model.Agent{
-		Outputs: map[string]*model.PolicyOutput{
-			"1": {ToRetireAPIKeyIds: toRetire1},
-		},
-	}
+	remoteBulker.On("APIKeyInvalidate",
+		context.Background(), []string{"toRetire1", "toRetire11"}).
+		Return(nil)
+	remoteBulker2.On("APIKeyInvalidate",
+		context.Background(), []string{"toRetire2"}).
+		Return(nil)
 
-	for i, out := range agent.Outputs {
-		want := wants[i]
+	logger := testlog.SetLogger(t)
+	ack := &AckT{bulk: bulker}
+	ack.invalidateAPIKeys(context.Background(), logger, toRetire, "")
 
-		bulker := ftesting.NewMockBulk()
-		remoteBulker := ftesting.NewMockBulk()
-		bulker.On("GetBulker", mock.AnythingOfType("string")).Return(remoteBulker)
-		if len(want) > 0 {
-			remoteBulker.On("APIKeyInvalidate",
-				context.Background(), mock.MatchedBy(func(ids []string) bool {
-					// if A contains B and B contains A => A = B
-					return assert.Subset(t, ids, want) &&
-						assert.Subset(t, want, ids)
-				})).
-				Return(nil)
-		}
-
-		logger := testlog.SetLogger(t)
-		ack := &AckT{bulk: bulker}
-		ack.invalidateAPIKeys(context.Background(), logger, out.ToRetireAPIKeyIds, "")
-
-		bulker.AssertExpectations(t)
-		remoteBulker.AssertExpectations(t)
-	}
+	bulker.AssertExpectations(t)
+	remoteBulker.AssertExpectations(t)
 }
 
 func TestAckHandleUpgrade(t *testing.T) {

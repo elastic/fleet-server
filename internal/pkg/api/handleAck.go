@@ -568,27 +568,33 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 
 func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
 	ids := make([]string, 0, len(toRetireAPIKeyIDs))
-	output := ""
+	remoteIds := make(map[string][]string)
 	for _, k := range toRetireAPIKeyIDs {
 		if k.ID == skip || k.ID == "" {
 			continue
 		}
-		ids = append(ids, k.ID)
-		output = k.Output
-	}
-	// using remote es bulker to invalidate api key - supposing all retire api key ids belong to the same remote es
-	bulk := ack.bulk
-	if output != "" {
-		outputBulk := ack.bulk.GetBulker(output)
-		if outputBulk != nil {
-			bulk = outputBulk
+		if k.Output != "" {
+			if remoteIds[k.Output] == nil {
+				remoteIds[k.Output] = make([]string, 0)
+			}
+			remoteIds[k.Output] = append(remoteIds[k.Output], k.ID)
+		} else {
+			ids = append(ids, k.ID)
 		}
 	}
-
 	if len(ids) > 0 {
 		zlog.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
-		if err := bulk.APIKeyInvalidate(ctx, ids...); err != nil {
+		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
 			zlog.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+		}
+	}
+	// using remote es bulker to invalidate api key
+	for outputName, outputIds := range remoteIds {
+		outputBulk := ack.bulk.GetBulker(outputName)
+		if outputBulk != nil {
+			if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
+				zlog.Info().Err(err).Strs("ids", outputIds).Str("outputName", outputName).Msg("Failed to invalidate API keys")
+			}
 		}
 	}
 }

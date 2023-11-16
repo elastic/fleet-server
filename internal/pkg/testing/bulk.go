@@ -81,7 +81,7 @@ func (m *MockBulk) Client() *elasticsearch.Client {
 }
 
 func (m *MockBulk) GetBulker(outputName string) bulk.Bulk {
-	args := m.Called()
+	args := m.Called(outputName)
 	return args.Get(0).(bulk.Bulk)
 }
 
