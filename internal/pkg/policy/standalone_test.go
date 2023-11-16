@@ -185,13 +185,15 @@ func TestStandAloneSelfMonitorRemoteOutputPing(t *testing.T) {
 	mocktrans.Response = &http.Response{
 		StatusCode: http.StatusOK,
 		Body:       ioutil.NopCloser(strings.NewReader(`{}`)),
+		Header: http.Header{
+			"X-Elastic-Product": []string{"Elasticsearch"},
+		},
 	}
 
 	sm.check(context.Background())
 	state = sm.State()
 
-	// TODO does not work, gives error "the client noticed that the server is not Elasticsearch and we do not support this unknown product"
-	// assert.Equal(t, client.UnitStateHealthy, state)
-	// assert.Equal(t, state, reporter.state, "reported state should be the same")
+	assert.Equal(t, client.UnitStateHealthy, state)
+	assert.Equal(t, state, reporter.state, "reported state should be the same")
 
 }

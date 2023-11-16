@@ -10,7 +10,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -907,7 +909,7 @@ func TestSelfMonitor_RemoteOutput_Back_To_Healthy(t *testing.T) {
 	}
 }
 
-func TestSelfMonitor_RemoteOutput_Ping_Degraded(t *testing.T) {
+func TestSelfMonitor_RemoteOutput_Ping_Degraded_Healthy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1031,6 +1033,26 @@ func TestSelfMonitor_RemoteOutput_Ping_Degraded(t *testing.T) {
 		}
 		if msg != "Could not connect to remote ES output: output1, status code: 500" {
 			return fmt.Errorf("expected remote ES error")
+		}
+		return nil
+	}, ftesting.RetrySleep(1*time.Second))
+
+	// back to healthy
+	mocktrans.Response = &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(strings.NewReader(`{}`)),
+		Header: http.Header{
+			"X-Elastic-Product": []string{"Elasticsearch"},
+		},
+	}
+
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		state, msg, _ := reporter.Current()
+		if state != client.UnitStateHealthy {
+			return fmt.Errorf("should be reported as healthy; instead its %s", state)
+		}
+		if msg != "Running on default policy with Fleet Server integration" {
+			return fmt.Errorf("should be matching with default policy")
 		}
 		return nil
 	}, ftesting.RetrySleep(1*time.Second))
