@@ -113,23 +113,24 @@ func (p *Output) prepareElasticsearch(
 
 	// retire api key of removed remote output
 	var toRetireAPIKeys *model.ToRetireAPIKeyIdsItems
-	var removedOutputKey string
+	var removedOutputName string
 	// find the first output that is removed - supposing one output can be removed at a time
-	for agentOutputKey, agentOutput := range agent.Outputs {
+	for agentOutputName, agentOutput := range agent.Outputs {
 		found := false
 		for outputMapKey := range outputMap {
-			if agentOutputKey == outputMapKey {
+			if agentOutputName == outputMapKey {
 				found = true
+				break
 			}
 		}
 		if !found {
-			zlog.Info().Str("APIKeyID", agentOutput.APIKeyID).Str("output", agentOutputKey).Msg("Output removed, will retire API key")
+			zlog.Info().Str(logger.APIKeyID, agentOutput.APIKeyID).Str("outputName", agentOutputName).Msg("Output removed, will retire API key")
 			toRetireAPIKeys = &model.ToRetireAPIKeyIdsItems{
 				ID:        agentOutput.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-				Output:    agentOutputKey,
+				Output:    agentOutputName,
 			}
-			removedOutputKey = agentOutputKey
+			removedOutputName = agentOutputName
 			break
 		}
 	}
@@ -156,7 +157,7 @@ func (p *Output) prepareElasticsearch(
 		body, err = json.Marshal(map[string]interface{}{
 			"script": map[string]interface{}{
 				"lang":   "painless",
-				"source": fmt.Sprintf("ctx._source['outputs'].remove(\"%s\")", removedOutputKey),
+				"source": fmt.Sprintf("ctx._source['outputs'].remove(\"%s\")", removedOutputName),
 			},
 		})
 		if err != nil {
@@ -262,7 +263,7 @@ func (p *Output) prepareElasticsearch(
 			// reporting output error status to self monitor and not returning the error to keep fleet-server running
 		if outputAPIKey == nil && p.Type == OutputTypeRemoteElasticsearch {
 			if err != nil {
-				zerolog.Ctx(ctx).Warn().Msg("Could not create API key in remote ES")
+				zerolog.Ctx(ctx).Warn().Err(err).Msg("Could not create API key in remote ES")
 				bulker.SetRemoteOutputError(p.Name, err.Error())
 			} else {
 				bulker.SetRemoteOutputError(p.Name, "")

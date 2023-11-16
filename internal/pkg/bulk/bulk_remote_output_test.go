@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_CheckRemoteOutputChanged(t *testing.T) {
+func Test_hasChangedAndUpdateRemoteOutputConfig(t *testing.T) {
 	testcases := []struct {
 		name    string
 		cfg     map[string]interface{}
@@ -80,8 +80,9 @@ func Test_CheckRemoteOutputChanged(t *testing.T) {
 			log := testlog.SetLogger(t)
 			bulker := NewBulker(nil, nil)
 			bulker.remoteOutputConfigMap["remote1"] = tc.cfg
-			hasChanged := bulker.CheckRemoteOutputChanged(log, "remote1", tc.newCfg)
+			hasChanged := bulker.hasChangedAndUpdateRemoteOutputConfig(log, "remote1", tc.newCfg)
 			assert.Equal(t, tc.changed, hasChanged)
+			assert.Equal(t, tc.newCfg, bulker.remoteOutputConfigMap["remote1"])
 		})
 	}
 }

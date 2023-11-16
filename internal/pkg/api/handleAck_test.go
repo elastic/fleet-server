@@ -608,6 +608,7 @@ func TestInvalidateAPIKeysRemoteOutput(t *testing.T) {
 		ack.invalidateAPIKeys(context.Background(), logger, out.ToRetireAPIKeyIds, "")
 
 		bulker.AssertExpectations(t)
+		remoteBulker.AssertExpectations(t)
 	}
 }
 
