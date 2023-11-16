@@ -475,8 +475,9 @@ if (ctx._source['outputs']['%s']==null)
 			source.WriteString(fmt.Sprintf(`
 if (ctx._source['outputs']['%s'].%s==null)
   {ctx._source['outputs']['%s'].%s=new ArrayList();}
-ctx._source['outputs']['%s'].%s.add(params.%s);
-`, outputName, field, outputName, field, outputName, field, field))
+if (!ctx._source['outputs']['%s'].%s.contains(params.%s))  
+  {ctx._source['outputs']['%s'].%s.add(params.%s);}
+`, outputName, field, outputName, field, outputName, field, field, outputName, field, field))
 		} else {
 			// Update the other fields
 			source.WriteString(fmt.Sprintf(`
