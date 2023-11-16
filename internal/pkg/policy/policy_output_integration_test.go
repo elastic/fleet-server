@@ -234,24 +234,23 @@ func TestPolicyOutputESPrepareRemoteES(t *testing.T) {
 		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false)
 	require.NoError(t, err)
 
-	// need to wait a bit before querying the agent again
-	// TODO: find a better way to query the updated agent
-	time.Sleep(time.Second)
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		got, err := dl.FindAgent(
+			ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		if err != nil {
+			require.NoError(t, err, "failed to find agent ID %q", agentID)
+		}
 
-	got, err := dl.FindAgent(
-		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
-	if err != nil {
-		require.NoError(t, err, "failed to find agent ID %q", agentID)
-	}
+		gotOutput, ok := got.Outputs[output.Name]
+		require.True(t, ok, "no '%s' output found on agent document", output.Name)
 
-	gotOutput, ok := got.Outputs[output.Name]
-	require.True(t, ok, "no '%s' output found on agent document", output.Name)
-
-	assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
-	assert.Equal(t, gotOutput.Type, OutputTypeElasticsearch)
-	assert.Equal(t, gotOutput.PermissionsHash, output.Role.Sha2)
-	assert.NotEmpty(t, gotOutput.APIKey)
-	assert.NotEmpty(t, gotOutput.APIKeyID)
+		assert.Empty(t, gotOutput.ToRetireAPIKeyIds)
+		assert.Equal(t, gotOutput.Type, OutputTypeElasticsearch)
+		assert.Equal(t, gotOutput.PermissionsHash, output.Role.Sha2)
+		assert.NotEmpty(t, gotOutput.APIKey)
+		assert.NotEmpty(t, gotOutput.APIKeyID)
+		return nil
+	}, ftesting.RetrySleep(1*time.Second))
 }
 
 func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
