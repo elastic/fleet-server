@@ -104,15 +104,11 @@ LOOP:
 		case <-ctx.Done():
 			break LOOP
 		case <-cT.C:
-			state, err := m.process(ctx)
+			_, err := m.process(ctx)
 			if err != nil {
 				return err
 			}
 			cT.Reset(m.checkTime)
-			if state == client.UnitStateHealthy {
-				// running; can stop
-				break LOOP
-			}
 		case hits := <-s.Output():
 			policies := make([]model.Policy, len(hits))
 			for i, hit := range hits {
@@ -121,13 +117,9 @@ LOOP:
 					return err
 				}
 			}
-			state, err := m.processPolicies(ctx, policies)
+			_, err := m.processPolicies(ctx, policies)
 			if err != nil {
 				return err
-			}
-			if state == client.UnitStateHealthy {
-				// running; can stop
-				break LOOP
 			}
 		}
 	}
@@ -231,7 +223,7 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 	if hasError {
 		m.state = client.UnitStateDegraded
 		m.reporter.UpdateState(client.UnitStateDegraded, "Could not connect to remote ES output", remoteESPayload) //nolint:errcheck // not clear what to do in failure cases
-		return client.UnitStateDegraded, nil
+		return m.state, nil
 	} else {
 		bulkerMap := m.bulker.GetBulkerMap()
 		for outputName, outputBulker := range bulkerMap {
