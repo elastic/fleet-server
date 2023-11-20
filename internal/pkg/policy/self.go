@@ -104,7 +104,8 @@ LOOP:
 		case <-ctx.Done():
 			break LOOP
 		case <-cT.C:
-			_, err := m.process(ctx)
+			state, err := m.process(ctx)
+			m.log.Trace().Str("state", state.String()).Msg("self monitor state")
 			if err != nil {
 				return err
 			}
@@ -117,7 +118,8 @@ LOOP:
 					return err
 				}
 			}
-			_, err := m.processPolicies(ctx, policies)
+			state, err := m.processPolicies(ctx, policies)
+			m.log.Trace().Str("state", state.String()).Msg("self monitor state")
 			if err != nil {
 				return err
 			}
@@ -238,7 +240,6 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 			} else if res.StatusCode != 200 {
 				m.state = client.UnitStateDegraded
 				message := fmt.Sprintf("Could not connect to remote ES output: %s, status code: %d", outputName, res.StatusCode)
-				m.log.Debug().Msg(message)
 				m.reporter.UpdateState(m.state, message, nil) //nolint:errcheck // not clear what to do in failure cases
 				hasError = true
 				break
