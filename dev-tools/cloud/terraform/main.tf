@@ -34,7 +34,13 @@ variable "pull_request" {
 variable "buildkite_id" {
   type=string
   default=""
-  description="The buildkite build id associated with this deployment"
+  description="The Buildkite build id associated with this deployment"
+}
+
+variable "creator" {
+  type=string
+  default=""
+  description="The Buildkite user who created the job"
 }
 
 resource "ec_deployment" "deployment" {
@@ -49,6 +55,7 @@ resource "ec_deployment" "deployment" {
     "provisioner" = "terraform"
     "pull_request" = var.pull_request
     "buildkite_id" = var.buildkite_id
+    "creator" = var.creator
 }
 
   elasticsearch {}
