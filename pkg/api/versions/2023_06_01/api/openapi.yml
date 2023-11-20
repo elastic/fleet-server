@@ -85,6 +85,7 @@ components:
           description: |
             A Unit state that fleet-server may report.
             Unit state is defined in the elastic-agent-client specification.
+            Fleet-server goes to degraded state if remote elasticsearch output is not reachable.
           enum:
             - starting
             - configuring

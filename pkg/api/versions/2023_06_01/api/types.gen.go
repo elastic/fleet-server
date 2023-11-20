@@ -418,6 +418,7 @@ type StatusAPIResponse struct {
 
 	// Status A Unit state that fleet-server may report.
 	// Unit state is defined in the elastic-agent-client specification.
+	// Fleet-server goes to degraded state if remote elasticsearch output is not reachable.
 	Status StatusResponseStatus `json:"status"`
 
 	// Version Version information included in the response to an authorized status request.
@@ -426,6 +427,7 @@ type StatusAPIResponse struct {
 
 // StatusResponseStatus A Unit state that fleet-server may report.
 // Unit state is defined in the elastic-agent-client specification.
+// Fleet-server goes to degraded state if remote elasticsearch output is not reachable.
 type StatusResponseStatus string
 
 // StatusResponseVersion Version information included in the response to an authorized status request.
