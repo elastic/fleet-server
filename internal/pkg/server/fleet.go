@@ -333,7 +333,9 @@ func (f *Fleet) initBulker(ctx context.Context, tracer *apm.Tracer, cfg *config.
 		return nil, err
 	}
 
-	blk := bulk.NewBulker(es, tracer, bulk.BulkOptsFromCfg(cfg)...)
+	bulkOpts := bulk.BulkOptsFromCfg(cfg)
+	bulkOpts = append(bulkOpts, bulk.WithBi(f.bi))
+	blk := bulk.NewBulker(es, tracer, bulkOpts...)
 	return blk, nil
 }
 

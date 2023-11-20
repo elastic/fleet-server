@@ -217,7 +217,7 @@ func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, se
 		},
 	}
 	es, err := es.NewClient(ctx, &cfg, false, elasticsearchOptions(
-		true, build.Info{},
+		true, b.opts.bi,
 	)...)
 	if err != nil {
 		return nil, err
