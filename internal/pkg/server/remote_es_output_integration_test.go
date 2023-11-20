@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -100,11 +101,9 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 				"type": "elasticsearch",
 			},
 			"remoteES": {
-				"type": "remote_elasticsearch",
-				// TODO start another fleet-server
-				"hosts": []string{"localhost:9200"},
-				// TODO create remote service token - superuser? manage_service_account
-				"service_token": srv.cfg.Output.Elasticsearch.ServiceToken,
+				"type":          "remote_elasticsearch",
+				"hosts":         []string{"localhost:9201"},
+				"service_token": os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
