@@ -16,7 +16,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 )
@@ -113,43 +112,7 @@ func (m *standAloneSelfMonitorT) check(ctx context.Context) {
 		message = fmt.Sprintf("Failed to request policies: %s", err)
 	}
 
-	remoteOutputErrorMap := m.bulker.GetRemoteOutputErrorMap()
-	hasError := false
-	remoteESPayload := make(map[string]interface{})
-	for key, value := range remoteOutputErrorMap {
-		if value != "" {
-			hasError = true
-			remoteESPayload[key] = value
-			break
-		}
-	}
-	if hasError {
-		state = client.UnitStateDegraded
-		message = fmt.Sprintf("Could not connect to remote ES output: %+v", remoteESPayload)
-		m.log.Debug().Msg(message)
-	} else {
-		bulkerMap := m.bulker.GetBulkerMap()
-		for outputName, outputBulker := range bulkerMap {
-			res, err := outputBulker.Client().Ping(outputBulker.Client().Ping.WithContext(ctx))
-			if err != nil {
-				m.log.Error().Err(err).Msg("error calling remote es ping")
-				state = client.UnitStateDegraded
-				message = fmt.Sprintf("Could not ping remote ES: %s, error: %s", outputName, err.Error())
-				break
-			} else if res.StatusCode != 200 {
-				state = client.UnitStateDegraded
-				message = fmt.Sprintf("Could not connect to remote ES output: %s, status code: %d", outputName, res.StatusCode)
-				m.log.Debug().Msg(message)
-				break
-			}
-		}
-	}
-
 	if current != state {
 		m.updateState(state, message)
 	}
-}
-
-func GetRequest(req *esapi.CatHealthRequest) {
-	req.Format = "json"
 }
