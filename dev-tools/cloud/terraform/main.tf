@@ -25,6 +25,24 @@ locals {
 resource "random_uuid" "name" {
 }
 
+variable "pull_request" {
+  type=string
+  default=""
+  description="The github pull request number"
+}
+
+variable "buildkite_id" {
+  type=string
+  default=""
+  description="The Buildkite build id associated with this deployment"
+}
+
+variable "creator" {
+  type=string
+  default=""
+  description="The Buildkite user who created the job"
+}
+
 resource "ec_deployment" "deployment" {
   name                   = format("fleet server PR %s", random_uuid.name.result)
   region                 = "gcp-us-west2"
@@ -34,7 +52,11 @@ resource "ec_deployment" "deployment" {
   tags = {
     "created_with_terraform" = "true"
     "docker_image_ea"        = local.docker_image_ea
-  }
+    "provisioner" = "terraform"
+    "pull_request" = var.pull_request
+    "buildkite_id" = var.buildkite_id
+    "creator" = var.creator
+}
 
   elasticsearch {}
 
