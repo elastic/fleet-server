@@ -179,7 +179,6 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 		requestURL := fmt.Sprintf("http://elastic:changeme@%s/_security/api_key?id=%s", remoteESHost, apiKeyID)
 		res, err := http.Get(requestURL)
 		if err != nil {
-			fmt.Printf("error making http request: %s\n", err)
 			t.Fatal("error querying remote api key")
 		}
 
