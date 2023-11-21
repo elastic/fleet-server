@@ -462,7 +462,6 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&apiKey, nil).Once()
 		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
-		bulker.On("GetRemoteOutputErrorMap").Return(make(map[string]string))
 
 		output := Output{
 			Type: OutputTypeRemoteElasticsearch,

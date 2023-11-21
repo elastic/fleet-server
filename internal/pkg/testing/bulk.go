@@ -95,13 +95,6 @@ func (m *MockBulk) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, 
 	return args.Get(0).(bulk.Bulk), args.Get(1).(bool), nil
 }
 
-func (m *MockBulk) GetRemoteOutputErrorMap() map[string]string {
-	args := m.Called()
-	return args.Get(0).(map[string]string)
-}
-
-func (m *MockBulk) SetRemoteOutputError(name string, status string) {}
-
 func (m *MockBulk) CancelFn() context.CancelFunc {
 	args := m.Called()
 	return args.Get(0).(context.CancelFunc)

@@ -71,8 +71,6 @@ type Bulk interface {
 	CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
 	GetBulker(outputName string) Bulk
 	GetBulkerMap() map[string]Bulk
-	GetRemoteOutputErrorMap() map[string]string
-	SetRemoteOutputError(name string, status string)
 	CancelFn() context.CancelFunc
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
@@ -89,7 +87,6 @@ type Bulker struct {
 	tracer                *apm.Tracer
 	remoteOutputConfigMap map[string]map[string]interface{}
 	bulkerMap             map[string]Bulk
-	remoteOutputErrorMap  map[string]string
 	cancelFn              context.CancelFunc
 	remoteOutputLimit     *semaphore.Weighted
 }
@@ -121,19 +118,9 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		tracer:                tracer,
 		remoteOutputConfigMap: make(map[string]map[string]interface{}),
 		// remote ES bulkers
-		bulkerMap:            make(map[string]Bulk),
-		remoteOutputErrorMap: make(map[string]string),
-		remoteOutputLimit:    semaphore.NewWeighted(1),
+		bulkerMap:         make(map[string]Bulk),
+		remoteOutputLimit: semaphore.NewWeighted(1),
 	}
-}
-
-func (b *Bulker) GetRemoteOutputErrorMap() map[string]string {
-	return b.remoteOutputErrorMap
-}
-
-func (b *Bulker) SetRemoteOutputError(name string, status string) {
-	// TODO concurrency control of updating map
-	b.remoteOutputErrorMap[name] = status
 }
 
 func (b *Bulker) GetBulker(outputName string) Bulk {

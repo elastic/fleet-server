@@ -264,9 +264,6 @@ func (p *Output) prepareElasticsearch(
 		if outputAPIKey == nil && p.Type == OutputTypeRemoteElasticsearch {
 			if err != nil {
 				zerolog.Ctx(ctx).Warn().Err(err).Msg("Could not create API key in remote ES")
-				bulker.SetRemoteOutputError(p.Name, err.Error())
-			} else if bulker.GetRemoteOutputErrorMap()[p.Name] != "" {
-				bulker.SetRemoteOutputError(p.Name, "")
 			}
 
 			// replace type remote_elasticsearch with elasticsearch as agent doesn't recognize remote_elasticsearch
@@ -274,8 +271,6 @@ func (p *Output) prepareElasticsearch(
 			// remove the service token from the agent policy sent to the agent
 			delete(outputMap[p.Name], FieldOutputServiceToken)
 			return nil
-		} else if p.Type == OutputTypeRemoteElasticsearch && bulker.GetRemoteOutputErrorMap()[p.Name] != "" {
-			bulker.SetRemoteOutputError(p.Name, "")
 		}
 		if err != nil {
 			return fmt.Errorf("failed generate output API key: %w", err)
