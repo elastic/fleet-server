@@ -9,20 +9,23 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/stretchr/testify/require"
 )
 
-func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string) {
+func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string) string {
 	str := agentID
 	cli := cleanhttp.DefaultClient()
 	var obj map[string]interface{}
@@ -66,12 +69,14 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	require.Equal(t, "elasticsearch", oType)
 	serviceToken := remoteES["service_token"]
 	require.Equal(t, nil, serviceToken)
-	remoteAPIKey := remoteES["api_key"]
+	remoteAPIKey, ok := remoteES["api_key"].(string)
+	require.True(t, ok, "expected remoteAPIKey to be string")
 	defaultOutput, ok := outputs["default"].(map[string]interface{})
 	require.True(t, ok, "expected default to be map")
-	defaultAPIKey := defaultOutput["api_key"]
+	defaultAPIKey, ok := defaultOutput["api_key"].(string)
+	require.True(t, ok, "expected defaultAPIKey to be string")
 	require.NotEqual(t, remoteAPIKey, defaultAPIKey, "expected remote api key to be different than default")
-
+	return remoteAPIKey
 }
 
 func Test_Agent_Remote_ES_Output(t *testing.T) {
@@ -95,6 +100,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	t.Log("Create policy with remote ES output")
 
 	var policyRemoteID = "policyRemoteID"
+	remoteESHost := "localhost:9201"
 	var policyDataRemoteES = model.PolicyData{
 		Outputs: map[string]map[string]interface{}{
 			"default": {
@@ -102,7 +108,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 			},
 			"remoteES": {
 				"type":          "remote_elasticsearch",
-				"hosts":         []string{"localhost:9201"},
+				"hosts":         []string{remoteESHost},
 				"service_token": os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
 			},
 		},
@@ -166,5 +172,24 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 		}
 	}()
 
-	Checkin(t, ctx, srvCopy, agentID, key)
+	remoteAPIKey := Checkin(t, ctx, srvCopy, agentID, key)
+	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
+
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		requestURL := fmt.Sprintf("http://elastic:changeme@%s/_security/api_key?id=%s", remoteESHost, apiKeyID)
+		res, err := http.Get(requestURL)
+		if err != nil {
+			fmt.Printf("error making http request: %s\n", err)
+			t.Fatal("error querying remote api key")
+		}
+
+		require.Equal(t, 200, res.StatusCode)
+
+		defer res.Body.Close()
+		respString, err := io.ReadAll(res.Body)
+		require.NoError(t, err, "did not expect error when parsing api key response")
+
+		require.Contains(t, string(respString), "\"invalidated\":false")
+		return nil
+	}, ftesting.RetrySleep(1*time.Second))
 }
