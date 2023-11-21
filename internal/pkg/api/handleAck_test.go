@@ -602,6 +602,7 @@ func TestInvalidateAPIKeysRemoteOutput(t *testing.T) {
 
 	bulker.AssertExpectations(t)
 	remoteBulker.AssertExpectations(t)
+	remoteBulker2.AssertExpectations(t)
 }
 
 func TestAckHandleUpgrade(t *testing.T) {

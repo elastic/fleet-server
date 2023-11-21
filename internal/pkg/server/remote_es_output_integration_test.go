@@ -70,7 +70,7 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	defaultOutput, ok := outputs["default"].(map[string]interface{})
 	require.True(t, ok, "expected default to be map")
 	defaultAPIKey := defaultOutput["api_key"]
-	require.False(t, remoteAPIKey == defaultAPIKey, "expected remote api key to be different than default")
+	require.NotEqual(t, remoteAPIKey, defaultAPIKey, "expected remote api key to be different than default")
 
 }
 
