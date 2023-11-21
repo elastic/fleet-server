@@ -68,7 +68,7 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
-	CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
+	CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
 	GetBulker(outputName string) Bulk
 	GetBulkerMap() map[string]Bulk
 	GetRemoteOutputErrorMap() map[string]string
@@ -91,6 +91,7 @@ type Bulker struct {
 	bulkerMap             map[string]Bulk
 	remoteOutputErrorMap  map[string]string
 	cancelFn              context.CancelFunc
+	remoteOutputLimit     *semaphore.Weighted
 }
 
 const (
@@ -122,6 +123,7 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		// remote ES bulkers
 		bulkerMap:            make(map[string]Bulk),
 		remoteOutputErrorMap: make(map[string]string),
+		remoteOutputLimit:    semaphore.NewWeighted(1),
 	}
 }
 
@@ -130,6 +132,7 @@ func (b *Bulker) GetRemoteOutputErrorMap() map[string]string {
 }
 
 func (b *Bulker) SetRemoteOutputError(name string, status string) {
+	// TODO concurrency control of updating map
 	b.remoteOutputErrorMap[name] = status
 }
 
@@ -145,11 +148,22 @@ func (b *Bulker) CancelFn() context.CancelFunc {
 	return b.cancelFn
 }
 
+func (b *Bulker) updateBulkerMap(ctx context.Context, outputName string, newBulker *Bulker) error {
+	// concurrency control of updating map
+	if err := b.remoteOutputLimit.Acquire(ctx, 1); err != nil {
+		return err
+	}
+	defer b.remoteOutputLimit.Release(1)
+
+	b.bulkerMap[outputName] = newBulker
+	return nil
+}
+
 // for remote ES output, create a new bulker in bulkerMap if does not exist
 // if bulker exists for output, check if config changed
 // if not changed, return the existing bulker
 // if changed, stop the existing bulker and create a new one
-func (b *Bulker) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, bool, error) {
+func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, bool, error) {
 	hasConfigChanged := b.hasChangedAndUpdateRemoteOutputConfig(zlog, outputName, outputMap[outputName])
 	bulker := b.bulkerMap[outputName]
 	if bulker != nil && !hasConfigChanged {
@@ -170,7 +184,11 @@ func (b *Bulker) CreateAndGetBulker(zlog zerolog.Logger, outputName string, serv
 	// starting a new bulker to create/update API keys for remote ES output
 	newBulker := NewBulker(es, b.tracer)
 	newBulker.cancelFn = bulkCancel
-	b.bulkerMap[outputName] = newBulker
+
+	err = b.updateBulkerMap(ctx, outputName, newBulker)
+	if err != nil {
+		return nil, hasConfigChanged, err
+	}
 
 	errCh := make(chan error)
 	go func() {
@@ -247,7 +265,6 @@ func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name
 
 	hasChanged := false
 
-	// TODO remoteOutputConfigMap empty when FS restarts - won't detect changes
 	// when output config first added, not reporting change
 	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
 		zlog.Info().Str("name", name).Msg("remote output configuration has changed")

@@ -60,7 +60,7 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 		}
 	case OutputTypeRemoteElasticsearch:
 		zlog.Debug().Msg("preparing remote elasticsearch output")
-		newBulker, hasConfigChanged, err := bulker.CreateAndGetBulker(zlog, p.Name, p.ServiceToken, outputMap)
+		newBulker, hasConfigChanged, err := bulker.CreateAndGetBulker(ctx, zlog, p.Name, p.ServiceToken, outputMap)
 		if err != nil {
 			return err
 		}
@@ -265,7 +265,7 @@ func (p *Output) prepareElasticsearch(
 			if err != nil {
 				zerolog.Ctx(ctx).Warn().Err(err).Msg("Could not create API key in remote ES")
 				bulker.SetRemoteOutputError(p.Name, err.Error())
-			} else {
+			} else if bulker.GetRemoteOutputErrorMap()[p.Name] != "" {
 				bulker.SetRemoteOutputError(p.Name, "")
 			}
 
@@ -274,7 +274,7 @@ func (p *Output) prepareElasticsearch(
 			// remove the service token from the agent policy sent to the agent
 			delete(outputMap[p.Name], FieldOutputServiceToken)
 			return nil
-		} else if p.Type == OutputTypeRemoteElasticsearch {
+		} else if p.Type == OutputTypeRemoteElasticsearch && bulker.GetRemoteOutputErrorMap()[p.Name] != "" {
 			bulker.SetRemoteOutputError(p.Name, "")
 		}
 		if err != nil {
