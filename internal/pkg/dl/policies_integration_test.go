@@ -14,6 +14,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
@@ -104,4 +105,41 @@ func TestCreatePolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestQueryOutputFromPolicy(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
+
+	now := time.Now().UTC()
+	var policyData = model.PolicyData{
+		Outputs: map[string]map[string]interface{}{
+			"remote": {
+				"type": "remote_elasticsearch",
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {}}`),
+		Inputs:            []map[string]interface{}{},
+	}
+	rec := model.Policy{
+		PolicyID:           "policy1",
+		RevisionIdx:        1,
+		CoordinatorIdx:     0,
+		Data:               &policyData,
+		DefaultFleetServer: false,
+		Timestamp:          now.Format(time.RFC3339),
+	}
+	_, err := CreatePolicy(ctx, bulker, rec, WithIndexName(index))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy, err := QueryOutputFromPolicy(ctx, bulker, "remote", WithIndexName(index))
+	if err != nil {
+		t.Fatal(err)
+	}
+	require.Equal(t, map[string]interface{}{"type": "remote_elasticsearch"}, policy.Data.Outputs["remote"])
 }
