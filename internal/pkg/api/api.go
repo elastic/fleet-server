@@ -45,7 +45,7 @@ func (a *apiServer) AgentEnroll(w http.ResponseWriter, r *http.Request, params A
 	rb := rollback.New(zlog)
 	defer func() {
 		if err != nil {
-			zlog.Error().Err(err).Msg("perform rollback on enrollment failure")
+			zlog.Info().Err(err).Msg("perform rollback on enrollment failure")
 			err = rb.Rollback(r.Context())
 			if err != nil {
 				zlog.Error().Err(err).Msg("rollback error on enrollment failure")

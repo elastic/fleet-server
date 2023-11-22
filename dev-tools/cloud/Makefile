@@ -29,7 +29,7 @@ build-and-push-cloud-image:
 .PHONY: cloud-deploy
 cloud-deploy: build-and-push-cloud-image  ## Create a new cloud deployment
 	@cd ${TERRAFORM_PATH}; echo 'elastic_agent_docker_image="${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"' > docker_image.auto.tfvars
-	@cd ${TERRAFORM_PATH}; terraform init; terraform apply -auto-approve
+	@cd ${TERRAFORM_PATH}; terraform init; terraform apply -auto-approve -var="pull_request=${GITHUB_PR_NUMBER}" -var="creator=${GITHUB_PR_HEAD_USER}" -var="buildkite_id=${BUILDKITE_BUILD_NUMBER}"
 
 .PHONY: cloud-clean
 cloud-clean: ## Clean cloud deployment
