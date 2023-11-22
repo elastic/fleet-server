@@ -68,7 +68,7 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
-	CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
+	CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
 	GetBulker(outputName string) Bulk
 	GetBulkerMap() map[string]Bulk
 	CancelFn() context.CancelFunc
@@ -150,7 +150,7 @@ func (b *Bulker) updateBulkerMap(ctx context.Context, outputName string, newBulk
 // if bulker exists for output, check if config changed
 // if not changed, return the existing bulker
 // if changed, stop the existing bulker and create a new one
-func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (Bulk, bool, error) {
+func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (Bulk, bool, error) {
 	hasConfigChanged := b.hasChangedAndUpdateRemoteOutputConfig(zlog, outputName, outputMap[outputName])
 	bulker := b.bulkerMap[outputName]
 	if bulker != nil && !hasConfigChanged {
@@ -163,7 +163,7 @@ func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, ou
 		}
 	}
 	bulkCtx, bulkCancel := context.WithCancel(context.Background())
-	es, err := b.createRemoteEsClient(bulkCtx, outputName, serviceToken, outputMap)
+	es, err := b.createRemoteEsClient(bulkCtx, outputName, outputMap)
 	if err != nil {
 		defer bulkCancel()
 		return nil, hasConfigChanged, err
@@ -199,7 +199,7 @@ func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, ou
 	return newBulker, hasConfigChanged, nil
 }
 
-func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, serviceToken string, outputMap map[string]map[string]interface{}) (*elasticsearch.Client, error) {
+func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, outputMap map[string]map[string]interface{}) (*elasticsearch.Client, error) {
 	hostsObj := outputMap[outputName]["hosts"]
 	hosts, ok := hostsObj.([]interface{})
 	if !ok {
@@ -211,6 +211,10 @@ func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, se
 		if !ok {
 			return nil, fmt.Errorf("failed to get hosts from output: %v", host)
 		}
+	}
+	serviceToken, ok := outputMap[outputName]["service_token"].(string)
+	if !ok {
+		return nil, fmt.Errorf("failed to get service token from output: %v", outputName)
 	}
 
 	cfg := config.Config{

@@ -305,7 +305,7 @@ func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 	outputBulker := ftesting.NewMockBulk()
-	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
+	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
 
 	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
 	require.Error(t, err, "expected prepare to error")
@@ -330,7 +330,7 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 		}
 
 		outputBulker := ftesting.NewMockBulk()
-		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
+		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
 
 		policyMap := map[string]map[string]interface{}{
 			"test output": map[string]interface{}{
@@ -391,7 +391,7 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 			Return(nil).Once()
 
 		outputBulker := ftesting.NewMockBulk()
-		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
+		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
 
 		outputBulker.
 			On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything).
@@ -461,7 +461,7 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 		outputBulker.On("APIKeyCreate",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&apiKey, nil).Once()
-		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
+		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
 
 		output := Output{
 			Type: OutputTypeRemoteElasticsearch,

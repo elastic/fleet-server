@@ -10,7 +10,9 @@ import (
 	"errors"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 )
@@ -18,6 +20,7 @@ import (
 var (
 	tmplQueryLatestPolicies = prepareQueryLatestPolicies()
 	ErrMissingAggregations  = errors.New("missing expected aggregation result")
+	tmplQueryPolicies       = prepareQueryPolicies()
 )
 
 func prepareQueryLatestPolicies() []byte {
@@ -71,4 +74,41 @@ func CreatePolicy(ctx context.Context, bulker bulk.Bulk, policy model.Policy, op
 		return "", err
 	}
 	return bulker.Create(ctx, o.indexName, "", data, bulk.WithRefresh())
+}
+
+func prepareQueryPolicies() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	root.Size(100)
+	root.Sort().SortOrder("@timestamp", "desc")
+	root.Source().Includes("data.outputs")
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
+// query policies last updated, find the one with matching output
+// can't filter on output in ES as the field is not mapped
+func QueryOutputFromPolicy(ctx context.Context, bulker bulk.Bulk, outputName string, opt ...Option) (*model.Policy, error) {
+	o := newOption(FleetPolicies, opt...)
+	params := map[string]interface{}{}
+	res, err := Search(ctx, bulker, tmplQueryPolicies, o.indexName, params)
+	if err != nil {
+		if errors.Is(err, es.ErrIndexNotFound) {
+			zerolog.Ctx(ctx).Debug().Str("index", o.indexName).Msg(es.ErrIndexNotFound.Error())
+			err = nil
+		}
+		return nil, err
+	}
+	var policy model.Policy
+	for _, hit := range res.Hits {
+		err = hit.Unmarshal(&policy)
+		if err != nil {
+			return nil, err
+		}
+		if policy.Data.Outputs[outputName] != nil {
+			return &policy, nil
+		}
+	}
+	zerolog.Ctx(ctx).Debug().Str("outputName", outputName).Msg("policy with output not found")
+	return nil, nil
 }

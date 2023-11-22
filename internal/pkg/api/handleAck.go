@@ -591,6 +591,19 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 	// using remote es bulker to invalidate api key
 	for outputName, outputIds := range remoteIds {
 		outputBulk := ack.bulk.GetBulker(outputName)
+
+		if outputBulk == nil {
+			// read output config from .fleet-policies, not filtering by policy id as agent could be reassigned
+			policy, err := dl.QueryOutputFromPolicy(ctx, ack.bulk, outputName)
+			if err != nil || policy == nil {
+				zlog.Debug().Str("outputName", outputName).Msg("Output policy not found")
+			} else {
+				outputBulk, _, err = ack.bulk.CreateAndGetBulker(ctx, zlog, outputName, policy.Data.Outputs)
+				if err != nil {
+					zlog.Debug().Str("outputName", outputName).Msg("Failed to recreate output bulker")
+				}
+			}
+		}
 		if outputBulk != nil {
 			if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
 				zlog.Info().Err(err).Strs("ids", outputIds).Str("outputName", outputName).Msg("Failed to invalidate API keys")
