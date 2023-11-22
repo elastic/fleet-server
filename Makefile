@@ -386,11 +386,11 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 test-cloude2e: prepare-test-context  ## - Run cloude2e tests with full setup (slow!)
 	@make -C ${CLOUD_TESTING_BASE} cloud-deploy
 	$(eval FLEET_SERVER_URL := $(shell make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
-	-@set -o pipefail; $(MAKE) test-cloude2e-set | tee build/test-cloude2e.out
+	@set -o pipefail; $(MAKE) test-cloude2e-set | tee build/test-cloude2e.out
 	@make -C ${CLOUD_TESTING_BASE} cloud-clean
 
 .PHONY: test-cloude2e-set
 test-cloude2e-set: ## Run cloude2e test
 	$(eval FLEET_SERVER_URL := $(shell make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
 	make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url
-	cd testing/cloude2e; FLEET_SERVER_URL=${FLEET_SERVER_URL} go test -v -tags=cloude2e -count=1 -race -p 1 ./...
+	cd testing; FLEET_SERVER_URL=${FLEET_SERVER_URL} go test -v -tags=cloude2e -count=1 -race -p 1 ./...
