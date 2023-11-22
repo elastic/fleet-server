@@ -452,7 +452,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 		outputBulk := ack.bulk.GetBulker(outputName)
 		if outputBulk != nil {
 			zlog.Debug().Str("outputName", outputName).Msg("Using output bulker in updateAPIKey")
-			bulk = outputBulk
+			bulk = *outputBulk
 		}
 	}
 	if apiKeyID != "" {
@@ -598,14 +598,15 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 			if err != nil || policy == nil {
 				zlog.Debug().Str("outputName", outputName).Msg("Output policy not found")
 			} else {
-				outputBulk, _, err = ack.bulk.CreateAndGetBulker(ctx, zlog, outputName, policy.Data.Outputs)
+				blk, _, err := ack.bulk.CreateAndGetBulker(ctx, zlog, outputName, policy.Data.Outputs)
+				outputBulk = &blk
 				if err != nil {
 					zlog.Debug().Str("outputName", outputName).Msg("Failed to recreate output bulker")
 				}
 			}
 		}
 		if outputBulk != nil {
-			if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
+			if err := (*outputBulk).APIKeyInvalidate(ctx, outputIds...); err != nil {
 				zlog.Info().Err(err).Strs("ids", outputIds).Str("outputName", outputName).Msg("Failed to invalidate API keys")
 			}
 		}

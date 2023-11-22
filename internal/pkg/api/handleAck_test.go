@@ -605,6 +605,40 @@ func TestInvalidateAPIKeysRemoteOutput(t *testing.T) {
 	remoteBulker2.AssertExpectations(t)
 }
 
+func TestInvalidateAPIKeysRemoteOutputReadFromPolicies(t *testing.T) {
+	toRetire := []model.ToRetireAPIKeyIdsItems{{
+		ID:     "toRetire1",
+		Output: "remote1",
+	}}
+
+	remoteBulker := ftesting.NewMockBulk()
+	remoteBulker.On("APIKeyInvalidate",
+		context.Background(), []string{"toRetire1"}).
+		Return(nil)
+
+	bulkerFn := func(t *testing.T) *ftesting.MockBulk {
+		m := ftesting.NewMockBulk()
+		m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+			Hits: []es.HitT{{
+				Source: []byte(`{"data":{"outputs":{"remote1":{}}}}`),
+			}},
+		}}, nil).Once()
+
+		m.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(remoteBulker, false, nil)
+		m.On("GetBulker", "remote1").Return(nil)
+		return m
+	}
+
+	bulker := bulkerFn(t)
+
+	logger := testlog.SetLogger(t)
+	ack := &AckT{bulk: bulker}
+	ack.invalidateAPIKeys(context.Background(), logger, toRetire, "")
+
+	bulker.AssertExpectations(t)
+	remoteBulker.AssertExpectations(t)
+}
+
 func TestAckHandleUpgrade(t *testing.T) {
 	tests := []struct {
 		name   string
