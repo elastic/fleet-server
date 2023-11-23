@@ -4,7 +4,7 @@ terraform {
   required_providers {
     ec = {
       source  = "elastic/ec"
-      version = "0.5.1"
+      version = "0.9.0"
     }
   }
 }
@@ -58,12 +58,16 @@ resource "ec_deployment" "deployment" {
     "creator" = var.creator
 }
 
-  elasticsearch {}
+  elasticsearch = {
+    hot = {
+      autoscaling = {}
+    }
+  }
 
-  kibana {}
+  kibana = {}
 
-  integrations_server {
-    config {
+  integrations_server = {
+    config = {
       docker_image = local.docker_image_ea
     }
   }
