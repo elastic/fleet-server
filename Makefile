@@ -371,7 +371,7 @@ test-e2e: docker-cover-e2e-binaries build-e2e-agent-image e2e-certs build-docker
 
 .PHONY: test-e2e-set
 test-e2e-set: ## - Run the blackbox end to end tests without setup.
-	cd testing; \
+	cd testing/e2e; \
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
@@ -391,6 +391,6 @@ test-cloude2e: prepare-test-context  ## - Run cloude2e tests with full setup (sl
 
 .PHONY: test-cloude2e-set
 test-cloude2e-set: ## Run cloude2e test
-	$(eval FLEET_SERVER_URL := $(shell make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
-	make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url
-	cd testing; FLEET_SERVER_URL=${FLEET_SERVER_URL} go test -v -tags=cloude2e -count=1 -race -p 1 ./...
+	cd testing/cloude2e; \
+	FLEET_SERVER_URL=$(shell terraform output --state=dev-tools/cloud/terraform/terraform.tfstate fleet_url) \
+	go test -v -tags=cloude2e -count=1 -race -p 1 ./...
