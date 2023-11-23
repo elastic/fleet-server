@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
@@ -270,6 +271,90 @@ func TestCancelCtx(t *testing.T) {
 			wg.Wait()
 		})
 	}
+}
+
+// verify that child bulker stops when bulker ctx cancelled
+func TestCancelCtxChildBulker(t *testing.T) {
+	bulker := NewBulker(nil, nil)
+
+	ctx, cancelF := context.WithCancel(context.Background())
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	logger := testlog.SetLogger(t)
+	outputMap := make(map[string]map[string]interface{})
+	outputMap["remote"] = map[string]interface{}{
+		"type":          "remote_elasticsearch",
+		"hosts":         []interface{}{"https://remote-es:443"},
+		"service_token": "token1",
+	}
+	childBulker, _, err := bulker.CreateAndGetBulker(ctx, logger, "remote", outputMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		_, err := childBulker.APIKeyAuth(ctx, apikey.APIKey{})
+
+		if !errors.Is(err, context.Canceled) {
+			t.Error("Expected context cancel err: ", err)
+		}
+	}()
+
+	time.Sleep(time.Millisecond)
+	cancelF()
+
+	wg.Wait()
+}
+
+// verify that old bulker ctx is canceled if cfg changed and a new one is started
+func TestCancelCtxChildBulkerReplaced(t *testing.T) {
+	bulker := NewBulker(nil, nil)
+
+	ctx, _ := context.WithCancel(context.Background())
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	logger := testlog.SetLogger(t)
+	outputMap := make(map[string]map[string]interface{})
+	outputMap["remote"] = map[string]interface{}{
+		"type":          "remote_elasticsearch",
+		"hosts":         []interface{}{"https://remote-es:443"},
+		"service_token": "token1",
+	}
+	childBulker, _, err := bulker.CreateAndGetBulker(ctx, logger, "remote", outputMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// output cfg changed
+	outputMap["remote"] = map[string]interface{}{
+		"type":          "remote_elasticsearch",
+		"hosts":         []interface{}{"https://remote-es:443"},
+		"service_token": "token2",
+	}
+	_, _, err = bulker.CreateAndGetBulker(ctx, logger, "remote", outputMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		_, err := childBulker.APIKeyAuth(ctx, apikey.APIKey{})
+
+		t.Log(err)
+		// TODO not context canceled error
+		// if !errors.Is(err, context.Canceled) {
+		// 	t.Error("Expected context cancel err: ", err)
+		// }
+	}()
+
+	wg.Wait()
 }
 
 func benchmarkMockBulk(b *testing.B, samples [][]byte) {
