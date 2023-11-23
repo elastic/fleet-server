@@ -57,18 +57,24 @@ func (suite *TestSuite) TestFleetServerStatusOK() {
 	var resp *http.Response
 	for ctx.Err() == nil {
 		resp, err = suite.client.Do(req)
-		if resp != nil && resp.StatusCode == http.StatusOK {
-			break
+		if err != nil {
+			suite.T().Logf("Request error: %v", err)
+		}
+		if resp != nil {
+			if resp.StatusCode == http.StatusOK {
+				break
+			}
+			suite.T().Logf("Response status: %d", resp.StatusCode)
 		}
 		time.Sleep(time.Second)
 	}
-	suite.Assert().NoError(err)
+	suite.Require().NoError(err)
 	suite.Require().Equal(http.StatusOK, resp.StatusCode)
 
 	var body StatusResp
 	err = json.NewDecoder(resp.Body).Decode(&body)
 	resp.Body.Close()
-	suite.Assert().NoError(err)
+	suite.Require().NoError(err)
 	suite.Require().Equal("HEALTHY", body.Status)
 
 }
