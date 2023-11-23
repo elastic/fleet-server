@@ -62,13 +62,13 @@ func (suite *TestSuite) TestFleetServerStatusOK() {
 		}
 		time.Sleep(time.Second)
 	}
-	suite.Require().NoError(err)
+	suite.Assert().NoError(err)
 	suite.Require().Equal(http.StatusOK, resp.StatusCode)
 
 	var body StatusResp
 	err = json.NewDecoder(resp.Body).Decode(&body)
 	resp.Body.Close()
-	suite.Require().NoError(err)
+	suite.Assert().NoError(err)
 	suite.Require().Equal("HEALTHY", body.Status)
 
 }
