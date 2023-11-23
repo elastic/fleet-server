@@ -69,7 +69,7 @@ type Bulk interface {
 	Client() *elasticsearch.Client
 
 	CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
-	GetBulker(outputName string) *Bulk
+	GetBulker(outputName string) Bulk
 	GetBulkerMap() map[string]Bulk
 	CancelFn() context.CancelFunc
 
@@ -123,9 +123,8 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 	}
 }
 
-func (b *Bulker) GetBulker(outputName string) *Bulk {
-	blk := b.bulkerMap[outputName]
-	return &blk
+func (b *Bulker) GetBulker(outputName string) Bulk {
+	return b.bulkerMap[outputName]
 }
 
 func (b *Bulker) GetBulkerMap() map[string]Bulk {

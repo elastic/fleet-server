@@ -80,12 +80,12 @@ func (m *MockBulk) Client() *elasticsearch.Client {
 	return args.Get(0).(*elasticsearch.Client)
 }
 
-func (m *MockBulk) GetBulker(outputName string) *bulk.Bulk {
+func (m *MockBulk) GetBulker(outputName string) bulk.Bulk {
 	args := m.Called(outputName)
 	if args.Get(0) == nil {
 		return nil
 	}
-	return args.Get(0).(*bulk.Bulk)
+	return args.Get(0).(bulk.Bulk)
 }
 
 func (m *MockBulk) GetBulkerMap() map[string]bulk.Bulk {
