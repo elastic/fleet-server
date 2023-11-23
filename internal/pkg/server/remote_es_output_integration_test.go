@@ -20,7 +20,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/stretchr/testify/require"
 )
@@ -175,25 +174,25 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	remoteAPIKey := Checkin(t, ctx, srvCopy, agentID, key)
 	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
 
-	ftesting.Retry(t, ctx, func(ctx context.Context) error {
-		requestURL := fmt.Sprintf("http://elastic:changeme@%s/_security/api_key?id=%s", remoteESHost, apiKeyID)
+	// need to wait a bit before querying the api key
+	time.Sleep(time.Second)
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
-		if err != nil {
-			t.Fatal("error creating request for remote api key")
-		}
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal("error querying remote api key")
-		}
+	requestURL := fmt.Sprintf("http://elastic:changeme@%s/_security/api_key?id=%s", remoteESHost, apiKeyID)
 
-		require.Equal(t, 200, res.StatusCode)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		t.Fatal("error creating request for remote api key")
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal("error querying remote api key")
+	}
 
-		defer res.Body.Close()
-		respString, err := io.ReadAll(res.Body)
-		require.NoError(t, err, "did not expect error when parsing api key response")
+	require.Equal(t, 200, res.StatusCode)
 
-		require.Contains(t, string(respString), "\"invalidated\":false")
-		return nil
-	}, ftesting.RetrySleep(1*time.Second))
+	defer res.Body.Close()
+	respString, err := io.ReadAll(res.Body)
+	require.NoError(t, err, "did not expect error when parsing api key response")
+
+	require.Contains(t, string(respString), "\"invalidated\":false")
 }
