@@ -54,7 +54,14 @@ func (suite *TestSuite) TestFleetServerStatusOK() {
 	req, err := http.NewRequestWithContext(ctx, "GET", suite.fleetServerURL+"/api/status", nil)
 	suite.Require().NoError(err)
 
-	resp, err := suite.client.Do(req)
+	var resp *http.Response
+	for ctx.Err() == nil {
+		resp, err = suite.client.Do(req)
+		if resp != nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		time.Sleep(time.Second)
+	}
 	suite.Require().NoError(err)
 	suite.Require().Equal(http.StatusOK, resp.StatusCode)
 
