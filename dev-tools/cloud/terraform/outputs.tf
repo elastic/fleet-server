@@ -25,7 +25,8 @@ output "kibana_url" {
   description = "The secure Kibana URL"
 }
 
+# Note that ec_deployment.deployment.integrations_server.endpoints.fleet may not be populated
 output "fleet_url" {
-  value       = ec_deployment.deployment.integrations_server.endpoints.fleet
+  value       = replace(ec_deployment.deployment.integrations_server.https_endpoint, ".apm.", ".fleet.")
   description = "The secure Fleet URL"
 }
