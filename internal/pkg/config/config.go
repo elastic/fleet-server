@@ -216,6 +216,7 @@ func FromConfig(c *ucfg.Config) (*Config, error) {
 }
 
 // LoadFile take a path and load the file and return a new configuration.
+// Only used in tests
 func LoadFile(path string) (*Config, error) {
 	c, err := yaml.NewConfigWithFile(path, DefaultOptions...)
 	if err != nil {
