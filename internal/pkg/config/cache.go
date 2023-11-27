@@ -28,9 +28,7 @@ type Cache struct {
 	APIKeyJitter time.Duration `config:"jitter_api_key"`
 }
 
-func (c *Cache) InitDefaults() {
-	c.LoadLimits(loadLimits(0))
-}
+func (c *Cache) InitDefaults() {}
 
 // LoadLimits loads envLimits for any attribute that is not defined in Cache
 func (c *Cache) LoadLimits(limits *envLimits) {

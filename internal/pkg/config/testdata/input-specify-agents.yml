@@ -8,9 +8,6 @@ fleet:
 inputs:
   - type: fleet-server
     server:
-      host: "localhost"
-      port: 8888
-      timeouts:
-        read: 20s
-        write: 5s
-        checkin_max_poll: 10m
+      limits:
+        max_agents: 2500
+
