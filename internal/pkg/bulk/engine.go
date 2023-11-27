@@ -88,7 +88,7 @@ type Bulker struct {
 	remoteOutputConfigMap map[string]map[string]interface{}
 	bulkerMap             map[string]Bulk
 	cancelFn              context.CancelFunc
-	remoteOutputLimit     *semaphore.Weighted
+	remoteOutputMutex   sync.RWMutex
 }
 
 const (
@@ -119,7 +119,6 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		remoteOutputConfigMap: make(map[string]map[string]interface{}),
 		// remote ES bulkers
 		bulkerMap:         make(map[string]Bulk),
-		remoteOutputLimit: semaphore.NewWeighted(1),
 	}
 }
 
@@ -137,10 +136,8 @@ func (b *Bulker) CancelFn() context.CancelFunc {
 
 func (b *Bulker) updateBulkerMap(ctx context.Context, outputName string, newBulker *Bulker) error {
 	// concurrency control of updating map
-	if err := b.remoteOutputLimit.Acquire(ctx, 1); err != nil {
-		return err
-	}
-	defer b.remoteOutputLimit.Release(1)
+	b.remoteOutputMutex.Lock()
+	defer b.remoteOutputMutex.Unlock()
 
 	b.bulkerMap[outputName] = newBulker
 	return nil

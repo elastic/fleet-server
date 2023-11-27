@@ -314,7 +314,8 @@ func TestCancelCtxChildBulker(t *testing.T) {
 func TestCancelCtxChildBulkerReplaced(t *testing.T) {
 	bulker := NewBulker(nil, nil)
 
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	logger := testlog.SetLogger(t)
@@ -345,13 +346,12 @@ func TestCancelCtxChildBulkerReplaced(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		_, err := childBulker.APIKeyAuth(ctx, apikey.APIKey{})
+		err := childBulker.APIKeyUpdate(ctx, "", "", make([]byte, 0))
 
 		t.Log(err)
-		// TODO not context canceled error
-		// if !errors.Is(err, context.Canceled) {
-		// 	t.Error("Expected context cancel err: ", err)
-		// }
+		if !errors.Is(err, context.Canceled) {
+			t.Error("Expected context cancel err: ", err)
+		}
 	}()
 
 	wg.Wait()
