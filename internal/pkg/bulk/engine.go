@@ -88,7 +88,7 @@ type Bulker struct {
 	remoteOutputConfigMap map[string]map[string]interface{}
 	bulkerMap             map[string]Bulk
 	cancelFn              context.CancelFunc
-	remoteOutputMutex   sync.RWMutex
+	remoteOutputMutex     sync.RWMutex
 }
 
 const (
@@ -118,7 +118,7 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		tracer:                tracer,
 		remoteOutputConfigMap: make(map[string]map[string]interface{}),
 		// remote ES bulkers
-		bulkerMap:         make(map[string]Bulk),
+		bulkerMap: make(map[string]Bulk),
 	}
 }
 
