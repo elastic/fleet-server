@@ -118,7 +118,6 @@ func constructPolicyOutputs(outputs map[string]map[string]interface{}, roles map
 			p.Role = &role
 		}
 
-
 		result[k] = p
 	}
 

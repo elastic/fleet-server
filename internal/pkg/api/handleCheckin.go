@@ -752,7 +752,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		err := policy.ProcessOutputSecret(ctx, policyOutput, bulker)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process output secrets %q: %w",
-			policyName, err)
+				policyName, err)
 		}
 	}
 	// Iterate through the policy outputs and prepare them

@@ -17,7 +17,11 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // TODO:
@@ -325,6 +329,14 @@ func TestCancelCtxChildBulkerReplaced(t *testing.T) {
 		"hosts":         []interface{}{"https://remote-es:443"},
 		"service_token": "token1",
 	}
+	old := newESClient
+	defer func() { newESClient = old }()
+
+	newESClient = func(ctx context.Context, cfg *config.Config, longPoll bool, opts ...es.ConfigOption) (*elasticsearch.Client, error) {
+		mockClient, _ := esutil.MockESClient(t)
+		return mockClient, nil
+	}
+
 	childBulker, _, err := bulker.CreateAndGetBulker(ctx, logger, "remote", outputMap)
 	if err != nil {
 		t.Fatal(err)
@@ -335,7 +347,7 @@ func TestCancelCtxChildBulkerReplaced(t *testing.T) {
 	go func() {
 		defer waitBulker.Done()
 		if err := (childBulker.(*Bulker)).Run(ctx); !errors.Is(err, context.Canceled) {
-			t.Fatal(err)
+			t.Error(err)
 		}
 	}()
 
@@ -357,10 +369,8 @@ func TestCancelCtxChildBulkerReplaced(t *testing.T) {
 
 		err := childBulker.APIKeyUpdate(ctx, "", "", make([]byte, 0))
 
-		t.Log(err)
-		// TODO dial tcp: lookup remote-es: no such host
 		if !errors.Is(err, context.Canceled) {
-			t.Fatal("Expected context cancel err: ", err)
+			t.Error("Expected context cancel err: ", err)
 		}
 		ctx.Done()
 	}()

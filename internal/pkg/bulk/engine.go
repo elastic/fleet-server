@@ -192,6 +192,8 @@ func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, ou
 	return newBulker, hasConfigChanged, nil
 }
 
+var newESClient = es.NewClient
+
 func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, outputMap map[string]map[string]interface{}) (*elasticsearch.Client, error) {
 	hostsObj := outputMap[outputName]["hosts"]
 	hosts, ok := hostsObj.([]interface{})
@@ -218,7 +220,7 @@ func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, ou
 			},
 		},
 	}
-	es, err := es.NewClient(ctx, &cfg, false, elasticsearchOptions(
+	es, err := newESClient(ctx, &cfg, false, elasticsearchOptions(
 		true, b.opts.bi,
 	)...)
 	if err != nil {
