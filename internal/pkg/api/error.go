@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/delivery"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
@@ -518,13 +520,25 @@ func (er HTTPErrResp) Write(w http.ResponseWriter) error {
 func ErrorResp(w http.ResponseWriter, r *http.Request, err error) {
 	zlog := hlog.FromRequest(r)
 	resp := NewHTTPErrResp(err)
-	e := zlog.WithLevel(resp.Level).Err(err).Int(ECSHTTPResponseCode, resp.StatusCode)
+	e := zlog.WithLevel(resp.Level).Err(err).Int(ECSHTTPResponseCode, resp.StatusCode).Str("error.type", fmt.Sprintf("%T", err))
 	if ts, ok := logger.CtxStartTime(r.Context()); ok {
 		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
 	}
 	e.Msg("HTTP request error")
 
 	if resp.StatusCode >= 500 {
+		trans := apm.TransactionFromContext(r.Context())
+		switch typ := err.(type) {
+		case *es.ErrElastic:
+			trans.Context.SetLabel("error.type", "ErrElastic")
+			trans.Context.SetLabel("error.details.status", typ.Status)
+			trans.Context.SetLabel("error.details.type", typ.Type)
+			trans.Context.SetLabel("error.details.reason", typ.Reason)
+			trans.Context.SetLabel("error.details.cause.type", typ.Cause.Type)
+			trans.Context.SetLabel("error.details.cause.reason", typ.Cause.Reason)
+		default:
+			trans.Context.SetLabel("error.type", fmt.Sprintf("%T", typ))
+		}
 		apm.CaptureError(r.Context(), err).Send()
 	}
 
