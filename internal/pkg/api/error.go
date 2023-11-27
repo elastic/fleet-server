@@ -527,17 +527,18 @@ func ErrorResp(w http.ResponseWriter, r *http.Request, err error) {
 	e.Msg("HTTP request error")
 
 	if resp.StatusCode >= 500 {
-		trans := apm.TransactionFromContext(r.Context())
-		switch typ := err.(type) {
-		case *es.ErrElastic:
-			trans.Context.SetLabel("error.type", "ErrElastic")
-			trans.Context.SetLabel("error.details.status", typ.Status)
-			trans.Context.SetLabel("error.details.type", typ.Type)
-			trans.Context.SetLabel("error.details.reason", typ.Reason)
-			trans.Context.SetLabel("error.details.cause.type", typ.Cause.Type)
-			trans.Context.SetLabel("error.details.cause.reason", typ.Cause.Reason)
-		default:
-			trans.Context.SetLabel("error.type", fmt.Sprintf("%T", typ))
+		if trans := apm.TransactionFromContext(r.Context()); trans != nil {
+			switch typ := err.(type) {
+			case *es.ErrElastic:
+				trans.Context.SetLabel("error.type", "ErrElastic")
+				trans.Context.SetLabel("error.details.status", typ.Status)
+				trans.Context.SetLabel("error.details.type", typ.Type)
+				trans.Context.SetLabel("error.details.reason", typ.Reason)
+				trans.Context.SetLabel("error.details.cause.type", typ.Cause.Type)
+				trans.Context.SetLabel("error.details.cause.reason", typ.Cause.Reason)
+			default:
+				trans.Context.SetLabel("error.type", fmt.Sprintf("%T", typ))
+			}
 		}
 		apm.CaptureError(r.Context(), err).Send()
 	}
