@@ -88,5 +88,4 @@ func TestNewParsedPolicyRemoteES(t *testing.T) {
 
 	// Validate that default was found
 	require.Equal(t, "remote", pp.Default.Name)
-	require.Equal(t, "token1", pp.Outputs["remote"].ServiceToken)
 }

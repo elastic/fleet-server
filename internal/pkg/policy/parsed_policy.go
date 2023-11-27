@@ -65,7 +65,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		return nil, err
 	}
 	for _, policyOutput := range p.Data.Outputs {
-		err := processOutputSecret(ctx, policyOutput, bulker)
+		err := ProcessOutputSecret(ctx, policyOutput, bulker)
 		if err != nil {
 			return nil, err
 		}
@@ -118,13 +118,6 @@ func constructPolicyOutputs(outputs map[string]map[string]interface{}, roles map
 			p.Role = &role
 		}
 
-		if p.Type == OutputTypeRemoteElasticsearch {
-			serviceTokenStr, ok := v[FieldOutputServiceToken].(string)
-			if !ok {
-				return nil, fmt.Errorf("missing or invalid service token: %+v", v)
-			}
-			p.ServiceToken = serviceTokenStr
-		}
 
 		result[k] = p
 	}
