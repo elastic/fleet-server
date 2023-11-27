@@ -134,13 +134,12 @@ func (b *Bulker) CancelFn() context.CancelFunc {
 	return b.cancelFn
 }
 
-func (b *Bulker) updateBulkerMap(outputName string, newBulker *Bulker) error {
+func (b *Bulker) updateBulkerMap(outputName string, newBulker *Bulker) {
 	// concurrency control of updating map
 	b.remoteOutputMutex.Lock()
 	defer b.remoteOutputMutex.Unlock()
 
 	b.bulkerMap[outputName] = newBulker
-	return nil
 }
 
 // for remote ES output, create a new bulker in bulkerMap if does not exist
@@ -169,10 +168,7 @@ func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, ou
 	newBulker := NewBulker(es, b.tracer)
 	newBulker.cancelFn = bulkCancel
 
-	err = b.updateBulkerMap(outputName, newBulker)
-	if err != nil {
-		return nil, hasConfigChanged, err
-	}
+	b.updateBulkerMap(outputName, newBulker)
 
 	errCh := make(chan error)
 	go func() {
