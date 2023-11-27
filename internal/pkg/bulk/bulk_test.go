@@ -330,6 +330,15 @@ func TestCancelCtxChildBulkerReplaced(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var waitBulker sync.WaitGroup
+	waitBulker.Add(1)
+	go func() {
+		defer waitBulker.Done()
+		if err := (childBulker.(*Bulker)).Run(ctx); !errors.Is(err, context.Canceled) {
+			t.Fatal(err)
+		}
+	}()
+
 	// output cfg changed
 	outputMap["remote"] = map[string]interface{}{
 		"type":          "remote_elasticsearch",
@@ -349,12 +358,16 @@ func TestCancelCtxChildBulkerReplaced(t *testing.T) {
 		err := childBulker.APIKeyUpdate(ctx, "", "", make([]byte, 0))
 
 		t.Log(err)
+		// TODO dial tcp: lookup remote-es: no such host
 		if !errors.Is(err, context.Canceled) {
-			t.Error("Expected context cancel err: ", err)
+			t.Fatal("Expected context cancel err: ", err)
 		}
+		ctx.Done()
 	}()
 
 	wg.Wait()
+	cancel()
+	waitBulker.Wait()
 }
 
 func benchmarkMockBulk(b *testing.B, samples [][]byte) {
