@@ -17,11 +17,7 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
-	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // TODO:
