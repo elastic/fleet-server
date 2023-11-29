@@ -92,7 +92,6 @@ func createSomePolicies(ctx context.Context, t *testing.T, n int, index string, 
 
 		policyModel := model.Policy{
 			ESDocument:         model.ESDocument{},
-			CoordinatorIdx:     int64(i),
 			Data:               &policyData,
 			DefaultFleetServer: false,
 			PolicyID:           fmt.Sprint(i),
@@ -114,7 +113,7 @@ func createSomePolicies(ctx context.Context, t *testing.T, n int, index string, 
 	return created
 }
 
-func TestPolicyCoordinatorIdx(t *testing.T) {
+func TestPolicyRevisionIdx(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
@@ -123,7 +122,7 @@ func TestPolicyCoordinatorIdx(t *testing.T) {
 
 	docIDs := createSomePolicies(ctx, t, 25, index, bulker)
 
-	migrated, err := migrate(ctx, bulker, migratePolicyCoordinatorIdx)
+	migrated, err := migrate(ctx, bulker, migratePolicyRevisionIdx)
 	require.NoError(t, err)
 
 	require.Equal(t, len(docIDs), migrated)
@@ -143,7 +142,7 @@ func TestPolicyCoordinatorIdx(t *testing.T) {
 			}
 		}
 
-		assert.Equal(t, int64(i+1), got.CoordinatorIdx)
+		assert.Equal(t, int64(2), got.RevisionIdx, "expected migration to increment revision_idx value by one")
 	}
 }
 

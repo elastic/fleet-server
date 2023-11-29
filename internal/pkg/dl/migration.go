@@ -193,9 +193,9 @@ func migrateToV8_5(ctx context.Context, bulker bulk.Bulk) error {
 
 	// The migration was necessary and indeed run, thus we need to regenerate
 	// the API keys for all agents. In order to do so, we increase the policy
-	// coordinator index to force a policy update.
+	// revision index to force a policy update.
 	if migrated > 0 {
-		_, err := migrate(ctx, bulker, migratePolicyCoordinatorIdx)
+		_, err := migrate(ctx, bulker, migratePolicyRevisionIdx)
 		if err != nil {
 			return fmt.Errorf("v8.5.0 data migration failed: %w", err)
 		}
@@ -274,16 +274,17 @@ ctx._source.policy_output_permissions_hash=null;
 	return migrationName, FleetAgents, body, nil
 }
 
-// migratePolicyCoordinatorIdx increases the policy's CoordinatorIdx to force
+// migratePolicyRevisionIdx increases the policy's RevisionIdx to force
 // a policy update ensuring the output data will be migrated to the new
 // Agent.Outputs field. See migrateAgentOutputs and https://github.com/elastic/fleet-server/issues/1672
 // for details.
-func migratePolicyCoordinatorIdx() (string, string, []byte, error) {
-	const migrationName = "PolicyCoordinatorIdx"
+// NOTE(michel-laterman): Updated to increment the RevisionIdx instead of the CoordinatorrIdx as the coordinator is being removed.
+func migratePolicyRevisionIdx() (string, string, []byte, error) {
+	const migrationName = "PolicyRevisionIdx"
 
 	query := dsl.NewRoot()
 	query.Query().MatchAll()
-	painless := `ctx._source.coordinator_idx++;`
+	painless := `ctx._source.revision_idx++;`
 	query.Param("script", painless)
 
 	body, err := query.MarshalJSON()

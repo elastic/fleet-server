@@ -547,7 +547,7 @@ func TestServerInstrumentation(t *testing.T) {
 		}
 	}
 
-	// Force a transaction (fleet-server should be sending tranactions from the coordinator and monitor)
+	// Force a transaction (fleet-server should be sending tranactions from monitor)
 	callCheckinFunc()
 
 	// Verify the APM tracer does not connect to the mocked APM Server.

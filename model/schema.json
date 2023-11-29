@@ -332,6 +332,7 @@
           "type": "integer"
         },
         "coordinator_idx": {
+          "deprecated": true,
           "description": "The coordinator index of the policy",
           "type": "integer"
         },
@@ -350,7 +351,6 @@
       "required": [
         "policy_id",
         "revision_idx",
-        "coordinator_idx",
         "data",
         "default_fleet_server"
       ]
@@ -524,6 +524,7 @@
           "type": "integer"
         },
         "policy_coordinator_idx": {
+          "deprecated": true,
           "description": "The current policy coordinator for the Elastic Agent",
           "type": "integer"
         },

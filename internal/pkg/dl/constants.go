@@ -14,8 +14,6 @@ const (
 	FleetArtifacts         = ".fleet-artifacts"
 	FleetEnrollmentAPIKeys = ".fleet-enrollment-api-keys"
 	FleetPolicies          = ".fleet-policies"
-	FleetPoliciesLeader    = ".fleet-policies-leader"
-	FleetServers           = ".fleet-servers"
 )
 
 // Query fields
@@ -30,13 +28,11 @@ const (
 	FieldActionID                      = "action_id"
 	FieldAgent                         = "agent"
 	FieldAgentVersion                  = "version"
-	FieldCoordinatorIdx                = "coordinator_idx"
 	FieldLastCheckin                   = "last_checkin"
 	FieldLastCheckinStatus             = "last_checkin_status"
 	FieldLastCheckinMessage            = "last_checkin_message"
 	FieldLocalMetadata                 = "local_metadata"
 	FieldComponents                    = "components"
-	FieldPolicyCoordinatorIdx          = "policy_coordinator_idx"
 	FieldPolicyID                      = "policy_id"
 	FieldPolicyOutputAPIKey            = "api_key"
 	FieldPolicyOutputAPIKeyID          = "api_key_id"

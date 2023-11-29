@@ -246,7 +246,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actCh := aSub.Ch()
 
 	// Subscribe to policy manager for changes on PolicyId > policyRev
-	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
+	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, agent.PolicyRevisionIdx)
 	if err != nil {
 		return fmt.Errorf("subscribe policy monitor: %w", err)
 	}
@@ -730,7 +730,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	zlog = zlog.With().
 		Str("fleet.ctx", "processPolicy").
 		Int64("fleet.policyRevision", pp.Policy.RevisionIdx).
-		Int64("fleet.policyCoordinator", pp.Policy.CoordinatorIdx).
 		Str(LogPolicyID, pp.Policy.PolicyID).
 		Logger()
 

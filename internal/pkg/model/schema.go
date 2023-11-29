@@ -347,7 +347,7 @@ type Policy struct {
 	ESDocument
 
 	// The coordinator index of the policy
-	CoordinatorIdx int64       `json:"coordinator_idx"`
+	CoordinatorIdx int64       `json:"coordinator_idx,omitempty"`
 	Data           *PolicyData `json:"data"`
 
 	// True when this policy is the default policy to start Fleet Server

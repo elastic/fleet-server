@@ -69,7 +69,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyID := uuid.Must(uuid.NewV4()).String()
-	s, err := monitor.Subscribe(agentId, policyID, 0, 0)
+	s, err := monitor.Subscribe(agentId, policyID, 0)
 	defer monitor.Unsubscribe(s)
 	require.NoError(t, err)
 
@@ -80,10 +80,9 @@ func TestMonitor_NewPolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyID:       policyID,
-		CoordinatorIdx: 1,
-		Data:           policyDataDefault,
-		RevisionIdx:    1,
+		PolicyID:    policyID,
+		Data:        policyDataDefault,
+		RevisionIdx: 1,
 	}
 	policyData, err := json.Marshal(&policy)
 	require.NoError(t, err)
@@ -149,7 +148,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
-	s, err := monitor.Subscribe(agentId, policyId, 1, 1)
+	s, err := monitor.Subscribe(agentId, policyId, 1)
 	defer monitor.Unsubscribe(s)
 	require.NoError(t, err)
 
@@ -160,10 +159,9 @@ func TestMonitor_SamePolicy(t *testing.T) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyID:       policyId,
-		CoordinatorIdx: 1,
-		Data:           policyDataDefault,
-		RevisionIdx:    1,
+		PolicyID:    policyId,
+		Data:        policyDataDefault,
+		RevisionIdx: 1,
 	}
 	policyData, err := json.Marshal(&policy)
 	require.NoError(t, err)
@@ -189,85 +187,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	if merr != nil && merr != context.Canceled {
 		t.Fatal(merr)
 	}
-	require.False(t, gotPolicy, "got policy update when it was the same rev/coord idx")
-	ms.AssertExpectations(t)
-	mm.AssertExpectations(t)
-}
-
-func TestMonitor_NewPolicyUncoordinated(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
-
-	chHitT := make(chan []es.HitT, 1)
-	defer close(chHitT)
-	ms := mmock.NewMockSubscription()
-	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
-	mm := mmock.NewMockMonitor()
-	mm.On("Subscribe").Return(ms).Once()
-	mm.On("Unsubscribe", mock.Anything).Return().Once()
-	bulker := ftesting.NewMockBulk()
-
-	monitor := NewMonitor(bulker, mm, 0)
-	pm := monitor.(*monitorT)
-	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
-		return []model.Policy{}, nil
-	}
-
-	var merr error
-	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
-		merr = monitor.Run(ctx)
-	}()
-
-	err := monitor.(*monitorT).waitStart(ctx)
-	require.NoError(t, err)
-
-	agentId := uuid.Must(uuid.NewV4()).String()
-	policyId := uuid.Must(uuid.NewV4()).String()
-	s, err := monitor.Subscribe(agentId, policyId, 1, 1)
-	defer monitor.Unsubscribe(s)
-	require.NoError(t, err)
-
-	rId := xid.New().String()
-	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
-		PolicyID:       policyId,
-		CoordinatorIdx: 0,
-		Data:           policyDataDefault,
-		RevisionIdx:    2,
-	}
-	policyData, err := json.Marshal(&policy)
-	require.NoError(t, err)
-
-	chHitT <- []es.HitT{{
-		ID:      rId,
-		SeqNo:   1,
-		Version: 1,
-		Source:  policyData,
-	}}
-
-	gotPolicy := false
-	tm := time.NewTimer(1 * time.Second)
-	defer tm.Stop()
-	select {
-	case <-s.Output():
-		gotPolicy = true
-	case <-tm.C:
-	}
-
-	cancel()
-	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
-		t.Fatal(merr)
-	}
-	require.False(t, gotPolicy, "got policy update when it had coordinator_idx set to 0")
+	require.False(t, gotPolicy, "got policy update when it was the same rev idx")
 	ms.AssertExpectations(t)
 	mm.AssertExpectations(t)
 }
@@ -318,10 +238,9 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 			Version: 1,
 			SeqNo:   1,
 		},
-		PolicyID:       policyId,
-		CoordinatorIdx: 1,
-		Data:           policyDataDefault,
-		RevisionIdx:    2,
+		PolicyID:    policyId,
+		Data:        policyDataDefault,
+		RevisionIdx: 2,
 	}
 
 	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
@@ -340,7 +259,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	err := monitor.(*monitorT).waitStart(ctx)
 	require.NoError(t, err)
 
-	s, err := monitor.Subscribe(agentId, policyId, 1, 1)
+	s, err := monitor.Subscribe(agentId, policyId, 1)
 	defer monitor.Unsubscribe(s)
 	require.NoError(t, err)
 

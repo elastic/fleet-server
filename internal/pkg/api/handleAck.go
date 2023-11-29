@@ -384,11 +384,10 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	defer span.End()
 	// If more than one, pick the winner;
 	// 0) Correct policy id
-	// 1) Highest revision/coordinator number
+	// 1) Highest revision number
 
 	found := false
 	currRev := agent.PolicyRevisionIdx
-	currCoord := agent.PolicyCoordinatorIdx
 	vSpan, _ := apm.StartSpan(ctx, "checkPolicyActions", "validate")
 	for _, a := range actionIds {
 		rev, ok := policy.RevisionFromString(a)
@@ -396,18 +395,13 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		zlog.Debug().
 			Str("agent.policyId", agent.PolicyID).
 			Int64("agent.revisionIdx", currRev).
-			Int64("agent.coordinatorIdx", currCoord).
 			Str("rev.policyId", rev.PolicyID).
 			Int64("rev.revisionIdx", rev.RevisionIdx).
-			Int64("rev.coordinatorIdx", rev.CoordinatorIdx).
 			Msg("ack policy revision")
 
-		if ok && rev.PolicyID == agent.PolicyID &&
-			(rev.RevisionIdx > currRev ||
-				(rev.RevisionIdx == currRev && rev.CoordinatorIdx > currCoord)) {
+		if ok && rev.PolicyID == agent.PolicyID && rev.RevisionIdx > currRev {
 			found = true
 			currRev = rev.RevisionIdx
-			currCoord = rev.CoordinatorIdx
 		}
 	}
 
@@ -432,7 +426,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 
 	err := ack.updateAgentDoc(ctx, zlog,
 		agent.Id,
-		currRev, currCoord,
+		currRev,
 		agent.PolicyID)
 	if err != nil {
 		return err
@@ -506,7 +500,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 func (ack *AckT) updateAgentDoc(ctx context.Context,
 	zlog zerolog.Logger,
 	agentID string,
-	currRev, currCoord int64,
+	currRev int64,
 	policyID string,
 ) error {
 	span, ctx := apm.StartSpan(ctx, "updateAgentDoc", "update")
@@ -514,7 +508,6 @@ func (ack *AckT) updateAgentDoc(ctx context.Context,
 	body := makeUpdatePolicyBody(
 		policyID,
 		currRev,
-		currCoord,
 	)
 
 	err := ack.bulk.Update(
@@ -529,7 +522,6 @@ func (ack *AckT) updateAgentDoc(ctx context.Context,
 	zlog.Err(err).
 		Str(LogPolicyID, policyID).
 		Int64("policyRevision", currRev).
-		Int64("policyCoordinator", currCoord).
 		Msg("ack policy")
 
 	if err != nil {
@@ -708,7 +700,7 @@ func isAgentActive(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, age
 // has not changed underneath us by an upstream process (Kibana or otherwise).
 // We have a race condition where a user could have assigned a new policy to
 // an agent while we were busy updating the old one.  A blind update to the
-// agent record without a check could set the revision and coordIdx for the wrong
+// agent record without a check could set the revision for the wrong
 // policy.  This script should be coupled with a "retry_on_conflict" parameter
 // to allow for *other* changes to the agent record while we running the script.
 // (For example, say the background bulk check-in timestamp update task fires)
@@ -718,12 +710,10 @@ func isAgentActive(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, age
 const kUpdatePolicyPrefix = `{"script":{"lang":"painless","source":"if (ctx._source.policy_id == params.id) {ctx._source.remove('default_api_key_history');ctx._source.` +
 	dl.FieldPolicyRevisionIdx +
 	` = params.rev;ctx._source.` +
-	dl.FieldPolicyCoordinatorIdx +
-	`= params.coord;ctx._source.` +
 	dl.FieldUpdatedAt +
 	` = params.ts;} else {ctx.op = \"noop\";}","params": {"id":"`
 
-func makeUpdatePolicyBody(policyID string, newRev, coordIdx int64) []byte {
+func makeUpdatePolicyBody(policyID string, newRev int64) []byte {
 	var buf bytes.Buffer
 	buf.Grow(410)
 
@@ -732,8 +722,6 @@ func makeUpdatePolicyBody(policyID string, newRev, coordIdx int64) []byte {
 	buf.WriteString(policyID)
 	buf.WriteString(`","rev":`)
 	buf.WriteString(strconv.FormatInt(newRev, 10))
-	buf.WriteString(`,"coord":`)
-	buf.WriteString(strconv.FormatInt(coordIdx, 10))
 	buf.WriteString(`,"ts":"`)
 	buf.WriteString(time.Now().UTC().Format(time.RFC3339))
 	buf.WriteString(`"}}}`)
