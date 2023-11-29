@@ -218,6 +218,8 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 		return client.UnitStateStarting, nil
 	}
 
+	reportOutputHealth(ctx, m.bulker, m.log)
+
 	state := client.UnitStateHealthy
 	extendMsg := ""
 	var payload map[string]interface{}
@@ -251,6 +253,30 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 		m.reporter.UpdateState(state, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyID, extendMsg), payload) //nolint:errcheck // not clear what to do in failure cases
 	}
 	return state, nil
+}
+
+func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, logger zerolog.Logger) {
+	//pinging logic
+	bulkerMap := bulker.GetBulkerMap()
+	for outputName, outputBulker := range bulkerMap {
+		doc := dl.OutputHealth{
+			Output:  outputName,
+			State:   client.UnitStateHealthy.String(),
+			Message: "",
+		}
+		res, err := outputBulker.Client().Ping(outputBulker.Client().Ping.WithContext(ctx))
+		if err != nil {
+			logger.Error().Err(err).Msg("error calling remote es ping")
+			doc.State = client.UnitStateDegraded.String()
+			doc.Message = err.Error()
+		} else if res.StatusCode != 200 {
+			doc.State = client.UnitStateDegraded.String()
+			doc.Message = fmt.Sprintf("unexpected status code when pinging remote es: %d", res.StatusCode)
+		}
+		if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
+			logger.Error().Err(err).Msg("create output health")
+		}
+	}
 }
 
 func HasFleetServerInput(inputs []map[string]interface{}) bool {
