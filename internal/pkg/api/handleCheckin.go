@@ -748,6 +748,13 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	data := model.ClonePolicyData(pp.Policy.Data)
+	for policyName, policyOutput := range data.Outputs {
+		err := policy.ProcessOutputSecret(ctx, policyOutput, bulker)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process output secrets %q: %w",
+				policyName, err)
+		}
+	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
 		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, data.Outputs)

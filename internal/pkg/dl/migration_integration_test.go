@@ -76,6 +76,16 @@ func createSomePolicies(ctx context.Context, t *testing.T, n int, index string, 
 
 	var created []string
 
+	var policyData = model.PolicyData{
+		Outputs: map[string]map[string]interface{}{
+			"default": {
+				"type": "elasticsearch",
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {}}`),
+		Inputs:            []map[string]interface{}{},
+	}
+
 	for i := 0; i < n; i++ {
 		now := time.Now().UTC()
 		nowStr := now.Format(time.RFC3339)
@@ -83,7 +93,7 @@ func createSomePolicies(ctx context.Context, t *testing.T, n int, index string, 
 		policyModel := model.Policy{
 			ESDocument:         model.ESDocument{},
 			CoordinatorIdx:     int64(i),
-			Data:               nil,
+			Data:               &policyData,
 			DefaultFleetServer: false,
 			PolicyID:           fmt.Sprint(i),
 			RevisionIdx:        1,

@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
@@ -80,7 +81,8 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 		t.Run(c.title, func(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
 			bulker.On("Search", searchArguments...).Return(c.searchResult, c.searchErr)
-
+			emptyBulkerMap := make(map[string]bulk.Bulk)
+			bulker.On("GetBulkerMap").Return(emptyBulkerMap).Once()
 			reporter := &FakeReporter{}
 
 			sm := NewStandAloneSelfMonitor(bulker, reporter)

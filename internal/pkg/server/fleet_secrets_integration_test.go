@@ -157,7 +157,7 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 

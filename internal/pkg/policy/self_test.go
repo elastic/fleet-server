@@ -47,6 +47,8 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	mm.On("Subscribe").Return(ms).Once()
 	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
@@ -183,6 +185,9 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	mm.On("Subscribe").Return(ms).Once()
 	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
+
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
@@ -340,6 +345,8 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	mm.On("Subscribe").Return(ms).Once()
 	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
@@ -476,6 +483,8 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	mm.On("Subscribe").Return(ms).Once()
 	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)

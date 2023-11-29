@@ -145,7 +145,7 @@ func setSecretPath(output smap.Map, secretValue string, secretPaths []string) er
 }
 
 // Read secret from output and mutate output with secret value
-func processOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) error {
+func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) error {
 	secrets := output.GetMap(FieldOutputSecrets)
 
 	delete(output, FieldOutputSecrets)

@@ -73,3 +73,19 @@ func TestNewParsedPolicyNoES(t *testing.T) {
 	// Validate that default was found
 	require.Equal(t, "remote_not_es", pp.Default.Name)
 }
+
+func TestNewParsedPolicyRemoteES(t *testing.T) {
+	// Load the model into the policy object
+	var m model.Policy
+	var d model.PolicyData
+	err := json.Unmarshal([]byte(testPolicyRemoteES), &d)
+	require.NoError(t, err)
+
+	m.Data = &d
+
+	pp, err := NewParsedPolicy(context.TODO(), nil, m)
+	require.NoError(t, err)
+
+	// Validate that default was found
+	require.Equal(t, "remote", pp.Default.Name)
+}

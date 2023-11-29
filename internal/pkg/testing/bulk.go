@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"go.elastic.co/apm/v2"
 
@@ -77,6 +78,29 @@ func (m *MockBulk) Search(ctx context.Context, index string, body []byte, opts .
 func (m *MockBulk) Client() *elasticsearch.Client {
 	args := m.Called()
 	return args.Get(0).(*elasticsearch.Client)
+}
+
+func (m *MockBulk) GetBulker(outputName string) bulk.Bulk {
+	args := m.Called(outputName)
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).(bulk.Bulk)
+}
+
+func (m *MockBulk) GetBulkerMap() map[string]bulk.Bulk {
+	args := m.Called()
+	return args.Get(0).(map[string]bulk.Bulk)
+}
+
+func (m *MockBulk) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (bulk.Bulk, bool, error) {
+	args := m.Called(ctx, zlog, outputName, outputMap)
+	return args.Get(0).(bulk.Bulk), args.Get(1).(bool), nil
+}
+
+func (m *MockBulk) CancelFn() context.CancelFunc {
+	args := m.Called()
+	return args.Get(0).(context.CancelFunc)
 }
 
 func (m *MockBulk) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
