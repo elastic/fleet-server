@@ -13,11 +13,18 @@ import (
 	"github.com/gofrs/uuid"
 )
 
+type DataStream struct {
+	Dataset   string `json:"dataset,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
 type OutputHealth struct {
-	Output    string `json:"output,omitempty"`
-	State     string `json:"state,omitempty"`
-	Message   string `json:"message,omitempty"`
-	Timestamp string `json:"@timestamp,omitempty"`
+	Output     string     `json:"output,omitempty"`
+	State      string     `json:"state,omitempty"`
+	Message    string     `json:"message,omitempty"`
+	Timestamp  string     `json:"@timestamp,omitempty"`
+	DataStream DataStream `json:"data_stream,omitempty"`
 }
 
 func CreateOutputHealth(ctx context.Context, bulker bulk.Bulk, doc OutputHealth) error {
@@ -27,6 +34,11 @@ func CreateOutputHealth(ctx context.Context, bulker bulk.Bulk, doc OutputHealth)
 func createOutputHealth(ctx context.Context, bulker bulk.Bulk, index string, doc OutputHealth) error {
 	if doc.Timestamp == "" {
 		doc.Timestamp = time.Now().UTC().Format(time.RFC3339)
+	}
+	doc.DataStream = DataStream{
+		Dataset:   "fleet_server.output_health",
+		Type:      "logs",
+		Namespace: "default",
 	}
 	body, err := json.Marshal(doc)
 	if err != nil {

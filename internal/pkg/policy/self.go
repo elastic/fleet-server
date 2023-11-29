@@ -266,15 +266,17 @@ func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, logger zerolog.Lo
 		}
 		res, err := outputBulker.Client().Ping(outputBulker.Client().Ping.WithContext(ctx))
 		if err != nil {
-			logger.Error().Err(err).Msg("error calling remote es ping")
 			doc.State = client.UnitStateDegraded.String()
-			doc.Message = err.Error()
+			doc.Message = fmt.Sprintf("remote ES %s is not reachable due to error: %s", outputName, err.Error())
+			logger.Error().Err(err).Msg(doc.Message)
+
 		} else if res.StatusCode != 200 {
 			doc.State = client.UnitStateDegraded.String()
-			doc.Message = fmt.Sprintf("unexpected status code when pinging remote es: %d", res.StatusCode)
+			doc.Message = fmt.Sprintf("remote ES %s is not reachable due to: unexpected status code %d", outputName, res.StatusCode)
+			logger.Error().Err(err).Msg(doc.Message)
 		}
 		if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
-			logger.Error().Err(err).Msg("create output health")
+			logger.Error().Err(err).Msg("error writing output health")
 		}
 	}
 }

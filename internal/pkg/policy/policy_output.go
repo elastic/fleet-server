@@ -265,15 +265,15 @@ func (p *Output) prepareElasticsearch(
 		// reporting output health and not returning the error to keep fleet-server running
 		if outputAPIKey == nil && p.Type == OutputTypeRemoteElasticsearch {
 			if err != nil {
-				zerolog.Ctx(ctx).Warn().Err(err).Msg("Could not create API key in remote ES")
-
 				doc := dl.OutputHealth{
 					Output:  p.Name,
 					State:   client.UnitStateDegraded.String(),
-					Message: err.Error(),
+					Message: fmt.Sprintf("remote ES %s could not create API key due to error: %s", p.Name, err.Error()),
 				}
+				zerolog.Ctx(ctx).Warn().Err(err).Msg(doc.Message)
+
 				if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
-					zlog.Error().Err(err).Msg("create output health")
+					zlog.Error().Err(err).Msg("error writing output health")
 				}
 			}
 
@@ -324,7 +324,7 @@ func (p *Output) prepareElasticsearch(
 		// Using painless script to append the old keys to the history
 		body, err := renderUpdatePainlessScript(p.Name, fields)
 		if err != nil {
-			return fmt.Errorf("could no tupdate painless script: %w", err)
+			return fmt.Errorf("could not update painless script: %w", err)
 		}
 
 		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
