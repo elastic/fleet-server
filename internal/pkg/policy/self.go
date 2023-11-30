@@ -109,10 +109,7 @@ LOOP:
 				return err
 			}
 			cT.Reset(m.checkTime)
-			if state == client.UnitStateHealthy {
-				// running; can stop
-				break LOOP
-			}
+			m.log.Trace().Msg(state.String())
 		case hits := <-s.Output():
 			policies := make([]model.Policy, len(hits))
 			for i, hit := range hits {
@@ -125,10 +122,7 @@ LOOP:
 			if err != nil {
 				return err
 			}
-			if state == client.UnitStateHealthy {
-				// running; can stop
-				break LOOP
-			}
+			m.log.Trace().Msg(state.String())
 		}
 	}
 
