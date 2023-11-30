@@ -268,15 +268,15 @@ func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, logger zerolog.Lo
 		if err != nil {
 			doc.State = client.UnitStateDegraded.String()
 			doc.Message = fmt.Sprintf("remote ES is not reachable due to error: %s", err.Error())
-			logger.Error().Err(err).Msg(doc.Message)
+			logger.Error().Err(err).Str("outputName", outputName).Msg(doc.Message)
 
 		} else if res.StatusCode != 200 {
 			doc.State = client.UnitStateDegraded.String()
 			doc.Message = fmt.Sprintf("remote ES is not reachable due to unexpected status code %d", res.StatusCode)
-			logger.Error().Err(err).Msg(doc.Message)
+			logger.Error().Err(err).Str("outputName", outputName).Msg(doc.Message)
 		}
 		if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
-			logger.Error().Err(err).Msg("error writing output health")
+			logger.Error().Err(err).Str("outputName", outputName).Msg("error writing output health")
 		}
 	}
 }

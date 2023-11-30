@@ -270,10 +270,10 @@ func (p *Output) prepareElasticsearch(
 					State:   client.UnitStateDegraded.String(),
 					Message: fmt.Sprintf("remote ES could not create API key due to error: %s", err.Error()),
 				}
-				zerolog.Ctx(ctx).Warn().Err(err).Msg(doc.Message)
+				zerolog.Ctx(ctx).Warn().Err(err).Str("outputName", p.Name).Msg(doc.Message)
 
 				if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
-					zlog.Error().Err(err).Msg("error writing output health")
+					zlog.Error().Err(err).Str("outputName", p.Name).Msg("error writing output health")
 				}
 			}
 
