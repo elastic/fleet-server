@@ -89,7 +89,7 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 .PHONY: clean
 clean: ## - Clean up build artifacts
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
-	rm -rf .service_token .kibana_service_token ./bin/ ./build/
+	rm -rf .service_token* .kibana_service_token ./bin/ ./build/
 
 .PHONY: generate
 generate: ## - Generate schema models
@@ -315,7 +315,7 @@ int-docker-start: ## - Start docker envronment for integration tests and wait un
 .PHONY: int-docker-stop
 int-docker-stop: ## - Stop docker environment for integration tests
 	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env down
-	@rm -f .service_token
+	@rm -f .service_token*
 
 # Run integration tests with starting/stopping docker
 .PHONY: test-int

@@ -236,8 +236,8 @@ func TestUploadBeginAuth(t *testing.T) {
 		ExpectStatus       int
 	}{
 		{"Agent ID matching API Key succeeds", true, "abc123", "abc123", http.StatusOK},
-		{"Agent ID not matching API Key should reject", true, "oneID", "differentID", http.StatusBadRequest},
-		{"Bad auth should reject request", false, "", "IDinDoc", http.StatusBadRequest},
+		{"Agent ID not matching API Key should reject", true, "oneID", "differentID", http.StatusForbidden},
+		{"Bad auth should reject request", false, "", "IDinDoc", http.StatusUnauthorized},
 	}
 
 	for _, tc := range tests {
@@ -577,8 +577,8 @@ func TestUploadCompleteRequiresMatchingAuth(t *testing.T) {
 		ExpectStatus      int
 	}{
 		{"Agent ID matching API Key succeeds", true, "abc123", "abc123", http.StatusOK},
-		{"Agent ID in File not matching API Key should reject", true, "oneID", "differentID", http.StatusBadRequest},
-		{"Bad auth should reject request", false, "", "IDinDoc", http.StatusBadRequest},
+		{"Agent ID in File not matching API Key should reject", true, "oneID", "differentID", http.StatusForbidden},
+		{"Bad auth should reject request", false, "", "IDinDoc", http.StatusUnauthorized},
 	}
 	mockUploadID := "abc123"
 
