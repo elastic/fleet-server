@@ -14,10 +14,10 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/rs/zerolog"
 )
 
 // TODO:
@@ -255,8 +255,8 @@ func TestCancelCtx(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancelF := context.WithCancel(context.Background())
-			ctx = testlog.SetLogger(t).WithContext(ctx)
 
+			cancelF()
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
@@ -264,9 +264,6 @@ func TestCancelCtx(t *testing.T) {
 
 				test.test(t, ctx)
 			}()
-
-			time.Sleep(time.Millisecond)
-			cancelF()
 
 			wg.Wait()
 		})
@@ -278,16 +275,16 @@ func TestCancelCtxChildBulker(t *testing.T) {
 	bulker := NewBulker(nil, nil)
 
 	ctx, cancelF := context.WithCancel(context.Background())
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
-	logger := testlog.SetLogger(t)
 	outputMap := make(map[string]map[string]interface{})
 	outputMap["remote"] = map[string]interface{}{
 		"type":          "remote_elasticsearch",
 		"hosts":         []interface{}{"https://remote-es:443"},
 		"service_token": "token1",
 	}
-	childBulker, _, err := bulker.CreateAndGetBulker(ctx, logger, "remote", outputMap)
+
+	cancelF()
+	childBulker, _, err := bulker.CreateAndGetBulker(ctx, zerolog.Nop(), "remote", outputMap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,9 +300,6 @@ func TestCancelCtxChildBulker(t *testing.T) {
 			t.Error("Expected context cancel err: ", err)
 		}
 	}()
-
-	time.Sleep(time.Millisecond)
-	cancelF()
 
 	wg.Wait()
 }
