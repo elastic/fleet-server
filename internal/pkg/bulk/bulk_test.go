@@ -17,6 +17,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/rs/zerolog"
 )
 
 // TODO:
@@ -275,7 +276,6 @@ func TestCancelCtxChildBulker(t *testing.T) {
 
 	ctx, cancelF := context.WithCancel(context.Background())
 
-	logger := testlog.SetLogger(t)
 	outputMap := make(map[string]map[string]interface{})
 	outputMap["remote"] = map[string]interface{}{
 		"type":          "remote_elasticsearch",
@@ -284,7 +284,7 @@ func TestCancelCtxChildBulker(t *testing.T) {
 	}
 
 	cancelF()
-	childBulker, _, err := bulker.CreateAndGetBulker(ctx, logger, "remote", outputMap)
+	childBulker, _, err := bulker.CreateAndGetBulker(ctx, zerolog.Nop(), "remote", outputMap)
 	if err != nil {
 		t.Fatal(err)
 	}
