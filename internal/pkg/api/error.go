@@ -167,7 +167,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			ErrAgentIdentity,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusForbidden,
 				"ErrAgentIdentity",
 				"Agent header contains wrong identifier",
 				zerolog.InfoLevel,
@@ -185,7 +185,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			ErrAgentInactive,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrAgentInactive",
 				"Agent inactive",
 				zerolog.InfoLevel,
@@ -194,7 +194,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			ErrAPIKeyNotEnabled,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrAPIKeyNotEnabled",
 				"APIKey not enabled",
 				zerolog.InfoLevel,
@@ -240,7 +240,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			apikey.ErrNoAuthHeader,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrNoAuthHeader",
 				"no authorization header",
 				zerolog.InfoLevel,
@@ -258,7 +258,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			apikey.ErrUnauthorized,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrUnauthorized",
 				"unauthorized",
 				zerolog.InfoLevel,
@@ -276,7 +276,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			apikey.ErrInvalidToken,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrInvalidToken",
 				"token not valid utf8",
 				zerolog.InfoLevel,
@@ -285,7 +285,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			apikey.ErrAPIKeyNotFound,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrAPIKeyNotFound",
 				"api key not found",
 				zerolog.InfoLevel,

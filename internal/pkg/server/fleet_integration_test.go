@@ -426,10 +426,7 @@ func TestServerUnauthorized(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer res.Body.Close()
-			diff := cmp.Diff(http.StatusBadRequest, res.StatusCode)
-			if diff != "" {
-				t.Fatal(diff)
-			}
+			require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 
 			raw, _ := ioutil.ReadAll(res.Body)
 			var resp api.HTTPErrResp
@@ -437,11 +434,8 @@ func TestServerUnauthorized(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			diff = cmp.Diff(http.StatusBadRequest, resp.StatusCode)
-			if diff != "" {
-				t.Fatal(diff)
-			}
-			diff = cmp.Diff("ErrNoAuthHeader", resp.Error)
+			require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+			diff := cmp.Diff("ErrNoAuthHeader", resp.Error)
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -461,10 +455,7 @@ func TestServerUnauthorized(t *testing.T) {
 			require.NoError(t, err)
 			defer res.Body.Close()
 
-			diff := cmp.Diff(http.StatusBadRequest, res.StatusCode)
-			if diff != "" {
-				t.Fatal(diff)
-			}
+			require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 
 			raw, _ := ioutil.ReadAll(res.Body)
 			var resp api.HTTPErrResp
@@ -472,11 +463,8 @@ func TestServerUnauthorized(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			diff = cmp.Diff(400, resp.StatusCode)
-			if diff != "" {
-				t.Fatal(diff)
-			}
-			diff = cmp.Diff("ErrUnauthorized", resp.Error)
+			require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+			diff := cmp.Diff("ErrUnauthorized", resp.Error)
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -912,7 +900,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		res, err := cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		require.Equal(t, http.StatusForbidden, res.StatusCode)
 	})
 	t.Run("use another agent's api key", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(ctx)
@@ -952,7 +940,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		res, err = cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		require.Equal(t, http.StatusForbidden, res.StatusCode)
 	})
 	t.Run("use api key for enrollment", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(ctx)
@@ -987,7 +975,7 @@ func Test_Agent_request_errors(t *testing.T) {
 		res, err := cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 	})
 	t.Run("bad path", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(ctx)
