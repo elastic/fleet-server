@@ -10,7 +10,7 @@ import (
 	"context"
 	"testing"
 
-	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -78,10 +78,9 @@ func Test_hasChangedAndUpdateRemoteOutputConfig(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			log := testlog.SetLogger(t)
 			bulker := NewBulker(nil, nil)
 			bulker.remoteOutputConfigMap["remote1"] = tc.cfg
-			hasChanged := bulker.hasChangedAndUpdateRemoteOutputConfig(log, "remote1", tc.newCfg)
+			hasChanged := bulker.hasChangedAndUpdateRemoteOutputConfig(zerolog.Nop(), "remote1", tc.newCfg)
 			assert.Equal(t, tc.changed, hasChanged)
 			assert.Equal(t, tc.newCfg, bulker.remoteOutputConfigMap["remote1"])
 		})
@@ -91,7 +90,6 @@ func Test_hasChangedAndUpdateRemoteOutputConfig(t *testing.T) {
 func Test_CreateAndGetBulkerNew(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
-	log := testlog.SetLogger(t)
 	bulker := NewBulker(nil, nil)
 	outputMap := make(map[string]map[string]interface{})
 	outputMap["remote1"] = map[string]interface{}{
@@ -99,7 +97,7 @@ func Test_CreateAndGetBulkerNew(t *testing.T) {
 		"hosts":         []interface{}{"https://remote-es:443"},
 		"service_token": "token1",
 	}
-	newBulker, hasChanged, err := bulker.CreateAndGetBulker(ctx, log, "remote1", outputMap)
+	newBulker, hasChanged, err := bulker.CreateAndGetBulker(ctx, zerolog.Nop(), "remote1", outputMap)
 	assert.NotNil(t, newBulker)
 	assert.Equal(t, false, hasChanged)
 	assert.Nil(t, err)
@@ -108,7 +106,6 @@ func Test_CreateAndGetBulkerNew(t *testing.T) {
 func Test_CreateAndGetBulkerExisting(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
-	log := testlog.SetLogger(t)
 	bulker := NewBulker(nil, nil)
 	outputBulker := NewBulker(nil, nil)
 	bulker.bulkerMap["remote1"] = outputBulker
@@ -120,7 +117,7 @@ func Test_CreateAndGetBulkerExisting(t *testing.T) {
 	}
 	bulker.remoteOutputConfigMap["remote1"] = cfg
 	outputMap["remote1"] = cfg
-	newBulker, hasChanged, err := bulker.CreateAndGetBulker(ctx, log, "remote1", outputMap)
+	newBulker, hasChanged, err := bulker.CreateAndGetBulker(ctx, zerolog.Nop(), "remote1", outputMap)
 	assert.Equal(t, outputBulker, newBulker)
 	assert.Equal(t, false, hasChanged)
 	assert.Nil(t, err)
@@ -129,7 +126,6 @@ func Test_CreateAndGetBulkerExisting(t *testing.T) {
 func Test_CreateAndGetBulkerChanged(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
-	log := testlog.SetLogger(t)
 	bulker := NewBulker(nil, nil)
 	outputBulker := NewBulker(nil, nil)
 	bulker.bulkerMap["remote1"] = outputBulker
@@ -146,7 +142,7 @@ func Test_CreateAndGetBulkerChanged(t *testing.T) {
 	}
 	cancelFnCalled := false
 	outputBulker.cancelFn = func() { cancelFnCalled = true }
-	newBulker, hasChanged, err := bulker.CreateAndGetBulker(ctx, log, "remote1", outputMap)
+	newBulker, hasChanged, err := bulker.CreateAndGetBulker(ctx, zerolog.Nop(), "remote1", outputMap)
 	assert.NotEqual(t, outputBulker, newBulker)
 	assert.Equal(t, true, hasChanged)
 	assert.Nil(t, err)
