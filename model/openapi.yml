@@ -997,7 +997,7 @@ components:
                 error: Unauthorized
                 message: ApiKey not enabled
     forbidden:
-      description: 403 response when the API key does not match the agent
+      description: 403 response when the API key is valid but does not match the agent
       headers:
         Elastic-Api-Version:
           $ref: "#/components/headers/apiVersion"
