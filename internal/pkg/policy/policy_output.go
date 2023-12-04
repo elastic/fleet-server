@@ -268,7 +268,7 @@ func (p *Output) prepareElasticsearch(
 				doc := dl.OutputHealth{
 					Output:  p.Name,
 					State:   client.UnitStateDegraded.String(),
-					Message: fmt.Sprintf("remote ES could not create API key due to error: %s", err.Error()),
+					Message: fmt.Sprintf("remote ES could not create API key due to error: %v", err),
 				}
 				zerolog.Ctx(ctx).Warn().Err(err).Str("outputName", p.Name).Msg(doc.Message)
 
