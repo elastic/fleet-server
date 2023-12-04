@@ -996,6 +996,25 @@ components:
                 statusCode: 401
                 error: Unauthorized
                 message: ApiKey not enabled
+    forbidden:
+      description: 403 response when the API key is valid but does not match the agent
+      headers:
+        Elastic-Api-Version:
+          $ref: "#/components/headers/apiVersion"
+        X-Request-Id:
+          $ref: "#/components/headers/requestID"
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/error"
+          examples:
+            unauthorized:
+              description: The ApiKey is not enabled
+              value:
+                statusCode: 403
+                error: ErrAgentIdentity
+                message: Agent header contains wrong identifier
     agentNotFound:
       description: 404 response when the agent is not found. May be returned by checkin endpoint. or endpoints that use the agentApiKey auth scheme
       headers:
@@ -1319,6 +1338,8 @@ paths:
           $ref: "#/components/responses/badRequest"
         "401":
           $ref: "#/components/responses/keyNotEnabled"
+        "403":
+          $ref: "#/components/responses/forbidden"
         "404":
           $ref: "#/components/responses/agentNotFound"
         "408":
@@ -1389,6 +1410,8 @@ paths:
           $ref: "#/components/responses/badRequest"
         "401":
           $ref: "#/components/responses/keyNotEnabled"
+        "403":
+          $ref: "#/components/responses/forbidden"
         "404":
           $ref: "#/components/responses/agentNotFound"
         "408":
@@ -1478,6 +1501,8 @@ paths:
           $ref: "#/components/responses/badRequest"
         "401":
           $ref: "#/components/responses/keyNotEnabled"
+        "403":
+          $ref: "#/components/responses/forbidden"
         "408":
           $ref: "#/components/responses/deadline"
         "500":
@@ -1538,6 +1563,8 @@ paths:
           $ref: "#/components/responses/badRequest"
         "401":
           $ref: "#/components/responses/keyNotEnabled"
+        "403":
+          $ref: "#/components/responses/forbidden"
         "408":
           $ref: "#/components/responses/deadline"
         "500":
@@ -1589,6 +1616,8 @@ paths:
           $ref: "#/components/responses/badRequest"
         "401":
           $ref: "#/components/responses/keyNotEnabled"
+        "403":
+          $ref: "#/components/responses/forbidden"
         "408":
           $ref: "#/components/responses/deadline"
         "500":
