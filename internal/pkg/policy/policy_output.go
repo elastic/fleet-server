@@ -265,7 +265,7 @@ func (p *Output) prepareElasticsearch(
 		// reporting output health and not returning the error to keep fleet-server running
 		if outputAPIKey == nil && p.Type == OutputTypeRemoteElasticsearch {
 			if err != nil {
-				doc := dl.OutputHealth{
+				doc := model.OutputHealth{
 					Output:  p.Name,
 					State:   client.UnitStateDegraded.String(),
 					Message: fmt.Sprintf("remote ES could not create API key due to error: %v", err),
@@ -283,7 +283,7 @@ func (p *Output) prepareElasticsearch(
 			delete(outputMap[p.Name], FieldOutputServiceToken)
 			return nil
 		} else if p.Type == OutputTypeRemoteElasticsearch {
-			doc := dl.OutputHealth{
+			doc := model.OutputHealth{
 				Output:  p.Name,
 				State:   client.UnitStateHealthy.String(),
 				Message: "",

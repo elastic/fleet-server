@@ -660,7 +660,7 @@ func TestSelfMonitor_reportOutputHealthyState(t *testing.T) {
 	bulkerMap["remote"] = outputBulker
 	bulker.On("GetBulkerMap").Return(bulkerMap)
 	bulker.On("Create", mock.Anything, dl.FleetOutputHealth, mock.Anything, mock.MatchedBy(func(body []byte) bool {
-		var doc dl.OutputHealth
+		var doc model.OutputHealth
 		err := json.Unmarshal(body, &doc)
 		if err != nil {
 			t.Fatal(err)
@@ -689,7 +689,7 @@ func TestSelfMonitor_reportOutputDegradedState(t *testing.T) {
 	bulkerMap["remote"] = outputBulker
 	bulker.On("GetBulkerMap").Return(bulkerMap)
 	bulker.On("Create", mock.Anything, dl.FleetOutputHealth, mock.Anything, mock.MatchedBy(func(body []byte) bool {
-		var doc dl.OutputHealth
+		var doc model.OutputHealth
 		err := json.Unmarshal(body, &doc)
 		if err != nil {
 			t.Fatal(err)

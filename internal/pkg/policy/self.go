@@ -253,7 +253,7 @@ func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, logger zerolog.Lo
 	//pinging logic
 	bulkerMap := bulker.GetBulkerMap()
 	for outputName, outputBulker := range bulkerMap {
-		doc := dl.OutputHealth{
+		doc := model.OutputHealth{
 			Output:  outputName,
 			State:   client.UnitStateHealthy.String(),
 			Message: "",
