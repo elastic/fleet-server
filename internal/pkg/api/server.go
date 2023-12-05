@@ -11,6 +11,7 @@ import (
 	slog "log"
 	"net"
 	"net/http"
+	"strconv"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
@@ -20,6 +21,9 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"go.elastic.co/apm/v2"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 
 	"github.com/rs/zerolog"
 )
@@ -157,19 +161,26 @@ func diagConn(c net.Conn, s http.ConnState) {
 		return
 	}
 
+	localAddr := c.LocalAddr().String()
 	zerolog.Ctx(context.TODO()).Trace().
-		Str("local", c.LocalAddr().String()).
+		Str("local", localAddr).
 		Str("remote", c.RemoteAddr().String()).
 		Str("state", s.String()).
 		Msg("connection state change")
 
+	host, port, _ := net.SplitHostPort(localAddr)
+	p, _ := strconv.Atoi(port)
+	ms := attribute.NewSet(
+		semconv.ServerAddress(host),
+		semconv.ServerPort(p),
+	)
 	switch s {
 	case http.StateNew:
-		cntHTTPNew.Inc()
-		cntHTTPActive.Inc()
+		countHTTPNew.Add(context.TODO(), 1, metric.WithAttributeSet(ms))
+		upDownHTTPActive.Add(context.TODO(), 1, metric.WithAttributeSet(ms))
 	case http.StateClosed:
-		cntHTTPClose.Inc()
-		cntHTTPActive.Dec()
+		countHTTPClose.Add(context.TODO(), 1, metric.WithAttributeSet(ms))
+		upDownHTTPActive.Add(context.TODO(), -1, metric.WithAttributeSet(ms))
 	}
 }
 

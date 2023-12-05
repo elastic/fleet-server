@@ -11,9 +11,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"go.elastic.co/apm/v2"
-
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -22,7 +19,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
+	"go.opentelemetry.io/otel/metric"
 )
 
 const (
@@ -88,7 +88,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 	}
 	span.End()
 
-	span, _ = apm.StartSpan(r.Context(), "response", "write")
+	span, ctx = apm.StartSpan(r.Context(), "response", "write")
 	defer span.End()
 
 	data, err := json.Marshal(&resp)
@@ -102,7 +102,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 	}
 	w.WriteHeader(code)
 
-	ts, ok := logger.CtxStartTime(r.Context())
+	ts, ok := logger.CtxStartTime(ctx)
 	nWritten, err := w.Write(data)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
@@ -114,7 +114,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 		}
 	}
 
-	cntStatus.bodyOut.Add(uint64(nWritten))
+	statusStats.bodyOut.Add(ctx, int64(nWritten), metric.WithAttributes(serverAttrs(r.URL)...))
 	e := zlog.Debug().Int(ECSHTTPResponseBodyBytes, nWritten)
 	if ok {
 		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())

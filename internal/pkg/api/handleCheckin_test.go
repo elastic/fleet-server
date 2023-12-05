@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -583,17 +584,24 @@ func TestProcessUpgradeDetails(t *testing.T) {
 }
 
 func Test_CheckinT_writeResponse(t *testing.T) {
+	u, err := url.Parse("http://example.com")
+	require.NoError(t, err)
+
+	// setup fake metrics tracker
+	checkinStats = nopRouteStats()
+
 	tests := []struct {
 		name       string
 		req        *http.Request
 		respHeader string
 	}{{
 		name:       "no compression",
-		req:        &http.Request{},
+		req:        &http.Request{URL: u},
 		respHeader: "",
 	}, {
 		name: "with compression",
 		req: &http.Request{
+			URL: u,
 			Header: http.Header{
 				"Accept-Encoding": []string{"gzip"},
 			},

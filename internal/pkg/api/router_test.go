@@ -59,6 +59,8 @@ func testStatusServer(t *testing.T, cfg *config.ServerLimits) http.Handler {
 }
 
 func TestLimiter(t *testing.T) {
+	statusStats = nopRouteStats()
+
 	tests := []struct {
 		name   string
 		cfg    *config.ServerLimits

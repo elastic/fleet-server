@@ -43,6 +43,11 @@ import (
 
 const kUAFleetServer = "Fleet-Server"
 
+type otelProvider interface {
+	Shutdown(context.Context) error
+	ShutdownProvider(context.Context) error
+}
+
 // Fleet is an instance of the fleet-server.
 type Fleet struct {
 	standAlone bool
@@ -52,6 +57,7 @@ type Fleet struct {
 	cfgCh    chan *config.Config
 	cache    cache.Cache
 	reporter state.Reporter
+	otel     otelProvider
 }
 
 // NewFleet creates the actual fleet server service.
@@ -205,6 +211,12 @@ LOOP:
 		}
 	}
 
+	if f.otel != nil {
+		if err := f.otel.ShutdownProvider(context.Background()); err != nil {
+			log.Error().Err(err).Msg("Otel MeterProvider failed to shutdown cleanly.")
+		}
+	}
+
 	// Server is coming down; wait for the server group to exit cleanly.
 	// Timeout if something is locked up.
 	err = safeWait(srvEg, time.Second)
@@ -348,14 +360,19 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 		return err
 	}
 
-	// The metricsServer is only enabled if http.enabled is set in the config
-	metricsServer, err := api.InitMetrics(ctx, cfg, f.bi, tracer)
+	provider, err := api.InitOTEL(f.bi, tracer, cfg.HTTP)
 	switch {
 	case err != nil:
 		return err
-	case metricsServer != nil:
-		defer func() {
-			_ = metricsServer.Stop()
+	case provider != nil:
+		f.otel = provider
+		go func() {
+			defer func() {
+				_ = provider.Shutdown(context.TODO()) // ctx passed to runServer may already be cancelled when Shutdown is called.
+			}()
+			if err := provider.Start(); err != nil {
+				zerolog.Ctx(ctx).Error().Err(err).Msg("Metrics server failed.")
+			}
 		}()
 	}
 

@@ -33,9 +33,9 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
-
 	"go.elastic.co/apm/module/apmhttp/v2"
 	"go.elastic.co/apm/v2"
+	"go.opentelemetry.io/otel/metric"
 )
 
 var (
@@ -162,7 +162,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	if err := decoder.Decode(&req); err != nil {
 		return val, fmt.Errorf("decode checkin request: %w", err)
 	}
-	cntCheckin.bodyIn.Add(readCounter.Count())
+	checkinStats.bodyIn.Add(ctx, int64(readCounter.Count()), metric.WithAttributes(serverAttrs(r.URL)...))
 
 	var pDur time.Duration
 	var err error
@@ -532,7 +532,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 			err = fmt.Errorf("writeResponse gzip close: %w", err)
 		}
 
-		cntCheckin.bodyOut.Add(wrCounter.Count())
+		checkinStats.bodyOut.Add(ctx, int64(wrCounter.Count()), metric.WithAttributes(serverAttrs(r.URL)...))
 
 		zlog.Trace().
 			Err(err).
@@ -543,7 +543,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	} else {
 		var nWritten int
 		nWritten, err = w.Write(payload)
-		cntCheckin.bodyOut.Add(uint64(nWritten))
+		checkinStats.bodyOut.Add(ctx, int64(nWritten), metric.WithAttributes(serverAttrs(r.URL)...))
 
 		if err != nil {
 			err = fmt.Errorf("writeResponse payload: %w", err)

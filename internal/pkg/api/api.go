@@ -56,7 +56,7 @@ func (a *apiServer) AgentEnroll(w http.ResponseWriter, r *http.Request, params A
 	err = a.et.handleEnroll(zlog, w, r, rb, params.UserAgent)
 
 	if err != nil {
-		cntEnroll.IncError(err)
+		enrollStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 	}
 }
@@ -65,7 +65,7 @@ func (a *apiServer) AgentAcks(w http.ResponseWriter, r *http.Request, id string,
 	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
 	w.Header().Set("Content-Type", "application/json")
 	if err := a.ack.handleAcks(zlog, w, r, id); err != nil {
-		cntAcks.IncError(err)
+		acksStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 	}
 }
@@ -75,7 +75,7 @@ func (a *apiServer) AgentCheckin(w http.ResponseWriter, r *http.Request, id stri
 	w.Header().Set("Content-Type", "application/json")
 	err := a.ct.handleCheckin(zlog, w, r, id, params.UserAgent)
 	if err != nil {
-		cntCheckin.IncError(err)
+		checkinStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 	}
 }
@@ -90,7 +90,7 @@ func (a *apiServer) Artifact(w http.ResponseWriter, r *http.Request, id string, 
 	err := a.at.handleArtifacts(zlog, w, r, id, sha2)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		cntArtifacts.IncError(err)
+		artifactsStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 	}
 }
@@ -100,7 +100,7 @@ func (a *apiServer) UploadBegin(w http.ResponseWriter, r *http.Request, params U
 	w.Header().Set("Content-Type", "application/json")
 	err := a.ut.handleUploadBegin(zlog, w, r)
 	if err != nil {
-		cntUploadStart.IncError(err)
+		uploadStartStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 	}
 }
@@ -110,7 +110,7 @@ func (a *apiServer) UploadComplete(w http.ResponseWriter, r *http.Request, id st
 	w.Header().Set("Content-Type", "application/json")
 	err := a.ut.handleUploadComplete(zlog, w, r, id)
 	if err != nil {
-		cntUploadEnd.IncError(err)
+		uploadEndStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 	}
 }
@@ -120,12 +120,12 @@ func (a *apiServer) UploadChunk(w http.ResponseWriter, r *http.Request, id strin
 	w.Header().Set("Content-Type", "application/json")
 
 	if _, err := a.ut.authAPIKey(r, a.bulker, a.ut.cache); err != nil {
-		cntUploadChunk.IncError(err)
+		uploadChunkStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 		return
 	}
 	if err := a.ut.handleUploadChunk(zlog, w, r, id, chunkNum, params.XChunkSHA2); err != nil {
-		cntUploadChunk.IncError(err)
+		uploadChunkStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 	}
 }
@@ -133,8 +133,8 @@ func (a *apiServer) UploadChunk(w http.ResponseWriter, r *http.Request, id strin
 func (a *apiServer) GetFile(w http.ResponseWriter, r *http.Request, id string, params GetFileParams) {
 	zlog := hlog.FromRequest(r).With().Logger()
 	if err := a.ft.handleSendFile(zlog, w, r, id); err != nil {
-		cntFileDeliv.IncError(err)
 		w.Header().Set("Content-Type", "application/json")
+		fileDeliveryStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 	}
 }
@@ -142,8 +142,8 @@ func (a *apiServer) GetFile(w http.ResponseWriter, r *http.Request, id string, p
 func (a *apiServer) GetPGPKey(w http.ResponseWriter, r *http.Request, major, minor, patch int, params GetPGPKeyParams) {
 	zlog := hlog.FromRequest(r).With().Logger()
 	if err := a.pt.handlePGPKey(zlog, w, r, major, minor, patch); err != nil {
-		cntGetPGP.IncError(err)
 		w.Header().Set("Content-Type", "application/json")
+		getPGPStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 	}
 }
@@ -155,7 +155,7 @@ func (a *apiServer) Status(w http.ResponseWriter, r *http.Request, params Status
 	w.Header().Set("Content-Type", "application/json")
 	err := a.st.handleStatus(zlog, a.sm, a.bi, r, w)
 	if err != nil {
-		cntStatus.IncError(err)
+		statusStats.IncError(err, serverAttrs(r.URL)...)
 		ErrorResp(w, r, err)
 	}
 }

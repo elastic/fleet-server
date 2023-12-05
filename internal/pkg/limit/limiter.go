@@ -7,12 +7,15 @@ package limit
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
+	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 )
@@ -21,8 +24,8 @@ type releaseFunc func()
 
 // StatIncer is the interface used to count statistics associated with an endpoint.
 type StatIncer interface {
-	IncError(error)
-	IncStart() func()
+	IncError(error, ...attribute.KeyValue)
+	IncStart(...attribute.KeyValue) func()
 }
 
 type Limiter struct {
@@ -74,8 +77,14 @@ func (l *Limiter) release() {
 func (l *Limiter) Wrap(name string, si StatIncer, ll zerolog.Level) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// attrs is a copy of api.serverAttrs // TODO maybe pass it as a function?
+			p, _ := strconv.Atoi(r.URL.Port())
+			attrs := []attribute.KeyValue{
+				semconv.ServerAddress(r.URL.Hostname()),
+				semconv.ServerPort(p),
+			}
 			if si != nil {
-				dfunc := si.IncStart()
+				dfunc := si.IncStart(attrs...)
 				defer dfunc()
 			}
 
@@ -86,7 +95,7 @@ func (l *Limiter) Wrap(name string, si StatIncer, ll zerolog.Level) func(http.Ha
 					hlog.FromRequest(r).Error().Err(wErr).Msg("fail writing error response")
 				}
 				if si != nil {
-					si.IncError(err)
+					si.IncError(err, attrs...)
 				}
 				return
 			}

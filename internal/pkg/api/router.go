@@ -113,25 +113,25 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		switch pathToOperation(r.URL.Path) {
 		case "enroll":
-			l.enroll.Wrap("enroll", &cntEnroll, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+			l.enroll.Wrap("enroll", &enrollStats, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "acks":
-			l.ack.Wrap("acks", &cntAcks, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+			l.ack.Wrap("acks", &acksStats, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "checkin":
-			l.checkin.Wrap("checkin", &cntCheckin, zerolog.WarnLevel)(next).ServeHTTP(w, r)
+			l.checkin.Wrap("checkin", &checkinStats, zerolog.WarnLevel)(next).ServeHTTP(w, r)
 		case "artifact":
-			l.artifact.Wrap("artifact", &cntArtifacts, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+			l.artifact.Wrap("artifact", &artifactsStats, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "uploadBegin":
-			l.uploadBegin.Wrap("uploadBegin", &cntUploadStart, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+			l.uploadBegin.Wrap("uploadBegin", &uploadStartStats, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "uploadComplete":
-			l.uploadComplete.Wrap("uploadComplete", &cntUploadEnd, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+			l.uploadComplete.Wrap("uploadComplete", &uploadEndStats, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "uploadChunk":
-			l.uploadChunk.Wrap("uploadChunk", &cntUploadChunk, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+			l.uploadChunk.Wrap("uploadChunk", &uploadChunkStats, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "deliverFile":
-			l.deliverFile.Wrap("deliverFile", &cntFileDeliv, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+			l.deliverFile.Wrap("deliverFile", &fileDeliveryStats, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "getPGPKey":
-			l.getPGPKey.Wrap("getPGPKey", &cntGetPGP, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+			l.getPGPKey.Wrap("getPGPKey", &getPGPStats, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "status":
-			l.status.Wrap("status", &cntStatus, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+			l.status.Wrap("status", &statusStats, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		default:
 			// no tracking or limits
 			next.ServeHTTP(w, r)
