@@ -15,6 +15,8 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/gofrs/uuid"
 )
 
@@ -23,6 +25,7 @@ const testVer = "1.0.0"
 func TestSearchPolicyLeaders(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPoliciesLeader)
 
@@ -56,6 +59,7 @@ func TestSearchPolicyLeaders(t *testing.T) {
 func TestTakePolicyLeadership(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPoliciesLeader)
 
@@ -91,6 +95,7 @@ func TestTakePolicyLeadership(t *testing.T) {
 func TestReleasePolicyLeadership(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPoliciesLeader)
 
@@ -131,6 +136,7 @@ func TestReleasePolicyLeadership(t *testing.T) {
 func TestReleasePolicyLeadership_NothingIfNotLeader(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPoliciesLeader)
 

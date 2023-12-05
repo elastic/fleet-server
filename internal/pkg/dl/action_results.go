@@ -13,7 +13,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 func CreateActionResult(ctx context.Context, bulker bulk.Bulk, acr model.ActionResult) error {
@@ -33,7 +33,7 @@ func createActionResult(ctx context.Context, bulker bulk.Bulk, index string, acr
 	_, err = bulker.Create(ctx, index, id, body, bulk.WithRefresh())
 	// ignoring version conflict in case the same action result is tried to be created multiple times (unique id with actionID and agentID)
 	if errors.Is(err, es.ErrElasticVersionConflict) {
-		log.Debug().Err(err).Str("id", id).Msg("action result already exists, ignoring")
+		zerolog.Ctx(ctx).Debug().Err(err).Str("id", id).Msg("action result already exists, ignoring")
 		return nil
 	}
 	return err

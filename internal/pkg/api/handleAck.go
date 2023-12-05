@@ -165,24 +165,46 @@ func (ack *AckT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *
 	return &req, err
 }
 
-func eventToActionResult(agentID string, ev Event) (acr model.ActionResult) {
-	return model.ActionResult{
-		ActionID:        ev.ActionId,
-		AgentID:         agentID,
-		ActionInputType: ev.ActionInputType,
-		StartedAt:       ev.StartedAt,
-		CompletedAt:     ev.CompletedAt,
-		ActionData:      fromPtr(ev.ActionData),
-		ActionResponse:  fromPtr(ev.ActionResponse),
-		Data:            fromPtr(ev.Data),
-		Error:           fromPtr(ev.Error),
+func eventToActionResult(agentID, aType string, ev AckRequest_Events_Item) (acr model.ActionResult) {
+	switch aType {
+	case string(REQUESTDIAGNOSTICS):
+		event, _ := ev.AsDiagnosticsEvent()
+		p, _ := json.Marshal(event.Data)
+		return model.ActionResult{
+			ActionID:  event.ActionId,
+			AgentID:   agentID,
+			Data:      p,
+			Error:     fromPtr(event.Error),
+			Timestamp: event.Timestamp.Format(time.RFC3339Nano),
+		}
+	case string(INPUTACTION):
+		event, _ := ev.AsInputEvent()
+		return model.ActionResult{
+			ActionID:        event.ActionId,
+			AgentID:         agentID,
+			ActionInputType: event.ActionInputType,
+			StartedAt:       event.StartedAt.Format(time.RFC3339Nano),
+			CompletedAt:     event.CompletedAt.Format(time.RFC3339Nano),
+			ActionData:      event.ActionData,
+			ActionResponse:  event.ActionResponse,
+			Error:           fromPtr(event.Error),
+			Timestamp:       event.Timestamp.Format(time.RFC3339Nano),
+		}
+	default: // UPGRADE action acks are also handled by handelUpgrade (deprecated func)
+		event, _ := ev.AsGenericEvent()
+		return model.ActionResult{
+			ActionID:  event.ActionId,
+			AgentID:   agentID,
+			Error:     fromPtr(event.Error),
+			Timestamp: event.Timestamp.Format(time.RFC3339Nano),
+		}
 	}
 }
 
 // handleAckEvents can return:
 // 1. AckResponse and nil error, when the whole request is successful
 // 2. AckResponse and non-nil error, when the request items had errors
-func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []Event) (AckResponse, error) {
+func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, events []AckRequest_Events_Item) (AckResponse, error) {
 	span, ctx := apm.StartSpan(ctx, "handleAckEvents", "process")
 	defer span.End()
 	var policyAcks []string
@@ -215,20 +237,19 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	}
 
 	for n, ev := range events {
+		event, _ := ev.AsGenericEvent()
 		span, ctx := apm.StartSpan(ctx, "ackEvent", "process")
 		span.Context.SetLabel("agent_id", agent.Agent.ID)
-		span.Context.SetLabel("action_id", ev.ActionId)
+		span.Context.SetLabel("action_id", event.ActionId)
 		log := zlog.With().
-			Str("actionType", string(ev.Type)).
-			Str("actionSubType", string(ev.Subtype)).
-			Str("actionId", ev.ActionId).
-			Str("agentId", ev.AgentId).
-			Str("timestamp", ev.Timestamp).
+			Str("actionId", event.ActionId).
+			Str("agentId", event.AgentId).
+			Time("timestamp", event.Timestamp).
 			Int("n", n).Logger()
 		log.Info().Msg("ack event")
 
 		// Check agent id mismatch
-		if ev.AgentId != "" && ev.AgentId != agent.Id {
+		if event.AgentId != "" && event.AgentId != agent.Id {
 			log.Error().Msg("agent id mismatch")
 			setResult(n, http.StatusBadRequest)
 			span.End()
@@ -237,10 +258,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 		// Check if this is the policy change ack
 		// The policy change acks are handled after actions
-		if strings.HasPrefix(ev.ActionId, "policy:") {
-			if ev.Error == nil {
+		if strings.HasPrefix(event.ActionId, "policy:") {
+			if event.Error == nil {
 				// only added if no error on action
-				policyAcks = append(policyAcks, ev.ActionId)
+				policyAcks = append(policyAcks, event.ActionId)
 				policyIdxs = append(policyIdxs, n)
 			}
 			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
@@ -252,10 +273,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		// Process non-policy change actions
 		// Find matching action by action ID
 		vSpan, vCtx := apm.StartSpan(ctx, "ackAction", "validate")
-		action, ok := ack.cache.GetAction(ev.ActionId)
+		action, ok := ack.cache.GetAction(event.ActionId)
 		if !ok {
 			// Find action by ID
-			actions, err := dl.FindAction(vCtx, ack.bulk, ev.ActionId)
+			actions, err := dl.FindAction(vCtx, ack.bulk, event.ActionId)
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
 				setError(n, err)
@@ -283,7 +304,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			setResult(n, http.StatusOK)
 		}
 
-		if ev.Error == nil && action.Type == TypeUnenroll {
+		if event.Error == nil && action.Type == TypeUnenroll {
 			unenrollIdxs = append(unenrollIdxs, n)
 		}
 		span.End()
@@ -316,7 +337,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	return res, nil
 }
 
-func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, action model.Action, ev Event) error {
+func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, action model.Action, ev AckRequest_Events_Item) error {
 	// Build span links for actions
 	var links []apm.SpanLink
 	if ack.bulk.HasTracer() && action.Traceparent != "" {
@@ -339,7 +360,7 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 	defer span.End()
 
 	// Convert ack event to action result document
-	acr := eventToActionResult(agent.Id, ev)
+	acr := eventToActionResult(agent.Id, action.Type, ev)
 
 	// Save action result document
 	if err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
@@ -348,7 +369,8 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	if action.Type == TypeUpgrade {
-		if err := ack.handleUpgrade(ctx, zlog, agent, ev); err != nil {
+		event, _ := ev.AsUpgradeEvent()
+		if err := ack.handleUpgrade(ctx, zlog, agent, event); err != nil {
 			zlog.Error().Err(err).Msg("handle upgrade event")
 			return err
 		}
@@ -394,7 +416,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		return nil
 	}
 
-	for _, output := range agent.Outputs {
+	for outputName, output := range agent.Outputs {
 		if output.Type != policy.OutputTypeElasticsearch {
 			continue
 		}
@@ -402,7 +424,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 		err := ack.updateAPIKey(ctx,
 			zlog,
 			agent.Id,
-			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds)
+			output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName)
 		if err != nil {
 			return err
 		}
@@ -423,20 +445,31 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	zlog zerolog.Logger,
 	agentID string,
 	apiKeyID, permissionHash string,
-	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) error {
+	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, outputName string) error {
+	bulk := ack.bulk
+	// use output bulker if exists
+	if outputName != "" {
+		outputBulk := ack.bulk.GetBulker(outputName)
+		if outputBulk != nil {
+			zlog.Debug().Str("outputName", outputName).Msg("Using output bulker in updateAPIKey")
+			bulk = outputBulk
+		}
+	}
 	if apiKeyID != "" {
-		res, err := ack.bulk.APIKeyRead(ctx, apiKeyID, true)
+		res, err := bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
 			if isAgentActive(ctx, zlog, ack.bulk, agentID) {
 				zlog.Error().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
+					Str("outputName", outputName).
 					Msg("Failed to read API Key roles")
 			} else {
 				// race when API key was invalidated before acking
 				zlog.Info().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
+					Str("outputName", outputName).
 					Msg("Failed to read invalidated API Key roles")
 
 				// prevents future checks
@@ -451,14 +484,15 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 					Str(LogAPIKeyID, apiKeyID).
 					Msg("Failed to cleanup roles")
 			} else if removedRolesCount > 0 {
-				if err := ack.bulk.APIKeyUpdate(ctx, apiKeyID, permissionHash, clean); err != nil {
-					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, apiKeyID).Msg("Failed to update API Key")
+				if err := bulk.APIKeyUpdate(ctx, apiKeyID, permissionHash, clean); err != nil {
+					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, apiKeyID).Str("outputName", outputName).Msg("Failed to update API Key")
 				} else {
 					zlog.Debug().
 						Str("hash.sha256", permissionHash).
 						Str(LogAPIKeyID, apiKeyID).
 						RawJSON("roles", clean).
 						Int("removedRoles", removedRolesCount).
+						Str("outputName", outputName).
 						Msg("Updating agent record to pick up reduced roles.")
 				}
 			}
@@ -534,17 +568,46 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 
 func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
 	ids := make([]string, 0, len(toRetireAPIKeyIDs))
+	remoteIds := make(map[string][]string)
 	for _, k := range toRetireAPIKeyIDs {
 		if k.ID == skip || k.ID == "" {
 			continue
 		}
-		ids = append(ids, k.ID)
+		if k.Output != "" {
+			if remoteIds[k.Output] == nil {
+				remoteIds[k.Output] = make([]string, 0)
+			}
+			remoteIds[k.Output] = append(remoteIds[k.Output], k.ID)
+		} else {
+			ids = append(ids, k.ID)
+		}
 	}
-
 	if len(ids) > 0 {
 		zlog.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
 		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
 			zlog.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+		}
+	}
+	// using remote es bulker to invalidate api key
+	for outputName, outputIds := range remoteIds {
+		outputBulk := ack.bulk.GetBulker(outputName)
+
+		if outputBulk == nil {
+			// read output config from .fleet-policies, not filtering by policy id as agent could be reassigned
+			policy, err := dl.QueryOutputFromPolicy(ctx, ack.bulk, outputName)
+			if err != nil || policy == nil {
+				zlog.Warn().Str("outputName", outputName).Any("ids", outputIds).Msg("Output policy not found, API keys will be orphaned")
+			} else {
+				outputBulk, _, err = ack.bulk.CreateAndGetBulker(ctx, zlog, outputName, policy.Data.Outputs)
+				if err != nil {
+					zlog.Warn().Str("outputName", outputName).Any("ids", outputIds).Msg("Failed to recreate output bulker, API keys will be orphaned")
+				}
+			}
+		}
+		if outputBulk != nil {
+			if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
+				zlog.Info().Err(err).Strs("ids", outputIds).Str("outputName", outputName).Msg("Failed to invalidate API keys")
+			}
 		}
 	}
 }
@@ -581,28 +644,24 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 	return nil
 }
 
-func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event Event) error {
+func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, event UpgradeEvent) error {
 	span, ctx := apm.StartSpan(ctx, "ackUpgrade", "process")
 	defer span.End()
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{}
 	if event.Error != nil {
-		// unmarshal event payload
-		var pl struct {
-			Retry   bool `json:"retry"`
-			Attempt int  `json:"retry_attempt"`
-		}
-		err := json.Unmarshal(fromPtr(event.Payload), &pl)
-		if err != nil {
-			zlog.Error().Err(err).Msg("unable to unmarshal upgrade event payload")
-		}
-
 		// if the payload indicates a retry, mark change the upgrade status to retrying.
-		if pl.Retry {
-			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as retrying")
+		if event.Payload == nil {
+			zlog.Info().Msg("marking agent upgrade as failed, agent logs contain failure message")
+			doc = bulk.UpdateFields{
+				dl.FieldUpgradeStartedAt: nil,
+				dl.FieldUpgradeStatus:    "failed",
+			}
+		} else if event.Payload.Retry {
+			zlog.Info().Int("retry_attempt", event.Payload.RetryAttempt).Msg("marking agent upgrade as retrying")
 			doc[dl.FieldUpgradeStatus] = "retrying" // Keep FieldUpgradeStatedAt abd FieldUpgradeded at to original values
 		} else {
-			zlog.Info().Int("retry_attempt", pl.Attempt).Msg("marking agent upgrade as failed, agent logs contain failure message")
+			zlog.Info().Int("retry_attempt", event.Payload.RetryAttempt).Msg("marking agent upgrade as failed, agent logs contain failure message")
 			doc = bulk.UpdateFields{
 				dl.FieldUpgradeStartedAt: nil,
 				dl.FieldUpgradeStatus:    "failed",

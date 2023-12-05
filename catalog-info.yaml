@@ -132,6 +132,7 @@ spec:
       repository: elastic/fleet-server
       pipeline_file: .buildkite/pipeline.fleet-server-tests.yaml
       branch_configuration: "main"
+      skip_intermediate_builds: false
       provider_settings:
         build_pull_requests: false
         trigger_mode: none

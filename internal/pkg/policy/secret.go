@@ -57,25 +57,39 @@ func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bul
 	for _, input := range data.Inputs {
 		newInput := make(map[string]interface{})
 		for k, v := range input {
-			// replace secret refs in input stream fields
-			if k == "streams" {
-				if streams, ok := v.([]any); ok {
-					newInput[k] = processStreams(streams, secretValues)
-				}
-				// replace secret refs in input fields
-			} else if ref, ok := input[k].(string); ok {
-				val := replaceSecretRef(ref, secretValues)
-				newInput[k] = val
-			}
-			// if any field was not processed, add back as is
-			if _, ok := newInput[k]; !ok {
-				newInput[k] = v
-			}
+			newInput[k] = replaceAnyRef(v, secretValues)
 		}
 		result = append(result, newInput)
 	}
 	data.SecretReferences = nil
 	return result, nil
+}
+
+// replaceAnyRef is a generic approach to replacing any secret references in the passed item.
+// It will go through any slices or maps and replace any secret references.
+//
+// go's generic parameters are not a good fit for rewriting this method as the typeswitch will not work.
+func replaceAnyRef(ref any, secrets map[string]string) any {
+	var r any
+	switch val := ref.(type) {
+	case string:
+		r = replaceStringRef(val, secrets)
+	case map[string]any:
+		obj := make(map[string]any)
+		for k, v := range val {
+			obj[k] = replaceAnyRef(v, secrets)
+		}
+		r = obj
+	case []any:
+		arr := make([]any, len(val))
+		for i, v := range val {
+			arr[i] = replaceAnyRef(v, secrets)
+		}
+		r = arr
+	default:
+		r = val
+	}
+	return r
 }
 
 type OutputSecret struct {
@@ -131,7 +145,7 @@ func setSecretPath(output smap.Map, secretValue string, secretPaths []string) er
 }
 
 // Read secret from output and mutate output with secret value
-func processOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) error {
+func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) error {
 	secrets := output.GetMap(FieldOutputSecrets)
 
 	delete(output, FieldOutputSecrets)
@@ -162,35 +176,8 @@ func processOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk)
 	return nil
 }
 
-func processStreams(streams []any, secretValues map[string]string) []any {
-	newStreams := make([]any, 0)
-	for _, stream := range streams {
-		if streamMap, ok := stream.(map[string]interface{}); ok {
-			newStream := replaceSecretsInStream(streamMap, secretValues)
-			newStreams = append(newStreams, newStream)
-		} else {
-			newStreams = append(newStreams, stream)
-		}
-	}
-	return newStreams
-}
-
-// if field values are secret refs, replace with secret value, otherwise noop
-func replaceSecretsInStream(streamMap map[string]interface{}, secretValues map[string]string) map[string]interface{} {
-	newStream := make(map[string]interface{})
-	for streamKey, streamVal := range streamMap {
-		if streamRef, ok := streamMap[streamKey].(string); ok {
-			replacedVal := replaceSecretRef(streamRef, secretValues)
-			newStream[streamKey] = replacedVal
-		} else {
-			newStream[streamKey] = streamVal
-		}
-	}
-	return newStream
-}
-
-// replace values mathing a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
-func replaceSecretRef(ref string, secretValues map[string]string) string {
+// replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
+func replaceStringRef(ref string, secretValues map[string]string) string {
 	matches := secretRegex.FindStringSubmatch(ref)
 	if len(matches) > 1 {
 		secretRef := matches[1]

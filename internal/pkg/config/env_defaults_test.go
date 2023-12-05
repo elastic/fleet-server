@@ -12,7 +12,7 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/stretchr/testify/require"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 func TestLoadLimits(t *testing.T) {
@@ -21,18 +21,19 @@ func TestLoadLimits(t *testing.T) {
 		ConfiguredAgentLimit int
 		ExpectedAgentLimit   int
 	}{
-		{"few agents", 5, 49},
-		{"512", 512, 4999},
-		{"precise", 7499, 7499},
-		{"10k", 10050, 12499},
-		{"close to max", 13000, 29999},
-		{"above max", 30001, int(getMaxInt())},
+		{"default", -1, int(getMaxInt())},
+		{"few agents", 5, 2500},
+		{"512", 512, 2500},
+		{"lesser bound", 5001, 10000},
+		{"upper bound", 10000, 10000},
+		{"above max", 40001, int(getMaxInt())},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			log.Logger = testlog.SetLogger(t)
-			l := loadLimitsForAgents(tc.ConfiguredAgentLimit)
+			log := testlog.SetLogger(t)
+			zerolog.DefaultContextLogger = &log
+			l := loadLimits(tc.ConfiguredAgentLimit)
 
 			require.Equal(t, tc.ExpectedAgentLimit, l.Agents.Max)
 		})

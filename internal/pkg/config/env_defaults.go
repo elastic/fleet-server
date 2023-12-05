@@ -5,6 +5,7 @@
 package config
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io"
@@ -16,7 +17,7 @@ import (
 
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/pbnjay/memory"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -40,13 +41,13 @@ const (
 	defaultArtifactMaxBody  = 0
 
 	defaultEnrollInterval = time.Millisecond * 10
-	defaultEnrollBurst    = 100
-	defaultEnrollMax      = 50
+	defaultEnrollBurst    = 50
+	defaultEnrollMax      = 100
 	defaultEnrollMaxBody  = 1024 * 512
 
 	defaultAckInterval = time.Millisecond * 10
-	defaultAckBurst    = 100
-	defaultAckMax      = 50
+	defaultAckBurst    = 50
+	defaultAckMax      = 100
 	defaultAckMaxBody  = 1024 * 1024 * 2
 
 	defaultStatusInterval = time.Millisecond * 5
@@ -54,29 +55,30 @@ const (
 	defaultStatusMax      = 50
 	defaultStatusMaxBody  = 0
 
-	defaultUploadStartInterval = time.Second * 3
-	defaultUploadStartBurst    = 8
-	defaultUploadStartMax      = 3
+	defaultUploadStartInterval = time.Second * 2
+	defaultUploadStartBurst    = 5
+	defaultUploadStartMax      = 10
 	defaultUploadStartMaxBody  = 1024 * 1024 * 5
 
 	defaultUploadEndInterval = time.Second * 2
 	defaultUploadEndBurst    = 5
-	defaultUploadEndMax      = 2
+	defaultUploadEndMax      = 10
 	defaultUploadEndMaxBody  = 1024
 
 	defaultUploadChunkInterval = time.Millisecond * 3
-	defaultUploadChunkBurst    = 10
-	defaultUploadChunkMax      = 5
+	defaultUploadChunkBurst    = 5
+	defaultUploadChunkMax      = 10
 	defaultUploadChunkMaxBody  = 1024 * 1024 * 4 // this is also enforced in handler, a chunk MAY NOT be larger than 4 MiB
 
 	defaultFileDelivInterval = time.Millisecond * 100
-	defaultFileDelivBurst    = 8
-	defaultFileDelivMax      = 5
-	defaultFileDelivMaxBody  = 1024 * 1024 * 5
+	defaultFileDelivBurst    = 5
+	defaultFileDelivMax      = 10
+	defaultFileDelivMaxBody  = 0
 
-	defaultPGPRetrievalInterval = time.Millisecond * 10
-	defaultPGPRetrievalBurst    = 100
+	defaultPGPRetrievalInterval = time.Millisecond * 5
+	defaultPGPRetrievalBurst    = 25
 	defaultPGPRetrievalMax      = 50
+	defaultPGPRetrievalMaxBody  = 0
 )
 
 type valueRange struct {
@@ -115,10 +117,20 @@ func defaultCacheLimits() *cacheLimits {
 }
 
 type limit struct {
+	// Interval is the rate limiter's max frequency of requests (1s means 1req/s, 1ms means 1req/ms)
+	// A rate of 0 disables the rate limiter
 	Interval time.Duration `config:"interval"`
-	Burst    int           `config:"burst"`
-	Max      int64         `config:"max"`
-	MaxBody  int64         `config:"max_body_byte_size"`
+	// Burst is the rate limiter's burst allocation that allows for spikes of traffic.
+	// Having a burst value > max is functionally setting it to the same as max.
+	// A burst of 0 allows no requests.
+	Burst int `config:"burst"`
+	// Max is the total number of requests allowed to an endpoint.
+	// A zero value disables the max limiter
+	Max int64 `config:"max"`
+	// MaxBody is the request body size limit.
+	// Used in the ack, checkin, and enroll endpoints.
+	// A zero value disabled the check.
+	MaxBody int64 `config:"max_body_byte_size"`
 }
 
 type serverLimitDefaults struct {
@@ -205,7 +217,7 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Interval: defaultPGPRetrievalInterval,
 			Burst:    defaultPGPRetrievalBurst,
 			Max:      defaultPGPRetrievalMax,
-			MaxBody:  0,
+			MaxBody:  defaultPGPRetrievalMaxBody,
 		},
 	}
 }
@@ -247,17 +259,21 @@ func init() {
 	}
 }
 
+// loadLimits loads cache and server_limit settings based on the passed agentLimit number.
+// If agentLimit < 0 the default settings are used.
+// If agentLimit > 0 the settings from the matching default/*.yml file are used based off agent count.
+// If agentLimit == 0 then the settings from default/*.yml are used based off system memory.
+// If a lookup fails, default settings are used.
 func loadLimits(agentLimit int) *envLimits {
-	return loadLimitsForAgents(agentLimit)
-}
-
-func loadLimitsForAgents(agentLimit int) *envLimits {
-	if agentLimit == 0 {
+	if agentLimit < 0 {
 		return defaultEnvLimits()
+	} else if agentLimit == 0 {
+		return memEnvLimits()
 	}
+	log := zerolog.Ctx(context.TODO())
 	for _, l := range defaults {
 		// get nearest limits for configured agent numbers
-		if l.Agents.Min < agentLimit && agentLimit <= l.Agents.Max {
+		if l.Agents.Min <= agentLimit && agentLimit <= l.Agents.Max {
 			log.Info().Msgf("Using system limits for %d to %d agents for a configured value of %d agents", l.Agents.Min, l.Agents.Max, agentLimit)
 			ramSize := int(memory.TotalMemory() / 1024 / 1024)
 			if ramSize < l.RecommendedRAM {
@@ -268,6 +284,31 @@ func loadLimitsForAgents(agentLimit int) *envLimits {
 	}
 	log.Info().Msgf("No applicable limit for %d agents, using default.", agentLimit)
 	return defaultEnvLimits()
+}
+
+// memMB returns the system total memory in MB
+// It wraps memory.TotalMemory() so that we can replace the var in unit tests.
+var memMB func() int = func() int {
+	return int(memory.TotalMemory() / 1024 / 1024)
+}
+
+func memEnvLimits() *envLimits {
+	mem := memMB()
+	k := 0
+	recRAM := 0
+	log := zerolog.Ctx(context.TODO())
+	for i, l := range defaults {
+		if mem >= l.RecommendedRAM && l.RecommendedRAM > recRAM {
+			k = i
+			recRAM = l.RecommendedRAM
+		}
+	}
+	if recRAM == 0 {
+		log.Warn().Int("memory_mb", mem).Msg("No settings with recommended ram found, using default.")
+		return defaultEnvLimits()
+	}
+	log.Info().Int("memory_mb", mem).Int("recommended_mb", recRAM).Msg("Found settings with recommended ram.")
+	return defaults[k]
 }
 
 func getMaxInt() int64 {

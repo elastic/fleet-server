@@ -13,6 +13,8 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,6 +31,7 @@ func TestMetricsEndpoints(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	srv, err := InitMetrics(ctx, cfg, bi, nil)
 	require.NoError(t, err, "unable to start metrics server")

@@ -14,9 +14,9 @@ import (
 	"strings"
 
 	esh "github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/rs/zerolog"
 
 	"github.com/hashicorp/go-version"
-	"github.com/rs/zerolog/log"
 
 	"github.com/elastic/go-elasticsearch/v8"
 )
@@ -30,23 +30,23 @@ var (
 // CheckCompatiblility will check the remote Elasticsearch version retrieved by the Elasticsearch client with the passed fleet version.
 // Versions are compatible when Elasticsearch's version is greater then or equal to fleet-server's version
 func CheckCompatibility(ctx context.Context, esCli *elasticsearch.Client, fleetVersion string) (string, error) {
-	log.Debug().Str("fleet_version", fleetVersion).Msg("check version compatibility with elasticsearch")
+	zerolog.Ctx(ctx).Debug().Str("fleet_version", fleetVersion).Msg("check version compatibility with elasticsearch")
 
 	esVersion, err := esh.FetchESVersion(ctx, esCli)
 
 	if err != nil {
-		log.Error().Err(err).Msg("failed to fetch elasticsearch version")
+		zerolog.Ctx(ctx).Error().Err(err).Msg("failed to fetch elasticsearch version")
 		return "", err
 	}
-	log.Debug().Str("elasticsearch_version", esVersion).Msg("fetched elasticsearch version")
+	zerolog.Ctx(ctx).Debug().Str("elasticsearch_version", esVersion).Msg("fetched elasticsearch version")
 
-	return esVersion, checkCompatibility(fleetVersion, esVersion)
+	return esVersion, checkCompatibility(ctx, fleetVersion, esVersion)
 }
 
-func checkCompatibility(fleetVersion, esVersion string) error {
+func checkCompatibility(ctx context.Context, fleetVersion, esVersion string) error {
 	verConst, err := buildVersionConstraint(fleetVersion)
 	if err != nil {
-		log.Error().Err(err).Str("fleet_version", fleetVersion).Msg("failed to build constraint")
+		zerolog.Ctx(ctx).Error().Err(err).Str("fleet_version", fleetVersion).Msg("failed to build constraint")
 		return err
 	}
 
@@ -56,14 +56,14 @@ func checkCompatibility(fleetVersion, esVersion string) error {
 	}
 
 	if !verConst.Check(ver) {
-		log.Error().
+		zerolog.Ctx(ctx).Error().
 			Err(ErrUnsupportedVersion).
 			Str("constraint", verConst.String()).
 			Str("reported", ver.String()).
 			Msg("failed elasticsearch version check")
 		return ErrUnsupportedVersion
 	}
-	log.Info().Str("fleet_version", fleetVersion).Str("elasticsearch_version", esVersion).Msg("Elasticsearch compatibility check successful")
+	zerolog.Ctx(ctx).Info().Str("fleet_version", fleetVersion).Str("elasticsearch_version", esVersion).Msg("Elasticsearch compatibility check successful")
 	return nil
 }
 
@@ -91,7 +91,7 @@ func minimizePatch(ver *version.Version) string {
 func parseVersion(sver string) (*version.Version, error) {
 	ver, err := version.NewVersion(strings.Split(sver, "-")[0])
 	if err != nil {
-		return nil, fmt.Errorf("%v: %w", err, ErrMalformedVersion)
+		return nil, fmt.Errorf("%w: %w", err, ErrMalformedVersion)
 	}
 	return ver, nil
 }

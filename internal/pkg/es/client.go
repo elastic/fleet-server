@@ -14,9 +14,9 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/rs/zerolog/log"
 )
 
 type ConfigOption func(config *elasticsearch.Config)
@@ -34,7 +34,7 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 		opt(&escfg)
 	}
 
-	zlog := log.With().
+	zlog := zerolog.Ctx(ctx).With().
 		Strs("cluster.addr", addr).
 		Int("cluster.maxConnsPersHost", mcph).
 		Logger()

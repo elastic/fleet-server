@@ -19,10 +19,15 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func TestFindAgent_NewModel(t *testing.T) {
-	index, bulker := ftesting.SetupCleanIndex(context.Background(), t, FleetAgents)
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
 
 	now := time.Now().UTC()
 	nowStr := now.Format(time.RFC3339)
@@ -55,11 +60,11 @@ func TestFindAgent_NewModel(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = bulker.Create(
-		context.Background(), index, agentID, body, bulk.WithRefresh())
+		ctx, index, agentID, body, bulk.WithRefresh())
 	require.NoError(t, err)
 
 	agent, err := FindAgent(
-		context.Background(), bulker, QueryAgentByID, FieldID, agentID, WithIndexName(index))
+		ctx, bulker, QueryAgentByID, FieldID, agentID, WithIndexName(index))
 	require.NoError(t, err)
 
 	assert.Equal(t, agentID, agent.Id)

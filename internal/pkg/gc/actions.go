@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/scheduler"
+
+	"github.com/rs/zerolog"
 )
 
 type ActionsCleanupConfig struct {
@@ -70,7 +70,7 @@ func cleanupActions(ctx context.Context, index string, bulker bulk.Bulk, opts ..
 		opt(&c)
 	}
 
-	log := log.With().Str("ctx", "fleet actions cleanup").Str("interval", "now-"+c.cleanupIntervalAfterExpired).Logger()
+	log := zerolog.Ctx(ctx).With().Str("ctx", "fleet actions cleanup").Str("interval", "now-"+c.cleanupIntervalAfterExpired).Logger()
 
 	log.Debug().Msg("delete expired actions")
 

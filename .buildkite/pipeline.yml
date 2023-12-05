@@ -9,7 +9,7 @@ env:
   DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
   DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
   GO_AGENT_IMAGE: "golang:${GO_VERSION}"
-  TERRAFORM_VERSION: "1.4.6"
+  TERRAFORM_VERSION: "1.6.3"
 
 steps:
   - group: "Check and build"
@@ -81,6 +81,7 @@ steps:
           image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
         command:
           - "buildkite-agent artifact download build/*coverage.out ."
+          - "buildkite-agent artifact download build/test-unit.out.xml ."
           - "/scan-source-code.sh"
         depends_on:
           - step: "unit-test"

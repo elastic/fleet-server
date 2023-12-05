@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	OutputTypeElasticsearch = "elasticsearch"
-	OutputTypeLogstash      = "logstash"
-	OutputTypeKafka         = "kafka"
+	OutputTypeElasticsearch       = "elasticsearch"
+	OutputTypeRemoteElasticsearch = "remote_elasticsearch"
+	OutputTypeLogstash            = "logstash"
+	OutputTypeKafka               = "kafka"
 )
 
 var (
@@ -35,9 +36,10 @@ var (
 )
 
 type Output struct {
-	Name string
-	Type string
-	Role *RoleT
+	Name         string
+	Type         string
+	ServiceToken string
+	Role         *RoleT
 }
 
 // Prepare prepares the output p to be sent to the elastic-agent
@@ -53,8 +55,18 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	switch p.Type {
 	case OutputTypeElasticsearch:
 		zlog.Debug().Msg("preparing elasticsearch output")
-		if err := p.prepareElasticsearch(ctx, zlog, bulker, agent, outputMap); err != nil {
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, bulker, agent, outputMap, false); err != nil {
 			return fmt.Errorf("failed to prepare elasticsearch output %q: %w", p.Name, err)
+		}
+	case OutputTypeRemoteElasticsearch:
+		zlog.Debug().Msg("preparing remote elasticsearch output")
+		newBulker, hasConfigChanged, err := bulker.CreateAndGetBulker(ctx, zlog, p.Name, outputMap)
+		if err != nil {
+			return err
+		}
+		// the outputBulker is different for remote ES, it is used to create/update Api keys in the remote ES client
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, newBulker, agent, outputMap, hasConfigChanged); err != nil {
+			return fmt.Errorf("failed to prepare remote elasticsearch output %q: %w", p.Name, err)
 		}
 	case OutputTypeLogstash:
 		zlog.Debug().Msg("preparing logstash output")
@@ -73,8 +85,10 @@ func (p *Output) prepareElasticsearch(
 	ctx context.Context,
 	zlog zerolog.Logger,
 	bulker bulk.Bulk,
+	outputBulker bulk.Bulk,
 	agent *model.Agent,
-	outputMap map[string]map[string]interface{}) error {
+	outputMap map[string]map[string]interface{},
+	hasConfigChanged bool) error {
 	// The role is required to do api key management
 	if p.Role == nil {
 		zlog.Error().
@@ -97,6 +111,65 @@ func (p *Output) prepareElasticsearch(
 		agent.Outputs[p.Name] = output
 	}
 
+	// retire api key of removed remote output
+	var toRetireAPIKeys *model.ToRetireAPIKeyIdsItems
+	var removedOutputName string
+	// find the first output that is removed - supposing one output can be removed at a time
+	for agentOutputName, agentOutput := range agent.Outputs {
+		found := false
+		for outputMapKey := range outputMap {
+			if agentOutputName == outputMapKey {
+				found = true
+				break
+			}
+		}
+		if !found {
+			zlog.Info().Str(logger.APIKeyID, agentOutput.APIKeyID).Str("outputName", agentOutputName).Msg("Output removed, will retire API key")
+			toRetireAPIKeys = &model.ToRetireAPIKeyIdsItems{
+				ID:        agentOutput.APIKeyID,
+				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+				Output:    agentOutputName,
+			}
+			removedOutputName = agentOutputName
+			break
+		}
+	}
+
+	if toRetireAPIKeys != nil {
+
+		// adding remote API key to new output toRetireAPIKeys
+		fields := map[string]interface{}{
+			dl.FieldPolicyOutputToRetireAPIKeyIDs: *toRetireAPIKeys,
+		}
+
+		// Using painless script to append the old keys to the history
+		body, err := renderUpdatePainlessScript(p.Name, fields)
+		if err != nil {
+			return fmt.Errorf("could not update painless script: %w", err)
+		}
+
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+			zlog.Error().Err(err).Msg("fail update agent record")
+			return fmt.Errorf("fail update agent record: %w", err)
+		}
+
+		// remove output from agent doc
+		body, err = json.Marshal(map[string]interface{}{
+			"script": map[string]interface{}{
+				"lang":   "painless",
+				"source": fmt.Sprintf("ctx._source['outputs'].remove(\"%s\")", removedOutputName),
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("could not create request body to update agent: %w", err)
+		}
+
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+			zlog.Error().Err(err).Msg("fail update agent record")
+			return fmt.Errorf("fail update agent record: %w", err)
+		}
+	}
+
 	// Determine whether we need to generate an output ApiKey.
 	// This is accomplished by comparing the sha2 hash stored in the corresponding
 	// output in the agent record with the precalculated sha2 hash of the role.
@@ -109,12 +182,15 @@ func (p *Output) prepareElasticsearch(
 	case output.APIKey == "":
 		zlog.Debug().Msg("must generate api key as default API key is not present")
 		needNewKey = true
+	case hasConfigChanged:
+		zlog.Debug().Msg("must generate api key as remote output config changed")
+		needNewKey = true
 	case p.Role.Sha2 != output.PermissionsHash:
 		// the is actually the OutputPermissionsHash for the default hash. The Agent
 		// document on ES does not have OutputPermissionsHash for any other output
 		// besides the default one. It seems to me error-prone to rely on the default
 		// output permissions hash to generate new API keys for other outputs.
-		zlog.Debug().Msg("must generate api key as policy output permissions changed")
+		zlog.Debug().Msg("must update api key as policy output permissions changed")
 		needUpdateKey = true
 	default:
 		zlog.Debug().Msg("policy output permissions are the same")
@@ -128,7 +204,7 @@ func (p *Output) prepareElasticsearch(
 			Msg("Generating a new API key")
 
 		// query current api key for roles so we don't lose permissions in the meantime
-		currentRoles, err := fetchAPIKeyRoles(ctx, bulker, output.APIKeyID)
+		currentRoles, err := fetchAPIKeyRoles(ctx, outputBulker, output.APIKeyID)
 		if err != nil {
 			zlog.Error().
 				Str("apiKeyID", output.APIKeyID).
@@ -146,7 +222,7 @@ func (p *Output) prepareElasticsearch(
 		}
 
 		// hash provided is only for merging request together and not persisted
-		err = bulker.APIKeyUpdate(ctx, output.APIKeyID, newRoles.Sha2, newRoles.Raw)
+		err = outputBulker.APIKeyUpdate(ctx, output.APIKeyID, newRoles.Sha2, newRoles.Raw)
 		if err != nil {
 			zlog.Error().Err(err).Msg("fail generate output key")
 			zlog.Debug().RawJSON("roles", newRoles.Raw).Str("sha", newRoles.Sha2).Err(err).Msg("roles not updated")
@@ -183,7 +259,19 @@ func (p *Output) prepareElasticsearch(
 
 		ctx := zlog.WithContext(ctx)
 		outputAPIKey, err :=
-			generateOutputAPIKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw)
+			generateOutputAPIKey(ctx, outputBulker, agent.Id, p.Name, p.Role.Raw)
+			// reporting output error status to self monitor and not returning the error to keep fleet-server running
+		if outputAPIKey == nil && p.Type == OutputTypeRemoteElasticsearch {
+			if err != nil {
+				zerolog.Ctx(ctx).Warn().Err(err).Msg("Could not create API key in remote ES")
+			}
+
+			// replace type remote_elasticsearch with elasticsearch as agent doesn't recognize remote_elasticsearch
+			outputMap[p.Name][FieldOutputType] = OutputTypeElasticsearch
+			// remove the service token from the agent policy sent to the agent
+			delete(outputMap[p.Name], FieldOutputServiceToken)
+			return nil
+		}
 		if err != nil {
 			return fmt.Errorf("failed generate output API key: %w", err)
 		}
@@ -209,6 +297,7 @@ func (p *Output) prepareElasticsearch(
 			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeyIdsItems{
 				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+				Output:    p.Name,
 			}
 		}
 
@@ -231,6 +320,14 @@ func (p *Output) prepareElasticsearch(
 		output.APIKey = outputAPIKey.Agent()
 		output.APIKeyID = outputAPIKey.ID
 		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
+	}
+
+	if p.Type == OutputTypeRemoteElasticsearch {
+
+		// replace type remote_elasticsearch with elasticsearch as agent doesn't recognize remote_elasticsearch
+		outputMap[p.Name][FieldOutputType] = OutputTypeElasticsearch
+		// remove the service token from the agent policy sent to the agent
+		delete(outputMap[p.Name], FieldOutputServiceToken)
 	}
 
 	// Always insert the `api_key` as part of the output block, this is required
@@ -373,8 +470,9 @@ if (ctx._source['outputs']['%s']==null)
 			source.WriteString(fmt.Sprintf(`
 if (ctx._source['outputs']['%s'].%s==null)
   {ctx._source['outputs']['%s'].%s=new ArrayList();}
-ctx._source['outputs']['%s'].%s.add(params.%s);
-`, outputName, field, outputName, field, outputName, field, field))
+if (!ctx._source['outputs']['%s'].%s.contains(params.%s))  
+  {ctx._source['outputs']['%s'].%s.add(params.%s);}
+`, outputName, field, outputName, field, outputName, field, field, outputName, field, field))
 		} else {
 			// Update the other fields
 			source.WriteString(fmt.Sprintf(`

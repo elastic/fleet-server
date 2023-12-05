@@ -1,0 +1,53 @@
+num_agents:
+  min: 0
+  max: 2500
+recommended_min_ram: 1024
+cache_limits:
+  num_counters: 20000
+  max_cost: 52428800
+server_limits:
+  policy_throttle: 5ms
+  max_connections: 7000
+  action_limit:
+    interval: 5ms
+    burst: 1
+  checkin_limit:
+    interval: 5ms
+    burst: 500
+    max: 2500
+  artifact_limit:
+    interval: 5ms
+    burst: 500
+    max: 1000
+  enroll_limit:
+    interval: 10ms
+    burst: 50
+    max: 100
+  ack_limit:
+    interval: 4ms
+    burst: 500
+    max: 1000
+  status_limit:
+    interval: 5ms
+    burst: 50
+    max: 100
+  upload_start_limit:
+    interval: 2s
+    burst: 10
+    max: 20
+  upload_end_limit:
+    interval: 2s
+    burst: 10
+    max: 20
+  upload_chunk_limit:
+    interval: 3ms
+    burst: 10
+    max: 20
+  file_delivery_limit:
+    interval: 100ms
+    burst: 10
+    max: 20
+  pgp_retieval_limit:
+    interval: 5ms
+    burst: 500
+    max: 1000

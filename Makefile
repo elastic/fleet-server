@@ -89,14 +89,14 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 .PHONY: clean
 clean: ## - Clean up build artifacts
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
-	rm -rf .service_token .kibana_service_token ./bin/ ./build/
+	rm -rf .service_token* .kibana_service_token ./bin/ ./build/
 
 .PHONY: generate
 generate: ## - Generate schema models
 	@printf "${CMD_COLOR_ON} Installing module for go generate\n${CMD_COLOR_OFF}"
 	env GOBIN=${GOBIN} go install github.com/elastic/go-json-schema-generate/cmd/schema-generate@ec19b88f6b5ef7825a928df8274a99337b855d1f
 	@printf "${CMD_COLOR_ON} Installing module for oapi-codegen\n${CMD_COLOR_OFF}"
-	env GOBIN=${GOBIN} go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.15.0
+	env GOBIN=${GOBIN} go install github.com/deepmap/oapi-codegen/v2/cmd/oapi-codegen@v2.0.0
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
 	env PATH="${GOBIN}:${PATH}" go generate ./...
 
@@ -297,12 +297,13 @@ export $(shell sed 's/=.*//' ./dev-tools/integration/.env)
 # Start ES with docker without waiting
 .PHONY: int-docker-start-async
 int-docker-start-async:
-	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans elasticsearch
+	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans elasticsearch elasticsearch-remote
 
 # Wait for ES to be ready
 .PHONY: int-docker-wait
 int-docker-wait:
 	@./dev-tools/integration/wait-for-elasticsearch.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}
+	@./dev-tools/integration/wait-for-elasticsearch.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_REMOTE_ELASTICSEARCH_HOST}
 
 # Start integration docker setup with wait for when the ES is ready
 .PHONY: int-docker-start
@@ -314,7 +315,7 @@ int-docker-start: ## - Start docker envronment for integration tests and wait un
 .PHONY: int-docker-stop
 int-docker-stop: ## - Stop docker environment for integration tests
 	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env down
-	@rm -f .service_token
+	@rm -f .service_token*
 
 # Run integration tests with starting/stopping docker
 .PHONY: test-int
@@ -331,7 +332,8 @@ test-int: prepare-test-context  ## - Run integration tests with full setup (slow
 .PHONY: test-int-set
 test-int-set: ## - Run integration tests without setup
 	# Initialize indices one before running all the tests
-	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
+	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS} "fleet-server") \
+	REMOTE_ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_REMOTE_ELASTICSEARCH_HOST} "fleet-server-remote") \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	go test -v -tags=integration -count=1 -race -p 1 ./...
 
@@ -372,7 +374,7 @@ test-e2e: docker-cover-e2e-binaries build-e2e-agent-image e2e-certs build-docker
 .PHONY: test-e2e-set
 test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	cd testing; \
-	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
+	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS} "fleet-server") \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
 	STANDALONE_E2E_IMAGE=$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) \

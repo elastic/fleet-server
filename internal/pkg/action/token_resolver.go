@@ -11,7 +11,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 const cacheSize = 5000
@@ -43,7 +43,7 @@ func (r *TokenResolver) Resolve(ctx context.Context, token string) (int64, error
 		return 0, dl.ErrNotFound
 	}
 	if v, ok := r.cache.Get(token); ok {
-		log.Debug().Str("token", token).Int64("seqno", v).Msg("Found token cached")
+		zerolog.Ctx(ctx).Debug().Str("token", token).Int64("seqno", v).Msg("Found token cached")
 		return v, nil
 	}
 

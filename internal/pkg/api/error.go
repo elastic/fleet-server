@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/delivery"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
@@ -165,7 +167,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			ErrAgentIdentity,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusForbidden,
 				"ErrAgentIdentity",
 				"Agent header contains wrong identifier",
 				zerolog.InfoLevel,
@@ -183,7 +185,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			ErrAgentInactive,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrAgentInactive",
 				"Agent inactive",
 				zerolog.InfoLevel,
@@ -192,7 +194,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			ErrAPIKeyNotEnabled,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrAPIKeyNotEnabled",
 				"APIKey not enabled",
 				zerolog.InfoLevel,
@@ -238,7 +240,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			apikey.ErrNoAuthHeader,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrNoAuthHeader",
 				"no authorization header",
 				zerolog.InfoLevel,
@@ -256,7 +258,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			apikey.ErrUnauthorized,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrUnauthorized",
 				"unauthorized",
 				zerolog.InfoLevel,
@@ -274,7 +276,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			apikey.ErrInvalidToken,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrInvalidToken",
 				"token not valid utf8",
 				zerolog.InfoLevel,
@@ -283,7 +285,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		{
 			apikey.ErrAPIKeyNotFound,
 			HTTPErrResp{
-				http.StatusBadRequest,
+				http.StatusUnauthorized,
 				"ErrAPIKeyNotFound",
 				"api key not found",
 				zerolog.InfoLevel,
@@ -445,6 +447,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		{
+			ErrPolicyNotFound,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"ErrPolicyNotFound",
+				"ErrPolicyNotFound",
+				zerolog.InfoLevel,
+			},
+		},
 	}
 
 	for _, e := range errTable {
@@ -509,13 +520,26 @@ func (er HTTPErrResp) Write(w http.ResponseWriter) error {
 func ErrorResp(w http.ResponseWriter, r *http.Request, err error) {
 	zlog := hlog.FromRequest(r)
 	resp := NewHTTPErrResp(err)
-	e := zlog.WithLevel(resp.Level).Err(err).Int(ECSHTTPResponseCode, resp.StatusCode)
+	e := zlog.WithLevel(resp.Level).Err(err).Int(ECSHTTPResponseCode, resp.StatusCode).Str("error.type", fmt.Sprintf("%T", err))
 	if ts, ok := logger.CtxStartTime(r.Context()); ok {
 		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
 	}
 	e.Msg("HTTP request error")
 
-	if (resp.StatusCode >= 500) {
+	if resp.StatusCode >= 500 {
+		if trans := apm.TransactionFromContext(r.Context()); trans != nil {
+			esErr := &es.ErrElastic{}
+			if errors.As(err, &esErr) {
+				trans.Context.SetLabel("error.type", "ErrElastic")
+				trans.Context.SetLabel("error.details.status", esErr.Status)
+				trans.Context.SetLabel("error.details.type", esErr.Type)
+				trans.Context.SetLabel("error.details.reason", esErr.Reason)
+				trans.Context.SetLabel("error.details.cause.type", esErr.Cause.Type)
+				trans.Context.SetLabel("error.details.cause.reason", esErr.Cause.Reason)
+			} else {
+				trans.Context.SetLabel("error.type", fmt.Sprintf("%T", err))
+			}
+		}
 		apm.CaptureError(r.Context(), err).Send()
 	}
 

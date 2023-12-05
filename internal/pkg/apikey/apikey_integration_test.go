@@ -11,6 +11,8 @@ import (
 	"errors"
 	"testing"
 
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
@@ -32,6 +34,7 @@ const testFleetRoles = `
 func TestRead_existingKey(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cfg := elasticsearch.Config{
 		Username: "elastic",
@@ -83,6 +86,7 @@ func TestRead_existingKey(t *testing.T) {
 func TestRead_noKey(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cfg := elasticsearch.Config{
 		Username: "elastic",
@@ -114,6 +118,7 @@ func TestCreateAPIKeyWithMetadata(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cn := context.WithCancel(context.Background())
 			defer cn()
+			ctx = testlog.SetLogger(t).WithContext(ctx)
 
 			cfg := elasticsearch.Config{
 				Username: "elastic",

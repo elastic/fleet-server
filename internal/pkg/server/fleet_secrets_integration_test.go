@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 type SecretResponse struct {
@@ -156,8 +157,9 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	// create secret with kibana_system user
 	secretID := createSecret(t, ctx, srv.bulker)
@@ -216,23 +218,13 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 
 	// expect 1 POLICY_CHANGE action
 	assert.Equal(t, 1, len(*checkinResponse.Actions))
-	var actionDataRaw interface{}
-	for _, action := range *checkinResponse.Actions {
-		actionDataRaw = action.Data
-		assert.Equal(t, "POLICY_CHANGE", action.Type)
-	}
+	assert.Equal(t, api.POLICYCHANGE, (*checkinResponse.Actions)[0].Type)
+	actionData, err := (*checkinResponse.Actions)[0].Data.AsActionPolicyChange()
+	require.NoError(t, err)
+	require.NotNil(t, actionData.Policy.Inputs)
+	require.NotNil(t, (*actionData.Policy.Inputs)[0])
 
-	actionData, ok := actionDataRaw.(map[string]interface{})
-	require.True(t, ok, "expected attribute action.Data to be an object")
-
-	policy, ok := actionData["policy"].(map[string]interface{})
-	require.True(t, ok, "expected attribute policy to be an object")
-	inputs, ok := policy["inputs"].([]interface{})
-	require.True(t, ok, "expected attribute inputs to be an array")
-
-	input, ok := inputs[0].(map[string]interface{})
-	require.True(t, ok, "expected first input to be an object")
-
+	input := (*actionData.Policy.Inputs)[0]
 	// expect secret reference replaced with secret value
 	assert.Equal(t, map[string]interface{}{
 		"package_var_secret": "secret_value",

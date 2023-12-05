@@ -5,9 +5,11 @@
 package server
 
 import (
+	"context"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -108,7 +110,8 @@ func Test_configChangedServer(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			changed := configChangedServer(cfg, tc.cfg)
+			log := testlog.SetLogger(t)
+			changed := configChangedServer(log, cfg, tc.cfg)
 			assert.Equal(t, changed, tc.changed)
 		})
 	}
@@ -141,9 +144,10 @@ func Test_initTracer(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx := testlog.SetLogger(t).WithContext(context.Background())
 			f := Fleet{}
 			t.Setenv("ELASTIC_APM_ACTIVE", tc.apmActiveEnvVariable)
-			tarcer, err := f.initTracer(tc.cfg)
+			tarcer, err := f.initTracer(ctx, tc.cfg)
 			assert.Nil(t, err)
 
 			if tc.expectTracer {

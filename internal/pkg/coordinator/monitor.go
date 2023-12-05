@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -47,8 +46,6 @@ type policyT struct {
 }
 
 type monitorT struct {
-	log zerolog.Logger
-
 	bulker  bulk.Bulk
 	monitor monitor.Monitor
 	factory Factory
@@ -77,7 +74,6 @@ type monitorT struct {
 // NewMonitor creates a new coordinator policy monitor.
 func NewMonitor(fleet config.Fleet, version string, bulker bulk.Bulk, monitor monitor.Monitor, factory Factory) Monitor {
 	return &monitorT{
-		log:               log.With().Str("ctx", "policy leader manager").Logger(),
 		version:           version,
 		fleet:             fleet,
 		bulker:            bulker,
@@ -98,12 +94,13 @@ func NewMonitor(fleet config.Fleet, version string, bulker bulk.Bulk, monitor mo
 
 // Run runs the monitor.
 func (m *monitorT) Run(ctx context.Context) (err error) {
+	log := zerolog.Ctx(ctx).With().Str("ctx", "policy leader manager").Logger()
 	// When ID of the Agent is not provided to Fleet Server then the Agent
 	// has not enrolled. The Fleet Server cannot become a leader until the
 	// Agent it is running under has been enrolled.
-	m.calcMetadata()
+	m.calcMetadata(ctx)
 	if m.agentMetadata.ID == "" {
-		m.log.Warn().Msg("missing config fleet.agent.id; acceptable until Elastic Agent has enrolled")
+		log.Warn().Msg("missing config fleet.agent.id; acceptable until Elastic Agent has enrolled")
 		<-ctx.Done()
 		return ctx.Err()
 	}
@@ -116,7 +113,7 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 	for {
 		err = m.ensureLeadership(ctx)
 		if err != nil {
-			m.log.Warn().Err(err).Msg("error ensuring leadership, will retry")
+			log.Warn().Err(err).Msg("error ensuring leadership, will retry")
 			select {
 			case <-lT.C:
 				lT.Reset(m.checkInterval)
@@ -147,17 +144,17 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 			if err != nil {
 				erroredOnLastRequest = true
 				numFailedRequests++
-				m.log.Warn().Err(err).Msgf("Encountered an error while policy leadership changes; continuing to retry.")
+				log.Warn().Err(err).Msgf("Encountered an error while policy leadership changes; continuing to retry.")
 			}
 		case <-mT.C:
-			m.calcMetadata()
+			m.calcMetadata(ctx)
 			mT.Reset(m.metadataInterval)
 		case <-lT.C:
 			err = m.ensureLeadership(ctx)
 			if err != nil {
 				erroredOnLastRequest = true
 				numFailedRequests++
-				m.log.Warn().Err(err).Msgf("Encountered an error while checking/assigning policy leaders; continuing to retry.")
+				log.Warn().Err(err).Msgf("Encountered an error while checking/assigning policy leaders; continuing to retry.")
 			}
 			lT.Reset(m.checkInterval)
 		case <-ctx.Done():
@@ -166,7 +163,7 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 		}
 		if err == nil && erroredOnLastRequest {
 			erroredOnLastRequest = false
-			m.log.Info().Msgf("Policy leader monitor successfully recovered after %d attempts", numFailedRequests)
+			log.Info().Msgf("Policy leader monitor successfully recovered after %d attempts", numFailedRequests)
 			numFailedRequests = 0
 		}
 	}
@@ -174,12 +171,13 @@ func (m *monitorT) Run(ctx context.Context) (err error) {
 
 // handlePolicies handles new policies or policy changes.
 func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
+	log := zerolog.Ctx(ctx).With().Str("ctx", "policy leader manager").Logger()
 	new := false
 	for _, hit := range hits {
 		var policy model.Policy
 		err := hit.Unmarshal(&policy)
 		if err != nil {
-			m.log.Debug().Err(err).Msg("Failed to deserialize policy json")
+			log.Debug().Err(err).Msg("Failed to deserialize policy json")
 			return err
 		}
 		if policy.CoordinatorIdx != 0 {
@@ -193,7 +191,7 @@ func (m *monitorT) handlePolicies(ctx context.Context, hits []es.HitT) error {
 				// current leader send to its coordinator
 				err = p.cord.Update(ctx, policy)
 				if err != nil {
-					m.log.Info().Err(err).Msg("Failed to update policy leader")
+					log.Info().Err(err).Msg("Failed to update policy leader")
 					return err
 				}
 			}
@@ -218,7 +216,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}
-	m.log.Debug().Msg("ensuring leadership of policies")
+	zerolog.Ctx(ctx).Debug().Str("ctx", "policy leader manager").Msg("ensuring leadership of policies")
 	err := dl.EnsureServer(ctx, m.bulker, m.version, m.agentMetadata, m.hostMetadata, dl.WithIndexName(m.serversIndex))
 
 	if err != nil {
@@ -230,7 +228,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 	policies, err := dl.QueryLatestPolicies(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
-			m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
+			zerolog.Ctx(ctx).Debug().Str("ctx", "policy leader manager").Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
 			return nil
 		}
 		return fmt.Errorf("encountered error while querying policies: %w", err)
@@ -278,7 +276,7 @@ func (m *monitorT) ensureLeadership(ctx context.Context) error {
 				res <- pt
 			}()
 
-			l := m.log.With().Str(dl.FieldPolicyID, pt.id).Logger()
+			l := zerolog.Ctx(ctx).With().Str("ctx", "policy leader manager").Str(dl.FieldPolicyID, pt.id).Logger()
 			err := dl.TakePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.version, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
 				l.Warn().Err(err).Msg("monitor.ensureLeadership: failed to take ownership")
@@ -346,7 +344,7 @@ func (m *monitorT) releaseLeadership() {
 			defer cancel()
 			err := dl.ReleasePolicyLeadership(ctx, m.bulker, pt.id, m.agentMetadata.ID, m.leaderInterval, dl.WithIndexName(m.leadersIndex))
 			if err != nil {
-				l := m.log.With().Str(dl.FieldPolicyID, pt.id).Logger()
+				l := zerolog.Ctx(ctx).With().Str("ctx", "policy leader manager").Str(dl.FieldPolicyID, pt.id).Logger()
 				l.Warn().Err(err).Msg("monitor.releaseLeadership: failed to release leadership")
 			}
 			wg.Done()
@@ -355,7 +353,7 @@ func (m *monitorT) releaseLeadership() {
 	wg.Wait()
 }
 
-func (m *monitorT) calcMetadata() {
+func (m *monitorT) calcMetadata(ctx context.Context) {
 	m.agentMetadata = model.AgentMetadata{
 		ID:      m.fleet.Agent.ID,
 		Version: m.fleet.Agent.Version,
@@ -364,13 +362,13 @@ func (m *monitorT) calcMetadata() {
 	if hostname == "" {
 		h, err := os.Hostname()
 		if err != nil {
-			m.log.Err(err).Msg("failed to get hostname")
+			zerolog.Ctx(ctx).Error().Str("ctx", "policy leader manager").Err(err).Msg("failed to get hostname")
 		}
 		hostname = h
 	}
 	ips, err := m.getIPs()
 	if err != nil {
-		m.log.Err(err).Msg("failed to get ip addresses")
+		zerolog.Ctx(ctx).Error().Str("ctx", "policy leader manager").Err(err).Msg("failed to get ip addresses")
 	}
 	m.hostMetadata = model.HostMetadata{
 		ID:           m.fleet.Host.ID,

@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
 
@@ -81,6 +82,7 @@ type bulkOptT struct {
 	apikeyMaxParallel int
 	apikeyMaxReqSize  int
 	policyTokens      []config.PolicyToken
+	bi                build.Info
 }
 
 type BulkOpt func(*bulkOptT)
@@ -140,6 +142,12 @@ func WithAPIKeyMaxRequestSize(maxBytes int) BulkOpt {
 func WithPolicyTokens(tokens []config.PolicyToken) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.policyTokens = tokens
+	}
+}
+
+func WithBi(bi build.Info) BulkOpt {
+	return func(opt *bulkOptT) {
+		opt.bi = bi
 	}
 }
 

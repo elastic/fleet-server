@@ -9,16 +9,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 	"golang.org/x/sync/semaphore"
 )
@@ -65,18 +68,27 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
+	CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
+	GetBulker(outputName string) Bulk
+	GetBulkerMap() map[string]Bulk
+	CancelFn() context.CancelFunc
+
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
 
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es          esapi.Transport
-	ch          chan *bulkT
-	opts        bulkOptT
-	blkPool     sync.Pool
-	apikeyLimit *semaphore.Weighted
-	tracer      *apm.Tracer
+	es                    esapi.Transport
+	ch                    chan *bulkT
+	opts                  bulkOptT
+	blkPool               sync.Pool
+	apikeyLimit           *semaphore.Weighted
+	tracer                *apm.Tracer
+	remoteOutputConfigMap map[string]map[string]interface{}
+	bulkerMap             map[string]Bulk
+	cancelFn              context.CancelFunc
+	remoteOutputMutex     sync.RWMutex
 }
 
 const (
@@ -98,13 +110,131 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 	}
 
 	return &Bulker{
-		opts:        bopts,
-		es:          es,
-		ch:          make(chan *bulkT, bopts.blockQueueSz),
-		blkPool:     sync.Pool{New: poolFunc},
-		apikeyLimit: semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
-		tracer:      tracer,
+		opts:                  bopts,
+		es:                    es,
+		ch:                    make(chan *bulkT, bopts.blockQueueSz),
+		blkPool:               sync.Pool{New: poolFunc},
+		apikeyLimit:           semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
+		tracer:                tracer,
+		remoteOutputConfigMap: make(map[string]map[string]interface{}),
+		// remote ES bulkers
+		bulkerMap: make(map[string]Bulk),
 	}
+}
+
+func (b *Bulker) GetBulker(outputName string) Bulk {
+	return b.bulkerMap[outputName]
+}
+
+func (b *Bulker) GetBulkerMap() map[string]Bulk {
+	return b.bulkerMap
+}
+
+func (b *Bulker) CancelFn() context.CancelFunc {
+	return b.cancelFn
+}
+
+func (b *Bulker) updateBulkerMap(outputName string, newBulker *Bulker) {
+	// concurrency control of updating map
+	b.remoteOutputMutex.Lock()
+	defer b.remoteOutputMutex.Unlock()
+
+	b.bulkerMap[outputName] = newBulker
+}
+
+// for remote ES output, create a new bulker in bulkerMap if does not exist
+// if bulker exists for output, check if config changed
+// if not changed, return the existing bulker
+// if changed, stop the existing bulker and create a new one
+func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (Bulk, bool, error) {
+	hasConfigChanged := b.hasChangedAndUpdateRemoteOutputConfig(zlog, outputName, outputMap[outputName])
+	bulker := b.bulkerMap[outputName]
+	if bulker != nil && !hasConfigChanged {
+		return bulker, false, nil
+	}
+	if bulker != nil && hasConfigChanged {
+		cancelFn := bulker.CancelFn()
+		if cancelFn != nil {
+			cancelFn()
+		}
+	}
+	bulkCtx, bulkCancel := context.WithCancel(context.Background())
+	es, err := b.createRemoteEsClient(bulkCtx, outputName, outputMap)
+	if err != nil {
+		defer bulkCancel()
+		return nil, hasConfigChanged, err
+	}
+	// starting a new bulker to create/update API keys for remote ES output
+	newBulker := NewBulker(es, b.tracer)
+	newBulker.cancelFn = bulkCancel
+
+	b.updateBulkerMap(outputName, newBulker)
+
+	errCh := make(chan error)
+	go func() {
+		runFunc := func() (err error) {
+			zlog.Debug().Str("outputName", outputName).Msg("Bulker started")
+			return newBulker.Run(bulkCtx)
+		}
+
+		errCh <- runFunc()
+	}()
+	go func() {
+		select {
+		case err = <-errCh:
+			zlog.Error().Err(err).Str("outputName", outputName).Msg("Bulker error")
+		case <-bulkCtx.Done():
+			zlog.Debug().Str("outputName", outputName).Msg("Bulk context done")
+			err = bulkCtx.Err()
+		}
+	}()
+
+	return newBulker, hasConfigChanged, nil
+}
+
+var newESClient = es.NewClient
+
+func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, outputMap map[string]map[string]interface{}) (*elasticsearch.Client, error) {
+	hostsObj := outputMap[outputName]["hosts"]
+	hosts, ok := hostsObj.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("failed to get hosts from output: %v", hostsObj)
+	}
+	hostsStrings := make([]string, len(hosts))
+	for i, host := range hosts {
+		hostsStrings[i], ok = host.(string)
+		if !ok {
+			return nil, fmt.Errorf("failed to get hosts from output: %v", host)
+		}
+	}
+	serviceToken, ok := outputMap[outputName]["service_token"].(string)
+	if !ok {
+		return nil, fmt.Errorf("failed to get service token from output: %v", outputName)
+	}
+
+	cfg := config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Hosts:        hostsStrings,
+				ServiceToken: serviceToken,
+			},
+		},
+	}
+	es, err := newESClient(ctx, &cfg, false, elasticsearchOptions(
+		true, b.opts.bi,
+	)...)
+	if err != nil {
+		return nil, err
+	}
+	return es, nil
+}
+
+func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
+	options := []es.ConfigOption{es.WithUserAgent("Remote-Fleet-Server", bi)}
+	if instumented {
+		options = append(options, es.InstrumentRoundTripper())
+	}
+	return options
 }
 
 func (b *Bulker) Client() *elasticsearch.Client {
@@ -113,6 +243,25 @@ func (b *Bulker) Client() *elasticsearch.Client {
 		panic("Client is not an elastic search pointer")
 	}
 	return client
+}
+
+// check if remote output cfg changed
+func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+	curCfg := b.remoteOutputConfigMap[name]
+
+	hasChanged := false
+
+	// when output config first added, not reporting change
+	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
+		zlog.Info().Str("name", name).Msg("remote output configuration has changed")
+		hasChanged = true
+	}
+	newCfgCopy := make(map[string]interface{})
+	for k, v := range newCfg {
+		newCfgCopy[k] = v
+	}
+	b.remoteOutputConfigMap[name] = newCfgCopy
+	return hasChanged
 }
 
 // read secrets one by one as there is no bulk API yet to read them in one request
@@ -170,7 +319,7 @@ func blkToQueueType(blk *bulkT) queueType {
 func (b *Bulker) Run(ctx context.Context) error {
 	var err error
 
-	log.Info().Interface("opts", &b.opts).Msg("Run bulker with options")
+	zerolog.Ctx(ctx).Info().Interface("opts", &b.opts).Msg("Run bulker with options")
 
 	// Create timer in stopped state
 	timer := time.NewTimer(b.opts.flushInterval)
@@ -242,7 +391,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 			// Threshold test, short circuit timer on pending count
 			if itemCnt >= b.opts.flushThresholdCnt || byteCnt >= b.opts.flushThresholdSz {
-				log.Trace().
+				zerolog.Ctx(ctx).Trace().
 					Str("mod", kModBulk).
 					Int("itemCnt", itemCnt).
 					Int("byteCnt", byteCnt).
@@ -254,7 +403,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 			}
 
 		case <-timer.C:
-			log.Trace().
+			zerolog.Ctx(ctx).Trace().
 				Str("mod", kModBulk).
 				Int("itemCnt", itemCnt).
 				Int("byteCnt", byteCnt).
@@ -267,12 +416,19 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 	}
 
+	// cancelling context of each remote bulker when Run exits
+	defer func() {
+		for _, bulker := range b.bulkerMap {
+			bulker.CancelFn()()
+		}
+	}()
+
 	return err
 }
 
 func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue queueT) error {
 	start := time.Now()
-	log.Trace().
+	zerolog.Ctx(ctx).Trace().
 		Str("mod", kModBulk).
 		Int("cnt", queue.cnt).
 		Int("szPending", queue.pending).
@@ -283,7 +439,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		return err
 	}
 
-	log.Trace().
+	zerolog.Ctx(ctx).Trace().
 		Str("mod", kModBulk).
 		Int("cnt", queue.cnt).
 		Dur("tdiff", time.Since(start)).
@@ -321,7 +477,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 			apm.CaptureError(ctx, err).Send()
 		}
 
-		log.Trace().
+		zerolog.Ctx(ctx).Trace().
 			Err(err).
 			Str("mod", kModBulk).
 			Int("cnt", queue.cnt).
@@ -408,7 +564,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 	select {
 	case b.ch <- blk:
 	case <-ctx.Done():
-		log.Error().
+		zerolog.Ctx(ctx).Error().
 			Err(ctx.Err()).
 			Str("mod", kModBulk).
 			Str("action", blk.action.String()).
@@ -421,7 +577,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 	// Wait for response
 	select {
 	case resp := <-blk.ch:
-		log.Trace().
+		zerolog.Ctx(ctx).Trace().
 			Err(resp.err).
 			Str("mod", kModBulk).
 			Str("action", blk.action.String()).
@@ -431,7 +587,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 
 		return resp
 	case <-ctx.Done():
-		log.Error().
+		zerolog.Ctx(ctx).Error().
 			Err(ctx.Err()).
 			Str("mod", kModBulk).
 			Str("action", blk.action.String()).

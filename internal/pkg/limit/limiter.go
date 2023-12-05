@@ -82,7 +82,7 @@ func (l *Limiter) Wrap(name string, si StatIncer, ll zerolog.Level) func(http.Ha
 			lf, err := l.acquire()
 			if err != nil {
 				hlog.FromRequest(r).WithLevel(ll).Str("route", name).Err(err).Msg("limit reached")
-				if wErr := writeError(w, err); wErr != nil {
+				if wErr := writeError(hlog.FromRequest(r), w, err); wErr != nil {
 					hlog.FromRequest(r).Error().Err(wErr).Msg("fail writing error response")
 				}
 				if si != nil {

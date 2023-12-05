@@ -16,11 +16,10 @@ import (
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/google/go-cmp/cmp"
 )
-
-// NOTE attempting to use testing/log here will cause the race detector to fail
 
 func TestBulkCreate(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
@@ -94,6 +93,7 @@ func TestBulkCreate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
+			ctx := testlog.SetLogger(t).WithContext(ctx)
 			sample := NewRandomSample()
 			sampleData := sample.marshal(t)
 
@@ -164,6 +164,7 @@ func TestBulkCreateBody(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
+			ctx := testlog.SetLogger(t).WithContext(ctx)
 			_, err := bulker.Create(ctx, index, "", test.Body)
 			if !EqualElastic(test.Err, err) {
 				t.Fatalf("expected: %v, got: %v", test.Err, err)
@@ -178,6 +179,7 @@ func TestBulkCreateBody(t *testing.T) {
 func TestBulkIndex(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy, WithFlushThresholdCount(1))
 
@@ -201,6 +203,7 @@ func TestBulkIndex(t *testing.T) {
 func TestBulkUpdate(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy)
 
@@ -239,6 +242,7 @@ func TestBulkUpdate(t *testing.T) {
 func TestBulkSearch(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy)
 
@@ -281,6 +285,7 @@ func TestBulkSearch(t *testing.T) {
 func TestBulkDelete(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy)
 
@@ -318,6 +323,7 @@ func benchmarkCreate(n int, b *testing.B) {
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(b).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, b, testPolicy, WithFlushThresholdCount(n))
 
@@ -373,6 +379,7 @@ func benchmarkCRUD(n int, b *testing.B) {
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
+	ctx = testlog.SetLogger(b).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, b, testPolicy, WithFlushThresholdCount(n))
 
