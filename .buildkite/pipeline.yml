@@ -42,7 +42,7 @@ steps:
         agents:
           provider: "gcp"
           cpu: "8"
-          memory: "4G"
+          memory: "8G"
 
       - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
         key: "go-benchmark-base"
@@ -52,7 +52,7 @@ steps:
         agents:
           provider: "gcp"
           cpu: "8"
-          memory: "4G"
+          memory: "8G"
 
       - label: "Compare results"
         key: "go-benchmark-compare"
@@ -65,7 +65,7 @@ steps:
         agents:
           provider: "gcp"
           cpu: "8"
-          memory: "4G"
+          memory: "8G"
 
     depends_on: "check"
 
