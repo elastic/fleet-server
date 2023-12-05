@@ -43,7 +43,7 @@ steps:
       - label: "Run go benchmark for base branch"
         key: "go-benchmark-base"
         command: ".buildkite/scripts/run_benchmark.sh base"
-        branches: ${BUILDKITE_BRANCH}
+        branches: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
         agents:
           provider: "gcp"
     depends_on: "check"
