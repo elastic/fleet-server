@@ -36,11 +36,11 @@ steps:
     steps:
       - label: "Run go benchmark"
         key: "go-benchmark"
-        command: ".buildkite/scripts/run_benchmark.sh
+        command: ".buildkite/scripts/run_benchmark.sh"
         agents:
           provider: "gcp"
     depends_on: "check"
-    
+
   - group: "Run tests"
     key: "tests"
     steps:
