@@ -44,7 +44,6 @@ fi
 
 if [[ ${TYPE} == "compare" ]]; then
     echo "Comparing go benchmarks"
-    git checkout ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
     buildkite-agent artifact download "build/base.out" .
     buildkite-agent artifact download "build/next.out" .
     BENCH_BASE=build/base.out BENCH_NEXT=build/next.out make benchstat | tee build/compare.out
