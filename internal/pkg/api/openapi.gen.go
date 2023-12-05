@@ -802,6 +802,9 @@ type BadRequest = Error
 // Deadline Error processing request.
 type Deadline = Error
 
+// Forbidden Error processing request.
+type Forbidden = Error
+
 // InternalServerError Error processing request.
 type InternalServerError = Error
 
