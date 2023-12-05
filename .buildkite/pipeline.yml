@@ -30,7 +30,17 @@ steps:
           image: "${GO_AGENT_IMAGE}"
           cpu: "8"
           memory: "4G"
-
+  
+  - group: "Performance test"
+    key: "performance-test"
+    steps:
+      - label: "Run go benchmark"
+        key: "go-benchmark"
+        command: ".buildkite/scripts/run_benchmark.sh
+        agents:
+          provider: "gcp"
+    depends_on: "check"
+    
   - group: "Run tests"
     key: "tests"
     steps:
@@ -88,12 +98,6 @@ steps:
             allow_failure: false
           - step: "e2e-test"
             allow_failure: false
-
-      - label: "Run go benchmark"
-        key: "go-benchmark"
-        command: ".buildkite/scripts/run_benchmark.sh
-        agents:
-          provider: "gcp"
 
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
