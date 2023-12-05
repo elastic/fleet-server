@@ -8,9 +8,16 @@ add_bin_path
 
 with_go
 
-echo "Starting the go benchmark for the pull request"
-BENCH_BASE=next.out make benchmark
+export TYPE=${1}
+#export BRANCH="${BUILDKITE_BRANCH}"
 
-#TODO
-#echo "Starting the go benchmark for the base branch"
-#BENCH_BASE=base.out make benchmark
+if [[ ${TYPE} == "pr" ]]; then
+    echo "Starting the go benchmark for the pull request"
+    BENCH_BASE=next.out make benchmark
+fi
+
+if [[ ${TYPE} == "base" ]]; then
+    echo "Starting the go benchmark for the pull request"
+    BENCH_BASE=base.out make benchmark
+fi
+

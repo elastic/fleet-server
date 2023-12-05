@@ -34,9 +34,16 @@ steps:
   - group: "Performance test"
     key: "performance-test"
     steps:
-      - label: "Run go benchmark"
-        key: "go-benchmark"
-        command: ".buildkite/scripts/run_benchmark.sh"
+      - label: "Run go benchmark for PR branch"
+        key: "go-benchmark-pr"
+        command: ".buildkite/scripts/run_benchmark.sh pr"
+        agents:
+          provider: "gcp"
+
+      - label: "Run go benchmark for base branch"
+        key: "go-benchmark-base"
+        command: ".buildkite/scripts/run_benchmark.sh base"
+        branches: ${BUILDKITE_BRANCH}
         agents:
           provider: "gcp"
     depends_on: "check"
