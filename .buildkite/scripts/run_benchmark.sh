@@ -14,12 +14,32 @@ export TYPE=${1}
 if [[ ${TYPE} == "pr" ]]; then
     echo "Starting the go benchmark for the pull request"
     BENCH_BASE=next.out make benchmark
+    BENCH=$(cat next.out)
+    buildkite-agent annotate --style 'success' --context "gobench_pr" --append << _EOF_
+        ### Benchmark for pull request
+        <details><summary>go bench output</summary>
+
+        ```bash
+        ${BENCH}
+        ```
+        </details>
+_EOF_
 fi
 
 if [[ ${TYPE} == "base" ]]; then
     echo "Starting the go benchmark for the pull request"
     git checkout ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
     BENCH_BASE=base.out make benchmark
+    BENCH=$(cat base.out)
+    buildkite-agent annotate --style 'success' --context "gobench_base" --append << _EOF_
+        ### Benchmark for the ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+        <details><summary>go bench output for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}</summary>
+
+        ```bash
+        ${BENCH}
+        ```
+        </details>
+_EOF_
 fi
 
 if [[ ${TYPE} == "compare" ]]; then
@@ -28,8 +48,6 @@ if [[ ${TYPE} == "compare" ]]; then
     buildkite-agent artifact download "base.out" .
     buildkite-agent artifact download "next.out" .
     BENCH_BASE=base.out BENCH_NEXT=next.out make benchstat | tee compare.out
-
-    BENCH_NEXT=$(cat base.out)
     BENCH_COMPARE=$(cat compare.out)
     buildkite-agent annotate --style 'success' --context "benchstat" --append << _EOF_
     ### Benchmark Result
@@ -37,13 +55,6 @@ if [[ ${TYPE} == "compare" ]]; then
 
     ```bash
     ${BENCH_COMPARE}
-    ```
-    </details>
-
-    <details><summary>Benchmark result</summary>
-
-    ```bash
-    ${BENCH_NEXT}
     ```
     </details>
 _EOF_

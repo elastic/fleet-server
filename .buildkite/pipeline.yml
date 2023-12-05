@@ -42,7 +42,7 @@ steps:
         agents:
           provider: "gcp"
 
-      - label: "Run go benchmark for base branch"
+      - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
         key: "go-benchmark-base"
         command: ".buildkite/scripts/run_benchmark.sh base"
         artifact_paths:
