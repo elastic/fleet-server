@@ -38,7 +38,7 @@ steps:
         key: "go-benchmark-pr"
         command: ".buildkite/scripts/run_benchmark.sh pr"
         artifact_paths:
-          - next.out
+          - build/next.out
         agents:
           provider: "gcp"
 
@@ -46,7 +46,7 @@ steps:
         key: "go-benchmark-base"
         command: ".buildkite/scripts/run_benchmark.sh base"
         artifact_paths:
-          - base.out
+          - build/base.out
         agents:
           provider: "gcp"
 
@@ -54,7 +54,7 @@ steps:
         key: "go-benchmark-compare"
         command: ".buildkite/scripts/run_benchmark.sh compare"
         artifact_paths:
-          - compare.out
+          - build/compare.out
         depends_on:
           - go-benchmark-pr
           - go-benchmark-base
