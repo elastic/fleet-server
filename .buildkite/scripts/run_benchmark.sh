@@ -19,9 +19,9 @@ if [[ ${TYPE} == "pr" ]]; then
         ### Benchmark for pull request
         <details><summary>go bench output</summary>
 
-        ```bash
+        \`\`\`
         ${BENCH}
-        ```
+        \`\`\`
         </details>
 _EOF_
 fi
@@ -35,9 +35,9 @@ if [[ ${TYPE} == "base" ]]; then
         ### Benchmark for the ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
         <details><summary>go bench output for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}</summary>
 
-        ```bash
+        \`\`\`
         ${BENCH}
-        ```
+        \`\`\`
         </details>
 _EOF_
 fi
@@ -52,9 +52,9 @@ if [[ ${TYPE} == "compare" ]]; then
     ### Benchmark Result
     <details><summary>Benchmark diff against base branch</summary>
 
-    ```bash
+    \`\`\`
     ${BENCH_COMPARE}
-    ```
+    \`\`\`
     </details>
 _EOF_
 fi
