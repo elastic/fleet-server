@@ -41,6 +41,8 @@ steps:
           - build/next.out
         agents:
           provider: "gcp"
+          cpu: "8"
+          memory: "4G"
 
       - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
         key: "go-benchmark-base"
@@ -49,6 +51,8 @@ steps:
           - build/base.out
         agents:
           provider: "gcp"
+          cpu: "8"
+          memory: "4G"
 
       - label: "Compare results"
         key: "go-benchmark-compare"
@@ -60,6 +64,8 @@ steps:
           - go-benchmark-base
         agents:
           provider: "gcp"
+          cpu: "8"
+          memory: "4G"
 
     depends_on: "check"
 
