@@ -58,7 +58,7 @@ if [[ ${TYPE} == "compare" ]]; then
     status=$(jq -r '.Status' build/full_report.json)
     if [[ $status == "fail" ]]; then
       cat build/full_report.json| jq 'del(.Checks."My Check".Diffs[]| select(.Status == "pass") )'| tee build/failed_report.json
-      gobenchdata checks report failed.json | tee build/failed_summary.md
+      gobenchdata checks report build/failed_report.json | tee build/failed_summary.md
       BENCH_COMPARE=$(cat build/failed_summary.md)
       buildkite-agent annotate --style 'error' --context "benchstat" --append << _EOF_
 #### Benchmark comparison
