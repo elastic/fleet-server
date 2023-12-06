@@ -8,13 +8,17 @@ package policy
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
@@ -462,6 +466,14 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&apiKey, nil).Once()
 		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
+		bulker.On("Create", mock.Anything, dl.FleetOutputHealth, mock.Anything, mock.MatchedBy(func(body []byte) bool {
+			var doc model.OutputHealth
+			err := json.Unmarshal(body, &doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return doc.Message == "" && doc.State == client.UnitStateHealthy.String()
+		}), mock.Anything).Return("", nil)
 
 		output := Output{
 			Type: OutputTypeRemoteElasticsearch,
@@ -497,6 +509,50 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 
 		assert.Equal(t, OutputTypeElasticsearch, policyMap["test output"]["type"])
 		assert.Empty(t, policyMap["test output"]["service_token"])
+
+		bulker.AssertExpectations(t)
+	})
+
+	t.Run("Report degraded output health on API key create failure", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+		var apiKey *bulk.APIKey = nil
+		var err error = errors.New("error connecting")
+
+		outputBulker := ftesting.NewMockBulk()
+		outputBulker.On("APIKeyCreate",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(apiKey, err).Once()
+		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
+		bulker.On("Create", mock.Anything, dl.FleetOutputHealth, mock.Anything, mock.MatchedBy(func(body []byte) bool {
+			var doc model.OutputHealth
+			err := json.Unmarshal(body, &doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return doc.Message == "remote ES could not create API key due to error: error connecting" && doc.State == client.UnitStateDegraded.String()
+		}), mock.Anything).Return("", nil)
+
+		output := Output{
+			Type: OutputTypeRemoteElasticsearch,
+			Name: "test output",
+			Role: &RoleT{
+				Sha2: "new-hash",
+				Raw:  TestPayload,
+			},
+		}
+
+		policyMap := map[string]map[string]interface{}{
+			"test output": map[string]interface{}{
+				"hosts":         []interface{}{"http://localhost"},
+				"service_token": "serviceToken1",
+				"type":          OutputTypeRemoteElasticsearch,
+			},
+		}
+		testAgent := &model.Agent{Outputs: map[string]*model.PolicyOutput{}}
+
+		err = output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
+		require.NoError(t, err, "expected prepare to pass")
 
 		bulker.AssertExpectations(t)
 	})
