@@ -1,9 +1,7 @@
 checks:
-    - name: My Check
+    - name: timePerOp
       description: |-
-        Define a check here - in this example, we caculate % difference for NsPerOp in the diff function.
-        diff is a function where you receive two parameters, current and base, and in general this function
-        should return a negative value for an improvement and a positive value for a regression.
+        This check is set to fail when there are benchmark tests that are slower than the defined threshold
       package: .
       benchmarks: []
       diff: (current.NsPerOp - base.NsPerOp) / base.NsPerOp * 100
