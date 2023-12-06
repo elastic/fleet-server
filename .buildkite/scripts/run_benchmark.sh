@@ -10,21 +10,23 @@ with_go
 
 export TYPE=${1}
 #export BRANCH="${BUILDKITE_BRANCH}"
+export BENCHMARK_ARGS="-count=8 -benchmem"
 
 if [[ ${TYPE} == "pr" ]]; then
     echo "Starting the go benchmark for the pull request"
     BENCH_BASE=next.out make benchmark
     BENCH=$(cat build/next.out)
-    buildkite-agent annotate --style 'success' --context "gobench_pr" --append << _EOF_
+    buildkite-agent annotate --style 'info' --context "gobench_pr" --append << _EOF_
 #### Benchmark for pull request
 <details><summary>go bench output</summary>
 
 \`\`\`bash
-
 ${BENCH}
 \`\`\`
 
 </details>
+
+Download <a href="artifact://build/next.out">next.out</a>
 _EOF_
 fi
 
@@ -33,16 +35,17 @@ if [[ ${TYPE} == "base" ]]; then
     git checkout ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
     BENCH_BASE=base.out make benchmark
     BENCH=$(cat build/base.out)
-    buildkite-agent annotate --style 'success' --context "gobench_base" --append << _EOF_
+    buildkite-agent annotate --style 'info' --context "gobench_base" --append << _EOF_
 #### Benchmark for the ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
 <details><summary>go bench output for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}</summary>
 
 \`\`\`bash
-
 ${BENCH}
 \`\`\`
 
 </details>
+
+Download <a href="artifact://build/base.out">${BUILDKITE_PULL_REQUEST_BASE_BRANCH}.out</a>
 _EOF_
 fi
 
@@ -58,7 +61,9 @@ if [[ ${TYPE} == "compare" ]]; then
     gobenchdata checks eval build/base.json build/next.json --json build/full_report.json
     status=$(jq -r '.Status' build/full_report.json)
     if [[ $status == "fail" ]]; then
-      cat build/full_report.json| jq 'del(.Checks."My Check".Diffs[]| select(.Status == "pass") )'| tee build/failed_report.json
+      cat build/full_report.json| \
+        jq 'del(.Checks.timePerOp.Diffs[]| select(.Status == "pass") )'| \
+        tee build/failed_report.json
       gobenchdata checks report build/failed_report.json | tee build/failed_summary.md
       BENCH_COMPARE=$(cat build/failed_summary.md)
       buildkite-agent annotate --style 'error' --context "benchstat" --append << _EOF_
