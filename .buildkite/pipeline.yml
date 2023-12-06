@@ -56,7 +56,9 @@ steps:
         key: "go-benchmark-compare"
         command: ".buildkite/scripts/run_benchmark.sh compare"
         artifact_paths:
-          - build/compare.out
+          - build/failed_summary.md
+          - build/failed_report.json
+          - build/full_report.json
         depends_on:
           - go-benchmark-pr
           - go-benchmark-base
