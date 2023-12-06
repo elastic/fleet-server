@@ -48,19 +48,21 @@ fi
 
 if [[ ${TYPE} == "compare" ]]; then
     echo "Comparing go benchmarks"
+    go install go.bobheadxi.dev/gobenchdata@latest
     buildkite-agent artifact download "build/base.out" .
     buildkite-agent artifact download "build/next.out" .
-    BENCH_BASE=base.out BENCH_NEXT=next.out make benchstat | tee build/compare.out
-    BENCH_COMPARE=$(cat build/compare.out)
-    buildkite-agent annotate --style 'success' --context "benchstat" --append << _EOF_
-### Benchmark Result
-<details><summary>Benchmark diff against base branch</summary>
 
-\`\`\`bash
+    cat build/base.out| gobenchdata --json build/base.out
+    cat build/next.out| gobenchdata --json build/next.out
+    gobenchdata checks eval base.json next.json --json build/full_report.json
+    cat build/full_report.json| jq 'del(.Checks."My Check".Diffs[]| select(.Status == "pass") )'| tee build/failed_report.json
+    gobenchdata checks report failed.json | tee build/failed_summary.md
+    BENCH_COMPARE=$(cat build/failed_summary.md)
+    buildkite-agent annotate --style 'success' --context "benchstat" --append << _EOF_
+### Benchmark comparison
+<details><summary>Comparison table of benchmark results of HEAD compared to ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}</summary>
 
 ${BENCH_COMPARE}
-
-\`\`\`
 
 </details>
 _EOF_
