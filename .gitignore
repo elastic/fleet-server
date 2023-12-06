@@ -25,3 +25,7 @@ dev-tools/cloud/terraform/*.tfvars*
 
 .service_token*
 .kibana_service_token
+
+
+# direnv
+.envrc*
