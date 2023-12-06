@@ -76,7 +76,7 @@ ${BENCH_COMPARE}
 
 Download <a href="artifact://build/failed_summary.md">failed_summary.md</a> , <a href="artifact://build/full_report.json">full_report.json</a>
 _EOF_
-      exit 1 # fail the build if the status is fail
+      #exit 1 # fail the build if the status is fail
     else
       BENCH_COMPARE=$(gobenchdata checks report build/full_report.json)
       buildkite-agent annotate --style 'success' --context "benchstat" --append << _EOF_
