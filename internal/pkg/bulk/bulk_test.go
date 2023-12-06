@@ -339,8 +339,6 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 		go func(sampleData []byte) {
 			defer wait.Done()
 
-			b.ResetTimer()
-			b.StartTimer()
 			for j := 0; j < b.N; j++ {
 				// Create
 				id, err := bulker.Create(ctx, index, "", sampleData)
@@ -366,7 +364,6 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 					b.Error(err)
 				}
 			}
-			b.StopTimer()
 		}(samples[i])
 	}
 
@@ -376,7 +373,7 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 }
 
 func BenchmarkMockBulk(b *testing.B) {
-	b.StopTimer()
+
 	benchmarks := []int{1, 8, 64, 4096, 32768}
 
 	// Create the samples outside the loop to avoid accounting
