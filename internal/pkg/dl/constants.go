@@ -16,6 +16,7 @@ const (
 	FleetPolicies          = ".fleet-policies"
 	FleetPoliciesLeader    = ".fleet-policies-leader"
 	FleetServers           = ".fleet-servers"
+	FleetOutputHealth      = "logs-fleet_server.output_health-default"
 )
 
 // Query fields

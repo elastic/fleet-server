@@ -109,10 +109,7 @@ LOOP:
 				return err
 			}
 			cT.Reset(m.checkTime)
-			if state == client.UnitStateHealthy {
-				// running; can stop
-				break LOOP
-			}
+			m.log.Trace().Msg(state.String())
 		case hits := <-s.Output():
 			policies := make([]model.Policy, len(hits))
 			for i, hit := range hits {
@@ -125,10 +122,7 @@ LOOP:
 			if err != nil {
 				return err
 			}
-			if state == client.UnitStateHealthy {
-				// running; can stop
-				break LOOP
-			}
+			m.log.Trace().Msg(state.String())
 		}
 	}
 
@@ -218,6 +212,8 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 		return client.UnitStateStarting, nil
 	}
 
+	reportOutputHealth(ctx, m.bulker, m.log)
+
 	state := client.UnitStateHealthy
 	extendMsg := ""
 	var payload map[string]interface{}
@@ -251,6 +247,32 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 		m.reporter.UpdateState(state, fmt.Sprintf("Running on policy with Fleet Server integration: %s%s", m.policyID, extendMsg), payload) //nolint:errcheck // not clear what to do in failure cases
 	}
 	return state, nil
+}
+
+func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, logger zerolog.Logger) {
+	//pinging logic
+	bulkerMap := bulker.GetBulkerMap()
+	for outputName, outputBulker := range bulkerMap {
+		doc := model.OutputHealth{
+			Output:  outputName,
+			State:   client.UnitStateHealthy.String(),
+			Message: "",
+		}
+		res, err := outputBulker.Client().Ping(outputBulker.Client().Ping.WithContext(ctx))
+		if err != nil {
+			doc.State = client.UnitStateDegraded.String()
+			doc.Message = fmt.Sprintf("remote ES is not reachable due to error: %s", err.Error())
+			logger.Error().Err(err).Str("outputName", outputName).Msg(doc.Message)
+
+		} else if res.StatusCode != 200 {
+			doc.State = client.UnitStateDegraded.String()
+			doc.Message = fmt.Sprintf("remote ES is not reachable due to unexpected status code %d", res.StatusCode)
+			logger.Error().Err(err).Str("outputName", outputName).Msg(doc.Message)
+		}
+		if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
+			logger.Error().Err(err).Str("outputName", outputName).Msg("error writing output health")
+		}
+	}
 }
 
 func HasFleetServerInput(inputs []map[string]interface{}) bool {
