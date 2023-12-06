@@ -68,8 +68,10 @@ if [[ ${TYPE} == "compare" ]]; then
 ${BENCH_COMPARE}
 
 </details>
+
+Download <a href="artifact://build/failed_summary.md">failed_summary.md</a> , <a href="artifact://build/full_report.json">full_report.json</a>
 _EOF_
-      exit 1
+      exit 1 # fail the build if the status is fail
     else
       BENCH_COMPARE=$(gobenchdata checks report build/full_report.json)
       buildkite-agent annotate --style 'success' --context "benchstat" --append << _EOF_
@@ -79,6 +81,8 @@ _EOF_
 ${BENCH_COMPARE}
 
 </details>
+
+Download <a href="artifact://build/full_report.json">full_report.json</a>
 _EOF_
     fi
 fi
