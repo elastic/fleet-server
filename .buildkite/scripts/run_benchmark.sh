@@ -54,6 +54,7 @@ if [[ ${TYPE} == "compare" ]]; then
 
     cat build/base.out| gobenchdata --json build/base.json
     cat build/next.out| gobenchdata --json build/next.json
+    set +e # suppress error handling of gobenchdata
     gobenchdata checks eval build/base.json build/next.json --json build/full_report.json
     status=$(jq -r '.Status' build/full_report.json)
     if [[ $status == "fail" ]]; then
@@ -68,6 +69,7 @@ ${BENCH_COMPARE}
 
 </details>
 _EOF_
+      exit 1
     else
       BENCH_COMPARE=$(gobenchdata checks report build/full_report.json)
       buildkite-agent annotate --style 'success' --context "benchstat" --append << _EOF_
