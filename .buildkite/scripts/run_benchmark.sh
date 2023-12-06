@@ -52,8 +52,8 @@ if [[ ${TYPE} == "compare" ]]; then
     buildkite-agent artifact download "build/base.out" .
     buildkite-agent artifact download "build/next.out" .
 
-    cat build/base.out| gobenchdata --json build/base.out
-    cat build/next.out| gobenchdata --json build/next.out
+    cat build/base.out| gobenchdata --json build/base.json
+    cat build/next.out| gobenchdata --json build/next.json
     gobenchdata checks eval base.json next.json --json build/full_report.json
     cat build/full_report.json| jq 'del(.Checks."My Check".Diffs[]| select(.Status == "pass") )'| tee build/failed_report.json
     gobenchdata checks report failed.json | tee build/failed_summary.md
