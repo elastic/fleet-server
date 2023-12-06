@@ -54,7 +54,7 @@ if [[ ${TYPE} == "compare" ]]; then
 
     cat build/base.out| gobenchdata --json build/base.json
     cat build/next.out| gobenchdata --json build/next.json
-    gobenchdata checks eval base.json next.json --json build/full_report.json
+    gobenchdata checks eval build/base.json build/next.json --json build/full_report.json
     cat build/full_report.json| jq 'del(.Checks."My Check".Diffs[]| select(.Status == "pass") )'| tee build/failed_report.json
     gobenchdata checks report failed.json | tee build/failed_summary.md
     BENCH_COMPARE=$(cat build/failed_summary.md)
