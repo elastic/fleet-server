@@ -615,14 +615,10 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
 	span, ctx := apm.StartSpan(ctx, "ackUnenroll", "process")
 	defer span.End()
-	apiKeys := agent.APIKeyIDs()
-	if len(apiKeys) > 0 {
-		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
 
-		if err := ack.bulk.APIKeyInvalidate(ctx, apiKeys...); err != nil {
-			return fmt.Errorf("handleUnenroll invalidate apikey: %w", err)
-		}
-	}
+	apiKeys := agent.APIKeyIDs()
+	zlog.Info().Any("fleet.policy.apiKeyIDsToRetire", apiKeys).Msg("handleUnenroll invalidate API keys")
+	ack.invalidateAPIKeys(ctx, zlog, apiKeys, "")
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{

@@ -44,24 +44,32 @@ func (a *Agent) CheckDifferentVersion(ver string) string {
 
 // APIKeyIDs returns all the API keys, the valid, in-use as well as the one
 // marked to be retired.
-func (a *Agent) APIKeyIDs() []string {
+func (a *Agent) APIKeyIDs() []ToRetireAPIKeyIdsItems {
 	if a == nil {
 		return nil
 	}
-	keys := make([]string, 0, len(a.Outputs)+1)
+	keys := make([]ToRetireAPIKeyIdsItems, 0, len(a.Outputs)+1)
 	if a.AccessAPIKeyID != "" {
-		keys = append(keys, a.AccessAPIKeyID)
+		keys = append(keys, ToRetireAPIKeyIdsItems{
+			ID:        a.AccessAPIKeyID,
+			Output:    "",
+			RetiredAt: "",
+		})
 	}
 
-	for _, output := range a.Outputs {
+	for outputName, output := range a.Outputs {
 		if output.APIKeyID != "" {
-			keys = append(keys, output.APIKeyID)
-		}
-		for _, key := range output.ToRetireAPIKeyIds {
-			if key.ID != "" {
-				keys = append(keys, key.ID)
+			name := ""
+			if outputName != "default" {
+				name = outputName
 			}
+			keys = append(keys, ToRetireAPIKeyIdsItems{
+				ID:        output.APIKeyID,
+				Output:    name,
+				RetiredAt: "",
+			})
 		}
+		keys = append(keys, output.ToRetireAPIKeyIds...)
 	}
 
 	return keys
