@@ -1,0 +1,9 @@
+checks:
+    - name: timePerOp
+      description: |-
+        This check is set to fail when there are benchmark tests that are slower than the defined threshold
+      package: .
+      benchmarks: []
+      diff: (current.NsPerOp - base.NsPerOp) / base.NsPerOp * 100
+      thresholds:
+        max: 10
