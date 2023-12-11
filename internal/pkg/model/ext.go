@@ -69,7 +69,11 @@ func (a *Agent) APIKeyIDs() []ToRetireAPIKeyIdsItems {
 				RetiredAt: "",
 			})
 		}
-		keys = append(keys, output.ToRetireAPIKeyIds...)
+		for _, key := range output.ToRetireAPIKeyIds {
+			if key.ID != "" {
+				keys = append(keys, key)
+			}
+		}
 	}
 
 	return keys
