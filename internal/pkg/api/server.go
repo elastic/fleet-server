@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	slog "log"
 	"net"
 	"net/http"
@@ -75,25 +76,7 @@ func (s *server) Run(ctx context.Context) error {
 		ConnState:         diagConn,
 	}
 
-	forceCh := make(chan struct{})
-	defer close(forceCh)
-
-	// handler to close server
-	go func() {
-		select {
-		case <-ctx.Done():
-			zerolog.Ctx(ctx).Debug().Msg("force server close on ctx.Done()")
-			err := srv.Close()
-			if err != nil {
-				zerolog.Ctx(ctx).Error().Err(err).Msg("error while closing server")
-			}
-		case <-forceCh:
-			zerolog.Ctx(ctx).Debug().Msg("go routine forced closed on exit")
-		}
-	}()
-
 	var listenCfg net.ListenConfig
-
 	ln, err := listenCfg.Listen(ctx, "tcp", s.addr)
 	if err != nil {
 		return err
@@ -130,23 +113,29 @@ func (s *server) Run(ctx context.Context) error {
 		zerolog.Ctx(ctx).Warn().Msg("Exposed over insecure HTTP; enablement of TLS is strongly recommended")
 	}
 
+	// Start the API server on another goroutine and return any non ErrServerClosed errors through a channel.
 	errCh := make(chan error)
-	baseCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	go func(ctx context.Context, errCh chan error, ln net.Listener) {
 		zerolog.Ctx(ctx).Info().Msgf("Listening on %s", s.addr)
 		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
-	}(baseCtx, errCh, ln)
+	}(ctx, errCh, ln)
 
 	select {
+	// Listen and return any errors that occur from the server listener
 	case err := <-errCh:
 		if !errors.Is(err, context.Canceled) {
-			return err
+			return fmt.Errorf("error while serving API listener: %w", err)
 		}
-	case <-baseCtx.Done():
+	// Do a clean shutdown if the context is cancelled
+	case <-ctx.Done():
+		sCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Timeouts.Drain)
+		defer cancel()
+		if err := srv.Shutdown(sCtx); err != nil {
+			cErr := srv.Close() // force it closed
+			return errors.Join(fmt.Errorf("error while shutting down api listener: %w", err), cErr)
+		}
 	}
 
 	return nil

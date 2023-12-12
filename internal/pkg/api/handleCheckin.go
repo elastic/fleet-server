@@ -319,7 +319,16 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		for {
 			select {
 			case <-ctx.Done():
-				span.End()
+				defer span.End()
+				// If the request context is canceled, the API server is shutting down.
+				// We want to immediately stop the long-poll and return a 200 with the ackToken and no actions.
+				if errors.Is(ctx.Err(), context.Canceled) {
+					resp := CheckinResponse{
+						AckToken: &ackToken,
+						Action:   "checkin",
+					}
+					return ct.writeResponse(zlog, w, r, agent, resp)
+				}
 				return ctx.Err()
 			case acdocs := <-actCh:
 				var acs []Action

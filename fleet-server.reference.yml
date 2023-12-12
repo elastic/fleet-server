@@ -122,6 +122,8 @@ fleet:
 #       checkin_jitter: 30s
 #       # checkin_max_poll is the maximum long_poll value a client can request.
 #       checkin_max_poll: 1h
+#       # drain is the amount of time fleet-server will wait for HTTP connections to terminate on a shutdown signal before forcing all connections closed
+#       drain: 10s
 #
 #     # profiler will bind Go's pprof endpoints to a new listener if enabled.
 #     profiler:
