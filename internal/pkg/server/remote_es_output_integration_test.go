@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool) (string, string) {
+func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType string) (string, string) {
 	cli := cleanhttp.DefaultClient()
 	var obj map[string]interface{}
 
@@ -60,7 +60,10 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	require.True(t, ok, "expected action id to be string")
 
 	typeRaw := action["type"]
-	require.Equal(t, "POLICY_CHANGE", typeRaw)
+	require.Equal(t, actionType, typeRaw)
+	if actionType != "POLICY_CHANGE" {
+		return "", actionID
+	}
 	dataRaw := action["data"]
 	data, ok := dataRaw.(map[string]interface{})
 	require.True(t, ok, "expected data to be map")
@@ -85,6 +88,7 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	defaultAPIKey, ok := defaultOutput["api_key"].(string)
 	require.True(t, ok, "expected defaultAPIKey to be string")
 	require.NotEqual(t, remoteAPIKey, defaultAPIKey, "expected remote api key to be different than default")
+
 	return remoteAPIKey, actionID
 }
 
@@ -215,7 +219,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 		}
 	}()
 
-	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true)
+	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
 	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
 
 	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, false)
@@ -245,7 +249,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	}
 
 	t.Log("Checkin so that agent gets new policy revision")
-	_, actionID = Checkin(t, ctx, srvCopy, agentID, key, false)
+	_, actionID = Checkin(t, ctx, srvCopy, agentID, key, false, "POLICY_CHANGE")
 
 	t.Log("Ack so that fleet triggers remote api key invalidate")
 	Ack(t, ctx, srvCopy, actionID, agentID, key)
@@ -372,7 +376,7 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 		}
 	}()
 
-	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true)
+	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
 	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
 
 	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, false)
@@ -401,6 +405,133 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	_, err = cli.Do(req)
 	require.NoError(t, err)
+
+	t.Log("Verify that remote API key is invalidated")
+	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, true)
+
+}
+
+func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
+	enrollBody := `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "enrollment_id": "",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+
+	t.Log("Create policy with remote ES output")
+
+	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
+	remoteESHost := "localhost:9201"
+	var policyDataRemoteES = model.PolicyData{
+		Outputs: map[string]map[string]interface{}{
+			"default": {
+				"type": "elasticsearch",
+			},
+			"remoteES": {
+				"type":          "remote_elasticsearch",
+				"hosts":         []string{remoteESHost},
+				"service_token": os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
+		Inputs:            []map[string]interface{}{},
+		Agent:             json.RawMessage(`{"monitoring": {"use_output":"remoteES"}}`),
+	}
+
+	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
+		PolicyID:           policyRemoteID,
+		RevisionIdx:        1,
+		DefaultFleetServer: false,
+		Data:               &policyDataRemoteES,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Create API key and enrollment key for new policy")
+
+	newKey, err := apikey.Create(ctx, srv.bulker.Client(), "default", "", "true", []byte(`{
+	    "fleet-apikey-enroll": {
+		"cluster": [],
+		"index": [],
+		"applications": [{
+		    "application": "fleet",
+		    "privileges": ["no-privileges"],
+		    "resources": ["*"]
+		}]
+	    }
+	}`), map[string]interface{}{
+		"managed_by": "fleet",
+		"managed":    true,
+		"type":       "enroll",
+		"policy_id":  policyRemoteID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = dl.CreateEnrollmentAPIKey(ctx, srv.bulker, model.EnrollmentAPIKey{
+		Name:     "RemoteES",
+		APIKey:   newKey.Key,
+		APIKeyID: newKey.ID,
+		PolicyID: policyRemoteID,
+		Active:   true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Enroll agent")
+	srvCopy := srv
+	srvCopy.enrollKey = newKey.Token()
+	agentID, key := EnrollAgent(enrollBody, t, ctx, srvCopy)
+
+	// cleanup
+	defer func() {
+		err = srv.bulker.Delete(ctx, dl.FleetAgents, agentID)
+		if err != nil {
+			t.Log("could not clean up agent")
+		}
+	}()
+
+	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
+	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
+
+	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, false)
+
+	Ack(t, ctx, srvCopy, actionID, agentID, key)
+
+	t.Log("Unenroll agent")
+
+	doc := fmt.Sprintf(`{
+		"action_id": "unenroll_action1",
+		"agents": ["%s"],
+		"@timestamp": "2023-12-11T13:00:00.000Z",
+		"expiration": "2099-01-10T13:14:36.565Z",
+		"type": "UNENROLL"
+	}`, agentID)
+	client := srv.bulker.Client()
+	res, err := client.Index(".fleet-actions", strings.NewReader(doc))
+	require.NoError(t, err)
+	require.Equal(t, 201, res.StatusCode)
+
+	t.Log("Checkin so that agent gets unenroll action")
+	_, actionID = Checkin(t, ctx, srvCopy, agentID, key, false, "UNENROLL")
+	t.Log(actionID)
+
+	t.Log("Ack so that fleet triggers remote api key invalidate")
+	Ack(t, ctx, srvCopy, actionID, agentID, key)
 
 	t.Log("Verify that remote API key is invalidated")
 	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, true)
