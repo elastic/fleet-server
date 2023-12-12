@@ -236,7 +236,7 @@ func TestProcessOutputSecret(t *testing.T) {
 			expectOutput, err := smap.Parse([]byte(tc.expectOutputJSON))
 			assert.NoError(t, err)
 
-			err = processOutputSecret(context.Background(), output, bulker)
+			err = ProcessOutputSecret(context.Background(), output, bulker)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expectOutput, output)

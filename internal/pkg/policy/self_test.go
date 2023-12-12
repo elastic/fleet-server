@@ -9,7 +9,9 @@ package policy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
@@ -26,6 +28,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	mmock "github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func TestSelfMonitor_DefaultPolicy(t *testing.T) {
@@ -47,6 +51,8 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	mm.On("Subscribe").Return(ms).Once()
 	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
@@ -183,6 +189,9 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	mm.On("Subscribe").Return(ms).Once()
 	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
+
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
@@ -340,6 +349,8 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	mm.On("Subscribe").Return(ms).Once()
 	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
@@ -476,6 +487,8 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	mm.On("Subscribe").Return(ms).Once()
 	mm.On("Unsubscribe", mock.Anything).Return().Once()
 	bulker := ftesting.NewMockBulk()
+	emptyBulkerMap := make(map[string]bulk.Bulk)
+	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
@@ -632,4 +645,60 @@ func (r *FakeReporter) Current() (client.UnitState, string, map[string]interface
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	return r.state, r.msg, r.payload
+}
+
+func TestSelfMonitor_reportOutputHealthyState(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	logger := testlog.SetLogger(t)
+
+	bulker := ftesting.NewMockBulk()
+	bulkerMap := make(map[string]bulk.Bulk)
+	outputBulker := ftesting.NewMockBulk()
+	mockEsClient, _ := esutil.MockESClient(t)
+	outputBulker.On("Client").Return(mockEsClient)
+	bulkerMap["remote"] = outputBulker
+	bulker.On("GetBulkerMap").Return(bulkerMap)
+	bulker.On("Create", mock.Anything, dl.FleetOutputHealth, mock.Anything, mock.MatchedBy(func(body []byte) bool {
+		var doc model.OutputHealth
+		err := json.Unmarshal(body, &doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return doc.Message == "" && doc.State == client.UnitStateHealthy.String()
+	}), mock.Anything).Return("", nil)
+
+	reportOutputHealth(ctx, bulker, logger)
+
+	bulker.AssertExpectations(t)
+	outputBulker.AssertExpectations(t)
+}
+
+func TestSelfMonitor_reportOutputDegradedState(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	logger := testlog.SetLogger(t)
+
+	bulker := ftesting.NewMockBulk()
+	bulkerMap := make(map[string]bulk.Bulk)
+	outputBulker := ftesting.NewMockBulk()
+	mockEsClient, mockTransport := esutil.MockESClient(t)
+	var err error = errors.New("error connecting")
+	mockTransport.RoundTripFn = func(req *http.Request) (*http.Response, error) { return mockTransport.Response, err }
+	outputBulker.On("Client").Return(mockEsClient)
+	bulkerMap["remote"] = outputBulker
+	bulker.On("GetBulkerMap").Return(bulkerMap)
+	bulker.On("Create", mock.Anything, dl.FleetOutputHealth, mock.Anything, mock.MatchedBy(func(body []byte) bool {
+		var doc model.OutputHealth
+		err := json.Unmarshal(body, &doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return doc.Message == "remote ES is not reachable due to error: error connecting" && doc.State == client.UnitStateDegraded.String()
+	}), mock.Anything).Return("", nil)
+
+	reportOutputHealth(ctx, bulker, logger)
+
+	bulker.AssertExpectations(t)
+	outputBulker.AssertExpectations(t)
 }

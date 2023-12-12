@@ -30,6 +30,42 @@ steps:
           image: "${GO_AGENT_IMAGE}"
           cpu: "8"
           memory: "4G"
+  
+  - group: "Performance test"
+    key: "performance-test"
+    steps:
+      - label: "Run go benchmark for PR branch"
+        key: "go-benchmark-pr"
+        command: ".buildkite/scripts/run_benchmark.sh pr"
+        artifact_paths:
+          - build/next.out
+        agents:
+          provider: "gcp"
+          machineType: "c2-standard-8"
+
+      - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+        key: "go-benchmark-base"
+        command: ".buildkite/scripts/run_benchmark.sh base"
+        artifact_paths:
+          - build/base.out
+        agents:
+          provider: "gcp"
+          machineType: "c2-standard-8"
+
+      - label: "Compare results"
+        key: "go-benchmark-compare"
+        command: ".buildkite/scripts/run_benchmark.sh compare"
+        artifact_paths:
+          - build/failed_summary.md
+          - build/failed_report.json
+          - build/full_report.json
+        depends_on:
+          - go-benchmark-pr
+          - go-benchmark-base
+        agents:
+          provider: "gcp"
+
+    depends_on: "check"
 
   - group: "Run tests"
     key: "tests"

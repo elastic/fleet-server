@@ -387,6 +387,10 @@
             "description": "Date/time the API key was retired",
             "type": "string",
             "format": "date-time"
+          },
+          "output": {
+            "description": "Output name where the API Key belongs",
+            "type": "string"
           }
         }
       }
@@ -424,6 +428,43 @@
         "permissions_hash",
         "type"
       ]
+    },
+
+    "output_health": {
+      "description": "Output health represents a health state of an output",
+      "type": "object",
+      "properties": {
+        "output": {
+          "type": "string",
+          "description": "Output ID"
+        },
+        "state": {
+          "type": "string",
+          "description": "Health state, can be HEALTHY or DEGRADED"
+        },
+        "message": {
+          "type": "string",
+          "description": "Long state message if unhealthy"
+        },
+        "@timestamp": {
+          "type": "string",
+          "description": "Timestamp of reported state"
+        },
+        "data_stream": {
+          "type": "object",
+          "properties": {
+            "dataset": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            }
+          }
+        }
+      }
     },
 
     "agent": {
@@ -539,10 +580,6 @@
         },
         "last_checkin_status": {
           "description": "Last checkin status",
-          "type": "string"
-        },
-        "last_checkin_message": {
-          "description": "Last checkin message",
           "type": "string"
         },
         "last_checkin_message": {

@@ -305,6 +305,13 @@ type CheckinPolicyInputItems struct {
 	TemplateID string `json:"template_id"`
 }
 
+// DataStream
+type DataStream struct {
+	Dataset   string `json:"dataset,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+	Type      string `json:"type,omitempty"`
+}
+
 // EnrollmentAPIKey An Elastic Agent enrollment API key
 type EnrollmentAPIKey struct {
 	ESDocument
@@ -340,6 +347,24 @@ type HostMetadata struct {
 
 	// The hostname of the Elastic Agent
 	Name string `json:"name"`
+}
+
+// OutputHealth Output health represents a health state of an output
+type OutputHealth struct {
+	ESDocument
+	DataStream *DataStream `json:"data_stream,omitempty"`
+
+	// Long state message if unhealthy
+	Message string `json:"message,omitempty"`
+
+	// Output ID
+	Output string `json:"output,omitempty"`
+
+	// Health state, can be HEALTHY or DEGRADED
+	State string `json:"state,omitempty"`
+
+	// Timestamp of reported state
+	Timestamp string `json:"@timestamp,omitempty"`
 }
 
 // Policy A policy that an Elastic Agent is attached to
@@ -465,6 +490,9 @@ type ToRetireAPIKeyIdsItems struct {
 
 	// API Key identifier
 	ID string `json:"id,omitempty"`
+
+	// Output name where the API Key belongs
+	Output string `json:"output,omitempty"`
 
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`

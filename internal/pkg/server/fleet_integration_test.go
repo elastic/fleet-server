@@ -103,7 +103,7 @@ func WithAPM(url string, enabled bool) Option {
 	}
 }
 
-func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserver, error) {
+func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData, opts ...Option) (*tserver, error) {
 	t.Helper()
 
 	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
@@ -120,7 +120,7 @@ func startTestServer(t *testing.T, ctx context.Context, opts ...Option) (*tserve
 		PolicyID:           policyID,
 		RevisionIdx:        1,
 		DefaultFleetServer: true,
-		Data:               &policyData,
+		Data:               &policyD,
 	})
 	if err != nil {
 		return nil, err
@@ -393,7 +393,7 @@ func TestServerUnauthorized(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -426,10 +426,7 @@ func TestServerUnauthorized(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer res.Body.Close()
-			diff := cmp.Diff(http.StatusBadRequest, res.StatusCode)
-			if diff != "" {
-				t.Fatal(diff)
-			}
+			require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 
 			raw, _ := ioutil.ReadAll(res.Body)
 			var resp api.HTTPErrResp
@@ -437,11 +434,8 @@ func TestServerUnauthorized(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			diff = cmp.Diff(http.StatusBadRequest, resp.StatusCode)
-			if diff != "" {
-				t.Fatal(diff)
-			}
-			diff = cmp.Diff("ErrNoAuthHeader", resp.Error)
+			require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+			diff := cmp.Diff("ErrNoAuthHeader", resp.Error)
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -461,10 +455,7 @@ func TestServerUnauthorized(t *testing.T) {
 			require.NoError(t, err)
 			defer res.Body.Close()
 
-			diff := cmp.Diff(http.StatusBadRequest, res.StatusCode)
-			if diff != "" {
-				t.Fatal(diff)
-			}
+			require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 
 			raw, _ := ioutil.ReadAll(res.Body)
 			var resp api.HTTPErrResp
@@ -472,11 +463,8 @@ func TestServerUnauthorized(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			diff = cmp.Diff(400, resp.StatusCode)
-			if diff != "" {
-				t.Fatal(diff)
-			}
-			diff = cmp.Diff("ErrUnauthorized", resp.Error)
+			require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+			diff := cmp.Diff("ErrUnauthorized", resp.Error)
 			if diff != "" {
 				t.Fatal(diff)
 			}
@@ -506,7 +494,7 @@ func TestServerInstrumentation(t *testing.T) {
 	defer server.Close()
 
 	// Start test server with instrumentation disabled
-	srv, err := startTestServer(t, ctx, WithAPM(server.URL, false))
+	srv, err := startTestServer(t, ctx, policyData, WithAPM(server.URL, false))
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -591,7 +579,7 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -702,7 +690,7 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
 }
 
-func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) string {
+func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) (string, string) {
 	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -727,7 +715,14 @@ func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tser
 	mm, ok := item.(map[string]interface{})
 	require.True(t, ok, "expected attribute item to be an object")
 	agentID := mm["id"]
-	return agentID.(string)
+
+	apiKey, ok := mm["access_api_key"]
+	require.True(t, ok, "expected attribute access_api_key is missing")
+	key, ok := apiKey.(string)
+	require.True(t, ok, "expected attribute access_api_key to be a string")
+	require.NotEmpty(t, key)
+
+	return agentID.(string), key
 }
 
 func Test_Agent_Enrollment_Id(t *testing.T) {
@@ -745,15 +740,15 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	t.Log("Enroll the first agent with enrollment_id")
-	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	t.Log("Enroll the second agent with the same enrollment_id")
-	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	secondAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	// cleanup
 	defer func() {
@@ -792,12 +787,12 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	t.Log("Enroll the first agent with enrollment_id")
-	firstAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
 	if err != nil {
@@ -812,7 +807,7 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	}
 
 	t.Log("Enroll the second agent with the same enrollment_id")
-	secondAgentID := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	secondAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
 
 	// cleanup
 	defer func() {
@@ -841,7 +836,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -905,7 +900,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		res, err := cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		require.Equal(t, http.StatusForbidden, res.StatusCode)
 	})
 	t.Run("use another agent's api key", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(ctx)
@@ -945,7 +940,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		res, err = cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		require.Equal(t, http.StatusForbidden, res.StatusCode)
 	})
 	t.Run("use api key for enrollment", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(ctx)
@@ -966,7 +961,7 @@ func Test_Agent_request_errors(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -980,7 +975,7 @@ func Test_Agent_request_errors(t *testing.T) {
 		res, err := cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 	})
 	t.Run("bad path", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(ctx)
@@ -1048,7 +1043,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 

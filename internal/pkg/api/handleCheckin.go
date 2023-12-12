@@ -119,6 +119,11 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 
 	agent, err := authAgent(r, &id, ct.bulker, ct.cache)
 	if err != nil {
+		// invalidate remote API keys of force unenrolled agents
+		if errors.Is(err, ErrAgentInactive) && agent != nil {
+			ctx := zlog.WithContext(r.Context())
+			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
+		}
 		return err
 	}
 
@@ -134,6 +139,18 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 	// Safely check if the agent version is different, return empty string otherwise
 	newVer := agent.CheckDifferentVersion(ver)
 	return ct.ProcessRequest(zlog, w, r, start, agent, newVer)
+}
+
+func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent) {
+	remoteAPIKeys := make([]model.ToRetireAPIKeyIdsItems, 0)
+	apiKeys := agent.APIKeyIDs()
+	for _, key := range apiKeys {
+		if key.Output != "" {
+			remoteAPIKeys = append(remoteAPIKeys, key)
+		}
+	}
+	zlog.Info().Any("fleet.policy.apiKeyIDsToRetire", remoteAPIKeys).Msg("handleCheckin invalidate remote API keys")
+	invalidateAPIKeys(ctx, zlog, bulker, remoteAPIKeys, "")
 }
 
 // validatedCheckin is a struct to wrap all the things that validateRequest returns.
@@ -748,6 +765,13 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	data := model.ClonePolicyData(pp.Policy.Data)
+	for policyName, policyOutput := range data.Outputs {
+		err := policy.ProcessOutputSecret(ctx, policyOutput, bulker)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process output secrets %q: %w",
+				policyName, err)
+		}
+	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
 		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, data.Outputs)

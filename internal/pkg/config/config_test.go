@@ -17,6 +17,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -125,7 +126,7 @@ func TestConfig(t *testing.T) {
 							},
 							CompressionLevel:  1,
 							CompressionThresh: 1024,
-							Limits:            generateServerLimits(12500),
+							Limits:            generateServerLimits(0),
 							Bulk:              defaultServerBulk(),
 							GC:                defaultServerGC(),
 							PGP: PGP{
@@ -133,7 +134,7 @@ func TestConfig(t *testing.T) {
 								Dir:         filepath.Join(retrieveExecutableDir(), defaultPGPDirectoryName),
 							},
 						},
-						Cache: generateCache(12500),
+						Cache: generateCache(0),
 						Monitor: Monitor{
 							FetchSize:   defaultFetchSize,
 							PollTimeout: defaultPollTimeout,
@@ -160,7 +161,8 @@ func TestConfig(t *testing.T) {
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			_ = testlog.SetLogger(t)
+			l := testlog.SetLogger(t)
+			zerolog.DefaultContextLogger = &l
 			path := filepath.Join("testdata", name+".yml")
 			cfg, err := LoadFile(path)
 			if test.err != "" {
@@ -184,6 +186,43 @@ func TestConfig(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("config specifies agent count", func(t *testing.T) {
+		l := testlog.SetLogger(t)
+		zerolog.DefaultContextLogger = &l
+		path := filepath.Join("testdata", "input-specify-agents.yml")
+		cfg, err := LoadFile(path)
+		t.Logf("cfg fileread: %+v", cfg.Inputs[0].Server.Limits)
+		require.NoError(t, err)
+		err = cfg.LoadServerLimits()
+		require.NoError(t, err)
+		t.Logf("cfg loaded: %+v", cfg.Inputs[0].Server.Limits)
+
+		t.Log("Before expect")
+		expected := Config{
+			Fleet: defaultFleet(),
+			Output: Output{
+				Elasticsearch: defaultElastic(),
+			},
+			Inputs: []Input{
+				{
+					Type:   "fleet-server",
+					Server: defaultServer(),
+					Cache:  generateCache(2500),
+					Monitor: Monitor{
+						FetchSize:   defaultFetchSize,
+						PollTimeout: defaultPollTimeout,
+					},
+				},
+			},
+			Logging: defaultLogging(),
+			HTTP:    defaultHTTP(),
+		}
+		expected.Inputs[0].Server.Limits = generateServerLimits(2500)
+		t.Log("After expect")
+		assert.EqualExportedValues(t, expected, *cfg)
+
+	})
 }
 
 func TestLoadStandaloneAgentMetadata(t *testing.T) {
@@ -203,8 +242,39 @@ func TestLoadServerLimits(t *testing.T) {
 		c := &Config{Inputs: []Input{{}}}
 		err := c.LoadServerLimits()
 		assert.NoError(t, err)
-		assert.Equal(t, int64(defaultCheckinMaxBody), c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
-		assert.Equal(t, defaultActionTTL, c.Inputs[0].Cache.ActionTTL)
+		assert.NotZero(t, c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
+		assert.NotZero(t, c.Inputs[0].Cache.ActionTTL)
+	})
+	t.Run("agent count limits load", func(t *testing.T) {
+		c := &Config{Inputs: []Input{{
+			Server: Server{
+				Limits: ServerLimits{
+					MaxAgents: 2500,
+				},
+			},
+		}}}
+		err := c.LoadServerLimits()
+		assert.NoError(t, err)
+		assert.NotZero(t, c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
+		assert.Equal(t, time.Millisecond*5, c.Inputs[0].Server.Limits.CheckinLimit.Interval)
+
+	})
+	t.Run("agent count limits load does not override", func(t *testing.T) {
+		c := &Config{Inputs: []Input{{
+			Server: Server{
+				Limits: ServerLimits{
+					MaxAgents: 2500,
+					ActionLimit: Limit{
+						Interval: time.Millisecond,
+					},
+				},
+			},
+		}}}
+		err := c.LoadServerLimits()
+		assert.NoError(t, err)
+		assert.NotZero(t, c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
+		assert.Equal(t, time.Millisecond, c.Inputs[0].Server.Limits.ActionLimit.Interval)
+
 	})
 	t.Run("existing values are not overridden", func(t *testing.T) {
 		c := &Config{
@@ -224,8 +294,8 @@ func TestLoadServerLimits(t *testing.T) {
 		err := c.LoadServerLimits()
 		assert.NoError(t, err)
 		assert.Equal(t, int64(5*defaultCheckinMaxBody), c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
-		assert.Equal(t, defaultCheckinBurst, c.Inputs[0].Server.Limits.CheckinLimit.Burst)
-		assert.Equal(t, time.Minute, c.Inputs[0].Cache.ActionTTL)
+		assert.NotZero(t, c.Inputs[0].Server.Limits.CheckinLimit.Burst)
+		assert.NotZero(t, c.Inputs[0].Cache.ActionTTL)
 	})
 
 }
@@ -235,6 +305,7 @@ func TestLoadServerLimits(t *testing.T) {
 func defaultCache() Cache {
 	var d Cache
 	d.InitDefaults()
+	d.LoadLimits(loadLimits(0))
 	return d
 }
 
@@ -299,6 +370,7 @@ func defaultElastic() Elasticsearch {
 func defaultServer() Server {
 	var d Server
 	d.InitDefaults()
+	d.Limits.LoadLimits(loadLimits(0))
 	return d
 }
 
