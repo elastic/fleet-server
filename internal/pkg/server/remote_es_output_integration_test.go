@@ -26,6 +26,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	remoteESHost = "localhost:9201"
+)
+
 func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType string) (string, string) {
 	cli := cleanhttp.DefaultClient()
 	var obj map[string]interface{}
@@ -126,16 +130,6 @@ func Ack(t *testing.T, ctx context.Context, srv *tserver, actionID, agentID, key
 }
 
 func Test_Agent_Remote_ES_Output(t *testing.T) {
-	enrollBody := `{
-	    "type": "PERMANENT",
-	    "shared_id": "",
-	    "enrollment_id": "",
-	    "metadata": {
-		"user_provided": {},
-		"local": {},
-		"tags": []
-	    }
-	}`
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -146,7 +140,6 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	t.Log("Create policy with remote ES output")
 
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
-	remoteESHost := "localhost:9201"
 	var policyDataRemoteES = model.PolicyData{
 		Outputs: map[string]map[string]interface{}{
 			"default": {
@@ -222,7 +215,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
 	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
 
-	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, false)
+	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 
 	Ack(t, ctx, srvCopy, actionID, agentID, key)
 
@@ -254,11 +247,11 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	t.Log("Ack so that fleet triggers remote api key invalidate")
 	Ack(t, ctx, srvCopy, actionID, agentID, key)
 
-	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, true)
+	verifyRemoteAPIKey(t, ctx, apiKeyID, true)
 
 }
 
-func verifyRemoteAPIKey(t *testing.T, ctx context.Context, remoteESHost, apiKeyID string, invalidated bool) {
+func verifyRemoteAPIKey(t *testing.T, ctx context.Context, apiKeyID string, invalidated bool) {
 	// need to wait a bit before querying the api key
 	time.Sleep(time.Second)
 
@@ -283,16 +276,6 @@ func verifyRemoteAPIKey(t *testing.T, ctx context.Context, remoteESHost, apiKeyI
 }
 
 func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
-	enrollBody := `{
-	    "type": "PERMANENT",
-	    "shared_id": "",
-	    "enrollment_id": "",
-	    "metadata": {
-		"user_provided": {},
-		"local": {},
-		"tags": []
-	    }
-	}`
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -303,7 +286,6 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 	t.Log("Create policy with remote ES output")
 
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
-	remoteESHost := "localhost:9201"
 	var policyDataRemoteES = model.PolicyData{
 		Outputs: map[string]map[string]interface{}{
 			"default": {
@@ -379,7 +361,7 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
 	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
 
-	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, false)
+	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 
 	Ack(t, ctx, srvCopy, actionID, agentID, key)
 
@@ -403,25 +385,16 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 	req.Header.Set("Authorization", "ApiKey "+key)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
 	req.Header.Set("Content-Type", "application/json")
-	_, err = cli.Do(req)
+	res, err := cli.Do(req)
 	require.NoError(t, err)
+	defer res.Body.Close()
 
 	t.Log("Verify that remote API key is invalidated")
-	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, true)
+	verifyRemoteAPIKey(t, ctx, apiKeyID, true)
 
 }
 
 func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
-	enrollBody := `{
-	    "type": "PERMANENT",
-	    "shared_id": "",
-	    "enrollment_id": "",
-	    "metadata": {
-		"user_provided": {},
-		"local": {},
-		"tags": []
-	    }
-	}`
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -432,7 +405,6 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 	t.Log("Create policy with remote ES output")
 
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
-	remoteESHost := "localhost:9201"
 	var policyDataRemoteES = model.PolicyData{
 		Outputs: map[string]map[string]interface{}{
 			"default": {
@@ -508,7 +480,7 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
 	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
 
-	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, false)
+	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 
 	Ack(t, ctx, srvCopy, actionID, agentID, key)
 
@@ -534,6 +506,6 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 	Ack(t, ctx, srvCopy, actionID, agentID, key)
 
 	t.Log("Verify that remote API key is invalidated")
-	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, true)
+	verifyRemoteAPIKey(t, ctx, apiKeyID, true)
 
 }
