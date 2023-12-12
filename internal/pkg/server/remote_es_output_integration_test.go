@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/gofrs/uuid"
@@ -25,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoveES bool) (string, string) {
+func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool) (string, string) {
 	cli := cleanhttp.DefaultClient()
 	var obj map[string]interface{}
 
@@ -68,7 +69,7 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	outputs, ok := policy["outputs"].(map[string]interface{})
 	require.True(t, ok, "expected outputs to be map")
 	var remoteAPIKey string
-	if shouldHaveRemoveES {
+	if shouldHaveRemoteES {
 		remoteES, ok := outputs["remoteES"].(map[string]interface{})
 		require.True(t, ok, "expected remoteES to be map")
 		oType, ok := remoteES["type"].(string)
@@ -275,4 +276,133 @@ func verifyRemoteAPIKey(t *testing.T, ctx context.Context, remoteESHost, apiKeyI
 	require.NoError(t, err, "did not expect error when parsing api key response")
 
 	require.Contains(t, string(respString), fmt.Sprintf("\"invalidated\":%t", invalidated))
+}
+
+func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
+	enrollBody := `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "enrollment_id": "",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+
+	t.Log("Create policy with remote ES output")
+
+	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
+	remoteESHost := "localhost:9201"
+	var policyDataRemoteES = model.PolicyData{
+		Outputs: map[string]map[string]interface{}{
+			"default": {
+				"type": "elasticsearch",
+			},
+			"remoteES": {
+				"type":          "remote_elasticsearch",
+				"hosts":         []string{remoteESHost},
+				"service_token": os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
+		Inputs:            []map[string]interface{}{},
+		Agent:             json.RawMessage(`{"monitoring": {"use_output":"remoteES"}}`),
+	}
+
+	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
+		PolicyID:           policyRemoteID,
+		RevisionIdx:        1,
+		DefaultFleetServer: false,
+		Data:               &policyDataRemoteES,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Create API key and enrollment key for new policy")
+
+	newKey, err := apikey.Create(ctx, srv.bulker.Client(), "default", "", "true", []byte(`{
+	    "fleet-apikey-enroll": {
+		"cluster": [],
+		"index": [],
+		"applications": [{
+		    "application": "fleet",
+		    "privileges": ["no-privileges"],
+		    "resources": ["*"]
+		}]
+	    }
+	}`), map[string]interface{}{
+		"managed_by": "fleet",
+		"managed":    true,
+		"type":       "enroll",
+		"policy_id":  policyRemoteID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = dl.CreateEnrollmentAPIKey(ctx, srv.bulker, model.EnrollmentAPIKey{
+		Name:     "RemoteES",
+		APIKey:   newKey.Key,
+		APIKeyID: newKey.ID,
+		PolicyID: policyRemoteID,
+		Active:   true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Enroll agent")
+	srvCopy := srv
+	srvCopy.enrollKey = newKey.Token()
+	agentID, key := EnrollAgent(enrollBody, t, ctx, srvCopy)
+
+	// cleanup
+	defer func() {
+		err = srv.bulker.Delete(ctx, dl.FleetAgents, agentID)
+		if err != nil {
+			t.Log("could not clean up agent")
+		}
+	}()
+
+	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true)
+	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
+
+	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, false)
+
+	Ack(t, ctx, srvCopy, actionID, agentID, key)
+
+	t.Log("Force Unenroll agent - set inactive")
+
+	doc := bulk.UpdateFields{
+		"active": false,
+	}
+	body, err := doc.Marshal()
+	require.NoError(t, err)
+	err = srv.bulker.Update(ctx, dl.FleetAgents, agentID, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+	require.NoError(t, err)
+
+	t.Log("Checkin so that invalidate logic runs")
+
+	cli := cleanhttp.DefaultClient()
+
+	t.Logf("Fake a checkin for agent %s", agentID)
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(checkinBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	_, err = cli.Do(req)
+	require.NoError(t, err)
+
+	t.Log("Verify that remote API key is invalidated")
+	verifyRemoteAPIKey(t, ctx, remoteESHost, apiKeyID, true)
+
 }
