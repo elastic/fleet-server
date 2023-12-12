@@ -120,7 +120,7 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 	agent, err := authAgent(r, &id, ct.bulker, ct.cache)
 	if err != nil {
 		// invalidate remote API keys of force unenrolled agents
-		if err == ErrAgentInactive && agent != nil {
+		if errors.Is(err, ErrAgentInactive) && agent != nil {
 			ctx := zlog.WithContext(r.Context())
 			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
 		}
