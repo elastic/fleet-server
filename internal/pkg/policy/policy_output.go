@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -260,10 +261,20 @@ func (p *Output) prepareElasticsearch(
 		ctx := zlog.WithContext(ctx)
 		outputAPIKey, err :=
 			generateOutputAPIKey(ctx, outputBulker, agent.Id, p.Name, p.Role.Raw)
-			// reporting output error status to self monitor and not returning the error to keep fleet-server running
+
+		// reporting output health and not returning the error to keep fleet-server running
 		if outputAPIKey == nil && p.Type == OutputTypeRemoteElasticsearch {
 			if err != nil {
-				zerolog.Ctx(ctx).Warn().Err(err).Msg("Could not create API key in remote ES")
+				doc := model.OutputHealth{
+					Output:  p.Name,
+					State:   client.UnitStateDegraded.String(),
+					Message: fmt.Sprintf("remote ES could not create API key due to error: %v", err),
+				}
+				zerolog.Ctx(ctx).Warn().Err(err).Str("outputName", p.Name).Msg(doc.Message)
+
+				if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
+					zlog.Error().Err(err).Str("outputName", p.Name).Msg("error writing output health")
+				}
 			}
 
 			// replace type remote_elasticsearch with elasticsearch as agent doesn't recognize remote_elasticsearch
@@ -271,6 +282,15 @@ func (p *Output) prepareElasticsearch(
 			// remove the service token from the agent policy sent to the agent
 			delete(outputMap[p.Name], FieldOutputServiceToken)
 			return nil
+		} else if p.Type == OutputTypeRemoteElasticsearch {
+			doc := model.OutputHealth{
+				Output:  p.Name,
+				State:   client.UnitStateHealthy.String(),
+				Message: "",
+			}
+			if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
+				zlog.Error().Err(err).Msg("create output health")
+			}
 		}
 		if err != nil {
 			return fmt.Errorf("failed generate output API key: %w", err)
@@ -304,7 +324,7 @@ func (p *Output) prepareElasticsearch(
 		// Using painless script to append the old keys to the history
 		body, err := renderUpdatePainlessScript(p.Name, fields)
 		if err != nil {
-			return fmt.Errorf("could no tupdate painless script: %w", err)
+			return fmt.Errorf("could not update painless script: %w", err)
 		}
 
 		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
