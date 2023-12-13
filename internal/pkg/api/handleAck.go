@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/module/apmhttp/v2"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -26,8 +28,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
-	"go.elastic.co/apm/module/apmhttp/v2"
-	"go.elastic.co/apm/v2"
 )
 
 const (
