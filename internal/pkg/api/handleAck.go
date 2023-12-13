@@ -559,62 +559,16 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 }
 
 func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
-	ids := make([]string, 0, len(toRetireAPIKeyIDs))
-	remoteIds := make(map[string][]string)
-	for _, k := range toRetireAPIKeyIDs {
-		if k.ID == skip || k.ID == "" {
-			continue
-		}
-		if k.Output != "" {
-			if remoteIds[k.Output] == nil {
-				remoteIds[k.Output] = make([]string, 0)
-			}
-			remoteIds[k.Output] = append(remoteIds[k.Output], k.ID)
-		} else {
-			ids = append(ids, k.ID)
-		}
-	}
-	if len(ids) > 0 {
-		zlog.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
-		if err := ack.bulk.APIKeyInvalidate(ctx, ids...); err != nil {
-			zlog.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
-		}
-	}
-	// using remote es bulker to invalidate api key
-	for outputName, outputIds := range remoteIds {
-		outputBulk := ack.bulk.GetBulker(outputName)
-
-		if outputBulk == nil {
-			// read output config from .fleet-policies, not filtering by policy id as agent could be reassigned
-			policy, err := dl.QueryOutputFromPolicy(ctx, ack.bulk, outputName)
-			if err != nil || policy == nil {
-				zlog.Warn().Str("outputName", outputName).Any("ids", outputIds).Msg("Output policy not found, API keys will be orphaned")
-			} else {
-				outputBulk, _, err = ack.bulk.CreateAndGetBulker(ctx, zlog, outputName, policy.Data.Outputs)
-				if err != nil {
-					zlog.Warn().Str("outputName", outputName).Any("ids", outputIds).Msg("Failed to recreate output bulker, API keys will be orphaned")
-				}
-			}
-		}
-		if outputBulk != nil {
-			if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
-				zlog.Info().Err(err).Strs("ids", outputIds).Str("outputName", outputName).Msg("Failed to invalidate API keys")
-			}
-		}
-	}
+	invalidateAPIKeys(ctx, zlog, ack.bulk, toRetireAPIKeyIDs, skip)
 }
 
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
 	span, ctx := apm.StartSpan(ctx, "ackUnenroll", "process")
 	defer span.End()
-	apiKeys := agent.APIKeyIDs()
-	if len(apiKeys) > 0 {
-		zlog = zlog.With().Strs(LogAPIKeyID, apiKeys).Logger()
 
-		if err := ack.bulk.APIKeyInvalidate(ctx, apiKeys...); err != nil {
-			return fmt.Errorf("handleUnenroll invalidate apikey: %w", err)
-		}
-	}
+	apiKeys := agent.APIKeyIDs()
+	zlog.Info().Any("fleet.policy.apiKeyIDsToRetire", apiKeys).Msg("handleUnenroll invalidate API keys")
+	ack.invalidateAPIKeys(ctx, zlog, apiKeys, "")
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
@@ -727,4 +681,50 @@ func makeUpdatePolicyBody(policyID string, newRev int64) []byte {
 	buf.WriteString(`"}}}`)
 
 	return buf.Bytes()
+}
+
+func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
+	ids := make([]string, 0, len(toRetireAPIKeyIDs))
+	remoteIds := make(map[string][]string)
+	for _, k := range toRetireAPIKeyIDs {
+		if k.ID == skip || k.ID == "" {
+			continue
+		}
+		if k.Output != "" {
+			if remoteIds[k.Output] == nil {
+				remoteIds[k.Output] = make([]string, 0)
+			}
+			remoteIds[k.Output] = append(remoteIds[k.Output], k.ID)
+		} else {
+			ids = append(ids, k.ID)
+		}
+	}
+	if len(ids) > 0 {
+		zlog.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
+		if err := bulk.APIKeyInvalidate(ctx, ids...); err != nil {
+			zlog.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+		}
+	}
+	// using remote es bulker to invalidate api key
+	for outputName, outputIds := range remoteIds {
+		outputBulk := bulk.GetBulker(outputName)
+
+		if outputBulk == nil {
+			// read output config from .fleet-policies, not filtering by policy id as agent could be reassigned
+			policy, err := dl.QueryOutputFromPolicy(ctx, bulk, outputName)
+			if err != nil || policy == nil {
+				zlog.Warn().Str("outputName", outputName).Any("ids", outputIds).Msg("Output policy not found, API keys will be orphaned")
+			} else {
+				outputBulk, _, err = bulk.CreateAndGetBulker(ctx, zlog, outputName, policy.Data.Outputs)
+				if err != nil {
+					zlog.Warn().Str("outputName", outputName).Any("ids", outputIds).Msg("Failed to recreate output bulker, API keys will be orphaned")
+				}
+			}
+		}
+		if outputBulk != nil {
+			if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
+				zlog.Info().Err(err).Strs("ids", outputIds).Str("outputName", outputName).Msg("Failed to invalidate API keys")
+			}
+		}
+	}
 }

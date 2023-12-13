@@ -14,6 +14,7 @@ const (
 	FleetArtifacts         = ".fleet-artifacts"
 	FleetEnrollmentAPIKeys = ".fleet-enrollment-api-keys"
 	FleetPolicies          = ".fleet-policies"
+	FleetOutputHealth      = "logs-fleet_server.output_health-default"
 )
 
 // Query fields

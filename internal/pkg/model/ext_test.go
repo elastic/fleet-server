@@ -88,7 +88,7 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 	tcs := []struct {
 		name  string
 		agent Agent
-		want  []string
+		want  []ToRetireAPIKeyIdsItems
 	}{
 		{
 			name: "no API key marked to be retired",
@@ -99,7 +99,9 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 					"p2": {APIKeyID: "p2_api_key_id"},
 				},
 			},
-			want: []string{"access_api_key_id", "p1_api_key_id", "p2_api_key_id"},
+			want: []ToRetireAPIKeyIdsItems{{ID: "access_api_key_id", Output: "", RetiredAt: ""},
+				{ID: "p1_api_key_id", Output: "p1", RetiredAt: ""},
+				{ID: "p2_api_key_id", Output: "p2", RetiredAt: ""}},
 		},
 		{
 			name: "with API key marked to be retired",
@@ -109,18 +111,22 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 					"p1": {
 						APIKeyID: "p1_api_key_id",
 						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
-							ID: "p1_to_retire_key",
+							ID:     "p1_to_retire_key",
+							Output: "remote",
 						}}},
 					"p2": {
 						APIKeyID: "p2_api_key_id",
 						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
-							ID: "p2_to_retire_key",
+							ID:     "p2_to_retire_key",
+							Output: "remote",
 						}}},
 				},
 			},
-			want: []string{
-				"access_api_key_id", "p1_api_key_id", "p2_api_key_id",
-				"p1_to_retire_key", "p2_to_retire_key"},
+			want: []ToRetireAPIKeyIdsItems{{ID: "access_api_key_id", Output: "", RetiredAt: ""},
+				{ID: "p1_api_key_id", Output: "p1", RetiredAt: ""},
+				{ID: "p2_api_key_id", Output: "p2", RetiredAt: ""},
+				{ID: "p1_to_retire_key", Output: "remote", RetiredAt: ""},
+				{ID: "p2_to_retire_key", Output: "remote", RetiredAt: ""}},
 		},
 		{
 			name: "API key empty",
@@ -130,7 +136,7 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 					"p1": {APIKeyID: ""},
 				},
 			},
-			want: []string{"access_api_key_id"},
+			want: []ToRetireAPIKeyIdsItems{{ID: "access_api_key_id", Output: "", RetiredAt: ""}},
 		},
 		{
 			name: "retired API key empty",
@@ -144,8 +150,8 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 						}}},
 				},
 			},
-			want: []string{
-				"access_api_key_id", "p1_api_key_id"},
+			want: []ToRetireAPIKeyIdsItems{{ID: "access_api_key_id", Output: "", RetiredAt: ""},
+				{ID: "p1_api_key_id", Output: "p1", RetiredAt: ""}},
 		},
 	}
 
