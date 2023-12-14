@@ -51,10 +51,11 @@ func FindEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl,
 	return findEnrollmentAPIKey(ctx, bulker, FleetEnrollmentAPIKeys, tmpl, field, id)
 }
 
-func findEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, tmpl *dsl.Tmpl, field string, id string) (rec model.EnrollmentAPIKey, err error) {
+func findEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, tmpl *dsl.Tmpl, field string, id string) (model.EnrollmentAPIKey, error) {
+	var rec model.EnrollmentAPIKey
 	res, err := SearchWithOneParam(ctx, bulker, tmpl, index, field, id)
 	if err != nil {
-		return
+		return rec, err
 	}
 
 	sz := len(res.Hits)
