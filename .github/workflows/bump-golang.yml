@@ -26,4 +26,4 @@ jobs:
           vaultSecretId: ${{ secrets.VAULT_SECRET_ID }}
           pipeline: ./.ci/bump-golang.yml
           notifySlackChannel: "#ingest-notifications"
-          messageIfFailure: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@update-me-with-the-slack-team-to-be-poked` please look what's going on <${{ env.JOB_URL }}|here>"
+          messageIfFailure: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@fleet_team` please look what's going on <${{ env.JOB_URL }}|here>"
