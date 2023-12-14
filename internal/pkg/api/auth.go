@@ -170,7 +170,7 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 
 		// Update the cache to mark the api key id associated with this agent as not enabled
 		c.SetAPIKey(*key, false)
-		return nil, ErrAgentInactive
+		return agent, ErrAgentInactive
 	}
 
 	return agent, nil
