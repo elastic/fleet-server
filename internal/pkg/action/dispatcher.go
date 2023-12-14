@@ -57,11 +57,11 @@ func NewDispatcher(am monitor.SimpleMonitor, throttle time.Duration, i int) *Dis
 // Run starts the Dispatcher.
 // After the Dispatcher is started subscriptions may receive actions.
 // Subscribe may be called before or after Run.
-func (d *Dispatcher) Run(ctx context.Context) (err error) {
+func (d *Dispatcher) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case hits := <-d.am.Output():
 			d.process(ctx, hits)
 		}

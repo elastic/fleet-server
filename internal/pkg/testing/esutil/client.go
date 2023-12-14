@@ -6,7 +6,6 @@ package esutil
 
 import (
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
@@ -48,7 +47,7 @@ func sendBodyString(body string) *http.Response {
 func sendBody(body io.Reader) *http.Response {
 	return &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(body),
+		Body:       io.NopCloser(body),
 		Header: http.Header{
 			"X-Elastic-Product": []string{"Elasticsearch"},
 			"Content-Type":      []string{"application/cbor"},

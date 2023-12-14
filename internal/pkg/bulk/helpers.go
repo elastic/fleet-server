@@ -6,7 +6,7 @@ package bulk
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -41,7 +41,7 @@ func parseError(res *esapi.Response, log *zerolog.Logger) error {
 
 	if err := decoder.Decode(&e); err != nil {
 		log.Error().Err(err).Msg("Cannot decode Elasticsearch error body")
-		bodyBytes, readErr := ioutil.ReadAll(res.Body)
+		bodyBytes, readErr := io.ReadAll(res.Body)
 		if readErr != nil {
 			log.Debug().Err(readErr).Msg("Error reading error response body from Elasticsearch")
 		} else {
