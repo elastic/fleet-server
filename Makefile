@@ -119,7 +119,7 @@ check-headers:  ## - Check copyright headers
 
 .PHONY: check-go
 check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.51.1
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.55.2
 	@./bin/golangci-lint run -v
 
 .PHONY: notice

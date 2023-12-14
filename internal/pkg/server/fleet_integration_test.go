@@ -4,7 +4,7 @@
 
 //go:build integration
 
-//nolint:dupl // don't care about repeating code
+//nolint:dupl,goconst // don't care about repeating code
 package server
 
 import (
@@ -14,7 +14,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"path"
@@ -428,7 +427,7 @@ func TestServerUnauthorized(t *testing.T) {
 			defer res.Body.Close()
 			require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 
-			raw, _ := ioutil.ReadAll(res.Body)
+			raw, _ := io.ReadAll(res.Body)
 			var resp api.HTTPErrResp
 			err = json.Unmarshal(raw, &resp)
 			if err != nil {
@@ -457,7 +456,7 @@ func TestServerUnauthorized(t *testing.T) {
 
 			require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 
-			raw, _ := ioutil.ReadAll(res.Body)
+			raw, _ := io.ReadAll(res.Body)
 			var resp api.HTTPErrResp
 			err = json.Unmarshal(raw, &resp)
 			if err != nil {

@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
@@ -285,7 +284,7 @@ func sendBodyBytes(body []byte) *http.Response  { return sendBody(bytes.NewReade
 func sendBody(body io.Reader) *http.Response {
 	return &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(body),
+		Body:       io.NopCloser(body),
 		Header: http.Header{
 			"X-Elastic-Product": []string{"Elasticsearch"},
 			"Content-Type":      []string{"application/cbor"},

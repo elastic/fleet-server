@@ -647,6 +647,8 @@ func filterActions(zlog zerolog.Logger, agentID string, actions []model.Action) 
 // raw is first parsed into the action-specific data struct then passed into Action_Data in order to remove any undefined keys.
 //
 // TODO: There is a lot of repitition in this method we should try to clean up.
+//
+//nolint:nakedret // FIXME try to refactor this in the future
 func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, err error) {
 	switch aType {
 	case CANCEL:
@@ -696,6 +698,7 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 	}
 }
 
+//nolint:gosec // memory aliasing is used to convert from pointers to values and the other way
 func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action) ([]Action, string) {
 	var ackToken string
 	sz := len(actions)

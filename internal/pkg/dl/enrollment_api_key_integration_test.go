@@ -38,16 +38,16 @@ func createRandomEnrollmentAPIKey(policyID string, active bool) model.Enrollment
 
 }
 
-func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, policyID string, active bool) (rec model.EnrollmentAPIKey, err error) {
-	rec = createRandomEnrollmentAPIKey(policyID, active)
+func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, policyID string, active bool) (model.EnrollmentAPIKey, error) {
+	rec := createRandomEnrollmentAPIKey(policyID, active)
 
 	body, err := json.Marshal(rec)
 	if err != nil {
-		return
+		return rec, err
 	}
 	_, err = bulker.Create(ctx, index, rec.Id, body, bulk.WithRefresh())
 	if err != nil {
-		return
+		return rec, err
 	}
 	return rec, err
 }

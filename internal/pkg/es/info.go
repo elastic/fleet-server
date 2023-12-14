@@ -21,13 +21,13 @@ type infoResponse struct {
 	Error   json.RawMessage `json:"error,omitempty"`
 }
 
-func FetchESVersion(ctx context.Context, esCli *elasticsearch.Client) (version string, err error) {
+func FetchESVersion(ctx context.Context, esCli *elasticsearch.Client) (string, error) {
 	res, err := esCli.Info(
 		esCli.Info.WithContext(ctx),
 	)
 
 	if err != nil {
-		return
+		return "", err
 	}
 	defer res.Body.Close()
 
@@ -35,13 +35,13 @@ func FetchESVersion(ctx context.Context, esCli *elasticsearch.Client) (version s
 
 	err = json.NewDecoder(res.Body).Decode(&sres)
 	if err != nil {
-		return
+		return "", err
 	}
 
 	// Check error
 	err = TranslateError(res.StatusCode, sres.Error)
 	if err != nil {
-		return
+		return "", err
 	}
 
 	verStr := strings.TrimSpace(strings.TrimSuffix(strings.ToLower(sres.Version.Number), "-snapshot"))

@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"sync"
@@ -101,7 +101,7 @@ func (m *mockBulkTransport) Perform(req *http.Request) (*http.Response, error) {
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,
 		ProtoMinor: 1,
-		Body:       ioutil.NopCloser(&body),
+		Body:       io.NopCloser(&body),
 	}
 
 	return resp, nil
