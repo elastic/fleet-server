@@ -36,6 +36,8 @@ func prepareSearchPolicyLeaders() (*dsl.Tmpl, error) {
 }
 
 // SearchPolicyLeaders returns all the leaders for the provided policies
+//
+//nolint:nakedret // leader election is going to be removed
 func SearchPolicyLeaders(ctx context.Context, bulker bulk.Bulk, ids []string, opt ...Option) (leaders map[string]model.PolicyLeader, err error) {
 	initSearchPolicyLeadersOnce.Do(func() {
 		tmplSearchPolicyLeaders, err = prepareSearchPolicyLeaders()
