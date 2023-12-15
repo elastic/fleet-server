@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -85,7 +85,7 @@ func parseResponseError(res *esapi.Response) (*errorResponse, error) {
 		// Read the original body content, in case if it was a error from the cloud response
 		// {"ok":false,"message":"Unknown deployment."}
 		// So we can log it
-		body, err := ioutil.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
 		if err != nil {
 			return nil, &ClientError{
 				StatusCode: res.StatusCode,

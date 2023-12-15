@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//nolint:dupl // don't care about repitition for tests
+//nolint:dupl,goconst // don't care about repitition for tests
 package api
 
 // Test json encoding/decoding for all req/resp items
@@ -227,6 +227,7 @@ func Test_UpgradeDetailsMetadata_Downloading(t *testing.T) {
 	}}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataDownloading()
 			if tc.err == nil {
@@ -281,6 +282,7 @@ func Test_UpgradeDetailsMetadata_Failed(t *testing.T) {
 	}}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataFailed()
 			if tc.err == nil {
@@ -336,6 +338,7 @@ func Test_UpgradeDetailsMetadata_Scheduled(t *testing.T) {
 	}}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataScheduled()
 			if tc.err == nil {
@@ -378,6 +381,7 @@ func TestUpgradeDetailsSerialization(t *testing.T) {
 		TargetVersion: "1.2.3",
 	}}
 	for _, d := range details {
+		d := d
 		t.Run(string(d.State), func(t *testing.T) {
 			p, err := json.Marshal(d)
 			require.NoError(t, err)

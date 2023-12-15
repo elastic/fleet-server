@@ -126,21 +126,21 @@ func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo 
 	return hitsToActions(res.Hits)
 }
 
-func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, cleanupIntervalAfterExpired string) (count int64, err error) {
+func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, cleanupIntervalAfterExpired string) (int64, error) {
 	params := map[string]interface{}{
 		FieldExpiration: "now-" + cleanupIntervalAfterExpired,
 	}
 
 	query, err := QueryDeleteExpiredActions.Render(params)
 	if err != nil {
-		return
+		return 0, err
 	}
 
 	res, err := bulker.Client().API.DeleteByQuery([]string{index}, bytes.NewReader(query),
 		bulker.Client().API.DeleteByQuery.WithContext(ctx))
 
 	if err != nil {
-		return
+		return 0, err
 	}
 	defer res.Body.Close()
 
@@ -148,7 +148,7 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 
 	err = json.NewDecoder(res.Body).Decode(&esres)
 	if err != nil {
-		return
+		return 0, err
 	}
 
 	if res.IsError() {
@@ -158,7 +158,7 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 				zerolog.Ctx(ctx).Debug().Str("index", index).Msg(es.ErrIndexNotFound.Error())
 				err = nil
 			}
-			return
+			return 0, err
 		}
 	}
 
