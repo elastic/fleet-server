@@ -9,14 +9,15 @@ import (
 	"net"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestRunProfiler(t *testing.T) {
-	ln, err := net.Listen("tcp", "localhost:8080")
+	ln, err := net.Listen("tcp", "localhost:8081")
 	if err != nil {
-		t.Skip("Port 8080 must be free to run this test")
+		t.Skip("Port 8081 must be free to run this test")
 	}
 	ln.Close()
 
@@ -26,12 +27,21 @@ func TestRunProfiler(t *testing.T) {
 	errCh := make(chan error)
 
 	go func() {
-		errCh <- RunProfiler(ctx, "localhost:8080")
+		errCh <- RunProfiler(ctx, "localhost:8081")
 	}()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:8080/debug/pprof", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:8081/debug/pprof", nil)
 	require.NoError(t, err)
-	resp, err := http.DefaultClient.Do(req)
+
+	var resp *http.Response
+	for i := 0; i < 10; i++ {
+		resp, err = http.DefaultClient.Do(req)
+		if err == nil {
+			break
+		}
+		t.Logf("profile request %d failed with: %v, retrying...", i, err)
+		time.Sleep(time.Millisecond * 200)
+	}
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
