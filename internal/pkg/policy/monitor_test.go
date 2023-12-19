@@ -524,7 +524,7 @@ LOOP:
 	if ts1.After(ts2) {
 		d *= -1
 	}
-	assert.LessOrEqual(t, 50*time.Millisecond, d, "Expected limiter delay to be at least 50ms")
+	assert.LessOrEqual(t, 45*time.Millisecond, d) // use 45ms instead of 50ms because we are testing buffered channel output here, not dispatch from the run loop which means we are measuring something that may be smaller then the delay
 	ms.AssertExpectations(t)
 	mm.AssertExpectations(t)
 }
