@@ -34,7 +34,7 @@ jobs:
           vaultRoleId: ${{ secrets.VAULT_ROLE_ID }}
           vaultSecretId: ${{ secrets.VAULT_SECRET_ID }}
           pipeline: ./.ci/bump-elastic-stack-snapshot.yml
-          notifySlackChannel: "#ingest-notifications"
+          notifySlackChannel: "#fleet-notifications"
           messageIfFailure: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@fleet_team` please look what's going on <${{ env.JOB_URL }}|here>"
         env:
           BRANCH: ${{ matrix.branch }}
