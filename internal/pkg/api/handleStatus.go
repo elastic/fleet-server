@@ -91,6 +91,12 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 	span, _ = apm.StartSpan(r.Context(), "response", "write")
 	defer span.End()
 
+	// If the request context has been cancelled, such as the case when the server is stopping we should return a 503
+	// Note that the API server uses Shutdown, so no new requests should be accepted and this edge case will be rare.
+	if errors.Is(r.Context().Err(), context.Canceled) {
+		state = client.UnitStateStopping
+	}
+
 	data, err := json.Marshal(&resp)
 	if err != nil {
 		return err
