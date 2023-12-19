@@ -6,11 +6,13 @@ cache_limits:
   num_counters: 1600000
   max_cost: 134217728
 server_limits:
-  policy_throttle: 5ms
   max_connections: 42000
   action_limit:
     interval: 1ms
     burst: 100
+  policy_limit:
+    interval: 5ms
+    burst: 1
   checkin_limit:
     interval: 0.5ms
     burst: 4000
