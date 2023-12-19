@@ -393,6 +393,7 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	// the bulker exits.  If the bulker exits before the error group,
 	// this will tear down the error group and g.Wait() will return.
 	// Otherwise it will be a noop.
+	//nolint:nakedret // small function is easy to track
 	g.Go(func() (err error) {
 		select {
 		case err = <-errCh:

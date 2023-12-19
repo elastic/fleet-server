@@ -4,6 +4,8 @@
 
 // Package gcheckpt handles the fleet API's global_checkpoints operations
 // checkpoints are used to track which actions, agetnc (docs in general) have been read based on the seqno received.
+
+//nolint:nakedret // FIXME refactor without naked returns at a later date
 package gcheckpt
 
 import (

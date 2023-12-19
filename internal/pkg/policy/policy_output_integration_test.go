@@ -4,6 +4,7 @@
 
 //go:build integration
 
+//nolint:goconst // disable constants checks for tests
 package policy
 
 import (
