@@ -286,7 +286,14 @@ components:
         download_rate:
           description: The artifact download rate as bytes per second.
           type: number
-          format: double  
+          format: double 
+        retry_error_msg:
+          description: The error message that is a result of a retryable upgrade.
+          type: string 
+        retry_until:
+          description: The RFC3339 timestamp the upgrade is retried until.
+          type: string
+          format: date-time  
     upgrade_metadata_failed:
       description: Upgrade metadata for an upgrade that has failed.
       required:
