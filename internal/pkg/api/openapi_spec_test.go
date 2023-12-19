@@ -190,6 +190,7 @@ func Test_UpgradeDetailsMetadata_Downloading(t *testing.T) {
 		md   *UpgradeDetails_Metadata
 		err  error
 		pct  float64
+		rate float64
 	}{{
 		name: "empty object",
 		md: &UpgradeDetails_Metadata{
@@ -200,10 +201,11 @@ func Test_UpgradeDetailsMetadata_Downloading(t *testing.T) {
 	}, {
 		name: "valid object",
 		md: &UpgradeDetails_Metadata{
-			union: json.RawMessage(`{"download_percent":1}`),
+			union: json.RawMessage(`{"download_percent":1,"download_rate":1000}`),
 		},
 		err: nil,
 		pct: 1,
+		rate: 1000,
 	}, {
 		name: "invalid object",
 		md: &UpgradeDetails_Metadata{
@@ -232,6 +234,9 @@ func Test_UpgradeDetailsMetadata_Downloading(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataDownloading()
 			if tc.err == nil {
 				assert.Equal(t, tc.pct, meta.DownloadPercent)
+				if meta.DownloadRate != nil {
+					assert.Equal(t, tc.rate, *meta.DownloadRate)
+				}
 			} else {
 				assert.ErrorAsf(t, err, &tc.err, "error is %v", err)
 			}

@@ -707,6 +707,9 @@ type UpgradeDetailsState string
 type UpgradeMetadataDownloading struct {
 	// DownloadPercent The artifact download progress as a percentage.
 	DownloadPercent float64 `json:"download_percent"`
+
+	// DownloadRate The artifact download rate as bytes per second.
+	DownloadRate *float64 `json:"download_rate,omitempty"`
 }
 
 // UpgradeMetadataFailed Upgrade metadata for an upgrade that has failed.
