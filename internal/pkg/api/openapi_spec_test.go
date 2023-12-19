@@ -203,8 +203,8 @@ func Test_UpgradeDetailsMetadata_Downloading(t *testing.T) {
 		md: &UpgradeDetails_Metadata{
 			union: json.RawMessage(`{"download_percent":1,"download_rate":1000}`),
 		},
-		err: nil,
-		pct: 1,
+		err:  nil,
+		pct:  1,
 		rate: 1000,
 	}, {
 		name: "invalid object",
