@@ -188,7 +188,7 @@ func (m *monitorT) waitStart(ctx context.Context) error {
 	return nil
 }
 
-func (m *monitorT) dispatchPending(ctx context.Context) bool {
+func (m *monitorT) dispatchPending(ctx context.Context) {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
@@ -198,14 +198,12 @@ func (m *monitorT) dispatchPending(ctx context.Context) bool {
 	err := m.limit.Wait(ctx)
 	if err != nil {
 		m.log.Error().Err(err).Msg("Policy limit error")
-		return false
+		return
 	}
 	s := m.pendingQ.popFront()
 	if s == nil {
-		return true
+		return
 	}
-
-	done := m.pendingQ.isEmpty()
 
 	// Lookup the latest policy for this subscription
 	policy, ok := m.policies[s.policyID]
@@ -213,7 +211,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) bool {
 		m.log.Warn().
 			Str(logger.PolicyID, s.policyID).
 			Msg("logic error: policy missing on dispatch")
-		return done
+		return
 	}
 
 	select {
@@ -232,8 +230,6 @@ func (m *monitorT) dispatchPending(ctx context.Context) bool {
 			Str(logger.AgentID, s.agentID).
 			Msg("logic error: should never block on policy channel")
 	}
-
-	return done
 }
 
 func (m *monitorT) loadPolicies(ctx context.Context) error {
