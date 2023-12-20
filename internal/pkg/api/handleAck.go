@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -111,7 +112,7 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 	zlog = zlog.With().Int("nEvents", len(req.Events)).Logger()
 
 	resp, err := ack.handleAckEvents(r.Context(), zlog, agent, req.Events)
-	span, _ := apm.StartSpan(r.Context(), "response", "write")
+	span, ctx := apm.StartSpan(r.Context(), "response", "write")
 	defer span.End()
 	if err != nil {
 		var herr *HTTPError
@@ -134,13 +135,13 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 		return err
 	}
 
-	cntAcks.bodyOut.Add(uint64(nWritten))
+	acksStats.bodyOut.Add(ctx, int64(nWritten), metric.WithAttributes(serverAttrs(r.URL)...))
 
 	return nil
 }
 
 func (ack *AckT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request) (*AckRequest, error) {
-	span, _ := apm.StartSpan(r.Context(), "validateRequest", "validate")
+	span, ctx := apm.StartSpan(r.Context(), "validateRequest", "validate")
 	defer span.End()
 
 	body := r.Body
@@ -155,7 +156,7 @@ func (ack *AckT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *
 		return nil, fmt.Errorf("handleAcks read body: %w", err)
 	}
 
-	cntAcks.bodyIn.Add(uint64(len(raw)))
+	acksStats.bodyIn.Add(ctx, int64(len(raw)), metric.WithAttributes(serverAttrs(r.URL)...))
 
 	var req AckRequest
 	if err := json.Unmarshal(raw, &req); err != nil {

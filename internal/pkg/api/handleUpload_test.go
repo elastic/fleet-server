@@ -43,6 +43,9 @@ import (
 const RouteUploadBegin = "/api/fleet/uploads"
 
 func TestUploadBeginValidation(t *testing.T) {
+	// setup stats
+	uploadStartStats = nopRouteStats()
+
 	hr, _, _, _ := prepareUploaderMock(t)
 
 	// test empty body
@@ -227,6 +230,8 @@ func TestUploadBeginValidation(t *testing.T) {
 }
 
 func TestUploadBeginAuth(t *testing.T) {
+	// setup stats
+	uploadStartStats = nopRouteStats()
 
 	tests := []struct {
 		Name               string
@@ -278,6 +283,9 @@ func TestUploadBeginAuth(t *testing.T) {
 }
 
 func TestUploadBeginResponse(t *testing.T) {
+	// setup stats
+	uploadStartStats = nopRouteStats()
+
 	hr, _, _, _ := prepareUploaderMock(t)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockStartBodyWithAgent("foo")))
@@ -293,6 +301,9 @@ func TestUploadBeginResponse(t *testing.T) {
 }
 
 func TestUploadBeginWritesTimestampToMeta(t *testing.T) {
+	// setup stats
+	uploadStartStats = nopRouteStats()
+
 	hr, _, fakebulk, _ := prepareUploaderMock(t)
 
 	rec := httptest.NewRecorder()
@@ -343,6 +354,9 @@ func TestUploadBeginWritesTimestampToMeta(t *testing.T) {
 */
 
 func TestChunkUploadRouteParams(t *testing.T) {
+	// setup stats
+	uploadChunkStats = nopRouteStats()
+
 	data := []byte("filedata")
 	hasher := sha256.New()
 	_, err := hasher.Write(data)
@@ -395,6 +409,9 @@ func TestChunkUploadRouteParams(t *testing.T) {
 }
 
 func TestChunkUploadRequiresChunkHashHeader(t *testing.T) {
+	// setup stats
+	uploadChunkStats = nopRouteStats()
+
 	data := []byte("filedata")
 	mockUploadID := "abc123"
 
@@ -422,6 +439,9 @@ func TestChunkUploadRequiresChunkHashHeader(t *testing.T) {
 }
 
 func TestChunkUploadStatus(t *testing.T) {
+	// setup stats
+	uploadChunkStats = nopRouteStats()
+
 	data := []byte("filedata")
 	hasher := sha256.New()
 	_, err := hasher.Write(data)
@@ -476,6 +496,9 @@ func TestChunkUploadStatus(t *testing.T) {
 }
 
 func TestChunkUploadExpiry(t *testing.T) {
+	// setup stats
+	uploadChunkStats = nopRouteStats()
+
 	data := []byte("filedata")
 	hasher := sha256.New()
 	_, err := hasher.Write(data)
@@ -527,6 +550,9 @@ func TestChunkUploadExpiry(t *testing.T) {
 }
 
 func TestChunkUploadWritesTimestamp(t *testing.T) {
+	// setup stats
+	uploadChunkStats = nopRouteStats()
+
 	data := []byte("filedata")
 	hasher := sha256.New()
 	_, err := hasher.Write(data)
@@ -569,6 +595,9 @@ func TestChunkUploadWritesTimestamp(t *testing.T) {
 */
 
 func TestUploadCompleteRequiresMatchingAuth(t *testing.T) {
+	// setup stats
+	uploadEndStats = nopRouteStats()
+
 	tests := []struct {
 		Name              string
 		AuthSuccess       bool
@@ -637,6 +666,9 @@ func TestUploadCompleteRequiresMatchingAuth(t *testing.T) {
 }
 
 func TestUploadCompleteRequiresValidStatus(t *testing.T) {
+	// setup stats
+	uploadEndStats = nopRouteStats()
+
 	mockUploadID := "abc123"
 
 	tests := []struct {
@@ -691,6 +723,9 @@ func TestUploadCompleteRequiresValidStatus(t *testing.T) {
 }
 
 func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
+	// setup stats
+	uploadEndStats = nopRouteStats()
+
 	mockUploadID := "abc123"
 
 	hr, _, fakebulk, _ := prepareUploaderMock(t)
@@ -735,6 +770,9 @@ func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
 }
 
 func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
+	// setup stats
+	uploadEndStats = nopRouteStats()
+
 	mockUploadID := "abc123"
 
 	hr, _, fakebulk, _ := prepareUploaderMock(t)
@@ -785,6 +823,9 @@ func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
 }
 
 func TestUploadCompleteNonFinalChunkMarkedFinal(t *testing.T) {
+	// setup stats
+	uploadEndStats = nopRouteStats()
+
 	mockUploadID := "abc123"
 
 	hr, _, fakebulk, _ := prepareUploaderMock(t)
@@ -835,6 +876,9 @@ func TestUploadCompleteNonFinalChunkMarkedFinal(t *testing.T) {
 }
 
 func TestUploadCompleteUndersizedChunk(t *testing.T) {
+	// setup stats
+	uploadEndStats = nopRouteStats()
+
 	mockUploadID := "abc123"
 
 	hr, _, fakebulk, _ := prepareUploaderMock(t)
@@ -885,6 +929,9 @@ func TestUploadCompleteUndersizedChunk(t *testing.T) {
 }
 
 func TestUploadCompleteIncorrectTransitHash(t *testing.T) {
+	// setup stats
+	uploadEndStats = nopRouteStats()
+
 	mockUploadID := "abc123"
 
 	hr, _, fakebulk, _ := prepareUploaderMock(t)

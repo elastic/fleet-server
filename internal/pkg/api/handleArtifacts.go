@@ -24,9 +24,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
-	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
+	"go.opentelemetry.io/otel/metric"
 )
 
 const (
@@ -88,7 +89,7 @@ func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, 
 		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
 	}
 	e.Msg("artifact response sent")
-	cntArtifacts.bodyOut.Add(uint64(n))
+	artifactsStats.bodyOut.Add(ctx, n, metric.WithAttributes(serverAttrs(r.URL)...))
 	return nil
 }
 

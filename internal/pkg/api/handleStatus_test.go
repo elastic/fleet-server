@@ -77,6 +77,9 @@ func TestHandleStatus(t *testing.T) {
 		},
 	}
 
+	// setup stats
+	statusStats = nopRouteStats()
+
 	// Test table, with inner loop on all available statuses
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {

@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 )
@@ -20,12 +21,12 @@ type mockIncer struct {
 	mock.Mock
 }
 
-func (m *mockIncer) IncError(err error) {
-	m.Called(err)
+func (m *mockIncer) IncError(err error, attrs ...attribute.KeyValue) {
+	m.Called(err, attrs)
 }
 
-func (m *mockIncer) IncStart() func() {
-	args := m.Called()
+func (m *mockIncer) IncStart(attrs ...attribute.KeyValue) func() {
+	args := m.Called(attrs)
 	return args.Get(0).(func())
 }
 
@@ -46,7 +47,7 @@ func Test_Limiter_Wrap(t *testing.T) {
 		l:    &Limiter{},
 		stats: func() *mockIncer {
 			m := &mockIncer{}
-			m.On("IncStart").Return(noop).Once()
+			m.On("IncStart", mock.Anything).Return(noop).Once()
 			return m
 		},
 		status: http.StatusOK,
@@ -57,8 +58,8 @@ func Test_Limiter_Wrap(t *testing.T) {
 		},
 		stats: func() *mockIncer {
 			m := &mockIncer{}
-			m.On("IncStart").Return(noop).Once()
-			m.On("IncError", ErrMaxLimit).Once()
+			m.On("IncStart", mock.Anything).Return(noop).Once()
+			m.On("IncError", ErrMaxLimit, mock.Anything).Once()
 			return m
 		},
 		status: http.StatusTooManyRequests,
@@ -69,8 +70,8 @@ func Test_Limiter_Wrap(t *testing.T) {
 		},
 		stats: func() *mockIncer {
 			m := &mockIncer{}
-			m.On("IncStart").Return(noop).Once()
-			m.On("IncError", ErrRateLimit).Once()
+			m.On("IncStart", mock.Anything).Return(noop).Once()
+			m.On("IncError", ErrRateLimit, mock.Anything).Once()
 			return m
 		},
 		status: http.StatusTooManyRequests,
@@ -81,7 +82,8 @@ func Test_Limiter_Wrap(t *testing.T) {
 			h := tt.l.Wrap("name", mi, zerolog.DebugLevel)
 
 			w := httptest.NewRecorder()
-			h(stubHandle()).ServeHTTP(w, &http.Request{})
+			req := httptest.NewRequest("GET", "http://example.com", nil)
+			h(stubHandle()).ServeHTTP(w, req)
 
 			resp := w.Result()
 			resp.Body.Close()

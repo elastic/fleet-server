@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/str"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -24,12 +23,14 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
-	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/elastic-agent-libs/str"
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
+	"go.opentelemetry.io/otel/metric"
 )
 
 const (
@@ -95,7 +96,7 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 	}
 
 	ts, _ := logger.CtxStartTime(r.Context())
-	return writeResponse(r.Context(), zlog, w, resp, ts)
+	return writeResponse(r.Context(), zlog, w, r, resp, ts)
 }
 
 func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKey *apikey.APIKey, ver string) (*EnrollResponse, error) {
@@ -130,7 +131,7 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		return nil, err
 	}
 
-	cntEnroll.bodyIn.Add(readCounter.Count())
+	enrollStats.bodyIn.Add(r.Context(), int64(readCounter.Count()), metric.WithAttributes(serverAttrs(r.URL)...))
 
 	return et._enroll(r.Context(), rb, zlog, req, enrollAPI.PolicyID, ver)
 }
@@ -383,8 +384,8 @@ LOOP:
 	return nil
 }
 
-func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, start time.Time) error {
-	span, _ := apm.StartSpan(ctx, "response", "write")
+func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWriter, req *http.Request, resp *EnrollResponse, start time.Time) error {
+	span, ctx := apm.StartSpan(ctx, "response", "write")
 	defer span.End()
 
 	data, err := json.Marshal(resp)
@@ -393,7 +394,7 @@ func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWrit
 	}
 
 	numWritten, err := w.Write(data)
-	cntEnroll.bodyOut.Add(uint64(numWritten))
+	enrollStats.bodyOut.Add(ctx, int64(numWritten), metric.WithAttributes(serverAttrs(req.URL)...))
 
 	if err != nil {
 		return fmt.Errorf("fail send enroll response: %w", err)

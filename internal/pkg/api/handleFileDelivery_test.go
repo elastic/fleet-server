@@ -65,6 +65,9 @@ func TestFileDeliveryRouteDisallowedMethods(t *testing.T) {
 }
 
 func TestFileDeliveryRouteGetMissingFile(t *testing.T) {
+	// setup error counter
+	fileDeliveryStats = nopRouteStats()
+
 	hr, _, _, fakebulk := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 	fakebulk.On("Search",
@@ -74,7 +77,7 @@ func TestFileDeliveryRouteGetMissingFile(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{}, nil)
-	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fleet/file/X", nil))
+	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://localhost/api/fleet/file/X", nil))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
