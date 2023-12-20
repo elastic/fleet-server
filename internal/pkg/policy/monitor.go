@@ -188,47 +188,56 @@ func (m *monitorT) waitStart(ctx context.Context) error {
 	return nil
 }
 
+// dispatchPending will dispatch all pending policy changes to the subscriptions in the queue.
+// dispatches are rate limited by the monitor's limiter.
 func (m *monitorT) dispatchPending(ctx context.Context) {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
-	// Use a rate.Limiter to control how fast policies are passed to the checkin handler.
-	// This is done to avoid all responses to agents on the same policy from being written at once.
-	// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
-	err := m.limit.Wait(ctx)
-	if err != nil {
-		m.log.Error().Err(err).Msg("Policy limit error")
-		return
-	}
 	s := m.pendingQ.popFront()
 	if s == nil {
 		return
 	}
 
-	// Lookup the latest policy for this subscription
-	policy, ok := m.policies[s.policyID]
-	if !ok {
-		m.log.Warn().
-			Str(logger.PolicyID, s.policyID).
-			Msg("logic error: policy missing on dispatch")
-		return
-	}
+	for s != nil {
+		// Use a rate.Limiter to control how fast policies are passed to the checkin handler.
+		// This is done to avoid all responses to agents on the same policy from being written at once.
+		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
+		err := m.limit.Wait(ctx)
+		if err != nil {
+			m.log.Error().Err(err).Msg("Policy limit error")
+			return
+		}
+		// Lookup the latest policy for this subscription
+		policy, ok := m.policies[s.policyID]
+		if !ok {
+			m.log.Warn().
+				Str(logger.PolicyID, s.policyID).
+				Msg("logic error: policy missing on dispatch")
+			return
+		}
 
-	select {
-	case s.ch <- &policy.pp:
-		m.log.Debug().
-			Str(logger.AgentID, s.agentID).
-			Str(logger.PolicyID, s.policyID).
-			Int64("rev", s.revIdx).
-			Int64("coord", s.coordIdx).
-			Msg("dispatch")
-	default:
-		// Should never block on a channel; we created a channel of size one.
-		// A block here indicates a logic error somewheres.
-		m.log.Error().
-			Str(logger.PolicyID, s.policyID).
-			Str(logger.AgentID, s.agentID).
-			Msg("logic error: should never block on policy channel")
+		select {
+		case <-ctx.Done():
+			m.log.Debug().Err(ctx.Err()).Msg("context termination detected in policy dispatch")
+			return
+		case s.ch <- &policy.pp:
+			m.log.Debug().
+				Str(logger.AgentID, s.agentID).
+				Str(logger.PolicyID, s.policyID).
+				Int64("rev", s.revIdx).
+				Int64("coord", s.coordIdx).
+				Msg("dispatch")
+		default:
+			// Should never block on a channel; we created a channel of size one.
+			// A block here indicates a logic error somewheres.
+			m.log.Error().
+				Str(logger.PolicyID, s.policyID).
+				Str(logger.AgentID, s.agentID).
+				Msg("logic error: should never block on policy channel")
+			return
+		}
+		s = m.pendingQ.popFront()
 	}
 }
 
