@@ -18,6 +18,7 @@ type ServerTimeouts struct {
 	CheckinLongPoll  time.Duration `config:"checkin_long_poll"`
 	CheckinJitter    time.Duration `config:"checkin_jitter"`
 	CheckinMaxPoll   time.Duration `config:"checkin_max_poll"`
+	Drain            time.Duration `config:"drain"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -64,4 +65,9 @@ func (c *ServerTimeouts) InitDefaults() {
 	// The long poll value is poll_timeout-2m, and the request's write timeout is set to poll_timeout-1m
 	// CheckinMaxPoll values of less then 1m are effectively ignored and a 1m limit is used.
 	c.CheckinMaxPoll = time.Hour
+
+	// Drain is the max duration that a server will keep connections open when a shutdown signal is received in order to gracefully handle in progress-requests.
+	// It is used as a context timeout value for server.ShutDown(ctx).
+	// A long-poll checkin connection should immediately return with a 200 status and the same ackToken it was sent, the same as if the long-poll completed with no changes detected.
+	c.Drain = 10 * time.Second
 }
