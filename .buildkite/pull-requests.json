@@ -34,8 +34,8 @@
         "set_commit_status": false,
         "build_on_commit": false,
         "build_on_comment": true,
-        "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:run)\\W+)|^/perf-test$",
-        "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:run)\\W+)|^/perf-test$",
+        "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:run)\\W+(?:perf-tests))|^/perf-tests$",
+        "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:run)\\W+(?:perf-tests))|^/perf-tests$",
         "fail_on_not_mergeable": true
       }
     ]
