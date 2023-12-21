@@ -23,7 +23,20 @@
         "build_on_comment": true,
         "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:package)\\W+(?:this|it))|^/package$",
         "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:package)\\W+(?:this|it))|^/package$",
-
         "fail_on_not_mergeable": true
-      }]
+      },
+      {
+        "enabled": true,
+        "pipeline_slug": "fleet-server-perf-test",
+        "allow_org_users": true,
+        "allowed_repo_permissions": ["admin", "write"],
+        "allowed_list": ["mergify[bot]"],
+        "set_commit_status": false,
+        "build_on_commit": false,
+        "build_on_comment": true,
+        "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:run)\\W+)|^/perf-test$",
+        "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:run)\\W+)|^/perf-test$",
+        "fail_on_not_mergeable": true
+      }
+    ]
 }
