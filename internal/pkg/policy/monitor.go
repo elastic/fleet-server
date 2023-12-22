@@ -56,7 +56,7 @@ type Monitor interface {
 	Run(ctx context.Context) error
 
 	// Subscribe creates a new subscription for a policy update.
-	Subscribe(agentID string, policyID string, revisionIdx int64, coordinatorIdx int64) (Subscription, error)
+	Subscribe(agentID string, policyID string, revisionIdx int64) (Subscription, error)
 
 	// Unsubscribe removes the current subscription.
 	Unsubscribe(sub Subscription) error
@@ -230,7 +230,6 @@ func (m *monitorT) dispatchPending() bool {
 			Str(logger.AgentID, s.agentID).
 			Str(logger.PolicyID, s.policyID).
 			Int64("rev", s.revIdx).
-			Int64("coord", s.coordIdx).
 			Msg("dispatch")
 	default:
 		// Should never block on a channel; we created a channel of size one.
@@ -294,9 +293,6 @@ func groupByLatest(policies []model.Policy) map[string]model.Policy {
 		}
 		if policy.RevisionIdx > curr.RevisionIdx {
 			latest[policy.PolicyID] = policy
-			continue
-		} else if policy.RevisionIdx == curr.RevisionIdx && policy.CoordinatorIdx > curr.CoordinatorIdx {
-			latest[policy.PolicyID] = policy
 		}
 	}
 	return latest
@@ -312,13 +308,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 	zlog := m.log.With().
 		Str(logger.PolicyID, newPolicy.PolicyID).
 		Int64("rev", newPolicy.RevisionIdx).
-		Int64("coord", newPolicy.CoordinatorIdx).
 		Logger()
-
-	if newPolicy.CoordinatorIdx <= 0 {
-		zlog.Info().Str(logger.PolicyID, newPolicy.PolicyID).Msg("Ignore policy that has not passed through coordinator")
-		return false
-	}
 
 	m.mut.Lock()
 	defer m.mut.Unlock()
@@ -371,7 +361,6 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 
 	zlog.Info().
 		Int64("oldRev", oldPolicy.RevisionIdx).
-		Int64("oldCoord", oldPolicy.CoordinatorIdx).
 		Int("nQueued", nQueued).
 		Str(logger.PolicyID, newPolicy.PolicyID).
 		Msg("New revision of policy received and added to the queue")
@@ -380,7 +369,6 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 }
 
 func (m *monitorT) kickLoad() {
-
 	select {
 	case m.kickCh <- struct{}{}:
 	default:
@@ -389,7 +377,6 @@ func (m *monitorT) kickLoad() {
 }
 
 func (m *monitorT) kickDeploy() {
-
 	select {
 	case m.deployCh <- struct{}{}:
 	default:
@@ -397,26 +384,20 @@ func (m *monitorT) kickDeploy() {
 }
 
 // Subscribe creates a new subscription for a policy update.
-func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64, coordinatorIdx int64) (Subscription, error) {
+func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64) (Subscription, error) {
 	if revisionIdx < 0 {
 		return nil, errors.New("revisionIdx must be greater than or equal to 0")
 	}
-	if coordinatorIdx < 0 {
-		return nil, errors.New("coordinatorIdx must be greater than or equal to 0")
-	}
-
 	m.log.Debug().
 		Str(logger.AgentID, agentID).
 		Str(logger.PolicyID, policyID).
 		Int64("rev", revisionIdx).
-		Int64("coord", coordinatorIdx).
 		Msg("subscribed to policy monitor")
 
 	s := NewSub(
 		policyID,
 		agentID,
 		revisionIdx,
-		coordinatorIdx,
 	)
 
 	m.mut.Lock()
@@ -464,7 +445,6 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 		Str(logger.AgentID, s.agentID).
 		Str(logger.PolicyID, s.policyID).
 		Int64("rev", s.revIdx).
-		Int64("coord", s.coordIdx).
 		Msg("unsubscribe")
 
 	return nil

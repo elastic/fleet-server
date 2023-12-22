@@ -77,17 +77,16 @@ func TestMonitor_Integration(t *testing.T) {
 
 	agentID := uuid.Must(uuid.NewV4()).String()
 	policyID := uuid.Must(uuid.NewV4()).String()
-	s, err := m.Subscribe(agentID, policyID, 0, 0)
+	s, err := m.Subscribe(agentID, policyID, 0)
 	defer m.Unsubscribe(s) //nolint:errcheck // defered function
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	policy := model.Policy{
-		PolicyID:       policyID,
-		CoordinatorIdx: 1,
-		Data:           &intPolData,
-		RevisionIdx:    1,
+		PolicyID:    policyID,
+		Data:        &intPolData,
+		RevisionIdx: 1,
 	}
 	ch := make(chan error, 1)
 	go func() {
@@ -102,7 +101,7 @@ func TestMonitor_Integration(t *testing.T) {
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()
-		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 1 && subPolicy.Policy.CoordinatorIdx != 1 {
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 1 {
 			t.Fatal("failed to get the expected updated policy")
 		}
 	case <-tm.C:
