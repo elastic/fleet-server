@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+env:
+  DOCKER_REGISTRY: "docker.elastic.co"
+  DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/fleet-server" # needs to rename for rollback
+  DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
+  DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
+  DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
+
+steps:
+  - label: ":docker: Publish docker image"
+    key: "create-image"
+    command: ".buildkite/scripts/build_push_docker_image.sh"
+    agents:
+      provider: "gcp"
+
+  - label: "perf test"
+    key: "obs-perf-test"
+    trigger: observability-perf
+    build:
+      branch: "main"
+      message: "10k serverless perf test for PR ${BUILDKITE_PULL_REQUEST_REPO}/pull/${BUILDKITE_PULL_REQUEST}"
+      env:
+        OBLT_cluster_perf_provider: serverless
+        OBLT_serverless_project_type: observability
+        OBLT_serverless_fleet_image: "${DOCKER_IMAGE}:${DOCKER_IMAGE_SHA_TAG}"
+        OBLT_cluster_perf_totalAgents: 10000
+    depends_on:
+      - step: "create-image"
+        allow_failure: false
