@@ -4,8 +4,8 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "publish" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" || "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-perf-tests" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "publish" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" || "$BUILDKITE_STEP_KEY" == "create-image" ]]; then
     docker logout ${DOCKER_REGISTRY}
   fi
 fi
