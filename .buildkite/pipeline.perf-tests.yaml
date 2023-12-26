@@ -19,7 +19,7 @@ steps:
     trigger: observability-perf
     build:
       branch: "main"
-      message: "10k serverless perf test for PR ${BUILDKITE_PULL_REQUEST_REPO}/pull/${BUILDKITE_PULL_REQUEST}"
+      message: "10k serverless perf test for PR https://github.com/elastic/fleet-server/pull/${BUILDKITE_PULL_REQUEST}"
       env:
         OBLT_cluster_perf_provider: serverless
         OBLT_serverless_project_type: observability

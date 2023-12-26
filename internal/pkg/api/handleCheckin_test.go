@@ -272,7 +272,7 @@ func TestResolveSeqNo(t *testing.T) {
 			bc := checkin.NewBulk(nil)
 			bulker := ftesting.NewMockBulk()
 			pim := mockmonitor.NewMockMonitor()
-			pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
+			pm := policy.NewMonitor(bulker, pim, config.ServerLimits{PolicyLimit: config.Limit{Interval: 5 * time.Millisecond, Burst: 1}})
 			ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
 
 			resp, _ := ct.resolveSeqNo(ctx, logger, tc.req, tc.agent)
