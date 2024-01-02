@@ -291,7 +291,7 @@ components:
           description: The error message that is a result of a retryable upgrade download failure.
           type: string 
         retry_until:
-          description: The RFC3339 timestamp the upgrade is retried until.
+          description: The RFC3339 timestamp of the deadline the upgrade download is retried until.
           type: string
           format: date-time  
     upgrade_metadata_failed:
