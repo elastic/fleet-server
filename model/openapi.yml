@@ -288,7 +288,7 @@ components:
           type: number
           format: double 
         retry_error_msg:
-          description: The error message that is a result of a retryable upgrade.
+          description: The error message that is a result of a retryable upgrade download failure.
           type: string 
         retry_until:
           description: The RFC3339 timestamp the upgrade is retried until.
