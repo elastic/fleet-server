@@ -711,10 +711,10 @@ type UpgradeMetadataDownloading struct {
 	// DownloadRate The artifact download rate as bytes per second.
 	DownloadRate *float64 `json:"download_rate,omitempty"`
 
-	// RetryErrorMsg The error message that is a result of a retryable upgrade.
+	// RetryErrorMsg The error message that is a result of a retryable upgrade download failure.
 	RetryErrorMsg *string `json:"retry_error_msg,omitempty"`
 
-	// RetryUntil The RFC3339 timestamp the upgrade is retried until.
+	// RetryUntil The RFC3339 timestamp of the deadline the upgrade download is retried until.
 	RetryUntil *time.Time `json:"retry_until,omitempty"`
 }
 
