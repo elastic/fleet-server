@@ -42,7 +42,7 @@ func Test_server_Run(t *testing.T) {
 	require.NoError(t, err)
 	bulker := ftesting.NewMockBulk()
 	pim := mock.NewMockMonitor()
-	pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
+	pm := policy.NewMonitor(bulker, pim, config.ServerLimits{PolicyLimit: config.Limit{Interval: 5 * time.Millisecond, Burst: 1}})
 	bc := checkin.NewBulk(nil)
 	ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
 	et, err := NewEnrollerT(verCon, cfg, nil, c)

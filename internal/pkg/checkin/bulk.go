@@ -99,6 +99,7 @@ func (bc *Bulk) timestamp() string {
 
 // CheckIn will add the agent (identified by id) to the pending set.
 // The pending agents are sent to elasticsearch as a bulk update at each flush interval.
+// NOTE: If Checkin is called after Run has returned it will just add the entry to the pending map and not do any operations, this may occur when the fleet-server is shutting down.
 // WARNING: Bulk will take ownership of fields, so do not use after passing in.
 func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string) error {
 	// Separate out the extra data to minimize

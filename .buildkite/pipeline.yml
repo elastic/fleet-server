@@ -30,7 +30,7 @@ steps:
           image: "${GO_AGENT_IMAGE}"
           cpu: "8"
           memory: "4G"
-  
+
   - group: "Performance test"
     key: "performance-test"
     steps:
