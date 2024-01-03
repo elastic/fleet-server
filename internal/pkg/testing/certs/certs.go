@@ -19,11 +19,13 @@ import (
 	"time"
 )
 
+const ext = ".pem"
+
 func CertToFile(t *testing.T, cert tls.Certificate, name string) string {
 	t.Helper()
 
 	dir := t.TempDir()
-	path := filepath.Join(dir, name+".pem")
+	path := filepath.Join(dir, name+ext)
 	file, err := os.Create(path)
 	if err != nil {
 		t.Fatalf("unable to create file: %v", err)
@@ -42,7 +44,7 @@ func KeyToFile(t *testing.T, cert tls.Certificate, name string) string {
 	t.Helper()
 
 	dir := t.TempDir()
-	path := filepath.Join(dir, name+".pem")
+	path := filepath.Join(dir, name+ext)
 	file, err := os.Create(path)
 	if err != nil {
 		t.Fatalf("unable to create file: %v", err)

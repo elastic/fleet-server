@@ -36,6 +36,7 @@ func TestClientCerts(t *testing.T) {
 			Certificates: []tls.Certificate{ca},
 			ClientAuth:   tls.VerifyClientCertIfGiven,
 			ClientCAs:    certPool,
+			MinVersion:   tls.VersionTLS12,
 		}
 		server.StartTLS()
 		defer server.Close()
@@ -78,6 +79,7 @@ func TestClientCerts(t *testing.T) {
 			Certificates: []tls.Certificate{ca},
 			ClientAuth:   tls.VerifyClientCertIfGiven,
 			ClientCAs:    certPool,
+			MinVersion:   tls.VersionTLS12,
 		}
 		server.StartTLS()
 		defer server.Close()
@@ -126,6 +128,7 @@ func TestClientCerts(t *testing.T) {
 			Certificates: []tls.Certificate{ca},
 			ClientAuth:   tls.VerifyClientCertIfGiven,
 			ClientCAs:    certPool,
+			MinVersion:   tls.VersionTLS12,
 		}
 		server.StartTLS()
 		defer server.Close()
@@ -155,7 +158,7 @@ func TestClientCerts(t *testing.T) {
 		req, err := http.NewRequestWithContext(context.Background(), "GET", server.URL, nil)
 		require.NoError(t, err)
 
-		_, err = client.Perform(req)
+		_, err = client.Perform(req) //nolint:bodyclose // no response is expected
 		require.Error(t, err)
 	})
 }
