@@ -404,9 +404,6 @@ func (a *Agent) configFromUnits() (*config.Config, error) {
 			"agent": map[string]interface{}{
 				"id":      agentID,
 				"version": agentVersion,
-				"logging": map[string]interface{}{
-					"level": logLevel.String(),
-				},
 			},
 		},
 		"output": map[string]interface{}{
