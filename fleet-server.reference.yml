@@ -50,7 +50,8 @@ fleet:
     id: fleet-server-agent-idv
 #    # version is the version of the elastic-agent instance
 #    version:
-#    # agent logging level may also be specified in top level logging config
+#    # specify logging level
+#    # deprecated: Use the top level logging.* attributes instead.
 #    logging.level: info
 #  host:
 #    id:
