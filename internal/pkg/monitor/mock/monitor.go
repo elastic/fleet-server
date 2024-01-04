@@ -7,6 +7,7 @@ package mock
 import (
 	"context"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
@@ -71,4 +72,9 @@ func (m *MockMonitor) Output() <-chan []es.HitT {
 		return nil
 	}
 	return args.Get(0).(<-chan []es.HitT)
+}
+
+func (m *MockMonitor) State() client.UnitState {
+	args := m.Called()
+	return args.Get(0).(client.UnitState)
 }
