@@ -30,6 +30,8 @@ output:
 #    ssl.enabled: true
 #    ssl.verification_mode: full
 #    ssl.certificate_authorities: ["/etc/pki/root/ca.pem"]
+#    ssl.certificate: /creds/cert.pem  # optional mTLS keypair used to connect to Elasticsearch
+#    ssl.key: /creds/key.pem           # optional mTLS keypair used to connect to Elasticsearch
 #    ssl.supported_protocols: [TLSv1.0, TLSv1.1, TLSv1.2]
 #    ssl.cipher_suites: []
 #    ssl.curve_types: []
@@ -93,9 +95,9 @@ fleet:
 #        supported_protocols: [TLSv1.0, TLSv1.1, TLSv1.2]
 #        cipher_suites: []
 #        curve_types: []
-#        certificate_authorities: []
+#        certificate_authorities: []  # CA used to verify client certs
 #        ca_sha256: []
-#        client_authentication: none
+#        client_authentication: none # 'none', 'optional', or 'required'
 #        certificate: /creds/cert.pem
 #        key: /creds/key.pem
 #        key_passphrase_path: /creds/key.pem
