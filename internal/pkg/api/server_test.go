@@ -141,15 +141,18 @@ func Test_server_ClientCert(t *testing.T) {
 			},
 		}
 
+		started := make(chan struct{}, 1)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
+			started <- struct{}{}
 			if err := srv.Run(ctx); err != nil {
 				errCh <- err
 			}
 			wg.Done()
 		}()
 
+		<-started
 		rCtx, rCancel := context.WithTimeout(ctx, time.Second)
 		defer rCancel()
 		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
@@ -198,15 +201,18 @@ func Test_server_ClientCert(t *testing.T) {
 			},
 		}
 
+		started := make(chan struct{}, 1)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
+			started <- struct{}{}
 			if err := srv.Run(ctx); err != nil {
 				errCh <- err
 			}
 			wg.Done()
 		}()
 
+		<-started
 		rCtx, rCancel := context.WithTimeout(ctx, time.Second)
 		defer rCancel()
 		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
@@ -256,15 +262,18 @@ func Test_server_ClientCert(t *testing.T) {
 			},
 		}
 
+		started := make(chan struct{}, 1)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
+			started <- struct{}{}
 			if err := srv.Run(ctx); err != nil {
 				errCh <- err
 			}
 			wg.Done()
 		}()
 
+		<-started
 		rCtx, rCancel := context.WithTimeout(ctx, time.Second)
 		defer rCancel()
 		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
