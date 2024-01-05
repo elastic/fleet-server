@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	secretRegex = regexp.MustCompile(`\$co\.elastic\.secret{(.*)}`)
+	secretRegex = regexp.MustCompile(`\$co\.elastic\.secret{([^}]*)}`)
 )
 
 // read secret values that belong to the agent policy's secret references, returns secrets as id:value map
@@ -177,13 +177,17 @@ func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk)
 }
 
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
+// and does this for multiple matches
 func replaceStringRef(ref string, secretValues map[string]string) string {
 	matches := secretRegex.FindStringSubmatch(ref)
-	if len(matches) > 1 {
+	for len(matches) > 1 {
 		secretRef := matches[1]
 		if val, ok := secretValues[secretRef]; ok {
-			return strings.Replace(ref, matches[0], val, 1)
+			ref = strings.Replace(ref, matches[0], val, 1)
+			matches = secretRegex.FindStringSubmatch(ref)
+			continue
 		}
+		break
 	}
 	return ref
 }

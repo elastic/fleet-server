@@ -42,6 +42,23 @@ func TestReplaceStringRefPartial2(t *testing.T) {
 	assert.Equal(t, "http://localhost/services", val)
 }
 
+func TestReplaceStringRefMultiple(t *testing.T) {
+	secretRefs := map[string]string{
+		"secret1": "value1",
+		"secret2": "value2",
+	}
+	val := replaceStringRef("partial \"$co.elastic.secret{secret1}\" \"$co.elastic.secret{secret2}\"", secretRefs)
+	assert.Equal(t, "partial \"value1\" \"value2\"", val)
+}
+
+func TestReplaceStringRefMultipleOneNotFound(t *testing.T) {
+	secretRefs := map[string]string{
+		"secret2": "value2",
+	}
+	val := replaceStringRef("partial \"$co.elastic.secret{secret1}\" \"$co.elastic.secret{secret2}\"", secretRefs)
+	assert.Equal(t, "partial \"$co.elastic.secret{secret1}\" \"$co.elastic.secret{secret2}\"", val)
+}
+
 func TestReplaceStringRefNotASecret(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
