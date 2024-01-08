@@ -64,7 +64,6 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 					Key: jwtToken,
 				}, nil
 			default:
-				// And here I'm feeling dumb. ;)
 				return nil, fmt.Errorf("not a valid type")
 			}
 		} else {
