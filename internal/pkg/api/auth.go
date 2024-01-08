@@ -39,7 +39,7 @@ func authAPIKey(r *http.Request, bulker bulk.Bulk, c cache.Cache) (*apikey.APIKe
 	start := time.Now()
 
 	//  Hacky way to have test passing
-	if !strings.Contains(r.URL.Path, "/enroll") && testing.Testing() == false {
+	if !strings.Contains(r.URL.Path, "/enroll") && !testing.Testing() {
 		jwtToken, err := apikey.ExtractJWTAPIKey(r)
 		if err != nil {
 			return nil, err

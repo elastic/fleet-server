@@ -262,8 +262,8 @@ func (et *EnrollerT) _enroll(
 
 	var accessAPIKey *apikey.APIKey
 	// Generate the Fleet Agent access api key
-	if testing.Testing() == false {
-		accessAPIKey, err = generateJWTTokenApiKey(ctx, et.bulker, agentID)
+	if !testing.Testing() {
+		accessAPIKey, err = generateJWTTokenAPIKey(agentID)
 
 		if err != nil {
 			return nil, err
@@ -508,10 +508,13 @@ func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (
 // TODO never
 var sampleSecretKey = []byte("TmpTestKey123asdasdnnsmasdasdlqklklklnopoipoipoipoipoiposdf")
 
-func generateJWTTokenApiKey(ctx context.Context, bulk bulk.Bulk, agentID string) (*apikey.APIKey, error) {
+func generateJWTTokenAPIKey(agentID string) (*apikey.APIKey, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 
-	claims := token.Claims.(jwt.MapClaims)
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("unexpected error")
+	}
 	claims["agent_id"] = agentID
 
 	tokenString, err := token.SignedString(sampleSecretKey)
