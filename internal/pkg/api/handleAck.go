@@ -459,7 +459,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 		res, err := bulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
 			if isAgentActive(ctx, zlog, ack.bulk, agentID) {
-				zlog.Error().
+				zlog.Warn().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
 					Str("outputName", outputName).
