@@ -124,6 +124,10 @@ func NewAPIKeyFromToken(token string) (*APIKey, error) {
 
 // Token returns the b64 encoded token of the APIKey.
 func (k APIKey) Token() string {
+	if strings.Contains(k.ID, "jwt:") {
+		return k.Key
+	}
+
 	s := fmt.Sprintf("%s:%s", k.ID, k.Key)
 	return base64.StdEncoding.EncodeToString([]byte(s))
 }
@@ -146,4 +150,19 @@ func ExtractAPIKey(r *http.Request) (*APIKey, error) {
 	apiKeyStr := s[0][len(authPrefix):]
 	apiKeyStr = strings.TrimSpace(apiKeyStr)
 	return NewAPIKeyFromToken(apiKeyStr)
+}
+
+func ExtractJWTAPIKey(r *http.Request) (string, error) {
+	s, ok := r.Header[AuthKey]
+	if !ok {
+		return "", ErrNoAuthHeader
+	}
+	if len(s) != 1 || !strings.HasPrefix(s[0], authPrefix) {
+		return "", ErrMalformedHeader
+	}
+
+	apiKeyStr := s[0][len(authPrefix):]
+	apiKeyStr = strings.TrimSpace(apiKeyStr)
+
+	return apiKeyStr, nil
 }

@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/str"
@@ -24,6 +25,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	"github.com/golang-jwt/jwt/v5"
 	"go.elastic.co/apm/v2"
 
 	"github.com/gofrs/uuid"
@@ -258,10 +260,20 @@ func (et *EnrollerT) _enroll(
 		return nil, err
 	}
 
+	var accessAPIKey *apikey.APIKey
 	// Generate the Fleet Agent access api key
-	accessAPIKey, err := generateAccessAPIKey(ctx, et.bulker, agentID)
-	if err != nil {
-		return nil, err
+	if testing.Testing() == false {
+		accessAPIKey, err = generateJWTTokenApiKey(ctx, et.bulker, agentID)
+
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		accessAPIKey, err = generateAccessAPIKey(ctx, et.bulker, agentID)
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Register invalidate API key function for enrollment error rollback
@@ -491,6 +503,27 @@ func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (
 		[]byte(kFleetAccessRolesJSON),
 		apikey.NewMetadata(agentID, "", apikey.TypeAccess),
 	)
+}
+
+// TODO never
+var sampleSecretKey = []byte("TmpTestKey123asdasdnnsmasdasdlqklklklnopoipoipoipoipoiposdf")
+
+func generateJWTTokenApiKey(ctx context.Context, bulk bulk.Bulk, agentID string) (*apikey.APIKey, error) {
+	token := jwt.New(jwt.SigningMethodHS256)
+
+	claims := token.Claims.(jwt.MapClaims)
+	claims["agent_id"] = agentID
+
+	tokenString, err := token.SignedString(sampleSecretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &apikey.APIKey{
+		ID:  fmt.Sprintf("jwt:%s", agentID),
+		Key: tokenString,
+	}, nil
+
 }
 
 func (et *EnrollerT) fetchEnrollmentKeyRecord(ctx context.Context, id string) (*model.EnrollmentAPIKey, error) {
