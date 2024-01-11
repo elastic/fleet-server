@@ -24,6 +24,7 @@ type optionsT struct {
 	RetryOnConflict    string
 	Indices            []string
 	WaitForCheckpoints []int64
+	IgnoreUnavailable  bool
 	spanLink           *apm.SpanLink
 }
 
@@ -32,6 +33,12 @@ type Opt func(*optionsT)
 func WithRefresh() Opt {
 	return func(opt *optionsT) {
 		opt.Refresh = true
+	}
+}
+
+func WithIgnoreUnavailble() Opt {
+	return func(opt *optionsT) {
+		opt.IgnoreUnavailable = true
 	}
 }
 
