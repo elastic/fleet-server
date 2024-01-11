@@ -39,14 +39,15 @@ func prepareQueryLatestPolicies() []byte {
 // QueryLatestPolicies gets the latest revision for a policy
 func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
-	res, err := bulker.Search(ctx, o.indexName, tmplQueryLatestPolicies)
+	res, err := bulker.Search(ctx, o.indexName, tmplQueryLatestPolicies, bulk.WithIgnoreUnavailble())
 	if err != nil {
 		return nil, err
 	}
 
 	policyID, ok := res.Aggregations[FieldPolicyID]
 	if !ok {
-		return nil, ErrMissingAggregations
+		// Aggregation will not be here if there index is not available
+		return []model.Policy{}, nil
 	}
 	if len(policyID.Buckets) == 0 {
 		return []model.Policy{}, nil
