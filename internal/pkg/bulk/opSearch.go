@@ -35,7 +35,7 @@ func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...
 	const kSlop = 64
 	blk.buf.Grow(len(body) + kSlop)
 
-	if err := b.writeMsearchMeta(&blk.buf, index, opt.Indices, opt.WaitForCheckpoints); err != nil {
+	if err := b.writeMsearchMeta(&blk.buf, index, opt.Indices, opt.WaitForCheckpoints, opt.IgnoreUnavailable); err != nil {
 		return nil, err
 	}
 
@@ -60,7 +60,7 @@ func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...
 	return &es.ResultT{HitsT: r.Hits, Aggregations: r.Aggregations}, nil
 }
 
-func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, checkpoints []int64) error {
+func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, checkpoints []int64, ignoreUnavailble bool) error {
 	if err := b.validateIndex(index); err != nil {
 		return err
 	}
@@ -89,6 +89,14 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, 
 		_, _ = buf.WriteString("\"")
 	} else {
 		needComma = false
+	}
+
+	if ignoreUnavailble {
+		if needComma {
+			_, _ = buf.WriteString(`,`)
+		}
+		_, _ = buf.WriteString(`"ignore_unavailable": true`)
+		needComma = true
 	}
 
 	if len(checkpoints) > 0 {

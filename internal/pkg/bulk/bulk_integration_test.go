@@ -282,6 +282,29 @@ func TestBulkSearch(t *testing.T) {
 	}
 }
 
+func TestBulkSearchWithIgnoreUnavailable(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	_, bulker := SetupIndexWithBulk(ctx, t, testPolicy)
+
+	// Search
+	dsl := fmt.Sprintf(`{"query": { "term": {"kwval": "%s"}}}`, "random")
+
+	res, err := bulker.Search(ctx, ".fleet-policies-do-not-exists-yet", []byte(dsl), WithIgnoreUnavailble())
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("hit mismatch: %d", len(res.Hits))
+	}
+	if res == nil {
+		t.Fatal(nil)
+	}
+}
+
 func TestBulkDelete(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
