@@ -12,6 +12,7 @@ Fleet-server communicates with Elasticsearch. Elasticsearch must be on the same 
 Fleet server is always on the exact same version as the Elastic Agent running fleet-server.
 Any Elastic Agent enrolling into a fleet-server must be the same version or older.
 For Kibana it is assumed it is on the same version as Elasticsearch. With this the compatibility looks as following:
+
 ```
 Elastic Agent <= Elastic Agent with fleet-server <= Elasticsearch / Kibana
 ```
@@ -29,6 +30,10 @@ The `golang-crossbuild:1.16.X-darwin-debian10` images expects the minimum MacOSX
 
 The following are notes to help developers onboarding to the project to quickly get running. These notes might change at any time.
 
+## Developing Fleet Server and Kibana at the same time
+
+When developing features for Fleet, it may become necessary to run both Fleet Server and Kibana from source in order to implement features end-to-end. To faciliate this, we've created a separate guide hosted [here](https://github.com/elastic/kibana/blob/main/x-pack/plugins/fleet/dev_docs/developing_kibana_and_fleet_server.md).
+
 ### Changelog
 
 The changelog for fleet-server is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool).
@@ -38,6 +43,7 @@ The changelog tool produces fragment files that are consolidated to generate a c
 Each PR containing a change with user impact (new feature, bug fix, etc.) must contain a changelog fragment describing the change.
 
 A simple example of a changelog fragment is below for reference:
+
 ```yaml
 kind: feature
 summary: Accept raw errors as a fallback to detailed error type
@@ -50,6 +56,7 @@ issue: https://github.com/elastic/elastic-agent/issues/931
 To compile the fleet-server in development mode set the env var `DEV=true`.
 When compiled in development mode the fleet-server will support debugging.
 i.e.:
+
 ```shell
 SNAPSHOT=true DEV=true make release-darwin/amd64
 GOOS=darwin GOARCH=amd64 go build -tags="dev" -gcflags="all=-N -l" -ldflags="-X main.Version=8.7.0 -X main.Commit=31668e0 -X main.BuildTime=2022-12-23T20:06:20Z" -buildmode=pie -o build/binaries/fleet-server-8.7.0-darwin-x86_64/fleet-server .
@@ -73,6 +80,7 @@ the section about stand alone Fleet Server to know more.
 
 You can run this image with the included configuration file with the following
 command:
+
 ```
 docker run -it --rm \
   -e ELASTICSEARCH_HOSTS="https://elasticsearch:9200" \
@@ -83,6 +91,7 @@ docker run -it --rm \
 
 You can replace the included configuration by mounting your
 configuration file as a volume in `/etc/fleet-server.yml`.
+
 ```
 docker run -it --rm \
   -e ELASTICSEARCH_HOSTS="https://elasticsearch:9200" \
@@ -107,6 +116,7 @@ The request will result in a JSON blob that descibes all artifacts.
 You will need to gather the URLs for Elasticsearch and Kibana that match your distribution, for example `linux/amd64`.
 
 TODO: parse the JSON to get the URL
+
 ```shell
 wget https://snapshots.elastic.co/8.7.0-19f30181/downloads/elasticsearch/elasticsearch-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
 wget https://snapshots.elastic.co/8.7.0-19f30181/downloads/kibana/kibana-8.7.0-SNAPSHOT-linux-x86_64.tar.gz
@@ -158,16 +168,18 @@ This is only supported internally and is not intended for end-users at this time
 
 Access the Fleet UI on Kibana and generate a fleet-server policy.
 Set the following env vars with the information from Kibana:
+
 - `ELASTICSEARCH_CA_TRUSTED_FINGERPRINT`
 - `ELASTICSEARCH_SERVICE_TOKEN`
 - `FLEET_SERVER_POLICY_ID`
-or edit `fleet-server.yml` to include these details directly.
+  or edit `fleet-server.yml` to include these details directly.
 
 Note the `fleet-server.reference.yml` contains a full configuration reference.
 
 ##### fleet-server certificates
 
 Create a self-signed TLS CA and cert+key for the fleet-server instance, you can use [elasticsearch-certutil](https://www.elastic.co/guide/en/elasticsearch/reference/current/certutil.html) for this:
+
 ```shell
 # Create a CA
 ../elasticsearch/bin/elasticsearch-certutil ca --pem --out stack.zip
@@ -180,9 +192,11 @@ unzip cert.zip
 Ensure that `server.ssl.enabled: true` is set as well as the `server.ssl.certificate` and `server.ssl.key` attributes in `fleet-server.yml`
 
 Then run the fleet-server:
+
 ```shell
 ./build/binaries/fleet-server-8.7.0-darwin-x86_64/fleet-server -c fleet-server.yml
 ```
+
 By default the fleet-server will attempt to connect to Elasticsearch on `https://localhost:9200`, if this needs to be changed set it with `ELASTICSEARCH_HOSTS`
 The fleet-server should appear as an agent with the ID `dev-fleet-server`.
 
@@ -193,6 +207,7 @@ Any additional agents will need the `ca/ca.crt` file to enroll (or will need to 
 The development Vagrant machine assumes the `elastic-agent`, `beats`, and `fleet-server` repos are in the same folder.
 Thus, it mounts `../` to `/vagrant` on the Vagrant machine. The vagrant machine IP address is `192.168.56.43`.
 Use `https://192.168.56.43:8220` as fleet-server host.
+
 ```shell
 vagrant up
 vagrant ssh
@@ -202,6 +217,7 @@ vagrant ssh
 
 Once in the Vagrant VM, and assuming that the repos are correctly mounted in `/vagrant`.
 Build the agent by running:
+
 ```shell
 cd /vagrant/elastic-agent
 SNAPSHOT=true EXTERNAL=true PLATFORMS="linux/amd64" PACKAGES="tar.gz" mage -v dev:package # adjust PLATFORMS and PACKAGES to your system and needs.
@@ -228,7 +244,6 @@ cp build/binaries/fleet-server-8.7.0-SNAPSHOT-linux-x86_64/fleet-server ./data/e
 ./elastic-agent install ...
 ```
 
-
 ### Running go test and benchmarks
 
 When developing new features as you write code you would want to make sure your changes are not breaking any pre-existing
@@ -238,6 +253,7 @@ you create a pull request.
 #### Running go tests
 
 To execute the full unit tests from your local environment you can do the following
+
 ```bash
 make test-unit
 ```
@@ -255,7 +271,8 @@ go test -v ./internal/pkg/checkin -run TestBulkSimple
 It's a good practice before you start your changes to establish the current baseline of the benchmarks in your machine.
 To establish the baseline benchmark report you can follow the following workflow
 
-__Establish a baseline__
+**Establish a baseline**
+
 ```bash
 BENCH_BASE=base.out make benchmark
 ```
@@ -263,16 +280,18 @@ BENCH_BASE=base.out make benchmark
 This will execute all the go benchmark test and write the output into the file build/base.out. If you omit the
 `BENCH_BASE` variable it will automatically select the name `build/benchmark-{git_head_sha1}.out`.
 
-__Re-running benchmark after changes__
+**Re-running benchmark after changes**
 
 After applying your changes into the code you can reuse the same command but with different output file.
+
 ```bash
 BENCH_BASE=next.out make benchmark
 ```
 
 At this point you can compare the 2 reports using benchstat.
 
-__Comparing the 2 results__
+**Comparing the 2 results**
+
 ```bash
 BENCH_BASE=base.out BENCH_NEXT=next.out make benchstat
 ```
@@ -282,16 +301,18 @@ And this will print the difference between the baseline and next results.
 You can read more on the [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) official site.
 
 There are some additional parameters that you can use with the `benchmark` target.
+
 - `BENCHMARK_FILTER`: you can define the test filter so that you only run a subset of tests (Default: Bench, only run
-the test BenchmarkXXXX and not unit tests)
+  the test BenchmarkXXXX and not unit tests)
 - `BENCHMARK_COUNT`: you can define the number of iterations go test will run. Having larger number helps
-remove run-to-run variations (Default: 8)
+  remove run-to-run variations (Default: 8)
 
 #### E2E Tests
 
 All E2E tests are located in `testing/e2e`.
 
 To execute them run:
+
 ```bash
 make test-e2e
 ```
@@ -303,16 +324,19 @@ Refer to the [e2e README](./testing/e2e/README.md) for information on how to wri
 Elastic employees can create an Elastic Cloud deployment with a locally built Fleet Server.
 
 To deploy it you can use the following commands:
+
 ```bash
 EC_API_KEY=yourapikey make -C dev-tools/cloud cloud-deploy
 ```
 
 And then to clean the deployment
+
 ```bash
 EC_API_KEY=yourapikey make -C dev-tools/cloud cloud-clean
 ```
 
 For more advanced scenario you can build a custom docker image that you could use in your own terraform.
+
 ```
 make -C dev-tools/cloud build-and-push-cloud-image
 ```
