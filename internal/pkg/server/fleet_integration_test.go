@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path"
@@ -87,6 +88,17 @@ func (s *tserver) waitExit() error {
 	if errors.Is(err, context.Canceled) {
 		return nil
 	}
+
+	// FIXME: Below is a work around to net.DNSError not supporting the `Unwrap` method.
+	// It is so we can ignore errors caused by context cancelation.
+	// It can be removed when DNSError.Unwrap is added to the stdlib.
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		if strings.Contains(dnsErr.Err, "operation was canceled") {
+			return nil
+		}
+	}
+
 	return err
 }
 
