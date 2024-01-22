@@ -61,7 +61,7 @@ const (
 	}`
 	checkinBody = `{
 	    "status": "online",
-	    "message": ""
+	    "message": "checkin ok"
 	}`
 )
 
@@ -1131,7 +1131,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
 	    "ack_token": "%s",
 	    "status": "online",
-	    "message": "",
+	    "message": "checkin ok",
 	    "poll_timeout": "3m"
 	}`, *checkinResponse.AckToken)))
 	require.NoError(t, err)
@@ -1159,7 +1159,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
 	    "ack_token": "%s",
 	    "status": "online",
-	    "message": "",
+	    "message": "checkin ok",
 	    "poll_timeout": "10m"
 	}`, *checkinResponse.AckToken)))
 	require.NoError(t, err)
@@ -1262,7 +1262,7 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 	req, err = http.NewRequest("POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
 	    "ack_token": "%s",
 	    "status": "online",
-	    "message": "",
+	    "message": "checkin ok",
 	    "poll_timeout": "3m"
 	}`, *checkinResponse.AckToken)))
 	require.NoError(t, err)

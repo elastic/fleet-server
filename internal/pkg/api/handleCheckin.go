@@ -181,6 +181,13 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	}
 	cntCheckin.bodyIn.Add(readCounter.Count())
 
+	if req.Status == CheckinRequestStatus("") {
+		return val, fmt.Errorf("checkin status missing")
+	}
+	if len(req.Message) == 0 {
+		return val, fmt.Errorf("checkin message missing")
+	}
+
 	var pDur time.Duration
 	var err error
 	if req.PollTimeout != nil {
