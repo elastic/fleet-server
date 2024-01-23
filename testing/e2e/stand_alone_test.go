@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -241,4 +242,98 @@ func (suite *StandAloneSuite) TestStaticTokenAuthentication() {
 		enrollmentToken,
 	)
 	tester.Enroll(ctx, enrollmentToken)
+}
+
+// TestElasticsearch429OnStartup will check to ensure fleet-server functions as expected (does not crash)
+// if Elasticsearch returns 429s on startup.
+func (suite *StandAloneSuite) TestElasticsearch429OnStartup() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+
+	// Create a proxy that returns 429s
+	proxy := NewStatusProxy(suite.T(), 429)
+	proxy.Enable()
+	server := httptest.NewServer(proxy)
+
+	// Create a config file from a template in the test temp dir
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-http-proxy.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"Hosts":        suite.ESHosts,
+		"ServiceToken": suite.ServiceToken,
+		"Proxy":        server.URL,
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	//cmd.Stderr = os.Stderr // NOTE: This can be uncommented to put out logs
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	suite.T().Log("Starting fleet-server")
+	err = cmd.Start()
+	suite.Require().NoError(err)
+
+	// FIXME timeout to make sure fleet-server has started
+	time.Sleep(5 * time.Second)
+	suite.T().Log("Checking fleet-server status")
+	// Wait to check that it is Starting.
+	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateStarting) // fleet-server returns 503:starting if upstream ES returns 429.
+
+	// Disable proxy and ensure fleet-server recovers
+	suite.T().Log("Disable proxy")
+	proxy.Disable()
+	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
+
+	cancel()
+	cmd.Wait()
+}
+
+// TestElasticsearchTimeoutOnStartup will check to ensure fleet-server functions as expected (does not crash)
+// if Elasticsearch times out on startup.
+func (suite *StandAloneSuite) TestElasticsearchTimeoutOnStartup() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+
+	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.ESHosts)
+	suite.Require().NoError(err)
+	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 1.0, toxiproxy.Attributes{})
+	suite.Require().NoError(err)
+
+	// Create a config file from a template in the test temp dir
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-http.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"Hosts":        "http://" + proxy.Listen,
+		"ServiceToken": suite.ServiceToken,
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	err = cmd.Start()
+	suite.Require().NoError(err)
+
+	// Provoke timeouts, fleet-server should be stuck in the starting state
+	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateStarting)
+
+	// Recover the network and wait for the healthcheck to be healthy again.
+	err = proxy.RemoveToxic("force_timeout")
+	suite.Require().NoError(err)
+	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
+
+	cancel()
+	cmd.Wait()
 }
