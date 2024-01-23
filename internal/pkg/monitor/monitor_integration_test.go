@@ -65,7 +65,7 @@ func TestSimpleMonitorWithDebounce(t *testing.T) {
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		// ready function will add two actions, one immediatly, and one after 100ms
+		// ready function will add two actions, one immediately, and one after 100ms
 		return runSimpleMonitor(t, ctx, mon, readyCh, ch, func(ctx context.Context) error {
 			_, err := ftesting.StoreRandomAction(ctx, bulker, index)
 			if err != nil {
@@ -77,7 +77,7 @@ func TestSimpleMonitorWithDebounce(t *testing.T) {
 				if err != nil {
 					return
 				}
-				ftesting.StoreRandomAction(ctx, bulker, index)
+				ftesting.StoreRandomAction(ctx, bulker, index) //nolint:errcheck // test case
 			}(ctx)
 			return nil
 		})
