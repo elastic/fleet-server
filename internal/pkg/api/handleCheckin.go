@@ -185,7 +185,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		return val, fmt.Errorf("checkin status missing")
 	}
 	if len(req.Message) == 0 {
-		return val, fmt.Errorf("checkin message missing")
+		zlog.Warn().Msg("checkin request method is empty.")
 	}
 
 	var pDur time.Duration
