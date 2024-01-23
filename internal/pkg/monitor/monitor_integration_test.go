@@ -8,6 +8,7 @@ package monitor
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -45,6 +46,66 @@ func TestSimpleMonitorNonEmptyIndex(t *testing.T) {
 	index, bulker, _ := ftesting.SetupActions(ctx, t, 1, 12)
 
 	runSimpleMonitorTest(t, ctx, index, bulker)
+}
+
+func TestSimpleMonitorWithDebounce(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, ".fleet-actions")
+
+	ch := make(chan model.Action)
+	readyCh := make(chan error)
+	mon, err := NewSimple(index, bulker.Client(), bulker.Client(),
+		WithReadyChan(readyCh),
+		WithDebounceTime(time.Second),
+	)
+	require.NoError(t, err)
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		// ready function will add two actions, one immediatly, and one after 100ms
+		return runSimpleMonitor(t, ctx, mon, readyCh, ch, func(ctx context.Context) error {
+			_, err := ftesting.StoreRandomAction(ctx, bulker, index)
+			if err != nil {
+				return err
+			}
+			go func(ctx context.Context) {
+				time.Sleep(100 * time.Millisecond)
+				err := sleep.WithContext(ctx, 100*time.Millisecond)
+				if err != nil {
+					return
+				}
+				ftesting.StoreRandomAction(ctx, bulker, index)
+			}(ctx)
+			return nil
+		})
+	})
+
+	// read 2 actions and check that time time between both is at least 1s
+	g.Go(func() error {
+		var ts time.Time
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-ch:
+				if ts.IsZero() {
+					ts = time.Now()
+					continue
+				}
+				dur := time.Since(ts)
+				assert.GreaterOrEqual(t, dur, time.Second)
+				cn()
+			}
+		}
+	})
+
+	err = g.Wait()
+	if err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
