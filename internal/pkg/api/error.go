@@ -484,6 +484,16 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		}
 	}
 
+	var esErr *es.ErrElastic
+	if errors.As(err, &esErr) {
+		return HTTPErrResp{
+			http.StatusServiceUnavailable,
+			esErr.Error(),
+			"elasticsearch error",
+			zerolog.ErrorLevel,
+		}
+	}
+
 	// Check if we have encountered a connectivity error
 	// Predicate taken from https://github.com/golang/go/blob/go1.17.5/src/net/dial_test.go#L798
 	if strings.Contains(err.Error(), "connection refused") {

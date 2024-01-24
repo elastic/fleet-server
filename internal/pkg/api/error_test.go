@@ -92,3 +92,32 @@ func Test_ErrorResp_NoTransaction(t *testing.T) {
 	require.Len(t, payloads.Transactions, 0)
 	require.Len(t, payloads.Errors, 0)
 }
+
+func Test_ErrResp_Status(t *testing.T) {
+	tests := []struct {
+		name   string
+		err    error
+		status int
+	}{{
+		name:   "context canceled",
+		err:    context.Canceled,
+		status: 499,
+	}, {
+		name:   "generic error",
+		err:    fmt.Errorf("some error"),
+		status: 500,
+	}, {
+		name: "es error",
+		err: &es.ErrElastic{
+			Status: 500,
+		},
+		status: 503,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := NewHTTPErrResp(tc.err)
+			require.Equal(t, tc.status, r.StatusCode)
+		})
+	}
+}
