@@ -124,6 +124,7 @@ func (tester *ClientAPITester20230601) Checkin(ctx context.Context, apiKey, agen
 		&api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion},
 		api.AgentCheckinJSONRequestBody{
 			Status:      api.CheckinRequestStatusOnline,
+			Message:     "test checkin",
 			AckToken:    ackToken,
 			PollTimeout: dur,
 		},
