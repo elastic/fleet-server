@@ -232,7 +232,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 		// first version of the policy should be returned fist
 		ts = time.Now()
 		tm.Stop()
-		t.Log("recieved initial policy from subsciption")
+		t.Log("received initial policy from subsciption")
 		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 1 && subPolicy.Policy.CoordinatorIdx != 1 {
 			t.Fatal("failed to get the expected updated policy")
 		}
@@ -241,22 +241,22 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 	}
 
 	if timedout {
-		t.Fatal("Did not recieve initial policy in 3s")
+		t.Fatal("Did not receive initial policy in 3s")
 	}
 
-	// Make new subscribtion to replicate agent checking in again.
+	// Make new subscription to replicate agent checking in again.
 	s2, err := m.Subscribe(agentID, policyID, 1, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer m.Unsubscribe(s2)
+	defer m.Unsubscribe(s2) //nolint:errcheck // defered function
 
 	tm.Reset(3 * time.Second)
 	select {
 	case subPolicy := <-s2.Output():
 		dur := time.Since(ts)
 		tm.Stop()
-		t.Log("recieved second policy from subsciption")
+		t.Log("received second policy from subsciption")
 		// check debounce time
 		if dur < time.Second {
 			t.Fatalf("Expected subscription to take at least 1s to update, time was: %s", dur)
