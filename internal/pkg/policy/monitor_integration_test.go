@@ -222,6 +222,18 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 			return
 		}
 		t.Log("added rev 3 policy to index")
+
+		err = sleep.WithContext(ctx, time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		policy.RevisionIdx = 4
+		_, err = dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
+		if err != nil {
+			ch <- err
+			return
+		}
+		t.Log("added rev 4 policy to index")
 	}()
 
 	timedout := false
@@ -263,6 +275,26 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 		}
 		// 2nd version of policy should be skipped, 3rd should be read.
 		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 3 && subPolicy.Policy.CoordinatorIdx != 1 {
+			t.Fatal("failed to get the expected updated policy")
+		}
+	case <-tm.C:
+		timedout = true
+
+	}
+
+	s3, err := m.Subscribe(agentID, policyID, 3, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Unsubscribe(s3)
+
+	tm.Reset(3 * time.Second)
+	select {
+	case subPolicy := <-s3.Output():
+		tm.Stop()
+		t.Logf("received third policy from subsciption, rev %d", subPolicy.Policy.RevisionIdx)
+		// 2nd version of policy should be skipped, 3rd should be read.
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 4 && subPolicy.Policy.CoordinatorIdx != 1 {
 			t.Fatal("failed to get the expected updated policy")
 		}
 	case <-tm.C:
