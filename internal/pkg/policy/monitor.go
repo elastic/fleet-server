@@ -225,10 +225,10 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			m.log.Debug().
 				Str(logger.AgentID, s.agentID).
 				Str(logger.PolicyID, s.policyID).
-				Int64("sub_rev", s.revIdx).
-				Int64("sub_coord", s.coordIdx).
-				Int64("rev", &policy.pp.Policy.RevisionIdx).
-				Int64("coord", &policy.pp.Policy.CoordinatorIdx).
+				Int64("subscription_revision_idx", s.revIdx).
+				Int64("subscription_coordinator_idx", s.coordIdx).
+				Int64("revision_idx", &policy.pp.Policy.RevisionIdx).
+				Int64("coordinator_idx", &policy.pp.Policy.CoordinatorIdx).
 				Msg("dispatch")
 		default:
 			// Should never block on a channel; we created a channel of size one.
@@ -310,8 +310,8 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 
 	zlog := m.log.With().
 		Str(logger.PolicyID, newPolicy.PolicyID).
-		Int64("rev", newPolicy.RevisionIdx).
-		Int64("coord", newPolicy.CoordinatorIdx).
+		Int64("revision_idx", newPolicy.RevisionIdx).
+		Int64("coordinator_idx", newPolicy.CoordinatorIdx).
 		Logger()
 
 	if newPolicy.CoordinatorIdx <= 0 {
@@ -369,8 +369,8 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 	}
 
 	zlog.Info().
-		Int64("oldRev", oldPolicy.RevisionIdx).
-		Int64("oldCoord", oldPolicy.CoordinatorIdx).
+		Int64("old_revision_idx", oldPolicy.RevisionIdx).
+		Int64("old_coordinator_idx", oldPolicy.CoordinatorIdx).
 		Int("nQueued", nQueued).
 		Str(logger.PolicyID, newPolicy.PolicyID).
 		Msg("New revision of policy received and added to the queue")
@@ -407,8 +407,8 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 	m.log.Debug().
 		Str(logger.AgentID, agentID).
 		Str(logger.PolicyID, policyID).
-		Int64("rev", revisionIdx).
-		Int64("coord", coordinatorIdx).
+		Int64("revision_idx", revisionIdx).
+		Int64("coordinator_idx", coordinatorIdx).
 		Msg("subscribed to policy monitor")
 
 	s := NewSub(
@@ -462,8 +462,8 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 	m.log.Debug().
 		Str(logger.AgentID, s.agentID).
 		Str(logger.PolicyID, s.policyID).
-		Int64("rev", s.revIdx).
-		Int64("coord", s.coordIdx).
+		Int64("revision_idx", s.revIdx).
+		Int64("coordinator_idx", s.coordIdx).
 		Msg("unsubscribe")
 
 	return nil
