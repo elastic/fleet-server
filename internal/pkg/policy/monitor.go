@@ -227,8 +227,8 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 				Str(logger.PolicyID, s.policyID).
 				Int64("subscription_revision_idx", s.revIdx).
 				Int64("subscription_coordinator_idx", s.coordIdx).
-				Int64("revision_idx", &policy.pp.Policy.RevisionIdx).
-				Int64("coordinator_idx", &policy.pp.Policy.CoordinatorIdx).
+				Int64("revision_idx", policy.pp.Policy.RevisionIdx).
+				Int64("coordinator_idx", policy.pp.Policy.CoordinatorIdx).
 				Msg("dispatch")
 		default:
 			// Should never block on a channel; we created a channel of size one.

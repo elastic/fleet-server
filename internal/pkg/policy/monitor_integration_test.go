@@ -225,7 +225,8 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 
 		err = sleep.WithContext(ctx, time.Second)
 		if err != nil {
-			t.Fatal(err)
+			ch <- err
+			return
 		}
 		policy.RevisionIdx = 4
 		_, err = dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
@@ -286,7 +287,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer m.Unsubscribe(s3)
+	defer m.Unsubscribe(s3) //nolint:errcheck // defered function
 
 	tm.Reset(3 * time.Second)
 	select {
