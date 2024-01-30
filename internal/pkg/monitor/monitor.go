@@ -361,6 +361,7 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			trans.End()
 		}
 		if m.debounceTime > 0 {
+			m.log.Debug().Dur("debounce_time", m.debounceTime).Msg("monitor debounce start")
 			// Introduce a debounce time before wait advance (the signal for new docs in the index)
 			// This is specifically done so we can introduce a delay in for cases like rapid policy changes
 			// where fleet-server may not have finished dispatching policies to all agents when a new change is detected.
