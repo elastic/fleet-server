@@ -112,7 +112,7 @@ upload_packages_to_gcp_bucket() {
         bucketUriDefault="${baseUri}"/pull-requests/pr-${GITHUB_PR_NUMBER}
     fi
     for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
-        gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
+        gsutil -m cp -a public-read -r ${pattern} "${bucketUri}"        #TODO add "-q" after tests
     done
 }
 
@@ -131,7 +131,7 @@ upload_mbp_packages_to_gcp_bucket() {
     local pattern=${1}
     local type=${2}
     get_bucket_uri "${type}"
-    gsutil -m -q cp -a public-read -r ${pattern} ${bucketUri}
+    gsutil -m cp -a public-read -r ${pattern} ${bucketUri}        #TODO add "-q" after tests
 }
 
 download_mbp_packages_from_gcp_bucket() {
