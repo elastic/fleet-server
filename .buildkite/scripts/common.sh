@@ -151,7 +151,6 @@ download_mbp_packages_from_gcp_bucket() {
     mkdir -p ${WORKSPACE}/${pattern}
     get_bucket_uri "${type}"
     gsutil -m -q cp -r ${bucketUri}/* ${WORKSPACE}/${pattern}
-    gsutil -m -q cp -r ${oldBucketUri}/* ${WORKSPACE}/${pattern}       #TODO remove after tests
 }
 
 with_mage() {

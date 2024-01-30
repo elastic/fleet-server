@@ -58,7 +58,7 @@ fi
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "release-test" ]]; then
   export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
   export JOB_GCS_BUCKET=$(retry 5 vault kv get -field plaintext ${JOB_GCS_BUCKET_SECRET_PATH})
-    export JOB_GCS_INGEST_BUCKET=$GCS_INGEST_BUCKET_SECRET
+  export JOB_GCS_INGEST_BUCKET=$GCS_INGEST_BUCKET_SECRET
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
