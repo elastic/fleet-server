@@ -386,7 +386,7 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 ##################################################
 .PHONY: test-cloude2e
 test-cloude2e: prepare-test-context  ## - Run cloude2e tests with full setup (slow!)
-	@make -C ${CLOUD_TESTING_BASE} cloud-deploy
+	-@make -C ${CLOUD_TESTING_BASE} cloud-deploy
 	$(eval FLEET_SERVER_URL := $(shell make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
 	-@set -o pipefail; $(MAKE) test-cloude2e-set | tee build/test-cloude2e.out
 	@make -C ${CLOUD_TESTING_BASE} cloud-clean
