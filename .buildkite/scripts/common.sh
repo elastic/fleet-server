@@ -105,14 +105,14 @@ google_cloud_auth() {
 upload_packages_to_gcp_bucket() {
     local pattern=${1}
     local baseUri="gs://${JOB_GCS_BUCKET}/${REPO}"
-    local bucketUriCommit="${baseUri}"/commits/${BUILDKITE_COMMIT}
-    local bucketUriDefault="${baseUri}"/snapshots
+    local bucketUriCommit="${baseUri}/commits/${BUILDKITE_COMMIT}"
+    local bucketUriDefault="${baseUri}/snapshots"
 
     if [[ ${BUILDKITE_PULL_REQUEST} != "false" ]]; then
-        bucketUriDefault="${baseUri}"/pull-requests/pr-${GITHUB_PR_NUMBER}
+        bucketUriDefault="${baseUri}/pull-requests/pr-${GITHUB_PR_NUMBER}"
     fi
     for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
-        gsutil -m cp -r ${pattern} "${bucketUri}"        #TODO add "-q" after tests
+        gsutil -m -q cp -r ${pattern} "${bucketUri}"
     done
 }
 
@@ -131,7 +131,7 @@ upload_mbp_packages_to_gcp_bucket() {
     local pattern=${1}
     local type=${2}
     get_bucket_uri "${type}"
-    gsutil -m cp -r ${pattern} ${bucketUri}        #TODO add "-q" after tests
+    gsutil -m -q cp -r ${pattern} ${bucketUri}
 }
 
 download_mbp_packages_from_gcp_bucket() {

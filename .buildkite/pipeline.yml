@@ -179,27 +179,13 @@ steps:
         DOCKER_TAG: "${BUILDKITE_TAG}"
     if: "build.env('BUILDKITE_TAG') != ''"
 
-  # - trigger: "fleet-server-package-mbp"
-  #   label: ":esbuild: Downstream - Package"
-  #   key: "downstream-package"
-  #   async: true
-  #   if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
-  #   build:
-  #     branch: "${BUILDKITE_BRANCH}"
-  #   depends_on:
-  #     - step: "release-test"
-  #       allow_failure: false
-
-# TEST
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
     async: true
+    if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
     build:
-      env:
-        DRY_RUN: true
-        BUILDKITE_REFSPEC: "refs/pull/${BUILDKITE_PULL_REQUEST}/head"
-        BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
-    # depends_on:
-    #   - step: "release-test"
-    #     allow_failure: false
+      branch: "${BUILDKITE_BRANCH}"
+    depends_on:
+      - step: "release-test"
+        allow_failure: false
