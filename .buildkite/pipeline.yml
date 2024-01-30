@@ -200,6 +200,6 @@ steps:
         DRY_RUN: true
         BUILDKITE_REFSPEC: "refs/pull/${BUILDKITE_PULL_REQUEST}/head"
         BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
-    depends_on:
-      - step: "release-test"
-        allow_failure: false
+    # depends_on:
+    #   - step: "release-test"
+    #     allow_failure: false
