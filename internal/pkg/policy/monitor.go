@@ -165,7 +165,7 @@ LOOP:
 
 			m.dispatchPending(iCtx)
 			endTrans(trans)
-		case hits := <-s.Output():
+		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("output policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
@@ -282,8 +282,12 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 	span, ctx := apm.StartSpan(ctx, "Load policies", "load")
 	defer span.End()
 
-	if m.bulker.HasTracer() { // TODO link bulker transaction with the policy_monitor one
-		trans := m.bulker.StartTransaction("Load policies", "bulker")
+	if m.bulker.HasTracer() {
+		tctx := span.TraceContext()
+		trans := m.bulker.StartTransactionOptions("Load policies", "bulker", apm.TransactionOptions{Links: []apm.SpanLink{{
+			Trace: tctx.Trace,
+			Span:  tctx.Span,
+		}}})
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}
@@ -305,6 +309,9 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 }
 
 func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy) error {
+	span, ctx := apm.StartSpan(ctx, "process policies", "process")
+	defer span.End()
+
 	if len(policies) == 0 {
 		return nil
 	}
