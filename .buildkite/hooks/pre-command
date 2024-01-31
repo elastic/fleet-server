@@ -6,9 +6,9 @@ source .buildkite/scripts/common.sh
 
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
 EC_KEY_SECRET_PATH="kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-PRIVATE_CI_GCS_CREDENTIALS_PATH="kv/ci-shared/platform-ingest/private_ci_artifacts_gcs_credentials"
+PRIVATE_CI_GCS_CREDENTIALS_PATH="kv/ci-shared/platform-ingest/gcp-platform-ingest-ci-service-account"
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
-JOB_GCS_BUCKET_SECRET_PATH="kv/ci-shared/platform-ingest/fleet_gcs_bucket"
+JOB_GCS_BUCKET="ingest-buildkite-ci"
 GITHUB_TOKEN_VAULT_PATH="kv/ci-shared/platform-ingest/github_token"
 GITHUB_REPO_TOKEN=$(retry 5 vault kv get -field token ${GITHUB_TOKEN_VAULT_PATH})
 
@@ -55,14 +55,14 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "release-test" ]]; then
-  export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
-  export JOB_GCS_BUCKET=$(retry 5 vault kv get -field plaintext ${JOB_GCS_BUCKET_SECRET_PATH})
+  export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
+  export JOB_GCS_BUCKET
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "package-x86-64" || "$BUILDKITE_STEP_KEY" == "package-arm" || "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
-    export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
-    export JOB_GCS_BUCKET=$(retry 5 vault kv get -field plaintext ${JOB_GCS_BUCKET_SECRET_PATH})
+    export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
+    export JOB_GCS_BUCKET
   fi
 fi
 
@@ -80,7 +80,7 @@ fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "package-x86-64" || "$BUILDKITE_STEP_KEY" == "package-arm" ]]; then
-    export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
-    export JOB_GCS_BUCKET=$(retry 5 vault kv get -field plaintext ${JOB_GCS_BUCKET_SECRET_PATH})
+    export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
+    export JOB_GCS_BUCKET
   fi
 fi
