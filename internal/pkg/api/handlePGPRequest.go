@@ -5,6 +5,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -143,7 +144,9 @@ func (pt *PGPRetrieverT) getPGPFromUpstream(ctx context.Context) ([]byte, error)
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%w: %d", ErrUpstreamStatus, resp.StatusCode)
 	}
-	return io.ReadAll(resp.Body)
+	var b bytes.Buffer
+	_, err = io.Copy(&b, resp.Body)
+	return b.Bytes(), err
 }
 
 // writeKeyToDir will write the specified key to the keys directory
