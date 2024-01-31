@@ -50,8 +50,8 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	defer span.End()
 	span.Context.SetLabel("output_type", p.Type)
 	zlog = zlog.With().
-		Str("fleet.agent.id", agent.Id).
-		Str("fleet.policy.output.name", p.Name).Logger()
+		Str(logger.AgentID, agent.Id).
+		Str(logger.PolicyOutputName, p.Name).Logger()
 
 	switch p.Type {
 	case OutputTypeElasticsearch:
@@ -125,7 +125,7 @@ func (p *Output) prepareElasticsearch(
 			}
 		}
 		if !found {
-			zlog.Info().Str(logger.APIKeyID, agentOutput.APIKeyID).Str("outputName", agentOutputName).Msg("Output removed, will retire API key")
+			zlog.Info().Str(logger.APIKeyID, agentOutput.APIKeyID).Str(logger.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
 			toRetireAPIKeys = &model.ToRetireAPIKeyIdsItems{
 				ID:        agentOutput.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
@@ -270,10 +270,10 @@ func (p *Output) prepareElasticsearch(
 					State:   client.UnitStateDegraded.String(),
 					Message: fmt.Sprintf("remote ES could not create API key due to error: %v", err),
 				}
-				zerolog.Ctx(ctx).Warn().Err(err).Str("outputName", p.Name).Msg(doc.Message)
+				zerolog.Ctx(ctx).Warn().Err(err).Str(logger.PolicyOutputName, p.Name).Msg(doc.Message)
 
 				if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
-					zlog.Error().Err(err).Str("outputName", p.Name).Msg("error writing output health")
+					zlog.Error().Err(err).Str(logger.PolicyOutputName, p.Name).Msg("error writing output health")
 				}
 			}
 

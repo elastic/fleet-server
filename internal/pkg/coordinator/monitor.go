@@ -431,7 +431,7 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 			if err != nil {
 				s.Err(err).Msg("Policy coordinator failed to add a new policy revision")
 			} else {
-				s.Info().Int64("revision_id", p.RevisionIdx).Msg("Policy coordinator added a new policy revision")
+				s.Info().Msg("Policy coordinator added a new policy revision")
 			}
 		case <-ctx.Done():
 			return

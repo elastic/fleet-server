@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/cbor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
@@ -81,7 +82,7 @@ func (ut *UploadT) validateUploadBeginRequest(ctx context.Context, reader io.Rea
 	}
 
 	// check API key matches payload agent ID
-	agentID, ok := payload.Str("agent_id")
+	agentID, ok := payload.Str(logger.AgentID)
 	if !ok || agentID == "" {
 		return nil, "", ErrAgentIDMissing
 	}
