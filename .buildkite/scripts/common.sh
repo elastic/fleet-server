@@ -104,32 +104,21 @@ google_cloud_auth() {
 
 upload_packages_to_gcp_bucket() {
     local pattern=${1}
-    local baseUri="gs://${JOB_GCS_BUCKET}/${REPO}"              #TODO: needs to add the "/buildkite" for rollback
-    local bucketUriCommit="${baseUri}"/commits/${BUILDKITE_COMMIT}
-    local bucketUriDefault="${baseUri}"/snapshots
+    local baseUri="gs://${JOB_GCS_BUCKET}/${REPO}"
+    local bucketUriCommit="${baseUri}/commits/${BUILDKITE_COMMIT}"
+    local bucketUriDefault="${baseUri}/snapshots"
 
     if [[ ${BUILDKITE_PULL_REQUEST} != "false" ]]; then
-        bucketUriDefault="${baseUri}"/pull-requests/pr-${GITHUB_PR_NUMBER}
+        bucketUriDefault="${baseUri}/pull-requests/pr-${GITHUB_PR_NUMBER}"
     fi
     for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
-        gsutil -m -q cp -a public-read -r ${pattern} "${bucketUri}"
+        gsutil -m -q cp -r ${pattern} "${bucketUri}"
     done
 }
 
 get_bucket_uri() {
     local type=${1}
-    local baseUri="gs://${JOB_GCS_BUCKET}/jobs"              #TODO: needs to add the "/buildkite" for rollback
-    if [[ ${type} == "snapshot" ]]; then
-        local folder="commits"
-    else
-        local folder="${type}"
-    fi
-    bucketUri="${baseUri}/${folder}/${BUILDKITE_COMMIT}"
-}
-
-get_bucket_uri() {
-    local type=${1}
-    local baseUri="gs://${JOB_GCS_BUCKET}/jobs"               #TODO: needs to add the "/buildkite" for rollback
+    local baseUri="gs://${JOB_GCS_BUCKET}/jobs"
     if [[ ${type} == "snapshot" ]]; then
         local folder="commits"
     else
@@ -142,7 +131,7 @@ upload_mbp_packages_to_gcp_bucket() {
     local pattern=${1}
     local type=${2}
     get_bucket_uri "${type}"
-    gsutil -m -q cp -a public-read -r ${pattern} ${bucketUri}
+    gsutil -m -q cp -r ${pattern} ${bucketUri}
 }
 
 download_mbp_packages_from_gcp_bucket() {
