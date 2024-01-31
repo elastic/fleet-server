@@ -143,9 +143,11 @@ func (m *monitorT) Run(ctx context.Context) error {
 	var trans *apm.Transaction
 LOOP:
 	for {
+		m.log.Debug().Msg("policy monitor loop start")
 		iCtx = ctx
 		select {
 		case <-m.kickCh:
+			m.log.Debug().Msg("policy monitor kicked")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("initial policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
@@ -158,6 +160,7 @@ LOOP:
 			m.dispatchPending(iCtx)
 			endTrans(trans)
 		case <-m.deployCh:
+			m.log.Debug().Msg("policy monitor deploy ch")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("forced policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
@@ -166,6 +169,7 @@ LOOP:
 			m.dispatchPending(iCtx)
 			endTrans(trans)
 		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
+			m.log.Debug().Int("hits", len(hits)).Msg("policy monitor hits from sub")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("output policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
