@@ -233,6 +233,11 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
+	ts := time.Now()
+	defer func(ts time.Time) {
+		m.log.Debug().Dur("duration", time.Since(ts)).Msg("policy monitor dispatch complete")
+	}(ts)
+
 	s := m.pendingQ.popFront()
 	if s == nil {
 		return

@@ -369,11 +369,121 @@ func TestMonitor_Revisions(t *testing.T) {
 	agentID := uuid.Must(uuid.NewV4()).String()
 	policyID := uuid.Must(uuid.NewV4()).String()
 
+	policy := model.Policy{
+		PolicyID:       policyID,
+		CoordinatorIdx: 1,
+		Data:           &intPolData,
+		RevisionIdx:    1,
+	}
+	_, err = dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy.RevisionIdx = 2
+	_, err = dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	s, err := m.Subscribe(agentID, policyID, 1, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer m.Unsubscribe(s) //nolint:errcheck // defered function
+
+	agent2 := uuid.Must(uuid.NewV4()).String()
+	s2, err := m.Subscribe(agent2, policyID, 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Unsubscribe(s2) //nolint:errcheck // defered function
+
+	policy.RevisionIdx = 3
+	_, err = dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tm := time.NewTimer(3 * time.Second)
+	select {
+	case subPolicy := <-s.Output():
+		tm.Stop()
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 3 && subPolicy.Policy.CoordinatorIdx != 1 {
+			t.Fatalf("failed to get the expected updated policy, policy revision: %d", subPolicy.Policy.RevisionIdx)
+		}
+	case <-tm.C:
+		t.Fatal("Did not receive initial policy in 3s")
+	}
+
+	tm.Reset(3 * time.Second)
+	select {
+	case subPolicy := <-s2.Output():
+		tm.Stop()
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 3 && subPolicy.Policy.CoordinatorIdx != 1 {
+			t.Fatalf("failed to get the expected updated policy, policy revision: %d", subPolicy.Policy.RevisionIdx)
+		}
+	case <-tm.C:
+		t.Fatal("Did not receive initial policy in 3s")
+	}
+
+	cancel()
+	imwg.Wait()
+	mwg.Wait()
+	if imerr != nil {
+		t.Fatal(imerr)
+	}
+	if merr != nil {
+		t.Fatal(merr)
+	}
+}
+
+func TestMonitor_KickDeploy(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetPolicies)
+
+	im, err := monitor.New(index, bulker.Client(), bulker.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Start index monitor
+	var imerr error
+	var imwg sync.WaitGroup
+	imwg.Add(1)
+	go func() {
+		defer imwg.Done()
+		imerr = im.Run(ctx)
+		if errors.Is(imerr, context.Canceled) {
+			imerr = nil
+		}
+	}()
+
+	m := NewMonitor(bulker, im, config.ServerLimits{})
+	pm, ok := m.(*monitorT)
+	if !ok {
+		t.Fatalf("unable to cast monitor m (type %T) as *monitorT", m)
+	}
+	pm.policiesIndex = index
+
+	var merr error
+	var mwg sync.WaitGroup
+	mwg.Add(1)
+	go func() {
+		defer mwg.Done()
+		merr = m.Run(ctx)
+		if errors.Is(merr, context.Canceled) {
+			merr = nil
+		}
+	}()
+	err = m.(*monitorT).waitStart(ctx)
+	require.NoError(t, err)
+
+	agentID := uuid.Must(uuid.NewV4()).String()
+	policyID := uuid.Must(uuid.NewV4()).String()
 
 	policy := model.Policy{
 		PolicyID:       policyID,
@@ -392,17 +502,24 @@ func TestMonitor_Revisions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	policy.RevisionIdx = 3
-	_, err = dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
+	s, err := m.Subscribe(agentID, policyID, 1, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer m.Unsubscribe(s) //nolint:errcheck // defered function
+
+	// Force a new policy load so that the kickLoad() func runs
+	s2, err := m.Subscribe("test", "test", 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Unsubscribe(s2) //nolint:errcheck // test
 
 	tm := time.NewTimer(3 * time.Second)
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()
-		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 3 && subPolicy.Policy.CoordinatorIdx != 1 {
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 2 && subPolicy.Policy.CoordinatorIdx != 1 {
 			t.Fatalf("failed to get the expected updated policy, policy revision: %d", subPolicy.Policy.RevisionIdx)
 		}
 	case <-tm.C:
