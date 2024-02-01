@@ -37,5 +37,4 @@ cloud-clean: ## Clean cloud deployment
 
 .PHONY: cloud-get-fleet-url
 cloud-get-fleet-url:  ## Get Fleet URL from this deployment
-	@# required to add "tr" command since terraform outputs the values with double quotes
-	@terraform output --state=${TERRAFORM_PATH}/terraform.tfstate fleet_url | tr -d \"
+	@terraform output --raw --state=${TERRAFORM_PATH}/terraform.tfstate fleet_url
