@@ -25,7 +25,7 @@ if [[ "${FLEET_SERVER_URL}" == "" ]]; then
         buildkite-agent annotate \
             "${message}" \
             --context "ctx-cloude2e-test" \
-            --stype "error"
+            --style "error"
     fi
     echo "${message}"
     exit 0
