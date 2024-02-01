@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+CLOUD_TESTING_BASE="$(dirname $0)"
+
 cleanup() {
   r=$?
 
@@ -11,7 +13,6 @@ cleanup() {
   exit $r
 }
 trap cleanup EXIT INT TERM
-
 
 echo "--- Creating deployment"
 make -C "${CLOUD_TESTING_BASE}" cloud-deploy

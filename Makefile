@@ -388,7 +388,7 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 test-cloude2e: prepare-test-context  ## - Run cloude2e tests with full setup (slow!)
 	@# Triggered using a shell script to ensure deployment is cleaned up even if errors (using trap).
 	@# it would also ensure to exit with failure if any error happens
-	@CLOUD_TESTING_BASE=$(CLOUD_TESTING_BASE) dev-tools/cloud/launch_cloud_e2e.sh
+	@$(CLOUD_TESTING_BASE)/launch_cloud_e2e_tests.sh
 
 .PHONY: test-cloude2e-set
 test-cloude2e-set: ## Run cloude2e test
