@@ -15,7 +15,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"go.elastic.co/apm/v2"
@@ -87,8 +86,8 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (file.Info, error) {
 	id := uid.String()
 
 	// grab required fields that were checked already in validation step
-	agentID, _ := data.Str(logger.AgentID)
-	actionID, _ := data.Str(logger.ActionID)
+	agentID, _ := data.Str("agent_id")
+	actionID, _ := data.Str("action_id")
 	source, _ := data.Str("src")
 	docID := fmt.Sprintf("%s.%s", actionID, agentID)
 
