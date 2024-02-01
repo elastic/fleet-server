@@ -16,16 +16,16 @@ output "elasticsearch_password" {
 }
 
 output "elasticsearch_url" {
-  value       = ec_deployment.deployment.elasticsearch.0.https_endpoint
+  value       = ec_deployment.deployment.elasticsearch.https_endpoint
   description = "The secure Elasticsearch URL"
 }
 
 output "kibana_url" {
-  value       = ec_deployment.deployment.kibana.0.https_endpoint
+  value       = ec_deployment.deployment.kibana.https_endpoint
   description = "The secure Kibana URL"
 }
 
 output "fleet_url" {
-  value       = ec_deployment.deployment.integrations_server.0.fleet_https_endpoint
+  value       = ec_deployment.deployment.integrations_server.endpoints.fleet
   description = "The secure Fleet URL"
 }
