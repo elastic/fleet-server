@@ -7,12 +7,18 @@ CLOUD_TESTING_BASE="$(dirname $0)"
 cleanup() {
   r=$?
 
+<<<<<<< HEAD
   if [ -f ${CLOUD_TESTING_BASE}/terraform/.terraform.lock.hcl ] ; then
     echo "--- Cleaning deployment"
     make -C "${CLOUD_TESTING_BASE}" cloud-clean
   else
       echo "Skipped cleaning deployment, no Terraform files"
   fi
+=======
+  echo "--- Cleaning deployment"
+  make -C "${CLOUD_TESTING_BASE}" cloud-clean
+
+>>>>>>> 9f3f977 ([Buildkite] Ignore non successful exit code in cloud-deploy target (test-cloude2e) (#3243))
   exit $r
 }
 trap cleanup EXIT INT TERM
