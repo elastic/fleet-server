@@ -766,8 +766,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	defer span.End()
 	zlog = zlog.With().
 		Str("fleet.ctx", "processPolicy").
-		Int64("fleet.policyRevision", pp.Policy.RevisionIdx).
-		Int64("fleet.policyCoordinator", pp.Policy.CoordinatorIdx).
+		Int64(dl.FieldRevisionIdx, pp.Policy.RevisionIdx).
+		Int64(dl.FieldCoordinatorIdx, pp.Policy.CoordinatorIdx).
 		Str(LogPolicyID, pp.Policy.PolicyID).
 		Logger()
 
