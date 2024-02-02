@@ -234,9 +234,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 	defer m.mut.Unlock()
 
 	ts := time.Now()
-	defer func(ts time.Time) {
-		m.log.Debug().Dur("duration", time.Since(ts)).Msg("policy monitor dispatch complete")
-	}(ts)
+	nQueued := 0
 
 	s := m.pendingQ.popFront()
 	if s == nil {
@@ -273,7 +271,8 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 				Int64("subscription_coordinator_idx", s.coordIdx).
 				Int64("revision_idx", policy.pp.Policy.RevisionIdx).
 				Int64("coordinator_idx", policy.pp.Policy.CoordinatorIdx).
-				Msg("dispatch")
+				Int("nSubs", len(s.ch)). // log number of events in the channel
+				Msg("dispatch policy change")
 		default:
 			// Should never block on a channel; we created a channel of size one.
 			// A block here indicates a logic error somewheres.
@@ -284,7 +283,12 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			return
 		}
 		s = m.pendingQ.popFront()
+		nQueued += 1
 	}
+
+	dur := time.Since(ts)
+	m.log.Debug().Dur("event.duration", dur).Int("nSubs", nQueued).
+		Msg("policy monitor dispatch complete")
 }
 
 func (m *monitorT) loadPolicies(ctx context.Context) error {
@@ -436,7 +440,7 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 	zlog.Info().
 		Int64("old_revision_idx", oldPolicy.RevisionIdx).
 		Int64("old_coordinator_idx", oldPolicy.CoordinatorIdx).
-		Int("nQueued", nQueued).
+		Int("nSubs", nQueued).
 		Str(logger.PolicyID, newPolicy.PolicyID).
 		Msg("New revision of policy received and added to the queue")
 
@@ -500,19 +504,13 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 		m.kickLoad()
 	case s.isUpdate(&p.pp.Policy):
 		empty := m.pendingQ.isEmpty()
+		m.pendingQ.pushBack(s)
+		m.log.Debug().
+			Str(logger.AgentID, s.agentID).
+			Int64(dl.FieldRevisionIdx, (&p.pp.Policy).RevisionIdx).
+			Msg("deploy pending on subscribe")
 		if empty {
-			m.pendingQ.pushBack(s)
-			m.log.Debug().
-				Str(logger.AgentID, s.agentID).
-				Msg("deploy pending on subscribe, empty queue")
 			m.kickDeploy()
-		} else {
-			m.log.Debug().
-				Str(logger.PolicyID, policyID).
-				Str(logger.AgentID, s.agentID).
-				Int64("revision_idx", (&p.pp.Policy).RevisionIdx).
-				Msg("policy subscription added, queue not empty")
-			p.head.pushBack(s)
 		}
 	default:
 		m.log.Debug().
