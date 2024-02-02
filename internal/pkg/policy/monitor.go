@@ -325,6 +325,10 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 		return nil
 	}
 
+	m.log.Debug().Int64(dl.FieldRevisionIdx, policies[0].RevisionIdx).
+		Int64(dl.FieldCoordinatorIdx, policies[0].CoordinatorIdx).
+		Str(logger.PolicyID, policies[0].PolicyID).Msg("process policies")
+
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
 		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
@@ -399,6 +403,7 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 	// Update the policy in our data structure
 	p.pp = *pp
 	m.policies[newPolicy.PolicyID] = p
+	zlog.Debug().Str(logger.PolicyID, newPolicy.PolicyID).Msg("Update policy revision")
 
 	// Iterate through the subscriptions on this policy;
 	// schedule any subscription for delivery that requires an update.
@@ -487,6 +492,7 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 		// We've not seen this policy before, force load.
 		m.log.Info().
 			Str(logger.PolicyID, policyID).
+			Str(logger.AgentID, s.agentID).
 			Msg("force load on unknown policyId")
 		p = policyT{head: makeHead()}
 		p.head.pushBack(s)
@@ -494,14 +500,26 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 		m.kickLoad()
 	case s.isUpdate(&p.pp.Policy):
 		empty := m.pendingQ.isEmpty()
-		m.pendingQ.pushBack(s)
-		m.log.Debug().
-			Str(logger.AgentID, s.agentID).
-			Msg("scheduled pending on subscribe")
 		if empty {
+			m.pendingQ.pushBack(s)
+			m.log.Debug().
+				Str(logger.AgentID, s.agentID).
+				Msg("deploy pending on subscribe, empty queue")
 			m.kickDeploy()
+		} else {
+			m.log.Debug().
+				Str(logger.PolicyID, policyID).
+				Str(logger.AgentID, s.agentID).
+				Int64("revision_idx", (&p.pp.Policy).RevisionIdx).
+				Msg("policy subscription added, queue not empty")
+			p.head.pushBack(s)
 		}
 	default:
+		m.log.Debug().
+			Str(logger.PolicyID, policyID).
+			Str(logger.AgentID, s.agentID).
+			Int64("revision_idx", (&p.pp.Policy).RevisionIdx).
+			Msg("subscription added without new revision")
 		p.head.pushBack(s)
 	}
 
