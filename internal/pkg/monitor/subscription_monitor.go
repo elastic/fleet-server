@@ -8,7 +8,6 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
@@ -16,10 +15,6 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"golang.org/x/sync/errgroup"
-)
-
-const (
-	defaultSubscriptionTimeout = 5 * time.Second // max amount of time subscription has to read from channel
 )
 
 var gCounter uint64
@@ -55,10 +50,9 @@ func (s *subT) Output() <-chan []es.HitT {
 
 // monitorT monitors for new documents in an index.
 type monitorT struct {
-	sm         SimpleMonitor
-	mut        sync.RWMutex
-	subs       map[uint64]*subT
-	subTimeout time.Duration
+	sm   SimpleMonitor
+	mut  sync.RWMutex
+	subs map[uint64]*subT
 }
 
 // New creates new subscription monitor.
@@ -69,9 +63,8 @@ func New(index string, esCli, monCli *elasticsearch.Client, opts ...Option) (Mon
 	}
 
 	m := &monitorT{
-		sm:         sm,
-		subTimeout: defaultSubscriptionTimeout,
-		subs:       make(map[uint64]*subT),
+		sm:   sm,
+		subs: make(map[uint64]*subT),
 	}
 
 	return m, nil
@@ -143,15 +136,12 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 		for _, s := range m.subs {
 			go func(s *subT) {
 				defer wg.Done()
-				// lc, cn := context.WithTimeout(ctx, m.subTimeout)
-				// defer cn()
 				select {
 				case s.c <- hits:
-					zerolog.Ctx(ctx).Debug().
+					zerolog.Ctx(ctx).Info().
 						Str("ctx", "subscription monitor").
 						Any("hits", hits).
 						Msg("received notification")
-				// case <-lc.Done():
 				case <-ctx.Done():
 					zerolog.Ctx(ctx).Error().
 						Err(ctx.Err()).
