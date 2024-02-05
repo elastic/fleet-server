@@ -62,6 +62,8 @@ endif
 # Directory to dump build tools into
 GOBIN=$(shell go env GOPATH)/bin/
 
+OS_NAME:=$(shell uname -s)
+
 .PHONY: help
 help: ## - Show help message
 	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
@@ -157,8 +159,8 @@ test-release:  ## - Check that all release binaries are created
 	./.buildkite/scripts/test-release.sh $(DEFAULT_VERSION)
 
 .PHONY: test-unit
-test-unit: prepare-test-context  ## - Run unit tests only
-	set -o pipefail; go test ${GO_TEST_FLAG} -v -race -coverprofile=build/coverage.out ./... | tee build/test-unit.out
+test-unit: prepare-test-context  ## - Run unit tests only	
+	set -o pipefail; go test ${GO_TEST_FLAG} -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
 
 .PHONY: benchmark
 benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
