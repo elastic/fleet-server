@@ -143,15 +143,20 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 		for _, s := range m.subs {
 			go func(s *subT) {
 				defer wg.Done()
-				lc, cn := context.WithTimeout(ctx, m.subTimeout)
-				defer cn()
+				// lc, cn := context.WithTimeout(ctx, m.subTimeout)
+				// defer cn()
 				select {
 				case s.c <- hits:
-				case <-lc.Done():
-					zerolog.Ctx(ctx).Error().
-						Err(lc.Err()).
+					zerolog.Ctx(ctx).Debug().
 						Str("ctx", "subscription monitor").
-						Dur("timeout", m.subTimeout).
+						Any("hits", hits).
+						Msg("received notification")
+				// case <-lc.Done():
+				case <-ctx.Done():
+					zerolog.Ctx(ctx).Error().
+						Err(ctx.Err()).
+						Str("ctx", "subscription monitor").
+						Any("hits", hits).
 						Msg("dropped notification")
 				}
 			}(s)

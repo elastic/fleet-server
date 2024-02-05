@@ -26,7 +26,7 @@ func NewSub(policyID, agentID string, revIdx, coordIdx int64) *subT {
 		agentID:  agentID,
 		revIdx:   revIdx,
 		coordIdx: coordIdx,
-		ch:       make(chan *ParsedPolicy, 5), // allow multiple policy changes to be queued
+		ch:       make(chan *ParsedPolicy, 1),
 	}
 }
 

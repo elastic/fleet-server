@@ -241,6 +241,9 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		return
 	}
 
+	firstPolicyRevision := m.policies[s.policyID].pp.Policy.RevisionIdx
+	var lastPolicyRevision int64
+
 	for s != nil {
 		// Use a rate.Limiter to control how fast policies are passed to the checkin handler.
 		// This is done to avoid all responses to agents on the same policy from being written at once.
@@ -284,10 +287,13 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		}
 		s = m.pendingQ.popFront()
 		nQueued += 1
+		lastPolicyRevision = policy.pp.Policy.RevisionIdx
 	}
 
 	dur := time.Since(ts)
 	m.log.Debug().Dur("event.duration", dur).Int("nSubs", nQueued).
+		Int64("revision_idx", firstPolicyRevision).
+		Int64("last_revision_idx", lastPolicyRevision).
 		Msg("policy monitor dispatch complete")
 }
 
