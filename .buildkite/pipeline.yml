@@ -31,6 +31,18 @@ steps:
           cpu: "8"
           memory: "4G"
 
+  # - group: "Check and build: MacOS"
+  #   key: "check"
+  #   steps:
+  #     - label: ":white_check_mark: Run check-ci"
+  #       key: check-ci
+  #       command: |
+  #         make check-ci
+  #         make local
+  #       agents:
+  #         provider: orka
+  #         imagePrefix: generic-13-ventura-arm
+
   - group: "Performance test"
     key: "performance-test"
     steps:
@@ -115,6 +127,8 @@ steps:
         depends_on:
           - step: "unit-test"
             allow_failure: true
+          - step: "unit-test-macos-13"
+            allow_failure: true
           - step: "int-test"
             allow_failure: true
           - step: "e2e-test"
@@ -133,6 +147,8 @@ steps:
           - step: "unit-test"
             allow_failure: false
           - step: "e2e-test"
+            allow_failure: false
+          - step: "unit-test-macos-13"
             allow_failure: false
 
       - label: ":gcloud: Cloud e2e Test"
