@@ -33,6 +33,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
+	"golang.org/x/time/rate"
 
 	"go.elastic.co/apm/module/apmhttp/v2"
 	"go.elastic.co/apm/v2"
@@ -75,6 +76,7 @@ type CheckinT struct {
 	// gwPool is a gzip.Writer pool intended to lower the amount of writers created when responding to checkin requests.
 	// gzip.Writer allocations are expensive (~1.2MB each) and can exhaust an instance's memory if a lot of concurrent responses are sent (this occurs when a mass-action such as an upgrade is detected).
 	// effectiveness of the pool is controlled by rate limiter configured through the limit.action_limit attribute.
+	limit  *rate.Limiter
 	gwPool sync.Pool
 	bulker bulk.Bulk
 }
@@ -99,6 +101,7 @@ func NewCheckinT(
 		gcp:    gcp,
 		ad:     ad,
 		tr:     tr,
+		limit:  rate.NewLimiter(rate.Every(cfg.Limits.ActionLimit.Interval), cfg.Limits.ActionLimit.Burst),
 		gwPool: sync.Pool{
 			New: func() any {
 				zipper, err := gzip.NewWriterLevel(io.Discard, cfg.CompressionLevel)
@@ -549,6 +552,12 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	compressThreshold := ct.cfg.CompressionThresh
 
 	if len(payload) > compressThreshold && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
+		if len(fromPtr(resp.Actions)) > 0 {
+			if err := ct.limit.Wait(ctx); err != nil {
+				return fmt.Errorf("checkin response limiter error: %w", err)
+			}
+
+		}
 		wrCounter := datacounter.NewWriterCounter(w)
 
 		zipper, _ := ct.gwPool.Get().(*gzip.Writer)

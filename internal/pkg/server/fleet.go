@@ -480,7 +480,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	g.Go(loggedRunFunc(ctx, "Coordinator policy monitor", cord.Run))
 
 	// Policy monitor
-	pm := policy.NewMonitor(bulker, pim, cfg.Inputs[0].Server.Limits)
+	pm := policy.NewMonitor(bulker, pim)
 	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
 
 	// Policy self monitor
@@ -508,7 +508,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	}
 	g.Go(loggedRunFunc(ctx, "Action monitor", am.Run))
 
-	ad = action.NewDispatcher(am, cfg.Inputs[0].Server.Limits.ActionLimit.Interval, cfg.Inputs[0].Server.Limits.ActionLimit.Burst)
+	ad = action.NewDispatcher(am)
 	g.Go(loggedRunFunc(ctx, "Action dispatcher", ad.Run))
 	tr, err = action.NewTokenResolver(bulker)
 	if err != nil {

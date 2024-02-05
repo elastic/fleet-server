@@ -267,12 +267,12 @@ func TestResolveSeqNo(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			verCon := mustBuildConstraints("8.0.0")
-			cfg := &config.Server{}
+			cfg := &config.Server{Limits: config.ServerLimits{ActionLimit: config.Limit{Interval: 5 * time.Millisecond, Burst: 1}}}
 			c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 			bc := checkin.NewBulk(nil)
 			bulker := ftesting.NewMockBulk()
 			pim := mockmonitor.NewMockMonitor()
-			pm := policy.NewMonitor(bulker, pim, config.ServerLimits{PolicyLimit: config.Limit{Interval: 5 * time.Millisecond, Burst: 1}})
+			pm := policy.NewMonitor(bulker, pim)
 			ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
 
 			resp, _ := ct.resolveSeqNo(ctx, logger, tc.req, tc.agent)
