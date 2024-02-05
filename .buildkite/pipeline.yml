@@ -33,10 +33,7 @@ steps:
 
       - label: ":building_construction: Run local build: MacOS"
         key: make-local-macos
-        command: |
-          source .buildkite/scripts/common.sh
-          with_go
-          make local
+        command: ".buildkite/scripts/local_build.sh"
         agents:
           provider: orka
           imagePrefix: generic-13-ventura-arm
