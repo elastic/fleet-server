@@ -79,6 +79,16 @@ steps:
           - build/*.xml
           - build/coverage.out
 
+      - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
+        key: unit-test-macos-13
+        command: ".buildkite/scripts/unit_test.sh"
+        agents:
+          provider: orka
+          imagePrefix: generic-13-ventura-arm
+        artifact_paths:
+          - build/*.xml
+          - build/coverage.out
+
       - label: ":smartbear-testexecute: Run integration tests"
         key: int-test
         command: ".buildkite/scripts/integration_test.sh"
