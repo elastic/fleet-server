@@ -31,6 +31,16 @@ steps:
           cpu: "8"
           memory: "4G"
 
+      - label: ":building_construction: Run local build: MacOS"
+        key: make-local-macos
+        command: |
+          source .buildkite/scripts/common.sh
+          with_go
+          make local
+        agents:
+          provider: orka
+          imagePrefix: generic-13-ventura-arm
+
   - group: "Performance test"
     key: "performance-test"
     steps:
