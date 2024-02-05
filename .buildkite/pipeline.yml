@@ -30,18 +30,14 @@ steps:
           image: "${GO_AGENT_IMAGE}"
           cpu: "8"
           memory: "4G"
-
-  # - group: "Check and build: MacOS"
-  #   key: "check"
-  #   steps:
-  #     - label: ":white_check_mark: Run check-ci"
-  #       key: check-ci
-  #       command: |
-  #         make check-ci
-  #         make local
-  #       agents:
-  #         provider: orka
-  #         imagePrefix: generic-13-ventura-arm
+      - label: ":building_construction: Check CI & build: MacOS"
+        key: check-ci-macos
+        command: |
+          make check-ci
+          make local
+        agents:
+          provider: orka
+          imagePrefix: generic-13-ventura-arm
 
   - group: "Performance test"
     key: "performance-test"
