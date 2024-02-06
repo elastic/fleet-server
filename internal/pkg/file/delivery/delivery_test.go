@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -245,6 +246,64 @@ func TestSendFileMultipleChunksUsesBackingIndex(t *testing.T) {
 		}
 
 		return sendBodyBytes(mockData), nil
+	}
+
+	d := New(esClient, fakeBulk, -1)
+	err := d.SendFile(context.Background(), zerolog.Logger{}, buf, chunks, fileID)
+	require.NoError(t, err)
+}
+
+func TestSendFileHandlesDisorderedChunks(t *testing.T) {
+	buf := bytes.NewBuffer(nil)
+
+	fakeBulk := itesting.NewMockBulk()
+	esClient, esMock := mockESClient(t)
+
+	const fileID = "xyz"
+	idx := fmt.Sprintf(FileDataIndexPattern, "endpoint") + "-0001"
+	sampleDocBody := hexDecode("A7665F696E64657878212E666C6565742D66696C6564656C69766572792D646174612D656E64706F696E74635F69646578797A2E30685F76657273696F6E01675F7365715F6E6F016D5F7072696D6172795F7465726D0165666F756E64F5666669656C6473A164646174618142ABCD")
+
+	chunks := []file.ChunkInfo{
+		{Index: idx, ID: fileID + ".20"},
+		{Index: idx, ID: fileID + ".21"},
+		{Index: idx, ID: fileID + ".22"},
+		{Index: idx, ID: fileID + ".9"},
+		{Index: idx, ID: fileID + ".10"},
+		{Index: idx, ID: fileID + ".11"},
+		{Index: idx, ID: fileID + ".12"},
+		{Index: idx, ID: fileID + ".13"},
+		{Index: idx, ID: fileID + ".14"},
+		{Index: idx, ID: fileID + ".15"},
+		{Index: idx, ID: fileID + ".16"},
+		{Index: idx, ID: fileID + ".17"},
+		{Index: idx, ID: fileID + ".18"},
+		{Index: idx, ID: fileID + ".19"},
+		{Index: idx, ID: fileID + ".0"},
+		{Index: idx, ID: fileID + ".1"},
+		{Index: idx, ID: fileID + ".2"},
+		{Index: idx, ID: fileID + ".3"},
+		{Index: idx, ID: fileID + ".4"},
+		{Index: idx, ID: fileID + ".5"},
+		{Index: idx, ID: fileID + ".6"},
+		{Index: idx, ID: fileID + ".7"},
+		{Index: idx, ID: fileID + ".8"},
+	}
+
+	expectedIdx := 0
+
+	esMock.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+
+		// Parse out the chunk number requested
+		parts := strings.Split(req.URL.Path, "/") // ["", ".fleet-filedelivery-data-endpoint-0001", "_doc", "xyz.1"]
+		docIdx := strings.TrimPrefix(parts[3], fileID+".")
+		docnum, err := strconv.Atoi(docIdx)
+		require.NoError(t, err)
+
+		// should be our expected increasing counter
+		assert.Equal(t, expectedIdx, docnum)
+		expectedIdx += 1
+
+		return sendBodyBytes(sampleDocBody), nil
 	}
 
 	d := New(esClient, fakeBulk, -1)
