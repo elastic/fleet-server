@@ -153,7 +153,7 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 						Msg("received notification")
 				case <-lc.Done():
 					zerolog.Ctx(ctx).Error().
-						Err(ctx.Err()).
+						Err(lc.Err()).
 						Str("ctx", "subscription monitor").
 						Any("hits", hits).
 						Dur("timeout", m.subTimeout).
