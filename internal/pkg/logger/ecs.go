@@ -69,4 +69,6 @@ const (
 	ActionID              = "fleet.action.id"
 	ActionType            = "fleet.action.type"
 	PolicyOutputName      = "fleet.policy.output.name"
+	RevisionIdx           = "fleet.revision_idx"
+	CoordinatorIdx        = "fleet.coordinator_idx"
 )

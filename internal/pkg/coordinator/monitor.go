@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
@@ -426,7 +427,7 @@ func runCoordinatorOutput(ctx context.Context, cord Coordinator, bulker bulk.Bul
 	for {
 		select {
 		case p := <-cord.Output():
-			s := l.With().Int64(dl.FieldRevisionIdx, p.RevisionIdx).Int64(dl.FieldCoordinatorIdx, p.CoordinatorIdx).Logger()
+			s := l.With().Int64(logger.RevisionIdx, p.RevisionIdx).Int64(logger.CoordinatorIdx, p.CoordinatorIdx).Logger()
 			_, err := dl.CreatePolicy(ctx, bulker, p, dl.WithIndexName(policiesIndex))
 			if err != nil {
 				s.Err(err).Msg("Policy coordinator failed to add a new policy revision")
