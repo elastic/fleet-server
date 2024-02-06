@@ -405,6 +405,14 @@ func TestMonitor_Revisions(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// policy should be ignored as coordinator_idx is 0
+	policy.RevisionIdx = 4
+	policy.CoordinatorIdx = 0
+	_, err = dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	tm := time.NewTimer(3 * time.Second)
 	select {
 	case subPolicy := <-s.Output():

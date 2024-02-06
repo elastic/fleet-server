@@ -143,11 +143,11 @@ func (m *monitorT) Run(ctx context.Context) error {
 	var trans *apm.Transaction
 LOOP:
 	for {
-		m.log.Debug().Msg("policy monitor loop start")
+		m.log.Trace().Msg("policy monitor loop start")
 		iCtx = ctx
 		select {
 		case <-m.kickCh:
-			m.log.Debug().Msg("policy monitor kicked")
+			m.log.Trace().Msg("policy monitor kicked")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("initial policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
@@ -160,7 +160,7 @@ LOOP:
 			m.dispatchPending(iCtx)
 			endTrans(trans)
 		case <-m.deployCh:
-			m.log.Debug().Msg("policy monitor deploy ch")
+			m.log.Trace().Msg("policy monitor deploy ch")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("forced policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
@@ -169,7 +169,7 @@ LOOP:
 			m.dispatchPending(iCtx)
 			endTrans(trans)
 		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
-			m.log.Debug().Int("hits", len(hits)).Msg("policy monitor hits from sub")
+			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("output policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
@@ -269,9 +269,8 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 				Str(logger.PolicyID, s.policyID).
 				Int64("subscription_revision_idx", s.revIdx).
 				Int64("subscription_coordinator_idx", s.coordIdx).
-				Int64("revision_idx", policy.pp.Policy.RevisionIdx).
-				Int64("coordinator_idx", policy.pp.Policy.CoordinatorIdx).
-				Int("nSubs", len(s.ch)). // log number of events in the channel
+				Int64(dl.FieldRevisionIdx, policy.pp.Policy.RevisionIdx).
+				Int64(dl.FieldCoordinatorIdx, policy.pp.Policy.CoordinatorIdx).
 				Msg("dispatch policy change")
 		default:
 			// Should never block on a channel; we created a channel of size one.
@@ -372,14 +371,14 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 
 	span, _ := apm.StartSpan(ctx, "update policy", "process")
 	span.Context.SetLabel(logger.PolicyID, newPolicy.PolicyID)
-	span.Context.SetLabel("revision_idx", newPolicy.RevisionIdx)
-	span.Context.SetLabel("coordinator_idx", newPolicy.CoordinatorIdx)
+	span.Context.SetLabel(dl.FieldRevisionIdx, newPolicy.RevisionIdx)
+	span.Context.SetLabel(dl.FieldCoordinatorIdx, newPolicy.CoordinatorIdx)
 	defer span.End()
 
 	zlog := m.log.With().
 		Str(logger.PolicyID, newPolicy.PolicyID).
-		Int64("revision_idx", newPolicy.RevisionIdx).
-		Int64("coordinator_idx", newPolicy.CoordinatorIdx).
+		Int64(dl.FieldRevisionIdx, newPolicy.RevisionIdx).
+		Int64(dl.FieldCoordinatorIdx, newPolicy.CoordinatorIdx).
 		Logger()
 
 	if newPolicy.CoordinatorIdx <= 0 {
@@ -476,8 +475,8 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 	m.log.Debug().
 		Str(logger.AgentID, agentID).
 		Str(logger.PolicyID, policyID).
-		Int64("revision_idx", revisionIdx).
-		Int64("coordinator_idx", coordinatorIdx).
+		Int64(dl.FieldRevisionIdx, revisionIdx).
+		Int64(dl.FieldCoordinatorIdx, coordinatorIdx).
 		Msg("subscribed to policy monitor")
 
 	s := NewSub(
@@ -516,7 +515,7 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 		m.log.Debug().
 			Str(logger.PolicyID, policyID).
 			Str(logger.AgentID, s.agentID).
-			Int64("revision_idx", (&p.pp.Policy).RevisionIdx).
+			Int64(dl.FieldRevisionIdx, (&p.pp.Policy).RevisionIdx).
 			Msg("subscription added without new revision")
 		p.head.pushBack(s)
 	}
@@ -538,8 +537,8 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 	m.log.Debug().
 		Str(logger.AgentID, s.agentID).
 		Str(logger.PolicyID, s.policyID).
-		Int64("revision_idx", s.revIdx).
-		Int64("coordinator_idx", s.coordIdx).
+		Int64(dl.FieldRevisionIdx, s.revIdx).
+		Int64(dl.FieldCoordinatorIdx, s.coordIdx).
 		Msg("unsubscribe")
 
 	return nil
