@@ -98,6 +98,7 @@ func NewCheckinT(
 	} else if cfg.Limits.ActionLimit.Interval == 0 && cfg.Limits.PolicyThrottle == 0 {
 		rt = rate.Inf
 	}
+	zerolog.Ctx(context.TODO()).Debug().Any("event_rate", rt).Int("burst", cfg.Limits.ActionLimit.Burst).Msg("checkin response gzip limiter")
 	ct := &CheckinT{
 		verCon: verCon,
 		cfg:    cfg,

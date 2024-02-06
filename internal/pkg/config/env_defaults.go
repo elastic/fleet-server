@@ -26,7 +26,7 @@ const (
 
 	defaultMaxConnections = 0 // no limit
 
-	defaultActionInterval = 5 * time.Millisecond
+	defaultActionInterval = 0 // no limit
 	defaultActionBurst    = 5
 
 	defaultCheckinInterval = time.Millisecond

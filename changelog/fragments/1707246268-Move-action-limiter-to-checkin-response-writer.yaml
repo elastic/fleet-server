@@ -22,7 +22,6 @@ description: |
   This allows fleet-server to control gzip.Writer access for responses that contain either actions from the action dispatcher, or a
   POLICY_CHANGE action from the policy monitor.
   Removing the throttle/limiter from the policy monitor also greatly improves performance of policy dispatches.
-  Set the default interval time for the action_limiter to 5ms (from 0), but do not adjust the env_default limits.
 
 # Affected component; a word indicating the component this changeset affects.
 component:
