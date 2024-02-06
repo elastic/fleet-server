@@ -92,6 +92,12 @@ func NewCheckinT(
 	tr *action.TokenResolver,
 	bulker bulk.Bulk,
 ) *CheckinT {
+	rt := rate.Every(cfg.Limits.ActionLimit.Interval)
+	if cfg.Limits.ActionLimit.Interval == 0 && cfg.Limits.PolicyThrottle != 0 {
+		rt = rate.Every(cfg.Limits.PolicyThrottle)
+	} else if cfg.Limits.ActionLimit.Interval == 0 && cfg.Limits.PolicyThrottle == 0 {
+		rt = rate.Inf
+	}
 	ct := &CheckinT{
 		verCon: verCon,
 		cfg:    cfg,
@@ -101,7 +107,7 @@ func NewCheckinT(
 		gcp:    gcp,
 		ad:     ad,
 		tr:     tr,
-		limit:  rate.NewLimiter(rate.Every(cfg.Limits.ActionLimit.Interval), cfg.Limits.ActionLimit.Burst),
+		limit:  rate.NewLimiter(rt, cfg.Limits.ActionLimit.Burst),
 		gwPool: sync.Pool{
 			New: func() any {
 				zipper, err := gzip.NewWriterLevel(io.Discard, cfg.CompressionLevel)
@@ -551,13 +557,17 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	compressionLevel := ct.cfg.CompressionLevel
 	compressThreshold := ct.cfg.CompressionThresh
 
-	if len(payload) > compressThreshold && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
-		if len(fromPtr(resp.Actions)) > 0 {
-			if err := ct.limit.Wait(ctx); err != nil {
-				return fmt.Errorf("checkin response limiter error: %w", err)
-			}
-
+	if (len(fromPtr(resp.Actions)) > 0 || len(payload) > compressThreshold) && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
+		// We compress the response if it would be over the threshold (default 1kb) or we are sending an action.
+		// gzip.Writer allocations are expensive, and we can easily hit an OOM issue if we try to write a large number of responses at once.
+		// This is likely to happen on bulk upgrades, or policy changes.
+		// In order to avoid a massive memory allocation we do two things:
+		// 1. re-use gzip.Writer instances across responses (through a pool)
+		// 2. rate-limit access to the writer pool
+		if err := ct.limit.Wait(ctx); err != nil {
+			return fmt.Errorf("checkin response limiter error: %w", err)
 		}
+
 		wrCounter := datacounter.NewWriterCounter(w)
 
 		zipper, _ := ct.gwPool.Get().(*gzip.Writer)

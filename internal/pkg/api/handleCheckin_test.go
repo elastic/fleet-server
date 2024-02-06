@@ -623,6 +623,46 @@ func Test_CheckinT_writeResponse(t *testing.T) {
 	}
 }
 
+func Test_CheckinT_writeResponse_limiter(t *testing.T) {
+	verCon := mustBuildConstraints("8.0.0")
+	cfg := &config.Server{
+		CompressionLevel:  flate.BestSpeed,
+		CompressionThresh: 1,
+		Limits: config.ServerLimits{
+			ActionLimit: config.Limit{
+				Interval: 50 * time.Millisecond,
+				Burst:    1,
+			},
+		},
+	}
+
+	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
+	wr1 := httptest.NewRecorder()
+	wr2 := httptest.NewRecorder()
+	req := &http.Request{
+		Header: http.Header{
+			"Accept-Encoding": []string{"gzip"},
+		},
+	}
+	cresp := CheckinResponse{
+		Action: "checkin",
+	}
+
+	ts := time.Now()
+	err1 := ct.writeResponse(testlog.SetLogger(t), wr1, req, &model.Agent{}, cresp)
+	err2 := ct.writeResponse(testlog.SetLogger(t), wr2, req, &model.Agent{}, cresp)
+	dur := time.Since(ts)
+	require.NoError(t, err1)
+	require.NoError(t, err2)
+
+	res1 := wr1.Result()
+	assert.Equal(t, "gzip", res1.Header.Get("Content-Encoding"))
+	res2 := wr2.Result()
+	assert.Equal(t, "gzip", res2.Header.Get("Content-Encoding"))
+
+	assert.GreaterOrEqual(t, dur, 50*time.Millisecond)
+}
+
 func Benchmark_CheckinT_writeResponse(b *testing.B) {
 	verCon := mustBuildConstraints("8.0.0")
 	cfg := &config.Server{
