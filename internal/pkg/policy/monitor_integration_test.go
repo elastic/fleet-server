@@ -153,7 +153,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 		}
 	}()
 
-	m := NewMonitor(bulker, im, config.ServerLimits{})
+	m := NewMonitor(bulker, im)
 	pm, ok := m.(*monitorT)
 	if !ok {
 		t.Fatalf("unable to cast monitor m (type %T) as *monitorT", m)
@@ -345,7 +345,7 @@ func TestMonitor_Revisions(t *testing.T) {
 		}
 	}()
 
-	m := NewMonitor(bulker, im, config.ServerLimits{})
+	m := NewMonitor(bulker, im)
 	pm, ok := m.(*monitorT)
 	if !ok {
 		t.Fatalf("unable to cast monitor m (type %T) as *monitorT", m)
@@ -469,7 +469,7 @@ func TestMonitor_KickDeploy(t *testing.T) {
 		}
 	}()
 
-	m := NewMonitor(bulker, im, config.ServerLimits{})
+	m := NewMonitor(bulker, im)
 	pm, ok := m.(*monitorT)
 	if !ok {
 		t.Fatalf("unable to cast monitor m (type %T) as *monitorT", m)
