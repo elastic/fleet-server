@@ -470,6 +470,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
 		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
 		monitor.WithAPMTracer(tracer),
+		monitor.WithDebounceTime(cfg.Inputs[0].Monitor.PolicyDebounceTime),
 	)
 	if err != nil {
 		return err

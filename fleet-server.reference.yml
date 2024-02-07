@@ -259,6 +259,11 @@ fleet:
 #           upstream_url: "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
 #           # By default dir is the directory containing the fleet-server executable (following symlinks) joined with elastic-agent-upgrade-keys
 #           dir: ./elastic-agent-upgrade-keys
+#    # monitor options are advanced configuration and should not be adjusted is most cases
+#    monitor:
+#      fetch_size: 1000 # The number of documents that each monitor may fetch at once
+#      poll_timeout: 4m # The poll timeout for each monitor's wait_for_advancement request
+#      policy_debounce_time: 1s # The debounce duration for the policy index monitor on successfull document retrievals.
 
 ##############################
 # Logging configuration
