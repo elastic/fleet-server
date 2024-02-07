@@ -490,7 +490,7 @@ if (ctx._source['outputs']['%s']==null)
 			source.WriteString(fmt.Sprintf(`
 if (ctx._source['outputs']['%s'].%s==null)
   {ctx._source['outputs']['%s'].%s=new ArrayList();}
-if (!ctx._source['outputs']['%s'].%s.contains(params.%s))  
+if (!ctx._source['outputs']['%s'].%s.contains(params.%s))
   {ctx._source['outputs']['%s'].%s.add(params.%s);}
 `, outputName, field, outputName, field, outputName, field, field, outputName, field, field))
 		} else {
@@ -519,8 +519,8 @@ func generateOutputAPIKey(
 	outputName string,
 	roles []byte) (*apikey.APIKey, error) {
 	name := fmt.Sprintf("%s:%s", agentID, outputName)
-	zerolog.Ctx(ctx).Info().Msgf("generating output API key %s for agent ID %s",
-		name, agentID)
+	zerolog.Ctx(ctx).Info().Str(logger.AgentID, agentID).Msgf("generating output API key %s",
+		name)
 	return bulk.APIKeyCreate(
 		ctx,
 		name,

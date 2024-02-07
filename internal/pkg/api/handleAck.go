@@ -10,12 +10,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -150,20 +150,17 @@ func (ack *AckT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *
 	if ack.cfg.Limits.AckLimit.MaxBody > 0 {
 		body = http.MaxBytesReader(w, body, ack.cfg.Limits.AckLimit.MaxBody)
 	}
-
-	raw, err := io.ReadAll(body)
-	if err != nil {
-		return nil, fmt.Errorf("handleAcks read body: %w", err)
-	}
-
-	cntAcks.bodyIn.Add(uint64(len(raw)))
+	readCounter := datacounter.NewReaderCounter(body)
 
 	var req AckRequest
-	if err := json.Unmarshal(raw, &req); err != nil {
-		return nil, fmt.Errorf("handleAcks unmarshal: %w", err)
+	dec := json.NewDecoder(readCounter)
+	if err := dec.Decode(&req); err != nil {
+		return nil, fmt.Errorf("unable to decode ack request: %w", err)
 	}
-	zlog.Trace().RawJSON("raw", raw).Msg("Ack request")
-	return &req, err
+
+	cntAcks.bodyIn.Add(readCounter.Count())
+	zlog.Trace().Msg("Ack request")
+	return &req, nil
 }
 
 func eventToActionResult(agentID, aType string, ev AckRequest_Events_Item) (acr model.ActionResult) {

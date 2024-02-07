@@ -87,6 +87,7 @@ type simpleMonitorT struct {
 	pollTimeout    time.Duration
 	withExpiration bool
 	fetchSize      int
+	debounceTime   time.Duration
 
 	checkpoint sqn.SeqNo    // index global checkpoint
 	mx         sync.RWMutex // checkpoint mutex
@@ -111,6 +112,7 @@ func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option
 		pollTimeout:    defaultPollTimeout,
 		withExpiration: defaultWithExpiration,
 		fetchSize:      defaultFetchSize,
+		debounceTime:   0,
 		checkpoint:     sqn.DefaultSeqNo,
 		outCh:          make(chan []es.HitT, 1),
 	}
@@ -167,6 +169,12 @@ func WithReadyChan(readyCh chan error) Option {
 func WithAPMTracer(tracer *apm.Tracer) Option {
 	return func(m SimpleMonitor) {
 		m.(*simpleMonitorT).tracer = tracer
+	}
+}
+
+func WithDebounceTime(dur time.Duration) Option {
+	return func(m SimpleMonitor) {
+		m.(*simpleMonitorT).debounceTime = dur
 	}
 }
 
@@ -351,6 +359,16 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		}
 		if m.tracer != nil {
 			trans.End()
+		}
+		if m.debounceTime > 0 {
+			m.log.Debug().Dur("debounce_time", m.debounceTime).Msg("monitor debounce start")
+			// Introduce a debounce time before wait advance (the signal for new docs in the index)
+			// This is specifically done so we can introduce a delay in for cases like rapid policy changes
+			// where fleet-server may not have finished dispatching policies to all agents when a new change is detected.
+			err := sleep.WithContext(ctx, m.debounceTime)
+			if err != nil {
+				return err
+			}
 		}
 	}
 }

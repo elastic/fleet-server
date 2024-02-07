@@ -52,6 +52,7 @@ type Bulk interface {
 	Search(ctx context.Context, index string, body []byte, opts ...Opt) (*es.ResultT, error)
 	HasTracer() bool
 	StartTransaction(name, transactionType string) *apm.Transaction
+	StartTransactionOptions(name, transactionType string, opts apm.TransactionOptions) *apm.Transaction
 
 	// Multi Operation API's run in the bulk engine
 	MCreate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)

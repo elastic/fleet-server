@@ -9,7 +9,7 @@ env:
   DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
   DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
   GO_AGENT_IMAGE: "golang:${GO_VERSION}"
-  TERRAFORM_VERSION: "1.6.3"
+  TERRAFORM_VERSION: "1.6.4"
 
 steps:
   - group: "Check and build"

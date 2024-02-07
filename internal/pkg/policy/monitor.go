@@ -119,6 +119,13 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, cfg config.ServerLimi
 	}
 }
 
+// endTrans is a convenience function to end the passed transaction if it's not nil
+func endTrans(t *apm.Transaction) {
+	if t != nil {
+		t.End()
+	}
+}
+
 // Run runs the monitor.
 func (m *monitorT) Run(ctx context.Context) error {
 	m.log = zerolog.Ctx(ctx).With().Str("ctx", "policy agent monitor").Logger()
@@ -132,21 +139,48 @@ func (m *monitorT) Run(ctx context.Context) error {
 
 	close(m.startCh)
 
+	var iCtx context.Context
+	var trans *apm.Transaction
 LOOP:
 	for {
+		m.log.Trace().Msg("policy monitor loop start")
+		iCtx = ctx
 		select {
 		case <-m.kickCh:
-			if err := m.loadPolicies(ctx); err != nil {
+			m.log.Trace().Msg("policy monitor kicked")
+			if m.bulker.HasTracer() {
+				trans = m.bulker.StartTransaction("initial policies", "policy_monitor")
+				iCtx = apm.ContextWithTransaction(ctx, trans)
+			}
+
+			if err := m.loadPolicies(iCtx); err != nil {
+				endTrans(trans)
 				return err
 			}
-			m.dispatchPending(ctx)
+			m.dispatchPending(iCtx)
+			endTrans(trans)
 		case <-m.deployCh:
-			m.dispatchPending(ctx)
-		case hits := <-s.Output():
-			if err := m.processHits(ctx, hits); err != nil {
+			m.log.Trace().Msg("policy monitor deploy ch")
+			if m.bulker.HasTracer() {
+				trans = m.bulker.StartTransaction("forced policies", "policy_monitor")
+				iCtx = apm.ContextWithTransaction(ctx, trans)
+			}
+
+			m.dispatchPending(iCtx)
+			endTrans(trans)
+		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
+			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
+			if m.bulker.HasTracer() {
+				trans = m.bulker.StartTransaction("output policies", "policy_monitor")
+				iCtx = apm.ContextWithTransaction(ctx, trans)
+			}
+
+			if err := m.processHits(iCtx, hits); err != nil {
+				endTrans(trans)
 				return err
 			}
-			m.dispatchPending(ctx)
+			m.dispatchPending(iCtx)
+			endTrans(trans)
 		case <-ctx.Done():
 			break LOOP
 		}
@@ -168,6 +202,9 @@ func unmarshalHits(hits []es.HitT) ([]model.Policy, error) {
 }
 
 func (m *monitorT) processHits(ctx context.Context, hits []es.HitT) error {
+	span, ctx := apm.StartSpan(ctx, "process hits", "process")
+	defer span.End()
+
 	policies, err := unmarshalHits(hits)
 	if err != nil {
 		zerolog.Ctx(ctx).Error().Err(err).Msg("fail unmarshal hits")
@@ -191,8 +228,13 @@ func (m *monitorT) waitStart(ctx context.Context) error {
 // dispatchPending will dispatch all pending policy changes to the subscriptions in the queue.
 // dispatches are rate limited by the monitor's limiter.
 func (m *monitorT) dispatchPending(ctx context.Context) {
+	span, ctx := apm.StartSpan(ctx, "dispatch pending", "dispatch")
+	defer span.End()
 	m.mut.Lock()
 	defer m.mut.Unlock()
+
+	ts := time.Now()
+	nQueued := 0
 
 	s := m.pendingQ.popFront()
 	if s == nil {
@@ -225,9 +267,11 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			m.log.Debug().
 				Str(logger.AgentID, s.agentID).
 				Str(logger.PolicyID, s.policyID).
+				Int64("subscription_revision_idx", s.revIdx).
+				Int64("subscription_coordinator_idx", s.coordIdx).
 				Int64(logger.RevisionIdx, s.revIdx).
 				Int64(logger.CoordinatorIdx, s.coordIdx).
-				Msg("dispatch")
+				Msg("dispatch policy change")
 		default:
 			// Should never block on a channel; we created a channel of size one.
 			// A block here indicates a logic error somewheres.
@@ -238,12 +282,24 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			return
 		}
 		s = m.pendingQ.popFront()
+		nQueued += 1
 	}
+
+	dur := time.Since(ts)
+	m.log.Debug().Dur("event.duration", dur).Int("nSubs", nQueued).
+		Msg("policy monitor dispatch complete")
 }
 
 func (m *monitorT) loadPolicies(ctx context.Context) error {
+	span, ctx := apm.StartSpan(ctx, "Load policies", "load")
+	defer span.End()
+
 	if m.bulker.HasTracer() {
-		trans := m.bulker.StartTransaction("Load policies", "bulker")
+		tctx := span.TraceContext()
+		trans := m.bulker.StartTransactionOptions("Load policies", "bulker", apm.TransactionOptions{Links: []apm.SpanLink{{
+			Trace: tctx.Trace,
+			Span:  tctx.Span,
+		}}})
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}
@@ -265,9 +321,16 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 }
 
 func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy) error {
+	span, ctx := apm.StartSpan(ctx, "process policies", "process")
+	defer span.End()
+
 	if len(policies) == 0 {
 		return nil
 	}
+
+	m.log.Debug().Int64(dl.FieldRevisionIdx, policies[0].RevisionIdx).
+		Int64(dl.FieldCoordinatorIdx, policies[0].CoordinatorIdx).
+		Str(logger.PolicyID, policies[0].PolicyID).Msg("process policies")
 
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
@@ -276,7 +339,7 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 			return err
 		}
 
-		m.updatePolicy(pp)
+		m.updatePolicy(ctx, pp)
 	}
 	return nil
 }
@@ -303,8 +366,14 @@ func (m *monitorT) groupByLatest(policies []model.Policy) map[string]model.Polic
 	return groupByLatest(policies)
 }
 
-func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
+func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 	newPolicy := pp.Policy
+
+	span, _ := apm.StartSpan(ctx, "update policy", "process")
+	span.Context.SetLabel(logger.PolicyID, newPolicy.PolicyID)
+	span.Context.SetLabel(dl.FieldRevisionIdx, newPolicy.RevisionIdx)
+	span.Context.SetLabel(dl.FieldCoordinatorIdx, newPolicy.CoordinatorIdx)
+	defer span.End()
 
 	zlog := m.log.With().
 		Str(logger.PolicyID, newPolicy.PolicyID).
@@ -337,6 +406,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 	// Update the policy in our data structure
 	p.pp = *pp
 	m.policies[newPolicy.PolicyID] = p
+	zlog.Debug().Str(logger.PolicyID, newPolicy.PolicyID).Msg("Update policy revision")
 
 	// Iterate through the subscriptions on this policy;
 	// schedule any subscription for delivery that requires an update.
@@ -367,9 +437,9 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 	}
 
 	zlog.Info().
-		Int64("oldRev", oldPolicy.RevisionIdx).
-		Int64("oldCoord", oldPolicy.CoordinatorIdx).
-		Int("nQueued", nQueued).
+		Int64("old_revision_idx", oldPolicy.RevisionIdx).
+		Int64("old_coordinator_idx", oldPolicy.CoordinatorIdx).
+		Int("nSubs", nQueued).
 		Str(logger.PolicyID, newPolicy.PolicyID).
 		Msg("New revision of policy received and added to the queue")
 
@@ -425,6 +495,7 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 		// We've not seen this policy before, force load.
 		m.log.Info().
 			Str(logger.PolicyID, policyID).
+			Str(logger.AgentID, s.agentID).
 			Msg("force load on unknown policyId")
 		p = policyT{head: makeHead()}
 		p.head.pushBack(s)
@@ -435,11 +506,17 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 		m.pendingQ.pushBack(s)
 		m.log.Debug().
 			Str(logger.AgentID, s.agentID).
-			Msg("scheduled pending on subscribe")
+			Int64(dl.FieldRevisionIdx, (&p.pp.Policy).RevisionIdx).
+			Msg("deploy pending on subscribe")
 		if empty {
 			m.kickDeploy()
 		}
 	default:
+		m.log.Debug().
+			Str(logger.PolicyID, policyID).
+			Str(logger.AgentID, s.agentID).
+			Int64(dl.FieldRevisionIdx, (&p.pp.Policy).RevisionIdx).
+			Msg("subscription added without new revision")
 		p.head.pushBack(s)
 	}
 
