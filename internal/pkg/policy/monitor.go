@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
