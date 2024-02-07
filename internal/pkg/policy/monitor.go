@@ -225,8 +225,8 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			m.log.Debug().
 				Str(logger.AgentID, s.agentID).
 				Str(logger.PolicyID, s.policyID).
-				Int64("rev", s.revIdx).
-				Int64("coord", s.coordIdx).
+				Int64(logger.RevisionIdx, s.revIdx).
+				Int64(logger.CoordinatorIdx, s.coordIdx).
 				Msg("dispatch")
 		default:
 			// Should never block on a channel; we created a channel of size one.
@@ -308,8 +308,8 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 
 	zlog := m.log.With().
 		Str(logger.PolicyID, newPolicy.PolicyID).
-		Int64("rev", newPolicy.RevisionIdx).
-		Int64("coord", newPolicy.CoordinatorIdx).
+		Int64(logger.RevisionIdx, newPolicy.RevisionIdx).
+		Int64(logger.CoordinatorIdx, newPolicy.CoordinatorIdx).
 		Logger()
 
 	if newPolicy.CoordinatorIdx <= 0 {
@@ -405,8 +405,8 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 	m.log.Debug().
 		Str(logger.AgentID, agentID).
 		Str(logger.PolicyID, policyID).
-		Int64("rev", revisionIdx).
-		Int64("coord", coordinatorIdx).
+		Int64(logger.RevisionIdx, revisionIdx).
+		Int64(logger.CoordinatorIdx, coordinatorIdx).
 		Msg("subscribed to policy monitor")
 
 	s := NewSub(
@@ -460,8 +460,8 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 	m.log.Debug().
 		Str(logger.AgentID, s.agentID).
 		Str(logger.PolicyID, s.policyID).
-		Int64("rev", s.revIdx).
-		Int64("coord", s.coordIdx).
+		Int64(logger.RevisionIdx, s.revIdx).
+		Int64(logger.CoordinatorIdx, s.coordIdx).
 		Msg("unsubscribe")
 
 	return nil
