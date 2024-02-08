@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	defaultSubscriptionTimeout = 5 * time.Second // max amount of time subscription has to read from channel
+	defaultSubscriptionTimeout = 60 * time.Second // max amount of time subscription has to read from channel
 )
 
 var gCounter uint64
@@ -70,8 +70,8 @@ func New(index string, esCli, monCli *elasticsearch.Client, opts ...Option) (Mon
 
 	m := &monitorT{
 		sm:         sm,
-		subTimeout: defaultSubscriptionTimeout,
 		subs:       make(map[uint64]*subT),
+		subTimeout: defaultSubscriptionTimeout,
 	}
 
 	return m, nil
@@ -147,10 +147,15 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 				defer cn()
 				select {
 				case s.c <- hits:
+					zerolog.Ctx(ctx).Info().
+						Str("ctx", "subscription monitor").
+						Any("hits", hits).
+						Msg("received notification")
 				case <-lc.Done():
 					zerolog.Ctx(ctx).Error().
 						Err(lc.Err()).
 						Str("ctx", "subscription monitor").
+						Any("hits", hits).
 						Dur("timeout", m.subTimeout).
 						Msg("dropped notification")
 				}
