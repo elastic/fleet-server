@@ -5,8 +5,7 @@ set -euo pipefail
 WORKSPACE="$(pwd)/bin"
 TMP_FOLDER_TEMPLATE_BASE="tmp.fleet-server"
 REPO="fleet-server"
-platform_type="$(uname)"
-platform_type_lowercase="${platform_type,,}"
+platform_type=$(uname | tr '[:upper:]' '[:lower:]')
 hw_type="$(uname -m)"
 
 check_platform_architeture() {
@@ -43,7 +42,7 @@ with_go() {
     echo "Setting up the Go environment..."
     create_workspace
     check_platform_architeture
-    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform_type_lowercase}-${arch_type}"
+    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform_type}-${arch_type}"
     chmod +x ${WORKSPACE}/gvm
     eval "$(gvm $(cat .go-version))"
     go version
@@ -54,7 +53,7 @@ with_go() {
 with_docker_compose() {
     echo "Setting up the Docker-compose environment..."
     create_workspace
-    retry 5 curl -sSL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${platform_type_lowercase}-${hw_type}"
+    retry 5 curl -sSL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${platform_type}-${hw_type}"
     chmod +x ${WORKSPACE}/docker-compose
     docker-compose version
 }
@@ -88,7 +87,7 @@ with_Terraform() {
     local path_to_file="${WORKSPACE}/terraform.zip"
     create_workspace
     check_platform_architeture
-    retry 5 curl -sSL -o ${path_to_file} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_${platform_type_lowercase}_${arch_type}.zip"
+    retry 5 curl -sSL -o ${path_to_file} "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_${platform_type}_${arch_type}.zip"
     unzip -q ${path_to_file} -d ${WORKSPACE}/
     rm ${path_to_file}
     chmod +x ${WORKSPACE}/terraform
