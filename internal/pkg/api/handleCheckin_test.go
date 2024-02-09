@@ -304,7 +304,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		err: nil,
 	}, {
 		name:    "agent has details checkin details are nil",
-		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: json.RawMessage(`{"action_id":"test"}`)},
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{}},
 		details: nil,
 		bulk: func() *ftesting.MockBulk {
 			mBulk := ftesting.NewMockBulk()
@@ -319,17 +319,6 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradeStatus] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
-		},
-		cache: func() *testcache.MockCache {
-			return testcache.NewMockCache()
-		},
-		err: nil,
-	}, {
-		name:    "agent has null details checkin details are nil",
-		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: json.RawMessage("null"), UpgradedAt: "2024-01-02T12:00:00Z"},
-		details: nil,
-		bulk: func() *ftesting.MockBulk {
-			return ftesting.NewMockBulk()
 		},
 		cache: func() *testcache.MockCache {
 			return testcache.NewMockCache()
