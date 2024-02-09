@@ -381,7 +381,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) error {
 	if details == nil {
 		// nop if there are no checkin details, and the agent has no details
-		if len(agent.UpgradeDetails) == 0 {
+		if agent.UpgradeDetails == nil || string(agent.UpgradeDetails) == "null" {
 			return nil
 		}
 		span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
