@@ -17,7 +17,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/rs/zerolog"
-	"golang.org/x/time/rate"
 )
 
 // Sub is an action subscription that will give a single agent all of it's actions.
@@ -34,23 +33,17 @@ func (s Sub) Ch() chan []model.Action {
 
 // Dispatcher tracks agent subscriptions and emits actions to the subscriptions.
 type Dispatcher struct {
-	am    monitor.SimpleMonitor
-	limit *rate.Limiter
+	am monitor.SimpleMonitor
 
 	mx   sync.RWMutex
 	subs map[string]Sub
 }
 
 // NewDispatcher creates a Dispatcher using the provided monitor.
-func NewDispatcher(am monitor.SimpleMonitor, throttle time.Duration, i int) *Dispatcher {
-	r := rate.Inf
-	if throttle > 0 {
-		r = rate.Every(throttle)
-	}
+func NewDispatcher(am monitor.SimpleMonitor) *Dispatcher {
 	return &Dispatcher{
-		am:    am,
-		limit: rate.NewLimiter(r, i),
-		subs:  make(map[string]Sub),
+		am:   am,
+		subs: make(map[string]Sub),
 	}
 }
 
@@ -129,10 +122,6 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 	}
 
 	for agentID, actions := range agentActions {
-		if err := d.limit.Wait(ctx); err != nil {
-			zerolog.Ctx(ctx).Error().Err(err).Msg("action dispatcher rate limit error")
-			return
-		}
 		d.dispatch(ctx, agentID, actions)
 	}
 }

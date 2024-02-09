@@ -8,10 +8,7 @@ cache_limits:
 server_limits:
   action_limit:
     interval: 0.5ms
-    burst: 100
-  policy_limit:
-    interval: 2ms
-    burst: 1
+    burst: 200
   checkin_limit:
     interval: 0.5ms
     burst: 4000

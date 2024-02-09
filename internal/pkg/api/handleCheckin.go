@@ -34,6 +34,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
+	"golang.org/x/time/rate"
 
 	"go.elastic.co/apm/module/apmhttp/v2"
 	"go.elastic.co/apm/v2"
@@ -76,6 +77,7 @@ type CheckinT struct {
 	// gwPool is a gzip.Writer pool intended to lower the amount of writers created when responding to checkin requests.
 	// gzip.Writer allocations are expensive (~1.2MB each) and can exhaust an instance's memory if a lot of concurrent responses are sent (this occurs when a mass-action such as an upgrade is detected).
 	// effectiveness of the pool is controlled by rate limiter configured through the limit.action_limit attribute.
+	limit  *rate.Limiter
 	gwPool sync.Pool
 	bulker bulk.Bulk
 }
@@ -91,6 +93,13 @@ func NewCheckinT(
 	tr *action.TokenResolver,
 	bulker bulk.Bulk,
 ) *CheckinT {
+	rt := rate.Every(cfg.Limits.ActionLimit.Interval)
+	if cfg.Limits.ActionLimit.Interval == 0 && cfg.Limits.PolicyThrottle != 0 {
+		rt = rate.Every(cfg.Limits.PolicyThrottle)
+	} else if cfg.Limits.ActionLimit.Interval == 0 && cfg.Limits.PolicyThrottle == 0 {
+		rt = rate.Inf
+	}
+	zerolog.Ctx(context.TODO()).Debug().Any("event_rate", rt).Int("burst", cfg.Limits.ActionLimit.Burst).Msg("checkin response gzip limiter")
 	ct := &CheckinT{
 		verCon: verCon,
 		cfg:    cfg,
@@ -100,6 +109,7 @@ func NewCheckinT(
 		gcp:    gcp,
 		ad:     ad,
 		tr:     tr,
+		limit:  rate.NewLimiter(rt, cfg.Limits.ActionLimit.Burst),
 		gwPool: sync.Pool{
 			New: func() any {
 				zipper, err := gzip.NewWriterLevel(io.Discard, cfg.CompressionLevel)
@@ -549,7 +559,17 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	compressionLevel := ct.cfg.CompressionLevel
 	compressThreshold := ct.cfg.CompressionThresh
 
-	if len(payload) > compressThreshold && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
+	if (len(fromPtr(resp.Actions)) > 0 || len(payload) > compressThreshold) && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
+		// We compress the response if it would be over the threshold (default 1kb) or we are sending an action.
+		// gzip.Writer allocations are expensive, and we can easily hit an OOM issue if we try to write a large number of responses at once.
+		// This is likely to happen on bulk upgrades, or policy changes.
+		// In order to avoid a massive memory allocation we do two things:
+		// 1. re-use gzip.Writer instances across responses (through a pool)
+		// 2. rate-limit access to the writer pool
+		if err := ct.limit.Wait(ctx); err != nil {
+			return fmt.Errorf("checkin response limiter error: %w", err)
+		}
+
 		wrCounter := datacounter.NewWriterCounter(w)
 
 		zipper, _ := ct.gwPool.Get().(*gzip.Writer)
