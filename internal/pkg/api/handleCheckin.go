@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -33,6 +34,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
+	"golang.org/x/time/rate"
 
 	"go.elastic.co/apm/module/apmhttp/v2"
 	"go.elastic.co/apm/v2"
@@ -75,6 +77,7 @@ type CheckinT struct {
 	// gwPool is a gzip.Writer pool intended to lower the amount of writers created when responding to checkin requests.
 	// gzip.Writer allocations are expensive (~1.2MB each) and can exhaust an instance's memory if a lot of concurrent responses are sent (this occurs when a mass-action such as an upgrade is detected).
 	// effectiveness of the pool is controlled by rate limiter configured through the limit.action_limit attribute.
+	limit  *rate.Limiter
 	gwPool sync.Pool
 	bulker bulk.Bulk
 }
@@ -90,6 +93,13 @@ func NewCheckinT(
 	tr *action.TokenResolver,
 	bulker bulk.Bulk,
 ) *CheckinT {
+	rt := rate.Every(cfg.Limits.ActionLimit.Interval)
+	if cfg.Limits.ActionLimit.Interval == 0 && cfg.Limits.PolicyThrottle != 0 {
+		rt = rate.Every(cfg.Limits.PolicyThrottle)
+	} else if cfg.Limits.ActionLimit.Interval == 0 && cfg.Limits.PolicyThrottle == 0 {
+		rt = rate.Inf
+	}
+	zerolog.Ctx(context.TODO()).Debug().Any("event_rate", rt).Int("burst", cfg.Limits.ActionLimit.Burst).Msg("checkin response gzip limiter")
 	ct := &CheckinT{
 		verCon: verCon,
 		cfg:    cfg,
@@ -99,6 +109,7 @@ func NewCheckinT(
 		gcp:    gcp,
 		ad:     ad,
 		tr:     tr,
+		limit:  rate.NewLimiter(rt, cfg.Limits.ActionLimit.Burst),
 		gwPool: sync.Pool{
 			New: func() any {
 				zipper, err := gzip.NewWriterLevel(io.Discard, cfg.CompressionLevel)
@@ -277,7 +288,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer func() {
 		err := ct.pm.Unsubscribe(sub)
 		if err != nil {
-			zlog.Error().Err(err).Str("policy_id", agent.PolicyID).Msg("unable to unsubscribe from policy")
+			zlog.Error().Err(err).Str(logger.PolicyID, agent.PolicyID).Msg("unable to unsubscribe from policy")
 		}
 	}()
 
@@ -303,7 +314,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	// Initial update on checkin, and any user fields that might have changed
 	err = ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, rawMeta, rawComponents, seqno, ver)
 	if err != nil {
-		zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
+		zlog.Error().Err(err).Str(logger.AgentID, agent.Id).Msg("checkin failed")
 	}
 
 	// Initial fetch for pending actions
@@ -357,7 +368,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 			case <-tick.C:
 				err := ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, nil, rawComponents, nil, ver)
 				if err != nil {
-					zlog.Error().Err(err).Str("agent_id", agent.Id).Msg("checkin failed")
+					zlog.Error().Err(err).Str(logger.AgentID, agent.Id).Msg("checkin failed")
 				}
 			}
 		}
@@ -531,8 +542,8 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 		zlog.Info().
 			Str("ackToken", fromPtr(resp.AckToken)).
 			Str("createdAt", action.CreatedAt).
-			Str("id", action.Id).
-			Str("type", string(action.Type)).
+			Str(logger.ActionID, action.Id).
+			Str(logger.ActionType, string(action.Type)).
 			Str("inputType", action.InputType).
 			Int64("timeout", fromPtr(action.Timeout)).
 			Msg("Action delivered to agent on checkin")
@@ -548,7 +559,17 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	compressionLevel := ct.cfg.CompressionLevel
 	compressThreshold := ct.cfg.CompressionThresh
 
-	if len(payload) > compressThreshold && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
+	if (len(fromPtr(resp.Actions)) > 0 || len(payload) > compressThreshold) && compressionLevel != flate.NoCompression && acceptsEncoding(r, kEncodingGzip) {
+		// We compress the response if it would be over the threshold (default 1kb) or we are sending an action.
+		// gzip.Writer allocations are expensive, and we can easily hit an OOM issue if we try to write a large number of responses at once.
+		// This is likely to happen on bulk upgrades, or policy changes.
+		// In order to avoid a massive memory allocation we do two things:
+		// 1. re-use gzip.Writer instances across responses (through a pool)
+		// 2. rate-limit access to the writer pool
+		if err := ct.limit.Wait(ctx); err != nil {
+			return fmt.Errorf("checkin response limiter error: %w", err)
+		}
+
 		wrCounter := datacounter.NewWriterCounter(w)
 
 		zipper, _ := ct.gwPool.Get().(*gzip.Writer)
@@ -640,7 +661,7 @@ func filterActions(zlog zerolog.Logger, agentID string, actions []model.Action) 
 	resp := make([]model.Action, 0, len(actions))
 	for _, action := range actions {
 		if valid := validActionTypes[action.Type]; !valid {
-			zlog.Info().Str("agent_id", agentID).Str("action_id", action.ActionID).Str("type", action.Type).Msg("Removing action found in index from check in response")
+			zlog.Info().Str(logger.AgentID, agentID).Str(logger.ActionID, action.ActionID).Str(logger.ActionType, action.Type).Msg("Removing action found in index from check in response")
 			continue
 		}
 		resp = append(resp, action)
@@ -714,7 +735,7 @@ func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action)
 	for _, action := range actions {
 		ad, err := convertActionData(ActionType(action.Type), action.Data)
 		if err != nil {
-			zlog.Error().Err(err).Str("action_id", action.ActionID).Str("type", action.Type).Msg("Failed to convert action.Data")
+			zlog.Error().Err(err).Str(logger.ActionID, action.ActionID).Str(logger.ActionType, action.Type).Msg("Failed to convert action.Data")
 			continue
 		}
 		r := Action{
@@ -765,8 +786,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	defer span.End()
 	zlog = zlog.With().
 		Str("fleet.ctx", "processPolicy").
-		Int64("fleet.policyRevision", pp.Policy.RevisionIdx).
-		Int64("fleet.policyCoordinator", pp.Policy.CoordinatorIdx).
+		Int64(logger.RevisionIdx, pp.Policy.RevisionIdx).
+		Int64(logger.CoordinatorIdx, pp.Policy.CoordinatorIdx).
 		Str(LogPolicyID, pp.Policy.PolicyID).
 		Logger()
 
