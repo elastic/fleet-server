@@ -12,10 +12,8 @@ import (
 
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
-	"golang.org/x/time/rate"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -86,25 +84,12 @@ type monitorT struct {
 
 	policyF       policyFetcher
 	policiesIndex string
-	limit         *rate.Limiter
 
 	startCh chan struct{}
 }
 
 // NewMonitor creates the policy monitor for subscribing agents.
-func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, cfg config.ServerLimits) Monitor {
-	burst := cfg.PolicyLimit.Burst
-	interval := rate.Every(cfg.PolicyLimit.Interval)
-	if cfg.PolicyLimit.Burst <= 0 {
-		burst = 1
-	}
-	if cfg.PolicyLimit.Interval <= 0 {
-		if cfg.PolicyThrottle > 0 { // use the old throttle if it's defined and the limit.Interval is not.
-			interval = rate.Every(cfg.PolicyThrottle)
-		} else {
-			interval = rate.Every(time.Nanosecond) // set minimal spin rate
-		}
-	}
+func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor) Monitor {
 	return &monitorT{
 		bulker:        bulker,
 		monitor:       monitor,
@@ -112,7 +97,6 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, cfg config.ServerLimi
 		deployCh:      make(chan struct{}, 1),
 		policies:      make(map[string]policyT),
 		pendingQ:      makeHead(),
-		limit:         rate.NewLimiter(interval, burst),
 		policyF:       dl.QueryLatestPolicies,
 		policiesIndex: dl.FleetPolicies,
 		startCh:       make(chan struct{}),
@@ -130,8 +114,6 @@ func endTrans(t *apm.Transaction) {
 func (m *monitorT) Run(ctx context.Context) error {
 	m.log = zerolog.Ctx(ctx).With().Str("ctx", "policy agent monitor").Logger()
 	m.log.Info().
-		Int("burst", m.limit.Burst()).
-		Any("event_rate", m.limit.Limit()). // Limit() returns an alias type for float64
 		Msg("run policy monitor")
 
 	s := m.monitor.Subscribe()
@@ -242,14 +224,6 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 	}
 
 	for s != nil {
-		// Use a rate.Limiter to control how fast policies are passed to the checkin handler.
-		// This is done to avoid all responses to agents on the same policy from being written at once.
-		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
-		err := m.limit.Wait(ctx)
-		if err != nil {
-			m.log.Error().Err(err).Msg("Policy limit error")
-			return
-		}
 		// Lookup the latest policy for this subscription
 		policy, ok := m.policies[s.policyID]
 		if !ok {
@@ -269,8 +243,8 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 				Str(logger.PolicyID, s.policyID).
 				Int64("subscription_revision_idx", s.revIdx).
 				Int64("subscription_coordinator_idx", s.coordIdx).
-				Int64(dl.FieldRevisionIdx, policy.pp.Policy.RevisionIdx).
-				Int64(dl.FieldCoordinatorIdx, policy.pp.Policy.CoordinatorIdx).
+				Int64(logger.RevisionIdx, s.revIdx).
+				Int64(logger.CoordinatorIdx, s.coordIdx).
 				Msg("dispatch policy change")
 		default:
 			// Should never block on a channel; we created a channel of size one.
@@ -377,8 +351,8 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 
 	zlog := m.log.With().
 		Str(logger.PolicyID, newPolicy.PolicyID).
-		Int64(dl.FieldRevisionIdx, newPolicy.RevisionIdx).
-		Int64(dl.FieldCoordinatorIdx, newPolicy.CoordinatorIdx).
+		Int64(logger.RevisionIdx, newPolicy.RevisionIdx).
+		Int64(logger.CoordinatorIdx, newPolicy.CoordinatorIdx).
 		Logger()
 
 	if newPolicy.CoordinatorIdx <= 0 {
@@ -475,8 +449,8 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 	m.log.Debug().
 		Str(logger.AgentID, agentID).
 		Str(logger.PolicyID, policyID).
-		Int64(dl.FieldRevisionIdx, revisionIdx).
-		Int64(dl.FieldCoordinatorIdx, coordinatorIdx).
+		Int64(logger.RevisionIdx, revisionIdx).
+		Int64(logger.CoordinatorIdx, coordinatorIdx).
 		Msg("subscribed to policy monitor")
 
 	s := NewSub(
@@ -537,8 +511,8 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 	m.log.Debug().
 		Str(logger.AgentID, s.agentID).
 		Str(logger.PolicyID, s.policyID).
-		Int64(dl.FieldRevisionIdx, s.revIdx).
-		Int64(dl.FieldCoordinatorIdx, s.coordIdx).
+		Int64(logger.RevisionIdx, s.revIdx).
+		Int64(logger.CoordinatorIdx, s.coordIdx).
 		Msg("unsubscribe")
 
 	return nil

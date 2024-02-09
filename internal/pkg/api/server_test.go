@@ -31,6 +31,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func Test_server_Run(t *testing.T) {
@@ -50,7 +51,7 @@ func Test_server_Run(t *testing.T) {
 	require.NoError(t, err)
 	bulker := ftesting.NewMockBulk()
 	pim := mock.NewMockMonitor()
-	pm := policy.NewMonitor(bulker, pim, config.ServerLimits{PolicyLimit: config.Limit{Interval: 5 * time.Millisecond, Burst: 1}})
+	pm := policy.NewMonitor(bulker, pim)
 	bc := checkin.NewBulk(nil)
 	ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
 	et, err := NewEnrollerT(verCon, cfg, nil, c)
@@ -116,6 +117,7 @@ func Test_server_ClientCert(t *testing.T) {
 	t.Run("no client certs", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		ctx = testlog.SetLogger(t).WithContext(ctx)
 
 		port, err := ftesting.FreePort()
 		require.NoError(t, err)
@@ -174,6 +176,7 @@ func Test_server_ClientCert(t *testing.T) {
 	t.Run("valid client certs", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		ctx = testlog.SetLogger(t).WithContext(ctx)
 
 		port, err := ftesting.FreePort()
 		require.NoError(t, err)
@@ -234,6 +237,7 @@ func Test_server_ClientCert(t *testing.T) {
 	t.Run("invalid client certs", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		ctx = testlog.SetLogger(t).WithContext(ctx)
 
 		port, err := ftesting.FreePort()
 		require.NoError(t, err)
@@ -293,6 +297,7 @@ func Test_server_ClientCert(t *testing.T) {
 	t.Run("valid client certs no certs requested", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		ctx = testlog.SetLogger(t).WithContext(ctx)
 
 		port, err := ftesting.FreePort()
 		require.NoError(t, err)
