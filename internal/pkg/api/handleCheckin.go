@@ -380,25 +380,11 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 // otherwise the details are validated; action_id is checked and upgrade_details.metadata is validated based on upgrade_details.state and the agent doc is updated.
 func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) error {
 	if details == nil {
-		// nop if there are no checkin details, and the agent has no details
-		if agent.UpgradeDetails == nil {
-			return nil
-		}
-		span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
-		span.Context.SetLabel("agent_id", agent.Agent.ID)
-		defer span.End()
-		// if the checkin had no details, but agent has details treat like a successful upgrade
-		doc := bulk.UpdateFields{
-			dl.FieldUpgradeDetails:   nil,
-			dl.FieldUpgradeStartedAt: nil,
-			dl.FieldUpgradeStatus:    nil,
-			dl.FieldUpgradedAt:       time.Now().UTC().Format(time.RFC3339),
-		}
-		body, err := doc.Marshal()
+		err := ct.markUpgradeComplete(ctx, agent)
 		if err != nil {
 			return err
 		}
-		return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+		return nil
 	}
 	// update docs with in progress details
 
@@ -488,6 +474,28 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails: details,
+	}
+	body, err := doc.Marshal()
+	if err != nil {
+		return err
+	}
+	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+}
+
+func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent) error {
+	// nop if there are no checkin details, and the agent has no details
+	if agent.UpgradeDetails == nil {
+		return nil
+	}
+	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
+	span.Context.SetLabel("agent_id", agent.Agent.ID)
+	defer span.End()
+	// if the checkin had no details, but agent has details treat like a successful upgrade
+	doc := bulk.UpdateFields{
+		dl.FieldUpgradeDetails:   nil,
+		dl.FieldUpgradeStartedAt: nil,
+		dl.FieldUpgradeStatus:    nil,
+		dl.FieldUpgradedAt:       time.Now().UTC().Format(time.RFC3339),
 	}
 	body, err := doc.Marshal()
 	if err != nil {
