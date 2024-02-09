@@ -48,15 +48,6 @@ fleet:
     # The id is provided by elastic-agent if fleet-server is supervised by an agent
     # It must be explicitly provided if fleet-server runs in stand-alone mode
     id: fleet-server-agent-idv
-<<<<<<< HEAD
-#    # version is the version of the elastic-agent instance
-#    version:
-#    # agent logging level may also be specified in top level logging config
-#    logging.level: info
-#  host:
-#    id:
-#    name:
-=======
 #   # version is the version of the elastic-agent instance
 #   version:
 #   # specify logging level
@@ -65,7 +56,6 @@ fleet:
 # host:
 #   id:
 #   name:
->>>>>>> f58c107 (Fix fleet-server.reference.yml indentation (#3260))
 
 ##############################
 # Input configuration
@@ -259,24 +249,11 @@ fleet:
 #         - token_key: "value"
 #           policy_id: "value"
 #
-<<<<<<< HEAD
-#         # configuration for pgp key endpoint
-#         pgp:
-#           upstream_url: "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
-#           # By default dir is the directory containing the fleet-server executable (following symlinks) joined with elastic-agent-upgrade-keys
-#           dir: ./elastic-agent-upgrade-keys
-=======
 #     # configuration for pgp key endpoint
 #     pgp:
 #       upstream_url: "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
 #       # By default dir is the directory containing the fleet-server executable (following symlinks) joined with elastic-agent-upgrade-keys
 #       dir: ./elastic-agent-upgrade-keys
-#    # monitor options are advanced configuration and should not be adjusted is most cases
-#    monitor:
-#      fetch_size: 1000 # The number of documents that each monitor may fetch at once
-#      poll_timeout: 4m # The poll timeout for each monitor's wait_for_advancement request
-#      policy_debounce_time: 1s # The debounce duration for the policy index monitor on successfull document retrievals.
->>>>>>> f58c107 (Fix fleet-server.reference.yml indentation (#3260))
 
 ##############################
 # Logging configuration
