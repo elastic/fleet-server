@@ -17,12 +17,11 @@ type Limit struct {
 
 type ServerLimits struct {
 	MaxAgents         int           `config:"max_agents"`
-	PolicyThrottle    time.Duration `config:"policy_throttle"` // deprecated: replaced by policy_limit
+	PolicyThrottle    time.Duration `config:"policy_throttle"` // deprecated: replaced by action_limit
 	MaxHeaderByteSize int           `config:"max_header_byte_size"`
 	MaxConnections    int           `config:"max_connections"`
 
 	ActionLimit      Limit `config:"action_limit"`
-	PolicyLimit      Limit `config:"policy_limit"`
 	CheckinLimit     Limit `config:"checkin_limit"`
 	ArtifactLimit    Limit `config:"artifact_limit"`
 	EnrollLimit      Limit `config:"enroll_limit"`
@@ -52,7 +51,6 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	}
 
 	c.ActionLimit = mergeEnvLimit(c.ActionLimit, l.ActionLimit)
-	c.PolicyLimit = mergeEnvLimit(c.PolicyLimit, l.PolicyLimit)
 	c.CheckinLimit = mergeEnvLimit(c.CheckinLimit, l.CheckinLimit)
 	c.ArtifactLimit = mergeEnvLimit(c.ArtifactLimit, l.ArtifactLimit)
 	c.EnrollLimit = mergeEnvLimit(c.EnrollLimit, l.EnrollLimit)
