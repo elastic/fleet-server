@@ -304,7 +304,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		err: nil,
 	}, {
 		name:    "agent has details checkin details are nil",
-		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: json.RawMessage(`{"action_id":"test"}`)},
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{}},
 		details: nil,
 		bulk: func() *ftesting.MockBulk {
 			mBulk := ftesting.NewMockBulk()
