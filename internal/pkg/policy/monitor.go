@@ -302,7 +302,7 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 		return nil
 	}
 
-	m.log.Debug().Int64(dl.FieldRevisionIdx, policies[0].RevisionIdx).
+	m.log.Debug().Int64(logger.RevisionIdx, policies[0].RevisionIdx).
 		Int64(dl.FieldCoordinatorIdx, policies[0].CoordinatorIdx).
 		Str(logger.PolicyID, policies[0].PolicyID).Msg("process policies")
 
@@ -480,7 +480,7 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 		m.pendingQ.pushBack(s)
 		m.log.Debug().
 			Str(logger.AgentID, s.agentID).
-			Int64(dl.FieldRevisionIdx, (&p.pp.Policy).RevisionIdx).
+			Int64(logger.RevisionIdx, (&p.pp.Policy).RevisionIdx).
 			Msg("deploy pending on subscribe")
 		if empty {
 			m.kickDeploy()
@@ -489,7 +489,7 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64,
 		m.log.Debug().
 			Str(logger.PolicyID, policyID).
 			Str(logger.AgentID, s.agentID).
-			Int64(dl.FieldRevisionIdx, (&p.pp.Policy).RevisionIdx).
+			Int64(logger.RevisionIdx, (&p.pp.Policy).RevisionIdx).
 			Msg("subscription added without new revision")
 		p.head.pushBack(s)
 	}
