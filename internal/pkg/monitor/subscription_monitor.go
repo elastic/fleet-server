@@ -36,10 +36,30 @@ type Monitor interface {
 	BaseMonitor
 
 	// Subscribe to get notified of documents
-	Subscribe() Subscription
+	Subscribe(opts ...SubOption) Subscription
 
 	// Unsubscribe from getting notifications on documents
 	Unsubscribe(sub Subscription)
+}
+
+type subOpt struct {
+	chLen int
+}
+
+type SubOption func(s *subOpt)
+
+// ChSize sets the channel size of the subscription to the passed value.
+// A min val of 1 is enforced.
+func ChSize(i int) SubOption {
+	return func(s *subOpt) {
+		n := 1
+		if i > n {
+			n = i
+		}
+		if n > s.chLen {
+			s.chLen = n
+		}
+	}
 }
 
 // subT is a subscription to get notified for new documents.
@@ -83,12 +103,18 @@ func (m *monitorT) GetCheckpoint() sqn.SeqNo {
 }
 
 // Subscribe returns a Subscription that is used to get notified of documents.
-func (m *monitorT) Subscribe() Subscription {
+func (m *monitorT) Subscribe(opts ...SubOption) Subscription {
+	so := &subOpt{
+		chLen: 1,
+	}
+	for _, opt := range opts {
+		opt(so)
+	}
 	idx := atomic.AddUint64(&gCounter, 1)
 
 	s := &subT{
 		idx: idx,
-		c:   make(chan []es.HitT, 1),
+		c:   make(chan []es.HitT, so.chLen),
 	}
 
 	m.mut.Lock()

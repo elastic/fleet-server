@@ -41,7 +41,7 @@ func NewMockMonitor() *MockMonitor {
 	return &MockMonitor{}
 }
 
-func (m *MockMonitor) Subscribe() monitor.Subscription {
+func (m *MockMonitor) Subscribe(opts ...monitor.SubOption) monitor.Subscription {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return nil

@@ -116,7 +116,7 @@ func (m *monitorT) Run(ctx context.Context) error {
 	m.log.Info().
 		Msg("run policy monitor")
 
-	s := m.monitor.Subscribe()
+	s := m.monitor.Subscribe(monitor.ChSize(10)) // TODO configurable channel size
 	defer m.monitor.Unsubscribe(s)
 
 	close(m.startCh)
@@ -151,6 +151,11 @@ LOOP:
 			m.dispatchPending(iCtx)
 			endTrans(trans)
 		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
+			// Handle buffered channel
+			for len(s.Output()) != 0 {
+				hit := <-s.Output()
+				hits = append(hits, hit...)
+			}
 			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("output policies", "policy_monitor")
