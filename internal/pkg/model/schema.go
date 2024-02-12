@@ -196,7 +196,7 @@ type Agent struct {
 	UpdatedAt string `json:"updated_at,omitempty"`
 
 	// Additional upgrade status details.
-	UpgradeDetails json.RawMessage `json:"upgrade_details,omitempty"`
+	UpgradeDetails *UpgradeDetails `json:"upgrade_details,omitempty"`
 
 	// Date/time the Elastic Agent started the current upgrade
 	UpgradeStartedAt string `json:"upgrade_started_at,omitempty"`
@@ -496,4 +496,8 @@ type ToRetireAPIKeyIdsItems struct {
 
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`
+}
+
+// UpgradeDetails Additional upgrade status details.
+type UpgradeDetails struct {
 }

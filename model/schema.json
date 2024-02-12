@@ -628,7 +628,7 @@
         },
         "upgrade_details": {
             "description": "Additional upgrade status details.",
-            "format": "raw"
+            "type": "object"
         }
       },
       "required": [
