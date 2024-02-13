@@ -9,7 +9,10 @@ server_limits:
   max_connections: 22000
   action_limit:
     interval: 1ms
-    burst: 100
+    burst: 10
+  policy_interval:
+    interval: 5ms
+    burst: 1
   checkin_limit:
     interval: 1ms
     burst: 2000

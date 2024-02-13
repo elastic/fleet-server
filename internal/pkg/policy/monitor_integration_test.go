@@ -16,6 +16,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
@@ -56,7 +57,7 @@ func TestMonitor_Integration(t *testing.T) {
 		}
 	}()
 
-	m := NewMonitor(bulker, im)
+	m := NewMonitor(bulker, im, config.ServerLimits{})
 	pm, ok := m.(*monitorT)
 	if !ok {
 		t.Fatalf("unable to cast monitor m (type %T) as *monitorT", m)
@@ -153,7 +154,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 		}
 	}()
 
-	m := NewMonitor(bulker, im)
+	m := NewMonitor(bulker, im, config.ServerLimits{})
 	pm, ok := m.(*monitorT)
 	if !ok {
 		t.Fatalf("unable to cast monitor m (type %T) as *monitorT", m)
@@ -345,7 +346,7 @@ func TestMonitor_Revisions(t *testing.T) {
 		}
 	}()
 
-	m := NewMonitor(bulker, im)
+	m := NewMonitor(bulker, im, config.ServerLimits{})
 	pm, ok := m.(*monitorT)
 	if !ok {
 		t.Fatalf("unable to cast monitor m (type %T) as *monitorT", m)
@@ -469,7 +470,7 @@ func TestMonitor_KickDeploy(t *testing.T) {
 		}
 	}()
 
-	m := NewMonitor(bulker, im)
+	m := NewMonitor(bulker, im, config.ServerLimits{})
 	pm, ok := m.(*monitorT)
 	if !ok {
 		t.Fatalf("unable to cast monitor m (type %T) as *monitorT", m)
