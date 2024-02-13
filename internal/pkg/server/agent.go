@@ -20,6 +20,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/go-ucfg"
 	"gopkg.in/yaml.v3"
 )
@@ -285,7 +286,7 @@ func (a *Agent) start(ctx context.Context) error {
 		return a.reconfigure(ctx)
 	}
 
-	cfg, err := a.configFromUnits()
+	cfg, err := a.configFromUnits(ctx)
 	if err != nil {
 		return err
 	}
@@ -331,7 +332,7 @@ func (a *Agent) reconfigure(ctx context.Context) error {
 		return a.start(ctx)
 	}
 
-	cfg, err := a.configFromUnits()
+	cfg, err := a.configFromUnits(ctx)
 	if err != nil {
 		return err
 	}
@@ -373,7 +374,7 @@ func (a *Agent) stop() {
 
 // configFromUnits takes both inputUnit and outputUnit and creates a single configuration just like fleet server was
 // being started from a configuration file.
-func (a *Agent) configFromUnits() (*config.Config, error) {
+func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 	agentID := ""
 	agentVersion := ""
 	agentInfo := a.agent.AgentInfo()
@@ -420,10 +421,54 @@ func (a *Agent) configFromUnits() (*config.Config, error) {
 		return nil, err
 	}
 
+	if expAPMCFG := expInput.APMConfig; expAPMCFG != nil {
+		instrumentationCfg, err := apmConfigToInstrumentation(expAPMCFG)
+		if err != nil {
+			zerolog.Ctx(ctx).Warn().Err(err).Msg("Unable to parse expected APM config as instrumentation config")
+		} else {
+			obj := map[string]interface{}{
+				"inputs": []interface{}{map[string]interface{}{
+					"server": map[string]interface{}{
+						"instrumentation": instrumentationCfg,
+					},
+				},
+				}}
+			err = cfgData.Merge(obj, config.DefaultOptions...)
+			if err != nil {
+				zerolog.Ctx(ctx).Warn().Err(err).Msg("Failed to merge APM config into cfgData")
+			}
+		}
+
+	}
+
 	cliCfg := ucfg.MustNewFrom(a.cliCfg, config.DefaultOptions...)
 	err = cliCfg.Merge(cfgData, config.DefaultOptions...)
 	if err != nil {
 		return nil, err
 	}
 	return config.FromConfig(cliCfg)
+}
+
+// apmConfigToInstrumentation transforms the passed APMConfig into the Instrumentation config that is used by fleet-server.
+func apmConfigToInstrumentation(src *proto.APMConfig) (config.Instrumentation, error) {
+	if apmest := src.GetElastic(); apmest != nil {
+		apmTLS := apmest.GetTls()
+		iTLS := config.InstrumentationTLS{
+			SkipVerify:        apmTLS.GetSkipVerify(),
+			ServerCertificate: apmTLS.GetServerCert(),
+			ServerCA:          apmTLS.GetServerCa(),
+		}
+
+		cfg := config.Instrumentation{
+			Enabled:      true,
+			TLS:          iTLS,
+			Environment:  apmest.GetEnvironment(),
+			APIKey:       apmest.GetApiKey(),
+			SecretToken:  apmest.GetSecretToken(),
+			Hosts:        apmest.GetHosts(),
+			GlobalLabels: apmest.GetGlobalLabels(),
+		}
+		return cfg, nil
+	}
+	return config.Instrumentation{}, fmt.Errorf("unable to transform APMConfig to instrumentatiopn")
 }
