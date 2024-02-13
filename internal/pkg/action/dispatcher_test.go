@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"golang.org/x/time/rate"
 )
 
 type mockMonitor struct {
@@ -38,7 +39,7 @@ func (m *mockMonitor) GetCheckpoint() sqn.SeqNo {
 
 func TestNewDispatcher(t *testing.T) {
 	m := &mockMonitor{}
-	d := NewDispatcher(m)
+	d := NewDispatcher(m, 0, 0)
 
 	assert.NotNil(t, d.am)
 	assert.NotNil(t, d.subs)
@@ -95,6 +96,41 @@ func Test_Dispatcher_Run(t *testing.T) {
 		},
 	}, {
 		name: "three agent action",
+		getMock: func() *mockMonitor {
+			m := &mockMonitor{}
+			ch := make(chan []es.HitT)
+			go func() {
+				ch <- []es.HitT{es.HitT{
+					Source: json.RawMessage(`{"action_id":"test-action","agents":["agent1","agent2","agent3"],"data":{"key":"value"},"type":"upgrade"}`),
+				}}
+			}()
+			var rch <-chan []es.HitT = ch
+			m.On("Output").Return(rch)
+			return m
+		},
+		expect: map[string][]model.Action{
+			"agent1": []model.Action{model.Action{
+				ActionID: "test-action",
+				Agents:   nil,
+				Data:     json.RawMessage(`{"key":"value"}`),
+				Type:     "upgrade",
+			}},
+			"agent2": []model.Action{model.Action{
+				ActionID: "test-action",
+				Agents:   nil,
+				Data:     json.RawMessage(`{"key":"value"}`),
+				Type:     "upgrade",
+			}},
+			"agent3": []model.Action{model.Action{
+				ActionID: "test-action",
+				Agents:   nil,
+				Data:     json.RawMessage(`{"key":"value"}`),
+				Type:     "upgrade",
+			}},
+		},
+	}, {
+		name:     "three agent action with limiter",
+		throttle: 1 * time.Second,
 		getMock: func() *mockMonitor {
 			m := &mockMonitor{}
 			ch := make(chan []es.HitT)
@@ -199,8 +235,13 @@ func Test_Dispatcher_Run(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := tt.getMock()
+			throttle := rate.Inf
+			if tt.throttle > 0 {
+				throttle = rate.Every(tt.throttle)
+			}
 			d := &Dispatcher{
-				am: m,
+				am:    m,
+				limit: rate.NewLimiter(throttle, 1),
 				subs: map[string]Sub{
 					"agent1": Sub{
 						agentID: "agent1",

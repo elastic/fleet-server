@@ -145,14 +145,14 @@ fleet:
 #       # If specified a set of other limits is automatically loaded.
 #       max_agents: 0
 #       # policy_throttle is the duration that the fleet-server will wait in between attempts to dispatch policy updates to polling agents
-#       # deprecated: replaced by action_limit settings
-#       policy_throttle: 5ms
+#       # deprecated: replaced by policy_limit settings
+#       policy_throttle: 5ms # 1ms min is forced
 #       # max_header_byte_size is the request header size limit
 #       max_header_byte_size: 8192 # 8Kib
 #       # max_connections is the maximum number of connnections per API endpoint
 #       max_connections: 0
 #
-#       # action_limit is a limiter for checkin responses that contain actions
+#       # action_limit is a limiter for the action dispatcher, it is added to control how fast the checkin endpoint writes responses when an action effecting multiple agents is detected.
 #       # This is done in order to be able to reuse gzip writers if gzip is requested as allocating new writers is expensive (around 1.2MB for a new allocation).
 #       # If the interval is too high it may negativly effect assumtions around server write timeouts and poll poll durations, if used we expect the value to be around 5ms.
 #       # An interval value of 0 disables the limiter by using an infinite rate limit (default behavior).
@@ -160,6 +160,16 @@ fleet:
 #       action_limit:
 #         interval: 0
 #         burst: 5
+#
+#       # policy_limit is a limiter used to control how fast fleet-server sends POLICY_CHANGE actions to agents.
+#       # As with the action_limit settings this is done to avoid allocating a lot of gzip writers.
+#       # The default settings are to have the interval of 5ms with a burst of 1.
+#       # A min burst value of 1 is always enforced.
+#       # If no interval is specified, the policy_throttle may be used as the interval instead.
+#       # if both interval and policy_throttle are 0, a value of 1ns is used instead.
+#       policy_limit:
+#         interval: 5ms
+#         burst: 1
 #
 #       # endpoint specific limits below
 #       checkin_limit:

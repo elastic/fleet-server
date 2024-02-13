@@ -10,6 +10,9 @@ server_limits:
   action_limit:
     interval: 5ms
     burst: 5
+  policy_limit:
+    interval: 5ms
+    burst: 1
   checkin_limit:
     interval: 2ms
     burst: 1000
