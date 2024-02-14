@@ -144,4 +144,8 @@ func (m *MockBulk) StartTransaction(name, transactionType string) *apm.Transacti
 	return nil
 }
 
+func (m *MockBulk) StartTransactionOptions(name, transactionType string, opts apm.TransactionOptions) *apm.Transaction {
+	return nil
+}
+
 var _ bulk.Bulk = (*MockBulk)(nil)

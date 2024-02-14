@@ -50,14 +50,14 @@ fleet:
     # The id is provided by elastic-agent if fleet-server is supervised by an agent
     # It must be explicitly provided if fleet-server runs in stand-alone mode
     id: fleet-server-agent-idv
-#    # version is the version of the elastic-agent instance
-#    version:
-#    # specify logging level
-#    # deprecated: Use the top level logging.* attributes instead.
-#    logging.level: info
-#  host:
-#    id:
-#    name:
+#   # version is the version of the elastic-agent instance
+#   version:
+#   # specify logging level
+#   # deprecated: Use the top level logging.* attributes instead.
+#   logging.level: info
+# host:
+#   id:
+#   name:
 
 ##############################
 # Input configuration
@@ -66,7 +66,7 @@ fleet:
 # Provided through the integration settings when running under elastic-agent.
 ##############################
 
-#inputs:
+# inputs:
 #  - type: fleet-server
 #    # The policy ID is used by a fleet-server running under elastic-agent
 #    policy.id: '${FLEET_SERVER_POLICY_ID:fleet-server-policy}'
@@ -223,52 +223,57 @@ fleet:
 #         max: 50
 #         max_body_byte_size: 0
 #
-#         # go runtime limits
-#         runtime:
-#           gc_percent: 0
-#           memory_limit: math.MaxInt64
+#     # go runtime limits
+#     runtime:
+#       gc_percent: 0
+#       memory_limit: math.MaxInt64
 #
-#         # elasticsearch bulk client config
-#         bulk:
-#           flush_interval: 250ms
-#           flush_threshold_cnt: 2048
-#           flush_threshold_size: 1048567 # 1MiB
-#           flush_max_pending: 8
+#     # elasticsearch bulk client config
+#     bulk:
+#       flush_interval: 250ms
+#       flush_threshold_cnt: 2048
+#       flush_threshold_size: 1048567 # 1MiB
+#       flush_max_pending: 8
 #
-#         # gc controls fleet-server index garbage collection operations
-#         # currently manages actions cleanup
-#         gc:
-#           schedule_interval: 1h
-#           cleanup_after_expired_interval: 30d
+#     # gc controls fleet-server index garbage collection operations
+#     # currently manages actions cleanup
+#     gc:
+#       schedule_interval: 1h
+#       cleanup_after_expired_interval: 30d
 #
-#         # instrumentation controls APM tracing
-#         instrumentation:
-#           enabled: false
-#           tls:
-#             skip_verify: false
-#             server_certificate: ""
-#             server_ca: ""
-#           environment: ""
-#           api_key: ""
-#           api_key_path: ""
-#           secret_token: ""
-#           secret_token_path: ""
-#           hosts: []
-#           global_labels: ""
-#           transaction_sample_rate: ""
+#     # instrumentation controls APM tracing
+#     instrumentation:
+#       enabled: false
+#       tls:
+#         skip_verify: false
+#         server_certificate: ""
+#         server_ca: ""
+#       environment: ""
+#       api_key: ""
+#       api_key_path: ""
+#       secret_token: ""
+#       secret_token_path: ""
+#       hosts: []
+#       global_labels: ""
+#       transaction_sample_rate: ""
 #
-#         # Add static token values to fleet-server
-#         static_policy_tokens:
-#           enabled: false
-#           policy_tokens:
-#             - token_key: "value"
-#               policy_id: "value"
+#     # Add static token values to fleet-server
+#     static_policy_tokens:
+#       enabled: false
+#       policy_tokens:
+#         - token_key: "value"
+#           policy_id: "value"
 #
-#         # configuration for pgp key endpoint
-#         pgp:
-#           upstream_url: "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
-#           # By default dir is the directory containing the fleet-server executable (following symlinks) joined with elastic-agent-upgrade-keys
-#           dir: ./elastic-agent-upgrade-keys
+#     # configuration for pgp key endpoint
+#     pgp:
+#       upstream_url: "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
+#       # By default dir is the directory containing the fleet-server executable (following symlinks) joined with elastic-agent-upgrade-keys
+#       dir: ./elastic-agent-upgrade-keys
+#    # monitor options are advanced configuration and should not be adjusted is most cases
+#    monitor:
+#      fetch_size: 1000 # The number of documents that each monitor may fetch at once
+#      poll_timeout: 4m # The poll timeout for each monitor's wait_for_advancement request
+#      policy_debounce_time: 1s # The debounce duration for the policy index monitor on successfull document retrievals.
 
 ##############################
 # Logging configuration

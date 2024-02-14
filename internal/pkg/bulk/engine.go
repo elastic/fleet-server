@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -51,6 +52,7 @@ type Bulk interface {
 	Search(ctx context.Context, index string, body []byte, opts ...Opt) (*es.ResultT, error)
 	HasTracer() bool
 	StartTransaction(name, transactionType string) *apm.Transaction
+	StartTransactionOptions(name, transactionType string, opts apm.TransactionOptions) *apm.Transaction
 
 	// Multi Operation API's run in the bulk engine
 	MCreate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
@@ -173,7 +175,7 @@ func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, ou
 	errCh := make(chan error)
 	go func() {
 		runFunc := func() (err error) {
-			zlog.Debug().Str("outputName", outputName).Msg("Bulker started")
+			zlog.Debug().Str(logger.PolicyOutputName, outputName).Msg("Bulker started")
 			return newBulker.Run(bulkCtx)
 		}
 
@@ -182,9 +184,9 @@ func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, ou
 	go func() {
 		select {
 		case err = <-errCh:
-			zlog.Error().Err(err).Str("outputName", outputName).Msg("Bulker error")
+			zlog.Error().Err(err).Str(logger.PolicyOutputName, outputName).Msg("Bulker error")
 		case <-bulkCtx.Done():
-			zlog.Debug().Str("outputName", outputName).Msg("Bulk context done")
+			zlog.Debug().Str(logger.PolicyOutputName, outputName).Msg("Bulk context done")
 			err = bulkCtx.Err()
 		}
 	}()
