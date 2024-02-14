@@ -470,5 +470,5 @@ func apmConfigToInstrumentation(src *proto.APMConfig) (config.Instrumentation, e
 		}
 		return cfg, nil
 	}
-	return config.Instrumentation{}, fmt.Errorf("unable to transform APMConfig to instrumentatiopn")
+	return config.Instrumentation{}, fmt.Errorf("unable to transform APMConfig to instrumentation")
 }
