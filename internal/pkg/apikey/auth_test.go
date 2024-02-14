@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package apikey
 
 import (
@@ -10,8 +14,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	rawToken = " foo:bar"
+)
+
 func TestAuth429(t *testing.T) {
-	rawToken := " foo:bar"
 	token := base64.StdEncoding.EncodeToString([]byte(rawToken))
 	apiKey, err := NewAPIKeyFromToken(token)
 	assert.NoError(t, err)
@@ -26,7 +33,6 @@ func TestAuth429(t *testing.T) {
 }
 
 func TestAuth401(t *testing.T) {
-	rawToken := " foo:bar"
 	token := base64.StdEncoding.EncodeToString([]byte(rawToken))
 	apiKey, err := NewAPIKeyFromToken(token)
 	assert.NoError(t, err)
