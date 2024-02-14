@@ -15,7 +15,8 @@ import (
 )
 
 var (
-	ErrUnauthorized = errors.New("unauthorized")
+	ErrUnauthorized           = errors.New("unauthorized")
+	ErrElasticsearchAuthLimit = errors.New("elasticsearch auth limit")
 )
 
 // SecurityInfo contains all related information about an APIKey that Elasticsearch tracks.
@@ -51,7 +52,11 @@ func (k APIKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	}
 
 	if res.IsError() {
-		return nil, fmt.Errorf("%w: %w", ErrUnauthorized, fmt.Errorf("apikey auth response %s: %s", k.ID, res.String()))
+		returnError := ErrUnauthorized
+		if res.StatusCode == 429 {
+			returnError = ErrElasticsearchAuthLimit
+		}
+		return nil, fmt.Errorf("%w: %w", returnError, fmt.Errorf("apikey auth response %s: %s", k.ID, res.String()))
 	}
 
 	var info SecurityInfo
