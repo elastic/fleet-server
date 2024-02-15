@@ -84,7 +84,7 @@ func TestCLIOverrides(t *testing.T) {
 		agent:      clientMock,
 	}
 
-	generatedCfg, err := agent.configFromUnits()
+	generatedCfg, err := agent.configFromUnits(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, httpEnabledExpected, generatedCfg.HTTP.Enabled)
 	require.Equal(t, httpHostExpected, generatedCfg.HTTP.Host)
@@ -190,7 +190,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			outputUnit: mockOutClient,
 		}
 
-		cfg, err := a.configFromUnits()
+		cfg, err := a.configFromUnits(context.Background())
 		require.NoError(t, err)
 		require.Len(t, cfg.Inputs, 1)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
@@ -230,9 +230,310 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			outputUnit: mockOutClient,
 		}
 
-		cfg, err := a.configFromUnits()
+		cfg, err := a.configFromUnits(context.Background())
 		require.NoError(t, err)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
 		require.Len(t, cfg.Output.Elasticsearch.Hosts, 2)
+	})
+	t.Run("APM config is specified", func(t *testing.T) {
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"service_token": "test-token",
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+
+		inStruct, err := structpb.NewStruct(map[string]interface{}{
+			"type": "fleet-server",
+			"server": map[string]interface{}{
+				"host": "0.0.0.0",
+			},
+		})
+		require.NoError(t, err)
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+				APMConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Tls: &proto.ElasticAPMTLS{
+							SkipVerify: false,
+							ServerCa:   "/path/to/ca.crt",
+						},
+						Environment:  "test",
+						ApiKey:       "apiKey",
+						SecretToken:  "secretToken",
+						Hosts:        []string{"testhost:8080"},
+						GlobalLabels: "test",
+					},
+				},
+			})
+
+		a := &Agent{
+			cliCfg:     ucfg.New(),
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+		}
+
+		cfg, err := a.configFromUnits(context.Background())
+		require.NoError(t, err)
+		require.Len(t, cfg.Inputs, 1)
+		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
+		assert.Equal(t, "0.0.0.0", cfg.Inputs[0].Server.Host)
+		assert.True(t, cfg.Inputs[0].Server.Instrumentation.Enabled)
+		assert.False(t, cfg.Inputs[0].Server.Instrumentation.TLS.SkipVerify)
+		assert.Equal(t, "/path/to/ca.crt", cfg.Inputs[0].Server.Instrumentation.TLS.ServerCA)
+		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.Environment)
+		assert.Equal(t, "apiKey", cfg.Inputs[0].Server.Instrumentation.APIKey)
+		assert.Equal(t, "secretToken", cfg.Inputs[0].Server.Instrumentation.SecretToken)
+		assert.Equal(t, []string{"testhost:8080"}, cfg.Inputs[0].Server.Instrumentation.Hosts)
+		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+	})
+	t.Run("APM config no tls", func(t *testing.T) {
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"service_token": "test-token",
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+
+		inStruct, err := structpb.NewStruct(map[string]interface{}{
+			"type": "fleet-server",
+			"server": map[string]interface{}{
+				"host": "0.0.0.0",
+			},
+		})
+		require.NoError(t, err)
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+				APMConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment:  "test",
+						ApiKey:       "apiKey",
+						SecretToken:  "secretToken",
+						Hosts:        []string{"testhost:8080"},
+						GlobalLabels: "test",
+					},
+				},
+			})
+
+		a := &Agent{
+			cliCfg:     ucfg.New(),
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+		}
+
+		cfg, err := a.configFromUnits(context.Background())
+		require.NoError(t, err)
+		require.Len(t, cfg.Inputs, 1)
+		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
+		assert.Equal(t, "0.0.0.0", cfg.Inputs[0].Server.Host)
+		assert.True(t, cfg.Inputs[0].Server.Instrumentation.Enabled)
+		assert.False(t, cfg.Inputs[0].Server.Instrumentation.TLS.SkipVerify)
+		assert.Empty(t, cfg.Inputs[0].Server.Instrumentation.TLS.ServerCA)
+		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.Environment)
+		assert.Equal(t, "apiKey", cfg.Inputs[0].Server.Instrumentation.APIKey)
+		assert.Equal(t, "secretToken", cfg.Inputs[0].Server.Instrumentation.SecretToken)
+		assert.Equal(t, []string{"testhost:8080"}, cfg.Inputs[0].Server.Instrumentation.Hosts)
+		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+	})
+	t.Run("APM config and instrumentation is specified", func(t *testing.T) {
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"service_token": "test-token",
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+
+		inStruct, err := structpb.NewStruct(map[string]interface{}{
+			"type": "fleet-server",
+			"server": map[string]interface{}{
+				"host": "0.0.0.0",
+				"instrumentation": map[string]interface{}{
+					"enabled": false,
+					"tls": map[string]interface{}{
+						"skip_verify":        true,
+						"server_certificate": "/path/to/cert.crt",
+					},
+					"environment":  "replace",
+					"api_key":      "replace",
+					"secret_token": "replace",
+					"hosts":        []interface{}{"replace"},
+				},
+			},
+		})
+		require.NoError(t, err)
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+				APMConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Tls: &proto.ElasticAPMTLS{
+							SkipVerify: false,
+							ServerCa:   "/path/to/ca.crt",
+						},
+						Environment:  "test",
+						ApiKey:       "apiKey",
+						SecretToken:  "secretToken",
+						Hosts:        []string{"testhost:8080"},
+						GlobalLabels: "test",
+					},
+				},
+			})
+
+		a := &Agent{
+			cliCfg:     ucfg.New(),
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+		}
+
+		cfg, err := a.configFromUnits(context.Background())
+		require.NoError(t, err)
+		require.Len(t, cfg.Inputs, 1)
+		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
+		assert.Equal(t, "0.0.0.0", cfg.Inputs[0].Server.Host)
+		assert.True(t, cfg.Inputs[0].Server.Instrumentation.Enabled)
+		assert.False(t, cfg.Inputs[0].Server.Instrumentation.TLS.SkipVerify)
+		assert.Equal(t, "/path/to/ca.crt", cfg.Inputs[0].Server.Instrumentation.TLS.ServerCA)
+		assert.Empty(t, cfg.Inputs[0].Server.Instrumentation.TLS.ServerCertificate, "expected use only config from APMConfig")
+		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.Environment)
+		assert.Equal(t, "apiKey", cfg.Inputs[0].Server.Instrumentation.APIKey)
+		assert.Equal(t, "secretToken", cfg.Inputs[0].Server.Instrumentation.SecretToken)
+		assert.Equal(t, []string{"testhost:8080"}, cfg.Inputs[0].Server.Instrumentation.Hosts)
+		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+	})
+	t.Run("APM config error", func(t *testing.T) {
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"service_token": "test-token",
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+
+		inStruct, err := structpb.NewStruct(map[string]interface{}{
+			"type": "fleet-server",
+			"server": map[string]interface{}{
+				"host": "0.0.0.0",
+			},
+		})
+		require.NoError(t, err)
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:     client.UnitStateHealthy,
+				LogLevel:  client.UnitLogLevelInfo,
+				Config:    &proto.UnitExpectedConfig{Source: inStruct},
+				APMConfig: &proto.APMConfig{},
+			})
+
+		a := &Agent{
+			cliCfg:     ucfg.New(),
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+		}
+
+		cfg, err := a.configFromUnits(context.Background())
+		require.NoError(t, err)
+		require.Len(t, cfg.Inputs, 1)
+		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
+		assert.Equal(t, "0.0.0.0", cfg.Inputs[0].Server.Host)
+		assert.False(t, cfg.Inputs[0].Server.Instrumentation.Enabled)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+	})
+	t.Run("no APMConfig has instrumentation config", func(t *testing.T) {
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"service_token": "test-token",
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+
+		inStruct, err := structpb.NewStruct(map[string]interface{}{
+			"type": "fleet-server",
+			"server": map[string]interface{}{
+				"host": "0.0.0.0",
+				"instrumentation": map[string]interface{}{
+					"enabled": true,
+					"tls": map[string]interface{}{
+						"skip_verify":        false,
+						"server_certificate": "/path/to/cert.crt",
+					},
+					"environment":  "test",
+					"secret_token": "testToken",
+					"hosts":        []interface{}{"localhost:8080"},
+				},
+			},
+		})
+		require.NoError(t, err)
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+			})
+
+		a := &Agent{
+			cliCfg:     ucfg.New(),
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+		}
+
+		cfg, err := a.configFromUnits(context.Background())
+		require.NoError(t, err)
+		require.Len(t, cfg.Inputs, 1)
+		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
+		assert.Equal(t, "0.0.0.0", cfg.Inputs[0].Server.Host)
+		assert.True(t, cfg.Inputs[0].Server.Instrumentation.Enabled)
+		assert.False(t, cfg.Inputs[0].Server.Instrumentation.TLS.SkipVerify)
+		assert.Equal(t, "/path/to/cert.crt", cfg.Inputs[0].Server.Instrumentation.TLS.ServerCertificate)
+		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.Environment)
+		assert.Empty(t, cfg.Inputs[0].Server.Instrumentation.APIKey)
+		assert.Equal(t, "testToken", cfg.Inputs[0].Server.Instrumentation.SecretToken)
+		assert.Equal(t, []string{"localhost:8080"}, cfg.Inputs[0].Server.Instrumentation.Hosts)
+		assert.Empty(t, cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
 	})
 }
