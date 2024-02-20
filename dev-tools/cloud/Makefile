@@ -33,7 +33,7 @@ cloud-deploy: build-and-push-cloud-image  ## Create a new cloud deployment
 
 .PHONY: cloud-clean
 cloud-clean: ## Clean cloud deployment
-	@cd ${TERRAFORM_PATH}; terraform destroy -auto-approve
+	@cd ${TERRAFORM_PATH}; terraform destroy -auto-approve -var="elastic_agent_docker_image=${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
 
 .PHONY: cloud-get-fleet-url
 cloud-get-fleet-url:  ## Get Fleet URL from this deployment
