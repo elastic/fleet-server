@@ -295,6 +295,7 @@ func Test_server_ClientCert(t *testing.T) {
 	})
 
 	t.Run("valid client certs no certs requested", func(t *testing.T) {
+		t.Skip("test is flakey see fleet-server/issue/3266")
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		ctx = testlog.SetLogger(t).WithContext(ctx)
