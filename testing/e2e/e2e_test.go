@@ -16,6 +16,15 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+type logger struct {
+	*testing.T
+}
+
+func (l *logger) Printf(format string, v ...interface{}) {
+	l.Helper()
+	l.Logf(format, v...)
+}
+
 var longFlag bool
 
 func init() {
