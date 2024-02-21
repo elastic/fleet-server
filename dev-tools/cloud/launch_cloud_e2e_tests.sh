@@ -11,7 +11,7 @@ cleanup() {
     echo "--- Cleaning deployment"
     make -C "${CLOUD_TESTING_BASE}" cloud-clean
   else
-      echo "+++ Skipped cleaning deployment, no terraform files"
+      echo "Skipped cleaning deployment, no Terraform files"
   fi
   exit $r
 }
