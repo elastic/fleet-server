@@ -50,8 +50,9 @@ func BenchmarkMultiUpdateMock(b *testing.B) {
 
 	for _, n := range benchmarks {
 		b.Run(strconv.Itoa(n), func(b *testing.B) {
-			b.ReportAllocs()
 			ctx := testlog.SetLogger(b).WithContext(context.Background())
+			b.ResetTimer()
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				if _, err := bulker.MUpdate(ctx, ops[:n]); err != nil {
 					b.Fatal(err)

@@ -36,7 +36,6 @@ func makeQuery2(leaf1 interface{}, leaf2 interface{}) *Node {
 }
 
 func BenchmarkRenderOne(b *testing.B) {
-
 	const kName = "api_key"
 	tmpl := NewTmpl()
 	token := tmpl.Bind(kName)
@@ -47,6 +46,7 @@ func BenchmarkRenderOne(b *testing.B) {
 		b.Fatal(err)
 	}
 
+	b.ResetTimer()
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
 		if _, err := tmpl.RenderOne(kName, "2Ye0F3UByTc0c1e9OeMO"); err != nil {
@@ -56,7 +56,6 @@ func BenchmarkRenderOne(b *testing.B) {
 }
 
 func BenchmarkRender(b *testing.B) {
-
 	const kName = "api_key"
 	tmpl := NewTmpl()
 	token := tmpl.Bind(kName)
@@ -69,6 +68,7 @@ func BenchmarkRender(b *testing.B) {
 
 	v := "2Ye0F3UByTc0c1e9OeMO"
 
+	b.ResetTimer()
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
 		if _, err := tmpl.Render(map[string]interface{}{
@@ -80,7 +80,6 @@ func BenchmarkRender(b *testing.B) {
 }
 
 func BenchmarkMarshalNode(b *testing.B) {
-
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
 		query := makeQuery("2Ye0F3UByTc0c1e9OeMO")
@@ -89,7 +88,6 @@ func BenchmarkMarshalNode(b *testing.B) {
 }
 
 func BenchmarkMarshalNode2(b *testing.B) {
-
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
 		query := makeQuery2("27e58fc0-09a2-11eb-a8cd-57e98f140de5", 3)
@@ -106,6 +104,7 @@ func BenchmarkSprintf(b *testing.B) {
 	policyRev := 3
 
 	var s string
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		s = fmt.Sprintf(queryTmpl, policyID, policyRev)
 	}
@@ -113,7 +112,6 @@ func BenchmarkSprintf(b *testing.B) {
 }
 
 func BenchmarkRender2(b *testing.B) {
-
 	const kName1 = "policyId"
 	const kName2 = "policyRev"
 
@@ -128,6 +126,7 @@ func BenchmarkRender2(b *testing.B) {
 	}
 
 	// run the RenderOne function b.N times
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		m := map[string]interface{}{
 			kName1: "27e58fc0-09a2-11eb-a8cd-57e98f140de5",

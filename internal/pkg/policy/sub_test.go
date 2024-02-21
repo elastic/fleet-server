@@ -193,9 +193,9 @@ func TestSub_UnlinkRandomN(t *testing.T) {
 }
 
 func BenchmarkSubsSimple(b *testing.B) {
-
 	head := makeHead()
 	nn := NewSub("", "", 0, 0)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		head.pushBack(nn)
 		head.popFront()
@@ -225,6 +225,7 @@ func BenchmarkSubs(b *testing.B) {
 
 	for _, bm := range benchmarks {
 		b.Run(fmt.Sprintf("%d", bm), func(b *testing.B) {
+			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
 				for j := 0; j < bm; j++ {

@@ -207,7 +207,6 @@ func validateTimestamp(tb testing.TB, start time.Time, ts string) {
 
 func benchmarkBulk(n int, flush bool, b *testing.B) {
 	ctx := testlog.SetLogger(b).WithContext(context.Background())
-	b.ReportAllocs()
 
 	mockBulk := ftesting.NewMockBulk()
 	mockBulk.On("MUpdate", mock.Anything, mock.Anything, []bulk.Opt(nil)).Return([]bulk.BulkIndexerResponseItem{}, nil)
@@ -220,8 +219,10 @@ func benchmarkBulk(n int, flush bool, b *testing.B) {
 		ids = append(ids, id)
 	}
 
-	for i := 0; i < b.N; i++ {
+	b.ResetTimer()
+	b.ReportAllocs()
 
+	for i := 0; i < b.N; i++ {
 		for _, id := range ids {
 			err := bc.CheckIn(id, "", "", nil, nil, nil, "")
 			if err != nil {

@@ -305,7 +305,6 @@ func TestCancelCtxChildBulker(t *testing.T) {
 }
 
 func benchmarkMockBulk(b *testing.B, samples [][]byte) {
-	b.ReportAllocs()
 	mock := &mockBulkTransport{}
 
 	ctx, cancelF := context.WithCancel(context.Background())
@@ -334,8 +333,10 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 
 	var wait sync.WaitGroup
 	wait.Add(n)
-	for i := 0; i < n; i++ {
 
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < n; i++ {
 		go func(sampleData []byte) {
 			defer wait.Done()
 
@@ -373,7 +374,6 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 }
 
 func BenchmarkMockBulk(b *testing.B) {
-
 	benchmarks := []int{1, 8, 64, 4096, 32768}
 
 	// Create the samples outside the loop to avoid accounting
@@ -391,7 +391,6 @@ func BenchmarkMockBulk(b *testing.B) {
 	}
 
 	for _, n := range benchmarks {
-
 		bindFunc := func(n int) func(b *testing.B) {
 			return func(b *testing.B) {
 				benchmarkMockBulk(b, samples[:n])
