@@ -7,9 +7,12 @@ CLOUD_TESTING_BASE="$(dirname $0)"
 cleanup() {
   r=$?
 
-  echo "--- Cleaning deployment"
-  make -C "${CLOUD_TESTING_BASE}" cloud-clean
-
+  if [ -f ${CLOUD_TESTING_BASE}/terraform/.terraform.lock.hcl ] ; then
+    echo "--- Cleaning deployment"
+    make -C "${CLOUD_TESTING_BASE}" cloud-clean
+  else
+      echo "Skipped cleaning deployment, no Terraform files"
+  fi
   exit $r
 }
 trap cleanup EXIT INT TERM
