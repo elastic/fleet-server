@@ -138,6 +138,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			apikey.ErrElasticsearchAuthLimit,
+			HTTPErrResp{
+				http.StatusTooManyRequests,
+				"ElasticsearchAPIKeyAuthLimit",
+				"exceeded the elasticsearch api key auth limit",
+				zerolog.WarnLevel,
+			},
+		},
+		{
 			os.ErrDeadlineExceeded,
 			HTTPErrResp{
 				http.StatusRequestTimeout,
