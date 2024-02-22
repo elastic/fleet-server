@@ -2,7 +2,10 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build e2e
+// FIXME(ml): test suite is disabled by additional build flag.
+//     we do not want to rely on agent builds in our pipeline.
+
+//go:build e2e && ignore
 
 package e2e
 
@@ -19,15 +22,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 )
-
-type logger struct {
-	*testing.T
-}
-
-func (l *logger) Printf(format string, v ...interface{}) {
-	l.Helper()
-	l.Logf(format, v...)
-}
 
 type AgentContainerSuite struct {
 	scaffold.Scaffold
