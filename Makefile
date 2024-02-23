@@ -284,7 +284,7 @@ release-manager-release: ## - Builds a snapshot release. The Go version defined 
 ## get-version : Get the Fleet server version
 .PHONY: get-version
 get-version:
-	@echo $(DEFAULT_VERSION)
+	@echo $(VERSION)
 
 ##################################################
 # Integration testing targets
