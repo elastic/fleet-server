@@ -27,11 +27,12 @@ CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG:-"${STACK_VERSION}-${USER_NAME}-$(date +%s)"
 
 SNAPSHOT=true make -C $REPO_ROOT release-linux/${GOARCH}
 FLEET_VERSION=$(SNAPSHOT=true make -C $REPO_ROOT get-version)
+echo "Fleet version: ${FLEET_VERSION}"
 
 docker build \
 	-f $REPO_ROOT/dev-tools/cloud/docker/Dockerfile \
 	--build-arg ELASTIC_AGENT_IMAGE=$BASE_IMAGE \
-	--build-arg STACK_VERSION=$FLEET_VERSION \
+	--build-arg STACK_VERSION=${FLEET_VERSION} \
 	--build-arg VCS_REF_SHORT=${VCS_REF:0:6} \
 	--platform linux/$GOARCH \
 	-t ${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG} \
