@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
@@ -77,6 +78,9 @@ func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileI
 func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w io.Writer, chunks []file.ChunkInfo, fileID string) error {
 	span, ctx := apm.StartSpan(ctx, "response", "write")
 	defer span.End()
+	sort.SliceStable(chunks, func(i, j int) bool {
+		return chunks[i].Pos < chunks[j].Pos
+	})
 	for _, chunkInfo := range chunks {
 		body, err := readChunkStream(ctx, d.client, chunkInfo.Index, chunkInfo.ID)
 		if err != nil {
