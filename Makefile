@@ -284,7 +284,7 @@ release-manager-release: ## - Builds a snapshot release. The Go version defined 
 ## get-version : Get the Fleet server version
 .PHONY: get-version
 get-version:
-	@echo $(DEFAULT_VERSION)
+	@echo $(VERSION)
 
 ##################################################
 # Integration testing targets
@@ -364,7 +364,7 @@ e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
 	@$(MAKE) int-docker-stop
 
 .PHONY: test-e2e
-test-e2e: docker-cover-e2e-binaries build-e2e-agent-image e2e-certs build-docker ## - Setup and run the blackbox end to end test suite
+test-e2e: docker-cover-e2e-binaries e2e-certs build-docker ## - Setup and run the blackbox end to end test suite
 	@mkdir -p build/e2e-cover
 	@$(MAKE) e2e-docker-start
 	@set -o pipefail; $(MAKE) test-e2e-set | tee build/test-e2e.out
@@ -379,20 +379,19 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
 	STANDALONE_E2E_IMAGE=$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) \
 	CGO_ENABLED=1 \
-	go test -v -timeout 30m -tags=e2e -count=1 -race -p 1 ./... -run StandAlone
+	go test -v -timeout 30m -tags=e2e -count=1 -race -p 1 ./...
 
 ##################################################
 # Cloud testing targets
 ##################################################
 .PHONY: test-cloude2e
 test-cloude2e: prepare-test-context  ## - Run cloude2e tests with full setup (slow!)
-	@make -C ${CLOUD_TESTING_BASE} cloud-deploy
-	$(eval FLEET_SERVER_URL := $(shell make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
-	-@set -o pipefail; $(MAKE) test-cloude2e-set | tee build/test-cloude2e.out
-	@make -C ${CLOUD_TESTING_BASE} cloud-clean
+	@# Triggered using a shell script to ensure deployment is cleaned up even if errors (using trap).
+	@# it would also ensure to exit with failure if any error happens
+	@$(CLOUD_TESTING_BASE)/launch_cloud_e2e_tests.sh
 
 .PHONY: test-cloude2e-set
 test-cloude2e-set: ## Run cloude2e test
-	$(eval FLEET_SERVER_URL := $(shell make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
+	$(eval FLEET_SERVER_URL := $(shell make --no-print-directory -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
 	make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url
-	FLEET_SERVER_URL=${FLEET_SERVER_URL} go test -v -tags=cloude2e -count=1 -race -p 1 ./testing/cloude2e
+	FLEET_SERVER_URL="${FLEET_SERVER_URL}" go test -v -tags=cloude2e -count=1 -race -p 1 ./testing/cloude2e
