@@ -26,7 +26,7 @@ VCS_REF=$(docker inspect -f '{{index .Config.Labels "org.label-schema.vcs-ref"}}
 CUSTOM_IMAGE_TAG=${CUSTOM_IMAGE_TAG:-"${STACK_VERSION}-${USER_NAME}-$(date +%s)"}
 
 SNAPSHOT=true make -C $REPO_ROOT release-linux/${GOARCH}
-FLEET_VERSION=$(SNAPSHOT=true make -s -C $REPO_ROOT get-version)
+FLEET_VERSION=$(SNAPSHOT=true make -s --no-print-directory -C $REPO_ROOT get-version)
 echo "Fleet version: ${FLEET_VERSION}"
 
 docker build \
