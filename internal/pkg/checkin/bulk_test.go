@@ -205,7 +205,29 @@ func validateTimestamp(tb testing.TB, start time.Time, ts string) {
 	}
 }
 
-func benchmarkBulk(n int, flush bool, b *testing.B) {
+func benchmarkBulk(n int, b *testing.B) {
+	mockBulk := ftesting.NewMockBulk()
+	bc := NewBulk(mockBulk)
+
+	ids := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		id := xid.New().String()
+		ids = append(ids, id)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		for _, id := range ids {
+			err := bc.CheckIn(id, "", "", nil, nil, nil, "")
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	}
+}
+
+func benchmarkFlush(n int, b *testing.B) {
 	ctx := context.Background()
 	mockBulk := ftesting.NewMockBulk()
 	mockBulk.On("MUpdate", mock.Anything, mock.Anything, []bulk.Opt(nil)).Return([]bulk.BulkIndexerResponseItem{}, nil)
@@ -221,32 +243,33 @@ func benchmarkBulk(n int, flush bool, b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		for _, id := range ids {
 			err := bc.CheckIn(id, "", "", nil, nil, nil, "")
 			if err != nil {
 				b.Fatal(err)
 			}
 		}
+		b.StartTimer()
 
-		if flush {
-			err := bc.flush(ctx)
-			if err != nil {
-				b.Fatal(err)
-			}
+		err := bc.flush(ctx)
+		if err != nil {
+			b.Fatal(err)
 		}
 	}
+
 }
 
-func BenchmarkBulk_1(b *testing.B)      { benchmarkBulk(1, false, b) }
-func BenchmarkBulk_64(b *testing.B)     { benchmarkBulk(64, false, b) }
-func BenchmarkBulk_8192(b *testing.B)   { benchmarkBulk(8192, false, b) }
-func BenchmarkBulk_37268(b *testing.B)  { benchmarkBulk(37268, false, b) }
-func BenchmarkBulk_131072(b *testing.B) { benchmarkBulk(131072, false, b) }
-func BenchmarkBulk_262144(b *testing.B) { benchmarkBulk(262144, false, b) }
+func BenchmarkBulk_1(b *testing.B)      { benchmarkBulk(1, b) }
+func BenchmarkBulk_64(b *testing.B)     { benchmarkBulk(64, b) }
+func BenchmarkBulk_8192(b *testing.B)   { benchmarkBulk(8192, b) }
+func BenchmarkBulk_37268(b *testing.B)  { benchmarkBulk(37268, b) }
+func BenchmarkBulk_131072(b *testing.B) { benchmarkBulk(131072, b) }
+func BenchmarkBulk_262144(b *testing.B) { benchmarkBulk(262144, b) }
 
-func BenchmarkBulkFlush_1(b *testing.B)      { benchmarkBulk(1, true, b) }
-func BenchmarkBulkFlush_64(b *testing.B)     { benchmarkBulk(64, true, b) }
-func BenchmarkBulkFlush_8192(b *testing.B)   { benchmarkBulk(8192, true, b) }
-func BenchmarkBulkFlush_37268(b *testing.B)  { benchmarkBulk(37268, true, b) }
-func BenchmarkBulkFlush_131072(b *testing.B) { benchmarkBulk(131072, true, b) }
-func BenchmarkBulkFlush_262144(b *testing.B) { benchmarkBulk(262144, true, b) }
+func BenchmarkFlush_1(b *testing.B)      { benchmarkFlush(1, b) }
+func BenchmarkFlush_64(b *testing.B)     { benchmarkFlush(64, b) }
+func BenchmarkFlush_8192(b *testing.B)   { benchmarkFlush(8192, b) }
+func BenchmarkFlush_37268(b *testing.B)  { benchmarkFlush(37268, b) }
+func BenchmarkFlush_131072(b *testing.B) { benchmarkFlush(131072, b) }
+func BenchmarkFlush_262144(b *testing.B) { benchmarkFlush(262144, b) }
