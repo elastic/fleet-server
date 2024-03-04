@@ -631,7 +631,7 @@ func Benchmark_CheckinT_writeResponse(b *testing.B) {
 	}
 	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
 
-	logger := testlog.SetLogger(b)
+	logger := zerolog.Nop()
 	req := &http.Request{
 		Header: http.Header{
 			"Accept-Encoding": []string{"gzip"},
@@ -657,7 +657,7 @@ func BenchmarkParallel_CheckinT_writeResponse(b *testing.B) {
 	}
 	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
 
-	logger := testlog.SetLogger(b)
+	logger := zerolog.Nop()
 	req := &http.Request{
 		Header: http.Header{
 			"Accept-Encoding": []string{"gzip"},
