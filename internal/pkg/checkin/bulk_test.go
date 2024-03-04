@@ -206,11 +206,9 @@ func validateTimestamp(tb testing.TB, start time.Time, ts string) {
 }
 
 func benchmarkBulk(n int, flush bool, b *testing.B) {
-	ctx := testlog.SetLogger(b).WithContext(context.Background())
-
+	ctx := context.Background()
 	mockBulk := ftesting.NewMockBulk()
 	mockBulk.On("MUpdate", mock.Anything, mock.Anything, []bulk.Opt(nil)).Return([]bulk.BulkIndexerResponseItem{}, nil)
-
 	bc := NewBulk(mockBulk)
 
 	ids := make([]string, 0, n)

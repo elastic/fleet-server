@@ -16,7 +16,6 @@ import (
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
-	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 	"github.com/rs/zerolog"
 )
 
@@ -309,7 +308,6 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 
 	ctx, cancelF := context.WithCancel(context.Background())
 	defer cancelF()
-	ctx = testlog.SetLogger(b).WithContext(ctx)
 
 	n := len(samples)
 	bulker := NewBulker(mock, nil, WithFlushThresholdCount(n))
@@ -361,7 +359,6 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 				// Delete
 				err = bulker.Delete(ctx, index, id)
 				if err != nil {
-					b.Logf("Delete failed index: %s id: %s", index, id)
 					b.Error(err)
 				}
 			}

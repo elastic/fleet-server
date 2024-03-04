@@ -66,7 +66,7 @@ func BenchmarkRender(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	v := "2Ye0F3UByTc0c1e9OeMO"
+	const v = "2Ye0F3UByTc0c1e9OeMO"
 
 	b.ResetTimer()
 	// run the RenderOne function b.N times
@@ -81,21 +81,31 @@ func BenchmarkRender(b *testing.B) {
 
 func BenchmarkMarshalNode(b *testing.B) {
 	// run the RenderOne function b.N times
+	query := makeQuery("2Ye0F3UByTc0c1e9OeMO")
+	var err error
+	var p []byte
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		query := makeQuery("2Ye0F3UByTc0c1e9OeMO")
-		_, _ = json.Marshal(query)
+		p, err = json.Marshal(query)
+	}
+	if len(p) == 0 || err != nil {
+		b.Errorf("sanity check failed, p=%v err: %v", p, err)
 	}
 }
 
 func BenchmarkMarshalNode2(b *testing.B) {
 	// run the RenderOne function b.N times
+	query := makeQuery2("27e58fc0-09a2-11eb-a8cd-57e98f140de5", 3)
+	var err error
+	var p []byte
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		query := makeQuery2("27e58fc0-09a2-11eb-a8cd-57e98f140de5", 3)
-		_, _ = json.Marshal(query)
+		p, err = json.Marshal(query)
+	}
+	if len(p) == 0 || err != nil {
+		b.Errorf("sanity check failed, p=%v err: %v", p, err)
 	}
 }
-
-var ssprintres string
 
 func BenchmarkSprintf(b *testing.B) {
 	queryTmpl := `{"size": 1,"sort": [{"fleet-agent-actions.created_at": {"order": "DESC"}}],"query": {"bool": {"must": [{"term": {"type": "fleet-agent-actions"}},{"term": {"fleet-agent-actions.policy_id": "%s"}},{"range": {"fleet-agent-actions.policy_revision": {"gt": %d}}}]}}}`
@@ -104,11 +114,15 @@ func BenchmarkSprintf(b *testing.B) {
 	policyRev := 3
 
 	var s string
+	var ssprintres string
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		s = fmt.Sprintf(queryTmpl, policyID, policyRev)
 	}
 	ssprintres = s
+	if len(ssprintres) == 0 {
+		b.Error("Sprintf had len 0")
+	}
 }
 
 func BenchmarkRender2(b *testing.B) {
@@ -128,12 +142,10 @@ func BenchmarkRender2(b *testing.B) {
 	// run the RenderOne function b.N times
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		m := map[string]interface{}{
+		if _, err := tmpl.Render(map[string]interface{}{
 			kName1: "27e58fc0-09a2-11eb-a8cd-57e98f140de5",
 			kName2: 3,
-		}
-
-		if _, err := tmpl.Render(m); err != nil {
+		}); err != nil {
 			b.Error(err)
 		}
 	}
