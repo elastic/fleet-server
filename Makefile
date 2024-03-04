@@ -18,7 +18,7 @@ BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-main-d
 #Benchmark related targets
 BENCH_BASE ?= benchmark-$(COMMIT).out
 BENCH_NEXT ?=
-BENCHMARK_ARGS := -count=8 -benchmem
+BENCHMARK_ARGS := -count=10 -benchmem
 BENCHMARK_PACKAGE ?= ./...
 BENCHMARK_FILTER ?= Bench
 
