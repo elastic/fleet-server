@@ -28,11 +28,12 @@ import (
 )
 
 func BenchmarkMakeUpdatePolicyBody(b *testing.B) {
-	b.ReportAllocs()
-
 	const policyID = "ed110be4-c2a0-42b8-adc0-94c2f0569207"
 	const newRev = 2
 	const coord = 1
+
+	b.ResetTimer()
+	b.ReportAllocs()
 
 	for n := 0; n < b.N; n++ {
 		makeUpdatePolicyBody(policyID, newRev, coord)
@@ -40,7 +41,6 @@ func BenchmarkMakeUpdatePolicyBody(b *testing.B) {
 }
 
 func TestMakeUpdatePolicyBody(t *testing.T) {
-
 	const policyID = "ed110be4-c2a0-42b8-adc0-94c2f0569207"
 	const newRev = 2
 	const coord = 1

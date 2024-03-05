@@ -46,6 +46,7 @@ steps:
         command: ".buildkite/scripts/run_benchmark.sh pr"
         artifact_paths:
           - build/next.out
+          - build/next.stat
         agents:
           provider: "gcp"
           machineType: "c2-standard-8"
@@ -55,6 +56,7 @@ steps:
         command: ".buildkite/scripts/run_benchmark.sh base"
         artifact_paths:
           - build/base.out
+          - build/base.stat
         agents:
           provider: "gcp"
           machineType: "c2-standard-8"
