@@ -15,12 +15,9 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
-// This runs a series of CRUD operations through elastic.
+// benchmarkMultiUpdate runs a series of CRUD operations through elastic.
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
-
 func benchmarkMultiUpdate(n int, b *testing.B) {
-	b.ReportAllocs()
-
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	ctx = testlog.SetLogger(b).WithContext(ctx)
@@ -41,6 +38,9 @@ func benchmarkMultiUpdate(n int, b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
 
 	for j := 0; j < b.N; j++ {
 		fields := UpdateFields{
@@ -64,8 +64,9 @@ func benchmarkMultiUpdate(n int, b *testing.B) {
 	}
 }
 
-func BenchmarkMultiUpdate(b *testing.B) {
-
+// BenchmarkMultiUpdateIntegration runs a benchmark for CRUD operations on a live ES instance
+// The results may be inconsistent due to the ES requirement.
+func BenchmarkMultiUpdateIntegration(b *testing.B) {
 	benchmarks := []int{1, 64, 8192, 37268, 131072}
 
 	for _, n := range benchmarks {

@@ -380,11 +380,9 @@ func benchmarkCreate(n int, b *testing.B) {
 }
 
 func BenchmarkCreate(b *testing.B) {
-
 	benchmarks := []int{1, 64, 8192, 16384, 32768, 65536}
 
 	for _, n := range benchmarks {
-
 		bindFunc := func(n int) func(b *testing.B) {
 			return func(b *testing.B) {
 				benchmarkCreate(n, b)
@@ -398,8 +396,6 @@ func BenchmarkCreate(b *testing.B) {
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
 
 func benchmarkCRUD(n int, b *testing.B) {
-	b.ReportAllocs()
-
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	ctx = testlog.SetLogger(b).WithContext(ctx)
@@ -415,8 +411,11 @@ func benchmarkCRUD(n int, b *testing.B) {
 	ch := make(chan error, n)
 	var wait sync.WaitGroup
 	wait.Add(n)
-	for i := 0; i < n; i++ {
 
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < n; i++ {
 		go func() {
 			defer wait.Done()
 
@@ -466,11 +465,9 @@ func benchmarkCRUD(n int, b *testing.B) {
 }
 
 func BenchmarkCRUD(b *testing.B) {
-
 	benchmarks := []int{1, 64, 8192, 16384, 32768, 65536}
 
 	for _, n := range benchmarks {
-
 		bindFunc := func(n int) func(b *testing.B) {
 			return func(b *testing.B) {
 				benchmarkCRUD(n, b)

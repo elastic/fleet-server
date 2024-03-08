@@ -29,6 +29,7 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/hashicorp/go-version"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -631,7 +632,7 @@ func Benchmark_CheckinT_writeResponse(b *testing.B) {
 	}
 	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
 
-	logger := testlog.SetLogger(b)
+	logger := zerolog.Nop()
 	req := &http.Request{
 		Header: http.Header{
 			"Accept-Encoding": []string{"gzip"},
@@ -657,7 +658,7 @@ func BenchmarkParallel_CheckinT_writeResponse(b *testing.B) {
 	}
 	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
 
-	logger := testlog.SetLogger(b)
+	logger := zerolog.Nop()
 	req := &http.Request{
 		Header: http.Header{
 			"Accept-Encoding": []string{"gzip"},

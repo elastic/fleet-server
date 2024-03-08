@@ -16,7 +16,6 @@ import (
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
-	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 	"github.com/rs/zerolog"
 )
 
@@ -305,12 +304,10 @@ func TestCancelCtxChildBulker(t *testing.T) {
 }
 
 func benchmarkMockBulk(b *testing.B, samples [][]byte) {
-	b.ReportAllocs()
 	mock := &mockBulkTransport{}
 
 	ctx, cancelF := context.WithCancel(context.Background())
 	defer cancelF()
-	ctx = testlog.SetLogger(b).WithContext(ctx)
 
 	n := len(samples)
 	bulker := NewBulker(mock, nil, WithFlushThresholdCount(n))
@@ -334,8 +331,10 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 
 	var wait sync.WaitGroup
 	wait.Add(n)
-	for i := 0; i < n; i++ {
 
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < n; i++ {
 		go func(sampleData []byte) {
 			defer wait.Done()
 
@@ -360,7 +359,6 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 				// Delete
 				err = bulker.Delete(ctx, index, id)
 				if err != nil {
-					b.Logf("Delete failed index: %s id: %s", index, id)
 					b.Error(err)
 				}
 			}
@@ -373,7 +371,6 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 }
 
 func BenchmarkMockBulk(b *testing.B) {
-
 	benchmarks := []int{1, 8, 64, 4096, 32768}
 
 	// Create the samples outside the loop to avoid accounting
@@ -391,7 +388,6 @@ func BenchmarkMockBulk(b *testing.B) {
 	}
 
 	for _, n := range benchmarks {
-
 		bindFunc := func(n int) func(b *testing.B) {
 			return func(b *testing.B) {
 				benchmarkMockBulk(b, samples[:n])

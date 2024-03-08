@@ -15,6 +15,7 @@ export BENCHMARK_ARGS="-count=8 -benchmem"
 if [[ ${TYPE} == "pr" ]]; then
     echo "Starting the go benchmark for the pull request"
     BENCH_BASE=next.out make benchmark
+    BENCH_BASE=next.out make benchstat | tee build/next.stat
     BENCH=$(cat build/next.out)
     buildkite-agent annotate --style 'info' --context "gobench_pr" --append << _EOF_
 #### Benchmark for pull request
@@ -34,6 +35,7 @@ if [[ ${TYPE} == "base" ]]; then
     echo "Starting the go benchmark for the pull request"
     git checkout ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
     BENCH_BASE=base.out make benchmark
+    BENCH_BASE=base.out make benchstat | tee build/base.stat
     BENCH=$(cat build/base.out)
     buildkite-agent annotate --style 'info' --context "gobench_base" --append << _EOF_
 #### Benchmark for the ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
