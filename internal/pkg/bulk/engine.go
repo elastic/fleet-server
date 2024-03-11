@@ -74,6 +74,7 @@ type Bulk interface {
 	GetBulker(outputName string) Bulk
 	GetBulkerMap() map[string]Bulk
 	CancelFn() context.CancelFunc
+	RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
@@ -247,17 +248,25 @@ func (b *Bulker) Client() *elasticsearch.Client {
 	return client
 }
 
-// check if remote output cfg changed
-func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
 	curCfg := b.remoteOutputConfigMap[name]
 
 	hasChanged := false
 
 	// when output config first added, not reporting change
 	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
-		zlog.Info().Str("name", name).Msg("remote output configuration has changed")
 		hasChanged = true
 	}
+	return hasChanged
+}
+
+// check if remote output cfg changed
+func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+	hasChanged := b.RemoteOutputConfigChanged(zlog, name, newCfg)
+	if hasChanged {
+		zlog.Debug().Str("name", name).Msg("remote output configuration has changed")
+	}
+
 	newCfgCopy := make(map[string]interface{})
 	for k, v := range newCfg {
 		newCfgCopy[k] = v
