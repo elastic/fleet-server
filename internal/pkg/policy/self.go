@@ -250,10 +250,22 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 	return state, nil
 }
 
+func isOutputCfgOutdated(ctx context.Context, bulker bulk.Bulk, zlog zerolog.Logger, outputName string) bool {
+	policy, err := dl.QueryOutputFromPolicy(ctx, bulker, outputName)
+	if err != nil || policy == nil {
+		return true
+	}
+	hasChanged := bulker.RemoteOutputConfigChanged(zlog, outputName, policy.Data.Outputs[outputName])
+	return hasChanged
+}
+
 func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, zlog zerolog.Logger) {
 	//pinging logic
 	bulkerMap := bulker.GetBulkerMap()
 	for outputName, outputBulker := range bulkerMap {
+		if isOutputCfgOutdated(ctx, bulker, zlog, outputName) {
+			continue
+		}
 		doc := model.OutputHealth{
 			Output:  outputName,
 			State:   client.UnitStateHealthy.String(),
