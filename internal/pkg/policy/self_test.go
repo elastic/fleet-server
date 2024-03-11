@@ -743,3 +743,22 @@ func TestSelfMonitor_reportOutputSkipIfOutdated(t *testing.T) {
 	bulker.AssertExpectations(t)
 	outputBulker.AssertExpectations(t)
 }
+
+func TestSelfMonitor_reportOutputSkipIfNotFound(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	logger := testlog.SetLogger(t)
+
+	bulker := ftesting.NewMockBulk()
+	bulkerMap := make(map[string]bulk.Bulk)
+	outputBulker := ftesting.NewMockBulk()
+	bulkerMap["outdated"] = outputBulker
+	bulker.On("GetBulkerMap").Return(bulkerMap)
+	bulker.On("Search", mock.Anything, dl.FleetPolicies, mock.Anything, mock.Anything).Return(
+		&es.ResultT{}, errors.New("output not found"))
+
+	reportOutputHealth(ctx, bulker, logger)
+
+	bulker.AssertExpectations(t)
+	outputBulker.AssertExpectations(t)
+}
