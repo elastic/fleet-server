@@ -71,8 +71,8 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 		reloadables: reloadables,
 	}
 	a.agent, _, err = client.NewV2FromReader(reader, client.VersionInfo{
-		Name:    kFleetServer,
-		Version: bi.Version,
+		Name:      kFleetServer,
+		BuildHash: bi.Commit,
 		Meta: map[string]string{
 			"commit":     bi.Commit,
 			"build_time": bi.BuildTime.String(),

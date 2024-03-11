@@ -122,8 +122,8 @@ func TestAgent(t *testing.T) {
 			bi:          biInfo,
 		}
 		a.agent = client.NewV2(fmt.Sprintf("localhost:%d", control.Port()), control.Token(), client.VersionInfo{
-			Name:    "fleet-server",
-			Version: "1.0.0",
+			Name:      "fleet-server",
+			BuildHash: "abcdefgh",
 		}, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		err = a.Run(ctx)
 		assert.NoError(t, err)
@@ -383,9 +383,9 @@ func getUnitState(control *StubV2Control, unitType proto.UnitType, unitID string
 func makeExpected(agentID string, inputConfigIdx uint64, inputSource *structpb.Struct, outputConfigIdx uint64, outputSource *structpb.Struct) *proto.CheckinExpected { //nolint:unparam // used for tests
 	return &proto.CheckinExpected{
 		AgentInfo: &proto.CheckinAgentInfo{
-			Id:       agentID,
-			Version:  "8.5.0",
-			Snapshot: true,
+			Id:        agentID,
+			BuildHash: "abcdefgh",
+			Snapshot:  true,
 		},
 		Units: []*proto.UnitExpected{
 			{
