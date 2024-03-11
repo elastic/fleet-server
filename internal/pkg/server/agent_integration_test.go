@@ -124,7 +124,7 @@ func TestAgent(t *testing.T) {
 		a.agent = client.NewV2(fmt.Sprintf("localhost:%d", control.Port()), control.Token(), client.VersionInfo{
 			Name:      "fleet-server",
 			BuildHash: "abcdefgh",
-		}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		}, client.WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
 		err = a.Run(ctx)
 		assert.NoError(t, err)
 	}()
