@@ -148,4 +148,8 @@ func (m *MockBulk) StartTransactionOptions(name, transactionType string, opts ap
 	return nil
 }
 
+func (m *MockBulk) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+	return name == "outdated"
+}
+
 var _ bulk.Bulk = (*MockBulk)(nil)
