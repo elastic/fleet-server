@@ -709,6 +709,11 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		return
 	case REQUESTDIAGNOSTICS:
 		d := ActionRequestDiagnostics{}
+		// NOTE: action data was added to diagnostics actions in #3333
+		// fleet ui creates actions without a data attribute and fleet-server needs to be backwards compatible with these actions.
+		if raw == nil {
+			return
+		}
 		err = json.Unmarshal(raw, &d)
 		if err != nil {
 			return

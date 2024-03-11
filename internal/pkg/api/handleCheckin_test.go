@@ -87,6 +87,11 @@ func TestConvertActionData(t *testing.T) {
 	}, {
 		name:   "request diagnostics action",
 		aType:  REQUESTDIAGNOSTICS,
+		expect: Action_Data{},
+		hasErr: false,
+	}, {
+		name:   "request diagnostics action empty data",
+		aType:  REQUESTDIAGNOSTICS,
 		raw:    json.RawMessage(`{}`),
 		expect: Action_Data{json.RawMessage(`{}`)},
 		hasErr: false,
