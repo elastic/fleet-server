@@ -93,7 +93,7 @@ func TestConvertActionData(t *testing.T) {
 		name:   "request diagnostics with additional cpu metric",
 		aType:  REQUESTDIAGNOSTICS,
 		raw:    json.RawMessage(`{"additional_metrics": ["CPU"]}`),
-		expect: Action_Data{json.RawMessage{`{"additional_metrics":["CPU"]}`}},
+		expect: Action_Data{json.RawMessage(`{"additional_metrics":["CPU"]}`)},
 		hasErr: false,
 	}, {
 		name:   "unenroll action",
