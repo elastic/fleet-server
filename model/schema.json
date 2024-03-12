@@ -586,6 +586,13 @@
           "description": "Last checkin message",
           "type": "string"
         },
+        "unhealthy_reason": {
+          "description": "Unhealthy reason: input/output/other",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "components": {
           "description": "Elastic Agent components detailed status information",
           "format": "raw"

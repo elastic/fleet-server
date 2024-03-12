@@ -192,6 +192,9 @@ type Agent struct {
 	// Date/time the Elastic Agent unenrolled started
 	UnenrollmentStartedAt string `json:"unenrollment_started_at,omitempty"`
 
+	// Unhealthy reason: input/output/other
+	UnhealthyReason []string `json:"unhealthy_reason,omitempty"`
+
 	// Date/time the Elastic Agent was last updated
 	UpdatedAt string `json:"updated_at,omitempty"`
 

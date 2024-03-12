@@ -704,3 +704,71 @@ func mustBuildConstraints(verStr string) version.Constraints {
 	}
 	return con
 }
+
+func TestCalcUnhealthyReason(t *testing.T) {
+	tests := []struct {
+		name            string
+		components      interface{}
+		unhealthyReason []string
+	}{{
+		name: "healthy",
+		components: []interface{}{map[string]interface{}{
+			"status": "HEALTHY",
+			"units":  []interface{}{map[string]interface{}{"status": "HEALTHY", "type": "input"}},
+		}},
+		unhealthyReason: []string{},
+	}, {
+		name: "input",
+		components: []interface{}{map[string]interface{}{
+			"status": "FAILED",
+			"units":  []interface{}{map[string]interface{}{"status": "FAILED", "type": "input"}},
+		}},
+		unhealthyReason: []string{"input"},
+	},
+		{
+			name: "output",
+			components: []interface{}{map[string]interface{}{
+				"status": "DEGRADED",
+				"units":  []interface{}{map[string]interface{}{"status": "HEALTHY", "type": "input"}, map[string]interface{}{"status": "DEGRADED", "type": "output"}},
+			}},
+			unhealthyReason: []string{"output"},
+		},
+		{
+			name: "other",
+			components: []interface{}{map[string]interface{}{
+				"status": "DEGRADED",
+				"units":  []interface{}{map[string]interface{}{}},
+			}},
+			unhealthyReason: []string{"other"},
+		},
+		{
+			name: "input,output in one component",
+			components: []interface{}{map[string]interface{}{
+				"status": "FAILED",
+				"units": []interface{}{map[string]interface{}{"status": "DEGRADED", "type": "input"},
+					map[string]interface{}{"status": "FAILED", "type": "output"}},
+			}},
+			unhealthyReason: []string{"input", "output"},
+		},
+		{
+			name: "input,output in different components",
+			components: []interface{}{map[string]interface{}{
+				"status": "FAILED",
+				"units": []interface{}{
+					map[string]interface{}{"status": "FAILED", "type": "input"}},
+			}, map[string]interface{}{
+				"status": "DEGRADED",
+				"units": []interface{}{
+					map[string]interface{}{"status": "DEGRADED", "type": "output"}},
+			}},
+			unhealthyReason: []string{"input", "output"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			unhealthyReason, err := calcUnhealthyReason(tc.components)
+			assert.Equal(t, tc.unhealthyReason, unhealthyReason)
+			assert.NoError(t, err)
+		})
+	}
+}
