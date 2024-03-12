@@ -708,67 +708,83 @@ func mustBuildConstraints(verStr string) version.Constraints {
 func TestCalcUnhealthyReason(t *testing.T) {
 	tests := []struct {
 		name            string
-		components      interface{}
+		components      []model.ComponentsItems
 		unhealthyReason []string
 	}{{
 		name: "healthy",
-		components: []interface{}{map[string]interface{}{
-			"status": "HEALTHY",
-			"units":  []interface{}{map[string]interface{}{"status": "HEALTHY", "type": "input"}},
+		components: []model.ComponentsItems{{
+			Status: "HEALTHY",
+			Units: []model.UnitsItems{{
+				Status: "HEALTHY", Type: "input",
+			}},
 		}},
 		unhealthyReason: []string{},
 	}, {
 		name: "input",
-		components: []interface{}{map[string]interface{}{
-			"status": "FAILED",
-			"units":  []interface{}{map[string]interface{}{"status": "FAILED", "type": "input"}},
+		components: []model.ComponentsItems{{
+			Status: "FAILED",
+			Units: []model.UnitsItems{{
+				Status: "FAILED", Type: "input",
+			}},
 		}},
 		unhealthyReason: []string{"input"},
 	},
 		{
 			name: "output",
-			components: []interface{}{map[string]interface{}{
-				"status": "DEGRADED",
-				"units":  []interface{}{map[string]interface{}{"status": "HEALTHY", "type": "input"}, map[string]interface{}{"status": "DEGRADED", "type": "output"}},
+			components: []model.ComponentsItems{{
+				Status: "DEGRADED",
+				Units: []model.UnitsItems{{
+					Status: "HEALTHY", Type: "input",
+				},
+					{
+						Status: "DEGRADED", Type: "output",
+					}},
 			}},
 			unhealthyReason: []string{"output"},
 		},
 		{
 			name: "other",
-			components: []interface{}{map[string]interface{}{
-				"status": "DEGRADED",
-				"units":  []interface{}{map[string]interface{}{}},
+			components: []model.ComponentsItems{{
+				Status: "DEGRADED",
+				Units:  []model.UnitsItems{},
 			}},
 			unhealthyReason: []string{"other"},
 		},
 		{
 			name: "input,output in one component",
-			components: []interface{}{map[string]interface{}{
-				"status": "FAILED",
-				"units": []interface{}{map[string]interface{}{"status": "DEGRADED", "type": "input"},
-					map[string]interface{}{"status": "FAILED", "type": "output"}},
+			components: []model.ComponentsItems{{
+				Status: "DEGRADED",
+				Units: []model.UnitsItems{{
+					Status: "FAILED", Type: "input",
+				},
+					{
+						Status: "DEGRADED", Type: "output",
+					}},
 			}},
 			unhealthyReason: []string{"input", "output"},
 		},
 		{
 			name: "input,output in different components",
-			components: []interface{}{map[string]interface{}{
-				"status": "FAILED",
-				"units": []interface{}{
-					map[string]interface{}{"status": "FAILED", "type": "input"}},
-			}, map[string]interface{}{
-				"status": "DEGRADED",
-				"units": []interface{}{
-					map[string]interface{}{"status": "DEGRADED", "type": "output"}},
-			}},
+			components: []model.ComponentsItems{{
+				Status: "DEGRADED",
+				Units: []model.UnitsItems{
+					{
+						Status: "DEGRADED", Type: "input",
+					}},
+			},
+				{
+					Status: "FAILED",
+					Units: []model.UnitsItems{{
+						Status: "FAILED", Type: "output",
+					}},
+				}},
 			unhealthyReason: []string{"input", "output"},
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			unhealthyReason, err := calcUnhealthyReason(tc.components)
+			unhealthyReason := calcUnhealthyReason(tc.components)
 			assert.Equal(t, tc.unhealthyReason, unhealthyReason)
-			assert.NoError(t, err)
 		})
 	}
 }

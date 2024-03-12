@@ -47,7 +47,9 @@ var (
 )
 
 const (
-	kEncodingGzip = "gzip"
+	kEncodingGzip  = "gzip"
+	FailedStatus   = "FAILED"
+	DegradedStatus = "DEGRADED"
 )
 
 // validActionTypes is a map of action.type and if they are valid
@@ -924,7 +926,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	var unhealthyReason []string
 
 	// fallback to other if components don't exist
-	if agent.UnhealthyReason == nil && (agent.LastCheckinStatus == "FAILED" || agent.LastCheckinStatus == "DEGRADED") {
+	if agent.UnhealthyReason == nil && (agent.LastCheckinStatus == FailedStatus || agent.LastCheckinStatus == DegradedStatus) {
 		unhealthyReason = []string{"other"}
 	}
 
@@ -932,22 +934,23 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 		return nil, &unhealthyReason, nil
 	}
 
+	agentComponentsJSON, err := json.Marshal(agent.Components)
+	if err != nil {
+		return nil, &unhealthyReason, fmt.Errorf("agent.Components marshal: %w", err)
+	}
+
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
-	if bytes.Equal(*req.Components, agent.Components) {
+	if bytes.Equal(*req.Components, agentComponentsJSON) {
 		zlog.Trace().Msg("quick comparing agent components data is equal")
 		return nil, &unhealthyReason, nil
 	}
 
 	// Deserialize the request components data
-	var reqComponents interface{}
+	var reqComponents []model.ComponentsItems
 	if len(*req.Components) > 0 {
 		if err := json.Unmarshal(*req.Components, &reqComponents); err != nil {
 			return nil, &unhealthyReason, fmt.Errorf("parseComponents request: %w", err)
-		}
-		// Validate that components is an array
-		if _, ok := reqComponents.([]interface{}); !ok {
-			return nil, &unhealthyReason, errors.New("parseComponets request: components property is not array")
 		}
 	}
 
@@ -956,21 +959,13 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 		return nil, &unhealthyReason, nil
 	}
 
-	// Deserialize the agent's components copy
-	var agentComponents interface{}
-	if len(agent.Components) > 0 {
-		if err := json.Unmarshal(agent.Components, &agentComponents); err != nil {
-			return nil, &unhealthyReason, fmt.Errorf("parseComponents local: %w", err)
-		}
-	}
-
 	var outComponents []byte
 
 	// Compare the deserialized meta structures and return the bytes to update if different
-	if !reflect.DeepEqual(reqComponents, agentComponents) {
+	if !reflect.DeepEqual(reqComponents, agent.Components) {
 
 		zlog.Trace().
-			RawJSON("oldComponents", agent.Components).
+			RawJSON("oldComponents", agentComponentsJSON).
 			RawJSON("newComponents", *req.Components).
 			Msg("local components data is not equal")
 
@@ -979,12 +974,9 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 			Msg("applying new components data")
 
 		outComponents = *req.Components
-		compUnhealthyReason, err := calcUnhealthyReason(reqComponents)
+		compUnhealthyReason := calcUnhealthyReason(reqComponents)
 		if len(compUnhealthyReason) > 0 {
 			unhealthyReason = compUnhealthyReason
-		}
-		if err != nil {
-			return outComponents, &unhealthyReason, err
 		}
 	}
 
@@ -993,35 +985,19 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	return outComponents, &unhealthyReason, nil
 }
 
-func calcUnhealthyReason(reqComponents interface{}) ([]string, error) {
+func calcUnhealthyReason(reqComponents []model.ComponentsItems) []string {
 	var unhealthyReason []string
 	hasUnhealthyInput := false
 	hasUnhealthyOutput := false
 	hasUnhealthyComponent := false
-	reqComponentsArray, ok := reqComponents.([]interface{})
-	if !ok {
-		return unhealthyReason, errors.New("parseComponets request: components property is not array")
-	}
-	for _, component := range reqComponentsArray {
-		componentMap, ok := component.(map[string]interface{})
-		if !ok {
-			return unhealthyReason, errors.New("parseComponets request: component is not a map")
-		}
-		if componentMap["status"] == "FAILED" || componentMap["status"] == "DEGRADED" {
+	for _, component := range reqComponents {
+		if component.Status == FailedStatus || component.Status == DegradedStatus {
 			hasUnhealthyComponent = true
-			units, ok := componentMap["units"].([]interface{})
-			if !ok {
-				return unhealthyReason, errors.New("parseComponets request: units property is not array")
-			}
-			for _, unit := range units {
-				unitMap, ok := unit.(map[string]interface{})
-				if !ok {
-					return unhealthyReason, errors.New("parseComponets request: unit is not a map")
-				}
-				if unitMap["status"] == "FAILED" || unitMap["status"] == "DEGRADED" {
-					if unitMap["type"] == "input" {
+			for _, unit := range component.Units {
+				if unit.Status == FailedStatus || unit.Status == DegradedStatus {
+					if unit.Type == "input" {
 						hasUnhealthyInput = true
-					} else if unitMap["type"] == "output" {
+					} else if unit.Type == "output" {
 						hasUnhealthyOutput = true
 					}
 				}
@@ -1039,7 +1015,7 @@ func calcUnhealthyReason(reqComponents interface{}) ([]string, error) {
 		unhealthyReason = append(unhealthyReason, "other")
 	}
 
-	return unhealthyReason, nil
+	return unhealthyReason
 }
 
 func calcPollDuration(zlog zerolog.Logger, pollDuration, setupDuration, jitterDuration time.Duration) (time.Duration, time.Duration) {

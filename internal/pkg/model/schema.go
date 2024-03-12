@@ -124,7 +124,7 @@ type Agent struct {
 	Agent  *AgentMetadata `json:"agent,omitempty"`
 
 	// Elastic Agent components detailed status information
-	Components json.RawMessage `json:"components,omitempty"`
+	Components []ComponentsItems `json:"components,omitempty"`
 
 	// Deprecated. Use Outputs instead. API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKey string `json:"default_api_key,omitempty"`
@@ -306,6 +306,14 @@ type CheckinPolicyInputItems struct {
 
 	// The template ID for the input
 	TemplateID string `json:"template_id"`
+}
+
+// ComponentsItems
+type ComponentsItems struct {
+	ID      string       `json:"id,omitempty"`
+	Message string       `json:"message,omitempty"`
+	Status  string       `json:"status,omitempty"`
+	Units   []UnitsItems `json:"units,omitempty"`
 }
 
 // DataStream
@@ -499,6 +507,14 @@ type ToRetireAPIKeyIdsItems struct {
 
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`
+}
+
+// UnitsItems
+type UnitsItems struct {
+	ID      string `json:"id,omitempty"`
+	Message string `json:"message,omitempty"`
+	Status  string `json:"status,omitempty"`
+	Type    string `json:"type,omitempty"`
 }
 
 // UpgradeDetails Additional upgrade status details.
