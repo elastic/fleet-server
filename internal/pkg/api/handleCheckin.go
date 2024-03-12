@@ -707,7 +707,20 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		}
 		err = ad.FromActionUpgrade(d)
 		return
-	case REQUESTDIAGNOSTICS, UNENROLL: // Action types with no data
+	case REQUESTDIAGNOSTICS:
+		d := ActionRequestDiagnostics{}
+		// NOTE: action data was added to diagnostics actions in #3333
+		// fleet ui creates actions without a data attribute and fleet-server needs to be backwards compatible with these actions.
+		if raw == nil {
+			return
+		}
+		err = json.Unmarshal(raw, &d)
+		if err != nil {
+			return
+		}
+		err = ad.FromActionRequestDiagnostics(d)
+		return
+	case UNENROLL: // Action types with no data
 		return ad, nil
 	default:
 		return ad, fmt.Errorf("data conversion unsupported action type: %s", aType)

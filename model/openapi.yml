@@ -286,14 +286,14 @@ components:
         download_rate:
           description: The artifact download rate as bytes per second.
           type: number
-          format: double 
+          format: double
         retry_error_msg:
           description: The error message that is a result of a retryable upgrade download failure.
-          type: string 
+          type: string
         retry_until:
           description: The RFC3339 timestamp of the deadline the upgrade download is retried until.
           type: string
-          format: date-time  
+          format: date-time
     upgrade_metadata_failed:
       description: Upgrade metadata for an upgrade that has failed.
       required:
@@ -549,7 +549,14 @@ components:
       # unenroll actions have no `data` attribute
     actionRequestDiagnostics:
       description: The REQUEST_DIAGNOSTICS action data.
-      # diagnostics actions have no `data` attribute
+      properties:
+        additional_metrics:
+          description: list optional additional metrics.
+          type: array
+          items:
+            type: string
+            enum:
+              - CPU
     actionPolicyReassign:
       description: The POLICY_REASSIGN action data.
       type: object
