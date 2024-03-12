@@ -35,6 +35,11 @@ const (
 	UPGRADE            ActionType = "UPGRADE"
 )
 
+// Defines values for ActionRequestDiagnosticsAdditionalMetrics.
+const (
+	CPU ActionRequestDiagnosticsAdditionalMetrics = "CPU"
+)
+
 // Defines values for ActionSettingsLogLevel.
 const (
 	ActionSettingsLogLevelDebug   ActionSettingsLogLevel = "debug"
@@ -217,7 +222,13 @@ type ActionPolicyReassign struct {
 }
 
 // ActionRequestDiagnostics The REQUEST_DIAGNOSTICS action data.
-type ActionRequestDiagnostics = interface{}
+type ActionRequestDiagnostics struct {
+	// AdditionalMetrics list optional additional metrics.
+	AdditionalMetrics *[]ActionRequestDiagnosticsAdditionalMetrics `json:"additional_metrics,omitempty"`
+}
+
+// ActionRequestDiagnosticsAdditionalMetrics defines model for ActionRequestDiagnostics.AdditionalMetrics.
+type ActionRequestDiagnosticsAdditionalMetrics string
 
 // ActionSettings The SETTINGS action data.
 type ActionSettings struct {

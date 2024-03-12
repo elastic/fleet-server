@@ -90,6 +90,18 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{},
 		hasErr: false,
 	}, {
+		name:   "request diagnostics action empty data",
+		aType:  REQUESTDIAGNOSTICS,
+		raw:    json.RawMessage(`{}`),
+		expect: Action_Data{json.RawMessage(`{}`)},
+		hasErr: false,
+	}, {
+		name:   "request diagnostics with additional cpu metric",
+		aType:  REQUESTDIAGNOSTICS,
+		raw:    json.RawMessage(`{"additional_metrics": ["CPU"]}`),
+		expect: Action_Data{json.RawMessage(`{"additional_metrics":["CPU"]}`)},
+		hasErr: false,
+	}, {
 		name:   "unenroll action",
 		aType:  UNENROLL,
 		expect: Action_Data{},
@@ -126,21 +138,23 @@ func TestConvertActions(t *testing.T) {
 		token:   "",
 	}, {
 		name:    "single action",
-		actions: []model.Action{{ActionID: "1234", Type: "REQUEST_DIAGNOSTICS"}},
+		actions: []model.Action{{ActionID: "1234", Type: "REQUEST_DIAGNOSTICS", Data: json.RawMessage(`{}`)}},
 		resp: []Action{{
 			AgentId: "agent-id",
 			Id:      "1234",
 			Type:    REQUESTDIAGNOSTICS,
+			Data:    Action_Data{json.RawMessage(`{}`)},
 		}},
 		token: "",
 	}, {
 		name:    "single action signed",
-		actions: []model.Action{{ActionID: "1234", Signed: &model.Signed{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="}, Type: "REQUEST_DIAGNOSTICS"}},
+		actions: []model.Action{{ActionID: "1234", Signed: &model.Signed{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="}, Type: "REQUEST_DIAGNOSTICS", Data: json.RawMessage(`{}`)}},
 		resp: []Action{{
 			AgentId: "agent-id",
 			Id:      "1234",
 			Type:    REQUESTDIAGNOSTICS,
 			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="},
+			Data:    Action_Data{json.RawMessage(`{}`)},
 		}},
 		token: "",
 	}, {name: "multiple actions",
@@ -148,10 +162,12 @@ func TestConvertActions(t *testing.T) {
 			{
 				ActionID: "1234",
 				Type:     "REQUEST_DIAGNOSTICS",
+				Data:     json.RawMessage(`{}`),
 			},
 			{
 				ActionID: "5678",
 				Type:     "REQUEST_DIAGNOSTICS",
+				Data:     json.RawMessage(`{}`),
 				Signed:   &model.Signed{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="},
 			},
 		},
@@ -159,11 +175,13 @@ func TestConvertActions(t *testing.T) {
 			AgentId: "agent-id",
 			Id:      "1234",
 			Type:    REQUESTDIAGNOSTICS,
+			Data:    Action_Data{json.RawMessage(`{}`)},
 		}, {
 			AgentId: "agent-id",
 			Id:      "5678",
 			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="},
 			Type:    REQUESTDIAGNOSTICS,
+			Data:    Action_Data{json.RawMessage(`{}`)},
 		}},
 		token: "",
 	}}
