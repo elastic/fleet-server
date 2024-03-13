@@ -593,6 +593,7 @@ components:
         log_level:
           type: string
           enum:
+            - trace
             - debug
             - info
             - warning
