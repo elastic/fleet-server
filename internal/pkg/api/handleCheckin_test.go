@@ -79,6 +79,12 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{json.RawMessage(`{"log_level":"error"}`)},
 		hasErr: false,
 	}, {
+		name:   "settings action trace level",
+		aType:  SETTINGS,
+		raw:    json.RawMessage(`{"log_level":"trace"}`),
+		expect: Action_Data{json.RawMessage(`{"log_level":"trace"}`)},
+		hasErr: false,
+	}, {
 		name:   "upgrade action",
 		aType:  UPGRADE,
 		raw:    json.RawMessage(`{"source_uri":"https://localhost:8080","version":"1.2.3"}`),
