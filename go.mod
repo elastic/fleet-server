@@ -6,10 +6,10 @@ require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/elastic/elastic-agent-client/v7 v7.8.0
-	github.com/elastic/elastic-agent-libs v0.7.4
-	github.com/elastic/elastic-agent-system-metrics v0.7.0
+	github.com/elastic/elastic-agent-libs v0.7.5
+	github.com/elastic/elastic-agent-system-metrics v0.9.2
 	github.com/elastic/go-elasticsearch/v8 v8.12.1
-	github.com/elastic/go-ucfg v0.8.6
+	github.com/elastic/go-ucfg v0.8.7
 	github.com/fxamacker/cbor/v2 v2.5.0
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/gofrs/uuid v4.4.0+incompatible
