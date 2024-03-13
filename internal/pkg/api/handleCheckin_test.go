@@ -788,3 +788,81 @@ func TestCalcUnhealthyReason(t *testing.T) {
 		})
 	}
 }
+
+func TestParseComponents(t *testing.T) {
+	var unhealthyReasonNil []string
+	degradedInputReqComponents := json.RawMessage(`[{"status":"DEGRADED","units":[{"status":"DEGRADED","type":"input"}]}]`)
+	tests := []struct {
+		name            string
+		agent           *model.Agent
+		req             *CheckinRequest
+		outComponents   []byte
+		unhealthyReason *[]string
+		err             error
+	}{{
+		name:            "unchanged components healthy",
+		agent:           &model.Agent{},
+		req:             &CheckinRequest{},
+		outComponents:   nil,
+		unhealthyReason: &unhealthyReasonNil,
+		err:             nil,
+	},
+		{
+			name: "unchanged components unhealthy",
+			agent: &model.Agent{
+				LastCheckinStatus: FailedStatus,
+			},
+			req:             &CheckinRequest{},
+			outComponents:   nil,
+			unhealthyReason: &[]string{"other"},
+			err:             nil,
+		},
+		{
+			name: "unchanged components",
+			agent: &model.Agent{
+				LastCheckinStatus: FailedStatus,
+				UnhealthyReason:   []string{"input"},
+				Components: []model.ComponentsItems{{
+					Status: "DEGRADED",
+					Units: []model.UnitsItems{{
+						Status: "DEGRADED", Type: "input",
+					}},
+				}},
+			},
+			req: &CheckinRequest{
+				Components: &degradedInputReqComponents,
+			},
+			outComponents:   nil,
+			unhealthyReason: &[]string{"input"},
+			err:             nil,
+		},
+		{
+			name: "changed components",
+			agent: &model.Agent{
+				LastCheckinStatus: "online",
+				UnhealthyReason:   nil,
+				Components: []model.ComponentsItems{{
+					Status: "HEALTHY",
+					Units: []model.UnitsItems{{
+						Status: "HEALTHY", Type: "input",
+					}},
+				}},
+			},
+			req: &CheckinRequest{
+				Status:     "DEGRADED",
+				Components: &degradedInputReqComponents,
+			},
+			outComponents:   degradedInputReqComponents,
+			unhealthyReason: &[]string{"input"},
+			err:             nil,
+		}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			outComponents, unhealthyReason, err := parseComponents(logger, tc.agent, tc.req)
+			assert.Equal(t, tc.outComponents, outComponents)
+			assert.Equal(t, tc.unhealthyReason, unhealthyReason)
+			assert.Equal(t, tc.err, err)
+		})
+	}
+}

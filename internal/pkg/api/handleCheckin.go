@@ -928,6 +928,8 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	// fallback to other if components don't exist
 	if agent.UnhealthyReason == nil && (agent.LastCheckinStatus == FailedStatus || agent.LastCheckinStatus == DegradedStatus) {
 		unhealthyReason = []string{"other"}
+	} else {
+		unhealthyReason = agent.UnhealthyReason
 	}
 
 	if req.Components == nil {
