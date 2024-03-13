@@ -22,36 +22,22 @@ jobs:
         with:
           go-version-file: .go-version
 
-      - name: run go mod tidy in testing/
-        run: cd testing; go mod tidy
-
-      - name: check for modified testing/go.mod or testing/go.sum
-        id: testing-mod-check
-        run: echo "modified=$(if git diff-index --quiet HEAD -- testing/go.mod testing/go.sum; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
-
-      - name: commit testing/go.mod and testing/go.sum files
-        if: steps.testing-mod-check.outputs.modified == 'true'
-        run: |
-          git config --global user.name 'dependabot[bot]'
-          git config --global user.email 'dependabot[bot]@users.noreply.github.com'
-          git add testing/go.mod testing/go.sum
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git commit -m "Update testing/go.mod and testing/go.sum files"
-          git push
-
       - name: update NOTICE.txt
         run: make notice
 
-      - name: check for modified NOTICE.txt
-        id: notice-check
-        run: echo "modified=$(if git diff-index --quiet HEAD -- NOTICE.txt; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+      - name: run go mod tidy in testing/
+        run: cd testing; go mod tidy
 
-      - name: commit NOTICE.txt
-        if: steps.notice-check.outputs.modified == 'true'
+      - name: check for modified files
+        id: check-files
+        run: echo "modified=$(if git diff-index --quiet HEAD -- NOTICE.txt testing/go.mod testing/go.sum; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+
+      - name: commit modified files
+        if: steps.check-files.outputs.modified == 'true'
         run: |
           git config --global user.name 'dependabot[bot]'
           git config --global user.email 'dependabot[bot]@users.noreply.github.com'
-          git add NOTICE.txt
+          git add NOTICE.txt testing/go.mod testing/go.sum
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git commit -m "Update NOTICE.txt"
+          git commit -m "Post dependabot file modifications"
           git push
