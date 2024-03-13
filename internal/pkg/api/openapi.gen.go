@@ -45,6 +45,7 @@ const (
 	ActionSettingsLogLevelDebug   ActionSettingsLogLevel = "debug"
 	ActionSettingsLogLevelError   ActionSettingsLogLevel = "error"
 	ActionSettingsLogLevelInfo    ActionSettingsLogLevel = "info"
+	ActionSettingsLogLevelTrace   ActionSettingsLogLevel = "trace"
 	ActionSettingsLogLevelWarning ActionSettingsLogLevel = "warning"
 )
 
