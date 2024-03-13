@@ -7,7 +7,7 @@ updates:
       interval: "daily"
     labels:
       - automation
-      - skip-changelog
+      - dependency
       - Team:Fleet
     allow:
       # Only update internal dependencies for now while we evaluate this workflow.
