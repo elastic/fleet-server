@@ -13,5 +13,5 @@ updates:
       # Only update internal dependencies for now while we evaluate this workflow.
       - dependency-name: "github.com/elastic/*"
     reviewers:
-      - "elastic/elastic-agent-control-plane"
+      - "elastic/fleet"
     open-pull-requests-limit: 10
