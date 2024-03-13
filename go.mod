@@ -6,9 +6,9 @@ require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/elastic/elastic-agent-client/v7 v7.8.0
-	github.com/elastic/elastic-agent-libs v0.7.4
-	github.com/elastic/elastic-agent-system-metrics v0.7.0
-	github.com/elastic/go-elasticsearch/v8 v8.10.1
+	github.com/elastic/elastic-agent-libs v0.7.5
+	github.com/elastic/elastic-agent-system-metrics v0.9.2
+	github.com/elastic/go-elasticsearch/v8 v8.12.1
 	github.com/elastic/go-ucfg v0.8.7
 	github.com/fxamacker/cbor/v2 v2.5.0
 	github.com/go-chi/chi/v5 v5.0.10
@@ -52,7 +52,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.4.0 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
-	github.com/elastic/go-sysinfo v1.11.1 // indirect
+	github.com/elastic/go-sysinfo v1.13.1 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/fatih/color v1.15.0 // indirect
