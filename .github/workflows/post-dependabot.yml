@@ -27,7 +27,7 @@ jobs:
 
       - name: check for modified testing/go.mod or testing/go.sum
         id: testing-mod-check
-        run: echo "modified=$(if git diff-index --quite HEAD -- testing/go.mod testing/go.sum; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+        run: echo "modified=$(if git diff-index --quiet HEAD -- testing/go.mod testing/go.sum; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
 
       - name: commit testing/go.mod and testing/go.sum files
         if: steps.testing-mod-check.outputs.modified == 'true'
