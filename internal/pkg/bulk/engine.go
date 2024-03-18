@@ -35,6 +35,10 @@ var (
 	ErrNoQuotes = errors.New("quoted literal not supported")
 )
 
+const (
+	defaultOutputName = "default"
+)
+
 type MultiOp struct {
 	ID    string
 	Index string
@@ -75,6 +79,7 @@ type Bulk interface {
 	GetBulkerMap() map[string]Bulk
 	CancelFn() context.CancelFunc
 	RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool
+	GetOutputID(outputName string) string
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
@@ -273,6 +278,21 @@ func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name
 	}
 	b.remoteOutputConfigMap[name] = newCfgCopy
 	return hasChanged
+}
+
+func (b *Bulker) GetOutputID(outputName string) string {
+	if outputName != defaultOutputName {
+		return outputName
+	}
+	id := defaultOutputName
+	if b.remoteOutputConfigMap[defaultOutputName] != nil {
+		defaultID := b.remoteOutputConfigMap[defaultOutputName]["id"]
+		defaultIDString, ok := defaultID.(string)
+		if ok && defaultIDString != "" {
+			id = defaultIDString
+		}
+	}
+	return id
 }
 
 // read secrets one by one as there is no bulk API yet to read them in one request

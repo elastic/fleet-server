@@ -152,4 +152,11 @@ func (m *MockBulk) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, n
 	return name == "outdated"
 }
 
+func (m *MockBulk) GetOutputID(name string) string {
+	if name == "default" {
+		return "id"
+	}
+	return name
+}
+
 var _ bulk.Bulk = (*MockBulk)(nil)

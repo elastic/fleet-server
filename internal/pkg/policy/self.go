@@ -267,7 +267,7 @@ func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, zlog zerolog.Logg
 			continue
 		}
 		doc := model.OutputHealth{
-			Output:  outputName,
+			Output:  bulker.GetOutputID(outputName),
 			State:   client.UnitStateHealthy.String(),
 			Message: "",
 		}

@@ -148,3 +148,66 @@ func Test_CreateAndGetBulkerChanged(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, true, cancelFnCalled)
 }
+
+func Test_GetOutputID(t *testing.T) {
+	testcases := []struct {
+		name       string
+		cfg        map[string]interface{}
+		outputName string
+		outputId   string
+	}{
+		{
+			name:       "non-default",
+			cfg:        nil,
+			outputName: "id1",
+			outputId:   "id1",
+		},
+		{
+			name:       "cfg nil",
+			cfg:        nil,
+			outputName: "default",
+			outputId:   "default",
+		},
+		{
+			name: "cfg no id",
+			cfg: map[string]interface{}{
+				"type":          "remote_elasticsearch",
+				"hosts":         []string{"https://remote-es:443"},
+				"service_token": "token1",
+			},
+			outputName: "default",
+			outputId:   "default",
+		},
+		{
+			name: "cfg id empty",
+			cfg: map[string]interface{}{
+				"id":            "",
+				"type":          "remote_elasticsearch",
+				"hosts":         []string{"https://remote-es:443"},
+				"service_token": "token1",
+			},
+			outputName: "default",
+			outputId:   "default",
+		},
+		{
+			name: "cfg id",
+			cfg: map[string]interface{}{
+				"id":            "id",
+				"type":          "remote_elasticsearch",
+				"hosts":         []string{"https://remote-es:443"},
+				"service_token": "token1",
+			},
+			outputName: "default",
+			outputId:   "id",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := NewBulker(nil, nil)
+			bulker.remoteOutputConfigMap["default"] = tc.cfg
+			outputId := bulker.GetOutputID(tc.outputName)
+			assert.Equal(t, tc.outputId, outputId)
+		})
+	}
+}
