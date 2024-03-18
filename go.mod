@@ -19,7 +19,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/mailru/easyjson v0.7.7
 	github.com/miolini/datacounter v1.0.3
-	github.com/oapi-codegen/runtime v1.0.0
+	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.17.0
 	github.com/rs/xid v1.5.0
@@ -35,7 +35,7 @@ require (
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/sync v0.5.0
-	golang.org/x/time v0.3.0
+	golang.org/x/time v0.5.0
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -54,14 +54,14 @@ require (
 	github.com/elastic/go-structform v0.0.10 // indirect
 	github.com/elastic/go-sysinfo v1.13.1 // indirect
 	github.com/elastic/go-windows v1.0.1 // indirect
-	github.com/elastic/gosigar v0.14.2 // indirect
+	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/golang/glog v1.1.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/uuid v1.4.0 // indirect
+	github.com/google/uuid v1.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

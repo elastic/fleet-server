@@ -2,12 +2,16 @@ module github.com/elastic/fleet-server/testing
 
 go 1.21
 
-replace github.com/elastic/fleet-server/v7 => ../
+replace (
+	github.com/elastic/fleet-server/pkg/api => ../pkg/api
+	github.com/elastic/fleet-server/v7 => ../
+)
 
 require (
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/docker/docker v24.0.7+incompatible
 	github.com/elastic/elastic-agent-client/v7 v7.8.0
+	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.8.4
 	github.com/testcontainers/testcontainers-go v0.23.0
@@ -30,14 +34,14 @@ require (
 	github.com/elastic/elastic-agent-libs v0.7.5 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/uuid v1.4.0 // indirect
+	github.com/google/uuid v1.5.0 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/moby/patternmatcher v0.5.0 // indirect
 	github.com/moby/sys/sequential v0.5.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/oapi-codegen/runtime v1.0.0 // indirect
+	github.com/oapi-codegen/runtime v1.1.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc4 // indirect
 	github.com/opencontainers/runc v1.1.12 // indirect
