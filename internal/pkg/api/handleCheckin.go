@@ -47,7 +47,9 @@ var (
 )
 
 const (
-	kEncodingGzip = "gzip"
+	kEncodingGzip  = "gzip"
+	FailedStatus   = "FAILED"
+	DegradedStatus = "DEGRADED"
 )
 
 // validActionTypes is a map of action.type and if they are valid
@@ -156,11 +158,12 @@ func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, 
 
 // validatedCheckin is a struct to wrap all the things that validateRequest returns.
 type validatedCheckin struct {
-	req     *CheckinRequest
-	dur     time.Duration
-	rawMeta []byte
-	rawComp []byte
-	seqno   sqn.SeqNo
+	req             *CheckinRequest
+	dur             time.Duration
+	rawMeta         []byte
+	rawComp         []byte
+	seqno           sqn.SeqNo
+	unhealthyReason *[]string
 }
 
 func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent) (validatedCheckin, error) {
@@ -228,7 +231,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	}
 
 	// Compare agent_components content and update if different
-	rawComponents, err := parseComponents(zlog, agent, &req)
+	rawComponents, unhealthyReason, err := parseComponents(zlog, agent, &req)
 	if err != nil {
 		return val, err
 	}
@@ -240,11 +243,12 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	}
 
 	return validatedCheckin{
-		req:     &req,
-		dur:     pollDuration,
-		rawMeta: rawMeta,
-		rawComp: rawComponents,
-		seqno:   seqno,
+		req:             &req,
+		dur:             pollDuration,
+		rawMeta:         rawMeta,
+		rawComp:         rawComponents,
+		seqno:           seqno,
+		unhealthyReason: unhealthyReason,
 	}, nil
 }
 
@@ -258,6 +262,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	rawMeta := validated.rawMeta
 	rawComponents := validated.rawComp
 	seqno := validated.seqno
+	unhealthyReason := validated.unhealthyReason
 
 	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
 	// Older agents will communicate any issues with upgrades via the Ack endpoint.
@@ -302,7 +307,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer longPoll.Stop()
 
 	// Initial update on checkin, and any user fields that might have changed
-	err = ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, rawMeta, rawComponents, seqno, ver)
+	err = ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, rawMeta, rawComponents, seqno, ver, unhealthyReason)
 	if err != nil {
 		zlog.Error().Err(err).Str(logger.AgentID, agent.Id).Msg("checkin failed")
 	}
@@ -356,7 +361,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				zlog.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
-				err := ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, nil, rawComponents, nil, ver)
+				err := ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, nil, rawComponents, nil, ver, unhealthyReason)
 				if err != nil {
 					zlog.Error().Err(err).Str(logger.AgentID, agent.Id).Msg("checkin failed")
 				}
@@ -917,50 +922,52 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	return outMeta, nil
 }
 
-func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
+func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, *[]string, error) {
+	var unhealthyReason []string
+
+	// fallback to other if components don't exist
+	if agent.UnhealthyReason == nil && (agent.LastCheckinStatus == FailedStatus || agent.LastCheckinStatus == DegradedStatus) {
+		unhealthyReason = []string{"other"}
+	} else {
+		unhealthyReason = agent.UnhealthyReason
+	}
+
 	if req.Components == nil {
-		return nil, nil
+		return nil, &unhealthyReason, nil
+	}
+
+	agentComponentsJSON, err := json.Marshal(agent.Components)
+	if err != nil {
+		return nil, &unhealthyReason, fmt.Errorf("agent.Components marshal: %w", err)
 	}
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
-	if bytes.Equal(*req.Components, agent.Components) {
+	if bytes.Equal(*req.Components, agentComponentsJSON) {
 		zlog.Trace().Msg("quick comparing agent components data is equal")
-		return nil, nil
+		return nil, &unhealthyReason, nil
 	}
 
 	// Deserialize the request components data
-	var reqComponents interface{}
+	var reqComponents []model.ComponentsItems
 	if len(*req.Components) > 0 {
 		if err := json.Unmarshal(*req.Components, &reqComponents); err != nil {
-			return nil, fmt.Errorf("parseComponents request: %w", err)
-		}
-		// Validate that components is an array
-		if _, ok := reqComponents.([]interface{}); !ok {
-			return nil, errors.New("parseComponets request: components property is not array")
+			return nil, &unhealthyReason, fmt.Errorf("parseComponents request: %w", err)
 		}
 	}
 
 	// If empty, don't step on existing data
 	if reqComponents == nil {
-		return nil, nil
-	}
-
-	// Deserialize the agent's components copy
-	var agentComponents interface{}
-	if len(agent.Components) > 0 {
-		if err := json.Unmarshal(agent.Components, &agentComponents); err != nil {
-			return nil, fmt.Errorf("parseComponents local: %w", err)
-		}
+		return nil, &unhealthyReason, nil
 	}
 
 	var outComponents []byte
 
 	// Compare the deserialized meta structures and return the bytes to update if different
-	if !reflect.DeepEqual(reqComponents, agentComponents) {
+	if !reflect.DeepEqual(reqComponents, agent.Components) {
 
 		zlog.Trace().
-			RawJSON("oldComponents", agent.Components).
+			RawJSON("oldComponents", agentComponentsJSON).
 			RawJSON("newComponents", *req.Components).
 			Msg("local components data is not equal")
 
@@ -969,9 +976,48 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 			Msg("applying new components data")
 
 		outComponents = *req.Components
+		compUnhealthyReason := calcUnhealthyReason(reqComponents)
+		if len(compUnhealthyReason) > 0 {
+			unhealthyReason = compUnhealthyReason
+		}
 	}
 
-	return outComponents, nil
+	zlog.Debug().Any("unhealthy_reason", unhealthyReason).Msg("unhealthy reason")
+
+	return outComponents, &unhealthyReason, nil
+}
+
+func calcUnhealthyReason(reqComponents []model.ComponentsItems) []string {
+	var unhealthyReason []string
+	hasUnhealthyInput := false
+	hasUnhealthyOutput := false
+	hasUnhealthyComponent := false
+	for _, component := range reqComponents {
+		if component.Status == FailedStatus || component.Status == DegradedStatus {
+			hasUnhealthyComponent = true
+			for _, unit := range component.Units {
+				if unit.Status == FailedStatus || unit.Status == DegradedStatus {
+					if unit.Type == "input" {
+						hasUnhealthyInput = true
+					} else if unit.Type == "output" {
+						hasUnhealthyOutput = true
+					}
+				}
+			}
+		}
+	}
+	unhealthyReason = make([]string, 0)
+	if hasUnhealthyInput {
+		unhealthyReason = append(unhealthyReason, "input")
+	}
+	if hasUnhealthyOutput {
+		unhealthyReason = append(unhealthyReason, "output")
+	}
+	if !hasUnhealthyInput && !hasUnhealthyOutput && hasUnhealthyComponent {
+		unhealthyReason = append(unhealthyReason, "other")
+	}
+
+	return unhealthyReason
 }
 
 func calcPollDuration(zlog zerolog.Logger, pollDuration, setupDuration, jitterDuration time.Duration) (time.Duration, time.Duration) {

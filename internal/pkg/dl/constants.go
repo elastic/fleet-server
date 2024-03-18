@@ -47,6 +47,7 @@ const (
 	FieldRevisionIdx                   = "revision_idx"
 	FieldUnenrolledReason              = "unenrolled_reason"
 	FiledType                          = "type"
+	FieldUnhealthyReason               = "unhealthy_reason"
 
 	FieldActive           = "active"
 	FieldUpdatedAt        = "updated_at"
