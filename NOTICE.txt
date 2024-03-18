@@ -2591,11 +2591,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/oapi-codegen/runtime
-Version: v1.0.0
+Version: v1.1.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/oapi-codegen/runtime@v1.0.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/oapi-codegen/runtime@v1.1.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4871,11 +4871,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/time
-Version: v0.3.0
+Version: v0.5.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/time@v0.3.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/time@v0.5.0/LICENSE:
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
@@ -11697,11 +11697,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/gomarkdown/markdown
-Version: v0.0.0-20230716120725-531d2d74bc12
+Version: v0.0.0-20230922112808-5421fefb8386
 Licence type (autodetected): BSD-2-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/gomarkdown/markdown@v0.0.0-20230716120725-531d2d74bc12/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/gomarkdown/markdown@v0.0.0-20230922112808-5421fefb8386/LICENSE.txt:
 
 Markdown is distributed under the Simplified BSD License:
 
@@ -12162,11 +12162,11 @@ Contents of probable licence file $GOMODCACHE/github.com/google/pprof@v0.0.0-202
 
 --------------------------------------------------------------------------------
 Dependency : github.com/google/uuid
-Version: v1.4.0
+Version: v1.5.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/google/uuid@v1.4.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/google/uuid@v1.5.0/LICENSE:
 
 Copyright (c) 2009,2014 Google Inc. All rights reserved.
 
@@ -13733,11 +13733,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/kataras/iris/v12
-Version: v12.2.5
+Version: v12.2.6-0.20230908161203-24ba4e8933b9
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/kataras/iris/v12@v12.2.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/kataras/iris/v12@v12.2.6-0.20230908161203-24ba4e8933b9/LICENSE:
 
 BSD 3-Clause License
 
@@ -14306,11 +14306,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/labstack/echo/v4
-Version: v4.11.1
+Version: v4.11.4
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/labstack/echo/v4@v4.11.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/labstack/echo/v4@v4.11.4/LICENSE:
 
 The MIT License (MIT)
 
@@ -14337,11 +14337,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/labstack/gommon
-Version: v0.4.0
+Version: v0.4.2
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/labstack/gommon@v0.4.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/labstack/gommon@v0.4.2/LICENSE:
 
 The MIT License (MIT)
 
@@ -17805,11 +17805,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/tdewolff/minify/v2
-Version: v2.12.8
+Version: v2.12.9
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/tdewolff/minify/v2@v2.12.8/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/tdewolff/minify/v2@v2.12.9/LICENSE:
 
 Copyright (c) 2015 Taco de Wolff
 
@@ -17836,11 +17836,11 @@ Copyright (c) 2015 Taco de Wolff
 
 --------------------------------------------------------------------------------
 Dependency : github.com/tdewolff/parse/v2
-Version: v2.6.7
+Version: v2.6.8
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/tdewolff/parse/v2@v2.6.7/LICENSE.md:
+Contents of probable licence file $GOMODCACHE/github.com/tdewolff/parse/v2@v2.6.8/LICENSE.md:
 
 Copyright (c) 2015 Taco de Wolff
 
