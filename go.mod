@@ -9,7 +9,7 @@ require (
 	github.com/elastic/elastic-agent-libs v0.7.5
 	github.com/elastic/elastic-agent-system-metrics v0.9.2
 	github.com/elastic/go-elasticsearch/v8 v8.12.1
-	github.com/elastic/go-ucfg v0.8.7
+	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.5.0
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/gofrs/uuid v4.4.0+incompatible
