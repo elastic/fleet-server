@@ -199,6 +199,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	defer span.End()
 
 	// Do actual bulk request; defer to the client
+	// test
 	req := esapi.BulkRequest{
 		Body: bytes.NewReader(buf.Bytes()),
 		Pipeline: "set_ingest_time",
