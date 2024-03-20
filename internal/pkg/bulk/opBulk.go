@@ -201,6 +201,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	// Do actual bulk request; defer to the client
 	req := esapi.BulkRequest{
 		Body: bytes.NewReader(buf.Bytes()),
+		Pipeline: "set_ingest_time",
 	}
 
 	if queue.ty == kQueueRefreshBulk {
