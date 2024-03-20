@@ -3,5 +3,5 @@ go 1.21
 use (
 	./
 	./testing
-  ./api/pkg
+  ./pkg/api
 )
