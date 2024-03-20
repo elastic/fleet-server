@@ -34,6 +34,67 @@ The following are notes to help developers onboarding to the project to quickly 
 
 When developing features for Fleet, it may become necessary to run both Fleet Server and Kibana from source in order to implement features end-to-end. To faciliate this, we've created a separate guide hosted [here](https://github.com/elastic/kibana/blob/main/x-pack/plugins/fleet/dev_docs/developing_kibana_and_fleet_server.md).
 
+## IDE config
+
+When using the gopls language server you may run into the following errors in
+the `testing` package:
+
+```bash
+error while importing github.com/elastic/fleet-server/testing/e2e/scaffold: build constraints exclude all Go files in  <path to fleet-server>/fleet-server/testing/e2e/scaffold
+```
+
+```bash
+/<path to fleet-server>/fleet-server/testing/e2e/agent_install_test.go.
+   This file may be excluded due to its build tags; try adding "-tags=<build tag>" to your gopls "buildFlags" configuration
+   See the documentation for more information on working with build tags:
+   https://github.com/golang/tools/blob/master/gopls/doc/settings.md#buildflags-string
+```
+
+The `go.work` and `go.work.sum` files should resolve the first error. Solution for
+the second error depends on the ide and the package manager you are using. 
+
+### neovim
+
+#### lazyvim package manager
+
+##### nvim-lspconfig plugin
+
+Add the following to your config files
+
+```lua
+{
+  "neovim/nvim-lspconfig",
+  opts = {
+    servers = {
+      gopls = {
+        settings = {
+          gopls = {
+            buildFlags = { "-tags=e2e integration cloude2e" },
+          },
+        },
+      },
+    },
+  },
+}
+```
+
+After these changes if you are still running into issues with code suggestions,
+autocomplete, you may have to clear your go mod cache and restart your lsp
+clients.
+
+Run the following command to clear your go mod cache
+
+```bash
+go clean -modcache
+```
+
+restart your vim session and run the following command to restart your lsp
+clients
+
+```vim
+:LspRestart
+```
+
 ### Changelog
 
 The changelog for fleet-server is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool).
