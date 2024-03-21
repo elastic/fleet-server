@@ -18,9 +18,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/elastic/fleet-server/pkg/api/versions/2023_06_01/api"
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
-	"github.com/elastic/fleet-server/v7/pkg/api/versions/2023_06_01/api"
-
 	"github.com/elastic/fleet-server/v7/version"
 )
 

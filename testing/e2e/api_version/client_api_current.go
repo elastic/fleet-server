@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/fleet-server/pkg/api"
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
-	"github.com/elastic/fleet-server/v7/pkg/api"
 	"github.com/elastic/fleet-server/v7/version"
 )
 

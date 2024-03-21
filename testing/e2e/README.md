@@ -19,7 +19,7 @@ The main touchpoints for adding a test are as follows:
 - `stand_alone_test.go` - suite contains tests to ensure that the fleet-server is able to start with different configuration as a stand-alone binary.
 - `stand_alone_container_test.go` - suite contains tests to ensure that the fleet-server is able to start with differnt configuration when running in a container.
 - `stand_alone_api_test.go` - wrappers to lauch API client tests against a fleet-server running as a stand-alone binary
-- `api_version/*` - suites and utilitys to test the API endpoints with specific versions.
+- `api_version/*` - suites and utilities to test the API endpoints with specific versions.
 
 ## API Tests
 
@@ -53,7 +53,7 @@ The `TestSomething` methods will automatically be ran as part of the API test su
 An example of adding a test is adding a new endpoint to the API.
 Here is how the `GET /api/agents/upgrades/:version/pgp-public-key` was added as a test.
 
-First, make sure that the client implementation in `pkg/api` has the new endpoint by running `make generate` in the repo's root directory.
+First, make sure that the client implementation in `../pkg/api` has the new endpoint by running `make generate` in the repo's root directory.
 
 Next you should add a wrapper to the call in `api_version/client_api_current.go` that other test cases may use, this method should make and validate the call.
 For example:
