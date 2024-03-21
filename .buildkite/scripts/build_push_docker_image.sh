@@ -14,4 +14,4 @@ if [[ "${DOCKER_IMAGE_GIT_TAG}" == "main" ]]; then
     DOCKER_IMAGE=${DOCKER_IMAGE} DOCKER_IMAGE_TAG="${DOCKER_IMAGE_LATEST_TAG}" make build-and-push-docker
 else
     DOCKER_IMAGE=${DOCKER_IMAGE} DOCKER_IMAGE_TAG="${DOCKER_IMAGE_GIT_TAG}" make build-and-push-docker
-
+fi
