@@ -365,8 +365,19 @@ e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
 	rm -f .kibana_service_token
 	@$(MAKE) int-docker-stop
 
+.PHONY: prepare-docker-build-context
+prepare-docker-build-context:
+	@echo "Preparing Docker build context..."
+	@temp_dir="docker_build_context"; \
+	rm -rf $$temp_dir; \
+	mkdir -p $$temp_dir; \
+	rsync -R go.work go.work.sum $$temp_dir/; \
+	find . -name 'go.mod' -o -name 'go.sum' | while read file; do \
+			rsync -R $$file $$temp_dir/; \
+	done
+
 .PHONY: test-e2e
-test-e2e: docker-cover-e2e-binaries e2e-certs build-docker ## - Setup and run the blackbox end to end test suite
+test-e2e: docker-cover-e2e-binaries e2e-certs build-docker prepare-docker-build-context ## - Setup and run the blackbox end to end test suite
 	@mkdir -p build/e2e-cover
 	@$(MAKE) e2e-docker-start
 	@set -o pipefail; $(MAKE) test-e2e-set | tee build/test-e2e.out
