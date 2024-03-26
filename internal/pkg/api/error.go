@@ -42,6 +42,22 @@ const (
 	LogAccessAPIKeyID = logger.AccessAPIKeyID
 )
 
+// DecodeReqErr is intended to be a wrapper around any possible json decoding errors that
+// may occur while decoding requests. These errors are mainly json.SyntaxError, json.UnmarshalTypeError, and
+// io.EOF errors.
+type DecodeReqErr struct {
+	Msg     string
+	nextErr error
+}
+
+func (e *DecodeReqErr) Error() string {
+	return fmt.Sprintf("Request decoding error: %s", e.Msg)
+}
+
+func (e *DecodeReqErr) Unwrap() error {
+	return e.nextErr
+}
+
 // HTTPErrResp is an HTTP error response
 type HTTPErrResp struct {
 	StatusCode int           `json:"statusCode"`
@@ -479,6 +495,16 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			}
 
 			return e.meta
+		}
+	}
+
+	var drErr *DecodeReqErr
+	if errors.As(err, &drErr) {
+		return HTTPErrResp{
+			http.StatusBadRequest,
+			err.Error(),
+			"Fleet server unable to decode request",
+			zerolog.ErrorLevel,
 		}
 	}
 
