@@ -112,6 +112,13 @@ func Test_ErrResp_Status(t *testing.T) {
 			Status: 500,
 		},
 		status: 503,
+	}, {
+		name: "decode req error",
+		err: &DecodeReqErr{
+			Msg:     "testMessage",
+			nextErr: fmt.Errorf("testError"),
+		},
+		status: 400,
 	}}
 
 	for _, tc := range tests {
