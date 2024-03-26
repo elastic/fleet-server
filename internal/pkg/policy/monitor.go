@@ -247,7 +247,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
 		err := m.limit.Wait(ctx)
 		if err != nil {
-			m.log.Error().Err(err).Msg("Policy limit error")
+			m.log.Warn().Err(err).Msg("Policy limit error")
 			return
 		}
 		// Lookup the latest policy for this subscription
