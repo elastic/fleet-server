@@ -489,7 +489,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	if f.standAlone {
 		sm = policy.NewStandAloneSelfMonitor(bulker, f.reporter)
 	} else {
-		sm = policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
+		sm = policy.NewSelfMonitor(*cfg, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
 	}
 	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 
