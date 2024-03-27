@@ -36,9 +36,11 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := config.Fleet{
-		Agent: config.Agent{
-			ID: "agent-id",
+	cfg := config.Config{
+		Fleet: config.Fleet{
+			Agent: config.Agent{
+				ID: "agent-id",
+			},
 		},
 	}
 	reporter := &FakeReporter{}
@@ -174,9 +176,11 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := config.Fleet{
-		Agent: config.Agent{
-			ID: "",
+	cfg := config.Config{
+		Fleet: config.Fleet{
+			Agent: config.Agent{
+				ID: "",
+			},
 		},
 	}
 	reporter := &FakeReporter{}
@@ -333,9 +337,11 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := config.Fleet{
-		Agent: config.Agent{
-			ID: "agent-id",
+	cfg := config.Config{
+		Fleet: config.Fleet{
+			Agent: config.Agent{
+				ID: "agent-id",
+			},
 		},
 	}
 	policyID := uuid.Must(uuid.NewV4()).String()
@@ -471,9 +477,11 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := config.Fleet{
-		Agent: config.Agent{
-			ID: "",
+	cfg := config.Config{
+		Fleet: config.Fleet{
+			Agent: config.Agent{
+				ID: "",
+			},
 		},
 	}
 	policyID := uuid.Must(uuid.NewV4()).String()
