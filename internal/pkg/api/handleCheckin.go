@@ -181,12 +181,12 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	var req CheckinRequest
 	decoder := json.NewDecoder(readCounter)
 	if err := decoder.Decode(&req); err != nil {
-		return val, &DecodeReqErr{Msg: "checkin request decode error", nextErr: err}
+		return val, &BadRequestErr{msg: "checkin request decode error", nextErr: err}
 	}
 	cntCheckin.bodyIn.Add(readCounter.Count())
 
 	if req.Status == CheckinRequestStatus("") {
-		return val, fmt.Errorf("checkin status missing")
+		return val, &BadRequestErr{msg: "checkin status missing"}
 	}
 	if len(req.Message) == 0 {
 		zlog.Warn().Msg("checkin request method is empty.")
@@ -197,7 +197,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	if req.PollTimeout != nil {
 		pDur, err = time.ParseDuration(*req.PollTimeout)
 		if err != nil {
-			return val, fmt.Errorf("poll_timeout cannot be parsed as duration: %w", err)
+			return val, &BadRequestErr{msg: "poll_timeout cannot be parsed as duration", nextErr: err}
 		}
 	}
 

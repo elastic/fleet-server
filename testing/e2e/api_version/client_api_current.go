@@ -324,6 +324,20 @@ func (tester *ClientAPITester) TestEnrollCheckinAck() {
 	tester.AgentIsOnline(ctx, agentID)
 }
 
+func (tester *ClientAPITester) TestCheckinWithBadRequest() {
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+
+	tester.T().Log("test enrollment")
+	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	tester.VerifyAgentInKibana(ctx, agentID)
+
+	tester.T().Logf("test checkin 1: agent %s", agentID)
+
+	_, _, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, &api.CheckinRequest{})
+	tester.Require().Equal(http.StatusBadRequest, statusCode, "Expected status code 400 for bad request")
+}
+
 func (tester *ClientAPITester) TestFullFileUpload() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -114,8 +114,8 @@ func Test_ErrResp_Status(t *testing.T) {
 		status: 503,
 	}, {
 		name: "decode req error",
-		err: &DecodeReqErr{
-			Msg:     "testMessage",
+		err: &BadRequestErr{
+			msg:     "testMessage",
 			nextErr: fmt.Errorf("testError"),
 		},
 		status: 400,
