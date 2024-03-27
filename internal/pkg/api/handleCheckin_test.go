@@ -10,8 +10,10 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -869,6 +871,49 @@ func TestParseComponents(t *testing.T) {
 			assert.Equal(t, tc.outComponents, outComponents)
 			assert.Equal(t, tc.unhealthyReason, unhealthyReason)
 			assert.Equal(t, tc.err, err)
+		})
+	}
+}
+
+func TestValidateRequest(t *testing.T) {
+	verCon := mustBuildConstraints("8.0.0")
+
+	tests := []struct {
+		name     string
+		req      *http.Request
+		cfg      *config.Server
+		expErr   error
+		expValid validatedCheckin
+	}{
+		{
+			name: "Invalid JSON",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"invalidJson":}`)),
+			},
+			expErr: &DecodeReqErr{},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			checkin := NewCheckinT(verCon, tc.cfg, nil, nil, nil, nil, nil, nil, nil)
+			wr := httptest.NewRecorder()
+			logger := testlog.SetLogger(t)
+			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, nil)
+			if tc.expErr == nil {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorAs(t, err, &tc.expErr)
+			}
+			assert.Equal(t, tc.expValid, valid)
 		})
 	}
 }
