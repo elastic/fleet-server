@@ -181,7 +181,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	var req CheckinRequest
 	decoder := json.NewDecoder(readCounter)
 	if err := decoder.Decode(&req); err != nil {
-		return val, fmt.Errorf("decode checkin request: %w", err)
+		return val, &DecodeReqErr{Msg: "checkin request decode error", nextErr: err}
 	}
 	cntCheckin.bodyIn.Add(readCounter.Count())
 
@@ -638,7 +638,6 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req C
 
 func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentID string) ([]model.Action, error) {
 	actions, err := dl.FindAgentActions(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentID)
-
 	if err != nil {
 		return nil, fmt.Errorf("fetchAgentPendingActions: %w", err)
 	}
@@ -660,7 +659,6 @@ func filterActions(zlog zerolog.Logger, agentID string, actions []model.Action) 
 		resp = append(resp, action)
 	}
 	return resp
-
 }
 
 // convertActionData converts the passed raw message data to Action_Data using aType as a discriminator.
