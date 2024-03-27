@@ -42,19 +42,19 @@ const (
 	LogAccessAPIKeyID = logger.AccessAPIKeyID
 )
 
-// DecodeReqErr is intended to be a wrapper around any possible json decoding errors that
-// may occur while decoding requests. These errors are mainly json.SyntaxError, json.UnmarshalTypeError, and
-// io.EOF errors.
-type DecodeReqErr struct {
-	Msg     string
+// BadRequestErr is used for request validation errors. These can be json
+// unmarshal errors such as json.SyntaxError, or any other input validation
+// error.
+type BadRequestErr struct {
+	msg     string
 	nextErr error
 }
 
-func (e *DecodeReqErr) Error() string {
-	return fmt.Sprintf("Request decoding error: %s", e.Msg)
+func (e *BadRequestErr) Error() string {
+	return fmt.Sprintf("Bad request: %s", e.msg)
 }
 
-func (e *DecodeReqErr) Unwrap() error {
+func (e *BadRequestErr) Unwrap() error {
 	return e.nextErr
 }
 
@@ -498,12 +498,12 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		}
 	}
 
-	var drErr *DecodeReqErr
+	var drErr *BadRequestErr
 	if errors.As(err, &drErr) {
 		return HTTPErrResp{
 			http.StatusBadRequest,
+			"BadRequest",
 			err.Error(),
-			"Fleet server unable to decode request",
 			zerolog.ErrorLevel,
 		}
 	}
