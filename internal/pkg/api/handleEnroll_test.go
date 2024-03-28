@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -246,4 +247,10 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestValidateEnrollRequest(t *testing.T) {
+	req, err := validateRequest(context.Background(), strings.NewReader("not a json"))
+	assert.Equal(t, "Bad request: decode enroll request", err.Error())
+	assert.Nil(t, req)
 }
