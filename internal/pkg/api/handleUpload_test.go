@@ -934,6 +934,56 @@ func TestUploadCompleteIncorrectTransitHash(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "failed validation")
 }
 
+func TestUploadCompleteBadRequests(t *testing.T) {
+	mockUploadID := "abc123"
+
+	hr, _, fakebulk, _ := prepareUploaderMock(t)
+	mockInfo := file.Info{
+		DocID:     "bar.foo",
+		ID:        mockUploadID,
+		ChunkSize: file.MaxChunkSize,
+		Total:     file.MaxChunkSize * 3,
+		Count:     3,
+		Start:     time.Now().Add(-time.Minute),
+		Status:    file.StatusProgress,
+		Source:    "agent",
+		AgentID:   "foo",
+		ActionID:  "bar",
+	}
+
+	mockUploadedFile(fakebulk, mockInfo, []file.ChunkInfo{
+		{
+			Last: false,
+			BID:  mockInfo.DocID,
+			Size: int(file.MaxChunkSize),
+			Pos:  0,
+			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
+		},
+		{
+			Last: true,
+			BID:  mockInfo.DocID,
+			Size: int(file.MaxChunkSize),
+			Pos:  1,
+			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
+		},
+		{
+			Last: true,
+			BID:  mockInfo.DocID,
+			Size: int(file.MaxChunkSize),
+			Pos:  2,
+			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
+		},
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": `))
+
+	hr.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, rec.Body.String(), "{\"statusCode\":400,\"error\":\"BadRequest\",\"message\":\"Bad request: unable to parse upload complete request body\"}")
+}
+
 /*
 	Helpers and mocks
 */
