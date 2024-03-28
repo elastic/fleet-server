@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"go.elastic.co/apm/v2"
@@ -193,8 +194,43 @@ LOOP:
 		curCfg = newCfg
 
 		select {
-		case newCfg = <-f.cfgCh:
+		case cfg := <-f.cfgCh:
 			log.Info().Msg("Server configuration update")
+			if cfg.Inputs == nil {
+				// cfg only contains updated output retrieved from policy
+				esOutput := config.MergeElasticsearchFromPolicy(curCfg.Output.Elasticsearch, cfg.Output.Elasticsearch)
+				newCfg.RevisionIdx = cfg.RevisionIdx
+
+				// test config
+				cli, err := es.NewClient(ctx,
+					&config.Config{
+						Output: config.Output{
+							Elasticsearch: esOutput,
+						},
+					},
+					false,
+					elasticsearchOptions(curCfg.Inputs[0].Server.Instrumentation.Enabled, f.bi)...,
+				)
+				if err != nil {
+					log.Warn().Err(err).Msg("unable to create elasticsearch client from policy output")
+					continue
+				}
+				remoteVersion, err := ver.CheckCompatibility(ctx, cli, f.bi.Version)
+				if err != nil {
+					// NOTE The error can indicate a bad network connection, bad TLS settings, etc.
+					// But if the error is an ErrElasticVersionConflict then something is very wrong
+					if errors.Is(err, es.ErrElasticVersionConflict) {
+						log.Error().Err(err).Interface("output", esOutput).Interface("bootstrap", curCfg.Output.Elasticsearch).Str("remote_version", remoteVersion).Msg("Elasticsearch version constraint failed for new output")
+					} else {
+						log.Warn().Err(err).Msg("Failed version compatibility check using output from policy")
+					}
+					continue
+				}
+				log.Info().Int64(logger.RevisionIdx, cfg.RevisionIdx).Msg("Using output from policy")
+				newCfg.Output.Elasticsearch = esOutput
+			} else {
+				newCfg = cfg
+			}
 		case err := <-ech:
 			f.reporter.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			log.Error().Err(err).Msg("Fleet Server failed")
@@ -489,7 +525,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	if f.standAlone {
 		sm = policy.NewStandAloneSelfMonitor(bulker, f.reporter)
 	} else {
-		sm = policy.NewSelfMonitor(*cfg, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter)
+		sm = policy.NewSelfMonitor(cfg.Fleet, bulker, pim, cfg.Inputs[0].Policy.ID, f.reporter, f.cfgCh)
 	}
 	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 

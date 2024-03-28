@@ -36,11 +36,9 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := config.Config{
-		Fleet: config.Fleet{
-			Agent: config.Agent{
-				ID: "agent-id",
-			},
+	cfg := config.Fleet{
+		Agent: config.Agent{
+			ID: "agent-id",
 		},
 	}
 	reporter := &FakeReporter{}
@@ -56,7 +54,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	emptyBulkerMap := make(map[string]bulk.Bulk)
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
-	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
+	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter, make(chan *config.Config, 2))
 	sm := monitor.(*selfMonitorT)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
@@ -176,11 +174,9 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := config.Config{
-		Fleet: config.Fleet{
-			Agent: config.Agent{
-				ID: "",
-			},
+	cfg := config.Fleet{
+		Agent: config.Agent{
+			ID: "",
 		},
 	}
 	reporter := &FakeReporter{}
@@ -197,7 +193,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	emptyBulkerMap := make(map[string]bulk.Bulk)
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
-	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
+	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter, make(chan *config.Config, 1))
 	sm := monitor.(*selfMonitorT)
 	sm.checkTime = 100 * time.Millisecond
 
@@ -337,11 +333,9 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := config.Config{
-		Fleet: config.Fleet{
-			Agent: config.Agent{
-				ID: "agent-id",
-			},
+	cfg := config.Fleet{
+		Agent: config.Agent{
+			ID: "agent-id",
 		},
 	}
 	policyID := uuid.Must(uuid.NewV4()).String()
@@ -358,7 +352,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	emptyBulkerMap := make(map[string]bulk.Bulk)
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
-	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
+	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter, make(chan *config.Config, 2))
 	sm := monitor.(*selfMonitorT)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
@@ -477,11 +471,9 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := config.Config{
-		Fleet: config.Fleet{
-			Agent: config.Agent{
-				ID: "",
-			},
+	cfg := config.Fleet{
+		Agent: config.Agent{
+			ID: "",
 		},
 	}
 	policyID := uuid.Must(uuid.NewV4()).String()
@@ -498,7 +490,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	emptyBulkerMap := make(map[string]bulk.Bulk)
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
-	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
+	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter, make(chan *config.Config, 1))
 	sm := monitor.(*selfMonitorT)
 	sm.checkTime = 100 * time.Millisecond
 

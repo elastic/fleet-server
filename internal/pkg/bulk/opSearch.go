@@ -160,12 +160,12 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 		req := esapi.FleetMsearchRequest{
 			Body: bytes.NewReader(buf.Bytes()),
 		}
-		res, err = req.Do(ctx, b.Client())
+		res, err = req.Do(ctx, b.es)
 	} else {
 		req := esapi.MsearchRequest{
 			Body: bytes.NewReader(buf.Bytes()),
 		}
-		res, err = req.Do(ctx, b.Client())
+		res, err = req.Do(ctx, b.es)
 	}
 
 	if err != nil {

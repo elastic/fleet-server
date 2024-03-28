@@ -13,7 +13,6 @@ import (
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
@@ -79,11 +78,6 @@ func (m *MockBulk) Search(ctx context.Context, index string, body []byte, opts .
 func (m *MockBulk) Client() *elasticsearch.Client {
 	args := m.Called()
 	return args.Get(0).(*elasticsearch.Client)
-}
-
-func (m *MockBulk) Reload(ctx context.Context, cfg *config.Config) error {
-	args := m.Called(ctx, cfg)
-	return args.Error(0)
 }
 
 func (m *MockBulk) GetBulker(outputName string) bulk.Bulk {

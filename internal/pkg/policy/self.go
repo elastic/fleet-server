@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +36,8 @@ const DefaultCheckTimeout = 30 * time.Second
 
 var errInvalidOutput = fmt.Errorf("policy output invalid")
 
+var ErrNoPolicyUpdate = fmt.Errorf("policy has not updated")
+
 type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error)
 
 type SelfMonitor interface {
@@ -48,9 +51,10 @@ type selfMonitorT struct {
 	log zerolog.Logger
 
 	mut     sync.Mutex
-	cfg     config.Config
+	fleet   config.Fleet
 	bulker  bulk.Bulk
 	monitor monitor.Monitor
+	cfgCh   chan<- *config.Config
 
 	policyID string
 	state    client.UnitState
@@ -71,11 +75,12 @@ type selfMonitorT struct {
 //
 // Ensures that the policy that this Fleet Server attached to exists and that it
 // has a Fleet Server input defined.
-func NewSelfMonitor(cfg config.Config, bulker bulk.Bulk, monitor monitor.Monitor, policyID string, reporter state.Reporter) SelfMonitor {
+func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monitor, policyID string, reporter state.Reporter, cfgCh chan<- *config.Config) SelfMonitor {
 	return &selfMonitorT{
-		cfg:              cfg,
+		fleet:            fleet,
 		bulker:           bulker,
 		monitor:          monitor,
+		cfgCh:            cfgCh,
 		policyID:         policyID,
 		state:            client.UnitStateStarting,
 		reporter:         reporter,
@@ -178,14 +183,30 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 		policy := latest[i]
 		if m.policyID != "" && policy.PolicyID == m.policyID {
 			m.policy = &policy
-			if err := m.checkAndUpdateOutput(ctx); err != nil {
-				m.log.Warn().Err(err).Str(logger.PolicyID, m.policyID).Msg("Failed to update fleet-server output")
+			esOut, err := m.getPolicyOutput()
+			if err != nil {
+				m.log.Warn().Err(err).Str(logger.PolicyID, m.policyID).Msg("Failed to get fleet-server output")
+			} else {
+				m.cfgCh <- &config.Config{
+					Output: config.Output{
+						Elasticsearch: esOut,
+					},
+					RevisionIdx: m.lastRev,
+				}
 			}
 			break
 		} else if m.policyID == "" && policy.DefaultFleetServer {
 			m.policy = &policy
-			if err := m.checkAndUpdateOutput(ctx); err != nil {
-				m.log.Warn().Err(err).Str(logger.PolicyID, m.policyID).Msg("Failed to update fleet-server output")
+			esOut, err := m.getPolicyOutput()
+			if err != nil {
+				m.log.Warn().Err(err).Str(logger.PolicyID, m.policyID).Msg("Failed to get fleet-server output")
+			} else {
+				m.cfgCh <- &config.Config{
+					Output: config.Output{
+						Elasticsearch: esOut,
+					},
+					RevisionIdx: m.lastRev,
+				}
 			}
 			break
 		}
@@ -197,49 +218,47 @@ func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.P
 	return groupByLatest(policies)
 }
 
-// checkAndUpdateOutput will check to see if the fleet-server's elasticsearch output needs to be updated and call bulker.Reload if it does
-// Output will update if the output block in the policy has different values then the local config
-// If there is an error while updating the output it is logged and the underling es client is not changed.
-func (m *selfMonitorT) checkAndUpdateOutput(ctx context.Context) error {
+// getPolicyOutput will return the Elasticsearch output block of m.policy if there is a new revision.
+func (m *selfMonitorT) getPolicyOutput() (config.Elasticsearch, error) {
+	var policyES config.Elasticsearch
 	// policy revision has not changed
 	if m.policy.RevisionIdx == m.lastRev {
-		return nil
+		return policyES, ErrNoPolicyUpdate
 	}
 	// always copy revisionIdx
 	m.lastRev = m.policy.RevisionIdx
 
 	// Find elasticsearch output in the policy
 	// TODO figure out how to get output name from policy in order not to scan outputs?
-	var policyES config.Elasticsearch
 	for name, data := range m.policy.Data.Outputs {
 		outType, ok := data["type"].(string)
 		if !ok {
-			return fmt.Errorf("output name %s has non-string in type attribute: %w", name, errInvalidOutput)
+			return policyES, fmt.Errorf("output name %s has non-string in type attribute: %w", name, errInvalidOutput)
 		}
 		if outType == OutputTypeElasticsearch {
 			output, err := ucfg.NewFrom(data, config.DefaultOptions...)
 			if err != nil {
-				return fmt.Errorf("unable to create config from output data: %w", err)
+				return policyES, fmt.Errorf("unable to create config from output data: %w", err)
 			}
 			if err := output.Unpack(&policyES, config.DefaultOptions...); err != nil {
-				return fmt.Errorf("unable to unback config data to config.Elasticsearch: %w", err)
+				return policyES, fmt.Errorf("unable to unback config data to config.Elasticsearch: %w", err)
 			}
 			break
 		}
 	}
 
-	cfg, err := m.cfg.Merge(&config.Config{
-		Output: config.Output{
-			Elasticsearch: policyES,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("unable to merge configs: %w", err)
+	// The output block in the policy may not have the schema set so we need to manually set it.
+	isHTTPS := false
+	for _, host := range policyES.Hosts {
+		if strings.HasPrefix(strings.ToLower(host), "https") {
+			isHTTPS = true
+			break
+		}
 	}
-	if err := m.bulker.Reload(ctx, cfg); err != nil {
-		return fmt.Errorf("unable to reload bulker: %w", err)
+	if isHTTPS {
+		policyES.Protocol = "https"
 	}
-	return nil
+	return policyES, nil
 }
 
 func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error) {
@@ -273,7 +292,7 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 	state := client.UnitStateHealthy
 	extendMsg := ""
 	var payload map[string]interface{}
-	if m.cfg.Fleet.Agent.ID == "" {
+	if m.fleet.Agent.ID == "" {
 		state = client.UnitStateDegraded
 		extendMsg = "; missing config fleet.agent.id (expected during bootstrap process)"
 

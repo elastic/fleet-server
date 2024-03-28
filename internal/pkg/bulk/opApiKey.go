@@ -215,7 +215,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 				Body: bytes.NewReader(payload),
 			}
 
-			res, err := req.Do(ctx, b.Client())
+			res, err := req.Do(ctx, b.es)
 			if err != nil {
 				zerolog.Ctx(ctx).Error().Err(err).Msg("Error sending bulk API Key update request to Elasticsearch")
 				return err

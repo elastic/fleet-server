@@ -207,7 +207,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 		req.Refresh = "true"
 	}
 
-	res, err := req.Do(ctx, b.Client())
+	res, err := req.Do(ctx, b.es)
 	if err != nil {
 		zerolog.Ctx(ctx).Error().Err(err).Str("mod", kModBulk).Msg("Fail BulkRequest req.Do")
 		return err

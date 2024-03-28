@@ -19,7 +19,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -70,8 +69,6 @@ type Bulk interface {
 
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
-	// Reload underlying es client
-	Reload(ctx context.Context, cfg *config.Config) error
 
 	CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
 	GetBulker(outputName string) Bulk
@@ -85,9 +82,7 @@ type Bulk interface {
 const kModBulk = "bulk"
 
 type Bulker struct {
-	l  sync.RWMutex
-	es esapi.Transport
-
+	es                    esapi.Transport
 	ch                    chan *bulkT
 	opts                  bulkOptT
 	blkPool               sync.Pool
@@ -246,36 +241,11 @@ func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
 }
 
 func (b *Bulker) Client() *elasticsearch.Client {
-	b.l.RLock()
-	defer b.l.RUnlock()
-
 	client, ok := b.es.(*elasticsearch.Client)
 	if !ok {
 		panic("Client is not an elastic search pointer")
 	}
 	return client
-}
-
-// Reload will test the output config passed and if valid will replace the bulker's es client with a new client built from the config.
-// A valid config is one that is able to connect to elasticsearch and pass the version check.
-// This reload method is not intended to be used with the agent-level reload manager and instead should be called by the policy self-monitor.
-func (b *Bulker) Reload(ctx context.Context, cfg *config.Config) error {
-	opts := []es.ConfigOption{es.WithUserAgent("Fleet-Server", b.opts.bi)}
-	if cfg.Inputs[0].Server.Instrumentation.Enabled {
-		opts = append(opts, es.InstrumentRoundTripper())
-	}
-	cli, err := es.NewClient(ctx, cfg, false, opts...)
-	if err != nil {
-		return fmt.Errorf("bulker reload failed to make new es client: %w", err)
-	}
-	v, err := ver.CheckCompatibility(ctx, cli, b.opts.bi.Version)
-	if err != nil {
-		return fmt.Errorf("bulker reload failed version compatiblity check with elasticsearch (agent: %s elasticsearch: %s): %w", b.opts.bi.Version, v, err)
-	}
-	b.l.Lock()
-	b.es = cli
-	b.l.Unlock()
-	return nil
 }
 
 func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {

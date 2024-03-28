@@ -98,7 +98,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 		req.Refresh = &refresh
 	}
 
-	res, err := req.Do(ctx, b.Client())
+	res, err := req.Do(ctx, b.es)
 
 	if err != nil {
 		zerolog.Ctx(ctx).Warn().Err(err).Str("mod", kModBulk).Msg("bulker.flushRead: Error sending mget request to Elasticsearch")
