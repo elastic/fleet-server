@@ -185,7 +185,7 @@ func (ut *UploadT) validateUploadCompleteRequest(r *http.Request, id string) (st
 
 	var req UploadCompleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return "", errors.New("unable to parse request body")
+		return "", &BadRequestErr{msg: "unable to parse upload complete request body"}
 	}
 
 	hash := strings.TrimSpace(req.Transithash.Sha256)
