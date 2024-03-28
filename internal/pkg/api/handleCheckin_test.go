@@ -875,7 +875,7 @@ func TestParseComponents(t *testing.T) {
 	}
 }
 
-func TestValidateRequest(t *testing.T) {
+func TestValidateCheckinRequest(t *testing.T) {
 	verCon := mustBuildConstraints("8.0.0")
 
 	tests := []struct {
