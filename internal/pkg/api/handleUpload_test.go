@@ -338,6 +338,14 @@ func TestUploadBeginWritesTimestampToMeta(t *testing.T) {
 	)
 }
 
+func TestUploadBeginBadRequest(t *testing.T) {
+	hr, _, _, _ := prepareUploaderMock(t)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader("not a json"))
+	hr.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
 /*
   Chunk data upload route
 */
