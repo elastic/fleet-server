@@ -11,7 +11,7 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Checkin endpoint returns 400 status code instead of 500 for bad requests
+summary: Updated endpoints to return 400 status code instead of 500 for bad requests
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
