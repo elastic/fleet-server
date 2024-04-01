@@ -251,6 +251,6 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 
 func TestValidateEnrollRequest(t *testing.T) {
 	req, err := validateRequest(context.Background(), strings.NewReader("not a json"))
-	assert.Equal(t, "Bad request: decode enroll request", err.Error())
+	assert.Equal(t, "Bad request: unable to decode enroll request", err.Error())
 	assert.Nil(t, req)
 }
