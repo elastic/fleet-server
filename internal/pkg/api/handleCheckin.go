@@ -181,7 +181,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	var req CheckinRequest
 	decoder := json.NewDecoder(readCounter)
 	if err := decoder.Decode(&req); err != nil {
-		return val, &BadRequestErr{msg: "checkin request decode error", nextErr: err}
+		return val, &BadRequestErr{msg: "unable to decode checkin request", nextErr: err}
 	}
 	cntCheckin.bodyIn.Add(readCounter.Count())
 
