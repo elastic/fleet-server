@@ -989,7 +989,7 @@ func TestUploadCompleteBadRequests(t *testing.T) {
 	hr.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Equal(t, rec.Body.String(), "{\"statusCode\":400,\"error\":\"BadRequest\",\"message\":\"Bad request: unable to parse upload complete request body\"}")
+	assert.Equal(t, rec.Body.String(), "{\"statusCode\":400,\"error\":\"BadRequest\",\"message\":\"Bad request: unable to decode upload complete request\"}")
 }
 
 /*
