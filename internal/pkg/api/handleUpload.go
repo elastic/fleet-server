@@ -77,7 +77,7 @@ func (ut *UploadT) validateUploadBeginRequest(ctx context.Context, reader io.Rea
 		if errors.Is(err, io.EOF) {
 			return nil, "", fmt.Errorf("%w: %w", ErrFileInfoBodyRequired, err)
 		}
-		return nil, "", &BadRequestErr{msg: "error decoding upload begin request", nextErr: err}
+		return nil, "", &BadRequestErr{msg: "unable to decode upload begin request", nextErr: err}
 	}
 
 	// check API key matches payload agent ID
