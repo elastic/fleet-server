@@ -19,7 +19,9 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/gofrs/uuid"
 	"github.com/rs/xid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -352,7 +354,8 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	emptyBulkerMap := make(map[string]bulk.Bulk)
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
-	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter, make(chan *config.Config, 2))
+	chConfig := make(chan *config.Config, 2)
+	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter, chConfig)
 	sm := monitor.(*selfMonitorT)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
@@ -420,11 +423,16 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	rId = xid.New().String()
-	pData = model.PolicyData{Inputs: []map[string]interface{}{
-		{
-			"type": "fleet-server",
+	pData = model.PolicyData{
+		Inputs: []map[string]interface{}{{"type": "fleet-server"}},
+		Outputs: map[string]map[string]interface{}{
+			"default": map[string]interface{}{
+				"type":     "elasticsearch",
+				"hosts":    []interface{}{"https://elasticsearch:9200"},
+				"protocol": "https",
+			},
 		},
-	}}
+	}
 	policy = model.Policy{
 		ESDocument: model.ESDocument{
 			Id:      rId,
@@ -464,6 +472,21 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	mwg.Wait()
 	if merr != nil && merr != context.Canceled {
 		t.Fatal(merr)
+	}
+
+	select {
+	case cfg := <-chConfig:
+		assert.Equal(t, int64(2), cfg.RevisionIdx)
+	default:
+		t.Fatal("no policy on config channel")
+	}
+	select {
+	case cfg := <-chConfig:
+		assert.Equal(t, int64(1), cfg.RevisionIdx)
+		require.Len(t, cfg.Output.Elasticsearch.Hosts, 1)
+		assert.Equal(t, "https://elasticsearch:9200", cfg.Output.Elasticsearch.Hosts[0])
+	default:
+		t.Fatal("no policy on config channel")
 	}
 }
 

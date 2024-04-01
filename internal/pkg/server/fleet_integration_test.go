@@ -19,6 +19,7 @@ import (
 	"net/http/httptest"
 	"path"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -396,6 +398,80 @@ func TestServerConfigErrorReload(t *testing.T) {
 	err = g.Wait()
 	require.NoError(t, err)
 	mReporter.AssertExpectations(t)
+}
+
+func TestServerReloadOutputOnly(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Add a custom hook to the logger to count successes and failures when only a new output is detected
+	// NOTE: This code is brittle as it depends on a log string message match
+	var failedOutputMsg atomic.Int32
+	var successfulOutputMsg atomic.Int32
+	logger := testlog.SetLogger(t).Hook(
+		zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+			if level == zerolog.WarnLevel && message == "Failed version compatibility check using output from policy" {
+				failedOutputMsg.Add(1)
+			} else if level == zerolog.InfoLevel && message == "Using output from policy" {
+				successfulOutputMsg.Add(1)
+			}
+		}),
+	)
+	ctx = logger.WithContext(ctx)
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+
+	// Give an output that will not work - it should not use this
+	cfg := config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Protocol: "http",
+				Hosts: []string{
+					"http://fake:9200",
+				},
+			},
+		},
+		RevisionIdx: 2,
+	}
+	err = srv.srv.Reload(ctx, &cfg)
+	require.NoError(t, err)
+
+	for i := 0; i < 5; i++ {
+		if failedOutputMsg.Load() > 0 {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	require.NotZero(t, failedOutputMsg.Load(), "Did not detect elasticsearch output client failure")
+
+	// Give an output that works
+	cfg = config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Protocol: "http",
+				Hosts: []string{
+					"http://localhost:9200",
+					"http://other:9200",
+				},
+			},
+		},
+		RevisionIdx: 3,
+	}
+	err = srv.srv.Reload(ctx, &cfg)
+	require.NoError(t, err)
+
+	for i := 0; i < 5; i++ {
+		if successfulOutputMsg.Load() > 0 {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	require.NotZero(t, successfulOutputMsg.Load(), "Did not detect elasticsearch output client success")
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func TestServerUnauthorized(t *testing.T) {

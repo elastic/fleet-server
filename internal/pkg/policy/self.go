@@ -185,7 +185,9 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 			m.policy = &policy
 			esOut, err := m.getPolicyOutput()
 			if err != nil {
-				m.log.Warn().Err(err).Str(logger.PolicyID, m.policyID).Msg("Failed to get fleet-server output")
+				if !errors.Is(err, ErrNoPolicyUpdate) {
+					m.log.Warn().Err(err).Str(logger.PolicyID, m.policyID).Msg("Failed to get fleet-server output")
+				}
 			} else {
 				m.cfgCh <- &config.Config{
 					Output: config.Output{
@@ -199,7 +201,9 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 			m.policy = &policy
 			esOut, err := m.getPolicyOutput()
 			if err != nil {
-				m.log.Warn().Err(err).Str(logger.PolicyID, m.policyID).Msg("Failed to get fleet-server output")
+				if !errors.Is(err, ErrNoPolicyUpdate) {
+					m.log.Warn().Err(err).Str(logger.PolicyID, m.policyID).Msg("Failed to get fleet-server output")
+				}
 			} else {
 				m.cfgCh <- &config.Config{
 					Output: config.Output{
