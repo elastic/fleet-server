@@ -173,6 +173,85 @@ func Test_server_ClientCert(t *testing.T) {
 		wg.Wait()
 	})
 
+	t.Run("expired CA", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = testlog.SetLogger(t).WithContext(ctx)
+
+		// prep expired CA config
+		ca := certs.GenExpCA(t)
+		caPath := certs.CertToFile(t, ca, "ca")
+		cert := certs.GenCert(t, ca)
+		certPath := certs.CertToFile(t, cert, "cert")
+		keyPath := certs.KeyToFile(t, cert, "key")
+
+		tlsYML := fmt.Sprintf(tlsCFGTempl,
+			caPath,
+			certPath,
+			keyPath,
+		)
+		ucfg, err := yaml.NewConfig([]byte(tlsYML))
+		require.NoError(t, err)
+		tlsCFG := &tlscommon.ServerConfig{}
+		err = tlsCFG.Unpack(libsconfig.C(*ucfg))
+		require.NoError(t, err)
+
+		port, err := ftesting.FreePort()
+		require.NoError(t, err)
+		cfg := &config.Server{}
+		cfg.InitDefaults()
+		cfg.Host = "localhost"
+		cfg.Port = port
+		addr := cfg.BindEndpoints()[0]
+		cfg.TLS = tlsCFG
+
+		st := NewStatusT(cfg, nil, nil)
+		srv := NewServer(addr, cfg, nil, nil, nil, nil, st, sm, fbuild.Info{}, nil, nil, nil, nil, nil)
+		errCh := make(chan error)
+
+		// make http client with valid client certs
+		clientCert := certs.GenCert(t, ca)
+		certPool := x509.NewCertPool()
+		certPool.AddCert(ca.Leaf)
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs:      certPool,
+					Certificates: []tls.Certificate{clientCert},
+				},
+			},
+		}
+
+		started := make(chan struct{}, 1)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			started <- struct{}{}
+			if err := srv.Run(ctx); err != nil {
+				errCh <- err
+			}
+			wg.Done()
+		}()
+
+		<-started
+		rCtx, rCancel := context.WithTimeout(ctx, time.Second)
+		defer rCancel()
+		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
+		require.NoError(t, err)
+		resp, err := httpClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		select {
+		case err := <-errCh:
+			require.NoError(t, err)
+		default:
+		}
+		cancel()
+		wg.Wait()
+	})
+
 	t.Run("valid client certs", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

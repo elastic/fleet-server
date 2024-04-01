@@ -63,9 +63,20 @@ func KeyToFile(t *testing.T, cert tls.Certificate, name string) string {
 	return path
 }
 
-// GenCA generates a CA for tests
-// copied from elastic-agent-libs/transport/tlscommon/ca_pinning_test.go
+// Generates expired CA for tests
+func GenExpCA(t *testing.T) tls.Certificate {
+	return genCA(t, true)
+}
+
+// Generates unexpired CA for tests
 func GenCA(t *testing.T) tls.Certificate {
+	return genCA(t, false)
+}
+
+// GenCA generates a CA for tests
+// Based on elastic-agent-libs/transport/tlscommon/ca_pinning_test.go
+// implementation
+func genCA(t *testing.T, isExpired bool) tls.Certificate {
 	t.Helper()
 	ca := &x509.Certificate{
 		SerialNumber: big.NewInt(2000),
@@ -78,12 +89,20 @@ func GenCA(t *testing.T) tls.Certificate {
 			StreetAddress: []string{"testing road"},
 			PostalCode:    []string{"HOH OHO"},
 		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(1 * time.Hour),
+		// NotBefore:             time.Now(),
+		// NotAfter:              time.Now().Add(1 * time.Hour),
 		IsCA:                  true,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
+	}
+
+	if isExpired {
+		ca.NotBefore = time.Now().Add(-48 * time.Hour)
+		ca.NotAfter = time.Now().Add(-24 * time.Hour)
+	} else {
+		ca.NotBefore = time.Now()
+		ca.NotAfter = time.Now().Add(1 * time.Hour)
 	}
 
 	caKey, err := rsa.GenerateKey(rand.Reader, 2048) // less secure key for quicker testing.
