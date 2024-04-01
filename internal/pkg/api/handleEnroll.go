@@ -523,7 +523,7 @@ func validateRequest(ctx context.Context, data io.Reader) (*EnrollRequest, error
 	var req EnrollRequest
 	decoder := json.NewDecoder(data)
 	if err := decoder.Decode(&req); err != nil {
-		return nil, &BadRequestErr{msg: "decode enroll request", nextErr: err}
+		&BadRequestErr{msg: "unable to decode enroll request", nextErr: err}
 	}
 
 	// Validate
