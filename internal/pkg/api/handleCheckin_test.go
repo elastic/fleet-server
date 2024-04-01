@@ -890,7 +890,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 			req: &http.Request{
 				Body: io.NopCloser(strings.NewReader(`{"invalidJson":}`)),
 			},
-			expErr: &BadRequestErr{msg: "checkin request decode error"},
+			expErr: &BadRequestErr{msg: "unable to decode checkin request"},
 			cfg: &config.Server{
 				Limits: config.ServerLimits{
 					CheckinLimit: config.Limit{
