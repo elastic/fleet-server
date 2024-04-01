@@ -238,10 +238,8 @@ func Test_server_ClientCert(t *testing.T) {
 		defer rCancel()
 		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
 		require.NoError(t, err)
-		resp, err := httpClient.Do(req)
-		require.NoError(t, err)
-		resp.Body.Close()
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		_, err = httpClient.Do(req)
+		require.Error(t, err)
 
 		select {
 		case err := <-errCh:

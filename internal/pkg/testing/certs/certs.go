@@ -89,8 +89,6 @@ func genCA(t *testing.T, isExpired bool) tls.Certificate {
 			StreetAddress: []string{"testing road"},
 			PostalCode:    []string{"HOH OHO"},
 		},
-		// NotBefore:             time.Now(),
-		// NotAfter:              time.Now().Add(1 * time.Hour),
 		IsCA:                  true,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
