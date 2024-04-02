@@ -14,9 +14,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/elastic/fleet-server/v7/internal/pkg/state"
-
+	"github.com/elastic/go-ucfg"
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
 
@@ -31,10 +29,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/gc"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/profile"
 	"github.com/elastic/fleet-server/v7/internal/pkg/scheduler"
+	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
 	"github.com/hashicorp/go-version"
@@ -196,10 +196,9 @@ LOOP:
 		select {
 		case cfg := <-f.cfgCh:
 			log.Info().Msg("Server configuration update")
-			if cfg.Inputs == nil {
-				// cfg only contains updated output retrieved from policy
+			if cfg.Inputs == nil && cfg.RevisionIdx != 0 { // cfg only contains updated output retrieved from policy
+				rev := cfg.RevisionIdx
 				esOutput := config.MergeElasticsearchFromPolicy(curCfg.Output.Elasticsearch, cfg.Output.Elasticsearch)
-				newCfg.RevisionIdx = cfg.RevisionIdx
 
 				// test config
 				cli, err := es.NewClient(ctx,
@@ -212,7 +211,7 @@ LOOP:
 					elasticsearchOptions(curCfg.Inputs[0].Server.Instrumentation.Enabled, f.bi)...,
 				)
 				if err != nil {
-					log.Warn().Err(err).Msg("unable to create elasticsearch client from policy output")
+					log.Warn().Int64(logger.RevisionIdx, rev).Err(err).Msg("unable to create elasticsearch client from policy output")
 					continue
 				}
 				remoteVersion, err := ver.CheckCompatibility(ctx, cli, f.bi.Version)
@@ -220,17 +219,29 @@ LOOP:
 					// NOTE The error can indicate a bad network connection, bad TLS settings, etc.
 					// But if the error is an ErrElasticVersionConflict then something is very wrong
 					if errors.Is(err, es.ErrElasticVersionConflict) {
-						log.Error().Err(err).Interface("output", esOutput).Interface("bootstrap", curCfg.Output.Elasticsearch).Str("remote_version", remoteVersion).Msg("Elasticsearch version constraint failed for new output")
+						log.Error().Err(err).Int64(logger.RevisionIdx, rev).Interface("output", esOutput).Interface("bootstrap", curCfg.Output.Elasticsearch).Str("remote_version", remoteVersion).Msg("Elasticsearch version constraint failed for new output")
 					} else {
-						log.Warn().Err(err).Msg("Failed version compatibility check using output from policy")
+						log.Warn().Err(err).Int64(logger.RevisionIdx, rev).Msg("Failed version compatibility check using output from policy")
 					}
 					continue
 				}
-				log.Info().Int64(logger.RevisionIdx, cfg.RevisionIdx).Msg("Using output from policy")
-				newCfg.Output.Elasticsearch = esOutput
-			} else {
-				newCfg = cfg
+				// work around to get a new cfg object based off curCfg
+				// we override the output with esOutput and have a complete config with a new mutex
+				tmp, err := ucfg.NewFrom(curCfg, config.DefaultOptions...)
+				if err != nil {
+					log.Error().Err(err).Int64(logger.RevisionIdx, rev).Msg("Unable to convert config")
+					continue
+				}
+				err = tmp.Unpack(cfg, config.DefaultOptions...)
+				if err != nil {
+					log.Error().Err(err).Int64(logger.RevisionIdx, rev).Msg("Unable to unpack config")
+					continue
+				}
+				log.Info().Int64(logger.RevisionIdx, rev).Msg("Using output from policy")
+				cfg.Output.Elasticsearch = esOutput
+				cfg.RevisionIdx = rev
 			}
+			newCfg = cfg
 		case err := <-ech:
 			f.reporter.UpdateState(client.UnitStateFailed, fmt.Sprintf("Error - %s", err), nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 			log.Error().Err(err).Msg("Fleet Server failed")

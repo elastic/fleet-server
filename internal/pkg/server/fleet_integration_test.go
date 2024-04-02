@@ -381,6 +381,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 		cancel()
 	}).Return(nil)
 	mReporter.On("UpdateState", client.UnitStateStopping, mock.Anything, mock.Anything).Return(nil)
+	mReporter.On("UpdateState", client.UnitStateFailed, mock.MatchedBy(func(err error) bool { return errors.Is(err, context.Canceled) }), mock.Anything).Return(nil).Maybe()
 
 	// set bad config
 	cfg.Output.Elasticsearch.ServiceToken = "incorrect"
@@ -459,16 +460,17 @@ func TestServerReloadOutputOnly(t *testing.T) {
 		},
 		RevisionIdx: 3,
 	}
+
+	successes := successfulOutputMsg.Load()
 	err = srv.srv.Reload(ctx, &cfg)
 	require.NoError(t, err)
-
 	for i := 0; i < 5; i++ {
-		if successfulOutputMsg.Load() > 0 {
+		if successfulOutputMsg.Load() > successes {
 			break
 		}
 		time.Sleep(time.Second)
 	}
-	require.NotZero(t, successfulOutputMsg.Load(), "Did not detect elasticsearch output client success")
+	require.Greater(t, successfulOutputMsg.Load(), successes, "Did not detect elasticsearch output client success")
 
 	cancel()
 	srv.waitExit() //nolint:errcheck // test case
