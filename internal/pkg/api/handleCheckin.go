@@ -181,12 +181,12 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	var req CheckinRequest
 	decoder := json.NewDecoder(readCounter)
 	if err := decoder.Decode(&req); err != nil {
-		return val, fmt.Errorf("decode checkin request: %w", err)
+		return val, &BadRequestErr{msg: "unable to decode checkin request", nextErr: err}
 	}
 	cntCheckin.bodyIn.Add(readCounter.Count())
 
 	if req.Status == CheckinRequestStatus("") {
-		return val, fmt.Errorf("checkin status missing")
+		return val, &BadRequestErr{msg: "checkin status missing"}
 	}
 	if len(req.Message) == 0 {
 		zlog.Warn().Msg("checkin request method is empty.")
@@ -197,7 +197,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	if req.PollTimeout != nil {
 		pDur, err = time.ParseDuration(*req.PollTimeout)
 		if err != nil {
-			return val, fmt.Errorf("poll_timeout cannot be parsed as duration: %w", err)
+			return val, &BadRequestErr{msg: "poll_timeout cannot be parsed as duration", nextErr: err}
 		}
 	}
 
@@ -638,7 +638,6 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req C
 
 func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentID string) ([]model.Action, error) {
 	actions, err := dl.FindAgentActions(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentID)
-
 	if err != nil {
 		return nil, fmt.Errorf("fetchAgentPendingActions: %w", err)
 	}
@@ -660,7 +659,6 @@ func filterActions(zlog zerolog.Logger, agentID string, actions []model.Action) 
 		resp = append(resp, action)
 	}
 	return resp
-
 }
 
 // convertActionData converts the passed raw message data to Action_Data using aType as a discriminator.

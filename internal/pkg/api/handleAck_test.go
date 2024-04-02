@@ -11,7 +11,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -755,6 +758,47 @@ func TestAckHandleUpgrade(t *testing.T) {
 			err := ack.handleUpgrade(ctx, logger, agent, tc.event)
 			assert.NoError(t, err)
 			bulker.AssertExpectations(t)
+		})
+	}
+}
+
+func TestValidateAckRequest(t *testing.T) {
+	tests := []struct {
+		name   string
+		req    *http.Request
+		cfg    *config.Server
+		expErr error
+		expAck *AckRequest
+	}{
+		{
+			name: "Invalid Request",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`not a json`)),
+			},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{},
+			},
+			expErr: &BadRequestErr{msg: "unable to decode ack request"},
+			expAck: nil,
+		},
+	}
+	logger := testlog.SetLogger(t)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			wr := httptest.NewRecorder()
+			ack := NewAckT(tc.cfg, nil, nil)
+			ackRes, err := ack.validateRequest(logger, wr, tc.req)
+			if tc.expErr == nil {
+				assert.NoError(t, err)
+			} else {
+				// Asserting error messages prior to ErrorAs becuase ErrorAs modifies
+				// the target error. If we assert error messages after calling ErrorAs
+				// we will end up with false positives.
+				assert.Equal(t, tc.expErr.Error(), err.Error())
+				assert.ErrorAs(t, err, &tc.expErr)
+			}
+			assert.Equal(t, tc.expAck, ackRes)
 		})
 	}
 }

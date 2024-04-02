@@ -155,7 +155,7 @@ func (ack *AckT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *
 	var req AckRequest
 	dec := json.NewDecoder(readCounter)
 	if err := dec.Decode(&req); err != nil {
-		return nil, fmt.Errorf("unable to decode ack request: %w", err)
+		return nil, &BadRequestErr{msg: "unable to decode ack request", nextErr: err}
 	}
 
 	cntAcks.bodyIn.Add(readCounter.Count())

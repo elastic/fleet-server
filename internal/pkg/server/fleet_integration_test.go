@@ -269,7 +269,6 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
-
 }
 
 func (s *tserver) buildURL(id string, cmd string) string {
@@ -1022,7 +1021,7 @@ func Test_Agent_request_errors(t *testing.T) {
 		res, err := cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusInternalServerError, res.StatusCode)
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 	t.Run("no user agent", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(ctx)
