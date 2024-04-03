@@ -36,8 +36,6 @@ const DefaultCheckTimeout = 30 * time.Second
 
 var ErrInvalidOutput = fmt.Errorf("policy output invalid")
 
-var ErrNoPolicyUpdate = fmt.Errorf("policy has not updated")
-
 type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error)
 
 type SelfMonitor interface {
@@ -183,34 +181,16 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 		policy := latest[i]
 		if m.policyID != "" && policy.PolicyID == m.policyID {
 			m.policy = &policy
-			esOut, err := m.getPolicyOutput()
+			err := m.sendPolicyOutput()
 			if err != nil {
-				if !errors.Is(err, ErrNoPolicyUpdate) {
-					m.log.Warn().Err(err).Str(logger.PolicyID, m.policyID).Msg("Failed to get fleet-server output")
-				}
-			} else {
-				m.cfgCh <- &config.Config{
-					Output: config.Output{
-						Elasticsearch: esOut,
-					},
-					RevisionIdx: m.lastRev,
-				}
+				m.log.Warn().Err(err).Int64(logger.RevisionIdx, m.lastRev).Str(logger.PolicyID, m.policyID).Msg("Failed to send fleet-server output")
 			}
 			break
 		} else if m.policyID == "" && policy.DefaultFleetServer {
 			m.policy = &policy
-			esOut, err := m.getPolicyOutput()
+			err := m.sendPolicyOutput()
 			if err != nil {
-				if !errors.Is(err, ErrNoPolicyUpdate) {
-					m.log.Warn().Err(err).Str(logger.PolicyID, m.policyID).Msg("Failed to get fleet-server output")
-				}
-			} else {
-				m.cfgCh <- &config.Config{
-					Output: config.Output{
-						Elasticsearch: esOut,
-					},
-					RevisionIdx: m.lastRev,
-				}
+				m.log.Warn().Err(err).Int64(logger.RevisionIdx, m.lastRev).Msg("Failed to send default policy fleet-server output")
 			}
 			break
 		}
@@ -222,30 +202,32 @@ func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.P
 	return groupByLatest(policies)
 }
 
-// getPolicyOutput will return the Elasticsearch output block of m.policy if there is a new revision.
-func (m *selfMonitorT) getPolicyOutput() (config.Elasticsearch, error) {
-	var policyES config.Elasticsearch
+// sendPolicyOutput will parse the policy and send it through the config channel with only Output.Elasticsearch and RevisionIdx set
+// It will not send to the config channel if the policy revision_idx has not changed.
+// It returns any errors encountered when parsing the policy
+func (m *selfMonitorT) sendPolicyOutput() error {
 	// policy revision has not changed
 	if m.policy.RevisionIdx == m.lastRev {
-		return policyES, ErrNoPolicyUpdate
+		return nil
 	}
 	// always copy revisionIdx
 	m.lastRev = m.policy.RevisionIdx
 
+	var policyES config.Elasticsearch
 	// Find elasticsearch output in the policy
 	// TODO figure out how to get output name from policy in order not to scan outputs?
 	for name, data := range m.policy.Data.Outputs {
 		outType, ok := data["type"].(string)
 		if !ok {
-			return policyES, fmt.Errorf("output name %s has non-string in type attribute: %w", name, errInvalidOutput)
+			return fmt.Errorf("output name %s has non-string in type attribute: %w", name, ErrInvalidOutput)
 		}
 		if outType == OutputTypeElasticsearch {
 			output, err := ucfg.NewFrom(data, config.DefaultOptions...)
 			if err != nil {
-				return policyES, fmt.Errorf("unable to create config from output data: %w", err)
+				return fmt.Errorf("unable to create config from output data: %w", err)
 			}
 			if err := output.Unpack(&policyES, config.DefaultOptions...); err != nil {
-				return policyES, fmt.Errorf("unable to unback config data to config.Elasticsearch: %w", err)
+				return fmt.Errorf("unable to unback config data to config.Elasticsearch: %w", err)
 			}
 			break
 		}
@@ -262,7 +244,13 @@ func (m *selfMonitorT) getPolicyOutput() (config.Elasticsearch, error) {
 	if isHTTPS {
 		policyES.Protocol = "https"
 	}
-	return policyES, nil
+	m.cfgCh <- &config.Config{
+		Output: config.Output{
+			Elasticsearch: policyES,
+		},
+		RevisionIdx: m.lastRev,
+	}
+	return nil
 }
 
 func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error) {

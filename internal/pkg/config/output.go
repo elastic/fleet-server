@@ -27,6 +27,7 @@ const httpTransportLongPollTimeout = 10 * time.Minute
 const schemeHTTP = "http"
 
 const (
+	DefaultElasticsearchHost             = "localhost:9200"
 	DefaultElasticsearchTimeout          = 90 * time.Second
 	DefaultElasticsearchMaxRetries       = 3
 	DefaultElasticsearchMaxConnPerHost   = 128
@@ -62,7 +63,7 @@ type Elasticsearch struct {
 // InitDefaults initializes the defaults for the configuration.
 func (c *Elasticsearch) InitDefaults() {
 	c.Protocol = schemeHTTP
-	c.Hosts = []string{"localhost:9200"}
+	c.Hosts = []string{DefaultElasticsearchHost}
 	c.Timeout = DefaultElasticsearchTimeout
 	c.MaxRetries = DefaultElasticsearchMaxRetries
 	c.MaxConnPerHost = DefaultElasticsearchMaxConnPerHost
@@ -200,7 +201,7 @@ func MergeElasticsearchFromPolicy(cfg, pol Elasticsearch) Elasticsearch {
 		MaxContentLength: cfg.MaxContentLength,
 	}
 	// If policy has a non-default Hosts value use it's values for Protocol and hosts
-	if pol.Hosts != nil && !(len(pol.Hosts) == 1 && pol.Hosts[0] == "localhost:9200") {
+	if pol.Hosts != nil && !(len(pol.Hosts) == 1 && pol.Hosts[0] == DefaultElasticsearchHost) {
 		res.Protocol = pol.Protocol
 		res.Hosts = pol.Hosts
 	}
