@@ -19,7 +19,7 @@ summary: Use policy outputs when running in agent-mode
 description: |
   Fleet-server will retrieve and use the output from the policy when running in agent-mode.
   This allows the fleet-server to connect to multiple Elasticsearch hosts if it is successful when
-  connecting to the host provided at enrolment/installation.
+  connecting to the host provided at enrollment/installation.
   We expect that the host provided during enrollment/installation is never removed as a valid output.
   fleet-server does not persist output settings it retrieves locally so it must always be able to connect
   with options specified at enrollment/installation.

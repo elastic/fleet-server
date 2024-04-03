@@ -34,7 +34,7 @@ const DefaultCheckTime = 5 * time.Second
 // DefaultCheckTimeout is the default timeout when checking for policies.
 const DefaultCheckTimeout = 30 * time.Second
 
-var errInvalidOutput = fmt.Errorf("policy output invalid")
+var ErrInvalidOutput = fmt.Errorf("policy output invalid")
 
 var ErrNoPolicyUpdate = fmt.Errorf("policy has not updated")
 
