@@ -378,7 +378,11 @@ func TestServerConfigErrorReload(t *testing.T) {
 	mReporter.On("UpdateState", client.UnitStateConfiguring, mock.Anything, mock.Anything).Return(nil)
 	mReporter.On("UpdateState", client.UnitStateHealthy, mock.Anything, mock.Anything).Run(func(_ mock.Arguments) {
 		// Call cancel to stop the server once it's healthy
-		cancel()
+		go func() {
+			// FIXME: A short delay is needed here as the mock failure call on line 388 is not being detected correctly in tests
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		}()
 	}).Return(nil)
 	mReporter.On("UpdateState", client.UnitStateStopping, mock.Anything, mock.Anything).Return(nil)
 	mReporter.On("UpdateState", client.UnitStateFailed, mock.MatchedBy(func(err error) bool { return errors.Is(err, context.Canceled) }), mock.Anything).Return(nil).Maybe()
