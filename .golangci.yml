@@ -3,7 +3,11 @@ run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   timeout: 1m
   build-tags: integration
+<<<<<<< HEAD
   go: "1.19.7"
+=======
+  go: "1.21.9"
+>>>>>>> d336446d ([Automation] Bump Golang version to 1.21.9 (#3429))
 
 issues:
   # Maximum count of issues with the same text.
