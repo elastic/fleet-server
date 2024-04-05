@@ -669,12 +669,12 @@ func TestServerInstrumentation(t *testing.T) {
 func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
 
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 	cli := cleanhttp.DefaultClient()
 
 	// enroll an agent
@@ -830,11 +830,11 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	}`
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	t.Log("Enroll the first agent with enrollment_id")
 	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
@@ -877,11 +877,11 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	}`
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	t.Log("Enroll the first agent with enrollment_id")
 	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
@@ -926,11 +926,11 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 func Test_Agent_Auth_errors(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 
@@ -1051,11 +1051,11 @@ func Test_Agent_Auth_errors(t *testing.T) {
 func Test_Agent_request_errors(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 	t.Run("no auth", func(t *testing.T) {
