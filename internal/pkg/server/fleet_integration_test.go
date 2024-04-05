@@ -19,7 +19,6 @@ import (
 	"net/http/httptest"
 	"path"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -74,6 +73,9 @@ type tserver struct {
 	srv       *Fleet
 	enrollKey string
 	bulker    bulk.Bulk
+
+	outputReloadSuccess atomic.Int32
+	outputReloadFailure atomic.Int32
 }
 
 func (s *tserver) baseURL() string {
@@ -216,15 +218,13 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Since we start the server in agent mode we need a way to detect if the policy monitor has reloaded the output
-	var once sync.Once
-	policyDetection := make(chan struct{}, 1)
+	// NOTE: This code is brittle as it depends on a log string message match
+	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
 	ctx = testlog.SetLogger(t).Hook(zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if level == zerolog.InfoLevel && message == "Using output from policy" {
-			once.Do(func() {
-				policyDetection <- struct{}{}
-				t.Log("policy from output detected")
-				close(policyDetection)
-			})
+			tsrv.outputReloadSuccess.Add(1)
+		} else if level == zerolog.WarnLevel && message == "Failed version compatibility check using output from policy" {
+			tsrv.outputReloadFailure.Add(1)
 		}
 	})).WithContext(ctx)
 
@@ -232,16 +232,9 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 		return srv.Run(ctx, cfg)
 	})
 
-	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
 	err = tsrv.waitServerUp(ctx, testWaitServerUp)
 	if err != nil {
 		return nil, fmt.Errorf("unable to start server: %w", err)
-	}
-	select {
-	case <-policyDetection:
-		time.Sleep(100 * time.Millisecond)
-	case <-time.After(time.Second * 5):
-		return nil, fmt.Errorf("could not detect output being reloaded from policy")
 	}
 	return tsrv, nil
 }
@@ -276,6 +269,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		return status.Status == "HEALTHY", nil
 	}
 
+	// Wait for the server to be in a healthy state after
 	for {
 		healthy, err := isHealthy()
 		if err != nil {
@@ -428,21 +422,6 @@ func TestServerReloadOutputOnly(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Add a custom hook to the logger to count successes and failures when only a new output is detected
-	// NOTE: This code is brittle as it depends on a log string message match
-	var failedOutputMsg atomic.Int32
-	var successfulOutputMsg atomic.Int32
-	logger := testlog.SetLogger(t).Hook(
-		zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-			if level == zerolog.WarnLevel && message == "Failed version compatibility check using output from policy" {
-				failedOutputMsg.Add(1)
-			} else if level == zerolog.InfoLevel && message == "Using output from policy" {
-				successfulOutputMsg.Add(1)
-			}
-		}),
-	)
-	ctx = logger.WithContext(ctx)
-
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
@@ -463,12 +442,12 @@ func TestServerReloadOutputOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	for i := 0; i < 5; i++ {
-		if failedOutputMsg.Load() > 0 {
+		if srv.outputReloadFailure.Load() > 0 {
 			break
 		}
 		time.Sleep(time.Second)
 	}
-	require.NotZero(t, failedOutputMsg.Load(), "Did not detect elasticsearch output client failure")
+	require.NotZero(t, srv.outputReloadFailure.Load(), "Did not detect elasticsearch output client failure")
 
 	// Give an output that works
 	cfg = config.Config{
@@ -484,16 +463,16 @@ func TestServerReloadOutputOnly(t *testing.T) {
 		RevisionIdx: 3,
 	}
 
-	successes := successfulOutputMsg.Load()
+	successes := srv.outputReloadSuccess.Load()
 	err = srv.srv.Reload(ctx, &cfg)
 	require.NoError(t, err)
 	for i := 0; i < 5; i++ {
-		if successfulOutputMsg.Load() > successes {
+		if srv.outputReloadSuccess.Load() > successes {
 			break
 		}
 		time.Sleep(time.Second)
 	}
-	require.Greater(t, successfulOutputMsg.Load(), successes, "Did not detect elasticsearch output client success")
+	require.Greater(t, srv.outputReloadSuccess.Load(), successes, "Did not detect elasticsearch output client success")
 
 	cancel()
 	srv.waitExit() //nolint:errcheck // test case
