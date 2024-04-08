@@ -785,6 +785,9 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	// When decoding to a (typed) struct, the default will implicitly be false if it's missing
 	_, ok = ackObj["errors"]
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) (string, string) {
@@ -866,6 +869,9 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	} else {
 		t.Fatal("duplicate agent found after enrolling with same enrollment id")
 	}
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
@@ -924,6 +930,9 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	} else {
 		t.Fatal("duplicate agent found after enrolling with same enrollment id")
 	}
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func Test_Agent_Auth_errors(t *testing.T) {
@@ -1044,6 +1053,9 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		res.Body.Close()
 		require.Equal(t, http.StatusInternalServerError, res.StatusCode)
 	})
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func Test_Agent_request_errors(t *testing.T) {
@@ -1119,6 +1131,9 @@ func Test_Agent_request_errors(t *testing.T) {
 		res.Body.Close()
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
@@ -1362,4 +1377,7 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 	err = json.Unmarshal(p, &checkinResponse)
 	require.NoError(t, err)
 	require.Equal(t, token, *checkinResponse.AckToken)
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
