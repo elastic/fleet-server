@@ -50,7 +50,7 @@ const (
 	serverVersion = "8.0.0"
 	localhost     = "localhost"
 
-	testWaitServerUp = 3 * time.Second
+	testWaitServerUp = 10 * time.Second
 
 	enrollBody = `{
 	    "type": "PERMANENT",
@@ -276,7 +276,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 			return err
 		}
 		if healthy {
-			return nil
+			break
 		}
 
 		select {
@@ -285,6 +285,18 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
+
+	for {
+		if s.outputReloadSuccess.Load() > 0 {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("no output reload: %w", ctx.Err())
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	return nil
 }
 
 func (s *tserver) buildURL(id string, cmd string) string {
