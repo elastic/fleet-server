@@ -86,7 +86,6 @@ notice: ## - Generates the NOTICE.txt file.
 		-noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
 		-noticeOut NOTICE.txt \
 		-depsOut ""
-	@go mod tidy
 
 .PHONY: defaults
 defaults: ## -Generate defaults based on limits files.
