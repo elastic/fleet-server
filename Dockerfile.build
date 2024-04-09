@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM golang:${GO_VERSION}-buster
+FROM golang:${GO_VERSION}-bullseye
 
 RUN \
   apt-get update \
