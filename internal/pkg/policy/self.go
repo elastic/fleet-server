@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
@@ -249,10 +250,22 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 	return state, nil
 }
 
-func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, logger zerolog.Logger) {
+func isOutputCfgOutdated(ctx context.Context, bulker bulk.Bulk, zlog zerolog.Logger, outputName string) bool {
+	policy, err := dl.QueryOutputFromPolicy(ctx, bulker, outputName)
+	if err != nil || policy == nil {
+		return true
+	}
+	hasChanged := bulker.RemoteOutputConfigChanged(zlog, outputName, policy.Data.Outputs[outputName])
+	return hasChanged
+}
+
+func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, zlog zerolog.Logger) {
 	//pinging logic
 	bulkerMap := bulker.GetBulkerMap()
 	for outputName, outputBulker := range bulkerMap {
+		if isOutputCfgOutdated(ctx, bulker, zlog, outputName) {
+			continue
+		}
 		doc := model.OutputHealth{
 			Output:  outputName,
 			State:   client.UnitStateHealthy.String(),
@@ -262,15 +275,15 @@ func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, logger zerolog.Lo
 		if err != nil {
 			doc.State = client.UnitStateDegraded.String()
 			doc.Message = fmt.Sprintf("remote ES is not reachable due to error: %s", err.Error())
-			logger.Error().Err(err).Str("outputName", outputName).Msg(doc.Message)
+			zlog.Error().Err(err).Str(logger.PolicyOutputName, outputName).Msg(doc.Message)
 
 		} else if res.StatusCode != 200 {
 			doc.State = client.UnitStateDegraded.String()
 			doc.Message = fmt.Sprintf("remote ES is not reachable due to unexpected status code %d", res.StatusCode)
-			logger.Error().Err(err).Str("outputName", outputName).Msg(doc.Message)
+			zlog.Error().Err(err).Str(logger.PolicyOutputName, outputName).Msg(doc.Message)
 		}
 		if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
-			logger.Error().Err(err).Str("outputName", outputName).Msg("error writing output health")
+			zlog.Error().Err(err).Str(logger.PolicyOutputName, outputName).Msg("error writing output health")
 		}
 	}
 }

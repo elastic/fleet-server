@@ -11,9 +11,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const defaultLevel = "info"
-
 // AgentLogging is the log level set on the Agent.
+// deprectated: Use top level `logging.*` attributes instead.
 type AgentLogging struct {
 	Level string `config:"level"`
 }

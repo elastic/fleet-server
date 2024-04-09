@@ -32,11 +32,17 @@ const (
 	UPGRADE            ActionType = "UPGRADE"
 )
 
+// Defines values for ActionRequestDiagnosticsAdditionalMetrics.
+const (
+	CPU ActionRequestDiagnosticsAdditionalMetrics = "CPU"
+)
+
 // Defines values for ActionSettingsLogLevel.
 const (
 	ActionSettingsLogLevelDebug   ActionSettingsLogLevel = "debug"
 	ActionSettingsLogLevelError   ActionSettingsLogLevel = "error"
 	ActionSettingsLogLevelInfo    ActionSettingsLogLevel = "info"
+	ActionSettingsLogLevelTrace   ActionSettingsLogLevel = "trace"
 	ActionSettingsLogLevelWarning ActionSettingsLogLevel = "warning"
 )
 
@@ -214,7 +220,13 @@ type ActionPolicyReassign struct {
 }
 
 // ActionRequestDiagnostics The REQUEST_DIAGNOSTICS action data.
-type ActionRequestDiagnostics = interface{}
+type ActionRequestDiagnostics struct {
+	// AdditionalMetrics list optional additional metrics.
+	AdditionalMetrics *[]ActionRequestDiagnosticsAdditionalMetrics `json:"additional_metrics,omitempty"`
+}
+
+// ActionRequestDiagnosticsAdditionalMetrics defines model for ActionRequestDiagnostics.AdditionalMetrics.
+type ActionRequestDiagnosticsAdditionalMetrics string
 
 // ActionSettings The SETTINGS action data.
 type ActionSettings struct {
@@ -704,6 +716,15 @@ type UpgradeDetailsState string
 type UpgradeMetadataDownloading struct {
 	// DownloadPercent The artifact download progress as a percentage.
 	DownloadPercent float64 `json:"download_percent"`
+
+	// DownloadRate The artifact download rate as bytes per second.
+	DownloadRate *float64 `json:"download_rate,omitempty"`
+
+	// RetryErrorMsg The error message that is a result of a retryable upgrade download failure.
+	RetryErrorMsg *string `json:"retry_error_msg,omitempty"`
+
+	// RetryUntil The RFC3339 timestamp of the deadline the upgrade download is retried until.
+	RetryUntil *time.Time `json:"retry_until,omitempty"`
 }
 
 // UpgradeMetadataFailed Upgrade metadata for an upgrade that has failed.

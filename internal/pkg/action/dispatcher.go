@@ -130,7 +130,7 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 
 	for agentID, actions := range agentActions {
 		if err := d.limit.Wait(ctx); err != nil {
-			zerolog.Ctx(ctx).Error().Err(err).Msg("action dispatcher rate limit error")
+			zerolog.Ctx(ctx).Warn().Err(err).Msg("action dispatcher rate limit error")
 			return
 		}
 		d.dispatch(ctx, agentID, actions)

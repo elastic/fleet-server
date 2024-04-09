@@ -12,8 +12,10 @@ import (
 
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
+	"golang.org/x/time/rate"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -84,13 +86,25 @@ type monitorT struct {
 
 	policyF       policyFetcher
 	policiesIndex string
-	throttle      time.Duration
+	limit         *rate.Limiter
 
 	startCh chan struct{}
 }
 
 // NewMonitor creates the policy monitor for subscribing agents.
-func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duration) Monitor {
+func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, cfg config.ServerLimits) Monitor {
+	burst := cfg.PolicyLimit.Burst
+	interval := rate.Every(cfg.PolicyLimit.Interval)
+	if cfg.PolicyLimit.Burst <= 0 {
+		burst = 1
+	}
+	if cfg.PolicyLimit.Interval <= 0 {
+		if cfg.PolicyThrottle > 0 { // use the old throttle if it's defined and the limit.Interval is not.
+			interval = rate.Every(cfg.PolicyThrottle)
+		} else {
+			interval = rate.Every(time.Nanosecond) // set minimal spin rate
+		}
+	}
 	return &monitorT{
 		bulker:        bulker,
 		monitor:       monitor,
@@ -98,10 +112,17 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duratio
 		deployCh:      make(chan struct{}, 1),
 		policies:      make(map[string]policyT),
 		pendingQ:      makeHead(),
-		throttle:      throttle,
+		limit:         rate.NewLimiter(interval, burst),
 		policyF:       dl.QueryLatestPolicies,
 		policiesIndex: dl.FleetPolicies,
 		startCh:       make(chan struct{}),
+	}
+}
+
+// endTrans is a convenience function to end the passed transaction if it's not nil
+func endTrans(t *apm.Transaction) {
+	if t != nil {
+		t.End()
 	}
 }
 
@@ -109,60 +130,57 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, throttle time.Duratio
 func (m *monitorT) Run(ctx context.Context) error {
 	m.log = zerolog.Ctx(ctx).With().Str("ctx", "policy agent monitor").Logger()
 	m.log.Info().
-		Dur("throttle", m.throttle).
+		Int("burst", m.limit.Burst()).
+		Any("event_rate", m.limit.Limit()). // Limit() returns an alias type for float64
 		Msg("run policy monitor")
 
 	s := m.monitor.Subscribe()
 	defer m.monitor.Unsubscribe(s)
 
-	// If no throttle set, setup a minimal spin rate.
-	dur := m.throttle
-	if dur == 0 {
-		dur = time.Nanosecond
-	}
-
-	isDeploying := true
-	ticker := time.NewTicker(dur)
-
-	startDeploy := func() {
-		if !isDeploying {
-			isDeploying = true
-			ticker = time.NewTicker(dur)
-		}
-	}
-
-	stopDeploy := func() {
-		ticker.Stop()
-		isDeploying = false
-	}
-
-	// begin in stopped state
-	stopDeploy()
-
-	// stop timer on exit
-	defer stopDeploy()
-
 	close(m.startCh)
 
+	var iCtx context.Context
+	var trans *apm.Transaction
 LOOP:
 	for {
+		m.log.Trace().Msg("policy monitor loop start")
+		iCtx = ctx
 		select {
 		case <-m.kickCh:
-			if err := m.loadPolicies(ctx); err != nil {
+			m.log.Trace().Msg("policy monitor kicked")
+			if m.bulker.HasTracer() {
+				trans = m.bulker.StartTransaction("initial policies", "policy_monitor")
+				iCtx = apm.ContextWithTransaction(ctx, trans)
+			}
+
+			if err := m.loadPolicies(iCtx); err != nil {
+				endTrans(trans)
 				return err
 			}
-			startDeploy()
+			m.dispatchPending(iCtx)
+			endTrans(trans)
 		case <-m.deployCh:
-			startDeploy()
-		case hits := <-s.Output():
-			if err := m.processHits(ctx, hits); err != nil {
+			m.log.Trace().Msg("policy monitor deploy ch")
+			if m.bulker.HasTracer() {
+				trans = m.bulker.StartTransaction("forced policies", "policy_monitor")
+				iCtx = apm.ContextWithTransaction(ctx, trans)
+			}
+
+			m.dispatchPending(iCtx)
+			endTrans(trans)
+		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
+			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
+			if m.bulker.HasTracer() {
+				trans = m.bulker.StartTransaction("output policies", "policy_monitor")
+				iCtx = apm.ContextWithTransaction(ctx, trans)
+			}
+
+			if err := m.processHits(iCtx, hits); err != nil {
+				endTrans(trans)
 				return err
 			}
-			startDeploy()
-		case <-ticker.C:
-			if done := m.dispatchPending(); done {
-				stopDeploy()
-			}
+			m.dispatchPending(iCtx)
+			endTrans(trans)
 		case <-ctx.Done():
 			break LOOP
 		}
@@ -184,6 +202,9 @@ func unmarshalHits(hits []es.HitT) ([]model.Policy, error) {
 }
 
 func (m *monitorT) processHits(ctx context.Context, hits []es.HitT) error {
+	span, ctx := apm.StartSpan(ctx, "process hits", "process")
+	defer span.End()
+
 	policies, err := unmarshalHits(hits)
 	if err != nil {
 		zerolog.Ctx(ctx).Error().Err(err).Msg("fail unmarshal hits")
@@ -204,48 +225,78 @@ func (m *monitorT) waitStart(ctx context.Context) error {
 	return nil
 }
 
-func (m *monitorT) dispatchPending() bool {
+// dispatchPending will dispatch all pending policy changes to the subscriptions in the queue.
+// dispatches are rate limited by the monitor's limiter.
+func (m *monitorT) dispatchPending(ctx context.Context) {
+	span, ctx := apm.StartSpan(ctx, "dispatch pending", "dispatch")
+	defer span.End()
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
+	ts := time.Now()
+	nQueued := 0
+
 	s := m.pendingQ.popFront()
 	if s == nil {
-		return true
+		return
 	}
 
-	done := m.pendingQ.isEmpty()
+	for s != nil {
+		// Use a rate.Limiter to control how fast policies are passed to the checkin handler.
+		// This is done to avoid all responses to agents on the same policy from being written at once.
+		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
+		err := m.limit.Wait(ctx)
+		if err != nil {
+			m.log.Warn().Err(err).Msg("Policy limit error")
+			return
+		}
+		// Lookup the latest policy for this subscription
+		policy, ok := m.policies[s.policyID]
+		if !ok {
+			m.log.Warn().
+				Str(logger.PolicyID, s.policyID).
+				Msg("logic error: policy missing on dispatch")
+			return
+		}
 
-	// Lookup the latest policy for this subscription
-	policy, ok := m.policies[s.policyID]
-	if !ok {
-		m.log.Warn().
-			Str(logger.PolicyID, s.policyID).
-			Msg("logic error: policy missing on dispatch")
-		return done
+		select {
+		case <-ctx.Done():
+			m.log.Debug().Err(ctx.Err()).Msg("context termination detected in policy dispatch")
+			return
+		case s.ch <- &policy.pp:
+			m.log.Debug().
+				Str(logger.PolicyID, s.policyID).
+				Int64("subscription_revision_idx", s.revIdx).
+				Int64(logger.RevisionIdx, s.revIdx).
+				Msg("dispatch policy change")
+		default:
+			// Should never block on a channel; we created a channel of size one.
+			// A block here indicates a logic error somewheres.
+			m.log.Error().
+				Str(logger.PolicyID, s.policyID).
+				Str(logger.AgentID, s.agentID).
+				Msg("logic error: should never block on policy channel")
+			return
+		}
+		s = m.pendingQ.popFront()
+		nQueued += 1
 	}
 
-	select {
-	case s.ch <- &policy.pp:
-		m.log.Debug().
-			Str(logger.AgentID, s.agentID).
-			Str(logger.PolicyID, s.policyID).
-			Int64("rev", s.revIdx).
-			Msg("dispatch")
-	default:
-		// Should never block on a channel; we created a channel of size one.
-		// A block here indicates a logic error somewheres.
-		m.log.Error().
-			Str(logger.PolicyID, s.policyID).
-			Str(logger.AgentID, s.agentID).
-			Msg("logic error: should never block on policy channel")
-	}
-
-	return done
+	dur := time.Since(ts)
+	m.log.Debug().Dur("event.duration", dur).Int("nSubs", nQueued).
+		Msg("policy monitor dispatch complete")
 }
 
 func (m *monitorT) loadPolicies(ctx context.Context) error {
+	span, ctx := apm.StartSpan(ctx, "Load policies", "load")
+	defer span.End()
+
 	if m.bulker.HasTracer() {
-		trans := m.bulker.StartTransaction("Load policies", "bulker")
+		tctx := span.TraceContext()
+		trans := m.bulker.StartTransactionOptions("Load policies", "bulker", apm.TransactionOptions{Links: []apm.SpanLink{{
+			Trace: tctx.Trace,
+			Span:  tctx.Span,
+		}}})
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}
@@ -267,9 +318,15 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 }
 
 func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy) error {
+	span, ctx := apm.StartSpan(ctx, "process policies", "process")
+	defer span.End()
+
 	if len(policies) == 0 {
 		return nil
 	}
+
+	m.log.Debug().Int64(logger.RevisionIdx, policies[0].RevisionIdx).
+		Str(logger.PolicyID, policies[0].PolicyID).Msg("process policies")
 
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
@@ -278,7 +335,7 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 			return err
 		}
 
-		m.updatePolicy(pp)
+		m.updatePolicy(ctx, pp)
 	}
 	return nil
 }
@@ -302,12 +359,17 @@ func (m *monitorT) groupByLatest(policies []model.Policy) map[string]model.Polic
 	return groupByLatest(policies)
 }
 
-func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
+func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 	newPolicy := pp.Policy
+
+	span, _ := apm.StartSpan(ctx, "update policy", "process")
+	span.Context.SetLabel(logger.PolicyID, newPolicy.PolicyID)
+	span.Context.SetLabel(dl.FieldRevisionIdx, newPolicy.RevisionIdx)
+	defer span.End()
 
 	zlog := m.log.With().
 		Str(logger.PolicyID, newPolicy.PolicyID).
-		Int64("rev", newPolicy.RevisionIdx).
+		Int64(logger.RevisionIdx, newPolicy.RevisionIdx).
 		Logger()
 
 	m.mut.Lock()
@@ -330,6 +392,7 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 	// Update the policy in our data structure
 	p.pp = *pp
 	m.policies[newPolicy.PolicyID] = p
+	zlog.Debug().Str(logger.PolicyID, newPolicy.PolicyID).Msg("Update policy revision")
 
 	// Iterate through the subscriptions on this policy;
 	// schedule any subscription for delivery that requires an update.
@@ -360,8 +423,8 @@ func (m *monitorT) updatePolicy(pp *ParsedPolicy) bool {
 	}
 
 	zlog.Info().
-		Int64("oldRev", oldPolicy.RevisionIdx).
-		Int("nQueued", nQueued).
+		Int64("old_revision_idx", oldPolicy.RevisionIdx).
+		Int("nSubs", nQueued).
 		Str(logger.PolicyID, newPolicy.PolicyID).
 		Msg("New revision of policy received and added to the queue")
 
@@ -391,7 +454,7 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64)
 	m.log.Debug().
 		Str(logger.AgentID, agentID).
 		Str(logger.PolicyID, policyID).
-		Int64("rev", revisionIdx).
+		Int64(logger.RevisionIdx, revisionIdx).
 		Msg("subscribed to policy monitor")
 
 	s := NewSub(
@@ -409,6 +472,7 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64)
 		// We've not seen this policy before, force load.
 		m.log.Info().
 			Str(logger.PolicyID, policyID).
+			Str(logger.AgentID, s.agentID).
 			Msg("force load on unknown policyId")
 		p = policyT{head: makeHead()}
 		p.head.pushBack(s)
@@ -419,11 +483,17 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64)
 		m.pendingQ.pushBack(s)
 		m.log.Debug().
 			Str(logger.AgentID, s.agentID).
-			Msg("scheduled pending on subscribe")
+			Int64(logger.RevisionIdx, (&p.pp.Policy).RevisionIdx).
+			Msg("deploy pending on subscribe")
 		if empty {
 			m.kickDeploy()
 		}
 	default:
+		m.log.Debug().
+			Str(logger.PolicyID, policyID).
+			Str(logger.AgentID, s.agentID).
+			Int64(logger.RevisionIdx, (&p.pp.Policy).RevisionIdx).
+			Msg("subscription added without new revision")
 		p.head.pushBack(s)
 	}
 
@@ -444,7 +514,7 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 	m.log.Debug().
 		Str(logger.AgentID, s.agentID).
 		Str(logger.PolicyID, s.policyID).
-		Int64("rev", s.revIdx).
+		Int64(logger.RevisionIdx, s.revIdx).
 		Msg("unsubscribe")
 
 	return nil

@@ -193,9 +193,9 @@ func TestSub_UnlinkRandomN(t *testing.T) {
 }
 
 func BenchmarkSubsSimple(b *testing.B) {
-
 	head := makeHead()
 	nn := NewSub("", "", 0)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		head.pushBack(nn)
 		head.popFront()
@@ -212,19 +212,18 @@ func BenchmarkSubs(b *testing.B) {
 		524288,
 	}
 
-	max := benchmarks[len(benchmarks)-1]
-
-	head := makeHead()
-	subs := make([]*subT, 0, max)
-
-	for i := 0; i < max; i++ {
-		name := fmt.Sprintf("policy%d", i)
-		nn := NewSub(name, "", 0)
-		subs = append(subs, nn)
-	}
-
 	for _, bm := range benchmarks {
 		b.Run(fmt.Sprintf("%d", bm), func(b *testing.B) {
+			b.StopTimer()
+			subs := make([]*subT, 0, bm)
+			for i := 0; i < bm; i++ {
+				name := fmt.Sprintf("policy%d", i)
+				nn := NewSub(name, "", 0)
+				subs = append(subs, nn)
+			}
+
+			head := makeHead()
+			b.StartTimer()
 
 			for i := 0; i < b.N; i++ {
 				for j := 0; j < bm; j++ {

@@ -300,3 +300,7 @@ func (b *Bulker) HasTracer() bool {
 func (b *Bulker) StartTransaction(name, transactionType string) *apm.Transaction {
 	return b.tracer.StartTransaction(name, transactionType)
 }
+
+func (b *Bulker) StartTransactionOptions(name, transactionType string, opts apm.TransactionOptions) *apm.Transaction {
+	return b.tracer.StartTransactionOptions(name, transactionType, opts)
+}

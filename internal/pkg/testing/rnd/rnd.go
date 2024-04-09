@@ -26,6 +26,9 @@ func New() *Rnd {
 }
 
 func (r *Rnd) Int(min, max int) int {
+	if min == max {
+		return max
+	}
 	return r.r.Intn(max-min) + min
 }
 

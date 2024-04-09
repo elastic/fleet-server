@@ -5,6 +5,7 @@
 package bulk
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 
@@ -41,11 +42,12 @@ func parseError(res *esapi.Response, log *zerolog.Logger) error {
 
 	if err := decoder.Decode(&e); err != nil {
 		log.Error().Err(err).Msg("Cannot decode Elasticsearch error body")
-		bodyBytes, readErr := io.ReadAll(res.Body)
+		var b bytes.Buffer
+		_, readErr := io.Copy(&b, res.Body)
 		if readErr != nil {
 			log.Debug().Err(readErr).Msg("Error reading error response body from Elasticsearch")
 		} else {
-			log.Debug().Err(err).Bytes("body", bodyBytes).Msg("Error content")
+			log.Debug().Err(err).Bytes("body", b.Bytes()).Msg("Error content")
 		}
 
 		return err

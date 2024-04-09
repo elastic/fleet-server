@@ -661,6 +661,14 @@ func TestSelfMonitor_reportOutputHealthyState(t *testing.T) {
 		}
 		return doc.Message == "" && doc.State == client.UnitStateHealthy.String()
 	}), mock.Anything).Return("", nil)
+	bulker.On("Search", mock.Anything, dl.FleetPolicies, mock.Anything, mock.Anything).Return(
+		&es.ResultT{
+			HitsT: es.HitsT{
+				Hits: []es.HitT{
+					{Source: []byte(`{"data": {"outputs":{"remote":{"type":"remote_elasticsearch","hosts":["http://localhost:9200"]}}}}`)},
+				},
+			},
+		}, nil)
 
 	reportOutputHealth(ctx, bulker, logger)
 
@@ -690,6 +698,58 @@ func TestSelfMonitor_reportOutputDegradedState(t *testing.T) {
 		}
 		return doc.Message == "remote ES is not reachable due to error: error connecting" && doc.State == client.UnitStateDegraded.String()
 	}), mock.Anything).Return("", nil)
+	bulker.On("Search", mock.Anything, dl.FleetPolicies, mock.Anything, mock.Anything).Return(
+		&es.ResultT{
+			HitsT: es.HitsT{
+				Hits: []es.HitT{
+					{Source: []byte(`{"data": {"outputs":{"remote":{"type":"remote_elasticsearch","hosts":["http://localhost:9200"]}}}}`)},
+				},
+			},
+		}, nil)
+
+	reportOutputHealth(ctx, bulker, logger)
+
+	bulker.AssertExpectations(t)
+	outputBulker.AssertExpectations(t)
+}
+
+func TestSelfMonitor_reportOutputSkipIfOutdated(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	logger := testlog.SetLogger(t)
+
+	bulker := ftesting.NewMockBulk()
+	bulkerMap := make(map[string]bulk.Bulk)
+	outputBulker := ftesting.NewMockBulk()
+	bulkerMap["outdated"] = outputBulker
+	bulker.On("GetBulkerMap").Return(bulkerMap)
+	bulker.On("Search", mock.Anything, dl.FleetPolicies, mock.Anything, mock.Anything).Return(
+		&es.ResultT{
+			HitsT: es.HitsT{
+				Hits: []es.HitT{
+					{Source: []byte(`{"data": {"outputs":{"outdated":{"type":"remote_elasticsearch","hosts":["http://localhost:9200"]}}}}`)},
+				},
+			},
+		}, nil)
+
+	reportOutputHealth(ctx, bulker, logger)
+
+	bulker.AssertExpectations(t)
+	outputBulker.AssertExpectations(t)
+}
+
+func TestSelfMonitor_reportOutputSkipIfNotFound(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	logger := testlog.SetLogger(t)
+
+	bulker := ftesting.NewMockBulk()
+	bulkerMap := make(map[string]bulk.Bulk)
+	outputBulker := ftesting.NewMockBulk()
+	bulkerMap["outdated"] = outputBulker
+	bulker.On("GetBulkerMap").Return(bulkerMap)
+	bulker.On("Search", mock.Anything, dl.FleetPolicies, mock.Anything, mock.Anything).Return(
+		&es.ResultT{}, errors.New("output not found"))
 
 	reportOutputHealth(ctx, bulker, logger)
 

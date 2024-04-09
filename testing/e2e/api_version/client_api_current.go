@@ -1,6 +1,22 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
 package api_version
 
@@ -17,8 +33,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/fleet-server/pkg/api"
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
-	"github.com/elastic/fleet-server/v7/pkg/api"
 	"github.com/elastic/fleet-server/v7/version"
 )
 
@@ -98,24 +114,32 @@ func (tester *ClientAPITester) Enroll(ctx context.Context, apiKey string) (strin
 
 // Checkin tests the checkin endpoint.
 // Returns the new ack token and the list of actions.
-func (tester *ClientAPITester) Checkin(ctx context.Context, apiKey, agentID string, ackToken, dur *string) (*string, []string) {
+func (tester *ClientAPITester) Checkin(ctx context.Context, apiKey, agentID string, ackToken, dur *string, requestBody *api.AgentCheckinJSONRequestBody) (*string, []string, int) {
 	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.Client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", "ApiKey "+apiKey)
 		return nil
 	}))
 	tester.Require().NoError(err)
 
-	resp, err := client.AgentCheckinWithResponse(ctx,
-		agentID,
-		&api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion},
-		api.AgentCheckinJSONRequestBody{
+	if requestBody == nil {
+		requestBody = &api.AgentCheckinJSONRequestBody{
 			Status:      api.CheckinRequestStatusOnline,
-			AckToken:    ackToken,
+			Message:     "test checkin",
 			PollTimeout: dur,
-		},
-	)
+		}
+	}
+
+	resp, err := client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, *requestBody)
 	tester.Require().NoError(err)
-	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+
+	// No need to process the response further if we're testing for a bad request;
+	// just return the status code
+	// For valid requests, process as usual
+	if resp.StatusCode() != http.StatusOK {
+		return nil, nil, resp.StatusCode()
+	}
+
+	// Process a successful check-in response.
 	checkin := resp.JSON200
 	tester.Require().NotNil(checkin.AckToken, "expected to recieve ack token from checkin")
 	tester.Require().NotNil(checkin.Actions, "expected to actions from checkin")
@@ -125,7 +149,7 @@ func (tester *ClientAPITester) Checkin(ctx context.Context, apiKey, agentID stri
 		actionIds[i] = action.Id
 	}
 
-	return checkin.AckToken, actionIds
+	return checkin.AckToken, actionIds, resp.StatusCode()
 }
 
 // Acks tests the acks endpoint
@@ -283,7 +307,8 @@ func (tester *ClientAPITester) TestEnrollCheckinAck() {
 	tester.VerifyAgentInKibana(ctx, agentID)
 
 	tester.T().Logf("test checkin 1: agent %s", agentID)
-	ackToken, actions := tester.Checkin(ctx, agentKey, agentID, nil, nil)
+	ackToken, actions, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, nil)
+	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
 	tester.Require().NotEmpty(actions)
 
 	tester.T().Log("test ack")
@@ -292,10 +317,25 @@ func (tester *ClientAPITester) TestEnrollCheckinAck() {
 	tester.T().Logf("test checkin 2: agent %s 3m timout", agentID)
 	dur := "3m"
 
-	tester.Checkin(ctx, agentKey, agentID, ackToken, &dur)
+	_, _, newStatusCode := tester.Checkin(ctx, agentKey, agentID, ackToken, &dur, nil)
+	tester.Require().Equal(http.StatusOK, newStatusCode, "Expected status code 200 for successful checkin with timeout")
 
 	// sanity check agent status in kibana
 	tester.AgentIsOnline(ctx, agentID)
+}
+
+func (tester *ClientAPITester) TestCheckinWithBadRequest() {
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+
+	tester.T().Log("test enrollment")
+	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	tester.VerifyAgentInKibana(ctx, agentID)
+
+	tester.T().Logf("test checkin 1: agent %s", agentID)
+
+	_, _, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, &api.CheckinRequest{})
+	tester.Require().Equal(http.StatusBadRequest, statusCode, "Expected status code 400 for bad request")
 }
 
 func (tester *ClientAPITester) TestFullFileUpload() {

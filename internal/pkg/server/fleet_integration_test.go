@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path"
@@ -60,7 +61,7 @@ const (
 	}`
 	checkinBody = `{
 	    "status": "online",
-	    "message": ""
+	    "message": "checkin ok"
 	}`
 )
 
@@ -87,6 +88,17 @@ func (s *tserver) waitExit() error {
 	if errors.Is(err, context.Canceled) {
 		return nil
 	}
+
+	// FIXME: Below is a work around to net.DNSError not supporting the `Unwrap` method.
+	// It is so we can ignore errors caused by context cancelation.
+	// It can be removed when DNSError.Unwrap is added to the stdlib.
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		if strings.Contains(dnsErr.Err, "operation was canceled") {
+			return nil
+		}
+	}
+
 	return err
 }
 
@@ -257,7 +269,6 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
-
 }
 
 func (s *tserver) buildURL(id string, cmd string) string {
@@ -1010,7 +1021,7 @@ func Test_Agent_request_errors(t *testing.T) {
 		res, err := cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusInternalServerError, res.StatusCode)
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 	t.Run("no user agent", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(ctx)
@@ -1119,7 +1130,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
 	    "ack_token": "%s",
 	    "status": "online",
-	    "message": "",
+	    "message": "checkin ok",
 	    "poll_timeout": "3m"
 	}`, *checkinResponse.AckToken)))
 	require.NoError(t, err)
@@ -1147,7 +1158,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
 	    "ack_token": "%s",
 	    "status": "online",
-	    "message": "",
+	    "message": "checkin ok",
 	    "poll_timeout": "10m"
 	}`, *checkinResponse.AckToken)))
 	require.NoError(t, err)
@@ -1167,4 +1178,117 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	require.LessOrEqual(t, dur, 3*time.Minute) // include write timeout
 	require.GreaterOrEqual(t, dur, time.Minute)
+}
+
+func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	cli := cleanhttp.DefaultClient()
+
+	// enroll an agent
+	t.Log("Enroll an agent")
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	dec := json.NewDecoder(res.Body)
+	var enrollResponse api.EnrollResponse
+	err = dec.Decode(&enrollResponse)
+	res.Body.Close()
+	require.NoError(t, err)
+	agentID := enrollResponse.Item.Id
+	apiKey := enrollResponse.Item.AccessApiKey
+
+	// checkin
+	t.Logf("checkin 1: agent %s no poll_timeout", agentID)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(checkinBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	start := time.Now()
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	t.Logf("checkin 1: agent %s took %s", agentID, time.Since(start))
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	var checkinResponse api.CheckinResponse
+	dec = json.NewDecoder(res.Body)
+	err = dec.Decode(&checkinResponse)
+	res.Body.Close()
+	require.NoError(t, err)
+
+	t.Logf("Ack actions for agent %s", agentID)
+	events := make([]api.AckRequest_Events_Item, 0, len(*checkinResponse.Actions))
+	for _, action := range *checkinResponse.Actions {
+		event := api.GenericEvent{
+			ActionId: action.Id,
+			AgentId:  agentID,
+			Message:  "test-message",
+			Type:     api.ACTIONRESULT,
+			Subtype:  api.ACKNOWLEDGED,
+		}
+		ev := api.AckRequest_Events_Item{}
+		err := ev.FromGenericEvent(event)
+		require.NoError(t, err)
+		events = append(events, ev)
+	}
+	p, err := json.Marshal(api.AckRequest{Events: events})
+	require.NoError(t, err)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/acks", bytes.NewBuffer(p))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	res.Body.Close()
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	t.Logf("checkin 2: agent %s poll_timeout 3m server will shutdown after 10s", agentID)
+	//nolint:noctx // we want to halt the request via the server context cancelation
+	req, err = http.NewRequest("POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
+	    "ack_token": "%s",
+	    "status": "online",
+	    "message": "checkin ok",
+	    "poll_timeout": "3m"
+	}`, *checkinResponse.AckToken)))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	start = time.Now()
+
+	go func() {
+		time.Sleep(time.Second * 10)
+		t.Log("Shutting down server")
+		cancel()
+	}()
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	dur := time.Since(start)
+	t.Logf("checkin 2: agent %s took %s", agentID, time.Since(start))
+	p, err = io.ReadAll(res.Body)
+	res.Body.Close()
+	require.NoError(t, err)
+	t.Logf("Response body: %s", string(p))
+	t.Logf("Request duration: %s", dur)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.LessOrEqual(t, dur, 2*time.Minute)
+	require.GreaterOrEqual(t, dur, time.Second*10)
+	token := *checkinResponse.AckToken
+	err = json.Unmarshal(p, &checkinResponse)
+	require.NoError(t, err)
+	require.Equal(t, token, *checkinResponse.AckToken)
 }

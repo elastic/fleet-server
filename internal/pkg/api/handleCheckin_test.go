@@ -10,8 +10,10 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,6 +31,7 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/hashicorp/go-version"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -78,6 +81,12 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{json.RawMessage(`{"log_level":"error"}`)},
 		hasErr: false,
 	}, {
+		name:   "settings action trace level",
+		aType:  SETTINGS,
+		raw:    json.RawMessage(`{"log_level":"trace"}`),
+		expect: Action_Data{json.RawMessage(`{"log_level":"trace"}`)},
+		hasErr: false,
+	}, {
 		name:   "upgrade action",
 		aType:  UPGRADE,
 		raw:    json.RawMessage(`{"source_uri":"https://localhost:8080","version":"1.2.3"}`),
@@ -87,6 +96,18 @@ func TestConvertActionData(t *testing.T) {
 		name:   "request diagnostics action",
 		aType:  REQUESTDIAGNOSTICS,
 		expect: Action_Data{},
+		hasErr: false,
+	}, {
+		name:   "request diagnostics action empty data",
+		aType:  REQUESTDIAGNOSTICS,
+		raw:    json.RawMessage(`{}`),
+		expect: Action_Data{json.RawMessage(`{}`)},
+		hasErr: false,
+	}, {
+		name:   "request diagnostics with additional cpu metric",
+		aType:  REQUESTDIAGNOSTICS,
+		raw:    json.RawMessage(`{"additional_metrics": ["CPU"]}`),
+		expect: Action_Data{json.RawMessage(`{"additional_metrics":["CPU"]}`)},
 		hasErr: false,
 	}, {
 		name:   "unenroll action",
@@ -125,21 +146,23 @@ func TestConvertActions(t *testing.T) {
 		token:   "",
 	}, {
 		name:    "single action",
-		actions: []model.Action{{ActionID: "1234", Type: "REQUEST_DIAGNOSTICS"}},
+		actions: []model.Action{{ActionID: "1234", Type: "REQUEST_DIAGNOSTICS", Data: json.RawMessage(`{}`)}},
 		resp: []Action{{
 			AgentId: "agent-id",
 			Id:      "1234",
 			Type:    REQUESTDIAGNOSTICS,
+			Data:    Action_Data{json.RawMessage(`{}`)},
 		}},
 		token: "",
 	}, {
 		name:    "single action signed",
-		actions: []model.Action{{ActionID: "1234", Signed: &model.Signed{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="}, Type: "REQUEST_DIAGNOSTICS"}},
+		actions: []model.Action{{ActionID: "1234", Signed: &model.Signed{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="}, Type: "REQUEST_DIAGNOSTICS", Data: json.RawMessage(`{}`)}},
 		resp: []Action{{
 			AgentId: "agent-id",
 			Id:      "1234",
 			Type:    REQUESTDIAGNOSTICS,
 			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="},
+			Data:    Action_Data{json.RawMessage(`{}`)},
 		}},
 		token: "",
 	}, {name: "multiple actions",
@@ -147,10 +170,12 @@ func TestConvertActions(t *testing.T) {
 			{
 				ActionID: "1234",
 				Type:     "REQUEST_DIAGNOSTICS",
+				Data:     json.RawMessage(`{}`),
 			},
 			{
 				ActionID: "5678",
 				Type:     "REQUEST_DIAGNOSTICS",
+				Data:     json.RawMessage(`{}`),
 				Signed:   &model.Signed{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="},
 			},
 		},
@@ -158,11 +183,13 @@ func TestConvertActions(t *testing.T) {
 			AgentId: "agent-id",
 			Id:      "1234",
 			Type:    REQUESTDIAGNOSTICS,
+			Data:    Action_Data{json.RawMessage(`{}`)},
 		}, {
 			AgentId: "agent-id",
 			Id:      "5678",
 			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="},
 			Type:    REQUESTDIAGNOSTICS,
+			Data:    Action_Data{json.RawMessage(`{}`)},
 		}},
 		token: "",
 	}}
@@ -272,7 +299,7 @@ func TestResolveSeqNo(t *testing.T) {
 			bc := checkin.NewBulk(nil)
 			bulker := ftesting.NewMockBulk()
 			pim := mockmonitor.NewMockMonitor()
-			pm := policy.NewMonitor(bulker, pim, 5*time.Millisecond)
+			pm := policy.NewMonitor(bulker, pim, config.ServerLimits{PolicyLimit: config.Limit{Interval: 5 * time.Millisecond, Burst: 1}})
 			ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
 
 			resp, _ := ct.resolveSeqNo(ctx, logger, tc.req, tc.agent)
@@ -304,7 +331,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		err: nil,
 	}, {
 		name:    "agent has details checkin details are nil",
-		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: json.RawMessage(`{"action_id":"test"}`)},
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{}},
 		details: nil,
 		bulk: func() *ftesting.MockBulk {
 			mBulk := ftesting.NewMockBulk()
@@ -631,7 +658,7 @@ func Benchmark_CheckinT_writeResponse(b *testing.B) {
 	}
 	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
 
-	logger := testlog.SetLogger(b)
+	logger := zerolog.Nop()
 	req := &http.Request{
 		Header: http.Header{
 			"Accept-Encoding": []string{"gzip"},
@@ -657,7 +684,7 @@ func BenchmarkParallel_CheckinT_writeResponse(b *testing.B) {
 	}
 	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
 
-	logger := testlog.SetLogger(b)
+	logger := zerolog.Nop()
 	req := &http.Request{
 		Header: http.Header{
 			"Accept-Encoding": []string{"gzip"},
@@ -684,4 +711,243 @@ func mustBuildConstraints(verStr string) version.Constraints {
 		panic(err)
 	}
 	return con
+}
+
+func TestCalcUnhealthyReason(t *testing.T) {
+	tests := []struct {
+		name            string
+		components      []model.ComponentsItems
+		unhealthyReason []string
+	}{{
+		name: "healthy",
+		components: []model.ComponentsItems{{
+			Status: "HEALTHY",
+			Units: []model.UnitsItems{{
+				Status: "HEALTHY", Type: "input",
+			}},
+		}},
+		unhealthyReason: []string{},
+	}, {
+		name: "input",
+		components: []model.ComponentsItems{{
+			Status: "FAILED",
+			Units: []model.UnitsItems{{
+				Status: "FAILED", Type: "input",
+			}},
+		}},
+		unhealthyReason: []string{"input"},
+	},
+		{
+			name: "output",
+			components: []model.ComponentsItems{{
+				Status: "DEGRADED",
+				Units: []model.UnitsItems{{
+					Status: "HEALTHY", Type: "input",
+				},
+					{
+						Status: "DEGRADED", Type: "output",
+					}},
+			}},
+			unhealthyReason: []string{"output"},
+		},
+		{
+			name: "other",
+			components: []model.ComponentsItems{{
+				Status: "DEGRADED",
+				Units:  []model.UnitsItems{},
+			}},
+			unhealthyReason: []string{"other"},
+		},
+		{
+			name: "input,output in one component",
+			components: []model.ComponentsItems{{
+				Status: "DEGRADED",
+				Units: []model.UnitsItems{{
+					Status: "FAILED", Type: "input",
+				},
+					{
+						Status: "DEGRADED", Type: "output",
+					}},
+			}},
+			unhealthyReason: []string{"input", "output"},
+		},
+		{
+			name: "input,output in different components",
+			components: []model.ComponentsItems{{
+				Status: "DEGRADED",
+				Units: []model.UnitsItems{
+					{
+						Status: "DEGRADED", Type: "input",
+					}},
+			},
+				{
+					Status: "FAILED",
+					Units: []model.UnitsItems{{
+						Status: "FAILED", Type: "output",
+					}},
+				}},
+			unhealthyReason: []string{"input", "output"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			unhealthyReason := calcUnhealthyReason(tc.components)
+			assert.Equal(t, tc.unhealthyReason, unhealthyReason)
+		})
+	}
+}
+
+func TestParseComponents(t *testing.T) {
+	var unhealthyReasonNil []string
+	degradedInputReqComponents := json.RawMessage(`[{"status":"DEGRADED","units":[{"status":"DEGRADED","type":"input"}]}]`)
+	tests := []struct {
+		name            string
+		agent           *model.Agent
+		req             *CheckinRequest
+		outComponents   []byte
+		unhealthyReason *[]string
+		err             error
+	}{{
+		name:            "unchanged components healthy",
+		agent:           &model.Agent{},
+		req:             &CheckinRequest{},
+		outComponents:   nil,
+		unhealthyReason: &unhealthyReasonNil,
+		err:             nil,
+	},
+		{
+			name: "unchanged components unhealthy",
+			agent: &model.Agent{
+				LastCheckinStatus: FailedStatus,
+			},
+			req:             &CheckinRequest{},
+			outComponents:   nil,
+			unhealthyReason: &[]string{"other"},
+			err:             nil,
+		},
+		{
+			name: "unchanged components",
+			agent: &model.Agent{
+				LastCheckinStatus: FailedStatus,
+				UnhealthyReason:   []string{"input"},
+				Components: []model.ComponentsItems{{
+					Status: "DEGRADED",
+					Units: []model.UnitsItems{{
+						Status: "DEGRADED", Type: "input",
+					}},
+				}},
+			},
+			req: &CheckinRequest{
+				Components: &degradedInputReqComponents,
+			},
+			outComponents:   nil,
+			unhealthyReason: &[]string{"input"},
+			err:             nil,
+		},
+		{
+			name: "changed components",
+			agent: &model.Agent{
+				LastCheckinStatus: "online",
+				UnhealthyReason:   nil,
+				Components: []model.ComponentsItems{{
+					Status: "HEALTHY",
+					Units: []model.UnitsItems{{
+						Status: "HEALTHY", Type: "input",
+					}},
+				}},
+			},
+			req: &CheckinRequest{
+				Status:     "DEGRADED",
+				Components: &degradedInputReqComponents,
+			},
+			outComponents:   degradedInputReqComponents,
+			unhealthyReason: &[]string{"input"},
+			err:             nil,
+		}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			outComponents, unhealthyReason, err := parseComponents(logger, tc.agent, tc.req)
+			assert.Equal(t, tc.outComponents, outComponents)
+			assert.Equal(t, tc.unhealthyReason, unhealthyReason)
+			assert.Equal(t, tc.err, err)
+		})
+	}
+}
+
+func TestValidateCheckinRequest(t *testing.T) {
+	verCon := mustBuildConstraints("8.0.0")
+
+	tests := []struct {
+		name     string
+		req      *http.Request
+		cfg      *config.Server
+		expErr   error
+		expValid validatedCheckin
+	}{
+		{
+			name: "Invalid JSON",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"invalidJson":}`)),
+			},
+			expErr: &BadRequestErr{msg: "unable to decode checkin request"},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{},
+		},
+		{
+			name: "Missing checkin status",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"validJson": "test"}`)),
+			},
+			expErr: &BadRequestErr{msg: "checkin status missing"},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{},
+		},
+		{
+			name: "Poll Timeout Parsing Error",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"validJson": "test", "status": "test", "poll_timeout": "not a timeout", "message": "test message"}`)),
+			},
+			expErr: &BadRequestErr{msg: "poll_timeout cannot be parsed as duration"},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			checkin := NewCheckinT(verCon, tc.cfg, nil, nil, nil, nil, nil, nil, nil)
+			wr := httptest.NewRecorder()
+			logger := testlog.SetLogger(t)
+			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, nil)
+			if tc.expErr == nil {
+				assert.NoError(t, err)
+			} else {
+				// Asserting error messages prior to ErrorAs becuase ErrorAs modifies
+				// the target error. If we assert error messages after calling ErrorAs
+				// we will end up with false positives.
+				assert.Equal(t, tc.expErr.Error(), err.Error())
+				assert.ErrorAs(t, err, &tc.expErr)
+			}
+			assert.Equal(t, tc.expValid, valid)
+		})
+	}
 }

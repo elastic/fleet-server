@@ -11,7 +11,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -28,10 +31,11 @@ import (
 )
 
 func BenchmarkMakeUpdatePolicyBody(b *testing.B) {
-	b.ReportAllocs()
-
 	const policyID = "ed110be4-c2a0-42b8-adc0-94c2f0569207"
 	const newRev = 2
+
+	b.ResetTimer()
+	b.ReportAllocs()
 
 	for n := 0; n < b.N; n++ {
 		makeUpdatePolicyBody(policyID, newRev)
@@ -636,6 +640,34 @@ func TestInvalidateAPIKeysRemoteOutputReadFromPolicies(t *testing.T) {
 	remoteBulker.AssertExpectations(t)
 }
 
+func TestInvalidateAPIKeysRemoteOutputReadFromPoliciesNotFound(t *testing.T) {
+	toRetire := []model.ToRetireAPIKeyIdsItems{{
+		ID:     "toRetire1",
+		Output: "remote1",
+	}}
+
+	remoteBulker := ftesting.NewMockBulk()
+
+	bulkerFn := func(t *testing.T) *ftesting.MockBulk {
+		m := ftesting.NewMockBulk()
+		m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+			Hits: []es.HitT{},
+		}}, nil).Once()
+
+		m.On("GetBulker", "remote1").Return(nil)
+		return m
+	}
+
+	bulker := bulkerFn(t)
+
+	logger := testlog.SetLogger(t)
+	ack := &AckT{bulk: bulker}
+	ack.invalidateAPIKeys(context.Background(), logger, toRetire, "")
+
+	bulker.AssertExpectations(t)
+	remoteBulker.AssertExpectations(t)
+}
+
 func TestAckHandleUpgrade(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -724,6 +756,47 @@ func TestAckHandleUpgrade(t *testing.T) {
 			err := ack.handleUpgrade(ctx, logger, agent, tc.event)
 			assert.NoError(t, err)
 			bulker.AssertExpectations(t)
+		})
+	}
+}
+
+func TestValidateAckRequest(t *testing.T) {
+	tests := []struct {
+		name   string
+		req    *http.Request
+		cfg    *config.Server
+		expErr error
+		expAck *AckRequest
+	}{
+		{
+			name: "Invalid Request",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`not a json`)),
+			},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{},
+			},
+			expErr: &BadRequestErr{msg: "unable to decode ack request"},
+			expAck: nil,
+		},
+	}
+	logger := testlog.SetLogger(t)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			wr := httptest.NewRecorder()
+			ack := NewAckT(tc.cfg, nil, nil)
+			ackRes, err := ack.validateRequest(logger, wr, tc.req)
+			if tc.expErr == nil {
+				assert.NoError(t, err)
+			} else {
+				// Asserting error messages prior to ErrorAs becuase ErrorAs modifies
+				// the target error. If we assert error messages after calling ErrorAs
+				// we will end up with false positives.
+				assert.Equal(t, tc.expErr.Error(), err.Error())
+				assert.ErrorAs(t, err, &tc.expErr)
+			}
+			assert.Equal(t, tc.expAck, ackRes)
 		})
 	}
 }

@@ -9,7 +9,7 @@ env:
   DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
   DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
   GO_AGENT_IMAGE: "golang:${GO_VERSION}"
-  TERRAFORM_VERSION: "1.6.3"
+  TERRAFORM_VERSION: "1.6.4"
 
 steps:
   - group: "Check and build"
@@ -30,7 +30,14 @@ steps:
           image: "${GO_AGENT_IMAGE}"
           cpu: "8"
           memory: "4G"
-  
+
+      - label: ":building_construction: Run local build: MacOS"
+        key: make-local-macos
+        command: ".buildkite/scripts/local_build.sh"
+        agents:
+          provider: orka
+          imagePrefix: generic-13-ventura-arm
+
   - group: "Performance test"
     key: "performance-test"
     steps:
@@ -39,6 +46,7 @@ steps:
         command: ".buildkite/scripts/run_benchmark.sh pr"
         artifact_paths:
           - build/next.out
+          - build/next.stat
         agents:
           provider: "gcp"
           machineType: "c2-standard-8"
@@ -48,6 +56,7 @@ steps:
         command: ".buildkite/scripts/run_benchmark.sh base"
         artifact_paths:
           - build/base.out
+          - build/base.stat
         agents:
           provider: "gcp"
           machineType: "c2-standard-8"
@@ -77,7 +86,17 @@ steps:
           provider: "gcp"
         artifact_paths:
           - build/*.xml
-          - build/coverage.out
+          - build/coverage*.out
+
+      - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
+        key: unit-test-macos-13
+        command: ".buildkite/scripts/unit_test.sh"
+        agents:
+          provider: orka
+          imagePrefix: generic-13-ventura-arm
+        artifact_paths:
+          - build/*.xml
+          - build/coverage*.out
 
       - label: ":smartbear-testexecute: Run integration tests"
         key: int-test
@@ -105,6 +124,8 @@ steps:
         depends_on:
           - step: "unit-test"
             allow_failure: true
+          - step: "unit-test-macos-13"
+            allow_failure: true
           - step: "int-test"
             allow_failure: true
           - step: "e2e-test"
@@ -116,13 +137,15 @@ steps:
         agents:
           image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
         command:
-          - "buildkite-agent artifact download build/*coverage.out ."
-          - "buildkite-agent artifact download build/test-unit.out.xml ."
+          - "buildkite-agent artifact download build/*coverage*.out ."
+          - "buildkite-agent artifact download build/test-unit*.out.xml ."
           - "/scan-source-code.sh"
         depends_on:
           - step: "unit-test"
             allow_failure: false
           - step: "e2e-test"
+            allow_failure: false
+          - step: "unit-test-macos-13"
             allow_failure: false
 
       - label: ":gcloud: Cloud e2e Test"
@@ -156,10 +179,7 @@ steps:
     build:
       env:
         SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
-        REMOTE_SERVICE_CONFIG: https://raw.githubusercontent.com/elastic/serverless-gitops/main/gen/gpctl/fleet/config.yaml
-        IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
-        NAMESPACE: observability-ci
-        IMAGE_NAME: fleet-server
+        SERVICE: fleet
     depends_on:
       - step: "publish"
 

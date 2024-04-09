@@ -42,6 +42,22 @@ const (
 	LogAccessAPIKeyID = logger.AccessAPIKeyID
 )
 
+// BadRequestErr is used for request validation errors. These can be json
+// unmarshal errors such as json.SyntaxError, or any other input validation
+// error.
+type BadRequestErr struct {
+	msg     string
+	nextErr error
+}
+
+func (e *BadRequestErr) Error() string {
+	return fmt.Sprintf("Bad request: %s", e.msg)
+}
+
+func (e *BadRequestErr) Unwrap() error {
+	return e.nextErr
+}
+
 // HTTPErrResp is an HTTP error response
 type HTTPErrResp struct {
 	StatusCode int           `json:"statusCode"`
@@ -134,6 +150,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				http.StatusTooManyRequests,
 				"MaxLimit",
 				"exceeded the max limit",
+				zerolog.WarnLevel,
+			},
+		},
+		{
+			apikey.ErrElasticsearchAuthLimit,
+			HTTPErrResp{
+				http.StatusTooManyRequests,
+				"ElasticsearchAPIKeyAuthLimit",
+				"exceeded the elasticsearch api key auth limit",
 				zerolog.WarnLevel,
 			},
 		},
@@ -473,6 +498,16 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		}
 	}
 
+	var drErr *BadRequestErr
+	if errors.As(err, &drErr) {
+		return HTTPErrResp{
+			http.StatusBadRequest,
+			"BadRequest",
+			err.Error(),
+			zerolog.ErrorLevel,
+		}
+	}
+
 	// If it's a JSON marshal error
 	var jErr *json.MarshalerError
 	if errors.As(err, &jErr) {
@@ -480,6 +515,16 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			http.StatusInternalServerError,
 			err.Error(),
 			"Fleet server unable to marshall JSON",
+			zerolog.ErrorLevel,
+		}
+	}
+
+	var esErr *es.ErrElastic
+	if errors.As(err, &esErr) {
+		return HTTPErrResp{
+			http.StatusServiceUnavailable,
+			esErr.Error(),
+			"elasticsearch error",
 			zerolog.ErrorLevel,
 		}
 	}

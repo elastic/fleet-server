@@ -206,7 +206,7 @@ LOOP:
 
 	// Server is coming down; wait for the server group to exit cleanly.
 	// Timeout if something is locked up.
-	err = safeWait(srvEg, time.Second)
+	err = safeWait(srvEg, curCfg.Inputs[0].Server.Timeouts.Drain)
 
 	// Eat cancel error to minimize confusion in logs
 	if errors.Is(err, context.Canceled) {
@@ -469,6 +469,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
 		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
 		monitor.WithAPMTracer(tracer),
+		monitor.WithDebounceTime(cfg.Inputs[0].Monitor.PolicyDebounceTime),
 	)
 	if err != nil {
 		return err
@@ -476,7 +477,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	g.Go(loggedRunFunc(ctx, "Policy index monitor", pim.Run))
 
 	// Policy monitor
-	pm := policy.NewMonitor(bulker, pim, cfg.Inputs[0].Server.Limits.PolicyThrottle)
+	pm := policy.NewMonitor(bulker, pim, cfg.Inputs[0].Server.Limits)
 	g.Go(loggedRunFunc(ctx, "Policy monitor", pm.Run))
 
 	// Policy self monitor
@@ -502,10 +503,10 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	if err != nil {
 		return err
 	}
-	g.Go(loggedRunFunc(ctx, "Revision monitor", am.Run))
+	g.Go(loggedRunFunc(ctx, "Action monitor", am.Run))
 
 	ad = action.NewDispatcher(am, cfg.Inputs[0].Server.Limits.ActionLimit.Interval, cfg.Inputs[0].Server.Limits.ActionLimit.Burst)
-	g.Go(loggedRunFunc(ctx, "Revision dispatcher", ad.Run))
+	g.Go(loggedRunFunc(ctx, "Action dispatcher", ad.Run))
 	tr, err = action.NewTokenResolver(bulker)
 	if err != nil {
 		return err

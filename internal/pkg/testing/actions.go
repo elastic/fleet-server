@@ -138,6 +138,17 @@ func CreateRandomActions(opts ...CreateActionsOpt) ([]model.Action, error) {
 
 }
 
+func StoreRandomAction(ctx context.Context, bulker bulk.Bulk, index string) ([]model.Action, error) {
+	actions, err := CreateRandomActions(
+		CreateActionsWithMinActionsCount(1),
+		CreateActionsWithMaxActionsCount(1),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return actions, StoreActions(ctx, bulker, index, actions)
+}
+
 func StoreRandomActions(ctx context.Context, bulker bulk.Bulk, index string, min, max int) ([]model.Action, error) {
 	actions, err := CreateRandomActions(
 		CreateActionsWithMinAgentsCount(min),

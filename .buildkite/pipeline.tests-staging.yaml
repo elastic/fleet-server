@@ -22,3 +22,8 @@ steps:
         SERVICE_TYPE_FIELD: service.name
         SERVICE_VERSION: ${SERVICE_VERSION:0:12}
         SERVICE_REPOSITORY: docker.elastic.co/observability-ci/fleet-server
+        CHECK_SYNTHETICS: true
+        CHECK_SYNTHETICS_TAG: "fleet-server"
+        CHECK_SYNTHETICS_MINIMUM_RUNS: 3
+        MAX_FAILURES: 2
+        CHECK_SYNTHETIC_MAX_POLL: 50

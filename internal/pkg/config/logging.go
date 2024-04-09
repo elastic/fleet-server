@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const defaultLevel = "info"
+
 // LoggingFiles configuration for the logging file output.
 type LoggingFiles struct {
 	Path            string        `config:"path"`

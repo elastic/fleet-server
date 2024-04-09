@@ -18,6 +18,9 @@ dev-tools/cloud/terraform/.terraform
 dev-tools/cloud/terraform/terraform.tfstate*
 dev-tools/cloud/terraform/*.tfvars*
 
+go.work
+go.work.sum
+
 # editor swap files
 *.swp
 *.swo

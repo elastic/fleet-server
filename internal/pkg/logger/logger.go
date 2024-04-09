@@ -101,16 +101,10 @@ func Init(cfg *config.Config, svcName string) (*Logger, error) {
 }
 
 func levelChanged(cfg *config.Config) bool {
-	if cfg.Fleet.Agent.Logging.LogLevel() != zerolog.GlobalLevel() {
-		return true
-	}
 	return level(cfg) != zerolog.GlobalLevel()
 }
 
 func level(cfg *config.Config) zerolog.Level {
-	if cfg.Fleet.Agent.Logging.Level != "" {
-		return cfg.Fleet.Agent.Logging.LogLevel()
-	}
 	return cfg.Logging.LogLevel()
 }
 

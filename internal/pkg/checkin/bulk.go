@@ -43,10 +43,11 @@ type extraT struct {
 // There will be 10's of thousands of items
 // in the map at any point.
 type pendingT struct {
-	ts      string
-	status  string
-	message string
-	extra   *extraT
+	ts              string
+	status          string
+	message         string
+	extra           *extraT
+	unhealthyReason *[]string
 }
 
 // Bulk will batch pending checkins and update elasticsearch at a set interval.
@@ -99,8 +100,9 @@ func (bc *Bulk) timestamp() string {
 
 // CheckIn will add the agent (identified by id) to the pending set.
 // The pending agents are sent to elasticsearch as a bulk update at each flush interval.
+// NOTE: If Checkin is called after Run has returned it will just add the entry to the pending map and not do any operations, this may occur when the fleet-server is shutting down.
 // WARNING: Bulk will take ownership of fields, so do not use after passing in.
-func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string) error {
+func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string, unhealthyReason *[]string) error {
 	// Separate out the extra data to minimize
 	// the memory footprint of the 90% case of just
 	// updating the timestamp.
@@ -117,10 +119,11 @@ func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, c
 	bc.mut.Lock()
 
 	bc.pending[id] = pendingT{
-		ts:      bc.timestamp(),
-		status:  status,
-		message: message,
-		extra:   extra,
+		ts:              bc.timestamp(),
+		status:          status,
+		message:         message,
+		extra:           extra,
+		unhealthyReason: unhealthyReason,
 	}
 
 	bc.mut.Unlock()
@@ -188,6 +191,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 					dl.FieldUpdatedAt:          nowTimestamp,
 					dl.FieldLastCheckinStatus:  pendingData.status,
 					dl.FieldLastCheckinMessage: pendingData.message,
+					dl.FieldUnhealthyReason:    pendingData.unhealthyReason,
 				}
 				if body, err = fields.Marshal(); err != nil {
 					return err
@@ -201,6 +205,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 				dl.FieldUpdatedAt:          nowTimestamp,        // Set "updated_at" to the current timestamp
 				dl.FieldLastCheckinStatus:  pendingData.status,  // Set the pending status
 				dl.FieldLastCheckinMessage: pendingData.message, // Set the status message
+				dl.FieldUnhealthyReason:    pendingData.unhealthyReason,
 			}
 
 			// If the agent version is not empty it needs to be updated

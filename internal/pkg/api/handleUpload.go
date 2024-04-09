@@ -77,7 +77,7 @@ func (ut *UploadT) validateUploadBeginRequest(ctx context.Context, reader io.Rea
 		if errors.Is(err, io.EOF) {
 			return nil, "", fmt.Errorf("%w: %w", ErrFileInfoBodyRequired, err)
 		}
-		return nil, "", err
+		return nil, "", &BadRequestErr{msg: "unable to decode upload begin request", nextErr: err}
 	}
 
 	// check API key matches payload agent ID
@@ -185,7 +185,7 @@ func (ut *UploadT) validateUploadCompleteRequest(r *http.Request, id string) (st
 
 	var req UploadCompleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return "", errors.New("unable to parse request body")
+		return "", &BadRequestErr{msg: "unable to decode upload complete request"}
 	}
 
 	hash := strings.TrimSpace(req.Transithash.Sha256)

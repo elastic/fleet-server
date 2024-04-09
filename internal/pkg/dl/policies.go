@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/rs/zerolog"
 
@@ -38,14 +39,15 @@ func prepareQueryLatestPolicies() []byte {
 // QueryLatestPolicies gets the latest revision for a policy
 func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
-	res, err := bulker.Search(ctx, o.indexName, tmplQueryLatestPolicies)
+	res, err := bulker.Search(ctx, o.indexName, tmplQueryLatestPolicies, bulk.WithIgnoreUnavailble())
 	if err != nil {
 		return nil, err
 	}
 
 	policyID, ok := res.Aggregations[FieldPolicyID]
 	if !ok {
-		return nil, ErrMissingAggregations
+		// Aggregation will not be here if there index is not available
+		return []model.Policy{}, nil
 	}
 	if len(policyID.Buckets) == 0 {
 		return []model.Policy{}, nil
@@ -108,6 +110,6 @@ func QueryOutputFromPolicy(ctx context.Context, bulker bulk.Bulk, outputName str
 			return &policy, nil
 		}
 	}
-	zerolog.Ctx(ctx).Debug().Str("outputName", outputName).Msg("policy with output not found")
+	zerolog.Ctx(ctx).Debug().Str(logger.PolicyOutputName, outputName).Msg("policy with output not found")
 	return nil, nil
 }

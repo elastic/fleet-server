@@ -25,10 +25,12 @@ const (
 	defaultCacheMaxCost     = 50 * 1024 * 1024 // 50MiB cache size
 
 	defaultMaxConnections = 0 // no limit
-	defaultPolicyThrottle = time.Millisecond * 5
 
 	defaultActionInterval = 0 // no throttle
 	defaultActionBurst    = 5
+
+	defaultPolicyInterval = time.Millisecond * 5
+	defaultPolicyBurst    = 1 // NOTE: burst 1 keeps the same behaviour as the previous throttle
 
 	defaultCheckinInterval = time.Millisecond
 	defaultCheckinBurst    = 1000
@@ -134,10 +136,11 @@ type limit struct {
 }
 
 type serverLimitDefaults struct {
-	PolicyThrottle time.Duration `config:"policy_throttle"`
+	PolicyThrottle time.Duration `config:"policy_throttle"` // deprecated: replaced by policy_limit
 	MaxConnections int           `config:"max_connections"`
 
 	ActionLimit      limit `config:"action_limit"`
+	PolicyLimit      limit `config:"policy_limit"`
 	CheckinLimit     limit `config:"checkin_limit"`
 	ArtifactLimit    limit `config:"artifact_limit"`
 	EnrollLimit      limit `config:"enroll_limit"`
@@ -152,12 +155,14 @@ type serverLimitDefaults struct {
 
 func defaultserverLimitDefaults() *serverLimitDefaults {
 	return &serverLimitDefaults{
-		PolicyThrottle: defaultPolicyThrottle,
 		MaxConnections: defaultMaxConnections,
-
 		ActionLimit: limit{
 			Interval: defaultActionInterval,
 			Burst:    defaultActionBurst,
+		},
+		PolicyLimit: limit{
+			Interval: defaultPolicyInterval,
+			Burst:    defaultPolicyBurst,
 		},
 		CheckinLimit: limit{
 			Interval: defaultCheckinInterval,
