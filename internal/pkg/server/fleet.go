@@ -11,6 +11,7 @@ import (
 	"os"
 	"reflect"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -53,6 +54,10 @@ type Fleet struct {
 	cfgCh    chan *config.Config
 	cache    cache.Cache
 	reporter state.Reporter
+
+	// Used for diagnostics reporting
+	l   sync.RWMutex
+	cfg *config.Config
 }
 
 // NewFleet creates the actual fleet server service.
@@ -74,6 +79,12 @@ func NewFleet(bi build.Info, reporter state.Reporter, standAlone bool) (*Fleet, 
 type runFunc func(context.Context) error
 
 type runFuncCfg func(context.Context, *config.Config) error
+
+func (f *Fleet) GetConfig() *config.Config {
+	f.l.RLock()
+	defer f.l.RUnlock()
+	return f.cfg
+}
 
 // Run runs the fleet server
 func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
@@ -192,6 +203,9 @@ LOOP:
 		}
 
 		curCfg = newCfg
+		f.l.Lock()
+		f.cfg = curCfg
+		f.l.Unlock()
 
 		select {
 		case cfg := <-f.cfgCh:
