@@ -16,3 +16,7 @@ updates:
     reviewers:
       - "elastic/fleet"
     open-pull-requests-limit: 10
+    groups:
+      elastic-apm:
+        patterns:
+          - "go.elastic.co/apm/*"
