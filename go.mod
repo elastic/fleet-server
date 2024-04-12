@@ -31,7 +31,7 @@ require (
 	go.elastic.co/apm/module/apmhttp/v2 v2.5.0
 	go.elastic.co/apm/module/apmprometheus/v2 v2.5.0
 	go.elastic.co/apm/module/apmzerolog/v2 v2.5.0
-	go.elastic.co/apm/v2 v2.5.0
+	go.elastic.co/apm/v2 v2.6.0
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.7.0
