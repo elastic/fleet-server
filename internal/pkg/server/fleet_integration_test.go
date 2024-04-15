@@ -296,6 +296,24 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
+
+	// small delay to allow config change to propogate
+	time.Sleep(100 * time.Millisecond)
+	for {
+		healthy, err := isHealthy()
+		if err != nil {
+			return err
+		}
+		if healthy {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 	return nil
 }
 
