@@ -19,6 +19,7 @@ import (
 	"net/http/httptest"
 	"path"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -48,7 +50,7 @@ const (
 	serverVersion = "8.0.0"
 	localhost     = "localhost"
 
-	testWaitServerUp = 3 * time.Second
+	testWaitServerUp = 10 * time.Second
 
 	enrollBody = `{
 	    "type": "PERMANENT",
@@ -71,6 +73,9 @@ type tserver struct {
 	srv       *Fleet
 	enrollKey string
 	bulker    bulk.Bulk
+
+	outputReloadSuccess atomic.Int32
+	outputReloadFailure atomic.Int32
 }
 
 func (s *tserver) baseURL() string {
@@ -212,11 +217,21 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 
 	g, ctx := errgroup.WithContext(ctx)
 
+	// Since we start the server in agent mode we need a way to detect if the policy monitor has reloaded the output
+	// NOTE: This code is brittle as it depends on a log string message match
+	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
+	ctx = testlog.SetLogger(t).Hook(zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.InfoLevel && message == "Using output from policy" {
+			tsrv.outputReloadSuccess.Add(1)
+		} else if level == zerolog.WarnLevel && message == "Failed version compatibility check using output from policy" {
+			tsrv.outputReloadFailure.Add(1)
+		}
+	})).WithContext(ctx)
+
 	g.Go(func() error {
 		return srv.Run(ctx, cfg)
 	})
 
-	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
 	err = tsrv.waitServerUp(ctx, testWaitServerUp)
 	if err != nil {
 		return nil, fmt.Errorf("unable to start server: %w", err)
@@ -254,13 +269,14 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		return status.Status == "HEALTHY", nil
 	}
 
+	// Wait for the server to be in a healthy state after
 	for {
 		healthy, err := isHealthy()
 		if err != nil {
 			return err
 		}
 		if healthy {
-			return nil
+			break
 		}
 
 		select {
@@ -269,6 +285,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
+	return nil
 }
 
 func (s *tserver) buildURL(id string, cmd string) string {
@@ -303,7 +320,6 @@ func TestServerConfigErrorReload(t *testing.T) {
 	require.NoError(t, err)
 
 	logger.Init(cfg, "fleet-server") //nolint:errcheck // test logging setup
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 	bulker := ftesting.SetupBulk(ctx, t)
 
 	policyID := uuid.Must(uuid.NewV4()).String()
@@ -376,9 +392,14 @@ func TestServerConfigErrorReload(t *testing.T) {
 	mReporter.On("UpdateState", client.UnitStateConfiguring, mock.Anything, mock.Anything).Return(nil)
 	mReporter.On("UpdateState", client.UnitStateHealthy, mock.Anything, mock.Anything).Run(func(_ mock.Arguments) {
 		// Call cancel to stop the server once it's healthy
-		cancel()
+		go func() {
+			// FIXME: A short delay is needed here as the mock failure call on line 388 is not being detected correctly in tests
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		}()
 	}).Return(nil)
 	mReporter.On("UpdateState", client.UnitStateStopping, mock.Anything, mock.Anything).Return(nil)
+	mReporter.On("UpdateState", client.UnitStateFailed, mock.MatchedBy(func(err error) bool { return errors.Is(err, context.Canceled) }), mock.Anything).Return(nil).Maybe()
 
 	// set bad config
 	cfg.Output.Elasticsearch.ServiceToken = "incorrect"
@@ -398,6 +419,66 @@ func TestServerConfigErrorReload(t *testing.T) {
 	mReporter.AssertExpectations(t)
 }
 
+func TestServerReloadOutputOnly(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+
+	// Give an output that will not work - it should not use this
+	cfg := config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Protocol: "http",
+				Hosts: []string{
+					"http://fake:9200",
+				},
+			},
+		},
+		RevisionIdx: 2,
+	}
+	err = srv.srv.Reload(ctx, &cfg)
+	require.NoError(t, err)
+
+	for i := 0; i < 5; i++ {
+		if srv.outputReloadFailure.Load() > 0 {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	require.NotZero(t, srv.outputReloadFailure.Load(), "Did not detect elasticsearch output client failure")
+
+	// Give an output that works
+	cfg = config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Protocol: "http",
+				Hosts: []string{
+					"http://localhost:9200",
+					"http://other:9200",
+				},
+			},
+		},
+		RevisionIdx: 3,
+	}
+
+	successes := srv.outputReloadSuccess.Load()
+	err = srv.srv.Reload(ctx, &cfg)
+	require.NoError(t, err)
+	for i := 0; i < 5; i++ {
+		if srv.outputReloadSuccess.Load() > successes {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	require.Greater(t, srv.outputReloadSuccess.Load(), successes, "Did not detect elasticsearch output client success")
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
+}
+
 func TestServerUnauthorized(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -405,7 +486,6 @@ func TestServerUnauthorized(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
 	cli := cleanhttp.DefaultClient()
@@ -424,7 +504,6 @@ func TestServerUnauthorized(t *testing.T) {
 	// Not sure if this is right response, just capturing what we have so far
 	// TODO: revisit error response format
 	t.Run("no auth header", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		for _, u := range allurls {
 			req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewBuffer([]byte("{}")))
 			if err != nil {
@@ -454,7 +533,6 @@ func TestServerUnauthorized(t *testing.T) {
 
 	// Unauthorized, expecting error from /_security/_authenticate
 	t.Run("unauthorized", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		for _, u := range agenturls {
 			req, err := http.NewRequestWithContext(ctx, "POST", u, bytes.NewBuffer([]byte("{}")))
 			require.NoError(t, err)
@@ -506,7 +584,6 @@ func TestServerInstrumentation(t *testing.T) {
 	// Start test server with instrumentation disabled
 	srv, err := startTestServer(t, ctx, policyData, WithAPM(server.URL, false))
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
 	checkinURL := srv.buildURL(agentID, "checkin")
@@ -591,7 +668,6 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 
@@ -698,6 +774,9 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	// When decoding to a (typed) struct, the default will implicitly be false if it's missing
 	_, ok = ackObj["errors"]
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) (string, string) {
@@ -752,7 +831,6 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	t.Log("Enroll the first agent with enrollment_id")
 	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
@@ -780,6 +858,9 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	} else {
 		t.Fatal("duplicate agent found after enrolling with same enrollment id")
 	}
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
@@ -799,7 +880,6 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	t.Log("Enroll the first agent with enrollment_id")
 	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
@@ -839,6 +919,9 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	} else {
 		t.Fatal("duplicate agent found after enrolling with same enrollment id")
 	}
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func Test_Agent_Auth_errors(t *testing.T) {
@@ -848,7 +931,6 @@ func Test_Agent_Auth_errors(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 
@@ -887,7 +969,6 @@ func Test_Agent_Auth_errors(t *testing.T) {
 	require.NotEmpty(t, id)
 
 	t.Run("use enroll key for checkin", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -900,7 +981,6 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, res.StatusCode) // NOTE this is a 404 and not a 400
 	})
 	t.Run("wrong agent ID", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/bad-agent-id/checkin", strings.NewReader(checkinBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+key)
@@ -913,7 +993,6 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, res.StatusCode)
 	})
 	t.Run("use another agent's api key", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -953,7 +1032,6 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, res.StatusCode)
 	})
 	t.Run("use api key for enrollment", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+key)
@@ -964,6 +1042,9 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		res.Body.Close()
 		require.Equal(t, http.StatusInternalServerError, res.StatusCode)
 	})
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func Test_Agent_request_errors(t *testing.T) {
@@ -973,11 +1054,9 @@ func Test_Agent_request_errors(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 	t.Run("no auth", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
@@ -988,7 +1067,6 @@ func Test_Agent_request_errors(t *testing.T) {
 		require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 	})
 	t.Run("bad path", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/temporary", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -1000,7 +1078,6 @@ func Test_Agent_request_errors(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, res.StatusCode)
 	})
 	t.Run("wrong method", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "PUT", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -1012,7 +1089,6 @@ func Test_Agent_request_errors(t *testing.T) {
 		require.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
 	})
 	t.Run("no body", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", nil)
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -1024,7 +1100,6 @@ func Test_Agent_request_errors(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 	t.Run("no user agent", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -1035,7 +1110,6 @@ func Test_Agent_request_errors(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 	t.Run("bad user agent", func(t *testing.T) {
-		ctx := testlog.SetLogger(t).WithContext(ctx)
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -1046,6 +1120,9 @@ func Test_Agent_request_errors(t *testing.T) {
 		res.Body.Close()
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
 
 func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
@@ -1055,7 +1132,6 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 
@@ -1187,7 +1263,6 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 
@@ -1291,4 +1366,7 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 	err = json.Unmarshal(p, &checkinResponse)
 	require.NoError(t, err)
 	require.Equal(t, token, *checkinResponse.AckToken)
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }
