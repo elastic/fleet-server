@@ -297,7 +297,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		}
 	}
 
-	// small delay to allow config change to propogate
+	// small delay to allow config change to propagate
 	time.Sleep(100 * time.Millisecond)
 	for {
 		healthy, err := isHealthy()
