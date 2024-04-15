@@ -127,7 +127,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	rId = xid.New().String()
 	pData = model.PolicyData{Inputs: []map[string]interface{}{
 		{
-			"type": "fleet-server",
+			"type": fleetserverInput,
 		},
 	}}
 	policy = model.Policy{
@@ -243,7 +243,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	rId := xid.New().String()
 	pData := model.PolicyData{Inputs: []map[string]interface{}{
 		{
-			"type": "fleet-server",
+			"type": fleetserverInput,
 		},
 	}}
 	policy := model.Policy{
@@ -424,7 +424,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 
 	rId = xid.New().String()
 	pData = model.PolicyData{
-		Inputs: []map[string]interface{}{{"type": "fleet-server"}},
+		Inputs: []map[string]interface{}{{"type": fleetserverInput, "use_output": "default"}},
 		Outputs: map[string]map[string]interface{}{
 			"default": map[string]interface{}{
 				"type":     "elasticsearch",
@@ -474,12 +474,6 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		t.Fatal(merr)
 	}
 
-	select {
-	case cfg := <-chConfig:
-		assert.Equal(t, int64(2), cfg.RevisionIdx)
-	default:
-		t.Fatal("no policy on config channel")
-	}
 	select {
 	case cfg := <-chConfig:
 		assert.Equal(t, int64(1), cfg.RevisionIdx)
@@ -560,7 +554,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	rId := xid.New().String()
 	pData := model.PolicyData{Inputs: []map[string]interface{}{
 		{
-			"type": "fleet-server",
+			"type": fleetserverInput,
 		},
 	}}
 	policy := model.Policy{
@@ -784,4 +778,71 @@ func TestSelfMonitor_reportOutputSkipIfNotFound(t *testing.T) {
 
 	bulker.AssertExpectations(t)
 	outputBulker.AssertExpectations(t)
+}
+
+func TestGetFleetOutputName(t *testing.T) {
+	tests := []struct {
+		name    string
+		policy  *model.Policy
+		found   bool
+		outname string
+	}{{
+		name: "found single input",
+		policy: &model.Policy{
+			Data: &model.PolicyData{
+				Inputs: []map[string]interface{}{{
+					"type":       fleetserverInput,
+					"use_output": "default",
+				}},
+			},
+		},
+		found:   true,
+		outname: "default",
+	}, {
+		name: "found multiple inputs",
+		policy: &model.Policy{
+			Data: &model.PolicyData{
+				Inputs: []map[string]interface{}{{
+					"type":       "system",
+					"use_output": "default",
+				}, {
+					"type":       fleetserverInput,
+					"use_output": "custom",
+				}},
+			},
+		},
+		found:   true,
+		outname: "custom",
+	}, {
+		name: "use_output not found",
+		policy: &model.Policy{
+			Data: &model.PolicyData{
+				Inputs: []map[string]interface{}{{
+					"type": fleetserverInput,
+				}},
+			},
+		},
+		found:   false,
+		outname: "",
+	}, {
+		name: "no match",
+		policy: &model.Policy{
+			Data: &model.PolicyData{
+				Inputs: []map[string]interface{}{{
+					"type":       "system",
+					"use_output": "custom",
+				}},
+			},
+		},
+		found:   false,
+		outname: "",
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			name, ok := getFleetOutputName(tc.policy)
+			assert.Equal(t, tc.found, ok)
+			assert.Equal(t, tc.outname, name)
+		})
+	}
 }

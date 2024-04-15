@@ -34,6 +34,8 @@ const DefaultCheckTime = 5 * time.Second
 // DefaultCheckTimeout is the default timeout when checking for policies.
 const DefaultCheckTimeout = 30 * time.Second
 
+const fleetserverInput = "fleet-server"
+
 var ErrInvalidOutput = fmt.Errorf("policy output invalid")
 
 type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error)
@@ -213,24 +215,29 @@ func (m *selfMonitorT) sendPolicyOutput() error {
 	// always copy revisionIdx
 	m.lastRev = m.policy.RevisionIdx
 
+	name, ok := getFleetOutputName(m.policy)
+	if !ok {
+		return fmt.Errorf("unable to find fleet-server use_output attribute")
+	}
+	data, ok := m.policy.Data.Outputs[name]
+	if !ok {
+		return fmt.Errorf("unable to find output name %q in policy", name)
+	}
+	outType, ok := data["type"].(string)
+	if !ok {
+		return fmt.Errorf("output name %s has non-string in type attribute: %w", name, ErrInvalidOutput)
+	}
+	if outType != OutputTypeElasticsearch {
+		return fmt.Errorf("output %s is type: %q, expected: elasticsearch", name, outType)
+	}
+
 	var policyES config.Elasticsearch
-	// Find elasticsearch output in the policy
-	// TODO figure out how to get output name from policy in order not to scan outputs?
-	for name, data := range m.policy.Data.Outputs {
-		outType, ok := data["type"].(string)
-		if !ok {
-			return fmt.Errorf("output name %s has non-string in type attribute: %w", name, ErrInvalidOutput)
-		}
-		if outType == OutputTypeElasticsearch {
-			output, err := ucfg.NewFrom(data, config.DefaultOptions...)
-			if err != nil {
-				return fmt.Errorf("unable to create config from output data: %w", err)
-			}
-			if err := output.Unpack(&policyES, config.DefaultOptions...); err != nil {
-				return fmt.Errorf("unable to unback config data to config.Elasticsearch: %w", err)
-			}
-			break
-		}
+	output, err := ucfg.NewFrom(data, config.DefaultOptions...)
+	if err != nil {
+		return fmt.Errorf("unable to create config from output data: %w", err)
+	}
+	if err := output.Unpack(&policyES, config.DefaultOptions...); err != nil {
+		return fmt.Errorf("unable to unback config data to config.Elasticsearch: %w", err)
 	}
 
 	// The output block in the policy may not have the schema set so we need to manually set it.
@@ -251,6 +258,33 @@ func (m *selfMonitorT) sendPolicyOutput() error {
 		RevisionIdx: m.lastRev,
 	}
 	return nil
+}
+
+// getFleetOutputName returns the output name that the fleet-server input of the policy uses
+func getFleetOutputName(p *model.Policy) (string, bool) {
+	if p.Data == nil {
+		return "", false
+	}
+	for _, input := range p.Data.Inputs {
+		val, found := input["type"]
+		if !found {
+			continue
+		}
+		typ, ok := val.(string)
+		if !ok {
+			continue
+		}
+		if typ != fleetserverInput {
+			continue
+		}
+		val, found = input["use_output"]
+		if !found {
+			return "", false
+		}
+		out, ok := val.(string)
+		return out, ok
+	}
+	return "", false
 }
 
 func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error) {
@@ -360,7 +394,7 @@ func HasFleetServerInput(inputs []map[string]interface{}) bool {
 		if !ok {
 			return false
 		}
-		if attr == "fleet-server" {
+		if attr == fleetserverInput {
 			return true
 		}
 	}
