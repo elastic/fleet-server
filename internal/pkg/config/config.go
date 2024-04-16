@@ -39,12 +39,13 @@ const kRedacted = "[redacted]"
 // The env vars that `elastic-agent container` command uses are unrelated.
 // The agent will do all substitutions before sending fleet-server the complete config.
 type Config struct {
-	Fleet   Fleet   `config:"fleet"`
-	Output  Output  `config:"output"`
-	Inputs  []Input `config:"inputs"`
-	Logging Logging `config:"logging"`
-	HTTP    HTTP    `config:"http"`
-	m       sync.Mutex
+	Fleet       Fleet   `config:"fleet"`
+	Output      Output  `config:"output"`
+	Inputs      []Input `config:"inputs"`
+	Logging     Logging `config:"logging"`
+	HTTP        HTTP    `config:"http"`
+	RevisionIdx int64   `config:",ignore"`
+	m           sync.Mutex
 }
 
 var deprecatedConfigOptions = map[string]string{

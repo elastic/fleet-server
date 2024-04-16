@@ -6,9 +6,9 @@ require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/elastic/elastic-agent-client/v7 v7.8.1
-	github.com/elastic/elastic-agent-libs v0.9.1
+	github.com/elastic/elastic-agent-libs v0.9.4
 	github.com/elastic/elastic-agent-system-metrics v0.9.2
-	github.com/elastic/go-elasticsearch/v8 v8.13.0
+	github.com/elastic/go-elasticsearch/v8 v8.13.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.6.0
 	github.com/go-chi/chi/v5 v5.0.12
@@ -26,12 +26,12 @@ require (
 	github.com/rs/zerolog v1.32.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
-	go.elastic.co/apm/module/apmchiv5/v2 v2.5.0
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.5.0
-	go.elastic.co/apm/module/apmhttp/v2 v2.5.0
-	go.elastic.co/apm/module/apmprometheus/v2 v2.5.0
-	go.elastic.co/apm/module/apmzerolog/v2 v2.5.0
-	go.elastic.co/apm/v2 v2.5.0
+	go.elastic.co/apm/module/apmchiv5/v2 v2.6.0
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.6.0
+	go.elastic.co/apm/module/apmhttp/v2 v2.6.0
+	go.elastic.co/apm/module/apmprometheus/v2 v2.6.0
+	go.elastic.co/apm/module/apmzerolog/v2 v2.6.0
+	go.elastic.co/apm/v2 v2.6.0
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.7.0
