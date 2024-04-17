@@ -1474,7 +1474,7 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 		outputNames = append(outputNames, name)
 	}
 	require.Len(t, outputNames, 1)
-	p = []byte(fmt.Sprintf(`{"script":{"lang": "painless", "source": "ctx._source['outputs'][params.output].api_key == ''; ctx._source['outputs'][params.output].api_key_id == '';", "params": {"output": "%s"}}}`, outputNames[0]))
+	p = []byte(fmt.Sprintf(`{"script":{"lang": "painless", "source": "ctx._source['outputs'][params.output].api_key = ''; ctx._source['outputs'][params.output].api_key_id = '';", "params": {"output": "%s"}}}`, outputNames[0]))
 	t.Logf("Attempting to remove api_key attribute from: %s, body: %s", id, string(p))
 	err = srv.bulker.Update(
 		ctx,
