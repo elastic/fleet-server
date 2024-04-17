@@ -292,6 +292,7 @@
     },
 
     "server": {
+      "deprecated": true,
       "title": "Server",
       "description": "A Fleet Server",
       "type": "object",
@@ -357,6 +358,7 @@
     },
 
     "policy-leader": {
+      "deprecated": true,
       "title": "Policy Leader",
       "description": "The current leader Fleet Server for a policy",
       "type": "object",

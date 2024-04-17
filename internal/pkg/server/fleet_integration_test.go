@@ -72,7 +72,6 @@ type tserver struct {
 	g         *errgroup.Group
 	srv       *Fleet
 	enrollKey string
-	policyID  string
 	bulker    bulk.Bulk
 
 	outputReloadSuccess atomic.Int32
@@ -220,7 +219,7 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 
 	// Since we start the server in agent mode we need a way to detect if the policy monitor has reloaded the output
 	// NOTE: This code is brittle as it depends on a log string message match
-	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), policyID: policyID, bulker: bulker}
+	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
 	ctx = testlog.SetLogger(t).Hook(zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if level == zerolog.InfoLevel && message == "Using output from policy" {
 			tsrv.outputReloadSuccess.Add(1)
@@ -1372,7 +1371,7 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 	srv.waitExit() //nolint:errcheck // test case
 }
 
-// Test_SmokeTest_Verify_v85Migrate will ensure that the policy regenerates o
+// Test_SmokeTest_Verify_v85Migrate will ensure that the policy regenerates output keys when the agent doc contains an empty key
 func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

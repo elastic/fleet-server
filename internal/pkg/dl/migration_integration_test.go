@@ -72,48 +72,6 @@ func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIK
 	return createdAgents
 }
 
-func createSomePolicies(ctx context.Context, t *testing.T, n int, index string, bulker bulk.Bulk) []string {
-	t.Helper()
-
-	var created []string
-
-	var policyData = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
-			"default": {
-				"type": "elasticsearch",
-			},
-		},
-		OutputPermissions: json.RawMessage(`{"default": {}}`),
-		Inputs:            []map[string]interface{}{},
-	}
-
-	for i := 0; i < n; i++ {
-		now := time.Now().UTC()
-		nowStr := now.Format(time.RFC3339)
-
-		policyModel := model.Policy{
-			ESDocument:         model.ESDocument{},
-			Data:               &policyData,
-			DefaultFleetServer: false,
-			PolicyID:           fmt.Sprint(i),
-			RevisionIdx:        1,
-			Timestamp:          nowStr,
-			UnenrollTimeout:    0,
-		}
-
-		body, err := json.Marshal(policyModel)
-		require.NoError(t, err)
-
-		policyDocID, err := bulker.Create(
-			ctx, index, "", body, bulk.WithRefresh())
-		require.NoError(t, err)
-
-		created = append(created, policyDocID)
-	}
-
-	return created
-}
-
 func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
