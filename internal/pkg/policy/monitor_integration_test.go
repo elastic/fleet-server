@@ -175,17 +175,16 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 
 	agentID := uuid.Must(uuid.NewV4()).String()
 	policyID := uuid.Must(uuid.NewV4()).String()
-	s, err := m.Subscribe(agentID, policyID, 0, 0)
+	s, err := m.Subscribe(agentID, policyID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer m.Unsubscribe(s) //nolint:errcheck // defered function
 
 	policy := model.Policy{
-		PolicyID:       policyID,
-		CoordinatorIdx: 1,
-		Data:           &intPolData,
-		RevisionIdx:    1,
+		PolicyID:    policyID,
+		Data:        &intPolData,
+		RevisionIdx: 1,
 	}
 	ch := make(chan error, 1)
 	go func() {
@@ -245,7 +244,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 		ts = time.Now()
 		tm.Stop()
 		t.Log("received initial policy from subsciption")
-		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 1 && subPolicy.Policy.CoordinatorIdx != 1 {
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 1 {
 			t.Fatal("failed to get the expected updated policy")
 		}
 	case <-tm.C:
@@ -257,7 +256,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 	}
 
 	// Make new subscription to replicate agent checking in again.
-	s2, err := m.Subscribe(agentID, policyID, 1, 1)
+	s2, err := m.Subscribe(agentID, policyID, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +273,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 			t.Fatalf("Expected subscription to take at least 1s to update, time was: %s", dur)
 		}
 		// 2nd version of policy should be skipped, 3rd should be read.
-		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 3 && subPolicy.Policy.CoordinatorIdx != 1 {
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 3 {
 			t.Fatal("failed to get the expected updated policy")
 		}
 	case <-tm.C:
@@ -282,7 +281,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 
 	}
 
-	s3, err := m.Subscribe(agentID, policyID, 3, 1)
+	s3, err := m.Subscribe(agentID, policyID, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +293,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 		tm.Stop()
 		t.Logf("received third policy from subsciption, rev %d", subPolicy.Policy.RevisionIdx)
 		// 2nd version of policy should be skipped, 3rd should be read.
-		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 4 && subPolicy.Policy.CoordinatorIdx != 1 {
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 4 {
 			t.Fatal("failed to get the expected updated policy")
 		}
 	case <-tm.C:
@@ -369,10 +368,9 @@ func TestMonitor_Revisions(t *testing.T) {
 	policyID := uuid.Must(uuid.NewV4()).String()
 
 	policy := model.Policy{
-		PolicyID:       policyID,
-		CoordinatorIdx: 1,
-		Data:           &intPolData,
-		RevisionIdx:    1,
+		PolicyID:    policyID,
+		Data:        &intPolData,
+		RevisionIdx: 1,
 	}
 	_, err = dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
 	if err != nil {
@@ -385,14 +383,14 @@ func TestMonitor_Revisions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := m.Subscribe(agentID, policyID, 1, 1)
+	s, err := m.Subscribe(agentID, policyID, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer m.Unsubscribe(s) //nolint:errcheck // defered function
 
 	agent2 := uuid.Must(uuid.NewV4()).String()
-	s2, err := m.Subscribe(agent2, policyID, 1, 1)
+	s2, err := m.Subscribe(agent2, policyID, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +404,6 @@ func TestMonitor_Revisions(t *testing.T) {
 
 	// policy should be ignored as coordinator_idx is 0
 	policy.RevisionIdx = 4
-	policy.CoordinatorIdx = 0
 	_, err = dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
 	if err != nil {
 		t.Fatal(err)
@@ -416,7 +413,7 @@ func TestMonitor_Revisions(t *testing.T) {
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()
-		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 3 && subPolicy.Policy.CoordinatorIdx != 1 {
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 3 {
 			t.Fatalf("failed to get the expected updated policy, policy revision: %d", subPolicy.Policy.RevisionIdx)
 		}
 	case <-tm.C:
@@ -427,7 +424,7 @@ func TestMonitor_Revisions(t *testing.T) {
 	select {
 	case subPolicy := <-s2.Output():
 		tm.Stop()
-		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 3 && subPolicy.Policy.CoordinatorIdx != 1 {
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 3 {
 			t.Fatalf("failed to get the expected updated policy, policy revision: %d", subPolicy.Policy.RevisionIdx)
 		}
 	case <-tm.C:
@@ -493,10 +490,9 @@ func TestMonitor_KickDeploy(t *testing.T) {
 	policyID := uuid.Must(uuid.NewV4()).String()
 
 	policy := model.Policy{
-		PolicyID:       policyID,
-		CoordinatorIdx: 1,
-		Data:           &intPolData,
-		RevisionIdx:    1,
+		PolicyID:    policyID,
+		Data:        &intPolData,
+		RevisionIdx: 1,
 	}
 	_, err = dl.CreatePolicy(ctx, bulker, policy, dl.WithIndexName(index))
 	if err != nil {
@@ -509,14 +505,14 @@ func TestMonitor_KickDeploy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := m.Subscribe(agentID, policyID, 1, 1)
+	s, err := m.Subscribe(agentID, policyID, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer m.Unsubscribe(s) //nolint:errcheck // defered function
 
 	// Force a new policy load so that the kickLoad() func runs
-	s2, err := m.Subscribe("test", "test", 1, 1)
+	s2, err := m.Subscribe("test", "test", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -526,7 +522,7 @@ func TestMonitor_KickDeploy(t *testing.T) {
 	select {
 	case subPolicy := <-s.Output():
 		tm.Stop()
-		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 2 && subPolicy.Policy.CoordinatorIdx != 1 {
+		if subPolicy.Policy.PolicyID != policyID && subPolicy.Policy.RevisionIdx != 2 {
 			t.Fatalf("failed to get the expected updated policy, policy revision: %d", subPolicy.Policy.RevisionIdx)
 		}
 	case <-tm.C:

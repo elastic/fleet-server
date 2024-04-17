@@ -114,39 +114,6 @@ func createSomePolicies(ctx context.Context, t *testing.T, n int, index string, 
 	return created
 }
 
-func TestPolicyRevisionIdx(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
-
-	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
-
-	docIDs := createSomePolicies(ctx, t, 25, index, bulker)
-
-	migrated, err := migrate(ctx, bulker, migratePolicyRevisionIdx)
-	require.NoError(t, err)
-
-	require.Equal(t, len(docIDs), migrated)
-
-	for i := range docIDs {
-		policies, err := QueryLatestPolicies(
-			ctx, bulker, WithIndexName(index))
-		if err != nil {
-			assert.NoError(t, err, "failed to query latest policies") // we want to continue even if a single agent fails
-			continue
-		}
-
-		var got model.Policy
-		for _, p := range policies {
-			if p.PolicyID == fmt.Sprint(i) {
-				got = p
-			}
-		}
-
-		assert.Equal(t, int64(2), got.RevisionIdx, "expected migration to increment revision_idx value by one")
-	}
-}
-
 func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()

@@ -72,6 +72,7 @@ type tserver struct {
 	g         *errgroup.Group
 	srv       *Fleet
 	enrollKey string
+	policyID  string
 	bulker    bulk.Bulk
 
 	outputReloadSuccess atomic.Int32
@@ -219,7 +220,7 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 
 	// Since we start the server in agent mode we need a way to detect if the policy monitor has reloaded the output
 	// NOTE: This code is brittle as it depends on a log string message match
-	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
+	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), policyID: policyID, bulker: bulker}
 	ctx = testlog.SetLogger(t).Hook(zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if level == zerolog.InfoLevel && message == "Using output from policy" {
 			tsrv.outputReloadSuccess.Add(1)
@@ -779,7 +780,7 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	srv.waitExit() //nolint:errcheck // test case
 }
 
-func EnrollAgent(enrollBody string, t *testing.T, ctx context.Context, srv *tserver) (string, string) {
+func EnrollAgent(t *testing.T, ctx context.Context, srv *tserver, enrollBody string) (string, string) {
 	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -833,10 +834,10 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enroll the first agent with enrollment_id")
-	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	firstAgentID, _ := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
 
 	t.Log("Enroll the second agent with the same enrollment_id")
-	secondAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	secondAgentID, _ := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
 
 	// cleanup
 	defer func() {
@@ -882,7 +883,7 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enroll the first agent with enrollment_id")
-	firstAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	firstAgentID, _ := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
 
 	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
 	if err != nil {
@@ -897,7 +898,7 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	}
 
 	t.Log("Enroll the second agent with the same enrollment_id")
-	secondAgentID, _ := EnrollAgent(enrollBodyWEnrollmentID, t, ctx, srv)
+	secondAgentID, _ := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
 
 	// cleanup
 	defer func() {
@@ -1366,6 +1367,151 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 	err = json.Unmarshal(p, &checkinResponse)
 	require.NoError(t, err)
 	require.Equal(t, token, *checkinResponse.AckToken)
+
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
+}
+
+// Test_SmokeTest_Verify_v85Migrate will ensure that the policy regenerates o
+func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+
+	cli := cleanhttp.DefaultClient()
+
+	// enroll an agent
+	enrollBody := `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	t.Log("Enroll an agent")
+	id, key := EnrollAgent(t, ctx, srv, enrollBody)
+
+	// checkin
+	t.Logf("Fake a checkin for agent %s", id)
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Checkin successful, verify body")
+	p, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	var obj map[string]interface{}
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	at, ok := obj["ack_token"]
+	require.True(t, ok, "expected ack_token in response")
+	_, ok = at.(string)
+	require.True(t, ok, "ack_token is not a string")
+
+	actionsRaw, ok := obj["actions"]
+	require.True(t, ok, "expected actions is missing")
+	actions, ok := actionsRaw.([]interface{})
+	require.True(t, ok, "expected actions to be an array")
+	require.Greater(t, len(actions), 0, "expected at least 1 action")
+	action, ok := actions[0].(map[string]interface{})
+	require.True(t, ok, "expected action to be an object")
+	aIDRaw, ok := action["id"]
+	require.True(t, ok, "expected action id attribute missing")
+	aID, ok := aIDRaw.(string)
+	require.True(t, ok, "expected action id to be string")
+	aAgentIDRaw, ok := action["agent_id"]
+	require.True(t, ok, "expected action agent_id attribute missing")
+	aAgentID, ok := aAgentIDRaw.(string)
+	require.True(t, ok, "expected action agent_id to be string")
+	require.Equal(t, id, aAgentID)
+
+	body := fmt.Sprintf(`{
+	    "events": [{
+		"action_id": "%s",
+		"agent_id": "%s",
+		"message": "test-message",
+		"type": "ACTION_RESULT",
+		"subtype": "ACKNOWLEDGED"
+	    }]
+	}`, aID, id)
+	t.Logf("Fake an ack for action %s for agent %s", aID, id)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/acks", strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Ack successful, verify body")
+	p, _ = io.ReadAll(res.Body)
+	res.Body.Close()
+	var ackObj map[string]interface{}
+	err = json.Unmarshal(p, &ackObj)
+	require.NoError(t, err)
+
+	// NOTE the checkin response will only have the errors attribute if it's set to true in the response.
+	// When decoding to a (typed) struct, the default will implicitly be false if it's missing
+	_, ok = ackObj["errors"]
+	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
+
+	// Update agent doc to have output key == ""
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, id)
+	require.NoError(t, err)
+	outputNames := make([]string, 0, len(agent.Outputs))
+	for name := range agent.Outputs {
+		outputNames = append(outputNames, name)
+	}
+	require.Len(t, outputNames, 1)
+	p = []byte(fmt.Sprintf(`{"script":{"lang": "painless", "source": "ctx._source['outputs'][params.output].api_key == ''; ctx._source['outputs'][params.output].api_key_id == '';", "params": {"output": "%s"}}}`, outputNames[0]))
+	t.Logf("Attempting to remove api_key attribute from: %s, body: %s", id, string(p))
+	err = srv.bulker.Update(
+		ctx,
+		dl.FleetAgents,
+		id,
+		p,
+		bulk.WithRefresh(),
+		bulk.WithRetryOnConflict(3),
+	)
+	require.NoError(t, err)
+
+	// Checkin again to get policy change action and new keys
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Checkin successful, verify body")
+	p, _ = io.ReadAll(res.Body)
+	res.Body.Close()
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	at, ok = obj["ack_token"]
+	require.True(t, ok, "expected ack_token in response")
+	_, ok = at.(string)
+	require.True(t, ok, "ack_token is not a string")
+
+	actionsRaw, ok = obj["actions"]
+	require.True(t, ok, "expected actions is missing")
+	actions, ok = actionsRaw.([]interface{})
+	require.True(t, ok, "expected actions to be an array")
+	require.Greater(t, len(actions), 0, "expected at least 1 action")
 
 	cancel()
 	srv.waitExit() //nolint:errcheck // test case
