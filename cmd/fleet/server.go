@@ -105,11 +105,11 @@ func runServer(ctx context.Context, router *httprouter.Router, cfg *config.Serve
 		ln = wrapConnLimitter(ctx, ln, cfg)
 
 		if cfg.TLS != nil && cfg.TLS.IsEnabled() {
-			commonTlsCfg, err := tlscommon.LoadTLSServerConfig(cfg.TLS)
+			commonTLSCfg, err := tlscommon.LoadTLSServerConfig(cfg.TLS)
 			if err != nil {
 				return err
 			}
-			server.TLSConfig = commonTlsCfg.ToConfig()
+			server.TLSConfig = commonTLSCfg.BuildServerConfig(cfg.Host)
 
 			// Must enable http/2 in the configuration explicitly.
 			// (see https://golang.org/pkg/net/http/#Server.Serve)
