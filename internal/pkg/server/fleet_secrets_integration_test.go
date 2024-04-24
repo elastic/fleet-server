@@ -230,7 +230,4 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 		"package_var_secret": "secret_value",
 		"type":               "fleet-server",
 	}, input)
-
-	cancel()
-	srv.waitExit() //nolint:errcheck // test case
 }
