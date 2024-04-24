@@ -56,6 +56,9 @@ type Agent struct {
 	srvCtx       context.Context
 	srvCanceller context.CancelFunc
 	srvDone      chan bool
+
+	l   sync.RWMutex
+	cfg *config.Config
 }
 
 // NewAgent returns an Agent that will gather connection information from the passed reader.
@@ -85,16 +88,14 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 func (a *Agent) Run(ctx context.Context) error {
 	log := zerolog.Ctx(ctx)
 	a.agent.RegisterDiagnosticHook("fleet-server config", "fleet-server's current configuration", "fleet-server.yml", "application/yml", func() []byte {
-		if a.srv == nil {
-			log.Warn().Msg("Diagnostics hook failure fleet-server is nil.")
-			return nil
-		}
-		cfg := a.srv.GetConfig()
-		if cfg == nil {
+		a.l.RLock()
+		if a.cfg == nil {
+			a.l.RUnlock()
 			log.Warn().Msg("Diagnostics hook failure config is nil.")
 			return nil
 		}
-		cfg = cfg.Redact()
+		cfg := a.cfg.Redact()
+		a.l.RUnlock()
 		p, err := yaml.Marshal(cfg)
 		if err != nil {
 			log.Error().Err(err).Msg("Diagnostics hook failure config unable to marshal yaml.")
@@ -335,6 +336,9 @@ func (a *Agent) reconfigure(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	a.l.Lock()
+	a.cfg = cfg
+	a.l.Unlock()
 
 	// reload the generic reloadables
 	for _, r := range a.reloadables {
