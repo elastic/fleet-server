@@ -249,8 +249,6 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, true)
 
-	cancel()
-	srv.waitExit() //nolint:errcheck // test case
 }
 
 func verifyRemoteAPIKey(t *testing.T, ctx context.Context, apiKeyID string, invalidated bool) {
@@ -394,8 +392,6 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 	t.Log("Verify that remote API key is invalidated")
 	verifyRemoteAPIKey(t, ctx, apiKeyID, true)
 
-	cancel()
-	srv.waitExit() //nolint:errcheck // test case
 }
 
 func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
@@ -512,6 +508,4 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 	t.Log("Verify that remote API key is invalidated")
 	verifyRemoteAPIKey(t, ctx, apiKeyID, true)
 
-	cancel()
-	srv.waitExit() //nolint:errcheck // test case
 }

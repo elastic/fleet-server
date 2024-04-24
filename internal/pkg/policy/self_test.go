@@ -19,9 +19,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/gofrs/uuid"
 	"github.com/rs/xid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -56,7 +54,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	emptyBulkerMap := make(map[string]bulk.Bulk)
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
-	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter, make(chan *config.Config, 2))
+	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
@@ -127,7 +125,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	rId = xid.New().String()
 	pData = model.PolicyData{Inputs: []map[string]interface{}{
 		{
-			"type": fleetserverInput,
+			"type": "fleet-server",
 		},
 	}}
 	policy = model.Policy{
@@ -195,7 +193,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	emptyBulkerMap := make(map[string]bulk.Bulk)
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
-	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter, make(chan *config.Config, 1))
+	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.checkTime = 100 * time.Millisecond
 
@@ -243,7 +241,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	rId := xid.New().String()
 	pData := model.PolicyData{Inputs: []map[string]interface{}{
 		{
-			"type": fleetserverInput,
+			"type": "fleet-server",
 		},
 	}}
 	policy := model.Policy{
@@ -354,8 +352,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	emptyBulkerMap := make(map[string]bulk.Bulk)
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
-	chConfig := make(chan *config.Config, 2)
-	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter, chConfig)
+	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
@@ -423,16 +420,11 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	rId = xid.New().String()
-	pData = model.PolicyData{
-		Inputs: []map[string]interface{}{{"type": fleetserverInput, "use_output": "default"}},
-		Outputs: map[string]map[string]interface{}{
-			"default": map[string]interface{}{
-				"type":     "elasticsearch",
-				"hosts":    []interface{}{"https://elasticsearch:9200"},
-				"protocol": "https",
-			},
+	pData = model.PolicyData{Inputs: []map[string]interface{}{
+		{
+			"type": "fleet-server",
 		},
-	}
+	}}
 	policy = model.Policy{
 		ESDocument: model.ESDocument{
 			Id:      rId,
@@ -473,15 +465,6 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	if merr != nil && merr != context.Canceled {
 		t.Fatal(merr)
 	}
-
-	select {
-	case cfg := <-chConfig:
-		assert.Equal(t, int64(1), cfg.RevisionIdx)
-		require.Len(t, cfg.Output.Elasticsearch.Hosts, 1)
-		assert.Equal(t, "https://elasticsearch:9200", cfg.Output.Elasticsearch.Hosts[0])
-	default:
-		t.Fatal("no policy on config channel")
-	}
 }
 
 func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
@@ -507,7 +490,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	emptyBulkerMap := make(map[string]bulk.Bulk)
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
-	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter, make(chan *config.Config, 1))
+	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
 	sm.checkTime = 100 * time.Millisecond
 
@@ -554,7 +537,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	rId := xid.New().String()
 	pData := model.PolicyData{Inputs: []map[string]interface{}{
 		{
-			"type": fleetserverInput,
+			"type": "fleet-server",
 		},
 	}}
 	policy := model.Policy{
@@ -778,71 +761,4 @@ func TestSelfMonitor_reportOutputSkipIfNotFound(t *testing.T) {
 
 	bulker.AssertExpectations(t)
 	outputBulker.AssertExpectations(t)
-}
-
-func TestGetFleetOutputName(t *testing.T) {
-	tests := []struct {
-		name    string
-		policy  *model.Policy
-		found   bool
-		outname string
-	}{{
-		name: "found single input",
-		policy: &model.Policy{
-			Data: &model.PolicyData{
-				Inputs: []map[string]interface{}{{
-					"type":       fleetserverInput,
-					"use_output": "default",
-				}},
-			},
-		},
-		found:   true,
-		outname: "default",
-	}, {
-		name: "found multiple inputs",
-		policy: &model.Policy{
-			Data: &model.PolicyData{
-				Inputs: []map[string]interface{}{{
-					"type":       "system",
-					"use_output": "default",
-				}, {
-					"type":       fleetserverInput,
-					"use_output": "custom",
-				}},
-			},
-		},
-		found:   true,
-		outname: "custom",
-	}, {
-		name: "use_output not found",
-		policy: &model.Policy{
-			Data: &model.PolicyData{
-				Inputs: []map[string]interface{}{{
-					"type": fleetserverInput,
-				}},
-			},
-		},
-		found:   false,
-		outname: "",
-	}, {
-		name: "no match",
-		policy: &model.Policy{
-			Data: &model.PolicyData{
-				Inputs: []map[string]interface{}{{
-					"type":       "system",
-					"use_output": "custom",
-				}},
-			},
-		},
-		found:   false,
-		outname: "",
-	}}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			name, ok := getFleetOutputName(tc.policy)
-			assert.Equal(t, tc.found, ok)
-			assert.Equal(t, tc.outname, name)
-		})
-	}
 }

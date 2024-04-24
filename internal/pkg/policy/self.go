@@ -8,12 +8,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/go-ucfg"
 	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
@@ -34,10 +32,6 @@ const DefaultCheckTime = 5 * time.Second
 // DefaultCheckTimeout is the default timeout when checking for policies.
 const DefaultCheckTimeout = 30 * time.Second
 
-const fleetserverInput = "fleet-server"
-
-var ErrInvalidOutput = fmt.Errorf("policy output invalid")
-
 type enrollmentTokenFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error)
 
 type SelfMonitor interface {
@@ -54,14 +48,12 @@ type selfMonitorT struct {
 	fleet   config.Fleet
 	bulker  bulk.Bulk
 	monitor monitor.Monitor
-	cfgCh   chan<- *config.Config
 
 	policyID string
 	state    client.UnitState
 	reporter state.Reporter
 
-	policy  *model.Policy
-	lastRev int64
+	policy *model.Policy
 
 	policyF          policyFetcher
 	policiesIndex    string
@@ -75,12 +67,11 @@ type selfMonitorT struct {
 //
 // Ensures that the policy that this Fleet Server attached to exists and that it
 // has a Fleet Server input defined.
-func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monitor, policyID string, reporter state.Reporter, cfgCh chan<- *config.Config) SelfMonitor {
+func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monitor, policyID string, reporter state.Reporter) SelfMonitor {
 	return &selfMonitorT{
 		fleet:            fleet,
 		bulker:           bulker,
 		monitor:          monitor,
-		cfgCh:            cfgCh,
 		policyID:         policyID,
 		state:            client.UnitStateStarting,
 		reporter:         reporter,
@@ -183,17 +174,9 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 		policy := latest[i]
 		if m.policyID != "" && policy.PolicyID == m.policyID {
 			m.policy = &policy
-			err := m.sendPolicyOutput()
-			if err != nil {
-				m.log.Warn().Err(err).Int64(logger.RevisionIdx, m.lastRev).Str(logger.PolicyID, m.policyID).Msg("Failed to send fleet-server output")
-			}
 			break
 		} else if m.policyID == "" && policy.DefaultFleetServer {
 			m.policy = &policy
-			err := m.sendPolicyOutput()
-			if err != nil {
-				m.log.Warn().Err(err).Int64(logger.RevisionIdx, m.lastRev).Msg("Failed to send default policy fleet-server output")
-			}
 			break
 		}
 	}
@@ -202,89 +185,6 @@ func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Pol
 
 func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.Policy {
 	return groupByLatest(policies)
-}
-
-// sendPolicyOutput will parse the policy and send it through the config channel with only Output.Elasticsearch and RevisionIdx set
-// It will not send to the config channel if the policy revision_idx has not changed.
-// It returns any errors encountered when parsing the policy
-func (m *selfMonitorT) sendPolicyOutput() error {
-	// policy revision has not changed
-	if m.policy.RevisionIdx == m.lastRev {
-		return nil
-	}
-	// always copy revisionIdx
-	m.lastRev = m.policy.RevisionIdx
-
-	name, ok := getFleetOutputName(m.policy)
-	if !ok {
-		return fmt.Errorf("unable to find fleet-server use_output attribute")
-	}
-	data, ok := m.policy.Data.Outputs[name]
-	if !ok {
-		return fmt.Errorf("unable to find output name %q in policy", name)
-	}
-	outType, ok := data["type"].(string)
-	if !ok {
-		return fmt.Errorf("output name %s has non-string in type attribute: %w", name, ErrInvalidOutput)
-	}
-	if outType != OutputTypeElasticsearch {
-		return fmt.Errorf("output %s is type: %q, expected: elasticsearch", name, outType)
-	}
-
-	var policyES config.Elasticsearch
-	output, err := ucfg.NewFrom(data, config.DefaultOptions...)
-	if err != nil {
-		return fmt.Errorf("unable to create config from output data: %w", err)
-	}
-	if err := output.Unpack(&policyES, config.DefaultOptions...); err != nil {
-		return fmt.Errorf("unable to unback config data to config.Elasticsearch: %w", err)
-	}
-
-	// The output block in the policy may not have the schema set so we need to manually set it.
-	isHTTPS := false
-	for _, host := range policyES.Hosts {
-		if strings.HasPrefix(strings.ToLower(host), "https") {
-			isHTTPS = true
-			break
-		}
-	}
-	if isHTTPS {
-		policyES.Protocol = "https"
-	}
-	m.cfgCh <- &config.Config{
-		Output: config.Output{
-			Elasticsearch: policyES,
-		},
-		RevisionIdx: m.lastRev,
-	}
-	return nil
-}
-
-// getFleetOutputName returns the output name that the fleet-server input of the policy uses
-func getFleetOutputName(p *model.Policy) (string, bool) {
-	if p.Data == nil {
-		return "", false
-	}
-	for _, input := range p.Data.Inputs {
-		val, found := input["type"]
-		if !found {
-			continue
-		}
-		typ, ok := val.(string)
-		if !ok {
-			continue
-		}
-		if typ != fleetserverInput {
-			continue
-		}
-		val, found = input["use_output"]
-		if !found {
-			return "", false
-		}
-		out, ok := val.(string)
-		return out, ok
-	}
-	return "", false
 }
 
 func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error) {
@@ -394,7 +294,7 @@ func HasFleetServerInput(inputs []map[string]interface{}) bool {
 		if !ok {
 			return false
 		}
-		if attr == fleetserverInput {
+		if attr == "fleet-server" {
 			return true
 		}
 	}
