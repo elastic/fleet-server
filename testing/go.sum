@@ -37,8 +37,8 @@ github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/elastic/elastic-agent-client/v7 v7.8.1 h1:J9wZc/0mUvSEok0X5iR5+n60Jgb+AWooKddb3XgPWqM=
 github.com/elastic/elastic-agent-client/v7 v7.8.1/go.mod h1:axl1nkdqc84YRFkeJGD9jExKNPUrOrzf3DFo2m653nY=
-github.com/elastic/elastic-agent-libs v0.9.5 h1:zHlQAohjyuKmH4N79Lzs9lXLaLJad37CkSly/8hNzfg=
-github.com/elastic/elastic-agent-libs v0.9.5/go.mod h1:h+izqYohdAEdb3OywTLvrrw7Yon5jiiP8N/F5NgDgBQ=
+github.com/elastic/elastic-agent-libs v0.9.6 h1:3paTd2JVkxTHH8rnlVZVrTLJgacR2l8jFr+NYHHCNio=
+github.com/elastic/elastic-agent-libs v0.9.6/go.mod h1:xhHF9jeWhPzKPtEHN+epKjdiZi0bCbACLxwkp1aHMpc=
 github.com/gofrs/uuid v4.4.0+incompatible h1:3qXRTX8/NbyulANqlc0lchS1gqAVxRgsuW1YrTJupqA=
 github.com/gofrs/uuid v4.4.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
