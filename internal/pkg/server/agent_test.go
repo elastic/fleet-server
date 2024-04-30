@@ -484,6 +484,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		mockOutClient := &mockClientUnit{}
 		mockOutClient.On("Expected").Return(
 			client.Expected{
+
 				State:    client.UnitStateHealthy,
 				LogLevel: client.UnitLogLevelInfo,
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
@@ -536,4 +537,106 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Empty(t, cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
 	})
+}
+
+func TestInjectMissingOutputAttributes(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  map[string]interface{}
+		expect map[string]interface{}
+	}{{
+		name:  "empty input",
+		input: map[string]interface{}{},
+		expect: map[string]interface{}{
+			"sKey": "string",
+			"iKey": 1,
+			"oKey": map[string]interface{}{
+				"innerKey":  "innerString",
+				"innerList": []interface{}{"val1", "val2"},
+			},
+		},
+	}, {
+		name: "all keys differ",
+		input: map[string]interface{}{
+			"inputKey": "inputVal",
+			"aNumber":  4,
+			"object": map[string]interface{}{
+				"innerVal": "custom",
+			},
+		},
+		expect: map[string]interface{}{
+			"sKey": "string",
+			"iKey": 1,
+			"oKey": map[string]interface{}{
+				"innerKey":  "innerString",
+				"innerList": []interface{}{"val1", "val2"},
+			},
+			"inputKey": "inputVal",
+			"aNumber":  4,
+			"object": map[string]interface{}{
+				"innerVal": "custom",
+			},
+		},
+	}, {
+		name: "input has same key",
+		input: map[string]interface{}{
+			"sKey":    "provided-value",
+			"iKey":    6,
+			"aNumber": 4,
+		},
+		expect: map[string]interface{}{
+			"sKey": "provided-value",
+			"iKey": 6,
+			"oKey": map[string]interface{}{
+				"innerKey":  "innerString",
+				"innerList": []interface{}{"val1", "val2"},
+			},
+			"aNumber": 4,
+		},
+	}, {
+		name: "input has empty inner object",
+		input: map[string]interface{}{
+			"inputKey": "inputVal",
+			"oKey":     map[string]interface{}{},
+		},
+		expect: map[string]interface{}{
+			"inputKey": "inputVal",
+			"sKey":     "string",
+			"iKey":     1,
+			"oKey": map[string]interface{}{
+				"innerKey":  "innerString",
+				"innerList": []interface{}{"val1", "val2"},
+			},
+		},
+	}, {
+		name: "input has inner object with same key",
+		input: map[string]interface{}{
+			"oKey": map[string]interface{}{
+				"innerKey": "my-val",
+			},
+		},
+		expect: map[string]interface{}{
+			"sKey": "string",
+			"iKey": 1,
+			"oKey": map[string]interface{}{
+				"innerKey":  "my-val",
+				"innerList": []interface{}{"val1", "val2"},
+			},
+		},
+	}}
+	bootstrap := map[string]interface{}{
+		"sKey": "string",
+		"iKey": 1,
+		"oKey": map[string]interface{}{
+			"innerKey":  "innerString",
+			"innerList": []interface{}{"val1", "val2"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			injectMissingOutputAttributes(tc.input, bootstrap)
+			assert.Equal(t, len(tc.expect), len(tc.input), "expected map sizes don't match")
+			assert.Equal(t, tc.expect, tc.input)
+		})
+	}
 }

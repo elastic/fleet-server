@@ -9,14 +9,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
+	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -56,9 +59,6 @@ type Agent struct {
 	srvCtx       context.Context
 	srvCanceller context.CancelFunc
 	srvDone      chan bool
-
-	l   sync.RWMutex
-	cfg *config.Config
 }
 
 // NewAgent returns an Agent that will gather connection information from the passed reader.
@@ -88,14 +88,16 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 func (a *Agent) Run(ctx context.Context) error {
 	log := zerolog.Ctx(ctx)
 	a.agent.RegisterDiagnosticHook("fleet-server config", "fleet-server's current configuration", "fleet-server.yml", "application/yml", func() []byte {
-		a.l.RLock()
-		if a.cfg == nil {
-			a.l.RUnlock()
+		if a.srv == nil {
+			log.Warn().Msg("Diagnostics hook failure fleet-server is nil.")
+			return nil
+		}
+		cfg := a.srv.GetConfig()
+		if cfg == nil {
 			log.Warn().Msg("Diagnostics hook failure config is nil.")
 			return nil
 		}
-		cfg := a.cfg.Redact()
-		a.l.RUnlock()
+		cfg = cfg.Redact()
 		p, err := yaml.Marshal(cfg)
 		if err != nil {
 			log.Error().Err(err).Msg("Diagnostics hook failure config unable to marshal yaml.")
@@ -336,9 +338,6 @@ func (a *Agent) reconfigure(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	a.l.Lock()
-	a.cfg = cfg
-	a.l.Unlock()
 
 	// reload the generic reloadables
 	for _, r := range a.reloadables {
@@ -399,6 +398,26 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 	if err := inputsConfig.Unpack(&input, config.DefaultOptions...); err != nil {
 		return nil, err
 	}
+	outMap := expOutput.Config.Source.AsMap()
+
+	// elastic-agent should be setting bootstrap with config provided through enrollment flags
+	if bootstrapCfg, ok := outMap["bootstrap"]; ok {
+		bootstrap, ok := bootstrapCfg.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("output bootstrap attribute is not an object, detected type: %T", bootstrapCfg)
+		}
+		delete(outMap, "bootstrap")
+		injectMissingOutputAttributes(outMap, bootstrap)
+
+		if err := a.esOutputCheck(ctx, outMap); err != nil {
+			outMap = bootstrap // outMap fails to connect, revert to bootstrap
+			if errors.Is(err, es.ErrElasticVersionConflict) {
+				zerolog.Ctx(ctx).Error().Err(err).Interface("output", outMap).Msg("Elasticsearch version constraint failed for new output")
+			} else {
+				zerolog.Ctx(ctx).Warn().Err(err).Interface("output", outMap).Msg("Failed Elasticsearch output configuration test, using bootstrap values.")
+			}
+		}
+	}
 
 	cfgData, err := ucfg.NewFrom(map[string]interface{}{
 		"fleet": map[string]interface{}{
@@ -408,7 +427,7 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 			},
 		},
 		"output": map[string]interface{}{
-			"elasticsearch": expOutput.Config.Source.AsMap(),
+			"elasticsearch": outMap,
 		},
 		"inputs": []interface{}{
 			input,
@@ -471,4 +490,60 @@ func apmConfigToInstrumentation(src *proto.APMConfig) (config.Instrumentation, e
 		return cfg, nil
 	}
 	return config.Instrumentation{}, fmt.Errorf("unable to transform APMConfig to instrumentation")
+}
+
+// injectMissingOutputAttributes will insert any kv pairs that are present in bootstrap but are not in outMap.
+// If the value of an existing key in outMap and bootstrap is map[string]interface{} the same injection is called recursively.
+func injectMissingOutputAttributes(outMap, bootstrap map[string]interface{}) {
+	for bootKey, bootVal := range bootstrap {
+		if _, ok := outMap[bootKey]; !ok {
+			outMap[bootKey] = bootVal
+			continue
+		}
+		if innerMap, ok := outMap[bootKey].(map[string]interface{}); ok {
+			bootMap, ok := bootVal.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			injectMissingOutputAttributes(innerMap, bootMap)
+		}
+	}
+}
+
+func (a *Agent) esOutputCheck(ctx context.Context, data map[string]interface{}) error {
+	var esOut config.Elasticsearch
+	temp, err := ucfg.NewFrom(data, config.DefaultOptions...)
+	if err != nil {
+		return err
+	}
+	if err := temp.Unpack(&esOut, config.DefaultOptions...); err != nil {
+		return err
+	}
+
+	const httpsSchema = "https"
+	isHTTPS := false
+	for _, host := range esOut.Hosts {
+		if strings.HasPrefix(strings.ToLower(host), httpsSchema) {
+			isHTTPS = true
+			break
+		}
+	}
+	if isHTTPS {
+		esOut.Protocol = httpsSchema
+	}
+
+	cli, err := es.NewClient(ctx,
+		&config.Config{
+			Output: config.Output{
+				Elasticsearch: esOut,
+			},
+		},
+		false,
+		elasticsearchOptions(false, a.bi)..., // disable instrumentation for output config test
+	)
+	if err != nil {
+		return err
+	}
+	_, err = ver.CheckCompatibility(ctx, cli, a.bi.Version)
+	return err
 }

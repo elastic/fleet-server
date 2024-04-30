@@ -99,12 +99,15 @@ func TestAgent(t *testing.T) {
 	})
 	require.NoError(t, err)
 	outputSource, err := structpb.NewStruct(map[string]interface{}{
-		"id":            "default",
-		"type":          "elasticsearch",
-		"name":          "elasticsearch",
-		"revision":      1,
-		"hosts":         getESHosts(),
-		"service_token": getESServiceToken(),
+		"id":       "default",
+		"type":     "elasticsearch",
+		"name":     "elasticsearch",
+		"revision": 1,
+		"hosts":    getESHosts(),
+		"bootstrap": map[string]interface{}{
+			// check to make sure the service_token is injected into the output
+			"service_token": getESServiceToken(),
+		},
 	})
 	require.NoError(t, err)
 	expected := makeExpected("", 1, inputSource, 1, outputSource)
@@ -180,13 +183,22 @@ func TestAgent(t *testing.T) {
 	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
 
 	// reconfigure to good config with debug log level
+	// the good config in this case is the bootstrap config.
 	goodSource, err := structpb.NewStruct(map[string]interface{}{
 		"id":            "default",
 		"type":          "elasticsearch",
 		"name":          "elasticsearch",
 		"revision":      1,
-		"hosts":         getESHosts(),
+		"hosts":         []interface{}{"localhost:63542"},
 		"service_token": getESServiceToken(),
+		"bootstrap": map[string]interface{}{
+			"id":            "default",
+			"type":          "elasticsearch",
+			"name":          "elasticsearch",
+			"revision":      1,
+			"hosts":         getESHosts(),
+			"service_token": getESServiceToken(),
+		},
 	})
 	require.NoError(t, err)
 	expected = makeExpected(agentID, 1, inputSource, 3, goodSource)
@@ -201,7 +213,6 @@ func TestAgent(t *testing.T) {
 		}
 		return nil
 	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
-
 	assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel(), "expected log level debug got: %s", zerolog.GlobalLevel())
 
 	t.Log("Test stop")
