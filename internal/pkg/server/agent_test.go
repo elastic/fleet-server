@@ -6,7 +6,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -290,7 +289,6 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		fmt.Printf("%v+", &cliCfg)
 		a := &Agent{
 			cliCfg:     cliCfg,
 			agent:      mockAgent,
