@@ -253,6 +253,9 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			"server": map[string]interface{}{
 				"host": "0.0.0.0",
 			},
+			"policy": map[string]interface{}{
+				"id": "test-policy",
+			},
 		})
 		require.NoError(t, err)
 		mockInClient := &mockClientUnit{}
@@ -276,8 +279,18 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				},
 			})
 
+		cliCfg, err := ucfg.NewFrom(map[string]interface{}{
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"policy": map[string]interface{}{
+						"id": "test-policy",
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
 		a := &Agent{
-			cliCfg:     ucfg.New(),
+			cliCfg:     cliCfg,
 			agent:      mockAgent,
 			inputUnit:  mockInClient,
 			outputUnit: mockOutClient,
@@ -287,6 +300,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, cfg.Inputs, 1)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
+		assert.Equal(t, "test-policy", cfg.Inputs[0].Policy.ID)
 		assert.Equal(t, "0.0.0.0", cfg.Inputs[0].Server.Host)
 		assert.True(t, cfg.Inputs[0].Server.Instrumentation.Enabled)
 		assert.False(t, cfg.Inputs[0].Server.Instrumentation.TLS.SkipVerify)
