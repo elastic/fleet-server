@@ -26,6 +26,13 @@ var DefaultOptions = []ucfg.Option{
 	ucfg.FieldReplaceValues("inputs"),
 }
 
+var MergeOptions = []ucfg.Option{
+	ucfg.PathSep("."),
+	ucfg.ResolveEnv,
+	ucfg.VarExp,
+	ucfg.FieldMergeValues("inputs"),
+}
+
 const kRedacted = "[redacted]"
 
 // Config is the global configuration.
