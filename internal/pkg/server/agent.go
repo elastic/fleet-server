@@ -86,6 +86,7 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 
 // Run starts a Server instance using config from the configured client.
 func (a *Agent) Run(ctx context.Context) error {
+	sleep.WithContext(ctx, 500*time.Millisecond)
 	log := zerolog.Ctx(ctx)
 	a.agent.RegisterDiagnosticHook("fleet-server config", "fleet-server's current configuration", "fleet-server.yml", "application/yml", func() []byte {
 		a.l.RLock()
@@ -422,10 +423,12 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 	}
 
 	if expAPMCFG := expInput.APMConfig; expAPMCFG != nil {
+		zerolog.Ctx(ctx).Info().Any("expAPMCFG", expAPMCFG).Msg("apm config to instrumentation")
 		instrumentationCfg, err := apmConfigToInstrumentation(expAPMCFG)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Msg("Unable to parse expected APM config as instrumentation config")
 		} else {
+			zerolog.Ctx(ctx).Info().Any("instrumentationCfg", instrumentationCfg).Any("cfgData before", cfgData).Msg("instrumentation cfg")
 			obj := map[string]interface{}{
 				"inputs": []interface{}{map[string]interface{}{
 					"server": map[string]interface{}{
@@ -437,6 +440,7 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 			if err != nil {
 				zerolog.Ctx(ctx).Warn().Err(err).Msg("Failed to merge APM config into cfgData")
 			}
+			zerolog.Ctx(ctx).Info().Any("cfgData after", cfgData).Msg("merged new instrumentation config to cfgData")
 		}
 
 	}

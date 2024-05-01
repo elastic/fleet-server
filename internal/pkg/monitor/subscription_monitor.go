@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/rs/zerolog"
 
@@ -116,7 +117,9 @@ func (m *monitorT) Unsubscribe(sub Subscription) {
 // Run starts the Monitor.
 func (m *monitorT) Run(ctx context.Context) (err error) {
 	g, gctx := errgroup.WithContext(ctx)
-
+	sleep.WithContext(ctx, 500*time.Millisecond)
+	zerolog.Ctx(ctx).Info().
+		Str("ctx", "subscription monitor").Msg("run subscription monitor")
 	g.Go(func() error {
 		return m.sm.Run(gctx)
 	})

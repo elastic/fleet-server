@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
 	"go.elastic.co/apm/v2"
@@ -76,6 +77,7 @@ type runFuncCfg func(context.Context, *config.Config) error
 
 // Run runs the fleet server
 func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
+	sleep.WithContext(ctx, 500*time.Millisecond)
 	log := zerolog.Ctx(ctx)
 	err := initCfg.LoadServerLimits()
 	if err != nil {
@@ -179,7 +181,7 @@ LOOP:
 				stop(srvCancel, srvEg)
 				select {
 				case err := <-ech:
-					log.Debug().Err(err).Msg("Server stopped intercepted expected context cancel error.")
+					log.Info().Err(err).Msg("Server stopped intercepted expected context cancel error.")
 				case <-time.After(time.Second * 5):
 					log.Warn().Msg("Server stopped expected context cancel error missing.")
 				}
@@ -285,7 +287,7 @@ func safeWait(g *errgroup.Group, to time.Duration) error {
 func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error {
 	log := zerolog.Ctx(ctx)
 	return func() error {
-		log.Debug().Msg(tag + " started")
+		log.Info().Msg(tag + " started")
 
 		err := runfn(ctx)
 
