@@ -6,11 +6,15 @@ package server
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 	"github.com/elastic/fleet-server/v7/version"
 	"github.com/elastic/go-ucfg"
 	"github.com/stretchr/testify/assert"
@@ -536,6 +540,104 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, []string{"localhost:8080"}, cfg.Inputs[0].Server.Instrumentation.Hosts)
 		assert.Empty(t, cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+	})
+	t.Run("output with bootstrap succeeds", func(t *testing.T) {
+		// fake an ES server's version check response
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-elastic-product", "Elasticsearch")
+			w.Write([]byte(`{"version":{"number":"8.0.0"}}`))
+		}))
+		defer srv.Close()
+
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"bootstrap": map[string]interface{}{
+				"service_token": "test-token",
+				"hosts":         []interface{}{"https://127.0.0.1:9200"},
+			},
+			"hosts": []interface{}{srv.URL, "https://127.0.0.1:9200"},
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+		inStruct, err := structpb.NewStruct(map[string]interface{}{"type": "fleet-server"})
+		require.NoError(t, err)
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+			})
+		a := &Agent{
+			cliCfg:     ucfg.New(),
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+			bi: build.Info{
+				Version: "8.0.0",
+			},
+		}
+
+		ctx := testlog.SetLogger(t).WithContext(context.Background())
+		cfg, err := a.configFromUnits(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+		assert.Equal(t, []string{srv.URL, "https://127.0.0.1:9200"}, cfg.Output.Elasticsearch.Hosts)
+	})
+	t.Run("output with bootstrap fails", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-elastic-product", "Elasticsearch")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"version":{"number":"8.0.0"}}`))
+		}))
+		defer srv.Close()
+
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"bootstrap": map[string]interface{}{
+				"service_token": "test-token",
+				"hosts":         []interface{}{"https://127.0.0.1:9200"},
+			},
+			"hosts": []interface{}{srv.URL, "https://127.0.0.1:9200"},
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+		inStruct, err := structpb.NewStruct(map[string]interface{}{"type": "fleet-server"})
+		require.NoError(t, err)
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+			})
+		a := &Agent{
+			cliCfg:     ucfg.New(),
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+			bi: build.Info{
+				Version: "8.0.0",
+			},
+		}
+
+		ctx := testlog.SetLogger(t).WithContext(context.Background())
+		cfg, err := a.configFromUnits(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+		assert.Equal(t, []string{"https://127.0.0.1:9200"}, cfg.Output.Elasticsearch.Hosts)
 	})
 }
 
