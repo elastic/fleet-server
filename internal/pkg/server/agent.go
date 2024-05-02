@@ -492,21 +492,69 @@ func apmConfigToInstrumentation(src *proto.APMConfig) (config.Instrumentation, e
 	return config.Instrumentation{}, fmt.Errorf("unable to transform APMConfig to instrumentation")
 }
 
-// injectMissingOutputAttributes will insert any kv pairs that are present in bootstrap but are not in outMap.
-// If the value of an existing key in outMap and bootstrap is map[string]interface{} the same injection is called recursively.
+// injectMissingOutputAttributes will inject an explicit set of keys that may be present in bootstrap into outMap.
+// Note that we are a more generic injection here (iterating over all keys in bootstrap recursively) in order to avoid injecting any unnecessary/deprecated attributes.
 func injectMissingOutputAttributes(outMap, bootstrap map[string]interface{}) {
-	for bootKey, bootVal := range bootstrap {
-		if _, ok := outMap[bootKey]; !ok {
-			outMap[bootKey] = bootVal
+	bootstrapKeys := []string{
+		"protocol",
+		"hosts",
+		"path",
+		"service_token",
+		"service_token_path",
+		"headers",
+		"proxy_url",
+		"proxy_disable",
+		"proxy_headers",
+	}
+	// keys that will appear under the "ssl" key
+	bootstrapSSLKeys := []string{
+		"verification_mode",
+		"certificate_authorities",
+		"ca_trusted_fingerprint",
+		"certificate",
+		"key",
+	}
+
+	injectKeys(bootstrapKeys, outMap, bootstrap)
+
+	// handle nested structs in bootstrap, currently we just support some ssl config
+	var bootstrapSSL map[string]interface{}
+	if mp, ok := bootstrap["ssl"]; ok {
+		bootstrapSSL, ok = mp.(map[string]interface{})
+		if !ok {
+			// ssl is not a map
+			// if bootstrap is used as output this will cause a parsing issue and fail later
+			return
+		}
+	} else {
+		// bootstrap has no ssl attributes
+		return
+	}
+	outputSSL := map[string]interface{}{}
+	if mp, ok := outMap["ssl"]; ok {
+		outputSSL, ok = mp.(map[string]interface{})
+		if !ok {
+			// output.ssl is not a map
+			// this will fail to parse later
+			return
+		}
+	}
+	injectKeys(bootstrapSSLKeys, outputSSL, bootstrapSSL)
+	outMap["ssl"] = outputSSL
+}
+
+// injectKeys will inject any key in the passed list that exists in src but is missing from dst.
+func injectKeys(keys []string, dst, src map[string]interface{}) {
+	for _, key := range keys {
+		// dst contains the key
+		if _, ok := dst[key]; ok {
 			continue
 		}
-		if innerMap, ok := outMap[bootKey].(map[string]interface{}); ok {
-			bootMap, ok := bootVal.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			injectMissingOutputAttributes(innerMap, bootMap)
+		// src does not contain the key
+		if _, ok := src[key]; !ok {
+			continue
 		}
+		dst[key] = src[key]
 	}
 }
 

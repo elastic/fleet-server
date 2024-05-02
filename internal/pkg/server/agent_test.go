@@ -652,88 +652,89 @@ func TestInjectMissingOutputAttributes(t *testing.T) {
 		name:  "empty input",
 		input: map[string]interface{}{},
 		expect: map[string]interface{}{
-			"sKey": "string",
-			"iKey": 1,
-			"oKey": map[string]interface{}{
-				"innerKey":  "innerString",
-				"innerList": []interface{}{"val1", "val2"},
+			"protocol":      "https",
+			"hosts":         []interface{}{"localhost:9200"},
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"verification_mode": "full",
 			},
 		},
 	}, {
 		name: "all keys differ",
 		input: map[string]interface{}{
-			"inputKey": "inputVal",
-			"aNumber":  4,
-			"object": map[string]interface{}{
-				"innerVal": "custom",
+			"NewSetting": 4,
+			"NewMap": map[string]interface{}{
+				"key": "val",
 			},
 		},
 		expect: map[string]interface{}{
-			"sKey": "string",
-			"iKey": 1,
-			"oKey": map[string]interface{}{
-				"innerKey":  "innerString",
-				"innerList": []interface{}{"val1", "val2"},
+			"NewSetting": 4,
+			"NewMap": map[string]interface{}{
+				"key": "val",
 			},
-			"inputKey": "inputVal",
-			"aNumber":  4,
-			"object": map[string]interface{}{
-				"innerVal": "custom",
+			"protocol":      "https",
+			"hosts":         []interface{}{"localhost:9200"},
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"verification_mode": "full",
 			},
 		},
 	}, {
 		name: "input has same key",
 		input: map[string]interface{}{
-			"sKey":    "provided-value",
-			"iKey":    6,
-			"aNumber": 4,
+			"hosts": []interface{}{"localhost:9200", "elasticsearch:9200"},
 		},
 		expect: map[string]interface{}{
-			"sKey": "provided-value",
-			"iKey": 6,
-			"oKey": map[string]interface{}{
-				"innerKey":  "innerString",
-				"innerList": []interface{}{"val1", "val2"},
-			},
-			"aNumber": 4,
-		},
-	}, {
-		name: "input has empty inner object",
-		input: map[string]interface{}{
-			"inputKey": "inputVal",
-			"oKey":     map[string]interface{}{},
-		},
-		expect: map[string]interface{}{
-			"inputKey": "inputVal",
-			"sKey":     "string",
-			"iKey":     1,
-			"oKey": map[string]interface{}{
-				"innerKey":  "innerString",
-				"innerList": []interface{}{"val1", "val2"},
+			"protocol":      "https",
+			"hosts":         []interface{}{"localhost:9200", "elasticsearch:9200"},
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"verification_mode": "full",
 			},
 		},
 	}, {
-		name: "input has inner object with same key",
+		name: "input has empty ssl object",
 		input: map[string]interface{}{
-			"oKey": map[string]interface{}{
-				"innerKey": "my-val",
+			"ssl": map[string]interface{}{},
+		},
+		expect: map[string]interface{}{
+			"protocol":      "https",
+			"hosts":         []interface{}{"localhost:9200"},
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"verification_mode": "full",
+			},
+		},
+	}, {
+		name: "input has ssl object with same key",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{
+				"certificate":       "cert",
+				"key":               "key",
+				"verification_mode": "none",
 			},
 		},
 		expect: map[string]interface{}{
-			"sKey": "string",
-			"iKey": 1,
-			"oKey": map[string]interface{}{
-				"innerKey":  "my-val",
-				"innerList": []interface{}{"val1", "val2"},
+			"protocol":      "https",
+			"hosts":         []interface{}{"localhost:9200"},
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"certificate":       "cert",
+				"key":               "key",
+				"verification_mode": "none",
 			},
 		},
 	}}
 	bootstrap := map[string]interface{}{
-		"sKey": "string",
-		"iKey": 1,
-		"oKey": map[string]interface{}{
-			"innerKey":  "innerString",
-			"innerList": []interface{}{"val1", "val2"},
+		"protocol":      "https",
+		"hosts":         []interface{}{"localhost:9200"},
+		"service_token": "token",
+		"ssl": map[string]interface{}{
+			"verification_mode": "full",
+		},
+		"ignoredKey": "badValue",
+		"ignoredMap": map[string]interface{}{
+			"key": "value",
 		},
 	}
 	for _, tc := range tests {
