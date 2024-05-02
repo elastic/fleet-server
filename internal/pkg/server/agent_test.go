@@ -546,7 +546,8 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-elastic-product", "Elasticsearch")
-			w.Write([]byte(`{"version":{"number":"8.0.0"}}`))
+			_, err := w.Write([]byte(`{"version":{"number":"8.0.0"}}`))
+			require.NoError(t, err)
 		}))
 		defer srv.Close()
 
@@ -595,7 +596,8 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-elastic-product", "Elasticsearch")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"version":{"number":"8.0.0"}}`))
+			_, err := w.Write([]byte(`{"version":{"number":"8.0.0"}}`))
+			require.NoError(t, err)
 		}))
 		defer srv.Close()
 
