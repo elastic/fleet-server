@@ -421,11 +421,13 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 		return nil, err
 	}
 
+	zerolog.Ctx(ctx).Info().Msg("Agent APM check")
 	if expAPMCFG := expInput.APMConfig; expAPMCFG != nil {
 		instrumentationCfg, err := apmConfigToInstrumentation(expAPMCFG)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Msg("Unable to parse expected APM config as instrumentation config")
 		} else {
+			zerolog.Ctx(ctx).Info().Interface("apm_config", expAPMCFG).Interface("cfg", cfgData).Msg("APM config from protocol")
 			obj := map[string]interface{}{
 				"inputs": []interface{}{map[string]interface{}{
 					"server": map[string]interface{}{
@@ -438,7 +440,8 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 				zerolog.Ctx(ctx).Warn().Err(err).Msg("Failed to merge APM config into cfgData")
 			}
 		}
-
+	} else {
+		zerolog.Ctx(ctx).Info().Msg("Agent no APM custom config")
 	}
 
 	cliCfg := ucfg.MustNewFrom(a.cliCfg, config.DefaultOptions...)
