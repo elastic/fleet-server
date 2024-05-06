@@ -335,7 +335,8 @@ test-int: prepare-test-context  ## - Run integration tests with full setup (slow
 test-int-set: ## - Run integration tests without setup
 	# Initialize indices one before running all the tests
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS} "fleet-server") \
-	REMOTE_ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_REMOTE_ELASTICSEARCH_HOST} "fleet-server-remote") \
+	REMOTE_ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh https://${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_REMOTE_ELASTICSEARCH_HOST} "fleet-server-remote") \
+	REMOTE_ELASTICSEARCH_CA_CRT_BASE64="$(shell COMPOSE_PROJECT_NAME=integration docker compose  -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env exec elasticsearch-remote /bin/bash -c "cat /usr/share/elasticsearch/config/certs/ca/ca.crt" | base64)" \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	go test -v -tags=integration -count=1 -race -p 1 ./...
 
