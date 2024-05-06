@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -198,29 +199,18 @@ func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, ou
 var newESClient = es.NewClient
 
 func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, outputMap map[string]map[string]interface{}) (*elasticsearch.Client, error) {
-	hostsObj := outputMap[outputName]["hosts"]
-	hosts, ok := hostsObj.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to get hosts from output: %v", hostsObj)
+	var esOutput config.Elasticsearch
+	esConfig, err := ucfg.NewFrom(outputMap[outputName], config.DefaultOptions...)
+	if err != nil {
+		return nil, err
 	}
-	hostsStrings := make([]string, len(hosts))
-	for i, host := range hosts {
-		hostsStrings[i], ok = host.(string)
-		if !ok {
-			return nil, fmt.Errorf("failed to get hosts from output: %v", host)
-		}
+	err = esConfig.Unpack(&esOutput)
+	if err != nil {
+		return nil, err
 	}
-	serviceToken, ok := outputMap[outputName]["service_token"].(string)
-	if !ok {
-		return nil, fmt.Errorf("failed to get service token from output: %v", outputName)
-	}
-
 	cfg := config.Config{
 		Output: config.Output{
-			Elasticsearch: config.Elasticsearch{
-				Hosts:        hostsStrings,
-				ServiceToken: serviceToken,
-			},
+			Elasticsearch: esOutput,
 		},
 	}
 	es, err := newESClient(ctx, &cfg, false, elasticsearchOptions(
