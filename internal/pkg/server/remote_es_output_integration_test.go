@@ -89,6 +89,8 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 		require.Equal(t, nil, serviceToken)
 		remoteAPIKey, ok = remoteES["api_key"].(string)
 		require.True(t, ok, "expected remoteAPIKey to be string")
+		remoteCertificateAuthorities, ok = remoteES["ssl"]["certificate_authorities"].(string)
+		require.True(t, ok, "expected remoteCertificateAuthorities to be string")
 	}
 	defaultOutput, ok := outputs["default"].(map[string]interface{})
 	require.True(t, ok, "expected default to be map")
@@ -272,6 +274,7 @@ func verifyRemoteAPIKey(t *testing.T, ctx context.Context, apiKeyID string, inva
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 	// Skip SSL verify as ES use self-signed certificate
 	tr := &http.Transport{
+		// #nosec G402
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
