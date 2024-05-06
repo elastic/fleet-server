@@ -89,7 +89,7 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 		require.Equal(t, nil, serviceToken)
 		remoteAPIKey, ok = remoteES["api_key"].(string)
 		require.True(t, ok, "expected remoteAPIKey to be string")
-		remoteCertificateAuthorities, ok = remoteES["ssl"]["certificate_authorities"].(string)
+		remoteCertificateAuthorities, ok = remoteES["ssl"].(map[string]interface{})["certificate_authorities"].(string)
 		require.True(t, ok, "expected remoteCertificateAuthorities to be string")
 	}
 	defaultOutput, ok := outputs["default"].(map[string]interface{})
