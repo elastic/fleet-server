@@ -100,7 +100,7 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 }
 
 func getRemoteElasticsearchCa(t *testing.T) string {
-	data, err := base64.StdEncoding.DecodeString(os.Getenv("REMOTE_ELASTICSEARCH_CA_CRT_BASE64"))
+	data, err := base64.StdEncoding.DecodeString(strings.Replace(os.Getenv("REMOTE_ELASTICSEARCH_CA_CRT_BASE64"), " ", "", -1))
 	require.NoError(t, err)
 
 	return string(data)

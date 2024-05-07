@@ -208,6 +208,12 @@ func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, ou
 	if err != nil {
 		return nil, err
 	}
+	if len(esOutput.Hosts) == 0 {
+		return nil, fmt.Errorf("failed to get hosts from output: %v", outputName)
+	}
+	if esOutput.ServiceToken == "" {
+		return nil, fmt.Errorf("failed to get service token from output: %v", outputName)
+	}
 	cfg := config.Config{
 		Output: config.Output{
 			Elasticsearch: esOutput,
