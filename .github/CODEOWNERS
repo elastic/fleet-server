@@ -1,5 +1,5 @@
 # Team responsible for Fleet Server
-* @elastic/fleet
+* @elastic/elastic-agent-control-plane
 
 # Allow to auto-merge PRs with Mergify
 dev-tools/integration/.env
