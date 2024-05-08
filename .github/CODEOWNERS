@@ -1,5 +1,9 @@
 # Team responsible for Fleet Server
+<<<<<<< HEAD
 * @elastic/fleet @elastic/elastic-agent-control-plane
+=======
+* @elastic/elastic-agent-control-plane
+>>>>>>> be644ae0 (Update default codeowners (#3529))
 
 # Allow to auto-merge PRs with Mergify
 dev-tools/integration/.env
