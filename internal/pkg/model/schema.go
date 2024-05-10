@@ -156,6 +156,9 @@ type Agent struct {
 	// Local metadata information for the Elastic Agent
 	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
 
+	// Namespaces
+	Namespaces []string `json:"namespaces,omitempty"`
+
 	// Outputs is the policy output data, mapping the output name to its data
 	Outputs map[string]*PolicyOutput `json:"outputs,omitempty"`
 
@@ -339,9 +342,12 @@ type EnrollmentAPIKey struct {
 	ExpireAt  string `json:"expire_at,omitempty"`
 
 	// Enrollment key name
-	Name      string `json:"name,omitempty"`
-	PolicyID  string `json:"policy_id,omitempty"`
-	UpdatedAt string `json:"updated_at,omitempty"`
+	Name string `json:"name,omitempty"`
+
+	// Namespaces
+	Namespaces []string `json:"namespaces,omitempty"`
+	PolicyID   string   `json:"policy_id,omitempty"`
+	UpdatedAt  string   `json:"updated_at,omitempty"`
 }
 
 // HostMetadata The host metadata for the Elastic Agent

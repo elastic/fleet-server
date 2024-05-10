@@ -90,7 +90,7 @@ func TestEnroll(t *testing.T) {
 		}, nil)
 	bulker.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		"", nil)
-	resp, _ := et._enroll(ctx, rb, zlog, req, "1234", "8.9.0")
+	resp, _ := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
 
 	if resp.Action != "created" {
 		t.Fatal("enroll failed")
