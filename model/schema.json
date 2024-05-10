@@ -14,6 +14,13 @@
           "description": "The action sequence number",
           "type": "integer"
         },
+        "namespaces": {
+          "description": "Namespaces",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "action_id": {
           "description": "The unique identifier for the Elastic Agent action. There could be multiple documents with the same action_id if the action is split into two separate documents.",
           "type": "string",
@@ -117,6 +124,13 @@
         "action_input_type": {
           "description": "The input type of the original action.",
           "type": "string"
+        },
+        "namespaces": {
+          "description": "Namespaces",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "started_at": {
           "description": "Date/time the action was started",

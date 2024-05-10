@@ -51,6 +51,9 @@ type Action struct {
 	// The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.
 	MinimumExecutionDuration int64 `json:"minimum_execution_duration,omitempty"`
 
+	// Namespaces
+	Namespaces []string `json:"namespaces,omitempty"`
+
 	// The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.
 	RolloutDurationSeconds int64   `json:"rollout_duration_seconds,omitempty"`
 	Signed                 *Signed `json:"signed,omitempty"`
@@ -101,6 +104,9 @@ type ActionResult struct {
 
 	// The action error message.
 	Error string `json:"error,omitempty"`
+
+	// Namespaces
+	Namespaces []string `json:"namespaces,omitempty"`
 
 	// Date/time the action was started
 	StartedAt string `json:"started_at,omitempty"`
