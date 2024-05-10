@@ -8,19 +8,14 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
-	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/gofrs/uuid"
@@ -28,12 +23,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	remoteESHost = "localhost:9201"
-	remoteESUrl  = "https://localhost:9201"
-)
+// const (
+// 	remoteESHost = "localhost:9201"
+// 	remoteESUrl  = "https://localhost:9201"
+// )
 
-func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType string) (string, string) {
+func AgentCheckin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType string) (string, string) {
 	cli := cleanhttp.DefaultClient()
 	var obj map[string]interface{}
 
@@ -79,17 +74,6 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	outputs, ok := policy["outputs"].(map[string]interface{})
 	require.True(t, ok, "expected outputs to be map")
 	var remoteAPIKey string
-	if shouldHaveRemoteES {
-		remoteES, ok := outputs["remoteES"].(map[string]interface{})
-		require.True(t, ok, "expected remoteES to be map")
-		oType, ok := remoteES["type"].(string)
-		require.True(t, ok, "expected type to be string")
-		require.Equal(t, "elasticsearch", oType)
-		serviceToken := remoteES["service_token"]
-		require.Equal(t, nil, serviceToken)
-		remoteAPIKey, ok = remoteES["api_key"].(string)
-		require.True(t, ok, "expected remoteAPIKey to be string")
-	}
 	defaultOutput, ok := outputs["default"].(map[string]interface{})
 	require.True(t, ok, "expected default to be map")
 	defaultAPIKey, ok := defaultOutput["api_key"].(string)
@@ -99,14 +83,7 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	return remoteAPIKey, actionID
 }
 
-func getRemoteElasticsearchCa(t *testing.T) string {
-	data, err := base64.StdEncoding.DecodeString(strings.Replace(os.Getenv("REMOTE_ELASTICSEARCH_CA_CRT_BASE64"), " ", "", -1))
-	require.NoError(t, err)
-
-	return string(data)
-}
-
-func Ack(t *testing.T, ctx context.Context, srv *tserver, actionID, agentID, key string) {
+func AgentAck(t *testing.T, ctx context.Context, srv *tserver, actionID, agentID, key string) {
 	t.Logf("Fake an ack for action %s for agent %s", actionID, agentID)
 	body := fmt.Sprintf(`{
 	    "events": [{
@@ -139,7 +116,24 @@ func Ack(t *testing.T, ctx context.Context, srv *tserver, actionID, agentID, key
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
 }
 
+type GetAgentResponse struct {
+	Agent model.Agent `json:"_source"`
+}
+
+func AssertAgentDocContainNamespace(t *testing.T, ctx context.Context, srv *tserver, agentId string, namespace string) {
+	res, err := srv.bulker.Client().Get(".fleet-agents", agentId)
+	require.NoError(t, err)
+
+	defer res.Body.Close()
+	var getAgentRes GetAgentResponse
+	err = json.NewDecoder(res.Body).Decode(&getAgentRes)
+	require.NoError(t, err)
+
+	require.EqualValues(t, getAgentRes.Agent.Namespaces, []string{namespace})
+}
+
 func Test_Agent_Namespace_test1(t *testing.T) {
+	testNamespace := "test1"
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -150,29 +144,22 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	t.Log("Create policy with namespace test1")
 
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
-	var policyDataRemoteES = model.PolicyData{
+	var policyDataNamespaceTest = model.PolicyData{
 		Outputs: map[string]map[string]interface{}{
 			"default": {
 				"type": "elasticsearch",
 			},
-			"remoteES": {
-				"type":                        "remote_elasticsearch",
-				"hosts":                       []string{remoteESUrl},
-				"service_token":               os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
-				"ssl.enabled":                 true,
-				"ssl.certificate_authorities": []string{getRemoteElasticsearchCa(t)},
-			},
 		},
-		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
+		OutputPermissions: json.RawMessage(`{"default": {} }`),
 		Inputs:            []map[string]interface{}{},
-		Agent:             json.RawMessage(`{"monitoring": {"use_output":"remoteES"}}`),
+		Agent:             json.RawMessage(`{"monitoring": {"use_output":"default"}}`),
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
 		PolicyID:           policyRemoteID,
 		RevisionIdx:        1,
 		DefaultFleetServer: false,
-		Data:               &policyDataRemoteES,
+		Data:               &policyDataNamespaceTest,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -201,12 +188,12 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	}
 
 	_, err = dl.CreateEnrollmentAPIKey(ctx, srv.bulker, model.EnrollmentAPIKey{
-		Name:     "TestNamespace1",
-		Namespaces: []string{"test1"}
-		APIKey:   newKey.Key,
-		APIKeyID: newKey.ID,
-		PolicyID: policyRemoteID,
-		Active:   true,
+		Name:       "TestNamespace1",
+		Namespaces: []string{testNamespace},
+		APIKey:     newKey.Key,
+		APIKeyID:   newKey.ID,
+		PolicyID:   policyRemoteID,
+		Active:     true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -217,6 +204,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	srvCopy.enrollKey = newKey.Token()
 	agentID, key := EnrollAgent(enrollBody, t, ctx, srvCopy)
 
+	AssertAgentDocContainNamespace(t, ctx, srv, agentID, testNamespace)
 	// cleanup
 	defer func() {
 		err = srv.bulker.Delete(ctx, dl.FleetAgents, agentID)
@@ -225,11 +213,9 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 		}
 	}()
 
-	apiKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
-	apiKeyID := strings.Split(apiKey, ":")[0]
+	_, actionID := AgentCheckin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
 
-
-	Ack(t, ctx, srvCopy, actionID, agentID, key)
+	AgentAck(t, ctx, srvCopy, actionID, agentID, key)
 
 	t.Log("Update policy to remove remote ES output")
 
@@ -259,5 +245,3 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	t.Log("Ack so that fleet triggers remote api key invalidate")
 	Ack(t, ctx, srvCopy, actionID, agentID, key)
 }
-
-
