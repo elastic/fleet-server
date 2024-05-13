@@ -698,8 +698,9 @@ func TestInjectMissingOutputAttributes(t *testing.T) {
 			"ssl": map[string]interface{}{},
 		},
 		expect: map[string]interface{}{
-			"protocol":      "https",
-			"hosts":         []interface{}{"localhost:9200"},
+			"protocol": "https",
+			"hosts":    []interface{}{"localhost:9200"},
+
 			"service_token": "token",
 			"ssl": map[string]interface{}{
 				"verification_mode": "full",
@@ -744,4 +745,80 @@ func TestInjectMissingOutputAttributes(t *testing.T) {
 			assert.Equal(t, tc.expect, tc.input)
 		})
 	}
+
+	bootstrapVerifyNone := map[string]interface{}{
+		"service_token": "token",
+		"ssl": map[string]interface{}{
+			"verification_mode": "none",
+		},
+	}
+	sslTests := []struct {
+		name   string
+		input  map[string]interface{}
+		expect map[string]interface{}
+	}{{
+		name: "no cas none is injected",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{
+				"certificate": "value",
+			},
+		},
+		expect: map[string]interface{}{
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"certificate":       "value",
+				"verification_mode": "none",
+			},
+		},
+	}, {
+		name: "certificate_authority provided",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{
+				"certificate_authorities": []interface{}{"value"},
+			},
+		},
+		expect: map[string]interface{}{
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"certificate_authorities": []interface{}{"value"},
+			},
+		},
+	}, {
+		name: "fingerprint provided",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{
+				"ca_trusted_fingerprint": "value",
+			},
+		},
+		expect: map[string]interface{}{
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"ca_trusted_fingerprint": "value",
+			},
+		},
+	}, {
+		name: "output has CA and vertification_mode: none",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{
+				"certificate_authorities": []interface{}{"value"},
+				"verification_mode":       "none",
+			},
+		},
+		expect: map[string]interface{}{
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"certificate_authorities": []interface{}{"value"},
+				"verification_mode":       "none",
+			},
+		},
+	}}
+
+	for _, tc := range sslTests {
+		t.Run(tc.name, func(t *testing.T) {
+			injectMissingOutputAttributes(tc.input, bootstrapVerifyNone)
+			assert.Equal(t, len(tc.expect), len(tc.input), "expected map sizes don't match")
+			assert.Equal(t, tc.expect, tc.input)
+		})
+	}
+
 }
