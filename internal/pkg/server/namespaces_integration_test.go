@@ -7,6 +7,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"text/template"
+	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -23,12 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// const (
-// 	remoteESHost = "localhost:9201"
-// 	remoteESUrl  = "https://localhost:9201"
-// )
-
-func AgentCheckin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType string) (string, string) {
+func AgentCheckin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string) string {
 	cli := cleanhttp.DefaultClient()
 	var obj map[string]interface{}
 
@@ -61,26 +59,7 @@ func AgentCheckin(t *testing.T, ctx context.Context, srv *tserver, agentID, key 
 	actionID, ok := aIDRaw.(string)
 	require.True(t, ok, "expected action id to be string")
 
-	typeRaw := action["type"]
-	require.Equal(t, actionType, typeRaw)
-	if actionType != "POLICY_CHANGE" {
-		return "", actionID
-	}
-	dataRaw := action["data"]
-	data, ok := dataRaw.(map[string]interface{})
-	require.True(t, ok, "expected data to be map")
-	policy, ok := data["policy"].(map[string]interface{})
-	require.True(t, ok, "expected policy to be map")
-	outputs, ok := policy["outputs"].(map[string]interface{})
-	require.True(t, ok, "expected outputs to be map")
-	var remoteAPIKey string
-	defaultOutput, ok := outputs["default"].(map[string]interface{})
-	require.True(t, ok, "expected default to be map")
-	defaultAPIKey, ok := defaultOutput["api_key"].(string)
-	require.True(t, ok, "expected defaultAPIKey to be string")
-	require.NotEqual(t, remoteAPIKey, defaultAPIKey, "expected remote api key to be different than default")
-
-	return remoteAPIKey, actionID
+	return actionID
 }
 
 func AgentAck(t *testing.T, ctx context.Context, srv *tserver, actionID, agentID, key string) {
@@ -101,27 +80,18 @@ func AgentAck(t *testing.T, ctx context.Context, srv *tserver, actionID, agentID
 	cli := cleanhttp.DefaultClient()
 	res, err := cli.Do(req)
 	require.NoError(t, err)
+	defer res.Body.Close()
 
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	t.Log("Ack successful, verify body")
-	p, _ := io.ReadAll(res.Body)
-	res.Body.Close()
-	var ackObj map[string]interface{}
-	err = json.Unmarshal(p, &ackObj)
-	require.NoError(t, err)
-
-	// NOTE the checkin response will only have the errors attribute if it's set to true in the response.
-	// When decoding to a (typed) struct, the default will implicitly be false if it's missing
-	_, ok := ackObj["errors"]
-	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
 }
 
 type GetAgentResponse struct {
 	Agent model.Agent `json:"_source"`
 }
 
-func AssertAgentDocContainNamespace(t *testing.T, ctx context.Context, srv *tserver, agentId string, namespace string) {
-	res, err := srv.bulker.Client().Get(".fleet-agents", agentId)
+func AssertAgentDocContainNamespace(t *testing.T, ctx context.Context, srv *tserver, agentID string, namespace string) {
+	res, err := srv.bulker.Client().Get(".fleet-agents", agentID)
 	require.NoError(t, err)
 
 	defer res.Body.Close()
@@ -130,6 +100,56 @@ func AssertAgentDocContainNamespace(t *testing.T, ctx context.Context, srv *tser
 	require.NoError(t, err)
 
 	require.EqualValues(t, getAgentRes.Agent.Namespaces, []string{namespace})
+}
+
+func CreateActionDocument(t *testing.T, ctx context.Context, srv *tserver, action model.Action) {
+	body, err := json.Marshal(action)
+	require.NoError(t, err)
+	_, err = srv.bulker.Client().Index(".fleet-actions", bytes.NewReader(body))
+	require.NoError(t, err)
+}
+
+type GetActionResults struct {
+	Hits struct {
+		Hits []struct {
+			Result model.ActionResult `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+func CheckActionResultsNamespace(t *testing.T, ctx context.Context, srv *tserver, actionID string, namespace string) {
+	queryTmpl := `{
+		"query": {
+			"bool" : {
+				"must" : {
+					"terms": {
+						"action_id": [ "{{.}}" ]
+					}
+				}
+			}
+		}
+	}`
+	queryBuff := bytes.Buffer{}
+	tmpl, err := template.New("").Parse(queryTmpl)
+	require.NoError(t, err)
+	err = tmpl.Execute(&queryBuff, actionID)
+	require.NoError(t, err)
+
+	client := srv.bulker.Client()
+
+	res, err := client.Search(
+		client.Search.WithIndex(".fleet-actions-results"),
+		client.Search.WithBody(strings.NewReader(queryBuff.String())),
+	)
+	defer res.Body.Close()
+	require.NoError(t, err)
+
+	var getActionResultsRes GetActionResults
+	err = json.NewDecoder(res.Body).Decode(&getActionResultsRes)
+	require.NoError(t, err)
+
+	require.Len(t, getActionResultsRes.Hits.Hits, 1)
+	require.EqualValues(t, getActionResultsRes.Hits.Hits[0].Result.Namespaces, []string{namespace})
 }
 
 func Test_Agent_Namespace_test1(t *testing.T) {
@@ -142,7 +162,6 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Create policy with namespace test1")
-
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
 	var policyDataNamespaceTest = model.PolicyData{
 		Outputs: map[string]map[string]interface{}{
@@ -166,7 +185,6 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	}
 
 	t.Log("Create API key and enrollment key for new policy")
-
 	newKey, err := apikey.Create(ctx, srv.bulker.Client(), "default", "", "true", []byte(`{
 	    "fleet-apikey-enroll": {
 		"cluster": [],
@@ -213,35 +231,28 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 		}
 	}()
 
-	_, actionID := AgentCheckin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
-
+	actionID := AgentCheckin(t, ctx, srvCopy, agentID, key)
 	AgentAck(t, ctx, srvCopy, actionID, agentID, key)
 
-	t.Log("Update policy to remove remote ES output")
-
-	var policyData = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
-			"default": {
-				"type": "elasticsearch",
-			},
-		},
-		OutputPermissions: json.RawMessage(`{"default": {}}`),
-		Inputs:            []map[string]interface{}{},
+	t.Log("Create SETTINGS Action")
+	newActionID, _ := uuid.NewV4()
+	var actionData = model.Action{
+		Agents:     []string{agentID},
+		Expiration: time.Now().Add(time.Hour * 2000).Format(time.RFC3339),
+		ActionID:   newActionID.String(),
+		Namespaces: []string{"test1"},
+		Type:       "SETTINGS",
+		Data:       []byte("{\"log_level\": \"debug\"}"),
 	}
 
-	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
-		PolicyID:           policyRemoteID,
-		RevisionIdx:        2,
-		DefaultFleetServer: false,
-		Data:               &policyData,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	CreateActionDocument(t, ctx, srv, actionData)
 
-	t.Log("Checkin so that agent gets new policy revision")
-	_, actionID = Checkin(t, ctx, srvCopy, agentID, key, false, "POLICY_CHANGE")
+	t.Log("Checkin so that agent gets the SETTINGS action")
+	actionID = AgentCheckin(t, ctx, srvCopy, agentID, key)
 
-	t.Log("Ack so that fleet triggers remote api key invalidate")
-	Ack(t, ctx, srvCopy, actionID, agentID, key)
+	t.Log("Ack so that fleet create the action results")
+	AgentAck(t, ctx, srvCopy, actionID, agentID, key)
+
+	t.Log("Check action results has the correct namespace")
+	CheckActionResultsNamespace(t, ctx, srv, actionID, "test1")
 }
