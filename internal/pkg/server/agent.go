@@ -35,6 +35,12 @@ const (
 	kElasticsearch = "elasticsearch"
 
 	kStopped = "Stopped"
+
+	verifyNone = "none"
+	// NOTE: Do we want to try to make this configurable in the future?
+	// It may need different handling as we would want it to be part of the policy definition so a user
+	// can specify in Kibana, but it only applies to agent mode.
+	outputCheckLoopDelay = time.Minute
 )
 
 type clientUnit interface {
@@ -59,6 +65,9 @@ type Agent struct {
 	srvCtx       context.Context
 	srvCanceller context.CancelFunc
 	srvDone      chan bool
+
+	outputCheckCanceller context.CancelFunc
+	chReconfigure        chan struct{}
 }
 
 // NewAgent returns an Agent that will gather connection information from the passed reader.
@@ -66,9 +75,10 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 	var err error
 
 	a := &Agent{
-		cliCfg:      cliCfg,
-		bi:          bi,
-		reloadables: reloadables,
+		cliCfg:        cliCfg,
+		bi:            bi,
+		reloadables:   reloadables,
+		chReconfigure: make(chan struct{}, 1),
 	}
 	a.agent, _, err = client.NewV2FromReader(reader, client.VersionInfo{
 		Name:      kFleetServer,
@@ -140,6 +150,11 @@ func (a *Agent) Run(ctx context.Context) error {
 					}
 				case client.UnitChangedRemoved:
 					a.unitRemoved(change.Unit)
+				}
+			case <-a.chReconfigure:
+				err := a.reconfigure(ctx)
+				if err != nil && !errors.Is(err, context.Canceled) {
+					log.Error().Err(err).Msg("Error when reconfiguring from trigger")
 				}
 			case <-t.C:
 				// Fleet Server is the only component that gets started by Elastic Agent without an Agent ID. We loop
@@ -354,6 +369,10 @@ func (a *Agent) stop() {
 	if a.srvCanceller == nil {
 		return
 	}
+	if a.outputCheckCanceller != nil {
+		a.outputCheckCanceller()
+		a.outputCheckCanceller = nil
+	}
 
 	canceller := a.srvCanceller
 	a.srvCanceller = nil
@@ -402,6 +421,11 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 
 	// elastic-agent should be setting bootstrap with config provided through enrollment flags
 	if bootstrapCfg, ok := outMap["bootstrap"]; ok {
+		if a.outputCheckCanceller != nil {
+			a.outputCheckCanceller()
+			a.outputCheckCanceller = nil
+		}
+
 		bootstrap, ok := bootstrapCfg.(map[string]interface{})
 		if !ok {
 			return nil, fmt.Errorf("output bootstrap attribute is not an object, detected type: %T", bootstrapCfg)
@@ -410,12 +434,19 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 		injectMissingOutputAttributes(outMap, bootstrap)
 
 		if err := a.esOutputCheck(ctx, outMap); err != nil {
-			outMap = bootstrap // outMap fails to connect, revert to bootstrap
-			if errors.Is(err, es.ErrElasticVersionConflict) {
+			if errors.Is(err, es.ErrElasticVersionConflict) || errors.Is(err, ver.ErrUnsupportedVersion) {
 				zerolog.Ctx(ctx).Error().Err(err).Interface("output", outMap).Msg("Elasticsearch version constraint failed for new output")
+			} else if errors.Is(err, context.Canceled) {
+				// ignore logging cancelation errors in the output check
 			} else {
 				zerolog.Ctx(ctx).Warn().Err(err).Interface("output", outMap).Msg("Failed Elasticsearch output configuration test, using bootstrap values.")
+
+				// try to reload periodically
+				outputCtx, canceller := context.WithCancel(ctx)
+				a.outputCheckCanceller = canceller
+				go a.esOutputCheckLoop(outputCtx, outputCheckLoopDelay, outMap)
 			}
+			outMap = bootstrap // outMap fails to connect, revert to bootstrap
 		}
 	}
 
@@ -493,7 +524,7 @@ func apmConfigToInstrumentation(src *proto.APMConfig) (config.Instrumentation, e
 }
 
 // injectMissingOutputAttributes will inject an explicit set of keys that may be present in bootstrap into outMap.
-// If outmap has a certificate_autority or fingerprint, verification_mode: none will not be injected if it is part of bootstrap.
+// If outmap has a certificate_authorities or a fingerprint, verification_mode: none will not be injected if it is part of bootstrap.
 // Note that we avoiding a more generic injection here (iterating over all keys in bootstrap recursively) in order to avoid injecting any unnecessary/deprecated attributes.
 func injectMissingOutputAttributes(outMap, bootstrap map[string]interface{}) {
 	bootstrapKeys := []string{
@@ -531,7 +562,7 @@ func injectMissingOutputAttributes(outMap, bootstrap map[string]interface{}) {
 			return
 		}
 		if v, ok := bootstrapSSL["verification_mode"]; ok {
-			if s, ok := v.(string); ok && s == "none" {
+			if s, ok := v.(string); ok && s == verifyNone {
 				injectVerificationNone = true
 			}
 		}
@@ -577,7 +608,7 @@ func injectKeys(keys []string, dst, src map[string]interface{}) {
 func checkForCA(cfg map[string]interface{}) bool {
 	// if the cfg contains verificaton_mode none return false
 	if tmp, ok := cfg["verification_mode"]; ok {
-		if verificationMode, ok := tmp.(string); ok && verificationMode == "none" {
+		if verificationMode, ok := tmp.(string); ok && verificationMode == verifyNone {
 			return false
 		}
 	}
@@ -630,4 +661,31 @@ func (a *Agent) esOutputCheck(ctx context.Context, data map[string]interface{}) 
 	}
 	_, err = ver.CheckCompatibility(ctx, cli, a.bi.Version)
 	return err
+}
+
+// esOutputCheckLoop will periodically retest the passed (output) config and signal chReconfigure if it succeeds then return.
+// If the context ic canceled, or an ErrElasticVersionConflict is returned (by the test) it will return
+func (a *Agent) esOutputCheckLoop(ctx context.Context, delay time.Duration, cfg map[string]interface{}) {
+	for {
+		if err := sleep.WithContext(ctx, delay); err != nil {
+			zerolog.Ctx(ctx).Debug().Msg("Async output check context cancelled")
+			return
+		}
+		err := a.esOutputCheck(ctx, cfg)
+		if err == nil {
+			zerolog.Ctx(ctx).Debug().Msg("Async output check successful")
+			a.chReconfigure <- struct{}{}
+			return
+		}
+		if errors.Is(err, context.Canceled) {
+			zerolog.Ctx(ctx).Debug().Msg("Async output check context cancelled")
+			return
+		}
+		// connected to invalid ES version
+		if errors.Is(err, es.ErrElasticVersionConflict) || errors.Is(err, ver.ErrUnsupportedVersion) {
+			zerolog.Ctx(ctx).Error().Err(err).Interface("output", cfg).Msg("Elasticsearch version constraint failed for new output")
+			return
+		}
+		zerolog.Ctx(ctx).Debug().Err(err).Interface("output", cfg).Msgf("Async output check failed, will retry after %v", delay)
+	}
 }

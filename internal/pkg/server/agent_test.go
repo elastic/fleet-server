@@ -797,7 +797,7 @@ func TestInjectMissingOutputAttributes(t *testing.T) {
 			},
 		},
 	}, {
-		name: "output has CA and vertification_mode: none",
+		name: "output has CA and verification_mode: none",
 		input: map[string]interface{}{
 			"ssl": map[string]interface{}{
 				"certificate_authorities": []interface{}{"value"},
@@ -821,4 +821,69 @@ func TestInjectMissingOutputAttributes(t *testing.T) {
 		})
 	}
 
+}
+
+func Test_Agent_esOutputCheckLoop(t *testing.T) {
+	t.Run("context canceled during sleep", func(t *testing.T) {
+		a := &Agent{
+			chReconfigure: make(chan struct{}, 1),
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{})
+		assert.Empty(t, a.chReconfigure)
+	})
+	t.Run("test fails version check", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-elastic-product", "Elasticsearch")
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(`{"version":{"number":"7.0.0"}}`))
+			require.NoError(t, err)
+		}))
+		defer srv.Close()
+		a := &Agent{
+			bi: build.Info{
+				Version: "8.0.0",
+			},
+			chReconfigure: make(chan struct{}, 1),
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{
+			"service_token": "test-token",
+			"hosts":         []interface{}{srv.URL},
+		})
+		assert.Empty(t, a.chReconfigure)
+	})
+	t.Run("succeeds after a retest", func(t *testing.T) {
+		returnOK := false
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-elastic-product", "Elasticsearch")
+			if returnOK {
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				returnOK = true
+			}
+			_, err := w.Write([]byte(`{"version":{"number":"8.0.0"}}`))
+			require.NoError(t, err)
+		}))
+		defer srv.Close()
+		a := &Agent{
+			bi: build.Info{
+				Version: "8.0.0",
+			},
+			chReconfigure: make(chan struct{}, 1),
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{
+			"service_token": "test-token",
+			"hosts":         []interface{}{srv.URL},
+		})
+		assert.NotEmpty(t, a.chReconfigure)
+	})
 }
