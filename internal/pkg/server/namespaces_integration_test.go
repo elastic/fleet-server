@@ -176,6 +176,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
 		PolicyID:           policyRemoteID,
+		Namespaces:         []string{testNamespace},
 		RevisionIdx:        1,
 		DefaultFleetServer: false,
 		Data:               &policyDataNamespaceTest,

@@ -325,6 +325,13 @@
           "description": "The coordinator index of the policy",
           "type": "integer"
         },
+        "namespaces": {
+          "description": "Namespaces",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "data": {
           "$ref": "#/definitions/policy-data"
         },
