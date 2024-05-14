@@ -483,7 +483,7 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 					},
 				},
 				}}
-			err = cfgData.Merge(obj, config.DefaultOptions...)
+			err = cfgData.Merge(obj, config.MergeOptions...)
 			if err != nil {
 				zerolog.Ctx(ctx).Warn().Err(err).Msg("Failed to merge APM config into cfgData")
 			}

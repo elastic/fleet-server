@@ -8,6 +8,8 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,6 +30,7 @@ import (
 
 const (
 	remoteESHost = "localhost:9201"
+	remoteESUrl  = "https://localhost:9201"
 )
 
 func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType string) (string, string) {
@@ -96,6 +99,13 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	return remoteAPIKey, actionID
 }
 
+func getRemoteElasticsearchCa(t *testing.T) string {
+	data, err := base64.StdEncoding.DecodeString(strings.Replace(os.Getenv("REMOTE_ELASTICSEARCH_CA_CRT_BASE64"), " ", "", -1))
+	require.NoError(t, err)
+
+	return string(data)
+}
+
 func Ack(t *testing.T, ctx context.Context, srv *tserver, actionID, agentID, key string) {
 	t.Logf("Fake an ack for action %s for agent %s", actionID, agentID)
 	body := fmt.Sprintf(`{
@@ -146,9 +156,11 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 				"type": "elasticsearch",
 			},
 			"remoteES": {
-				"type":          "remote_elasticsearch",
-				"hosts":         []string{remoteESHost},
-				"service_token": os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+				"type":                        "remote_elasticsearch",
+				"hosts":                       []string{remoteESUrl},
+				"service_token":               os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+				"ssl.enabled":                 true,
+				"ssl.certificate_authorities": []string{getRemoteElasticsearchCa(t)},
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
@@ -255,13 +267,19 @@ func verifyRemoteAPIKey(t *testing.T, ctx context.Context, apiKeyID string, inva
 	// need to wait a bit before querying the api key
 	time.Sleep(time.Second)
 
-	requestURL := fmt.Sprintf("http://elastic:changeme@%s/_security/api_key?id=%s", remoteESHost, apiKeyID)
+	requestURL := fmt.Sprintf("https://elastic:changeme@%s/_security/api_key?id=%s", remoteESHost, apiKeyID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	// Skip SSL verify as ES use self-signed certificate
+	tr := &http.Transport{
+		// #nosec G402
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 	if err != nil {
 		t.Fatal("error creating request for remote api key")
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		t.Fatal("error querying remote api key")
 	}
@@ -292,9 +310,11 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 				"type": "elasticsearch",
 			},
 			"remoteES": {
-				"type":          "remote_elasticsearch",
-				"hosts":         []string{remoteESHost},
-				"service_token": os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+				"type":                        "remote_elasticsearch",
+				"hosts":                       []string{remoteESUrl},
+				"service_token":               os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+				"ssl.enabled":                 true,
+				"ssl.certificate_authorities": []string{getRemoteElasticsearchCa(t)},
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
@@ -411,9 +431,11 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 				"type": "elasticsearch",
 			},
 			"remoteES": {
-				"type":          "remote_elasticsearch",
-				"hosts":         []string{remoteESHost},
-				"service_token": os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+				"type":                        "remote_elasticsearch",
+				"hosts":                       []string{remoteESUrl},
+				"service_token":               os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+				"ssl.enabled":                 true,
+				"ssl.certificate_authorities": []string{getRemoteElasticsearchCa(t)},
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
