@@ -55,7 +55,7 @@ func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, cache cache.Cache,
 }
 
 // Start an upload operation
-func (u *Uploader) Begin(ctx context.Context, data JSDict) (file.Info, error) {
+func (u *Uploader) Begin(ctx context.Context, namespaces []string, data JSDict) (file.Info, error) {
 	vSpan, _ := apm.StartSpan(ctx, "validateFileInfo", "validate")
 	if data == nil {
 		vSpan.End()
@@ -92,15 +92,16 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (file.Info, error) {
 	docID := fmt.Sprintf("%s.%s", actionID, agentID)
 
 	info := file.Info{
-		ID:        id,
-		DocID:     docID,
-		AgentID:   agentID,
-		ActionID:  actionID,
-		ChunkSize: file.MaxChunkSize,
-		Source:    source,
-		Total:     size,
-		Status:    file.StatusAwaiting,
-		Start:     time.Now(),
+		ID:         id,
+		DocID:      docID,
+		AgentID:    agentID,
+		ActionID:   actionID,
+		Namespaces: namespaces,
+		ChunkSize:  file.MaxChunkSize,
+		Source:     source,
+		Total:      size,
+		Status:     file.StatusAwaiting,
+		Start:      time.Now(),
 	}
 	chunkCount := info.Total / info.ChunkSize
 	if info.Total%info.ChunkSize > 0 {
@@ -125,6 +126,9 @@ func (u *Uploader) Begin(ctx context.Context, data JSDict) (file.Info, error) {
 		return file.Info{}, err
 	}
 	if err := data.Put(info.Start.UnixMilli(), "@timestamp"); err != nil {
+		return file.Info{}, err
+	}
+	if err := data.Put(info.Namespaces, "namespaces"); err != nil {
 		return file.Info{}, err
 	}
 
