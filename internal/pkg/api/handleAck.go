@@ -163,23 +163,25 @@ func (ack *AckT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *
 	return &req, nil
 }
 
-func eventToActionResult(agentID, aType string, ev AckRequest_Events_Item) (acr model.ActionResult) {
+func eventToActionResult(agentID, aType string, namespaces []string, ev AckRequest_Events_Item) (acr model.ActionResult) {
 	switch aType {
 	case string(REQUESTDIAGNOSTICS):
 		event, _ := ev.AsDiagnosticsEvent()
 		p, _ := json.Marshal(event.Data)
 		return model.ActionResult{
-			ActionID:  event.ActionId,
-			AgentID:   agentID,
-			Data:      p,
-			Error:     fromPtr(event.Error),
-			Timestamp: event.Timestamp.Format(time.RFC3339Nano),
+			ActionID:   event.ActionId,
+			AgentID:    agentID,
+			Namespaces: namespaces,
+			Data:       p,
+			Error:      fromPtr(event.Error),
+			Timestamp:  event.Timestamp.Format(time.RFC3339Nano),
 		}
 	case string(INPUTACTION):
 		event, _ := ev.AsInputEvent()
 		return model.ActionResult{
 			ActionID:        event.ActionId,
 			AgentID:         agentID,
+			Namespaces:      namespaces,
 			ActionInputType: event.ActionInputType,
 			StartedAt:       event.StartedAt.Format(time.RFC3339Nano),
 			CompletedAt:     event.CompletedAt.Format(time.RFC3339Nano),
@@ -191,10 +193,11 @@ func eventToActionResult(agentID, aType string, ev AckRequest_Events_Item) (acr 
 	default: // UPGRADE action acks are also handled by handelUpgrade (deprecated func)
 		event, _ := ev.AsGenericEvent()
 		return model.ActionResult{
-			ActionID:  event.ActionId,
-			AgentID:   agentID,
-			Error:     fromPtr(event.Error),
-			Timestamp: event.Timestamp.Format(time.RFC3339Nano),
+			ActionID:   event.ActionId,
+			Namespaces: namespaces,
+			AgentID:    agentID,
+			Error:      fromPtr(event.Error),
+			Timestamp:  event.Timestamp.Format(time.RFC3339Nano),
 		}
 	}
 }
@@ -358,7 +361,7 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 	defer span.End()
 
 	// Convert ack event to action result document
-	acr := eventToActionResult(agent.Id, action.Type, ev)
+	acr := eventToActionResult(agent.Id, action.Type, action.Namespaces, ev)
 
 	// Save action result document
 	if err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {

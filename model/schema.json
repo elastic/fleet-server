@@ -1,7 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
-
     "action": {
       "title": "Agent action",
       "description": "An Elastic Agent action",
@@ -14,6 +13,13 @@
         "_seq_no": {
           "description": "The action sequence number",
           "type": "integer"
+        },
+        "namespaces": {
+          "description": "Namespaces",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "action_id": {
           "description": "The unique identifier for the Elastic Agent action. There could be multiple documents with the same action_id if the action is split into two separate documents.",
@@ -75,12 +81,10 @@
           "format": "raw"
         },
         "signed": {
-            "$ref": "#/definitions/signed"
+          "$ref": "#/definitions/signed"
         }
       },
-      "required": [
-        "id"
-      ]
+      "required": ["id"]
     },
 
     "signed": {
@@ -96,10 +100,7 @@
           "type": "string"
         }
       },
-      "required": [
-          "data",
-          "signature"
-      ]
+      "required": ["data", "signature"]
     },
 
     "action-result": {
@@ -123,6 +124,13 @@
         "action_input_type": {
           "description": "The input type of the original action.",
           "type": "string"
+        },
+        "namespaces": {
+          "description": "Namespaces",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "started_at": {
           "description": "Date/time the action was started",
@@ -151,11 +159,7 @@
           "format": "raw"
         }
       },
-      "required": [
-        "id",
-        "agent",
-        "action"
-      ]
+      "required": ["id", "agent", "action"]
     },
 
     "agent-metadata": {
@@ -173,10 +177,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "version"
-      ]
+      "required": ["id", "version"]
     },
 
     "artifact": {
@@ -263,11 +264,7 @@
           }
         }
       },
-      "required": [
-        "id",
-        "architecture",
-        "name"
-      ]
+      "required": ["id", "architecture", "name"]
     },
 
     "server-metadata": {
@@ -285,10 +282,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "version"
-      ]
+      "required": ["id", "version"]
     },
 
     "server": {
@@ -303,13 +297,9 @@
         },
         "agent": { "$ref": "#/definitions/agent-metadata" },
         "host": { "$ref": "#/definitions/host-metadata" },
-        "server": { "$ref":  "#/definitions/server-metadata" }
+        "server": { "$ref": "#/definitions/server-metadata" }
       },
-      "required": [
-        "agent",
-        "host",
-        "server"
-      ]
+      "required": ["agent", "host", "server"]
     },
 
     "policy": {
@@ -334,6 +324,13 @@
         "coordinator_idx": {
           "description": "The coordinator index of the policy",
           "type": "integer"
+        },
+        "namespaces": {
+          "description": "Namespaces",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "data": {
           "$ref": "#/definitions/policy-data"
@@ -366,11 +363,9 @@
           "type": "string",
           "format": "date-time"
         },
-        "server": { "$ref":  "#/definitions/server-metadata" }
+        "server": { "$ref": "#/definitions/server-metadata" }
       },
-      "required": [
-        "server"
-      ]
+      "required": ["server"]
     },
 
     "to_retire_api_key_ids": {
@@ -396,7 +391,7 @@
       }
     },
 
-    "policy_output" : {
+    "policy_output": {
       "type": "object",
       "description": "holds the needed data to manage the output API keys",
       "properties": {
@@ -406,7 +401,7 @@
         },
         "to_retire_api_key_ids": {
           "description": "API keys to be invalidated on next agent ack",
-          "$ref":  "#/definitions/to_retire_api_key_ids"
+          "$ref": "#/definitions/to_retire_api_key_ids"
         },
         "api_key_id": {
           "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
@@ -488,6 +483,13 @@
         "enrollment_id": {
           "description": "Enrollment ID",
           "type": "string"
+        },
+        "namespaces": {
+          "description": "Namespaces",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "type": {
           "description": "Type",
@@ -641,12 +643,12 @@
         },
         "default_api_key_history": {
           "description": "Deprecated. Use Outputs instead. Default API Key History",
-          "$ref":  "#/definitions/to_retire_api_key_ids"
+          "$ref": "#/definitions/to_retire_api_key_ids"
         },
         "outputs": {
           "description": "Outputs is the policy output data, mapping the output name to its data",
           "type": "object",
-          "additionalProperties": {  "$ref":  "#/definitions/policy_output"}
+          "additionalProperties": { "$ref": "#/definitions/policy_output" }
         },
         "updated_at": {
           "description": "Date/time the Elastic Agent was last updated",
@@ -668,17 +670,11 @@
           }
         },
         "upgrade_details": {
-            "description": "Additional upgrade status details.",
-            "type": "object"
+          "description": "Additional upgrade status details.",
+          "type": "object"
         }
       },
-      "required": [
-        "_id",
-        "type",
-        "active",
-        "enrolled_at",
-        "status"
-      ]
+      "required": ["_id", "type", "active", "enrolled_at", "status"]
     },
 
     "enrollment_api_key": {
@@ -697,6 +693,13 @@
         "api_key": {
           "description": "Api key",
           "type": "string"
+        },
+        "namespaces": {
+          "description": "Namespaces",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "name": {
           "description": "Enrollment key name",
@@ -718,10 +721,7 @@
           "format": "date-time"
         }
       },
-      "required": [
-        "api_key_id",
-        "api_key"
-      ]
+      "required": ["api_key_id", "api_key"]
     },
 
     "checkin": {
@@ -745,7 +745,15 @@
         "status": {
           "description": "The current overall status of the Elastic Agent",
           "type": "string",
-          "enum": ["enrolling", "healthy", "error", "degraded", "offline", "unenrolling", "upgrading"]
+          "enum": [
+            "enrolling",
+            "healthy",
+            "error",
+            "degraded",
+            "offline",
+            "unenrolling",
+            "upgrading"
+          ]
         },
         "message": {
           "description": "The current overall status message of the Elastic Agent",
@@ -792,20 +800,11 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "id",
-                  "template_id",
-                  "status",
-                  "message"
-                ]
+                "required": ["id", "template_id", "status", "message"]
               }
             }
           },
-          "required": [
-            "id",
-            "revision",
-            "inputs"
-          ]
+          "required": ["id", "revision", "inputs"]
         }
       },
       "required": [
@@ -819,74 +818,68 @@
     },
 
     "policy-data": {
-        "title": "Policy Data",
-        "description": "The policy data that an agent needs to run",
-        "type": "object",
-        "properties": {
-            "id": {
-                "description": "The policy's ID",
-                "type": "string"
-            },
-            "outputs": {
-                "description": "A map of all outputs that the agent running the policy can use to send data to.",
-                "type": "object",
-                "additionalProperties": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$comment": "results in map[string]map[string]interface{}. We use a dynamic output objects because it would be a larger task to define the properties we need to support for each output type, this may be done as future work"
-                    }
-                }
-            },
-            "inputs": {
-                "description": "A list of all inputs the agent should run",
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "additionalProperties":{
-                        "$comment": "embedded additionalProperties type results in `outputs map[string]interface{}`"
-                    }
-                }
-            },
-            "secret_references": {
-                "description": "A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.",
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "id": {
-                            "type": "string"
-                        }
-                    },
-                    "required": [
-                        "id"
-                    ]
-                }
-            },
-            "revision": {
-                "description": "The policy revision number. Should match revision_idx",
-                "type": "integer"
-            },
-            "agent": {
-                "description": "The policy's agent configuration details",
-                "format": "raw"
-            },
-            "signed": {
-                "$ref": "#/definitions/signed"
-            },
-            "output_permissions": {
-                "description": "The Elasticsearch permissions needed to run the policy",
-                "format": "raw"
-            },
-            "fleet": {
-                "description": "The policy's fleet configuration details",
-                "format": "raw"
-            }
+      "title": "Policy Data",
+      "description": "The policy data that an agent needs to run",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The policy's ID",
+          "type": "string"
         },
-        "required": [
-            "id",
-            "revision",
-            "outputs"
-        ]
+        "outputs": {
+          "description": "A map of all outputs that the agent running the policy can use to send data to.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$comment": "results in map[string]map[string]interface{}. We use a dynamic output objects because it would be a larger task to define the properties we need to support for each output type, this may be done as future work"
+            }
+          }
+        },
+        "inputs": {
+          "description": "A list of all inputs the agent should run",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "$comment": "embedded additionalProperties type results in `outputs map[string]interface{}`"
+            }
+          }
+        },
+        "secret_references": {
+          "description": "A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": ["id"]
+          }
+        },
+        "revision": {
+          "description": "The policy revision number. Should match revision_idx",
+          "type": "integer"
+        },
+        "agent": {
+          "description": "The policy's agent configuration details",
+          "format": "raw"
+        },
+        "signed": {
+          "$ref": "#/definitions/signed"
+        },
+        "output_permissions": {
+          "description": "The Elasticsearch permissions needed to run the policy",
+          "format": "raw"
+        },
+        "fleet": {
+          "description": "The policy's fleet configuration details",
+          "format": "raw"
+        }
+      },
+      "required": ["id", "revision", "outputs"]
     }
   }
 }

@@ -51,6 +51,9 @@ type Action struct {
 	// The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.
 	MinimumExecutionDuration int64 `json:"minimum_execution_duration,omitempty"`
 
+	// Namespaces
+	Namespaces []string `json:"namespaces,omitempty"`
+
 	// The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.
 	RolloutDurationSeconds int64   `json:"rollout_duration_seconds,omitempty"`
 	Signed                 *Signed `json:"signed,omitempty"`
@@ -101,6 +104,9 @@ type ActionResult struct {
 
 	// The action error message.
 	Error string `json:"error,omitempty"`
+
+	// Namespaces
+	Namespaces []string `json:"namespaces,omitempty"`
 
 	// Date/time the action was started
 	StartedAt string `json:"started_at,omitempty"`
@@ -155,6 +161,9 @@ type Agent struct {
 
 	// Local metadata information for the Elastic Agent
 	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
+
+	// Namespaces
+	Namespaces []string `json:"namespaces,omitempty"`
 
 	// Outputs is the policy output data, mapping the output name to its data
 	Outputs map[string]*PolicyOutput `json:"outputs,omitempty"`
@@ -339,9 +348,12 @@ type EnrollmentAPIKey struct {
 	ExpireAt  string `json:"expire_at,omitempty"`
 
 	// Enrollment key name
-	Name      string `json:"name,omitempty"`
-	PolicyID  string `json:"policy_id,omitempty"`
-	UpdatedAt string `json:"updated_at,omitempty"`
+	Name string `json:"name,omitempty"`
+
+	// Namespaces
+	Namespaces []string `json:"namespaces,omitempty"`
+	PolicyID   string   `json:"policy_id,omitempty"`
+	UpdatedAt  string   `json:"updated_at,omitempty"`
 }
 
 // HostMetadata The host metadata for the Elastic Agent
@@ -388,6 +400,9 @@ type Policy struct {
 
 	// True when this policy is the default policy to start Fleet Server
 	DefaultFleetServer bool `json:"default_fleet_server"`
+
+	// Namespaces
+	Namespaces []string `json:"namespaces,omitempty"`
 
 	// The ID of the policy
 	PolicyID string `json:"policy_id"`

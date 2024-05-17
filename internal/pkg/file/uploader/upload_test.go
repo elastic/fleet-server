@@ -84,7 +84,7 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 	u := New(nil, fakeBulk, c, int64(size), time.Hour)
-	info, err := u.Begin(context.Background(), data)
+	info, err := u.Begin(context.Background(), []string{}, data)
 	assert.NoError(t, err)
 
 	assert.Equal(t, int64(size), info.Total)
@@ -128,7 +128,7 @@ func TestUploadBeginWritesDocumentFromInputs(t *testing.T) {
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 	u := New(nil, fakeBulk, c, int64(size), time.Hour)
-	_, err = u.Begin(context.Background(), data)
+	_, err = u.Begin(context.Background(), []string{}, data)
 	assert.NoError(t, err)
 
 	payload, ok := fakeBulk.Calls[0].Arguments[3].([]byte)
@@ -172,7 +172,7 @@ func TestUploadBeginCalculatesCorrectChunkCount(t *testing.T) {
 			data := makeUploadRequestDict(map[string]interface{}{
 				"file.size": tc.FileSize,
 			})
-			info, err := u.Begin(context.Background(), data)
+			info, err := u.Begin(context.Background(), []string{}, data)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.ExpectedCount, info.Count)
 		})
@@ -211,7 +211,7 @@ func TestUploadBeginMaxFileSize(t *testing.T) {
 			data := makeUploadRequestDict(map[string]interface{}{
 				"file.size": tc.FileSize,
 			})
-			_, err := u.Begin(context.Background(), data)
+			_, err := u.Begin(context.Background(), []string{}, data)
 			if tc.ShouldError {
 				assert.ErrorIs(t, err, ErrFileSizeTooLarge)
 			} else {
@@ -265,7 +265,7 @@ func TestUploadRejectsMissingRequiredFields(t *testing.T) {
 				}
 			}
 
-			_, err = u.Begin(context.Background(), data)
+			_, err = u.Begin(context.Background(), []string{}, data)
 			assert.Errorf(t, err, "%s is a required field and should error if not provided", field)
 		})
 
@@ -343,7 +343,7 @@ func TestChunkMarksFinal(t *testing.T) {
 				"file.size": tc.FileSize,
 			})
 
-			info, err := u.Begin(context.Background(), data)
+			info, err := u.Begin(context.Background(), []string{}, data)
 			assert.NoError(t, err)
 
 			// for anything larger than 1-chunk, check for off-by-ones
