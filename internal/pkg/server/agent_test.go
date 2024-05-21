@@ -754,7 +754,7 @@ func TestInjectMissingOutputAttributes(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			injectMissingOutputAttributes(tc.input, bootstrap)
+			injectMissingOutputAttributes(context.Background(), tc.input, bootstrap)
 			assert.Equal(t, len(tc.expect), len(tc.input), "expected map sizes don't match")
 			assert.Equal(t, tc.expect, tc.input)
 		})
@@ -829,7 +829,7 @@ func TestInjectMissingOutputAttributes(t *testing.T) {
 
 	for _, tc := range sslTests {
 		t.Run(tc.name, func(t *testing.T) {
-			injectMissingOutputAttributes(tc.input, bootstrapVerifyNone)
+			injectMissingOutputAttributes(context.Background(), tc.input, bootstrapVerifyNone)
 			assert.Equal(t, len(tc.expect), len(tc.input), "expected map sizes don't match")
 			assert.Equal(t, tc.expect, tc.input)
 		})

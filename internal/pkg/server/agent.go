@@ -431,7 +431,7 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 			return nil, fmt.Errorf("output bootstrap attribute is not an object, detected type: %T", bootstrapCfg)
 		}
 		delete(outMap, "bootstrap")
-		injectMissingOutputAttributes(outMap, bootstrap)
+		injectMissingOutputAttributes(ctx, outMap, bootstrap)
 
 		if err := a.esOutputCheck(ctx, outMap); err != nil {
 			if errors.Is(err, es.ErrElasticVersionConflict) || errors.Is(err, ver.ErrUnsupportedVersion) {
@@ -526,7 +526,7 @@ func apmConfigToInstrumentation(src *proto.APMConfig) (config.Instrumentation, e
 // injectMissingOutputAttributes will inject an explicit set of keys that may be present in bootstrap into outMap.
 // If outmap has a certificate_authorities or a fingerprint, verification_mode: none will not be injected if it is part of bootstrap.
 // Note that we avoiding a more generic injection here (iterating over all keys in bootstrap recursively) in order to avoid injecting any unnecessary/deprecated attributes.
-func injectMissingOutputAttributes(outMap, bootstrap map[string]interface{}) {
+func injectMissingOutputAttributes(ctx context.Context, outMap, bootstrap map[string]interface{}) {
 	bootstrapKeys := []string{
 		"protocol",
 		"hosts",
@@ -557,6 +557,7 @@ func injectMissingOutputAttributes(outMap, bootstrap map[string]interface{}) {
 	if mp, ok := bootstrap["ssl"]; ok {
 		bootstrapSSL, ok = mp.(map[string]interface{})
 		if !ok {
+			zerolog.Ctx(ctx).Warn().Interface("ssl_attribute", mp).Msg("Bootstrap ssl attribute is not an object.")
 			// ssl is not a map
 			// if bootstrap is used as output this will cause a parsing issue and fail later
 			return
@@ -575,6 +576,7 @@ func injectMissingOutputAttributes(outMap, bootstrap map[string]interface{}) {
 	if mp, ok := outMap["ssl"]; ok {
 		outputSSL, ok = mp.(map[string]interface{})
 		if !ok {
+			zerolog.Ctx(ctx).Warn().Interface("ssl_attribute", mp).Msg("Policy ssl attribute is not an object.")
 			// output.ssl is not a map
 			// this will fail to parse later
 			return
