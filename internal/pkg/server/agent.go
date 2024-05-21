@@ -9,14 +9,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/reload"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
+	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -32,6 +35,12 @@ const (
 	kElasticsearch = "elasticsearch"
 
 	kStopped = "Stopped"
+
+	verifyNone = "none"
+	// NOTE: Do we want to try to make this configurable in the future?
+	// It may need different handling as we would want it to be part of the policy definition so a user
+	// can specify in Kibana, but it only applies to agent mode.
+	outputCheckLoopDelay = time.Minute
 )
 
 type clientUnit interface {
@@ -57,8 +66,8 @@ type Agent struct {
 	srvCanceller context.CancelFunc
 	srvDone      chan bool
 
-	l   sync.RWMutex
-	cfg *config.Config
+	outputCheckCanceller context.CancelFunc
+	chReconfigure        chan struct{}
 }
 
 // NewAgent returns an Agent that will gather connection information from the passed reader.
@@ -66,9 +75,10 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 	var err error
 
 	a := &Agent{
-		cliCfg:      cliCfg,
-		bi:          bi,
-		reloadables: reloadables,
+		cliCfg:        cliCfg,
+		bi:            bi,
+		reloadables:   reloadables,
+		chReconfigure: make(chan struct{}, 1),
 	}
 	a.agent, _, err = client.NewV2FromReader(reader, client.VersionInfo{
 		Name:      kFleetServer,
@@ -88,14 +98,16 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 func (a *Agent) Run(ctx context.Context) error {
 	log := zerolog.Ctx(ctx)
 	a.agent.RegisterDiagnosticHook("fleet-server config", "fleet-server's current configuration", "fleet-server.yml", "application/yml", func() []byte {
-		a.l.RLock()
-		if a.cfg == nil {
-			a.l.RUnlock()
+		if a.srv == nil {
+			log.Warn().Msg("Diagnostics hook failure fleet-server is nil.")
+			return nil
+		}
+		cfg := a.srv.GetConfig()
+		if cfg == nil {
 			log.Warn().Msg("Diagnostics hook failure config is nil.")
 			return nil
 		}
-		cfg := a.cfg.Redact()
-		a.l.RUnlock()
+		cfg = cfg.Redact()
 		p, err := yaml.Marshal(cfg)
 		if err != nil {
 			log.Error().Err(err).Msg("Diagnostics hook failure config unable to marshal yaml.")
@@ -138,6 +150,11 @@ func (a *Agent) Run(ctx context.Context) error {
 					}
 				case client.UnitChangedRemoved:
 					a.unitRemoved(change.Unit)
+				}
+			case <-a.chReconfigure:
+				err := a.reconfigure(ctx)
+				if err != nil && !errors.Is(err, context.Canceled) {
+					log.Error().Err(err).Msg("Error when reconfiguring from trigger")
 				}
 			case <-t.C:
 				// Fleet Server is the only component that gets started by Elastic Agent without an Agent ID. We loop
@@ -336,9 +353,6 @@ func (a *Agent) reconfigure(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	a.l.Lock()
-	a.cfg = cfg
-	a.l.Unlock()
 
 	// reload the generic reloadables
 	for _, r := range a.reloadables {
@@ -354,6 +368,10 @@ func (a *Agent) reconfigure(ctx context.Context) error {
 func (a *Agent) stop() {
 	if a.srvCanceller == nil {
 		return
+	}
+	if a.outputCheckCanceller != nil {
+		a.outputCheckCanceller()
+		a.outputCheckCanceller = nil
 	}
 
 	canceller := a.srvCanceller
@@ -399,6 +417,38 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 	if err := inputsConfig.Unpack(&input, config.DefaultOptions...); err != nil {
 		return nil, err
 	}
+	outMap := expOutput.Config.Source.AsMap()
+
+	// elastic-agent should be setting bootstrap with config provided through enrollment flags
+	if bootstrapCfg, ok := outMap["bootstrap"]; ok {
+		if a.outputCheckCanceller != nil {
+			a.outputCheckCanceller()
+			a.outputCheckCanceller = nil
+		}
+
+		bootstrap, ok := bootstrapCfg.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("output bootstrap attribute is not an object, detected type: %T", bootstrapCfg)
+		}
+		delete(outMap, "bootstrap")
+		injectMissingOutputAttributes(ctx, outMap, bootstrap)
+
+		if err := a.esOutputCheck(ctx, outMap); err != nil {
+			if errors.Is(err, es.ErrElasticVersionConflict) || errors.Is(err, ver.ErrUnsupportedVersion) {
+				zerolog.Ctx(ctx).Error().Err(err).Interface("output", outMap).Msg("Elasticsearch version constraint failed for new output")
+			} else if errors.Is(err, context.Canceled) {
+				// ignore logging cancelation errors in the output check
+			} else {
+				zerolog.Ctx(ctx).Warn().Err(err).Interface("output", outMap).Msg("Failed Elasticsearch output configuration test, using bootstrap values.")
+
+				// try to reload periodically
+				outputCtx, canceller := context.WithCancel(ctx)
+				a.outputCheckCanceller = canceller
+				go a.esOutputCheckLoop(outputCtx, outputCheckLoopDelay, outMap)
+			}
+			outMap = bootstrap // outMap fails to connect, revert to bootstrap
+		}
+	}
 
 	cfgData, err := ucfg.NewFrom(map[string]interface{}{
 		"fleet": map[string]interface{}{
@@ -408,7 +458,7 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 			},
 		},
 		"output": map[string]interface{}{
-			"elasticsearch": expOutput.Config.Source.AsMap(),
+			"elasticsearch": outMap,
 		},
 		"inputs": []interface{}{
 			input,
@@ -471,4 +521,173 @@ func apmConfigToInstrumentation(src *proto.APMConfig) (config.Instrumentation, e
 		return cfg, nil
 	}
 	return config.Instrumentation{}, fmt.Errorf("unable to transform APMConfig to instrumentation")
+}
+
+// injectMissingOutputAttributes will inject an explicit set of keys that may be present in bootstrap into outMap.
+// If outmap has a certificate_authorities or a fingerprint, verification_mode: none will not be injected if it is part of bootstrap.
+// Note that we avoiding a more generic injection here (iterating over all keys in bootstrap recursively) in order to avoid injecting any unnecessary/deprecated attributes.
+func injectMissingOutputAttributes(ctx context.Context, outMap, bootstrap map[string]interface{}) {
+	bootstrapKeys := []string{
+		"protocol",
+		"hosts",
+		"path",
+		"service_token",
+		"service_token_path",
+		"headers",
+		"proxy_url",
+		"proxy_disable",
+		"proxy_headers",
+	}
+	// keys that will appear under the "ssl" key
+	bootstrapSSLKeys := []string{
+		"verification_mode",
+		"certificate_authorities",
+		"ca_trusted_fingerprint",
+		"certificate",
+		"key",
+	}
+
+	injectKeys(bootstrapKeys, outMap, bootstrap)
+
+	// flags used to delete verification_mode: none if it is part of bootstrap and injected when output provides a CA of some sort.
+	outputSSLUsesCA := false
+	injectVerificationNone := false
+	// handle nested structs in bootstrap, currently we just support some ssl config
+	var bootstrapSSL map[string]interface{}
+	if mp, ok := bootstrap["ssl"]; ok {
+		bootstrapSSL, ok = mp.(map[string]interface{})
+		if !ok {
+			zerolog.Ctx(ctx).Warn().Interface("ssl_attribute", mp).Msg("Bootstrap ssl attribute is not an object.")
+			// ssl is not a map
+			// if bootstrap is used as output this will cause a parsing issue and fail later
+			return
+		}
+		if v, ok := bootstrapSSL["verification_mode"]; ok {
+			if s, ok := v.(string); ok && s == verifyNone {
+				injectVerificationNone = true
+			}
+		}
+	} else {
+		// bootstrap has no ssl attributes
+		return
+	}
+
+	outputSSL := map[string]interface{}{}
+	if mp, ok := outMap["ssl"]; ok {
+		outputSSL, ok = mp.(map[string]interface{})
+		if !ok {
+			zerolog.Ctx(ctx).Warn().Interface("ssl_attribute", mp).Msg("Policy ssl attribute is not an object.")
+			// output.ssl is not a map
+			// this will fail to parse later
+			return
+		}
+		outputSSLUsesCA = checkForCA(outputSSL)
+	}
+	injectKeys(bootstrapSSLKeys, outputSSL, bootstrapSSL)
+	if outputSSLUsesCA && injectVerificationNone {
+		delete(outputSSL, "verification_mode")
+	}
+
+	outMap["ssl"] = outputSSL
+}
+
+// injectKeys will inject any key in the passed list that exists in src but is missing from dst.
+func injectKeys(keys []string, dst, src map[string]interface{}) {
+	for _, key := range keys {
+		// dst contains the key
+		if _, ok := dst[key]; ok {
+			continue
+		}
+		// src does not contain the key
+		if _, ok := src[key]; !ok {
+			continue
+		}
+		dst[key] = src[key]
+	}
+}
+
+// checkForCA checks to see if the passed cfg contains a certificate_authorities list with one item or a non-empty ca_trusted_fingerprint value.
+func checkForCA(cfg map[string]interface{}) bool {
+	// if the cfg contains verificaton_mode none return false
+	if tmp, ok := cfg["verification_mode"]; ok {
+		if verificationMode, ok := tmp.(string); ok && verificationMode == verifyNone {
+			return false
+		}
+	}
+	if tmp, ok := cfg["certificate_authorities"]; ok {
+		if cas, ok := tmp.([]interface{}); ok && len(cas) > 0 {
+			return true
+		}
+	}
+	if tmp, ok := cfg["ca_trusted_fingerprint"]; ok {
+		if fingerprint, ok := tmp.(string); ok && fingerprint != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *Agent) esOutputCheck(ctx context.Context, data map[string]interface{}) error {
+	var esOut config.Elasticsearch
+	temp, err := ucfg.NewFrom(data, config.DefaultOptions...)
+	if err != nil {
+		return err
+	}
+	if err := temp.Unpack(&esOut, config.DefaultOptions...); err != nil {
+		return err
+	}
+
+	const httpsSchema = "https"
+	isHTTPS := false
+	for _, host := range esOut.Hosts {
+		if strings.HasPrefix(strings.ToLower(host), httpsSchema) {
+			isHTTPS = true
+			break
+		}
+	}
+	if isHTTPS {
+		esOut.Protocol = httpsSchema
+	}
+
+	cli, err := es.NewClient(ctx,
+		&config.Config{
+			Output: config.Output{
+				Elasticsearch: esOut,
+			},
+		},
+		false,
+		elasticsearchOptions(false, a.bi)..., // disable instrumentation for output config test
+	)
+	if err != nil {
+		return err
+	}
+	_, err = ver.CheckCompatibility(ctx, cli, a.bi.Version)
+	return err
+}
+
+// esOutputCheckLoop will periodically retest the passed (output) config and signal chReconfigure if it succeeds then return.
+// If the context ic canceled, or an ErrElasticVersionConflict is returned (by the test) it will return
+func (a *Agent) esOutputCheckLoop(ctx context.Context, delay time.Duration, cfg map[string]interface{}) {
+	for {
+		if err := sleep.WithContext(ctx, delay); err != nil {
+			zerolog.Ctx(ctx).Debug().Msg("Async output check context cancelled")
+			return
+		}
+		err := a.esOutputCheck(ctx, cfg)
+		if err == nil {
+			zerolog.Ctx(ctx).Debug().Msg("Async output check successful")
+			a.chReconfigure <- struct{}{}
+			return
+		}
+		if errors.Is(err, context.Canceled) {
+			zerolog.Ctx(ctx).Debug().Msg("Async output check context cancelled")
+			return
+		}
+		// connected to invalid ES version
+		if errors.Is(err, es.ErrElasticVersionConflict) || errors.Is(err, ver.ErrUnsupportedVersion) {
+			zerolog.Ctx(ctx).Error().Err(err).Interface("output", cfg).Msg("Elasticsearch version constraint failed for new output")
+			return
+		}
+		zerolog.Ctx(ctx).Debug().Err(err).Interface("output", cfg).Msgf("Async output check failed, will retry after %v", delay)
+	}
 }
