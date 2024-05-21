@@ -36,6 +36,19 @@ jobs:
         uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
           channel-id: '#fleet-notifications'
-          payload: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@fleet_team` please look what's going on <${{ env.JOB_URL }}|here>"
+          payload: |
+            {
+              "text": "${{ env.MESSAGE }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ env.MESSAGE }}"
+                  }
+                }
+              ]
+            }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          MESSAGE: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@fleet_team` please look what's going on <${{ env.JOB_URL }}|here>"
