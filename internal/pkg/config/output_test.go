@@ -8,8 +8,10 @@
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -381,4 +383,20 @@ func setTestEnv(t *testing.T, env map[string]string) {
 	for k, v := range env {
 		t.Setenv(k, v)
 	}
+}
+
+func Test_Elasticsearch_DiagRequests(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	es := &Elasticsearch{}
+	es.InitDefaults()
+	es.Hosts = []string{srv.URL}
+
+	p := es.DiagRequests(ctx)
+	require.NotEmpty(t, p)
+	require.Contains(t, string(p), "request 0 successful.")
 }
