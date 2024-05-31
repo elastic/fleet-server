@@ -116,11 +116,15 @@ func (suite *AgentContainerSuite) TestHTTP() {
 		},
 		ExposedPorts: []string{"8220/tcp"},
 		Networks:     []string{"integration_default"},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
+		HostConfigModifier: func(cfg *container.HostConfig) {
+			if cfg.Mounts == nil {
+				cfg.Mounts = make([]mount.Mount, 0)
+			}
+			cfg.Mounts = append(cfg.Mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: suite.CoverPath,
 				Target: "/cover",
-			},
+			})
 		},
 		WaitingFor: containerWaitForHealthyStatus(),
 	}
@@ -251,11 +255,15 @@ func (suite *AgentContainerSuite) TestSleep10m() {
 			ContainerFilePath: "/tmp/passphrase",
 			FileMode:          0644,
 		}},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
+		HostConfigModifier: func(cfg *container.HostConfig) {
+			if cfg.Mounts == nil {
+				cfg.Mounts = make([]mount.Mount, 0)
+			}
+			cfg.Mounts = append(cfg.Mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: suite.CoverPath,
 				Target: "/cover",
-			},
+			})
 		},
 		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}
@@ -322,11 +330,15 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 			ContainerFilePath: "/tmp/passphrase",
 			FileMode:          0644,
 		}},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
+		HostConfigModifier: func(cfg *container.HostConfig) {
+			if cfg.Mounts == nil {
+				cfg.Mounts = make([]mount.Mount, 0)
+			}
+			cfg.Mounts = append(cfg.Mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: suite.CoverPath,
 				Target: "/cover",
-			},
+			})
 		},
 		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}
