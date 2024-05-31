@@ -2,10 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// FIXME(ml): test suite is disabled by additional build flag.
-//     we do not want to rely on agent builds in our pipeline.
-
-//go:build e2e && ignore
+//go:build e2e
 
 package e2e
 
@@ -123,6 +120,7 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 		fType = "zip"
 	}
 
+	// FIXME do we need to handle aarch64 for darwin?
 	arch := runtime.GOARCH
 	if arch == "amd64" {
 		arch = "x86_64"
