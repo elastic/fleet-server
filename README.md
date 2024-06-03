@@ -125,6 +125,16 @@ pr: https://github.com/elastic/fleet-server/pull/2079
 issue: https://github.com/elastic/elastic-agent/issues/931
 ```
 
+### Vagrant
+
+A Vagrantfile is provided to get an environment capable of developing and testing fleet-server.
+In order to provision the vagrant box run:
+
+```shell
+vagrant plugin install vagrant-docker-compose
+vagrant up
+```
+
 ### Development build
 
 To compile the fleet-server in development mode set the env var `DEV=true`.
