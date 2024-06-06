@@ -47,6 +47,7 @@ type Bulk interface {
 	// Synchronous operations run in the bulk engine
 	Create(ctx context.Context, index, id string, body []byte, opts ...Opt) (string, error)
 	Read(ctx context.Context, index, id string, opts ...Opt) ([]byte, error)
+	ReadRaw(ctx context.Context, index, id string, opts ...Opt) (*MgetResponseItem, error)
 	Update(ctx context.Context, index, id string, body []byte, opts ...Opt) error
 	Delete(ctx context.Context, index, id string, opts ...Opt) error
 	Index(ctx context.Context, index, id string, body []byte, opts ...Opt) (string, error)

@@ -116,7 +116,12 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 			Msg("authApiKey slow")
 	}
 
-	agent, err := findAgentByAPIKeyID(ctx, bulker, key.ID)
+	var agent *model.Agent
+	if id != nil {
+		agent, err = getAgentAndVerifyAPIKeyID(ctx, bulker, *id, key.ID)
+	} else {
+		agent, err = findAgentByAPIKeyID(ctx, bulker, key.ID)
+	}
 	if err != nil {
 		return nil, err
 	}

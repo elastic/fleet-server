@@ -21,6 +21,37 @@ const (
 	rSuffix = "]}"
 )
 
+func (b *Bulker) ReadRaw(ctx context.Context, index, id string, opts ...Opt) (*MgetResponseItem, error) {
+	span, ctx := apm.StartSpan(ctx, "Bulker: read", "bulker")
+	defer span.End()
+	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
+	blk := b.newBlk(ActionRead, opt)
+
+	// Serialize request
+	const kSlop = 64
+	blk.buf.Grow(kSlop)
+
+	if err := b.writeMget(&blk.buf, index, id); err != nil {
+		return nil, err
+	}
+
+	// Process response
+	resp := b.dispatch(ctx, blk)
+	if resp.err != nil {
+		return nil, resp.err
+	}
+	b.freeBlk(blk)
+
+	// TODO if we can ever set span links after creation we can inject the flushQueue span into resp and link to the action span here.
+
+	// Interpret response, looking for generated id
+	r, ok := resp.data.(*MgetResponseItem)
+	if !ok {
+		return nil, fmt.Errorf("unable to cast response to *MgetResponseItem, detected type: %T", resp.data)
+	}
+	return r, nil
+}
+
 func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byte, error) {
 	span, ctx := apm.StartSpan(ctx, "Bulker: read", "bulker")
 	defer span.End()
