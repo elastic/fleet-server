@@ -897,7 +897,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		res, err := cli.Do(req)
 		require.NoError(t, err)
 		res.Body.Close()
-		require.Equal(t, http.StatusNotFound, res.StatusCode) // NOTE this is a 404 and not a 400
+		require.Equal(t, http.StatusForbidden, res.StatusCode)
 	})
 	t.Run("wrong agent ID", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(ctx)
