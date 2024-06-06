@@ -862,15 +862,13 @@ func getAgentAndVerifyAPIKeyID(ctx context.Context, bulker bulk.Bulk, agentID st
 	if err != nil {
 		if errors.Is(err, dl.ErrNotFound) {
 			err = ErrAgentNotFound
-		} else if errors.Is(err, dl.ErrNotFound) {
-			err = ErrAgentNotFound
 		} else {
 			err = fmt.Errorf("GetAgent: %w", err)
 		}
 	}
 
 	if agent.AccessAPIKeyID != apiKeyID {
-		err = fmt.Errorf("invalid API Key ID %w", ErrAgentNotFound)
+		err = fmt.Errorf("invalid API Key ID %w", ErrAgentIdentity)
 	}
 
 	return &agent, err
