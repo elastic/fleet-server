@@ -227,11 +227,11 @@ Contents of probable licence file $GOMODCACHE/github.com/dgraph-io/ristretto@v0.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-client/v7
-Version: v7.10.0
+Version: v7.11.0
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.10.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.11.0/LICENSE.txt:
 
 ELASTIC LICENSE AGREEMENT
 
