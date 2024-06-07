@@ -59,14 +59,18 @@ func TestAgentInstallSuite(t *testing.T) {
 }
 
 func (suite *AgentInstallSuite) SetupSuite() {
-	arch := runtime.GOARCH
-	if arch == "amd64" {
-		arch = "x86_64"
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("windows install e2e tests non-functional") // TODOO: https://github.com/elastic/fleet-server/issues/3620
+		return
 	}
 	// check if agent is installed
 	if _, err := exec.LookPath(agentName); err == nil {
 		suite.installDetected = true
 		return // don't bother with setup, skip all tests
+	}
+	arch := runtime.GOARCH
+	if arch == "amd64" {
+		arch = "x86_64"
 	}
 
 	suite.Setup() // base setup
@@ -123,10 +127,12 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 		fType = "zip"
 	}
 
-	// FIXME do we need to handle aarch64 for darwin?
 	arch := runtime.GOARCH
 	if arch == "amd64" {
 		arch = "x86_64"
+	}
+	if arch == "arm64" && runtime.GOOS == "darwin" {
+		arch = "aarch64"
 	}
 
 	fileName := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s-%s.%s", version.DefaultVersion, runtime.GOOS, arch, fType)
@@ -246,9 +252,6 @@ func (suite *AgentInstallSuite) copyFleetServer(w io.WriteCloser) {
 
 func (suite *AgentInstallSuite) TearDownSuite() {
 	if suite.downloadPath != "" {
-		//err := os.RemoveAll(suite.downloadPath)
-		//suite.Require().NoErrorf(err, "failed to remove download from %s", suite.downloadPath)
-
 		// FIXME work around for needing to run sudo elastic-agent install
 		err := exec.Command("sudo", "rm", "-rf", suite.downloadPath).Run()
 		if err != nil {
@@ -270,13 +273,8 @@ func (suite *AgentInstallSuite) TearDownTest() {
 	if suite.T().Skipped() {
 		return
 	}
-	//path, err := exec.LookPath(agentName)
-	//if err != nil {
-	//	suite.T().Logf("unable to detect elastic-agent install on test tear-down: %s", err)
-	//	return
-	//}
-	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "--force").CombinedOutput() // TODO windows uninstall?
-	suite.Require().NoErrorf(err, "elastic-agent uninstall failed. Output: %s", out)
+	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "--force").CombinedOutput()
+	suite.Assert().NoErrorf(err, "elastic-agent uninstall failed. Output: %s", out)
 }
 
 func (suite *AgentInstallSuite) TestHTTP() {
