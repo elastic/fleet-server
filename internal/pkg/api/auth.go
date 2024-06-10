@@ -117,6 +117,7 @@ func authAgent(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*m
 	}
 
 	var agent *model.Agent
+	// If we have the agentID retrieve the agent document with a get (more performant) instead of triggering a search
 	if id != nil {
 		agent, err = getAgentAndVerifyAPIKeyID(ctx, bulker, *id, key.ID)
 	} else {
