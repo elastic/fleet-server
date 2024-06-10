@@ -10,7 +10,7 @@ replace (
 require (
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/docker/docker v24.0.9+incompatible
-	github.com/elastic/elastic-agent-client/v7 v7.10.0
+	github.com/elastic/elastic-agent-client/v7 v7.11.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
@@ -51,7 +51,7 @@ require (
 	golang.org/x/exp v0.0.0-20231127185646-65229373498e // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.24.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240415180920-8c6c420018be // indirect
