@@ -5,6 +5,7 @@
 package config
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -254,10 +255,13 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 	reqs := make([]*http.Request, 0, len(c.Hosts))
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	var res bytes.Buffer
 	for _, host := range c.Hosts {
 		u, err := url.Parse(host)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to transform host to url.URL")
+			res.WriteString(fmt.Sprintf("Unable to transform host %q to url.URL: %v\n", host, err))
 			continue
 		}
 		if u.Scheme == "" {
@@ -266,10 +270,12 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to create request to host")
+			res.WriteString(fmt.Sprintf("Unable to create request to host %q: %v\n", host, err))
 			continue
 		}
 		req.Header = headers.Clone()
 		reqs = append(reqs, req)
 	}
-	return settings.DiagRequests(reqs)()
+	res.Write(settings.DiagRequests(reqs)())
+	return res.Bytes()
 }
