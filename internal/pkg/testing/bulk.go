@@ -45,6 +45,11 @@ func (m *MockBulk) Read(ctx context.Context, index, id string, opts ...bulk.Opt)
 	return args.Get(0).([]byte), args.Error(1)
 }
 
+func (m *MockBulk) ReadRaw(ctx context.Context, index, id string, opts ...bulk.Opt) (*bulk.MgetResponseItem, error) {
+	args := m.Called(ctx, index, id, opts)
+	return args.Get(0).(*bulk.MgetResponseItem), args.Error(1)
+}
+
 func (m *MockBulk) Delete(ctx context.Context, index, id string, opts ...bulk.Opt) error {
 	args := m.Called(ctx, index, id, opts)
 	return args.Error(0)

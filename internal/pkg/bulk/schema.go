@@ -80,9 +80,9 @@ type MgetResponse struct {
 type MgetResponseItem struct {
 	//	Index      string          `json:"_index"`
 	//	Type       string          `json:"_type"`
-	//	DocumentID string          `json:"_id"`
-	//	Version    int64           `json:"_version"`
-	//	SeqNo      int64           `json:"_seq_no"`
+	DocumentID string `json:"_id"`
+	Version    int64  `json:"_version"`
+	SeqNo      int64  `json:"_seq_no"`
 	//	PrimTerm   int64           `json:"_primary_term"`
 	Found bool `json:"found"`
 	//	Routing    string          `json:"_routing"`

@@ -855,6 +855,25 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	return &resp, nil
 }
 
+func getAgentAndVerifyAPIKeyID(ctx context.Context, bulker bulk.Bulk, agentID string, apiKeyID string) (*model.Agent, error) {
+	span, ctx := apm.StartSpan(ctx, "getAgentAndVerifyAPIKeyID", "read")
+	defer span.End()
+	agent, err := dl.GetAgent(ctx, bulker, agentID)
+	if err != nil {
+		if errors.Is(err, dl.ErrNotFound) {
+			err = ErrAgentNotFound
+		} else {
+			err = fmt.Errorf("GetAgent: %w", err)
+		}
+	}
+
+	if agent.AccessAPIKeyID != apiKeyID {
+		err = fmt.Errorf("invalid API Key ID %w", ErrAgentIdentity)
+	}
+
+	return &agent, err
+}
+
 func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {
 	span, ctx := apm.StartSpan(ctx, "findAgentByID", "search")
 	defer span.End()
