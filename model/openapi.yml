@@ -557,6 +557,7 @@ components:
             type: string
             enum:
               - CPU
+              - CONN
     actionPolicyReassign:
       description: The POLICY_REASSIGN action data.
       type: object

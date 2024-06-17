@@ -139,7 +139,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 		return cfg.Output.Elasticsearch.TLS.DiagCerts()()
 	})
-	a.agent.RegisterDiagnosticHook("fleet-server output request diag", "fleet-server output request trace diagnostics", "fleet-server-output-request.txt", "text/plain", func() []byte {
+	a.agent.RegisterOptionalDiagnosticHook("CONN", "fleet-server output request diag", "fleet-server output request trace diagnostics", "fleet-server-output-request.txt", "text/plain", func() []byte {
 		if a.srv == nil {
 			log.Warn().Msg("Diagnostics hook failure fleet-server is nil.")
 			return []byte(`Diagnostics hook failure fleet-server is nil`)
