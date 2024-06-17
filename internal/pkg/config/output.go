@@ -253,7 +253,7 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 	}
 
 	reqs := make([]*http.Request, 0, len(c.Hosts))
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30) // TODO(michel-laterman): Configurable timeout; should this be part of config, or part of a diagnostics action?
 	defer cancel()
 
 	var res bytes.Buffer
@@ -267,8 +267,7 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 		if u.Scheme == "" {
 			u.Scheme = c.Protocol
 		}
-		rCtx, _ := context.WithTimeout(ctx, time.Second*30) // TODO(michel-laterman): Configurable timeout; should this be part of config, or part of a diagnostics action?
-		req, err := http.NewRequestWithContext(rCtx, http.MethodGet, u.String(), nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to create request to host")
 			res.WriteString(fmt.Sprintf("Unable to create request to host %q: %v\n", host, err))
