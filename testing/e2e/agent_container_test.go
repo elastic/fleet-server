@@ -2,10 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// FIXME(ml): test suite is disabled by additional build flag.
-//     we do not want to rely on agent builds in our pipeline.
-
-//go:build e2e && ignore
+//go:build e2e
 
 package e2e
 
@@ -15,10 +12,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -115,11 +116,15 @@ func (suite *AgentContainerSuite) TestHTTP() {
 		},
 		ExposedPorts: []string{"8220/tcp"},
 		Networks:     []string{"integration_default"},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
+		HostConfigModifier: func(cfg *container.HostConfig) {
+			if cfg.Mounts == nil {
+				cfg.Mounts = make([]mount.Mount, 0)
+			}
+			cfg.Mounts = append(cfg.Mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: suite.CoverPath,
 				Target: "/cover",
-			},
+			})
 		},
 		WaitingFor: containerWaitForHealthyStatus(),
 	}
@@ -138,11 +143,6 @@ func (suite *AgentContainerSuite) TestHTTP() {
 }
 
 func (suite *AgentContainerSuite) TestWithSecretFiles() {
-	// Create a service token file in the temp test dir
-	dir := suite.T().TempDir()
-	err := os.WriteFile(filepath.Join(dir, "service-token"), []byte(suite.ServiceToken), 0644)
-	suite.Require().NoError(err)
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
@@ -180,17 +180,20 @@ func (suite *AgentContainerSuite) TestWithSecretFiles() {
 			HostFilePath:      filepath.Join(suite.CertPath, "passphrase"),
 			ContainerFilePath: "/tmp/passphrase",
 			FileMode:          0644,
+		}, {
+			Reader:            strings.NewReader(suite.ServiceToken),
+			ContainerFilePath: "/token/service-token",
+			FileMode:          0644,
 		}},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.ContainerMount{
-				Source:   &testcontainers.GenericBindMountSource{dir},
-				Target:   "/token",
-				ReadOnly: true,
-			},
-			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
+		HostConfigModifier: func(cfg *container.HostConfig) {
+			if cfg.Mounts == nil {
+				cfg.Mounts = make([]mount.Mount, 0)
+			}
+			cfg.Mounts = append(cfg.Mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: suite.CoverPath,
 				Target: "/cover",
-			},
+			})
 		},
 		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}
@@ -252,11 +255,15 @@ func (suite *AgentContainerSuite) TestSleep10m() {
 			ContainerFilePath: "/tmp/passphrase",
 			FileMode:          0644,
 		}},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
+		HostConfigModifier: func(cfg *container.HostConfig) {
+			if cfg.Mounts == nil {
+				cfg.Mounts = make([]mount.Mount, 0)
+			}
+			cfg.Mounts = append(cfg.Mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: suite.CoverPath,
 				Target: "/cover",
-			},
+			})
 		},
 		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}
@@ -323,11 +330,15 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 			ContainerFilePath: "/tmp/passphrase",
 			FileMode:          0644,
 		}},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
+		HostConfigModifier: func(cfg *container.HostConfig) {
+			if cfg.Mounts == nil {
+				cfg.Mounts = make([]mount.Mount, 0)
+			}
+			cfg.Mounts = append(cfg.Mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: suite.CoverPath,
 				Target: "/cover",
-			},
+			})
 		},
 		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}

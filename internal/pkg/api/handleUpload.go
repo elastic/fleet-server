@@ -95,13 +95,13 @@ func (ut *UploadT) handleUploadBegin(_ zerolog.Logger, w http.ResponseWriter, r 
 		return err
 	}
 
-	_, err = ut.authAgent(r, &agentID, ut.bulker, ut.cache)
+	agent, err := ut.authAgent(r, &agentID, ut.bulker, ut.cache)
 	if err != nil {
 		return err
 	}
 
 	// validate payload, enrich with additional fields, and write metadata doc to ES
-	info, err := ut.uploader.Begin(r.Context(), payload)
+	info, err := ut.uploader.Begin(r.Context(), agent.Namespaces, payload)
 	if err != nil {
 		return err
 	}

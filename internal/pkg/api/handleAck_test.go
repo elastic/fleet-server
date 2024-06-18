@@ -59,7 +59,7 @@ func TestMakeUpdatePolicyBody(t *testing.T) {
 func TestEventToActionResult(t *testing.T) {
 	agentID := "6e9b6655-8cfe-4eb6-9b2f-c10aefae7517"
 	t.Run("generic", func(t *testing.T) {
-		r := eventToActionResult(agentID, "UPGRADE", AckRequest_Events_Item{json.RawMessage(`{
+		r := eventToActionResult(agentID, "UPGRADE", []string{}, AckRequest_Events_Item{json.RawMessage(`{
 		"action_id": "test-action-id",
 		"message": "action message",
 		"timestamp": "2022-02-23T18:26:08.506128Z"
@@ -70,7 +70,7 @@ func TestEventToActionResult(t *testing.T) {
 		assert.Empty(t, r.Error)
 	})
 	t.Run("with error", func(t *testing.T) {
-		r := eventToActionResult(agentID, "UPGRADE", AckRequest_Events_Item{json.RawMessage(`{
+		r := eventToActionResult(agentID, "UPGRADE", []string{}, AckRequest_Events_Item{json.RawMessage(`{
 		"action_id": "test-action-id",
 		"message": "action message",
 		"timestamp": "2022-02-23T18:26:08.506128Z",
@@ -82,7 +82,7 @@ func TestEventToActionResult(t *testing.T) {
 		assert.Equal(t, "error message", r.Error)
 	})
 	t.Run("request diagnostics", func(t *testing.T) {
-		r := eventToActionResult(agentID, "REQUEST_DIAGNOSTICS", AckRequest_Events_Item{json.RawMessage(`{
+		r := eventToActionResult(agentID, "REQUEST_DIAGNOSTICS", []string{}, AckRequest_Events_Item{json.RawMessage(`{
 		"action_id": "test-action-id",
 		"message": "action message",
 		"timestamp": "2022-02-23T18:26:08.506128Z",
@@ -96,7 +96,7 @@ func TestEventToActionResult(t *testing.T) {
 		assert.Equal(t, "error message", r.Error)
 	})
 	t.Run("input action", func(t *testing.T) {
-		r := eventToActionResult(agentID, "INPUT_ACTION", AckRequest_Events_Item{json.RawMessage(`{
+		r := eventToActionResult(agentID, "INPUT_ACTION", []string{}, AckRequest_Events_Item{json.RawMessage(`{
 		"action_id": "test-action-id",
 		"message": "action message",
 		"timestamp": "2022-02-23T18:26:08.506128Z",

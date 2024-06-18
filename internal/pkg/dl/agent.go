@@ -6,10 +6,13 @@ package dl
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
@@ -37,6 +40,29 @@ func prepareAgentFindByEnrollmentID() *dsl.Tmpl {
 
 func prepareAgentFindByField(field string) *dsl.Tmpl {
 	return prepareFindByField(field, map[string]interface{}{"version": true})
+}
+
+func GetAgent(ctx context.Context, bulker bulk.Bulk, agentID string, opt ...Option) (model.Agent, error) {
+	o := newOption(FleetAgents, opt...)
+	var agent model.Agent
+	data, err := bulker.ReadRaw(ctx, o.indexName, agentID)
+	if err != nil {
+		if errors.Is(err, es.ErrElasticNotFound) {
+			return model.Agent{}, ErrNotFound
+		} else {
+			return model.Agent{}, err
+		}
+	}
+	err = json.Unmarshal(data.Source, &agent)
+	if err != nil {
+		return model.Agent{}, err
+	}
+
+	agent.Id = agentID
+	agent.SeqNo = data.SeqNo
+	agent.Version = data.Version
+
+	return agent, err
 }
 
 func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name string, v interface{}, opt ...Option) (model.Agent, error) {

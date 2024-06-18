@@ -2,10 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// FIXME(ml): test suite is disabled by additional build flag.
-//     we do not want to rely on agent builds in our pipeline.
-
-//go:build e2e && ignore
+//go:build e2e
 
 package e2e
 
@@ -62,14 +59,18 @@ func TestAgentInstallSuite(t *testing.T) {
 }
 
 func (suite *AgentInstallSuite) SetupSuite() {
-	arch := runtime.GOARCH
-	if arch == "amd64" {
-		arch = "x86_64"
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("windows install e2e tests non-functional") // TODOO: https://github.com/elastic/fleet-server/issues/3620
+		return
 	}
 	// check if agent is installed
 	if _, err := exec.LookPath(agentName); err == nil {
 		suite.installDetected = true
 		return // don't bother with setup, skip all tests
+	}
+	arch := runtime.GOARCH
+	if arch == "amd64" {
+		arch = "x86_64"
 	}
 
 	suite.Setup() // base setup
@@ -102,6 +103,9 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	default:
 		suite.Require().Failf("Unsupported OS", "OS %s is unsupported for tests", runtime.GOOS)
 	}
+	_, err = os.Stat(suite.agentPath)
+	suite.Require().NoError(err)
+	suite.T().Log("Setup complete.")
 }
 
 // downloadAgent will search the artifacts repo for the latest snapshot and return the stream to the download for the current OS + ARCH.
@@ -127,6 +131,9 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 	if arch == "amd64" {
 		arch = "x86_64"
 	}
+	if arch == "arm64" && runtime.GOOS == "darwin" {
+		arch = "aarch64"
+	}
 
 	fileName := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s-%s.%s", version.DefaultVersion, runtime.GOOS, arch, fType)
 	pkg, ok := body.Packages[fileName]
@@ -139,28 +146,8 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 	return resp.Body
 }
 
-func copyPath(src, dst string) error {
-	srcF, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcF.Close()
-	dstF, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer dstF.Close()
-	err = dstF.Chmod(0755)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(dstF, srcF)
-	return err
-}
-
 // extractZip treats the passed Reader as a zip stream and unarchives it to a temp dir
 // fleet-server binary in archive is replaced by a locally compiled version
-// FIXME this method might be broken as it hasn't been tested.
 func (suite *AgentInstallSuite) extractZip(r io.Reader) {
 	suite.T().Helper()
 	// Extract zip stream
@@ -169,122 +156,104 @@ func (suite *AgentInstallSuite) extractZip(r io.Reader) {
 	suite.Require().NoError(err)
 	zipReader, err := zip.NewReader(bytes.NewReader(b.Bytes()), n)
 	suite.Require().NoError(err)
-	fleetPath := ""
 	for _, file := range zipReader.File {
-		if file.FileInfo().IsDir() {
-			err := os.Mkdir(filepath.Join(suite.downloadPath, file.Name), 0755)
+		path := filepath.Join(suite.downloadPath, file.Name)
+		mode := file.FileInfo().Mode()
+		switch {
+		case mode.IsDir():
+			err := os.MkdirAll(path, 0755)
 			suite.Require().NoError(err)
-		} else {
-			dst, err := os.Create(filepath.Join(suite.downloadPath, file.Name))
+		case mode.IsRegular():
+			err := os.MkdirAll(filepath.Dir(path), 0755)
 			suite.Require().NoError(err)
-			err = dst.Chmod(0755)
+			w, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 			suite.Require().NoError(err)
-			src, err := file.Open()
-			suite.Require().NoError(err)
-			_, err = io.Copy(dst, src)
-			dst.Close() // might be a dirty close
-			suite.Require().NoError(err)
-
 			if strings.HasSuffix(file.Name, binaryName) {
-				fleetPath = filepath.Join(suite.downloadPath, file.Name)
-			}
-			if strings.HasSuffix(file.Name, agentName) {
-				suite.agentPath = filepath.Join(suite.downloadPath, file.Name)
-			}
-		}
-	}
-	suite.Require().NotEmpty(fleetPath, "no fleet-server component detected")
-	err = os.Remove(fleetPath)
-	suite.Require().NoError(err)
-	err = copyPath(suite.binaryPath, fleetPath)
-	suite.Require().NoError(err)
-}
-
-// extractTar treats the passed Reader as a tar.gz stream and unarchives it to a temp dir
-// fleet-server binary in archive is replaced by a locally compiled version
-// Additionally the elastic-agent symlink will be recreated.
-func (suite *AgentInstallSuite) extractTar(r io.Reader) {
-	suite.T().Helper()
-	var fleetPath, agentSrc, agentDst, agentLink string
-	// Extract tar.gz stream
-	stream, err := gzip.NewReader(r)
-	suite.Require().NoError(err)
-	tarReader := tar.NewReader(stream)
-	for header, err := tarReader.Next(); err == nil; header, err = tarReader.Next() {
-		if header.FileInfo().IsDir() {
-			// headers may be specified out of order in the archive, as a shortcut we'll make all nested dirs
-			err := os.MkdirAll(filepath.Join(suite.downloadPath, header.Name), 0755)
-			suite.Require().NoError(err)
-			continue
-		}
-		if !header.FileInfo().Mode().IsRegular() {
-			// the elastic-agent may count as a symlink in Linux or MacOS bundles
-			if header.FileInfo().Name() == agentName {
-				agentDst = filepath.Join(suite.downloadPath, header.Name)
-				agentLink = header.Linkname
+				suite.copyFleetServer(w)
 				continue
 			}
-			suite.T().Logf("unable to extract irregular file: %s linkname: %s", header.Name, header.Linkname)
-			continue
-		}
-
-		var pathErr *os.PathError
-		dst, err := os.Create(filepath.Join(suite.downloadPath, header.Name))
-		// if we get a PathError, try to make the directory before retrying file creation
-		// headers may be specified out of order in the archive, as a shortcut we'll make all nested dirs
-		if errors.As(err, &pathErr) {
-			dir := filepath.Dir(header.Name)
-			err = os.MkdirAll(filepath.Join(suite.downloadPath, dir), 0755)
-			suite.Require().NoErrorf(err, "unable to create directory %s", dir)
-			dst, err = os.Create(filepath.Join(suite.downloadPath, header.Name))
-			suite.Require().NoErrorf(err, "unable to create file %s", header.Name)
-		} else if err != nil {
-			suite.Require().Failf("unable to create file", "filename: %s, error: %v", header.Name, err)
-		}
-		err = dst.Chmod(0755)
-		suite.Require().NoError(err)
-		_, err = io.Copy(dst, tarReader)
-		dst.Close() // might be a dirty close
-		suite.Require().NoError(err)
-
-		// note the fleet-server locaction in the extracted path
-		if strings.HasSuffix(header.Name, binaryName) {
-			fleetPath = filepath.Join(suite.downloadPath, header.Name)
-		}
-		// note if elastic-agent has been extracted as a regular file
-		if strings.HasSuffix(header.Name, agentName) {
-			suite.agentPath = filepath.Join(suite.downloadPath, header.Name)
-			agentSrc = filepath.Join(suite.downloadPath, header.Name)
-		}
-		// note the source of the elastic-agent if it has been detected as a symlink
-		if agentLink != "" && strings.HasSuffix(header.Name, agentLink) {
-			agentSrc = filepath.Join(suite.downloadPath, header.Name)
+			if strings.HasSuffix(file.Name, agentName) {
+				suite.agentPath = path
+			}
+			f, err := file.Open()
+			suite.Require().NoError(err)
+			_, err = io.Copy(w, f)
+			suite.Require().NoError(err)
+			err = w.Close()
+			suite.Require().NoError(err)
+			err = f.Close()
+			suite.Require().NoError(err)
+		default:
+			suite.T().Logf("Unable to unzip type=%+v in file=%s", mode, path)
 		}
 	}
-	// Copy fleet-server binary to un archived package
-	suite.Require().NotEmpty(fleetPath, "no fleet-server component detected")
-	err = os.Remove(fleetPath)
-	suite.Require().NoError(err)
-	err = copyPath(suite.binaryPath, fleetPath)
-	suite.Require().NoError(err)
+}
 
-	// link elastic-agent to the actual binary
-	if agentLink != "" {
-		suite.Require().NotEmpty(agentSrc, "agent link src undetected")
-		suite.Require().NotEmpty(agentDst, "agent link dst undetected")
-		err = os.Symlink(agentSrc, agentDst)
+// extractTar treats the passed Reader as a tar.gz stream and unarchives it to the suite.downloadPath
+// fleet-server binary in archive is replaced by a locally compiled version
+func (suite *AgentInstallSuite) extractTar(r io.Reader) {
+	suite.T().Helper()
+	// Extract tar.gz stream
+	gs, err := gzip.NewReader(r)
+	suite.Require().NoError(err)
+	tarReader := tar.NewReader(gs)
+	for {
+		header, err := tarReader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
 		suite.Require().NoError(err)
-		suite.agentPath = agentDst // replace path if we are using a link
+
+		path := filepath.Join(suite.downloadPath, header.Name)
+		mode := header.FileInfo().Mode()
+		switch {
+		case mode.IsDir():
+			err := os.MkdirAll(path, 0755)
+			suite.Require().NoError(err)
+		case mode.IsRegular():
+			err := os.MkdirAll(filepath.Dir(path), 0755)
+			suite.Require().NoError(err)
+			w, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm())
+			suite.Require().NoError(err)
+			// Use local fleet-server instead of the one from the archive
+			if strings.HasSuffix(header.Name, binaryName) {
+				suite.copyFleetServer(w)
+				continue
+			}
+			_, err = io.Copy(w, tarReader)
+			suite.Require().NoError(err)
+			err = w.Close()
+			suite.Require().NoError(err)
+		case mode.Type()&os.ModeSymlink == os.ModeSymlink:
+			err := os.MkdirAll(filepath.Dir(path), 0755)
+			suite.Require().NoError(err)
+			err = os.Symlink(header.Linkname, path)
+			suite.Require().NoError(err)
+			if strings.HasSuffix(header.Linkname, agentName) {
+				suite.agentPath = path
+			}
+		default:
+			suite.T().Logf("Unable to untar type=%c in file=%s", header.Typeflag, path)
+		}
 	}
+}
+
+func (suite *AgentInstallSuite) copyFleetServer(w io.WriteCloser) {
+	suite.T().Helper()
+	src, err := os.Open(suite.binaryPath)
+	suite.Require().NoError(err)
+	_, err = io.Copy(w, src)
+	suite.Require().NoError(err)
+	err = w.Close()
+	suite.Require().NoError(err)
+	err = src.Close()
+	suite.Require().NoError(err)
 }
 
 func (suite *AgentInstallSuite) TearDownSuite() {
 	if suite.downloadPath != "" {
-		err := os.RemoveAll(suite.downloadPath)
-		suite.Require().NoErrorf(err, "failed to remove download from %s", suite.downloadPath)
-
 		// FIXME work around for needing to run sudo elastic-agent install
-		err = exec.Command("sudo", "rm", "-rf", suite.downloadPath).Run()
+		err := exec.Command("sudo", "rm", "-rf", suite.downloadPath).Run()
 		if err != nil {
 			suite.T().Logf("unable to remove %q: %v", suite.downloadPath, err)
 		}
@@ -304,13 +273,8 @@ func (suite *AgentInstallSuite) TearDownTest() {
 	if suite.T().Skipped() {
 		return
 	}
-	path, err := exec.LookPath(agentName)
-	if err != nil {
-		suite.T().Logf("unable to detect elastic-agent install on test tear-down: %s", err)
-		return
-	}
-	err = exec.Command("sudo", path, "uninstall", "--force").Run()
-	suite.Require().NoError(err, "elastic-agent uninstall failed.")
+	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "--force").CombinedOutput()
+	suite.Assert().NoErrorf(err, "elastic-agent uninstall failed. Output: %s", out)
 }
 
 func (suite *AgentInstallSuite) TestHTTP() {
@@ -342,7 +306,7 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
-		"--url=https://localhost:8200",
+		"--url=https://localhost:8220",
 		"--certificate-authorities="+filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
 		"--fleet-server-es=http://"+suite.ESHosts,
 		"--fleet-server-service-token-path="+filepath.Join(dir, "service-token"),

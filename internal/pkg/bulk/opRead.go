@@ -21,8 +21,8 @@ const (
 	rSuffix = "]}"
 )
 
-func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byte, error) {
-	span, ctx := apm.StartSpan(ctx, "Bulker: read", "bulker")
+func (b *Bulker) ReadRaw(ctx context.Context, index, id string, opts ...Opt) (*MgetResponseItem, error) {
+	span, ctx := apm.StartSpan(ctx, "Bulker: readRaw", "bulker")
 	defer span.End()
 	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 	blk := b.newBlk(ActionRead, opt)
@@ -49,6 +49,17 @@ func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byt
 	if !ok {
 		return nil, fmt.Errorf("unable to cast response to *MgetResponseItem, detected type: %T", resp.data)
 	}
+	return r, nil
+}
+
+func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byte, error) {
+	span, ctx := apm.StartSpan(ctx, "Bulker: read", "bulker")
+	defer span.End()
+	r, err := b.ReadRaw(ctx, index, id, opts...)
+	if err != nil {
+		return nil, err
+	}
+
 	return r.Source, nil
 }
 

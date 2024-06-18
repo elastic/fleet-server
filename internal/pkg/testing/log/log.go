@@ -14,7 +14,7 @@ import (
 // loggest is set to debug level
 func SetLogger(tb testing.TB) zerolog.Logger {
 	tb.Helper()
-	tw := zerolog.TestWriter{T: tb, Frame: 5}
-	log := zerolog.New(zerolog.SyncWriter(tw)).Level(zerolog.DebugLevel)
+	tw := zerolog.TestWriter{T: tb, Frame: 4}
+	log := zerolog.New(tw).Level(zerolog.DebugLevel)
 	return log
 }

@@ -7,6 +7,14 @@ Vagrant.configure("2") do |config|
     vbox.cpus = 6
   end
 
+  # require plugin https://github.com/leighmcculloch/vagrant-docker-compose
+  # vagrant plugin install vagrant-docker-compose
+  config.vagrant.plugins = "vagrant-docker-compose"
+
+  # install docker and docker-compose
+  config.vm.provision :docker
+  config.vm.provision :docker_compose
+
     config.vm.define "fleet-dev" do |nodeconfig|
       nodeconfig.vm.box = "ubuntu/jammy64"
 
@@ -21,23 +29,15 @@ Vagrant.configure("2") do |config|
       # fleet-server needs the agent, so let's mount it all
       nodeconfig.vm.synced_folder "../", "/vagrant"
       nodeconfig.vm.provider "virtualbox" do |vb|
-        # Display the VirtualBox GUI when booting the machine
         vb.gui = false
-        vb.customize ["modifyvm", :id, "--vram", "128"]
-        # Customize the amount of memory on the VM:
-        vb.memory = "2048"
+        vb.memory = 8192
+        vb.cpus = 2
+        vb.customize ["modifyvm", :id, "--ioapic", "on"]
       end
-      $user_script = <<-SCRIPT
-        GOPATH=$(go env GOPATH) # use Go's default
-        mkdir -p $GOPATH/src/github.com/magefile
-        cd $GOPATH/src/github.com/magefile
-        git clone https://github.com/magefile/mage.git
-        cd $GOPATH/src/github.com/magefile/mage
-        go run bootstrap.go
-      SCRIPT
 
-      nodeconfig.vm.provision "root-shell", type: "shell", inline: <<-SHELL
+      nodeconfig.vm.provision "shell", inline: <<-SHELL
          apt-get update
+         apt-get upgrade -y
          apt-get install -y \
           build-essential \
           curl \
@@ -56,6 +56,7 @@ Vagrant.configure("2") do |config|
          tar -xf /tmp/mage.tar.gz
          mv mage /usr/local/bin
       SHELL
+      nodeconfig.vm.provision "shell", reboot: true
     end
 
 end

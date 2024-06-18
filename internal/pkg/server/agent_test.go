@@ -6,11 +6,15 @@ package server
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 	"github.com/elastic/fleet-server/v7/version"
 	"github.com/elastic/go-ucfg"
 	"github.com/stretchr/testify/assert"
@@ -253,6 +257,9 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			"server": map[string]interface{}{
 				"host": "0.0.0.0",
 			},
+			"policy": map[string]interface{}{
+				"id": "test-policy",
+			},
 		})
 		require.NoError(t, err)
 		mockInClient := &mockClientUnit{}
@@ -276,8 +283,18 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				},
 			})
 
+		cliCfg, err := ucfg.NewFrom(map[string]interface{}{
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"policy": map[string]interface{}{
+						"id": "test-policy",
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
 		a := &Agent{
-			cliCfg:     ucfg.New(),
+			cliCfg:     cliCfg,
 			agent:      mockAgent,
 			inputUnit:  mockInClient,
 			outputUnit: mockOutClient,
@@ -287,6 +304,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, cfg.Inputs, 1)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
+		assert.Equal(t, "test-policy", cfg.Inputs[0].Policy.ID)
 		assert.Equal(t, "0.0.0.0", cfg.Inputs[0].Server.Host)
 		assert.True(t, cfg.Inputs[0].Server.Instrumentation.Enabled)
 		assert.False(t, cfg.Inputs[0].Server.Instrumentation.TLS.SkipVerify)
@@ -484,6 +502,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		mockOutClient := &mockClientUnit{}
 		mockOutClient.On("Expected").Return(
 			client.Expected{
+
 				State:    client.UnitStateHealthy,
 				LogLevel: client.UnitLogLevelInfo,
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
@@ -535,5 +554,350 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, []string{"localhost:8080"}, cfg.Inputs[0].Server.Instrumentation.Hosts)
 		assert.Empty(t, cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+	})
+	t.Run("output with bootstrap succeeds", func(t *testing.T) {
+		// fake an ES server's version check response
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-elastic-product", "Elasticsearch")
+			_, err := w.Write([]byte(`{"version":{"number":"8.0.0"}}`))
+			require.NoError(t, err)
+		}))
+		defer srv.Close()
+
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"bootstrap": map[string]interface{}{
+				"service_token": "test-token",
+				"hosts":         []interface{}{"https://127.0.0.1:9200"},
+			},
+			"hosts": []interface{}{srv.URL, "https://127.0.0.1:9200"},
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+		inStruct, err := structpb.NewStruct(map[string]interface{}{"type": "fleet-server"})
+		require.NoError(t, err)
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+			})
+		a := &Agent{
+			cliCfg:     ucfg.New(),
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+			bi: build.Info{
+				Version: "8.0.0",
+			},
+		}
+
+		ctx := testlog.SetLogger(t).WithContext(context.Background())
+		cfg, err := a.configFromUnits(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+		assert.Equal(t, []string{srv.URL, "https://127.0.0.1:9200"}, cfg.Output.Elasticsearch.Hosts)
+	})
+	t.Run("output with bootstrap fails", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-elastic-product", "Elasticsearch")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, err := w.Write([]byte(`{"version":{"number":"8.0.0"}}`))
+			require.NoError(t, err)
+		}))
+		defer srv.Close()
+
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"bootstrap": map[string]interface{}{
+				"service_token": "test-token",
+				"hosts":         []interface{}{"https://127.0.0.1:9200"},
+			},
+			"hosts": []interface{}{srv.URL, "https://127.0.0.1:9200"},
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+		inStruct, err := structpb.NewStruct(map[string]interface{}{"type": "fleet-server"})
+		require.NoError(t, err)
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+			})
+		a := &Agent{
+			cliCfg:     ucfg.New(),
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+			bi: build.Info{
+				Version: "8.0.0",
+			},
+		}
+
+		ctx := testlog.SetLogger(t).WithContext(context.Background())
+		cfg, err := a.configFromUnits(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+		assert.Equal(t, []string{"https://127.0.0.1:9200"}, cfg.Output.Elasticsearch.Hosts)
+	})
+}
+
+func TestInjectMissingOutputAttributes(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  map[string]interface{}
+		expect map[string]interface{}
+	}{{
+		name:  "empty input",
+		input: map[string]interface{}{},
+		expect: map[string]interface{}{
+			"protocol":      "https",
+			"hosts":         []interface{}{"localhost:9200"},
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"verification_mode": "full",
+			},
+		},
+	}, {
+		name: "all keys differ",
+		input: map[string]interface{}{
+			"NewSetting": 4,
+			"NewMap": map[string]interface{}{
+				"key": "val",
+			},
+		},
+		expect: map[string]interface{}{
+			"NewSetting": 4,
+			"NewMap": map[string]interface{}{
+				"key": "val",
+			},
+			"protocol":      "https",
+			"hosts":         []interface{}{"localhost:9200"},
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"verification_mode": "full",
+			},
+		},
+	}, {
+		name: "input has same key",
+		input: map[string]interface{}{
+			"hosts": []interface{}{"localhost:9200", "elasticsearch:9200"},
+		},
+		expect: map[string]interface{}{
+			"protocol":      "https",
+			"hosts":         []interface{}{"localhost:9200", "elasticsearch:9200"},
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"verification_mode": "full",
+			},
+		},
+	}, {
+		name: "input has empty ssl object",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{},
+		},
+		expect: map[string]interface{}{
+			"protocol": "https",
+			"hosts":    []interface{}{"localhost:9200"},
+
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"verification_mode": "full",
+			},
+		},
+	}, {
+		name: "input has ssl object with same key",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{
+				"certificate":       "cert",
+				"key":               "key",
+				"verification_mode": "none",
+			},
+		},
+		expect: map[string]interface{}{
+			"protocol":      "https",
+			"hosts":         []interface{}{"localhost:9200"},
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"certificate":       "cert",
+				"key":               "key",
+				"verification_mode": "none",
+			},
+		},
+	}}
+	bootstrap := map[string]interface{}{
+		"protocol":      "https",
+		"hosts":         []interface{}{"localhost:9200"},
+		"service_token": "token",
+		"ssl": map[string]interface{}{
+			"verification_mode": "full",
+		},
+		"ignoredKey": "badValue",
+		"ignoredMap": map[string]interface{}{
+			"key": "value",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			injectMissingOutputAttributes(context.Background(), tc.input, bootstrap)
+			assert.Equal(t, len(tc.expect), len(tc.input), "expected map sizes don't match")
+			assert.Equal(t, tc.expect, tc.input)
+		})
+	}
+
+	bootstrapVerifyNone := map[string]interface{}{
+		"service_token": "token",
+		"ssl": map[string]interface{}{
+			"verification_mode": "none",
+		},
+	}
+	sslTests := []struct {
+		name   string
+		input  map[string]interface{}
+		expect map[string]interface{}
+	}{{
+		name: "no cas none is injected",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{
+				"certificate": "value",
+			},
+		},
+		expect: map[string]interface{}{
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"certificate":       "value",
+				"verification_mode": "none",
+			},
+		},
+	}, {
+		name: "certificate_authority provided",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{
+				"certificate_authorities": []interface{}{"value"},
+			},
+		},
+		expect: map[string]interface{}{
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"certificate_authorities": []interface{}{"value"},
+			},
+		},
+	}, {
+		name: "fingerprint provided",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{
+				"ca_trusted_fingerprint": "value",
+			},
+		},
+		expect: map[string]interface{}{
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"ca_trusted_fingerprint": "value",
+			},
+		},
+	}, {
+		name: "output has CA and verification_mode: none",
+		input: map[string]interface{}{
+			"ssl": map[string]interface{}{
+				"certificate_authorities": []interface{}{"value"},
+				"verification_mode":       "none",
+			},
+		},
+		expect: map[string]interface{}{
+			"service_token": "token",
+			"ssl": map[string]interface{}{
+				"certificate_authorities": []interface{}{"value"},
+				"verification_mode":       "none",
+			},
+		},
+	}}
+
+	for _, tc := range sslTests {
+		t.Run(tc.name, func(t *testing.T) {
+			injectMissingOutputAttributes(context.Background(), tc.input, bootstrapVerifyNone)
+			assert.Equal(t, len(tc.expect), len(tc.input), "expected map sizes don't match")
+			assert.Equal(t, tc.expect, tc.input)
+		})
+	}
+
+}
+
+func Test_Agent_esOutputCheckLoop(t *testing.T) {
+	t.Run("context canceled during sleep", func(t *testing.T) {
+		a := &Agent{
+			chReconfigure: make(chan struct{}, 1),
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{})
+		assert.Empty(t, a.chReconfigure)
+	})
+	t.Run("test fails version check", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-elastic-product", "Elasticsearch")
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(`{"version":{"number":"7.0.0"}}`))
+			require.NoError(t, err)
+		}))
+		defer srv.Close()
+		a := &Agent{
+			bi: build.Info{
+				Version: "8.0.0",
+			},
+			chReconfigure: make(chan struct{}, 1),
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{
+			"service_token": "test-token",
+			"hosts":         []interface{}{srv.URL},
+		})
+		assert.Empty(t, a.chReconfigure)
+	})
+	t.Run("succeeds after a retest", func(t *testing.T) {
+		returnOK := false
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-elastic-product", "Elasticsearch")
+			if returnOK {
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				returnOK = true
+			}
+			_, err := w.Write([]byte(`{"version":{"number":"8.0.0"}}`))
+			require.NoError(t, err)
+		}))
+		defer srv.Close()
+		a := &Agent{
+			bi: build.Info{
+				Version: "8.0.0",
+			},
+			chReconfigure: make(chan struct{}, 1),
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{
+			"service_token": "test-token",
+			"hosts":         []interface{}{srv.URL},
+		})
+		assert.NotEmpty(t, a.chReconfigure)
 	})
 }

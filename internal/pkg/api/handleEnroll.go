@@ -132,7 +132,7 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	return et._enroll(r.Context(), rb, zlog, req, enrollAPI.PolicyID, ver)
+	return et._enroll(r.Context(), rb, zlog, req, enrollAPI.PolicyID, enrollAPI.Namespaces, ver)
 }
 
 // retrieveStaticTokenEnrollmentToken fetches the enrollment key record from the config static tokens.
@@ -190,7 +190,8 @@ func (et *EnrollerT) _enroll(
 	rb *rollback.Rollback,
 	zlog zerolog.Logger,
 	req *EnrollRequest,
-	policyID,
+	policyID string,
+	namespaces []string,
 	ver string,
 ) (*EnrollResponse, error) {
 	var agent model.Agent
@@ -272,6 +273,7 @@ func (et *EnrollerT) _enroll(
 	agentData := model.Agent{
 		Active:         true,
 		PolicyID:       policyID,
+		Namespaces:     namespaces,
 		Type:           string(req.Type),
 		EnrolledAt:     now.UTC().Format(time.RFC3339),
 		LocalMetadata:  localMeta,

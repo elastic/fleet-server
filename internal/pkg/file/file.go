@@ -45,12 +45,13 @@ type Hash struct {
 }
 
 type MetaDoc struct {
-	ActionID string    `json:"action_id"`
-	AgentID  string    `json:"agent_id"`
-	Source   string    `json:"src"`
-	File     FileData  `json:"file"`
-	UploadID string    `json:"upload_id"`
-	Start    time.Time `json:"upload_start"`
+	ActionID   string    `json:"action_id"`
+	AgentID    string    `json:"agent_id"`
+	Source     string    `json:"src"`
+	File       FileData  `json:"file"`
+	UploadID   string    `json:"upload_id"`
+	Start      time.Time `json:"upload_start"`
+	Namespaces []string  `json:"namespaces"`
 }
 
 // custom unmarshaller to make unix-epoch values work
@@ -71,26 +72,28 @@ func (m *MetaDoc) UnmarshalJSON(b []byte) error {
 }
 
 type ChunkInfo struct {
-	Pos   int  // Ordered chunk position in file
-	Last  bool // Is this the final chunk in the file
-	SHA2  string
-	Size  int
-	BID   string // base id, matches metadata doc's _id
-	Index string
-	ID    string // chunk _id
+	Pos        int  // Ordered chunk position in file
+	Last       bool // Is this the final chunk in the file
+	SHA2       string
+	Size       int
+	BID        string // base id, matches metadata doc's _id
+	Index      string
+	ID         string // chunk _id
+	Namespaces []string
 }
 
 type Info struct {
-	ID        string // upload operation identifier. Used to identify the upload process
-	DocID     string // document ID of the uploaded file and chunks
-	Source    string // which integration is performing the upload
-	AgentID   string
-	ActionID  string
-	ChunkSize int64
-	Total     int64
-	Count     int
-	Start     time.Time
-	Status    Status
+	ID         string // upload operation identifier. Used to identify the upload process
+	DocID      string // document ID of the uploaded file and chunks
+	Source     string // which integration is performing the upload
+	AgentID    string
+	ActionID   string
+	Namespaces []string
+	ChunkSize  int64
+	Total      int64
+	Count      int
+	Start      time.Time
+	Status     Status
 }
 
 // convenience functions for computing current "Status" based on the fields
