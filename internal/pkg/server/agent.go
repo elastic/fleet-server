@@ -149,6 +149,8 @@ func (a *Agent) Run(ctx context.Context) error {
 			log.Warn().Msg("Diagnostics hook failure config is nil.")
 			return []byte(`Diagnostics hook failure config is nil`)
 		}
+		ctx, cancel := context.WithTimeout(ctx, time.Second*30) // TODO(michel-laterman): duration/timeout should be part of the diagnostics action from fleet-server (https://github.com/elastic/fleet-server/issues/3648) and the control protocol (https://github.com/elastic/elastic-agent-client/issues/113)
+		defer cancel()
 		return cfg.Output.Elasticsearch.DiagRequests(ctx)
 	})
 

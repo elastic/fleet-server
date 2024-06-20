@@ -253,8 +253,6 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 	}
 
 	reqs := make([]*http.Request, 0, len(c.Hosts))
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30) // TODO(michel-laterman): duration/timeout should be part of the diagnostics action from fleet-server (https://github.com/elastic/fleet-server/issues/3648) and the control protocol (https://github.com/elastic/elastic-agent-client/issues/113)
-	defer cancel()
 
 	var res bytes.Buffer
 	for _, host := range c.Hosts {
