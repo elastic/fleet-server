@@ -5,6 +5,8 @@
 package config
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -16,8 +18,10 @@ import (
 	"time"
 
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/rs/zerolog"
 )
 
 // The timeout would be driven by the server for long poll.
@@ -227,4 +231,49 @@ func makeURL(defaultScheme string, defaultPath string, rawURL string, defaultPor
 	addr.Scheme = scheme
 	addr.Host = host + ":" + port
 	return addr.String(), nil
+}
+
+func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
+	pURL, err := httpcommon.NewProxyURIFromString(c.ProxyURL)
+	if err != nil {
+		zerolog.Ctx(ctx).Warn().Err(err).Msg("Unable to transform proxy_url to url.URL")
+	}
+	settings := httpcommon.HTTPTransportSettings{
+		TLS:     c.TLS,
+		Timeout: c.Timeout,
+		Proxy: httpcommon.HTTPClientProxySettings{
+			Disable: c.ProxyDisable,
+			URL:     pURL,
+			Headers: httpcommon.ProxyHeaders(c.ProxyHeaders),
+		},
+	}
+	headers := http.Header{}
+	for k, v := range c.Headers {
+		headers.Set(k, v)
+	}
+
+	reqs := make([]*http.Request, 0, len(c.Hosts))
+
+	var res bytes.Buffer
+	for _, host := range c.Hosts {
+		u, err := url.Parse(host)
+		if err != nil {
+			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to transform host to url.URL")
+			res.WriteString(fmt.Sprintf("Unable to transform host %q to url.URL: %v\n", host, err))
+			continue
+		}
+		if u.Scheme == "" {
+			u.Scheme = c.Protocol
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+		if err != nil {
+			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to create request to host")
+			res.WriteString(fmt.Sprintf("Unable to create request to host %q: %v\n", host, err))
+			continue
+		}
+		req.Header = headers.Clone()
+		reqs = append(reqs, req)
+	}
+	res.Write(settings.DiagRequests(reqs)())
+	return res.Bytes()
 }
