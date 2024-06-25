@@ -8,6 +8,7 @@ metadata:
   description: fleet-server - The control server for managing a fleet of elastic-agents
   annotations:
     sonarqube.org/project-key: elastic_fleet-server_AYpL8BsVaV3I-igkX4hx
+    gitops.elastic.co/service-name: fleet
 
 spec:
   type: tool
