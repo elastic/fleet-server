@@ -227,11 +227,11 @@ Contents of probable licence file $GOMODCACHE/github.com/dgraph-io/ristretto@v0.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.17.20
+Version: v7.17.22
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.17.20/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.17.22/LICENSE.txt:
 
 Source code in this repository is variously licensed under the Apache License
 Version 2.0, an Apache compatible license, or the Elastic License. Outside of
@@ -9975,11 +9975,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-lambda-go@v1.13
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/aws-sdk-go
-Version: v1.19.48
+Version: v1.51.14
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go@v1.19.48/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go@v1.51.14/LICENSE.txt:
 
 
                                  Apache License
