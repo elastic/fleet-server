@@ -12,7 +12,6 @@ type subT struct {
 	policyID string
 	agentID  string // not logically necessary; cached for logging
 	revIdx   int64
-	coordIdx int64
 
 	next *subT
 	prev *subT
@@ -20,12 +19,11 @@ type subT struct {
 	ch chan *ParsedPolicy
 }
 
-func NewSub(policyID, agentID string, revIdx, coordIdx int64) *subT {
+func NewSub(policyID, agentID string, revIdx int64) *subT {
 	return &subT{
 		policyID: policyID,
 		agentID:  agentID,
 		revIdx:   revIdx,
-		coordIdx: coordIdx,
 		ch:       make(chan *ParsedPolicy, 1),
 	}
 }
@@ -77,11 +75,9 @@ func (n *subT) isEmpty() bool {
 }
 
 func (n *subT) isUpdate(policy *model.Policy) bool {
-
 	pRevIdx := policy.RevisionIdx
-	pCoordIdx := policy.CoordinatorIdx
 
-	return (pRevIdx > n.revIdx && pCoordIdx > 0) || (pRevIdx == n.revIdx && pCoordIdx > n.coordIdx)
+	return pRevIdx > n.revIdx
 }
 
 // Output returns a new policy that needs to be sent based on the current subscription.

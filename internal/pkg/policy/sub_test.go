@@ -35,7 +35,7 @@ func TestSub_PushBackN(t *testing.T) {
 		nodes := make([]*subT, 0, n)
 		for i := 0; i < n; i++ {
 			name := fmt.Sprintf("policy%d", i)
-			nn := NewSub(name, "", 0, 0)
+			nn := NewSub(name, "", 0)
 			head.pushBack(nn)
 			nodes = append(nodes, nn)
 		}
@@ -82,7 +82,7 @@ func TestSub_PushFrontN(t *testing.T) {
 		nodes := make([]*subT, 0, n)
 		for i := 0; i < n; i++ {
 			name := fmt.Sprintf("policy%d", i)
-			nn := NewSub(name, "", 0, 0)
+			nn := NewSub(name, "", 0)
 			head.pushFront(nn)
 			nodes = append(nodes, nn)
 		}
@@ -126,7 +126,7 @@ func TestSub_PushRandom(t *testing.T) {
 	nodes := make([]*subT, 0, N)
 	for i := 0; i < N; i++ {
 		name := fmt.Sprintf("policy%d", i)
-		nn := NewSub(name, "", 0, 0)
+		nn := NewSub(name, "", 0)
 
 		if rand.Intn(2) == 1 {
 			head.pushBack(nn)
@@ -162,7 +162,7 @@ func TestSub_UnlinkRandomN(t *testing.T) {
 	nodes := make([]*subT, 0, N)
 	for i := 0; i < N; i++ {
 		name := fmt.Sprintf("policy%d", i)
-		nn := NewSub(name, "", 0, 0)
+		nn := NewSub(name, "", 0)
 		head.pushBack(nn)
 		nodes = append(nodes, nn)
 	}
@@ -194,7 +194,7 @@ func TestSub_UnlinkRandomN(t *testing.T) {
 
 func BenchmarkSubsSimple(b *testing.B) {
 	head := makeHead()
-	nn := NewSub("", "", 0, 0)
+	nn := NewSub("", "", 0)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		head.pushBack(nn)
@@ -218,7 +218,7 @@ func BenchmarkSubs(b *testing.B) {
 			subs := make([]*subT, 0, bm)
 			for i := 0; i < bm; i++ {
 				name := fmt.Sprintf("policy%d", i)
-				nn := NewSub(name, "", 0, 0)
+				nn := NewSub(name, "", 0)
 				subs = append(subs, nn)
 			}
 

@@ -33,7 +33,6 @@ func prepareQueryLatestPolicies() []byte {
 	revisionIdx.Size(1)
 	rSort := revisionIdx.Sort()
 	rSort.SortOrder(FieldRevisionIdx, dsl.SortDescend)
-	rSort.SortOrder(FieldCoordinatorIdx, dsl.SortDescend)
 	return root.MustMarshalJSON()
 }
 
