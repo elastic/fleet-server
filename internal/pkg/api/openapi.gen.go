@@ -37,7 +37,8 @@ const (
 
 // Defines values for ActionRequestDiagnosticsAdditionalMetrics.
 const (
-	CPU ActionRequestDiagnosticsAdditionalMetrics = "CPU"
+	CONN ActionRequestDiagnosticsAdditionalMetrics = "CONN"
+	CPU  ActionRequestDiagnosticsAdditionalMetrics = "CPU"
 )
 
 // Defines values for ActionSettingsLogLevel.

@@ -115,6 +115,44 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 		return p
 	})
+	a.agent.RegisterDiagnosticHook("fleet-server api tls diag", "fleet-server's API TLS config", "fleet-server-api-tls.txt", "text/plain", func() []byte {
+		if a.srv == nil {
+			log.Warn().Msg("Diagnostics hook failure fleet-server is nil.")
+			return []byte(`Diagnostics hook failure fleet-server is nil`)
+		}
+		cfg := a.srv.GetConfig()
+		if cfg == nil || len(cfg.Inputs) == 0 {
+			log.Warn().Msg("Diagnostics hook failure config is nil.")
+			return []byte(`Diagnostics hook failure config is nil`)
+		}
+		return cfg.Inputs[0].Server.TLS.DiagCerts()()
+	})
+	a.agent.RegisterDiagnosticHook("fleet-server output tls diag", "fleet-server's output TLS config", "fleet-server-output-tls.txt", "text/plain", func() []byte {
+		if a.srv == nil {
+			log.Warn().Msg("Diagnostics hook failure fleet-server is nil.")
+			return []byte(`Diagnostics hook failure fleet-server is nil`)
+		}
+		cfg := a.srv.GetConfig()
+		if cfg == nil {
+			log.Warn().Msg("Diagnostics hook failure config is nil.")
+			return []byte(`Diagnostics hook failure config is nil`)
+		}
+		return cfg.Output.Elasticsearch.TLS.DiagCerts()()
+	})
+	a.agent.RegisterOptionalDiagnosticHook("CONN", "fleet-server output request diag", "fleet-server output request trace diagnostics", "fleet-server-output-request.txt", "text/plain", func() []byte {
+		if a.srv == nil {
+			log.Warn().Msg("Diagnostics hook failure fleet-server is nil.")
+			return []byte(`Diagnostics hook failure fleet-server is nil`)
+		}
+		cfg := a.srv.GetConfig()
+		if cfg == nil {
+			log.Warn().Msg("Diagnostics hook failure config is nil.")
+			return []byte(`Diagnostics hook failure config is nil`)
+		}
+		ctx, cancel := context.WithTimeout(ctx, time.Second*30) // TODO(michel-laterman): duration/timeout should be part of the diagnostics action from fleet-server (https://github.com/elastic/fleet-server/issues/3648) and the control protocol (https://github.com/elastic/elastic-agent-client/issues/113)
+		defer cancel()
+		return cfg.Output.Elasticsearch.DiagRequests(ctx)
+	})
 
 	subCtx, subCanceller := context.WithCancel(ctx)
 	defer subCanceller()
