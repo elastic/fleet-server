@@ -227,7 +227,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	// Compare local_metadata content and update if different
 	rawMeta, err := parseMeta(zlog, agent, &req)
 	if err != nil {
-		return val, err
+		return val, &BadRequestErr{msg: "unable to parse meta", nextErr: err}
 	}
 
 	// Compare agent_components content and update if different
