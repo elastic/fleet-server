@@ -16,7 +16,7 @@ summary: Fix Download rate parsing
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: Fix checkin API to API to support download_rate as string with unit per second (example 123MBps)
+description: Fix checkin API to API to temporarly support download_rate as string with unit per second (example 123MBps) as elastic-agent is currently sending this.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: fleet-server
