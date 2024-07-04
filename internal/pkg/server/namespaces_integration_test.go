@@ -221,7 +221,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	t.Log("Enroll agent")
 	srvCopy := srv
 	srvCopy.enrollKey = newKey.Token()
-	agentID, key := EnrollAgent(enrollBody, t, ctx, srvCopy)
+	agentID, key := EnrollAgent(t, ctx, srvCopy, enrollBody)
 
 	AssertAgentDocContainNamespace(t, ctx, srv, agentID, testNamespace)
 	// cleanup
