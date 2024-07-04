@@ -29,6 +29,10 @@ func Test_ParseDownloadRate(t *testing.T) {
 		raw:           json.RawMessage(`"1MBps"`),
 		expectedValue: 1000000.00,
 	}, {
+		name:           "download only MBps",
+		raw:            json.RawMessage(`"MBps"`),
+		expectedErrMsg: "error converting download_rate from human size: invalid size: 'MB'",
+	}, {
 		name:           "download rate random string",
 		raw:            json.RawMessage(`"toto"`),
 		expectedErrMsg: "error converting download_rate from human size: invalid size: 'toto'",
