@@ -227,11 +227,11 @@ Contents of probable licence file $GOMODCACHE/github.com/dgraph-io/ristretto@v0.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.17.22
+Version: v7.17.23-0.20240701114223-e5bb44934c11
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.17.22/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.17.23-0.20240701114223-e5bb44934c11/LICENSE.txt:
 
 Source code in this repository is variously licensed under the Apache License
 Version 2.0, an Apache compatible license, or the Elastic License. Outside of
@@ -23446,11 +23446,13 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 
 --------------------------------------------------------------------------------
 Dependency : github.com/hashicorp/go-retryablehttp
-Version: v0.6.6
+Version: v0.7.7
 Licence type (autodetected): MPL-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/hashicorp/go-retryablehttp@v0.6.6/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/hashicorp/go-retryablehttp@v0.7.7/LICENSE:
+
+Copyright (c) 2015 HashiCorp, Inc.
 
 Mozilla Public License, version 2.0
 
@@ -27408,11 +27410,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 --------------------------------------------------------------------------------
 Dependency : github.com/magefile/mage
-Version: v1.14.0
+Version: v1.15.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/magefile/mage@v1.14.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/magefile/mage@v1.15.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -35700,11 +35702,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/sys
-Version: v0.19.0
+Version: v0.20.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.19.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.20.0/LICENSE:
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
@@ -35853,6 +35855,43 @@ Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/golang.org/x/tools@v0.20.0/LICENSE:
+
+Copyright (c) 2009 The Go Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--------------------------------------------------------------------------------
+Dependency : golang.org/x/tools/go/vcs
+Version: v0.1.0-deprecated
+Licence type (autodetected): BSD-3-Clause
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/golang.org/x/tools/go/vcs@v0.1.0-deprecated/LICENSE:
 
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
