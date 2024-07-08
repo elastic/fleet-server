@@ -5,8 +5,8 @@ go 1.21
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.1
-	github.com/elastic/beats/v7 v7.17.22
-	github.com/elastic/elastic-agent-client/v7 v7.0.0-20210727140539-f0905d9377f6
+	github.com/elastic/beats/v7 v7.17.23-0.20240701114223-e5bb44934c11
+	github.com/elastic/elastic-agent-client/v7 v7.8.1
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/gofrs/uuid v4.4.0+incompatible
@@ -34,6 +34,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/elastic/elastic-agent-libs v0.7.2 // indirect
 	github.com/elastic/go-licenser v0.4.1 // indirect
 	github.com/elastic/go-structform v0.0.9 // indirect
 	github.com/elastic/go-sysinfo v1.14.0 // indirect
@@ -60,10 +61,11 @@ require (
 	go.elastic.co/fastjson v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.22.0 // indirect
+	golang.org/x/exp v0.0.0-20231127185646-65229373498e // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.24.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.20.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240415180920-8c6c420018be // indirect
