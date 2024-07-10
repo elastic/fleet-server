@@ -512,80 +512,119 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			return mCache
 		},
 		err: nil,
-	}, {
-		name:  "upgrade downloading action in cache no metadata",
-		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
-		details: &UpgradeDetails{
-			ActionId: "test-action",
-			State:    UpgradeDetailsStateUPGDOWNLOADING,
-		},
-		bulk: func() *ftesting.MockBulk {
-			mBulk := ftesting.NewMockBulk()
-			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			return mBulk
-		},
-		cache: func() *testcache.MockCache {
-			mCache := testcache.NewMockCache()
-			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-			return mCache
-		},
-		err: nil,
-	}, {
-		name:  "upgrade downloading action in cache wrong metadata attribute present",
-		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
-		details: &UpgradeDetails{
-			ActionId: "test-action",
-			State:    UpgradeDetailsStateUPGDOWNLOADING,
-			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"scheduled_at":"2023-01-02T12:00:00Z"}`)},
-		},
-		bulk: func() *ftesting.MockBulk {
-			mBulk := ftesting.NewMockBulk()
-			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			return mBulk
-		},
-		cache: func() *testcache.MockCache {
-			mCache := testcache.NewMockCache()
-			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-			return mCache
-		},
-		err: nil,
-	}, {
-		name:  "upgrade failed action in cache",
-		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
-		details: &UpgradeDetails{
-			ActionId: "test-action",
-			State:    UpgradeDetailsStateUPGFAILED,
-			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
-		},
-		bulk: func() *ftesting.MockBulk {
-			mBulk := ftesting.NewMockBulk()
-			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-			return mBulk
-		},
-		cache: func() *testcache.MockCache {
-			mCache := testcache.NewMockCache()
-			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-			return mCache
-		},
-		err: nil,
-	}, {
-		name:  "upgrade failed action in cache empty error_msg",
-		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
-		details: &UpgradeDetails{
-			ActionId: "test-action",
-			State:    UpgradeDetailsStateUPGFAILED,
-			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":""}`)},
-		},
-		bulk: func() *ftesting.MockBulk {
-			return ftesting.NewMockBulk()
-		},
-		cache: func() *testcache.MockCache {
-			mCache := testcache.NewMockCache()
-			mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-			return mCache
-		},
-		err: ErrInvalidUpgradeMetadata,
-	}}
+	},
+		{
+			name:  "upgrade downloading action in cache, download rate in bytes",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGDOWNLOADING,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"download_percent":12.3, "download_rate": 1000000}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade downloading action in cache, download rate in Human MB",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGDOWNLOADING,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"download_percent":12.3, "download_rate": "1MBps"}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade downloading action in cache no metadata",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGDOWNLOADING,
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade downloading action in cache wrong metadata attribute present",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGDOWNLOADING,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"scheduled_at":"2023-01-02T12:00:00Z"}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade failed action in cache",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade failed action in cache empty error_msg",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":""}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				return ftesting.NewMockBulk()
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: ErrInvalidUpgradeMetadata,
+		}}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

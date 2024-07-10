@@ -214,7 +214,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	t.Log("Enroll agent")
 	srvCopy := srv
 	srvCopy.enrollKey = newKey.Token()
-	agentID, key := EnrollAgent(enrollBody, t, ctx, srvCopy)
+	agentID, key := EnrollAgent(t, ctx, srvCopy, enrollBody)
 
 	// cleanup
 	defer func() {
@@ -368,7 +368,7 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 	t.Log("Enroll agent")
 	srvCopy := srv
 	srvCopy.enrollKey = newKey.Token()
-	agentID, key := EnrollAgent(enrollBody, t, ctx, srvCopy)
+	agentID, key := EnrollAgent(t, ctx, srvCopy, enrollBody)
 
 	// cleanup
 	defer func() {
@@ -489,7 +489,7 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 	t.Log("Enroll agent")
 	srvCopy := srv
 	srvCopy.enrollKey = newKey.Token()
-	agentID, key := EnrollAgent(enrollBody, t, ctx, srvCopy)
+	agentID, key := EnrollAgent(t, ctx, srvCopy, enrollBody)
 
 	// cleanup
 	defer func() {

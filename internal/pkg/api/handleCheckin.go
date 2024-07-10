@@ -227,7 +227,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	// Compare local_metadata content and update if different
 	rawMeta, err := parseMeta(zlog, agent, &req)
 	if err != nil {
-		return val, err
+		return val, &BadRequestErr{msg: "unable to parse meta", nextErr: err}
 	}
 
 	// Compare agent_components content and update if different
@@ -275,8 +275,18 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer ct.ad.Unsubscribe(aSub)
 	actCh := aSub.Ch()
 
+	// use revision_idx=0 if the agent has a single output where no API key is defined
+	// This will force the policy monitor to emit a new policy to regerate API keys
+	revID := agent.PolicyRevisionIdx
+	for _, output := range agent.Outputs {
+		if output.APIKey == "" {
+			revID = 0
+			break
+		}
+	}
+
 	// Subscribe to policy manager for changes on PolicyId > policyRev
-	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, agent.PolicyRevisionIdx, agent.PolicyCoordinatorIdx)
+	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, revID)
 	if err != nil {
 		return fmt.Errorf("subscribe policy monitor: %w", err)
 	}
@@ -791,7 +801,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	zlog = zlog.With().
 		Str("fleet.ctx", "processPolicy").
 		Int64(logger.RevisionIdx, pp.Policy.RevisionIdx).
-		Int64(logger.CoordinatorIdx, pp.Policy.CoordinatorIdx).
 		Str(LogPolicyID, pp.Policy.PolicyID).
 		Logger()
 
