@@ -10,7 +10,7 @@ replace (
 require (
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/docker/docker v26.1.3+incompatible
-	github.com/elastic/elastic-agent-client/v7 v7.13.0
+	github.com/elastic/elastic-agent-client/v7 v7.14.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.9.0
