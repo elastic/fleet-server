@@ -12,6 +12,8 @@ xpack.fleet.packages:
     version: latest
   - name: fleet_server
     version: latest
+  - name: apm
+    version: latest
 xpack.fleet.agentPolicies:
   - name: dummy-policy
     id: dummy-policy
