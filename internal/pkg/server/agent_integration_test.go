@@ -11,7 +11,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"sync"
@@ -23,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/go-ucfg"
 	"github.com/gofrs/uuid"
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -230,6 +234,187 @@ func TestAgent(t *testing.T) {
 		}
 		return nil
 	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+
+	// stop the agent and wait for go routine to exit
+	cancel()
+	wg.Wait()
+}
+
+func TestAgentAPM(t *testing.T) {
+	lg := testlog.SetLogger(t)
+	zerolog.DefaultContextLogger = &lg
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx = lg.WithContext(ctx)
+
+	// Fake an APM server
+	tracerConnected := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer req.Body.Close()
+		t.Logf("Tracing server received request to: %s", req.URL.Path)
+		if req.URL.Path != "/intake/v2/events" {
+			return
+		}
+		tracerConnected <- struct{}{}
+		io.Copy(io.Discard, req.Body) //nolint:errcheck // test case
+		t.Log("Tracing server request complete")
+	}))
+	defer server.Close()
+
+	t.Log("Setup agent integration test")
+	bulker := ftesting.SetupBulk(ctx, t)
+
+	policyWithInstrumentation := model.PolicyData{
+		Outputs: map[string]map[string]interface{}{
+			"default": {
+				"type": "elasticsearch",
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {}}`),
+		Inputs: []map[string]interface{}{{
+			"type": "fleet-server",
+			"instrumentation": map[string]interface{}{ // expect this config to not send traces
+				"enabled": true,
+				"hosts":   []string{"example"},
+			},
+		}},
+	}
+
+	// add a real default fleet server policy
+	policyID := uuid.Must(uuid.NewV4()).String()
+	_, err := dl.CreatePolicy(ctx, bulker, model.Policy{
+		PolicyID:           policyID,
+		RevisionIdx:        1,
+		DefaultFleetServer: true,
+		Data:               &policyWithInstrumentation,
+	})
+	require.NoError(t, err)
+
+	// add entry for enrollment key (doesn't have to be a real key)
+	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentAPIKey{
+		Name:     "Default",
+		APIKey:   "keyvalue",
+		APIKeyID: "keyid",
+		PolicyID: policyID,
+		Active:   true,
+	})
+	require.NoError(t, err)
+
+	inputSource, err := structpb.NewStruct(map[string]interface{}{
+		"id":       "fleet-server",
+		"type":     "fleet-server",
+		"name":     "fleet-server",
+		"revision": 1,
+	})
+	require.NoError(t, err)
+	outputSource, err := structpb.NewStruct(map[string]interface{}{
+		"id":       "default",
+		"type":     "elasticsearch",
+		"name":     "elasticsearch",
+		"revision": 1,
+		"hosts":    getESHosts(),
+		"bootstrap": map[string]interface{}{
+			// check to make sure the service_token is injected into the output
+			"service_token": getESServiceToken(),
+		},
+	})
+	require.NoError(t, err)
+	agentID := uuid.Must(uuid.NewV4()).String()
+	expected := makeExpected(agentID, 1, inputSource, 1, outputSource)
+	control := createAndStartControlServer(t, expected)
+	defer control.Stop()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	a := &Agent{
+		cliCfg: ucfg.New(),
+		bi:     biInfo,
+	}
+	a.agent = client.NewV2(fmt.Sprintf("localhost:%d", control.Port()), control.Token(), client.VersionInfo{
+		Name:      "fleet-server",
+		BuildHash: "abcdefgh",
+	}, client.WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
+	go func() {
+		defer wg.Done()
+
+		err = a.Run(ctx)
+		assert.NoError(t, err)
+	}()
+
+	// wait for fleet-server to report as healthy
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		state := getUnitState(control, proto.UnitType_INPUT, "fleet-server-default-fleet-server")
+		if state != proto.State_HEALTHY {
+			return fmt.Errorf("should be reported as healthy; instead its %s", state)
+		}
+		return nil
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+
+	// make a request
+	cli := cleanhttp.DefaultClient()
+	callStatus := func() {
+		var Err error
+		defer require.NoError(t, Err)
+		for {
+			req, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost:8220/api/status", nil)
+			req.Header.Set("Content-Type", "application/json")
+			res, err := cli.Do(req)
+			if err == nil { // return on successful request
+				if res.Body != nil {
+					res.Body.Close()
+				}
+				return
+			}
+			Err = err //nolint:ineffassign,staticcheck // ugly work around for error checking
+			// retry after wait or cancel
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+			}
+		}
+	}
+
+	callStatus()
+
+	// Verify the APM tracer does not connect to the mocked APM Server.
+	select {
+	case <-tracerConnected:
+		t.Error("APM Tracer connected to APM Server, bug in the tracing code")
+	case <-time.After(5 * time.Second):
+		t.Log("No APM data when tracer is disabled")
+	}
+
+	t.Log("Test APMConfig")
+	expected = makeExpected(agentID, 2, inputSource, 1, outputSource)
+	expected.Component = &proto.Component{
+		ApmConfig: &proto.APMConfig{
+			Elastic: &proto.ElasticAPM{
+				Hosts: []string{server.URL},
+			},
+		},
+	}
+	control.Expected(expected)
+
+	// wait for fleet-server to report as healthy
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		state := getUnitState(control, proto.UnitType_INPUT, "fleet-server-default-fleet-server")
+		if state != proto.State_HEALTHY {
+			return fmt.Errorf("should be reported as healthy; instead its %s", state)
+		}
+		return nil
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+
+	callStatus()
+
+	// Verify that the server now sends APM data
+	select {
+	case <-tracerConnected:
+		t.Log("tracer connection detected")
+	case <-time.After(5 * time.Second):
+		t.Error("APM tracer connection undetected, bug in the tracing code")
+	}
 
 	// stop the agent and wait for go routine to exit
 	cancel()
