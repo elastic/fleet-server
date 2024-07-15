@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -242,24 +241,13 @@ func TestAgent(t *testing.T) {
 
 func TestAgentAPM(t *testing.T) {
 	lg := testlog.SetLogger(t)
-	zerolog.DefaultContextLogger = &lg
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx = lg.WithContext(ctx)
 
 	// Fake an APM server
 	tracerConnected := make(chan struct{}, 1)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		defer req.Body.Close()
-		t.Logf("Tracing server received request to: %s", req.URL.Path)
-		if req.URL.Path != "/intake/v2/events" {
-			return
-		}
-		tracerConnected <- struct{}{}
-		io.Copy(io.Discard, req.Body) //nolint:errcheck // test case
-		t.Log("Tracing server request complete")
-	}))
+	server := httptest.NewServer(stubAPMServer(t, tracerConnected))
 	defer server.Close()
 
 	t.Log("Setup agent integration test")
@@ -415,6 +403,21 @@ func TestAgentAPM(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Error("APM tracer connection undetected, bug in the tracing code")
 	}
+
+	// trigger stop
+	expected = makeExpected(agentID, 1, inputSource, 3, outputSource)
+	expected.Units[0].State = proto.State_STOPPED
+	expected.Units[1].State = proto.State_STOPPED
+	control.Expected(expected)
+
+	// wait for fleet-server to report as stopped
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		state := getUnitState(control, proto.UnitType_INPUT, "fleet-server-default-fleet-server")
+		if state != proto.State_STOPPED {
+			return fmt.Errorf("should be reported as stopped; instead its %s", state)
+		}
+		return nil
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
 
 	// stop the agent and wait for go routine to exit
 	cancel()
