@@ -149,13 +149,11 @@ func (m *monitorT) notify(ctx context.Context, hits []es.HitT) {
 				case s.c <- hits:
 					zerolog.Ctx(ctx).Info().
 						Str("ctx", "subscription monitor").
-						Any("hits", hits).
 						Msg("received notification")
 				case <-lc.Done():
 					zerolog.Ctx(ctx).Error().
 						Err(lc.Err()).
 						Str("ctx", "subscription monitor").
-						Any("hits", hits).
 						Dur("timeout", m.subTimeout).
 						Msg("dropped notification")
 				}
