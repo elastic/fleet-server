@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"os"
@@ -322,4 +323,57 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
 
 	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
+}
+
+func (suite *AgentInstallSuite) TestAPMInstrumentation() {
+	// Restore original elastic-agent.yml after test
+	cfgFile := filepath.Join(filepath.Dir(suite.agentPath), "elastic-agent.yml")
+	f, err := os.Open(cfgFile)
+	suite.Require().NoError(err)
+	p, err := io.ReadAll(f)
+	suite.Require().NoError(err)
+	err = f.Close()
+	suite.Require().NoError(err)
+	err = os.Remove(cfgFile)
+	suite.Require().NoError(err)
+	suite.T().Cleanup(func() {
+		f, err := os.OpenFile(cfgFile, os.O_RDWR|os.O_TRUNC, 0644)
+		suite.Require().NoError(err)
+		n, err := f.WriteAt(p, 0)
+		suite.Require().NoError(err)
+		err = f.Truncate(int64(n))
+		suite.Require().NoError(err)
+	})
+
+	// write elastic-agent.yml used for test
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "agent-install-apm.tpl"))
+	suite.Require().NoError(err)
+	f, err = os.Create(cfgFile)
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"TestName": "AgentInstallAPMInstrumentation",
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
+		"--fleet-server-es=http://"+suite.ESHosts,
+		"--fleet-server-service-token="+suite.ServiceToken,
+		"--fleet-server-insecure-http=true",
+		"--fleet-server-host=0.0.0.0",
+		"--fleet-server-policy=fleet-server-policy",
+		"--non-interactive")
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Dir = filepath.Dir(suite.agentPath)
+
+	output, err := cmd.CombinedOutput()
+	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
+
+	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+	suite.HasTraceWithLabels(ctx, map[string]string{"TestName": "AgentInstallAPMInstrumentation"})
+
+	suite.Require().Fail("test fail")
 }

@@ -520,3 +520,10 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 	endpoint := fmt.Sprintf("%s:%s", hostIP, mappedPort.Port())
 	return toxiproxy.NewClient(endpoint)
 }
+
+func (s *Scaffold) HasTraceWithLabels(ctx context.Context, labels map[string]string) {
+	if len(labels) == 0 {
+		return
+	}
+	s.Require().Fail("trace verification unimplemented")
+}
