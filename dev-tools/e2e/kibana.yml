@@ -36,6 +36,15 @@ xpack.fleet.agentPolicies:
         id: default-fleet-server
         package:
           name: fleet_server
+  - name: apm-policy
+    id: apm-policy
+    namespace: default
+    monitoring_enabled: []
+    package_policies:
+      - name: apm-1
+        id: default-apm
+        package:
+          name: apm
 xpack.fleet.outputs:
   - id: fleet-default-output
     name: default
