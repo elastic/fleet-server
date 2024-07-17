@@ -16,7 +16,8 @@ jsonBody=$(curl -sSL -XPOST "$host/_security/api_key" -H 'Content-Type: applicat
       }, {
         "names": [".apm-agent-configuration"],
         "privileges": ["read"]
-      }]
+      }],
+      "cluster": ["monitor"]
     }
   }
 }
