@@ -405,7 +405,7 @@ func TestAgentAPM(t *testing.T) {
 	}
 
 	// trigger stop
-	expected = makeExpected(agentID, 1, inputSource, 3, outputSource)
+	expected = makeExpected(agentID, 3, inputSource, 1, outputSource)
 	expected.Units[0].State = proto.State_STOPPED
 	expected.Units[1].State = proto.State_STOPPED
 	control.Expected(expected)
