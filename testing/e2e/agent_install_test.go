@@ -356,7 +356,7 @@ func (suite *AgentInstallSuite) TestAPMInstrumentation() {
 	f.Close()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
@@ -373,7 +373,5 @@ func (suite *AgentInstallSuite) TestAPMInstrumentation() {
 	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
-	suite.HasTraceWithLabels(ctx, map[string]string{"TestName": "AgentInstallAPMInstrumentation"})
-
-	suite.Require().Fail("test fail")
+	suite.HasTestStatusTrace(ctx, "AgentInstallAPMInstrumentation")
 }

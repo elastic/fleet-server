@@ -3,7 +3,7 @@ agent.monitoring:
   apm:
     hosts:
       - http://localhost:8200
-    environment: test
+    environment: test-{{ .TestName }}
     secret_token: "b!gS3cret"
     global_labels:
       testName: {{ .TestName }}

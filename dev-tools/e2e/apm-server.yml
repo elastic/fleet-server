@@ -9,7 +9,7 @@ apm-server:
   auth:
     api_key:
       enabled: false
-    secret_token: b!gS3cret
+    secret_token: "b!gS3cret"
 
 logging.level: debug
 logging.to_stderr: true

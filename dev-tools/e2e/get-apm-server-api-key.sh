@@ -17,8 +17,25 @@ jsonBody=$(curl -sSL -XPOST "$host/_security/api_key" -H 'Content-Type: applicat
         "names": [".apm-agent-configuration"],
         "privileges": ["read"],
         "allow_restricted_indices": true
+      }, {
+        "names": ["traces-apm*", "logs-apm*", "metrics-apm*"],
+        "privileges": ["auto_configure", "create_doc"]
       }],
       "cluster": ["monitor"]
+    },
+    "apm_monitoring_writer": {
+      "indices": [{
+        "names": [".monitoring-beats-*"],
+        "privileges": ["create_index", "create_doc"]
+      }]
+    },
+    "apm_api_key": {
+      "cluster": ["manage_own_api_key"],
+      "applications": [{
+        "application": "apm",
+        "privileges": ["event:write"],
+        "resources": ["*"]
+      }]
     }
   }
 }

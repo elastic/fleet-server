@@ -169,7 +169,7 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 }
 
 func (suite *StandAloneContainerSuite) TestAPMInstrumentation() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 	defer cancel()
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{
@@ -185,5 +185,5 @@ func (suite *StandAloneContainerSuite) TestAPMInstrumentation() {
 	suite.Require().NoError(err)
 
 	suite.FleetServerStatusOK(ctx, endpoint)
-	suite.HasTraceWithLabels(ctx, map[string]string{"TestName": "StandAloneContainerAPMInstrumentation"})
+	suite.HasTestStatusTrace(ctx, "StandAloneContainerAPMInstrumentation")
 }

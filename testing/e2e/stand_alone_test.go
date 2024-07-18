@@ -353,7 +353,7 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 	f.Close()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
 
 	// Run the fleet-server binary
 	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
@@ -365,9 +365,8 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 	suite.Require().NoError(err)
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
-	suite.HasTraceWithLabels(ctx, map[string]string{"TestName": "StandAloneAPMInstrumentation"})
+	suite.HasTestStatusTrace(ctx, "StandAloneAPMInstrumentation")
 
 	cancel()
 	cmd.Wait()
-
 }
