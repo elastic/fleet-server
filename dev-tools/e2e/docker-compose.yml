@@ -17,7 +17,7 @@ services:
     environment:
       - API_KEY=${APM_KEY}
     volumes:
-      - ./apm-server.yml:/usr/share/apm-server/config/apm-server.yml
+      - ./apm-server.yml:/usr/share/apm-server/apm-server.yml
     ports:
       - 127.0.0.1:8200:8200
     networks:

@@ -11,26 +11,9 @@ apm-server:
       enabled: false
     secret_token: b!gS3cret
 
+logging.level: debug
+logging.to_stderr: true
+
 output.elasticsearch:
-  # Array of hosts to connect to.
-  # Scheme and port can be left out and will be set to the default (`http` and `9200`).
-  # In case you specify and additional path, the scheme is required: `http://elasticsearch:9200/path`.
-  # IPv6 addresses should always be defined as: `https://[2001:db8::1]:9200`.
   hosts: ["elasticsearch:9200"]
   api_key: "${API_KEY}"
-
-#=============================== HTTP Endpoint ===============================
-
-# apm-server can expose internal metrics through a HTTP endpoint. For security
-# reasons the endpoint is disabled by default. This feature is currently experimental.
-# Stats can be access through http://localhost:5066/stats. For pretty JSON output
-# append ?pretty to the URL.
-
-# Defines if the HTTP endpoint is enabled.
-#http.enabled: false
-
-# The HTTP endpoint will bind to this hostname or IP address. It is recommended to use only localhost.
-#http.host: localhost
-
-# Port on which the HTTP endpoint will bind. Default is 5066.
-#http.port: 5066

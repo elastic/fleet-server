@@ -15,7 +15,8 @@ jsonBody=$(curl -sSL -XPOST "$host/_security/api_key" -H 'Content-Type: applicat
         "privileges": ["read"]
       }, {
         "names": [".apm-agent-configuration"],
-        "privileges": ["read"]
+        "privileges": ["read"],
+        "allow_restricted_indices": true
       }],
       "cluster": ["monitor"]
     }
@@ -24,10 +25,9 @@ jsonBody=$(curl -sSL -XPOST "$host/_security/api_key" -H 'Content-Type: applicat
 ')
 
 # use grep and sed to get the encoded api key as we may not have jq or a similar tool on the instance
-apiKey=$(echo ${jsonBody} |  grep -Eo '"encoded"[^}]*' | grep -Eo ':.*' | sed -r "s/://" | sed -r 's/"//g')
+apiKey=$(echo ${jsonBody} |  grep -Eo '"encoded"[^}]*' | grep -Eo ':.*' | sed -r "s/://" | sed -r 's/"//g' | base64 --decode)
 
-# cache or use cached api key in order to be able to run repeative integration tests,
-# very useful during development, without recreating elasticsearch instance every time.
+# cache ApiKey for testing
 if [ -z "$apiKey" ]
 then
     apiKey=`cat .apm_server_api_key`
