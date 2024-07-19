@@ -364,7 +364,7 @@ e2e-docker-start: int-docker-start ## - Start a testing instance of Elasticsearc
 
 .PHONY: e2e-docker-stop
 e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
-	@KIBANA_TOKEN="supress-warning" docker compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env down
+	@KIBANA_TOKEN="supress-warning" APM_KEY="supress-warning" docker compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env down
 	rm -f .kibana_service_token .apm_server_api_key
 	@$(MAKE) int-docker-stop
 
