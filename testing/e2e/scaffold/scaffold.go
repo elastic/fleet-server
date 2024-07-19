@@ -557,6 +557,7 @@ func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string) {
 			if obj.Hits.Total.Value > 0 {
 				return
 			}
+			timer.Reset(time.Second)
 		}
 	}
 }
