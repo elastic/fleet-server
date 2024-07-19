@@ -554,6 +554,7 @@ func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string) {
 			err = json.NewDecoder(resp.Body).Decode(&obj)
 			resp.Body.Close()
 			s.Require().NoError(err)
+			s.T().Logf("search for trace: test-%s found %d hits", name, obj.Hits.Total.Value)
 			if obj.Hits.Total.Value > 0 {
 				return
 			}
