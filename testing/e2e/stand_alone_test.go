@@ -348,6 +348,7 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 	err = tpl.Execute(f, map[string]string{
 		"Hosts":        suite.ESHosts,
 		"ServiceToken": suite.ServiceToken,
+		"APMHost":      "http://localhost:8200",
 		"TestName":     "StandAloneAPMInstrumentation",
 	})
 	f.Close()

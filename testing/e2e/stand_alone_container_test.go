@@ -177,6 +177,7 @@ func (suite *StandAloneContainerSuite) TestAPMInstrumentation() {
 		TemplateData: map[string]string{
 			"Hosts":        "http://elasticsearch:9200",
 			"ServiceToken": suite.ServiceToken,
+			"APMHost":      "http://apm-server:8200",
 			"TestName":     "StandAloneContainerAPMInstrumentation",
 		},
 	})

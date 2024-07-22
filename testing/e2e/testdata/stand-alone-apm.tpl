@@ -11,7 +11,7 @@ inputs:
     instrumentation:
       enabled: true
       hosts:
-        - http://localhost:8200
+        - {{ .APMHost }}
       secret_token: "b!gS3cret"
       environment: test-{{ .TestName }}
       global_lables: testName={{ .TestName }}
