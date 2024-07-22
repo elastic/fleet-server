@@ -579,7 +579,7 @@ func getUnitState(control *StubV2Control, unitType proto.UnitType, unitID string
 	return proto.State_STARTING
 }
 
-func makeExpected(agentID string, inputConfigIdx uint64, inputSource *structpb.Struct, outputConfigIdx uint64, outputSource *structpb.Struct) *proto.CheckinExpected { //nolint:unparam // used for tests
+func makeExpected(agentID string, inputConfigIdx uint64, inputSource *structpb.Struct, outputConfigIdx uint64, outputSource *structpb.Struct) *proto.CheckinExpected {
 	return &proto.CheckinExpected{
 		AgentInfo: &proto.AgentInfo{
 			Id:       agentID,
