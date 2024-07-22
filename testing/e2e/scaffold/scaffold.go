@@ -536,8 +536,10 @@ func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string) {
 			s.Require().NoError(ctx.Err(), "context expired before status trace was detected")
 			return
 		case <-timer.C:
+			s.T().Log("Search for trace")
 			resp, err := s.Client.Do(req)
 			s.Require().NoError(err)
+			s.T().Logf("Response: status=%d", resp.StatusCode)
 			if resp.StatusCode != http.StatusOK {
 				resp.Body.Close()
 				timer.Reset(time.Second)
