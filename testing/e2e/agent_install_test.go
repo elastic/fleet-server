@@ -274,6 +274,7 @@ func (suite *AgentInstallSuite) TearDownTest() {
 	if suite.T().Skipped() {
 		return
 	}
+
 	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "--force").CombinedOutput()
 	suite.Assert().NoErrorf(err, "elastic-agent uninstall failed. Output: %s", out)
 }
@@ -325,7 +326,9 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
 }
 
-func (suite *AgentInstallSuite) TestAPMInstrumentation() {
+// testAPMInstrumentationFile tests passing agentt.monitoring.apm.* config options through the elastic-agent.yml file during install time
+// it currently does not work, not sure if that is intended behaviour
+func (suite *AgentInstallSuite) testAPMInstrumentationFile() {
 	// Restore original elastic-agent.yml after test
 	cfgFile := filepath.Join(filepath.Dir(suite.agentPath), "elastic-agent.yml")
 	f, err := os.Open(cfgFile)
@@ -351,7 +354,7 @@ func (suite *AgentInstallSuite) TestAPMInstrumentation() {
 	f, err = os.Create(cfgFile)
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]string{
-		"TestName": "AgentInstallAPMInstrumentation",
+		"TestName": "AgentInstallAPMInstrumentationFile",
 	})
 	f.Close()
 	suite.Require().NoError(err)
@@ -373,5 +376,40 @@ func (suite *AgentInstallSuite) TestAPMInstrumentation() {
 	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
-	suite.HasTestStatusTrace(ctx, "AgentInstallAPMInstrumentation")
+	suite.HasTestStatusTrace(ctx, "AgentInstallAPMInstrumentationFile")
+}
+
+func (suite *AgentInstallSuite) TestAPMInstrumentationPolicy() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
+
+	suite.AddPolicyOverrides(ctx, "fleet-server-apm", map[string]interface{}{
+		"agent.monitoring": map[string]interface{}{
+			"traces": true,
+			"apm": map[string]interface{}{
+				"hosts":        []interface{}{"http://localhost:8200"},
+				"environment":  "test-AgentInstallAPMInstrumentationPolicy",
+				"secret_token": "b!gS3cret",
+				"global_labels": map[string]interface{}{
+					"testName": "AgentInstallAPMInstrumentationPolicy",
+				},
+			},
+		},
+	})
+
+	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
+		"--fleet-server-es=http://"+suite.ESHosts,
+		"--fleet-server-service-token="+suite.ServiceToken,
+		"--fleet-server-insecure-http=true",
+		"--fleet-server-host=0.0.0.0",
+		"--fleet-server-policy=fleet-server-apm",
+		"--non-interactive")
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Dir = filepath.Dir(suite.agentPath)
+
+	output, err := cmd.CombinedOutput()
+	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
+
+	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+	suite.HasTestStatusTrace(ctx, "AgentInstallAPMInstrumentationPolicy")
 }

@@ -563,3 +563,26 @@ func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string) {
 		}
 	}
 }
+
+func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides map[string]interface{}) {
+	body := struct {
+		Name      string                 `json:"name"`
+		Namespace string                 `json:"namespace"`
+		Overrides map[string]interface{} `json:"overrides"`
+	}{
+		Name:      id,
+		Namespace: "default",
+		Overrides: overrides,
+	}
+	p, err := json.Marshal(&body)
+	s.Require().NoError(err)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, fmt.Sprintf("http://localhost:5601/api/fleet/agent_policies/%s", id), bytes.NewReader(p))
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("kbn-xsrf", "e2e-test")
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	s.Require().Equal(http.StatusOK, resp.StatusCode)
+}
