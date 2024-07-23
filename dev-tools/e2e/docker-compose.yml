@@ -3,6 +3,12 @@ services:
   kibana:
     image: "docker.elastic.co/kibana/kibana:${ELASTICSEARCH_VERSION}-amd64"
     container_name: kibana
+    healthcheck:
+      test: ["CMD", "curl", "-f", "${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:5601/api/status"]
+      start_period: 20s
+      interval: 10s
+      timeout: 10s
+      retries: 3
     environment:
       - KIBANA_TOKEN=${KIBANA_TOKEN}
     volumes:
@@ -14,6 +20,12 @@ services:
   apm-server:
     image:  "docker.elastic.co/apm/apm-server:${ELASTICSEARCH_VERSION}-amd64"
     container_name: apm-server
+    # curl is not in the apm-server image
+    #healthcheck:
+    #  test: ["CMD", "curl", "-f", "localhost:8200"]
+    #  interval: 10s
+    #  timeout: 10s
+    #  retries: 3
     environment:
       - API_KEY=${APM_KEY}
     volumes:

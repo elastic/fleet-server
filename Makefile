@@ -360,7 +360,7 @@ e2e-docker-start: int-docker-start ## - Start a testing instance of Elasticsearc
 	@KIBANA_TOKEN=$(shell ./dev-tools/e2e/get-kibana-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 		APM_KEY=$(shell ./dev-tools/e2e/get-apm-server-api-key.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}) \
 		docker compose -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans kibana --remove-orphans apm-server
-	@./dev-tools/e2e/wait-for-kibana.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:5601
+	@./dev-tools/e2e/wait-for-apm.sh localhost:8200
 
 .PHONY: e2e-docker-stop
 e2e-docker-stop: ## - Tear down testing Elasticsearch and Kibana instances
