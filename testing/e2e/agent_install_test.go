@@ -384,14 +384,17 @@ func (suite *AgentInstallSuite) TestAPMInstrumentationPolicy() {
 	defer cancel()
 
 	suite.AddPolicyOverrides(ctx, "fleet-server-apm", map[string]interface{}{
-		"agent.monitoring": map[string]interface{}{
-			"traces": true,
-			"apm": map[string]interface{}{
-				"hosts":        []interface{}{"http://localhost:8200"},
-				"environment":  "test-AgentInstallAPMInstrumentationPolicy",
-				"secret_token": "b!gS3cret",
-				"global_labels": map[string]interface{}{
-					"testName": "AgentInstallAPMInstrumentationPolicy",
+		// NOTE: if the following key is specified as agent.monitoring the kibana ui will not merge it correctly in the policy.
+		"agent": map[string]interface{}{
+			"monitoring": map[string]interface{}{
+				"traces": true,
+				"apm": map[string]interface{}{
+					"hosts":        []interface{}{"http://localhost:8200"},
+					"environment":  "test-AgentInstallAPMInstrumentationPolicy",
+					"secret_token": "b!gS3cret",
+					"global_labels": map[string]interface{}{
+						"testName": "AgentInstallAPMInstrumentationPolicy",
+					},
 				},
 			},
 		},
