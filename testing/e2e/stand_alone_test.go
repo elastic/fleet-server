@@ -366,7 +366,7 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 	suite.Require().NoError(err)
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
-	suite.HasTestStatusTrace(ctx, "StandAloneAPMInstrumentation")
+	suite.HasTestStatusTrace(ctx, "StandAloneAPMInstrumentation", nil)
 
 	cancel()
 	cmd.Wait()

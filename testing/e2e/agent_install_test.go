@@ -376,7 +376,7 @@ func (suite *AgentInstallSuite) testAPMInstrumentationFile() {
 	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
-	suite.HasTestStatusTrace(ctx, "AgentInstallAPMInstrumentationFile")
+	suite.HasTestStatusTrace(ctx, "AgentInstallAPMInstrumentationFile", nil)
 }
 
 func (suite *AgentInstallSuite) TestAPMInstrumentationPolicy() {
@@ -414,5 +414,7 @@ func (suite *AgentInstallSuite) TestAPMInstrumentationPolicy() {
 	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
-	suite.HasTestStatusTrace(ctx, "AgentInstallAPMInstrumentationPolicy")
+	suite.HasTestStatusTrace(ctx, "AgentInstallAPMInstrumentationPolicy", func(ctx context.Context) {
+		suite.FleetServerStatusOK(ctx, "http://localhost:8220") // retry status API if no traces are found to allow the policy reload to propagate
+	})
 }

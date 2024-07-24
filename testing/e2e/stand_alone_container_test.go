@@ -186,5 +186,5 @@ func (suite *StandAloneContainerSuite) TestAPMInstrumentation() {
 	suite.Require().NoError(err)
 
 	suite.FleetServerStatusOK(ctx, endpoint)
-	suite.HasTestStatusTrace(ctx, "StandAloneContainerAPMInstrumentation")
+	suite.HasTestStatusTrace(ctx, "StandAloneContainerAPMInstrumentation", nil)
 }

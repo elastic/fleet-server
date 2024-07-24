@@ -522,7 +522,8 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 }
 
 // HasTestStatusTrace will search elasticsearch for an APM trace to GET /api/status with the environment name test-$name
-func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string) {
+// If a retry func is specified, it will be ran if the query for traces recieves no hits, the retry func is intended to generate a trace.
+func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string, retry func(ctx context.Context)) {
 	timer := time.NewTimer(time.Second)
 	for {
 		buf := bytes.NewBufferString(fmt.Sprintf(`{"query": {"bool": {"filter": [{"term": { "transaction.name": "GET /api/status"}}, {"term": { "service.environment": "test-%s"}}]}}}`, name))
@@ -536,10 +537,8 @@ func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string) {
 			s.Require().NoError(ctx.Err(), "context expired before status trace was detected")
 			return
 		case <-timer.C:
-			s.T().Log("Search for trace")
 			resp, err := s.Client.Do(req)
 			s.Require().NoError(err)
-			s.T().Logf("Response: status=%d", resp.StatusCode)
 			if resp.StatusCode != http.StatusOK {
 				resp.Body.Close()
 				timer.Reset(time.Second)
@@ -558,6 +557,9 @@ func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string) {
 			s.Require().NoError(err)
 			if obj.Hits.Total.Value > 0 {
 				return
+			}
+			if retry != nil {
+				retry(ctx)
 			}
 			timer.Reset(time.Second)
 		}
