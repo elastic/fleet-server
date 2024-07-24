@@ -14,7 +14,7 @@ inputs:
         - {{ .APMHost }}
       secret_token: "b!gS3cret"
       environment: test-{{ .TestName }}
-      global_lables: testName={{ .TestName }}
+      global_labels: testName={{ .TestName }}
 
 logging:
   to_stderr: true

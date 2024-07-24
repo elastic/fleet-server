@@ -521,12 +521,12 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 	return toxiproxy.NewClient(endpoint)
 }
 
-// HasTestStatusTrace will search elasticsearch for an APM trace to GET /api/status with the environment name test-$name
+// HasTestStatusTrace will search elasticsearch for an APM trace to GET /api/status with labels.testName: name
 // If a retry func is specified, it will be ran if the query for traces recieves no hits, the retry func is intended to generate a trace.
 func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string, retry func(ctx context.Context)) {
 	timer := time.NewTimer(time.Second)
 	for {
-		buf := bytes.NewBufferString(fmt.Sprintf(`{"query": {"bool": {"filter": [{"term": { "transaction.name": "GET /api/status"}}, {"term": { "service.environment": "test-%s"}}]}}}`, name))
+		buf := bytes.NewBufferString(fmt.Sprintf(`{"query": {"bool": {"filter": [{"term": { "transaction.name": "GET /api/status"}}, {"term": { "labels.testName": "%s"}}]}}}`, name))
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:9200/traces-apm-default/_search", buf)
 		s.Require().NoError(err)
 		req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
