@@ -22,8 +22,8 @@ github.com/docker/docker v1.4.2-0.20190924003213-a8608b5b67c7/go.mod h1:eEKB0N0r
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
-github.com/elastic/beats/v7 v7.17.23-0.20240701114223-e5bb44934c11 h1:kmgyS9V7HdnTnpVtq0g+x5FOKz+z2JtBCCRAaVO/q5Y=
-github.com/elastic/beats/v7 v7.17.23-0.20240701114223-e5bb44934c11/go.mod h1:XSeg9SQ0QHKyh5Cr6qHdUdNdcJ1Cg30bOFqvjoFh8vg=
+github.com/elastic/beats/v7 v7.17.23-0.20240725133810-bd0ffc1af3bb h1:qVgqKszYsvoHgSpP415dEzuCm2uJwDH4w+1BLWWwnXg=
+github.com/elastic/beats/v7 v7.17.23-0.20240725133810-bd0ffc1af3bb/go.mod h1:+2K2qNEHhRNl80SXImhFrxuOrdvDs/Sb/3ay+MFbK2M=
 github.com/elastic/elastic-agent-client/v7 v7.8.1 h1:J9wZc/0mUvSEok0X5iR5+n60Jgb+AWooKddb3XgPWqM=
 github.com/elastic/elastic-agent-client/v7 v7.8.1/go.mod h1:axl1nkdqc84YRFkeJGD9jExKNPUrOrzf3DFo2m653nY=
 github.com/elastic/elastic-agent-libs v0.7.2 h1:yT0hF0UAxJCdQqhHh6SFpgYrcpB10oFzPj8IaytPS2o=
