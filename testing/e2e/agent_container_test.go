@@ -8,6 +8,7 @@ package e2e
 
 import (
 	"context"
+	"html/template"
 	"io"
 	"os"
 	"os/exec"
@@ -23,6 +24,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 )
+
+// NOTE: GOCOVERDIR is specied when manipulating the container, but is not defined in the fleet-server spec and is not passed to fleet-server
 
 type AgentContainerSuite struct {
 	scaffold.Scaffold
@@ -440,4 +443,67 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 			return
 		}
 	}
+}
+
+func (suite *AgentContainerSuite) TestAPMInstrumentationFile() {
+	suite.T().Skip("Testcase requires https://github.com/elastic/fleet-server/issues/3526 to be resolved.")
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "agent-install-apm.tpl"))
+	suite.Require().NoError(err)
+	configPath := filepath.Join(dir, "elastic-agent.yml")
+	f, err := os.Create(configPath)
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"APMHost":  "http://apm-server:8200",
+		"TestName": "AgentContainerAPMInstrumentationFile",
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	req := testcontainers.ContainerRequest{
+		Hostname: "fleet-server",
+		Image:    suite.dockerImg,
+		Env: map[string]string{
+			"GOCOVERDIR":                      "/cover",
+			"FLEET_SERVER_ENABLE":             "1",
+			"FLEET_SERVER_POLICY_ID":          "fleet-server-policy",
+			"FLEET_SERVER_ELASTICSEARCH_HOST": "http://elasticsearch:9200",
+			"FLEET_SERVER_SERVICE_TOKEN":      suite.ServiceToken,
+			"FLEET_SERVER_INSECURE_HTTP":      "true",
+			"FLEET_SERVER_HOST":               "0.0.0.0",
+		},
+		ExposedPorts: []string{"8220/tcp"},
+		Networks:     []string{"integration_default"},
+		HostConfigModifier: func(cfg *container.HostConfig) {
+			if cfg.Mounts == nil {
+				cfg.Mounts = make([]mount.Mount, 0)
+			}
+			cfg.Mounts = append(cfg.Mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: suite.CoverPath,
+				Target: "/cover",
+			}, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: dir,
+				Target: "/usr/share/elastic-agent/state",
+			})
+		},
+		WaitingFor: containerWaitForHealthyStatus(),
+	}
+	fleetC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+		Logger:           &logger{suite.T()},
+	})
+	suite.Require().NoError(err)
+	suite.container = fleetC
+
+	endpoint, err := fleetC.Endpoint(ctx, "http")
+	suite.Require().NoError(err)
+
+	suite.FleetIsHealthy(ctx, endpoint)
+	suite.HasTestStatusTrace(ctx, "AgentContainerAPMInstrumentationFile", nil)
 }

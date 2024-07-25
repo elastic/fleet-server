@@ -32,6 +32,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+// NOTE: GOCOVERDIR is specied when manipulating the agent, but is not defined in the fleet-server spec and is not passed to fleet-server
+
 type AgentInstallSuite struct {
 	scaffold.Scaffold
 
@@ -290,7 +292,7 @@ func (suite *AgentInstallSuite) TestHTTP() {
 		"--fleet-server-host=0.0.0.0",
 		"--fleet-server-policy=fleet-server-policy",
 		"--non-interactive")
-	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	cmd.Dir = filepath.Dir(suite.agentPath)
 
 	output, err := cmd.CombinedOutput()
@@ -317,7 +319,7 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 		"--fleet-server-cert-key="+filepath.Join(suite.CertPath, "fleet-server.key"),
 		"--fleet-server-cert-key-passphrase="+filepath.Join(suite.CertPath, "passphrase"),
 		"--non-interactive")
-	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	cmd.Dir = filepath.Dir(suite.agentPath)
 
 	output, err := cmd.CombinedOutput()
@@ -326,9 +328,8 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
 }
 
-// testAPMInstrumentationFile tests passing agentt.monitoring.apm.* config options through the elastic-agent.yml file during install time
-// it currently does not work, not sure if that is intended behaviour
-func (suite *AgentInstallSuite) testAPMInstrumentationFile() {
+func (suite *AgentInstallSuite) TestAPMInstrumentationFile() {
+	suite.T().Skip("Testcase requires https://github.com/elastic/fleet-server/issues/3526 to be resolved.") // solution to 3526 may also resolve for the install test case, if it does not we can consider this to be an unsupported usecase and remove the test.
 	// Restore original elastic-agent.yml after test
 	cfgFile := filepath.Join(filepath.Dir(suite.agentPath), "elastic-agent.yml")
 	f, err := os.Open(cfgFile)
@@ -354,6 +355,7 @@ func (suite *AgentInstallSuite) testAPMInstrumentationFile() {
 	f, err = os.Create(cfgFile)
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]string{
+		"APMHost":  "http://localhost:8200",
 		"TestName": "AgentInstallAPMInstrumentationFile",
 	})
 	f.Close()
@@ -369,7 +371,7 @@ func (suite *AgentInstallSuite) testAPMInstrumentationFile() {
 		"--fleet-server-host=0.0.0.0",
 		"--fleet-server-policy=fleet-server-policy",
 		"--non-interactive")
-	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	cmd.Dir = filepath.Dir(suite.agentPath)
 
 	output, err := cmd.CombinedOutput()
@@ -407,7 +409,7 @@ func (suite *AgentInstallSuite) TestAPMInstrumentationPolicy() {
 		"--fleet-server-host=0.0.0.0",
 		"--fleet-server-policy=fleet-server-apm",
 		"--non-interactive")
-	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	cmd.Dir = filepath.Dir(suite.agentPath)
 
 	output, err := cmd.CombinedOutput()
