@@ -9,8 +9,7 @@ EC_KEY_SECRET_PATH="kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
 PRIVATE_CI_GCS_CREDENTIALS_PATH="kv/ci-shared/platform-ingest/gcp-platform-ingest-ci-service-account"
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 JOB_GCS_BUCKET="ingest-buildkite-ci"
-GITHUB_TOKEN_VAULT_PATH="kv/ci-shared/platform-ingest/github_token"
-GITHUB_REPO_TOKEN=$(retry 5 vault kv get -field token ${GITHUB_TOKEN_VAULT_PATH})
+GITHUB_REPO_TOKEN=$VAULT_GITHUB_TOKEN
 
 # Usage:
 #check_if_file_exist_in_repo "infra" "main"
