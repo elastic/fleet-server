@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.1
-	github.com/elastic/beats/v7 v7.17.23-0.20240701114223-e5bb44934c11
+	github.com/elastic/beats/v7 v7.17.23-0.20240725133810-bd0ffc1af3bb
 	github.com/elastic/elastic-agent-client/v7 v7.8.1
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
 	github.com/elastic/go-ucfg v0.8.8
