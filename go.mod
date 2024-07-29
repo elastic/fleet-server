@@ -8,7 +8,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.15.0
 	github.com/elastic/elastic-agent-libs v0.9.15
-	github.com/elastic/elastic-agent-system-metrics v0.10.4
+	github.com/elastic/elastic-agent-system-metrics v0.10.6
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.6.0
@@ -52,7 +52,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.6.0 // indirect
 	github.com/elastic/go-structform v0.0.10 // indirect
-	github.com/elastic/go-sysinfo v1.14.0 // indirect
+	github.com/elastic/go-sysinfo v1.14.1 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
