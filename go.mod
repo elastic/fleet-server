@@ -51,7 +51,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.6.0 // indirect
-	github.com/elastic/go-structform v0.0.10 // indirect
+	github.com/elastic/go-structform v0.0.11 // indirect
 	github.com/elastic/go-sysinfo v1.14.1 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
