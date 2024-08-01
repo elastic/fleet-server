@@ -5,7 +5,7 @@ elasticsearch.hosts: ["http://elasticsearch:9200"]
 elasticsearch.serviceAccountToken: "${KIBANA_TOKEN}"
 
 xpack.securitySolution.packagerTaskInterval: 1s
-xpack.encryptedSavedObjects.encryptionKey: s3cretKEY
+xpack.encryptedSavedObjects.encryptionKey: abcdefghijklmnopqrstuvwxyz123456
 xpack.fleet.agents.enabled: true
 xpack.fleet.agents.fleet_server.hosts: ["https://fleet-server:8220"]
 xpack.fleet.packages:
