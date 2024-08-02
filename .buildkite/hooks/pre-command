@@ -37,6 +37,7 @@ fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   check_if_file_exist_in_repo "infra" "${BUILDKITE_BRANCH}"                  #TODO should be changed to "main" for rollback...
+  echo "FILE_EXIST_IN_REPO = $FILE_EXIST_IN_REPO"
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" || "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-perf-tests" ]]; then
