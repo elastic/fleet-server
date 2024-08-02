@@ -486,21 +486,25 @@ func TestServerUnauthorized(t *testing.T) {
 	srv.waitExit() //nolint:errcheck // test case
 }
 
-func TestServerInstrumentation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	tracerConnected := make(chan struct{}, 1)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+func stubAPMServer(t *testing.T, ch chan<- struct{}) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		t.Logf("Tracing server received request to: %s", req.URL.Path)
 		if req.URL.Path != "/intake/v2/events" {
 			return
 		}
-		tracerConnected <- struct{}{}
+		ch <- struct{}{}
 		io.Copy(io.Discard, req.Body) //nolint:errcheck // test case
 		t.Log("Tracing server request complete")
-	}))
+	})
+}
+
+func TestServerInstrumentation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tracerConnected := make(chan struct{}, 1)
+	server := httptest.NewServer(stubAPMServer(t, tracerConnected))
 	defer server.Close()
 
 	// Start test server with instrumentation disabled

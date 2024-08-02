@@ -1,0 +1,19 @@
+######################### APM Server Configuration #########################
+
+################################ APM Server ################################
+
+apm-server:
+  host: "0.0.0.0:8200"
+
+  # Agent authorization configuration. If no methods are defined, all requests will be allowed.
+  auth:
+    api_key:
+      enabled: false
+    secret_token: "b!gS3cret"
+
+logging.level: debug
+logging.to_stderr: true
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  api_key: "${API_KEY}"

@@ -520,3 +520,71 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 	endpoint := fmt.Sprintf("%s:%s", hostIP, mappedPort.Port())
 	return toxiproxy.NewClient(endpoint)
 }
+
+// HasTestStatusTrace will search elasticsearch for an APM trace to GET /api/status with labels.testName: name
+// If a retry func is specified, it will be ran if the query for traces recieves no hits, the retry func is intended to generate a trace.
+func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string, retry func(ctx context.Context)) {
+	timer := time.NewTimer(time.Second)
+	for {
+		buf := bytes.NewBufferString(fmt.Sprintf(`{"query": {"bool": {"filter": [{"term": { "transaction.name": "GET /api/status"}}, {"term": { "labels.testName": "%s"}}]}}}`, name))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:9200/traces-apm-default/_search", buf)
+		s.Require().NoError(err)
+		req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+		req.Header.Set("Content-Type", "application/json")
+
+		select {
+		case <-ctx.Done():
+			s.Require().NoError(ctx.Err(), "context expired before status trace was detected")
+			return
+		case <-timer.C:
+			resp, err := s.Client.Do(req)
+			s.Require().NoError(err)
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				timer.Reset(time.Second)
+				continue
+			}
+
+			var obj struct {
+				Hits struct {
+					Total struct {
+						Value int `json:"value"`
+					} `json:"total"`
+				} `json:"hits"`
+			}
+			err = json.NewDecoder(resp.Body).Decode(&obj)
+			resp.Body.Close()
+			s.Require().NoError(err)
+			if obj.Hits.Total.Value > 0 {
+				return
+			}
+			if retry != nil {
+				retry(ctx)
+			}
+			timer.Reset(time.Second)
+		}
+	}
+}
+
+func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides map[string]interface{}) {
+	body := struct {
+		Name      string                 `json:"name"`
+		Namespace string                 `json:"namespace"`
+		Overrides map[string]interface{} `json:"overrides"`
+	}{
+		Name:      id,
+		Namespace: "default",
+		Overrides: overrides,
+	}
+	p, err := json.Marshal(&body)
+	s.Require().NoError(err)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, fmt.Sprintf("http://localhost:5601/api/fleet/agent_policies/%s", id), bytes.NewReader(p))
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("kbn-xsrf", "e2e-test")
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	s.Require().Equal(http.StatusOK, resp.StatusCode)
+}
