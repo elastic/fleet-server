@@ -23,11 +23,13 @@ check_if_file_exist_in_repo() {
         branchName="master"
     fi
     local path_to_file="cd/release/release-manager/project-configs/${branchName}/${fileName}"
-    local response=$(curl -s -u $GITHUB_REPO_TOKEN:x-oauth-basic https://api.github.com/repos/elastic/${repoName}/contents/${path_to_file}| grep -c "\"path\"\: \"${path_to_file}\"")
+    local response=$(curl -s -H "Authorization: token $GITHUB_REPO_TOKEN" https://api.github.com/repos/elastic/${repoName}/contents/${path_to_file}| grep -c "\"path\"\: \"${path_to_file}\"")
     if [[ ${response} -ge 1 ]]; then
         export FILE_EXISTS_IN_REPO=true
+        echo "FILE_EXIST_IN_REPO = true"        
     else
         export FILE_EXISTS_IN_REPO=false
+        echo "FILE_EXIST_IN_REPO = false"
     fi
 }
 
