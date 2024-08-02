@@ -13,6 +13,8 @@ xpack.fleet.packages:
     version: latest
   - name: fleet_server
     version: latest
+  - name: apm
+    version: latest
 xpack.fleet.agentPolicies:
   - name: dummy-policy
     id: dummy-policy
@@ -32,6 +34,26 @@ xpack.fleet.agentPolicies:
     namespace: default
     package_policies:
       - name: fleet_server-1
+        id: default-fleet-server
+        package:
+          name: fleet_server
+  - name: apm-policy
+    id: apm-policy
+    namespace: default
+    monitoring_enabled: []
+    package_policies:
+      - name: apm-1
+        id: default-apm
+        package:
+          name: apm
+  - name: fleet-server-apm
+    id: fleet-server-apm
+    monitoring_enabled: []
+    is_default_fleet_server: false
+    is_managed: false
+    namespace: default
+    package_policies:
+      - name: fleet_server-2
         id: default-fleet-server
         package:
           name: fleet_server

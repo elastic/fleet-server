@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"os"
@@ -30,6 +31,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 )
+
+// NOTE: GOCOVERDIR is specied when manipulating the agent, but is not defined in the fleet-server spec and is not passed to fleet-server
 
 type AgentInstallSuite struct {
 	scaffold.Scaffold
@@ -273,6 +276,7 @@ func (suite *AgentInstallSuite) TearDownTest() {
 	if suite.T().Skipped() {
 		return
 	}
+
 	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "--force").CombinedOutput()
 	suite.Assert().NoErrorf(err, "elastic-agent uninstall failed. Output: %s", out)
 }
@@ -288,7 +292,7 @@ func (suite *AgentInstallSuite) TestHTTP() {
 		"--fleet-server-host=0.0.0.0",
 		"--fleet-server-policy=fleet-server-policy",
 		"--non-interactive")
-	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	cmd.Dir = filepath.Dir(suite.agentPath)
 
 	output, err := cmd.CombinedOutput()
@@ -315,11 +319,104 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 		"--fleet-server-cert-key="+filepath.Join(suite.CertPath, "fleet-server.key"),
 		"--fleet-server-cert-key-passphrase="+filepath.Join(suite.CertPath, "passphrase"),
 		"--non-interactive")
-	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath} // TODO Check if this env var will be passed by the agent to fleet-server
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	cmd.Dir = filepath.Dir(suite.agentPath)
 
 	output, err := cmd.CombinedOutput()
 	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
 
 	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
+}
+
+func (suite *AgentInstallSuite) TestAPMInstrumentationFile() {
+	suite.T().Skip("Testcase requires https://github.com/elastic/fleet-server/issues/3526 to be resolved.") // solution to 3526 may also resolve for the install test case, if it does not we can consider this to be an unsupported usecase and remove the test.
+	// Restore original elastic-agent.yml after test
+	cfgFile := filepath.Join(filepath.Dir(suite.agentPath), "elastic-agent.yml")
+	f, err := os.Open(cfgFile)
+	suite.Require().NoError(err)
+	p, err := io.ReadAll(f)
+	suite.Require().NoError(err)
+	err = f.Close()
+	suite.Require().NoError(err)
+	err = os.Remove(cfgFile)
+	suite.Require().NoError(err)
+	suite.T().Cleanup(func() {
+		f, err := os.OpenFile(cfgFile, os.O_RDWR|os.O_TRUNC, 0644)
+		suite.Require().NoError(err)
+		n, err := f.WriteAt(p, 0)
+		suite.Require().NoError(err)
+		err = f.Truncate(int64(n))
+		suite.Require().NoError(err)
+	})
+
+	// write elastic-agent.yml used for test
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "agent-install-apm.tpl"))
+	suite.Require().NoError(err)
+	f, err = os.Create(cfgFile)
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"APMHost":  "http://localhost:8200",
+		"TestName": "AgentInstallAPMInstrumentationFile",
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
+		"--fleet-server-es=http://"+suite.ESHosts,
+		"--fleet-server-service-token="+suite.ServiceToken,
+		"--fleet-server-insecure-http=true",
+		"--fleet-server-host=0.0.0.0",
+		"--fleet-server-policy=fleet-server-policy",
+		"--non-interactive")
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	cmd.Dir = filepath.Dir(suite.agentPath)
+
+	output, err := cmd.CombinedOutput()
+	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
+
+	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+	suite.HasTestStatusTrace(ctx, "AgentInstallAPMInstrumentationFile", nil)
+}
+
+func (suite *AgentInstallSuite) TestAPMInstrumentationPolicy() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
+
+	suite.AddPolicyOverrides(ctx, "fleet-server-apm", map[string]interface{}{
+		// NOTE: if the following key is specified as agent.monitoring the kibana ui will not merge it correctly in the policy.
+		"agent": map[string]interface{}{
+			"monitoring": map[string]interface{}{
+				"traces": true,
+				"apm": map[string]interface{}{
+					"hosts":        []interface{}{"http://localhost:8200"},
+					"environment":  "test-AgentInstallAPMInstrumentationPolicy",
+					"secret_token": "b!gS3cret",
+					"global_labels": map[string]interface{}{
+						"testName": "AgentInstallAPMInstrumentationPolicy",
+					},
+				},
+			},
+		},
+	})
+
+	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
+		"--fleet-server-es=http://"+suite.ESHosts,
+		"--fleet-server-service-token="+suite.ServiceToken,
+		"--fleet-server-insecure-http=true",
+		"--fleet-server-host=0.0.0.0",
+		"--fleet-server-policy=fleet-server-apm",
+		"--non-interactive")
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	cmd.Dir = filepath.Dir(suite.agentPath)
+
+	output, err := cmd.CombinedOutput()
+	suite.Require().NoErrorf(err, "elastic-agent install failed. command: %s, exit_code: %d, output: %s", cmd.String(), cmd.ProcessState.ExitCode(), string(output))
+
+	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+	suite.HasTestStatusTrace(ctx, "AgentInstallAPMInstrumentationPolicy", func(ctx context.Context) {
+		suite.FleetServerStatusOK(ctx, "http://localhost:8220") // retry status API if no traces are found to allow the policy reload to propagate
+	})
 }

@@ -337,3 +337,37 @@ func (suite *StandAloneSuite) TestElasticsearchTimeoutOnStartup() {
 	cancel()
 	cmd.Wait()
 }
+
+func (suite *StandAloneSuite) TestAPMInstrumentation() {
+	// Create a config file from a template in the test temp dir
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-apm.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"Hosts":        suite.ESHosts,
+		"ServiceToken": suite.ServiceToken,
+		"APMHost":      "http://localhost:8200",
+		"TestName":     "StandAloneAPMInstrumentation",
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	err = cmd.Start()
+	suite.Require().NoError(err)
+
+	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+	suite.HasTestStatusTrace(ctx, "StandAloneAPMInstrumentation", nil)
+
+	cancel()
+	cmd.Wait()
+}

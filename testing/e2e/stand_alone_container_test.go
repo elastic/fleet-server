@@ -167,3 +167,24 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 	suite.Require().NoError(err)
 	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
 }
+
+func (suite *StandAloneContainerSuite) TestAPMInstrumentation() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+	defer cancel()
+
+	suite.startFleetServer(ctx, standaloneContainerOptions{
+		Template: "stand-alone-apm.tpl",
+		TemplateData: map[string]string{
+			"Hosts":        "http://elasticsearch:9200",
+			"ServiceToken": suite.ServiceToken,
+			"APMHost":      "http://apm-server:8200",
+			"TestName":     "StandAloneContainerAPMInstrumentation",
+		},
+	})
+
+	endpoint, err := suite.container.PortEndpoint(ctx, "8220/tcp", "http")
+	suite.Require().NoError(err)
+
+	suite.FleetServerStatusOK(ctx, endpoint)
+	suite.HasTestStatusTrace(ctx, "StandAloneContainerAPMInstrumentation", nil)
+}
