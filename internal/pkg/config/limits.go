@@ -21,18 +21,19 @@ type ServerLimits struct {
 	MaxHeaderByteSize int           `config:"max_header_byte_size"`
 	MaxConnections    int           `config:"max_connections"`
 
-	ActionLimit      Limit `config:"action_limit"`
-	PolicyLimit      Limit `config:"policy_limit"`
-	CheckinLimit     Limit `config:"checkin_limit"`
-	ArtifactLimit    Limit `config:"artifact_limit"`
-	EnrollLimit      Limit `config:"enroll_limit"`
-	AckLimit         Limit `config:"ack_limit"`
-	StatusLimit      Limit `config:"status_limit"`
-	UploadStartLimit Limit `config:"upload_start_limit"`
-	UploadEndLimit   Limit `config:"upload_end_limit"`
-	UploadChunkLimit Limit `config:"upload_chunk_limit"`
-	DeliverFileLimit Limit `config:"file_delivery_limit"`
-	GetPGPKey        Limit `config:"pgp_retrieval_limit"`
+	ActionLimit        Limit `config:"action_limit"`
+	PolicyLimit        Limit `config:"policy_limit"`
+	CheckinLimit       Limit `config:"checkin_limit"`
+	ArtifactLimit      Limit `config:"artifact_limit"`
+	EnrollLimit        Limit `config:"enroll_limit"`
+	AckLimit           Limit `config:"ack_limit"`
+	StatusLimit        Limit `config:"status_limit"`
+	UploadStartLimit   Limit `config:"upload_start_limit"`
+	UploadEndLimit     Limit `config:"upload_end_limit"`
+	UploadChunkLimit   Limit `config:"upload_chunk_limit"`
+	DeliverFileLimit   Limit `config:"file_delivery_limit"`
+	GetPGPKey          Limit `config:"pgp_retrieval_limit"`
+	AuditUnenrollLimit Limit `config:"audit_unenroll_limit"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -63,6 +64,7 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	c.UploadChunkLimit = mergeEnvLimit(c.UploadChunkLimit, l.UploadChunkLimit)
 	c.DeliverFileLimit = mergeEnvLimit(c.DeliverFileLimit, l.DeliverFileLimit)
 	c.GetPGPKey = mergeEnvLimit(c.GetPGPKey, l.GetPGPKeyLimit)
+	c.AuditUnenrollLimit = mergeEnvLimit(c.AuditUnenrollLimit, l.AuditUnenrollLimit)
 }
 
 func mergeEnvLimit(L Limit, l limit) Limit {

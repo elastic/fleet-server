@@ -53,3 +53,7 @@ server_limits:
     interval: 1ms
     burst: 2000
     max: 4000
+  audit_unenroll_limit:
+    interval: 1ms
+    burst: 2000
+    max: 4000

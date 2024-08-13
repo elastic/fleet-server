@@ -35,7 +35,7 @@ type server struct {
 //
 // The server has a listener specific conn limit and endpoint specific rate-limits.
 // The underlying API structs (such as *CheckinT) may be shared between servers.
-func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, sm policy.SelfMonitor, bi build.Info, ut *UploadT, ft *FileDeliveryT, pt *PGPRetrieverT, bulker bulk.Bulk, tracer *apm.Tracer) *server {
+func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, sm policy.SelfMonitor, bi build.Info, ut *UploadT, ft *FileDeliveryT, pt *PGPRetrieverT, audit *AuditT, bulker bulk.Bulk, tracer *apm.Tracer) *server {
 	a := &apiServer{
 		ct:     ct,
 		et:     et,
@@ -47,6 +47,7 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 		ut:     ut,
 		ft:     ft,
 		pt:     pt,
+		audit:  audit,
 		bulker: bulker,
 	}
 	return &server{
