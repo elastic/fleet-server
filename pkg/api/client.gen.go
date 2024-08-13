@@ -106,6 +106,11 @@ type ClientInterface interface {
 
 	AgentAcks(ctx context.Context, id string, params *AgentAcksParams, body AgentAcksJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// AuditUnenrollWithBody request with any body
+	AuditUnenrollWithBody(ctx context.Context, id string, params *AuditUnenrollParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	AuditUnenroll(ctx context.Context, id string, params *AuditUnenrollParams, body AuditUnenrollJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AgentCheckinWithBody request with any body
 	AgentCheckinWithBody(ctx context.Context, id string, params *AgentCheckinParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -184,6 +189,30 @@ func (c *Client) AgentAcksWithBody(ctx context.Context, id string, params *Agent
 
 func (c *Client) AgentAcks(ctx context.Context, id string, params *AgentAcksParams, body AgentAcksJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAgentAcksRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AuditUnenrollWithBody(ctx context.Context, id string, params *AuditUnenrollParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAuditUnenrollRequestWithBody(c.Server, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AuditUnenroll(ctx context.Context, id string, params *AuditUnenrollParams, body AuditUnenrollJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAuditUnenrollRequest(c.Server, id, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -491,6 +520,79 @@ func NewAgentAcksRequestWithBody(server string, id string, params *AgentAcksPara
 	}
 
 	operationPath := fmt.Sprintf("/api/fleet/agents/%s/acks", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.XRequestId != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("X-Request-Id", headerParam0)
+		}
+
+		if params.ElasticApiVersion != nil {
+			var headerParam1 string
+
+			headerParam1, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("elastic-api-version", headerParam1)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewAuditUnenrollRequest calls the generic AuditUnenroll builder with application/json body
+func NewAuditUnenrollRequest(server string, id string, params *AuditUnenrollParams, body AuditUnenrollJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAuditUnenrollRequestWithBody(server, id, params, "application/json", bodyReader)
+}
+
+// NewAuditUnenrollRequestWithBody generates requests for AuditUnenroll with any type of body
+func NewAuditUnenrollRequestWithBody(server string, id string, params *AuditUnenrollParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/fleet/agents/%s/audit/unenroll", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1082,6 +1184,11 @@ type ClientWithResponsesInterface interface {
 
 	AgentAcksWithResponse(ctx context.Context, id string, params *AgentAcksParams, body AgentAcksJSONRequestBody, reqEditors ...RequestEditorFn) (*AgentAcksResponse, error)
 
+	// AuditUnenrollWithBodyWithResponse request with any body
+	AuditUnenrollWithBodyWithResponse(ctx context.Context, id string, params *AuditUnenrollParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AuditUnenrollResponse, error)
+
+	AuditUnenrollWithResponse(ctx context.Context, id string, params *AuditUnenrollParams, body AuditUnenrollJSONRequestBody, reqEditors ...RequestEditorFn) (*AuditUnenrollResponse, error)
+
 	// AgentCheckinWithBodyWithResponse request with any body
 	AgentCheckinWithBodyWithResponse(ctx context.Context, id string, params *AgentCheckinParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AgentCheckinResponse, error)
 
@@ -1183,6 +1290,31 @@ func (r AgentAcksResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r AgentAcksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type AuditUnenrollResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *BadRequest
+	JSON401      *KeyNotEnabled
+	JSON500      *InternalServerError
+	JSON503      *Unavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r AuditUnenrollResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AuditUnenrollResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1424,6 +1556,23 @@ func (c *ClientWithResponses) AgentAcksWithResponse(ctx context.Context, id stri
 	return ParseAgentAcksResponse(rsp)
 }
 
+// AuditUnenrollWithBodyWithResponse request with arbitrary body returning *AuditUnenrollResponse
+func (c *ClientWithResponses) AuditUnenrollWithBodyWithResponse(ctx context.Context, id string, params *AuditUnenrollParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AuditUnenrollResponse, error) {
+	rsp, err := c.AuditUnenrollWithBody(ctx, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAuditUnenrollResponse(rsp)
+}
+
+func (c *ClientWithResponses) AuditUnenrollWithResponse(ctx context.Context, id string, params *AuditUnenrollParams, body AuditUnenrollJSONRequestBody, reqEditors ...RequestEditorFn) (*AuditUnenrollResponse, error) {
+	rsp, err := c.AuditUnenroll(ctx, id, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAuditUnenrollResponse(rsp)
+}
+
 // AgentCheckinWithBodyWithResponse request with arbitrary body returning *AgentCheckinResponse
 func (c *ClientWithResponses) AgentCheckinWithBodyWithResponse(ctx context.Context, id string, params *AgentCheckinParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AgentCheckinResponse, error) {
 	rsp, err := c.AgentCheckinWithBody(ctx, id, params, contentType, body, reqEditors...)
@@ -1660,6 +1809,53 @@ func ParseAgentAcksResponse(rsp *http.Response) (*AgentAcksResponse, error) {
 			return nil, err
 		}
 		response.JSON408 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Unavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseAuditUnenrollResponse parses an HTTP response from a AuditUnenrollWithResponse call
+func ParseAuditUnenrollResponse(rsp *http.Response) (*AuditUnenrollResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AuditUnenrollResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest KeyNotEnabled
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError

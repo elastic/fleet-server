@@ -521,6 +521,16 @@
           "type": "string",
           "format": "date-time"
         },
+        "audit_unenrolled_time": {
+          "description": "Agent timestamp for audit unenroll/uninstall action",
+          "type": "string",
+          "format": "date-time"
+        },
+        "audit_unenrolled_reason": {
+          "description": "Agent reason for unenroll/uninstall annotation.",
+          "type": "string",
+          "enum": ["uninstall", "orphaned", "key_revoked"]
+        },
         "upgraded_at": {
           "description": "Date/time the Elastic Agent was last upgraded",
           "type": "string",

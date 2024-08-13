@@ -50,6 +50,13 @@ const (
 	ActionSettingsLogLevelWarning ActionSettingsLogLevel = "warning"
 )
 
+// Defines values for AuditUnenrollRequestReason.
+const (
+	KeyRevoked AuditUnenrollRequestReason = "key_revoked"
+	Orphaned   AuditUnenrollRequestReason = "orphaned"
+	Uninstall  AuditUnenrollRequestReason = "uninstall"
+)
+
 // Defines values for CheckinRequestStatus.
 const (
 	CheckinRequestStatusDegraded CheckinRequestStatus = "degraded"
@@ -260,6 +267,18 @@ type ActionUpgrade struct {
 	// Version The version number that the agent should upgrade to.
 	Version string `json:"version"`
 }
+
+// AuditUnenrollRequest Request to add unenroll audit information to an agent document.
+type AuditUnenrollRequest struct {
+	// Reason The unenroll reason
+	Reason AuditUnenrollRequestReason `json:"reason"`
+
+	// Timestamp Agent timestamp of when the uninstall/unenroll action occured; may differ from fleet-server time due to retries.
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// AuditUnenrollRequestReason The unenroll reason
+type AuditUnenrollRequestReason string
 
 // CheckinRequest defines model for checkinRequest.
 type CheckinRequest struct {
@@ -871,6 +890,15 @@ type AgentAcksParams struct {
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
 
+// AuditUnenrollParams defines parameters for AuditUnenroll.
+type AuditUnenrollParams struct {
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+}
+
 // AgentCheckinParams defines parameters for AgentCheckin.
 type AgentCheckinParams struct {
 	// AcceptEncoding If the agent is able to accept encoded responses.
@@ -952,6 +980,9 @@ type AgentEnrollJSONRequestBody = EnrollRequest
 
 // AgentAcksJSONRequestBody defines body for AgentAcks for application/json ContentType.
 type AgentAcksJSONRequestBody = AckRequest
+
+// AuditUnenrollJSONRequestBody defines body for AuditUnenroll for application/json ContentType.
+type AuditUnenrollJSONRequestBody = AuditUnenrollRequest
 
 // AgentCheckinJSONRequestBody defines body for AgentCheckin for application/json ContentType.
 type AgentCheckinJSONRequestBody = CheckinRequest
@@ -1620,6 +1651,9 @@ type ServerInterface interface {
 
 	// (POST /api/fleet/agents/{id}/acks)
 	AgentAcks(w http.ResponseWriter, r *http.Request, id string, params AgentAcksParams)
+	// Annotate an agent with unenroll attributes.
+	// (POST /api/fleet/agents/{id}/audit/unenroll)
+	AuditUnenroll(w http.ResponseWriter, r *http.Request, id string, params AuditUnenrollParams)
 
 	// (POST /api/fleet/agents/{id}/checkin)
 	AgentCheckin(w http.ResponseWriter, r *http.Request, id string, params AgentCheckinParams)
@@ -1660,6 +1694,12 @@ func (_ Unimplemented) AgentEnroll(w http.ResponseWriter, r *http.Request, param
 
 // (POST /api/fleet/agents/{id}/acks)
 func (_ Unimplemented) AgentAcks(w http.ResponseWriter, r *http.Request, id string, params AgentAcksParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Annotate an agent with unenroll attributes.
+// (POST /api/fleet/agents/{id}/audit/unenroll)
+func (_ Unimplemented) AuditUnenroll(w http.ResponseWriter, r *http.Request, id string, params AuditUnenrollParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1947,6 +1987,77 @@ func (siw *ServerInterfaceWrapper) AgentAcks(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AgentAcks(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// AuditUnenroll operation middleware
+func (siw *ServerInterfaceWrapper) AuditUnenroll(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "id", runtime.ParamLocationPath, chi.URLParam(r, "id"), &id)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, AgentApiKeyScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AuditUnenrollParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Request-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-Id")]; found {
+		var XRequestId RequestId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Request-Id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, valueList[0], &XRequestId)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Request-Id", Err: err})
+			return
+		}
+
+		params.XRequestId = &XRequestId
+
+	}
+
+	// ------------- Optional header parameter "elastic-api-version" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("elastic-api-version")]; found {
+		var ElasticApiVersion ApiVersion
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "elastic-api-version", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, valueList[0], &ElasticApiVersion)
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "elastic-api-version", Err: err})
+			return
+		}
+
+		params.ElasticApiVersion = &ElasticApiVersion
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AuditUnenroll(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2639,6 +2750,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/fleet/agents/{id}/acks", wrapper.AgentAcks)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/fleet/agents/{id}/audit/unenroll", wrapper.AuditUnenroll)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/fleet/agents/{id}/checkin", wrapper.AgentCheckin)
