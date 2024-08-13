@@ -151,8 +151,8 @@ func (a *apiServer) GetPGPKey(w http.ResponseWriter, r *http.Request, major, min
 
 func (a *apiServer) AuditUnenroll(w http.ResponseWriter, r *http.Request, id string, params AuditUnenrollParams) {
 	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
-	w.Header().Set("Content-Type", "application/json")
 	if err := a.audit.handleUnenroll(zlog, w, r, id); err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		cntAuditUnenroll.IncError(err)
 		ErrorResp(w, r, err)
 	}

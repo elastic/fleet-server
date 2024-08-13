@@ -1093,6 +1093,25 @@ components:
                 statusCode: 408
                 error: RequestTimeout
                 message: timeout on request
+    conflict:
+      description: 409 conflict response.
+      headers:
+        Elastic-Api-Version:
+          $ref: "#/components/headers/apiVersion"
+        X-Request-Id:
+          $ref: "#/components/headers/requestID"
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/error"
+          examples:
+            reasonConflict:
+              description: Audit unenroll endpoint agent already has reason attribute.
+              value:
+                statusCode: 409
+                error: ErrAuditReasonConflict
+                message: agent document contains audit_unenroll_reason
     throttle:
       description: 428 rate limiting request.
       headers:
@@ -1838,12 +1857,7 @@ paths:
         "401":
           $ref: "#/components/responses/keyNotEnabled"
         "409":
-          description: audit_reason attribute already set in agent document
-          headers:
-            Elastic-Api-Version:
-              $ref: "#/components/headers/apiVersion"
-            X-Request-Id:
-              $ref: "#/components/headers/requestID"
+          $ref: "#/components/responses/conflict"
         "500":
           $ref: "#/components/responses/internalServerError"
         "503":

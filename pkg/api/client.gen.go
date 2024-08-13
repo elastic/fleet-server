@@ -1301,6 +1301,7 @@ type AuditUnenrollResponse struct {
 	HTTPResponse *http.Response
 	JSON400      *BadRequest
 	JSON401      *KeyNotEnabled
+	JSON409      *Conflict
 	JSON500      *InternalServerError
 	JSON503      *Unavailable
 }
@@ -1856,6 +1857,13 @@ func ParseAuditUnenrollResponse(rsp *http.Response) (*AuditUnenrollResponse, err
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError

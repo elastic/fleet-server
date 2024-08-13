@@ -53,6 +53,9 @@ const (
 	FieldUpgradeStatus    = "upgrade_status"
 	FieldUpgradeDetails   = "upgrade_details"
 
+	FieldAuditUnenrolledTime   = "audit_unenrolled_time"
+	FieldAuditUnenrolledReason = "audit_unenrolled_reason"
+
 	FieldDecodedSha256 = "decoded_sha256"
 	FieldIdentifier    = "identifier"
 	FieldSharedID      = "shared_id"

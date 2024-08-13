@@ -837,6 +837,9 @@ type AgentNotFound = Error
 // BadRequest Error processing request.
 type BadRequest = Error
 
+// Conflict Error processing request.
+type Conflict = Error
+
 // Deadline Error processing request.
 type Deadline = Error
 
