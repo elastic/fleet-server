@@ -103,7 +103,6 @@ func (audit *AuditT) markUnenroll(ctx context.Context, zlog zerolog.Logger, req 
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
-		dl.FieldActive:                false,
 		dl.FieldUnenrolledAt:          now,
 		dl.FieldUpdatedAt:             now,
 		dl.FieldAuditUnenrolledTime:   req.Timestamp,
