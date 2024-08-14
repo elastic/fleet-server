@@ -295,8 +295,7 @@ func (tester *ClientAPITester) AuditUnenroll(ctx context.Context, apiKey, id str
 
 	resp, err := client.AuditUnenrollWithResponse(ctx, id, nil, api.AuditUnenrollJSONRequestBody{Reason: reason, Timestamp: timestamp})
 	tester.Require().NoError(err)
-	resp.Body.Close()
-	return resp.StatusCode
+	return resp.StatusCode()
 }
 
 func (tester *ClientAPITester) TestStatus_Unauthenticated() {
@@ -390,9 +389,9 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 
 	tester.T().Logf("use audit/unenroll endpoint for agent: %s", agentID)
 	status := tester.AuditUnenroll(ctx, agentKey, agentID, api.Uninstall, now)
-	tester.Require().Equal(t, http.StatusOK, status)
+	tester.Require().Equal(http.StatusOK, status)
 
 	tester.T().Logf("audit/unenroll endpoint for agent: %s should return conflict", agentID)
 	status = tester.AuditUnenroll(ctx, agentKey, agentID, api.Uninstall, now)
-	tester.Require().Equal(t, http.StatusConflict, status)
+	tester.Require().Equal(http.StatusConflict, status)
 }
