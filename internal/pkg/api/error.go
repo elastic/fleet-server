@@ -487,7 +487,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			HTTPErrResp{
 				http.StatusConflict,
 				"ErrAuditReasonConflict",
-				"agent document contaiins audit_unenroll_reason",
+				"agent document contains audit_unenroll_reason",
 				zerolog.InfoLevel,
 			},
 		},
