@@ -1441,3 +1441,53 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 	cancel()
 	srv.waitExit() //nolint:errcheck // test case
 }
+
+func Test_SmokeTest_AuditUnenroll(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+
+	cli := cleanhttp.DefaultClient()
+
+	// enroll an agent
+	enrollBody := `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	t.Log("Enroll an agent")
+	id, key := EnrollAgent(t, ctx, srv, enrollBody)
+
+	t.Logf("Use audit/unenroll endpoint for agent %s", id)
+	unenrollBody := `{
+          "reason": "uninstall",
+	  "timestamp": "2024-01-01T12:00:00.000Z"
+	}`
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(unenrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	res.Body.Close()
+
+	t.Log("Use of audit/unenroll a second time should fail.")
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(unenrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusConflict, res.StatusCode)
+	res.Body.Close()
+}

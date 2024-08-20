@@ -481,6 +481,16 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		// audit unenroll
+		{
+			ErrAuditUnenrollReason,
+			HTTPErrResp{
+				http.StatusConflict,
+				"ErrAuditReasonConflict",
+				"agent document contains audit_unenroll_reason",
+				zerolog.InfoLevel,
+			},
+		},
 	}
 
 	for _, e := range errTable {

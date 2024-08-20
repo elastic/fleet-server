@@ -35,16 +35,17 @@ var (
 	cntHTTPClose  *statsCounter
 	cntHTTPActive *statsGauge
 
-	cntCheckin     routeStats
-	cntEnroll      routeStats
-	cntAcks        routeStats
-	cntStatus      routeStats
-	cntUploadStart routeStats
-	cntUploadChunk routeStats
-	cntUploadEnd   routeStats
-	cntFileDeliv   routeStats
-	cntGetPGP      routeStats
-	cntArtifacts   artifactStats
+	cntCheckin       routeStats
+	cntEnroll        routeStats
+	cntAcks          routeStats
+	cntStatus        routeStats
+	cntUploadStart   routeStats
+	cntUploadChunk   routeStats
+	cntUploadEnd     routeStats
+	cntFileDeliv     routeStats
+	cntGetPGP        routeStats
+	cntAuditUnenroll routeStats
+	cntArtifacts     artifactStats
 
 	infoReg sync.Once
 )
@@ -75,7 +76,7 @@ func init() {
 	cntUploadEnd.Register(routesRegistry.newRegistry("uploadEnd"))
 	cntFileDeliv.Register(routesRegistry.newRegistry("deliverFile"))
 	cntGetPGP.Register(routesRegistry.newRegistry("getPGPKey"))
-
+	cntAuditUnenroll.Register(routesRegistry.newRegistry("auditUnenroll"))
 }
 
 // metricsRegistry wraps libbeat and prometheus registries

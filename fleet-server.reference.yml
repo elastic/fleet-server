@@ -222,6 +222,11 @@ fleet:
 #         burst: 100
 #         max: 50
 #         max_body_byte_size: 0
+#       audit_unenroll_limit:
+#         interval: 10ms
+#         burst: 100
+#         max: 50
+#         max_body_byte_size: 1024
 #
 #     # go runtime limits
 #     runtime:

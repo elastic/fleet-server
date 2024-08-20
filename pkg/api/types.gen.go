@@ -47,6 +47,13 @@ const (
 	ActionSettingsLogLevelWarning ActionSettingsLogLevel = "warning"
 )
 
+// Defines values for AuditUnenrollRequestReason.
+const (
+	KeyRevoked AuditUnenrollRequestReason = "key_revoked"
+	Orphaned   AuditUnenrollRequestReason = "orphaned"
+	Uninstall  AuditUnenrollRequestReason = "uninstall"
+)
+
 // Defines values for CheckinRequestStatus.
 const (
 	CheckinRequestStatusDegraded CheckinRequestStatus = "degraded"
@@ -257,6 +264,18 @@ type ActionUpgrade struct {
 	// Version The version number that the agent should upgrade to.
 	Version string `json:"version"`
 }
+
+// AuditUnenrollRequest Request to add unenroll audit information to an agent document.
+type AuditUnenrollRequest struct {
+	// Reason The unenroll reason
+	Reason AuditUnenrollRequestReason `json:"reason"`
+
+	// Timestamp Agent timestamp of when the uninstall/unenroll action occured; may differ from fleet-server time due to retries.
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// AuditUnenrollRequestReason The unenroll reason
+type AuditUnenrollRequestReason string
 
 // CheckinRequest defines model for checkinRequest.
 type CheckinRequest struct {
@@ -818,6 +837,9 @@ type AgentNotFound = Error
 // BadRequest Error processing request.
 type BadRequest = Error
 
+// Conflict Error processing request.
+type Conflict = Error
+
 // Deadline Error processing request.
 type Deadline = Error
 
@@ -861,6 +883,15 @@ type AgentEnrollParams struct {
 
 // AgentAcksParams defines parameters for AgentAcks.
 type AgentAcksParams struct {
+	// XRequestId The request tracking ID for APM.
+	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
+
+	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
+	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
+}
+
+// AuditUnenrollParams defines parameters for AuditUnenroll.
+type AuditUnenrollParams struct {
 	// XRequestId The request tracking ID for APM.
 	XRequestId *RequestId `json:"X-Request-Id,omitempty"`
 
@@ -949,6 +980,9 @@ type AgentEnrollJSONRequestBody = EnrollRequest
 
 // AgentAcksJSONRequestBody defines body for AgentAcks for application/json ContentType.
 type AgentAcksJSONRequestBody = AckRequest
+
+// AuditUnenrollJSONRequestBody defines body for AuditUnenroll for application/json ContentType.
+type AuditUnenrollJSONRequestBody = AuditUnenrollRequest
 
 // AgentCheckinJSONRequestBody defines body for AgentCheckin for application/json ContentType.
 type AgentCheckinJSONRequestBody = CheckinRequest

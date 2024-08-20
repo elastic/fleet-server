@@ -129,6 +129,12 @@ type Agent struct {
 	Active bool           `json:"active"`
 	Agent  *AgentMetadata `json:"agent,omitempty"`
 
+	// Agent reason for unenroll/uninstall annotation.
+	AuditUnenrolledReason string `json:"audit_unenrolled_reason,omitempty"`
+
+	// Agent timestamp for audit unenroll/uninstall action
+	AuditUnenrolledTime string `json:"audit_unenrolled_time,omitempty"`
+
 	// Elastic Agent components detailed status information
 	Components []ComponentsItems `json:"components,omitempty"`
 

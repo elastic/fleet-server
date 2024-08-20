@@ -49,6 +49,7 @@ type limiter struct {
 	uploadComplete *limit.Limiter
 	deliverFile    *limit.Limiter
 	getPGPKey      *limit.Limiter
+	auditUnenroll  *limit.Limiter
 }
 
 func Limiter(cfg *config.ServerLimits) *limiter {
@@ -63,6 +64,7 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 		uploadComplete: limit.NewLimiter(&cfg.UploadEndLimit),
 		deliverFile:    limit.NewLimiter(&cfg.DeliverFileLimit),
 		getPGPKey:      limit.NewLimiter(&cfg.GetPGPKey),
+		auditUnenroll:  limit.NewLimiter(&cfg.AuditUnenrollLimit),
 	}
 }
 
@@ -104,6 +106,8 @@ func pathToOperation(path string) string {
 			} else if pp[2] == "artifacts" {
 				return "artifact"
 			}
+		} else if len(pp) == 6 && pp[2] == "agents" && pp[4] == "audit" {
+			return "audit-" + pp[5]
 		}
 	}
 	return ""
@@ -132,6 +136,8 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 			l.getPGPKey.Wrap("getPGPKey", &cntGetPGP, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "status":
 			l.status.Wrap("status", &cntStatus, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+		case "audit-unenroll":
+			l.auditUnenroll.Wrap("audit-unenroll", &cntAuditUnenroll, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		default:
 			// no tracking or limits
 			next.ServeHTTP(w, r)

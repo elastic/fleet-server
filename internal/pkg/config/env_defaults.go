@@ -81,6 +81,11 @@ const (
 	defaultPGPRetrievalBurst    = 25
 	defaultPGPRetrievalMax      = 50
 	defaultPGPRetrievalMaxBody  = 0
+
+	defaultAuditUnenrollInterval = time.Millisecond * 10
+	defaultAuditUnenrollBurst    = 50
+	defaultAuditUnenrollMax      = 100
+	defaultAuditUnenrollMaxBody  = 1024
 )
 
 type valueRange struct {
@@ -139,18 +144,19 @@ type serverLimitDefaults struct {
 	PolicyThrottle time.Duration `config:"policy_throttle"` // deprecated: replaced by policy_limit
 	MaxConnections int           `config:"max_connections"`
 
-	ActionLimit      limit `config:"action_limit"`
-	PolicyLimit      limit `config:"policy_limit"`
-	CheckinLimit     limit `config:"checkin_limit"`
-	ArtifactLimit    limit `config:"artifact_limit"`
-	EnrollLimit      limit `config:"enroll_limit"`
-	AckLimit         limit `config:"ack_limit"`
-	StatusLimit      limit `config:"status_limit"`
-	UploadStartLimit limit `config:"upload_start_limit"`
-	UploadEndLimit   limit `config:"upload_end_limit"`
-	UploadChunkLimit limit `config:"upload_chunk_limit"`
-	DeliverFileLimit limit `config:"file_delivery_limit"`
-	GetPGPKeyLimit   limit `config:"pgp_retrieval_limit"`
+	ActionLimit        limit `config:"action_limit"`
+	PolicyLimit        limit `config:"policy_limit"`
+	CheckinLimit       limit `config:"checkin_limit"`
+	ArtifactLimit      limit `config:"artifact_limit"`
+	EnrollLimit        limit `config:"enroll_limit"`
+	AckLimit           limit `config:"ack_limit"`
+	StatusLimit        limit `config:"status_limit"`
+	UploadStartLimit   limit `config:"upload_start_limit"`
+	UploadEndLimit     limit `config:"upload_end_limit"`
+	UploadChunkLimit   limit `config:"upload_chunk_limit"`
+	DeliverFileLimit   limit `config:"file_delivery_limit"`
+	GetPGPKeyLimit     limit `config:"pgp_retrieval_limit"`
+	AuditUnenrollLimit limit `config:"audit_unenroll_limit"`
 }
 
 func defaultserverLimitDefaults() *serverLimitDefaults {
@@ -223,6 +229,12 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Burst:    defaultPGPRetrievalBurst,
 			Max:      defaultPGPRetrievalMax,
 			MaxBody:  defaultPGPRetrievalMaxBody,
+		},
+		AuditUnenrollLimit: limit{
+			Interval: defaultAuditUnenrollInterval,
+			Burst:    defaultAuditUnenrollBurst,
+			Max:      defaultAuditUnenrollMax,
+			MaxBody:  defaultAuditUnenrollMaxBody,
 		},
 	}
 }

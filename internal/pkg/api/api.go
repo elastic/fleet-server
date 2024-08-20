@@ -28,6 +28,7 @@ type apiServer struct {
 	ut     *UploadT
 	ft     *FileDeliveryT
 	pt     *PGPRetrieverT
+	audit  *AuditT
 	bulker bulk.Bulk
 }
 
@@ -144,6 +145,15 @@ func (a *apiServer) GetPGPKey(w http.ResponseWriter, r *http.Request, major, min
 	if err := a.pt.handlePGPKey(zlog, w, r, major, minor, patch); err != nil {
 		cntGetPGP.IncError(err)
 		w.Header().Set("Content-Type", "application/json")
+		ErrorResp(w, r, err)
+	}
+}
+
+func (a *apiServer) AuditUnenroll(w http.ResponseWriter, r *http.Request, id string, params AuditUnenrollParams) {
+	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
+	if err := a.audit.handleUnenroll(zlog, w, r, id); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		cntAuditUnenroll.IncError(err)
 		ErrorResp(w, r, err)
 	}
 }

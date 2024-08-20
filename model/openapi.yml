@@ -917,6 +917,26 @@ components:
               type: string
               examples:
                 - 83810fdc61c44290778c212d7829d0c3f0232e81bd551d3943998a920025d14f
+    auditUnenrollRequest:
+      description: Request to add unenroll audit information to an agent document.
+      type: object
+      required:
+        - reason
+        - timestamp
+      properties:
+        reason:
+          description: The unenroll reason
+          type: string
+          enum:
+            - uninstall
+            - orphaned
+            - key_revoked # here for completeness, fleet-ui should set this reason when a FORCE_UNENROLL action is made.
+          examples:
+            - uninstall
+        timestamp:
+          description: Agent timestamp of when the uninstall/unenroll action occured; may differ from fleet-server time due to retries.
+          type: string
+          format: date-time
   parameters:
     requestId:
       name: X-Request-Id
@@ -1073,6 +1093,25 @@ components:
                 statusCode: 408
                 error: RequestTimeout
                 message: timeout on request
+    conflict:
+      description: 409 conflict response.
+      headers:
+        Elastic-Api-Version:
+          $ref: "#/components/headers/apiVersion"
+        X-Request-Id:
+          $ref: "#/components/headers/requestID"
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/error"
+          examples:
+            reasonConflict:
+              description: Audit unenroll endpoint agent already has reason attribute.
+              value:
+                statusCode: 409
+                error: ErrAuditReasonConflict
+                message: agent document contains audit_unenroll_reason
     throttle:
       description: 428 rate limiting request.
       headers:
@@ -1774,3 +1813,52 @@ paths:
               $ref: "#/components/headers/apiVersion"
             X-Request-Id:
               $ref: "#/components/headers/requestID"
+  /api/fleet/agents/{id}/audit/unenroll:
+    post:
+      operationId: auditUnenroll
+      summary: Annotate an agent with unenroll attributes.
+      description: |
+        Annotate an agent with unenroll attributes so the UI will show it as uninstalled or orphaned instead of offline.
+        API keys for an agent that is annotated will not be revoked by fleet-server.
+        If an agent checks in after the unenroll attributes are set, the attributes will be removed from the agent document.
+      security:
+        - agentApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/auditUnenrollRequest"
+            examples:
+              request:
+                description: An uninstall request.
+                value:
+                  reason: uninstall
+                  timestamp: 2024-01-01T12:00:00.000Z
+      parameters:
+        - name: id
+          in: path
+          description: The agent ID.
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/requestId"
+        - $ref: "#/components/parameters/apiVersion"
+      responses:
+        "200":
+          description: Audit attributes set in agent document.
+          headers:
+            Elastic-Api-Version:
+              $ref: "#/components/headers/apiVersion"
+            X-Request-Id:
+              $ref: "#/components/headers/requestID"
+        "400":
+          $ref: "#/components/responses/badRequest"
+        "401":
+          $ref: "#/components/responses/keyNotEnabled"
+        "409":
+          $ref: "#/components/responses/conflict"
+        "500":
+          $ref: "#/components/responses/internalServerError"
+        "503":
+          $ref: "#/components/responses/unavailable"

@@ -286,6 +286,18 @@ func (tester *ClientAPITester) GetPGPKey(ctx context.Context, apiKey string) []b
 	return resp.Body
 }
 
+func (tester *ClientAPITester) AuditUnenroll(ctx context.Context, apiKey, id string, reason api.AuditUnenrollRequestReason, timestamp time.Time) int {
+	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.Client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+		req.Header.Set("Authorization", "ApiKey "+apiKey)
+		return nil
+	}))
+	tester.Require().NoError(err)
+
+	resp, err := client.AuditUnenrollWithResponse(ctx, id, nil, api.AuditUnenrollJSONRequestBody{Reason: reason, Timestamp: timestamp})
+	tester.Require().NoError(err)
+	return resp.StatusCode()
+}
+
 func (tester *ClientAPITester) TestStatus_Unauthenticated() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -364,4 +376,22 @@ func (tester *ClientAPITester) TestGetPGPKey() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	tester.GetPGPKey(ctx, tester.enrollmentKey)
+}
+
+func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	now := time.Now().UTC()
+
+	tester.T().Log("test enrollment")
+	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	tester.VerifyAgentInKibana(ctx, agentID)
+
+	tester.T().Logf("use audit/unenroll endpoint for agent: %s", agentID)
+	status := tester.AuditUnenroll(ctx, agentKey, agentID, api.Uninstall, now)
+	tester.Require().Equal(http.StatusOK, status)
+
+	tester.T().Logf("audit/unenroll endpoint for agent: %s should return conflict", agentID)
+	status = tester.AuditUnenroll(ctx, agentKey, agentID, api.Uninstall, now)
+	tester.Require().Equal(http.StatusConflict, status)
 }
