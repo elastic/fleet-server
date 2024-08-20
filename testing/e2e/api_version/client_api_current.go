@@ -394,4 +394,10 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 	tester.T().Logf("audit/unenroll endpoint for agent: %s should return conflict", agentID)
 	status = tester.AuditUnenroll(ctx, agentKey, agentID, api.Uninstall, now)
 	tester.Require().Equal(http.StatusConflict, status)
+
+	tester.T().Logf("test checkin agent: %s", agentID)
+	ackToken, actions, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, nil)
+	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
+
+	// TODO verify that unenroll_time and audit_unenroll_* attributes are cleared
 }

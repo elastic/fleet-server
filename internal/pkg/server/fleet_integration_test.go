@@ -1467,7 +1467,7 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 
 	t.Logf("Use audit/unenroll endpoint for agent %s", id)
 	unenrollBody := `{
-          "reason": "uninstall",
+          "reason": "orphaned",
 	  "timestamp": "2024-01-01T12:00:00.000Z"
 	}`
 	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(unenrollBody))
@@ -1490,4 +1490,42 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusConflict, res.StatusCode)
 	res.Body.Close()
+
+	t.Logf("Fake a checkin for agent %s", id)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Checkin successful, verify body")
+	p, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	var obj map[string]interface{}
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "localhost:9200/.fleet-agents/_doc/"+id, nil)
+		require.NoError(t, err)
+		req.SetBasicAuth("elastic", "changeme")
+		res, err := cli.Do(req)
+		require.NoError(t, err)
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			return false
+		}
+		p, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+		var obj map[string]interface{}
+		err = json.Unmarshal(p, &obj)
+		require.NoError(t, err)
+		_, ok := obj["audit_unenrolled_reason"]
+		return !ok
+	}, time.Second*20, time.Second, "agent document should not have audit_unenrolled_reason attribute")
+	cancel()
+	srv.waitExit() //nolint:errcheck // test case
 }

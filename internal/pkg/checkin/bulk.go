@@ -6,16 +6,21 @@
 package checkin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
 )
 
 const defaultFlushInterval = 10 * time.Second
@@ -168,6 +173,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 	}
 
 	updates := make([]bulk.MultiOp, 0, len(pending))
+	ids := make([]string, 0, len(pending))
 
 	simpleCache := make(map[pendingT][]byte)
 
@@ -181,6 +187,8 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		// When that is true, we can reuse an already generated
 		// JSON body containing just the timestamp updates.
 		var body []byte
+
+		zerolog.Ctx(ctx).Info().Msg("BULK CHECKIN")
 		if pendingData.extra == nil {
 
 			var ok bool
@@ -242,6 +250,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			}
 		}
 
+		ids = append(ids, id)
 		updates = append(updates, bulk.MultiOp{
 			ID:    id,
 			Body:  body,
@@ -263,5 +272,42 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		Bool("refresh", needRefresh).
 		Msg("Flush updates")
 
-	return err
+	if err != nil {
+		return err
+	}
+	body, err := deleteAuditAttributesQuery(ids)
+	if err != nil {
+		return err
+	}
+
+	span, ctx := apm.StartSpan(ctx, "deleteAuditAttributes", "update_by_query")
+	defer span.End()
+	client := bc.bulker.Client()
+	resp, err := client.UpdateByQuery([]string{dl.FleetAgents}, client.UpdateByQuery.WithContext(ctx), client.UpdateByQuery.WithRefresh(true), client.UpdateByQuery.WithBody(bytes.NewReader(body)))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	p, _ := io.ReadAll(resp.Body)
+	zerolog.Ctx(ctx).Info().Str("req_body", string(body)).Str("resp", string(p)).Int("status_code", resp.StatusCode).Msg("UPDATE BY QUERY CODE")
+	return nil
+}
+
+// deleteAuditAttirbutesQuery returns the body for an update_by_quer
+//
+// The query removes any unenroll_timestamp and audit_unenroll_* attributes from documents matching the passed ids where the audit_unenrolled_reason is orphaned.
+func deleteAuditAttributesQuery(ids []string) ([]byte, error) {
+	q := dsl.NewRoot()
+	filter := q.Query().Bool().Filter()
+	filter.IDs(ids)
+	filter.Term(dl.FieldAuditUnenrolledReason, "orphaned", nil)
+	painless := fmt.Sprintf(`
+            ctx._source.remove('%s');
+            ctx._source.remove('%s');
+            ctx._source.remove('%s');
+        `, dl.FieldAuditUnenrolledReason, dl.FieldAuditUnenrolledTime, dl.FieldUnenrolledAt)
+	script := q.Script()
+	script.Param("source", painless)
+	script.Param("lang", "painless")
+	return q.MarshalJSON()
 }
