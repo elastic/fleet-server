@@ -1520,10 +1520,14 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 		}
 		p, err := io.ReadAll(res.Body)
 		require.NoError(t, err)
-		var obj map[string]interface{}
-		err = json.Unmarshal(p, &obj)
+		var tmp map[string]interface{}
+		err = json.Unmarshal(p, &tmp)
 		require.NoError(t, err)
-		_, ok := obj["audit_unenrolled_reason"]
+		o, ok := tmp["_source"]
+		require.Truef(t, ok, "expected to find _source in: %v", tmp)
+		obj, ok := o.(map[string]interface{})
+		require.Truef(t, ok, "expected _source to be an object, was: %T", o)
+		_, ok = obj["audit_unenrolled_reason"]
 		return !ok
 	}, time.Second*20, time.Second, "agent document should not have audit_unenrolled_reason attribute")
 	cancel()

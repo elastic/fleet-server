@@ -6,24 +6,26 @@
 package checkin
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/rs/zerolog"
-	"go.elastic.co/apm/v2"
 )
 
 const defaultFlushInterval = 10 * time.Second
+
+// deleteAuditAttributesScript is the script that is ran as part of the bulk update.
+//
+// the script removes the attributes the audit/unenroll API sets and is only ran if the agent checks in with audit_unenrolled_reason set
+// It's ran as part of the same _bulk request as a seperate update_by_query failed due to version conflicts.
+var deleteAuditAttributesScript = []byte(fmt.Sprintf(`{"script": {"lang": "painless", "source": "ctx._source.remove('%s'); ctx._source.remove('%s'); ctx._source.remove('%s')"}}`, dl.FieldAuditUnenrolledReason, dl.FieldAuditUnenrolledTime, dl.FieldUnenrolledAt))
 
 type optionsT struct {
 	flushInterval time.Duration
@@ -38,10 +40,11 @@ func WithFlushInterval(d time.Duration) Opt {
 }
 
 type extraT struct {
-	meta       []byte
-	seqNo      sqn.SeqNo
-	ver        string
-	components []byte
+	meta        []byte
+	seqNo       sqn.SeqNo
+	ver         string
+	components  []byte
+	deleteAudit bool
 }
 
 // Minimize the size of this structure.
@@ -107,17 +110,18 @@ func (bc *Bulk) timestamp() string {
 // The pending agents are sent to elasticsearch as a bulk update at each flush interval.
 // NOTE: If Checkin is called after Run has returned it will just add the entry to the pending map and not do any operations, this may occur when the fleet-server is shutting down.
 // WARNING: Bulk will take ownership of fields, so do not use after passing in.
-func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string, unhealthyReason *[]string) error {
+func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string, unhealthyReason *[]string, deleteAudit bool) error {
 	// Separate out the extra data to minimize
 	// the memory footprint of the 90% case of just
 	// updating the timestamp.
 	var extra *extraT
-	if meta != nil || seqno.IsSet() || newVer != "" || components != nil {
+	if meta != nil || seqno.IsSet() || newVer != "" || components != nil || deleteAudit {
 		extra = &extraT{
-			meta:       meta,
-			seqNo:      seqno,
-			ver:        newVer,
-			components: components,
+			meta:        meta,
+			seqNo:       seqno,
+			ver:         newVer,
+			components:  components,
+			deleteAudit: deleteAudit,
 		}
 	}
 
@@ -172,8 +176,8 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		return nil
 	}
 
-	updates := make([]bulk.MultiOp, 0, len(pending))
-	ids := make([]string, 0, len(pending))
+	// make cap pending*2 in case all checked in agents have audit/unenroll attributes that must be removed.
+	updates := make([]bulk.MultiOp, 0, len(pending)*2)
 
 	simpleCache := make(map[pendingT][]byte)
 
@@ -245,9 +249,17 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			if body, err = fields.Marshal(); err != nil {
 				return err
 			}
+
+			// If deleteAudit is set on the agent make sure the script is part of the request.
+			if pendingData.extra.deleteAudit {
+				updates = append(updates, bulk.MultiOp{
+					ID:    id,
+					Body:  deleteAuditAttributesScript,
+					Index: dl.FleetAgents,
+				})
+			}
 		}
 
-		ids = append(ids, id)
 		updates = append(updates, bulk.MultiOp{
 			ID:    id,
 			Body:  body,
@@ -269,49 +281,5 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		Bool("refresh", needRefresh).
 		Msg("Flush updates")
 
-	if err != nil {
-		return err
-	}
-
-	return bc.deleteAuditAttributes(ctx, ids)
-}
-
-// deleteAuditAttributes runs an update_by_query to remove attributes the audit/unenroll API sets if the audit_unenroll_reason is set to orphaned for any of the passed agent ids.
-func (bc *Bulk) deleteAuditAttributes(ctx context.Context, ids []string) error {
-	span, ctx := apm.StartSpan(ctx, "deleteAuditAttributes", "update_by_query")
-	defer span.End()
-
-	body, err := deleteAuditAttributesQuery(ids)
-	if err != nil {
-		return err
-	}
-	client := bc.bulker.Client()
-	resp, err := client.UpdateByQuery([]string{dl.FleetAgents}, client.UpdateByQuery.WithContext(ctx), client.UpdateByQuery.WithRefresh(true), client.UpdateByQuery.WithBody(bytes.NewReader(body)))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	// TODO remove logging once integration tests succeed
-	p, _ := io.ReadAll(resp.Body)
-	zerolog.Ctx(ctx).Info().Str("req_body", string(body)).Str("resp", string(p)).Int("status_code", resp.StatusCode).Msg("UPDATE BY QUERY CODE")
-	return nil
-}
-
-// deleteAuditAttirbutesQuery returns the body for an update_by_quer
-//
-// The query removes any unenroll_timestamp and audit_unenroll_* attributes from documents matching the passed ids where the audit_unenrolled_reason is orphaned.
-func deleteAuditAttributesQuery(ids []string) ([]byte, error) {
-	q := dsl.NewRoot()
-	filter := q.Query().Bool().Filter()
-	filter.IDs(ids)
-	filter.Term(dl.FieldAuditUnenrolledReason, "orphaned", nil)
-	painless := fmt.Sprintf(`
-            ctx._source.remove('%s');
-            ctx._source.remove('%s');
-            ctx._source.remove('%s');
-        `, dl.FieldAuditUnenrolledReason, dl.FieldAuditUnenrolledTime, dl.FieldUnenrolledAt)
-	script := q.Script()
-	script.Param("source", painless)
-	script.Param("lang", "painless")
-	return q.MarshalJSON()
+	return err
 }
