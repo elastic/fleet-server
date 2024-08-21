@@ -41,7 +41,7 @@ services:
         fi;
         echo "Setting file permissions"
         chown -R root:root config/certs;
-       find . -type d -exec chmod 750 \{\} \;;
+        find . -type d -exec chmod 750 \{\} \;;
         find . -type f -exec chmod 640 \{\} \;;
       ';
   elasticsearch:
@@ -69,14 +69,11 @@ services:
       - bootstrap.memory_lock=true
       - "ELASTIC_USERNAME=${ELASTICSEARCH_USERNAME}"
       - "ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}"
-    mem_limit: ${MEM_LIMIT}
+    mem_limit: 1073741824 # 1g
     ulimits:
       memlock:
         soft: -1
         hard: -1
-        #nofile:
-        #    soft: 65536
-        #    hard: 65536
     volumes:
       - certs:/usr/share/elasticsearch/config/certs
     ports:
@@ -109,14 +106,11 @@ services:
       - bootstrap.memory_lock=true
       - "ELASTIC_USERNAME=${ELASTICSEARCH_USERNAME}"
       - "ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}"
-    mem_limit: ${MEM_LIMIT}
+    mem_limit: 1073741824 # 1g
     ulimits:
       memlock:
         soft: -1
         hard: -1
-        #nofile:
-        #    soft: 65536
-        #    hard: 65536
     volumes:
       - certs:/usr/share/elasticsearch/config/certs
     ports:

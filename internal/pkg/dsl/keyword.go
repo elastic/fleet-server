@@ -13,7 +13,6 @@ const (
 	kKeywordField       = "field"
 	kKeywordFilter      = "filter"
 	kKeywordGreaterThan = "gt"
-	kKeywordIDs         = "ids"
 	kKeywordIncludes    = "includes"
 	kKeywordLessThanEq  = "lte"
 	kKeywordMatchAll    = "match_all"
@@ -31,5 +30,4 @@ const (
 	kKeywordTerm        = "term"
 	kKeywordTerms       = "terms"
 	kKeywordTopHits     = "top_hits"
-	kKeywordValues      = "values"
 )

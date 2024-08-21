@@ -28,7 +28,7 @@ func (t *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.RoundTripFn(req)
 }
 
-func MockESClient(tb testing.TB) (*elasticsearch.Client, *MockTransport) {
+func MockESClient(t *testing.T) (*elasticsearch.Client, *MockTransport) {
 	mocktrans := MockTransport{
 		Response: sendBodyString("{}"), //nolint:bodyclose // nopcloser is used, linter does not see it
 	}
@@ -37,7 +37,7 @@ func MockESClient(tb testing.TB) (*elasticsearch.Client, *MockTransport) {
 	client, err := elasticsearch.NewClient(elasticsearch.Config{
 		Transport: &mocktrans,
 	})
-	require.NoError(tb, err)
+	require.NoError(t, err)
 	return client, &mocktrans
 }
 

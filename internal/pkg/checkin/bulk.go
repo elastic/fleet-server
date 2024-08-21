@@ -24,7 +24,7 @@ const defaultFlushInterval = 10 * time.Second
 // deleteAuditAttributesScript is the script that is ran as part of the bulk update.
 //
 // the script removes the attributes the audit/unenroll API sets and is only ran if the agent checks in with audit_unenrolled_reason set
-// It's ran as part of the same _bulk request as a seperate update_by_query failed due to version conflicts.
+// It's ran as part of the same _bulk request as a separate update_by_query failed due to version conflicts.
 var deleteAuditAttributesScript = []byte(fmt.Sprintf(`{"script": {"lang": "painless", "source": "ctx._source.remove('%s'); ctx._source.remove('%s'); ctx._source.remove('%s')"}}`, dl.FieldAuditUnenrolledReason, dl.FieldAuditUnenrolledTime, dl.FieldUnenrolledAt))
 
 type optionsT struct {
