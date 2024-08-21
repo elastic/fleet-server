@@ -187,10 +187,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		// When that is true, we can reuse an already generated
 		// JSON body containing just the timestamp updates.
 		var body []byte
-
-		zerolog.Ctx(ctx).Info().Msg("BULK CHECKIN")
 		if pendingData.extra == nil {
-
 			var ok bool
 			body, ok = simpleCache[pendingData]
 			if !ok {
@@ -275,19 +272,26 @@ func (bc *Bulk) flush(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	return bc.deleteAuditAttributes(ctx, ids)
+}
+
+// deleteAuditAttributes runs an update_by_query to remove attributes the audit/unenroll API sets if the audit_unenroll_reason is set to orphaned for any of the passed agent ids.
+func (bc *Bulk) deleteAuditAttributes(ctx context.Context, ids []string) error {
+	span, ctx := apm.StartSpan(ctx, "deleteAuditAttributes", "update_by_query")
+	defer span.End()
+
 	body, err := deleteAuditAttributesQuery(ids)
 	if err != nil {
 		return err
 	}
-
-	span, ctx := apm.StartSpan(ctx, "deleteAuditAttributes", "update_by_query")
-	defer span.End()
 	client := bc.bulker.Client()
 	resp, err := client.UpdateByQuery([]string{dl.FleetAgents}, client.UpdateByQuery.WithContext(ctx), client.UpdateByQuery.WithRefresh(true), client.UpdateByQuery.WithBody(bytes.NewReader(body)))
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+	// TODO remove logging once integration tests succeed
 	p, _ := io.ReadAll(resp.Body)
 	zerolog.Ctx(ctx).Info().Str("req_body", string(body)).Str("resp", string(p)).Int("status_code", resp.StatusCode).Msg("UPDATE BY QUERY CODE")
 	return nil

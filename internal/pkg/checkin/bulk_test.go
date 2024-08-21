@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/google/go-cmp/cmp"
@@ -191,6 +192,8 @@ func TestBulkSimple(t *testing.T) {
 			ctx := testlog.SetLogger(t).WithContext(context.Background())
 			mockBulk := ftesting.NewMockBulk()
 			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
+			mockEsClient, _ := esutil.MockESClient(t)
+			mockBulk.On("Client").Return(mockEsClient).Once()
 			bc := NewBulk(mockBulk)
 
 			if err := bc.CheckIn(c.id, c.status, c.message, c.meta, c.components, c.seqno, c.ver, c.unhealthyReason); err != nil {
@@ -240,6 +243,8 @@ func benchmarkFlush(n int, b *testing.B) {
 	ctx := context.Background()
 	mockBulk := ftesting.NewMockBulk()
 	mockBulk.On("MUpdate", mock.Anything, mock.Anything, []bulk.Opt(nil)).Return([]bulk.BulkIndexerResponseItem{}, nil)
+	mockEsClient, _ := esutil.MockESClient(b)
+	mockBulk.On("Client").Return(mockEsClient)
 	bc := NewBulk(mockBulk)
 
 	ids := make([]string, 0, n)
