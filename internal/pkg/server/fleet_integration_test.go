@@ -1509,7 +1509,7 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "localhost:9200/.fleet-agents/_doc/"+id, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:9200/.fleet-agents/_doc/"+id, nil)
 		require.NoError(t, err)
 		req.SetBasicAuth("elastic", "changeme")
 		res, err := cli.Do(req)
