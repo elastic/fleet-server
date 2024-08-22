@@ -399,5 +399,23 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 	ackToken, actions, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, nil)
 	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
 
-	// TODO verify that unenroll_time and audit_unenroll_* attributes are cleared
+	// verify that audit_unenrolled_reason attribute does not exist in agent doc
+	tester.Require().Eventually(func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, tester.ESHosts+"/.fleet-agents/_doc/"+agentID, nil)
+		tester.Require().NoError(err)
+		req.SetBasicAuth(tester.ElasticUser, tester.ElasticPass)
+		res, err := tester.Client.Do(req)
+		tester.Require().NoError(err)
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			return false
+		}
+		var obj struct {
+			source map[string]interface{} `json:"_source"`
+		}
+		err = json.NewDecoder(res.Body).Decode(&obj)
+		tester.Require().NoError(err)
+		_, ok := obj.source["audit_unenrolled_reason"]
+		return !ok
+	}, time.Second*20, time.Second, "agent document in elasticsearch should not have audit_unenrolled_reason attribute")
 }
