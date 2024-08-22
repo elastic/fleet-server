@@ -396,7 +396,7 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 	tester.Require().Equal(http.StatusConflict, status)
 
 	tester.T().Logf("test checkin agent: %s", agentID)
-	ackToken, actions, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, nil)
+	_, _, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, nil)
 	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
 
 	// verify that audit_unenrolled_reason attribute does not exist in agent doc
