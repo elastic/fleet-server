@@ -411,11 +411,11 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 			return false
 		}
 		var obj struct {
-			source map[string]interface{} `json:"_source"`
+			Source map[string]interface{} `json:"_source"`
 		}
 		err = json.NewDecoder(res.Body).Decode(&obj)
 		tester.Require().NoError(err)
-		_, ok := obj.source["audit_unenrolled_reason"]
+		_, ok := obj.Source["audit_unenrolled_reason"]
 		return !ok
 	}, time.Second*20, time.Second, "agent document in elasticsearch should not have audit_unenrolled_reason attribute")
 }
