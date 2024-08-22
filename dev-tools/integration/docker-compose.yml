@@ -1,9 +1,6 @@
-  
-version: '2.3'
 volumes:
   certs:
     driver: local
-
 services:
   setup:
     image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}-amd64
@@ -38,12 +35,6 @@ services:
           "      - localhost\n"\
           "    ip:\n"\
           "      - 127.0.0.1\n"\
-          "  - name: es03\n"\
-          "    dns:\n"\
-          "      - es03\n"\
-          "      - localhost\n"\
-          "    ip:\n"\
-          "      - 127.0.0.1\n"\
           > config/certs/instances.yml;
           bin/elasticsearch-certutil cert --silent --pem -out config/certs/certs.zip --in config/certs/instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
           unzip config/certs/certs.zip -d config/certs;
@@ -59,23 +50,41 @@ services:
     environment:
       - node.name=es01
       - cluster.name=es-docker-cluster
-      - discovery.seed_hosts=elasticsearch
+      - network.host="0.0.0.0"
+      - discovery.type=single-node
+      - xpack.license.self_generated.type=trial
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.enabled=true
+      - xpack.security.authc.api_key.enabled=true
+      - xpack.security.authc.token.enabled=true
+      #- xpack.security.http.ssl.enabled=true
+      #- xpack.security.http.ssl.key=certs/es01/es01.key
+      #- xpack.security.http.ssl.certificate=certs/es01/es01.crt
+      #- xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+      #- xpack.security.transport.ssl.enabled=true
+      #- xpack.security.transport.ssl.key=certs/es01/es01.key
+      #- xpack.security.transport.ssl.certificate=certs/es01/es01.crt
+      #- xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      #- xpack.security.transport.ssl.verification_mode=certificate
       - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms1G -Xmx1G"
       - "ELASTIC_USERNAME=${ELASTICSEARCH_USERNAME}"
       - "ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}"
+    mem_limit: 1073741824 # 1g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"]
+      start_period: 10s
+      interval: 10s
+      timeout: 10s
+      retries: 120
     ulimits:
       memlock:
         soft: -1
         hard: -1
-      nofile:
-          soft: 65536
-          hard: 65536
     volumes:
-      - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - certs:/usr/share/elasticsearch/config/certs
     ports:
       - 127.0.0.1:9200:9200
-      
+
   elasticsearch-remote:
     depends_on:
       setup:
@@ -85,9 +94,12 @@ services:
     environment:
       - node.name=es02
       - cluster.name=es-docker-cluster2
-      - discovery.seed_hosts=elasticsearch
-      - bootstrap.memory_lock=true
+      - network.host="0.0.0.0"
+      - discovery.type=single-node
+      - xpack.license.self_generated.type=trial
       - xpack.security.enabled=true
+      - xpack.security.authc.api_key.enabled=true
+      - xpack.security.authc.token.enabled=true
       - xpack.security.http.ssl.enabled=true
       - xpack.security.http.ssl.key=certs/es02/es02.key
       - xpack.security.http.ssl.certificate=certs/es02/es02.crt
@@ -97,23 +109,22 @@ services:
       - xpack.security.transport.ssl.certificate=certs/es02/es02.crt
       - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
       - xpack.security.transport.ssl.verification_mode=certificate
-      - cluster.name="docker-cluster"
-      - network.host="0.0.0.0"
-      - xpack.security.authc.api_key.enabled="true"
-      - xpack.license.self_generated.type="trial"
-      - "ES_JAVA_OPTS=-Xms1G -Xmx1G"
+      - bootstrap.memory_lock=true
       - "ELASTIC_USERNAME=${ELASTICSEARCH_USERNAME}"
       - "ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}"
+    mem_limit: 1073741824 # 1g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s --cacert config/certs/ca/ca.crt https://${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"]
+      start_period: 10s
+      interval: 10s
+      timeout: 10s
+      retries: 120
     ulimits:
       memlock:
         soft: -1
         hard: -1
-      nofile:
-          soft: 65536
-          hard: 65536
     volumes:
       - certs:/usr/share/elasticsearch/config/certs
-      - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
     ports:
       - 127.0.0.1:9201:9200
-      
+
