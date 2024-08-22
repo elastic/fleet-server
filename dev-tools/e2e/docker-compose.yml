@@ -1,3 +1,4 @@
+version: '2.3'
 services:
   kibana:
     image: "docker.elastic.co/kibana/kibana:${ELASTICSEARCH_VERSION}-amd64"
