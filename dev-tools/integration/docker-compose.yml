@@ -70,6 +70,12 @@ services:
       - "ELASTIC_USERNAME=${ELASTICSEARCH_USERNAME}"
       - "ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}"
     mem_limit: 1073741824 # 1g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"]
+      start_period: 10s
+      interval: 10s
+      timeout: 10s
+      retries: 120
     ulimits:
       memlock:
         soft: -1
@@ -107,6 +113,12 @@ services:
       - "ELASTIC_USERNAME=${ELASTICSEARCH_USERNAME}"
       - "ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}"
     mem_limit: 1073741824 # 1g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s --cacert config/certs/ca/ca.crt https://${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"]
+      start_period: 10s
+      interval: 10s
+      timeout: 10s
+      retries: 120
     ulimits:
       memlock:
         soft: -1

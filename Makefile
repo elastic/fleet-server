@@ -296,22 +296,10 @@ get-version:
 include ./dev-tools/integration/.env
 export $(shell sed 's/=.*//' ./dev-tools/integration/.env)
 
-# Start ES with docker without waiting
-.PHONY: int-docker-start-async
-int-docker-start-async:
-	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --remove-orphans elasticsearch elasticsearch-remote
-
-# Wait for ES to be ready
-.PHONY: int-docker-wait
-int-docker-wait:
-	@./dev-tools/integration/wait-for-elasticsearch.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS}
-	@./dev-tools/integration/wait-for-elasticsearch.sh https://${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_REMOTE_ELASTICSEARCH_HOST}
-
 # Start integration docker setup with wait for when the ES is ready
 .PHONY: int-docker-start
 int-docker-start: ## - Start docker envronment for integration tests and wait until it's ready
-	@$(MAKE) int-docker-start-async
-	@$(MAKE) int-docker-wait
+	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --wait --remove-orphans elasticsearch elasticsearch-remote
 
 # Stop integration docker setup
 .PHONY: int-docker-stop
