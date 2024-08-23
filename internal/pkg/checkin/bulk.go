@@ -8,6 +8,7 @@ package checkin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -16,16 +17,32 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
+	estypes "github.com/elastic/go-elasticsearch/v8/typedapi/types"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/scriptlanguage"
 	"github.com/rs/zerolog"
 )
 
 const defaultFlushInterval = 10 * time.Second
-
-// deleteAuditAttributesScript is the script that is ran as part of the bulk update.
-//
-// the script removes the attributes the audit/unenroll API sets and is only ran if the agent checks in with audit_unenrolled_reason set
-// It's ran as part of the same _bulk request as a separate update_by_query failed due to version conflicts.
-var deleteAuditAttributesScript = []byte(fmt.Sprintf(`{"script": {"lang": "painless", "source": "ctx._source.remove('%s'); ctx._source.remove('%s'); ctx._source.remove('%s')"}}`, dl.FieldAuditUnenrolledReason, dl.FieldAuditUnenrolledTime, dl.FieldUnenrolledAt))
+const deleteAuditAttributesScript = `ctx._source.` + dl.FieldLastCheckin + ` = params.TS;
+ctx._source.` + dl.FieldUpdatedAt + ` = params.Now;
+ctx._source.` + dl.FieldLastCheckinStatus + ` = params.Status;
+ctx._source.` + dl.FieldLastCheckinMessage + ` = params.Message;
+ctx._source.` + dl.FieldUnhealthyReason + ` = params.UnhealthyReason;
+if (params.Ver != "") {
+  ctx._source.` + dl.FieldAgent + `.` + dl.FieldAgentVersion + ` = params.Ver;
+}
+if (params.Meta != null) {
+  ctx._source.` + dl.FieldLocalMetadata + ` = params.Meta;
+}
+if (params.Components != null) {
+  ctx._source.` + dl.FieldComponents + ` = params.Components;
+}
+if (params.SeqNoSet) {
+    ctx._source.` + dl.FieldActionSeqNo + ` = params.SeqNo;
+}
+ctx._source.remove('` + dl.FieldAuditUnenrolledReason + `');
+ctx._source.remove('` + dl.FieldAuditUnenrolledTime + `');
+ctx._source.remove('` + dl.FieldUnenrolledAt + `');`
 
 type optionsT struct {
 	flushInterval time.Duration
@@ -176,8 +193,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		return nil
 	}
 
-	// make cap pending*2 in case all checked in agents have audit/unenroll attributes that must be removed.
-	updates := make([]bulk.MultiOp, 0, len(pending)*2)
+	updates := make([]bulk.MultiOp, 0, len(pending))
 
 	simpleCache := make(map[pendingT][]byte)
 
@@ -207,8 +223,27 @@ func (bc *Bulk) flush(ctx context.Context) error {
 				}
 				simpleCache[pendingData] = body
 			}
+		} else if pendingData.extra.deleteAudit {
+			// Use a script instead of a partial doc to update if attributes need to be removed
+			params, err := encodeParams(nowTimestamp, &pendingData)
+			if err != nil {
+				return err
+			}
+			action := &estypes.UpdateAction{
+				Script: &estypes.InlineScript{
+					Lang:   &scriptlanguage.Painless,
+					Source: deleteAuditAttributesScript,
+					Params: params,
+				},
+			}
+			body, err = json.Marshal(&action)
+			if err != nil {
+				return fmt.Errorf("could not marshall script action: %w", err)
+			}
+			if pendingData.extra.seqNo.IsSet() {
+				needRefresh = true
+			}
 		} else {
-
 			fields := bulk.UpdateFields{
 				dl.FieldLastCheckin:        pendingData.ts,      // Set the checkin timestamp
 				dl.FieldUpdatedAt:          nowTimestamp,        // Set "updated_at" to the current timestamp
@@ -249,15 +284,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			if body, err = fields.Marshal(); err != nil {
 				return err
 			}
-
-			// If deleteAudit is set on the agent make sure the script is part of the request.
-			if pendingData.extra.deleteAudit {
-				updates = append(updates, bulk.MultiOp{
-					ID:    id,
-					Body:  deleteAuditAttributesScript,
-					Index: dl.FleetAgents,
-				})
-			}
 		}
 
 		updates = append(updates, bulk.MultiOp{
@@ -282,4 +308,59 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		Msg("Flush updates")
 
 	return err
+}
+
+func encodeParams(now string, data *pendingT) (map[string]json.RawMessage, error) {
+	var (
+		tsNow      json.RawMessage
+		ts         json.RawMessage
+		status     json.RawMessage
+		message    json.RawMessage
+		reason     json.RawMessage
+		ver        json.RawMessage
+		meta       json.RawMessage
+		components json.RawMessage
+		isSet      json.RawMessage
+		seqNo      json.RawMessage
+		err        error
+	)
+	tsNow, err = json.Marshal(now)
+	Err := errors.Join(err)
+	ts, err = json.Marshal(data.ts)
+	Err = errors.Join(Err, err)
+	status, err = json.Marshal(data.status)
+	Err = errors.Join(Err, err)
+	message, err = json.Marshal(data.message)
+	Err = errors.Join(Err, err)
+	reason, err = json.Marshal(data.unhealthyReason)
+	Err = errors.Join(Err, err)
+	ver, err = json.Marshal(data.extra.ver)
+	Err = errors.Join(Err, err)
+	isSet, err = json.Marshal(data.extra.seqNo.IsSet())
+	Err = errors.Join(Err, err)
+	seqNo, err = json.Marshal(data.extra.seqNo)
+	Err = errors.Join(Err, err)
+	if data.extra.meta != nil {
+		meta, err = json.Marshal(data.extra.meta)
+		Err = errors.Join(Err, err)
+	}
+	if data.extra.components != nil {
+		components, err = json.Marshal(data.extra.components)
+		Err = errors.Join(Err, err)
+	}
+	if Err != nil {
+		return nil, Err
+	}
+	return map[string]json.RawMessage{
+		"Now":             tsNow,
+		"TS":              ts,
+		"Status":          status,
+		"Message":         message,
+		"UnhealthyReason": reason,
+		"Ver":             ver,
+		"Meta":            meta,
+		"Components":      components,
+		"SeqNoSet":        isSet,
+		"SeqNo":           seqNo,
+	}, nil
 }
