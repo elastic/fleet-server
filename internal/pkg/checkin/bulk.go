@@ -209,7 +209,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			}
 		} else if pendingData.extra.deleteAudit {
 			// Use a script instead of a partial doc to update if attributes need to be removed
-			params, err := encodeParams(nowTimestamp, &pendingData)
+			params, err := encodeParams(nowTimestamp, pendingData)
 			if err != nil {
 				return err
 			}
@@ -294,7 +294,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 	return err
 }
 
-func encodeParams(now string, data *pendingT) (map[string]json.RawMessage, error) {
+func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error) {
 	var (
 		tsNow      json.RawMessage
 		ts         json.RawMessage

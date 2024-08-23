@@ -401,7 +401,7 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 
 	// verify that audit_unenrolled_reason attribute does not exist in agent doc
 	tester.Require().Eventually(func() bool {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, tester.ESHosts+"/.fleet-agents/_doc/"+agentID, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+tester.ESHosts+"/.fleet-agents/_doc/"+agentID, nil)
 		tester.Require().NoError(err)
 		req.SetBasicAuth(tester.ElasticUser, tester.ElasticPass)
 		res, err := tester.Client.Do(req)
