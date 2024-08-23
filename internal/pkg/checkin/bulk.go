@@ -7,6 +7,7 @@ package checkin
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,26 +24,9 @@ import (
 )
 
 const defaultFlushInterval = 10 * time.Second
-const deleteAuditAttributesScript = `ctx._source.` + dl.FieldLastCheckin + ` = params.TS;
-ctx._source.` + dl.FieldUpdatedAt + ` = params.Now;
-ctx._source.` + dl.FieldLastCheckinStatus + ` = params.Status;
-ctx._source.` + dl.FieldLastCheckinMessage + ` = params.Message;
-ctx._source.` + dl.FieldUnhealthyReason + ` = params.UnhealthyReason;
-if (params.Ver != "") {
-  ctx._source.` + dl.FieldAgent + `.` + dl.FieldAgentVersion + ` = params.Ver;
-}
-if (params.Meta != null) {
-  ctx._source.` + dl.FieldLocalMetadata + ` = params.Meta;
-}
-if (params.Components != null) {
-  ctx._source.` + dl.FieldComponents + ` = params.Components;
-}
-if (params.SeqNoSet) {
-    ctx._source.` + dl.FieldActionSeqNo + ` = params.SeqNo;
-}
-ctx._source.remove('` + dl.FieldAuditUnenrolledReason + `');
-ctx._source.remove('` + dl.FieldAuditUnenrolledTime + `');
-ctx._source.remove('` + dl.FieldUnenrolledAt + `');`
+
+//go:embed deleteAuditFieldsOnCheckin.painless
+var deleteAuditAttributesScript string
 
 type optionsT struct {
 	flushInterval time.Duration
