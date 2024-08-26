@@ -9,6 +9,7 @@ services:
     user: "0"
     healthcheck:
       test: ["CMD-SHELL", "[ -f config/certs/es01/es01.crt ]"]
+      start_period: 10s
       interval: 1s
       timeout: 5s
       retries: 120
