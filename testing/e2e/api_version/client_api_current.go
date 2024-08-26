@@ -394,4 +394,28 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 	tester.T().Logf("audit/unenroll endpoint for agent: %s should return conflict", agentID)
 	status = tester.AuditUnenroll(ctx, agentKey, agentID, api.Uninstall, now)
 	tester.Require().Equal(http.StatusConflict, status)
+
+	tester.T().Logf("test checkin agent: %s", agentID)
+	_, _, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, nil)
+	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
+
+	// verify that audit_unenrolled_reason attribute does not exist in agent doc
+	tester.Require().Eventually(func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+tester.ESHosts+"/.fleet-agents/_doc/"+agentID, nil)
+		tester.Require().NoError(err)
+		req.SetBasicAuth(tester.ElasticUser, tester.ElasticPass)
+		res, err := tester.Client.Do(req)
+		tester.Require().NoError(err)
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			return false
+		}
+		var obj struct {
+			Source map[string]interface{} `json:"_source"`
+		}
+		err = json.NewDecoder(res.Body).Decode(&obj)
+		tester.Require().NoError(err)
+		_, ok := obj.Source["audit_unenrolled_reason"]
+		return !ok
+	}, time.Second*20, time.Second, "agent document in elasticsearch should not have audit_unenrolled_reason attribute")
 }

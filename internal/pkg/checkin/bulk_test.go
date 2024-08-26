@@ -193,7 +193,7 @@ func TestBulkSimple(t *testing.T) {
 			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
 			bc := NewBulk(mockBulk)
 
-			if err := bc.CheckIn(c.id, c.status, c.message, c.meta, c.components, c.seqno, c.ver, c.unhealthyReason); err != nil {
+			if err := bc.CheckIn(c.id, c.status, c.message, c.meta, c.components, c.seqno, c.ver, c.unhealthyReason, false); err != nil {
 				t.Fatal(err)
 			}
 
@@ -228,7 +228,7 @@ func benchmarkBulk(n int, b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for _, id := range ids {
-			err := bc.CheckIn(id, "", "", nil, nil, nil, "", nil)
+			err := bc.CheckIn(id, "", "", nil, nil, nil, "", nil, false)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -254,7 +254,7 @@ func benchmarkFlush(n int, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		for _, id := range ids {
-			err := bc.CheckIn(id, "", "", nil, nil, nil, "", nil)
+			err := bc.CheckIn(id, "", "", nil, nil, nil, "", nil, false)
 			if err != nil {
 				b.Fatal(err)
 			}

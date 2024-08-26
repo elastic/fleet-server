@@ -7,7 +7,10 @@ package checkin
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -15,10 +18,15 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
+	estypes "github.com/elastic/go-elasticsearch/v8/typedapi/types"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/scriptlanguage"
 	"github.com/rs/zerolog"
 )
 
 const defaultFlushInterval = 10 * time.Second
+
+//go:embed deleteAuditFieldsOnCheckin.painless
+var deleteAuditAttributesScript string
 
 type optionsT struct {
 	flushInterval time.Duration
@@ -33,10 +41,11 @@ func WithFlushInterval(d time.Duration) Opt {
 }
 
 type extraT struct {
-	meta       []byte
-	seqNo      sqn.SeqNo
-	ver        string
-	components []byte
+	meta        []byte
+	seqNo       sqn.SeqNo
+	ver         string
+	components  []byte
+	deleteAudit bool
 }
 
 // Minimize the size of this structure.
@@ -102,17 +111,18 @@ func (bc *Bulk) timestamp() string {
 // The pending agents are sent to elasticsearch as a bulk update at each flush interval.
 // NOTE: If Checkin is called after Run has returned it will just add the entry to the pending map and not do any operations, this may occur when the fleet-server is shutting down.
 // WARNING: Bulk will take ownership of fields, so do not use after passing in.
-func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string, unhealthyReason *[]string) error {
+func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string, unhealthyReason *[]string, deleteAudit bool) error {
 	// Separate out the extra data to minimize
 	// the memory footprint of the 90% case of just
 	// updating the timestamp.
 	var extra *extraT
-	if meta != nil || seqno.IsSet() || newVer != "" || components != nil {
+	if meta != nil || seqno.IsSet() || newVer != "" || components != nil || deleteAudit {
 		extra = &extraT{
-			meta:       meta,
-			seqNo:      seqno,
-			ver:        newVer,
-			components: components,
+			meta:        meta,
+			seqNo:       seqno,
+			ver:         newVer,
+			components:  components,
+			deleteAudit: deleteAudit,
 		}
 	}
 
@@ -182,7 +192,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		// JSON body containing just the timestamp updates.
 		var body []byte
 		if pendingData.extra == nil {
-
 			var ok bool
 			body, ok = simpleCache[pendingData]
 			if !ok {
@@ -198,8 +207,27 @@ func (bc *Bulk) flush(ctx context.Context) error {
 				}
 				simpleCache[pendingData] = body
 			}
+		} else if pendingData.extra.deleteAudit {
+			// Use a script instead of a partial doc to update if attributes need to be removed
+			params, err := encodeParams(nowTimestamp, pendingData)
+			if err != nil {
+				return err
+			}
+			action := &estypes.UpdateAction{
+				Script: &estypes.InlineScript{
+					Lang:   &scriptlanguage.Painless,
+					Source: deleteAuditAttributesScript,
+					Params: params,
+				},
+			}
+			body, err = json.Marshal(&action)
+			if err != nil {
+				return fmt.Errorf("could not marshall script action: %w", err)
+			}
+			if pendingData.extra.seqNo.IsSet() {
+				needRefresh = true
+			}
 		} else {
-
 			fields := bulk.UpdateFields{
 				dl.FieldLastCheckin:        pendingData.ts,      // Set the checkin timestamp
 				dl.FieldUpdatedAt:          nowTimestamp,        // Set "updated_at" to the current timestamp
@@ -264,4 +292,59 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		Msg("Flush updates")
 
 	return err
+}
+
+func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error) {
+	var (
+		tsNow      json.RawMessage
+		ts         json.RawMessage
+		status     json.RawMessage
+		message    json.RawMessage
+		reason     json.RawMessage
+		ver        json.RawMessage
+		meta       json.RawMessage
+		components json.RawMessage
+		isSet      json.RawMessage
+		seqNo      json.RawMessage
+		err        error
+	)
+	tsNow, err = json.Marshal(now)
+	Err := errors.Join(err)
+	ts, err = json.Marshal(data.ts)
+	Err = errors.Join(Err, err)
+	status, err = json.Marshal(data.status)
+	Err = errors.Join(Err, err)
+	message, err = json.Marshal(data.message)
+	Err = errors.Join(Err, err)
+	reason, err = json.Marshal(data.unhealthyReason)
+	Err = errors.Join(Err, err)
+	ver, err = json.Marshal(data.extra.ver)
+	Err = errors.Join(Err, err)
+	isSet, err = json.Marshal(data.extra.seqNo.IsSet())
+	Err = errors.Join(Err, err)
+	seqNo, err = json.Marshal(data.extra.seqNo)
+	Err = errors.Join(Err, err)
+	if data.extra.meta != nil {
+		meta, err = json.Marshal(data.extra.meta)
+		Err = errors.Join(Err, err)
+	}
+	if data.extra.components != nil {
+		components, err = json.Marshal(data.extra.components)
+		Err = errors.Join(Err, err)
+	}
+	if Err != nil {
+		return nil, Err
+	}
+	return map[string]json.RawMessage{
+		"Now":             tsNow,
+		"TS":              ts,
+		"Status":          status,
+		"Message":         message,
+		"UnhealthyReason": reason,
+		"Ver":             ver,
+		"Meta":            meta,
+		"Components":      components,
+		"SeqNoSet":        isSet,
+		"SeqNo":           seqNo,
+	}, nil
 }
