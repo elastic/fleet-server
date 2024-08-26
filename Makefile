@@ -300,6 +300,7 @@ export $(shell sed 's/=.*//' ./dev-tools/integration/.env)
 .PHONY: int-docker-start
 int-docker-start: ## - Start docker envronment for integration tests and wait until it's ready
 	@docker compose -f ./dev-tools/integration/docker-compose.yml --env-file ./dev-tools/integration/.env up  -d --wait --remove-orphans elasticsearch elasticsearch-remote
+	docker ps
 
 # Stop integration docker setup
 .PHONY: int-docker-stop
