@@ -53,10 +53,10 @@ services:
       - network.host="0.0.0.0"
       - discovery.type=single-node
       - xpack.license.self_generated.type=trial
-      - xpack.security.http.ssl.enabled=false
       - xpack.security.enabled=true
       - xpack.security.authc.api_key.enabled=true
       - xpack.security.authc.token.enabled=true
+      - xpack.security.http.ssl.enabled=false
       #- xpack.security.http.ssl.enabled=true
       #- xpack.security.http.ssl.key=certs/es01/es01.key
       #- xpack.security.http.ssl.certificate=certs/es01/es01.crt
@@ -69,7 +69,7 @@ services:
       - bootstrap.memory_lock=true
       - "ELASTIC_USERNAME=${ELASTICSEARCH_USERNAME}"
       - "ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}"
-    mem_limit: 1073741824 # 1g
+    mem_limit: 4294967296  # 4g
     healthcheck:
       test: ["CMD-SHELL", "curl -s ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"]
       start_period: 10s
@@ -112,7 +112,7 @@ services:
       - bootstrap.memory_lock=true
       - "ELASTIC_USERNAME=${ELASTICSEARCH_USERNAME}"
       - "ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}"
-    mem_limit: 1073741824 # 1g
+    mem_limit:  4294967296  # 4g
     healthcheck:
       test: ["CMD-SHELL", "curl -s --cacert config/certs/ca/ca.crt https://${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"]
       start_period: 10s
