@@ -1466,11 +1466,15 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	id, key := EnrollAgent(t, ctx, srv, enrollBody)
 
 	t.Logf("Use audit/unenroll endpoint for agent %s", id)
-	unenrollBody := `{
-          "reason": "uninstall",
+	orphanBody := `{
+          "reason": "orphaned",
 	  "timestamp": "2024-01-01T12:00:00.000Z"
 	}`
-	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(unenrollBody))
+	uninstallBody := `{
+          "reason": "orphaned",
+	  "timestamp": "2024-01-01T12:00:00.000Z"
+	}`
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(uninstallBody))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+key)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
@@ -1480,8 +1484,19 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	res.Body.Close()
 
-	t.Log("Use of audit/unenroll a second time should fail.")
-	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(unenrollBody))
+	t.Log("Orphaned can replace uninstall")
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(orphanBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	res.Body.Close()
+
+	t.Log("Use of audit/unenroll once orphaned should fail.")
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(orphanBody))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+key)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
