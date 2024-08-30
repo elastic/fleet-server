@@ -1471,7 +1471,7 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	  "timestamp": "2024-01-01T12:00:00.000Z"
 	}`
 	uninstallBody := `{
-          "reason": "orphaned",
+          "reason": "uninstall",
 	  "timestamp": "2024-01-01T12:00:00.000Z"
 	}`
 	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(uninstallBody))

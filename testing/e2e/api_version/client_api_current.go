@@ -391,6 +391,10 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 	status := tester.AuditUnenroll(ctx, agentKey, agentID, api.Uninstall, now)
 	tester.Require().Equal(http.StatusOK, status)
 
+	tester.T().Logf("use audit/unenroll endpoint to replace uninstalled with orphaned for agent: %s", agentID)
+	status = tester.AuditUnenroll(ctx, agentKey, agentID, api.Orphaned, now)
+	tester.Require().Equal(http.StatusOK, status)
+
 	tester.T().Logf("audit/unenroll endpoint for agent: %s should return conflict", agentID)
 	status = tester.AuditUnenroll(ctx, agentKey, agentID, api.Uninstall, now)
 	tester.Require().Equal(http.StatusConflict, status)
