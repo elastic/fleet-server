@@ -214,10 +214,11 @@ func (bc *Bulk) flush(ctx context.Context) error {
 				return err
 			}
 			action := &estypes.UpdateAction{
-				Script: &estypes.InlineScript{
-					Lang:   &scriptlanguage.Painless,
-					Source: deleteAuditAttributesScript,
-					Params: params,
+				Script: &estypes.Script{
+					Lang:    &scriptlanguage.Painless,
+					Source:  &deleteAuditAttributesScript,
+					Options: map[string]string{},
+					Params:  params,
 				},
 			}
 			body, err = json.Marshal(&action)
