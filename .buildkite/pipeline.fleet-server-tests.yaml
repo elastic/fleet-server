@@ -12,6 +12,7 @@
 
 env:
   ENVIRONMENT: ${ENVIRONMENT?}
+  DEPLOYMENT_SLICES: ${DEPLOYMENT_SLICES:-""}
   TEAM_CHANNEL: "#fleet-cloud-services"
 
 steps:
