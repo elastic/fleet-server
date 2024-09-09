@@ -50,7 +50,7 @@ pull_request_rules:
     conditions:
       - merged
       - base=main
-      - label=backport-v7.17.0
+      - label ~= ^(backport-v7.17.0|backport-7.17)$
     actions:
       backport:
         assignees:
@@ -236,7 +236,7 @@ pull_request_rules:
   - name: backport patches to 8.15 branch
     conditions:
       - merged
-      - label=backport-v8.15.0
+      - label ~= ^(backport-v8.15.0|backport-8.15)$
     actions:
       backport:
         assignees:
@@ -249,7 +249,7 @@ pull_request_rules:
   - name: backport patches to 8.x branch
     conditions:
       - merged
-      - label=backport-v8.x
+      - label=backport-8.x
     actions:
       backport:
         assignees:
