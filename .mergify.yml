@@ -242,7 +242,7 @@ pull_request_rules:
   - name: backport patches to 8.x branch
     conditions:
       - merged
-      - label=backport-8.x
+      - label~=^(backport-v8.x|backport-8.x)$
     actions:
       backport:
         assignees:
