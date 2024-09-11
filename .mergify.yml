@@ -50,7 +50,7 @@ pull_request_rules:
     conditions:
       - merged
       - base=main
-      - label=backport-v7.17.0
+      - label~=^(backport-v7.17.0|backport-7.17)$
     actions:
       backport:
         assignees:
@@ -60,13 +60,6 @@ pull_request_rules:
         labels:
           - "backport"
         title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
-  - name: remove backport-skip label
-    conditions:
-      - label~=backport-v
-    actions:
-      label:
-        remove:
-          - backport-skip
   - name: notify the backport has not been merged yet
     conditions:
       - -merged
@@ -236,7 +229,7 @@ pull_request_rules:
   - name: backport patches to 8.15 branch
     conditions:
       - merged
-      - label=backport-v8.15.0
+      - label~=^(backport-v8.15.0|backport-8.15)$
     actions:
       backport:
         assignees:
@@ -249,7 +242,7 @@ pull_request_rules:
   - name: backport patches to 8.x branch
     conditions:
       - merged
-      - label=backport-v8.x
+      - label~=^(backport-v8.x|backport-8.x)$
     actions:
       backport:
         assignees:
@@ -271,17 +264,17 @@ pull_request_rules:
           This pull request does not have a backport label. Could you fix it @{{author}}? 🙏
           To fixup this pull request, you need to add the backport labels for the needed
           branches, such as:
-          * `backport-v./d./d./d` is the label to automatically backport to the `8./d` branch. `/d` is the digit
-  - name: add backport-v8.x label for main only
+          * `backport-./d./d` is the label to automatically backport to the `8./d` branch. `/d` is the digit
+  - name: add backport-8.x label for main only
     conditions:
-      - -label~=^backport-v8.x
+      - -label~=^backport-8.x
       - base=main
       - -merged
       - -closed
     actions:
       comment:
         message: |
-          `backport-v8.x` has been added to help with the transition to the new branch `8.x`.
+          `backport-8.x` has been added to help with the transition to the new branch `8.x`.
       label:
         add:
-          - backport-v8.x
+          - backport-8.x
