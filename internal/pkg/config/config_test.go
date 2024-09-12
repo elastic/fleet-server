@@ -397,7 +397,7 @@ func TestDeprecationWarnings(t *testing.T) {
 	log = log.Hook(zerolog.HookFunc(func(_ *zerolog.Event, _ zerolog.Level, _ string) {
 		logCount.Add(1)
 	}))
-	oldLog := zerlog.DefaultContextLogger
+	oldLog := zerolog.DefaultContextLogger
 	t.Cleanup(func() {
 		zerolog.DefaultContextLogger = oldLog
 	})
@@ -406,5 +406,5 @@ func TestDeprecationWarnings(t *testing.T) {
 	path := filepath.Join("testdata", "deprecated-config-attributes.yml")
 	_, err := LoadFile(path)
 	require.NoError(t, err)
-	assert.Equal(t, 3, logCount.Load(), "Expected 3 log messages")
+	assert.Equal(t, uint64(3), logCount.Load(), "Expected 3 log messages")
 }
