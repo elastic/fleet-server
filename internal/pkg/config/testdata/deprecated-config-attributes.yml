@@ -1,0 +1,16 @@
+output:
+  elasticsearch:
+    hosts: ["localhost:9200"]
+    service_token: "test-token"
+fleet:
+  agent:
+    id: 1e4954ce-af37-4731-9f4a-407b08e69e42
+    logging:
+      level: debug
+inputs:
+  - type: fleet-server
+    server:
+      limits:
+        max_connections: 10
+        policy_throttle: 1s
+
