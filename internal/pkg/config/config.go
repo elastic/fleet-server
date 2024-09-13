@@ -59,7 +59,7 @@ type Config struct {
 var deprecatedConfigOptions = map[string]string{
 	"inputs.0.server.limits.max_connections": "max_connections has been deprecated and will be removed in a future release. Please configure server limits using max_agents instead.",
 	"inputs.0.server.limits.policy_throttle": "policy_throttle has been deprecated and will be removed in a future release. Please use policy_limits instead.",
-	"fleet.agent.logging.level":              "fleet.agent.logging.level has been deprecated and will be rmoved in a future release. Please set logging level with the root attribute logging.level instead.",
+	"fleet.agent.logging.level":              "fleet.agent.logging.level has been deprecated and will be removed in a future release. Please set logging level with the root attribute logging.level instead.",
 }
 
 // InitDefaults initializes the defaults for the configuration.
