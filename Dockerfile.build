@@ -1,6 +1,6 @@
 ARG GO_VERSION
-ARG ARCH=main # ARCH should be main or arm
-FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${ARCH}
+ARG TARGETARCH # Should be main or arm
+FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${TARGETARCH}
 
 RUN \
   apt-get update \

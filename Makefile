@@ -43,12 +43,6 @@ endif
 DOCKER_IMAGE_TAG?=${VERSION}
 DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
-ifeq ($(shell uname -p),arm)
-DOCKERARCH=arm
-else
-DOCKERARCH=main
-endif
-
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
 COVER_TARGETS=$(addprefix cover-, $(PLATFORMS))
 COMMIT=$(shell git rev-parse --short HEAD)
@@ -253,7 +247,12 @@ else
 endif
 
 build-releaser: ## - Build a Docker image to run make package including all build tools
-	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) --build-arg ARCH=${DOCKERARCH} .
+ifeq ($(shell uname -p),arm)
+	$(eval DOCKERARCH := arm)
+else
+	$(eval DOCKERARCH := main)
+endif
+	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) --build-arg TARGETARCH=${DOCKERARCH} .
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
