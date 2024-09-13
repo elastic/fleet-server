@@ -43,6 +43,11 @@ endif
 DOCKER_IMAGE_TAG?=${VERSION}
 DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
+ifeq ($(shell uname -p),arm)
+DOCKERARCH=arm
+else
+DOCKERARCH=main
+endif
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
 COVER_TARGETS=$(addprefix cover-, $(PLATFORMS))
@@ -248,7 +253,7 @@ else
 endif
 
 build-releaser: ## - Build a Docker image to run make package including all build tools
-	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) .
+	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) --build-arg ARCH=${DOCKERARCH} .
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
@@ -257,7 +262,7 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser
 	## Build for local architecture and for linux/amd64 for docker images.
-	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(BUILDER_IMAGE) cover-linux/amd64 cover-$(shell go env GOOS)/$(shell go env GOARCH)
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
@@ -336,7 +341,7 @@ test-int-set: ## - Run integration tests without setup
 .PHONY: build-e2e-agent-image
 build-e2e-agent-image: docker-cover-e2e-binaries ## - Build a custom elastic-agent image with fleet-server binaries with coverage enabled injected
 	@printf "${CMD_COLOR_ON} Creating test e2e agent image\n${CMD_COLOR_OFF}"
-	GOARCH=amd64 ./dev-tools/e2e/build.sh
+	./dev-tools/e2e/build.sh
 
 .PHONY: e2e-certs
 e2e-certs: ## - Use openssl to create a CA, encrypted private key, and signed fleet-server cert testing purposes
