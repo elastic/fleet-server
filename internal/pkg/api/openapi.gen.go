@@ -630,6 +630,9 @@ type PolicyData struct {
 	// Revision The revision number of the policy. Should match revision_idx.
 	Revision *int `json:"revision,omitempty"`
 
+	// SecretPaths A list of keys that reference secret values that have been injected into the policy.
+	SecretPaths *[]string `json:"secret_paths,omitempty"`
+
 	// Signed Optional action signing data.
 	Signed *ActionSignature `json:"signed,omitempty" yaml:"signed"`
 }

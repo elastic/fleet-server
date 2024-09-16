@@ -522,6 +522,11 @@ components:
         id:
           description: The policy's ID.
           type: string
+        secret_paths:
+          description: A list of keys that reference secret values that have been injected into the policy.
+          type: array
+          items:
+            type: string
         outputs:
           description: A map of all outputs that the agent running the policy can use to send data to.
           type: object

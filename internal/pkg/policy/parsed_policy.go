@@ -10,10 +10,11 @@ import (
 	"errors"
 	"fmt"
 
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
-	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -44,16 +45,18 @@ type ParsedPolicyDefaults struct {
 }
 
 type ParsedPolicy struct {
-	Policy  model.Policy
-	Roles   RoleMapT
-	Outputs map[string]Output
-	Default ParsedPolicyDefaults
-	Inputs  []map[string]interface{}
-	Links   apm.SpanLink
+	Policy     model.Policy
+	Roles      RoleMapT
+	Outputs    map[string]Output
+	Default    ParsedPolicyDefaults
+	Inputs     []map[string]interface{}
+	SecretKeys []string
+	Links      apm.SpanLink
 }
 
 func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*ParsedPolicy, error) {
 	var err error
+	secretKeys := make([]string, 0)
 	// Interpret the output permissions if available
 	var roles map[string]RoleT
 	if roles, err = parsePerms(p.Data.OutputPermissions); err != nil {
@@ -65,7 +68,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		return nil, err
 	}
 	for _, policyOutput := range p.Data.Outputs {
-		err := ProcessOutputSecret(ctx, policyOutput, bulker)
+		err := ProcessOutputSecret(ctx, policyOutput, bulker) // TODO: Do we want to add output secret paths to SecretKeys?
 		if err != nil {
 			return nil, err
 		}
@@ -74,10 +77,11 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	if err != nil {
 		return nil, err
 	}
-	policyInputs, err := getPolicyInputsWithSecrets(ctx, p.Data, bulker)
+	policyInputs, keys, err := getPolicyInputsWithSecrets(ctx, p.Data, bulker)
 	if err != nil {
 		return nil, err
 	}
+	secretKeys = append(secretKeys, keys...)
 
 	// We are cool and the gang
 	pp := &ParsedPolicy{
@@ -87,7 +91,8 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		Default: ParsedPolicyDefaults{
 			Name: defaultName,
 		},
-		Inputs: policyInputs,
+		Inputs:     policyInputs,
+		SecretKeys: secretKeys,
 	}
 	if trace := apm.TransactionFromContext(ctx); trace != nil {
 		// Pass current transaction link (should be a monitor transaction) to caller (likely a client request).

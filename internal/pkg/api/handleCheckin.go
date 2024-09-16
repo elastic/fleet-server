@@ -846,6 +846,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	if err != nil {
 		return nil, err
 	}
+	d.SecretPaths = &pp.SecretKeys
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})
 	if err != nil {
