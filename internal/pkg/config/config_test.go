@@ -8,18 +8,20 @@ package config
 
 import (
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
-	"github.com/elastic/go-ucfg"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/go-ucfg"
 )
 
 func TestConfig(t *testing.T) {
@@ -387,4 +389,22 @@ func TestConfigFromEnv(t *testing.T) {
 	c, err := LoadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, "test-val", c.Output.Elasticsearch.ServiceToken)
+}
+
+func TestDeprecationWarnings(t *testing.T) {
+	var logCount atomic.Uint64
+	log := testlog.SetLogger(t)
+	log = log.Hook(zerolog.HookFunc(func(_ *zerolog.Event, _ zerolog.Level, _ string) {
+		logCount.Add(1)
+	}))
+	oldLog := zerolog.DefaultContextLogger
+	t.Cleanup(func() {
+		zerolog.DefaultContextLogger = oldLog
+	})
+	zerolog.DefaultContextLogger = &log
+
+	path := filepath.Join("testdata", "deprecated-config-attributes.yml")
+	_, err := LoadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(3), logCount.Load(), "Expected 3 log messages")
 }
