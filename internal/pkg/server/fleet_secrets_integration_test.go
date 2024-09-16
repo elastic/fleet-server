@@ -17,11 +17,12 @@ import (
 
 	"testing"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -230,4 +231,6 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 		"package_var_secret": "secret_value",
 		"type":               "fleet-server",
 	}, input)
+	// expect that secret_paths lists the key
+	assert.Equal(t, []string{"inputs[0].package_secret_value"}, *actionData.Policy.SecretPaths)
 }
