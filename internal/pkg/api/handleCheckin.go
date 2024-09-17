@@ -819,7 +819,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 
 	data := model.ClonePolicyData(pp.Policy.Data)
 	for policyName, policyOutput := range data.Outputs {
-		err := policy.ProcessOutputSecret(ctx, policyOutput, bulker)
+		_, err := policy.ProcessOutputSecret(ctx, policyOutput, bulker) // FIXME: Do we need to handle output keys here?
 		if err != nil {
 			return nil, fmt.Errorf("failed to process output secrets %q: %w",
 				policyName, err)

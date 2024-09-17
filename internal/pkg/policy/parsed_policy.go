@@ -67,10 +67,13 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	if err != nil {
 		return nil, err
 	}
-	for _, policyOutput := range p.Data.Outputs {
-		err := ProcessOutputSecret(ctx, policyOutput, bulker) // TODO: Do we want to add output secret paths to SecretKeys?
+	for name, policyOutput := range p.Data.Outputs {
+		ks, err := ProcessOutputSecret(ctx, policyOutput, bulker)
 		if err != nil {
 			return nil, err
+		}
+		for _, key := range ks {
+			secretKeys = append(secretKeys, "outputs."+name+"."+key)
 		}
 	}
 	defaultName, err := findDefaultOutputName(p.Data.Outputs)

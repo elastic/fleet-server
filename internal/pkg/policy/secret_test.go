@@ -212,11 +212,13 @@ func TestProcessOutputSecret(t *testing.T) {
 		name             string
 		outputJSON       string
 		expectOutputJSON string
+		expectKeys       []string
 	}{
 		{
 			name:             "Output without secrets",
 			outputJSON:       `{"password": "test"}`,
 			expectOutputJSON: `{"password": "test"}`,
+			expectKeys:       nil,
 		},
 		{
 			name: "Output with secrets",
@@ -228,6 +230,7 @@ func TestProcessOutputSecret(t *testing.T) {
 			expectOutputJSON: `{
 				"password": "passwordid_value"
 			}`,
+			expectKeys: []string{"password"},
 		},
 		{
 			name: "Output with nested secrets",
@@ -239,6 +242,7 @@ func TestProcessOutputSecret(t *testing.T) {
 			expectOutputJSON: `{
 				"ssl": {"key": "sslkey_value"}
 			}`,
+			expectKeys: []string{"ssl.key"},
 		},
 		{
 			name: "Output with multiple secrets",
@@ -250,6 +254,7 @@ func TestProcessOutputSecret(t *testing.T) {
 			expectOutputJSON: `{
 				"ssl": {"key": "sslkey_value", "other": "sslother_value"}
 			}`,
+			expectKeys: []string{"ssl.key", "ssl.other"},
 		},
 	}
 
@@ -262,11 +267,11 @@ func TestProcessOutputSecret(t *testing.T) {
 			expectOutput, err := smap.Parse([]byte(tc.expectOutputJSON))
 			assert.NoError(t, err)
 
-			err = ProcessOutputSecret(context.Background(), output, bulker)
+			keys, err := ProcessOutputSecret(context.Background(), output, bulker)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expectOutput, output)
-
+			assert.Equal(t, tc.expectKeys, keys)
 		})
 	}
 }

@@ -188,14 +188,15 @@ func setSecretPath(output smap.Map, secretValue string, secretPaths []string) er
 }
 
 // Read secret from output and mutate output with secret value
-func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) error {
+func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) ([]string, error) {
 	secrets := output.GetMap(FieldOutputSecrets)
 
 	delete(output, FieldOutputSecrets)
 	secretReferences := make([]model.SecretReferencesItems, 0)
 	outputSecrets, err := getSecretIDAndPath(secrets)
+	keys := make([]string, 0, len(outputSecrets))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, secret := range outputSecrets {
@@ -204,19 +205,28 @@ func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk)
 		})
 	}
 	if len(secretReferences) == 0 {
-		return nil
+		return nil, nil
 	}
 	secretValues, err := getSecretValues(ctx, secretReferences, bulker)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, secret := range outputSecrets {
+		var key string
+		for _, p := range secret.Path {
+			if key == "" {
+				key = p
+				continue
+			}
+			key = key + "." + p
+		}
+		keys = append(keys, key)
 		err = setSecretPath(output, secretValues[secret.ID], secret.Path)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return keys, nil
 }
 
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
