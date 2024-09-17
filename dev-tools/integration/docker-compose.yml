@@ -1,4 +1,4 @@
-  
+
 version: '2.3'
 volumes:
   certs:
@@ -6,7 +6,7 @@ volumes:
 
 services:
   setup:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}-amd64
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}
     volumes:
       - certs:/usr/share/elasticsearch/config/certs
     user: "0"
@@ -54,7 +54,7 @@ services:
         find . -type f -exec chmod 640 \{\} \;;
       ';
   elasticsearch:
-    image: "docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}-amd64"
+    image: "docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}"
     container_name: elasticsearch
     environment:
       - node.name=es01
@@ -75,12 +75,12 @@ services:
       - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
     ports:
       - 127.0.0.1:9200:9200
-      
+
   elasticsearch-remote:
     depends_on:
       setup:
         condition: service_healthy
-    image: "docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}-amd64"
+    image: "docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}"
     container_name: elasticsearch-remote
     environment:
       - node.name=es02
@@ -116,4 +116,4 @@ services:
       - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
     ports:
       - 127.0.0.1:9201:9200
-      
+

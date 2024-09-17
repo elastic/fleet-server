@@ -1,7 +1,7 @@
 version: '2.3'
 services:
   kibana:
-    image: "docker.elastic.co/kibana/kibana:${ELASTICSEARCH_VERSION}-amd64"
+    image: "docker.elastic.co/kibana/kibana:${ELASTICSEARCH_VERSION}"
     container_name: kibana
     environment:
       - KIBANA_TOKEN=${KIBANA_TOKEN}
