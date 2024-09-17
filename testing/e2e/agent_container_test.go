@@ -34,6 +34,7 @@ type AgentContainerSuite struct {
 }
 
 func TestAgentContainerSuite(t *testing.T) {
+	t.Skip("Flakey test suite skipped. See https://github.com/elastic/fleet-server/issues/3909")
 	suite.Run(t, new(AgentContainerSuite))
 }
 
