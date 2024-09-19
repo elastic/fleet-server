@@ -3,7 +3,7 @@ volumes:
     driver: local
 services:
   setup:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}-amd64
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}
     volumes:
       - certs:/usr/share/elasticsearch/config/certs
     user: "0"
@@ -45,7 +45,7 @@ services:
         find . -type f -exec chmod 640 \{\} \;;
       ';
   elasticsearch:
-    image: "docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}-amd64"
+    image: "docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}"
     container_name: elasticsearch
     environment:
       - node.name=es01
@@ -89,7 +89,7 @@ services:
     depends_on:
       setup:
         condition: service_healthy
-    image: "docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}-amd64"
+    image: "docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}"
     container_name: elasticsearch-remote
     environment:
       - node.name=es02
