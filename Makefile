@@ -69,6 +69,17 @@ help: ## - Show help message
 	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | sed -e "s/^Makefile://" | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
+.PHONY: multipass
+multipass: ## - Launch a multipass instance for development
+ifeq ($(shell uname -p),arm)
+	$(eval ARCH := arm64)
+else
+	$(eval ARCH := amd64)
+endif
+	@cat dev-tools/multipass-cloud-init.yml.txt | GO_VERSION=${GO_VERSION} ARCH=${ARCH} envsubst > dev-tools/multipass-cloud-init.yml
+	@multipass launch --cloud-init=dev-tools/multipass-cloud-init.yml --mount ..:~/git --name fleet-server-dev --memory 8G --cpus 2 --disk 50G noble
+	@rm dev-tools/multipass-cloud-init.yml
+
 .PHONY: list-platforms
 list-platforms: ## - Show the possible PLATFORMS
 	@echo  "${PLATFORMS}"
