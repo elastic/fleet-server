@@ -1,6 +1,6 @@
 services:
   kibana:
-    image: "docker.elastic.co/kibana/kibana:${ELASTICSEARCH_VERSION}-amd64"
+    image: "docker.elastic.co/kibana/kibana:${ELASTICSEARCH_VERSION}"
     container_name: kibana
     healthcheck:
       test: ["CMD", "curl", "-f", "${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:5601/api/status"]
@@ -17,7 +17,7 @@ services:
     networks:
       - integration
   apm-server:
-    image:  "docker.elastic.co/apm/apm-server:${ELASTICSEARCH_VERSION}-amd64"
+    image:  "docker.elastic.co/apm/apm-server:${ELASTICSEARCH_VERSION}"
     container_name: apm-server
     # curl is not in the apm-server image
     #healthcheck:
