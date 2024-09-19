@@ -336,7 +336,7 @@ test-int-set: ## - Run integration tests without setup
 .PHONY: build-e2e-agent-image
 build-e2e-agent-image: docker-cover-e2e-binaries ## - Build a custom elastic-agent image with fleet-server binaries with coverage enabled injected
 	@printf "${CMD_COLOR_ON} Creating test e2e agent image\n${CMD_COLOR_OFF}"
-	GOARCH=amd64 ./dev-tools/e2e/build.sh
+	FLEET_VERSION=${DEFAULT_VERSION}-SNAPSHOT GOARCH=amd64 ./dev-tools/e2e/build.sh # force fleet version to be equal to VERSION-SNAPSHOT
 
 .PHONY: e2e-certs
 e2e-certs: ## - Use openssl to create a CA, encrypted private key, and signed fleet-server cert testing purposes
