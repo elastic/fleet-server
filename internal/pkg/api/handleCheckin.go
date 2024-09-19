@@ -35,8 +35,8 @@ import (
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
 
-	apmhttp "go.elastic.co/apm/module/apmhttp/v2"
-	apm "go.elastic.co/apm/v2"
+	"go.elastic.co/apm/module/apmhttp/v2"
+	"go.elastic.co/apm/v2"
 )
 
 var (
