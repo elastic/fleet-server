@@ -13,7 +13,8 @@ BUILDMODE_windows_amd64=-buildmode=pie
 BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
-BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-main-debian11
+CROSSBUILD_SUFFIX=main-debian11
+BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${CROSSBUILD_SUFFIX}
 
 #Benchmark related targets
 BENCH_BASE ?= benchmark-$(COMMIT).out
@@ -248,11 +249,11 @@ endif
 
 build-releaser: ## - Build a Docker image to run make package including all build tools
 ifeq ($(shell uname -p),arm)
-	$(eval DOCKERARCH := arm)
+	$(eval SUFFIX := arm)
 else
-	$(eval DOCKERARCH := main)
+	$(eval SUFFIX := ${CROSSBUILD_SUFFIX})
 endif
-	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) --build-arg TARGETARCH=${DOCKERARCH} .
+	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) --build-arg SUFFIX=${SUFFIX} .
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
