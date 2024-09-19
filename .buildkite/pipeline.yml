@@ -105,6 +105,11 @@ steps:
           provider: "gcp"
         artifact_paths:
           - build/*.xml
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/test-*.xml"
+              format: "xml"
+              debug: true
 
       - label: "E2E Test"
         key: "e2e-test"
