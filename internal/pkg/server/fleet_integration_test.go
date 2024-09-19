@@ -22,14 +22,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -236,7 +237,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		}
 		resp, err := cli.Do(req)
 		if err != nil {
-			return false, nil //nolint:nilerr // we want to ignore the error in this case.
+			return false, nil
 		}
 		defer resp.Body.Close()
 

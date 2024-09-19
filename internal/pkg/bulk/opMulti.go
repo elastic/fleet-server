@@ -79,7 +79,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 
 		bulk := &bulks[i]
 		bulk.ch = ch
-		bulk.idx = int32(i)
+		bulk.idx = int32(i) //nolint:gosec // disable G115
 		bulk.action = action
 		bulk.buf.Set(bodySlice)
 		if opt.Refresh {

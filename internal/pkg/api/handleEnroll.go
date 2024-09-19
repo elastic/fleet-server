@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/elastic-agent-libs/str"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -24,7 +26,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
-	"go.elastic.co/apm/v2"
 
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-version"
@@ -395,7 +396,7 @@ func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWrit
 	}
 
 	numWritten, err := w.Write(data)
-	cntEnroll.bodyOut.Add(uint64(numWritten))
+	cntEnroll.bodyOut.Add(uint64(numWritten)) //nolint:gosec // disable G115
 
 	if err != nil {
 		return fmt.Errorf("fail send enroll response: %w", err)
