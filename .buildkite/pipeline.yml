@@ -172,10 +172,10 @@ steps:
       - step: "tests"
         allow_failure: false
 
-  - label: ":argo: Update fleet image tag for fleet-controller using gpctl"
+  - label: ":serverless::argo: Run synthetics tests and update fleet to ${BUILDKITE_COMMIT:0:12} in serverless-gitops"
     async: true
     branches: main
-    trigger: gpctl-promote-with-e2e-tests
+    trigger: gpctl-promote-after-serverless-devenv-synthetics
     build:
       env:
         SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
