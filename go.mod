@@ -6,13 +6,8 @@ require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/docker/go-units v0.5.0
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-client/v7 v7.15.0
-	github.com/elastic/elastic-agent-libs v0.10.1
-=======
 	github.com/elastic/elastic-agent-client/v7 v7.16.0
 	github.com/elastic/elastic-agent-libs v0.11.0
->>>>>>> 73a7879 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.10.1 to 0.11.0 (#3915))
 	github.com/elastic/elastic-agent-system-metrics v0.11.2
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
 	github.com/elastic/go-ucfg v0.8.8
