@@ -4,7 +4,6 @@
 
 // Package cache implements an in-memory cache used to track API keys, actions, and artifacts.
 
-//nolint:goconst // easier to read scoped keys if no constants are used
 package cache
 
 import (

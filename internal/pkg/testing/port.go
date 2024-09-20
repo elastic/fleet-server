@@ -18,5 +18,5 @@ func FreePort() (uint16, error) {
 	}
 	defer l.Close()
 
-	return uint16(l.Addr().(*net.TCPAddr).Port), nil
+	return uint16(l.Addr().(*net.TCPAddr).Port), nil //nolint:gosec // disable G115
 }
