@@ -15,9 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/go-ucfg/yaml"
 	"github.com/pbnjay/memory"
 	"github.com/rs/zerolog"
+
+	"github.com/elastic/go-ucfg/yaml"
 )
 
 const (
@@ -95,7 +96,7 @@ type valueRange struct {
 
 type envLimits struct {
 	Agents         valueRange           `config:"num_agents"`
-	RecommendedRAM int                  `config:"recommended_min_ram"`
+	RecommendedRAM uint64               `config:"recommended_min_ram"`
 	Server         *serverLimitDefaults `config:"server_limits"`
 	Cache          *cacheLimits         `config:"cache_limits"`
 }
@@ -292,7 +293,7 @@ func loadLimits(agentLimit int) *envLimits {
 		// get nearest limits for configured agent numbers
 		if l.Agents.Min <= agentLimit && agentLimit <= l.Agents.Max {
 			log.Info().Msgf("Using system limits for %d to %d agents for a configured value of %d agents", l.Agents.Min, l.Agents.Max, agentLimit)
-			ramSize := int(memory.TotalMemory() / 1024 / 1024)
+			ramSize := memory.TotalMemory() / 1024 / 1024
 			if ramSize < l.RecommendedRAM {
 				log.Warn().Msgf("Detected %d MB of system RAM, which is lower than the recommended amount (%d MB) for the configured agent limit", ramSize, l.RecommendedRAM)
 			}
@@ -305,14 +306,14 @@ func loadLimits(agentLimit int) *envLimits {
 
 // memMB returns the system total memory in MB
 // It wraps memory.TotalMemory() so that we can replace the var in unit tests.
-var memMB func() int = func() int {
-	return int(memory.TotalMemory() / 1024 / 1024)
+var memMB func() uint64 = func() uint64 {
+	return memory.TotalMemory() / 1024 / 1024
 }
 
 func memEnvLimits() *envLimits {
 	mem := memMB()
 	k := 0
-	recRAM := 0
+	var recRAM uint64
 	log := zerolog.Ctx(context.TODO())
 	for i, l := range defaults {
 		if mem >= l.RecommendedRAM && l.RecommendedRAM > recRAM {
@@ -321,10 +322,10 @@ func memEnvLimits() *envLimits {
 		}
 	}
 	if recRAM == 0 {
-		log.Warn().Int("memory_mb", mem).Msg("No settings with recommended ram found, using default.")
+		log.Warn().Uint64("memory_mb", mem).Msg("No settings with recommended ram found, using default.")
 		return defaultEnvLimits()
 	}
-	log.Info().Int("memory_mb", mem).Int("recommended_mb", recRAM).Msg("Found settings with recommended ram.")
+	log.Info().Uint64("memory_mb", mem).Uint64("recommended_mb", recRAM).Msg("Found settings with recommended ram.")
 	return defaults[k]
 }
 
