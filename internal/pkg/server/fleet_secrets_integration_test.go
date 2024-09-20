@@ -252,7 +252,7 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 		if !ok {
 			return false
 		}
-		return "output_secret_value" == s
+		return s == "output_secret_value"
 	}, "expected output to contain secret-key: output_secret_value, got %v", output)
 	assert.NotContains(t, output, "secrets")
 	// expect that secret_paths lists the key
