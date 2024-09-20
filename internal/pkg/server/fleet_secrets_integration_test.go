@@ -232,5 +232,5 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 		"type":               "fleet-server",
 	}, input)
 	// expect that secret_paths lists the key
-	assert.Equal(t, []string{"inputs[0].package_secret_value"}, *actionData.Policy.SecretPaths)
+	assert.Equal(t, []string{"inputs[0].package_var_secret"}, *actionData.Policy.SecretPaths)
 }
