@@ -14,6 +14,8 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 const (
@@ -122,7 +124,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 
 	if res.IsError() {
 		zerolog.Ctx(ctx).Warn().Str("mod", kModBulk).Str("error.message", res.String()).Msg("bulker.flushRead: Error in mget request result to Elasticsearch")
-		return parseError(res, zerolog.Ctx(ctx))
+		return es.ParseError(res, zerolog.Ctx(ctx))
 	}
 
 	// Reuse buffer
