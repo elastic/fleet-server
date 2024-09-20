@@ -11,8 +11,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"go.elastic.co/apm/v2"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
@@ -120,7 +121,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi bu
 		}
 	}
 
-	cntStatus.bodyOut.Add(uint64(nWritten))
+	cntStatus.bodyOut.Add(uint64(nWritten)) //nolint:gosec // disable G115
 	e := zlog.Debug().Int(ECSHTTPResponseBodyBytes, nWritten)
 	if ok {
 		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())

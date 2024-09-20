@@ -17,6 +17,8 @@ import (
 	"net/http"
 	"time"
 
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -24,7 +26,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
-	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
 )
@@ -88,7 +89,7 @@ func (at ArtifactT) handleArtifacts(zlog zerolog.Logger, w http.ResponseWriter, 
 		e = e.Int64(ECSEventDuration, time.Since(ts).Nanoseconds())
 	}
 	e.Msg("artifact response sent")
-	cntArtifacts.bodyOut.Add(uint64(n))
+	cntArtifacts.bodyOut.Add(uint64(n)) //nolint:gosec // disable G115
 	return nil
 }
 
@@ -146,7 +147,7 @@ func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, age
 //
 // Initial implementation is dependent on security by obscurity; ie.
 // it should be difficult for an attacker to guess a guid.
-func (at ArtifactT) authorizeArtifact(ctx context.Context, _ *model.Agent, _, _ string) error { //nolint:unparam // remove if this is implemented
+func (at ArtifactT) authorizeArtifact(ctx context.Context, _ *model.Agent, _, _ string) error {
 	span, _ := apm.StartSpan(ctx, "authorizeArtifacts", "auth") // TODO return and use span ctx if this is ever not a nop
 	defer span.End()
 	return nil // TODO

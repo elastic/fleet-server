@@ -4,7 +4,6 @@
 
 //go:build integration
 
-//nolint:goconst // disable duplicate checking
 package dl
 
 import (
