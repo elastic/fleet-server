@@ -11,9 +11,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 var (

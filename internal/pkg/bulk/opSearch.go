@@ -11,13 +11,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/mailru/easyjson"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
-
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 )
 
 func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...Opt) (*es.ResultT, error) {
