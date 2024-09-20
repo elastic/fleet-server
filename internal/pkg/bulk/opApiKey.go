@@ -15,7 +15,6 @@ import (
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 const (
@@ -227,7 +226,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 			}
 			if res.IsError() {
 				zerolog.Ctx(ctx).Error().Str("error.message", res.String()).Msg("Error in bulk API Key update result to Elasticsearch")
-				return es.ParseError(res, zerolog.Ctx(ctx))
+				return parseError(res, zerolog.Ctx(ctx))
 			}
 
 			zerolog.Ctx(ctx).Debug().Strs("IDs", bulkReq.IDs).RawJSON("role", role).Msg("API Keys updated.")

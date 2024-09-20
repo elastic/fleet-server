@@ -11,11 +11,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/rs/zerolog"
-
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 var (
@@ -66,7 +64,8 @@ func (k APIKey) Authenticate(ctx context.Context, client *elasticsearch.Client) 
 		if returnError != nil {
 			return nil, fmt.Errorf("%w: %w", returnError, fmt.Errorf("apikey auth response %s: %s", k.ID, res.String()))
 		}
-		return nil, es.ParseError(res, zerolog.Ctx(ctx))
+		// body is not parsed to not give the caller too much information
+		return nil, es.TranslateError(res.StatusCode, nil)
 	}
 
 	var info SecurityInfo

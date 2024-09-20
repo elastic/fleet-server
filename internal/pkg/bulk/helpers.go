@@ -5,7 +5,13 @@
 package bulk
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/rs/zerolog"
 )
 
 type UpdateFields map[string]interface{}
@@ -18,4 +24,34 @@ func (u UpdateFields) Marshal() ([]byte, error) {
 	}
 
 	return json.Marshal(doc)
+}
+
+// Attempt to interpret the response as an elastic error,
+// otherwise return generic elastic error.
+func parseError(res *esapi.Response, log *zerolog.Logger) error {
+	if log == nil {
+		l := zerolog.Nop()
+		log = &l
+	}
+
+	var e struct {
+		Err json.RawMessage `json:"error"`
+	}
+
+	decoder := json.NewDecoder(res.Body)
+
+	if err := decoder.Decode(&e); err != nil {
+		log.Error().Err(err).Msg("Cannot decode Elasticsearch error body")
+		var b bytes.Buffer
+		_, readErr := io.Copy(&b, res.Body)
+		if readErr != nil {
+			log.Debug().Err(readErr).Msg("Error reading error response body from Elasticsearch")
+		} else {
+			log.Debug().Err(err).Bytes("body", b.Bytes()).Msg("Error content")
+		}
+
+		return err
+	}
+
+	return es.TranslateError(res.StatusCode, e.Err)
 }
