@@ -21,9 +21,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 const (
@@ -462,7 +463,7 @@ func (m *simpleMonitorT) prepareCheckQuery() (*dsl.Tmpl, error) {
 // Prepares full documents query
 func (m *simpleMonitorT) prepareQuery() (*dsl.Tmpl, error) {
 	tmpl, root := m.prepareCommon(true)
-	root.Size(uint64(m.fetchSize))
+	root.Size(uint64(m.fetchSize)) //nolint:gosec // disable G115
 	root.Sort().SortOrder(fieldSeqNo, dsl.SortAscend)
 
 	if err := tmpl.Resolve(root); err != nil {
