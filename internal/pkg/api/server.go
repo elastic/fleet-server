@@ -13,6 +13,8 @@ import (
 	"net"
 	"net/http"
 
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -20,8 +22,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
-	"go.elastic.co/apm/v2"
 
+	"github.com/open-telemetry/opamp-go/protobufs"
 	opamp "github.com/open-telemetry/opamp-go/server"
 	"github.com/open-telemetry/opamp-go/server/types"
 	"github.com/rs/zerolog"
@@ -58,10 +60,23 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 	handlerFn, contextWithConn, _ := ompampServer.Attach(opamp.Settings{
 		Callbacks: opamp.CallbacksStruct{
 			OnConnectingFunc: func(request *http.Request) types.ConnectionResponse {
-				fmt.Printf("TEST ")
 				return types.ConnectionResponse{
-					Accept:              true,
-					ConnectionCallbacks: opamp.ConnectionCallbacksStruct{},
+					Accept: true,
+					ConnectionCallbacks: opamp.ConnectionCallbacksStruct{
+						OnConnectedFunc: func(ctx context.Context, _ types.Connection) {
+							zerolog.Ctx(ctx).Info().Msg("Opamp connection started.")
+						},
+						OnMessageFunc: func(ctx context.Context, _ types.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
+							// TODO: opamp logic goes here
+							zerolog.Ctx(ctx).Info().Msg("Opamp message recieved.")
+							return &protobufs.ServerToAgent{
+								InstanceUid: message.InstanceUid,
+							}
+						},
+						OnConnectionClose: func(ctx context.Context, _ types.Connection) {
+							zerolog.Ctx(ctx).Info().Msg("Opamp connection ended.")
+						},
+					},
 				}
 
 			},
