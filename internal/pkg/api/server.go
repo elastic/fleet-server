@@ -59,14 +59,14 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 	}
 
 	ompampServer := opampserver.New(nil)
-	op := opamp.NewHandler(bulk, cache, pm)
+	op := opamp.NewHandler(bulker, cache, pm)
 	handlerFn, contextWithConn, _ := ompampServer.Attach(opampserver.Settings{
 		Callbacks: opampserver.CallbacksStruct{
 			OnConnectingFunc: func(request *http.Request) types.ConnectionResponse {
 				// NOTE: We don't have an agent ID at this stage so we can only check if the API key is valid.
-				agent, err := authAgent(request, nil, bulk, cache)
+				agent, err := authAgent(request, nil, bulker, cache)
 				if err != nil {
-					zerolog.Ctx(ctx).Warn().Err(err).Msg("Opamp request api key auth failed.")
+					zerolog.Ctx(request.Context()).Warn().Err(err).Msg("Opamp request api key auth failed.")
 					return types.ConnectionResponse{
 						Accept:         false,
 						HTTPStatusCode: http.StatusUnauthorized,
@@ -92,8 +92,8 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 							}
 							return response
 						},
-						OnConnectionClose: func(ctx context.Context, _ types.Connection) {
-							zerolog.Ctx(ctx).Info().Msg("Opamp connection ended.")
+						OnConnectionCloseFunc: func(_ types.Connection) {
+							zerolog.Ctx(request.Context()).Info().Msg("Opamp connection ended.") // FIXME getting context from request might be messy
 						},
 					},
 				}

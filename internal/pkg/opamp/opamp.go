@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 // opamp provides a poc of fleet-server serving the opamp spec
 // It can serve new policies
 
@@ -29,6 +33,7 @@ const serverCapabilities uint64 = 0x00000001 | 0x00000002 | 0x00000004 // status
 type opamp struct {
 	bulk  bulk.Bulk
 	cache cache.Cache
+	pm    policy.Monitor
 }
 
 func NewHandler(bulk bulk.Bulk, cache cache.Cache, pm policy.Monitor) *opamp {
@@ -43,13 +48,13 @@ func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protob
 	if agent.Id != string(message.InstanceUid) {
 		return nil, fmt.Errorf("API key's associated agent does not match InstanceUid")
 	}
-	ts := time.Now().Unix()
+	ts := time.Now().UTC()
 	tsStr := ts.Format(time.RFC3339)
 
 	// update the agent description if health status has changed. otherwise just a minimal update
 	updateAgent := false
 	if health := message.GetHealth(); health != nil &&
-		(health.Healthy && agent.LastCheckinStatus != healty) ||
+		(health.Healthy && agent.LastCheckinStatus != healthy) ||
 		(!health.Healthy && agent.LastCheckinStatus != unhealthy) {
 		updateAgent = true
 	}
@@ -66,7 +71,7 @@ func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protob
 		update[dl.FieldLastCheckinMessage] = message.GetHealth().Status
 		// TODO: map ComponentHealthMap to components list
 	}
-	updateBody, err := fields.Marshal()
+	updateBody, err := update.Marshal()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal agent update: %w", err)
 	}
@@ -76,11 +81,11 @@ func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protob
 
 	rev := agent.PolicyRevisionIdx
 	// use revisionIDx from agent's config if it's sent
-	var cfg protobuf.AgentConfigFile
+	var cfg *protobufs.AgentConfigFile
 	ecfg := message.GetEffectiveConfig()
 	if ecfg != nil {
 		if cm := ecfg.GetConfigMap(); cm != nil {
-			if cfile, ok := cm[""]; ok {
+			if cfile, ok := cm.GetConfigMap()[""]; ok {
 				cfg = cfile
 			}
 		}
@@ -92,7 +97,7 @@ func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protob
 			if err := json.Unmarshal(cfg.Body, &policy); err != nil {
 				return nil, fmt.Errorf("unmarshal effective policy failed: %w", err)
 			}
-			rev = policy.RebisionIdx
+			rev = policy.RevisionIdx
 		default:
 			zerolog.Ctx(ctx).Warn().Str("Content-Type", cfg.ContentType).Msg("Unknown content type.")
 		}
@@ -105,12 +110,12 @@ func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protob
 	defer func() {
 		err := o.pm.Unsubscribe(sub)
 		if err != nil {
-			zerolog.Ctx(ctx).Error().Err(err).Msg("Unable to subscribe from policy.")
+			zerolog.Ctx(ctx).Error().Err(err).Msg("Unable to unsubscribe from policy.")
 		}
 	}()
-	var remoteConfig *protobuf.AgentRemoteConfig
+	var remoteConfig *protobufs.AgentRemoteConfig
 	select {
-	case pp := sub.Output():
+	case pp := <-sub.Output():
 		zerolog.Ctx(ctx).Debug().Msg("Found policy update.")
 		if len(pp.Policy.Data.Outputs) == 0 {
 			return nil, fmt.Errorf("no outputs defined in policy")
@@ -123,7 +128,7 @@ func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protob
 			}
 		}
 		for _, output := range pp.Outputs {
-			err := output.Prepare(ctx, zerolog.Ctx(ctx), o.bulk, agent, data.Outputs)
+			err := output.Prepare(ctx, *zerolog.Ctx(ctx), o.bulk, agent, data.Outputs)
 			if err != nil {
 				return nil, fmt.Errorf("failed to pepare output %q: %w", output.Name, err)
 			}
@@ -133,9 +138,16 @@ func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protob
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal policy: %w", err)
 		}
-		remoteConfig = &protobuf.AgentRemoteConfig{
-			Body:        p,
-			ContentType: "application/json",
+		remoteConfig = &protobufs.AgentRemoteConfig{
+			Config: &protobufs.AgentConfigMap{
+				ConfigMap: map[string]*protobufs.AgentConfigFile{
+					"": &protobufs.AgentConfigFile{
+						Body:        body,
+						ContentType: "application/json",
+					},
+				},
+			},
+			ConfigHash: []byte{}, // TODO
 		}
 	default:
 		zerolog.Ctx(ctx).Debug().Msg("No policy update.")
