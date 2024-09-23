@@ -22,13 +22,16 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"go.elastic.co/apm/v2"
 
+	opamp "github.com/open-telemetry/opamp-go/server"
+	"github.com/open-telemetry/opamp-go/server/types"
 	"github.com/rs/zerolog"
 )
 
 type server struct {
-	cfg     *config.Server
-	addr    string
-	handler http.Handler
+	cfg             *config.Server
+	addr            string
+	handler         http.Handler
+	contextWithConn opamp.ConnContext
 }
 
 // NewServer creates a new HTTP api for the passed addr.
@@ -50,10 +53,26 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 		audit:  audit,
 		bulker: bulker,
 	}
+
+	ompampServer := opamp.New(nil)
+	handlerFn, contextWithConn, _ := ompampServer.Attach(opamp.Settings{
+		Callbacks: opamp.CallbacksStruct{
+			OnConnectingFunc: func(request *http.Request) types.ConnectionResponse {
+				fmt.Printf("TEST ")
+				return types.ConnectionResponse{
+					Accept:              true,
+					ConnectionCallbacks: opamp.ConnectionCallbacksStruct{},
+				}
+
+			},
+		},
+	})
+
 	return &server{
-		addr:    addr,
-		cfg:     cfg,
-		handler: newRouter(&cfg.Limits, a, tracer),
+		addr:            addr,
+		cfg:             cfg,
+		handler:         newRouter(&cfg.Limits, a, tracer, handlerFn),
+		contextWithConn: contextWithConn,
 	}
 }
 
@@ -75,6 +94,7 @@ func (s *server) Run(ctx context.Context) error {
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		ErrorLog:          errLogger(ctx),
 		ConnState:         diagConn,
+		ConnContext:       s.contextWithConn,
 	}
 
 	var listenCfg net.ListenConfig

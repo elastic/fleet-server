@@ -17,16 +17,24 @@ import (
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/module/apmchiv5/v2"
 	"go.elastic.co/apm/v2"
+
+	opamp "github.com/open-telemetry/opamp-go/server"
 )
 
-func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer) http.Handler {
+func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer, handlerFn opamp.HTTPHandlerFunc) http.Handler {
 	r := chi.NewRouter()
 	if tracer != nil {
 		r.Use(apmchiv5.Middleware(apmchiv5.WithTracer(tracer)))
 	}
+
 	r.Use(logger.Middleware) // Attach middlewares to router directly so the occur before any request parsing/validation
 	r.Use(middleware.Recoverer)
 	r.Use(Limiter(cfg).middleware)
+	r.HandleFunc("/opamp", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			handlerFn(w, r)
+		},
+	))
 	return HandlerWithOptions(si, ChiServerOptions{
 		BaseRouter:       r,
 		ErrorHandlerFunc: ErrorResp,
@@ -78,6 +86,9 @@ func pathToOperation(path string) string {
 	path = strings.TrimSuffix(path, "/")
 	if path == "/api/status" {
 		return "status"
+	}
+	if path == "/opamp" {
+		return "opamp"
 	}
 	if path == "/api/fleet/uploads" {
 		return "uploadBegin"
@@ -136,8 +147,6 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 			l.getPGPKey.Wrap("getPGPKey", &cntGetPGP, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "status":
 			l.status.Wrap("status", &cntStatus, zerolog.DebugLevel)(next).ServeHTTP(w, r)
-		case "audit-unenroll":
-			l.auditUnenroll.Wrap("audit-unenroll", &cntAuditUnenroll, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		default:
 			// no tracking or limits
 			next.ServeHTTP(w, r)
