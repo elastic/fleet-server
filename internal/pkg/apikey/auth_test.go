@@ -7,6 +7,7 @@ package apikey
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -32,15 +33,41 @@ func setup(t *testing.T, statusCode int) (context.Context, *APIKey, *elasticsear
 }
 
 func TestAuth429(t *testing.T) {
-	ctx, apiKey, mockES := setup(t, 429)
+	ctx, apiKey, mockES := setup(t, http.StatusTooManyRequests)
 	_, err := apiKey.Authenticate(ctx, mockES)
 
 	assert.Equal(t, "elasticsearch auth limit: apikey auth response  foo: [429 Too Many Requests] ", err.Error())
 }
 
 func TestAuth401(t *testing.T) {
-	ctx, apiKey, mockES := setup(t, 401)
+	ctx, apiKey, mockES := setup(t, http.StatusUnauthorized)
 	_, err := apiKey.Authenticate(ctx, mockES)
 
 	assert.Equal(t, "unauthorized: apikey auth response  foo: [401 Unauthorized] ", err.Error())
+}
+
+func TestAuthOtherErrors(t *testing.T) {
+	scenarios := []struct {
+		StatusCode int
+	}{
+		{StatusCode: http.StatusBadRequest},
+		// 401 is handled in TestAuth401
+		{StatusCode: http.StatusForbidden},
+		{StatusCode: http.StatusNotFound},
+		{StatusCode: http.StatusMethodNotAllowed},
+		{StatusCode: http.StatusConflict},
+		// 429 is handled in TestAuth429
+		{StatusCode: http.StatusInternalServerError},
+		{StatusCode: http.StatusBadGateway},
+		{StatusCode: http.StatusServiceUnavailable},
+		{StatusCode: http.StatusGatewayTimeout},
+	}
+	for _, scenario := range scenarios {
+		t.Run(fmt.Sprintf("%d", scenario.StatusCode), func(t *testing.T) {
+			ctx, apiKey, mockES := setup(t, scenario.StatusCode)
+			_, err := apiKey.Authenticate(ctx, mockES)
+
+			assert.Equal(t, fmt.Sprintf("elastic fail %d", scenario.StatusCode), err.Error())
+		})
+	}
 }
