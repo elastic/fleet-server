@@ -18,13 +18,15 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/opamp"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
-	opamp "github.com/open-telemetry/opamp-go/server"
+	opampserver "github.com/open-telemetry/opamp-go/server"
 	"github.com/open-telemetry/opamp-go/server/types"
 	"github.com/rs/zerolog"
 )
@@ -33,14 +35,14 @@ type server struct {
 	cfg             *config.Server
 	addr            string
 	handler         http.Handler
-	contextWithConn opamp.ConnContext
+	contextWithConn opampserver.ConnContext
 }
 
 // NewServer creates a new HTTP api for the passed addr.
 //
 // The server has a listener specific conn limit and endpoint specific rate-limits.
 // The underlying API structs (such as *CheckinT) may be shared between servers.
-func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, sm policy.SelfMonitor, bi build.Info, ut *UploadT, ft *FileDeliveryT, pt *PGPRetrieverT, audit *AuditT, bulker bulk.Bulk, tracer *apm.Tracer) *server {
+func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, sm policy.SelfMonitor, bi build.Info, ut *UploadT, ft *FileDeliveryT, pt *PGPRetrieverT, audit *AuditT, bulker bulk.Bulk, cache cache.Cache, pm policy.Monitor, tracer *apm.Tracer) *server { // this is messy, we have an open issue to refactor
 	a := &apiServer{
 		ct:     ct,
 		et:     et,
@@ -56,22 +58,39 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 		bulker: bulker,
 	}
 
-	ompampServer := opamp.New(nil)
-	handlerFn, contextWithConn, _ := ompampServer.Attach(opamp.Settings{
-		Callbacks: opamp.CallbacksStruct{
+	ompampServer := opampserver.New(nil)
+	op := opamp.NewHandler(bulk, cache, pm)
+	handlerFn, contextWithConn, _ := ompampServer.Attach(opampserver.Settings{
+		Callbacks: opampserver.CallbacksStruct{
 			OnConnectingFunc: func(request *http.Request) types.ConnectionResponse {
+				// NOTE: We don't have an agent ID at this stage so we can only check if the API key is valid.
+				agent, err := authAgent(request, nil, bulk, cache)
+				if err != nil {
+					zerolog.Ctx(ctx).Warn().Err(err).Msg("Opamp request api key auth failed.")
+					return types.ConnectionResponse{
+						Accept:         false,
+						HTTPStatusCode: http.StatusUnauthorized,
+					}
+				}
 				return types.ConnectionResponse{
 					Accept: true,
-					ConnectionCallbacks: opamp.ConnectionCallbacksStruct{
+					ConnectionCallbacks: opampserver.ConnectionCallbacksStruct{
 						OnConnectedFunc: func(ctx context.Context, _ types.Connection) {
 							zerolog.Ctx(ctx).Info().Msg("Opamp connection started.")
 						},
 						OnMessageFunc: func(ctx context.Context, _ types.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
-							// TODO: opamp logic goes here
 							zerolog.Ctx(ctx).Info().Msg("Opamp message recieved.")
-							return &protobufs.ServerToAgent{
-								InstanceUid: message.InstanceUid,
+							response, err := op.Process(ctx, agent, message)
+							if err != nil {
+								zerolog.Ctx(ctx).Error().Err(err).Msg("Error processing opamp request.")
+								return &protobufs.ServerToAgent{
+									InstanceUid: message.InstanceUid,
+									ErrorResponse: &protobufs.ServerErrorResponse{
+										ErrorMessage: err.Error(),
+									},
+								}
 							}
+							return response
 						},
 						OnConnectionClose: func(ctx context.Context, _ types.Connection) {
 							zerolog.Ctx(ctx).Info().Msg("Opamp connection ended.")
