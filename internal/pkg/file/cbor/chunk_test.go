@@ -38,8 +38,8 @@ func TestChunkWriter(t *testing.T) {
 		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, // contents
 	}
 
-	assert.Equal(t, expected[:13], outbuf[:13]) // up to 0x1b after timestamp
-	assert.WithinDuration(t, time.Now(), time.UnixMilli(int64(binary.BigEndian.Uint64(outbuf[13:]))), time.Second*5)
+	assert.Equal(t, expected[:13], outbuf[:13])                                                                      // up to 0x1b after timestamp
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(int64(binary.BigEndian.Uint64(outbuf[13:]))), time.Second*5) //nolint:gosec // disable G115
 
 	assert.Equal(t, expected[21:], outbuf[21:])
 
@@ -68,7 +68,7 @@ func TestChunkWriterLastChunk(t *testing.T) {
 
 	// assert equality up to the constant set point
 	assert.Equal(t, expected[:13], outbuf[:13])
-	assert.WithinDuration(t, time.Now(), time.UnixMilli(int64(binary.BigEndian.Uint64(outbuf[13:]))), time.Second*5)
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(int64(binary.BigEndian.Uint64(outbuf[13:]))), time.Second*5) //nolint:gosec // disable G115
 	assert.Equal(t, expected[21:], outbuf[21:len(expected)])
 	assert.Equal(t, uint8(0xFF), outbuf[len(outbuf)-1]) // final byte MUST be a 0xFF terminating byte when using indeterminate-length style
 
@@ -116,7 +116,7 @@ func TestChunkWriterLargeLastChunk(t *testing.T) {
 
 	// assert equality up to the constant set point
 	assert.Equal(t, expected[:13], outbuf[:13])
-	assert.WithinDuration(t, time.Now(), time.UnixMilli(int64(binary.BigEndian.Uint64(outbuf[13:]))), time.Second*5)
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(int64(binary.BigEndian.Uint64(outbuf[13:]))), time.Second*5) //nolint:gosec // disable G115
 	assert.Equal(t, expected[21:], outbuf[21:len(expected)])
 	assert.Equal(t, uint8(0xFF), outbuf[len(outbuf)-1]) // final byte MUST be a 0xFF terminating byte when using indeterminate-length style
 

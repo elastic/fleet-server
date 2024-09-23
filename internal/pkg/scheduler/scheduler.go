@@ -50,7 +50,7 @@ func WithSplayPercent(splayPercent uint) OptFunc {
 		if splayPercent >= 100 {
 			return errors.New("invalid splay value, expected < 100")
 		}
-		s.splayPercent = int(splayPercent)
+		s.splayPercent = int(splayPercent) //nolint:gosec // disable G115
 		return nil
 	}
 }

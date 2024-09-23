@@ -80,8 +80,8 @@ func encodePreambleToCBOR(final bool, baseID string, chunkHash string, chunkSize
 	preamble[11] = 'p'
 	preamble[12] = 0x1b // uint64 to follow
 	// occupies 8 bytes, indexes 13-20
-	binary.BigEndian.PutUint64(preamble[13:], uint64(time.Now().UnixMilli()))
-	preamble[21] = 0x64 // string with 4 chars (key: last)
+	binary.BigEndian.PutUint64(preamble[13:], uint64(time.Now().UnixMilli())) //nolint:gosec // disable G115
+	preamble[21] = 0x64                                                       // string with 4 chars (key: last)
 	preamble[22] = 'l'
 	preamble[23] = 'a'
 	preamble[24] = 's'
@@ -118,8 +118,8 @@ func encodePreambleToCBOR(final bool, baseID string, chunkHash string, chunkSize
 	}
 	if !final {
 		// byte data should be precisely chunkSize long, otherwise malformed
-		preamble[i] = 0x5A // say length descriptor will be 32-bit int
-		binary.BigEndian.PutUint32(preamble[i+1:], uint32(chunkSize))
+		preamble[i] = 0x5A                                            // say length descriptor will be 32-bit int
+		binary.BigEndian.PutUint32(preamble[i+1:], uint32(chunkSize)) //nolint:gosec // disable G115
 	} else {
 		// final chunk may be less than full size, will need to determine length
 		preamble[i] = 0x5F // indeterminate-length byte sequence
@@ -150,8 +150,8 @@ func (c *ChunkEncoder) Read(buf []byte) (int, error) {
 			return 0, errors.New("buffer too small")
 		}
 		n, err := c.chunk.Read(buf[varLenHeaderSize:])
-		buf[0] = 0x5A // 4-byte length descriptor to follow
-		binary.BigEndian.PutUint32(buf[1:], uint32(n))
+		buf[0] = 0x5A                                  // 4-byte length descriptor to follow
+		binary.BigEndian.PutUint32(buf[1:], uint32(n)) //nolint:gosec // disable G115
 
 		if errors.Is(err, io.EOF) {
 			if n == 0 { // chunk data has been exhausted, write the terminating byte and get out

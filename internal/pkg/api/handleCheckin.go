@@ -600,7 +600,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	} else {
 		var nWritten int
 		nWritten, err = w.Write(payload)
-		cntCheckin.bodyOut.Add(uint64(nWritten))
+		cntCheckin.bodyOut.Add(uint64(nWritten)) //nolint:gosec // disable G115
 
 		if err != nil {
 			err = fmt.Errorf("writeResponse payload: %w", err)
@@ -740,7 +740,6 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 	}
 }
 
-//nolint:gosec // memory aliasing is used to convert from pointers to values and the other way
 func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action) ([]Action, string) {
 	var ackToken string
 	sz := len(actions)

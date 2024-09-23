@@ -19,8 +19,9 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"go.elastic.co/apm/module/apmzerolog/v2"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 )
 
 const (
@@ -41,7 +42,7 @@ func NewReaderCounter(r io.ReadCloser) *ReaderCounter {
 
 func (rd *ReaderCounter) Read(buf []byte) (int, error) {
 	n, err := rd.ReadCloser.Read(buf)
-	atomic.AddUint64(&rd.count, uint64(n))
+	atomic.AddUint64(&rd.count, uint64(n)) //nolint:gosec // disable G115
 	return n, err
 }
 
@@ -67,7 +68,7 @@ func (rc *ResponseCounter) Write(buf []byte) (int, error) {
 	}
 
 	n, err := rc.ResponseWriter.Write(buf)
-	atomic.AddUint64(&rc.count, uint64(n))
+	atomic.AddUint64(&rc.count, uint64(n)) //nolint:gosec // disable G115
 	return n, err
 }
 

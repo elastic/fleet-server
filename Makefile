@@ -13,7 +13,8 @@ BUILDMODE_windows_amd64=-buildmode=pie
 BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
-BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-main-debian11
+CROSSBUILD_SUFFIX=main-debian11
+BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${CROSSBUILD_SUFFIX}
 
 #Benchmark related targets
 BENCH_BASE ?= benchmark-$(COMMIT).out
@@ -43,7 +44,6 @@ endif
 DOCKER_IMAGE_TAG?=${VERSION}
 DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
-
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
 COVER_TARGETS=$(addprefix cover-, $(PLATFORMS))
 COMMIT=$(shell git rev-parse --short HEAD)
@@ -68,6 +68,17 @@ OS_NAME:=$(shell uname -s)
 help: ## - Show help message
 	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | sed -e "s/^Makefile://" | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: multipass
+multipass: ## - Launch a multipass instance for development
+ifeq ($(shell uname -p),arm)
+	$(eval ARCH := arm64)
+else
+	$(eval ARCH := amd64)
+endif
+	@cat dev-tools/multipass-cloud-init.yml.envsubst | GO_VERSION=${GO_VERSION} ARCH=${ARCH} envsubst > dev-tools/multipass-cloud-init.yml
+	@multipass launch --cloud-init=dev-tools/multipass-cloud-init.yml --mount ..:~/git --name fleet-server-dev --memory 8G --cpus 2 --disk 50G noble
+	@rm dev-tools/multipass-cloud-init.yml
 
 .PHONY: list-platforms
 list-platforms: ## - Show the possible PLATFORMS
@@ -121,7 +132,7 @@ check-headers:  ## - Check copyright headers
 
 .PHONY: check-go
 check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.55.2
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.61.0
 	@./bin/golangci-lint run -v
 
 .PHONY: notice
@@ -248,7 +259,12 @@ else
 endif
 
 build-releaser: ## - Build a Docker image to run make package including all build tools
-	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) .
+ifeq ($(shell uname -p),arm)
+	$(eval SUFFIX := arm)
+else
+	$(eval SUFFIX := ${CROSSBUILD_SUFFIX})
+endif
+	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) --build-arg SUFFIX=${SUFFIX} .
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
@@ -257,7 +273,7 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser
 	## Build for local architecture and for linux/amd64 for docker images.
-	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(BUILDER_IMAGE) cover-linux/amd64 cover-$(shell go env GOOS)/$(shell go env GOARCH)
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
@@ -336,7 +352,7 @@ test-int-set: ## - Run integration tests without setup
 .PHONY: build-e2e-agent-image
 build-e2e-agent-image: docker-cover-e2e-binaries ## - Build a custom elastic-agent image with fleet-server binaries with coverage enabled injected
 	@printf "${CMD_COLOR_ON} Creating test e2e agent image\n${CMD_COLOR_OFF}"
-	GOARCH=amd64 ./dev-tools/e2e/build.sh
+	FLEET_VERSION=${DEFAULT_VERSION}-SNAPSHOT ./dev-tools/e2e/build.sh # force fleet version to be equal to VERSION-SNAPSHOT
 
 .PHONY: e2e-certs
 e2e-certs: ## - Use openssl to create a CA, encrypted private key, and signed fleet-server cert testing purposes
