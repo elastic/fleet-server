@@ -76,7 +76,7 @@ ifeq ($(shell uname -p),arm)
 else
 	$(eval ARCH := amd64)
 endif
-	@cat dev-tools/multipass-cloud-init.yml.txt | GO_VERSION=${GO_VERSION} ARCH=${ARCH} envsubst > dev-tools/multipass-cloud-init.yml
+	@cat dev-tools/multipass-cloud-init.yml.envsubst | GO_VERSION=${GO_VERSION} ARCH=${ARCH} envsubst > dev-tools/multipass-cloud-init.yml
 	@multipass launch --cloud-init=dev-tools/multipass-cloud-init.yml --mount ..:~/git --name fleet-server-dev --memory 8G --cpus 2 --disk 50G noble
 	@rm dev-tools/multipass-cloud-init.yml
 
