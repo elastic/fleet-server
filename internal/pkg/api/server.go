@@ -64,6 +64,11 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 		Callbacks: opampserver.CallbacksStruct{
 			OnConnectingFunc: func(request *http.Request) types.ConnectionResponse {
 				// NOTE: We don't have an agent ID at this stage so we can only check if the API key is valid.
+				// TODO enrollment
+				// 1. we should probably here detect if the oamp client use an enrollment token
+				// 2. create the .fleet-agent document
+				// 3. create an access token
+				// 4. return it to the agent with the connection settings flow https://opentelemetry.io/docs/specs/opamp/#opamp-connection-setting-offer-flow
 				agent, err := authAgent(request, nil, bulker, cache)
 				if err != nil {
 					zerolog.Ctx(request.Context()).Warn().Err(err).Msg("Opamp request api key auth failed.")
