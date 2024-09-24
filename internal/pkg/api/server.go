@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/opamp"
@@ -63,14 +64,40 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 	handlerFn, contextWithConn, _ := ompampServer.Attach(opampserver.Settings{
 		Callbacks: opampserver.CallbacksStruct{
 			OnConnectingFunc: func(request *http.Request) types.ConnectionResponse {
-				// NOTE: We don't have an agent ID at this stage so we can only check if the API key is valid.
-				// TODO enrollment
-				// 1. we should probably here detect if the oamp client use an enrollment token
-				// 2. create the .fleet-agent document
-				// 3. create an access token
-				// 4. return it to the agent with the connection settings flow https://opentelemetry.io/docs/specs/opamp/#opamp-connection-setting-offer-flow
+				var policyID string
+				var namespaces []string
 				agent, err := authAgent(request, nil, bulker, cache)
-				if err != nil {
+				if errors.Is(err, ErrAgentNotFound) { // No agent associated, get the enrollment token's associated policyID for a register on first use flow
+					enrollKey, err := authAPIKey(request, bulker, cache)
+					if err != nil {
+						zerolog.Ctx(request.Context()).Warn().Err(err).Msg("Opamp registration api key auth failed.")
+						return types.ConnectionResponse{
+							Accept:         false,
+							HTTPStatusCode: http.StatusUnauthorized,
+						}
+					}
+					// TODO handle static enrollment tokens
+					key, ok := cache.GetEnrollmentAPIKey(enrollKey.ID)
+					if !ok {
+						rec, err := dl.FindEnrollmentAPIKey(request.Context(), bulker, dl.QueryEnrollmentAPIKeyByID, dl.FieldAPIKeyID, enrollKey.ID)
+						if err != nil {
+							return types.ConnectionResponse{
+								Accept:         false,
+								HTTPStatusCode: http.StatusInternalServerError,
+							}
+						}
+						if !rec.Active {
+							return types.ConnectionResponse{
+								Accept:         false,
+								HTTPStatusCode: http.StatusUnauthorized,
+							}
+						}
+						cache.SetEnrollmentAPIKey(enrollKey.ID, rec, int64(len(rec.APIKey)))
+						key = rec
+					}
+					policyID = key.PolicyID
+					namespaces = key.Namespaces
+				} else if err != nil {
 					zerolog.Ctx(request.Context()).Warn().Err(err).Msg("Opamp request api key auth failed.")
 					return types.ConnectionResponse{
 						Accept:         false,
@@ -84,8 +111,8 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 							zerolog.Ctx(ctx).Info().Msg("Opamp connection started.")
 						},
 						OnMessageFunc: func(ctx context.Context, _ types.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
-							zerolog.Ctx(ctx).Info().Msg("Opamp message recieved.")
-							response, err := op.Process(ctx, agent, message)
+							zerolog.Ctx(ctx).Info().Msg("Opamp message received.")
+							response, err := op.Process(ctx, agent, policyID, namespaces, message)
 							if err != nil {
 								zerolog.Ctx(ctx).Error().Err(err).Msg("Error processing opamp request.")
 								return &protobufs.ServerToAgent{

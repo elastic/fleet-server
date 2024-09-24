@@ -10,17 +10,21 @@ package opamp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/oklog/ulid/v2"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/rs/zerolog"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 )
 
 const (
@@ -28,7 +32,20 @@ const (
 	unhealthy = "unhealthy"
 )
 
-const serverCapabilities uint64 = 0x00000001 | 0x00000002 | 0x00000004 // status, offers remote config, accepts effective config
+const serverCapabilities uint64 = 0x00000001 | 0x00000002 | 0x00000004 | 0x00000020 // status, offers remote config, accepts effective config, offers connection settings
+
+const kFleetAccessRolesJSON = `
+{
+	"fleet-apikey-access": {
+		"cluster": [],
+		"applications": [{
+			"application": "fleet",
+			"privileges": ["no-privileges"],
+			"resources": ["*"]
+		}]
+	}
+}
+`
 
 type opamp struct {
 	bulk  bulk.Bulk
@@ -44,10 +61,26 @@ func NewHandler(bulk bulk.Bulk, cache cache.Cache, pm policy.Monitor) *opamp {
 	}
 }
 
-func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protobufs.AgentToServer) (*protobufs.ServerToAgent, error) {
+// Process handles AgentToServer messages
+// TODO use optional funcs to pass agent, policy id, namespaces, etc.
+func (o *opamp) Process(ctx context.Context, agent *model.Agent, policyID string, namespaces []string, message *protobufs.AgentToServer) (*protobufs.ServerToAgent, error) {
+	if message.GetCapabilities()&0x00000001 == 0 { // ReportsStatus must be set on all agents
+		return nil, fmt.Errorf("ReportsStatus capability is unset.")
+	}
+
+	if agent == nil && policyID != "" {
+		return o.register(ctx, policyID, namespaces, message)
+	}
 	if agent.Id != string(message.InstanceUid) {
 		return nil, fmt.Errorf("API key's associated agent does not match InstanceUid")
 	}
+	return o.process(ctx, agent, message)
+}
+
+// process is a func that is similar to the api checkin path
+// it will update health status (but not metadata yet) and dispatch new config
+// configs are dispatched if the sent config has a lower revision number than the current policy, or if no config is sent if the agent doc has a lower revision number.
+func (o *opamp) process(ctx context.Context, agent *model.Agent, message *protobufs.AgentToServer) (*protobufs.ServerToAgent, error) {
 	ts := time.Now().UTC()
 	tsStr := ts.Format(time.RFC3339)
 
@@ -75,7 +108,7 @@ func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protob
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal agent update: %w", err)
 	}
-	if err := o.bulk.Update(ctx, dl.FleetAgents, agent.Agent.ID, updateBody); err != nil {
+	if err := o.bulk.Update(ctx, dl.FleetAgents, agent.Id, updateBody); err != nil {
 		return nil, fmt.Errorf("failed to update agent doc: %w", err)
 	}
 
@@ -134,6 +167,10 @@ func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protob
 			}
 		}
 		data.Inputs = pp.Inputs
+
+		// FIXME: We should be sure to handle outputs seperately here
+		// At a minimum we need to set ConnectionSettingsOffers.opamp
+
 		body, err := json.Marshal(data)
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal policy: %w", err)
@@ -158,4 +195,75 @@ func (o *opamp) Process(ctx context.Context, agent *model.Agent, message *protob
 		RemoteConfig: remoteConfig,
 		Capabilities: serverCapabilities,
 	}, nil
+}
+
+func (o *opamp) register(ctx context.Context, policyID string, namespaces []string, message *protobufs.AgentToServer) (*protobufs.ServerToAgent, error) {
+	if message.GetCapabilities()&0x00000100 == 0 {
+		return nil, fmt.Errorf("AcceptsOpAMPConnectionSettings capability must be set in order for agent to register")
+	}
+	// NOTE: message.ConnectionSettingsRequest.Opamp is used for a CSR flow
+	// TODO: Should we also read message.Flags to see if we need to generate a new uid?
+	replaceID := false
+	uid := ulid.ULID(message.InstanceUid)
+	// TODO: our current enroll flow does something different on collisions
+	_, err := dl.FindAgent(ctx, o.bulk, dl.QueryAgentByID, dl.FieldID, uid.String())
+	if err == nil {
+		zerolog.Ctx(ctx).Debug().Msg("Agent registration has detected uid collision")
+		uid = ulid.Make() // TODO replace this with a better call?
+		replaceID = true
+	} else if errors.Is(err, dl.ErrNotFound) {
+		zerolog.Ctx(ctx).Trace().Msg("Agent registration no uid collision")
+	} else {
+		return nil, fmt.Errorf("unable to check for uid collision on registration")
+	}
+
+	key, err := o.bulk.APIKeyCreate(ctx, uid.String(), "", []byte(kFleetAccessRolesJSON), apikey.NewMetadata(uid.String(), "", apikey.TypeAccess))
+	if err != nil {
+		return nil, fmt.Errorf("registration failed to make ApiKey: %w", err)
+	}
+	// TODO need a way to split agent description into local metadata, tags, and version info
+	var localMeta json.RawMessage
+	if ad := message.GetAgentDescription(); ad != nil {
+		localMeta, err = json.Marshal(ad)
+		if err != nil {
+			zerolog.Ctx(ctx).Error().Err(err).Msg("Unable to marshal agent description")
+		}
+	}
+	// TODO Invalidate key if func returns error after this
+	agent := model.Agent{
+		Active:         true,
+		PolicyID:       policyID,
+		Namespaces:     namespaces,
+		Type:           "opamp", // regular agents use PERMANENT, might be nice to distinguish
+		EnrolledAt:     time.Now().UTC().Format(time.RFC3339),
+		LocalMetadata:  localMeta,
+		AccessAPIKeyID: key.ID,
+		ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
+		Agent: &model.AgentMetadata{
+			ID: uid.String(),
+			// TODO version
+		},
+		// TODO tags
+		// TODO handle enrolmentId
+	}
+	body, err := json.Marshal(agent)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal agent doc: %w", err)
+	}
+	if _, err := o.bulk.Create(ctx, dl.FleetAgents, uid.String(), body, bulk.WithRefresh()); err != nil {
+		return nil, fmt.Errorf("unable to index agent doc: %w", err)
+	}
+	// TODO: Set agent to inactive if error is returned below
+	o.cache.SetAPIKey(*key, true)
+
+	resp, err := o.process(ctx, &agent, message)
+	if err != nil {
+		return nil, err
+	}
+	if replaceID {
+		resp.AgentIdentification = &protobufs.AgentIdentification{
+			NewInstanceUid: uid.Bytes(),
+		}
+	}
+	return resp, nil
 }

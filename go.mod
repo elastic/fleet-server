@@ -21,6 +21,8 @@ require (
 	github.com/mailru/easyjson v0.7.7
 	github.com/miolini/datacounter v1.0.3
 	github.com/oapi-codegen/runtime v1.1.1
+	github.com/oklog/ulid/v2 v2.1.0
+	github.com/open-telemetry/opamp-go v0.15.0
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.19.0
 	github.com/rs/xid v1.5.0
@@ -70,7 +72,6 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/open-telemetry/opamp-go v0.15.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
