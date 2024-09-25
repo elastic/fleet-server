@@ -93,7 +93,7 @@ func WithNamespaces(namespaces []string) Option {
 // Process handles AgentToServer messages
 func (o *opamp) Process(ctx context.Context, message *protobufs.AgentToServer, opts ...Option) (*protobufs.ServerToAgent, error) {
 	if message.GetCapabilities()&0x00000001 == 0 { // ReportsStatus must be set on all agents
-		return nil, fmt.Errorf("capaability: ReportsStatus is unset.")
+		return nil, fmt.Errorf("capaability: ReportsStatus is unset")
 	}
 	args := &processArgs{}
 	for _, opt := range opts {
@@ -398,6 +398,7 @@ func toComponentList(comps map[string]*protobufs.ComponentHealth) []model.Compon
 
 func invalidateAPIKey(ctx context.Context, bulker bulk.Bulk, id string) error {
 	timer := time.NewTimer(time.Minute)
+	defer timer.Stop()
 LOOP:
 	for {
 		_, err := bulker.APIKeyRead(ctx, id, true)
