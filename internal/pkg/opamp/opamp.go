@@ -28,6 +28,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 )
 
+const DefaultPath = "/v1/opamp"
+
 const (
 	healthy   = "healthy"
 	unhealthy = "unhealthy"
@@ -271,7 +273,7 @@ func (o *opamp) register(ctx context.Context, policyID string, namespaces []stri
 		ConnectionSettings: &protobufs.ConnectionSettingsOffers{
 			Hash: hash.Sum(nil),
 			Opamp: &protobufs.OpAMPConnectionSettings{
-				DestinationEndpoint: fleet.Hosts[0],
+				DestinationEndpoint: fleet.Hosts[0] + DefaultPath,
 				Headers: &protobufs.Headers{
 					Headers: []*protobufs.Header{
 						&protobufs.Header{

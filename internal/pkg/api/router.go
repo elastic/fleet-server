@@ -18,13 +18,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/opamp"
 
-	opamp "github.com/open-telemetry/opamp-go/server"
+	opampserver "github.com/open-telemetry/opamp-go/server"
 )
 
-const opampPath = "/v1/opamp"
-
-func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer, handlerFn opamp.HTTPHandlerFunc) http.Handler {
+func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer, handlerFn opampserver.HTTPHandlerFunc) http.Handler {
 	r := chi.NewRouter()
 	if tracer != nil {
 		r.Use(apmchiv5.Middleware(apmchiv5.WithTracer(tracer)))
@@ -33,7 +32,7 @@ func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer,
 	r.Use(logger.Middleware) // Attach middlewares to router directly so the occur before any request parsing/validation
 	r.Use(middleware.Recoverer)
 	r.Use(Limiter(cfg).middleware)
-	r.HandleFunc(opampPath, http.HandlerFunc(
+	r.HandleFunc(opamp.DefaultPath, http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			handlerFn(w, r)
 		},
@@ -90,7 +89,7 @@ func pathToOperation(path string) string {
 	if path == "/api/status" {
 		return "status"
 	}
-	if path == opampPath {
+	if path == opamp.DefaultPath {
 		return "opamp"
 	}
 	if path == "/api/fleet/uploads" {
