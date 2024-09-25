@@ -30,10 +30,10 @@ import (
 
 const DefaultPath = "/v1/opamp"
 
-const (
-	healthy   = "healthy"
-	unhealthy = "unhealthy"
-)
+var healthToStatus = map[bool]string{
+	true:  "healthy",
+	false: "unhealthy",
+}
 
 const serverCapabilities uint64 = 0x00000001 | 0x00000002 | 0x00000004 | 0x00000020 // status, offers remote config, accepts effective config, offers connection settings
 
@@ -64,34 +64,64 @@ func NewHandler(bulk bulk.Bulk, cache cache.Cache, pm policy.Monitor) *opamp {
 	}
 }
 
+type processArgs struct {
+	agent      *model.Agent
+	policyID   string
+	namespaces []string
+}
+
+type Option func(*processArgs)
+
+func WithAgent(agent *model.Agent) Option {
+	return func(p *processArgs) {
+		p.agent = agent
+	}
+}
+
+func WithPolicyID(id string) Option {
+	return func(p *processArgs) {
+		p.policyID = id
+	}
+}
+
+func WithNamespaces(namespaces []string) Option {
+	return func(p *processArgs) {
+		p.namespaces = namespaces
+	}
+}
+
 // Process handles AgentToServer messages
-// TODO use optional funcs to pass agent, policy id, namespaces, etc.
-func (o *opamp) Process(ctx context.Context, agent *model.Agent, policyID string, namespaces []string, message *protobufs.AgentToServer) (*protobufs.ServerToAgent, error) {
+func (o *opamp) Process(ctx context.Context, message *protobufs.AgentToServer, opts ...Option) (*protobufs.ServerToAgent, error) {
 	if message.GetCapabilities()&0x00000001 == 0 { // ReportsStatus must be set on all agents
-		return nil, fmt.Errorf("ReportsStatus capability is unset.")
+		return nil, fmt.Errorf("capaability: ReportsStatus is unset.")
+	}
+	args := &processArgs{}
+	for _, opt := range opts {
+		opt(args)
 	}
 
-	if agent == nil && policyID != "" {
-		return o.register(ctx, policyID, namespaces, message)
+	if args.agent == nil && args.policyID != "" {
+		return o.register(ctx, message, args.policyID, args.namespaces)
 	}
-	if agent.Id != string(message.InstanceUid) {
+	if args.agent.Id != string(message.InstanceUid) {
 		return nil, fmt.Errorf("API key's associated agent does not match InstanceUid")
 	}
-	return o.process(ctx, agent, message)
+	return o.process(ctx, message, args.agent)
 }
 
 // process is a func that is similar to the api checkin path
 // it will update health status (but not metadata yet) and dispatch new config
 // configs are dispatched if the sent config has a lower revision number than the current policy, or if no config is sent if the agent doc has a lower revision number.
-func (o *opamp) process(ctx context.Context, agent *model.Agent, message *protobufs.AgentToServer) (*protobufs.ServerToAgent, error) {
+func (o *opamp) process(ctx context.Context, message *protobufs.AgentToServer, agent *model.Agent) (*protobufs.ServerToAgent, error) {
+	if agent == nil {
+		return nil, fmt.Errorf("no agent record found")
+	}
 	ts := time.Now().UTC()
 	tsStr := ts.Format(time.RFC3339)
 
 	// update the agent description if health status has changed. otherwise just a minimal update
 	updateAgent := false
-	if health := message.GetHealth(); health != nil &&
-		(health.Healthy && agent.LastCheckinStatus != healthy) ||
-		(!health.Healthy && agent.LastCheckinStatus != unhealthy) {
+	if health := message.GetHealth(); health != nil && agent.LastCheckinStatus != healthToStatus[health.Healthy] {
 		updateAgent = true
 	}
 	update := bulk.UpdateFields{
@@ -99,13 +129,9 @@ func (o *opamp) process(ctx context.Context, agent *model.Agent, message *protob
 		dl.FieldUpdatedAt:   tsStr,
 	}
 	if updateAgent {
-		if message.GetHealth().Healthy {
-			update[dl.FieldLastCheckinStatus] = healthy
-		} else {
-			update[dl.FieldLastCheckinStatus] = unhealthy
-		}
+		update[dl.FieldLastCheckinStatus] = healthToStatus[message.GetHealth().Healthy]
 		update[dl.FieldLastCheckinMessage] = message.GetHealth().Status
-		// TODO: map ComponentHealthMap to components list
+		update[dl.FieldComponents] = toComponentList(message.GetHealth().GetComponentHealthMap())
 	}
 	updateBody, err := update.Marshal()
 	if err != nil {
@@ -153,7 +179,7 @@ func (o *opamp) process(ctx context.Context, agent *model.Agent, message *protob
 	select {
 	case pp := <-sub.Output():
 		remoteConfig, _, err = o.preparePolicy(ctx, agent, pp)
-		// FIXME: We should be sure to handle outputs seperately here using the returned data (2nd arg)
+		// FIXME: We should be sure to handle outputs separately here using the returned data (2nd arg)
 		// At a minimum we need to set ConnectionSettingsOffers.opamp
 		if err != nil {
 			return nil, fmt.Errorf("unable to prepare remote config: %w", err)
@@ -169,20 +195,28 @@ func (o *opamp) process(ctx context.Context, agent *model.Agent, message *protob
 	}, nil
 }
 
-func (o *opamp) register(ctx context.Context, policyID string, namespaces []string, message *protobufs.AgentToServer) (*protobufs.ServerToAgent, error) {
+func (o *opamp) register(ctx context.Context, message *protobufs.AgentToServer, policyID string, namespaces []string) (*protobufs.ServerToAgent, error) {
 	if message.GetCapabilities()&0x00000100 == 0 {
-		return nil, fmt.Errorf("AcceptsOpAMPConnectionSettings capability must be set in order for agent to register")
+		return nil, fmt.Errorf("capability: AcceptsOpAMPConnectionSettings is unset")
 	}
-	// NOTE: message.ConnectionSettingsRequest.Opamp is used for a CSR flow
-	// TODO: Should we also read message.Flags to see if we need to generate a new uid?
-	replaceID := false
+	// NOTE: message.ConnectionSettingsRequest.Opamp is used for a CSR flow, we don't support this workflow at the moment
+	replaceID := message.GetFlags()&uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid) != 0
 	uid := ulid.ULID(message.InstanceUid)
-	// TODO: our current enroll flow does something different on collisions
-	_, err := dl.FindAgent(ctx, o.bulk, dl.QueryAgentByID, dl.FieldID, uid.String())
+	agent, err := dl.FindAgent(ctx, o.bulk, dl.QueryAgentByID, dl.FieldID, uid.String())
 	if err == nil {
-		zerolog.Ctx(ctx).Debug().Msg("Agent registration has detected uid collision")
-		uid = ulid.Make() // TODO replace this with a better call?
-		replaceID = true
+		// ID collides with an existing agent that has not checked in
+		if agent.Id != "" && agent.LastCheckin == "" {
+			if err := invalidateAPIKey(ctx, o.bulk, agent.AccessAPIKeyID); err != nil {
+				return nil, fmt.Errorf("agent id collision, unable to invalidate previous API key: %w", err)
+			}
+			if err := o.bulk.Delete(ctx, dl.FleetAgents, agent.Id); err != nil {
+				return nil, fmt.Errorf("agent id collision, unable to delete previous agent doc: %w", err)
+			}
+		} else {
+			zerolog.Ctx(ctx).Debug().Msg("Agent registration has detected uid collision")
+			uid = ulid.Make() // TODO replace this with a better call?
+			replaceID = true
+		}
 	} else if errors.Is(err, dl.ErrNotFound) {
 		zerolog.Ctx(ctx).Trace().Msg("Agent registration no uid collision")
 	} else {
@@ -202,7 +236,7 @@ func (o *opamp) register(ctx context.Context, policyID string, namespaces []stri
 		}
 	}
 	// TODO Invalidate key if func returns error after this
-	agent := model.Agent{
+	agent = model.Agent{
 		Active:         true,
 		PolicyID:       policyID,
 		Namespaces:     namespaces,
@@ -332,4 +366,54 @@ func (o *opamp) preparePolicy(ctx context.Context, agent *model.Agent, pp *polic
 		ConfigHash: hash.Sum(nil),
 	}
 	return remoteConfig, data, nil
+}
+
+// toComponentsList will transform opamp components health to fleet's componets list
+// it will only go one level down in the opamp map
+func toComponentList(comps map[string]*protobufs.ComponentHealth) []model.ComponentsItems {
+	if len(comps) == 0 {
+		return nil
+	}
+	arr := make([]model.ComponentsItems, len(comps))
+	for k, v := range comps {
+		status := healthToStatus[v.Healthy]
+		units := make([]model.UnitsItems, len(v.ComponentHealthMap))
+		for uk, uv := range v.ComponentHealthMap {
+			uStatus := healthToStatus[uv.Healthy]
+			units = append(units, model.UnitsItems{
+				ID:      uk,
+				Message: uv.Status,
+				Status:  uStatus,
+			})
+		}
+		arr = append(arr, model.ComponentsItems{
+			ID:      k,
+			Message: v.Status,
+			Status:  status,
+			Units:   units,
+		})
+	}
+	return arr
+}
+
+func invalidateAPIKey(ctx context.Context, bulker bulk.Bulk, id string) error {
+	timer := time.NewTimer(time.Minute)
+LOOP:
+	for {
+		_, err := bulker.APIKeyRead(ctx, id, true)
+		switch {
+		case err == nil:
+			break LOOP
+		case !errors.Is(err, apikey.ErrAPIKeyNotFound):
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return fmt.Errorf("apikey index failed to refresh")
+		case <-time.After(time.Second):
+		}
+	}
+	return bulker.APIKeyInvalidate(ctx, id)
 }

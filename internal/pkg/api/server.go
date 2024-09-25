@@ -64,8 +64,7 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 	handlerFn, contextWithConn, _ := ompampServer.Attach(opampserver.Settings{
 		Callbacks: opampserver.CallbacksStruct{
 			OnConnectingFunc: func(request *http.Request) types.ConnectionResponse {
-				var policyID string
-				var namespaces []string
+				opts := make([]opamp.Option, 0)
 				agent, err := authAgent(request, nil, bulker, cache)
 				if errors.Is(err, ErrAgentNotFound) { // No agent associated, get the enrollment token's associated policyID for a register on first use flow
 					enrollKey, err := authAPIKey(request, bulker, cache)
@@ -95,14 +94,15 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 						cache.SetEnrollmentAPIKey(enrollKey.ID, rec, int64(len(rec.APIKey)))
 						key = rec
 					}
-					policyID = key.PolicyID
-					namespaces = key.Namespaces
+					opts = append(opts, opamp.WithPolicyID(key.PolicyID), opamp.WithNamespaces(key.Namespaces))
 				} else if err != nil {
 					zerolog.Ctx(request.Context()).Warn().Err(err).Msg("Opamp request api key auth failed.")
 					return types.ConnectionResponse{
 						Accept:         false,
 						HTTPStatusCode: http.StatusUnauthorized,
 					}
+				} else {
+					opts = append(opts, opamp.WithAgent(agent))
 				}
 				return types.ConnectionResponse{
 					Accept: true,
@@ -112,7 +112,7 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 						},
 						OnMessageFunc: func(ctx context.Context, _ types.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
 							zerolog.Ctx(ctx).Info().Msg("Opamp message received.")
-							response, err := op.Process(ctx, agent, policyID, namespaces, message)
+							response, err := op.Process(ctx, message, opts...)
 							if err != nil {
 								zerolog.Ctx(ctx).Error().Err(err).Msg("Error processing opamp request.")
 								return &protobufs.ServerToAgent{
@@ -125,7 +125,7 @@ func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at 
 							return response
 						},
 						OnConnectionCloseFunc: func(_ types.Connection) {
-							zerolog.Ctx(request.Context()).Info().Msg("Opamp connection ended.") // FIXME getting context from request might be messy
+							zerolog.Ctx(request.Context()).Info().Msg("Opamp connection ended.")
 						},
 					},
 				}
