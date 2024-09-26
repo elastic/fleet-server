@@ -150,7 +150,6 @@ steps:
 
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
-        skip: true
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
