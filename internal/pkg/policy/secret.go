@@ -6,7 +6,6 @@ package policy
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -60,7 +59,7 @@ func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bul
 	for i, input := range data.Inputs {
 		newInput, ks := replaceMapRef(input, secretValues)
 		for _, key := range ks {
-			keys = append(keys, fmt.Sprintf("inputs."+strconv.Itoa(i)+"."+key))
+			keys = append(keys, "inputs."+strconv.Itoa(i)+"."+key)
 		}
 		result = append(result, newInput)
 	}
