@@ -256,5 +256,5 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	}, "expected output to contain secret-key: output_secret_value, got %v", output)
 	assert.NotContains(t, output, "secrets")
 	// expect that secret_paths lists the key
-	assert.ElementsMatch(t, []string{"inputs[0].package_var_secret", "outputs.default.secret-key"}, *actionData.Policy.SecretPaths)
+	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "outputs.default.secret-key"}, *actionData.Policy.SecretPaths)
 }

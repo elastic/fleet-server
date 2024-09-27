@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -59,7 +60,7 @@ func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bul
 	for i, input := range data.Inputs {
 		newInput, ks := replaceMapRef(input, secretValues)
 		for _, key := range ks {
-			keys = append(keys, fmt.Sprintf("inputs[%d].%s", i, key))
+			keys = append(keys, fmt.Sprintf("inputs."+strconv.Itoa(i)+"."+key))
 		}
 		result = append(result, newInput)
 	}
@@ -90,7 +91,7 @@ func replaceMapRef(input map[string]any, secrets map[string]string) (map[string]
 		case []any:
 			ref, ks := replaceSliceRef(value, secrets)
 			for _, key := range ks {
-				keys = append(keys, k+key)
+				keys = append(keys, k+"."+key)
 			}
 			r = ref
 		default:
@@ -112,19 +113,19 @@ func replaceSliceRef(arr []any, secrets map[string]string) ([]any, []string) {
 		case string:
 			ref, replaced := replaceStringRef(value, secrets)
 			if replaced {
-				keys = append(keys, fmt.Sprintf("[%d]", i))
+				keys = append(keys, strconv.Itoa(i))
 			}
 			r = ref
 		case map[string]any:
 			ref, ks := replaceMapRef(value, secrets)
 			for _, key := range ks {
-				keys = append(keys, fmt.Sprintf("[%d].%s", i, key))
+				keys = append(keys, strconv.Itoa(i)+"."+key)
 			}
 			r = ref
 		case []any:
 			ref, ks := replaceSliceRef(value, secrets)
 			for _, key := range ks {
-				keys = append(keys, fmt.Sprintf("[%d]%s", i, key))
+				keys = append(keys, strconv.Itoa(i)+"."+key)
 			}
 			r = ref
 		default:
