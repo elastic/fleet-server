@@ -112,6 +112,7 @@ generate: ## - Generate schema models
 	env GOBIN=${GOBIN} go install github.com/deepmap/oapi-codegen/v2/cmd/oapi-codegen@v2.0.0
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
 	env PATH="${GOBIN}:${PATH}" go generate ./...
+	@$(MAKE) check-headers
 
 .PHONY: check-ci
 check-ci: ## - Run all checks of the ci without linting, the linter is run through github action to have comments in the pull-request.
