@@ -11,8 +11,8 @@ import (
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
-	"github.com/stretchr/testify/require"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadLimits(t *testing.T) {
