@@ -337,6 +337,9 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actions, ackToken = convertActions(zlog, agent.Id, pendingActions)
 
 	span, ctx := apm.StartSpan(r.Context(), "longPoll", "process")
+	ctx, cancel := context.WithTimeout(ctx, pollDuration)
+	defer cancel()
+
 	if len(actions) == 0 {
 	LOOP:
 		for {
@@ -368,7 +371,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				actions = append(actions, *actionResp)
 				break LOOP
 			case <-longPoll.C:
-				zlog.Trace().Msg("fire long poll")
+				zlog.Debug().Str(logger.AgentID, agent.Id).Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
 				err := ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, nil, rawComponents, nil, ver, unhealthyReason, false)
