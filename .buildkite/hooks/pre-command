@@ -55,6 +55,13 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
   export EC_API_KEY=${EC_API_KEY_SECRET}
 fi
 
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "int-test" ]]; then
+  # BK analytics
+  echo "--- Prepare BK test analytics token :vault:"
+  BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_tokens/fleet-server)
+  export BUILDKITE_ANALYTICS_TOKEN
+fi
+
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "release-test" ]]; then
   export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
   export JOB_GCS_BUCKET
