@@ -87,6 +87,11 @@ steps:
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/test-*.xml"
+              format: "junit"
+              branches: "main"
 
       - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
         key: unit-test-macos-13
@@ -97,6 +102,11 @@ steps:
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/test-*.xml"
+              format: "junit"
+              branches: "main"
 
       - label: ":smartbear-testexecute: Run integration tests"
         key: int-test
@@ -105,6 +115,11 @@ steps:
           provider: "gcp"
         artifact_paths:
           - build/*.xml
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/test-*.xml"
+              format: "junit"
+              branches: "main"
 
       - label: "E2E Test"
         key: "e2e-test"
@@ -114,6 +129,11 @@ steps:
         artifact_paths:
           - build/*.xml
           - build/e2e-coverage.out
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/test-*.xml"
+              format: "junit"
+              branches: "main"
 
       - label: ":junit: Junit annotate"
         plugins:

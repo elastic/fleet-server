@@ -35,6 +35,10 @@ check_if_file_exist_in_repo() {
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
   export GO_VERSION=$(cat .go-version)
+  # BK analytics
+  echo "--- Prepare BK test analytics token :vault:"
+  BUILDKITE_ANALYTICS_TOKEN=$(vault read -field token /secret/ci/elastic-fleet-server/bk_analytics)
+  export BUILDKITE_ANALYTICS_TOKEN
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
