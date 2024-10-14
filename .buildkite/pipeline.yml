@@ -106,9 +106,10 @@ steps:
         artifact_paths:
           - build/*.xml
         plugins:
-          - test-collector#v1.10.1:
+          - test-collector#v1.10.2:
               files: "build/test-*.xml"
-              format: "xml"
+              format: "junit"
+              # branches: "main"
               debug: true
 
       - label: "E2E Test"
