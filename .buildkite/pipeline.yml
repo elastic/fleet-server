@@ -120,6 +120,12 @@ steps:
         artifact_paths:
           - build/*.xml
           - build/e2e-coverage.out
+        plugins:
+          - test-collector#v1.10.2:
+              files: "build/test-*.xml"
+              format: "junit"
+              # branches: "main"
+              debug: true
 
       - label: ":junit: Junit annotate"
         plugins:
