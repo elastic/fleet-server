@@ -32,7 +32,7 @@ func TestBulkCreate(t *testing.T) {
 		Index  string
 		ID     string
 		Err    error
-		AltErr error // Hack until https://elasticco.atlassian.net/browse/ES-9711 is resolved
+		AltErr error // FIXME: workaround until https://elasticco.atlassian.net/browse/ES-9711 is resolved
 	}{
 		{
 			Name:  "Empty Id",
