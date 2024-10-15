@@ -109,7 +109,7 @@ steps:
           - test-collector#v1.10.2:
               files: "build/test-*.xml"
               format: "junit"
-              # branches: "main"
+              branches: "main"
               debug: true
 
       - label: "E2E Test"
@@ -124,7 +124,7 @@ steps:
           - test-collector#v1.10.2:
               files: "build/test-*.xml"
               format: "junit"
-              # branches: "main"
+              branches: "main"
               debug: true
 
       - label: ":junit: Junit annotate"
