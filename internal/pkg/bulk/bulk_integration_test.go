@@ -104,8 +104,10 @@ func TestBulkCreate(t *testing.T) {
 
 			// Create
 			id, err := bulker.Create(ctx, test.Index, test.ID, sampleData)
-			if !EqualElastic(test.Err, err) || (test.AltErr != nil && !EqualElastic(test.AltErr, err)) {
-				t.Fatalf("expected error: %+v (alt: %+v), got: %+v", test.Err, test.AltErr, err)
+			if !EqualElastic(test.Err, err) {
+				if test.AltErr == nil || !EqualElastic(test.AltErr, err) {
+					t.Fatalf("expected error: %+v (alt: %+v), got: %+v", test.Err, test.AltErr, err)
+				}
 			}
 			if err != nil {
 				return
