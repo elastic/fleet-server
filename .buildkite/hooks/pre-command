@@ -55,11 +55,13 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
   export EC_API_KEY=${EC_API_KEY_SECRET}
 fi
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "int-test" ]]; then
-  # BK analytics
-  echo "--- Prepare BK test analytics token :vault:"
-  BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_fleet_server_analytics_token)
-  export BUILDKITE_ANALYTICS_TOKEN
+# BK analytics
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "int-test" || "$BUILDKITE_STEP_KEY" == "e2e-test" ]]; then
+    echo "--- Prepare BK test analytics token :vault:"
+    BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_fleet_server_analytics_token)
+    export BUILDKITE_ANALYTICS_TOKEN
+  fi
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "release-test" ]]; then
