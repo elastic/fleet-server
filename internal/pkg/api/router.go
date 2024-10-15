@@ -9,24 +9,34 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/module/apmchiv5/v2"
 	"go.elastic.co/apm/v2"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/opamp"
+
+	opampserver "github.com/open-telemetry/opamp-go/server"
 )
 
-func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer) http.Handler {
+func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer, handlerFn opampserver.HTTPHandlerFunc) http.Handler {
 	r := chi.NewRouter()
 	if tracer != nil {
 		r.Use(apmchiv5.Middleware(apmchiv5.WithTracer(tracer)))
 	}
+
 	r.Use(logger.Middleware) // Attach middlewares to router directly so the occur before any request parsing/validation
 	r.Use(middleware.Recoverer)
 	r.Use(Limiter(cfg).middleware)
+	r.HandleFunc(opamp.DefaultPath, http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			handlerFn(w, r)
+		},
+	))
 	return HandlerWithOptions(si, ChiServerOptions{
 		BaseRouter:       r,
 		ErrorHandlerFunc: ErrorResp,
@@ -78,6 +88,9 @@ func pathToOperation(path string) string {
 	path = strings.TrimSuffix(path, "/")
 	if path == "/api/status" {
 		return "status"
+	}
+	if path == opamp.DefaultPath {
+		return "opamp"
 	}
 	if path == "/api/fleet/uploads" {
 		return "uploadBegin"
