@@ -28,11 +28,10 @@ func TestBulkCreate(t *testing.T) {
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy, WithFlushThresholdCount(1))
 
 	tests := []struct {
-		Name   string
-		Index  string
-		ID     string
-		Err    error
-		AltErr error // FIXME: workaround until https://elasticco.atlassian.net/browse/ES-9711 is resolved
+		Name  string
+		Index string
+		ID    string
+		Err   error
 	}{
 		{
 			Name:  "Empty Id",
@@ -70,12 +69,8 @@ func TestBulkCreate(t *testing.T) {
 			Name:  "Invalid utf-8",
 			Index: string([]byte{0xfe, 0xfe, 0xff, 0xff}),
 			Err: es.ErrElastic{
-				Status: 500,
-				Type:   "json_parse_exception",
-			},
-			AltErr: es.ErrElastic{
 				Status: 400,
-				Type:   "parse_exception",
+				Type:   "json_parse_exception",
 			},
 		},
 		{
@@ -105,9 +100,7 @@ func TestBulkCreate(t *testing.T) {
 			// Create
 			id, err := bulker.Create(ctx, test.Index, test.ID, sampleData)
 			if !EqualElastic(test.Err, err) {
-				if test.AltErr == nil || !EqualElastic(test.AltErr, err) {
-					t.Fatalf("expected error: %+v (alt: %+v), got: %+v", test.Err, test.AltErr, err)
-				}
+				t.Fatalf("expected error: %+v, got: %+v", test.Err, err)
 			}
 			if err != nil {
 				return
