@@ -350,6 +350,26 @@ func (tester *ClientAPITester) TestCheckinWithBadRequest() {
 	tester.Require().Equal(http.StatusBadRequest, statusCode, "Expected status code 400 for bad request")
 }
 
+func (tester *ClientAPITester) TestCheckinWithActionNotFound() {
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+
+	// enroll agent
+	tester.T().Log("test enrollment")
+	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	tester.VerifyAgentInKibana(ctx, agentID)
+
+	tester.T().Logf("test checkin with no upgrade action: agent %s", agentID)
+	// checkin request with upgrade details
+	req := &api.AgentCheckinJSONRequestBody{
+		Status:         api.CheckinRequestStatusOnline,
+		Message:        "test checkin",
+		UpgradeDetails: &api.UpgradeDetailsStateUPGDOWNLOADING,
+	}
+	_, _, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, req)
+	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin with action not found")
+}
+
 func (tester *ClientAPITester) TestFullFileUpload() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
