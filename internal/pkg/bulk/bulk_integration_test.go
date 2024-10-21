@@ -70,7 +70,7 @@ func TestBulkCreate(t *testing.T) {
 			Index: string([]byte{0xfe, 0xfe, 0xff, 0xff}),
 			Err: es.ErrElastic{
 				Status: 400,
-				Type:   "json_parse_exception",
+				Type:   "parse_exception",
 			},
 		},
 		{
