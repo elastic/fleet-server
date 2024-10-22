@@ -69,13 +69,8 @@ func TestBulkCreate(t *testing.T) {
 			Name:  "Invalid utf-8",
 			Index: string([]byte{0xfe, 0xfe, 0xff, 0xff}),
 			Err: es.ErrElastic{
-<<<<<<< HEAD
-				Status: 500,
-				Type:   "json_parse_exception",
-=======
 				Status: 400,
 				Type:   "parse_exception",
->>>>>>> 1ae9ab6 ([Integration testing] Remove AltErr and only expect 400 from ES bulk API (#4012))
 			},
 		},
 		{
