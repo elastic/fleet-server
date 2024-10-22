@@ -253,6 +253,8 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 }
 
 func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
+	zlog = zlog.With().
+		Str(logger.AgentID, agent.Id).Logger()
 	validated, err := ct.validateRequest(zlog, w, r, start, agent)
 	if err != nil {
 		return err
