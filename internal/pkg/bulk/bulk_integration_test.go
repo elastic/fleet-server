@@ -100,11 +100,7 @@ func TestBulkCreate(t *testing.T) {
 			// Create
 			id, err := bulker.Create(ctx, test.Index, test.ID, sampleData)
 			if !EqualElastic(test.Err, err) {
-<<<<<<< HEAD
-				t.Fatal(err)
-=======
 				t.Fatalf("expected error: %+v, got: %+v", test.Err, err)
->>>>>>> 1ae9ab6 ([Integration testing] Remove AltErr and only expect 400 from ES bulk API (#4012))
 			}
 			if err != nil {
 				return
