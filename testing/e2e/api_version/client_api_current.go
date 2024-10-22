@@ -362,9 +362,12 @@ func (tester *ClientAPITester) TestCheckinWithActionNotFound() {
 	tester.T().Logf("test checkin with no upgrade action: agent %s", agentID)
 	// checkin request with upgrade details
 	req := &api.AgentCheckinJSONRequestBody{
-		Status:         api.CheckinRequestStatusOnline,
-		Message:        "test checkin",
-		UpgradeDetails: &api.UpgradeDetailsStateUPGDOWNLOADING,
+		Status:  api.CheckinRequestStatusOnline,
+		Message: "test checkin",
+		UpgradeDetails: &api.UpgradeDetails{
+			ActionId: "test-missing-id",
+			State:    api.UpgradeDetailsStateUPGDOWNLOADING,
+		},
 	}
 	_, _, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, req)
 	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin with action not found")
