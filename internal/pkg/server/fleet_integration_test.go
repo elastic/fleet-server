@@ -1516,7 +1516,9 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 		obj, ok := o.(map[string]interface{})
 		require.Truef(t, ok, "expected _source to be an object, was: %T", o)
 		activeStr, ok := obj["active"]
+		require.Truef(t, ok, "expected active to exist")
 		active, ok := activeStr.(bool)
+		require.Truef(t, ok, "expected active to be a bool")
 		return !active
 	}, time.Second*20, time.Second, "agent document should be inactive")
 	cancel()
