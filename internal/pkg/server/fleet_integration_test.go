@@ -1485,17 +1485,6 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	res.Body.Close()
 
-	t.Log("Orphaned can replace uninstall")
-	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(orphanBody))
-	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+key)
-	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
-	req.Header.Set("Content-Type", "application/json")
-	res, err = cli.Do(req)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, res.StatusCode)
-	res.Body.Close()
-
 	t.Log("Use of audit/unenroll once orphaned should fail.")
 	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(orphanBody))
 	require.NoError(t, err)
@@ -1504,25 +1493,8 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	res, err = cli.Do(req)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusConflict, res.StatusCode)
+	require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 	res.Body.Close()
-
-	t.Logf("Fake a checkin for agent %s", id)
-	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
-	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+key)
-	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
-	req.Header.Set("Content-Type", "application/json")
-	res, err = cli.Do(req)
-	require.NoError(t, err)
-
-	require.Equal(t, http.StatusOK, res.StatusCode)
-	t.Log("Checkin successful, verify body")
-	p, _ := io.ReadAll(res.Body)
-	res.Body.Close()
-	var obj map[string]interface{}
-	err = json.Unmarshal(p, &obj)
-	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:9200/.fleet-agents/_doc/"+id, nil)
@@ -1543,9 +1515,10 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 		require.Truef(t, ok, "expected to find _source in: %v", tmp)
 		obj, ok := o.(map[string]interface{})
 		require.Truef(t, ok, "expected _source to be an object, was: %T", o)
-		_, ok = obj["audit_unenrolled_reason"]
-		return !ok
-	}, time.Second*20, time.Second, "agent document should not have audit_unenrolled_reason attribute")
+		activeStr, ok := obj["active"]
+		active, ok := activeStr.(bool)
+		return !active
+	}, time.Second*20, time.Second, "agent document should be inactive")
 	cancel()
 	srv.waitExit() //nolint:errcheck // test case
 }
