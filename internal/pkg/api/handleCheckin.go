@@ -415,7 +415,8 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		}
 		if len(actions) == 0 {
 			vSpan.End()
-			return fmt.Errorf("upgrade_details no action for id %q found", details.ActionId)
+			zerolog.Ctx(vCtx).Warn().Msgf("upgrade_details no action for id %q found (agent id %q)", details.ActionId, agent.Agent.ID)
+			return nil
 		}
 		action = actions[0]
 		ct.cache.SetAction(action)
