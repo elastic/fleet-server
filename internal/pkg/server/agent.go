@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -556,6 +557,12 @@ func apmConfigToInstrumentation(src *proto.APMConfig) (config.Instrumentation, e
 			Hosts:        apmest.GetHosts(),
 			GlobalLabels: apmest.GetGlobalLabels(),
 		}
+
+		if apmest.SamplingRate != nil {
+			// set the sampling rate in config
+			cfg.TransactionSampleRate = strconv.FormatFloat(float64(*apmest.SamplingRate), 'f', -1, 32)
+		}
+
 		return cfg, nil
 	}
 	return config.Instrumentation{}, fmt.Errorf("unable to transform APMConfig to instrumentation")
