@@ -239,6 +239,78 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
 		require.Len(t, cfg.Output.Elasticsearch.Hosts, 2)
 	})
+	t.Run("Minimal APM config is specified", func(t *testing.T) {
+		outStruct, err := structpb.NewStruct(map[string]interface{}{
+			"service_token": "test-token",
+		})
+		require.NoError(t, err)
+		mockOutClient := &mockClientUnit{}
+		mockOutClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: outStruct},
+			})
+
+		inStruct, err := structpb.NewStruct(map[string]interface{}{
+			"type": "fleet-server",
+			"server": map[string]interface{}{
+				"host": "0.0.0.0",
+			},
+			"policy": map[string]interface{}{
+				"id": "test-policy",
+			},
+		})
+		require.NoError(t, err)
+
+		mockInClient := &mockClientUnit{}
+		mockInClient.On("Expected").Return(
+			client.Expected{
+				State:    client.UnitStateHealthy,
+				LogLevel: client.UnitLogLevelInfo,
+				Config:   &proto.UnitExpectedConfig{Source: inStruct},
+				APMConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment: "test",
+						SecretToken: "secretToken",
+						Hosts:       []string{"testhost:8080"},
+					},
+				},
+			})
+
+		cliCfg, err := ucfg.NewFrom(map[string]interface{}{
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"policy": map[string]interface{}{
+						"id": "test-policy",
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		a := &Agent{
+			cliCfg:     cliCfg,
+			agent:      mockAgent,
+			inputUnit:  mockInClient,
+			outputUnit: mockOutClient,
+		}
+
+		cfg, err := a.configFromUnits(context.Background())
+		require.NoError(t, err)
+		require.Len(t, cfg.Inputs, 1)
+		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
+		assert.Equal(t, "test-policy", cfg.Inputs[0].Policy.ID)
+		assert.Equal(t, "0.0.0.0", cfg.Inputs[0].Server.Host)
+		assert.True(t, cfg.Inputs[0].Server.Instrumentation.Enabled)
+		assert.False(t, cfg.Inputs[0].Server.Instrumentation.TLS.SkipVerify)
+		assert.Empty(t, cfg.Inputs[0].Server.Instrumentation.TLS.ServerCA)
+		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.Environment)
+		assert.Empty(t, cfg.Inputs[0].Server.Instrumentation.APIKey)
+		assert.Equal(t, "secretToken", cfg.Inputs[0].Server.Instrumentation.SecretToken)
+		assert.Equal(t, []string{"testhost:8080"}, cfg.Inputs[0].Server.Instrumentation.Hosts)
+		assert.Empty(t, cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
+		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+	})
 	t.Run("APM config is specified", func(t *testing.T) {
 		outStruct, err := structpb.NewStruct(map[string]interface{}{
 			"service_token": "test-token",
@@ -262,6 +334,8 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+
+		samplingRate := float32(0.5)
 		mockInClient := &mockClientUnit{}
 		mockInClient.On("Expected").Return(
 			client.Expected{
@@ -279,6 +353,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 						SecretToken:  "secretToken",
 						Hosts:        []string{"testhost:8080"},
 						GlobalLabels: "test",
+						SamplingRate: &samplingRate,
 					},
 				},
 			})
@@ -315,6 +390,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, []string{"testhost:8080"}, cfg.Inputs[0].Server.Instrumentation.Hosts)
 		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+		assert.Equal(t, "0.5", cfg.Inputs[0].Server.Instrumentation.TransactionSampleRate)
 	})
 	t.Run("APM config no tls", func(t *testing.T) {
 		outStruct, err := structpb.NewStruct(map[string]interface{}{
@@ -336,6 +412,8 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+
+		samplingRate := float32(0.01)
 		mockInClient := &mockClientUnit{}
 		mockInClient.On("Expected").Return(
 			client.Expected{
@@ -349,6 +427,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 						SecretToken:  "secretToken",
 						Hosts:        []string{"testhost:8080"},
 						GlobalLabels: "test",
+						SamplingRate: &samplingRate,
 					},
 				},
 			})
@@ -374,6 +453,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, []string{"testhost:8080"}, cfg.Inputs[0].Server.Instrumentation.Hosts)
 		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+		assert.Equal(t, "0.01", cfg.Inputs[0].Server.Instrumentation.TransactionSampleRate)
 	})
 	t.Run("APM config and instrumentation is specified", func(t *testing.T) {
 		outStruct, err := structpb.NewStruct(map[string]interface{}{
@@ -398,14 +478,17 @@ func Test_Agent_configFromUnits(t *testing.T) {
 						"skip_verify":        true,
 						"server_certificate": "/path/to/cert.crt",
 					},
-					"environment":  "replace",
-					"api_key":      "replace",
-					"secret_token": "replace",
-					"hosts":        []interface{}{"replace"},
+					"environment":             "replace",
+					"api_key":                 "replace",
+					"secret_token":            "replace",
+					"hosts":                   []interface{}{"replace"},
+					"transaction_sample_rate": "0.75",
 				},
 			},
 		})
 		require.NoError(t, err)
+
+		samplingRate := float32(0.01)
 		mockInClient := &mockClientUnit{}
 		mockInClient.On("Expected").Return(
 			client.Expected{
@@ -423,6 +506,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 						SecretToken:  "secretToken",
 						Hosts:        []string{"testhost:8080"},
 						GlobalLabels: "test",
+						SamplingRate: &samplingRate,
 					},
 				},
 			})
@@ -449,6 +533,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, []string{"testhost:8080"}, cfg.Inputs[0].Server.Instrumentation.Hosts)
 		assert.Equal(t, "test", cfg.Inputs[0].Server.Instrumentation.GlobalLabels)
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
+		assert.Equal(t, "0.01", cfg.Inputs[0].Server.Instrumentation.TransactionSampleRate)
 	})
 	t.Run("APM config error", func(t *testing.T) {
 		outStruct, err := structpb.NewStruct(map[string]interface{}{
