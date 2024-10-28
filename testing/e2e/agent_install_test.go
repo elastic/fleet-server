@@ -140,7 +140,7 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 
 	fileName := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s-%s.%s", version.DefaultVersion, runtime.GOOS, arch, fType)
 	pkg, ok := body.Packages[fileName]
-	suite.Require().True(ok, "unable to find package download")
+	suite.Require().Truef(ok, "unable to find package download: %s", fileName)
 
 	req, err = http.NewRequestWithContext(ctx, "GET", pkg.URL, nil)
 	suite.Require().NoError(err)
