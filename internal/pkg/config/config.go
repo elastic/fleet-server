@@ -190,6 +190,14 @@ func redactServer(cfg *Config) Server {
 		redacted.TLS = &newTLS
 	}
 
+	if redacted.Instrumentation.APIKey != "" {
+		redacted.Instrumentation.APIKey = kRedacted
+	}
+
+	if redacted.Instrumentation.SecretToken != "" {
+		redacted.Instrumentation.SecretToken = kRedacted
+	}
+
 	return redacted
 }
 

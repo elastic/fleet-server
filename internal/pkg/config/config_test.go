@@ -308,6 +308,132 @@ func TestLoadServerLimits(t *testing.T) {
 
 }
 
+func TestConfigRedact(t *testing.T) {
+
+	testcases := []struct {
+		name        string
+		inputCfg    *Config
+		redactedCfg *Config
+	}{
+		{
+			name: "do not modify empty APM secrets",
+			inputCfg: &Config{
+				Inputs: []Input{
+					{
+						Type: "fleet-server",
+						Server: Server{
+							Instrumentation: Instrumentation{
+								SecretToken: "",
+								APIKey:      "",
+							},
+						},
+					},
+				},
+			},
+			redactedCfg: &Config{
+				Inputs: []Input{
+					{
+						Server: Server{
+							Instrumentation: Instrumentation{
+								SecretToken: "",
+								APIKey:      "",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "redact APM secret token",
+			inputCfg: &Config{
+				Inputs: []Input{
+					{
+						Type: "fleet-server",
+						Server: Server{
+							Instrumentation: Instrumentation{
+								SecretToken: "secret value that noone should know",
+							},
+						},
+					},
+				},
+			},
+			redactedCfg: &Config{
+				Inputs: []Input{
+					{
+						Server: Server{
+							Instrumentation: Instrumentation{
+								SecretToken: kRedacted,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "redact APM API key",
+			inputCfg: &Config{
+				Inputs: []Input{
+					{
+						Type: "fleet-server",
+						Server: Server{
+							Instrumentation: Instrumentation{
+								APIKey: "secret value that noone should know",
+							},
+						},
+					},
+				},
+			},
+			redactedCfg: &Config{
+				Inputs: []Input{
+					{
+						Server: Server{
+							Instrumentation: Instrumentation{
+								APIKey: kRedacted,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "redact both APM API key and secret token",
+			inputCfg: &Config{
+				Inputs: []Input{
+					{
+						Type: "fleet-server",
+						Server: Server{
+							Instrumentation: Instrumentation{
+								APIKey:      "secret value that noone should know",
+								SecretToken: "another value that noone should know",
+							},
+						},
+					},
+				},
+			},
+			redactedCfg: &Config{
+				Inputs: []Input{
+					{
+						Server: Server{
+							Instrumentation: Instrumentation{
+								APIKey:      kRedacted,
+								SecretToken: kRedacted,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			require.NotNil(t, tt.inputCfg, "input config cannot be nil")
+			actualRedacted := tt.inputCfg.Redact()
+			assert.Equal(t, tt.redactedCfg, actualRedacted)
+		})
+	}
+}
+
 // Stub out the defaults so that the above is easier to maintain
 
 func defaultCache() Cache {
