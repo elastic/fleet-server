@@ -4,11 +4,7 @@ terraform {
   required_providers {
     ec = {
       source  = "elastic/ec"
-<<<<<<< HEAD
-      version = "0.9.0"
-=======
       version = "0.12.1"
->>>>>>> daafd1a (Update version of elastic/ec terraform provider to latest (#4087))
     }
   }
 }
