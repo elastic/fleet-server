@@ -214,6 +214,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 			req := &esapi.SecurityBulkUpdateAPIKeysRequest{
 				Body: bytes.NewReader(payload),
 			}
+			zerolog.Ctx(ctx).Debug().Msg("flushUpdateAPIKey: Sending request to Elasticsearch")
 
 			res, err := req.Do(ctx, b.es)
 			if err != nil {

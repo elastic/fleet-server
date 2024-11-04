@@ -411,7 +411,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 			}
 
 		case <-timer.C:
-			zerolog.Ctx(ctx).Trace().
+			zerolog.Ctx(ctx).Debug().
 				Str("mod", kModBulk).
 				Int("itemCnt", itemCnt).
 				Int("byteCnt", byteCnt).
@@ -436,18 +436,20 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue queueT) error {
 	start := time.Now()
-	zerolog.Ctx(ctx).Trace().
+	deadline, _ := ctx.Deadline()
+	zerolog.Ctx(ctx).Debug().
 		Str("mod", kModBulk).
 		Int("cnt", queue.cnt).
 		Int("szPending", queue.pending).
 		Str("queue", queue.Type()).
+		Time("deadline", deadline).
 		Msg("flushQueue Wait")
 
 	if err := w.Acquire(ctx, 1); err != nil {
 		return err
 	}
 
-	zerolog.Ctx(ctx).Trace().
+	zerolog.Ctx(ctx).Debug().
 		Str("mod", kModBulk).
 		Int("cnt", queue.cnt).
 		Dur("tdiff", time.Since(start)).
@@ -485,7 +487,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 			apm.CaptureError(ctx, err).Send()
 		}
 
-		zerolog.Ctx(ctx).Trace().
+		zerolog.Ctx(ctx).Debug().
 			Err(err).
 			Str("mod", kModBulk).
 			Int("cnt", queue.cnt).
@@ -502,8 +504,12 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 func failQueue(queue queueT, err error) {
 	for n := queue.head; n != nil; {
 		next := n.next // 'n' is invalid immediately on channel send
-		n.ch <- respT{
+		select {
+		case n.ch <- respT{
 			err: err,
+		}:
+		default:
+			panic("Unexpected blocked response channel on failQueue")
 		}
 		n = next
 	}

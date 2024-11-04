@@ -207,6 +207,8 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 		req.Refresh = "true"
 	}
 
+	zerolog.Ctx(ctx).Debug().Msg("flushBulk: Sending request to Elasticsearch")
+
 	res, err := req.Do(ctx, b.es)
 	if err != nil {
 		zerolog.Ctx(ctx).Error().Err(err).Str("mod", kModBulk).Msg("Fail BulkRequest req.Do")
@@ -251,7 +253,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 		zerolog.Ctx(ctx).Debug().Err(errors.New(buf.String())).Msg("Bulk call: Es returned an error")
 	}
 
-	zerolog.Ctx(ctx).Trace().
+	zerolog.Ctx(ctx).Debug().
 		Err(err).
 		Bool("refresh", queue.ty == kQueueRefreshBulk).
 		Str("mod", kModBulk).
