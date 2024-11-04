@@ -109,7 +109,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 		req.Refresh = &refresh
 	}
 
-	zerolog.Ctx(ctx).Debug().Msg("flushRead: Sending mget request to Elasticsearch")
+	zerolog.Ctx(ctx).Debug().Msg("flushRead: Sending request to Elasticsearch")
 
 	res, err := req.Do(ctx, b.es)
 

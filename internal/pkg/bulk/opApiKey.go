@@ -229,7 +229,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 				return parseError(res, zerolog.Ctx(ctx))
 			}
 
-			zerolog.Ctx(ctx).Debug().Strs("IDs", bulkReq.IDs).RawJSON("role", role).Msg("API Keys updated.")
+			zerolog.Ctx(ctx).Debug().Strs("IDs", bulkReq.IDs).RawJSON("role", role).Msg("flushUpdateAPIKey")
 
 			responses[responseIdx] = res.StatusCode
 			for _, id := range idsInBatch {

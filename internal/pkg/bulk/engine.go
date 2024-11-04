@@ -336,6 +336,9 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 	w := semaphore.NewWeighted(int64(b.opts.maxPending))
 
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
 	var queues [kNumQueues]queueT
 
 	var i queueType
@@ -436,13 +439,14 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue queueT) error {
 	start := time.Now()
-	deadline, _ := ctx.Deadline()
+	deadline, ok := ctx.Deadline()
 	zerolog.Ctx(ctx).Debug().
 		Str("mod", kModBulk).
 		Int("cnt", queue.cnt).
 		Int("szPending", queue.pending).
 		Str("queue", queue.Type()).
 		Time("deadline", deadline).
+		Bool("hasDeadline", ok).
 		Msg("flushQueue Wait")
 
 	if err := w.Acquire(ctx, 1); err != nil {
