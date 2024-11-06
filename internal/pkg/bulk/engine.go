@@ -414,7 +414,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 			}
 
 		case <-timer.C:
-			zerolog.Ctx(ctx).Debug().
+			zerolog.Ctx(ctx).Trace().
 				Str("mod", kModBulk).
 				Int("itemCnt", itemCnt).
 				Int("byteCnt", byteCnt).
@@ -443,7 +443,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue queueT) error {
 	start := time.Now()
-	zerolog.Ctx(ctx).Debug().
+	zerolog.Ctx(ctx).Trace().
 		Str("mod", kModBulk).
 		Int("cnt", queue.cnt).
 		Int("szPending", queue.pending).
@@ -455,7 +455,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		return err
 	}
 
-	zerolog.Ctx(ctx).Debug().
+	zerolog.Ctx(ctx).Trace().
 		Str("mod", kModBulk).
 		Int("cnt", queue.cnt).
 		Dur("tdiff", time.Since(start)).
@@ -493,7 +493,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 			apm.CaptureError(ctx, err).Send()
 		}
 
-		zerolog.Ctx(ctx).Debug().
+		zerolog.Ctx(ctx).Trace().
 			Err(err).
 			Str("mod", kModBulk).
 			Int("cnt", queue.cnt).

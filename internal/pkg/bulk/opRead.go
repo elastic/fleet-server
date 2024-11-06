@@ -109,8 +109,6 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 		req.Refresh = &refresh
 	}
 
-	zerolog.Ctx(ctx).Debug().Msg("flushRead: Sending request to Elasticsearch")
-
 	res, err := req.Do(ctx, b.es)
 
 	if err != nil {
@@ -144,7 +142,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 		return err
 	}
 
-	zerolog.Ctx(ctx).Debug().
+	zerolog.Ctx(ctx).Trace().
 		Err(err).
 		Bool("refresh", refresh).
 		Str("mod", kModBulk).

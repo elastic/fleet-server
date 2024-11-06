@@ -372,7 +372,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				actions = append(actions, *actionResp)
 				break LOOP
 			case <-longPoll.C:
-				zlog.Trace().Str(logger.AgentID, agent.Id).Msg("fire long poll")
+				zlog.Trace().Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
 				err := ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, nil, rawComponents, nil, ver, unhealthyReason, false)

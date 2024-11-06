@@ -214,11 +214,10 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 			req := &esapi.SecurityBulkUpdateAPIKeysRequest{
 				Body: bytes.NewReader(payload),
 			}
-			zerolog.Ctx(ctx).Debug().Msg("flushUpdateAPIKey: Sending request to Elasticsearch")
 
 			res, err := req.Do(ctx, b.es)
 			if err != nil {
-				zerolog.Ctx(ctx).Error().Err(err).Msg("flushUpdateAPIKey: Error sending bulk API Key update request to Elasticsearch")
+				zerolog.Ctx(ctx).Error().Err(err).Msg("Error sending bulk API Key update request to Elasticsearch")
 				return err
 			}
 			if res.Body != nil {
@@ -229,7 +228,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 				return parseError(res, zerolog.Ctx(ctx))
 			}
 
-			zerolog.Ctx(ctx).Debug().Strs("IDs", bulkReq.IDs).RawJSON("role", role).Msg("flushUpdateAPIKey: API Keys updated.")
+			zerolog.Ctx(ctx).Debug().Strs("IDs", bulkReq.IDs).RawJSON("role", role).Msg("API Keys updated.")
 
 			responses[responseIdx] = res.StatusCode
 			for _, id := range idsInBatch {

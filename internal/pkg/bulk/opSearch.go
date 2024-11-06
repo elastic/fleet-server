@@ -156,8 +156,6 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 		err error
 	)
 
-	zerolog.Ctx(ctx).Debug().Msg("flushSearch: Sending request to Elasticsearch")
-
 	if queue.ty == kQueueFleetSearch {
 		req := esapi.FleetMsearchRequest{
 			Body: bytes.NewReader(buf.Bytes()),
@@ -201,7 +199,7 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 		return err
 	}
 
-	zerolog.Ctx(ctx).Debug().
+	zerolog.Ctx(ctx).Trace().
 		Err(err).
 		Str("mod", kModBulk).
 		Dur("rtt", time.Since(start)).
