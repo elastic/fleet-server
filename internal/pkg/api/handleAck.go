@@ -265,6 +265,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 				policyAcks = append(policyAcks, event.ActionId)
 				policyIdxs = append(policyIdxs, n)
 			}
+			log.Debug().Msg("ack policy change")
 			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
 			setResult(n, http.StatusOK)
 			span.End()
@@ -365,14 +366,14 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 
 	// Save action result document
 	if err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
-		zlog.Error().Err(err).Msg("create action result")
+		zlog.Error().Err(err).Str(logger.AgentID, agent.Agent.ID).Str(logger.ActionID, action.Id).Msg("create action result")
 		return err
 	}
 
 	if action.Type == TypeUpgrade {
 		event, _ := ev.AsUpgradeEvent()
 		if err := ack.handleUpgrade(ctx, zlog, agent, event); err != nil {
-			zlog.Error().Err(err).Msg("handle upgrade event")
+			zlog.Error().Err(err).Str(logger.AgentID, agent.Agent.ID).Str(logger.ActionID, action.Id).Msg("handle upgrade event")
 			return err
 		}
 	}
@@ -634,6 +635,8 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 	zlog.Info().
 		Str("lastReportedVersion", agent.Agent.Version).
 		Str("upgradedAt", now).
+		Str(logger.AgentID, agent.Agent.ID).
+		Str(logger.ActionID, event.ActionId).
 		Msg("ack upgrade")
 
 	return nil

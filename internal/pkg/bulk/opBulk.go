@@ -211,7 +211,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 
 	res, err := req.Do(ctx, b.es)
 	if err != nil {
-		zerolog.Ctx(ctx).Error().Err(err).Str("mod", kModBulk).Msg("Fail BulkRequest req.Do")
+		zerolog.Ctx(ctx).Error().Err(err).Str("mod", kModBulk).Msg("flushBulk: Fail BulkRequest req.Do")
 		return err
 	}
 
@@ -220,7 +220,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	}
 
 	if res.IsError() {
-		zerolog.Ctx(ctx).Error().Str("mod", kModBulk).Str("error.message", res.String()).Msg("Fail BulkRequest result")
+		zerolog.Ctx(ctx).Error().Str("mod", kModBulk).Str("error.message", res.String()).Msg("flushBulk: Fail BulkRequest result")
 		return parseError(res, zerolog.Ctx(ctx))
 	}
 
