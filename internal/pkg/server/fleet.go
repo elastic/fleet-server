@@ -90,7 +90,6 @@ func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("encountered error while loading server limits: %w", err)
 	}
-	log.Info().Msg("DEBUG Fleet Server run")
 	cacheCfg := config.CopyCache(initCfg)
 	log.Info().Interface("cfg", cacheCfg).Msg("Setting cache config options")
 	cache, err := cache.New(cacheCfg)
@@ -214,7 +213,6 @@ LOOP:
 			return err
 		case <-ctx.Done():
 			f.reporter.UpdateState(client.UnitStateStopping, "Stopping", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
-			log.Info().Err(ctx.Err()).Msg("DEBUG Fleet Server stopping")
 			break LOOP
 		}
 	}
@@ -340,7 +338,6 @@ func initRuntime(cfg *config.Config) {
 }
 
 func (f *Fleet) initBulker(ctx context.Context, tracer *apm.Tracer, cfg *config.Config) (*bulk.Bulker, error) {
-	zerolog.Ctx(ctx).Info().Msg("DEBUG init bulker")
 	es, err := es.NewClient(ctx, cfg, false, elasticsearchOptions(
 		cfg.Inputs[0].Server.Instrumentation.Enabled, f.bi,
 	)...)
@@ -415,7 +412,6 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 		case err = <-errCh:
 		case <-ctx.Done():
 			err = ctx.Err()
-			zerolog.Ctx(ctx).Info().Err(err).Msg("DEBUG bulker error")
 		}
 		return
 	})
@@ -430,7 +426,6 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	}
 
 	if err = f.runSubsystems(ctx, cfg, g, bulker, tracer); err != nil {
-		zerolog.Ctx(ctx).Info().Err(err).Msg("DEBUG runSubsystems error")
 		return err
 	}
 
@@ -530,7 +525,6 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 		return err
 	}
 
-	zerolog.Ctx(ctx).Info().Msg("DEBUG create bulker")
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 

@@ -53,7 +53,6 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 		Str(logger.AgentID, agent.Id).
 		Str(logger.PolicyOutputName, p.Name).Logger()
 
-	zlog.Debug().Str("output_type", p.Type).Msg("SCALEDEBUG preparing output")
 	switch p.Type {
 	case OutputTypeElasticsearch:
 		zlog.Debug().Msg("preparing elasticsearch output")
@@ -91,7 +90,6 @@ func (p *Output) prepareElasticsearch(
 	agent *model.Agent,
 	outputMap map[string]map[string]interface{},
 	hasConfigChanged bool) error {
-	zlog.Debug().Msg("SCALEDEBUG [prepare elasticsearch output] start")
 	// The role is required to do api key management
 	if p.Role == nil {
 		zlog.Error().
@@ -200,7 +198,6 @@ func (p *Output) prepareElasticsearch(
 	}
 
 	if needUpdateKey {
-		zlog.Debug().Msg("SCALEDEBUG [prepare elasticsearch output] needUpdateKey")
 		zlog.Debug().
 			RawJSON("roles", p.Role.Raw).
 			Str("oldHash", output.PermissionsHash).
@@ -249,15 +246,12 @@ func (p *Output) prepareElasticsearch(
 			return err
 		}
 
-		zlog.Debug().Msg("SCALEDEBUG [prepare elasticsearch output] needUpdateKey before agent update")
 		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 			zlog.Error().Err(err).Msg("fail update agent record")
 			return err
 		}
-		zlog.Debug().Msg("SCALEDEBUG [prepare elasticsearch output] needUpdateKey after agent update")
 
 	} else if needNewKey {
-		zlog.Debug().Msg("SCALEDEBUG [prepare elasticsearch output] needNewKey")
 		zlog.Debug().
 			RawJSON("fleet.policy.roles", p.Role.Raw).
 			Str("fleet.policy.default.oldHash", output.PermissionsHash).
@@ -333,12 +327,10 @@ func (p *Output) prepareElasticsearch(
 			return fmt.Errorf("could not update painless script: %w", err)
 		}
 
-		zlog.Debug().Msg("SCALEDEBUG [prepare elasticsearch output] needNewKey before agent update")
 		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 			zlog.Error().Err(err).Msg("fail update agent record")
 			return fmt.Errorf("fail update agent record: %w", err)
 		}
-		zlog.Debug().Msg("SCALEDEBUG [prepare elasticsearch output] needNewKey after agent update")
 
 		// Now that all is done, we can update the output on the agent variable
 		// Right not it's more for consistency and to ensure the in-memory agent

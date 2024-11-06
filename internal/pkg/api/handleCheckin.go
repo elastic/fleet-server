@@ -340,20 +340,16 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actions, ackToken = convertActions(zlog, agent.Id, pendingActions)
 
 	span, ctx := apm.StartSpan(r.Context(), "longPoll", "process")
-	// ctx, cancel := context.WithTimeout(ctx, pollDuration)
-	// defer cancel()
 
 	if len(actions) == 0 {
 	LOOP:
 		for {
 			select {
 			case <-ctx.Done():
-				zlog.Debug().Str(logger.AgentID, agent.Id).Msg("SCALEDEBUG checkin context done")
 				defer span.End()
 				// If the request context is canceled, the API server is shutting down.
 				// We want to immediately stop the long-poll and return a 200 with the ackToken and no actions.
 				if errors.Is(ctx.Err(), context.Canceled) {
-					zlog.Debug().Str(logger.AgentID, agent.Id).Msg("SCALEDEBUG checkin context canceled")
 					resp := CheckinResponse{
 						AckToken: &ackToken,
 						Action:   "checkin",
@@ -368,7 +364,6 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				actions = append(actions, acs...)
 				break LOOP
 			case policy := <-sub.Output():
-				zlog.Debug().Str(logger.AgentID, agent.Id).Msg("SCALEDEBUG new policy")
 				actionResp, err := processPolicy(ctx, zlog, ct.bulker, agent.Id, policy)
 				if err != nil {
 					span.End()
@@ -377,7 +372,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				actions = append(actions, *actionResp)
 				break LOOP
 			case <-longPoll.C:
-				zlog.Debug().Str(logger.AgentID, agent.Id).Msg("fire long poll")
+				zlog.Trace().Str(logger.AgentID, agent.Id).Msg("fire long poll")
 				break LOOP
 			case <-tick.C:
 				err := ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, nil, rawComponents, nil, ver, unhealthyReason, false)
@@ -815,7 +810,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 
 	// Repull and decode the agent object. Do not trust the cache.
 	bSpan, bCtx := apm.StartSpan(ctx, "findAgent", "search")
-	zlog.Debug().Str("agentID", agentID).Msg("SCALEDEBUG start findAgent")
 	agent, err := dl.FindAgent(bCtx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
 	bSpan.End()
 	if err != nil {
@@ -839,11 +833,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-		zlog.Debug().
-			Str("agentID", agentID).
-			Str("output_name", policyOutput.Name).
-			Str("output_type", policyOutput.Type).
-			Msg("SCALEDEBUG start prepare output")
 		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, data.Outputs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare output %q: %w",
