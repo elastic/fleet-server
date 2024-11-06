@@ -22,24 +22,27 @@ func TestReplaceStringRef(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceStringRef("$co.elastic.secret{abcd}", secretRefs)
+	val, replaced := replaceStringRef("$co.elastic.secret{abcd}", secretRefs)
 	assert.Equal(t, "value1", val)
+	assert.True(t, replaced)
 }
 
 func TestReplaceStringRefPartial(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceStringRef("partial $co.elastic.secret{abcd}", secretRefs)
+	val, replaced := replaceStringRef("partial $co.elastic.secret{abcd}", secretRefs)
 	assert.Equal(t, "partial value1", val)
+	assert.True(t, replaced)
 }
 
 func TestReplaceStringRefPartial2(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "http://localhost",
 	}
-	val := replaceStringRef("$co.elastic.secret{abcd}/services", secretRefs)
+	val, replaced := replaceStringRef("$co.elastic.secret{abcd}/services", secretRefs)
 	assert.Equal(t, "http://localhost/services", val)
+	assert.True(t, replaced)
 }
 
 func TestReplaceStringRefMultiple(t *testing.T) {
@@ -47,32 +50,36 @@ func TestReplaceStringRefMultiple(t *testing.T) {
 		"secret1": "value1",
 		"secret2": "value2",
 	}
-	val := replaceStringRef("partial \"$co.elastic.secret{secret1}\" \"$co.elastic.secret{secret2}\"", secretRefs)
+	val, replaced := replaceStringRef("partial \"$co.elastic.secret{secret1}\" \"$co.elastic.secret{secret2}\"", secretRefs)
 	assert.Equal(t, "partial \"value1\" \"value2\"", val)
+	assert.True(t, replaced)
 }
 
 func TestReplaceStringRefMultipleOneNotFound(t *testing.T) {
 	secretRefs := map[string]string{
 		"secret2": "value2",
 	}
-	val := replaceStringRef("partial \"$co.elastic.secret{secret1}\" \"$co.elastic.secret{secret2}\"", secretRefs)
+	val, replaced := replaceStringRef("partial \"$co.elastic.secret{secret1}\" \"$co.elastic.secret{secret2}\"", secretRefs)
 	assert.Equal(t, "partial \"$co.elastic.secret{secret1}\" \"$co.elastic.secret{secret2}\"", val)
+	assert.False(t, replaced)
 }
 
 func TestReplaceStringRefNotASecret(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceStringRef("abcd", secretRefs)
+	val, replaced := replaceStringRef("abcd", secretRefs)
 	assert.Equal(t, "abcd", val)
+	assert.False(t, replaced)
 }
 
 func TestReplaceStringRefNotFound(t *testing.T) {
 	secretRefs := map[string]string{
 		"abcd": "value1",
 	}
-	val := replaceStringRef("$co.elastic.secret{other}", secretRefs)
+	val, replaced := replaceStringRef("$co.elastic.secret{other}", secretRefs)
 	assert.Equal(t, "$co.elastic.secret{other}", val)
+	assert.False(t, replaced)
 }
 
 func TestGetSecretValues(t *testing.T) {
@@ -119,9 +126,10 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 		{"id": "input2", "streams": []interface{}{expectedStream}},
 	}
 
-	result, _ := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	result, keys, _ := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
 
 	assert.Equal(t, expectedResult, result)
+	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "inputs.0.input_var_secret", "inputs.1.streams.0.package_var_secret", "inputs.1.streams.0.input_var_secret", "inputs.1.streams.0.stream_var_secret"}, keys)
 	assert.Nil(t, pData.SecretReferences)
 }
 
@@ -165,11 +173,11 @@ func TestPolicyInputSteamsEmbedded(t *testing.T) {
 		}},
 	}
 
-	result, err := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	result, keys, err := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
 	require.NoError(t, err)
 
 	assert.Equal(t, expected, result)
-
+	assert.ElementsMatch(t, []string{"inputs.0.streams.0.embedded.embedded-arr.0.embedded-secret"}, keys)
 }
 
 func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
@@ -193,9 +201,10 @@ func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 		{"id": "input2", "streams": []interface{}{expectedStream}},
 	}
 
-	result, _ := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	result, keys, _ := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
 
 	assert.Equal(t, expectedResult, result)
+	assert.Empty(t, keys)
 }
 
 func TestProcessOutputSecret(t *testing.T) {
@@ -203,11 +212,13 @@ func TestProcessOutputSecret(t *testing.T) {
 		name             string
 		outputJSON       string
 		expectOutputJSON string
+		expectKeys       []string
 	}{
 		{
 			name:             "Output without secrets",
 			outputJSON:       `{"password": "test"}`,
 			expectOutputJSON: `{"password": "test"}`,
+			expectKeys:       nil,
 		},
 		{
 			name: "Output with secrets",
@@ -219,6 +230,7 @@ func TestProcessOutputSecret(t *testing.T) {
 			expectOutputJSON: `{
 				"password": "passwordid_value"
 			}`,
+			expectKeys: []string{"password"},
 		},
 		{
 			name: "Output with nested secrets",
@@ -230,6 +242,7 @@ func TestProcessOutputSecret(t *testing.T) {
 			expectOutputJSON: `{
 				"ssl": {"key": "sslkey_value"}
 			}`,
+			expectKeys: []string{"ssl.key"},
 		},
 		{
 			name: "Output with multiple secrets",
@@ -241,6 +254,7 @@ func TestProcessOutputSecret(t *testing.T) {
 			expectOutputJSON: `{
 				"ssl": {"key": "sslkey_value", "other": "sslother_value"}
 			}`,
+			expectKeys: []string{"ssl.key", "ssl.other"},
 		},
 	}
 
@@ -253,11 +267,11 @@ func TestProcessOutputSecret(t *testing.T) {
 			expectOutput, err := smap.Parse([]byte(tc.expectOutputJSON))
 			assert.NoError(t, err)
 
-			err = ProcessOutputSecret(context.Background(), output, bulker)
+			keys, err := ProcessOutputSecret(context.Background(), output, bulker)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expectOutput, output)
-
+			assert.ElementsMatch(t, tc.expectKeys, keys)
 		})
 	}
 }

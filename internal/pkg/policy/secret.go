@@ -7,6 +7,7 @@ package policy
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -39,57 +40,99 @@ func getSecretValues(ctx context.Context, secretRefs []model.SecretReferencesIte
 
 // read inputs and secret_references from agent policy
 // replace values of secret refs in inputs and input streams properties
-func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bulker bulk.Bulk) ([]map[string]interface{}, error) {
+func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bulker bulk.Bulk) ([]map[string]interface{}, []string, error) {
 	if len(data.Inputs) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if len(data.SecretReferences) == 0 {
-		return data.Inputs, nil
+		return data.Inputs, nil, nil
 	}
 
 	secretValues, err := getSecretValues(ctx, data.SecretReferences, bulker)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	result := make([]map[string]interface{}, 0)
-	for _, input := range data.Inputs {
-		newInput := make(map[string]interface{})
-		for k, v := range input {
-			newInput[k] = replaceAnyRef(v, secretValues)
+	keys := make([]string, 0)
+	for i, input := range data.Inputs {
+		newInput, ks := replaceMapRef(input, secretValues)
+		for _, key := range ks {
+			keys = append(keys, "inputs."+strconv.Itoa(i)+"."+key)
 		}
 		result = append(result, newInput)
 	}
 	data.SecretReferences = nil
-	return result, nil
+	return result, keys, nil
 }
 
-// replaceAnyRef is a generic approach to replacing any secret references in the passed item.
-// It will go through any slices or maps and replace any secret references.
-//
-// go's generic parameters are not a good fit for rewriting this method as the typeswitch will not work.
-func replaceAnyRef(ref any, secrets map[string]string) any {
+// replaceMapRef replaces all nested secret values in the passed input and returns the resulting input along with a list of keys where inputs have been replaced.
+func replaceMapRef(input map[string]any, secrets map[string]string) (map[string]any, []string) {
+	keys := make([]string, 0)
+	result := make(map[string]any, len(input))
 	var r any
-	switch val := ref.(type) {
-	case string:
-		r = replaceStringRef(val, secrets)
-	case map[string]any:
-		obj := make(map[string]any)
-		for k, v := range val {
-			obj[k] = replaceAnyRef(v, secrets)
+
+	for k, v := range input {
+		switch value := v.(type) {
+		case string:
+			ref, replaced := replaceStringRef(value, secrets)
+			if replaced {
+				keys = append(keys, k)
+			}
+			r = ref
+		case map[string]any:
+			ref, ks := replaceMapRef(value, secrets)
+			for _, key := range ks {
+				keys = append(keys, k+"."+key)
+			}
+			r = ref
+		case []any:
+			ref, ks := replaceSliceRef(value, secrets)
+			for _, key := range ks {
+				keys = append(keys, k+"."+key)
+			}
+			r = ref
+		default:
+			r = v
 		}
-		r = obj
-	case []any:
-		arr := make([]any, len(val))
-		for i, v := range val {
-			arr[i] = replaceAnyRef(v, secrets)
-		}
-		r = arr
-	default:
-		r = val
+		result[k] = r
 	}
-	return r
+	return result, keys
+}
+
+// replaceSliceRef replaces all nested secrets within the passed slice and returns the resulting slice along with a list of keys that indicate where values have been replaced.
+func replaceSliceRef(arr []any, secrets map[string]string) ([]any, []string) {
+	keys := make([]string, 0)
+	result := make([]any, len(arr))
+	var r any
+
+	for i, v := range arr {
+		switch value := v.(type) {
+		case string:
+			ref, replaced := replaceStringRef(value, secrets)
+			if replaced {
+				keys = append(keys, strconv.Itoa(i))
+			}
+			r = ref
+		case map[string]any:
+			ref, ks := replaceMapRef(value, secrets)
+			for _, key := range ks {
+				keys = append(keys, strconv.Itoa(i)+"."+key)
+			}
+			r = ref
+		case []any:
+			ref, ks := replaceSliceRef(value, secrets)
+			for _, key := range ks {
+				keys = append(keys, strconv.Itoa(i)+"."+key)
+			}
+			r = ref
+		default:
+			r = v
+		}
+		result[i] = r
+	}
+	return result, keys
 }
 
 type OutputSecret struct {
@@ -145,14 +188,15 @@ func setSecretPath(output smap.Map, secretValue string, secretPaths []string) er
 }
 
 // Read secret from output and mutate output with secret value
-func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) error {
+func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) ([]string, error) {
 	secrets := output.GetMap(FieldOutputSecrets)
 
 	delete(output, FieldOutputSecrets)
 	secretReferences := make([]model.SecretReferencesItems, 0)
 	outputSecrets, err := getSecretIDAndPath(secrets)
+	keys := make([]string, 0, len(outputSecrets))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, secret := range outputSecrets {
@@ -161,33 +205,45 @@ func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk)
 		})
 	}
 	if len(secretReferences) == 0 {
-		return nil
+		return nil, nil
 	}
 	secretValues, err := getSecretValues(ctx, secretReferences, bulker)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, secret := range outputSecrets {
+		var key string
+		for _, p := range secret.Path {
+			if key == "" {
+				key = p
+				continue
+			}
+			key = key + "." + p
+		}
+		keys = append(keys, key)
 		err = setSecretPath(output, secretValues[secret.ID], secret.Path)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return keys, nil
 }
 
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
 // and does this for multiple matches
-func replaceStringRef(ref string, secretValues map[string]string) string {
+// returns the resulting string value, and if any replacements were made
+func replaceStringRef(ref string, secretValues map[string]string) (string, bool) {
+	hasReplaced := false
 	matches := secretRegex.FindStringSubmatch(ref)
 	for len(matches) > 1 {
 		secretRef := matches[1]
 		if val, ok := secretValues[secretRef]; ok {
+			hasReplaced = true
 			ref = strings.Replace(ref, matches[0], val, 1)
 			matches = secretRegex.FindStringSubmatch(ref)
 			continue
 		}
 		break
 	}
-	return ref
+	return ref, hasReplaced
 }

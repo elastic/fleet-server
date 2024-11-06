@@ -22,7 +22,7 @@ import (
 	"go.elastic.co/apm/v2"
 )
 
-var ErrAuditUnenrollReason = fmt.Errorf("agent document contains audit_unenroll_reason attribute")
+var ErrAuditUnenrollReason = fmt.Errorf("agent document contains audit_unenroll_reason: orphaned")
 
 type AuditT struct {
 	cfg   *config.Server
@@ -51,7 +51,7 @@ func (audit *AuditT) handleUnenroll(zlog zerolog.Logger, w http.ResponseWriter, 
 }
 
 func (audit *AuditT) unenroll(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent) error {
-	if agent.AuditUnenrolledReason != "" {
+	if agent.AuditUnenrolledReason == string(Orphaned) {
 		return ErrAuditUnenrollReason
 	}
 

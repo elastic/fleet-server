@@ -135,7 +135,7 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 		return err
 	}
 
-	cntAcks.bodyOut.Add(uint64(nWritten))
+	cntAcks.bodyOut.Add(uint64(nWritten)) //nolint:gosec // disable G115
 
 	return nil
 }

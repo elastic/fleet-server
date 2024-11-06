@@ -22,14 +22,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -236,7 +237,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 		}
 		resp, err := cli.Do(req)
 		if err != nil {
-			return false, nil //nolint:nilerr // we want to ignore the error in this case.
+			return false, nil
 		}
 		defer resp.Body.Close()
 
@@ -1466,11 +1467,15 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	id, key := EnrollAgent(t, ctx, srv, enrollBody)
 
 	t.Logf("Use audit/unenroll endpoint for agent %s", id)
-	unenrollBody := `{
+	orphanBody := `{
+          "reason": "orphaned",
+	  "timestamp": "2024-01-01T12:00:00.000Z"
+	}`
+	uninstallBody := `{
           "reason": "uninstall",
 	  "timestamp": "2024-01-01T12:00:00.000Z"
 	}`
-	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(unenrollBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(uninstallBody))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+key)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
@@ -1480,8 +1485,19 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	res.Body.Close()
 
-	t.Log("Use of audit/unenroll a second time should fail.")
-	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(unenrollBody))
+	t.Log("Orphaned can replace uninstall")
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(orphanBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	res.Body.Close()
+
+	t.Log("Use of audit/unenroll once orphaned should fail.")
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(orphanBody))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+key)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)

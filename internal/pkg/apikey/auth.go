@@ -9,9 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 var (
@@ -33,7 +36,7 @@ type SecurityInfo struct {
 
 // Authenticate will return the SecurityInfo associated with the APIKey (retrieved from Elasticsearch).
 // Note: Prefer the bulk wrapper on this API
-func (k APIKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*SecurityInfo, error) {
+func (k APIKey) Authenticate(ctx context.Context, client *elasticsearch.Client) (*SecurityInfo, error) {
 
 	token := fmt.Sprintf("%s%s", authPrefix, k.Token())
 
@@ -41,7 +44,7 @@ func (k APIKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 		Header: map[string][]string{AuthKey: []string{token}},
 	}
 
-	res, err := req.Do(ctx, es)
+	res, err := req.Do(ctx, client)
 
 	if err != nil {
 		return nil, fmt.Errorf("apikey auth request %s: %w", k.ID, err)
@@ -52,11 +55,18 @@ func (k APIKey) Authenticate(ctx context.Context, es *elasticsearch.Client) (*Se
 	}
 
 	if res.IsError() {
-		returnError := ErrUnauthorized
-		if res.StatusCode == 429 {
+		var returnError error
+		switch res.StatusCode {
+		case http.StatusUnauthorized:
+			returnError = ErrUnauthorized
+		case http.StatusTooManyRequests:
 			returnError = ErrElasticsearchAuthLimit
 		}
-		return nil, fmt.Errorf("%w: %w", returnError, fmt.Errorf("apikey auth response %s: %s", k.ID, res.String()))
+		if returnError != nil {
+			return nil, fmt.Errorf("%w: %w", returnError, fmt.Errorf("apikey auth response %s: %s", k.ID, res.String()))
+		}
+		// body is not parsed to not give the caller too much information
+		return nil, es.TranslateError(res.StatusCode, nil)
 	}
 
 	var info SecurityInfo

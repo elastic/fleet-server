@@ -16,6 +16,7 @@ import (
 	"math/rand"
 	"net/http"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -422,7 +423,8 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		}
 		if len(actions) == 0 {
 			vSpan.End()
-			return fmt.Errorf("upgrade_details no action for id %q found", details.ActionId)
+			zerolog.Ctx(vCtx).Warn().Msgf("upgrade_details no action for id %q found (agent id %q)", details.ActionId, agent.Agent.ID)
+			return nil
 		}
 		action = actions[0]
 		ct.cache.SetAction(action)
@@ -608,7 +610,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	} else {
 		var nWritten int
 		nWritten, err = w.Write(payload)
-		cntCheckin.bodyOut.Add(uint64(nWritten))
+		cntCheckin.bodyOut.Add(uint64(nWritten)) //nolint:gosec // disable G115
 
 		if err != nil {
 			err = fmt.Errorf("writeResponse payload: %w", err)
@@ -748,7 +750,6 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 	}
 }
 
-//nolint:gosec // memory aliasing is used to convert from pointers to values and the other way
 func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action) ([]Action, string) {
 	var ackToken string
 	sz := len(actions)
@@ -828,11 +829,13 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 
 	data := model.ClonePolicyData(pp.Policy.Data)
 	for policyName, policyOutput := range data.Outputs {
-		err := policy.ProcessOutputSecret(ctx, policyOutput, bulker)
+		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
+		ks, err := policy.ProcessOutputSecret(ctx, policyOutput, bulker)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process output secrets %q: %w",
 				policyName, err)
 		}
+		pp.SecretKeys = append(pp.SecretKeys, ks...)
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
@@ -860,6 +863,10 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	if err != nil {
 		return nil, err
 	}
+	// remove duplicates from secretkeys
+	slices.Sort(pp.SecretKeys)
+	keys := slices.Compact(pp.SecretKeys)
+	d.SecretPaths = &keys
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})
 	if err != nil {

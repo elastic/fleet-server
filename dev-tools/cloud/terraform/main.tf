@@ -4,7 +4,7 @@ terraform {
   required_providers {
     ec = {
       source  = "elastic/ec"
-      version = "0.9.0"
+      version = "0.12.1"
     }
   }
 }
@@ -47,7 +47,7 @@ resource "ec_deployment" "deployment" {
   name                   = format("fleet server PR %s", random_uuid.name.result)
   region                 = "gcp-us-west2"
   version                = local.stack_version
-  deployment_template_id = "gcp-io-optimized-v2"
+  deployment_template_id = "gcp-general-purpose"
 
   tags = {
     "created_with_terraform" = "true"
