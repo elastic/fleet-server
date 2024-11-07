@@ -97,13 +97,14 @@ type Bulker struct {
 }
 
 const (
-	defaultFlushInterval     = time.Second * 5
-	defaultFlushThresholdCnt = 32768
-	defaultFlushThresholdSz  = 1024 * 1024 * 10
-	defaultMaxPending        = 32
-	defaultBlockQueueSz      = 32 // Small capacity to allow multiOp to spin fast
-	defaultAPIKeyMaxParallel = 32
-	defaultApikeyMaxReqSize  = 100 * 1024 * 1024
+	defaultFlushInterval       = time.Second * 5
+	defaultFlushThresholdCnt   = 32768
+	defaultFlushThresholdSz    = 1024 * 1024 * 10
+	defaultMaxPending          = 32
+	defaultBlockQueueSz        = 32 // Small capacity to allow multiOp to spin fast
+	defaultAPIKeyMaxParallel   = 32
+	defaultApikeyMaxReqSize    = 100 * 1024 * 1024
+	defaultFlushContextTimeout = time.Minute * 1
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -406,7 +407,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 					Msg("Flush on threshold")
 
 				// deadline prevents bulker being blocked on flush
-				flushCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+				flushCtx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
 				defer cancel()
 				err = doFlush(flushCtx)
 
@@ -421,7 +422,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 				Msg("Flush on timer")
 
 			// deadline prevents bulker being blocked on flush
-			flushCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+			flushCtx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
 			defer cancel()
 			err = doFlush(flushCtx)
 
