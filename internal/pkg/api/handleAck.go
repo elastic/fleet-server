@@ -265,7 +265,6 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 				policyAcks = append(policyAcks, event.ActionId)
 				policyIdxs = append(policyIdxs, n)
 			}
-			log.Debug().Msg("ack policy change")
 			// Set OK status, this can be overwritten in case of the errors later when the policy change events acked
 			setResult(n, http.StatusOK)
 			span.End()
