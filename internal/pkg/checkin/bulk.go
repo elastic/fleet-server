@@ -153,6 +153,7 @@ LOOP:
 		case <-tick.C:
 			if err = bc.flush(ctx); err != nil {
 				zerolog.Ctx(ctx).Error().Err(err).Msg("Eat bulk checkin error; Keep on truckin'")
+				break LOOP
 			}
 
 		case <-ctx.Done():
