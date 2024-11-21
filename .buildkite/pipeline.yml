@@ -150,7 +150,7 @@ steps:
 
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
-        skip: "temporary skip until elastic-agent-8.18.0-SNAPSHOT artifact is available on ESS"
+        skip: "8.18.0-SNAPSHOT not available on ESS"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
