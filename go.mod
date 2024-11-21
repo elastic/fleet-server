@@ -7,9 +7,9 @@ require (
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.16.0
-	github.com/elastic/elastic-agent-libs v0.13.0
-	github.com/elastic/elastic-agent-system-metrics v0.11.3
-	github.com/elastic/go-elasticsearch/v8 v8.15.0
+	github.com/elastic/elastic-agent-libs v0.17.3
+	github.com/elastic/elastic-agent-system-metrics v0.11.4
+	github.com/elastic/go-elasticsearch/v8 v8.16.0
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.6.0
 	github.com/go-chi/chi/v5 v5.0.12
@@ -52,7 +52,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.6.0 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
-	github.com/elastic/go-sysinfo v1.14.2 // indirect
+	github.com/elastic/go-sysinfo v1.15.0 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
