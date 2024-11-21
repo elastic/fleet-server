@@ -139,6 +139,7 @@ func NewCommand(bi build.Info) *cobra.Command {
 		Use:   build.ServiceName,
 		Short: "Fleet Server controls a fleet of Elastic Agents",
 		RunE:  getRunCommand(bi),
+		Version: bi.Version,
 	}
 	cmd.Flags().StringP("config", "c", "fleet-server.yml", "Configuration for Fleet Server")
 	cmd.Flags().Bool(kAgentMode, false, "Running under execution of the Elastic Agent")
