@@ -58,6 +58,7 @@ type Artifact struct {
 }
 
 func TestAgentInstallSuite(t *testing.T) {
+	t.Skip("temporary skip until elastic-agent-8.18.0-SNAPSHOT artifact is available")
 	suite.Run(t, new(AgentInstallSuite))
 }
 
