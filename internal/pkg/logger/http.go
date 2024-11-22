@@ -254,7 +254,8 @@ func Middleware(next http.Handler) http.Handler {
 		next.ServeHTTP(wrCounter, r)
 		httpMeta(r, e)
 
-		if zlog.Info().Enabled() {
+		// Write an info level log line for each HTTP request if debug is enabled, or a non-2XX status is returned.
+		if zlog.Debug().Enabled() || (wrCounter.statusCode < 200 || wrCounter.statusCode >= 300) {
 			e.Uint64(ECSHTTPRequestBodyBytes, rdCounter.Count())
 			e.Uint64(ECSHTTPResponseBodyBytes, wrCounter.Count())
 			e.Int(ECSHTTPResponseCode, wrCounter.statusCode)

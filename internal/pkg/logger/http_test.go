@@ -24,7 +24,7 @@ func TestMiddleware(t *testing.T) {
 		require.True(t, ok, "expected context to have start time")
 		require.False(t, ts.Equal(time.Time{}), "expected start time to be non-zero")
 
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`hello, world`))
 	})
 
@@ -46,7 +46,7 @@ func TestMiddleware(t *testing.T) {
 	res, err := srv.Client().Do(req)
 	require.NoError(t, err)
 	res.Body.Close()
-	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	_, ok := res.Header[HeaderRequestID]
 	require.True(t, ok, "expected to have a request ID")
 
