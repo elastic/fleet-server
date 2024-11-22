@@ -136,9 +136,9 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 
 func NewCommand(bi build.Info) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   build.ServiceName,
-		Short: "Fleet Server controls a fleet of Elastic Agents",
-		RunE:  getRunCommand(bi),
+		Use:     build.ServiceName,
+		Short:   "Fleet Server controls a fleet of Elastic Agents",
+		RunE:    getRunCommand(bi),
 		Version: bi.Version,
 	}
 	cmd.Flags().StringP("config", "c", "fleet-server.yml", "Configuration for Fleet Server")
