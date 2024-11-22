@@ -38,7 +38,9 @@ func TestMiddleware(t *testing.T) {
 	}
 	srv.Start()
 	defer srv.Close()
-	req, err := http.NewRequest("GET", srv.URL, nil)
+	reqCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, "GET", srv.URL, nil)
 	require.NoError(t, err)
 
 	res, err := srv.Client().Do(req)
