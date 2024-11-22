@@ -216,7 +216,11 @@ func Middleware(next http.Handler) http.Handler {
 		w.Header().Set(HeaderRequestID, reqID)
 
 		// get the server bound addr from the req ctx
-		addr, _ := r.Context().Value(http.LocalAddrContextKey).(string)
+		var addr string
+		netAddr, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr)
+		if ok {
+			addr = netAddr.String()
+		}
 
 		// Add trace correlation fields
 		ctx := r.Context()
@@ -250,13 +254,12 @@ func Middleware(next http.Handler) http.Handler {
 		next.ServeHTTP(wrCounter, r)
 		httpMeta(r, e)
 
-		if zlog.Debug().Enabled() || (wrCounter.statusCode < 200 && wrCounter.statusCode >= 300) {
+		if zlog.Info().Enabled() {
 			e.Uint64(ECSHTTPRequestBodyBytes, rdCounter.Count())
 			e.Uint64(ECSHTTPResponseBodyBytes, wrCounter.Count())
 			e.Int(ECSHTTPResponseCode, wrCounter.statusCode)
 			e.Int64(ECSEventDuration, time.Since(start).Nanoseconds())
-
-			e.Msgf("%d HTTP Request", wrCounter.statusCode)
+			e.Msg("HTTP Request")
 		}
 	}
 	return http.HandlerFunc(fn)
