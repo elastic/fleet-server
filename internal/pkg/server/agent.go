@@ -11,8 +11,9 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -21,12 +22,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
-	"github.com/rs/zerolog"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/go-ucfg"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -65,7 +66,7 @@ type Agent struct {
 	srv          *Fleet
 	srvCtx       context.Context
 	srvCanceller context.CancelFunc
-	srvDone      chan bool
+	srvDone      chan struct{}
 
 	outputCheckCanceller context.CancelFunc
 	chReconfigure        chan struct{}
@@ -97,6 +98,7 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 
 // Run starts a Server instance using config from the configured client.
 func (a *Agent) Run(ctx context.Context) error {
+	// ctx is cancelled when a SIGTERM or SIGINT is recieved.
 	log := zerolog.Ctx(ctx)
 	a.agent.RegisterDiagnosticHook("fleet-server config", "fleet-server's current configuration", "fleet-server.yml", "application/yml", func() []byte {
 		if a.srv == nil {
@@ -150,24 +152,21 @@ func (a *Agent) Run(ctx context.Context) error {
 			log.Warn().Msg("Diagnostics hook failure config is nil.")
 			return []byte(`Diagnostics hook failure config is nil`)
 		}
-		ctx, cancel := context.WithTimeout(ctx, time.Second*30) // TODO(michel-laterman): duration/timeout should be part of the diagnostics action from fleet-server (https://github.com/elastic/fleet-server/issues/3648) and the control protocol (https://github.com/elastic/elastic-agent-client/issues/113)
+		ctx, cancel := context.WithTimeout(ctx, time.Second*30) // diag specific context, has a timeout  // TODO(michel-laterman): duration/timeout should be part of the diagnostics action from fleet-server (https://github.com/elastic/fleet-server/issues/3648) and the control protocol (https://github.com/elastic/elastic-agent-client/issues/113)
 		defer cancel()
 		return cfg.Output.Elasticsearch.DiagRequests(ctx)
 	})
 
-	subCtx, subCanceller := context.WithCancel(ctx)
-	defer subCanceller()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
+	// doneCh is used to track when agent wrapper run loop returns
+	doneCh := make(chan struct{})
 	go func() {
-		defer wg.Done()
+		defer close(doneCh)
 
 		t := time.NewTicker(1 * time.Second)
 		defer t.Stop()
 		for {
 			select {
-			case <-subCtx.Done():
+			case <-ctx.Done():
 				return
 			case err := <-a.agent.Errors():
 				if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
@@ -176,13 +175,13 @@ func (a *Agent) Run(ctx context.Context) error {
 			case change := <-a.agent.UnitChanges():
 				switch change.Type {
 				case client.UnitChangedAdded:
-					err := a.unitAdded(subCtx, change.Unit)
+					err := a.unitAdded(ctx, change.Unit)
 					if err != nil {
 						log.Error().Str("unit", change.Unit.ID()).Err(err)
 						_ = change.Unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
 					}
 				case client.UnitChangedModified:
-					err := a.unitModified(subCtx, change.Unit)
+					err := a.unitModified(ctx, change.Unit)
 					if err != nil {
 						log.Error().Str("unit", change.Unit.ID()).Err(err)
 						_ = change.Unit.UpdateState(client.UnitStateFailed, err.Error(), nil)
@@ -202,7 +201,7 @@ func (a *Agent) Run(ctx context.Context) error {
 				if agentInfo != nil && agentInfo.ID != "" {
 					// Agent ID is not set for the component.
 					t.Stop()
-					err := a.reconfigure(subCtx)
+					err := a.reconfigure(ctx)
 					if err != nil && !errors.Is(err, context.Canceled) {
 						log.Error().Err(err).Msg("Bootstrap error when reconfiguring")
 					}
@@ -212,13 +211,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	}()
 
 	log.Info().Msg("starting communication connection back to Elastic Agent")
-	err := a.agent.Start(subCtx)
-	if err != nil {
+	err := a.agent.Start(ctx)
+	if err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 
-	<-subCtx.Done()
-	wg.Wait()
+	<-ctx.Done() // wait for a termination signal
+	<-doneCh     // wait for agent wrapper goroutine to terminate
 
 	return nil
 }
@@ -355,7 +354,7 @@ func (a *Agent) start(ctx context.Context) error {
 		}
 	}
 
-	srvDone := make(chan bool)
+	srvDone := make(chan struct{})
 	srvCtx, srvCanceller := context.WithCancel(ctx)
 	srv, err := NewFleet(a.bi, state.NewChained(state.NewLog(), a), false)
 	if err != nil {
@@ -394,6 +393,7 @@ func (a *Agent) reconfigure(ctx context.Context) error {
 	}
 
 	// reload the generic reloadables
+	// Currently logger is the only reloadable
 	for _, r := range a.reloadables {
 		err = r.Reload(ctx, cfg)
 		if err != nil {
@@ -405,6 +405,7 @@ func (a *Agent) reconfigure(ctx context.Context) error {
 }
 
 func (a *Agent) stop() {
+	// stop is called when expected config state indicates an input or output should stop
 	if a.srvCanceller == nil {
 		return
 	}
@@ -418,7 +419,7 @@ func (a *Agent) stop() {
 	a.srvCtx = nil
 	a.srv = nil
 	canceller()
-	<-a.srvDone
+	<-a.srvDone // wait for srv.Run loop to terminate either because root-context recieved a signal, or stop has been called
 	a.srvDone = nil
 
 	if a.inputUnit != nil {
@@ -460,6 +461,7 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 
 	// elastic-agent should be setting bootstrap with config provided through enrollment flags
 	if bootstrapCfg, ok := outMap["bootstrap"]; ok {
+		// Check if an output check loop is running, cancel if it is.
 		if a.outputCheckCanceller != nil {
 			a.outputCheckCanceller()
 			a.outputCheckCanceller = nil
