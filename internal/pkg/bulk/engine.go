@@ -448,7 +448,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		Str("queue", queue.Type()).
 		Msg("flushQueue Wait")
 
-	ctx, cancel = context.WithTimeout(ctx, defaultFlushContextTimeout)
+	ctx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
 	defer cancel()
 
 	if err := w.Acquire(ctx, 1); err != nil {
@@ -468,7 +468,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		start := time.Now()
 
 		// deadline prevents bulker being blocked on flush
-		ctx, cancel = context.WithTimeout(ctx, defaultFlushContextTimeout)
+		ctx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
 		defer cancel()
 
 		if b.tracer != nil {
