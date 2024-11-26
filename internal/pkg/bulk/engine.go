@@ -421,10 +421,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 				Int("byteCnt", byteCnt).
 				Msg("Flush on timer")
 
-			// deadline prevents bulker being blocked on flush
-			flushCtx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
-			defer cancel()
-			err = doFlush(flushCtx)
+			err = doFlush(ctx)
 
 		case <-ctx.Done():
 			err = ctx.Err()
@@ -451,6 +448,9 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		Str("queue", queue.Type()).
 		Msg("flushQueue Wait")
 
+	ctx, cancel = context.WithTimeout(ctx, defaultFlushContextTimeout)
+	defer cancel()
+
 	if err := w.Acquire(ctx, 1); err != nil {
 		zerolog.Ctx(ctx).Error().Err(err).Msg("flushQueue Wait error")
 		return err
@@ -466,6 +466,10 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 
 	go func() {
 		start := time.Now()
+
+		// deadline prevents bulker being blocked on flush
+		ctx, cancel = context.WithTimeout(ctx, defaultFlushContextTimeout)
+		defer cancel()
 
 		if b.tracer != nil {
 			trans := b.tracer.StartTransaction(fmt.Sprintf("Flush queue %s", queue.Type()), "bulker")
