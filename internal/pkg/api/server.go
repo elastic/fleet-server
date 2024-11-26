@@ -117,7 +117,7 @@ func (s *server) Run(ctx context.Context) error {
 		}
 	// Do a clean shutdown if the context is cancelled
 	case <-ctx.Done():
-		sCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Timeouts.Drain)
+		sCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Timeouts.Drain) // Background context to allow connections to drain when server context is cancelled.
 		defer cancel()
 		if err := srv.Shutdown(sCtx); err != nil {
 			cErr := srv.Close() // force it closed
@@ -159,7 +159,7 @@ func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) 
 			Int("hardConnLimit", hardLimit).
 			Msg("server hard connection limiter installed")
 
-		ln = limit.Listener(ln, hardLimit)
+		ln = limit.Listener(ln, hardLimit, zerolog.Ctx(ctx))
 	} else {
 		zerolog.Ctx(ctx).Info().Msg("server hard connection limiter disabled")
 	}

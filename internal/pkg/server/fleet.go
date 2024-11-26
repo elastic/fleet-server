@@ -95,13 +95,13 @@ func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
 	defer cn()
 
 	log := zerolog.Ctx(ctx)
-	err := initCfg.LoadServerLimits()
+	err := initCfg.LoadServerLimits(log)
 	if err != nil {
 		return fmt.Errorf("encountered error while loading server limits: %w", err)
 	}
 	cacheCfg := config.CopyCache(initCfg)
 	log.Info().Interface("cfg", cacheCfg).Msg("Setting cache config options")
-	cache, err := cache.New(cacheCfg)
+	cache, err := cache.New(cacheCfg, cache.WithLog(log))
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ LOOP:
 			f.reporter.UpdateState(client.UnitStateStarting, "Starting", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		}
 
-		err := newCfg.LoadServerLimits()
+		err := newCfg.LoadServerLimits(log)
 		if err != nil {
 			return fmt.Errorf("encountered error while loading server limits: %w", err)
 		}
@@ -222,7 +222,7 @@ LOOP:
 
 	// Server is coming down; wait for the server group to exit cleanly.
 	// Timeout if something is locked up.
-	err = safeWait(srvEg, curCfg.Inputs[0].Server.Timeouts.Drain)
+	err = safeWait(log, srvEg, curCfg.Inputs[0].Server.Timeouts.Drain)
 
 	// Eat cancel error to minimize confusion in logs
 	if errors.Is(err, context.Canceled) {
@@ -280,7 +280,7 @@ func configChangedServer(log zerolog.Logger, curCfg, newCfg *config.Config) bool
 	return changed
 }
 
-func safeWait(g *errgroup.Group, to time.Duration) error {
+func safeWait(log *zerolog.Logger, g *errgroup.Group, to time.Duration) error {
 	var err error
 	waitCh := make(chan error)
 	go func() {
@@ -290,7 +290,7 @@ func safeWait(g *errgroup.Group, to time.Duration) error {
 	select {
 	case err = <-waitCh:
 	case <-time.After(to):
-		zerolog.Ctx(context.TODO()).Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
+		log.Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
 		err = errors.New("group wait timeout")
 	}
 
@@ -318,12 +318,11 @@ func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error 
 	}
 }
 
-func initRuntime(cfg *config.Config) {
+func initRuntime(log *zerolog.Logger, cfg *config.Config) {
 	gcPercent := cfg.Inputs[0].Server.Runtime.GCPercent
 	if gcPercent != 0 {
 		old := debug.SetGCPercent(gcPercent)
-
-		zerolog.Ctx(context.TODO()).Info().
+		log.Info().
 			Int("old", old).
 			Int("new", gcPercent).
 			Msg("SetGCPercent")
@@ -331,8 +330,7 @@ func initRuntime(cfg *config.Config) {
 	memoryLimit := cfg.Inputs[0].Server.Runtime.MemoryLimit
 	if memoryLimit != 0 {
 		old := debug.SetMemoryLimit(memoryLimit)
-
-		zerolog.Ctx(context.TODO()).Info().
+		log.Info().
 			Int64("old", old).
 			Int64("new", memoryLimit).
 			Msg("SetMemoryLimit")
@@ -355,7 +353,7 @@ func (f *Fleet) initBulker(ctx context.Context, tracer *apm.Tracer, cfg *config.
 }
 
 func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
-	initRuntime(cfg)
+	initRuntime(zerolog.Ctx(ctx), cfg)
 
 	// Create the APM tracer.
 	tracer, err := f.initTracer(ctx, cfg.Inputs[0].Server.Instrumentation)
