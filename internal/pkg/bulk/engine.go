@@ -347,14 +347,14 @@ func (b *Bulker) Run(ctx context.Context) error {
 	var itemCnt int
 	var byteCnt int
 
-	doFlush := func(flushCtx context.Context) error {
+	doFlush := func() error {
 
 		for i := range queues {
 			q := &queues[i]
 			if q.pending > 0 {
 
 				// Pass queue structure by value
-				if err := b.flushQueue(flushCtx, w, *q); err != nil {
+				if err := b.flushQueue(ctx, w, *q); err != nil {
 					return err
 				}
 
@@ -406,10 +406,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 					Int("byteCnt", byteCnt).
 					Msg("Flush on threshold")
 
-				// deadline prevents bulker being blocked on flush
-				flushCtx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
-				defer cancel()
-				err = doFlush(flushCtx)
+				err = doFlush()
 
 				stopTimer(timer)
 			}
@@ -421,7 +418,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 				Int("byteCnt", byteCnt).
 				Msg("Flush on timer")
 
-			err = doFlush(ctx)
+			err = doFlush()
 
 		case <-ctx.Done():
 			err = ctx.Err()
