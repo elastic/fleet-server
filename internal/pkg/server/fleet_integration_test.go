@@ -25,6 +25,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -206,7 +207,7 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 		}
 	}
 
-	l := testlog.SetLogger(t)
+	l := zerolog.Nop()
 	srv, err := NewFleet(build.Info{Version: serverVersion}, state.NewLog(&l), false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create server: %w", err)
