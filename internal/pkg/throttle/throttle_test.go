@@ -74,11 +74,11 @@ func TestThrottleZero(t *testing.T) {
 		key := strconv.Itoa(i)
 
 		token = throttle.Acquire(l, key, time.Hour)
-		if token == nil { //nolint:staticcheck // this is a lint check
+		if token == nil {
 			t.Fatal("Acquire failed")
 		}
 
-		found = token.Release(l) //nolint:staticcheck // nil checked above
+		found = token.Release(l)
 		if !found {
 			t.Error("Expect token to be found")
 		}
@@ -143,11 +143,11 @@ func TestThrottleN(t *testing.T) {
 			key := strconv.Itoa(i)
 
 			token = throttle.Acquire(l, key, time.Hour)
-			if token == nil { //nolint:staticcheck // this is a lint check
+			if token == nil {
 				t.Fatal("Acquire failed")
 			}
 
-			found = token.Release(l) //nolint:staticcheck // nil checked above
+			found = token.Release(l)
 			if !found {
 				t.Error("Expect token to be found")
 			}
@@ -174,7 +174,7 @@ func TestThrottleExpireIdentity(t *testing.T) {
 
 	// Should be able to re-acquire on expiration
 	token3 := throttle.Acquire(l, key, time.Hour)
-	if token3 == nil { //nolint:staticcheck // this is a lint check
+	if token3 == nil {
 		t.Fatal("Expected third acquire to succeed")
 	}
 
@@ -185,7 +185,7 @@ func TestThrottleExpireIdentity(t *testing.T) {
 	}
 
 	// However, third token should release fine
-	found = token3.Release(l) //nolint:staticcheck // nil checked above
+	found = token3.Release(l)
 	if !found {
 		t.Error("Expect recently acquired token to release cleanly")
 	}
@@ -212,7 +212,7 @@ func TestThrottleExpireAtMax(t *testing.T) {
 
 	// Should be able acquire second after timeout
 	token2 = throttle.Acquire(l, key2, time.Hour)
-	if token2 == nil { //nolint:staticcheck // this is a lint check
+	if token2 == nil {
 		t.Fatal("Expected third acquire to succeed")
 	}
 
@@ -223,7 +223,7 @@ func TestThrottleExpireAtMax(t *testing.T) {
 	}
 
 	// However, third token should release fine
-	found = token2.Release(l) //nolint:staticcheck // nil checked above
+	found = token2.Release(l)
 	if !found {
 		t.Error("Expect recently acquired token2 to release cleanly")
 	}
