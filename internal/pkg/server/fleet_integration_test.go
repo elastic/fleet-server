@@ -206,7 +206,8 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 		}
 	}
 
-	srv, err := NewFleet(build.Info{Version: serverVersion}, state.NewLog(), false)
+	l := testlog.SetLogger(t)
+	srv, err := NewFleet(build.Info{Version: serverVersion}, state.NewLog(&l), false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create server: %w", err)
 	}

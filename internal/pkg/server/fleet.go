@@ -86,7 +86,7 @@ func (f *Fleet) GetConfig() *config.Config {
 
 // Run runs the fleet server
 func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
-	// ctx is cancelled when a SIGTERM or SIGINT is recieved or when the agent wrappers calls stop because a unit is being stopped/removed.
+	// ctx is cancelled when a SIGTERM or SIGINT is received or when the agent wrappers calls stop because a unit is being stopped/removed.
 
 	// Replace context with cancellable ctx
 	// in order to automatically cancel all the go routines

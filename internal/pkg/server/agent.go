@@ -98,7 +98,7 @@ func NewAgent(cliCfg *ucfg.Config, reader io.Reader, bi build.Info, reloadables 
 
 // Run starts a Server instance using config from the configured client.
 func (a *Agent) Run(ctx context.Context) error {
-	// ctx is cancelled when a SIGTERM or SIGINT is recieved.
+	// ctx is cancelled when a SIGTERM or SIGINT is received.
 	log := zerolog.Ctx(ctx)
 	a.agent.RegisterDiagnosticHook("fleet-server config", "fleet-server's current configuration", "fleet-server.yml", "application/yml", func() []byte {
 		if a.srv == nil {
@@ -419,7 +419,7 @@ func (a *Agent) stop() {
 	a.srvCtx = nil
 	a.srv = nil
 	canceller()
-	<-a.srvDone // wait for srv.Run loop to terminate either because root-context recieved a signal, or stop has been called
+	<-a.srvDone // wait for srv.Run loop to terminate either because root-context received a signal, or stop has been called
 	a.srvDone = nil
 
 	if a.inputUnit != nil {
