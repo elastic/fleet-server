@@ -445,10 +445,10 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		Str("queue", queue.Type()).
 		Msg("flushQueue Wait")
 
-	ctx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
+	acquireCtx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
 	defer cancel()
 
-	if err := w.Acquire(ctx, 1); err != nil {
+	if err := w.Acquire(acquireCtx, 1); err != nil {
 		zerolog.Ctx(ctx).Error().Err(err).Msg("flushQueue Wait error")
 		return err
 	}
@@ -465,7 +465,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		start := time.Now()
 
 		// deadline prevents bulker being blocked on flush
-		ctx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
+		flushCtx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
 		defer cancel()
 
 		if b.tracer != nil {
@@ -481,13 +481,13 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		var err error
 		switch queue.ty {
 		case kQueueRead, kQueueRefreshRead:
-			err = b.flushRead(ctx, queue)
+			err = b.flushRead(flushCtx, queue)
 		case kQueueSearch, kQueueFleetSearch:
-			err = b.flushSearch(ctx, queue)
+			err = b.flushSearch(flushCtx, queue)
 		case kQueueAPIKeyUpdate:
-			err = b.flushUpdateAPIKey(ctx, queue)
+			err = b.flushUpdateAPIKey(flushCtx, queue)
 		default:
-			err = b.flushBulk(ctx, queue)
+			err = b.flushBulk(flushCtx, queue)
 		}
 
 		if err != nil {
