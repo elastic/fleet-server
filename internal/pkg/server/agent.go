@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -21,12 +23,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sleep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
-	"github.com/rs/zerolog"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/go-ucfg"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -357,7 +359,7 @@ func (a *Agent) start(ctx context.Context) error {
 
 	srvDone := make(chan bool)
 	srvCtx, srvCanceller := context.WithCancel(ctx)
-	srv, err := NewFleet(a.bi, state.NewChained(state.NewLog(), a), false)
+	srv, err := NewFleet(a.bi, state.NewChained(state.NewLog(zerolog.Ctx(ctx)), a), false)
 	if err != nil {
 		close(srvDone)
 		srvCanceller()
