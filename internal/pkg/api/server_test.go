@@ -17,13 +17,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	libsconfig "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/go-ucfg/yaml"
+	"github.com/stretchr/testify/require"
 
+	fbuild "github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
@@ -43,7 +43,7 @@ func Test_server_Run(t *testing.T) {
 	cfg.Port = port
 	addr := cfg.BindEndpoints()[0]
 
-	srv := NewServer(addr, cfg)
+	srv := NewServer(addr, cfg, nil, nil, nil, nil, nil, nil, fbuild.Info{}, nil, nil, nil, nil, nil, nil)
 
 	started := make(chan struct{}, 1)
 	errCh := make(chan error, 1)
@@ -123,8 +123,8 @@ func Test_server_ClientCert(t *testing.T) {
 		addr := cfg.BindEndpoints()[0]
 		cfg.TLS = tlsCFG
 
-		st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
-		srv := NewServer(addr, cfg, WithStatus(st))
+		st := NewStatusT(cfg, nil, nil)
+		srv := NewServer(addr, cfg, nil, nil, nil, nil, st, sm, fbuild.Info{}, nil, nil, nil, nil, nil, nil)
 
 		// make http client with no client certs
 		certPool := x509.NewCertPool()
@@ -193,8 +193,8 @@ func Test_server_ClientCert(t *testing.T) {
 		addr := cfg.BindEndpoints()[0]
 		cfg.TLS = tlsCFG
 
-		st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
-		srv := NewServer(addr, cfg, WithStatus(st))
+		st := NewStatusT(cfg, nil, nil)
+		srv := NewServer(addr, cfg, nil, nil, nil, nil, st, sm, fbuild.Info{}, nil, nil, nil, nil, nil, nil)
 
 		// make http client with valid client certs
 		clientCert := certs.GenCert(t, ca)
@@ -265,8 +265,8 @@ func Test_server_ClientCert(t *testing.T) {
 		addr := cfg.BindEndpoints()[0]
 		cfg.TLS = tlsCFG
 
-		st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
-		srv := NewServer(addr, cfg, WithStatus(st))
+		st := NewStatusT(cfg, nil, nil)
+		srv := NewServer(addr, cfg, nil, nil, nil, nil, st, sm, fbuild.Info{}, nil, nil, nil, nil, nil, nil)
 
 		// make http client with invalid client certs
 		clientCA := certs.GenCA(t)
@@ -348,8 +348,8 @@ key: %s`,
 		require.NoError(t, err)
 		cfg.TLS = tlsCFG
 
-		st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
-		srv := NewServer(addr, cfg, WithStatus(st))
+		st := NewStatusT(cfg, nil, nil)
+		srv := NewServer(addr, cfg, nil, nil, nil, nil, st, sm, fbuild.Info{}, nil, nil, nil, nil, nil, nil)
 
 		// make http client with valid client certs
 		clientCert := certs.GenCert(t, ca)

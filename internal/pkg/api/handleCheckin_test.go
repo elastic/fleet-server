@@ -300,8 +300,7 @@ func TestResolveSeqNo(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
 			pim := mockmonitor.NewMockMonitor()
 			pm := policy.NewMonitor(bulker, pim, config.ServerLimits{PolicyLimit: config.Limit{Interval: 5 * time.Millisecond, Burst: 1}})
-			ct, err := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil)
-			assert.NoError(t, err)
+			ct := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil, nil)
 
 			resp, _ := ct.resolveSeqNo(ctx, logger, tc.req, tc.agent)
 			assert.Equal(t, tc.resp, resp)
@@ -674,8 +673,7 @@ func Test_CheckinT_writeResponse(t *testing.T) {
 		CompressionThresh: 1,
 	}
 
-	ct, err := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
-	require.NoError(t, err)
+	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -697,8 +695,7 @@ func Benchmark_CheckinT_writeResponse(b *testing.B) {
 		CompressionLevel:  flate.BestSpeed,
 		CompressionThresh: 1,
 	}
-	ct, err := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
-	require.NoError(b, err)
+	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
 
 	logger := zerolog.Nop()
 	req := &http.Request{
@@ -724,8 +721,7 @@ func BenchmarkParallel_CheckinT_writeResponse(b *testing.B) {
 		CompressionLevel:  flate.BestSpeed,
 		CompressionThresh: 1,
 	}
-	ct, err := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
-	require.NoError(b, err)
+	ct := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
 
 	logger := zerolog.Nop()
 	req := &http.Request{
@@ -977,8 +973,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			checkin, err := NewCheckinT(verCon, tc.cfg, nil, nil, nil, nil, nil, nil)
-			assert.NoError(t, err)
+			checkin := NewCheckinT(verCon, tc.cfg, nil, nil, nil, nil, nil, nil, nil)
 			wr := httptest.NewRecorder()
 			logger := testlog.SetLogger(t)
 			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, nil)

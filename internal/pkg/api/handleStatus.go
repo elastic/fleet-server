@@ -36,24 +36,10 @@ type StatusT struct {
 	cfg    *config.Server
 	bulk   bulk.Bulk
 	cache  cache.Cache
-	sm     policy.SelfMonitor
-	bi     build.Info
 	authfn AuthFunc
 }
 
 type OptFunc func(*StatusT)
-
-func WithSelfMonitor(sm policy.SelfMonitor) OptFunc {
-	return func(st *StatusT) {
-		st.sm = sm
-	}
-}
-
-func WithBuildInfo(bi build.Info) OptFunc {
-	return func(st *StatusT) {
-		st.bi = bi
-	}
-}
 
 func NewStatusT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache, opts ...OptFunc) *StatusT {
 	st := &StatusT{
@@ -77,7 +63,7 @@ func (st StatusT) authenticate(r *http.Request) (*apikey.APIKey, error) {
 	return authAPIKey(r, st.bulk, st.cache)
 }
 
-func (st StatusT) handleStatus(zlog zerolog.Logger, r *http.Request, w http.ResponseWriter) error {
+func (st StatusT) handleStatus(zlog zerolog.Logger, sm policy.SelfMonitor, bi build.Info, r *http.Request, w http.ResponseWriter) error {
 	authed := true
 	if _, aerr := st.authfn(r); aerr != nil {
 		zlog.Debug().Err(aerr).Msg("unauthenticated status request, return short status response only")
@@ -85,7 +71,7 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, r *http.Request, w http.Resp
 	}
 
 	span, ctx := apm.StartSpan(r.Context(), "getState", "process")
-	state := st.sm.State()
+	state := sm.State()
 	resp := StatusAPIResponse{
 		Name:   build.ServiceName,
 		Status: StatusResponseStatus(state.String()), // TODO try to make the oapi codegen less verbose here
@@ -93,10 +79,10 @@ func (st StatusT) handleStatus(zlog zerolog.Logger, r *http.Request, w http.Resp
 
 	if authed {
 		sSpan, _ := apm.StartSpan(ctx, "getVersion", "process")
-		bt := st.bi.BuildTime.Format(time.RFC3339)
+		bt := bi.BuildTime.Format(time.RFC3339)
 		resp.Version = &StatusResponseVersion{
-			Number:    &st.bi.Version,
-			BuildHash: &st.bi.Commit,
+			Number:    &bi.Version,
+			BuildHash: &bi.Commit,
 			BuildTime: &bt,
 		}
 		sSpan.End()

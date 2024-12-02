@@ -14,9 +14,13 @@ import (
 	"net/http"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
+	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
 )
@@ -31,15 +35,25 @@ type server struct {
 //
 // The server has a listener specific conn limit and endpoint specific rate-limits.
 // The underlying API structs (such as *CheckinT) may be shared between servers.
-func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
-	a := &apiServer{}
-	for _, opt := range opts {
-		opt(a)
+func NewServer(addr string, cfg *config.Server, ct *CheckinT, et *EnrollerT, at *ArtifactT, ack *AckT, st *StatusT, sm policy.SelfMonitor, bi build.Info, ut *UploadT, ft *FileDeliveryT, pt *PGPRetrieverT, audit *AuditT, bulker bulk.Bulk, tracer *apm.Tracer) *server {
+	a := &apiServer{
+		ct:     ct,
+		et:     et,
+		at:     at,
+		ack:    ack,
+		st:     st,
+		sm:     sm,
+		bi:     bi,
+		ut:     ut,
+		ft:     ft,
+		pt:     pt,
+		audit:  audit,
+		bulker: bulker,
 	}
 	return &server{
 		addr:    addr,
 		cfg:     cfg,
-		handler: newRouter(&cfg.Limits, a, a.tracer),
+		handler: newRouter(&cfg.Limits, a, tracer),
 	}
 }
 
