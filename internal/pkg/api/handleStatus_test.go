@@ -86,13 +86,11 @@ func TestHandleStatus(t *testing.T) {
 					ctx = logger.WithContext(ctx)
 					state := client.UnitState(k)
 					r := apiServer{
-						st: NewStatusT(cfg, nil, c, withAuthFunc(tc.AuthFn)),
-						sm: &mockPolicyMonitor{state},
-						bi: fbuild.Info{
+						st: NewStatusT(cfg, nil, c, withAuthFunc(tc.AuthFn), WithSelfMonitor(&mockPolicyMonitor{state}), WithBuildInfo(fbuild.Info{
 							Version:   "8.1.0",
 							Commit:    "4eff928",
 							BuildTime: time.Now(),
-						},
+						})),
 					}
 
 					hr := Handler(&r)
@@ -117,9 +115,9 @@ func TestHandleStatus(t *testing.T) {
 					// Expect extended version information if authenticated
 					if tc.Authed {
 						require.NotNil(t, res.Version)
-						assert.Equal(t, r.bi.Version, *res.Version.Number)
-						assert.Equal(t, r.bi.Commit, *res.Version.BuildHash)
-						assert.Equal(t, r.bi.BuildTime.Format(time.RFC3339), *res.Version.BuildTime)
+						assert.Equal(t, r.st.bi.Version, *res.Version.Number)
+						assert.Equal(t, r.st.bi.Commit, *res.Version.BuildHash)
+						assert.Equal(t, r.st.bi.BuildTime.Format(time.RFC3339), *res.Version.BuildTime)
 					} else {
 						require.Nil(t, res.Version)
 					}

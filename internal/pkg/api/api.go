@@ -7,29 +7,90 @@ package api
 import (
 	"net/http"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/build"
-	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 
 	"github.com/rs/zerolog/hlog"
 )
 
+type APIOpt func(a *apiServer)
+
+func WithCheckin(ct *CheckinT) APIOpt {
+	return func(a *apiServer) {
+		a.ct = ct
+	}
+}
+
+func WithEnroller(et *EnrollerT) APIOpt {
+	return func(a *apiServer) {
+		a.et = et
+	}
+}
+
+func WithArtifact(at *ArtifactT) APIOpt {
+	return func(a *apiServer) {
+		a.at = at
+	}
+}
+
+func WithAck(ack *AckT) APIOpt {
+	return func(a *apiServer) {
+		a.ack = ack
+	}
+}
+
+func WithStatus(st *StatusT) APIOpt {
+	return func(a *apiServer) {
+		a.st = st
+	}
+}
+
+func WithUpload(ut *UploadT) APIOpt {
+	return func(a *apiServer) {
+		a.ut = ut
+	}
+}
+
+func WithFileDelivery(ft *FileDeliveryT) APIOpt {
+	return func(a *apiServer) {
+		a.ft = ft
+	}
+}
+
+func WithPGP(pt *PGPRetrieverT) APIOpt {
+	return func(a *apiServer) {
+		a.pt = pt
+	}
+}
+
+func WithAudit(audit *AuditT) APIOpt {
+	return func(a *apiServer) {
+		a.audit = audit
+	}
+}
+
+func WithTracer(tracer *apm.Tracer) APIOpt {
+	return func(a *apiServer) {
+		a.tracer = tracer
+	}
+}
+
 // FIXME: Cleanup needed for: metrics endpoint (actually a separate listener?), endpoint auth
 // FIXME: Should we use strict handler
 type apiServer struct {
-	ct     *CheckinT
-	et     *EnrollerT
-	at     *ArtifactT
-	ack    *AckT
-	st     *StatusT
-	sm     policy.SelfMonitor
-	bi     build.Info
-	ut     *UploadT
-	ft     *FileDeliveryT
-	pt     *PGPRetrieverT
-	audit  *AuditT
-	bulker bulk.Bulk
+	ct    *CheckinT
+	et    *EnrollerT
+	at    *ArtifactT
+	ack   *AckT
+	st    *StatusT
+	ut    *UploadT
+	ft    *FileDeliveryT
+	pt    *PGPRetrieverT
+	audit *AuditT
+
+	// tracer is used by the wrapping server to instrument the API server
+	tracer *apm.Tracer
 }
 
 // ensure api implements the ServerInterface
@@ -120,7 +181,7 @@ func (a *apiServer) UploadChunk(w http.ResponseWriter, r *http.Request, id strin
 	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
 	w.Header().Set("Content-Type", "application/json")
 
-	if _, err := a.ut.authAPIKey(r, a.bulker, a.ut.cache); err != nil {
+	if _, err := a.ut.authAPIKey(r, a.ut.bulker, a.ut.cache); err != nil {
 		cntUploadChunk.IncError(err)
 		ErrorResp(w, r, err)
 		return
@@ -163,7 +224,7 @@ func (a *apiServer) Status(w http.ResponseWriter, r *http.Request, params Status
 		Str("mod", kStatusMod).
 		Logger()
 	w.Header().Set("Content-Type", "application/json")
-	err := a.st.handleStatus(zlog, a.sm, a.bi, r, w)
+	err := a.st.handleStatus(zlog, r, w)
 	if err != nil {
 		cntStatus.IncError(err)
 		ErrorResp(w, r, err)
