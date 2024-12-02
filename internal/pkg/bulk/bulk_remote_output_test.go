@@ -12,6 +12,8 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+
+	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
 func Test_hasChangedAndUpdateRemoteOutputConfig(t *testing.T) {
@@ -78,11 +80,14 @@ func Test_hasChangedAndUpdateRemoteOutputConfig(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			log := testlog.SetLogger(t)
 			bulker := NewBulker(nil, nil)
-			bulker.remoteOutputConfigMap["remote1"] = tc.cfg
-			hasChanged := bulker.hasChangedAndUpdateRemoteOutputConfig(zerolog.Nop(), "remote1", tc.newCfg)
+			bulker.remoteOutputConfigMap.Store("remote1", tc.cfg)
+			hasChanged := bulker.hasChangedAndUpdateRemoteOutputConfig(log, "remote1", tc.newCfg)
 			assert.Equal(t, tc.changed, hasChanged)
-			assert.Equal(t, tc.newCfg, bulker.remoteOutputConfigMap["remote1"])
+			result, ok := bulker.remoteOutputConfigMap.Load("remote1")
+			assert.True(t, ok)
+			assert.Equal(t, tc.newCfg, result)
 		})
 	}
 }
@@ -108,14 +113,14 @@ func Test_CreateAndGetBulkerExisting(t *testing.T) {
 	defer cn()
 	bulker := NewBulker(nil, nil)
 	outputBulker := NewBulker(nil, nil)
-	bulker.bulkerMap["remote1"] = outputBulker
+	bulker.bulkerMap.Store("remote1", outputBulker)
 	outputMap := make(map[string]map[string]interface{})
 	cfg := map[string]interface{}{
 		"type":          "remote_elasticsearch",
 		"hosts":         []interface{}{"https://remote-es:443"},
 		"service_token": "token1",
 	}
-	bulker.remoteOutputConfigMap["remote1"] = cfg
+	bulker.remoteOutputConfigMap.Store("remote1", cfg)
 	outputMap["remote1"] = cfg
 	newBulker, hasChanged, err := bulker.CreateAndGetBulker(ctx, zerolog.Nop(), "remote1", outputMap)
 	assert.Equal(t, outputBulker, newBulker)
@@ -128,13 +133,13 @@ func Test_CreateAndGetBulkerChanged(t *testing.T) {
 	defer cn()
 	bulker := NewBulker(nil, nil)
 	outputBulker := NewBulker(nil, nil)
-	bulker.bulkerMap["remote1"] = outputBulker
+	bulker.bulkerMap.Store("remote1", outputBulker)
 	outputMap := make(map[string]map[string]interface{})
-	bulker.remoteOutputConfigMap["remote1"] = map[string]interface{}{
+	bulker.remoteOutputConfigMap.Store("remote1", map[string]interface{}{
 		"type":          "remote_elasticsearch",
 		"hosts":         []interface{}{"https://remote-es:443"},
 		"service_token": "token1",
-	}
+	})
 	outputMap["remote1"] = map[string]interface{}{
 		"type":          "remote_elasticsearch",
 		"hosts":         []interface{}{"https://remote-es:443"},
