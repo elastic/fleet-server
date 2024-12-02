@@ -97,7 +97,7 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	suite.T().Log("Setup complete.")
 }
 
-// downloadAgent will search the artifacts repo for the latest snapshot and return the stream to the download for the current OS + ARCH.
+// downloadAgent will return the stream to the download for the current OS + ARCH.
 func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser {
 	suite.T().Helper()
 	fType := "tar.gz"
@@ -114,9 +114,9 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 	}
 
 	fileName := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s-%s.%s", version.DefaultVersion, runtime.GOOS, arch, fType)
-	req, err = http.NewRequestWithContext(ctx, "GET", "https://artifacts-api.elastic.co/v1/downloads/elastic-agent-package/"+fileName, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://artifacts-api.elastic.co/v1/downloads/elastic-agent-package/"+fileName, nil)
 	suite.Require().NoError(err)
-	resp, err = suite.Client.Do(req)
+	resp, err := suite.Client.Do(req)
 	suite.Require().NoError(err)
 	return resp.Body
 }
