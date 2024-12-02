@@ -7,6 +7,7 @@
 package cache
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -45,17 +46,8 @@ type Cache interface {
 type APIKey = apikey.APIKey
 type SecurityInfo = apikey.SecurityInfo
 
-type Option func(c *CacheT)
-
-func WithLog(log *zerolog.Logger) Option {
-	return func(c *CacheT) {
-		c.log = log
-	}
-}
-
 type CacheT struct {
 	cache Cacher
-	log   *zerolog.Logger
 	cfg   config.Cache
 	mut   sync.RWMutex
 }
@@ -66,21 +58,15 @@ type actionCache struct {
 }
 
 // New creates a new cache.
-func New(cfg config.Cache, opts ...Option) (*CacheT, error) {
+func New(cfg config.Cache) (*CacheT, error) {
 	cache, err := newCache(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	log := zerolog.Nop()
 	c := CacheT{
 		cache: cache,
 		cfg:   cfg,
-		log:   &log,
-	}
-
-	for _, opt := range opts {
-		opt(&c)
 	}
 
 	return &c, nil
@@ -121,7 +107,7 @@ func (c *CacheT) SetAction(action model.Action) {
 	cost := len(action.ActionID) + len(action.Type)
 	ttl := c.cfg.ActionTTL
 	ok := c.cache.SetWithTTL(scopedKey, v, int64(cost), ttl)
-	c.log.Trace().
+	zerolog.Ctx(context.TODO()).Trace().
 		Bool("ok", ok).
 		Str("id", action.ActionID).
 		Int("cost", cost).
@@ -136,12 +122,13 @@ func (c *CacheT) GetAction(id string) (model.Action, bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
+	log := zerolog.Ctx(context.TODO())
 	scopedKey := "action:" + id
 	if v, ok := c.cache.Get(scopedKey); ok {
-		c.log.Trace().Str("id", id).Msg("Action cache HIT")
+		log.Trace().Str("id", id).Msg("Action cache HIT")
 		action, ok := v.(actionCache)
 		if !ok {
-			c.log.Error().Str("id", id).Msg("Action cache cast fail")
+			log.Error().Str("id", id).Msg("Action cache cast fail")
 			return model.Action{}, false
 		}
 		return model.Action{
@@ -150,7 +137,7 @@ func (c *CacheT) GetAction(id string) (model.Action, bool) {
 		}, ok
 	}
 
-	c.log.Trace().Str("id", id).Msg("Action cache MISS")
+	log.Trace().Str("id", id).Msg("Action cache MISS")
 	return model.Action{}, false
 }
 
@@ -182,7 +169,7 @@ func (c *CacheT) SetAPIKey(key APIKey, enabled bool) {
 
 	cost := len(scopedKey) + len(val)
 	ok := c.cache.SetWithTTL(scopedKey, val, int64(cost), ttl)
-	c.log.Trace().
+	zerolog.Ctx(context.TODO()).Trace().
 		Bool("ok", ok).
 		Bool("enabled", enabled).
 		Str("key", key.ID).
@@ -196,20 +183,21 @@ func (c *CacheT) ValidAPIKey(key APIKey) bool {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
+	log := zerolog.Ctx(context.TODO())
 	scopedKey := "api:" + key.ID
 	v, ok := c.cache.Get(scopedKey)
 	if ok {
 		switch v {
 		case "":
-			c.log.Trace().Str("id", key.ID).Msg("ApiKey cache HIT on disabled KEY")
+			log.Trace().Str("id", key.ID).Msg("ApiKey cache HIT on disabled KEY")
 		case key.Key:
-			c.log.Trace().Str("id", key.ID).Msg("ApiKey cache HIT")
+			log.Trace().Str("id", key.ID).Msg("ApiKey cache HIT")
 		default:
-			c.log.Trace().Str("id", key.ID).Msg("ApiKey cache MISMATCH")
+			log.Trace().Str("id", key.ID).Msg("ApiKey cache MISMATCH")
 			ok = false
 		}
 	} else {
-		c.log.Trace().Str("id", key.ID).Msg("ApiKey cache MISS")
+		log.Trace().Str("id", key.ID).Msg("ApiKey cache MISS")
 	}
 	return ok
 }
@@ -219,19 +207,20 @@ func (c *CacheT) GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
+	log := zerolog.Ctx(context.TODO())
 	scopedKey := "record:" + id
 	if v, ok := c.cache.Get(scopedKey); ok {
-		c.log.Trace().Str("id", id).Msg("Enrollment cache HIT")
+		log.Trace().Str("id", id).Msg("Enrollment cache HIT")
 		key, ok := v.(model.EnrollmentAPIKey)
 
 		if !ok {
-			c.log.Error().Str("id", id).Msg("Enrollment cache cast fail")
+			log.Error().Str("id", id).Msg("Enrollment cache cast fail")
 			return model.EnrollmentAPIKey{}, false
 		}
 		return key, ok
 	}
 
-	c.log.Trace().Str("id", id).Msg("EnrollmentApiKey cache MISS")
+	log.Trace().Str("id", id).Msg("EnrollmentApiKey cache MISS")
 	return model.EnrollmentAPIKey{}, false
 }
 
@@ -243,7 +232,7 @@ func (c *CacheT) SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, cost
 	scopedKey := "record:" + id
 	ttl := c.cfg.EnrollKeyTTL
 	ok := c.cache.SetWithTTL(scopedKey, key, cost, ttl)
-	c.log.Trace().
+	zerolog.Ctx(context.TODO()).Trace().
 		Bool("ok", ok).
 		Str("id", id).
 		Int64("cost", cost).
@@ -259,19 +248,20 @@ func (c *CacheT) GetArtifact(ident, sha2 string) (model.Artifact, bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
+	log := zerolog.Ctx(context.TODO())
 	scopedKey := makeArtifactKey(ident, sha2)
 	if v, ok := c.cache.Get(scopedKey); ok {
-		c.log.Trace().Str("key", scopedKey).Msg("Artifact cache HIT")
+		log.Trace().Str("key", scopedKey).Msg("Artifact cache HIT")
 		key, ok := v.(model.Artifact)
 
 		if !ok {
-			c.log.Error().Str("sha2", sha2).Msg("Artifact cache cast fail")
+			log.Error().Str("sha2", sha2).Msg("Artifact cache cast fail")
 			return model.Artifact{}, false
 		}
 		return key, ok
 	}
 
-	c.log.Trace().Str("key", scopedKey).Msg("Artifact cache MISS")
+	log.Trace().Str("key", scopedKey).Msg("Artifact cache MISS")
 	return model.Artifact{}, false
 }
 
@@ -286,7 +276,7 @@ func (c *CacheT) SetArtifact(artifact model.Artifact) {
 	ttl := c.cfg.ArtifactTTL
 
 	ok := c.cache.SetWithTTL(scopedKey, artifact, cost, ttl)
-	c.log.Trace().
+	zerolog.Ctx(context.TODO()).Trace().
 		Bool("ok", ok).
 		Str("key", scopedKey).
 		Int64("cost", cost).
@@ -303,7 +293,7 @@ func (c *CacheT) SetUpload(id string, info file.Info) {
 	// cache cost for other entries use bytes as the unit. Add up the string lengths and the size of the int64s in the upload.Info struct, as a manual 'sizeof'
 	cost := int64(len(info.ID) + len(info.DocID) + len(info.ActionID) + len(info.AgentID) + len(info.Source) + len(info.Status) + 8*4)
 	ok := c.cache.SetWithTTL(scopedKey, info, cost, ttl)
-	c.log.Trace().
+	zerolog.Ctx(context.TODO()).Trace().
 		Bool("ok", ok).
 		Str("id", id).
 		Int64("cost", cost).
@@ -314,18 +304,19 @@ func (c *CacheT) GetUpload(id string) (file.Info, bool) { //nolint:dupl // a lit
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
+	log := zerolog.Ctx(context.TODO())
 	scopedKey := "upload:" + id
 	if v, ok := c.cache.Get(scopedKey); ok {
-		c.log.Trace().Str("id", id).Msg("upload info cache HIT")
+		log.Trace().Str("id", id).Msg("upload info cache HIT")
 		key, ok := v.(file.Info)
 		if !ok {
-			c.log.Error().Str("id", id).Msg("upload info cache cast fail")
+			log.Error().Str("id", id).Msg("upload info cache cast fail")
 			return file.Info{}, false
 		}
 		return key, ok
 	}
 
-	c.log.Trace().Str("id", id).Msg("upload info cache MISS")
+	log.Trace().Str("id", id).Msg("upload info cache MISS")
 	return file.Info{}, false
 }
 
@@ -336,7 +327,7 @@ func (c *CacheT) SetPGPKey(id string, p []byte) {
 	scopedKey := "pgp:" + id
 	ttl := 30 * time.Minute // @todo: add to configurable
 	ok := c.cache.SetWithTTL(scopedKey, p, int64(len(p)), ttl)
-	c.log.Trace().
+	zerolog.Ctx(context.TODO()).Trace().
 		Bool("ok", ok).
 		Str("id", id).
 		Int("cost", len(p)).
@@ -348,12 +339,13 @@ func (c *CacheT) GetPGPKey(id string) ([]byte, bool) {
 	c.mut.RLock()
 	defer c.mut.RUnlock()
 
+	log := zerolog.Ctx(context.TODO())
 	scopedKey := "pgp:" + id
 	if v, ok := c.cache.Get(scopedKey); ok {
-		c.log.Trace().Str("id", id).Msg("PGP key cache HIT")
+		log.Trace().Str("id", id).Msg("PGP key cache HIT")
 		key, ok := v.([]byte)
 		if !ok {
-			c.log.Error().Str("id", id).Msg("upload info cache cast fail")
+			log.Error().Str("id", id).Msg("upload info cache cast fail")
 			return nil, false
 		}
 		return key, ok

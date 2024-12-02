@@ -33,7 +33,7 @@ func TestLoadLimits(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			log := testlog.SetLogger(t)
 			zerolog.DefaultContextLogger = &log
-			l := loadLimits(&log, tc.ConfiguredAgentLimit)
+			l := loadLimits(tc.ConfiguredAgentLimit)
 
 			require.Equal(t, tc.ExpectedAgentLimit, l.Agents.Max)
 		})

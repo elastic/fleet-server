@@ -10,13 +10,12 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/gofrs/uuid"
-	"github.com/rs/zerolog"
-
 	"github.com/elastic/fleet-server/v7/version"
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/flag"
 	"github.com/elastic/go-ucfg/yaml"
+	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog"
 )
 
 // DefaultOptions defaults options used to read the configuration
@@ -89,17 +88,17 @@ func (c *Config) Validate() error {
 
 // LoadServerLimits should be called after initialization, so we may access the user defined
 // agent limit setting.
-func (c *Config) LoadServerLimits(log *zerolog.Logger) error {
+func (c *Config) LoadServerLimits() error {
 	c.m.Lock()
 	defer c.m.Unlock()
 	err := c.Validate()
 	if err != nil {
-		log.Error().Err(err).Msgf("failed to validate while calculating limits")
+		zerolog.Ctx(context.TODO()).Error().Err(err).Msgf("failed to validate while calculating limits")
 		return err
 	}
 
 	fleetInput := &c.Inputs[0]
-	agentLimits := loadLimits(log, fleetInput.Server.Limits.MaxAgents)
+	agentLimits := loadLimits(fleetInput.Server.Limits.MaxAgents)
 	fleetInput.Cache.LoadLimits(agentLimits)
 	fleetInput.Server.Limits.LoadLimits(agentLimits)
 	return nil
@@ -215,7 +214,7 @@ func (c *Config) Redact() *Config {
 func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
 	for opt, message := range deprecatedOpts {
 		if c.HasField(opt) {
-			zerolog.Ctx(context.TODO()).Warn().Msg(message) // TODO is used as this may be called before logger config is read.
+			zerolog.Ctx(context.TODO()).Warn().Msg(message)
 		}
 	}
 }

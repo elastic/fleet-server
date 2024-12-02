@@ -10,9 +10,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/rs/zerolog"
 )
 
 func CreateIndex(ctx context.Context, cli *elasticsearch.Client, name string) error {
@@ -26,7 +25,7 @@ func CreateIndex(ctx context.Context, cli *elasticsearch.Client, name string) er
 
 	defer res.Body.Close()
 
-	err = checkResponseError(res, zerolog.Ctx(ctx))
+	err = checkResponseError(res)
 	if err != nil {
 		if errors.Is(err, ErrResourceAlreadyExists) {
 			zerolog.Ctx(ctx).Info().Str("name", name).Msg("Index already exists")
@@ -58,7 +57,7 @@ func DeleteIndices(ctx context.Context, cli *elasticsearch.Client, names ...stri
 
 	defer res.Body.Close()
 
-	err = checkResponseError(res, zerolog.Ctx(ctx))
+	err = checkResponseError(res)
 	if err != nil {
 		return err
 	}

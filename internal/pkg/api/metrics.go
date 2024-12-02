@@ -10,16 +10,15 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/elastic/elastic-agent-libs/api"
+	cfglib "github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/monitoring"
+	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	apmprometheus "go.elastic.co/apm/module/apmprometheus/v2"
 	"go.elastic.co/apm/v2"
-
-	"github.com/elastic/elastic-agent-libs/api"
-	cfglib "github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-system-metrics/report"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -57,7 +56,7 @@ var (
 func init() {
 	err := report.SetupMetrics(logger.NewZapStub("instance-metrics"), build.ServiceName, version.DefaultVersion)
 	if err != nil {
-		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics") // TODO is used because this may logged during the package load
+		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics")
 	}
 
 	registry = newMetricsRegistry("http_server")

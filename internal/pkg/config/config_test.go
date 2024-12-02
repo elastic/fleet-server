@@ -13,14 +13,13 @@ import (
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
+	"github.com/elastic/go-ucfg"
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/go-ucfg"
 )
 
 func TestConfig(t *testing.T) {
@@ -180,7 +179,7 @@ func TestConfig(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
-				err = cfg.LoadServerLimits(&l)
+				err = cfg.LoadServerLimits()
 				require.NoError(t, err)
 				skipUnexported := cmpopts.IgnoreUnexported(Config{})
 				if !assert.True(t, cmp.Equal(test.cfg, cfg, skipUnexported)) {
@@ -200,7 +199,7 @@ func TestConfig(t *testing.T) {
 		cfg, err := LoadFile(path)
 		t.Logf("cfg fileread: %+v", cfg.Inputs[0].Server.Limits)
 		require.NoError(t, err)
-		err = cfg.LoadServerLimits(&l)
+		err = cfg.LoadServerLimits()
 		require.NoError(t, err)
 		t.Logf("cfg loaded: %+v", cfg.Inputs[0].Server.Limits)
 
@@ -246,15 +245,13 @@ func TestLoadStandaloneAgentMetadata(t *testing.T) {
 
 func TestLoadServerLimits(t *testing.T) {
 	t.Run("empty loads limits", func(t *testing.T) {
-		l := testlog.SetLogger(t)
 		c := &Config{Inputs: []Input{{}}}
-		err := c.LoadServerLimits(&l)
+		err := c.LoadServerLimits()
 		assert.NoError(t, err)
 		assert.NotZero(t, c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
 		assert.NotZero(t, c.Inputs[0].Cache.ActionTTL)
 	})
 	t.Run("agent count limits load", func(t *testing.T) {
-		l := testlog.SetLogger(t)
 		c := &Config{Inputs: []Input{{
 			Server: Server{
 				Limits: ServerLimits{
@@ -262,14 +259,13 @@ func TestLoadServerLimits(t *testing.T) {
 				},
 			},
 		}}}
-		err := c.LoadServerLimits(&l)
+		err := c.LoadServerLimits()
 		assert.NoError(t, err)
 		assert.NotZero(t, c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
 		assert.Equal(t, time.Millisecond*5, c.Inputs[0].Server.Limits.CheckinLimit.Interval)
 
 	})
 	t.Run("agent count limits load does not override", func(t *testing.T) {
-		l := testlog.SetLogger(t)
 		c := &Config{Inputs: []Input{{
 			Server: Server{
 				Limits: ServerLimits{
@@ -280,14 +276,13 @@ func TestLoadServerLimits(t *testing.T) {
 				},
 			},
 		}}}
-		err := c.LoadServerLimits(&l)
+		err := c.LoadServerLimits()
 		assert.NoError(t, err)
 		assert.NotZero(t, c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
 		assert.Equal(t, time.Millisecond, c.Inputs[0].Server.Limits.ActionLimit.Interval)
 
 	})
 	t.Run("existing values are not overridden", func(t *testing.T) {
-		l := testlog.SetLogger(t)
 		c := &Config{
 			Inputs: []Input{{
 				Server: Server{
@@ -302,7 +297,7 @@ func TestLoadServerLimits(t *testing.T) {
 				},
 			}},
 		}
-		err := c.LoadServerLimits(&l)
+		err := c.LoadServerLimits()
 		assert.NoError(t, err)
 		assert.Equal(t, int64(5*defaultCheckinMaxBody), c.Inputs[0].Server.Limits.CheckinLimit.MaxBody)
 		assert.NotZero(t, c.Inputs[0].Server.Limits.CheckinLimit.Burst)
@@ -440,25 +435,22 @@ func TestConfigRedact(t *testing.T) {
 // Stub out the defaults so that the above is easier to maintain
 
 func defaultCache() Cache {
-	log := zerolog.Nop()
 	var d Cache
 	d.InitDefaults()
-	d.LoadLimits(loadLimits(&log, 0))
+	d.LoadLimits(loadLimits(0))
 	return d
 }
 
 func generateCache(maxAgents int) Cache {
-	log := zerolog.Nop()
 	var d Cache
-	d.LoadLimits(loadLimits(&log, maxAgents))
+	d.LoadLimits(loadLimits(maxAgents))
 	return d
 }
 
 func generateServerLimits(maxAgents int) ServerLimits {
-	log := zerolog.Nop()
 	var d ServerLimits
 	d.MaxAgents = maxAgents
-	d.LoadLimits(loadLimits(&log, maxAgents))
+	d.LoadLimits(loadLimits(maxAgents))
 	return d
 }
 
@@ -508,10 +500,9 @@ func defaultElastic() Elasticsearch {
 }
 
 func defaultServer() Server {
-	log := zerolog.Nop()
 	var d Server
 	d.InitDefaults()
-	d.Limits.LoadLimits(loadLimits(&log, 0))
+	d.Limits.LoadLimits(loadLimits(0))
 	return d
 }
 

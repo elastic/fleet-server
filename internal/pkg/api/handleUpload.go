@@ -16,9 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog"
-	"go.elastic.co/apm/v2"
-
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -28,6 +25,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -54,6 +53,11 @@ type UploadT struct {
 }
 
 func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *UploadT {
+	zerolog.Ctx(context.TODO()).Info().
+		Interface("limits", cfg.Limits.ArtifactLimit).
+		Int64("maxFileSize", maxFileSize).
+		Msg("upload limits")
+
 	return &UploadT{
 		chunkClient: chunkClient,
 		bulker:      bulker,

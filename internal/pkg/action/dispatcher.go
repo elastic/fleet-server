@@ -70,7 +70,7 @@ func (d *Dispatcher) Run(ctx context.Context) error {
 
 // Subscribe generates a new subscription with the Dispatcher using the provided agentID and seqNo.
 // There is no check to ensure that the agentID has not been used; using the same one twice results in undefined behaviour.
-func (d *Dispatcher) Subscribe(log zerolog.Logger, agentID string, seqNo sqn.SeqNo) *Sub {
+func (d *Dispatcher) Subscribe(agentID string, seqNo sqn.SeqNo) *Sub {
 	cbCh := make(chan []model.Action, 1)
 
 	sub := Sub{
@@ -84,14 +84,14 @@ func (d *Dispatcher) Subscribe(log zerolog.Logger, agentID string, seqNo sqn.Seq
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentID, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
+	zerolog.Ctx(context.TODO()).Trace().Str(logger.AgentID, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
 
 	return &sub
 }
 
 // Unsubscribe removes the given subscription from the dispatcher.
 // Note that the channel sub.Ch() provides is not closed in this event.
-func (d *Dispatcher) Unsubscribe(log zerolog.Logger, sub *Sub) {
+func (d *Dispatcher) Unsubscribe(sub *Sub) {
 	if sub == nil {
 		return
 	}
@@ -101,7 +101,7 @@ func (d *Dispatcher) Unsubscribe(log zerolog.Logger, sub *Sub) {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
+	zerolog.Ctx(context.TODO()).Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
 // process gathers actions from the monitor and dispatches them to the corresponding subscriptions.

@@ -275,8 +275,8 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	}
 
 	// Subscribe to actions dispatcher
-	aSub := ct.ad.Subscribe(zlog, agent.Id, seqno)
-	defer ct.ad.Unsubscribe(zlog, aSub)
+	aSub := ct.ad.Subscribe(agent.Id, seqno)
+	defer ct.ad.Unsubscribe(aSub)
 	actCh := aSub.Ch()
 
 	// use revision_idx=0 if the agent has a single output where no API key is defined

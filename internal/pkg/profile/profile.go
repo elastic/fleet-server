@@ -13,9 +13,8 @@ import (
 	"net/http"
 	"net/http/pprof"
 
-	"github.com/rs/zerolog"
-
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/rs/zerolog"
 )
 
 // RunProfiler exposes /debug/pprof on the passed address by staring a server.
@@ -61,7 +60,7 @@ func RunProfiler(ctx context.Context, addr string) error {
 		zerolog.Ctx(ctx).Error().Err(err).Str("bind", addr).Msg("Fail install profiler")
 		return err
 	case <-ctx.Done():
-		sCtx, cancel := context.WithTimeout(context.Background(), cfg.Drain) // new context from Background to allow connections to drain when server context is cancelled.
+		sCtx, cancel := context.WithTimeout(context.Background(), cfg.Drain)
 		defer cancel()
 		if err := server.Shutdown(sCtx); err != nil {
 			cErr := server.Close() // force it closed

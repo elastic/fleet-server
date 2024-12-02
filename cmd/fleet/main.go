@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/signal"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
@@ -118,13 +117,12 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
-			ctx := installSignalHandler()
-			srv, err := server.NewFleet(bi, state.NewLog(zerolog.Ctx(ctx)), true)
+			srv, err := server.NewFleet(bi, state.NewLog(), true)
 			if err != nil {
 				return err
 			}
 
-			if err := srv.Run(ctx, cfg); err != nil && !errors.Is(err, context.Canceled) {
+			if err := srv.Run(installSignalHandler(), cfg); err != nil && !errors.Is(err, context.Canceled) {
 				log.Error().Err(err).Msg("Exiting")
 				l.Sync()
 				return err

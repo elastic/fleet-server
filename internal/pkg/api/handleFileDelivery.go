@@ -5,11 +5,10 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
-
-	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -17,6 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/delivery"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/rs/zerolog"
 )
 
 type FileDeliveryT struct {
@@ -28,6 +28,11 @@ type FileDeliveryT struct {
 }
 
 func NewFileDeliveryT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *FileDeliveryT {
+	zerolog.Ctx(context.TODO()).Info().
+		Interface("limits", cfg.Limits.ArtifactLimit).
+		Int64("maxFileSize", maxFileSize).
+		Msg("upload limits")
+
 	return &FileDeliveryT{
 		chunkClient: chunkClient,
 		bulker:      bulker,

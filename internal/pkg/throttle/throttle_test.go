@@ -10,9 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/rs/zerolog"
 )
 
 func TestThrottleZero(t *testing.T) {
@@ -31,7 +30,7 @@ func TestThrottleZero(t *testing.T) {
 		key := strconv.Itoa(i)
 
 		// Acquire token for key with long timeout so doesn't trip unit test
-		token1 := throttle.Acquire(l, key, time.Hour)
+		token1 := throttle.Acquire(key, time.Hour)
 		if token1 == nil {
 			t.Fatal("Acquire failed")
 		}
@@ -39,7 +38,7 @@ func TestThrottleZero(t *testing.T) {
 
 		// Second acquire should fail because we have not released the original token,
 		// or possibly if i == N-1 we could max parallel
-		token2 := throttle.Acquire(l, key, time.Hour)
+		token2 := throttle.Acquire(key, time.Hour)
 		if token2 != nil {
 			t.Error("Expected second acquire to fail on conflict")
 		}
@@ -51,7 +50,7 @@ func TestThrottleZero(t *testing.T) {
 		key := strconv.Itoa(i)
 
 		// Acquire should fail because we have not released the original token,
-		token := throttle.Acquire(l, key, time.Hour)
+		token := throttle.Acquire(key, time.Hour)
 		if token != nil {
 			t.Error("Expected acquire to fail on conflict")
 		}
@@ -59,13 +58,13 @@ func TestThrottleZero(t *testing.T) {
 
 	for i, token := range tokens {
 
-		found := token.Release(l)
+		found := token.Release()
 		if !found {
 			t.Error("Expect token to be found")
 		}
 
 		// Second release should return false
-		found = token.Release(l)
+		found = token.Release()
 		if found {
 			t.Error("Expect token to not found on second release")
 		}
@@ -73,12 +72,12 @@ func TestThrottleZero(t *testing.T) {
 		// We should now be able to to acquire
 		key := strconv.Itoa(i)
 
-		token = throttle.Acquire(l, key, time.Hour)
+		token = throttle.Acquire(key, time.Hour)
 		if token == nil {
 			t.Fatal("Acquire failed")
 		}
 
-		found = token.Release(l)
+		found = token.Release()
 		if !found {
 			t.Error("Expect token to be found")
 		}
@@ -99,7 +98,7 @@ func TestThrottleN(t *testing.T) {
 			key := strconv.Itoa(i)
 
 			// Acquire token for key with long timeout so doesn't trip unit test
-			token1 := throttle.Acquire(l, key, time.Hour)
+			token1 := throttle.Acquire(key, time.Hour)
 			if token1 == nil {
 				t.Fatal("Acquire failed")
 			}
@@ -107,7 +106,7 @@ func TestThrottleN(t *testing.T) {
 
 			// Second acquire should fail because we have not released the original token,
 			// or possibly if i == N-1 we could max parallel
-			token2 := throttle.Acquire(l, key, time.Hour)
+			token2 := throttle.Acquire(key, time.Hour)
 			if token2 != nil {
 				t.Error("Expected second acquire to fail on conflict")
 			}
@@ -119,7 +118,7 @@ func TestThrottleN(t *testing.T) {
 
 			key := strconv.Itoa(N + i)
 
-			token1 := throttle.Acquire(l, key, time.Hour)
+			token1 := throttle.Acquire(key, time.Hour)
 			if token1 != nil {
 				t.Fatal("Expect acquire to fail on max tokens")
 			}
@@ -128,13 +127,13 @@ func TestThrottleN(t *testing.T) {
 		// Release one at a time, validate that we can reacquire
 		for i, token := range tokens {
 
-			found := token.Release(l)
+			found := token.Release()
 			if !found {
 				t.Error("Expect token to be found")
 			}
 
 			// Second release should return false
-			found = token.Release(l)
+			found = token.Release()
 			if found {
 				t.Error("Expect token to not found on second release")
 			}
@@ -142,12 +141,12 @@ func TestThrottleN(t *testing.T) {
 			// We should now be able to to acquire
 			key := strconv.Itoa(i)
 
-			token = throttle.Acquire(l, key, time.Hour)
+			token = throttle.Acquire(key, time.Hour)
 			if token == nil {
 				t.Fatal("Acquire failed")
 			}
 
-			found = token.Release(l)
+			found = token.Release()
 			if !found {
 				t.Error("Expect token to be found")
 			}
@@ -162,10 +161,10 @@ func TestThrottleExpireIdentity(t *testing.T) {
 	throttle := NewThrottle(1)
 
 	const key = "xxx"
-	token := throttle.Acquire(l, key, time.Second)
+	token := throttle.Acquire(key, time.Second)
 
 	// Should *NOT* be able to re-acquire until TTL
-	token2 := throttle.Acquire(l, key, time.Hour)
+	token2 := throttle.Acquire(key, time.Hour)
 	if token2 != nil {
 		t.Error("Expected second acquire to fail on conflict")
 	}
@@ -173,19 +172,19 @@ func TestThrottleExpireIdentity(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// Should be able to re-acquire on expiration
-	token3 := throttle.Acquire(l, key, time.Hour)
+	token3 := throttle.Acquire(key, time.Hour)
 	if token3 == nil {
 		t.Fatal("Expected third acquire to succeed")
 	}
 
 	// Original token should fail release
-	found := token.Release(l)
+	found := token.Release()
 	if found {
 		t.Error("Expected token to have expired")
 	}
 
 	// However, third token should release fine
-	found = token3.Release(l)
+	found = token3.Release()
 	if !found {
 		t.Error("Expect recently acquired token to release cleanly")
 	}
@@ -199,11 +198,11 @@ func TestThrottleExpireAtMax(t *testing.T) {
 	throttle := NewThrottle(1)
 
 	key1 := "xxx"
-	token1 := throttle.Acquire(l, key1, time.Second)
+	token1 := throttle.Acquire(key1, time.Second)
 
 	// Should be at max, cannot acquire different key
 	key2 := "yyy"
-	token2 := throttle.Acquire(l, key2, time.Hour)
+	token2 := throttle.Acquire(key2, time.Hour)
 	if token2 != nil {
 		t.Error("Expected second acquire to fail on max")
 	}
@@ -211,19 +210,19 @@ func TestThrottleExpireAtMax(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// Should be able acquire second after timeout
-	token2 = throttle.Acquire(l, key2, time.Hour)
+	token2 = throttle.Acquire(key2, time.Hour)
 	if token2 == nil {
 		t.Fatal("Expected third acquire to succeed")
 	}
 
 	// Original token should fail release
-	found := token1.Release(l)
+	found := token1.Release()
 	if found {
 		t.Error("Expected token to have expired")
 	}
 
 	// However, third token should release fine
-	found = token2.Release(l)
+	found = token2.Release()
 	if !found {
 		t.Error("Expect recently acquired token2 to release cleanly")
 	}
