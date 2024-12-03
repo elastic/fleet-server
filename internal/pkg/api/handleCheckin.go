@@ -254,6 +254,8 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 }
 
 func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
+	zlog = zlog.With().
+		Str(logger.AgentID, agent.Id).Logger()
 	validated, err := ct.validateRequest(zlog, w, r, start, agent)
 	if err != nil {
 		return err
@@ -338,6 +340,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actions, ackToken = convertActions(zlog, agent.Id, pendingActions)
 
 	span, ctx := apm.StartSpan(r.Context(), "longPoll", "process")
+
 	if len(actions) == 0 {
 	LOOP:
 		for {
