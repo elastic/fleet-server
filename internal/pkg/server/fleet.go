@@ -14,9 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
@@ -503,11 +504,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 
 	// Actions monitoring
-	var am monitor.SimpleMonitor
-	var ad *action.Dispatcher
-	var tr *action.TokenResolver
-
-	am, err = monitor.NewSimple(dl.FleetActions, esCli, monCli,
+	am, err := monitor.NewSimple(dl.FleetActions, esCli, monCli,
 		monitor.WithExpiration(true),
 		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
 		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
@@ -518,17 +515,16 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	}
 	g.Go(loggedRunFunc(ctx, "Action monitor", am.Run))
 
-	ad = action.NewDispatcher(am, cfg.Inputs[0].Server.Limits.ActionLimit.Interval, cfg.Inputs[0].Server.Limits.ActionLimit.Burst)
+	ad := action.NewDispatcher(am, cfg.Inputs[0].Server.Limits.ActionLimit.Interval, cfg.Inputs[0].Server.Limits.ActionLimit.Burst)
 	g.Go(loggedRunFunc(ctx, "Action dispatcher", ad.Run))
-	tr, err = action.NewTokenResolver(bulker)
-	if err != nil {
-		return err
-	}
 
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
-	ct := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
+	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
+	if err != nil {
+		return err
+	}
 	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
@@ -536,20 +532,31 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 
 	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
-	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
+	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache, api.WithSelfMonitor(sm), api.WithBuildInfo(f.bi))
 	ut := api.NewUploadT(&cfg.Inputs[0].Server, bulker, monCli, f.cache) // uses no-retry client for bufferless chunk upload
 	ft := api.NewFileDeliveryT(&cfg.Inputs[0].Server, bulker, monCli, f.cache)
 	pt := api.NewPGPRetrieverT(&cfg.Inputs[0].Server, bulker, f.cache)
 	auditT := api.NewAuditT(&cfg.Inputs[0].Server, bulker, f.cache)
 
 	for _, endpoint := range (&cfg.Inputs[0].Server).BindEndpoints() {
-		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server, ct, et, at, ack, st, sm, f.bi, ut, ft, pt, auditT, bulker, tracer)
+		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server,
+			api.WithCheckin(ct),
+			api.WithEnroller(et),
+			api.WithArtifact(at),
+			api.WithAck(ack),
+			api.WithStatus(st),
+			api.WithUpload(ut),
+			api.WithFileDelivery(ft),
+			api.WithPGP(pt),
+			api.WithAudit(auditT),
+			api.WithTracer(tracer),
+		)
 		g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 			return apiServer.Run(ctx)
 		}))
 	}
 
-	return err
+	return nil
 }
 
 // Reload reloads the fleet server with the latest configuration.
