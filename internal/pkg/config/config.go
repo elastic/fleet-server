@@ -8,6 +8,7 @@ package config
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 
 	"github.com/gofrs/uuid"
@@ -168,6 +169,12 @@ func redactOutput(cfg *Config) Output {
 		redacted.Elasticsearch.TLS = &newTLS
 	}
 
+	for k := range redacted.Elasticsearch.Headers {
+		if strings.Contains(strings.ToLower(k), "auth") {
+			redacted.Elasticsearch.Headers[k] = kRedacted
+		}
+	}
+
 	return redacted
 }
 
@@ -193,6 +200,10 @@ func redactServer(cfg *Config) Server {
 
 	if redacted.Instrumentation.SecretToken != "" {
 		redacted.Instrumentation.SecretToken = kRedacted
+	}
+
+	for i := range redacted.StaticPolicyTokens.PolicyTokens {
+		redacted.StaticPolicyTokens.PolicyTokens[i].TokenKey = kRedacted
 	}
 
 	return redacted

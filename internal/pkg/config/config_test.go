@@ -426,6 +426,60 @@ func TestConfigRedact(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Redact custom authorization output header",
+			inputCfg: &Config{
+				Inputs: []Input{{}},
+				Output: Output{
+					Elasticsearch: Elasticsearch{
+						Protocol:         "https",
+						Hosts:            []string{"localhost:9200"},
+						Headers:          map[string]string{"X-Authorization": "secretValue", "X-Custom": "value"},
+						ServiceTokenPath: "path/to/file",
+					},
+				},
+			},
+			redactedCfg: &Config{
+				Inputs: []Input{{}},
+				Output: Output{
+					Elasticsearch: Elasticsearch{
+						Protocol:         "https",
+						Hosts:            []string{"localhost:9200"},
+						Headers:          map[string]string{"X-Authorization": kRedacted, "X-Custom": "value"},
+						ServiceTokenPath: "path/to/file",
+					},
+				},
+			},
+		},
+		{
+			name: "redact static tokens",
+			inputCfg: &Config{
+				Inputs: []Input{{
+					Server: Server{
+						StaticPolicyTokens: StaticPolicyTokens{
+							Enabled: true,
+							PolicyTokens: []PolicyToken{{
+								TokenKey: "secretValue",
+								PolicyID: "testPolicy",
+							}},
+						},
+					},
+				}},
+			},
+			redactedCfg: &Config{
+				Inputs: []Input{{
+					Server: Server{
+						StaticPolicyTokens: StaticPolicyTokens{
+							Enabled: true,
+							PolicyTokens: []PolicyToken{{
+								TokenKey: kRedacted,
+								PolicyID: "testPolicy",
+							}},
+						},
+					},
+				}},
+			},
+		},
 	}
 
 	for _, tt := range testcases {
