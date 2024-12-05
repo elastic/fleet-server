@@ -155,6 +155,7 @@ func Test_CreateAndGetBulkerChanged(t *testing.T) {
 }
 
 func Benchmark_CreateAndGetBulker(b *testing.B) {
+	b.Skip("Crashes on remote runner")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	log := zerolog.Nop()
