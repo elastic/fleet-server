@@ -86,6 +86,14 @@ func (f *Fleet) GetConfig() *config.Config {
 
 // Run runs the fleet server
 func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
+	// ctx is cancelled when a SIGTERM or SIGINT is received or when the agent wrappers calls stop because a unit is being stopped/removed.
+
+	// Replace context with cancellable ctx
+	// in order to automatically cancel all the go routines
+	// that were started in the scope of this function on function exit
+	ctx, cn := context.WithCancel(ctx)
+	defer cn()
+
 	log := zerolog.Ctx(ctx)
 	err := initCfg.LoadServerLimits()
 	if err != nil {
@@ -101,12 +109,6 @@ func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
 
 	var curCfg *config.Config
 	newCfg := initCfg
-
-	// Replace context with cancellable ctx
-	// in order to automatically cancel all the go routines
-	// that were started in the scope of this function on function exit
-	ctx, cn := context.WithCancel(ctx)
-	defer cn()
 
 	stop := func(cn context.CancelFunc, g *errgroup.Group) {
 		if cn != nil {
@@ -320,7 +322,6 @@ func initRuntime(cfg *config.Config) {
 	gcPercent := cfg.Inputs[0].Server.Runtime.GCPercent
 	if gcPercent != 0 {
 		old := debug.SetGCPercent(gcPercent)
-
 		zerolog.Ctx(context.TODO()).Info().
 			Int("old", old).
 			Int("new", gcPercent).
@@ -329,7 +330,6 @@ func initRuntime(cfg *config.Config) {
 	memoryLimit := cfg.Inputs[0].Server.Runtime.MemoryLimit
 	if memoryLimit != 0 {
 		old := debug.SetMemoryLimit(memoryLimit)
-
 		zerolog.Ctx(context.TODO()).Info().
 			Int64("old", old).
 			Int64("new", memoryLimit).
@@ -433,6 +433,19 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	return g.Wait()
 }
 
+// runSubsystems starts  all other subsystems for fleet-server
+// we assume bulker.Run is called in another goroutine, it's ctx is not the same ctx passed into runSubsystems and used with the passed errgroup.
+// however if the bulker returns an error, the passed errgroup is canceled.
+// runSubsystems will also do an ES version check and run migrations if started in agent-mode
+// The started subsystems are:
+// - Elasticsearch GC - cleanup expired fleet actions
+// - Policy Index Monitor - track new documents in the .fleet-policies index
+// - Policy Monitor - parse .fleet-policies docuuments into usable policies
+// - Policy Self Monitor - report fleet-server health status based on .fleet-policies index
+// - Action Monitor - track new documents in the .fleet-actions index
+// - Action Dispatcher - send actions from the .fleet-actions index to agents that check in
+// - Bulk Checkin handler - batches agent checkin messages to _bulk endpoint, minimizes changed attributes
+// - HTTP APIs - start http server on 8220 (default) for external agents, and on 8221 (default) for managing agent in agent-mode or local communications.
 func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk, tracer *apm.Tracer) (err error) {
 	esCli := bulker.Client()
 
@@ -448,12 +461,9 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 			}
 			return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 		}
-	}
 
-	// Migrations are not executed in standalone mode. When needed, they will be executed
-	// by some external process.
-	if !f.standAlone {
-		// Run migrations
+		// Migrations are not executed in standalone mode. When needed, they will be executed
+		// by some external process.
 		loggedMigration := loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
 			return dl.Migrate(ctx, bulker)
 		})
