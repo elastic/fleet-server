@@ -153,3 +153,56 @@ func Test_CreateAndGetBulkerChanged(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, true, cancelFnCalled)
 }
+
+func Benchmark_CreateAndGetBulker(b *testing.B) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	log := zerolog.Nop()
+	outputMap := map[string]map[string]any{
+		"remote1": map[string]any{
+			"type":          "remote_elasticsearch",
+			"hosts":         []interface{}{"https://remote-es:443"},
+			"service_token": "token1",
+		},
+	}
+	b.Run("new remote bulker", func(b *testing.B) {
+		bulker := NewBulker(nil, nil)
+		b.ReportAllocs()
+		for range b.N {
+			b.StopTimer()
+			bulker.bulkerMap.Clear()
+			bulker.remoteOutputConfigMap.Clear()
+			b.StartTimer()
+
+			bulker.CreateAndGetBulker(ctx, log, "remote1", outputMap)
+		}
+	})
+	b.Run("existing remote bulker", func(b *testing.B) {
+		bulker := NewBulker(nil, nil)
+		outputBulker := NewBulker(nil, nil)
+		bulker.bulkerMap.Store("remote1", outputBulker)
+		bulker.remoteOutputConfigMap.Store("remote1", outputMap["remote1"])
+		b.ResetTimer()
+		b.ReportAllocs()
+		for range b.N {
+			bulker.CreateAndGetBulker(ctx, log, "remote1", outputMap)
+		}
+	})
+	b.Run("changed remote bulker", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			b.StopTimer()
+			bulker := NewBulker(nil, nil)
+			outputBulker := NewBulker(nil, nil)
+			bulker.bulkerMap.Store("remote1", outputBulker)
+			bulker.remoteOutputConfigMap.Store("remote1", map[string]any{
+				"type":          "remote_elasticsearch",
+				"hosts":         []interface{}{"https://remote-es:443"},
+				"service_token": "wrong token",
+			})
+			b.StartTimer()
+
+			bulker.CreateAndGetBulker(ctx, log, "remote1", outputMap)
+		}
+	})
+}
