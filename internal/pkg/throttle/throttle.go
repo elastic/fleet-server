@@ -8,7 +8,6 @@
 package throttle
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -47,13 +46,12 @@ func NewThrottle(max int) *Throttle {
 }
 
 // Acquire will return the token associated with passed key if possible or a nil.
-func (tt *Throttle) Acquire(key string, ttl time.Duration) *Token {
+func (tt *Throttle) Acquire(log zerolog.Logger, key string, ttl time.Duration) *Token {
 	var token *Token
 	tt.mut.Lock()
 	defer tt.mut.Unlock()
 
-	log := zerolog.Ctx(context.TODO())
-	if tt.checkAtMaxPending(key) {
+	if tt.checkAtMaxPending(log, key) {
 		log.Trace().
 			Str("key", key).
 			Int("max", tt.maxParallel).
@@ -100,7 +98,7 @@ func (tt *Throttle) Acquire(key string, ttl time.Duration) *Token {
 }
 
 // WARNING:  Assumes mutex already held
-func (tt *Throttle) checkAtMaxPending(key string) bool {
+func (tt *Throttle) checkAtMaxPending(log zerolog.Logger, key string) bool {
 
 	// Are we already at max parallel?
 	if tt.maxParallel == 0 || len(tt.tokenMap) < tt.maxParallel {
@@ -109,7 +107,6 @@ func (tt *Throttle) checkAtMaxPending(key string) bool {
 
 	now := time.Now()
 
-	log := zerolog.Ctx(context.TODO())
 	// Try to eject the target key first
 	if state, ok := tt.tokenMap[key]; ok && state.expire.Before(now) {
 		delete(tt.tokenMap, key)
@@ -137,11 +134,10 @@ func (tt *Throttle) checkAtMaxPending(key string) bool {
 	return !found
 }
 
-func (tt *Throttle) release(id uint64, key string) bool {
+func (tt *Throttle) release(log zerolog.Logger, id uint64, key string) bool {
 	tt.mut.Lock()
 	defer tt.mut.Unlock()
 
-	log := zerolog.Ctx(context.TODO())
 	state, ok := tt.tokenMap[key]
 	if !ok {
 		log.Trace().Uint64("id", id).Str("key", key).Msg("Token not found to release")
@@ -158,6 +154,6 @@ func (tt *Throttle) release(id uint64, key string) bool {
 }
 
 // Release will release the token so that another caller may acquire it through the Throttle.
-func (t Token) Release() bool {
-	return t.throttle.release(t.id, t.key)
+func (t Token) Release(log zerolog.Logger) bool {
+	return t.throttle.release(log, t.id, t.key)
 }

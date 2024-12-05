@@ -12,8 +12,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 const (
@@ -124,7 +125,7 @@ func createTemplate(ctx context.Context, cli *elasticsearch.Client, name string,
 	}
 	defer res.Body.Close()
 
-	err = checkResponseError(res)
+	err = checkResponseError(res, zerolog.Ctx(ctx))
 	if err != nil {
 		if errors.Is(err, ErrResourceAlreadyExists) {
 			zerolog.Ctx(ctx).Info().Str("name", name).Msg("Index template already exists")
