@@ -170,7 +170,7 @@ func redactOutput(cfg *Config) Output {
 	}
 
 	for k := range redacted.Elasticsearch.Headers {
-		if strings.Contains(strings.ToLower(k), "auth") {
+		if strings.Contains(strings.ToLower(k), "auth") || strings.Contains(strings.ToLower(k), "token") || strings.Contains(strings.ToLower(k), "key") { // best-effort scan to redact sensitive headers
 			redacted.Elasticsearch.Headers[k] = kRedacted
 		}
 	}
