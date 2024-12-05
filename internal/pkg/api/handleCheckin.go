@@ -91,9 +91,12 @@ func NewCheckinT(
 	pm policy.Monitor,
 	gcp monitor.GlobalCheckpointProvider,
 	ad *action.Dispatcher,
-	tr *action.TokenResolver,
 	bulker bulk.Bulk,
-) *CheckinT {
+) (*CheckinT, error) {
+	tr, err := action.NewTokenResolver(bulker)
+	if err != nil {
+		return nil, err
+	}
 	ct := &CheckinT{
 		verCon: verCon,
 		cfg:    cfg,
@@ -115,7 +118,7 @@ func NewCheckinT(
 		bulker: bulker,
 	}
 
-	return ct
+	return ct, nil
 }
 
 func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, id, userAgent string) error {
