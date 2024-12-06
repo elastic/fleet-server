@@ -170,29 +170,27 @@ func redactOutput(cfg *Config) Output {
 	}
 
 	if redacted.Elasticsearch.Headers != nil {
-		headers := make(map[string]string)
-		for k, v := range redacted.Elasticsearch.Headers {
-			headers[k] = v
-			lk := strings.ToLower(k)
-			if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") { // best-effort scan to redact sensitive headers
-				headers[k] = kRedacted
-			}
-		}
-		redacted.Elasticsearch.Headers = headers
+		redacted.Elasticsearch.Headers = redactHeaders(redacted.Elasticsearch.Headers)
 	}
 
 	if redacted.Elasticsearch.ProxyHeaders != nil {
-		proxyHeaders := make(map[string]string)
-		for k, v := range redacted.Elasticsearch.ProxyHeaders {
-			proxyHeaders[k] = v
-			lk := strings.ToLower(k)
-			if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") { // best-effort scan to redact sensitive headers
-				proxyHeaders[k] = kRedacted
-			}
-		}
-		redacted.Elasticsearch.ProxyHeaders = proxyHeaders
+		redacted.Elasticsearch.ProxyHeaders = redactHeaders(redacted.Elasticsearch.ProxyHeaders)
 	}
 	return redacted
+}
+
+// redactHeaders returns a copy of the passed headers map.
+// It will do a best-effort attempt to redact sensitive headers based on header names.
+func redactHeaders(headers map[string]string) map[string]string {
+	redactedHeaders := make(map[string]string)
+	for k, v := range headers {
+		redactedHeaders[k] = v
+		lk := strings.ToLower(k)
+		if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") {
+			redactedHeaders[k] = kRedacted
+		}
+	}
+	return redactedHeaders
 }
 
 func redactServer(cfg *Config) Server {
