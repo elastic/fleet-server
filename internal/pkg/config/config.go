@@ -169,18 +169,28 @@ func redactOutput(cfg *Config) Output {
 		redacted.Elasticsearch.TLS = &newTLS
 	}
 
-	for k := range redacted.Elasticsearch.Headers {
-		lk := strings.ToLower(k)
-		if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") { // best-effort scan to redact sensitive headers
-			redacted.Elasticsearch.Headers[k] = kRedacted
+	if redacted.Elasticsearch.Headers != nil {
+		headers := make(map[string]string)
+		for k, v := range redacted.Elasticsearch.Headers {
+			headers[k] = v
+			lk := strings.ToLower(k)
+			if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") { // best-effort scan to redact sensitive headers
+				headers[k] = kRedacted
+			}
 		}
+		redacted.Elasticsearch.Headers = headers
 	}
 
-	for k := range redacted.Elasticsearch.ProxyHeaders {
-		lk := strings.ToLower(k)
-		if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") { // best-effort scan to redact sensitive headers
-			redacted.Elasticsearch.ProxyHeaders[k] = kRedacted
+	if redacted.Elasticsearch.ProxyHeaders != nil {
+		proxyHeaders := make(map[string]string)
+		for k, v := range redacted.Elasticsearch.ProxyHeaders {
+			proxyHeaders[k] = v
+			lk := strings.ToLower(k)
+			if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") { // best-effort scan to redact sensitive headers
+				proxyHeaders[k] = kRedacted
+			}
 		}
+		redacted.Elasticsearch.ProxyHeaders = proxyHeaders
 	}
 	return redacted
 }
@@ -209,8 +219,15 @@ func redactServer(cfg *Config) Server {
 		redacted.Instrumentation.SecretToken = kRedacted
 	}
 
-	for i := range redacted.StaticPolicyTokens.PolicyTokens {
-		redacted.StaticPolicyTokens.PolicyTokens[i].TokenKey = kRedacted
+	if redacted.StaticPolicyTokens.PolicyTokens != nil {
+		policyTokens := make([]PolicyToken, len(redacted.StaticPolicyTokens.PolicyTokens))
+		for i := range redacted.StaticPolicyTokens.PolicyTokens {
+			policyTokens[i] = PolicyToken{
+				TokenKey: kRedacted,
+				PolicyID: redacted.StaticPolicyTokens.PolicyTokens[i].PolicyID,
+			}
+		}
+		redacted.StaticPolicyTokens.PolicyTokens = policyTokens
 	}
 
 	return redacted
