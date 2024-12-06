@@ -427,14 +427,14 @@ func TestConfigRedact(t *testing.T) {
 			},
 		},
 		{
-			name: "Redact custom authorization output header",
+			name: "Redact custom output headers",
 			inputCfg: &Config{
 				Inputs: []Input{{}},
 				Output: Output{
 					Elasticsearch: Elasticsearch{
 						Protocol:         "https",
 						Hosts:            []string{"localhost:9200"},
-						Headers:          map[string]string{"X-Authorization": "secretValue", "X-Custom": "value"},
+						Headers:          map[string]string{"X-Authorization": "secretValue", "X-Custom": "value", "X-App-Token": "customToken", "X-App-Key": "secretKey", "X-Custom-Bearer": "secretBearer"},
 						ServiceTokenPath: "path/to/file",
 					},
 				},
@@ -445,7 +445,32 @@ func TestConfigRedact(t *testing.T) {
 					Elasticsearch: Elasticsearch{
 						Protocol:         "https",
 						Hosts:            []string{"localhost:9200"},
-						Headers:          map[string]string{"X-Authorization": kRedacted, "X-Custom": "value"},
+						Headers:          map[string]string{"X-Authorization": kRedacted, "X-Custom": "value", "X-App-Token": kRedacted, "X-App-Key": kRedacted, "X-Custom-Bearer": kRedacted},
+						ServiceTokenPath: "path/to/file",
+					},
+				},
+			},
+		},
+		{
+			name: "Redact proxy authorization output header",
+			inputCfg: &Config{
+				Inputs: []Input{{}},
+				Output: Output{
+					Elasticsearch: Elasticsearch{
+						Protocol:         "https",
+						Hosts:            []string{"localhost:9200"},
+						ProxyHeaders:     map[string]string{"X-Proxy-Authorization": "secretValue"},
+						ServiceTokenPath: "path/to/file",
+					},
+				},
+			},
+			redactedCfg: &Config{
+				Inputs: []Input{{}},
+				Output: Output{
+					Elasticsearch: Elasticsearch{
+						Protocol:         "https",
+						Hosts:            []string{"localhost:9200"},
+						ProxyHeaders:     map[string]string{"X-Proxy-Authorization": kRedacted},
 						ServiceTokenPath: "path/to/file",
 					},
 				},

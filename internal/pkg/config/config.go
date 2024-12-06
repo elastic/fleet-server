@@ -170,11 +170,18 @@ func redactOutput(cfg *Config) Output {
 	}
 
 	for k := range redacted.Elasticsearch.Headers {
-		if strings.Contains(strings.ToLower(k), "auth") || strings.Contains(strings.ToLower(k), "token") || strings.Contains(strings.ToLower(k), "key") { // best-effort scan to redact sensitive headers
+		lk := strings.ToLower(k)
+		if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") { // best-effort scan to redact sensitive headers
 			redacted.Elasticsearch.Headers[k] = kRedacted
 		}
 	}
 
+	for k := range redacted.Elasticsearch.ProxyHeaders {
+		lk := strings.ToLower(k)
+		if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") { // best-effort scan to redact sensitive headers
+			redacted.Elasticsearch.ProxyHeaders[k] = kRedacted
+		}
+	}
 	return redacted
 }
 
