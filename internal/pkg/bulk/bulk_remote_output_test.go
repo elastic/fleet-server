@@ -82,12 +82,10 @@ func Test_hasChangedAndUpdateRemoteOutputConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			log := testlog.SetLogger(t)
 			bulker := NewBulker(nil, nil)
-			bulker.remoteOutputConfigMap.Store("remote1", tc.cfg)
+			bulker.remoteOutputConfigMap["remote1"] = tc.cfg
 			hasChanged := bulker.hasChangedAndUpdateRemoteOutputConfig(log, "remote1", tc.newCfg)
 			assert.Equal(t, tc.changed, hasChanged)
-			result, ok := bulker.remoteOutputConfigMap.Load("remote1")
-			assert.True(t, ok)
-			assert.Equal(t, tc.newCfg, result)
+			assert.Equal(t, tc.newCfg, bulker.remoteOutputConfigMap["remote1"])
 		})
 	}
 }
@@ -113,14 +111,14 @@ func Test_CreateAndGetBulkerExisting(t *testing.T) {
 	defer cn()
 	bulker := NewBulker(nil, nil)
 	outputBulker := NewBulker(nil, nil)
-	bulker.bulkerMap.Store("remote1", outputBulker)
+	bulker.bulkerMap["remote1"] = outputBulker
 	outputMap := make(map[string]map[string]interface{})
 	cfg := map[string]interface{}{
 		"type":          "remote_elasticsearch",
 		"hosts":         []interface{}{"https://remote-es:443"},
 		"service_token": "token1",
 	}
-	bulker.remoteOutputConfigMap.Store("remote1", cfg)
+	bulker.remoteOutputConfigMap["remote1"] = cfg
 	outputMap["remote1"] = cfg
 	newBulker, hasChanged, err := bulker.CreateAndGetBulker(ctx, zerolog.Nop(), "remote1", outputMap)
 	assert.Equal(t, outputBulker, newBulker)
@@ -133,13 +131,13 @@ func Test_CreateAndGetBulkerChanged(t *testing.T) {
 	defer cn()
 	bulker := NewBulker(nil, nil)
 	outputBulker := NewBulker(nil, nil)
-	bulker.bulkerMap.Store("remote1", outputBulker)
+	bulker.bulkerMap["remote1"] = outputBulker
 	outputMap := make(map[string]map[string]interface{})
-	bulker.remoteOutputConfigMap.Store("remote1", map[string]interface{}{
+	bulker.remoteOutputConfigMap["remote1"] = map[string]interface{}{
 		"type":          "remote_elasticsearch",
 		"hosts":         []interface{}{"https://remote-es:443"},
 		"service_token": "token1",
-	})
+	}
 	outputMap["remote1"] = map[string]interface{}{
 		"type":          "remote_elasticsearch",
 		"hosts":         []interface{}{"https://remote-es:443"},
@@ -171,8 +169,8 @@ func Benchmark_CreateAndGetBulker(b *testing.B) {
 		b.ReportAllocs()
 		for range b.N {
 			b.StopTimer()
-			bulker.bulkerMap.Clear()
-			bulker.remoteOutputConfigMap.Clear()
+			bulker.bulkerMap = make(map[string]Bulk)
+			bulker.remoteOutputConfigMap = make(map[string]map[string]any)
 			b.StartTimer()
 
 			bulker.CreateAndGetBulker(ctx, log, "remote1", outputMap)
@@ -181,8 +179,8 @@ func Benchmark_CreateAndGetBulker(b *testing.B) {
 	b.Run("existing remote bulker", func(b *testing.B) {
 		bulker := NewBulker(nil, nil)
 		outputBulker := NewBulker(nil, nil)
-		bulker.bulkerMap.Store("remote1", outputBulker)
-		bulker.remoteOutputConfigMap.Store("remote1", outputMap["remote1"])
+		bulker.bulkerMap["remote1"] = outputBulker
+		bulker.remoteOutputConfigMap["remote1"] = outputMap["remote1"]
 		b.ResetTimer()
 		b.ReportAllocs()
 		for range b.N {
@@ -195,12 +193,12 @@ func Benchmark_CreateAndGetBulker(b *testing.B) {
 			b.StopTimer()
 			bulker := NewBulker(nil, nil)
 			outputBulker := NewBulker(nil, nil)
-			bulker.bulkerMap.Store("remote1", outputBulker)
-			bulker.remoteOutputConfigMap.Store("remote1", map[string]any{
+			bulker.bulkerMap["remote1"] = outputBulker
+			bulker.remoteOutputConfigMap["remote1"] = map[string]any{
 				"type":          "remote_elasticsearch",
 				"hosts":         []interface{}{"https://remote-es:443"},
 				"service_token": "wrong token",
-			})
+			}
 			b.StartTimer()
 
 			bulker.CreateAndGetBulker(ctx, log, "remote1", outputMap)

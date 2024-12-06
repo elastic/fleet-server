@@ -91,9 +91,10 @@ type Bulker struct {
 	blkPool               sync.Pool
 	apikeyLimit           *semaphore.Weighted
 	tracer                *apm.Tracer
-	remoteOutputConfigMap sync.Map
-	bulkerMap             sync.Map
+	remoteOutputConfigMap map[string]map[string]interface{}
+	bulkerMap             map[string]Bulk
 	cancelFn              context.CancelFunc
+	remoteOutputMutex     sync.RWMutex
 }
 
 const (
@@ -116,37 +117,32 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 	}
 
 	return &Bulker{
-		opts:        bopts,
-		es:          es,
-		ch:          make(chan *bulkT, bopts.blockQueueSz),
-		blkPool:     sync.Pool{New: poolFunc},
-		apikeyLimit: semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
-		tracer:      tracer,
+		opts:                  bopts,
+		es:                    es,
+		ch:                    make(chan *bulkT, bopts.blockQueueSz),
+		blkPool:               sync.Pool{New: poolFunc},
+		apikeyLimit:           semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
+		tracer:                tracer,
+		remoteOutputConfigMap: make(map[string]map[string]interface{}),
+		// remote ES bulkers
+		bulkerMap: make(map[string]Bulk),
 	}
 }
 
 func (b *Bulker) GetBulker(outputName string) Bulk {
-	o, ok := b.bulkerMap.Load(outputName)
-	if !ok {
-		return nil
-	}
-	return o.(Bulk)
+	b.remoteOutputMutex.RLock()
+	defer b.remoteOutputMutex.RUnlock()
+	return b.bulkerMap[outputName]
 }
 
-// GetBulkerMap returns a copy of the BulkerMap
+// GetBulkerMap returns a copy of the remote output bulkers
 func (b *Bulker) GetBulkerMap() map[string]Bulk {
 	mp := make(map[string]Bulk)
-	for k, v := range b.bulkerMap.Range {
-		str, ok := k.(string)
-		if !ok {
-			continue
-		}
-		blk, ok := v.(Bulk)
-		if !ok {
-			continue
-		}
-		mp[str] = blk
+	b.remoteOutputMutex.RLock()
+	for k, v := range b.bulkerMap {
+		mp[k] = v
 	}
+	b.remoteOutputMutex.RUnlock()
 	return mp
 }
 
@@ -155,7 +151,11 @@ func (b *Bulker) CancelFn() context.CancelFunc {
 }
 
 func (b *Bulker) updateBulkerMap(outputName string, newBulker *Bulker) {
-	b.bulkerMap.Store(outputName, newBulker)
+	// concurrency control of updating map
+	b.remoteOutputMutex.Lock()
+	defer b.remoteOutputMutex.Unlock()
+
+	b.bulkerMap[outputName] = newBulker
 }
 
 // for remote ES output, create a new bulker in bulkerMap if does not exist
@@ -164,12 +164,14 @@ func (b *Bulker) updateBulkerMap(outputName string, newBulker *Bulker) {
 // if changed, stop the existing bulker and create a new one
 func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (Bulk, bool, error) {
 	hasConfigChanged := b.hasChangedAndUpdateRemoteOutputConfig(zlog, outputName, outputMap[outputName])
-	bulker, ok := b.bulkerMap.Load(outputName)
-	if ok && !hasConfigChanged {
-		return bulker.(Bulk), false, nil
+	b.remoteOutputMutex.RLock()
+	bulker := b.bulkerMap[outputName]
+	b.remoteOutputMutex.RUnlock()
+	if bulker != nil && !hasConfigChanged {
+		return bulker, false, nil
 	}
-	if ok && hasConfigChanged {
-		cancelFn := bulker.(Bulk).CancelFn()
+	if bulker != nil && hasConfigChanged {
+		cancelFn := bulker.CancelFn()
 		if cancelFn != nil {
 			cancelFn()
 		}
@@ -257,12 +259,15 @@ func (b *Bulker) Client() *elasticsearch.Client {
 }
 
 func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
-	curCfg, ok := b.remoteOutputConfigMap.Load(name)
-	if !ok || curCfg.(map[string]any) == nil {
-		return false
-	}
+	curCfg := b.remoteOutputConfigMap[name]
 
-	return !reflect.DeepEqual(curCfg, newCfg)
+	hasChanged := false
+
+	// when output config first added, not reporting change
+	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
+		hasChanged = true
+	}
+	return hasChanged
 }
 
 // check if remote output cfg changed
@@ -276,7 +281,7 @@ func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name
 	for k, v := range newCfg {
 		newCfgCopy[k] = v
 	}
-	b.remoteOutputConfigMap.Store(name, newCfgCopy)
+	b.remoteOutputConfigMap[name] = newCfgCopy
 	return hasChanged
 }
 
@@ -435,8 +440,10 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 	// cancelling context of each remote bulker when Run exits
 	defer func() {
-		for _, v := range b.bulkerMap.Range {
-			v.(Bulk).CancelFn()()
+		b.remoteOutputMutex.RLock()
+		defer b.remoteOutputMutex.RUnlock()
+		for _, bulker := range b.bulkerMap {
+			bulker.CancelFn()()
 		}
 	}()
 
