@@ -97,13 +97,14 @@ type Bulker struct {
 }
 
 const (
-	defaultFlushInterval     = time.Second * 5
-	defaultFlushThresholdCnt = 32768
-	defaultFlushThresholdSz  = 1024 * 1024 * 10
-	defaultMaxPending        = 32
-	defaultBlockQueueSz      = 32 // Small capacity to allow multiOp to spin fast
-	defaultAPIKeyMaxParallel = 32
-	defaultApikeyMaxReqSize  = 100 * 1024 * 1024
+	defaultFlushInterval       = time.Second * 5
+	defaultFlushThresholdCnt   = 32768
+	defaultFlushThresholdSz    = 1024 * 1024 * 10
+	defaultMaxPending          = 32
+	defaultBlockQueueSz        = 32 // Small capacity to allow multiOp to spin fast
+	defaultAPIKeyMaxParallel   = 32
+	defaultApikeyMaxReqSize    = 100 * 1024 * 1024
+	defaultFlushContextTimeout = time.Minute * 1
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -173,7 +174,7 @@ func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, ou
 			cancelFn()
 		}
 	}
-	bulkCtx, bulkCancel := context.WithCancel(context.Background())
+	bulkCtx, bulkCancel := context.WithCancel(context.Background()) // background context used to allow bulker to flush on exit, exits when config changes or primary bulker exits.
 	es, err := b.createRemoteEsClient(bulkCtx, outputName, outputMap)
 	if err != nil {
 		defer bulkCancel()
@@ -423,6 +424,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 				Int("itemCnt", itemCnt).
 				Int("byteCnt", byteCnt).
 				Msg("Flush on timer")
+
 			err = doFlush()
 
 		case <-ctx.Done():
@@ -450,7 +452,11 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		Str("queue", queue.Type()).
 		Msg("flushQueue Wait")
 
-	if err := w.Acquire(ctx, 1); err != nil {
+	acquireCtx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
+	defer cancel()
+
+	if err := w.Acquire(acquireCtx, 1); err != nil {
+		zerolog.Ctx(ctx).Error().Err(err).Msg("flushQueue Wait error")
 		return err
 	}
 
@@ -465,6 +471,10 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 	go func() {
 		start := time.Now()
 
+		// deadline prevents bulker being blocked on flush
+		flushCtx, cancel := context.WithTimeout(ctx, defaultFlushContextTimeout)
+		defer cancel()
+
 		if b.tracer != nil {
 			trans := b.tracer.StartTransaction(fmt.Sprintf("Flush queue %s", queue.Type()), "bulker")
 			trans.Context.SetLabel("queue.size", queue.cnt)
@@ -478,13 +488,13 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		var err error
 		switch queue.ty {
 		case kQueueRead, kQueueRefreshRead:
-			err = b.flushRead(ctx, queue)
+			err = b.flushRead(flushCtx, queue)
 		case kQueueSearch, kQueueFleetSearch:
-			err = b.flushSearch(ctx, queue)
+			err = b.flushSearch(flushCtx, queue)
 		case kQueueAPIKeyUpdate:
-			err = b.flushUpdateAPIKey(ctx, queue)
+			err = b.flushUpdateAPIKey(flushCtx, queue)
 		default:
-			err = b.flushBulk(ctx, queue)
+			err = b.flushBulk(flushCtx, queue)
 		}
 
 		if err != nil {
@@ -509,8 +519,12 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 func failQueue(queue queueT, err error) {
 	for n := queue.head; n != nil; {
 		next := n.next // 'n' is invalid immediately on channel send
-		n.ch <- respT{
+		select {
+		case n.ch <- respT{
 			err: err,
+		}:
+		default:
+			panic("Unexpected blocked response channel on failQueue")
 		}
 		n = next
 	}
