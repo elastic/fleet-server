@@ -1005,13 +1005,14 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	// Compare the deserialized meta structures and return the bytes to update if different
 	if !reflect.DeepEqual(reqComponents, agent.Components) {
 
+		reqComponentsJSON, _ := json.Marshal(*req.Components)
 		zlog.Trace().
-			RawJSON("oldComponents", agentComponentsJSON).
-			RawJSON("newComponents", *req.Components).
+			Str("oldComponents", string(agentComponentsJSON)).
+			Str("req.Components", string(reqComponentsJSON)).
 			Msg("local components data is not equal")
 
 		zlog.Info().
-			RawJSON("req.Components", *req.Components).
+			Str("req.Components", string(reqComponentsJSON)).
 			Msg("applying new components data")
 
 		outComponents = *req.Components
