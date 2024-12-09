@@ -8,11 +8,8 @@ package config
 import (
 	"context"
 	"errors"
-<<<<<<< HEAD
 	"slices"
-=======
 	"strings"
->>>>>>> d0993e86 (Redact static tokens and custom http headers (#4182))
 	"sync"
 
 	"github.com/gofrs/uuid"
