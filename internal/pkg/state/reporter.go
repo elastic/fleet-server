@@ -6,10 +6,9 @@
 package state
 
 import (
-	"context"
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/rs/zerolog"
 )
 
 // Reporter is interface that reports updated state on.
@@ -19,16 +18,20 @@ type Reporter interface {
 }
 
 // Log will write state' to log.
-type Log struct{}
+type Log struct {
+	*zerolog.Logger
+}
 
 // NewLog creates a Log.
-func NewLog() *Log {
-	return &Log{}
+func NewLog(l *zerolog.Logger) *Log {
+	return &Log{
+		l,
+	}
 }
 
 // UpdateState triggers updating the state.
 func (l *Log) UpdateState(state client.UnitState, message string, _ map[string]interface{}) error {
-	zerolog.Ctx(context.TODO()).Info().Str("state", state.String()).Msg(message)
+	l.Info().Str("state", state.String()).Msg(message)
 	return nil
 }
 

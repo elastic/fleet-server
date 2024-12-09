@@ -21,11 +21,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/go-ucfg"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 type APIKey = apikey.APIKey
@@ -175,7 +176,7 @@ func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, ou
 			cancelFn()
 		}
 	}
-	bulkCtx, bulkCancel := context.WithCancel(context.Background())
+	bulkCtx, bulkCancel := context.WithCancel(context.Background()) // background context used to allow bulker to flush on exit, exits when config changes or primary bulker exits.
 	es, err := b.createRemoteEsClient(bulkCtx, outputName, outputMap)
 	if err != nil {
 		defer bulkCancel()

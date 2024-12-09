@@ -10,8 +10,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 func CreateDatastream(ctx context.Context, cli *elasticsearch.Client, name string) error {
@@ -25,7 +26,7 @@ func CreateDatastream(ctx context.Context, cli *elasticsearch.Client, name strin
 
 	defer res.Body.Close()
 
-	err = checkResponseError(res)
+	err = checkResponseError(res, zerolog.Ctx(ctx))
 	if err != nil {
 		if errors.Is(err, ErrResourceAlreadyExists) {
 			zerolog.Ctx(ctx).Info().Str("name", name).Msg("Datastream already exists")

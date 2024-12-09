@@ -12,9 +12,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 )
 
 var (
@@ -46,11 +47,11 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 		return info, err
 	}
 	vSpan, _ := apm.StartSpan(ctx, "validateUpload", "validate")
-	if !u.allChunksPresent(info, chunks) {
+	if !u.allChunksPresent(ctx, info, chunks) {
 		vSpan.End()
 		return info, ErrMissingChunks
 	}
-	if !u.verifyChunkInfo(info, chunks, transitHash) {
+	if !u.verifyChunkInfo(ctx, info, chunks, transitHash) {
 		if err := SetStatus(ctx, u.bulker, info, file.StatusFail); err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("fileID", info.DocID).Str("uploadID", info.ID).Msg("file upload failed chunk validation, but encountered an error setting the upload status to failure")
 		}
@@ -73,8 +74,8 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 	return info, nil
 }
 
-func (u *Uploader) allChunksPresent(info file.Info, chunks []file.ChunkInfo) bool {
-	log := zerolog.Ctx(context.TODO())
+func (u *Uploader) allChunksPresent(ctx context.Context, info file.Info, chunks []file.ChunkInfo) bool {
+	log := zerolog.Ctx(ctx)
 	// check overall count
 	if len(chunks) != info.Count {
 		log.Warn().Int("expectedCount", info.Count).Int("received", len(chunks)).Interface("chunks", chunks).Msg("mismatch number of chunks")
@@ -96,8 +97,8 @@ func (u *Uploader) allChunksPresent(info file.Info, chunks []file.ChunkInfo) boo
 	return true
 }
 
-func (u *Uploader) verifyChunkInfo(info file.Info, chunks []file.ChunkInfo, transitHash string) bool {
-	log := zerolog.Ctx(context.TODO())
+func (u *Uploader) verifyChunkInfo(ctx context.Context, info file.Info, chunks []file.ChunkInfo, transitHash string) bool {
+	log := zerolog.Ctx(ctx)
 	// verify all chunks except last are info.ChunkSize size
 	// verify last: false (or field excluded) for all except final chunk
 	// verify final chunk is last: true

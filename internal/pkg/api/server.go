@@ -60,7 +60,7 @@ func (s *server) Run(ctx context.Context) error {
 		MaxHeaderBytes:    mhbz,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		ErrorLog:          errLogger(ctx),
-		ConnState:         diagConn,
+		ConnState:         getDiagConnFunc(ctx),
 	}
 
 	var listenCfg net.ListenConfig
@@ -117,7 +117,7 @@ func (s *server) Run(ctx context.Context) error {
 		}
 	// Do a clean shutdown if the context is cancelled
 	case <-ctx.Done():
-		sCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Timeouts.Drain)
+		sCtx, cancel := context.WithTimeout(context.Background(), s.cfg.Timeouts.Drain) // Background context to allow connections to drain when server context is cancelled.
 		defer cancel()
 		if err := srv.Shutdown(sCtx); err != nil {
 			cErr := srv.Close() // force it closed
@@ -128,24 +128,26 @@ func (s *server) Run(ctx context.Context) error {
 	return nil
 }
 
-func diagConn(c net.Conn, s http.ConnState) {
-	if c == nil {
-		return
-	}
+func getDiagConnFunc(ctx context.Context) func(c net.Conn, s http.ConnState) {
+	return func(c net.Conn, s http.ConnState) {
+		if c == nil {
+			return
+		}
 
-	zerolog.Ctx(context.TODO()).Trace().
-		Str("local", c.LocalAddr().String()).
-		Str("remote", c.RemoteAddr().String()).
-		Str("state", s.String()).
-		Msg("connection state change")
+		zerolog.Ctx(ctx).Trace().
+			Str("local", c.LocalAddr().String()).
+			Str("remote", c.RemoteAddr().String()).
+			Str("state", s.String()).
+			Msg("connection state change")
 
-	switch s {
-	case http.StateNew:
-		cntHTTPNew.Inc()
-		cntHTTPActive.Inc()
-	case http.StateClosed:
-		cntHTTPClose.Inc()
-		cntHTTPActive.Dec()
+		switch s {
+		case http.StateNew:
+			cntHTTPNew.Inc()
+			cntHTTPActive.Inc()
+		case http.StateClosed:
+			cntHTTPClose.Inc()
+			cntHTTPActive.Dec()
+		}
 	}
 }
 
@@ -157,7 +159,7 @@ func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) 
 			Int("hardConnLimit", hardLimit).
 			Msg("server hard connection limiter installed")
 
-		ln = limit.Listener(ln, hardLimit)
+		ln = limit.Listener(ln, hardLimit, zerolog.Ctx(ctx))
 	} else {
 		zerolog.Ctx(ctx).Info().Msg("server hard connection limiter disabled")
 	}

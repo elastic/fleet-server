@@ -5,12 +5,13 @@
 package limit
 
 import (
-	"context"
 	"net"
 	"sync"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 )
 
 // Derived from netutil.LimitListener but works slightly differently.
@@ -22,11 +23,12 @@ import (
 // The downside to this is that it will Close() valid connections
 // indiscriminately.
 
-func Listener(l net.Listener, n int) net.Listener {
+func Listener(l net.Listener, n int, log *zerolog.Logger) net.Listener {
 	return &limitListener{
 		Listener: l,
 		sem:      make(chan struct{}, n),
 		done:     make(chan struct{}),
+		log:      log,
 	}
 }
 
@@ -35,6 +37,7 @@ type limitListener struct {
 	sem       chan struct{}
 	closeOnce sync.Once     // ensures the done chan is only closed once
 	done      chan struct{} // no values sent; closed when Close is called
+	log       *zerolog.Logger
 }
 
 func (l *limitListener) acquire() bool {
@@ -59,7 +62,7 @@ func (l *limitListener) Accept() (net.Conn, error) {
 
 	// If we cannot acquire the semaphore, close the connection
 	if acquired := l.acquire(); !acquired {
-		zlog := zerolog.Ctx(context.TODO()).Warn()
+		zlog := log.Warn()
 
 		var err error
 		if c != nil {
