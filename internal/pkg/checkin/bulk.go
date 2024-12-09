@@ -18,9 +18,10 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
+	"github.com/rs/zerolog"
+
 	estypes "github.com/elastic/go-elasticsearch/v8/typedapi/types"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/scriptlanguage"
-	"github.com/rs/zerolog"
 )
 
 const defaultFlushInterval = 10 * time.Second
@@ -142,26 +143,20 @@ func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, c
 
 // Run starts the flush timer and exit only when the context is cancelled.
 func (bc *Bulk) Run(ctx context.Context) error {
-
 	tick := time.NewTicker(bc.opts.flushInterval)
 	defer tick.Stop()
 
-	var err error
-LOOP:
 	for {
 		select {
 		case <-tick.C:
-			if err = bc.flush(ctx); err != nil {
+			if err := bc.flush(ctx); err != nil {
 				zerolog.Ctx(ctx).Error().Err(err).Msg("Eat bulk checkin error; Keep on truckin'")
 			}
 
 		case <-ctx.Done():
-			err = ctx.Err()
-			break LOOP
+			return ctx.Err()
 		}
 	}
-
-	return err
 }
 
 // flush sends the minium data needed to update records in elasticsearch.
