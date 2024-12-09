@@ -129,11 +129,20 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 }
 
 func (b *Bulker) GetBulker(outputName string) Bulk {
+	b.remoteOutputMutex.RLock()
+	defer b.remoteOutputMutex.RUnlock()
 	return b.bulkerMap[outputName]
 }
 
+// GetBulkerMap returns a copy of the remote output bulkers
 func (b *Bulker) GetBulkerMap() map[string]Bulk {
-	return b.bulkerMap
+	mp := make(map[string]Bulk)
+	b.remoteOutputMutex.RLock()
+	for k, v := range b.bulkerMap {
+		mp[k] = v
+	}
+	b.remoteOutputMutex.RUnlock()
+	return mp
 }
 
 func (b *Bulker) CancelFn() context.CancelFunc {
@@ -154,7 +163,9 @@ func (b *Bulker) updateBulkerMap(outputName string, newBulker *Bulker) {
 // if changed, stop the existing bulker and create a new one
 func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (Bulk, bool, error) {
 	hasConfigChanged := b.hasChangedAndUpdateRemoteOutputConfig(zlog, outputName, outputMap[outputName])
+	b.remoteOutputMutex.RLock()
 	bulker := b.bulkerMap[outputName]
+	b.remoteOutputMutex.RUnlock()
 	if bulker != nil && !hasConfigChanged {
 		return bulker, false, nil
 	}
@@ -428,6 +439,8 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 	// cancelling context of each remote bulker when Run exits
 	defer func() {
+		b.remoteOutputMutex.RLock()
+		defer b.remoteOutputMutex.RUnlock()
 		for _, bulker := range b.bulkerMap {
 			bulker.CancelFn()()
 		}
