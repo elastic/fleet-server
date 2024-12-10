@@ -1011,9 +1011,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 			Str("req.Components", string(reqComponentsJSON)).
 			Msg("local components data is not equal")
 
-		zlog.Info().
-			Str("req.Components", string(reqComponentsJSON)).
-			Msg("applying new components data")
+		zlog.Info().Msg("applying new components data")
 
 		outComponents = *req.Components
 		compUnhealthyReason := calcUnhealthyReason(reqComponents)
