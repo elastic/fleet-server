@@ -248,7 +248,6 @@ func (c *Config) Redact() *Config {
 }
 
 func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
-	keys := c.FlattenedKeys()
 	for opt, message := range deprecatedOpts {
 		if c.HasField(opt) {
 			zerolog.Ctx(context.TODO()).Warn().Msg(message) // TODO is used as this may be called before logger config is read.
