@@ -5,7 +5,6 @@
 package config
 
 import (
-	"context"
 	"embed"
 	"fmt"
 	"io"
@@ -282,13 +281,12 @@ func init() {
 // If agentLimit > 0 the settings from the matching default/*.yml file are used based off agent count.
 // If agentLimit == 0 then the settings from default/*.yml are used based off system memory.
 // If a lookup fails, default settings are used.
-func loadLimits(agentLimit int) *envLimits {
+func loadLimits(log *zerolog.Logger, agentLimit int) *envLimits {
 	if agentLimit < 0 {
 		return defaultEnvLimits()
 	} else if agentLimit == 0 {
-		return memEnvLimits()
+		return memEnvLimits(log)
 	}
-	log := zerolog.Ctx(context.TODO())
 	for _, l := range defaults {
 		// get nearest limits for configured agent numbers
 		if l.Agents.Min <= agentLimit && agentLimit <= l.Agents.Max {
@@ -310,11 +308,10 @@ var memMB func() uint64 = func() uint64 {
 	return memory.TotalMemory() / 1024 / 1024
 }
 
-func memEnvLimits() *envLimits {
+func memEnvLimits(log *zerolog.Logger) *envLimits {
 	mem := memMB()
 	k := 0
 	var recRAM uint64
-	log := zerolog.Ctx(context.TODO())
 	for i, l := range defaults {
 		if mem >= l.RecommendedRAM && l.RecommendedRAM > recRAM {
 			k = i

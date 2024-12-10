@@ -5,7 +5,6 @@
 package esutil
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,8 +12,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog"
+
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 const (
@@ -52,9 +52,9 @@ type errorResponse struct {
 	Status int `json:"status,omitempty"`
 }
 
-func checkResponseError(res *esapi.Response) error {
+func checkResponseError(res *esapi.Response, log *zerolog.Logger) error {
 	if res.StatusCode >= http.StatusBadRequest {
-		resErr, err := parseResponseError(res)
+		resErr, err := parseResponseError(res, log)
 		if err != nil {
 			return err
 		}
@@ -79,7 +79,7 @@ func checkResponseError(res *esapi.Response) error {
 	return nil
 }
 
-func parseResponseError(res *esapi.Response) (*errorResponse, error) {
+func parseResponseError(res *esapi.Response, log *zerolog.Logger) (*errorResponse, error) {
 	var eres errorResponse
 	if res.StatusCode >= http.StatusBadRequest {
 		// Read the original body content, in case if it was a error from the cloud response
@@ -105,7 +105,7 @@ func parseResponseError(res *esapi.Response) (*errorResponse, error) {
 
 		// Unexpected error, probably from the cloud deployment, not elasticsearch API response
 		if eres.Status == 0 {
-			zerolog.Ctx(context.TODO()).Warn().
+			log.Warn().
 				Int("status", eres.Status).
 				Str("type", eres.Error.Type).
 				Str("reason", eres.Error.Reason).Msg("ES client response error")

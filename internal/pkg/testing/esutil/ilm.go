@@ -12,8 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // Can be cleaner but it's temporary bootstrap until it's moved to the elasticseach system index plugin
@@ -55,7 +56,7 @@ func EnsureILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 	if res.StatusCode == http.StatusNotFound {
 		// Got 404. Could be from elastic, could be from the cloud if deployment is not found.
 		// Parse response to figure out the details from JSON body
-		errRes, err := parseResponseError(res)
+		errRes, err := parseResponseError(res, zerolog.Ctx(ctx))
 		if err != nil {
 			lg.Warn().Err(err).Msgf("Failed to parse ILM policy not found response.")
 			return err
@@ -80,7 +81,7 @@ func EnsureILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 	}
 
 	// Check for other possible error responses
-	err = checkResponseError(res)
+	err = checkResponseError(res, zerolog.Ctx(ctx))
 	if err != nil {
 		lg.Info().Err(err).Msgf("Error response on fetching ILM Policy")
 		return err
@@ -157,7 +158,7 @@ func createILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 		return err
 	}
 	defer res.Body.Close()
-	return checkResponseError(res)
+	return checkResponseError(res, zerolog.Ctx(ctx))
 }
 
 func GetILMPolicyName(name string) string {
