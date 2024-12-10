@@ -8,7 +8,6 @@ package config
 import (
 	"context"
 	"errors"
-	"slices"
 	"sync"
 
 	"github.com/gofrs/uuid"
@@ -218,13 +217,8 @@ func (c *Config) Redact() *Config {
 func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
 	keys := c.FlattenedKeys()
 	for opt, message := range deprecatedOpts {
-<<<<<<< HEAD
-		if slices.Contains(keys, opt) {
-			zerolog.Ctx(context.TODO()).Warn().Msg(message)
-=======
 		if c.HasField(opt) {
 			zerolog.Ctx(context.TODO()).Warn().Msg(message) // TODO is used as this may be called before logger config is read.
->>>>>>> cf41f38c (Replace most context.TODO calls, comment on other Background and TODOs (#4168))
 		}
 	}
 }

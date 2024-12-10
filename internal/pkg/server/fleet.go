@@ -321,11 +321,7 @@ func initRuntime(log *zerolog.Logger, cfg *config.Config) {
 	if gcPercent != 0 {
 		old := debug.SetGCPercent(gcPercent)
 
-<<<<<<< HEAD
-		zerolog.Ctx(context.TODO()).Info().
-=======
 		log.Info().
->>>>>>> cf41f38c (Replace most context.TODO calls, comment on other Background and TODOs (#4168))
 			Int("old", old).
 			Int("new", gcPercent).
 			Msg("SetGCPercent")
@@ -333,12 +329,7 @@ func initRuntime(log *zerolog.Logger, cfg *config.Config) {
 	memoryLimit := cfg.Inputs[0].Server.Runtime.MemoryLimit
 	if memoryLimit != 0 {
 		old := debug.SetMemoryLimit(memoryLimit)
-<<<<<<< HEAD
-
-		zerolog.Ctx(context.TODO()).Info().
-=======
 		log.Info().
->>>>>>> cf41f38c (Replace most context.TODO calls, comment on other Background and TODOs (#4168))
 			Int64("old", old).
 			Int64("new", memoryLimit).
 			Msg("SetMemoryLimit")
