@@ -427,6 +427,85 @@ func TestConfigRedact(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Redact custom output headers",
+			inputCfg: &Config{
+				Inputs: []Input{{}},
+				Output: Output{
+					Elasticsearch: Elasticsearch{
+						Protocol:         "https",
+						Hosts:            []string{"localhost:9200"},
+						Headers:          map[string]string{"X-Authorization": "secretValue", "X-Custom": "value", "X-App-Token": "customToken", "X-App-Key": "secretKey", "X-Custom-Bearer": "secretBearer"},
+						ServiceTokenPath: "path/to/file",
+					},
+				},
+			},
+			redactedCfg: &Config{
+				Inputs: []Input{{}},
+				Output: Output{
+					Elasticsearch: Elasticsearch{
+						Protocol:         "https",
+						Hosts:            []string{"localhost:9200"},
+						Headers:          map[string]string{"X-Authorization": kRedacted, "X-Custom": "value", "X-App-Token": kRedacted, "X-App-Key": kRedacted, "X-Custom-Bearer": kRedacted},
+						ServiceTokenPath: "path/to/file",
+					},
+				},
+			},
+		},
+		{
+			name: "Redact proxy authorization output header",
+			inputCfg: &Config{
+				Inputs: []Input{{}},
+				Output: Output{
+					Elasticsearch: Elasticsearch{
+						Protocol:         "https",
+						Hosts:            []string{"localhost:9200"},
+						ProxyHeaders:     map[string]string{"X-Proxy-Authorization": "secretValue"},
+						ServiceTokenPath: "path/to/file",
+					},
+				},
+			},
+			redactedCfg: &Config{
+				Inputs: []Input{{}},
+				Output: Output{
+					Elasticsearch: Elasticsearch{
+						Protocol:         "https",
+						Hosts:            []string{"localhost:9200"},
+						ProxyHeaders:     map[string]string{"X-Proxy-Authorization": kRedacted},
+						ServiceTokenPath: "path/to/file",
+					},
+				},
+			},
+		},
+		{
+			name: "redact static tokens",
+			inputCfg: &Config{
+				Inputs: []Input{{
+					Server: Server{
+						StaticPolicyTokens: StaticPolicyTokens{
+							Enabled: true,
+							PolicyTokens: []PolicyToken{{
+								TokenKey: "secretValue",
+								PolicyID: "testPolicy",
+							}},
+						},
+					},
+				}},
+			},
+			redactedCfg: &Config{
+				Inputs: []Input{{
+					Server: Server{
+						StaticPolicyTokens: StaticPolicyTokens{
+							Enabled: true,
+							PolicyTokens: []PolicyToken{{
+								TokenKey: kRedacted,
+								PolicyID: "testPolicy",
+							}},
+						},
+					},
+				}},
+			},
+		},
 	}
 
 	for _, tt := range testcases {
