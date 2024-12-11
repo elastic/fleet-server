@@ -254,25 +254,17 @@ func configCacheChanged(curCfg, newCfg *config.Config) bool {
 	return curCfg.Inputs[0].Cache != newCfg.Inputs[0].Cache
 }
 
-func configChangedServer(log zerolog.Logger, curCfg, newCfg *config.Config) bool {
-	zlog := log.With().Interface("new", newCfg.Redact()).Logger()
-
+func configChangedServer(zlog zerolog.Logger, curCfg, newCfg *config.Config) bool {
 	changed := true
 	switch {
 	case curCfg == nil:
 		zlog.Info().Msg("initial server configuration")
 	case !reflect.DeepEqual(curCfg.Fleet.CopyNoLogging(), newCfg.Fleet.CopyNoLogging()):
-		zlog.Info().
-			Interface("old", curCfg.Redact()).
-			Msg("fleet configuration has changed")
+		zlog.Info().Msg("fleet configuration has changed")
 	case !reflect.DeepEqual(curCfg.Output, newCfg.Output):
-		zlog.Info().
-			Interface("old", curCfg.Redact()).
-			Msg("output configuration has changed")
+		zlog.Info().Msg("output configuration has changed")
 	case !reflect.DeepEqual(curCfg.Inputs[0].Server, newCfg.Inputs[0].Server):
-		zlog.Info().
-			Interface("old", curCfg.Redact()).
-			Msg("server configuration has changed")
+		zlog.Info().Msg("server configuration has changed")
 	default:
 		changed = false
 	}
