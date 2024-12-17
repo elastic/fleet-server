@@ -1524,7 +1524,7 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	err = json.Unmarshal(p, &obj)
 	require.NoError(t, err)
 
-	require.Eventually(t, func() bool {
+	require.Eventuallyf(t, func() bool {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:9200/.fleet-agents/_doc/"+id, nil)
 		require.NoError(t, err)
 		req.SetBasicAuth("elastic", "changeme")
@@ -1544,8 +1544,9 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 		obj, ok := o.(map[string]interface{})
 		require.Truef(t, ok, "expected _source to be an object, was: %T", o)
 		_, ok = obj["audit_unenrolled_reason"]
-		return !ok
-	}, time.Second*20, time.Second, "agent document should not have audit_unenrolled_reason attribute")
+		_, ok2 := obj["unenrolled_at"]
+		return !ok && !ok2
+	}, time.Second*20, time.Second, "agent document should not have the audit_unenrolled_reason or unenrolled_at attributes. agent doc: %v", obj)
 	cancel()
 	srv.waitExit() //nolint:errcheck // test case
 }

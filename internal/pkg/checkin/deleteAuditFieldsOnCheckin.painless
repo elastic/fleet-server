@@ -17,4 +17,4 @@ if (params.SeqNoSet) {
 }
 ctx._source.remove('audit_unenrolled_reason');
 ctx._source.remove('audit_unenrolled_time');
-ctx._source.remove('dl.unenrolled_at');
+ctx._source.remove('unenrolled_at'); // audit/unenroll no longer sets this but it did in the 8.16.x releases, so we need to clear it.
