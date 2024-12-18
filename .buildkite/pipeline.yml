@@ -150,7 +150,6 @@ steps:
 
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
-        skip: "8.17.1-SNAPSHOT not available on ESS"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
