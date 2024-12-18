@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -44,21 +43,7 @@ type AgentInstallSuite struct {
 
 }
 
-// SearchResp is the response body for the artifacts search API
-type SearchResp struct {
-	Packages map[string]Artifact `json:"packages"`
-}
-
-// Artifact describes an elastic artifact available through the API.
-type Artifact struct {
-	URL string `json:"url"`
-	//SHAURL       string `json:"sha_url"`      // Unused
-	//Type         string `json:"type"`         // Unused
-	//Architecture string `json:"architecture"` // Unused
-}
-
 func TestAgentInstallSuite(t *testing.T) {
-	t.Skip("temporary skip until elastic-agent-8.18.0-SNAPSHOT artifact is available")
 	suite.Run(t, new(AgentInstallSuite))
 }
 
@@ -112,20 +97,9 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	suite.T().Log("Setup complete.")
 }
 
-// downloadAgent will search the artifacts repo for the latest snapshot and return the stream to the download for the current OS + ARCH.
+// downloadAgent will return the stream to the download for the current OS + ARCH.
 func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser {
 	suite.T().Helper()
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s-SNAPSHOT", version.DefaultVersion), nil)
-	suite.Require().NoError(err)
-
-	resp, err := suite.Client.Do(req)
-	suite.Require().NoError(err)
-
-	var body SearchResp
-	err = json.NewDecoder(resp.Body).Decode(&body)
-	resp.Body.Close()
-	suite.Require().NoError(err)
-
 	fType := "tar.gz"
 	if runtime.GOOS == "windows" {
 		fType = "zip"
@@ -140,12 +114,9 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 	}
 
 	fileName := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s-%s.%s", version.DefaultVersion, runtime.GOOS, arch, fType)
-	pkg, ok := body.Packages[fileName]
-	suite.Require().Truef(ok, "unable to find package download for fileName = %s", fileName)
-
-	req, err = http.NewRequestWithContext(ctx, "GET", pkg.URL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://artifacts-api.elastic.co/v1/downloads/elastic-agent-package/"+fileName, nil)
 	suite.Require().NoError(err)
-	resp, err = suite.Client.Do(req)
+	resp, err := suite.Client.Do(req)
 	suite.Require().NoError(err)
 	return resp.Body
 }
