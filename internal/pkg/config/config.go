@@ -15,11 +15,16 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog"
 
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/version"
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/flag"
 	"github.com/elastic/go-ucfg/yaml"
 )
+
+func init() {
+	tlscommon.SetInsecureDefaults()
+}
 
 // DefaultOptions defaults options used to read the configuration
 var DefaultOptions = []ucfg.Option{

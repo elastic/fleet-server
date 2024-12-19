@@ -1,0 +1,10 @@
+output:
+  elasticsearch:
+    hosts: ["localhost:9200"]
+    service_token: "test-token"
+    ssl:
+      enabled: true
+fleet:
+  agent:
+    id: 1e4954ce-af37-4731-9f4a-407b08e69e42
+
