@@ -15,11 +15,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/rs/zerolog"
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/rs/zerolog"
-	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -52,10 +53,9 @@ func (pt *PGPRetrieverT) handlePGPKey(zlog zerolog.Logger, w http.ResponseWriter
 		return ErrTLSRequired
 	}
 	key, err := authAPIKey(r, pt.bulker, pt.cache)
-	if err != nil {
-		return err
+	if err == nil {
+		zlog = zlog.With().Str(LogEnrollAPIKeyID, key.ID).Logger()
 	}
-	zlog = zlog.With().Str(LogEnrollAPIKeyID, key.ID).Logger()
 	ctx := zlog.WithContext(r.Context())
 
 	p, err := pt.getPGPKey(ctx, zlog)
