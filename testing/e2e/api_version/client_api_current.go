@@ -269,11 +269,8 @@ func (tester *ClientAPITester) Artifact(ctx context.Context, apiKey, id, sha2, e
 	tester.Require().Equal(encodedSHA, fmt.Sprintf("%x", hash[:]))
 }
 
-func (tester *ClientAPITester) GetPGPKey(ctx context.Context, apiKey string) []byte {
-	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.Client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-		req.Header.Set("Authorization", "ApiKey "+apiKey)
-		return nil
-	}))
+func (tester *ClientAPITester) GetPGPKey(ctx context.Context) []byte {
+	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.Client))
 	tester.Require().NoError(err)
 
 	resp, err := client.GetPGPKeyWithResponse(ctx, 1, 2, 3, nil)
@@ -398,7 +395,7 @@ func (tester *ClientAPITester) TestArtifact() {
 func (tester *ClientAPITester) TestGetPGPKey() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tester.GetPGPKey(ctx, tester.enrollmentKey)
+	tester.GetPGPKey(ctx)
 }
 
 func (tester *ClientAPITester) TestEnrollAuditUnenroll() {

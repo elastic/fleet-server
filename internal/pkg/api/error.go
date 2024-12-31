@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -22,7 +24,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
@@ -250,15 +251,6 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				"ErrTLSRequired",
 				"server must run with tls to use this endpoint",
 				zerolog.InfoLevel,
-			},
-		},
-		{
-			ErrPGPPermissions,
-			HTTPErrResp{
-				http.StatusInternalServerError,
-				"ErrPGPPermissions",
-				"fleet-server PGP key has incorrect permissions",
-				zerolog.ErrorLevel,
 			},
 		},
 		// apikey
