@@ -52,10 +52,8 @@ func (pt *PGPRetrieverT) handlePGPKey(zlog zerolog.Logger, w http.ResponseWriter
 	if r.TLS == nil {
 		return ErrTLSRequired
 	}
-	key, err := authAPIKey(r, pt.bulker, pt.cache)
-	if err == nil {
-		zlog = zlog.With().Str(LogEnrollAPIKeyID, key.ID).Logger()
-	}
+	// auth is not required for this endpoint.
+	// we also do not check if an API key is present in order to avoid making a round trip.
 	ctx := zlog.WithContext(r.Context())
 
 	p, err := pt.getPGPKey(ctx, zlog)
