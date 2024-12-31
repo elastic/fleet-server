@@ -1764,8 +1764,6 @@ paths:
       operationId: getPGPKey
       summary: retrieve a PGP key from the fleet-server's local storage.
       description: "Get a PGP key that can be used to verify agent upgrades. Key is stored on (fleet-server's) disk."
-      security:
-        - apiKey: []
       parameters:
         - name: major
           in: path
@@ -1802,8 +1800,6 @@ paths:
                 format: binary
         "400":
           $ref: "#/components/responses/badRequest"
-        "401":
-          $ref: "#/components/responses/keyNotEnabled"
         "500":
           description: The server has an error retrieving or reading the local key.
           headers:

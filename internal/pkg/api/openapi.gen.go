@@ -1790,8 +1790,6 @@ func (siw *ServerInterfaceWrapper) GetPGPKey(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	ctx = context.WithValue(ctx, ApiKeyScopes, []string{})
-
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetPGPKeyParams
 
