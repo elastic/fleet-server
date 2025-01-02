@@ -136,7 +136,7 @@ func TestToESConfig(t *testing.T) {
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
 						InsecureSkipVerify: true, //nolint:gosec // test case
-						MinVersion:         tls.VersionTLS11,
+						MinVersion:         tls.VersionTLS12,
 						MaxVersion:         tls.VersionTLS13,
 						Certificates:       []tls.Certificate{},
 						CurvePreferences:   []tls.CurveID{},
@@ -174,7 +174,7 @@ func TestToESConfig(t *testing.T) {
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
 						InsecureSkipVerify: true, //nolint:gosec // test case
-						MinVersion:         tls.VersionTLS11,
+						MinVersion:         tls.VersionTLS12,
 						MaxVersion:         tls.VersionTLS13,
 						Certificates:       []tls.Certificate{},
 						CurvePreferences:   []tls.CurveID{},
