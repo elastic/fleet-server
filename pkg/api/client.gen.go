@@ -1221,7 +1221,6 @@ type GetPGPKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON400      *BadRequest
-	JSON401      *KeyNotEnabled
 }
 
 // Status returns HTTPResponse.Status
@@ -1681,13 +1680,6 @@ func ParseGetPGPKeyResponse(rsp *http.Response) (*GetPGPKeyResponse, error) {
 			return nil, err
 		}
 		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest KeyNotEnabled
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
 
 	}
 
