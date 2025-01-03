@@ -13,7 +13,7 @@ BUILDMODE_windows_amd64=-buildmode=pie
 BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
-CROSSBUILD_SUFFIX=main-debian11
+CROSSBUILD_SUFFIX=main-debian12
 BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${CROSSBUILD_SUFFIX}
 
 #Benchmark related targets
