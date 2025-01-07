@@ -14,9 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
@@ -85,14 +86,22 @@ func (f *Fleet) GetConfig() *config.Config {
 
 // Run runs the fleet server
 func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
+	// ctx is cancelled when a SIGTERM or SIGINT is received or when the agent wrappers calls stop because a unit is being stopped/removed.
+
+	// Replace context with cancellable ctx
+	// in order to automatically cancel all the go routines
+	// that were started in the scope of this function on function exit
+	ctx, cn := context.WithCancel(ctx)
+	defer cn()
+
 	log := zerolog.Ctx(ctx)
-	err := initCfg.LoadServerLimits()
+	err := initCfg.LoadServerLimits(log)
 	if err != nil {
 		return fmt.Errorf("encountered error while loading server limits: %w", err)
 	}
 	cacheCfg := config.CopyCache(initCfg)
 	log.Info().Interface("cfg", cacheCfg).Msg("Setting cache config options")
-	cache, err := cache.New(cacheCfg)
+	cache, err := cache.New(cacheCfg, cache.WithLog(log))
 	if err != nil {
 		return err
 	}
@@ -100,12 +109,6 @@ func (f *Fleet) Run(ctx context.Context, initCfg *config.Config) error {
 
 	var curCfg *config.Config
 	newCfg := initCfg
-
-	// Replace context with cancellable ctx
-	// in order to automatically cancel all the go routines
-	// that were started in the scope of this function on function exit
-	ctx, cn := context.WithCancel(ctx)
-	defer cn()
 
 	stop := func(cn context.CancelFunc, g *errgroup.Group) {
 		if cn != nil {
@@ -150,7 +153,7 @@ LOOP:
 			f.reporter.UpdateState(client.UnitStateStarting, "Starting", nil) //nolint:errcheck // unclear on what should we do if updating the status fails?
 		}
 
-		err := newCfg.LoadServerLimits()
+		err := newCfg.LoadServerLimits(log)
 		if err != nil {
 			return fmt.Errorf("encountered error while loading server limits: %w", err)
 		}
@@ -219,7 +222,7 @@ LOOP:
 
 	// Server is coming down; wait for the server group to exit cleanly.
 	// Timeout if something is locked up.
-	err = safeWait(srvEg, curCfg.Inputs[0].Server.Timeouts.Drain)
+	err = safeWait(log, srvEg, curCfg.Inputs[0].Server.Timeouts.Drain)
 
 	// Eat cancel error to minimize confusion in logs
 	if errors.Is(err, context.Canceled) {
@@ -251,25 +254,17 @@ func configCacheChanged(curCfg, newCfg *config.Config) bool {
 	return curCfg.Inputs[0].Cache != newCfg.Inputs[0].Cache
 }
 
-func configChangedServer(log zerolog.Logger, curCfg, newCfg *config.Config) bool {
-	zlog := log.With().Interface("new", newCfg.Redact()).Logger()
-
+func configChangedServer(zlog zerolog.Logger, curCfg, newCfg *config.Config) bool {
 	changed := true
 	switch {
 	case curCfg == nil:
 		zlog.Info().Msg("initial server configuration")
 	case !reflect.DeepEqual(curCfg.Fleet.CopyNoLogging(), newCfg.Fleet.CopyNoLogging()):
-		zlog.Info().
-			Interface("old", curCfg.Redact()).
-			Msg("fleet configuration has changed")
+		zlog.Info().Msg("fleet configuration has changed")
 	case !reflect.DeepEqual(curCfg.Output, newCfg.Output):
-		zlog.Info().
-			Interface("old", curCfg.Redact()).
-			Msg("output configuration has changed")
+		zlog.Info().Msg("output configuration has changed")
 	case !reflect.DeepEqual(curCfg.Inputs[0].Server, newCfg.Inputs[0].Server):
-		zlog.Info().
-			Interface("old", curCfg.Redact()).
-			Msg("server configuration has changed")
+		zlog.Info().Msg("server configuration has changed")
 	default:
 		changed = false
 	}
@@ -277,7 +272,7 @@ func configChangedServer(log zerolog.Logger, curCfg, newCfg *config.Config) bool
 	return changed
 }
 
-func safeWait(g *errgroup.Group, to time.Duration) error {
+func safeWait(log *zerolog.Logger, g *errgroup.Group, to time.Duration) error {
 	var err error
 	waitCh := make(chan error)
 	go func() {
@@ -287,7 +282,7 @@ func safeWait(g *errgroup.Group, to time.Duration) error {
 	select {
 	case err = <-waitCh:
 	case <-time.After(to):
-		zerolog.Ctx(context.TODO()).Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
+		log.Warn().Msg("deadlock: goroutine locked up on errgroup.Wait()")
 		err = errors.New("group wait timeout")
 	}
 
@@ -315,12 +310,12 @@ func loggedRunFunc(ctx context.Context, tag string, runfn runFunc) func() error 
 	}
 }
 
-func initRuntime(cfg *config.Config) {
+func initRuntime(log *zerolog.Logger, cfg *config.Config) {
 	gcPercent := cfg.Inputs[0].Server.Runtime.GCPercent
 	if gcPercent != 0 {
 		old := debug.SetGCPercent(gcPercent)
 
-		zerolog.Ctx(context.TODO()).Info().
+		log.Info().
 			Int("old", old).
 			Int("new", gcPercent).
 			Msg("SetGCPercent")
@@ -328,8 +323,7 @@ func initRuntime(cfg *config.Config) {
 	memoryLimit := cfg.Inputs[0].Server.Runtime.MemoryLimit
 	if memoryLimit != 0 {
 		old := debug.SetMemoryLimit(memoryLimit)
-
-		zerolog.Ctx(context.TODO()).Info().
+		log.Info().
 			Int64("old", old).
 			Int64("new", memoryLimit).
 			Msg("SetMemoryLimit")
@@ -352,7 +346,7 @@ func (f *Fleet) initBulker(ctx context.Context, tracer *apm.Tracer, cfg *config.
 }
 
 func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
-	initRuntime(cfg)
+	initRuntime(zerolog.Ctx(ctx), cfg)
 
 	// Create the APM tracer.
 	tracer, err := f.initTracer(ctx, cfg.Inputs[0].Server.Instrumentation)
@@ -432,6 +426,19 @@ func (f *Fleet) runServer(ctx context.Context, cfg *config.Config) (err error) {
 	return g.Wait()
 }
 
+// runSubsystems starts  all other subsystems for fleet-server
+// we assume bulker.Run is called in another goroutine, it's ctx is not the same ctx passed into runSubsystems and used with the passed errgroup.
+// however if the bulker returns an error, the passed errgroup is canceled.
+// runSubsystems will also do an ES version check and run migrations if started in agent-mode
+// The started subsystems are:
+// - Elasticsearch GC - cleanup expired fleet actions
+// - Policy Index Monitor - track new documents in the .fleet-policies index
+// - Policy Monitor - parse .fleet-policies docuuments into usable policies
+// - Policy Self Monitor - report fleet-server health status based on .fleet-policies index
+// - Action Monitor - track new documents in the .fleet-actions index
+// - Action Dispatcher - send actions from the .fleet-actions index to agents that check in
+// - Bulk Checkin handler - batches agent checkin messages to _bulk endpoint, minimizes changed attributes
+// - HTTP APIs - start http server on 8220 (default) for external agents, and on 8221 (default) for managing agent in agent-mode or local communications.
 func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgroup.Group, bulker bulk.Bulk, tracer *apm.Tracer) (err error) {
 	esCli := bulker.Client()
 
@@ -447,12 +454,9 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 			}
 			return fmt.Errorf("failed version compatibility check with elasticsearch: %w", err)
 		}
-	}
 
-	// Migrations are not executed in standalone mode. When needed, they will be executed
-	// by some external process.
-	if !f.standAlone {
-		// Run migrations
+		// Migrations are not executed in standalone mode. When needed, they will be executed
+		// by some external process.
 		loggedMigration := loggedRunFunc(ctx, "Migrations", func(ctx context.Context) error {
 			return dl.Migrate(ctx, bulker)
 		})
@@ -503,11 +507,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	g.Go(loggedRunFunc(ctx, "Policy self monitor", sm.Run))
 
 	// Actions monitoring
-	var am monitor.SimpleMonitor
-	var ad *action.Dispatcher
-	var tr *action.TokenResolver
-
-	am, err = monitor.NewSimple(dl.FleetActions, esCli, monCli,
+	am, err := monitor.NewSimple(dl.FleetActions, esCli, monCli,
 		monitor.WithExpiration(true),
 		monitor.WithFetchSize(cfg.Inputs[0].Monitor.FetchSize),
 		monitor.WithPollTimeout(cfg.Inputs[0].Monitor.PollTimeout),
@@ -518,17 +518,16 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	}
 	g.Go(loggedRunFunc(ctx, "Action monitor", am.Run))
 
-	ad = action.NewDispatcher(am, cfg.Inputs[0].Server.Limits.ActionLimit.Interval, cfg.Inputs[0].Server.Limits.ActionLimit.Burst)
+	ad := action.NewDispatcher(am, cfg.Inputs[0].Server.Limits.ActionLimit.Interval, cfg.Inputs[0].Server.Limits.ActionLimit.Burst)
 	g.Go(loggedRunFunc(ctx, "Action dispatcher", ad.Run))
-	tr, err = action.NewTokenResolver(bulker)
-	if err != nil {
-		return err
-	}
 
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
-	ct := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, tr, bulker)
+	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
+	if err != nil {
+		return err
+	}
 	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
@@ -536,20 +535,31 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 
 	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
-	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache)
+	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache, api.WithSelfMonitor(sm), api.WithBuildInfo(f.bi))
 	ut := api.NewUploadT(&cfg.Inputs[0].Server, bulker, monCli, f.cache) // uses no-retry client for bufferless chunk upload
 	ft := api.NewFileDeliveryT(&cfg.Inputs[0].Server, bulker, monCli, f.cache)
 	pt := api.NewPGPRetrieverT(&cfg.Inputs[0].Server, bulker, f.cache)
 	auditT := api.NewAuditT(&cfg.Inputs[0].Server, bulker, f.cache)
 
 	for _, endpoint := range (&cfg.Inputs[0].Server).BindEndpoints() {
-		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server, ct, et, at, ack, st, sm, f.bi, ut, ft, pt, auditT, bulker, tracer)
+		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server,
+			api.WithCheckin(ct),
+			api.WithEnroller(et),
+			api.WithArtifact(at),
+			api.WithAck(ack),
+			api.WithStatus(st),
+			api.WithUpload(ut),
+			api.WithFileDelivery(ft),
+			api.WithPGP(pt),
+			api.WithAudit(auditT),
+			api.WithTracer(tracer),
+		)
 		g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 			return apiServer.Run(ctx)
 		}))
 	}
 
-	return err
+	return nil
 }
 
 // Reload reloads the fleet server with the latest configuration.

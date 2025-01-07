@@ -8,14 +8,16 @@ package config
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
+
+	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/version"
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/flag"
 	"github.com/elastic/go-ucfg/yaml"
-	"github.com/gofrs/uuid"
-	"github.com/rs/zerolog"
 )
 
 // DefaultOptions defaults options used to read the configuration
@@ -88,17 +90,17 @@ func (c *Config) Validate() error {
 
 // LoadServerLimits should be called after initialization, so we may access the user defined
 // agent limit setting.
-func (c *Config) LoadServerLimits() error {
+func (c *Config) LoadServerLimits(log *zerolog.Logger) error {
 	c.m.Lock()
 	defer c.m.Unlock()
 	err := c.Validate()
 	if err != nil {
-		zerolog.Ctx(context.TODO()).Error().Err(err).Msgf("failed to validate while calculating limits")
+		log.Error().Err(err).Msgf("failed to validate while calculating limits")
 		return err
 	}
 
 	fleetInput := &c.Inputs[0]
-	agentLimits := loadLimits(fleetInput.Server.Limits.MaxAgents)
+	agentLimits := loadLimits(log, fleetInput.Server.Limits.MaxAgents)
 	fleetInput.Cache.LoadLimits(agentLimits)
 	fleetInput.Server.Limits.LoadLimits(agentLimits)
 	return nil
@@ -167,7 +169,28 @@ func redactOutput(cfg *Config) Output {
 		redacted.Elasticsearch.TLS = &newTLS
 	}
 
+	if redacted.Elasticsearch.Headers != nil {
+		redacted.Elasticsearch.Headers = redactHeaders(redacted.Elasticsearch.Headers)
+	}
+
+	if redacted.Elasticsearch.ProxyHeaders != nil {
+		redacted.Elasticsearch.ProxyHeaders = redactHeaders(redacted.Elasticsearch.ProxyHeaders)
+	}
 	return redacted
+}
+
+// redactHeaders returns a copy of the passed headers map.
+// It will do a best-effort attempt to redact sensitive headers based on header names.
+func redactHeaders(headers map[string]string) map[string]string {
+	redactedHeaders := make(map[string]string)
+	for k, v := range headers {
+		redactedHeaders[k] = v
+		lk := strings.ToLower(k)
+		if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") {
+			redactedHeaders[k] = kRedacted
+		}
+	}
+	return redactedHeaders
 }
 
 func redactServer(cfg *Config) Server {
@@ -194,6 +217,17 @@ func redactServer(cfg *Config) Server {
 		redacted.Instrumentation.SecretToken = kRedacted
 	}
 
+	if redacted.StaticPolicyTokens.PolicyTokens != nil {
+		policyTokens := make([]PolicyToken, len(redacted.StaticPolicyTokens.PolicyTokens))
+		for i := range redacted.StaticPolicyTokens.PolicyTokens {
+			policyTokens[i] = PolicyToken{
+				TokenKey: kRedacted,
+				PolicyID: redacted.StaticPolicyTokens.PolicyTokens[i].PolicyID,
+			}
+		}
+		redacted.StaticPolicyTokens.PolicyTokens = policyTokens
+	}
+
 	return redacted
 }
 
@@ -214,7 +248,7 @@ func (c *Config) Redact() *Config {
 func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
 	for opt, message := range deprecatedOpts {
 		if c.HasField(opt) {
-			zerolog.Ctx(context.TODO()).Warn().Msg(message)
+			zerolog.Ctx(context.TODO()).Warn().Msg(message) // TODO is used as this may be called before logger config is read.
 		}
 	}
 }

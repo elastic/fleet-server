@@ -16,10 +16,9 @@ type Limit struct {
 }
 
 type ServerLimits struct {
-	MaxAgents         int           `config:"max_agents"`
-	PolicyThrottle    time.Duration `config:"policy_throttle"` // deprecated: replaced by policy_limit
-	MaxHeaderByteSize int           `config:"max_header_byte_size"`
-	MaxConnections    int           `config:"max_connections"`
+	MaxAgents         int `config:"max_agents"`
+	MaxHeaderByteSize int `config:"max_header_byte_size"`
+	MaxConnections    int `config:"max_connections"`
 
 	ActionLimit        Limit `config:"action_limit"`
 	PolicyLimit        Limit `config:"policy_limit"`
@@ -47,9 +46,6 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	}
 	if c.MaxConnections == 0 {
 		c.MaxConnections = l.MaxConnections
-	}
-	if c.PolicyThrottle == 0 {
-		c.PolicyThrottle = l.PolicyThrottle
 	}
 
 	c.ActionLimit = mergeEnvLimit(c.ActionLimit, l.ActionLimit)

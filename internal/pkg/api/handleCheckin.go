@@ -91,9 +91,12 @@ func NewCheckinT(
 	pm policy.Monitor,
 	gcp monitor.GlobalCheckpointProvider,
 	ad *action.Dispatcher,
-	tr *action.TokenResolver,
 	bulker bulk.Bulk,
-) *CheckinT {
+) (*CheckinT, error) {
+	tr, err := action.NewTokenResolver(bulker)
+	if err != nil {
+		return nil, err
+	}
 	ct := &CheckinT{
 		verCon: verCon,
 		cfg:    cfg,
@@ -115,7 +118,7 @@ func NewCheckinT(
 		bulker: bulker,
 	}
 
-	return ct
+	return ct, nil
 }
 
 func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, id, userAgent string) error {
@@ -254,6 +257,8 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 }
 
 func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
+	zlog = zlog.With().
+		Str(logger.AgentID, agent.Id).Logger()
 	validated, err := ct.validateRequest(zlog, w, r, start, agent)
 	if err != nil {
 		return err
@@ -272,8 +277,8 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	}
 
 	// Subscribe to actions dispatcher
-	aSub := ct.ad.Subscribe(agent.Id, seqno)
-	defer ct.ad.Unsubscribe(aSub)
+	aSub := ct.ad.Subscribe(zlog, agent.Id, seqno)
+	defer ct.ad.Unsubscribe(zlog, aSub)
 	actCh := aSub.Ch()
 
 	// use revision_idx=0 if the agent has a single output where no API key is defined
@@ -318,7 +323,9 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer longPoll.Stop()
 
 	// Initial update on checkin, and any user fields that might have changed
-	err = ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, rawMeta, rawComponents, seqno, ver, unhealthyReason, agent.AuditUnenrolledReason != "")
+	// Run a script to remove audit_unenrolled_* and unenrolled_at attributes if one is set on checkin.
+	// 8.16.x releases would incorrectly set unenrolled_at
+	err = ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, rawMeta, rawComponents, seqno, ver, unhealthyReason, agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != "")
 	if err != nil {
 		zlog.Error().Err(err).Str(logger.AgentID, agent.Id).Msg("checkin failed")
 	}
@@ -338,6 +345,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actions, ackToken = convertActions(zlog, agent.Id, pendingActions)
 
 	span, ctx := apm.StartSpan(r.Context(), "longPoll", "process")
+
 	if len(actions) == 0 {
 	LOOP:
 		for {
@@ -999,14 +1007,13 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	// Compare the deserialized meta structures and return the bytes to update if different
 	if !reflect.DeepEqual(reqComponents, agent.Components) {
 
+		reqComponentsJSON, _ := json.Marshal(*req.Components)
 		zlog.Trace().
-			RawJSON("oldComponents", agentComponentsJSON).
-			RawJSON("newComponents", *req.Components).
+			Str("oldComponents", string(agentComponentsJSON)).
+			Str("req.Components", string(reqComponentsJSON)).
 			Msg("local components data is not equal")
 
-		zlog.Info().
-			RawJSON("req.Components", *req.Components).
-			Msg("applying new components data")
+		zlog.Info().Msg("applying new components data")
 
 		outComponents = *req.Components
 		compUnhealthyReason := calcUnhealthyReason(reqComponents)
