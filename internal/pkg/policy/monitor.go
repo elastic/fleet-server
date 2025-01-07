@@ -99,11 +99,7 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, cfg config.ServerLimi
 		burst = 1
 	}
 	if cfg.PolicyLimit.Interval <= 0 {
-		if cfg.PolicyThrottle > 0 { // use the old throttle if it's defined and the limit.Interval is not.
-			interval = rate.Every(cfg.PolicyThrottle)
-		} else {
-			interval = rate.Every(time.Nanosecond) // set minimal spin rate
-		}
+		interval = rate.Every(time.Nanosecond) // set minimal spin rate
 	}
 	return &monitorT{
 		bulker:        bulker,
