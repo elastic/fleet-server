@@ -262,6 +262,8 @@ endif
 build-releaser: ## - Build a Docker image to run make package including all build tools
 ifeq ($(shell uname -p),arm)
 	$(eval SUFFIX := arm)
+else ifeq ($(shell uname -p),aarch64)
+	$(eval SUFFIX := arm)
 else
 	$(eval SUFFIX := ${CROSSBUILD_SUFFIX})
 endif
