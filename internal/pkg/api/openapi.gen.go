@@ -402,7 +402,8 @@ type EnrollRequest struct {
 	// Id The ID of the agent.
 	// This is the ID that will be used to reference this agent, if no ID is passed one will be generated.
 	// If another agent is enrolled with the same ID the other agent will no longer be able to communicate,
-	// this new agent is considered a replacement of the other agent.
+	// this new agent is considered a replacement of the other agent. The other agent will be able to continue
+	// sending data to ES.
 	Id *string `json:"id,omitempty"`
 
 	// Metadata Metadata associated with the agent that is enrolling to fleet.

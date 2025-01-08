@@ -875,6 +875,7 @@ func Test_Agent_Id_No_ReplaceToken(t *testing.T) {
 	cli := cleanhttp.DefaultClient()
 	res, err := cli.Do(req)
 	require.NoError(t, err)
+	_ = res.Body.Close()
 	require.Equal(t, http.StatusForbidden, res.StatusCode)
 }
 
@@ -928,6 +929,7 @@ func Test_Agent_Id_ReplaceToken_Mismatch(t *testing.T) {
 	cli := cleanhttp.DefaultClient()
 	res, err := cli.Do(req)
 	require.NoError(t, err)
+	_ = res.Body.Close()
 	require.Equal(t, http.StatusForbidden, res.StatusCode)
 }
 
