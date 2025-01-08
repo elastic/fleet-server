@@ -707,7 +707,7 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
 }
 
-func EnrollAgent(t *testing.T, ctx context.Context, srv *tserver, enrollBody string) (string, string) {
+func EnrollAgent(t *testing.T, ctx context.Context, srv *tserver, enrollBody string) api.EnrollResponse {
 	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
@@ -717,29 +717,17 @@ func EnrollAgent(t *testing.T, ctx context.Context, srv *tserver, enrollBody str
 	cli := cleanhttp.DefaultClient()
 	res, err := cli.Do(req)
 	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
 
 	p, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	var obj map[string]interface{}
-	err = json.Unmarshal(p, &obj)
+	var response api.EnrollResponse
+	err = json.Unmarshal(p, &response)
 	require.NoError(t, err)
 
-	t.Log(obj)
+	t.Log(response)
 
-	require.Equal(t, http.StatusOK, res.StatusCode)
-
-	item := obj["item"]
-	mm, ok := item.(map[string]interface{})
-	require.True(t, ok, "expected attribute item to be an object")
-	agentID := mm["id"]
-
-	apiKey, ok := mm["access_api_key"]
-	require.True(t, ok, "expected attribute access_api_key is missing")
-	key, ok := apiKey.(string)
-	require.True(t, ok, "expected attribute access_api_key to be a string")
-	require.NotEmpty(t, key)
-
-	return agentID.(string), key
+	return response
 }
 
 func Test_Agent_Enrollment_Id(t *testing.T) {
@@ -762,25 +750,25 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	t.Log("Enroll the first agent with enrollment_id")
-	firstAgentID, _ := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
+	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
 
 	t.Log("Enroll the second agent with the same enrollment_id")
-	secondAgentID, _ := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
+	secondEnroll := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
 
 	// cleanup
 	defer func() {
-		err := srv.bulker.Delete(ctx, dl.FleetAgents, secondAgentID)
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, firstEnroll.Item.Id)
 		if err != nil {
 			t.Log("could not clean up second agent")
 		}
-		err2 := srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
+		err2 := srv.bulker.Delete(ctx, dl.FleetAgents, secondEnroll.Item.Id)
 		if err2 != nil {
 			t.Log("could not clean up first agent")
 		}
 	}()
 
 	// checking that old agent with enrollment id is deleted
-	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstEnroll.Item.Id)
 	t.Log(agent)
 	if err != nil {
 		t.Log("old agent not found as expected")
@@ -809,9 +797,9 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	t.Log("Enroll the first agent with enrollment_id")
-	firstAgentID, _ := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
+	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
 
-	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstEnroll.Item.Id)
 	if err != nil {
 		t.Log("first agent not found")
 	}
@@ -824,27 +812,80 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	}
 
 	t.Log("Enroll the second agent with the same enrollment_id")
-	secondAgentID, _ := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
+	secondEnroll := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
 
 	// cleanup
 	defer func() {
-		err := srv.bulker.Delete(ctx, dl.FleetAgents, secondAgentID)
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, secondEnroll.Item.Id)
 		if err != nil {
 			t.Log("could not clean up second agent")
 		}
-		err2 := srv.bulker.Delete(ctx, dl.FleetAgents, firstAgentID)
+		err2 := srv.bulker.Delete(ctx, dl.FleetAgents, firstEnroll.Item.Id)
 		if err2 != nil {
 			t.Log("could not clean up first agent")
 		}
 	}()
 
 	// checking that old agent with enrollment id is deleted
-	agent, err = dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstAgentID)
+	agent, err = dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstEnroll.Item.Id)
 	t.Log(agent)
 	if err != nil {
 		t.Log("old agent not found as expected")
 	} else {
 		t.Fatal("duplicate agent found after enrolling with same enrollment id")
+	}
+}
+
+func Test_Agent_Id(t *testing.T) {
+	enrollBodyWID := `{
+	    "type": "PERMANENT",
+	    "id": "123456",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	t.Log("Enroll the first agent with id")
+	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWID)
+
+	t.Log("Enroll the second agent with the same id")
+	secondEnroll := EnrollAgent(t, ctx, srv, enrollBodyWID)
+
+	// cleanup
+	defer func() {
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, firstEnroll.Item.Id)
+		if err != nil {
+			t.Log("could not clean up agent")
+		}
+	}()
+
+	// check that the id's are expected values
+	if firstEnroll.Item.Id != "123456" {
+		t.Fatal("agent id is not expect value")
+	}
+	if firstEnroll.Item.Id != secondEnroll.Item.Id {
+		t.Fatal("agent id does not match")
+	}
+
+	// check that the access key id's don't match
+	if firstEnroll.Item.AccessApiKeyId == secondEnroll.Item.AccessApiKeyId {
+		t.Fatal("agent access key id's should not match")
+	}
+
+	// checking that updated agent has the access key ID from the second agent
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstEnroll.Item.Id)
+	t.Log(agent)
+	if agent.AccessAPIKeyID != secondEnroll.Item.AccessApiKeyId {
+		t.Fatal("saved agent access key ID should be for the second enroll call")
 	}
 }
 
@@ -1322,13 +1363,13 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 	    }
 	}`
 	t.Log("Enroll an agent")
-	id, key := EnrollAgent(t, ctx, srv, enrollBody)
+	resp := EnrollAgent(t, ctx, srv, enrollBody)
 
 	// checkin
-	t.Logf("Fake a checkin for agent %s", id)
-	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
+	t.Logf("Fake a checkin for agent %s", resp.Item.Id)
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+resp.Item.Id+"/checkin", strings.NewReader(checkinBody))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("Authorization", "ApiKey "+resp.Item.AccessApiKey)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
 	req.Header.Set("Content-Type", "application/json")
 	res, err := cli.Do(req)
@@ -1362,7 +1403,7 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 	require.True(t, ok, "expected action agent_id attribute missing")
 	aAgentID, ok := aAgentIDRaw.(string)
 	require.True(t, ok, "expected action agent_id to be string")
-	require.Equal(t, id, aAgentID)
+	require.Equal(t, resp.Item.Id, aAgentID)
 
 	body := fmt.Sprintf(`{
 	    "events": [{
@@ -1372,11 +1413,11 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 		"type": "ACTION_RESULT",
 		"subtype": "ACKNOWLEDGED"
 	    }]
-	}`, aID, id)
-	t.Logf("Fake an ack for action %s for agent %s", aID, id)
-	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/acks", strings.NewReader(body))
+	}`, aID, resp.Item.Id)
+	t.Logf("Fake an ack for action %s for agent %s", aID, resp.Item.Id)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+resp.Item.Id+"/acks", strings.NewReader(body))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("Authorization", "ApiKey "+resp.Item.AccessApiKey)
 	req.Header.Set("Content-Type", "application/json")
 	res, err = cli.Do(req)
 	require.NoError(t, err)
@@ -1395,7 +1436,7 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
 
 	// Update agent doc to have output key == ""
-	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, id)
+	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, resp.Item.Id)
 	require.NoError(t, err)
 	outputNames := make([]string, 0, len(agent.Outputs))
 	for name := range agent.Outputs {
@@ -1403,11 +1444,11 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 	}
 	require.Len(t, outputNames, 1)
 	p = []byte(fmt.Sprintf(`{"script":{"lang": "painless", "source": "ctx._source['outputs'][params.output].api_key = ''; ctx._source['outputs'][params.output].api_key_id = '';", "params": {"output": "%s"}}}`, outputNames[0]))
-	t.Logf("Attempting to remove api_key attribute from: %s, body: %s", id, string(p))
+	t.Logf("Attempting to remove api_key attribute from: %s, body: %s", resp.Item.Id, string(p))
 	err = srv.bulker.Update(
 		ctx,
 		dl.FleetAgents,
-		id,
+		resp.Item.Id,
 		p,
 		bulk.WithRefresh(),
 		bulk.WithRetryOnConflict(3),
@@ -1415,9 +1456,9 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 	require.NoError(t, err)
 
 	// Checkin again to get policy change action and new keys
-	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+resp.Item.Id+"/checkin", strings.NewReader(checkinBody))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("Authorization", "ApiKey "+resp.Item.AccessApiKey)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
 	req.Header.Set("Content-Type", "application/json")
 	res, err = cli.Do(req)
@@ -1466,9 +1507,9 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	    }
 	}`
 	t.Log("Enroll an agent")
-	id, key := EnrollAgent(t, ctx, srv, enrollBody)
+	resp := EnrollAgent(t, ctx, srv, enrollBody)
 
-	t.Logf("Use audit/unenroll endpoint for agent %s", id)
+	t.Logf("Use audit/unenroll endpoint for agent %s", resp.Item.Id)
 	orphanBody := `{
           "reason": "orphaned",
 	  "timestamp": "2024-01-01T12:00:00.000Z"
@@ -1477,9 +1518,9 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
           "reason": "uninstall",
 	  "timestamp": "2024-01-01T12:00:00.000Z"
 	}`
-	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(uninstallBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+resp.Item.Id+"/audit/unenroll", strings.NewReader(uninstallBody))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("Authorization", "ApiKey "+resp.Item.AccessApiKey)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
 	req.Header.Set("Content-Type", "application/json")
 	res, err := cli.Do(req)
@@ -1488,9 +1529,9 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	res.Body.Close()
 
 	t.Log("Orphaned can replace uninstall")
-	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(orphanBody))
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+resp.Item.Id+"/audit/unenroll", strings.NewReader(orphanBody))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("Authorization", "ApiKey "+resp.Item.AccessApiKey)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
 	req.Header.Set("Content-Type", "application/json")
 	res, err = cli.Do(req)
@@ -1499,9 +1540,9 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	res.Body.Close()
 
 	t.Log("Use of audit/unenroll once orphaned should fail.")
-	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/audit/unenroll", strings.NewReader(orphanBody))
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+resp.Item.Id+"/audit/unenroll", strings.NewReader(orphanBody))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("Authorization", "ApiKey "+resp.Item.AccessApiKey)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
 	req.Header.Set("Content-Type", "application/json")
 	res, err = cli.Do(req)
@@ -1509,10 +1550,10 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	require.Equal(t, http.StatusConflict, res.StatusCode)
 	res.Body.Close()
 
-	t.Logf("Fake a checkin for agent %s", id)
-	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
+	t.Logf("Fake a checkin for agent %s", resp.Item.Id)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+resp.Item.Id+"/checkin", strings.NewReader(checkinBody))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("Authorization", "ApiKey "+resp.Item.AccessApiKey)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
 	req.Header.Set("Content-Type", "application/json")
 	res, err = cli.Do(req)
@@ -1527,7 +1568,7 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventuallyf(t, func() bool {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:9200/.fleet-agents/_doc/"+id, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:9200/.fleet-agents/_doc/"+resp.Item.Id, nil)
 		require.NoError(t, err)
 		req.SetBasicAuth("elastic", "changeme")
 		res, err := cli.Do(req)

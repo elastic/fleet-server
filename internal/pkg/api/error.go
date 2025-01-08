@@ -101,6 +101,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			ErrAgentIDInAnotherPolicy,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"AgentIDInAnotherPolicy",
+				"agent with ID is already enrolled into another policy",
+				zerolog.WarnLevel,
+			},
+		},
+		{
 			ErrInvalidUserAgent,
 			HTTPErrResp{
 				http.StatusBadRequest,

@@ -396,6 +396,12 @@ type EnrollRequest struct {
 	// The existing agent with a matching enrollment_id will be deleted if it never checked in. The new agent will be enrolled with the enrollment_id.
 	EnrollmentId *string `json:"enrollment_id,omitempty"`
 
+	// Id The ID of the agent.
+	// This is the ID that will be used to reference this agent, if no ID is passed one will be generated.
+	// If another agent is enrolled with the same ID the other agent will no longer be able to communicate,
+	// this new agent is considered a replacement of the other agent.
+	Id *string `json:"id,omitempty"`
+
 	// Metadata Metadata associated with the agent that is enrolling to fleet.
 	Metadata EnrollMetadata `json:"metadata"`
 

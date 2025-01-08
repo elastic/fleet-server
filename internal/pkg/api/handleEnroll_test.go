@@ -97,6 +97,48 @@ func TestEnroll(t *testing.T) {
 	}
 }
 
+func TestEnrollWithAgentID(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{
+			Hits: make([]es.HitT, 0),
+		},
+	}, nil)
+	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKey{
+			ID:  "1234",
+			Key: "1234",
+		}, nil)
+	bulker.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		"", nil)
+	resp, _ := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
+
+	if resp.Action != "created" {
+		t.Fatal("enroll failed")
+	}
+	if resp.Item.Id != agentID {
+		t.Fatalf("agent ID should have been %s (not %s)", agentID, resp.Item.Id)
+	}
+}
+
 func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 	bulkerBuilder := func(policies ...model.Policy) func() bulk.Bulk {
 		return func() bulk.Bulk {
