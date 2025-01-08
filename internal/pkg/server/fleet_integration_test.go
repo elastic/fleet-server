@@ -910,6 +910,7 @@ func Test_Agent_Id_ReplaceToken_Mismatch(t *testing.T) {
 	}()
 
 	t.Log("Enroll the second agent with the same id")
+	//nolint:gosec // disable G101
 	enrollBodyBadReplaceToken := `{
 	    "type": "PERMANENT",
 	    "id": "123456",
