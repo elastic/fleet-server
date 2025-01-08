@@ -9,6 +9,8 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
@@ -24,6 +27,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestRemoveDuplicateStr(t *testing.T) {
@@ -129,6 +133,268 @@ func TestEnrollWithAgentID(t *testing.T) {
 		}, nil)
 	bulker.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		"", nil)
+	resp, _ := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
+
+	if resp.Action != "created" {
+		t.Fatal("enroll failed")
+	}
+	if resp.Item.Id != agentID {
+		t.Fatalf("agent ID should have been %s (not %s)", agentID, resp.Item.Id)
+	}
+}
+
+func TestEnrollWithAgentIDExistingNonActive(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{
+			Hits: []es.HitT{{
+				ID:     "1234",
+				Index:  dl.FleetAgents,
+				Source: []byte(`{"active":false,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234"}`),
+			}},
+		},
+	}, nil)
+	bulker.On("Delete", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKey{
+			ID:  "1234",
+			Key: "1234",
+		}, nil)
+	bulker.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		"", nil)
+	resp, _ := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
+
+	if resp.Action != "created" {
+		t.Fatal("enroll failed")
+	}
+	if resp.Item.Id != agentID {
+		t.Fatalf("agent ID should have been %s (not %s)", agentID, resp.Item.Id)
+	}
+}
+
+func TestEnrollWithAgentIDExistingActive_NotReplaceable(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{
+			Hits: []es.HitT{{
+				ID:     "1234",
+				Index:  dl.FleetAgents,
+				Source: []byte(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234"}`),
+			}},
+		},
+	}, nil)
+	_, err := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
+	if !errors.Is(err, ErrAgentNotReplaceable) {
+		t.Fatal("should have got error ErrAgentNotReplaceable")
+	}
+}
+
+func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Missing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("error generating bcrypt hash: %v", err)
+	}
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, string(replaceToken))
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{
+			Hits: []es.HitT{{
+				ID:     "1234",
+				Index:  dl.FleetAgents,
+				Source: []byte(source),
+			}},
+		},
+	}, nil)
+	_, err = et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
+	if !errors.Is(err, ErrAgentNotReplaceable) {
+		t.Fatal("should have got error ErrAgentNotReplaceable")
+	}
+}
+
+func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Mismatch(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken, err := bcrypt.GenerateFromPassword([]byte("replace_token"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("error generating bcrypt hash: %v", err)
+	}
+	wrongToken := "wrong_token"
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+		ReplaceToken: &wrongToken,
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, string(replaceToken))
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{
+			Hits: []es.HitT{{
+				ID:     "1234",
+				Index:  dl.FleetAgents,
+				Source: []byte(source),
+			}},
+		},
+	}, nil)
+	_, err = et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
+	if !errors.Is(err, ErrAgentNotReplaceable) {
+		t.Fatal("should have got error ErrAgentNotReplaceable")
+	}
+}
+
+func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken := "replace_token"
+	replaceTokenHash, err := bcrypt.GenerateFromPassword([]byte(replaceToken), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("error generating bcrypt hash: %v", err)
+	}
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+		ReplaceToken: &replaceToken,
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, string(replaceTokenHash))
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{
+			Hits: []es.HitT{{
+				ID:     "1234",
+				Index:  dl.FleetAgents,
+				Source: []byte(source),
+			}},
+		},
+	}, nil)
+	_, err = et._enroll(ctx, rb, zlog, req, "5678", []string{}, "8.9.0")
+	if !errors.Is(err, ErrAgentInAnotherPolicy) {
+		t.Fatal("should have got error ErrAgentInAnotherPolicy")
+	}
+}
+
+func TestEnrollWithAgentIDExistingActive(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken := "replace_token"
+	replaceTokenHash, err := bcrypt.GenerateFromPassword([]byte(replaceToken), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("error generating bcrypt hash: %v", err)
+	}
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+		ReplaceToken: &replaceToken,
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, string(replaceTokenHash))
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{
+			Hits: []es.HitT{{
+				ID:     "1234",
+				Index:  dl.FleetAgents,
+				Source: []byte(source),
+			}},
+		},
+	}, nil)
+	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKeyMetadata{ID: "1234"}, nil)
+	bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKey{
+			ID:  "1234",
+			Key: "1234",
+		}, nil)
+	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		nil)
 	resp, _ := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
 
 	if resp.Action != "created" {

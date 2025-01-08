@@ -836,10 +836,106 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	}
 }
 
+func Test_Agent_Id_No_ReplaceToken(t *testing.T) {
+	enrollBodyWID := `{
+	    "type": "PERMANENT",
+	    "id": "123456",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	t.Log("Enroll the first agent with id")
+	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWID)
+
+	// cleanup
+	defer func() {
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, firstEnroll.Item.Id)
+		if err != nil {
+			t.Log("could not clean up agent")
+		}
+	}()
+
+	t.Log("Enroll the second agent with the same id")
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBodyWID))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+
+	cli := cleanhttp.DefaultClient()
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusForbidden, res.StatusCode)
+}
+
+func Test_Agent_Id_ReplaceToken_Mismatch(t *testing.T) {
+	enrollBodyWID := `{
+	    "type": "PERMANENT",
+	    "id": "123456",
+		"replace_token": "replaceable",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	t.Log("Enroll the first agent with id")
+	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWID)
+
+	// cleanup
+	defer func() {
+		err := srv.bulker.Delete(ctx, dl.FleetAgents, firstEnroll.Item.Id)
+		if err != nil {
+			t.Log("could not clean up agent")
+		}
+	}()
+
+	t.Log("Enroll the second agent with the same id")
+	enrollBodyBadReplaceToken := `{
+	    "type": "PERMANENT",
+	    "id": "123456",
+		"replace_token": "replaceable_wrong",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBodyBadReplaceToken))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+
+	cli := cleanhttp.DefaultClient()
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusForbidden, res.StatusCode)
+}
+
 func Test_Agent_Id(t *testing.T) {
 	enrollBodyWID := `{
 	    "type": "PERMANENT",
 	    "id": "123456",
+		"replace_token": "replaceable",
 	    "metadata": {
 		"user_provided": {},
 		"local": {},

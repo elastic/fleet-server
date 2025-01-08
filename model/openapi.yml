@@ -154,6 +154,12 @@ components:
           type: string
           enum:
             - PERMANENT
+        replace_token:
+          type: string
+          description: |
+            The replacement token of the agent.
+            Provided when an agent could replace an existing agent. This token must match the original enrollment of
+            that agent otherwise it will not be able to enroll.
         enrollment_id:
           type: string
           description: |

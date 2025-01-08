@@ -405,6 +405,11 @@ type EnrollRequest struct {
 	// Metadata Metadata associated with the agent that is enrolling to fleet.
 	Metadata EnrollMetadata `json:"metadata"`
 
+	// ReplaceToken The replacement token of the agent.
+	// Provided when an agent could replace an existing agent. This token must match the original enrollment of
+	// that agent otherwise it will not be able to enroll.
+	ReplaceToken *string `json:"replace_token,omitempty"`
+
 	// SharedId The shared ID of the agent.
 	// To support pre-existing installs.
 	//

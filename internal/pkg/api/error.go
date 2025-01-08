@@ -101,12 +101,30 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
-			ErrAgentIDInAnotherPolicy,
+			ErrAgentReplaceTokenInvalid,
 			HTTPErrResp{
 				http.StatusBadRequest,
-				"AgentIDInAnotherPolicy",
-				"agent with ID is already enrolled into another policy",
+				"AgentReplaceTokenInvalid",
+				"replace token is invalid",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			ErrAgentNotReplaceable,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"AgentNotReplaceable",
+				"existing agent cannot be replaced",
 				zerolog.WarnLevel,
+			},
+		},
+		{
+			ErrAgentInAnotherPolicy,
+			HTTPErrResp{
+				http.StatusBadRequest,
+				"AgentInAnotherPolicy",
+				"agent with ID is already enrolled into another policy",
+				zerolog.InfoLevel,
 			},
 		},
 		{

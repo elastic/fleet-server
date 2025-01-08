@@ -31,6 +31,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -55,10 +56,12 @@ const kFleetAccessRolesJSON = `
 `
 
 var (
-	ErrUnknownEnrollType      = errors.New("unknown enroll request type")
-	ErrInactiveEnrollmentKey  = errors.New("inactive enrollment key")
-	ErrPolicyNotFound         = errors.New("policy not found")
-	ErrAgentIDInAnotherPolicy = errors.New("existing agent with ID in another policy")
+	ErrUnknownEnrollType        = errors.New("unknown enroll request type")
+	ErrInactiveEnrollmentKey    = errors.New("inactive enrollment key")
+	ErrPolicyNotFound           = errors.New("policy not found")
+	ErrAgentReplaceTokenInvalid = errors.New("replace token is invalid")
+	ErrAgentNotReplaceable      = errors.New("existing agent cannot be replaced")
+	ErrAgentInAnotherPolicy     = errors.New("existing agent with ID in another policy")
 )
 
 type EnrollerT struct {
@@ -198,9 +201,21 @@ func (et *EnrollerT) _enroll(
 ) (*EnrollResponse, error) {
 	var agent model.Agent
 	var enrollmentID string
+	var replaceToken string
 
 	span, ctx := apm.StartSpan(ctx, "enroll", "process")
 	defer span.End()
+
+	now := time.Now()
+
+	if req.ReplaceToken != nil && *req.ReplaceToken != "" {
+		replaceTokenBytes, err := bcrypt.GenerateFromPassword([]byte(*req.ReplaceToken), bcrypt.DefaultCost)
+		if err != nil {
+			// not a valid replace token
+			return nil, ErrAgentReplaceTokenInvalid
+		}
+		replaceToken = string(replaceTokenBytes)
+	}
 
 	if req.EnrollmentId != nil {
 		vSpan, vCtx := apm.StartSpan(ctx, "checkEnrollmentID", "validate")
@@ -218,7 +233,6 @@ func (et *EnrollerT) _enroll(
 		}
 		vSpan.End()
 	}
-	now := time.Now()
 
 	// only delete existing agent if it never checked in
 	if agent.Id != "" && agent.LastCheckin == "" {
@@ -266,14 +280,51 @@ func (et *EnrollerT) _enroll(
 				vSpan.End()
 				return nil, err
 			}
+		} else if !agent.Active {
+			// inactive agent has been unenrolled and the API key has already been invalidated
+			// delete the current record as the new enrollment will overwrite this one
+			zlog.Debug().
+				Str("ID", agentID).
+				Msg("Inactive agent with ID found")
+			err = deleteAgent(ctx, zlog, et.bulker, agent.Id)
+			if err != nil {
+				zlog.Error().Err(err).
+					Str("AgentId", agent.Id).
+					Msg("Error when trying to delete old agent with same id")
+				return nil, err
+			}
+			// deleted, so clear the ID so code below knows it needs to be created
+			agent.Id = ""
 		} else {
 			zlog.Debug().
 				Str("ID", agentID).
-				Msg("Agent with ID found")
+				Msg("Active agent with ID found")
 		}
 		vSpan.End()
 
 		if agent.Id != "" {
+			// confirm that this agent has a set replace token
+			// one is required or replacement of this already enrolled and active
+			// agent is not allowed
+			if agent.ReplaceToken == "" {
+				zlog.Warn().
+					Str("AgentId", agent.Id).
+					Msg("Existing agent with same ID already enrolled without a replace token set")
+				return nil, ErrAgentNotReplaceable
+			}
+			if req.ReplaceToken == nil || *req.ReplaceToken == "" {
+				zlog.Warn().
+					Str("AgentId", agent.Id).
+					Msg("Existing agent with same ID already enrolled; no replace token given during enrollment")
+				return nil, ErrAgentNotReplaceable
+			}
+			err = bcrypt.CompareHashAndPassword([]byte(agent.ReplaceToken), []byte(*req.ReplaceToken))
+			if err != nil {
+				// not the same, cannot replace
+				// provides no real reason as that would expose to much information
+				return nil, ErrAgentNotReplaceable
+			}
+
 			// confirm that its on the same policy
 			// it is not supported to have it the same ID enroll into different policies
 			if agent.PolicyID != policyID {
@@ -282,11 +333,11 @@ func (et *EnrollerT) _enroll(
 					Str("PolicyId", policyID).
 					Str("CurrentPolicyId", agent.PolicyID).
 					Msg("Existing agent with same ID already enrolled into another policy")
-				return nil, ErrAgentIDInAnotherPolicy
+				return nil, ErrAgentInAnotherPolicy
 			}
 
 			// invalidate the previous api key
-			// this has to be done because its not possible to get the previous token
+			// this has to be done because it's not possible to get the previous token
 			// so the other is invalidated and a new one is generated
 			zlog.Debug().
 				Str("AgentId", agent.Id).
@@ -346,7 +397,6 @@ func (et *EnrollerT) _enroll(
 		// clears state of policy revision, as this agent needs to get the latest policy
 		// clears state of unenrollment, as this is a new enrollment
 		doc := bulk.UpdateFields{
-			dl.FieldActive:                true,
 			dl.FieldNamespaces:            namespaces,
 			dl.FieldLocalMetadata:         json.RawMessage(localMeta),
 			dl.FieldAccessAPIKeyID:        accessAPIKey.ID,
@@ -379,6 +429,7 @@ func (et *EnrollerT) _enroll(
 			},
 			Tags:         removeDuplicateStr(req.Metadata.Tags),
 			EnrollmentID: enrollmentID,
+			ReplaceToken: replaceToken,
 		}
 
 		err = createFleetAgent(ctx, et.bulker, agentID, agent)
