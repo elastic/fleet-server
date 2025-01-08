@@ -883,6 +883,9 @@ func Test_Agent_Id(t *testing.T) {
 
 	// checking that updated agent has the access key ID from the second agent
 	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, firstEnroll.Item.Id)
+	if err != nil {
+		t.Fatalf("could not find agent with id %s: %s", firstEnroll.Item.Id, err)
+	}
 	t.Log(agent)
 	if agent.AccessAPIKeyID != secondEnroll.Item.AccessApiKeyId {
 		t.Fatal("saved agent access key ID should be for the second enroll call")
