@@ -384,7 +384,7 @@ func (et *EnrollerT) _enroll(
 			dl.FieldAuditUnenrolledReason: nil,
 			dl.FieldUnenrolledAt:          nil,
 			dl.FieldUnenrolledReason:      nil,
-			dl.FieldUpdatedAt:             time.Now().UTC().Format(time.RFC3339),
+			dl.FieldUpdatedAt:             now.UTC().Format(time.RFC3339),
 		}
 		err = updateFleetAgent(ctx, et.bulker, agentID, doc)
 		if err != nil {
