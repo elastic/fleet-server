@@ -344,8 +344,8 @@ func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
 		},
 	}, nil)
 	_, err = et._enroll(ctx, rb, zlog, req, "5678", []string{}, "8.9.0")
-	if !errors.Is(err, ErrAgentInAnotherPolicy) {
-		t.Fatal("should have got error ErrAgentInAnotherPolicy")
+	if !errors.Is(err, ErrAgentNotReplaceable) {
+		t.Fatal("should have got error ErrAgentNotReplaceable")
 	}
 }
 

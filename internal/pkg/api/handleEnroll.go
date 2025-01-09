@@ -61,7 +61,6 @@ var (
 	ErrPolicyNotFound           = errors.New("policy not found")
 	ErrAgentReplaceTokenInvalid = errors.New("replace token is invalid")
 	ErrAgentNotReplaceable      = errors.New("existing agent cannot be replaced")
-	ErrAgentInAnotherPolicy     = errors.New("existing agent with ID in another policy")
 )
 
 type EnrollerT struct {
@@ -211,6 +210,8 @@ func (et *EnrollerT) _enroll(
 	if req.ReplaceToken != nil && *req.ReplaceToken != "" {
 		replaceTokenBytes, err := bcrypt.GenerateFromPassword([]byte(*req.ReplaceToken), bcrypt.DefaultCost)
 		if err != nil {
+			zlog.Debug().Err(err).
+				Msg("Enroll request had an invalid replace token")
 			// not a valid replace token
 			return nil, ErrAgentReplaceTokenInvalid
 		}
@@ -268,39 +269,12 @@ func (et *EnrollerT) _enroll(
 	if req.Id != nil && *req.Id != "" {
 		agentID = *req.Id
 
-		// Possible this agent already exists.
-		vSpan, vCtx := apm.StartSpan(ctx, "checkAgentID", "validate")
+		// check if the agent with this ID already exists
 		var err error
-		agent, err = dl.FindAgent(vCtx, et.bulker, dl.QueryAgentByID, dl.FieldID, agentID)
+		agent, err = et._checkAgent(ctx, zlog, agentID)
 		if err != nil {
-			zlog.Debug().Err(err).
-				Str("ID", agentID).
-				Msg("Agent with ID not found")
-			if !errors.Is(err, dl.ErrNotFound) && !strings.Contains(err.Error(), "no such index") {
-				vSpan.End()
-				return nil, err
-			}
-		} else if !agent.Active {
-			// inactive agent has been unenrolled and the API key has already been invalidated
-			// delete the current record as the new enrollment will overwrite this one
-			zlog.Debug().
-				Str("ID", agentID).
-				Msg("Inactive agent with ID found")
-			err = deleteAgent(ctx, zlog, et.bulker, agent.Id)
-			if err != nil {
-				zlog.Error().Err(err).
-					Str("AgentId", agent.Id).
-					Msg("Error when trying to delete old agent with same id")
-				return nil, err
-			}
-			// deleted, so clear the ID so code below knows it needs to be created
-			agent.Id = ""
-		} else {
-			zlog.Debug().
-				Str("ID", agentID).
-				Msg("Active agent with ID found")
+			return nil, err
 		}
-		vSpan.End()
 
 		if agent.Id != "" {
 			// confirm that this agent has a set replace token
@@ -321,7 +295,10 @@ func (et *EnrollerT) _enroll(
 			err = bcrypt.CompareHashAndPassword([]byte(agent.ReplaceToken), []byte(*req.ReplaceToken))
 			if err != nil {
 				// not the same, cannot replace
-				// provides no real reason as that would expose to much information
+				// provides no real reason as that would expose too much information
+				zlog.Debug().Err(err).
+					Str("AgentId", agent.Id).
+					Msg("Existing agent with same ID already enrolled; replace token didn't match")
 				return nil, ErrAgentNotReplaceable
 			}
 
@@ -333,7 +310,7 @@ func (et *EnrollerT) _enroll(
 					Str("PolicyId", policyID).
 					Str("CurrentPolicyId", agent.PolicyID).
 					Msg("Existing agent with same ID already enrolled into another policy")
-				return nil, ErrAgentInAnotherPolicy
+				return nil, ErrAgentNotReplaceable
 			}
 
 			// invalidate the previous api key
@@ -463,6 +440,41 @@ func (et *EnrollerT) _enroll(
 	et.cache.SetAPIKey(*accessAPIKey, true)
 
 	return &resp, nil
+}
+
+func (et *EnrollerT) _checkAgent(ctx context.Context, zlog zerolog.Logger, agentID string) (model.Agent, error) {
+	vSpan, vCtx := apm.StartSpan(ctx, "checkAgentID", "validate")
+	defer vSpan.End()
+
+	agent, err := dl.FindAgent(vCtx, et.bulker, dl.QueryAgentByID, dl.FieldID, agentID)
+	if err != nil {
+		zlog.Debug().Err(err).
+			Str("ID", agentID).
+			Msg("Agent with ID not found")
+		if !errors.Is(err, dl.ErrNotFound) && !strings.Contains(err.Error(), "no such index") {
+			return model.Agent{}, err
+		}
+		return model.Agent{}, nil
+	} else if !agent.Active {
+		// inactive agent has been unenrolled and the API key has already been invalidated
+		// delete the current record as the new enrollment will overwrite this one
+		zlog.Debug().
+			Str("ID", agentID).
+			Msg("Inactive agent with ID found")
+		err = deleteAgent(ctx, zlog, et.bulker, agent.Id)
+		if err != nil {
+			zlog.Error().Err(err).
+				Str("AgentId", agent.Id).
+				Msg("Error when trying to delete old agent with same id")
+			return model.Agent{}, err
+		}
+		// deleted, so return like one is not found
+		return model.Agent{}, nil
+	}
+	zlog.Debug().
+		Str("ID", agentID).
+		Msg("Active agent with ID found")
+	return agent, nil
 }
 
 // Helper function to remove duplicate agent tags.
