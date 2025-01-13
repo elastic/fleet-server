@@ -22,7 +22,7 @@ require (
 	github.com/miolini/datacounter v1.0.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.15.0
-	github.com/rs/xid v1.4.0
+	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.4
