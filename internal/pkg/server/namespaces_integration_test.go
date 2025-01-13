@@ -221,24 +221,24 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	t.Log("Enroll agent")
 	srvCopy := srv
 	srvCopy.enrollKey = newKey.Token()
-	agentID, key := EnrollAgent(t, ctx, srvCopy, enrollBody)
+	resp := EnrollAgent(t, ctx, srvCopy, enrollBody)
 
-	AssertAgentDocContainNamespace(t, ctx, srv, agentID, testNamespace)
+	AssertAgentDocContainNamespace(t, ctx, srv, resp.Item.Id, testNamespace)
 	// cleanup
 	defer func() {
-		err = srv.bulker.Delete(ctx, dl.FleetAgents, agentID)
+		err = srv.bulker.Delete(ctx, dl.FleetAgents, resp.Item.Id)
 		if err != nil {
 			t.Log("could not clean up agent")
 		}
 	}()
 
-	actionID := AgentCheckin(t, ctx, srvCopy, agentID, key)
-	AgentAck(t, ctx, srvCopy, actionID, agentID, key)
+	actionID := AgentCheckin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey)
+	AgentAck(t, ctx, srvCopy, actionID, resp.Item.Id, resp.Item.AccessApiKey)
 
 	t.Log("Create SETTINGS Action")
 	newActionID, _ := uuid.NewV4()
 	var actionData = model.Action{
-		Agents:     []string{agentID},
+		Agents:     []string{resp.Item.Id},
 		Expiration: time.Now().Add(time.Hour * 2000).Format(time.RFC3339),
 		ActionID:   newActionID.String(),
 		Namespaces: []string{"test1"},
@@ -249,10 +249,10 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	CreateActionDocument(t, ctx, srv, actionData)
 
 	t.Log("Checkin so that agent gets the SETTINGS action")
-	actionID = AgentCheckin(t, ctx, srvCopy, agentID, key)
+	actionID = AgentCheckin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey)
 
 	t.Log("Ack so that fleet create the action results")
-	AgentAck(t, ctx, srvCopy, actionID, agentID, key)
+	AgentAck(t, ctx, srvCopy, actionID, resp.Item.Id, resp.Item.AccessApiKey)
 
 	t.Log("Check action results has the correct namespace")
 	CheckActionResultsNamespace(t, ctx, srv, actionID, "test1")

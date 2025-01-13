@@ -46,6 +46,8 @@ const (
 	FieldUnhealthyReason               = "unhealthy_reason"
 
 	FieldActive           = "active"
+	FieldNamespaces       = "namespaces"
+	FieldTags             = "tags"
 	FieldUpdatedAt        = "updated_at"
 	FieldUnenrolledAt     = "unenrolled_at"
 	FieldUpgradedAt       = "upgraded_at"

@@ -31,6 +31,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -55,9 +56,11 @@ const kFleetAccessRolesJSON = `
 `
 
 var (
-	ErrUnknownEnrollType     = errors.New("unknown enroll request type")
-	ErrInactiveEnrollmentKey = errors.New("inactive enrollment key")
-	ErrPolicyNotFound        = errors.New("policy not found")
+	ErrUnknownEnrollType        = errors.New("unknown enroll request type")
+	ErrInactiveEnrollmentKey    = errors.New("inactive enrollment key")
+	ErrPolicyNotFound           = errors.New("policy not found")
+	ErrAgentReplaceTokenInvalid = errors.New("replace token is invalid")
+	ErrAgentNotReplaceable      = errors.New("existing agent cannot be replaced")
 )
 
 type EnrollerT struct {
@@ -197,9 +200,23 @@ func (et *EnrollerT) _enroll(
 ) (*EnrollResponse, error) {
 	var agent model.Agent
 	var enrollmentID string
+	var replaceToken string
 
 	span, ctx := apm.StartSpan(ctx, "enroll", "process")
 	defer span.End()
+
+	now := time.Now()
+
+	if req.ReplaceToken != nil && *req.ReplaceToken != "" {
+		replaceTokenBytes, err := bcrypt.GenerateFromPassword([]byte(*req.ReplaceToken), bcrypt.DefaultCost)
+		if err != nil {
+			zlog.Debug().Err(err).
+				Msg("Enroll request had an invalid replace token")
+			// not a valid replace token
+			return nil, ErrAgentReplaceTokenInvalid
+		}
+		replaceToken = string(replaceTokenBytes)
+	}
 
 	if req.EnrollmentId != nil {
 		vSpan, vCtx := apm.StartSpan(ctx, "checkEnrollmentID", "validate")
@@ -217,15 +234,7 @@ func (et *EnrollerT) _enroll(
 		}
 		vSpan.End()
 	}
-	now := time.Now()
 
-	// Generate an ID here so we can pre-create the api key and avoid a round trip
-	u, err := uuid.NewV4()
-	if err != nil {
-		return nil, err
-	}
-
-	agentID := u.String()
 	// only delete existing agent if it never checked in
 	if agent.Id != "" && agent.LastCheckin == "" {
 		zlog.Debug().
@@ -252,6 +261,81 @@ func (et *EnrollerT) _enroll(
 				Msg("Error when trying to delete old agent with enrollment id")
 			return nil, err
 		}
+		// deleted, so clear the ID so code below knows it needs to be created
+		agent.Id = ""
+	}
+
+	var agentID string
+	if req.Id != nil && *req.Id != "" {
+		agentID = *req.Id
+
+		// check if the agent with this ID already exists
+		var err error
+		agent, err = et._checkAgent(ctx, zlog, agentID)
+		if err != nil {
+			return nil, err
+		}
+
+		if agent.Id != "" {
+			// confirm that this agent has a set replace token
+			// one is required or replacement of this already enrolled and active
+			// agent is not allowed
+			if agent.ReplaceToken == "" {
+				zlog.Warn().
+					Str("AgentId", agent.Id).
+					Msg("Existing agent with same ID already enrolled without a replace token set")
+				return nil, ErrAgentNotReplaceable
+			}
+			if req.ReplaceToken == nil || *req.ReplaceToken == "" {
+				zlog.Warn().
+					Str("AgentId", agent.Id).
+					Msg("Existing agent with same ID already enrolled; no replace token given during enrollment")
+				return nil, ErrAgentNotReplaceable
+			}
+			err = bcrypt.CompareHashAndPassword([]byte(agent.ReplaceToken), []byte(*req.ReplaceToken))
+			if err != nil {
+				// not the same, cannot replace
+				// provides no real reason as that would expose too much information
+				zlog.Debug().Err(err).
+					Str("AgentId", agent.Id).
+					Msg("Existing agent with same ID already enrolled; replace token didn't match")
+				return nil, ErrAgentNotReplaceable
+			}
+
+			// confirm that its on the same policy
+			// it is not supported to have it the same ID enroll into different policies
+			if agent.PolicyID != policyID {
+				zlog.Warn().
+					Str("AgentId", agent.Id).
+					Str("PolicyId", policyID).
+					Str("CurrentPolicyId", agent.PolicyID).
+					Msg("Existing agent with same ID already enrolled into another policy")
+				return nil, ErrAgentNotReplaceable
+			}
+
+			// invalidate the previous api key
+			// this has to be done because it's not possible to get the previous token
+			// so the other is invalidated and a new one is generated
+			zlog.Debug().
+				Str("AgentId", agent.Id).
+				Str("APIKeyID", agent.AccessAPIKeyID).
+				Msg("Invalidate old api key with same id")
+			err := invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
+			if err != nil {
+				zlog.Error().Err(err).
+					Str("AgentId", agent.Id).
+					Str("APIKeyID", agent.AccessAPIKeyID).
+					Msg("Error when trying to invalidate API key of old agent with same id")
+				return nil, err
+			}
+		}
+	} else {
+		// No ID provided so generate an ID.
+		u, err := uuid.NewV4()
+		if err != nil {
+			return nil, err
+		}
+		agentID = u.String()
 	}
 
 	// Update the local metadata agent id
@@ -271,47 +355,84 @@ func (et *EnrollerT) _enroll(
 		return invalidateAPIKey(ctx, zlog, et.bulker, accessAPIKey.ID)
 	})
 
-	agentData := model.Agent{
-		Active:         true,
-		PolicyID:       policyID,
-		Namespaces:     namespaces,
-		Type:           string(req.Type),
-		EnrolledAt:     now.UTC().Format(time.RFC3339),
-		LocalMetadata:  localMeta,
-		AccessAPIKeyID: accessAPIKey.ID,
-		ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
-		Agent: &model.AgentMetadata{
+	// Existing agent, only update a subset of the fields
+	if agent.Id != "" {
+		agent.Active = true
+		agent.Namespaces = namespaces
+		agent.LocalMetadata = localMeta
+		agent.AccessAPIKeyID = accessAPIKey.ID
+		agent.Agent = &model.AgentMetadata{
 			ID:      agentID,
 			Version: ver,
-		},
-		Tags:         removeDuplicateStr(req.Metadata.Tags),
-		EnrollmentID: enrollmentID,
-	}
+		}
+		agent.Tags = removeDuplicateStr(req.Metadata.Tags)
+		agentField, err := json.Marshal(agent.Agent)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal agent to JSON: %w", err)
+		}
+		// update the agent record
+		// clears state of policy revision, as this agent needs to get the latest policy
+		// clears state of unenrollment, as this is a new enrollment
+		doc := bulk.UpdateFields{
+			dl.FieldNamespaces:            namespaces,
+			dl.FieldLocalMetadata:         json.RawMessage(localMeta),
+			dl.FieldAccessAPIKeyID:        accessAPIKey.ID,
+			dl.FieldAgent:                 json.RawMessage(agentField),
+			dl.FieldTags:                  agent.Tags,
+			dl.FieldPolicyRevisionIdx:     0,
+			dl.FieldAuditUnenrolledTime:   nil,
+			dl.FieldAuditUnenrolledReason: nil,
+			dl.FieldUnenrolledAt:          nil,
+			dl.FieldUnenrolledReason:      nil,
+			dl.FieldUpdatedAt:             now.UTC().Format(time.RFC3339),
+		}
+		err = updateFleetAgent(ctx, et.bulker, agentID, doc)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		agent = model.Agent{
+			Active:         true,
+			PolicyID:       policyID,
+			Namespaces:     namespaces,
+			Type:           string(req.Type),
+			EnrolledAt:     now.UTC().Format(time.RFC3339),
+			LocalMetadata:  localMeta,
+			AccessAPIKeyID: accessAPIKey.ID,
+			ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
+			Agent: &model.AgentMetadata{
+				ID:      agentID,
+				Version: ver,
+			},
+			Tags:         removeDuplicateStr(req.Metadata.Tags),
+			EnrollmentID: enrollmentID,
+			ReplaceToken: replaceToken,
+		}
 
-	err = createFleetAgent(ctx, et.bulker, agentID, agentData)
-	if err != nil {
-		return nil, err
+		err = createFleetAgent(ctx, et.bulker, agentID, agent)
+		if err != nil {
+			return nil, err
+		}
+		// Register delete fleet agent for enrollment error rollback
+		rb.Register("delete agent", func(ctx context.Context) error {
+			return deleteAgent(ctx, zlog, et.bulker, agentID)
+		})
 	}
-
-	// Register delete fleet agent for enrollment error rollback
-	rb.Register("delete agent", func(ctx context.Context) error {
-		return deleteAgent(ctx, zlog, et.bulker, agentID)
-	})
 
 	resp := EnrollResponse{
 		Action: "created",
 		Item: EnrollResponseItem{
 			AccessApiKey:         accessAPIKey.Token(),
-			AccessApiKeyId:       agentData.AccessAPIKeyID,
-			Active:               agentData.Active,
-			EnrolledAt:           agentData.EnrolledAt,
+			AccessApiKeyId:       agent.AccessAPIKeyID,
+			Active:               agent.Active,
+			EnrolledAt:           agent.EnrolledAt,
 			Id:                   agentID,
-			LocalMetadata:        agentData.LocalMetadata,
-			PolicyId:             agentData.PolicyID,
+			LocalMetadata:        agent.LocalMetadata,
+			PolicyId:             agent.PolicyID,
 			Status:               "online",
-			Tags:                 agentData.Tags,
-			Type:                 agentData.Type,
-			UserProvidedMetadata: agentData.UserProvidedMetadata,
+			Tags:                 agent.Tags,
+			Type:                 agent.Type,
+			UserProvidedMetadata: agent.UserProvidedMetadata,
 		},
 	}
 
@@ -319,6 +440,41 @@ func (et *EnrollerT) _enroll(
 	et.cache.SetAPIKey(*accessAPIKey, true)
 
 	return &resp, nil
+}
+
+func (et *EnrollerT) _checkAgent(ctx context.Context, zlog zerolog.Logger, agentID string) (model.Agent, error) {
+	vSpan, vCtx := apm.StartSpan(ctx, "checkAgentID", "validate")
+	defer vSpan.End()
+
+	agent, err := dl.FindAgent(vCtx, et.bulker, dl.QueryAgentByID, dl.FieldID, agentID)
+	if err != nil {
+		zlog.Debug().Err(err).
+			Str("ID", agentID).
+			Msg("Agent with ID not found")
+		if !errors.Is(err, dl.ErrNotFound) && !strings.Contains(err.Error(), "no such index") {
+			return model.Agent{}, err
+		}
+		return model.Agent{}, nil
+	} else if !agent.Active {
+		// inactive agent has been unenrolled and the API key has already been invalidated
+		// delete the current record as the new enrollment will overwrite this one
+		zlog.Debug().
+			Str("ID", agentID).
+			Msg("Inactive agent with ID found")
+		err = deleteAgent(ctx, zlog, et.bulker, agent.Id)
+		if err != nil {
+			zlog.Error().Err(err).
+				Str("AgentId", agent.Id).
+				Msg("Error when trying to delete old agent with same id")
+			return model.Agent{}, err
+		}
+		// deleted, so return like one is not found
+		return model.Agent{}, nil
+	}
+	zlog.Debug().
+		Str("ID", agentID).
+		Msg("Active agent with ID found")
+	return agent, nil
 }
 
 // Helper function to remove duplicate agent tags.
@@ -468,6 +624,17 @@ func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func updateFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, doc bulk.UpdateFields) error {
+	span, ctx := apm.StartSpan(ctx, "updateAgent", "update")
+	defer span.End()
+
+	body, err := doc.Marshal()
+	if err != nil {
+		return err
+	}
+	return bulker.Update(ctx, dl.FleetAgents, id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
 func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent) error {
