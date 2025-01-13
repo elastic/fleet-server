@@ -4,7 +4,7 @@ DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version
 TARGET_ARCH_386=x86
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
-PLATFORMS ?= darwin/amd64 darwin/arm64 linux/386 linux/amd64 linux/arm64 windows/386 windows/amd64
+PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
 DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
 BUILDMODE_linux_amd64=-buildmode=pie
 BUILDMODE_linux_arm64=-buildmode=pie
@@ -14,7 +14,7 @@ BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
 CROSSBUILD_SUFFIX=main-debian11
-BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${CROSSBUILD_SUFFIX}
+BUILDER_IMAGE=fleet-server-builder:${GO_VERSION}
 
 #Benchmark related targets
 BENCH_BASE ?= benchmark-$(COMMIT).out
@@ -64,6 +64,14 @@ GOBIN=$(shell go env GOPATH)/bin/
 
 OS_NAME:=$(shell uname -s)
 
+# Set FIPS=true to force FIPS compliance when building
+FIPS?=
+ifeq "${FIPS}" "true"
+BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
+PLATFORMS ?= linux/amd64 linux/arm64
+endif
+
+
 .PHONY: help
 help: ## - Show help message
 	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
@@ -76,7 +84,12 @@ ifeq ($(shell uname -p),arm)
 else
 	$(eval ARCH := amd64)
 endif
-	@cat dev-tools/multipass-cloud-init.yml.envsubst | GO_VERSION=${GO_VERSION} ARCH=${ARCH} envsubst > dev-tools/multipass-cloud-init.yml
+ifeq "${FIPS}" "true"
+	$(eval DOWNLOAD_URL := https://aka.ms/golang/release/latest/go${GO_VERSION}-1.linux-${ARCH}.tar.gz)
+else
+	$(eval DOWNLOAD_URL := https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz)
+endif
+	@cat dev-tools/multipass-cloud-init.yml.envsubst | DOWNLOAD_URL=${DOWNLOAD_URL} ARCH=${ARCH} envsubst > dev-tools/multipass-cloud-init.yml
 	@multipass launch --cloud-init=dev-tools/multipass-cloud-init.yml --mount ..:~/git --name fleet-server-dev --memory 8G --cpus 2 --disk 50G noble
 	@rm dev-tools/multipass-cloud-init.yml
 
@@ -87,7 +100,7 @@ list-platforms: ## - Show the possible PLATFORMS
 .PHONY: local
 local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
-	go build $(if $(SNAPSHOT),-tags="snapshot",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
+	$(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
 .PHONY: $(COVER_TARGETS)
@@ -97,7 +110,7 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(SNAPSHOT),-tags="snapshot",) -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
@@ -212,7 +225,7 @@ $(PLATFORM_TARGETS): release-%:
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst release-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(SNAPSHOT),-tags="snapshot",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
 
 .PHONY: build-docker
@@ -265,7 +278,11 @@ ifeq ($(shell uname -p),arm)
 else
 	$(eval SUFFIX := ${CROSSBUILD_SUFFIX})
 endif
+ifeq "${FIPS}" "true"
+	docker build -t $(BUILDER_IMAGE) -f Dockerfile.fips --target base --build-arg GO_VERSION=$(GO_VERSION) .
+else
 	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) --build-arg SUFFIX=${SUFFIX} .
+endif
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
