@@ -68,7 +68,7 @@ OS_NAME:=$(shell uname -s)
 FIPS?=
 ifeq "${FIPS}" "true"
 BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
-PLATFORMS ?= linux/amd64 linux/arm64
+PLATFORMS = linux/amd64 linux/arm64
 endif
 
 
@@ -286,7 +286,7 @@ endif
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
-	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) release
+	docker run --rm --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) release
 
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser

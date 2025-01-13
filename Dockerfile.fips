@@ -1,11 +1,20 @@
 ARG GO_VERSION
-FROM cgr.dev/chainguard-private/go-msft-fips:${GO_VERSION} AS base
+FROM docker.elastic.co/wolfi/go-msft-fips:${GO_VERSION} AS base
 
-WORKDIR /usr/src/fleet-server
+ENV FIPS=true
+ENV CGO_ENABLED=1
+
+RUN mkdir -p /.cache \
+  && chmod 777 /.cache
+
+WORKDIR /go/src/github.com/elastic/fleet-server
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
+
+ENTRYPOINT [ "make" ]
+CMD [ "release" ]
 
 FROM base AS builder
 
@@ -18,10 +27,12 @@ ARG TARGETPLATFORM
 
 RUN FIPS=true GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" DEV="${DEV}" make release-${TARGETPLATFORM}
 
-FROM cgr.dev/chainguard-private/glibc-openssl-fips:latest
+FROM docker.elastic.co/wolfi/glibc-openssl-fips:latest
 ARG VERSION
 ARG TARGETOS
 ARG TARGETARCH
+
+ENV GOFIPS=1
 
 RUN for iter in {1..10}; do \
         apk update && \
