@@ -1,14 +1,11 @@
 SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
 DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
-TARGET_ARCH_386=x86
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
 PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
-DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
 BUILDMODE_linux_amd64=-buildmode=pie
 BUILDMODE_linux_arm64=-buildmode=pie
-BUILDMODE_windows_386=-buildmode=pie
 BUILDMODE_windows_amd64=-buildmode=pie
 BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
@@ -41,6 +38,7 @@ else
 VERSION=${DEFAULT_VERSION}
 endif
 
+DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
 DOCKER_IMAGE_TAG?=${VERSION}
 DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
@@ -71,6 +69,8 @@ BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
 PLATFORMS = linux/amd64 linux/arm64
 endif
 
+.EXPORT_ALL_VARIABLES:
+	FIPS=${FIPS}
 
 .PHONY: help
 help: ## - Show help message
@@ -175,8 +175,8 @@ check-no-changes:
 
 .PHONY: test
 test: prepare-test-context  ## - Run all tests
-	@./dev-tools/run_with_go_ver $(MAKE) test-unit
-	@./dev-tools/run_with_go_ver $(MAKE) test-int
+	$(MAKE) test-unit
+	$(MAKE) test-int
 	@$(MAKE) junit-report
 
 .PHONY: test-release
@@ -185,11 +185,11 @@ test-release:  ## - Check that all release binaries are created
 
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
-	set -o pipefail; go test ${GO_TEST_FLAG} -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
+	set -o pipefail; go test ${GO_TEST_FLAG} $(if $(FIPS),-tags="requirefips",) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
 
 .PHONY: benchmark
 benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
-	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
+	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) $(if $(FIPS),-tags="requirefips",) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
 
 .PHONY: install-benchstat
 install-benchstat: ## - Install the benchstat package
@@ -225,7 +225,7 @@ $(PLATFORM_TARGETS): release-%:
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst release-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(if $(FIPS),-fips,)/fleet-server .
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
 
 .PHONY: build-docker
@@ -268,8 +268,8 @@ else ifeq ($(OS)-$(ARCH),darwin-arm64)
 	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz fleet-server-$(VERSION)-$(OS)-aarch64
 	@cd build/distributions && sha512sum fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz > fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz.sha512
 else
-	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz fleet-server-$(VERSION)-$(OS)-$(ARCH)
-	@cd build/distributions && sha512sum fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz > fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz.sha512
+	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH)$(if $(FIPS),-fips,).tar.gz fleet-server-$(VERSION)-$(OS)-$(ARCH)$(if $(FIPS),-fips,)
+	@cd build/distributions && sha512sum fleet-server-$(VERSION)-$(OS)-$(ARCH)$(if $(FIPS),-fips,).tar.gz > fleet-server-$(VERSION)-$(OS)-$(ARCH)$(if $(FIPS),-fips,).tar.gz.sha512
 endif
 
 build-releaser: ## - Build a Docker image to run make package including all build tools
@@ -290,8 +290,8 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser
-	## Build for local architecture and for linux/amd64 for docker images.
-	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
+	## Build for local architecture and for linux/$ARCH for docker images.
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(if $(FIPS),-e FIPS=true) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
