@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM docker.elastic.co/wolfi/go-msft-fips:${GO_VERSION} AS base
+FROM mcr.microsoft.com/oss/go/microsoft/golang:${GO_VERSION}-1-fips-bookworm AS base
 
 ENV FIPS=true
 ENV CGO_ENABLED=1
