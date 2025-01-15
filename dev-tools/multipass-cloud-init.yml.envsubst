@@ -46,7 +46,7 @@ write_files:
     path: /etc/profile.d/docker-compose-alias.sh
 runcmd:
   - [ mkdir, /run/go ]
-  - [ wget, https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz, -O, /run/go/go.tar.gz ]
+  - [ wget, ${DOWNLOAD_URL}, -O, /run/go/go.tar.gz ]
   - [ tar, -xzf, /run/go/go.tar.gz, -C, /usr/local/ ]
   - [ rm, -rf, /run/go ]
   - [ su, ubuntu, -c, "/usr/local/go/bin/go install github.com/magefile/mage@latest" ]
