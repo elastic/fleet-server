@@ -3528,11 +3528,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmchiv5/v2
-Version: v2.6.2
+Version: v2.6.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/v2@v2.6.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/v2@v2.6.3/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3739,11 +3739,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmelasticsearch/v2
-Version: v2.6.2
+Version: v2.6.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.6.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.6.3/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3950,11 +3950,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasti
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmhttp/v2
-Version: v2.6.2
+Version: v2.6.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v2@v2.6.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v2@v2.6.3/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4161,11 +4161,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmprometheus/v2
-Version: v2.6.2
+Version: v2.6.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmprometheus/v2@v2.6.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmprometheus/v2@v2.6.3/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4372,11 +4372,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmpromet
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmzerolog/v2
-Version: v2.6.2
+Version: v2.6.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolog/v2@v2.6.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolog/v2@v2.6.3/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4583,11 +4583,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolo
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/v2
-Version: v2.6.2
+Version: v2.6.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/v2@v2.6.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/v2@v2.6.3/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
