@@ -35,16 +35,15 @@ get_go_version() {
 }
 
 # install_gvm
-# Install gvm to /usr/local/bin.
+# Install gvm to GOPATH
 # To read more about installing gvm in other platforms: https://github.com/andrewkroh/gvm#installation
 install_gvm() {
   # Install gvm
-  if [ ! -f "/usr/local/bin/gvm" ]; then
-    curl -sL -o ~/bin/gvm https://github.com/andrewkroh/gvm/releases/download/v0.3.0/gvm-linux-amd64
-    chmod +x /usr/local/bin/gvm
+  if [ ! -f "$(go env GOPATH)/bin/gvm" ]; then
+    go install github.com/andrewkroh/gvm/cmd/gvm@v0.5.2
   fi
 
-  GVM="/usr/local/bin/gvm"
+  GVM="$(go env GOPATH)/bin/gvm"
   debug "Gvm version $(${GVM} --version)"
 }
 
@@ -76,37 +75,4 @@ setup_go_path() {
   export PATH="${GOPATH}/bin:${PATH}"
 
   debug "GOPATH=${GOPATH}"
-}
-
-jenkins_setup() {
-  : "${HOME:?Need to set HOME to a non-empty value.}"
-  : "${WORKSPACE:?Need to set WORKSPACE to a non-empty value.}"
-
-  if [ -z ${GO_VERSION:-} ]; then
-    get_go_version
-  fi
-
-  # Setup Go.
-  export GOPATH=${WORKSPACE}
-  export PATH=${GOPATH}/bin:${PATH}
-  eval "$(gvm ${GO_VERSION})"
-
-  # Workaround for Python virtualenv path being too long.
-  export TEMP_PYTHON_ENV=$(mktemp -d)
-  export PYTHON_ENV="${TEMP_PYTHON_ENV}/python-env"
-
-  # Write cached magefile binaries to workspace to ensure
-  # each run starts from a clean slate.
-  export MAGEFILE_CACHE="${WORKSPACE}/.magefile"
-}
-
-docker_setup() {
-  OS="$(uname)"
-  case $OS in
-    'Darwin')
-      # Start the docker machine VM (ignore error if it's already running).
-      docker-machine start default || true
-      eval $(docker-machine env default)
-      ;;
-  esac
 }
