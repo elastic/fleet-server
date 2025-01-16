@@ -40,7 +40,7 @@ get_go_version() {
 install_gvm() {
   # Install gvm
   if [ ! -f "$(go env GOPATH)/bin/gvm" ]; then
-      go install github.com/andrewkroh/gvm/cmd/gvm@v0.5.2
+    go install github.com/andrewkroh/gvm/cmd/gvm@v0.5.2
   fi
 
   GVM="$(go env GOPATH)/bin/gvm"
