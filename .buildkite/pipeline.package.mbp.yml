@@ -56,7 +56,8 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
-    if: "${FILE_EXISTS_IN_REPO} == true && build.env('BUILDKITE_BRANCH') != 'main'"
+    # TODO remove || build.env('VERSION_QUALIFIER') != null) after prerelease tests using main
+    if: "${FILE_EXISTS_IN_REPO} == true && (build.env('BUILDKITE_BRANCH') != 'main' || build.env('VERSION_QUALIFIER') != null)"
     depends_on:
       - step: "dra-snapshot"
         allow_failure: false

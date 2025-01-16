@@ -38,7 +38,10 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  check_if_file_exist_in_repo "infra" "${BUILDKITE_BRANCH}"                  #TODO should be changed to "main" for rollback...
+  # TODO remove and replace _branch with BUILDKITE_BRANCH after PR tests
+  _branch="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
+
+  check_if_file_exist_in_repo "infra" "${_branch}"                  #TODO should be changed to "main" for rollback...
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" || "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-perf-tests" ]]; then
