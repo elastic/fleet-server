@@ -10,7 +10,7 @@ DRA_OUTPUT="release-manager.out"
 export PROJECT="fleet-server"
 export TYPE=${1}
 # DRA_BRANCH can be used for manually testing packaging with PRs
-# e.g. define `DRA_BRANCH="main"` and `RUN_SNAPSHOT="true"` under Options/Environment Variables in the Buildkite UI after clicking new Build
+# e.g. define `DRA_BRANCH="main"` under Options/Environment Variables in the Buildkite UI after clicking new Build
 export BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 export VERSION="$(make get-version)"
 
@@ -39,11 +39,6 @@ export RM_VERSION="${VERSION}"
 if [[ ${TYPE} == "snapshot" ]]; then
     export SNAPSHOT=true
     VERSION="${VERSION}-SNAPSHOT"
-fi
-
-readonly VERSION_QUALIFIER="${VERSION_QUALIFIER:-""}"
-if [[ -n "$VERSION_QUALIFIER" ]]; then
-  VERSION="${VERSION}-${VERSION_QUALIFIER}"
 fi
 
 mkdir -p ${BASE_DIR}/reports
