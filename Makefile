@@ -1,20 +1,17 @@
 SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
 DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
-TARGET_ARCH_386=x86
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
-PLATFORMS ?= darwin/amd64 darwin/arm64 linux/386 linux/amd64 linux/arm64 windows/386 windows/amd64
-DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
+PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
 BUILDMODE_linux_amd64=-buildmode=pie
 BUILDMODE_linux_arm64=-buildmode=pie
-BUILDMODE_windows_386=-buildmode=pie
 BUILDMODE_windows_amd64=-buildmode=pie
 BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
 CROSSBUILD_SUFFIX=main-debian11
-BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${CROSSBUILD_SUFFIX}
+BUILDER_IMAGE=fleet-server-builder:${GO_VERSION}
 
 #Benchmark related targets
 BENCH_BASE ?= benchmark-$(COMMIT).out
@@ -41,6 +38,7 @@ else
 VERSION=${DEFAULT_VERSION}
 endif
 
+DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
 DOCKER_IMAGE_TAG?=${VERSION}
 DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
