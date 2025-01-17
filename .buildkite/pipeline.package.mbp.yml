@@ -9,7 +9,8 @@ env:
 
 steps:
   - label: "Package x86_64 snapshot"
-    # Skip snapshots with prerelease builds. There are flagged by a non-empty VERSION_QUALIFIER env var/BK param.
+    # skip building + packaging snapshot for pre-releases (flagged by a non-empty VERSION_QUALIFIER env var/BK param)
+    # as prereleases are only intended to be used with staging; details in https://github.com/elastic/ingest-dev/issues/4855
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-x86-64-snapshot"
     command: ".buildkite/scripts/package.sh snapshot"
@@ -58,6 +59,8 @@ steps:
         allow_failure: false
 
   - label: "DRA release staging"
+    # we don't usually build staging from the main branch, but we exceptionally allow it for prereleases
+    # details in https://github.com/elastic/ingest-dev/issues/4855
     if: "${FILE_EXISTS_IN_REPO} == true && (build.env('BUILDKITE_BRANCH') != 'main' || build.env('VERSION_QUALIFIER') != null)"
     key: "dra-staging"
     command: ".buildkite/scripts/dra_release.sh staging"
