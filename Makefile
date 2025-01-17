@@ -62,6 +62,16 @@ GOBIN=$(shell go env GOPATH)/bin/
 
 OS_NAME:=$(shell uname -s)
 
+# Set FIPS=true to force FIPS compliance when building
+FIPS?=
+ifeq "${FIPS}" "true"
+BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
+PLATFORMS = linux/amd64 linux/arm64
+endif
+
+.EXPORT_ALL_VARIABLES:
+	FIPS=${FIPS}
+
 .PHONY: help
 help: ## - Show help message
 	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
@@ -74,7 +84,12 @@ ifeq ($(shell uname -p),arm)
 else
 	$(eval ARCH := amd64)
 endif
-	@cat dev-tools/multipass-cloud-init.yml.envsubst | GO_VERSION=${GO_VERSION} ARCH=${ARCH} envsubst > dev-tools/multipass-cloud-init.yml
+ifeq "${FIPS}" "true"
+	$(eval DOWNLOAD_URL := https://aka.ms/golang/release/latest/go${GO_VERSION}-1.linux-${ARCH}.tar.gz)
+else
+	$(eval DOWNLOAD_URL := https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz)
+endif
+	@cat dev-tools/multipass-cloud-init.yml.envsubst | DOWNLOAD_URL=${DOWNLOAD_URL} ARCH=${ARCH} envsubst > dev-tools/multipass-cloud-init.yml
 	@multipass launch --cloud-init=dev-tools/multipass-cloud-init.yml --mount ..:~/git --name fleet-server-dev --memory 8G --cpus 2 --disk 50G noble
 	@rm dev-tools/multipass-cloud-init.yml
 
@@ -85,7 +100,7 @@ list-platforms: ## - Show the possible PLATFORMS
 .PHONY: local
 local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
-	go build $(if $(SNAPSHOT),-tags="snapshot",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
+	$(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
 .PHONY: $(COVER_TARGETS)
@@ -95,7 +110,7 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(SNAPSHOT),-tags="snapshot",) -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
@@ -170,11 +185,11 @@ test-release:  ## - Check that all release binaries are created
 
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
-	set -o pipefail; go test ${GO_TEST_FLAG} -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
+	set -o pipefail; go test ${GO_TEST_FLAG} $(if $(FIPS),-tags="requirefips",) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
 
 .PHONY: benchmark
 benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
-	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
+	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) $(if $(FIPS),-tags="requirefips",) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
 
 .PHONY: install-benchstat
 install-benchstat: ## - Install the benchstat package
@@ -210,7 +225,7 @@ $(PLATFORM_TARGETS): release-%:
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst release-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(SNAPSHOT),-tags="snapshot",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(if $(FIPS),-fips,)/fleet-server .
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
 
 .PHONY: build-docker
@@ -247,14 +262,14 @@ package-target: build/distributions
 ifeq ($(OS),windows)
 	@mv build/binaries/fleet-server-$(VERSION)-$(OS)-$(ARCH)/fleet-server build/binaries/fleet-server-$(VERSION)-$(OS)-$(ARCH)/fleet-server.exe
 	@cd build/binaries && zip -q -r ../distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH).zip fleet-server-$(VERSION)-$(OS)-$(ARCH)
-	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-$(ARCH).zip > fleet-server-$(VERSION)-$(OS)-$(ARCH).zip.sha512
+	@cd build/distributions && sha512sum fleet-server-$(VERSION)-$(OS)-$(ARCH).zip > fleet-server-$(VERSION)-$(OS)-$(ARCH).zip.sha512
 else ifeq ($(OS)-$(ARCH),darwin-arm64)
 	@mv build/binaries/fleet-server-$(VERSION)-$(OS)-$(ARCH) build/binaries/fleet-server-$(VERSION)-$(OS)-aarch64
 	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz fleet-server-$(VERSION)-$(OS)-aarch64
-	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz > fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz.sha512
+	@cd build/distributions && sha512sum fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz > fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz.sha512
 else
-	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz fleet-server-$(VERSION)-$(OS)-$(ARCH)
-	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz > fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz.sha512
+	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH)$(if $(FIPS),-fips,).tar.gz fleet-server-$(VERSION)-$(OS)-$(ARCH)$(if $(FIPS),-fips,)
+	@cd build/distributions && sha512sum fleet-server-$(VERSION)-$(OS)-$(ARCH)$(if $(FIPS),-fips,).tar.gz > fleet-server-$(VERSION)-$(OS)-$(ARCH)$(if $(FIPS),-fips,).tar.gz.sha512
 endif
 
 build-releaser: ## - Build a Docker image to run make package including all build tools
@@ -263,7 +278,11 @@ ifeq ($(shell uname -p),arm)
 else
 	$(eval SUFFIX := ${CROSSBUILD_SUFFIX})
 endif
+ifeq "${FIPS}" "true"
+	docker build -t $(BUILDER_IMAGE) -f Dockerfile.fips --target base --build-arg GO_VERSION=$(GO_VERSION) .
+else
 	docker build -t $(BUILDER_IMAGE) -f Dockerfile.build --build-arg GO_VERSION=$(GO_VERSION) --build-arg SUFFIX=${SUFFIX} .
+endif
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
@@ -271,8 +290,8 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser
-	## Build for local architecture and for linux/amd64 for docker images.
-	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
+	## Build for local architecture and for linux/$ARCH for docker images.
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(if $(FIPS),-e FIPS=true) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
