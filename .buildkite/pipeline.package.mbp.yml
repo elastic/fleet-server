@@ -20,6 +20,8 @@ steps:
       machineType: "c2-standard-16"
 
   - label: "Package x86_64 staging"
+    # only run staging builds on main for prereleases (VERSION_QUALIFIER is set)
+    if: "build.env('BUILDKITE_BRANCH') != 'main' || build.env('VERSION_QUALIFIER') != null"
     key: "package-x86-64-staging"
     command: ".buildkite/scripts/package.sh snapshot"
     agents:
@@ -37,6 +39,8 @@ steps:
       instanceType: "t4g.2xlarge"
 
   - label: "Package aarch64 staging"
+    # only run staging builds on main for prereleases (VERSION_QUALIFIER is set)
+    if: "build.env('BUILDKITE_BRANCH') != 'main' || build.env('VERSION_QUALIFIER') != null"
     key: "package-arm-staging"
     command: ".buildkite/scripts/package.sh staging"
     agents:
