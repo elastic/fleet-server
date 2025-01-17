@@ -43,6 +43,10 @@ write_files:
     path: /etc/profile.d/docker-compose-alias.sh
 runcmd:
   - [ mkdir, /run/go ]
+<<<<<<< HEAD:dev-tools/multipass-cloud-init.yml
   - [ wget, https://go.dev/dl/go1.20.4.linux-amd64.tar.gz, -O, /run/go/go.tar.gz ] # FIXME don't hardcode go version
+=======
+  - [ wget, ${DOWNLOAD_URL}, -O, /run/go/go.tar.gz ]
+>>>>>>> f1c29b9 (FIPS compliant builds (#4318)):dev-tools/multipass-cloud-init.yml.envsubst
   - [ tar, -xzf, /run/go/go.tar.gz, -C, /usr/local/ ]
   - [ rm, -rf, /run/go ]
