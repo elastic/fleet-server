@@ -21,7 +21,7 @@ steps:
 
   - label: "Package x86_64 staging"
     key: "package-x86-64-staging"
-    command: ".buildkite/scripts/package.sh snapshot"
+    command: ".buildkite/scripts/package.sh staging"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
