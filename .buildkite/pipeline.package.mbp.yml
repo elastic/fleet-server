@@ -8,58 +8,65 @@ env:
   IMAGE_UBUNTU_ARM_64: "core-ubuntu-2004-aarch64"
 
 steps:
-  - group: "Package and Publish"
-    key: "package-publish"
-    steps:
-    - label: "Package Ubuntu-20 x86_64"
-      key: "package-x86-64"
-      command: ".buildkite/scripts/package.sh {{matrix.type}}"
-      agents:
-        provider: "gcp"
-        image: "${IMAGE_UBUNTU_X86_64}"
-        machineType: "c2-standard-16"
-      matrix:
-        setup:
-          type:
-          - "snapshot"
-          - "staging"
+  - label: "Package x86_64 snapshot"
+    # Skip snapshots with prerelease builds. There are flagged by a non-empty VERSION_QUALIFIER env var/BK param.
+    if: "build.env('VERSION_QUALIFIER') == null"
+    key: "package-x86-64-snapshot"
+    command: ".buildkite/scripts/package.sh snapshot"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+      machineType: "c2-standard-16"
 
-    - label: "Package Ubuntu-20 aarch64"
-      key: "package-arm"
-      command: ".buildkite/scripts/package.sh {{matrix.type}}"
-      agents:
-        provider: "aws"
-        imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
-        instanceType: "t4g.2xlarge"
-      matrix:
-        setup:
-          type:
-          - "snapshot"
-          - "staging"
+  - label: "Package x86_64 staging"
+    key: "package-x86-64-staging"
+    command: ".buildkite/scripts/package.sh snapshot"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+      machineType: "c2-standard-16"
+
+  - label: "Package aarch64 snapshot"
+    if: "build.env('VERSION_QUALIFIER') == null"
+    key: "package-arm-snapshot"
+    command: ".buildkite/scripts/package.sh snapshot"
+    agents:
+      provider: "aws"
+      imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+      instanceType: "t4g.2xlarge"
+
+  - label: "Package aarch64 staging"
+    key: "package-arm-staging"
+    command: ".buildkite/scripts/package.sh staging"
+    agents:
+      provider: "aws"
+      imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+      instanceType: "t4g.2xlarge"
 
   - label: "DRA snapshot"
+    if: "${FILE_EXISTS_IN_REPO} && build.env('VERSION_QUALIFIER') == null"
     key: "dra-snapshot"
     command: ".buildkite/scripts/dra_release.sh snapshot"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
-    if: "${FILE_EXISTS_IN_REPO} && build.env('VERSION_QUALIFIER') == null"
     depends_on:
-      - step: "package-publish"
+      - step: "package-x86-64-snapshot"
+        allow_failure: false
+      - step: "package-arm-snapshot"
         allow_failure: false
 
   - label: "DRA release staging"
+    if: "${FILE_EXISTS_IN_REPO} == true && (build.env('BUILDKITE_BRANCH') != 'main' || build.env('VERSION_QUALIFIER') != null)"
     key: "dra-staging"
     command: ".buildkite/scripts/dra_release.sh staging"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
-    # TODO remove || build.env('VERSION_QUALIFIER') != null) after prerelease tests using main
-    if: "${FILE_EXISTS_IN_REPO} == true && (build.env('BUILDKITE_BRANCH') != 'main' || build.env('VERSION_QUALIFIER') != null)"
     depends_on:
-      - step: "package-publish"
+      - step: "package-x86-64-staging"
         allow_failure: false
-      - step: "package-arm"
+      - step: "package-arm-staging"
         allow_failure: false
