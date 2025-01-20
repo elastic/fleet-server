@@ -10,7 +10,7 @@
 apt:
   sources:
     docker.list:
-      source: deb [arch=amd64] https://download.docker.com/linux/ubuntu $RELEASE stable
+      source: deb [arch=${ARCH}] https://download.docker.com/linux/ubuntu noble stable
       keyid: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
 groups:
   - docker
@@ -32,9 +32,12 @@ packages:
   - containerd.io
   - docker-buildx-plugin
   - docker-compose-plugin
+  - unzip
+  - zip
 write_files:
   - content: |
       export PATH=$PATH:/usr/local/go/bin
+      export PATH=$PATH:$(go env GOPATH)/bin
     path: /etc/profile.d/go-bin.sh
   # backwords compatibilityi alias for docker-compose
   # makefile does not use the alias
@@ -43,10 +46,8 @@ write_files:
     path: /etc/profile.d/docker-compose-alias.sh
 runcmd:
   - [ mkdir, /run/go ]
-<<<<<<< HEAD:dev-tools/multipass-cloud-init.yml
-  - [ wget, https://go.dev/dl/go1.20.4.linux-amd64.tar.gz, -O, /run/go/go.tar.gz ] # FIXME don't hardcode go version
-=======
   - [ wget, ${DOWNLOAD_URL}, -O, /run/go/go.tar.gz ]
->>>>>>> f1c29b9 (FIPS compliant builds (#4318)):dev-tools/multipass-cloud-init.yml.envsubst
   - [ tar, -xzf, /run/go/go.tar.gz, -C, /usr/local/ ]
   - [ rm, -rf, /run/go ]
+  - [ su, ubuntu, -c, "/usr/local/go/bin/go install github.com/magefile/mage@latest" ]
+  - [ su, ubuntu, -c, "/usr/local/go/bin/go install github.com/go-delve/delve/cmd/dlv@latest" ]
