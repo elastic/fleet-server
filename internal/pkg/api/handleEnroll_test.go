@@ -27,7 +27,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func TestRemoveDuplicateStr(t *testing.T) {
@@ -231,7 +230,9 @@ func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Missing(t *testing.
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"
-	replaceToken, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken("password", pbkdf2Cfg)
 	if err != nil {
 		t.Fatalf("error generating bcrypt hash: %v", err)
 	}
@@ -245,11 +246,12 @@ func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Missing(t *testing.
 	}
 	verCon := mustBuildConstraints("8.9.0")
 	cfg := &config.Server{}
+	cfg.InitDefaults()
 	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	bulker := ftesting.NewMockBulk()
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
-	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, string(replaceToken))
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 		HitsT: es.HitsT{
 			Hits: []es.HitT{{
@@ -271,7 +273,9 @@ func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Mismatch(t *testing
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"
-	replaceToken, err := bcrypt.GenerateFromPassword([]byte("replace_token"), bcrypt.DefaultCost)
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken("password", pbkdf2Cfg)
 	if err != nil {
 		t.Fatalf("error generating bcrypt hash: %v", err)
 	}
@@ -287,11 +291,12 @@ func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Mismatch(t *testing
 	}
 	verCon := mustBuildConstraints("8.9.0")
 	cfg := &config.Server{}
+	cfg.InitDefaults()
 	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	bulker := ftesting.NewMockBulk()
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
-	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, string(replaceToken))
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 		HitsT: es.HitsT{
 			Hits: []es.HitT{{
@@ -314,7 +319,9 @@ func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
 	zlog := zerolog.Logger{}
 	agentID := "1234"
 	replaceToken := "replace_token"
-	replaceTokenHash, err := bcrypt.GenerateFromPassword([]byte(replaceToken), bcrypt.DefaultCost)
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
 	if err != nil {
 		t.Fatalf("error generating bcrypt hash: %v", err)
 	}
@@ -329,11 +336,12 @@ func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
 	}
 	verCon := mustBuildConstraints("8.9.0")
 	cfg := &config.Server{}
+	cfg.InitDefaults()
 	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	bulker := ftesting.NewMockBulk()
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
-	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, string(replaceTokenHash))
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 		HitsT: es.HitsT{
 			Hits: []es.HitT{{
@@ -356,7 +364,9 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	zlog := zerolog.Logger{}
 	agentID := "1234"
 	replaceToken := "replace_token"
-	replaceTokenHash, err := bcrypt.GenerateFromPassword([]byte(replaceToken), bcrypt.DefaultCost)
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
 	if err != nil {
 		t.Fatalf("error generating bcrypt hash: %v", err)
 	}
@@ -371,11 +381,12 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	}
 	verCon := mustBuildConstraints("8.9.0")
 	cfg := &config.Server{}
+	cfg.InitDefaults()
 	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	bulker := ftesting.NewMockBulk()
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
-	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, string(replaceTokenHash))
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 		HitsT: es.HitsT{
 			Hits: []es.HitT{{

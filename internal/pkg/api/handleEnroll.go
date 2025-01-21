@@ -727,19 +727,19 @@ func compareHashAndToken(zlog zerolog.Logger, hash string, token string, cfg con
 		zlog.Error().Err(ErrAgentCorrupted).Msg("replace_token hash is not pbkdf2-sha512")
 		return false, ErrAgentCorrupted
 	}
-	iterations, err := strconv.Atoi(tokens[1])
+	iterations, err := strconv.Atoi(tokens[2])
 	if err != nil {
 		// hash invalid format
 		zlog.Error().Err(err).Msg("replace_token hash iterations not an integer")
 		return false, ErrAgentCorrupted
 	}
-	salt, err := base64.RawStdEncoding.DecodeString(tokens[2])
+	salt, err := base64.RawStdEncoding.DecodeString(tokens[3])
 	if err != nil {
 		// hash invalid format
 		zlog.Error().Err(err).Msg("replace_token hash failed to base64 decode salt")
 		return false, ErrAgentCorrupted
 	}
-	encoded, err := base64.RawStdEncoding.DecodeString(tokens[3])
+	encoded, err := base64.RawStdEncoding.DecodeString(tokens[4])
 	if err != nil {
 		// hash invalid format
 		zlog.Error().Err(err).Msg("replace_token hash failed to base64 decode encoded")
