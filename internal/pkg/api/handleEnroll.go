@@ -746,7 +746,7 @@ func compareHashAndToken(zlog zerolog.Logger, hash string, token string, cfg con
 		return false, ErrAgentCorrupted
 	}
 	key := pbkdf2.Key([]byte(token), salt, iterations, cfg.KeyLength, sha512.New)
-	return bytes.Compare(key, encoded) == 0, nil
+	return bytes.Equal(key, encoded), nil
 }
 
 func hashReplaceToken(token string, cfg config.PBKDF2) (string, error) {
