@@ -5,16 +5,22 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha512"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"go.elastic.co/apm/v2"
+	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/elastic/elastic-agent-libs/str"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -31,7 +37,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -56,11 +61,10 @@ const kFleetAccessRolesJSON = `
 `
 
 var (
-	ErrUnknownEnrollType        = errors.New("unknown enroll request type")
-	ErrInactiveEnrollmentKey    = errors.New("inactive enrollment key")
-	ErrPolicyNotFound           = errors.New("policy not found")
-	ErrAgentReplaceTokenInvalid = errors.New("replace token is invalid")
-	ErrAgentNotReplaceable      = errors.New("existing agent cannot be replaced")
+	ErrUnknownEnrollType     = errors.New("unknown enroll request type")
+	ErrInactiveEnrollmentKey = errors.New("inactive enrollment key")
+	ErrPolicyNotFound        = errors.New("policy not found")
+	ErrAgentNotReplaceable   = errors.New("existing agent cannot be replaced")
 )
 
 type EnrollerT struct {
@@ -200,23 +204,11 @@ func (et *EnrollerT) _enroll(
 ) (*EnrollResponse, error) {
 	var agent model.Agent
 	var enrollmentID string
-	var replaceToken string
 
 	span, ctx := apm.StartSpan(ctx, "enroll", "process")
 	defer span.End()
 
 	now := time.Now()
-
-	if req.ReplaceToken != nil && *req.ReplaceToken != "" {
-		replaceTokenBytes, err := bcrypt.GenerateFromPassword([]byte(*req.ReplaceToken), bcrypt.DefaultCost)
-		if err != nil {
-			zlog.Debug().Err(err).
-				Msg("Enroll request had an invalid replace token")
-			// not a valid replace token
-			return nil, ErrAgentReplaceTokenInvalid
-		}
-		replaceToken = string(replaceTokenBytes)
-	}
 
 	if req.EnrollmentId != nil {
 		vSpan, vCtx := apm.StartSpan(ctx, "checkEnrollmentID", "validate")
@@ -292,11 +284,15 @@ func (et *EnrollerT) _enroll(
 					Msg("Existing agent with same ID already enrolled; no replace token given during enrollment")
 				return nil, ErrAgentNotReplaceable
 			}
-			err = bcrypt.CompareHashAndPassword([]byte(agent.ReplaceToken), []byte(*req.ReplaceToken))
+			same, err := compareHashAndToken(zlog.With().Str("AgentID", agent.Id).Logger(), agent.ReplaceToken, *req.ReplaceToken, et.cfg.PDKDF2)
 			if err != nil {
+				// issue with hash comparison; reason already logged
+				return nil, ErrAgentNotReplaceable
+			}
+			if !same {
 				// not the same, cannot replace
 				// provides no real reason as that would expose too much information
-				zlog.Debug().Err(err).
+				zlog.Debug().
 					Str("AgentId", agent.Id).
 					Msg("Existing agent with same ID already enrolled; replace token didn't match")
 				return nil, ErrAgentNotReplaceable
@@ -320,7 +316,7 @@ func (et *EnrollerT) _enroll(
 				Str("AgentId", agent.Id).
 				Str("APIKeyID", agent.AccessAPIKeyID).
 				Msg("Invalidate old api key with same id")
-			err := invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
+			err = invalidateAPIKey(ctx, zlog, et.bulker, agent.AccessAPIKeyID)
 			if err != nil {
 				zlog.Error().Err(err).
 					Str("AgentId", agent.Id).
@@ -391,6 +387,16 @@ func (et *EnrollerT) _enroll(
 			return nil, err
 		}
 	} else {
+		var replaceHash string
+		if req.ReplaceToken != nil && *req.ReplaceToken != "" {
+			var err error
+			replaceHash, err = hashReplaceToken(*req.ReplaceToken, et.cfg.PDKDF2)
+			if err != nil {
+				zlog.Error().Err(err).Msg("failed generate hash of replace token")
+				return nil, err
+			}
+		}
+
 		agent = model.Agent{
 			Active:         true,
 			PolicyID:       policyID,
@@ -406,7 +412,7 @@ func (et *EnrollerT) _enroll(
 			},
 			Tags:         removeDuplicateStr(req.Metadata.Tags),
 			EnrollmentID: enrollmentID,
-			ReplaceToken: replaceToken,
+			ReplaceToken: replaceHash,
 		}
 
 		err = createFleetAgent(ctx, et.bulker, agentID, agent)
@@ -704,4 +710,57 @@ func validateRequest(ctx context.Context, data io.Reader) (*EnrollRequest, error
 	}
 
 	return &req, nil
+}
+
+func compareHashAndToken(zlog zerolog.Logger, hash string, token string, cfg config.PBKDF2) (bool, error) {
+	// format of stored replace_token
+	// $pbkdf2-sha512${iterations}${salt]${encoded}
+	// ${salt} and ${encoded} are stored base64 encoded
+	tokens := strings.Split(hash, "$")
+	if len(tokens) != 5 || tokens[0] != "" {
+		// stored hash is invalid
+		zlog.Error().Err(ErrAgentCorrupted).Msg("replace_token hash is corrupted")
+		return false, ErrAgentCorrupted
+	}
+	if tokens[1] != "pbkdf2-sha512" {
+		// unsupported hash
+		zlog.Error().Err(ErrAgentCorrupted).Msg("replace_token hash is not pbkdf2-sha512")
+		return false, ErrAgentCorrupted
+	}
+	iterations, err := strconv.Atoi(tokens[1])
+	if err != nil {
+		// hash invalid format
+		zlog.Error().Err(err).Msg("replace_token hash iterations not an integer")
+		return false, ErrAgentCorrupted
+	}
+	salt, err := base64.RawStdEncoding.DecodeString(tokens[2])
+	if err != nil {
+		// hash invalid format
+		zlog.Error().Err(err).Msg("replace_token hash failed to base64 decode salt")
+		return false, ErrAgentCorrupted
+	}
+	encoded, err := base64.RawStdEncoding.DecodeString(tokens[3])
+	if err != nil {
+		// hash invalid format
+		zlog.Error().Err(err).Msg("replace_token hash failed to base64 decode encoded")
+		return false, ErrAgentCorrupted
+	}
+	key := pbkdf2.Key([]byte(token), salt, iterations, cfg.KeyLength, sha512.New)
+	return bytes.Compare(key, encoded) == 0, nil
+}
+
+func hashReplaceToken(token string, cfg config.PBKDF2) (string, error) {
+	// generate random salt
+	r := make([]byte, cfg.SaltLength)
+	_, err := rand.Read(r)
+	if err != nil {
+		return "", errors.New("failed to generate random salt")
+	}
+	key := pbkdf2.Key([]byte(token), r, cfg.Iterations, cfg.KeyLength, sha512.New)
+	salt := base64.RawStdEncoding.EncodeToString(r)
+	encoded := base64.RawStdEncoding.EncodeToString(key)
+	// format of stored replace_token
+	// $pbkdf2-sha512${iterations}${salt]${encoded}
+	// ${salt} and ${encoded} are stored base64 encoded
+	return fmt.Sprintf("$pbkdf2-sha512$%d$%s$%s", cfg.Iterations, salt, encoded), nil
 }

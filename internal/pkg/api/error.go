@@ -101,15 +101,6 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
-			ErrAgentReplaceTokenInvalid,
-			HTTPErrResp{
-				http.StatusBadRequest,
-				"AgentReplaceTokenInvalid",
-				"replace token is invalid",
-				zerolog.InfoLevel,
-			},
-		},
-		{
 			ErrAgentNotReplaceable,
 			HTTPErrResp{
 				http.StatusForbidden,
