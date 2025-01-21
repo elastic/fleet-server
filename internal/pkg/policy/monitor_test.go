@@ -55,11 +55,6 @@ func TestNewMonitor(t *testing.T) {
 		cfg:   config.ServerLimits{PolicyLimit: config.Limit{Burst: 2, Interval: time.Second}},
 		burst: 2,
 		rate:  1,
-	}, {
-		name:  "no limit",
-		cfg:   config.ServerLimits{PolicyThrottle: time.Second},
-		burst: 1,
-		rate:  1,
 	}}
 
 	for _, tc := range tests {

@@ -7,7 +7,7 @@ require (
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.0
-	github.com/elastic/elastic-agent-libs v0.18.0
+	github.com/elastic/elastic-agent-libs v0.18.1
 	github.com/elastic/elastic-agent-system-metrics v0.11.7
 	github.com/elastic/go-elasticsearch/v8 v8.17.0
 	github.com/elastic/go-ucfg v0.8.8
@@ -27,12 +27,12 @@ require (
 	github.com/rs/zerolog v1.32.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
-	go.elastic.co/apm/module/apmchiv5/v2 v2.6.2
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.6.2
-	go.elastic.co/apm/module/apmhttp/v2 v2.6.2
-	go.elastic.co/apm/module/apmprometheus/v2 v2.6.2
-	go.elastic.co/apm/module/apmzerolog/v2 v2.6.2
-	go.elastic.co/apm/v2 v2.6.2
+	go.elastic.co/apm/module/apmchiv5/v2 v2.6.3
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.6.3
+	go.elastic.co/apm/module/apmhttp/v2 v2.6.3
+	go.elastic.co/apm/module/apmprometheus/v2 v2.6.3
+	go.elastic.co/apm/module/apmzerolog/v2 v2.6.3
+	go.elastic.co/apm/v2 v2.6.3
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.26.0
