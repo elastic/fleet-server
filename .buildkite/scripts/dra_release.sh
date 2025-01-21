@@ -9,7 +9,9 @@ BASE_DIR="${WORKSPACE}/${FOLDER_PATH}"
 DRA_OUTPUT="release-manager.out"
 export PROJECT="fleet-server"
 export TYPE=${1}
-export BRANCH="${BUILDKITE_BRANCH}"
+# DRA_BRANCH can be used for manually testing packaging with PRs
+# e.g. define `DRA_BRANCH="main"` under Options/Environment Variables in the Buildkite UI after clicking new Build
+export BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 export VERSION="$(make get-version)"
 
 if [[ "${VERSION}" == *"-SNAPSHOT"* || "${VERSION}" == "" ]]; then
