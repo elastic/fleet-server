@@ -5,8 +5,8 @@
 package api
 
 import (
-	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha512"
 	"encoding/base64"
@@ -746,7 +746,8 @@ func compareHashAndToken(zlog zerolog.Logger, hash string, token string, cfg con
 		return false, ErrAgentCorrupted
 	}
 	key := pbkdf2.Key([]byte(token), salt, iterations, cfg.KeyLength, sha512.New)
-	return bytes.Equal(key, encoded), nil
+	// use `hmac.Equal` vs `bytes.Equal` to not leak timing information for comparison
+	return hmac.Equal(key, encoded), nil
 }
 
 func hashReplaceToken(token string, cfg config.PBKDF2) (string, error) {

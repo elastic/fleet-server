@@ -5,7 +5,6 @@
 package config
 
 import (
-	"bytes"
 	"errors"
 )
 
@@ -13,9 +12,6 @@ type PBKDF2 struct {
 	Iterations int `config:"iterations"`
 	KeyLength  int `config:"key_length"`
 	SaltLength int `config:"salt_length"`
-
-	// BlockSize must be a factor of aes.BlockSize
-	BlockSize int `config:"block_size"`
 }
 
 // Validate the config options
@@ -35,8 +31,7 @@ func (p *PBKDF2) Validate() error {
 // InitDefaults is the default options to use with PDKDF2, changing might decrease
 // the efficacy of the encryption.
 func (p *PBKDF2) InitDefaults() {
-	p.Iterations = 10000
+	p.Iterations = 210000 // recommend OWASP value as of 2023
 	p.KeyLength = 32
 	p.SaltLength = 64
-	p.BlockSize = bytes.MinRead
 }
