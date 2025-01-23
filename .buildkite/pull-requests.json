@@ -10,6 +10,7 @@
         "build_on_comment": true,
         "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
         "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
+        "skip_ci_on_only_changed": [ "^.ci/", "^.github/", "^.pre-commit-config.yaml", "^.mergify.yml", "\\.md$", "^changelog/", "^docs/"],
         "fail_on_not_mergeable": true
       },
       {
