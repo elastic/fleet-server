@@ -57,8 +57,8 @@ func TestBulkCreate(t *testing.T) {
 			Name:  "Empty Index",
 			Index: "",
 			Err: es.ErrElastic{
-				Status: 500,
-				Type:   "string_index_out_of_bounds_exception",
+				Status: 400,
+				Type:   "invalid_index_name_exception",
 			},
 		},
 		{
