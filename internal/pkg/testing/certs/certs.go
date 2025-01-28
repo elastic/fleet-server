@@ -5,8 +5,12 @@
 package certs
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -91,6 +95,8 @@ func GenCA(t *testing.T) tls.Certificate {
 		t.Fatalf("fail to generate RSA key: %v", err)
 	}
 
+	ca.SubjectKeyId = generateSubjectKeyID(caKey)
+
 	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caKey.PublicKey, caKey)
 	if err != nil {
 		t.Fatalf("fail to create certificate: %v", err)
@@ -106,6 +112,23 @@ func GenCA(t *testing.T) tls.Certificate {
 		PrivateKey:  caKey,
 		Leaf:        leaf,
 	}
+}
+
+func generateSubjectKeyID(pub crypto.PublicKey) []byte {
+	// SubjectKeyId generated using method 1 in RFC 7093, Section 2:
+	//   1) The keyIdentifier is composed of the leftmost 160-bits of the
+	//   SHA-256 hash of the value of the BIT STRING subjectPublicKey
+	//   (excluding the tag, length, and number of unused bits).
+	var publicKeyBytes []byte
+	switch publicKey := pub.(type) {
+	case *rsa.PublicKey:
+		publicKeyBytes = x509.MarshalPKCS1PublicKey(publicKey)
+	case *ecdsa.PublicKey:
+		//nolint:staticcheck // no alternative
+		publicKeyBytes = elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y)
+	}
+	h := sha256.Sum256(publicKeyBytes)
+	return h[:20]
 }
 
 // GenCert generates a test keypair and signs the cert with the passed CA.
