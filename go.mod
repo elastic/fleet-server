@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
-	github.com/dgraph-io/ristretto v0.1.1
+	github.com/dgraph-io/ristretto v0.2.0
 	github.com/elastic/beats/v7 v7.17.23-0.20240725133810-bd0ffc1af3bb
 	github.com/elastic/elastic-agent-client/v7 v7.8.1
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
@@ -22,7 +22,7 @@ require (
 	github.com/rs/xid v1.3.0
 	github.com/rs/zerolog v1.27.0
 	github.com/spf13/cobra v1.7.0
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/time v0.3.0
@@ -42,7 +42,6 @@ require (
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/gofrs/flock v0.7.2-0.20190320160742-5135e617513b // indirect
-	github.com/golang/glog v1.2.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
