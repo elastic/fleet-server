@@ -21,7 +21,9 @@ steps:
 
   - label: "Package x86_64 staging"
     key: "package-x86-64-staging"
-    command: ".buildkite/scripts/package.sh staging"
+    command: |
+      source .buildkite/scripts/version_qualifier.sh
+      .buildkite/scripts/package.sh staging
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -38,7 +40,9 @@ steps:
 
   - label: "Package aarch64 staging"
     key: "package-arm-staging"
-    command: ".buildkite/scripts/package.sh staging"
+    command: |
+      source .buildkite/scripts/version_qualifier.sh
+      .buildkite/scripts/package.sh staging
     agents:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
@@ -63,7 +67,9 @@ steps:
     # details in https://github.com/elastic/ingest-dev/issues/4855
     if: "${FILE_EXISTS_IN_REPO} == true && (build.env('BUILDKITE_BRANCH') != 'main' || build.env('VERSION_QUALIFIER') != null)"
     key: "dra-staging"
-    command: ".buildkite/scripts/dra_release.sh staging"
+    command: |
+      source .buildkite/scripts/version_qualifier.sh
+      .buildkite/scripts/dra_release.sh staging
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
