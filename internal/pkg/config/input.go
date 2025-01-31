@@ -76,6 +76,7 @@ type (
 		Instrumentation    Instrumentation         `config:"instrumentation"`
 		StaticPolicyTokens StaticPolicyTokens      `config:"static_policy_tokens"`
 		PGP                PGP                     `config:"pgp"`
+		PDKDF2             PBKDF2                  `config:"pdkdf2"`
 	}
 
 	StaticPolicyTokens struct {
@@ -106,6 +107,7 @@ func (c *Server) InitDefaults() {
 	c.Bulk.InitDefaults()
 	c.GC.InitDefaults()
 	c.PGP.InitDefaults()
+	c.PDKDF2.InitDefaults()
 }
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.

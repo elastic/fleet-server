@@ -685,6 +685,10 @@
         "upgrade_details": {
           "description": "Additional upgrade status details.",
           "type": "object"
+        },
+        "replace_token": {
+          "description": "hash of token provided during enrollment that allows replacement by another enrollment with same ID",
+          "type": "string"
         }
       },
       "required": ["_id", "type", "active", "enrolled_at", "status"]

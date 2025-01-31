@@ -189,6 +189,9 @@ type Agent struct {
 	// The current policy revision_idx for the Elastic Agent
 	PolicyRevisionIdx int64 `json:"policy_revision_idx,omitempty"`
 
+	// hash of token provided during enrollment that allows replacement by another enrollment with same ID
+	ReplaceToken string `json:"replace_token,omitempty"`
+
 	// Shared ID
 	SharedID string `json:"shared_id,omitempty"`
 
