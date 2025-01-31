@@ -20,3 +20,18 @@ updates:
       elastic-apm:
         patterns:
           - "go.elastic.co/apm/*"
+
+  # GitHub actions
+  - package-ecosystem: github-actions
+    directories:
+      - '/'
+    reviewers:
+      - "elastic/observablt-ci"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "22:00"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
