@@ -39,8 +39,8 @@ github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/elastic/elastic-agent-client/v7 v7.17.0 h1:TPLrEHF4kJ3RkmQzZPffrniY4WeW4vriHZbOAzM1hFo=
 github.com/elastic/elastic-agent-client/v7 v7.17.0/go.mod h1:6h+f9QdIr3GO2ODC0Y8+aEXRwzbA5W4eV4dd/67z7nI=
-github.com/elastic/elastic-agent-libs v0.18.1 h1:dE6jf/D9bP8eRMQsV7KKpKV/G8zQzwMFBTj1w4e716c=
-github.com/elastic/elastic-agent-libs v0.18.1/go.mod h1:rWdyrrAFzZwgNNi41Tsqhlt2c2GdXWhCEwcsnqISJ2U=
+github.com/elastic/elastic-agent-libs v0.18.2 h1:jQrGytcG67YEhK9JzUhM1Yb6j9Ied68iYrWK8mlIV5M=
+github.com/elastic/elastic-agent-libs v0.18.2/go.mod h1:rWdyrrAFzZwgNNi41Tsqhlt2c2GdXWhCEwcsnqISJ2U=
 github.com/elastic/go-sysinfo v1.15.0 h1:54pRFlAYUlVNQ2HbXzLVZlV+fxS7Eax49stzg95M4Xw=
 github.com/elastic/go-sysinfo v1.15.0/go.mod h1:jPSuTgXG+dhhh0GKIyI2Cso+w5lPJ5PvVqKlL8LV/Hk=
 github.com/elastic/go-ucfg v0.8.8 h1:54KIF/2zFKfl0MzsSOCGOsZ3O2bnjFQJ0nDJcLhviyk=
