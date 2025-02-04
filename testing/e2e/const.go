@@ -4,5 +4,6 @@
 
 package e2e
 
-const binaryName = "fleet-server" //nolint:unused // work around to get platform specific binary name for tests
-const agentName = "elastic-agent" //nolint:unused // work around to get platform specific binary name for tests
+const binaryName = "fleet-server"                //nolint:unused // work around to get platform specific binary name for tests
+const agentName = "elastic-agent"                //nolint:unused // work around to get platform specific binary name for tests
+const agentDevName = "elastic-development-agent" //nolint:unused // work around to get platform specific binary name for tests
