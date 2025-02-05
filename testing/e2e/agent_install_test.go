@@ -67,7 +67,7 @@ func (suite *AgentInstallSuite) SetupSuite() {
 		return
 	}
 	// check if agent is installed
-	if _, err := exec.LookPath(agentName); err == nil {
+	if _, err := exec.LookPath(agentDevName); err == nil {
 		suite.installDetected = true
 		return // don't bother with setup, skip all tests
 	}
@@ -277,8 +277,8 @@ func (suite *AgentInstallSuite) TearDownTest() {
 		return
 	}
 
-	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "--force").CombinedOutput()
-	suite.Assert().NoErrorf(err, "elastic-agent uninstall failed. Output: %s", out)
+	out, err := exec.Command("sudo", "elastic-development-agent", "uninstall", "--force").CombinedOutput()
+	suite.Assert().NoErrorf(err, "elastic-development-agent uninstall failed. Output: %s", out)
 }
 
 func (suite *AgentInstallSuite) TestHTTP() {
@@ -286,6 +286,7 @@ func (suite *AgentInstallSuite) TestHTTP() {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
+		"--develop", "--install-servers",
 		"--fleet-server-es=http://"+suite.ESHosts,
 		"--fleet-server-service-token="+suite.ServiceToken,
 		"--fleet-server-insecure-http=true",
@@ -310,6 +311,7 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
+		"--develop", "--install-servers",
 		"--url=https://localhost:8220",
 		"--certificate-authorities="+filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
 		"--fleet-server-es=http://"+suite.ESHosts,
@@ -365,6 +367,7 @@ func (suite *AgentInstallSuite) TestAPMInstrumentationFile() {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
+		"--develop", "--install-servers",
 		"--fleet-server-es=http://"+suite.ESHosts,
 		"--fleet-server-service-token="+suite.ServiceToken,
 		"--fleet-server-insecure-http=true",
@@ -403,6 +406,7 @@ func (suite *AgentInstallSuite) TestAPMInstrumentationPolicy() {
 	})
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
+		"--develop", "--install-servers",
 		"--fleet-server-es=http://"+suite.ESHosts,
 		"--fleet-server-service-token="+suite.ServiceToken,
 		"--fleet-server-insecure-http=true",
