@@ -101,6 +101,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			ErrAgentNotReplaceable,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"AgentNotReplaceable",
+				"existing agent cannot be replaced",
+				zerolog.WarnLevel,
+			},
+		},
+		{
 			ErrInvalidUserAgent,
 			HTTPErrResp{
 				http.StatusBadRequest,
