@@ -26,9 +26,6 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.10.0
 	golang.org/x/time v0.5.0
-	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.33.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -63,6 +60,8 @@ require (
 	go.elastic.co/fastjson v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/exp v0.0.0-20231127185646-65229373498e // indirect
+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
