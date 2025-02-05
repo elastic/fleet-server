@@ -214,22 +214,22 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	t.Log("Enroll agent")
 	srvCopy := srv
 	srvCopy.enrollKey = newKey.Token()
-	agentID, key := EnrollAgent(t, ctx, srvCopy, enrollBody)
+	resp := EnrollAgent(t, ctx, srvCopy, enrollBody)
 
 	// cleanup
 	defer func() {
-		err = srv.bulker.Delete(ctx, dl.FleetAgents, agentID)
+		err = srv.bulker.Delete(ctx, dl.FleetAgents, resp.Item.Id)
 		if err != nil {
 			t.Log("could not clean up agent")
 		}
 	}()
 
-	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
+	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, true, "POLICY_CHANGE")
 	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 
-	Ack(t, ctx, srvCopy, actionID, agentID, key)
+	Ack(t, ctx, srvCopy, actionID, resp.Item.Id, resp.Item.AccessApiKey)
 
 	t.Log("Update policy to remove remote ES output")
 
@@ -254,10 +254,10 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	}
 
 	t.Log("Checkin so that agent gets new policy revision")
-	_, actionID = Checkin(t, ctx, srvCopy, agentID, key, false, "POLICY_CHANGE")
+	_, actionID = Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, false, "POLICY_CHANGE")
 
 	t.Log("Ack so that fleet triggers remote api key invalidate")
-	Ack(t, ctx, srvCopy, actionID, agentID, key)
+	Ack(t, ctx, srvCopy, actionID, resp.Item.Id, resp.Item.AccessApiKey)
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, true)
 
@@ -368,22 +368,22 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 	t.Log("Enroll agent")
 	srvCopy := srv
 	srvCopy.enrollKey = newKey.Token()
-	agentID, key := EnrollAgent(t, ctx, srvCopy, enrollBody)
+	resp := EnrollAgent(t, ctx, srvCopy, enrollBody)
 
 	// cleanup
 	defer func() {
-		err = srv.bulker.Delete(ctx, dl.FleetAgents, agentID)
+		err = srv.bulker.Delete(ctx, dl.FleetAgents, resp.Item.Id)
 		if err != nil {
 			t.Log("could not clean up agent")
 		}
 	}()
 
-	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
+	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, true, "POLICY_CHANGE")
 	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 
-	Ack(t, ctx, srvCopy, actionID, agentID, key)
+	Ack(t, ctx, srvCopy, actionID, resp.Item.Id, resp.Item.AccessApiKey)
 
 	t.Log("Force Unenroll agent - set inactive")
 
@@ -392,17 +392,17 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 	}
 	body, err := doc.Marshal()
 	require.NoError(t, err)
-	err = srv.bulker.Update(ctx, dl.FleetAgents, agentID, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+	err = srv.bulker.Update(ctx, dl.FleetAgents, resp.Item.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 	require.NoError(t, err)
 
 	t.Log("Checkin so that invalidate logic runs")
 
 	cli := cleanhttp.DefaultClient()
 
-	t.Logf("Fake a checkin for agent %s", agentID)
-	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(checkinBody))
+	t.Logf("Fake a checkin for agent %s", resp.Item.Id)
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+resp.Item.Id+"/checkin", strings.NewReader(checkinBody))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "ApiKey "+key)
+	req.Header.Set("Authorization", "ApiKey "+resp.Item.AccessApiKey)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
 	req.Header.Set("Content-Type", "application/json")
 	res, err := cli.Do(req)
@@ -489,22 +489,22 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 	t.Log("Enroll agent")
 	srvCopy := srv
 	srvCopy.enrollKey = newKey.Token()
-	agentID, key := EnrollAgent(t, ctx, srvCopy, enrollBody)
+	resp := EnrollAgent(t, ctx, srvCopy, enrollBody)
 
 	// cleanup
 	defer func() {
-		err = srv.bulker.Delete(ctx, dl.FleetAgents, agentID)
+		err = srv.bulker.Delete(ctx, dl.FleetAgents, resp.Item.Id)
 		if err != nil {
 			t.Log("could not clean up agent")
 		}
 	}()
 
-	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, agentID, key, true, "POLICY_CHANGE")
+	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, true, "POLICY_CHANGE")
 	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 
-	Ack(t, ctx, srvCopy, actionID, agentID, key)
+	Ack(t, ctx, srvCopy, actionID, resp.Item.Id, resp.Item.AccessApiKey)
 
 	t.Log("Unenroll agent")
 
@@ -514,18 +514,18 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 		"@timestamp": "2023-12-11T13:00:00.000Z",
 		"expiration": "2099-01-10T13:14:36.565Z",
 		"type": "UNENROLL"
-	}`, agentID)
+	}`, resp.Item.Id)
 	client := srv.bulker.Client()
 	res, err := client.Index(".fleet-actions", strings.NewReader(doc))
 	require.NoError(t, err)
 	require.Equal(t, 201, res.StatusCode)
 
 	t.Log("Checkin so that agent gets unenroll action")
-	_, actionID = Checkin(t, ctx, srvCopy, agentID, key, false, "UNENROLL")
+	_, actionID = Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, false, "UNENROLL")
 	t.Log(actionID)
 
 	t.Log("Ack so that fleet triggers remote api key invalidate")
-	Ack(t, ctx, srvCopy, actionID, agentID, key)
+	Ack(t, ctx, srvCopy, actionID, resp.Item.Id, resp.Item.AccessApiKey)
 
 	t.Log("Verify that remote API key is invalidated")
 	verifyRemoteAPIKey(t, ctx, apiKeyID, true)
