@@ -15,7 +15,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 
 	"github.com/rs/zerolog"
@@ -29,7 +28,7 @@ type server struct {
 
 // NewServer creates a new HTTP api for the passed addr.
 //
-// The server has a listener specific conn limit and endpoint specific rate-limits.
+// The server has an http request limit and endpoint specific rate-limits.
 // The underlying API structs (such as *CheckinT) may be shared between servers.
 func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 	a := &apiServer{}
@@ -75,13 +74,6 @@ func (s *server) Run(ctx context.Context) error {
 			zerolog.Ctx(ctx).Warn().Err(err).Msg("server.Run: error while closing listener.")
 		}
 	}()
-
-	// Conn Limiter must be before the TLS handshake in the stack;
-	// The server should not eat the cost of the handshake if there
-	// is no capacity to service the connection.
-	// Also, it appears the HTTP2 implementation depends on the tls.Listener
-	// being at the top of the stack.
-	ln = wrapConnLimitter(ctx, ln, s.cfg)
 
 	if s.cfg.TLS != nil && s.cfg.TLS.IsEnabled() {
 		commonTLSCfg, err := tlscommon.LoadTLSServerConfig(s.cfg.TLS)
@@ -149,22 +141,6 @@ func getDiagConnFunc(ctx context.Context) func(c net.Conn, s http.ConnState) {
 			cntHTTPActive.Dec()
 		}
 	}
-}
-
-func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) net.Listener {
-	hardLimit := cfg.Limits.MaxConnections
-
-	if hardLimit != 0 {
-		zerolog.Ctx(ctx).Info().
-			Int("hardConnLimit", hardLimit).
-			Msg("server hard connection limiter installed")
-
-		ln = limit.Listener(ln, hardLimit, zerolog.Ctx(ctx))
-	} else {
-		zerolog.Ctx(ctx).Info().Msg("server hard connection limiter disabled")
-	}
-
-	return ln
 }
 
 type stubLogger struct {
