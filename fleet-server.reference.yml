@@ -146,7 +146,7 @@ fleet:
 #       max_agents: 0
 #       # max_header_byte_size is the request header size limit
 #       max_header_byte_size: 8192 # 8Kib
-#       # max_connections is the maximum number of connnections per API endpoint
+#       # max_connections is the maximum number of in-flight HTTP requests per API listener
 #       max_connections: 0
 #
 #       # action_limit is a limiter for the action dispatcher, it is added to control how fast the checkin endpoint writes responses when an action effecting multiple agents is detected.
