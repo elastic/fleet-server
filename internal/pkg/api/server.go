@@ -13,13 +13,14 @@ import (
 	"net"
 	"net/http"
 
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
-	"go.elastic.co/apm/v2"
 
 	"github.com/rs/zerolog"
 )
@@ -155,25 +156,6 @@ func diagConn(c net.Conn, s http.ConnState) {
 	}
 }
 
-<<<<<<< HEAD
-func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) net.Listener {
-	hardLimit := cfg.Limits.MaxConnections
-
-	if hardLimit != 0 {
-		zerolog.Ctx(ctx).Info().
-			Int("hardConnLimit", hardLimit).
-			Msg("server hard connection limiter installed")
-
-		ln = limit.Listener(ln, hardLimit)
-	} else {
-		zerolog.Ctx(ctx).Info().Msg("server hard connection limiter disabled")
-	}
-
-	return ln
-}
-
-=======
->>>>>>> fbe3b2b (Use chi/middleware.Throttle instead of custom conn limiter (#4402))
 type stubLogger struct {
 	log zerolog.Logger
 }
