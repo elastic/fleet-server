@@ -141,6 +141,7 @@ func TestConfig(t *testing.T) {
 								UpstreamURL: defaultPGPUpstreamURL,
 								Dir:         filepath.Join(retrieveExecutableDir(), defaultPGPDirectoryName),
 							},
+							PDKDF2: defaultPBKDF2(),
 						},
 						Cache: generateCache(0),
 						Monitor: Monitor{
@@ -552,6 +553,12 @@ func defaultServerBulk() ServerBulk {
 
 func defaultServerGC() GC {
 	var d GC
+	d.InitDefaults()
+	return d
+}
+
+func defaultPBKDF2() PBKDF2 {
+	var d PBKDF2
 	d.InitDefaults()
 	return d
 }
