@@ -5,9 +5,17 @@ go 1.21
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.2.0
+<<<<<<< HEAD
 	github.com/elastic/beats/v7 v7.17.23-0.20240725133810-bd0ffc1af3bb
 	github.com/elastic/elastic-agent-client/v7 v7.8.1
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
+=======
+	github.com/docker/go-units v0.5.0
+	github.com/elastic/elastic-agent-client/v7 v7.17.1
+	github.com/elastic/elastic-agent-libs v0.18.6
+	github.com/elastic/elastic-agent-system-metrics v0.11.8
+	github.com/elastic/go-elasticsearch/v8 v8.17.0
+>>>>>>> ff1e859 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.18.5 to 0.18.6 (#4436))
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.6.0
