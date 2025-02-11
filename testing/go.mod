@@ -12,7 +12,7 @@ replace (
 require (
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/docker/docker v26.1.5+incompatible
-	github.com/elastic/elastic-agent-client/v7 v7.17.0
+	github.com/elastic/elastic-agent-client/v7 v7.17.1
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.10.0
@@ -33,7 +33,7 @@ require (
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/elastic/elastic-agent-libs v0.18.1 // indirect
+	github.com/elastic/elastic-agent-libs v0.18.6 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
