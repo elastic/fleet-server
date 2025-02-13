@@ -45,13 +45,17 @@ spec:
     spec:
       repository: elastic/fleet-server
       pipeline_file: ".buildkite/pipeline.yml"
-      branch_configuration: "main 9.* 8.* 7.*"
+      # patterns for tags are required to trigger the step that publishes the docker.elastic.co/package-registry/distribution images
+      # step with key: "release-package-registry"
+      branch_configuration: "main 9.* 8.* 7.* v9.* v8.* v7.*"
       provider_settings:
         build_pull_request_forks: false
         build_pull_requests: true # requires filter_enabled and filter_condition settings as below when used with buildkite-pr-bot
-        build_tags: false
+        build_tags: true
         filter_enabled: true
-        # TODO: what's the reason for this filter?
+        # filter condition to ensure that builds triggered are created from branch (build.pull_request.id= null)
+        # or if they are created from pull requests, just the build from the user `elasticmachine` is triggered.
+        # this user is the user by the buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       env:
@@ -95,7 +99,9 @@ spec:
         build_tags: false
         build_branches: false
         filter_enabled: true
-        # TODO: what's the reason for this filter?
+        # filter condition to ensure that builds triggered are created from branch (build.pull_request.id= null)
+        # or if they are created from pull requests, just the build from the user `elasticmachine` is triggered.
+        # this user is the user by the buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       env:
@@ -177,7 +183,9 @@ spec:
         build_tags: false
         build_branches: false
         filter_enabled: true
-        # TODO: what's the reason for this filter?
+        # filter condition to ensure that builds triggered are created from branch (build.pull_request.id= null)
+        # or if they are created from pull requests, just the build from the user `elasticmachine` is triggered.
+        # this user is the user by the buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       cancel_intermediate_builds: true
