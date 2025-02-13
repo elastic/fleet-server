@@ -55,7 +55,7 @@ spec:
         filter_enabled: true
         # filter condition to ensure that builds triggered are created from branch (build.pull_request.id= null)
         # or if they are created from pull requests, just the build from the user `elasticmachine` is triggered.
-        # this user is the user by the buildkite-pr-bot
+        # this user is the one used by the buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       env:
@@ -101,7 +101,7 @@ spec:
         filter_enabled: true
         # filter condition to ensure that builds triggered are created from branch (build.pull_request.id= null)
         # or if they are created from pull requests, just the build from the user `elasticmachine` is triggered.
-        # this user is the user by the buildkite-pr-bot
+        # this user is the one used by the buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       env:
@@ -185,7 +185,7 @@ spec:
         filter_enabled: true
         # filter condition to ensure that builds triggered are created from branch (build.pull_request.id= null)
         # or if they are created from pull requests, just the build from the user `elasticmachine` is triggered.
-        # this user is the user by the buildkite-pr-bot
+        # this user is the one used by the buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       cancel_intermediate_builds: true
