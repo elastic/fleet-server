@@ -56,7 +56,7 @@ DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
 # to use a tag like X.Y.Z-fips and not X.Y.Z-fips-fips as the test-e2e target calls into make
 ifndef DOCKER_IMAGE_TAG
 DOCKER_IMAGE_TAG?=${VERSION}
-ifeq ($(strip $(DEV)),)
+ifeq "${DEV}" "true"
 DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-dev
 endif
 ifeq "${FIPS}" "true"
