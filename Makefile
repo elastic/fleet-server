@@ -50,7 +50,19 @@ VERSION=${DEFAULT_VERSION}
 endif
 
 DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
+# defing the docker image tag used for stand-alone fleet-server images
+# only want to define the tag if none is specified, this allows an invocation like
+#    FIPS=true make test-e2e
+# to use a tag like X.Y.Z-fips and not X.Y.Z-fips-fips as the test-e2e target calls into make
+ifndef DOCKER_IMAGE_TAG
 DOCKER_IMAGE_TAG?=${VERSION}
+ifeq ($(strip $(DEV)),)
+DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-dev
+endif
+ifeq "${FIPS}" "true"
+DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-fips
+endif
+endif
 DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
@@ -66,7 +78,6 @@ GCFLAGS ?=
 LDFLAGS:=-s -w ${LDFLAGS}
 else
 GCFLAGS ?= all=-N -l
-DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-dev
 endif
 
 # Directory to dump build tools into
@@ -79,7 +90,6 @@ FIPS?=
 ifeq "${FIPS}" "true"
 BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
 PLATFORMS = linux/amd64 linux/arm64
-DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-fips
 gobuildtags += requirefips
 endif
 
@@ -130,7 +140,7 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build -tags=${GOBUILDTAGS} -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build -tags=${GOBUILDTAGS} -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(if $(FIPS),-fips,)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
@@ -312,7 +322,7 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser
 	## Build for local architecture and for linux/$ARCH for docker images.
-	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(if $(FIPS),-e FIPS=true) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(if $(DEV),-e DEV=true) $(if $(FIPS),-e FIPS=true) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) $(if $(FIPS),,cover-$(shell go env GOOS)/$(shell go env GOARCH))
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
@@ -427,7 +437,7 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
 	STANDALONE_E2E_IMAGE=$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG) \
 	CGO_ENABLED=1 \
-	go test -v -timeout 30m -tags=e2e -count=1 -race -p 1 ./...
+	go test -v -timeout 30m -tags=e2e$(if $(FIPS),$(comma)requirefips) -count=1 -race -p 1 ./...
 
 ##################################################
 # Cloud testing targets
