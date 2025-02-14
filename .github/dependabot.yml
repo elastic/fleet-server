@@ -12,8 +12,6 @@ updates:
       # Only update internal dependencies for now while we evaluate this workflow.
       - dependency-name: "github.com/elastic/*"
       - dependency-name: "go.elastic.co/*"
-    reviewers:
-      - "elastic/fleet"
     open-pull-requests-limit: 10
     groups:
       elastic-apm:
