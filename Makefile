@@ -1,3 +1,11 @@
+# Makefile for fleet-server
+# Many of the targets can change behaviour based on the following flags:
+# - SNAPSHOT - true/false (default false); Make a SNAPSHOT build; fleet-server will allow agents on the next minor version to connect
+# - DEV - true/false (default false); Make a dev build, compiler inlining and optimizations are disabled and the symbols table is kept
+# - FIPS - true/false (default false); Make a FIPS build.
+#
+# Additionally the PLATFORMS env var can be used to deterimine outputs for specific targets, such as release.
+
 SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
 DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
@@ -32,14 +40,29 @@ ifdef VERSION_QUALIFIER
 DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
 endif
 
+# gobuildtags is an intermediate variable taht is used to properly assemble GOBUILDTAGS, a comma seperated list of tags to use with go build
+gobuildtags=
 ifeq ($(SNAPSHOT),true)
 VERSION=${DEFAULT_VERSION}-SNAPSHOT
+gobuildtags=snapshot
 else
 VERSION=${DEFAULT_VERSION}
 endif
 
 DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
+# defing the docker image tag used for stand-alone fleet-server images
+# only want to define the tag if none is specified, this allows an invocation like
+#    FIPS=true make test-e2e
+# to use a tag like X.Y.Z-fips and not X.Y.Z-fips-fips as the test-e2e target calls into make
+ifndef DOCKER_IMAGE_TAG
 DOCKER_IMAGE_TAG?=${VERSION}
+ifeq "${DEV}" "true"
+DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-dev
+endif
+ifeq "${FIPS}" "true"
+DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-fips
+endif
+endif
 DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
@@ -67,7 +90,14 @@ FIPS?=
 ifeq "${FIPS}" "true"
 BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
 PLATFORMS = linux/amd64 linux/arm64
+gobuildtags += requirefips
 endif
+
+# Assemble GOBUILDTAGS with some Makefile trickery as we need to avoid sending multiple -tags flags
+# the character of a comma needs a variable so it can be used as a value in a subst call
+comma=,
+# transform the space-seperated values in gobuildtags to a comma seperated string
+GOBUILDTAGS=$(subst $() $(),$(comma),$(gobuildtags))
 
 .EXPORT_ALL_VARIABLES:
 	FIPS=${FIPS}
@@ -100,7 +130,7 @@ list-platforms: ## - Show the possible PLATFORMS
 .PHONY: local
 local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
-	$(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
+	$(if $(FIPS),GOEXPERIMENT=systemcrypto) go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
 .PHONY: $(COVER_TARGETS)
@@ -110,7 +140,7 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build -tags=${GOBUILDTAGS} -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(if $(FIPS),-fips,)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
@@ -225,7 +255,7 @@ $(PLATFORM_TARGETS): release-%:
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst release-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build $(if $(SNAPSHOT),-tags="snapshot",) $(if $(FIPS),-tags="requirefips",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(if $(FIPS),-fips,)/fleet-server .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) $(if $(FIPS),GOEXPERIMENT=systemcrypto) go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(if $(FIPS),-fips,)/fleet-server .
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
 
 .PHONY: build-docker
@@ -237,7 +267,8 @@ build-docker:
 		--build-arg=DEV="$(DEV)" \
 		--build-arg=SNAPSHOT="$(SNAPSHOT)" \
 		--build-arg=VERSION="$(VERSION)" \
-		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
+		$(if $(FIPS),-f Dockerfile.fips) \
+		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG) .
 
 .PHONY: build-and-push-docker
 build-and-push-docker:
@@ -250,12 +281,12 @@ build-and-push-docker:
 		--build-arg=DEV="$(DEV)" \
 		--build-arg=SNAPSHOT="$(SNAPSHOT)" \
 		--build-arg=VERSION="$(VERSION)" \
-		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
+		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG) .
 
 .PHONY: release-docker
 release-docker:
 	docker push \
-		$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,)
+		$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)
 
 .PHONY: package-target
 package-target: build/distributions
@@ -291,7 +322,7 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser
 	## Build for local architecture and for linux/$ARCH for docker images.
-	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(if $(FIPS),-e FIPS=true) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(if $(DEV),-e DEV=true) $(if $(FIPS),-e FIPS=true) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) $(if $(FIPS),,cover-$(shell go env GOOS)/$(shell go env GOARCH))
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
@@ -370,7 +401,7 @@ test-int-set: ## - Run integration tests without setup
 .PHONY: build-e2e-agent-image
 build-e2e-agent-image: docker-cover-e2e-binaries ## - Build a custom elastic-agent image with fleet-server binaries with coverage enabled injected
 	@printf "${CMD_COLOR_ON} Creating test e2e agent image\n${CMD_COLOR_OFF}"
-	FLEET_VERSION=${DEFAULT_VERSION}-SNAPSHOT ./dev-tools/e2e/build.sh # force fleet version to be equal to VERSION-SNAPSHOT
+	FIPS=${FIPS} FLEET_VERSION=${DEFAULT_VERSION}-SNAPSHOT ./dev-tools/e2e/build.sh # force fleet version to be equal to VERSION-SNAPSHOT
 
 .PHONY: e2e-certs
 e2e-certs: ## - Use openssl to create a CA, encrypted private key, and signed fleet-server cert testing purposes
@@ -404,9 +435,9 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS} "fleet-server") \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
-	STANDALONE_E2E_IMAGE=$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) \
+	STANDALONE_E2E_IMAGE=$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG) \
 	CGO_ENABLED=1 \
-	go test -v -timeout 30m -tags=e2e -count=1 -race -p 1 ./...
+	go test -v -timeout 30m -tags=e2e$(if $(FIPS),$(comma)requirefips) -count=1 -race -p 1 ./...
 
 ##################################################
 # Cloud testing targets

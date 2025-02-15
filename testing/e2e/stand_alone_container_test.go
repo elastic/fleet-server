@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build e2e
+//go:build e2e && !requirefips
 
 package e2e
 
@@ -19,9 +19,10 @@ import (
 
 	toxiproxy "github.com/Shopify/toxiproxy/client"
 	"github.com/docker/docker/api/types/container"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 )
 
 type StandAloneContainerSuite struct {

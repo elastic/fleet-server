@@ -24,10 +24,20 @@ VCS_REF=$(docker inspect -f '{{index .Config.Labels "org.label-schema.vcs-ref"}}
 
 CUSTOM_IMAGE_TAG=${STACK_VERSION}-e2e-${COMMIT}-$(date +%s)
 
+FLEET_SUFFIX="${STACK_VERSION}-linux"
+if [[ "$GOARCH" == "arm64" ]]; then
+    FLEET_SUFFIX="${FLEET_SUFFIX}-arm64"
+else
+    FLEET_SUFFIX="${FLEET_SUFFIX}-x86_64"
+fi
+if [[ "$FIPS" == "true" ]]; then
+    FLEET_SUFFIX="${FLEET_SUFFIX}-fips"
+fi
+
 docker build \
 	-f $REPO_ROOT/dev-tools/e2e/Dockerfile \
 	--build-arg ELASTIC_AGENT_IMAGE=$BASE_IMAGE \
-	--build-arg STACK_VERSION=${FLEET_VERSION} \
+	--build-arg FLEET_SUFFIX=${FLEET_SUFFIX} \
 	--build-arg VCS_REF_SHORT=${VCS_REF:0:6} \
 	--platform linux/$GOARCH \
 	-t ${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG} \

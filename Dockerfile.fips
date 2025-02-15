@@ -27,19 +27,19 @@ ARG TARGETPLATFORM
 
 RUN FIPS=true CGO_ENABLED=1 GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" DEV="${DEV}" make release-${TARGETPLATFORM}
 
-FROM docker.elastic.co/wolfi/glibc-openssl-fips:latest
+FROM docker.elastic.co/wolfi/chainguard-base-fips:latest
 ARG VERSION
 ARG TARGETOS
 ARG TARGETARCH
 
-RUN groupadd --gid 1000 fleet-server && \
-    useradd -M --uid 1000 --gid 1000 fleet-server
+RUN addgroup --gid 1000 fleet-server && \
+    adduser -H -D -u 1000 -G fleet-server fleet-server
 
 USER fleet-server
 
 COPY --chown=fleet-server:fleet-server --chmod=644 fleet-server.yml /etc/fleet-server.yml
-COPY --chown=fleet-server:fleet-server --chmod=755 --from=builder /usr/src/fleet-server/build/binaries/fleet-server-${VERSION}-${TARGETOS:-linux}-*/fleet-server /usr/bin/fleet-server
+COPY --chown=fleet-server:fleet-server --chmod=555 --from=builder /go/src/github.com/elastic/fleet-server/build/binaries/fleet-server-${VERSION}-${TARGETOS:-linux}-*-fips/fleet-server /usr/bin/fleet-server
 
 ENV GOFIPS=1
 
-CMD /usr/bin/fleet-server -c /etc/fleet-server.yml
+CMD [ "/usr/bin/fleet-server", "-c", "/etc/fleet-server.yml" ]
