@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script does some basic sanity checking to verify that the passed binary is FIPS complian
+# This script does some basic sanity checking to verify that the passed binary is FIPS compliant
 
 set -euo pipefail
 
