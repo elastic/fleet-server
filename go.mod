@@ -1,22 +1,15 @@
 module github.com/elastic/fleet-server/v7
 
-go 1.22
+go 1.22.10
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-client/v7 v7.16.0
-	github.com/elastic/elastic-agent-libs v0.14.0
-	github.com/elastic/elastic-agent-system-metrics v0.11.3
-	github.com/elastic/go-elasticsearch/v8 v8.15.0
-=======
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
 	github.com/elastic/elastic-agent-libs v0.18.6
 	github.com/elastic/elastic-agent-system-metrics v0.11.8
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
->>>>>>> 8aa73ff (build(deps): bump github.com/elastic/go-elasticsearch/v8 from 8.17.0 to 8.17.1 (#4468))
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.6.0
 	github.com/go-chi/chi/v5 v5.0.12
@@ -57,7 +50,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/elastic/elastic-transport-go/v8 v8.6.0 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.6.1 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-sysinfo v1.14.2 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
