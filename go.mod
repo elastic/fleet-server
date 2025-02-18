@@ -1,13 +1,13 @@
 module github.com/elastic/fleet-server/v7
 
-go 1.22.8
+go 1.22.10
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.16.0
-	github.com/elastic/elastic-agent-libs v0.17.3
+	github.com/elastic/elastic-agent-libs v0.18.6
 	github.com/elastic/elastic-agent-system-metrics v0.11.4
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-ucfg v0.8.8
