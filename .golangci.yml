@@ -2,7 +2,8 @@
 run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   timeout: 1m
-  build-tags: integration
+  build-tags:
+    - integration
   go: "1.23.6"
 
 issues:
@@ -97,7 +98,7 @@ linters-settings:
     forbid:
       - fmt.Print.* # too much log noise
     # Exclude godoc examples from forbidigo checks.  Default is true.
-    exclude_godoc_examples: true
+    exclude-godoc-examples: true
 
   gomoddirectives:
     # Allow local `replace` directives. Default is false.
@@ -119,8 +120,6 @@ linters-settings:
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
     allow-unused: false
-    # Disable to ensure that nolint directives don't have a leading space. Default is true.
-    allow-leading-space: true
     # Exclude following linters from requiring an explanation.  Default is [].
     allow-no-explanation: []
     # Enable to require an explanation of nonzero length after each nolint directive. Default is false.
