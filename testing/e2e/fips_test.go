@@ -63,7 +63,7 @@ func (suite *FIPSStandAlone) TestVerifyArtifact() {
 			suite.Require().Contains(setting.Value, "requirefips")
 			continue
 		case "GOEXPERIMENT":
-			foundExpirement = true
+			foundExperiment = true
 			suite.Require().Contains(setting.Value, "systemcrypto")
 			continue
 		case "-ldflags":
@@ -74,8 +74,8 @@ func (suite *FIPSStandAlone) TestVerifyArtifact() {
 		}
 	}
 
-	suite.Require().True(t, foundTags, "Did not find -tags within binary description")
-	suite.Require().True(t, foundExpirement, "Did not find GOEXPERIMENT within binary description")
+	suite.Require().True(foundTags, "Did not find -tags within binary description")
+	suite.Require().True(foundExperiment, "Did not find GOEXPERIMENT within binary description")
 
 	if checkLinks {
 		suite.T().Log("checking artifact symbols")
