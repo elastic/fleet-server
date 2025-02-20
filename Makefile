@@ -1,3 +1,11 @@
+# Makefile for fleet-server
+# Many of the targets can change behaviour based on the following flags:
+# - SNAPSHOT - true/false (default false); Make a SNAPSHOT build; fleet-server will allow agents on the next minor version to connect
+# - DEV - true/false (default false); Make a dev build, compiler inlining and optimizations are disabled and the symbols table is kept
+# - FIPS - true/false (default false); Make a FIPS build.
+#
+# Additionally the PLATFORMS env var can be used to deterimine outputs for specific targets, such as release.
+
 SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
 DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
@@ -14,7 +22,12 @@ BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
 CROSSBUILD_SUFFIX=main-debian11
+<<<<<<< HEAD
 BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${CROSSBUILD_SUFFIX}
+=======
+STANDALONE_DOCKERFILE=Dockerfile
+BUILDER_IMAGE=fleet-server-builder:${GO_VERSION}
+>>>>>>> c83472b (Fix docker image build for FIPS variants (#4472))
 
 #Benchmark related targets
 BENCH_BASE ?= benchmark-$(COMMIT).out
@@ -35,13 +48,32 @@ ifdef VERSION_QUALIFIER
 DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
 endif
 
+# gobuildtags is an intermediate variable that is used to properly assemble GOBUILDTAGS, a comma seperated list of tags to use with go build
+gobuildtags=
 ifeq ($(SNAPSHOT),true)
 VERSION=${DEFAULT_VERSION}-SNAPSHOT
+gobuildtags=snapshot
 else
 VERSION=${DEFAULT_VERSION}
 endif
 
+<<<<<<< HEAD
+=======
+DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
+# defing the docker image tag used for stand-alone fleet-server images
+# only want to define the tag if none is specified, this allows an invocation like
+#    FIPS=true make test-e2e
+# to use a tag like X.Y.Z-fips and not X.Y.Z-fips-fips as the test-e2e target calls into make
+ifndef DOCKER_IMAGE_TAG
+>>>>>>> c83472b (Fix docker image build for FIPS variants (#4472))
 DOCKER_IMAGE_TAG?=${VERSION}
+ifeq "${DEV}" "true"
+DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-dev
+endif
+ifeq "${FIPS}" "true"
+DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-fips
+endif
+endif
 DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
@@ -64,6 +96,32 @@ GOBIN=$(shell go env GOPATH)/bin/
 
 OS_NAME:=$(shell uname -s)
 
+<<<<<<< HEAD
+=======
+# Set FIPS=true to force FIPS compliance when building
+FIPS?=
+# NOTE: We are assuming that the only GOEXPIREMENT flag will be associated with FIPS
+GOFIPSEXPERIMENT?=
+FIPSSUFFIX=
+ifeq "${FIPS}" "true"
+BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
+STANDALONE_DOCKERFILE=Dockerfile.fips
+PLATFORMS = linux/amd64 linux/arm64
+gobuildtags += requirefips
+GOFIPSEXPERIMENT=GOEXPERIMENT=systemcrypto
+FIPSSUFFIX=-fips
+endif
+
+# Assemble GOBUILDTAGS with some Makefile trickery as we need to avoid sending multiple -tags flags
+# the character of a comma needs a variable so it can be used as a value in a subst call
+comma=,
+# transform the space-seperated values in gobuildtags to a comma seperated string
+GOBUILDTAGS=$(subst $() $(),$(comma),$(gobuildtags))
+
+.EXPORT_ALL_VARIABLES:
+	FIPS=${FIPS}
+
+>>>>>>> c83472b (Fix docker image build for FIPS variants (#4472))
 .PHONY: help
 help: ## - Show help message
 	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
@@ -76,7 +134,11 @@ list-platforms: ## - Show the possible PLATFORMS
 .PHONY: local
 local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
+<<<<<<< HEAD
 	go build $(if $(SNAPSHOT),-tags="snapshot",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
+=======
+	${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
+>>>>>>> c83472b (Fix docker image build for FIPS variants (#4472))
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
 .PHONY: $(COVER_TARGETS)
@@ -86,7 +148,11 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
+<<<<<<< HEAD
 	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(SNAPSHOT),-tags="snapshot",) -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+=======
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(FIPSSUFFIX)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+>>>>>>> c83472b (Fix docker image build for FIPS variants (#4472))
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
@@ -122,7 +188,7 @@ check-headers:  ## - Check copyright headers
 
 .PHONY: check-go
 check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.61.0
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.64.5
 	@./bin/golangci-lint run -v
 
 .PHONY: notice
@@ -161,11 +227,19 @@ test-release:  ## - Check that all release binaries are created
 
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
+<<<<<<< HEAD
 	set -o pipefail; go test ${GO_TEST_FLAG} -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
 
 .PHONY: benchmark
 benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
 	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
+=======
+	set -o pipefail; go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
+
+.PHONY: benchmark
+benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
+	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) -tags=$(GOBUILDTAGS) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
+>>>>>>> c83472b (Fix docker image build for FIPS variants (#4472))
 
 .PHONY: install-benchstat
 install-benchstat: ## - Install the benchstat package
@@ -201,7 +275,11 @@ $(PLATFORM_TARGETS): release-%:
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst release-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
+<<<<<<< HEAD
 	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) go build $(if $(SNAPSHOT),-tags="snapshot",) -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
+=======
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(FIPSSUFFIX)/fleet-server .
+>>>>>>> c83472b (Fix docker image build for FIPS variants (#4472))
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
 
 .PHONY: build-docker
@@ -213,7 +291,8 @@ build-docker:
 		--build-arg=DEV="$(DEV)" \
 		--build-arg=SNAPSHOT="$(SNAPSHOT)" \
 		--build-arg=VERSION="$(VERSION)" \
-		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
+		-f $(STANDALONE_DOCKERFILE) \
+		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG) .
 
 .PHONY: build-and-push-docker
 build-and-push-docker:
@@ -226,12 +305,12 @@ build-and-push-docker:
 		--build-arg=DEV="$(DEV)" \
 		--build-arg=SNAPSHOT="$(SNAPSHOT)" \
 		--build-arg=VERSION="$(VERSION)" \
-		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) .
+		-t $(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG) .
 
 .PHONY: release-docker
 release-docker:
 	docker push \
-		$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,)
+		$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)
 
 .PHONY: package-target
 package-target: build/distributions
@@ -244,8 +323,13 @@ else ifeq ($(OS)-$(ARCH),darwin-arm64)
 	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz fleet-server-$(VERSION)-$(OS)-aarch64
 	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz > fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz.sha512
 else
+<<<<<<< HEAD
 	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz fleet-server-$(VERSION)-$(OS)-$(ARCH)
 	@cd build/distributions && shasum -a 512 fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz > fleet-server-$(VERSION)-$(OS)-$(ARCH).tar.gz.sha512
+=======
+	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH)$(FIPSSUFFIX).tar.gz fleet-server-$(VERSION)-$(OS)-$(ARCH)$(FIPSSUFFIX)
+	@cd build/distributions && sha512sum fleet-server-$(VERSION)-$(OS)-$(ARCH)$(FIPSSUFFIX).tar.gz > fleet-server-$(VERSION)-$(OS)-$(ARCH)$(FIPSSUFFIX).tar.gz.sha512
+>>>>>>> c83472b (Fix docker image build for FIPS variants (#4472))
 endif
 
 build-releaser: ## - Build a Docker image to run make package including all build tools
@@ -262,8 +346,18 @@ docker-release: build-releaser ## - Builds a release for all platforms in a dock
 
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser
+<<<<<<< HEAD
 	## Build for local architecture and for linux/amd64 for docker images.
 	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
+=======
+ifeq "${FIPS}" "true"
+	## non-linux is currently unsupported for FIPS
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true -e DEV=$(DEV) -e FIPS=$(FIPS) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH)
+else
+	## Build for local architecture and for linux/$ARCH for docker images.
+	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true -e DEV=$(DEV) -e FIPS=$(FIPS) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
+endif
+>>>>>>> c83472b (Fix docker image build for FIPS variants (#4472))
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
@@ -342,7 +436,7 @@ test-int-set: ## - Run integration tests without setup
 .PHONY: build-e2e-agent-image
 build-e2e-agent-image: docker-cover-e2e-binaries ## - Build a custom elastic-agent image with fleet-server binaries with coverage enabled injected
 	@printf "${CMD_COLOR_ON} Creating test e2e agent image\n${CMD_COLOR_OFF}"
-	FLEET_VERSION=${DEFAULT_VERSION}-SNAPSHOT ./dev-tools/e2e/build.sh # force fleet version to be equal to VERSION-SNAPSHOT
+	FIPS=${FIPS} FLEET_VERSION=${DEFAULT_VERSION}-SNAPSHOT ./dev-tools/e2e/build.sh # force fleet version to be equal to VERSION-SNAPSHOT
 
 .PHONY: e2e-certs
 e2e-certs: ## - Use openssl to create a CA, encrypted private key, and signed fleet-server cert testing purposes
@@ -376,9 +470,9 @@ test-e2e-set: ## - Run the blackbox end to end tests without setup.
 	ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_ELASTICSEARCH_HOSTS} "fleet-server") \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
 	AGENT_E2E_IMAGE=$(shell cat "build/e2e-image") \
-	STANDALONE_E2E_IMAGE=$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG)$(if $(DEV),-dev,) \
+	STANDALONE_E2E_IMAGE=$(DOCKER_IMAGE):$(DOCKER_IMAGE_TAG) \
 	CGO_ENABLED=1 \
-	go test -v -timeout 30m -tags=e2e -count=1 -race -p 1 ./...
+	go test -v -timeout 30m -tags=e2e,$(GOBUILDTAGS) -count=1 -race -p 1 ./...
 
 ##################################################
 # Cloud testing targets
