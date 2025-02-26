@@ -184,7 +184,7 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFlakyness() {
 
 	// wait for unit state degraded
 	timeoutCtx, tCancel := context.WithTimeout(ctx, 30*time.Second)
-	suite.FleetServerStatusIsNot(timeoutCtx, "http://localhost:8220", client.UnitStateDegraded)
+	suite.FleetServerStatusNeverBecomes(timeoutCtx, "http://localhost:8220", client.UnitStateDegraded)
 
 	// test should not fail at this point
 	tCancel()

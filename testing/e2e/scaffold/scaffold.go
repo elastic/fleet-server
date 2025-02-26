@@ -176,8 +176,8 @@ func (s *Scaffold) FleetServerStatusIs(ctx context.Context, url string, state cl
 }
 
 // FleetServerStatusIs will poll fleet-server's status endpoint every second and return when it returns the expected state.
-// Caller controls duration using context timeout.
-func (s *Scaffold) FleetServerStatusIsNot(ctx context.Context, url string, state client.UnitState) {
+// If the passed context terminates before a 200 is returned the current test will be marked as failed.
+func (s *Scaffold) FleetServerStatusNeverBecomes(ctx context.Context, url string, state client.UnitState) {
 	s.FleetServerStatusCondition(ctx, url, func(resp *http.Response) bool {
 		var status struct {
 			Status string `json:"status"`
@@ -188,7 +188,8 @@ func (s *Scaffold) FleetServerStatusIsNot(ctx context.Context, url string, state
 		err = json.Unmarshal(d, &status)
 		s.Require().NoError(err)
 
-		return status.Status != state.String()
+		s.NotEqual(state.String(), status.Status)
+		return false
 	}, false)
 }
 
