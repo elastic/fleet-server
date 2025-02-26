@@ -6,9 +6,12 @@ package es
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"runtime"
+	"syscall"
+	"time"
 
 	"go.elastic.co/apm/module/apmelasticsearch/v2"
 
@@ -16,10 +19,44 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/rs/zerolog"
 
+	backoff "github.com/cenkalti/backoff/v4"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
+const (
+	initialRetryBackoff = 500 * time.Millisecond
+	maxRetryBackoff     = 10 * time.Second
+	randomizationFactor = 0.5
+	maxRetries          = 5
+)
+
 type ConfigOption func(config *elasticsearch.Config)
+
+var retriableErrors []error
+
+func applyDefaultOptions(escfg *elasticsearch.Config) {
+	exp := backoff.NewExponentialBackOff()
+	exp.InitialInterval = initialRetryBackoff
+	exp.RandomizationFactor = randomizationFactor
+	exp.MaxInterval = maxRetryBackoff
+
+	opts := []ConfigOption{
+		WithRetryOnErr(syscall.ECONNREFUSED), // server not ready
+		WithRetryOnErr(syscall.ECONNRESET),   // server may be restarting
+
+		WithRetryOnStatus(http.StatusTooManyRequests),
+		WithRetryOnStatus(http.StatusBadGateway),
+		WithRetryOnStatus(http.StatusServiceUnavailable),
+		WithRetryOnStatus(http.StatusGatewayTimeout),
+
+		WithBackoff(exp),
+		WithMaxRetries(5),
+	}
+
+	for _, opt := range opts {
+		opt(escfg)
+	}
+}
 
 func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...ConfigOption) (*elasticsearch.Client, error) {
 	escfg, err := cfg.Output.Elasticsearch.ToESConfig(longPoll)
@@ -28,6 +65,9 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 	}
 	addr := cfg.Output.Elasticsearch.Hosts
 	mcph := cfg.Output.Elasticsearch.MaxConnPerHost
+
+	// apply defauly config
+	applyDefaultOptions(&escfg)
 
 	// Apply configuration options
 	for _, opt := range opts {
@@ -75,6 +115,60 @@ func InstrumentRoundTripper() ConfigOption {
 		config.Transport = apmelasticsearch.WrapRoundTripper(
 			config.Transport,
 		)
+	}
+}
+
+func WithRetryOnErr(err error) ConfigOption {
+	if retriableErrors == nil {
+		retriableErrors = make([]error, 0, 1)
+	}
+	retriableErrors = append(retriableErrors, err)
+
+	return func(config *elasticsearch.Config) {
+		config.RetryOnError = func(_ *http.Request, err error) bool {
+			for _, e := range retriableErrors {
+				if errors.Is(err, e) {
+					return true
+				}
+			}
+			return false
+		}
+	}
+}
+
+func WithMaxRetries(retries int) ConfigOption {
+	return func(config *elasticsearch.Config) {
+		config.MaxRetries = retries
+	}
+}
+
+func WithRetryOnStatus(status int) ConfigOption {
+	return func(config *elasticsearch.Config) {
+		for _, s := range config.RetryOnStatus {
+			// check for duplicities
+			if s == status {
+				return
+			}
+		}
+
+		config.RetryOnStatus = append(config.RetryOnStatus, status)
+	}
+}
+
+func WithBackoff(exp *backoff.ExponentialBackOff) ConfigOption {
+	return func(config *elasticsearch.Config) {
+		if exp == nil {
+			// no retry backoff
+			config.RetryBackoff = nil
+			return
+		}
+
+		config.RetryBackoff = func(attempt int) time.Duration {
+			if attempt == 1 {
+				exp.Reset()
+			}
+			return exp.NextBackOff()
+		}
 	}
 }
 
