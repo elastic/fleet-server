@@ -34,7 +34,7 @@ const (
 type ConfigOption func(config *elasticsearch.Config)
 
 var retriableErrors []error
-var retriableErrorsLock sync.Mutex
+var retriableErrorsLock sync.RWMutex
 
 func applyDefaultOptions(escfg *elasticsearch.Config) {
 	exp := backoff.NewExponentialBackOff()
@@ -130,10 +130,10 @@ func WithRetryOnErr(err error) ConfigOption {
 	retriableErrors = append(retriableErrors, err)
 
 	return func(config *elasticsearch.Config) {
-		retriableErrorsLock.Lock()
-		defer retriableErrorsLock.Unlock()
-
 		config.RetryOnError = func(_ *http.Request, err error) bool {
+			retriableErrorsLock.RLock()
+			defer retriableErrorsLock.RUnlock()
+
 			for _, e := range retriableErrors {
 				if errors.Is(err, e) {
 					return true

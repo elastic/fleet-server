@@ -243,7 +243,7 @@ func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, ou
 }
 
 func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
-	options := []es.ConfigOption{es.WithUserAgent("Remote-Fleet-Server", bi), es.WithMaxRetries(3)}
+	options := []es.ConfigOption{es.WithUserAgent("Remote-Fleet-Server", bi)}
 	if instumented {
 		options = append(options, es.InstrumentRoundTripper())
 	}
