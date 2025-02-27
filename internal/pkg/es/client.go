@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
@@ -33,6 +34,7 @@ const (
 type ConfigOption func(config *elasticsearch.Config)
 
 var retriableErrors []error
+var retriableErrorsLock sync.Mutex
 
 func applyDefaultOptions(escfg *elasticsearch.Config) {
 	exp := backoff.NewExponentialBackOff()
@@ -119,12 +121,18 @@ func InstrumentRoundTripper() ConfigOption {
 }
 
 func WithRetryOnErr(err error) ConfigOption {
+	retriableErrorsLock.Lock()
+	defer retriableErrorsLock.Unlock()
+
 	if retriableErrors == nil {
 		retriableErrors = make([]error, 0, 1)
 	}
 	retriableErrors = append(retriableErrors, err)
 
 	return func(config *elasticsearch.Config) {
+		retriableErrorsLock.Lock()
+		defer retriableErrorsLock.Unlock()
+
 		config.RetryOnError = func(_ *http.Request, err error) bool {
 			for _, e := range retriableErrors {
 				if errors.Is(err, e) {
