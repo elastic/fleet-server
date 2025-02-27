@@ -33,7 +33,11 @@ func (b *Buf) Reset() {
 }
 
 func (b *Buf) grow(n int) {
-	buf := make([]byte, len(b.buf), 2*cap(b.buf)+n)
+	newCap := 2*cap(b.buf) + n
+	if newCap < 0 {
+		panic("danger.Buf.grow: size computation overflow")
+	}
+	buf := make([]byte, len(b.buf), newCap)
 	copy(buf, b.buf)
 	b.buf = buf
 }
