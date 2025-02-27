@@ -33,7 +33,7 @@ func (b *Buf) Reset() {
 }
 
 func (b *Buf) grow(n int) {
-	buf := make([]byte, len(b.buf), 2*cap(b.buf)+n)
+	newCap := 2*cap(b.buf) + n
 	copy(buf, b.buf)
 	b.buf = buf
 }
