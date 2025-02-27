@@ -28,7 +28,7 @@ const (
 	initialRetryBackoff = 500 * time.Millisecond
 	maxRetryBackoff     = 10 * time.Second
 	randomizationFactor = 0.5
-	maxRetries          = 5
+	defaultMaxRetries   = 5
 )
 
 type ConfigOption func(config *elasticsearch.Config)
@@ -52,7 +52,7 @@ func applyDefaultOptions(escfg *elasticsearch.Config) {
 		WithRetryOnStatus(http.StatusGatewayTimeout),
 
 		WithBackoff(exp),
-		WithMaxRetries(5),
+		WithMaxRetries(defaultMaxRetries),
 	}
 
 	for _, opt := range opts {
