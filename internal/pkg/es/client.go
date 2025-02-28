@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
-	"sync"
 	"syscall"
 	"time"
 
@@ -33,9 +32,6 @@ const (
 
 type ConfigOption func(config *elasticsearch.Config)
 
-var retriableErrors []error
-var retriableErrorsLock sync.RWMutex
-
 func applyDefaultOptions(escfg *elasticsearch.Config) {
 	exp := backoff.NewExponentialBackOff()
 	exp.InitialInterval = initialRetryBackoff
@@ -43,10 +39,11 @@ func applyDefaultOptions(escfg *elasticsearch.Config) {
 	exp.MaxInterval = maxRetryBackoff
 
 	opts := []ConfigOption{
-		WithRetryOnErr(syscall.ECONNREFUSED), // server not ready
-		WithRetryOnErr(syscall.ECONNRESET),   // server may be restarting
+		WithRetryOnErrs(syscall.ECONNREFUSED, syscall.ECONNRESET), // server may be restarting
 
 		WithRetryOnStatus(http.StatusTooManyRequests),
+		WithRetryOnStatus(http.StatusRequestTimeout),
+		WithRetryOnStatus(http.StatusTooEarly),
 		WithRetryOnStatus(http.StatusBadGateway),
 		WithRetryOnStatus(http.StatusServiceUnavailable),
 		WithRetryOnStatus(http.StatusGatewayTimeout),
@@ -120,21 +117,10 @@ func InstrumentRoundTripper() ConfigOption {
 	}
 }
 
-func WithRetryOnErr(err error) ConfigOption {
-	retriableErrorsLock.Lock()
-	defer retriableErrorsLock.Unlock()
-
-	if retriableErrors == nil {
-		retriableErrors = make([]error, 0, 1)
-	}
-	retriableErrors = append(retriableErrors, err)
-
+func WithRetryOnErrs(errs ...error) ConfigOption {
 	return func(config *elasticsearch.Config) {
 		config.RetryOnError = func(_ *http.Request, err error) bool {
-			retriableErrorsLock.RLock()
-			defer retriableErrorsLock.RUnlock()
-
-			for _, e := range retriableErrors {
+			for _, e := range errs {
 				if errors.Is(err, e) {
 					return true
 				}
