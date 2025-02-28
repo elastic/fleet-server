@@ -179,7 +179,7 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFlakyness() {
 	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
 
 	// Provoke timeouts and wait for the healthcheck to fail.
-	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 0.6, toxiproxy.Attributes{}) // we have 5 retries, test with failure 6 out of 10 should be ok
+	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 0.4, toxiproxy.Attributes{}) // we have 5 retries, test with failure 4 out of 10 should be ok
 	suite.Require().NoError(err)
 
 	// wait for unit state degraded
