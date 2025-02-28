@@ -619,6 +619,7 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 			dl.FieldUpgradeStartedAt: nil,
 			dl.FieldUpgradeStatus:    nil,
 			dl.FieldUpgradedAt:       now,
+			dl.FieldUpgradeAttempts:  nil,
 		}
 	}
 
