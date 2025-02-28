@@ -219,7 +219,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		}
 
 		wTime := pollDuration + time.Minute
-		rc := http.NewResponseController(w) //nolint:bodyclose // we are working with a ResponseWriter not a Respons
+		rc := http.NewResponseController(w)
 		if err := rc.SetWriteDeadline(start.Add(wTime)); err != nil {
 			zlog.Warn().Err(err).Time("write_deadline", start.Add(wTime)).Msg("Unable to set checkin write deadline.")
 		} else {
@@ -521,6 +521,7 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent)
 		dl.FieldUpgradeStartedAt: nil,
 		dl.FieldUpgradeStatus:    nil,
 		dl.FieldUpgradedAt:       time.Now().UTC().Format(time.RFC3339),
+		dl.FieldUpgradeAttempts:  nil,
 	}
 	body, err := doc.Marshal()
 	if err != nil {
