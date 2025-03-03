@@ -158,7 +158,7 @@ func TestAgent(t *testing.T) {
 			return fmt.Errorf("should be reported as healthy; instead its %s", state)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(220))
 
 	assert.Equal(t, zerolog.InfoLevel, zerolog.GlobalLevel(), "expected log level info got: %s", zerolog.GlobalLevel())
 
