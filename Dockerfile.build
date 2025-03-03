@@ -1,6 +1,6 @@
 ARG GO_VERSION
 ARG SUFFIX # Should be main-debian11 or arm
-FROM docker.elastic.co/observability-ci/golang-crossbuild:${GO_VERSION}-${SUFFIX}
+FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX}
 
 RUN \
   apt-get update \
