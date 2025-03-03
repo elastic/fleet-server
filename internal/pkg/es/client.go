@@ -65,7 +65,7 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 	addr := cfg.Output.Elasticsearch.Hosts
 	mcph := cfg.Output.Elasticsearch.MaxConnPerHost
 
-	// apply defauly config
+	// apply default config
 	applyDefaultOptions(&escfg)
 
 	// Apply configuration options
