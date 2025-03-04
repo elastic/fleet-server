@@ -14,6 +14,7 @@ BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
 CROSSBUILD_SUFFIX=main-debian11
+CROSSBUILD_ARM_SUFFIX=base-arm-debian9
 BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${CROSSBUILD_SUFFIX}
 
 #Benchmark related targets
@@ -250,7 +251,7 @@ endif
 
 build-releaser: ## - Build a Docker image to run make package including all build tools
 ifeq ($(shell uname -p),arm)
-	$(eval SUFFIX := arm)
+	$(eval SUFFIX := ${CROSSBUILD_ARM_SUFFIX})
 else
 	$(eval SUFFIX := ${CROSSBUILD_SUFFIX})
 endif
