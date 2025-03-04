@@ -7,6 +7,7 @@ package api
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha512"
 	"encoding/base64"
@@ -20,7 +21,6 @@ import (
 	"time"
 
 	"go.elastic.co/apm/v2"
-	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/elastic/elastic-agent-libs/str"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -745,7 +745,7 @@ func compareHashAndToken(zlog zerolog.Logger, hash string, token string, cfg con
 		zlog.Error().Err(err).Msg("replace_token hash failed to base64 decode encoded")
 		return false, ErrAgentCorrupted
 	}
-	key := pbkdf2.Key([]byte(token), salt, iterations, cfg.KeyLength, sha512.New)
+	key := pbkdf2.Key(sha512.New, []byte(token), salt, iterations, cfg.KeyLength)
 	// use `hmac.Equal` vs `bytes.Equal` to not leak timing information for comparison
 	return hmac.Equal(key, encoded), nil
 }
@@ -757,7 +757,7 @@ func hashReplaceToken(token string, cfg config.PBKDF2) (string, error) {
 	if err != nil {
 		return "", errors.New("failed to generate random salt")
 	}
-	key := pbkdf2.Key([]byte(token), r, cfg.Iterations, cfg.KeyLength, sha512.New)
+	key := pbkdf2.Key(sha512.New, []byte(token), r, cfg.Iterations, cfg.KeyLength)
 	salt := base64.RawStdEncoding.EncodeToString(r)
 	encoded := base64.RawStdEncoding.EncodeToString(key)
 	// format of stored replace_token
