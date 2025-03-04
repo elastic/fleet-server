@@ -4,28 +4,10 @@
 
 package config
 
-import (
-	"errors"
-)
-
 type PBKDF2 struct {
 	Iterations int `config:"iterations"`
 	KeyLength  int `config:"key_length"`
 	SaltLength int `config:"salt_length"`
-}
-
-// Validate the config options
-func (p *PBKDF2) Validate() error {
-	if p.Iterations == 0 {
-		return errors.New("iterations must be superior to 0")
-	}
-	if p.KeyLength == 0 {
-		return errors.New("key_length must be superior to 0")
-	}
-	if p.SaltLength == 0 {
-		return errors.New("salt_length must be superior to 0")
-	}
-	return nil
 }
 
 // InitDefaults is the default options to use with PDKDF2, changing might decrease
