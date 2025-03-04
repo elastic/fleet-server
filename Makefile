@@ -14,13 +14,8 @@ BUILDMODE_darwin_amd64=-buildmode=pie
 BUILDMODE_darwin_arm64=-buildmode=pie
 
 CROSSBUILD_SUFFIX=main-debian11
-<<<<<<< HEAD
-BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${CROSSBUILD_SUFFIX}
-=======
 CROSSBUILD_ARM_SUFFIX=base-arm-debian9
-STANDALONE_DOCKERFILE=Dockerfile
-BUILDER_IMAGE=fleet-server-builder:${GO_VERSION}
->>>>>>> 3b8d818 (use golang-crossbuild native to ARM64 (#4536))
+BUILDER_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${CROSSBUILD_SUFFIX}
 
 #Benchmark related targets
 BENCH_BASE ?= benchmark-$(COMMIT).out
