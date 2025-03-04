@@ -745,7 +745,11 @@ func compareHashAndToken(zlog zerolog.Logger, hash string, token string, cfg con
 		zlog.Error().Err(err).Msg("replace_token hash failed to base64 decode encoded")
 		return false, ErrAgentCorrupted
 	}
-	key := pbkdf2.Key(sha512.New, []byte(token), salt, iterations, cfg.KeyLength)
+	key, err := pbkdf2.Key(sha512.New, token, salt, iterations, cfg.KeyLength)
+	if err != nil {
+		zlog.Error().Err(err).Msg("pbkdf2 key creation failed")
+		return false, ErrAgentCorrupted
+	}
 	// use `hmac.Equal` vs `bytes.Equal` to not leak timing information for comparison
 	return hmac.Equal(key, encoded), nil
 }
@@ -757,7 +761,10 @@ func hashReplaceToken(token string, cfg config.PBKDF2) (string, error) {
 	if err != nil {
 		return "", errors.New("failed to generate random salt")
 	}
-	key := pbkdf2.Key(sha512.New, []byte(token), r, cfg.Iterations, cfg.KeyLength)
+	key, err := pbkdf2.Key(sha512.New, token, r, cfg.Iterations, cfg.KeyLength)
+	if err != nil {
+		return "", fmt.Errorf("failed to create pbkdf2 key: %w", err)
+	}
 	salt := base64.RawStdEncoding.EncodeToString(r)
 	encoded := base64.RawStdEncoding.EncodeToString(key)
 	// format of stored replace_token
