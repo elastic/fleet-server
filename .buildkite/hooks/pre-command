@@ -58,6 +58,18 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
   export EC_API_KEY=${EC_API_KEY_SECRET}
 fi
 
+<<<<<<< HEAD
+=======
+# BK analytics
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == "int-test" || "$BUILDKITE_STEP_KEY" == "e2e-test" || "$BUILDKITE_STEP_KEY" == "fips-e2e-test" ]]; then
+    echo "--- Prepare BK test analytics token :vault:"
+    BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_fleet_server_analytics_token)
+    export BUILDKITE_ANALYTICS_TOKEN
+  fi
+fi
+
+>>>>>>> 2c04d3d (Add BUILDKITE_ANALYTICS_TOKEN in fips-e2e-test step (#4544))
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "release-test" ]]; then
   export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
   export JOB_GCS_BUCKET
