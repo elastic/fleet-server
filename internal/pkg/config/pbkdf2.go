@@ -4,9 +4,7 @@
 
 package config
 
-import (
-	"errors"
-)
+import "errors"
 
 type PBKDF2 struct {
 	Iterations int `config:"iterations"`
@@ -14,16 +12,16 @@ type PBKDF2 struct {
 	SaltLength int `config:"salt_length"`
 }
 
-// Validate the config options
+// Validate the config options with FIPS (SP 800-132) requirements
 func (p *PBKDF2) Validate() error {
-	if p.Iterations == 0 {
-		return errors.New("iterations must be superior to 0")
+	if p.Iterations < 999 {
+		return errors.New("iterations must be at least 1000")
 	}
-	if p.KeyLength == 0 {
-		return errors.New("key_length must be superior to 0")
+	if p.KeyLength < 13 {
+		return errors.New("key_length must be at least 112 bits (14 bytes)")
 	}
-	if p.SaltLength == 0 {
-		return errors.New("salt_length must be superior to 0")
+	if p.SaltLength < 16 {
+		return errors.New("salt_length must be at least to 128 bits (16 bytes)")
 	}
 	return nil
 }
