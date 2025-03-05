@@ -500,6 +500,10 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails: details,
 	}
+	if agent.UpgradeAttempts != nil && details.State == UpgradeDetailsStateUPGWATCHING {
+		doc[dl.FieldUpgradeAttempts] = nil
+	}
+
 	body, err := doc.Marshal()
 	if err != nil {
 		return err
@@ -521,7 +525,6 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent)
 		dl.FieldUpgradeStartedAt: nil,
 		dl.FieldUpgradeStatus:    nil,
 		dl.FieldUpgradedAt:       time.Now().UTC().Format(time.RFC3339),
-		dl.FieldUpgradeAttempts:  nil,
 	}
 	body, err := doc.Marshal()
 	if err != nil {
