@@ -228,6 +228,9 @@ type Agent struct {
 	// Date/time the Elastic Agent was last upgraded
 	UpgradedAt string `json:"upgraded_at,omitempty"`
 
+	// List of timestamps of attempts of Elastic Agent automatic upgrades
+	UpgradeAttempts []string `json:"upgrade_attempts,omitempty"`
+
 	// User provided metadata information for the Elastic Agent
 	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata,omitempty"`
 }
