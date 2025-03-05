@@ -108,6 +108,17 @@ func TestBulkSimple(t *testing.T) {
 			nil,
 		},
 		{
+			"has meta with fips attribute",
+			"metaCaseID",
+			"online",
+			"message",
+			[]byte(`{"fips":true,"snapshot":false}`),
+			nil,
+			nil,
+			"",
+			nil,
+		},
+		{
 			"Singled field case",
 			"singleFieldId",
 			"online",
