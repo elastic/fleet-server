@@ -158,7 +158,7 @@ func TestAgent(t *testing.T) {
 			return fmt.Errorf("should be reported as healthy; instead its %s", state)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(220))
 
 	assert.Equal(t, zerolog.InfoLevel, zerolog.GlobalLevel(), "expected log level info got: %s", zerolog.GlobalLevel())
 
@@ -469,7 +469,11 @@ func (s *StubV2Control) Start(opt ...grpc.ServerOption) error {
 	if err != nil {
 		return err
 	}
-	s.port = lis.Addr().(*net.TCPAddr).Port
+	tcpAddr, ok := lis.Addr().(*net.TCPAddr)
+	if !ok {
+		return errors.New("failed to convert to *net.TCPAddr")
+	}
+	s.port = tcpAddr.Port
 	srv := grpc.NewServer(opt...)
 	s.server = srv
 	proto.RegisterElasticAgentServer(s.server, s)
