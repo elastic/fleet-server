@@ -2,7 +2,6 @@
 name: "fleet server package mbp"
 env:
   REPO: 'fleet-server'
-  SETUP_GVM_VERSION: 'v0.3.0'
   DOCKER_REGISTRY: "docker.elastic.co"
   IMAGE_UBUNTU_X86_64: "family/core-ubuntu-2004"
   IMAGE_UBUNTU_ARM_64: "core-ubuntu-2004-aarch64"
