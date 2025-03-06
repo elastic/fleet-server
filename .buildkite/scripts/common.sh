@@ -43,7 +43,12 @@ with_go() {
     echo "Setting up the Go environment..."
     create_workspace
     check_platform_architeture
+<<<<<<< HEAD
     retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform_type_lowercase}-${arch_type}"
+=======
+    SETUP_GVM_VERSION=v0.5.2
+    retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform_type}-${arch_type}"
+>>>>>>> 20c2254 (Update pipeline.package.mbp.yml (#4555))
     chmod +x ${WORKSPACE}/gvm
     eval "$(gvm $(cat .go-version))"
     go version
