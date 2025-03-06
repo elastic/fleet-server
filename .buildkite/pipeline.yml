@@ -1,7 +1,6 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
 env:
-  SETUP_GVM_VERSION: "v0.5.1"
   DOCKER_COMPOSE_VERSION: "1.25.5"
   DOCKER_REGISTRY: "docker.elastic.co"
   DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/fleet-server" # needs to rename for rollback
