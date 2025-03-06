@@ -6,14 +6,6 @@ package api
 
 import (
 	"context"
-<<<<<<< HEAD
-=======
-	"crypto/hmac"
-	"crypto/pbkdf2"
-	"crypto/rand"
-	"crypto/sha512"
-	"encoding/base64"
->>>>>>> c2b8d66 (Update to go v1.24.0 (#4543))
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -546,67 +538,3 @@ func validateRequest(ctx context.Context, data io.Reader) (*EnrollRequest, error
 
 	return &req, nil
 }
-<<<<<<< HEAD
-=======
-
-func compareHashAndToken(zlog zerolog.Logger, hash string, token string, cfg config.PBKDF2) (bool, error) {
-	// format of stored replace_token
-	// $pbkdf2-sha512${iterations}${salt]${encoded}
-	// ${salt} and ${encoded} are stored base64 encoded
-	tokens := strings.Split(hash, "$")
-	if len(tokens) != 5 || tokens[0] != "" {
-		// stored hash is invalid
-		zlog.Error().Err(ErrAgentCorrupted).Msg("replace_token hash is corrupted")
-		return false, ErrAgentCorrupted
-	}
-	if tokens[1] != "pbkdf2-sha512" {
-		// unsupported hash
-		zlog.Error().Err(ErrAgentCorrupted).Msg("replace_token hash is not pbkdf2-sha512")
-		return false, ErrAgentCorrupted
-	}
-	iterations, err := strconv.Atoi(tokens[2])
-	if err != nil {
-		// hash invalid format
-		zlog.Error().Err(err).Msg("replace_token hash iterations not an integer")
-		return false, ErrAgentCorrupted
-	}
-	salt, err := base64.RawStdEncoding.DecodeString(tokens[3])
-	if err != nil {
-		// hash invalid format
-		zlog.Error().Err(err).Msg("replace_token hash failed to base64 decode salt")
-		return false, ErrAgentCorrupted
-	}
-	encoded, err := base64.RawStdEncoding.DecodeString(tokens[4])
-	if err != nil {
-		// hash invalid format
-		zlog.Error().Err(err).Msg("replace_token hash failed to base64 decode encoded")
-		return false, ErrAgentCorrupted
-	}
-	key, err := pbkdf2.Key(sha512.New, token, salt, iterations, cfg.KeyLength)
-	if err != nil {
-		zlog.Error().Err(err).Msg("pbkdf2 key creation failed")
-		return false, ErrAgentCorrupted
-	}
-	// use `hmac.Equal` vs `bytes.Equal` to not leak timing information for comparison
-	return hmac.Equal(key, encoded), nil
-}
-
-func hashReplaceToken(token string, cfg config.PBKDF2) (string, error) {
-	// generate random salt
-	r := make([]byte, cfg.SaltLength)
-	_, err := rand.Read(r)
-	if err != nil {
-		return "", errors.New("failed to generate random salt")
-	}
-	key, err := pbkdf2.Key(sha512.New, token, r, cfg.Iterations, cfg.KeyLength)
-	if err != nil {
-		return "", fmt.Errorf("failed to create pbkdf2 key: %w", err)
-	}
-	salt := base64.RawStdEncoding.EncodeToString(r)
-	encoded := base64.RawStdEncoding.EncodeToString(key)
-	// format of stored replace_token
-	// $pbkdf2-sha512${iterations}${salt]${encoded}
-	// ${salt} and ${encoded} are stored base64 encoded
-	return fmt.Sprintf("$pbkdf2-sha512$%d$%s$%s", cfg.Iterations, salt, encoded), nil
-}
->>>>>>> c2b8d66 (Update to go v1.24.0 (#4543))
