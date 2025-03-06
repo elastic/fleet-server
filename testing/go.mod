@@ -1,8 +1,14 @@
 module github.com/elastic/fleet-server/testing
 
+<<<<<<< HEAD
 go 1.22.10
 
 toolchain go1.23.3
+=======
+go 1.24
+
+toolchain go1.24.0
+>>>>>>> c2b8d66 (Update to go v1.24.0 (#4543))
 
 replace (
 	github.com/elastic/fleet-server/pkg/api => ../pkg/api
