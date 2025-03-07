@@ -20,20 +20,18 @@ import (
 )
 
 type FileDeliveryT struct {
-	bulker      bulk.Bulk
-	cache       cache.Cache
-	chunkClient *elasticsearch.Client
-	deliverer   *delivery.Deliverer
-	authAgent   func(*http.Request, *string, bulk.Bulk, cache.Cache) (*model.Agent, error) // injectable for testing purposes
+	bulker    bulk.Bulk
+	cache     cache.Cache
+	deliverer *delivery.Deliverer
+	authAgent func(*http.Request, *string, bulk.Bulk, cache.Cache) (*model.Agent, error) // injectable for testing purposes
 }
 
 func NewFileDeliveryT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *FileDeliveryT {
 	return &FileDeliveryT{
-		chunkClient: chunkClient,
-		bulker:      bulker,
-		cache:       cache,
-		deliverer:   delivery.New(chunkClient, bulker, maxFileSize),
-		authAgent:   authAgent,
+		bulker:    bulker,
+		cache:     cache,
+		deliverer: delivery.New(chunkClient, bulker, maxFileSize),
+		authAgent: authAgent,
 	}
 }
 
