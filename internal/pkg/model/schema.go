@@ -216,6 +216,9 @@ type Agent struct {
 	// Date/time the Elastic Agent was last updated
 	UpdatedAt string `json:"updated_at,omitempty"`
 
+	// List of timestamps of attempts of Elastic Agent automatic upgrades
+	UpgradeAttempts []string `json:"upgrade_attempts,omitempty"`
+
 	// Additional upgrade status details.
 	UpgradeDetails *UpgradeDetails `json:"upgrade_details,omitempty"`
 
