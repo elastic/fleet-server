@@ -437,6 +437,9 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	if err != nil {
 		return err
 	}
+	if action == nil {
+		return nil
+	}
 
 	// link action with APM spans
 	var links []apm.SpanLink
