@@ -215,7 +215,7 @@ func TestAgent(t *testing.T) {
 			return fmt.Errorf("should be reported as healthy; instead its %s", state)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(160))
 	assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel(), "expected log level debug got: %s", zerolog.GlobalLevel())
 
 	t.Log("Test stop")
@@ -232,7 +232,7 @@ func TestAgent(t *testing.T) {
 			return fmt.Errorf("should be reported as stopped; instead its %s", state)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(220))
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(160))
 
 	// stop the agent and wait for go routine to exit
 	cancel()
