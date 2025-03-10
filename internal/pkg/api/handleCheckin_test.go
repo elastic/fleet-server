@@ -973,6 +973,23 @@ func TestValidateCheckinRequest(t *testing.T) {
 			},
 			expValid: validatedCheckin{},
 		},
+		{
+			name: "local metadata has fips attribute",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"status": "online", "message": "test message", "local_metadata": {"elastic": {"agent": {"id": "testid", "fips": true}}}}`)),
+			},
+			expErr: nil,
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{
+				rawMeta: []byte(`{"elastic": {"agent": {"id": "testid", "fips": true}}}`),
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -981,9 +998,10 @@ func TestValidateCheckinRequest(t *testing.T) {
 			assert.NoError(t, err)
 			wr := httptest.NewRecorder()
 			logger := testlog.SetLogger(t)
-			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, nil)
+			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, &model.Agent{LocalMetadata: json.RawMessage(`{}`)})
 			if tc.expErr == nil {
 				assert.NoError(t, err)
+				assert.Equal(t, tc.expValid.rawMeta, valid.rawMeta)
 			} else {
 				// Asserting error messages prior to ErrorAs becuase ErrorAs modifies
 				// the target error. If we assert error messages after calling ErrorAs
@@ -991,7 +1009,6 @@ func TestValidateCheckinRequest(t *testing.T) {
 				assert.Equal(t, tc.expErr.Error(), err.Error())
 				assert.ErrorAs(t, err, &tc.expErr)
 			}
-			assert.Equal(t, tc.expValid, valid)
 		})
 	}
 }
