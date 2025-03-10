@@ -155,7 +155,7 @@ func (s *Scaffold) IsFleetServerPortFree() bool {
 func (s *Scaffold) FleetServerStatusOK(ctx context.Context, url string) {
 	s.FleetServerStatusCondition(ctx, url, func(resp *http.Response) bool {
 		return resp.StatusCode == http.StatusOK
-	})
+	}, true)
 }
 
 // FleetServerStatusIs will poll fleet-server's status endpoint every second and return when it returns the expected state.
@@ -172,18 +172,38 @@ func (s *Scaffold) FleetServerStatusIs(ctx context.Context, url string, state cl
 		s.Require().NoError(err)
 
 		return status.Status == state.String()
-	})
+	}, true)
+}
+
+// FleetServerStatusIs will poll fleet-server's status endpoint every second and return when it returns the expected state.
+// If the passed context terminates before a 200 is returned the current test will be marked as failed.
+func (s *Scaffold) FleetServerStatusNeverBecomes(ctx context.Context, url string, state client.UnitState) {
+	s.FleetServerStatusCondition(ctx, url, func(resp *http.Response) bool {
+		var status struct {
+			Status string `json:"status"`
+		}
+		d, err := io.ReadAll(resp.Body)
+		s.Require().NoError(err)
+
+		err = json.Unmarshal(d, &status)
+		s.Require().NoError(err)
+
+		s.NotEqual(state.String(), status.Status)
+		return false
+	}, false)
 }
 
 // FleetServerStatusCondition will poll fleet-server's status till the response satisfies the given
 // condition.
 // If the passed context terminates before, the current test will be marked as failed.
-func (s *Scaffold) FleetServerStatusCondition(ctx context.Context, url string, condition func(resp *http.Response) bool) {
+func (s *Scaffold) FleetServerStatusCondition(ctx context.Context, url string, condition func(resp *http.Response) bool, failOnDone bool) {
 	timer := time.NewTimer(time.Second)
 	for {
 		select {
 		case <-ctx.Done():
-			s.Require().NoError(ctx.Err(), "context expired before status endpoint returned 200")
+			if failOnDone {
+				s.Require().NoError(ctx.Err(), "context expired before status endpoint returned 200")
+			}
 			return
 		case <-timer.C:
 			// ping /api/status
