@@ -398,6 +398,26 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	return ct.writeResponse(zlog, w, r, agent, resp)
 }
 
+func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, agent *model.Agent, details *UpgradeDetails) (*model.Action, error) {
+	action, ok := ct.cache.GetAction(details.ActionId)
+	if !ok {
+		actions, err := dl.FindAction(vCtx, ct.bulker, details.ActionId)
+		if err != nil {
+			vSpan.End()
+			return nil, fmt.Errorf("unable to find upgrade_details action: %w", err)
+		}
+		if len(actions) == 0 {
+			vSpan.End()
+			zerolog.Ctx(vCtx).Warn().Msgf("upgrade_details no action for id %q found (agent id %q)", details.ActionId, agent.Agent.ID)
+			return nil, nil
+		}
+		action = actions[0]
+		ct.cache.SetAction(action)
+	}
+	vSpan.End()
+	return &action, nil
+}
+
 // processUpgradeDetails will verify and set the upgrade_details section of an agent document based on checkin value.
 // if the agent doc and checkin details are both nil the method is a nop
 // if the checkin upgrade_details is nil but there was a previous value in the agent doc, fleet-server treats it as a successful upgrade
@@ -412,24 +432,11 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	}
 	// update docs with in progress details
 
-	// verify action exists
 	vSpan, vCtx := apm.StartSpan(ctx, "Check update action", "validate")
-	action, ok := ct.cache.GetAction(details.ActionId)
-	if !ok {
-		actions, err := dl.FindAction(vCtx, ct.bulker, details.ActionId)
-		if err != nil {
-			vSpan.End()
-			return fmt.Errorf("unable to find upgrade_details action: %w", err)
-		}
-		if len(actions) == 0 {
-			vSpan.End()
-			zerolog.Ctx(vCtx).Warn().Msgf("upgrade_details no action for id %q found (agent id %q)", details.ActionId, agent.Agent.ID)
-			return nil
-		}
-		action = actions[0]
-		ct.cache.SetAction(action)
+	action, err := ct.verifyActionExists(ctx, vSpan, agent, details)
+	if err != nil {
+		return err
 	}
-	vSpan.End()
 
 	// link action with APM spans
 	var links []apm.SpanLink
