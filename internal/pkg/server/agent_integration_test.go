@@ -67,7 +67,7 @@ func TestAgent(t *testing.T) {
 	lg := testlog.SetLogger(t)
 	zerolog.DefaultContextLogger = &lg
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:usetesting // switch to t.Context once we have go version updated
 	defer cancel()
 	ctx = lg.WithContext(ctx)
 
@@ -241,7 +241,7 @@ func TestAgent(t *testing.T) {
 
 func TestAgentAPM(t *testing.T) {
 	lg := testlog.SetLogger(t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:usetesting // switch to t.Context once we have go version updated
 	defer cancel()
 	ctx = lg.WithContext(ctx)
 
