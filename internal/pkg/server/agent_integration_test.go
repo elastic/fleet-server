@@ -67,7 +67,7 @@ func TestAgent(t *testing.T) {
 	lg := testlog.SetLogger(t)
 	zerolog.DefaultContextLogger = &lg
 
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx = lg.WithContext(ctx)
 
@@ -241,7 +241,7 @@ func TestAgent(t *testing.T) {
 
 func TestAgentAPM(t *testing.T) {
 	lg := testlog.SetLogger(t)
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx = lg.WithContext(ctx)
 
