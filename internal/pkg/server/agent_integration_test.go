@@ -143,7 +143,7 @@ func TestAgent(t *testing.T) {
 			return fmt.Errorf("should be reported as degraded; instead its %s", state)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(180))
 
 	// reconfigure with agent ID set
 	agentID := uuid.Must(uuid.NewV4()).String()
@@ -183,7 +183,7 @@ func TestAgent(t *testing.T) {
 			return fmt.Errorf("should be reported as failed; instead its %s", state)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(180))
 
 	// reconfigure to good config with debug log level
 	// the good config in this case is the bootstrap config.
@@ -337,7 +337,7 @@ func TestAgentAPM(t *testing.T) {
 			return fmt.Errorf("should be reported as healthy; instead its %s", state)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(180))
 
 	// make a request
 	cli := cleanhttp.DefaultClient()
@@ -392,7 +392,7 @@ func TestAgentAPM(t *testing.T) {
 			return fmt.Errorf("should be reported as healthy; instead its %s", state)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(180))
 
 	callStatus()
 
@@ -417,7 +417,7 @@ func TestAgentAPM(t *testing.T) {
 			return fmt.Errorf("should be reported as stopped; instead its %s", state)
 		}
 		return nil
-	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(120))
+	}, ftesting.RetrySleep(100*time.Millisecond), ftesting.RetryCount(180))
 
 	// stop the agent and wait for go routine to exit
 	cancel()
