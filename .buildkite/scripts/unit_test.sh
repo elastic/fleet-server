@@ -9,4 +9,8 @@ add_bin_path
 with_go
 
 echo "Starting the unit tests..."
-make test-unit junit-report
+if [ ${FIPS} = "true" ]; then
+    make test-unit-fips junit-report
+else
+    make test-unit junit-report
+fi

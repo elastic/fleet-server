@@ -221,9 +221,16 @@ test: prepare-test-context  ## - Run all tests
 test-release:  ## - Check that all release binaries are created
 	./.buildkite/scripts/test-release.sh $(DEFAULT_VERSION)
 
+# If FIPS=true unit tests need microsoft/go + OpenSSL with FIPS
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
-	set -o pipefail; go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
+	set -o pipefail; ${GOFIPSEXPERIMENT} go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
+
+# FIPS unit tests are meant to use go v1.24 to check FIPS compliance.
+# This check is very strict, and should be thought of as a static-code analysis tool.
+.PHONY: test-unit-fips
+test-unit-fips: ## - Run unit tests with go 1.24's fips140=only for testing
+	set -o pipefail; GODEBUG=fips140=only go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-fips-${OS_NAME}.out
 
 .PHONY: benchmark
 benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
