@@ -1,8 +1,8 @@
 module github.com/elastic/fleet-server/testing
 
-go 1.23
+go 1.24
 
-toolchain go1.23.2
+toolchain go1.24.0
 
 replace (
 	github.com/elastic/fleet-server/pkg/api => ../pkg/api
@@ -25,7 +25,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/Microsoft/hcsshim v0.11.4 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/containerd/containerd v1.7.15 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/cpuguy83/dockercfg v0.3.1 // indirect
