@@ -229,8 +229,8 @@ test-unit: prepare-test-context  ## - Run unit tests only
 # FIPS unit tests are meant to use go v1.24 to check FIPS compliance.
 # This check is very strict, and should be thought of as a static-code analysis tool.
 .PHONY: test-unit-fips
-test-unit-fips: ## - Run unit tests with go 1.24's fips140=only for testing
-	set -o pipefail; GODEBUG=fips140=only go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-fips-${OS_NAME}.out
+test-unit-fips: prepare-test-context  ## - Run unit tests with go 1.24's fips140=only for testing
+	set -o pipefail; GOFIPS140=latest GODEBUG=fips140=only go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-fips-${OS_NAME}.out
 
 .PHONY: benchmark
 benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
