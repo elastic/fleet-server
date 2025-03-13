@@ -87,6 +87,17 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
+      - label: ":smartbear-testexecute: Run FIPS unit tests"
+        key: unit-test-fips
+        command: ".buildkite/scripts/unit_test.sh"
+        env:
+          FIPS: "true"
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - build/*.xml
+          - build/coverage*.out
+
       - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
         key: unit-test-macos-13
         command: ".buildkite/scripts/unit_test.sh"
