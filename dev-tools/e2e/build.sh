@@ -28,8 +28,9 @@ FLEET_SUFFIX="-linux-x86_64"
 if [[ "$GOARCH" == "arm64" ]]; then
     FLEET_SUFFIX="-linux-arm64"
 fi
+FLEET_FIPS=""
 if [[ "$FIPS" == "true" ]]; then
-    FLEET_SUFFIX="${FLEET_SUFFIX}-fips"
+    FLEET_FIPS="-fips"
 fi
 
 docker build \
@@ -37,6 +38,7 @@ docker build \
 	--build-arg ELASTIC_AGENT_IMAGE=$BASE_IMAGE \
 	--build-arg STACK_VERSION=${FLEET_VERSION} \
 	--build-arg FLEET_SUFFIX=${FLEET_SUFFIX} \
+	--build-arg FLEET_FIPS=${FLEET_FIPS} \
 	--build-arg VCS_REF_SHORT=${VCS_REF:0:6} \
 	--platform linux/$GOARCH \
 	-t ${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG} \

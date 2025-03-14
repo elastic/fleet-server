@@ -43,7 +43,6 @@ fi
 
 if [[ ${FIPS} == "true" ]]; then
     export FIPS=true
-    VERSION="${VERSION}-fips" # NOTE: fips artifact naming is fleet-server-fips-VERSION-OS-ARCH, not VERSION-fips
 fi
 
 mkdir -p ${BASE_DIR}/reports
