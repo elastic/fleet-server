@@ -56,6 +56,7 @@ DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
 # only want to define the tag if none is specified, this allows an invocation like
 #    FIPS=true make test-e2e
 # to use a tag like X.Y.Z-fips and not X.Y.Z-fips-fips as the test-e2e target calls into make
+# TODO: We should change FIPS stand-alone/e2e images to use fleet-server-fips:TAG instead of fleet-server:TAG-fips
 ifndef DOCKER_IMAGE_TAG
 DOCKER_IMAGE_TAG?=${VERSION}
 ifeq "${DEV}" "true"
