@@ -39,7 +39,7 @@ func (suite *FIPSStandAlone) SetupSuite() {
 		arch = "x86_64"
 	}
 	// NOTE the path checked is hardcoded to linux as we currently only support linux for FIPS builds
-	path, err := filepath.Abs(filepath.Join("..", "..", "build", "cover", fmt.Sprintf("fleet-server-%s-SNAPSHOT-linux-%s-fips", version.DefaultVersion, arch), binaryName))
+	path, err := filepath.Abs(filepath.Join("..", "..", "build", "cover", fmt.Sprintf("fleet-server-fips-%s-SNAPSHOT-linux-%s", version.DefaultVersion, arch), binaryName))
 	suite.Require().NoError(err)
 	suite.binaryPath = path
 	_, err = os.Stat(suite.binaryPath)
