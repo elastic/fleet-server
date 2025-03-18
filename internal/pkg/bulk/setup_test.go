@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Pallinder/go-randomdata"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/rs/xid"
 
@@ -133,7 +134,11 @@ func SetupBulk(ctx context.Context, t testing.TB, opts ...BulkOpt) Bulk {
 
 	// Set up the client with username and password since this test is generic for any index and uses it's own index/mapping
 	e := getEnvironment()
-	cli, err := es.NewClient(ctx, &defaultCfg, false, es.WithUsrPwd(e.Username, e.Password))
+	cli, err := es.NewClient(ctx, &defaultCfg, false, func(config *elasticsearch.Config) {
+		config.ServiceToken = "" // reset service token
+		config.Username = e.Username
+		config.Password = e.Password
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
