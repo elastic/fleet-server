@@ -25,8 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/go-elasticsearch/v8"
-
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
 func TestToESConfig(t *testing.T) {
@@ -103,82 +101,6 @@ func TestToESConfig(t *testing.T) {
 				Header:       http.Header{"X-Custom-Header": {"Header-Value"}},
 				MaxRetries:   6,
 				Transport: &http.Transport{
-					TLSHandshakeTimeout:   10 * time.Second,
-					MaxIdleConns:          100,
-					MaxIdleConnsPerHost:   32,
-					MaxConnsPerHost:       256,
-					IdleConnTimeout:       60 * time.Second,
-					ResponseHeaderTimeout: 120 * time.Second,
-					ExpectContinueTimeout: 1 * time.Second,
-				},
-			},
-		},
-		"https": {
-			cfg: Elasticsearch{
-				Protocol:     "https",
-				Hosts:        []string{"localhost:9200", "other-host:9200"},
-				ServiceToken: "test-token",
-				Headers: map[string]string{
-					"X-Custom-Header": "Header-Value",
-				},
-				MaxRetries:     6,
-				MaxConnPerHost: 256,
-				Timeout:        120 * time.Second,
-				TLS: &tlscommon.Config{
-					VerificationMode: tlscommon.VerifyNone,
-				},
-			},
-			result: elasticsearch.Config{
-				Addresses:    []string{"https://localhost:9200", "https://other-host:9200"},
-				ServiceToken: "test-token",
-				Header:       http.Header{"X-Custom-Header": {"Header-Value"}},
-				MaxRetries:   6,
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true, //nolint:gosec // test case
-						MinVersion:         tls.VersionTLS11,
-						MaxVersion:         tls.VersionTLS13,
-						Certificates:       []tls.Certificate{},
-						CurvePreferences:   []tls.CurveID{},
-					},
-					TLSHandshakeTimeout:   10 * time.Second,
-					MaxIdleConns:          100,
-					MaxIdleConnsPerHost:   32,
-					MaxConnsPerHost:       256,
-					IdleConnTimeout:       60 * time.Second,
-					ResponseHeaderTimeout: 120 * time.Second,
-					ExpectContinueTimeout: 1 * time.Second,
-				},
-			},
-		},
-		"mixed-https": {
-			cfg: Elasticsearch{
-				Protocol:     "http",
-				Hosts:        []string{"localhost:9200", "https://other-host:9200"},
-				ServiceToken: "test-token",
-				Headers: map[string]string{
-					"X-Custom-Header": "Header-Value",
-				},
-				MaxRetries:     6,
-				MaxConnPerHost: 256,
-				Timeout:        120 * time.Second,
-				TLS: &tlscommon.Config{
-					VerificationMode: tlscommon.VerifyNone,
-				},
-			},
-			result: elasticsearch.Config{
-				Addresses:    []string{"http://localhost:9200", "https://other-host:9200"},
-				ServiceToken: "test-token",
-				Header:       http.Header{"X-Custom-Header": {"Header-Value"}},
-				MaxRetries:   6,
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true, //nolint:gosec // test case
-						MinVersion:         tls.VersionTLS11,
-						MaxVersion:         tls.VersionTLS13,
-						Certificates:       []tls.Certificate{},
-						CurvePreferences:   []tls.CurveID{},
-					},
 					TLSHandshakeTimeout:   10 * time.Second,
 					MaxIdleConns:          100,
 					MaxIdleConnsPerHost:   32,
