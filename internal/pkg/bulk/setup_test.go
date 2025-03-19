@@ -26,16 +26,19 @@ import (
 
 var rand = rnd.New()
 
-var defaultCfg config.Config
-var defaultCfgData = []byte(`
+var (
+	defaultCfg     config.Config
+	defaultCfgData = []byte(`
 output:
   elasticsearch:
     hosts: '${ELASTICSEARCH_HOSTS:localhost:9200}'
     service_token: '${ELASTICSEARCH_SERVICE_TOKEN:test-token}'
+    protocol: http
 fleet:
   agent:
     id: 1e4954ce-af37-4731-9f4a-407b08e69e42
 `)
+)
 
 const testPolicy = `{
 	"properties": {
