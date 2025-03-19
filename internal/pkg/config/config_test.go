@@ -583,7 +583,7 @@ func defaultFleet() Fleet {
 
 func defaultElastic() Elasticsearch {
 	return Elasticsearch{
-		Protocol:         "http",
+		Protocol:         "https",
 		ServiceToken:     "test-token",
 		Hosts:            []string{"localhost:9200"},
 		MaxRetries:       3,

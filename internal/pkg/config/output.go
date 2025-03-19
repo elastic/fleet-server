@@ -26,8 +26,10 @@ import (
 
 // The timeout would be driven by the server for long poll.
 // Giving it some sane long value.
-const httpTransportLongPollTimeout = 10 * time.Minute
-const schemeHTTP = "http"
+const (
+	httpTransportLongPollTimeout = 10 * time.Minute
+	schemeHTTP                   = "https"
+)
 
 var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
