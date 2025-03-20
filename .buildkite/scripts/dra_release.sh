@@ -41,10 +41,6 @@ if [[ ${TYPE} == "snapshot" ]]; then
     VERSION="${VERSION}-SNAPSHOT"
 fi
 
-if [[ ${FIPS} == "true" ]]; then
-    export FIPS=true
-fi
-
 mkdir -p ${BASE_DIR}/reports
 ./dev-tools/dependencies-report --csv ${BASE_DIR}/reports/dependencies-${VERSION}.csv
 cd ${BASE_DIR}/reports && shasum -a 512 dependencies-${VERSION}.csv > dependencies-${VERSION}.csv.sha512

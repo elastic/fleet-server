@@ -20,6 +20,10 @@ if [[ ${PLATFORM_TYPE} == "arm" || ${PLATFORM_TYPE} == "aarch64" ]]; then
     PACKAGES="docker"
 fi
 
+if [[ ${FIPS} == "true" ]]; then
+    export FIPS=true
+fi
+
 add_bin_path
 with_go
 with_mage

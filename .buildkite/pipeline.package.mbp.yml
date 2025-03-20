@@ -104,21 +104,9 @@ steps:
     depends_on:
       - step: "package-x86-64-snapshot"
         allow_failure: false
-      - step: "package-arm-snapshot"
-        allow_failure: false
-
-  - label: "DRA FIPS snapshot"
-    if: "${FILE_EXISTS_IN_REPO} && build.env('VERSION_QUALIFIER') == null"
-    key: "dra-fips snapshot"
-    command: ".buildkite/scripts/dra_release.sh snapshot"
-    env:
-      FIPS: "true"
-    agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_X86_64}"
-      machineType: "c2-standard-16"
-    depends_on:
       - step: "package-fips-x86-64-snapshot"
+        allow_failure: false
+      - step: "package-arm-snapshot"
         allow_failure: false
       - step: "package-fips-arm-snapshot"
         allow_failure: false
@@ -138,25 +126,9 @@ steps:
     depends_on:
       - step: "package-x86-64-staging"
         allow_failure: false
-      - step: "package-arm-staging"
-        allow_failure: false
-
-  - label: "DRA FIPS release staging"
-    # we don't usually build staging from the main branch, but we exceptionally allow it for prereleases
-    # details in https://github.com/elastic/ingest-dev/issues/4855
-    if: "${FILE_EXISTS_IN_REPO} == true && (build.env('BUILDKITE_BRANCH') != 'main' || build.env('VERSION_QUALIFIER') != null)"
-    key: "dra-fips-staging"
-    command: |
-      source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/dra_release.sh staging
-    env:
-      FIPS: "true"
-    agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_X86_64}"
-      machineType: "c2-standard-16"
-    depends_on:
       - step: "package-fips-x86-64-staging"
+        allow_failure: false
+      - step: "package-arm-staging"
         allow_failure: false
       - step: "package-fips-arm-staging"
         allow_failure: false
