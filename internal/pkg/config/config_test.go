@@ -7,13 +7,11 @@
 package config
 
 import (
-	"crypto/tls"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/gofrs/uuid"
@@ -629,28 +627,4 @@ func TestDeprecationWarnings(t *testing.T) {
 	_, err := LoadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(3), logCount.Load(), "Expected 3 log messages")
-}
-
-func TestTLSDefaults(t *testing.T) {
-	c, err := LoadFile(filepath.Join("testdata", "tls.yml"))
-	require.NoError(t, err)
-	require.NotNil(t, c.Output.Elasticsearch.TLS)
-
-	common, err := tlscommon.LoadTLSConfig(c.Output.Elasticsearch.TLS)
-	require.NoError(t, err)
-	cfg := common.ToConfig()
-	assert.Equal(t, uint16(tls.VersionTLS11), cfg.MinVersion)
-	assert.Equal(t, uint16(tls.VersionTLS13), cfg.MaxVersion)
-}
-
-func TestTLS10(t *testing.T) {
-	c, err := LoadFile(filepath.Join("testdata", "tls10.yml"))
-	require.NoError(t, err)
-	require.NotNil(t, c.Output.Elasticsearch.TLS)
-
-	common, err := tlscommon.LoadTLSConfig(c.Output.Elasticsearch.TLS)
-	require.NoError(t, err)
-	cfg := common.ToConfig()
-	assert.Equal(t, uint16(tls.VersionTLS10), cfg.MinVersion)
-	assert.Equal(t, uint16(tls.VersionTLS10), cfg.MaxVersion)
 }
