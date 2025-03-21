@@ -36,7 +36,7 @@ The following make commands have different behaviour when FIPS is enabled:
 A Multipass VM created with `FIPS=true make multipass` is able to compile FIPS enabled golang programs, but is not able to run them.
 When you try to run one the following error occurs:
 ```
-GOFIPS=1 ./bin/fleet-server -c fleet-server.yml
+GODEBUG=fips140=on ./bin/fleet-server -c fleet-server.yml
 panic: opensslcrypto: can't enable FIPS mode for OpenSSL 3.0.13 30 Jan 2024: openssl: FIPS mode not supported by any provider
 
 goroutine 1 [running]:
@@ -92,14 +92,14 @@ activate = 1
 default_properties = fips=yes
 ```
 
-4. Run the program with the `OPENSSL_CONF=openssl.cnf` and `GOFIPS=1` env vars, i.e.,
+4. Run the program with the `OPENSSL_CONF=openssl.cnf` and `GODEBUG=fips140=on` env vars, i.e.,
 ```
-OPENSSL_CONF=./openssl.cnf GOFIPS=1 ./bin/fleet-server -c fleet-server.yml
+OPENSSL_CONF=./openssl.cnf GODEBUG=fips140=on ./bin/fleet-server -c fleet-server.yml
 23:48:47.871 INF Boot fleet-server args=["-c","fleet-server.yml"] commit=55104f6f ecs.version=1.6.0 exe=./bin/fleet-server pid=65037 ppid=5642 service.name=fleet-server service.type=fleet-server version=9.0.0
 i...
 ```
 
 ## Usage
 
-A FIPS enabled binary should be ran with the env var `GOFIPS=1` set.
+A FIPS enabled binary should be ran with the env var `GODEBUG=fips140=on` set.
 The system/image is required to have a FIPS compliant provider available.

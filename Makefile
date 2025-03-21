@@ -51,6 +51,7 @@ else
 VERSION=${DEFAULT_VERSION}
 endif
 
+DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 DOCKER_PLATFORMS ?= linux/amd64 linux/arm64
 # defing the docker image tag used for stand-alone fleet-server images
 # only want to define the tag if none is specified, this allows an invocation like
@@ -61,11 +62,7 @@ DOCKER_IMAGE_TAG?=${VERSION}
 ifeq "${DEV}" "true"
 DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-dev
 endif
-ifeq "${FIPS}" "true"
-DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-fips
 endif
-endif
-DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
 PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
 COVER_TARGETS=$(addprefix cover-, $(PLATFORMS))
@@ -94,10 +91,11 @@ GOFIPSEXPERIMENT?=
 FIPSSUFFIX=
 ifeq "${FIPS}" "true"
 BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
+DOCKER_IMAGE:=docker.elastic.co/fleet-server/fleet-server-fips
 STANDALONE_DOCKERFILE=Dockerfile.fips
 PLATFORMS = linux/amd64 linux/arm64
 gobuildtags += requirefips
-GOFIPSEXPERIMENT=GOEXPERIMENT=systemcrypto
+GOFIPSEXPERIMENT=GOEXPERIMENT=systemcrypto CGO_ENABLED=1
 FIPSSUFFIX=-fips
 endif
 
@@ -148,7 +146,7 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(FIPSSUFFIX)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server$(FIPSSUFFIX)-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
@@ -270,7 +268,7 @@ $(PLATFORM_TARGETS): release-%:
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst release-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(FIPSSUFFIX)/fleet-server .
+	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server$(FIPSSUFFIX)-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server .
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
 
 .PHONY: build-docker
@@ -314,8 +312,8 @@ else ifeq ($(OS)-$(ARCH),darwin-arm64)
 	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz fleet-server-$(VERSION)-$(OS)-aarch64
 	@cd build/distributions && sha512sum fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz > fleet-server-$(VERSION)-$(OS)-aarch64.tar.gz.sha512
 else
-	@tar -C build/binaries -zcf build/distributions/fleet-server-$(VERSION)-$(OS)-$(ARCH)$(FIPSSUFFIX).tar.gz fleet-server-$(VERSION)-$(OS)-$(ARCH)$(FIPSSUFFIX)
-	@cd build/distributions && sha512sum fleet-server-$(VERSION)-$(OS)-$(ARCH)$(FIPSSUFFIX).tar.gz > fleet-server-$(VERSION)-$(OS)-$(ARCH)$(FIPSSUFFIX).tar.gz.sha512
+	@tar -C build/binaries -zcf build/distributions/fleet-server$(FIPSSUFFIX)-$(VERSION)-$(OS)-$(ARCH).tar.gz fleet-server$(FIPSSUFFIX)-$(VERSION)-$(OS)-$(ARCH)
+	@cd build/distributions && sha512sum fleet-server$(FIPSSUFFIX)-$(VERSION)-$(OS)-$(ARCH).tar.gz > fleet-server$(FIPSSUFFIX)-$(VERSION)-$(OS)-$(ARCH).tar.gz.sha512
 endif
 
 build-releaser: ## - Build a Docker image to run make package including all build tools
