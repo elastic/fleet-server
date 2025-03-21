@@ -98,6 +98,19 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
+      - label: ":smartbear-testexecute: Run FIPS Provider tests"
+        key: provider-test-fips
+        command: ".buildkite/scripts/fips_provider_test.sh"
+        agents:
+          provider: "aws"
+          imagePrefix: "elasticcloud-fips-ubuntu-2204-amd64-dev-jammyf-"
+          diskSizeGb: 100
+          instanceType: m5.large
+        artifact_paths:
+          - build/*.xml
+          - build/coverage*.out
+
+
       - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
         key: unit-test-macos-13
         command: ".buildkite/scripts/unit_test.sh"
