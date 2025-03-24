@@ -100,15 +100,6 @@ func WithUserAgent(name string, bi build.Info) ConfigOption {
 	}
 }
 
-// WithUsrPwd is intended to be used by integration tests ONLY!
-func WithUsrPwd(usr, pwd string) ConfigOption {
-	return func(config *elasticsearch.Config) {
-		config.ServiceToken = "" // reset service token
-		config.Username = usr
-		config.Password = pwd
-	}
-}
-
 func InstrumentRoundTripper() ConfigOption {
 	return func(config *elasticsearch.Config) {
 		config.Transport = apmelasticsearch.WrapRoundTripper(
