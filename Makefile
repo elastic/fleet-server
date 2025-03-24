@@ -11,7 +11,7 @@ GO_VERSION=$(shell cat '.go-version')
 DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
 
 # Set FIPS=true to force FIPS compliance when building
-FIPS?=
+FIPS?=false
 
 ifeq "${FIPS}" "true"
 PLATFORMS ?= linux/amd64 linux/arm64

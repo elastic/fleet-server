@@ -25,7 +25,7 @@ VCS_REF=$(docker inspect -f '{{index .Config.Labels "org.label-schema.vcs-ref"}}
 CUSTOM_IMAGE_TAG=${STACK_VERSION}-e2e-${COMMIT}-$(date +%s)
 
 FLEET_FIPS=""
-if [[ "$FIPS" == "true" ]]; then
+if [[ "${FIPS:-false}" == "true" ]]; then
     FLEET_FIPS="-fips"
 fi
 

@@ -6,7 +6,7 @@ FLEET_SERVER_VERSION=${1:?"Fleet Server version is needed"}
 FILE_PREFIX="build/distributions/fleet-server-${FLEET_SERVER_VERSION}-"
 
 PLATFORM_FILES=(darwin-aarch64.tar.gz darwin-x86_64.tar.gz linux-arm64.tar.gz linux-x86_64.tar.gz windows-x86_64.zip)
-if [ "$FIPS" = "true" ] ; then
+if [[ "${FIPS:-false}" == "true" ]] ; then
     PLATFORM_FILES=(linux-arm64.tar.gz linux-x86_64.tar.gz)
     FILE_PREFIX="build/distributions/fleet-server-fips-${FLEET_SERVER_VERSION}-"
 fi

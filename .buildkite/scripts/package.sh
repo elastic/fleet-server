@@ -20,7 +20,7 @@ fi
 
 add_bin_path
 
-if [[ -v FIPS && ${FIPS} == "true" ]]; then
+if [[ ${FIPS:-false} == "true" ]]; then
     with_msft_go
     if [[ ${PLATFORM_TYPE} == "arm" || ${PLATFORM_TYPE} == "aarch64" ]]; then
         export PLATFORMS="linux/arm64"
