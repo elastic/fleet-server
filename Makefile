@@ -9,9 +9,18 @@
 SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
 DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
+
+# Set FIPS=true to force FIPS compliance when building
+FIPS?=
+
+ifeq "${FIPS}" "true"
+PLATFORMS ?= linux/amd64 linux/arm64
+else
+PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
+endif
+
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
-PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
 BUILDMODE_linux_amd64=-buildmode=pie
 BUILDMODE_linux_arm64=-buildmode=pie
 BUILDMODE_windows_amd64=-buildmode=pie
@@ -84,8 +93,6 @@ GOBIN=$(shell go env GOPATH)/bin/
 
 OS_NAME:=$(shell uname -s)
 
-# Set FIPS=true to force FIPS compliance when building
-FIPS?=
 # NOTE: We are assuming that the only GOEXPIREMENT flag will be associated with FIPS
 GOFIPSEXPERIMENT?=
 FIPSSUFFIX=
@@ -93,7 +100,6 @@ ifeq "${FIPS}" "true"
 BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
 DOCKER_IMAGE:=docker.elastic.co/fleet-server/fleet-server-fips
 STANDALONE_DOCKERFILE=Dockerfile.fips
-PLATFORMS = linux/amd64 linux/arm64
 gobuildtags += requirefips
 GOFIPSEXPERIMENT=GOEXPERIMENT=systemcrypto CGO_ENABLED=1
 FIPSSUFFIX=-fips
