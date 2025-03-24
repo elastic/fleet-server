@@ -21,7 +21,12 @@ if [[ ${PLATFORM_TYPE} == "arm" || ${PLATFORM_TYPE} == "aarch64" ]]; then
 fi
 
 add_bin_path
-with_go
+
+if [[ -v FIPS && ${FIPS} == "true" ]]; then
+    with_msft_go
+else
+    with_go
+fi
 with_mage
 
 case "${TYPE}" in
