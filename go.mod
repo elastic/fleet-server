@@ -12,10 +12,16 @@ require (
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
+<<<<<<< HEAD
 	github.com/hashicorp/go-version v1.3.0
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mailru/easyjson v0.7.7
+=======
+	github.com/hashicorp/go-version v1.7.0
+	github.com/hashicorp/golang-lru/v2 v2.0.7
+	github.com/mailru/easyjson v0.9.0
+>>>>>>> c5495d1 (build(deps): bump github.com/mailru/easyjson from 0.7.7 to 0.9.0 (#4635))
 	github.com/miolini/datacounter v1.0.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
