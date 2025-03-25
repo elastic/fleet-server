@@ -10,7 +10,7 @@ require (
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/gofrs/uuid v4.4.0+incompatible
-	github.com/google/go-cmp v0.6.0
+	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-version v1.3.0
 	github.com/hashicorp/golang-lru v0.5.4
