@@ -2,17 +2,16 @@
 version: 2
 updates:
   - package-ecosystem: "gomod"
-    directory: "/"
+    directories:
+      - "/"
+      - "/pkg/api/"
+      - "/testing/"
     schedule:
       interval: "daily"
     labels:
       - automation
       - dependency
       - Team:Elastic-Agent-Control-Plane
-    allow:
-      # Only update internal dependencies for now while we evaluate this workflow.
-      - dependency-name: "github.com/elastic/*"
-      - dependency-name: "go.elastic.co/*"
     open-pull-requests-limit: 10
     groups:
       elastic-apm:
