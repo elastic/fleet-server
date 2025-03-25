@@ -26,7 +26,7 @@ check_if_file_exist_in_repo() {
     local response=$(curl --fail -s -H "Authorization: token $GITHUB_REPO_TOKEN" https://api.github.com/repos/elastic/${repoName}/contents/${path_to_file}| grep -c "\"path\"\: \"${path_to_file}\"")
     if [[ ${response} -ge 1 ]]; then
         export FILE_EXISTS_IN_REPO=true
-        echo "FILE_EXIST_IN_REPO = true"        
+        echo "FILE_EXIST_IN_REPO = true"
     else
         export FILE_EXISTS_IN_REPO=false
         echo "FILE_EXIST_IN_REPO = false"
@@ -64,7 +64,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == package-x86-64* || "$BUILDKITE_STEP_KEY" == package-arm* || "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == package-x86-64* || "$BUILDKITE_STEP_KEY" == package-fips-x86_64* || "$BUILDKITE_STEP_KEY" == package-arm* || "$BUILDKITE_STEP_KEY" == package-fips-arm* || "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
     export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
     export JOB_GCS_BUCKET
   fi
@@ -83,7 +83,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == package-x86-64* || "$BUILDKITE_STEP_KEY" == package-arm* ]]; then
+  if [[ "$BUILDKITE_STEP_KEY" == package-x86-64* || "$BUILDKITE_STEP_KEY" == package-fips-x86-64* || "$BUILDKITE_STEP_KEY" == package-arm* || "$BUILDKITE_STEP_KEY" == package-fips-arm* ]]; then
     export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
     export JOB_GCS_BUCKET
   fi
