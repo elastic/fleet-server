@@ -4,9 +4,7 @@ FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX}
 
 RUN \
   apt-get update \
-  && apt-get install -y zip \
-  && mkdir -p /.cache \
-  && chmod 777 /.cache
+  && apt-get install -y zip
 
 WORKDIR /go/src/github.com/elastic/fleet-server
 
