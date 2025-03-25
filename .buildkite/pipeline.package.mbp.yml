@@ -28,6 +28,29 @@ steps:
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
 
+  - label: "Package FIPS x86_64 snapshot"
+    if: "build.env('VERSION_QUALIFIER') == null"
+    key: "package-fips-x86-64-snapshot"
+    command: ".buildkite/scripts/package.sh snapshot"
+    env:
+      FIPS: "true"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+      machineType: "c2-standard-16"
+
+  - label: "Package FIPS x86_64 staging"
+    key: "package-fips-x86-64-staging"
+    command: |
+      source .buildkite/scripts/version_qualifier.sh
+      .buildkite/scripts/package.sh staging
+    env:
+      FIPS: "true"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+      machineType: "c2-standard-16"
+
   - label: "Package aarch64 snapshot"
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-arm-snapshot"
@@ -47,6 +70,29 @@ steps:
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
       instanceType: "t4g.2xlarge"
 
+  - label: "Package FIPS aarch64 snapshot"
+    if: "build.env('VERSION_QUALIFIER') == null"
+    key: "package-fips-arm-snapshot"
+    command: ".buildkite/scripts/package.sh snapshot"
+    env:
+      FIPS: "true"
+    agents:
+      provider: "aws"
+      imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+      instanceType: "t4g.2xlarge"
+
+  - label: "Package FIPS aarch64 staging"
+    key: "package-fips-arm-staging"
+    command: |
+      source .buildkite/scripts/version_qualifier.sh
+      .buildkite/scripts/package.sh staging
+    env:
+      FIPS: "true"
+    agents:
+      provider: "aws"
+      imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+      instanceType: "t4g.2xlarge"
+
   - label: "DRA snapshot"
     if: "${FILE_EXISTS_IN_REPO} && build.env('VERSION_QUALIFIER') == null"
     key: "dra-snapshot"
@@ -58,7 +104,11 @@ steps:
     depends_on:
       - step: "package-x86-64-snapshot"
         allow_failure: false
+      - step: "package-fips-x86-64-snapshot"
+        allow_failure: false
       - step: "package-arm-snapshot"
+        allow_failure: false
+      - step: "package-fips-arm-snapshot"
         allow_failure: false
 
   - label: "DRA release staging"
@@ -76,5 +126,9 @@ steps:
     depends_on:
       - step: "package-x86-64-staging"
         allow_failure: false
+      - step: "package-fips-x86-64-staging"
+        allow_failure: false
       - step: "package-arm-staging"
+        allow_failure: false
+      - step: "package-fips-arm-staging"
         allow_failure: false
