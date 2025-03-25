@@ -14,7 +14,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.6.0
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/gofrs/uuid v4.4.0+incompatible
-	github.com/google/go-cmp v0.6.0
+	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
@@ -36,7 +36,7 @@ require (
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.12.0
-	golang.org/x/time v0.5.0
+	golang.org/x/time v0.11.0
 	google.golang.org/grpc v1.63.2
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
