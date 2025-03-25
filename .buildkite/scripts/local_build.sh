@@ -5,6 +5,10 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 
 add_bin_path
-with_go
+if [[ "${FIPS:-false}" == "true" ]]; then
+    with_msft_go
+else
+    with_go
+fi
 
 make local
