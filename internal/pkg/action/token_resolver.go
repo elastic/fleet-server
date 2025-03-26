@@ -43,7 +43,7 @@ func (r *TokenResolver) Resolve(ctx context.Context, token string) (int64, error
 		return 0, dl.ErrNotFound
 	}
 	if v, ok := r.cache.Get(token); ok {
-		zerolog.Ctx(ctx).Debug().Str("token", token).Int64("seqno", v).Msg("Found token cached")
+		zerolog.Ctx(ctx).Debug().Int64("seqno", v).Msg("Found token cached")
 		return v, nil
 	}
 
