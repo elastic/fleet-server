@@ -18,26 +18,11 @@ require (
 	github.com/mailru/easyjson v0.7.7
 	github.com/miolini/datacounter v1.0.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
-<<<<<<< HEAD
 	github.com/pkg/errors v0.9.1
-	github.com/rs/xid v1.3.0
+	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.27.0
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.4
-=======
-	github.com/prometheus/client_golang v1.19.0
-	github.com/rs/xid v1.6.0
-	github.com/rs/zerolog v1.32.0
-	github.com/spf13/cobra v1.8.0
-	github.com/stretchr/testify v1.10.0
-	go.elastic.co/apm/module/apmchiv5/v2 v2.7.0
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.0
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.0
-	go.elastic.co/apm/module/apmprometheus/v2 v2.7.0
-	go.elastic.co/apm/module/apmzerolog/v2 v2.7.0
-	go.elastic.co/apm/v2 v2.7.0
-	go.elastic.co/ecszerolog v0.2.0
->>>>>>> 94505e4 (build(deps): bump github.com/rs/xid from 1.5.0 to 1.6.0 (#4641))
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.10.0
 	golang.org/x/time v0.5.0
