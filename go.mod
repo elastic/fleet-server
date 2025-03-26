@@ -19,7 +19,7 @@ require (
 	github.com/miolini/datacounter v1.0.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
-	github.com/rs/xid v1.3.0
+	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.27.0
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.4
