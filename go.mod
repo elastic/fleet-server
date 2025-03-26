@@ -12,14 +12,9 @@ require (
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.6.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
-<<<<<<< HEAD
-	github.com/hashicorp/go-version v1.3.0
+	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/julienschmidt/httprouter v1.3.0
-=======
-	github.com/hashicorp/go-version v1.7.0
-	github.com/hashicorp/golang-lru/v2 v2.0.7
->>>>>>> 944e1f4 (build(deps): bump github.com/hashicorp/go-version from 1.6.0 to 1.7.0 (#4633))
 	github.com/mailru/easyjson v0.7.7
 	github.com/miolini/datacounter v1.0.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
