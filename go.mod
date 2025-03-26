@@ -1,8 +1,8 @@
 module github.com/elastic/fleet-server/v7
 
-go 1.22.10
+go 1.23.0
 
-toolchain go1.23.3
+toolchain go1.24.1
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
@@ -37,8 +37,8 @@ require (
 	go.elastic.co/apm/v2 v2.6.2
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.10.0
-	golang.org/x/time v0.5.0
+	golang.org/x/sync v0.12.0
+	golang.org/x/time v0.11.0
 	google.golang.org/grpc v1.63.2
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
