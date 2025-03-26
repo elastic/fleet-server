@@ -95,7 +95,10 @@ func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, err
 		Str("exe", os.Args[0]).
 		Strs("args", os.Args[1:]).
 		Msg("Boot fleet-server")
+<<<<<<< HEAD
 	log.Debug().Strs("env", os.Environ()).Msg("environment")
+=======
+>>>>>>> e1c693b (Cleanup debug logs (#4687))
 
 	return l, err
 }

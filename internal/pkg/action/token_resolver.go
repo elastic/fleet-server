@@ -38,9 +38,14 @@ func (r *TokenResolver) Resolve(ctx context.Context, token string) (seqno int64,
 		return seqno, dl.ErrNotFound
 	}
 	if v, ok := r.cache.Get(token); ok {
+<<<<<<< HEAD
 		seqno = v.(int64)
 		log.Debug().Str("token", token).Int64("seqno", seqno).Msg("Found token cached")
 		return
+=======
+		zerolog.Ctx(ctx).Debug().Int64("seqno", v).Msg("Found token cached")
+		return v, nil
+>>>>>>> e1c693b (Cleanup debug logs (#4687))
 	}
 
 	seqno, err = dl.FindSeqNoByDocID(ctx, r.bulker, dl.QuerySeqNoByDocID, dl.FleetActions, token)
