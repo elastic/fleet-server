@@ -61,7 +61,7 @@ with_msft_go() {
     echo "microsoft/go in ${WORKSPACE}"
     go version
     which go
-    export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
+    export PATH="${PATH}:$(go env GOPATH)/bin"
 }
 
 with_docker_compose() {
