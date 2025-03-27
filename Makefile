@@ -154,7 +154,21 @@ build-releaser: ## - Build a Docker image to run make package including all buil
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
+<<<<<<< HEAD
 	docker run --rm -u $(shell id -u):$(shell id -g) --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE)
+=======
+	docker run --rm -u $(shell id -u):$(shell id -g) --env=GOCACHE=/go/cache --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) release
+
+.PHONY: docker-cover-e2e-binaries
+docker-cover-e2e-binaries: build-releaser
+ifeq "${FIPS}" "true"
+	## non-linux is currently unsupported for FIPS
+	docker run --rm -u $(shell id -u):$(shell id -g) --env=GOCACHE=/go/cache --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true -e DEV=$(DEV) -e FIPS=$(FIPS) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH)
+else
+	## Build for local architecture and for linux/$ARCH for docker images.
+	docker run --rm -u $(shell id -u):$(shell id -g) --env=GOCACHE=/go/cache --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true -e DEV=$(DEV) -e FIPS=$(FIPS) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
+endif
+>>>>>>> 6c68026 (fix: don't create directory for go build cache (#4644))
 
 .PHONY: release
 release: $(PLATFORM_TARGETS) ## - Builds a release. Specify exact platform with PLATFORMS env.
