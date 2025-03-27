@@ -111,6 +111,8 @@ steps:
       - label: ":smartbear-testexecute: Run FIPS Provider tests"
         key: provider-test-fips
         command: ".buildkite/scripts/fips_provider_test.sh"
+        env:
+          FIPS: "true"
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-fleet-server-ubuntu-2204-fips"
