@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/testing
 
-go 1.23.0
+go 1.23.7
 
 toolchain go1.24.1
 
@@ -33,11 +33,7 @@ require (
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.18.6 // indirect
-=======
 	github.com/elastic/elastic-agent-libs v0.18.12 // indirect
->>>>>>> bb0bb3c (build(deps): bump github.com/elastic/elastic-agent-libs from 0.18.11 to 0.18.12 (#4642))
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
