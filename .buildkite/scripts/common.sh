@@ -58,6 +58,7 @@ with_msft_go() {
     MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version)-1.${platform_type}-${arch_type}.tar.gz
     retry 5 $(curl -sL -o - $MSFT_DOWNLOAD_URL | tar -xz -f - -C ${WORKSPACE})
     export PATH="${PATH}:${WORKSPACE}/go/bin"
+    echo "microsoft/go in ${WORKSPACE}"
     go version
     which go
     export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
