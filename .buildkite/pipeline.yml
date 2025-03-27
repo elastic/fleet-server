@@ -30,6 +30,16 @@ steps:
           cpu: "8"
           memory: "4G"
 
+      - label: ":building_construction: Run local FIPS build"
+        key: make-local-fips
+        command: ".buildkite/scripts/local_build.sh"
+        agents:
+          image: "${GO_AGENT_IMAGE}"
+          cpu: "8"
+          memory: "4G"
+        env:
+          FIPS: "true"
+
       - label: ":building_construction: Run local build: MacOS"
         key: make-local-macos
         command: ".buildkite/scripts/local_build.sh"
