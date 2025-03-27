@@ -55,7 +55,7 @@ with_msft_go() {
     echo "Setting up microsoft/go"
     create_workspace
     check_platform_architeture
-    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version)-1.${platform_type}-${arch_type}.tar.gz
+    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version).${platform_type}-${arch_type}.tar.gz
     retry 5 $(curl -sL -o - $MSFT_DOWNLOAD_URL | tar -xz -f - -C ${WORKSPACE})
     export PATH="${WORKSPACE}/go/bin:${PATH}"
     echo "microsoft/go in ${WORKSPACE}"

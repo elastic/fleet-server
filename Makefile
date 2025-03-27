@@ -127,7 +127,7 @@ else
 	$(eval ARCH := amd64)
 endif
 ifeq "${FIPS}" "true"
-	$(eval DOWNLOAD_URL := https://aka.ms/golang/release/latest/go${GO_VERSION}-1.linux-${ARCH}.tar.gz)
+	$(eval DOWNLOAD_URL := https://aka.ms/golang/release/latest/go${GO_VERSION}.linux-${ARCH}.tar.gz)
 else
 	$(eval DOWNLOAD_URL := https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz)
 endif
