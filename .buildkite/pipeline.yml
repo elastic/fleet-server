@@ -103,7 +103,7 @@ steps:
         command: ".buildkite/scripts/fips_provider_test.sh"
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-fleet-server-aws-linux-x86-64-fleet-server-ubuntu-2204-fips"
+          imagePrefix: "platform-ingest-fleet-server-ubuntu-2204-fips"
           diskSizeGb: 100
           instanceType: m5.large
         artifact_paths:
