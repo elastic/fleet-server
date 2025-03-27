@@ -14,14 +14,22 @@ if [[ ${BUILDKITE_BRANCH} == "main" && ${TYPE} == "staging" && -z ${VERSION_QUAL
 fi
 
 PLATFORMS=""
-PACKAGES=""
 if [[ ${PLATFORM_TYPE} == "arm" || ${PLATFORM_TYPE} == "aarch64" ]]; then
     PLATFORMS="linux/arm64"
-    PACKAGES="docker"
 fi
 
 add_bin_path
-with_go
+
+if [[ ${FIPS:-false} == "true" ]]; then
+    with_msft_go
+    if [[ ${PLATFORM_TYPE} == "arm" || ${PLATFORM_TYPE} == "aarch64" ]]; then
+        export PLATFORMS="linux/arm64"
+    else
+        export PLATFORMS="linux/amd64"
+    fi
+else
+    with_go
+fi
 with_mage
 
 case "${TYPE}" in

@@ -8,23 +8,23 @@ require (
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
-	github.com/elastic/elastic-agent-libs v0.18.11
-	github.com/elastic/elastic-agent-system-metrics v0.11.9
+	github.com/elastic/elastic-agent-libs v0.18.12
+	github.com/elastic/elastic-agent-system-metrics v0.11.10
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.6.0
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/gofrs/uuid v4.4.0+incompatible
-	github.com/google/go-cmp v0.6.0
+	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
-	github.com/hashicorp/go-version v1.6.0
+	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/mailru/easyjson v0.7.7
+	github.com/mailru/easyjson v0.9.0
 	github.com/miolini/datacounter v1.0.3
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.19.0
-	github.com/rs/xid v1.5.0
+	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.32.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.10.0
@@ -36,10 +36,10 @@ require (
 	go.elastic.co/apm/v2 v2.7.0
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.11.0
-	golang.org/x/time v0.5.0
-	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.33.0
+	golang.org/x/sync v0.12.0
+	golang.org/x/time v0.11.0
+	google.golang.org/grpc v1.71.0
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -85,17 +85,18 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.elastic.co/ecszap v1.0.3 // indirect
 	go.elastic.co/fastjson v1.5.0 // indirect
-	go.opentelemetry.io/otel v1.28.0 // indirect
-	go.opentelemetry.io/otel/metric v1.28.0 // indirect
-	go.opentelemetry.io/otel/trace v1.28.0 // indirect
+	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+	go.opentelemetry.io/otel v1.34.0 // indirect
+	go.opentelemetry.io/otel/metric v1.34.0 // indirect
+	go.opentelemetry.io/otel/trace v1.34.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/mod v0.23.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240415180920-8c6c420018be // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect
 )
