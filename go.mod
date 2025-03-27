@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/v7
 
-go 1.23.7
+go 1.23.0
 
 toolchain go1.24.1
 
@@ -10,7 +10,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
 	github.com/elastic/elastic-agent-libs v0.18.12
-	github.com/elastic/elastic-agent-system-metrics v0.11.10
+	github.com/elastic/elastic-agent-system-metrics v0.11.8
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.6.0
