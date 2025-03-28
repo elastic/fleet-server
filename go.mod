@@ -9,6 +9,11 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.8.1
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
 	github.com/elastic/go-ucfg v0.8.8
+<<<<<<< HEAD
+=======
+	github.com/fxamacker/cbor/v2 v2.7.0
+	github.com/go-chi/chi/v5 v5.2.1
+>>>>>>> 0f1cde7 (build(deps): bump github.com/go-chi/chi/v5 from 5.0.12 to 5.2.1 (#4638))
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
