@@ -3,9 +3,8 @@ FROM golang:${GO_VERSION}-bullseye
 
 RUN \
   apt-get update \
-  && apt-get install -y zip \
-  && mkdir /.cache \
-  && chmod 777 /.cache
+  && apt-get install --no-install-recommends -y zip \
+  && apt-get clean
 
 WORKDIR /go/src/github.com/elastic/fleet-server
 
