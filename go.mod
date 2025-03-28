@@ -23,13 +23,8 @@ require (
 	github.com/miolini/datacounter v1.0.3
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
-<<<<<<< HEAD
-	github.com/prometheus/client_golang v1.19.0
-	github.com/rs/xid v1.5.0
-=======
 	github.com/prometheus/client_golang v1.21.1
-	github.com/rs/xid v1.6.0
->>>>>>> 0aff7da (build(deps): bump github.com/prometheus/client_golang from 1.19.0 to 1.21.1 (#4637))
+	github.com/rs/xid v1.5.0
 	github.com/rs/zerolog v1.32.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.10.0
@@ -44,7 +39,7 @@ require (
 	golang.org/x/sync v0.11.0
 	golang.org/x/time v0.5.0
 	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.36.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
