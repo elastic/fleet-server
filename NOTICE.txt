@@ -20350,13 +20350,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/oauth2
-Version: v0.18.0
+Version: v0.24.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/oauth2@v0.18.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/oauth2@v0.24.0/LICENSE:
 
-Copyright (c) 2009 The Go Authors. All rights reserved.
+Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -20368,7 +20368,7 @@ notice, this list of conditions and the following disclaimer.
 copyright notice, this list of conditions and the following disclaimer
 in the documentation and/or other materials provided with the
 distribution.
-   * Neither the name of Google Inc. nor the names of its
+   * Neither the name of Google LLC nor the names of its
 contributors may be used to endorse or promote products derived from
 this software without specific prior written permission.
 
@@ -20608,7 +20608,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 --------------------------------------------------------------------------------
-<<<<<<< HEAD
 Dependency : google.golang.org/appengine
 Version: v1.6.8
 Licence type (autodetected): Apache-2.0
@@ -20821,8 +20820,6 @@ Contents of probable licence file $GOMODCACHE/google.golang.org/appengine@v1.6.8
 
 
 --------------------------------------------------------------------------------
-=======
->>>>>>> 0aff7da (build(deps): bump github.com/prometheus/client_golang from 1.19.0 to 1.21.1 (#4637))
 Dependency : google.golang.org/genproto
 Version: v0.0.0-20240227224415-6ceb2ff114de
 Licence type (autodetected): Apache-2.0
