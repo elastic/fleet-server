@@ -14,10 +14,10 @@ type PBKDF2 struct {
 
 // Validate the config options with FIPS (SP 800-132) requirements
 func (p *PBKDF2) Validate() error {
-	if p.Iterations < 999 {
+	if p.Iterations < 1000 {
 		return errors.New("iterations must be at least 1000")
 	}
-	if p.KeyLength < 13 {
+	if p.KeyLength < 14 {
 		return errors.New("key_length must be at least 112 bits (14 bytes)")
 	}
 	if p.SaltLength < 16 {
