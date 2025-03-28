@@ -1345,13 +1345,11 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 --------------------------------------------------------------------------------
 Dependency : github.com/hashicorp/go-version
-Version: v1.7.0
+Version: v1.3.0
 Licence type (autodetected): MPL-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/hashicorp/go-version@v1.7.0/LICENSE:
-
-Copyright (c) 2014 HashiCorp, Inc.
+Contents of probable licence file $GOMODCACHE/github.com/hashicorp/go-version@v1.3.0/LICENSE:
 
 Mozilla Public License, version 2.0
 
