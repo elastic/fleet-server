@@ -18,7 +18,11 @@ require (
 	github.com/mailru/easyjson v0.7.7
 	github.com/miolini/datacounter v1.0.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
+<<<<<<< HEAD
 	github.com/pkg/errors v0.9.1
+=======
+	github.com/prometheus/client_golang v1.21.1
+>>>>>>> 0aff7da (build(deps): bump github.com/prometheus/client_golang from 1.19.0 to 1.21.1 (#4637))
 	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.27.0
 	github.com/spf13/cobra v1.7.0
@@ -49,11 +53,27 @@ require (
 	github.com/jcchavezs/porto v0.6.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+<<<<<<< HEAD
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/procfs v0.13.0 // indirect
 	github.com/santhosh-tekuri/jsonschema v1.2.4 // indirect
+=======
+	github.com/klauspost/compress v1.17.11 // indirect
+	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
+	github.com/prometheus/client_model v0.6.1 // indirect
+	github.com/prometheus/common v0.62.0 // indirect
+	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/shirou/gopsutil/v4 v4.24.7 // indirect
+	github.com/shoenig/go-m1cpu v0.1.6 // indirect
+>>>>>>> 0aff7da (build(deps): bump github.com/prometheus/client_golang from 1.19.0 to 1.21.1 (#4637))
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.elastic.co/apm v1.15.0 // indirect
 	go.elastic.co/ecszap v1.0.2 // indirect
