@@ -3,14 +3,8 @@ FROM golang:${GO_VERSION}-bullseye
 
 RUN \
   apt-get update \
-<<<<<<< HEAD
-  && apt-get install -y zip \
-  && mkdir /.cache \
-  && chmod 777 /.cache
-=======
   && apt-get install --no-install-recommends -y zip \
   && apt-get clean
->>>>>>> 6c68026 (fix: don't create directory for go build cache (#4644))
 
 WORKDIR /go/src/github.com/elastic/fleet-server
 
