@@ -54,7 +54,6 @@ func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, err
 		Str("exe", os.Args[0]).
 		Strs("args", os.Args[1:]).
 		Msg("Boot fleet-server")
-	log.Debug().Strs("env", os.Environ()).Msg("environment variables")
 
 	return l, err
 }
