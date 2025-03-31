@@ -5,9 +5,17 @@ go 1.21
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.2.0
+<<<<<<< HEAD
 	github.com/elastic/beats/v7 v7.17.23-0.20240725133810-bd0ffc1af3bb
 	github.com/elastic/elastic-agent-client/v7 v7.8.1
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
+=======
+	github.com/docker/go-units v0.5.0
+	github.com/elastic/elastic-agent-client/v7 v7.17.2
+	github.com/elastic/elastic-agent-libs v0.18.12
+	github.com/elastic/elastic-agent-system-metrics v0.11.10
+	github.com/elastic/go-elasticsearch/v8 v8.17.1
+>>>>>>> f4fdf8e (build(deps): bump github.com/elastic/elastic-agent-client/v7 from 7.17.1 to 7.17.2 (#4744))
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.7.0
@@ -34,6 +42,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-libs v0.7.2 // indirect
 	github.com/elastic/go-licenser v0.4.1 // indirect
 	github.com/elastic/go-structform v0.0.9 // indirect
@@ -45,6 +54,20 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+=======
+	github.com/elastic/elastic-transport-go/v8 v8.6.1 // indirect
+	github.com/elastic/go-structform v0.0.12 // indirect
+	github.com/elastic/go-sysinfo v1.15.1 // indirect
+	github.com/elastic/go-windows v1.0.2 // indirect
+	github.com/elastic/gosigar v0.14.3 // indirect
+	github.com/elastic/pkcs8 v1.0.0 // indirect
+	github.com/fatih/color v1.15.0 // indirect
+	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/gofrs/uuid/v5 v5.2.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+>>>>>>> f4fdf8e (build(deps): bump github.com/elastic/elastic-agent-client/v7 from 7.17.1 to 7.17.2 (#4744))
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jcchavezs/porto v0.6.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
