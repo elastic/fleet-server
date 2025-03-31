@@ -1505,11 +1505,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-ucfg@v0.8.8/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/fxamacker/cbor/v2
-Version: v2.7.0
+Version: v2.8.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/fxamacker/cbor/v2@v2.7.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/fxamacker/cbor/v2@v2.8.0/LICENSE:
 
 MIT License
 
