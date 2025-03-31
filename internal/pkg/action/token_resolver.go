@@ -39,7 +39,7 @@ func (r *TokenResolver) Resolve(ctx context.Context, token string) (seqno int64,
 	}
 	if v, ok := r.cache.Get(token); ok {
 		seqno = v.(int64)
-		log.Debug().Str("token", token).Int64("seqno", seqno).Msg("Found token cached")
+		log.Debug().Int64("seqno", seqno).Msg("Found token cached")
 		return
 	}
 
