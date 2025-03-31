@@ -95,7 +95,7 @@ func GenCA(t *testing.T) tls.Certificate {
 		t.Fatalf("fail to generate RSA key: %v", err)
 	}
 
-	ca.SubjectKeyId = generateSubjectKeyID(caKey)
+	ca.SubjectKeyId = generateSubjectKeyID(caKey.Public())
 
 	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caKey.PublicKey, caKey)
 	if err != nil {
