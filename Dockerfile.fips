@@ -9,6 +9,9 @@ RUN mkdir -p /.cache \
 
 WORKDIR /go/src/github.com/elastic/fleet-server
 
+RUN groupadd --gid 1000 fleet-server && \
+    useradd -M --uid 1000 --gid 1000 fleet-server
+    
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
