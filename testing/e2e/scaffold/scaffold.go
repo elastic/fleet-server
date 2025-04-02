@@ -516,7 +516,7 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 		Image:        "ghcr.io/shopify/toxiproxy:2.5.0",
 		ExposedPorts: []string{"8474/tcp"},
 		WaitingFor:   wait.ForHTTP("/version").WithPort("8474/tcp"),
-		NetworkMode:  "host",
+		//NetworkMode:  "host",
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
