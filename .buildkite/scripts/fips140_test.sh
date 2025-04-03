@@ -9,4 +9,5 @@ add_bin_path
 with_go
 
 echo "Starting the unit tests..."
-make test-unit junit-report
+make test-unit-fips junit-report
+
