@@ -147,8 +147,8 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 	suite.Require().NoError(err)
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{
-		Template:    "stand-alone-http.tpl",
-		NetworkMode: "host",
+		Template: "stand-alone-http.tpl",
+		//NetworkMode: "host",
 		TemplateData: map[string]string{
 			"Hosts":        "http://" + proxy.Listen,
 			"ServiceToken": suite.ServiceToken,
