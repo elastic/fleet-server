@@ -9,5 +9,5 @@ add_bin_path
 with_msft_go
 
 echo "Starting the provider enabled tests..."
-make test-unit junit-report
+make test-fips-provider-unit junit-report
 

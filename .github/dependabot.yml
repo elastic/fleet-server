@@ -18,12 +18,13 @@ updates:
         patterns:
           - "go.elastic.co/apm/*"
 
-  # GitHub actions
   - package-ecosystem: github-actions
     directories:
       - '/'
+      - '/.github/actions/*'
     reviewers:
       - "elastic/observablt-ci"
+      - "elastic/observablt-ci-contractors"
     schedule:
       interval: "weekly"
       day: "sunday"

@@ -8,6 +8,8 @@
 
 SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
+# Use workflow file as source of truth for golangci-lint version
+GOLANGCI_LINT_VERSION=$(shell grep 'version:' .github/workflows/golangci-lint.yml | cut -d : -f 2 | tr -d ' ')
 DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
 
 # Set FIPS=true to force FIPS compliance when building
@@ -161,10 +163,6 @@ clean: ## - Clean up build artifacts
 
 .PHONY: generate
 generate: ## - Generate schema models
-	@printf "${CMD_COLOR_ON} Installing module for go generate\n${CMD_COLOR_OFF}"
-	env GOBIN=${GOBIN} go install github.com/elastic/go-json-schema-generate/cmd/schema-generate@ec19b88f6b5ef7825a928df8274a99337b855d1f
-	@printf "${CMD_COLOR_ON} Installing module for oapi-codegen\n${CMD_COLOR_OFF}"
-	env GOBIN=${GOBIN} go install github.com/deepmap/oapi-codegen/v2/cmd/oapi-codegen@v2.0.0
 	@printf "${CMD_COLOR_ON} Running go generate\n${CMD_COLOR_OFF}"
 	env PATH="${GOBIN}:${PATH}" go generate ./...
 	@$(MAKE) check-headers
@@ -183,12 +181,11 @@ check: ## - Run all checks
 
 .PHONY: check-headers
 check-headers:  ## - Check copyright headers
-	@env GOBIN=${GOBIN} go install github.com/elastic/go-licenser@latest
-	@env PATH="${GOBIN}:${PATH}" go-licenser -license Elastic
+	@go tool -modfile ./dev-tools/go.mod github.com/elastic/go-licenser -license Elastic
 
 .PHONY: check-go
 check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s v1.64.5
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh | sh -s $(GOLANGCI_LINT_VERSION)
 	@./bin/golangci-lint run -v
 
 .PHONY: notice
@@ -196,8 +193,7 @@ notice: ## - Generates the NOTICE.txt file.
 	@echo "Generating NOTICE.txt"
 	@go mod tidy
 	@go mod download all
-	@env GOBIN=${GOBIN} go install go.elastic.co/go-licence-detector@latest
-	go list -m -json all | env PATH="${GOBIN}:${PATH}" go-licence-detector \
+	go list -m -json all | go tool -modfile ./dev-tools/go.mod go.elastic.co/go-licence-detector \
 		-includeIndirect \
 		-rules dev-tools/notice/rules.json \
 		-overrides dev-tools/notice/overrides.json \
@@ -225,32 +221,25 @@ test: prepare-test-context  ## - Run all tests
 test-release:  ## - Check that all release binaries are created
 	./.buildkite/scripts/test-release.sh $(DEFAULT_VERSION)
 
-# If FIPS=true unit tests need microsoft/go + OpenSSL with FIPS
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
-	set -o pipefail; ${GOFIPSEXPERIMENT} go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
+	set -o pipefail; go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
 
-# FIPS unit tests are meant to use go v1.24 to check FIPS compliance.
-# This check is very strict, and should be thought of as a static-code analysis tool.
-.PHONY: test-unit-fips
-test-unit-fips: prepare-test-context  ## - Run unit tests with go 1.24's fips140=only for testing
-	set -o pipefail; GOFIPS140=latest GODEBUG=fips140=only go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-fips-${OS_NAME}.out
+.PHONY: test-fips-provider-unit
+test-fips-provider-unit: prepare-test-context  ## - Run unit tests with GOEXPERIMENT=systemcrypto to check that system FIPS provider works
+	set -o pipefail; GOEXPERIMENT=systemcrypto CGO_ENABLED=1 go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
 
 .PHONY: benchmark
-benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
+benchmark: prepare-test-context ## - Run benchmark tests only
 	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) -tags=$(GOBUILDTAGS) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
 
-.PHONY: install-benchstat
-install-benchstat: ## - Install the benchstat package
-	@benchstat 2> /dev/null || go install golang.org/x/perf/cmd/benchstat@latest
-
 .PHONY: benchstat
-benchstat: install-benchstat ## - Run the benchstat comparing base against next, BENCH_BASE and BENCH_NEXT are required for comparison
+benchstat: ## - Run the benchstat comparing base against next, BENCH_BASE and BENCH_NEXT are required for comparison
 	$(eval BENCHSTAT_ARGS := "build/$(BENCH_BASE)")
 ifneq ($(BENCH_NEXT),)
 	$(eval BENCHSTAT_ARGS += "build/$(BENCH_NEXT)")
 endif
-	@benchstat $(BENCHSTAT_ARGS)
+	@go tool -modfile ./dev-tools/go.mod golang.org/x/perf/cmd/benchstat $(BENCHSTAT_ARGS)
 
 .PHONY: prepare-test-context
 prepare-test-context: ## - Prepare the test context folders
@@ -258,8 +247,7 @@ prepare-test-context: ## - Prepare the test context folders
 
 .PHONY: junit-report
 junit-report: ## - Run the junit-report generation for all the out files generated
-	@go install github.com/jstemmer/go-junit-report@latest
-	$(foreach file, $(wildcard build/*.out), go-junit-report > "${file}.xml" < ${file};)
+	$(foreach file, $(wildcard build/*.out), go tool -modfile ./dev-tools/go.mod github.com/jstemmer/go-junit-report > "${file}.xml" < ${file};)
 
 ##################################################
 # Release building targets

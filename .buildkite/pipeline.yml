@@ -108,20 +108,28 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
-      - label: ":smartbear-testexecute: Run FIPS Provider tests"
-        key: provider-test-fips
-        command: ".buildkite/scripts/fips_provider_test.sh"
+      - label: ":smartbear-testexecute: Run fips140=only unit tests"
+        key: unit-test-fips140-only
+        command: ".buildkite/scripts/unit_test.sh"
         env:
           FIPS: "true"
+          GODEBUG: "fips140=only"
         agents:
-          provider: "aws"
-          imagePrefix: "platform-ingest-fleet-server-ubuntu-2204-fips"
-          diskSizeGb: 100
-          instanceType: m5.large
+          provider: "gcp"
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
 
+      - label: ":smartbear-testexecute: Run FIPS provider unit tests"
+        key: unit-test-fips-provider
+        command: ".buildkite/scripts/fips_provider_test.sh"
+        env:
+          FIPS: "true"
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - build/*.xml
+          - build/coverage*.out
 
       - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
         key: unit-test-macos-13
