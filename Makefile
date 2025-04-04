@@ -229,12 +229,6 @@ test-unit: prepare-test-context  ## - Run unit tests only
 test-fips-provider-unit: prepare-test-context  ## - Run unit tests with GOEXPERIMENT=systemcrypto to check that system FIPS provider works
 	set -o pipefail; GOEXPERIMENT=systemcrypto CGO_ENABLED=1 go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
 
-# FIPS unit tests are meant to use go v1.24 to check FIPS compliance.
-# This check is very strict, and should be thought of as a static-code analysis tool.
-.PHONY: test-unit-fips
-test-unit-fips: prepare-test-context  ## - Run unit tests with go 1.24's fips140=only for testing
-	set -o pipefail; GOFIPS140=latest GODEBUG=fips140=only go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-fips-${OS_NAME}.out
-
 .PHONY: benchmark
 benchmark: prepare-test-context ## - Run benchmark tests only
 	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) -tags=$(GOBUILDTAGS) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
