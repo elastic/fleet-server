@@ -673,13 +673,25 @@ func TestAckHandleUpgrade(t *testing.T) {
 		name   string
 		event  UpgradeEvent
 		bulker func(t *testing.T) *ftesting.MockBulk
+		agent  *model.Agent
 	}{{
 		name:  "ok",
 		event: UpgradeEvent{},
 		bulker: func(t *testing.T) *ftesting.MockBulk {
 			m := ftesting.NewMockBulk()
-			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
+				var body map[string]map[string]interface{}
+				if err := json.Unmarshal(p, &body); err != nil {
+					t.Fatal(err)
+				}
+				upgradeAttempts, ok := body["doc"]["upgrade_attempts"]
+				return ok == true && upgradeAttempts == nil
+			}), mock.Anything).Return(nil).Once()
 			return m
+		},
+		agent: &model.Agent{
+			ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+			Agent:      &model.AgentMetadata{Version: "8.0.0"},
 		},
 	}, {
 		name: "retry signaled",
@@ -708,6 +720,10 @@ func TestAckHandleUpgrade(t *testing.T) {
 			}), mock.Anything).Return(nil).Once()
 			return m
 		},
+		agent: &model.Agent{
+			ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+			Agent:      &model.AgentMetadata{Version: "8.0.0"},
+		},
 	}, {
 		name: "no more retries",
 		event: UpgradeEvent{
@@ -734,13 +750,33 @@ func TestAckHandleUpgrade(t *testing.T) {
 			}), mock.Anything).Return(nil).Once()
 			return m
 		},
+		agent: &model.Agent{
+			ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+			Agent:      &model.AgentMetadata{Version: "8.0.0"},
+		},
+	}, {
+		name:  "keep upgrade_attempts if upgrade_details is not nil",
+		event: UpgradeEvent{},
+		bulker: func(t *testing.T) *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
+				var body map[string]map[string]interface{}
+				if err := json.Unmarshal(p, &body); err != nil {
+					t.Fatal(err)
+				}
+				_, ok := body["doc"]["upgrade_attempts"]
+				return ok == false
+			}), mock.Anything).Return(nil).Once()
+			return m
+		},
+		agent: &model.Agent{
+			ESDocument:     model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+			Agent:          &model.AgentMetadata{Version: "8.0.0"},
+			UpgradeDetails: &model.UpgradeDetails{},
+		},
 	}}
 	cfg := &config.Server{
 		Limits: config.ServerLimits{},
-	}
-	agent := &model.Agent{
-		ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
-		Agent:      &model.AgentMetadata{Version: "8.0.0"},
 	}
 	ctx := context.Background()
 	cache, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
@@ -753,7 +789,7 @@ func TestAckHandleUpgrade(t *testing.T) {
 			bulker := tc.bulker(t)
 			ack := NewAckT(cfg, bulker, cache)
 
-			err := ack.handleUpgrade(ctx, logger, agent, tc.event)
+			err := ack.handleUpgrade(ctx, logger, tc.agent, tc.event)
 			assert.NoError(t, err)
 			bulker.AssertExpectations(t)
 		})
