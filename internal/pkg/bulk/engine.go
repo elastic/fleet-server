@@ -85,15 +85,16 @@ type Bulk interface {
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es                    esapi.Transport
-	ch                    chan *bulkT
-	opts                  bulkOptT
-	blkPool               sync.Pool
-	apikeyLimit           *semaphore.Weighted
-	tracer                *apm.Tracer
+	es          esapi.Transport
+	ch          chan *bulkT
+	opts        bulkOptT
+	blkPool     sync.Pool
+	apikeyLimit *semaphore.Weighted
+	tracer      *apm.Tracer
+	cancelFn    context.CancelFunc
+
 	remoteOutputConfigMap map[string]map[string]interface{}
 	bulkerMap             map[string]Bulk
-	cancelFn              context.CancelFunc
 	remoteOutputMutex     sync.RWMutex
 }
 
@@ -259,7 +260,9 @@ func (b *Bulker) Client() *elasticsearch.Client {
 }
 
 func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+	b.remoteOutputMutex.RLock()
 	curCfg := b.remoteOutputConfigMap[name]
+	b.remoteOutputMutex.RUnlock()
 
 	hasChanged := false
 
@@ -281,7 +284,9 @@ func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name
 	for k, v := range newCfg {
 		newCfgCopy[k] = v
 	}
+	b.remoteOutputMutex.Lock()
 	b.remoteOutputConfigMap[name] = newCfgCopy
+	b.remoteOutputMutex.Unlock()
 	return hasChanged
 }
 
