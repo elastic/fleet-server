@@ -10,8 +10,10 @@ package config
 import (
 	"context"
 	"crypto/tls"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -314,11 +316,28 @@ func Test_Elasticsearch_DiagRequests(t *testing.T) {
 	defer srv.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	es := &Elasticsearch{}
-	es.InitDefaults()
-	es.Hosts = []string{srv.URL}
 
-	p := es.DiagRequests(ctx)
-	require.NotEmpty(t, p)
-	require.Contains(t, string(p), "request 0 successful.")
+	t.Run("scheme included", func(t *testing.T) {
+		es := &Elasticsearch{}
+		es.InitDefaults()
+		es.Hosts = []string{srv.URL}
+
+		p := es.DiagRequests(ctx)
+		require.NotEmpty(t, p)
+		require.Contains(t, string(p), "request 0 successful.")
+	})
+
+	t.Run("split scheme", func(t *testing.T) {
+		es := &Elasticsearch{}
+		es.InitDefaults()
+
+		srvURL, err := url.Parse(srv.URL)
+		require.NoError(t, err)
+		es.Protocol = srvURL.Scheme
+		es.Hosts = []string{net.JoinHostPort(srvURL.Hostname(), srvURL.Port())}
+
+		p := es.DiagRequests(ctx)
+		require.NotEmpty(t, p)
+		require.Contains(t, string(p), "request 0 successful.")
+	})
 }
