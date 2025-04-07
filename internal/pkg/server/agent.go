@@ -705,7 +705,7 @@ func toOutput(data map[string]interface{}) (config.Output, error) {
 func (a *Agent) esOutputCheck(ctx context.Context, cfg map[string]interface{}) error {
 	outCfg, err := toOutput(cfg)
 	if err != nil {
-		return fmt.Errorf("unable to convert map into ouput object: %w", err)
+		return fmt.Errorf("unable to convert map into output object: %w", err)
 	}
 	cli, err := es.NewClient(ctx,
 		&config.Config{
