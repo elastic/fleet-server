@@ -256,16 +256,13 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 
 	var res bytes.Buffer
 	for _, host := range c.Hosts {
-		u, err := url.Parse(host)
+		hostURL, err := makeURL(c.Protocol, "", host, 9200)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to transform host to url.URL")
 			res.WriteString(fmt.Sprintf("Unable to transform host %q to url.URL: %v\n", host, err))
 			continue
 		}
-		if u.Scheme == "" {
-			u.Scheme = c.Protocol
-		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, hostURL, nil)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to create request to host")
 			res.WriteString(fmt.Sprintf("Unable to create request to host %q: %v\n", host, err))
