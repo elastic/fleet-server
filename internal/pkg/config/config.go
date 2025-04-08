@@ -65,6 +65,113 @@ func (c *Config) Merge(other *Config) (*Config, error) {
 	return cfg, nil
 }
 
+<<<<<<< HEAD
+=======
+func RedactOutput(cfg *Config) Output {
+	redacted := cfg.Output
+
+	if redacted.Elasticsearch.ServiceToken != "" {
+		redacted.Elasticsearch.ServiceToken = kRedacted
+	}
+
+	if redacted.Elasticsearch.TLS != nil {
+		newTLS := *redacted.Elasticsearch.TLS
+
+		if newTLS.Certificate.Key != "" {
+			newTLS.Certificate.Key = kRedacted
+		}
+		if newTLS.Certificate.Passphrase != "" {
+			newTLS.Certificate.Passphrase = kRedacted
+		}
+
+		redacted.Elasticsearch.TLS = &newTLS
+	}
+
+	if redacted.Elasticsearch.Headers != nil {
+		redacted.Elasticsearch.Headers = redactHeaders(redacted.Elasticsearch.Headers)
+	}
+
+	if redacted.Elasticsearch.ProxyHeaders != nil {
+		redacted.Elasticsearch.ProxyHeaders = redactHeaders(redacted.Elasticsearch.ProxyHeaders)
+	}
+	return redacted
+}
+
+// redactHeaders returns a copy of the passed headers map.
+// It will do a best-effort attempt to redact sensitive headers based on header names.
+func redactHeaders(headers map[string]string) map[string]string {
+	redactedHeaders := make(map[string]string)
+	for k, v := range headers {
+		redactedHeaders[k] = v
+		lk := strings.ToLower(k)
+		if strings.Contains(lk, "auth") || strings.Contains(lk, "token") || strings.Contains(lk, "key") || strings.Contains(lk, "bearer") {
+			redactedHeaders[k] = kRedacted
+		}
+	}
+	return redactedHeaders
+}
+
+func redactServer(cfg *Config) Server {
+	redacted := cfg.Inputs[0].Server
+
+	if redacted.TLS != nil {
+		newTLS := *redacted.TLS
+
+		if newTLS.Certificate.Key != "" {
+			newTLS.Certificate.Key = kRedacted
+		}
+		if newTLS.Certificate.Passphrase != "" {
+			newTLS.Certificate.Passphrase = kRedacted
+		}
+
+		redacted.TLS = &newTLS
+	}
+
+	if redacted.Instrumentation.APIKey != "" {
+		redacted.Instrumentation.APIKey = kRedacted
+	}
+
+	if redacted.Instrumentation.SecretToken != "" {
+		redacted.Instrumentation.SecretToken = kRedacted
+	}
+
+	if redacted.StaticPolicyTokens.PolicyTokens != nil {
+		policyTokens := make([]PolicyToken, len(redacted.StaticPolicyTokens.PolicyTokens))
+		for i := range redacted.StaticPolicyTokens.PolicyTokens {
+			policyTokens[i] = PolicyToken{
+				TokenKey: kRedacted,
+				PolicyID: redacted.StaticPolicyTokens.PolicyTokens[i].PolicyID,
+			}
+		}
+		redacted.StaticPolicyTokens.PolicyTokens = policyTokens
+	}
+
+	return redacted
+}
+
+// Redact returns a copy of the config with all sensitive attributes redacted.
+func (c *Config) Redact() *Config {
+	redacted := &Config{
+		Fleet:   c.Fleet,
+		Output:  c.Output,
+		Inputs:  make([]Input, 1),
+		Logging: c.Logging,
+		HTTP:    c.HTTP,
+	}
+	redacted.Inputs[0].Server = redactServer(c)
+	redacted.Output = RedactOutput(c)
+	return redacted
+}
+
+func checkDeprecatedOptions(deprecatedOpts map[string]string, c *ucfg.Config) {
+	for opt, message := range deprecatedOpts {
+		if c.HasField(opt) {
+			zerolog.Ctx(context.TODO()).Warn().Msg(message) // TODO is used as this may be called before logger config is read.
+		}
+	}
+}
+
+>>>>>>> f023602 (Redact output log lines during bootstrap config (#4775))
 // FromConfig returns Config from the ucfg.Config.
 func FromConfig(c *ucfg.Config) (*Config, error) {
 	cfg := &Config{}
