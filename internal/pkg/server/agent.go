@@ -473,12 +473,14 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 		injectMissingOutputAttributes(ctx, outMap, bootstrap)
 
 		if err := a.esOutputCheck(ctx, outMap); err != nil {
+			redactedOut, _ := toOutput(outMap)
+			redactedOut = config.RedactOutput(&config.Config{Output: redactedOut})
 			if errors.Is(err, es.ErrElasticVersionConflict) || errors.Is(err, ver.ErrUnsupportedVersion) {
-				zerolog.Ctx(ctx).Error().Err(err).Interface("output", outMap).Msg("Elasticsearch version constraint failed for new output")
+				zerolog.Ctx(ctx).Error().Err(err).Interface("output", redactedOut).Msg("Elasticsearch version constraint failed for new output")
 			} else if errors.Is(err, context.Canceled) {
 				// ignore logging cancelation errors in the output check
 			} else {
-				zerolog.Ctx(ctx).Warn().Err(err).Interface("output", outMap).Msg("Failed Elasticsearch output configuration test, using bootstrap values.")
+				zerolog.Ctx(ctx).Warn().Err(err).Interface("output", redactedOut).Msg("Failed Elasticsearch output configuration test, using bootstrap values.")
 
 				// try to reload periodically
 				outputCtx, canceller := context.WithCancel(ctx)
@@ -672,14 +674,14 @@ func checkForCA(cfg map[string]interface{}) bool {
 	return false
 }
 
-func (a *Agent) esOutputCheck(ctx context.Context, data map[string]interface{}) error {
+func toOutput(data map[string]interface{}) (config.Output, error) {
 	var esOut config.Elasticsearch
 	temp, err := ucfg.NewFrom(data, config.DefaultOptions...)
 	if err != nil {
-		return err
+		return config.Output{}, err
 	}
 	if err := temp.Unpack(&esOut, config.DefaultOptions...); err != nil {
-		return err
+		return config.Output{}, err
 	}
 
 	const httpsSchema = "https"
@@ -693,12 +695,19 @@ func (a *Agent) esOutputCheck(ctx context.Context, data map[string]interface{}) 
 	if isHTTPS {
 		esOut.Protocol = httpsSchema
 	}
+	return config.Output{
+		Elasticsearch: esOut,
+	}, nil
+}
 
+func (a *Agent) esOutputCheck(ctx context.Context, cfg map[string]interface{}) error {
+	outCfg, err := toOutput(cfg)
+	if err != nil {
+		return fmt.Errorf("unable to convert map into output object: %w", err)
+	}
 	cli, err := es.NewClient(ctx,
 		&config.Config{
-			Output: config.Output{
-				Elasticsearch: esOut,
-			},
+			Output: outCfg,
 		},
 		false,
 		elasticsearchOptions(false, a.bi)..., // disable instrumentation for output config test
@@ -729,10 +738,11 @@ func (a *Agent) esOutputCheckLoop(ctx context.Context, delay time.Duration, cfg 
 			return
 		}
 		// connected to invalid ES version
+		outCfg, _ := toOutput(cfg)
 		if errors.Is(err, es.ErrElasticVersionConflict) || errors.Is(err, ver.ErrUnsupportedVersion) {
-			zerolog.Ctx(ctx).Error().Err(err).Interface("output", cfg).Msg("Elasticsearch version constraint failed for new output")
+			zerolog.Ctx(ctx).Error().Err(err).Interface("output", config.RedactOutput(&config.Config{Output: outCfg})).Msg("Elasticsearch version constraint failed for new output")
 			return
 		}
-		zerolog.Ctx(ctx).Debug().Err(err).Interface("output", cfg).Msgf("Async output check failed, will retry after %v", delay)
+		zerolog.Ctx(ctx).Debug().Err(err).Interface("output", config.RedactOutput(&config.Config{Output: outCfg})).Msgf("Async output check failed, will retry after %v", delay)
 	}
 }
