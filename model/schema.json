@@ -686,6 +686,13 @@
           "description": "Additional upgrade status details.",
           "type": "object"
         },
+        "upgrade_attempts": {
+          "description": "List of timestamps of attempts of Elastic Agent automatic upgrades",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "replace_token": {
           "description": "hash of token provided during enrollment that allows replacement by another enrollment with same ID",
           "type": "string"
