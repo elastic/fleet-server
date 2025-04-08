@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -312,6 +313,17 @@ func TestResolveSeqNo(t *testing.T) {
 
 func TestProcessUpgradeDetails(t *testing.T) {
 	esd := model.ESDocument{Id: "doc-ID"}
+	doc := bulk.UpdateFields{
+		dl.FieldUpgradeDetails: &UpgradeDetails{
+			ActionId: "test-action",
+			State:    UpgradeDetailsStateUPGWATCHING,
+		},
+		dl.FieldUpgradeAttempts: nil,
+	}
+	body, err := doc.Marshal()
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
 	tests := []struct {
 		name    string
 		agent   *model.Agent
@@ -625,6 +637,24 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				return mCache
 			},
 			err: ErrInvalidUpgradeMetadata,
+		}, {
+			name:  "clear upgrade attempts when watching",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeAttempts: make([]string, 0)},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGWATCHING,
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", body, mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
 		}}
 
 	for _, tc := range tests {
