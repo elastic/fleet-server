@@ -157,7 +157,7 @@ func (c *Config) Merge(other *Config) (*Config, error) {
 	return cfg, nil
 }
 
-func redactOutput(cfg *Config) Output {
+func RedactOutput(cfg *Config) Output {
 	redacted := cfg.Output
 
 	if redacted.Elasticsearch.ServiceToken != "" {
@@ -249,7 +249,7 @@ func (c *Config) Redact() *Config {
 		HTTP:    c.HTTP,
 	}
 	redacted.Inputs[0].Server = redactServer(c)
-	redacted.Output = redactOutput(c)
+	redacted.Output = RedactOutput(c)
 	return redacted
 }
 
