@@ -69,6 +69,15 @@ type Bulker struct {
 	opts        bulkOptT
 	blkPool     sync.Pool
 	apikeyLimit *semaphore.Weighted
+<<<<<<< HEAD
+=======
+	tracer      *apm.Tracer
+	cancelFn    context.CancelFunc
+
+	remoteOutputConfigMap map[string]map[string]interface{}
+	bulkerMap             map[string]Bulk
+	remoteOutputMutex     sync.RWMutex
+>>>>>>> 33329a4 (Fix concurrent access to remote bulker config (#4776))
 }
 
 const (
@@ -105,6 +114,54 @@ func (b *Bulker) Client() *elasticsearch.Client {
 	return client
 }
 
+<<<<<<< HEAD
+=======
+func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+	b.remoteOutputMutex.RLock()
+	defer b.remoteOutputMutex.RUnlock()
+	curCfg := b.remoteOutputConfigMap[name]
+
+	hasChanged := false
+
+	// when output config first added, not reporting change
+	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
+		hasChanged = true
+	}
+	return hasChanged
+}
+
+// check if remote output cfg changed
+func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+	hasChanged := b.RemoteOutputConfigChanged(zlog, name, newCfg)
+	if hasChanged {
+		zlog.Debug().Str("name", name).Msg("remote output configuration has changed")
+	}
+
+	newCfgCopy := make(map[string]interface{})
+	for k, v := range newCfg {
+		newCfgCopy[k] = v
+	}
+	b.remoteOutputMutex.Lock()
+	b.remoteOutputConfigMap[name] = newCfgCopy
+	b.remoteOutputMutex.Unlock()
+	return hasChanged
+}
+
+// read secrets one by one as there is no bulk API yet to read them in one request
+func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
+	result := make(map[string]string)
+	esClient := b.Client()
+	for _, id := range secretIds {
+		val, err := ReadSecret(ctx, esClient, id)
+		if err != nil {
+			return nil, err
+		}
+		result[id] = val
+	}
+	return result, nil
+}
+
+>>>>>>> 33329a4 (Fix concurrent access to remote bulker config (#4776))
 // Stop timer, but don't stall on channel.
 // API doesn't not seem to work as specified.
 func stopTimer(t *time.Timer) {
