@@ -261,8 +261,8 @@ func (b *Bulker) Client() *elasticsearch.Client {
 
 func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
 	b.remoteOutputMutex.RLock()
+	defer b.remoteOutputMutex.RUnlock()
 	curCfg := b.remoteOutputConfigMap[name]
-	b.remoteOutputMutex.RUnlock()
 
 	hasChanged := false
 
