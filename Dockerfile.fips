@@ -4,9 +4,6 @@ FROM mcr.microsoft.com/oss/go/microsoft/golang:${GO_VERSION}-1-fips-bookworm AS 
 ENV FIPS=true
 ENV CGO_ENABLED=1
 
-RUN mkdir -p /.cache \
-  && chmod 777 /.cache
-
 WORKDIR /go/src/github.com/elastic/fleet-server
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
