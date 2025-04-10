@@ -2209,12 +2209,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 --------------------------------------------------------------------------------
+<<<<<<< HEAD
 Dependency : github.com/pkg/errors
 Version: v0.9.1
 Licence type (autodetected): BSD-2-Clause
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/pkg/errors@v0.9.1/LICENSE:
+=======
+Dependency : github.com/prometheus/client_golang
+Version: v1.22.0
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.22.0/LICENSE:
+>>>>>>> e0bd07f (build(deps): bump github.com/prometheus/client_golang from 1.21.1 to 1.22.0 (#4792))
 
 Copyright (c) 2015, Dave Cheney <dave@cheney.net>
 All rights reserved.
@@ -26953,11 +26962,19 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/klauspost/compress
+<<<<<<< HEAD
 Version: v1.15.9
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/klauspost/compress@v1.15.9/LICENSE:
+=======
+Version: v1.18.0
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/github.com/klauspost/compress@v1.18.0/LICENSE:
+>>>>>>> e0bd07f (build(deps): bump github.com/prometheus/client_golang from 1.21.1 to 1.22.0 (#4792))
 
 Copyright (c) 2012 The Go Authors. All rights reserved.
 Copyright (c) 2019 Klaus Post. All rights reserved.
