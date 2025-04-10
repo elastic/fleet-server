@@ -3074,11 +3074,19 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/client_golang
+<<<<<<< HEAD
 Version: v1.19.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.19.0/LICENSE:
+=======
+Version: v1.22.0
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.22.0/LICENSE:
+>>>>>>> e0bd07f (build(deps): bump github.com/prometheus/client_golang from 1.21.1 to 1.22.0 (#4792))
 
                                  Apache License
                            Version 2.0, January 2004
@@ -13040,11 +13048,19 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/klauspost/compress
+<<<<<<< HEAD
 Version: v1.16.7
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/klauspost/compress@v1.16.7/LICENSE:
+=======
+Version: v1.18.0
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/github.com/klauspost/compress@v1.18.0/LICENSE:
+>>>>>>> e0bd07f (build(deps): bump github.com/prometheus/client_golang from 1.21.1 to 1.22.0 (#4792))
 
 Copyright (c) 2012 The Go Authors. All rights reserved.
 Copyright (c) 2019 Klaus Post. All rights reserved.
