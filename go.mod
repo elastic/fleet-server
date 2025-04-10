@@ -18,7 +18,11 @@ require (
 	github.com/mailru/easyjson v0.9.0
 	github.com/miolini/datacounter v1.0.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
+<<<<<<< HEAD
 	github.com/pkg/errors v0.9.1
+=======
+	github.com/prometheus/client_golang v1.22.0
+>>>>>>> e0bd07f (build(deps): bump github.com/prometheus/client_golang from 1.21.1 to 1.22.0 (#4792))
 	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.27.0
 	github.com/spf13/cobra v1.7.0
@@ -49,6 +53,10 @@ require (
 	github.com/jcchavezs/porto v0.6.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+<<<<<<< HEAD
+=======
+	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
+>>>>>>> e0bd07f (build(deps): bump github.com/prometheus/client_golang from 1.21.1 to 1.22.0 (#4792))
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
