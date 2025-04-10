@@ -3343,11 +3343,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/spf13/cobra
-Version: v1.8.0
+Version: v1.9.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/spf13/cobra@v1.8.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/spf13/cobra@v1.9.1/LICENSE.txt:
 
                                 Apache License
                            Version 2.0, January 2004
@@ -8043,11 +8043,11 @@ third-party archives.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/cpuguy83/go-md2man/v2
-Version: v2.0.3
+Version: v2.0.6
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/cpuguy83/go-md2man/v2@v2.0.3/LICENSE.md:
+Contents of probable licence file $GOMODCACHE/github.com/cpuguy83/go-md2man/v2@v2.0.6/LICENSE.md:
 
 The MIT License (MIT)
 
@@ -17482,11 +17482,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/spf13/pflag
-Version: v1.0.5
+Version: v1.0.6
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/spf13/pflag@v1.0.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/spf13/pflag@v1.0.6/LICENSE:
 
 Copyright (c) 2012 Alex Ogier. All rights reserved.
 Copyright (c) 2012 The Go Authors. All rights reserved.
