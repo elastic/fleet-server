@@ -64,6 +64,7 @@ var validActionTypes = map[string]bool{
 	string(SETTINGS):           true,
 	string(UNENROLL):           true,
 	string(UPGRADE):            true,
+	string(MIGRATE):            true,
 }
 
 type CheckinT struct {
@@ -759,6 +760,14 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		return
 	case UNENROLL: // Action types with no data
 		return ad, nil
+	case MIGRATE:
+		d := ActionMigrate{}
+		err = json.Unmarshal(raw, &d)
+		if err != nil {
+			return
+		}
+		err = ad.FromActionMigrate(d)
+		return
 	default:
 		return ad, fmt.Errorf("data conversion unsupported action type: %s", aType)
 	}
