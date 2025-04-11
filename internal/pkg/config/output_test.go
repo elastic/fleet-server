@@ -206,7 +206,7 @@ func TestToESConfig(t *testing.T) {
 			require.NoError(t, err)
 
 			// cmp.Diff can't handle function pointers.
-			res.Transport.(*http.Transport).Proxy = nil
+			res.Transport.(*http.Transport).Proxy = nil //nolint:errcheck // skipping error check in test
 
 			test.result.Header.Set("X-elastic-product-origin", "fleet")
 			assert.True(t, cmp.Equal(test.result, res, copts...), "mismatch (-want +got)\n%s", cmp.Diff(test.result, res, copts...))
@@ -227,7 +227,7 @@ func TestToESConfig(t *testing.T) {
 		require.NoError(t, err)
 
 		expect := elasticsearch.Config{
-			Addresses:    []string{"http://localhost:9200"},
+			Addresses:    []string{"https://localhost:9200"},
 			ServiceToken: "test-token",
 			Header:       http.Header{"X-Elastic-Product-Origin": []string{"fleet"}},
 			MaxRetries:   3,
@@ -242,7 +242,7 @@ func TestToESConfig(t *testing.T) {
 			},
 		}
 
-		es.Transport.(*http.Transport).Proxy = nil
+		es.Transport.(*http.Transport).Proxy = nil //nolint:errcheck // skipping error check in test
 		assert.True(t, cmp.Equal(expect, es, copts...), "mismatch (-want +got)\n%s", cmp.Diff(expect, es, copts...))
 	})
 
@@ -260,7 +260,7 @@ func TestToESConfig(t *testing.T) {
 		require.NoError(t, err)
 
 		expect := elasticsearch.Config{
-			Addresses:  []string{"http://localhost:9200"},
+			Addresses:  []string{"https://localhost:9200"},
 			Header:     http.Header{"X-Elastic-Product-Origin": []string{"fleet"}},
 			MaxRetries: 3,
 			Transport: &http.Transport{
@@ -274,7 +274,7 @@ func TestToESConfig(t *testing.T) {
 			},
 		}
 
-		es.Transport.(*http.Transport).Proxy = nil
+		es.Transport.(*http.Transport).Proxy = nil //nolint:errcheck // skipping error check in test
 		assert.True(t, cmp.Equal(expect, es, copts...), "mismatch (-want +got)\n%s", cmp.Diff(expect, es, copts...))
 	})
 
@@ -392,7 +392,7 @@ func Test_Elasticsearch_DiagRequests(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:usetesting // using context.Background not t.Context
 	defer cancel()
 
 	t.Run("scheme included", func(t *testing.T) {
