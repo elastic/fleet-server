@@ -8,7 +8,7 @@ require (
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
-	github.com/elastic/elastic-agent-libs v0.19.0
+	github.com/elastic/elastic-agent-libs v0.19.1
 	github.com/elastic/elastic-agent-system-metrics v0.11.11
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-ucfg v0.8.8
@@ -23,7 +23,7 @@ require (
 	github.com/miolini/datacounter v1.0.3
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
-	github.com/prometheus/client_golang v1.21.1
+	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.9.1
@@ -65,7 +65,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
