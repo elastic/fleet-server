@@ -31,7 +31,11 @@ require (
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-libs v0.18.12 // indirect
+=======
+	github.com/elastic/elastic-agent-libs v0.19.2 // indirect
+>>>>>>> 05504fa (build(deps): bump github.com/elastic/elastic-agent-libs from 0.19.1 to 0.19.2 (#4807))
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
