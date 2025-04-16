@@ -636,9 +636,6 @@ components:
       description: The MIGRATE action data.
       type: object
       properties:
-        policy_id:
-          type: string
-          description: Type of the action.
         target_uri:
           type: string
           description: URI of Fleet Server in a target cluster.
@@ -654,7 +651,6 @@ components:
           x-go-type: json.RawMessage
       required:
        - enrollment_token
-       - policy_id
        - target_uri
     checkinResponse:
       type: object
