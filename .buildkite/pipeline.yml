@@ -87,8 +87,8 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
-      - label: ":smartbear-testexecute: Run FIPS unit tests"
-        key: unit-test-fips
+      - label: ":smartbear-testexecute: Run unit tests with requirefips build tag"
+        key: unit-test-fips-tag
         command: ".buildkite/scripts/unit_test.sh"
         env:
           FIPS: "true"
