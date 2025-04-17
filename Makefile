@@ -54,10 +54,10 @@ DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
 endif
 
 # gobuildtags is an intermediate variable that is used to properly assemble GOBUILDTAGS, a comma seperated list of tags to use with go build
-gobuildtags=
+gobuildtags=grpcnotrace
 ifeq ($(SNAPSHOT),true)
 VERSION=${DEFAULT_VERSION}-SNAPSHOT
-gobuildtags=snapshot
+gobuildtags += snapshot
 else
 VERSION=${DEFAULT_VERSION}
 endif
