@@ -296,6 +296,8 @@ func (m *MockReporter) UpdateState(state client.UnitState, message string, paylo
 }
 
 func TestServerConfigErrorReload(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	// don't use startTestServer as we need failing initial config.
 	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
 	require.NoError(t, err)
@@ -303,7 +305,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 	require.NoError(t, err)
 
 	logger.Init(cfg, "fleet-server") //nolint:errcheck // test logging setup
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 	bulker := ftesting.SetupBulk(ctx, t)
 
 	policyID := uuid.Must(uuid.NewV4()).String()
@@ -399,11 +401,12 @@ func TestServerConfigErrorReload(t *testing.T) {
 }
 
 func TestServerUnauthorized(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
 
 	// Start test server
-	srv, err := startTestServer(t, t.Context(), policyData)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
 	cli := cleanhttp.DefaultClient()

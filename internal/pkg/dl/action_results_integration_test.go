@@ -101,7 +101,7 @@ func (acrs ActionsResults) find(ar model.ActionResult) *model.ActionResult {
 }
 
 func TestActionsResultsStored(t *testing.T) {
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker, acrs := setupActionResults(ctx, t)
 

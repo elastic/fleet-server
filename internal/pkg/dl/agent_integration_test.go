@@ -23,7 +23,7 @@ import (
 )
 
 func TestFindAgent_NewModel(t *testing.T) {
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
 
