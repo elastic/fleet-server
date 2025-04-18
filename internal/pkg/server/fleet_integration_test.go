@@ -298,6 +298,7 @@ func (m *MockReporter) UpdateState(state client.UnitState, message string, paylo
 func TestServerConfigErrorReload(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
+
 	// don't use startTestServer as we need failing initial config.
 	cfg, err := config.LoadFile("../testing/fleet-server-testing.yml")
 	require.NoError(t, err)
@@ -402,6 +403,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 
 func TestServerUnauthorized(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
@@ -501,6 +503,8 @@ func stubAPMServer(t *testing.T, ch chan<- struct{}) http.Handler {
 }
 
 func TestServerInstrumentation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	tracerConnected := make(chan struct{}, 1)
 	server := httptest.NewServer(stubAPMServer(t, tracerConnected))
 	defer server.Close()
@@ -508,7 +512,7 @@ func TestServerInstrumentation(t *testing.T) {
 	// Start test server with instrumentation disabled
 	srv, err := startTestServer(t, t.Context(), policyData, WithAPM(server.URL, false))
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	agentID := "1e4954ce-af37-4731-9f4a-407b08e69e42"
 	checkinURL := srv.buildURL(agentID, "checkin")
@@ -590,7 +594,7 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	cli := cleanhttp.DefaultClient()
 
@@ -737,7 +741,7 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	t.Log("Enroll the first agent with enrollment_id")
 	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
@@ -782,7 +786,7 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	t.Log("Enroll the first agent with enrollment_id")
 	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
@@ -880,7 +884,7 @@ func Test_Agent_Id_ReplaceToken_Mismatch(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	t.Log("Enroll the first agent with id")
 	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWID)
@@ -933,7 +937,7 @@ func Test_Agent_Id(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	t.Log("Enroll the first agent with id")
 	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWID)
@@ -977,7 +981,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	cli := cleanhttp.DefaultClient()
 
@@ -1099,7 +1103,7 @@ func Test_Agent_request_errors(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	cli := cleanhttp.DefaultClient()
 	t.Run("no auth", func(t *testing.T) {
@@ -1178,7 +1182,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	cli := cleanhttp.DefaultClient()
 
@@ -1248,7 +1252,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.StatusCode)
 
 	t.Logf("checkin 2: agent %s poll_timeout 3m", agentID)
-	ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
 	    "ack_token": "%s",
@@ -1304,10 +1308,13 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 }
 
 func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
 	// Start test server
-	srv, err := startTestServer(t, t.Context(), policyData)
+	srv, err := startTestServer(t, ctx, policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	cli := cleanhttp.DefaultClient()
 
@@ -1415,7 +1422,8 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 
 // Test_SmokeTest_Verify_v85Migrate will ensure that the policy regenerates output keys when the agent doc contains an empty key
 func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)
@@ -1558,7 +1566,8 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 }
 
 func Test_SmokeTest_AuditUnenroll(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	// Start test server
 	srv, err := startTestServer(t, ctx, policyData)

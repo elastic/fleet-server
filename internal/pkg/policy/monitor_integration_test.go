@@ -130,7 +130,9 @@ func TestMonitor_Integration(t *testing.T) {
 }
 
 func TestMonitor_Debounce_Integration(t *testing.T) {
-	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetPolicies)
 
