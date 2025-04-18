@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/version"

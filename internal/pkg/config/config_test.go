@@ -13,7 +13,7 @@ import (
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"

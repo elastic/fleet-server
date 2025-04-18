@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
 
