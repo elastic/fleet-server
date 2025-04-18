@@ -56,7 +56,7 @@ func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string) (mod
 }
 
 func TestQueryLatestPolicies(t *testing.T) {
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
@@ -85,7 +85,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 }
 
 func TestCreatePolicy(t *testing.T) {
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
@@ -103,7 +103,7 @@ func TestCreatePolicy(t *testing.T) {
 }
 
 func TestQueryOutputFromPolicy(t *testing.T) {
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
