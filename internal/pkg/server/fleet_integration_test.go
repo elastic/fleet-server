@@ -842,7 +842,7 @@ func Test_Agent_Id_No_ReplaceToken(t *testing.T) {
 	// Start test server
 	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	t.Log("Enroll the first agent with id")
 	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWID)

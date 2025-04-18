@@ -7,7 +7,6 @@
 package dl
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
