@@ -49,6 +49,7 @@ func initLogger(cfg *config.Config, version, commit string) (*logger.Logger, err
 	log.Info().
 		Str("version", version).
 		Str("commit", commit).
+		Bool("fips-distribution", build.FIPSDistribution).
 		Int("pid", os.Getpid()).
 		Int("ppid", os.Getppid()).
 		Str("exe", os.Args[0]).
@@ -140,7 +141,7 @@ func NewCommand(bi build.Info) *cobra.Command {
 		Use:     build.ServiceName,
 		Short:   "Fleet Server controls a fleet of Elastic Agents",
 		RunE:    getRunCommand(bi),
-		Version: bi.Version,
+		Version: bi.FullVersion(),
 	}
 	cmd.Flags().StringP("config", "c", "fleet-server.yml", "Configuration for Fleet Server")
 	cmd.Flags().Bool(kAgentMode, false, "Running under execution of the Elastic Agent")
