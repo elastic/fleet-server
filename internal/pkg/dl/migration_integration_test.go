@@ -72,9 +72,7 @@ func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIK
 }
 
 func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 	now, err := time.Parse(time.RFC3339, nowStr)
 	require.NoError(t, err, "could not parse time "+nowStr)
@@ -164,9 +162,7 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 }
 
 func TestMigrateOutputs_dontMigrateTwice(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 	now, err := time.Parse(time.RFC3339, nowStr)
 	require.NoError(t, err, "could not parse time "+nowStr)
@@ -193,9 +189,7 @@ func TestMigrateOutputs_dontMigrateTwice(t *testing.T) {
 }
 
 func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 	wantOutputType := "elasticsearch"
 
@@ -294,9 +288,7 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 }
 
 func TestMigrateOutputs_no_agent_document(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 	now, err := time.Parse(time.RFC3339, nowStr)
 	require.NoError(t, err, "could not parse time "+nowStr)

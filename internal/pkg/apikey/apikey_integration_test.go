@@ -32,9 +32,7 @@ const testFleetRoles = `
 `
 
 func TestRead_existingKey(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 	cfg := elasticsearch.Config{
 		Username: "elastic",
@@ -84,9 +82,7 @@ func TestRead_existingKey(t *testing.T) {
 }
 
 func TestRead_noKey(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 	cfg := elasticsearch.Config{
 		Username: "elastic",
@@ -116,9 +112,7 @@ func TestCreateAPIKeyWithMetadata(t *testing.T) {
 
 	for _, tt := range tts {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cn := context.WithCancel(context.Background())
-			defer cn()
-			ctx = testlog.SetLogger(t).WithContext(ctx)
+			ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 			cfg := elasticsearch.Config{
 				Username: "elastic",

@@ -34,9 +34,7 @@ var intPolData = model.PolicyData{
 }
 
 func TestMonitor_Integration(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetPolicies)
 
@@ -130,9 +128,7 @@ func TestMonitor_Integration(t *testing.T) {
 }
 
 func TestMonitor_Debounce_Integration(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetPolicies)
 
@@ -321,9 +317,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 }
 
 func TestMonitor_Revisions(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetPolicies)
 
@@ -443,9 +437,7 @@ func TestMonitor_Revisions(t *testing.T) {
 }
 
 func TestMonitor_KickDeploy(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx = testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetPolicies)
 
