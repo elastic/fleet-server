@@ -27,6 +27,7 @@ const (
 const (
 	CANCEL             ActionType = "CANCEL"
 	INPUTACTION        ActionType = "INPUT_ACTION"
+	MIGRATE            ActionType = "MIGRATE"
 	POLICYCHANGE       ActionType = "POLICY_CHANGE"
 	POLICYREASSIGN     ActionType = "POLICY_REASSIGN"
 	REQUESTDIAGNOSTICS ActionType = "REQUEST_DIAGNOSTICS"
@@ -218,6 +219,22 @@ type ActionCancel struct {
 
 // ActionInputAction The INPUT_ACTION action data.
 type ActionInputAction = map[string]interface{}
+
+// ActionMigrate The MIGRATE action data.
+type ActionMigrate struct {
+	// EnrollmentToken Enrollment token used to enroll agent to a new cluster.
+	EnrollmentToken string `json:"enrollment_token"`
+
+	// PolicyId Type of the action.
+	PolicyId string `json:"policy_id"`
+
+	// Settings An embedded JSON object that holds user-provided settings like TLS.
+	// Defined in fleet-server as a `json.RawMessage`.
+	Settings *json.RawMessage `json:"settings,omitempty"`
+
+	// TargetUri URI of Fleet Server in a target cluster.
+	TargetUri string `json:"target_uri"`
+}
 
 // ActionPolicyChange The POLICY_CHANGE action data.
 type ActionPolicyChange struct {
@@ -1550,6 +1567,32 @@ func (t *Action_Data) FromActionInputAction(v ActionInputAction) error {
 
 // MergeActionInputAction performs a merge with any union data inside the Action_Data, using the provided ActionInputAction
 func (t *Action_Data) MergeActionInputAction(v ActionInputAction) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsActionMigrate returns the union data inside the Action_Data as a ActionMigrate
+func (t Action_Data) AsActionMigrate() (ActionMigrate, error) {
+	var body ActionMigrate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromActionMigrate overwrites any union data inside the Action_Data as the provided ActionMigrate
+func (t *Action_Data) FromActionMigrate(v ActionMigrate) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeActionMigrate performs a merge with any union data inside the Action_Data, using the provided ActionMigrate
+func (t *Action_Data) MergeActionMigrate(v ActionMigrate) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
