@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -512,10 +513,11 @@ func (s *Scaffold) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 }
 
 func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
+	port := randomEphemeralPort()
 	req := testcontainers.ContainerRequest{
 		Image:        "ghcr.io/shopify/toxiproxy:2.5.0",
-		ExposedPorts: []string{"8474/tcp"},
-		WaitingFor:   wait.ForHTTP("/version").WithPort("8474/tcp"),
+		ExposedPorts: []string{fmt.Sprintf("%d/tcp", port)},
+		WaitingFor:   wait.ForHTTP("/version").WithPort(fmt.Sprintf("%d/tcp", port)),
 		NetworkMode:  "host",
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -531,7 +533,7 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 		}
 	})
 
-	mappedPort, err := container.MappedPort(ctx, "8474")
+	mappedPort, err := container.MappedPort(ctx, strconv.Itoa(int(port)))
 	s.Require().NoError(err)
 
 	hostIP, err := container.Host(ctx)
@@ -607,4 +609,21 @@ func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides 
 	s.Require().NoError(err)
 	defer resp.Body.Close()
 	s.Require().Equal(http.StatusOK, resp.StatusCode)
+}
+
+// randomEphemeralPort returns a random port number in the 49152-65535 range, as
+// per https://datatracker.ietf.org/doc/html/rfc6335#section-6
+func randomEphemeralPort() uint {
+	return randomUintInRange(49152, 65535)
+}
+
+// randomInRange returns a random integer between min and max, inclusive.
+func randomUintInRange(min, max uint) uint {
+	// swap to ensure min is less than or equal to max
+	if min > max {
+		min, max = max, min
+	}
+
+	rand.Seed(time.Now().UnixNano())
+	return rand.Intn(max-min+1) + min
 }
