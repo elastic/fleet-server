@@ -14,16 +14,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	toxiproxy "github.com/Shopify/toxiproxy/client"
+	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -514,10 +515,12 @@ func (s *Scaffold) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 
 func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 	port := randomEphemeralPort()
+	natPort := nat.Port(fmt.Sprintf("%d/tcp", port))
+
 	req := testcontainers.ContainerRequest{
 		Image:        "ghcr.io/shopify/toxiproxy:2.5.0",
 		ExposedPorts: []string{fmt.Sprintf("%d/tcp", port)},
-		WaitingFor:   wait.ForHTTP("/version").WithPort(fmt.Sprintf("%d/tcp", port)),
+		WaitingFor:   wait.ForHTTP("/version").WithPort(natPort),
 		NetworkMode:  "host",
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -533,7 +536,7 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 		}
 	})
 
-	mappedPort, err := container.MappedPort(ctx, strconv.Itoa(int(port)))
+	mappedPort, err := container.MappedPort(ctx, natPort)
 	s.Require().NoError(err)
 
 	hostIP, err := container.Host(ctx)
