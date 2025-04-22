@@ -518,10 +518,10 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 	natPort := nat.Port(fmt.Sprintf("%d/tcp", port))
 
 	req := testcontainers.ContainerRequest{
-		Image:        "ghcr.io/shopify/toxiproxy:2.5.0",
-		ExposedPorts: []string{fmt.Sprintf("%d/tcp", port)},
-		WaitingFor:   wait.ForHTTP("/version").WithPort(natPort),
-		NetworkMode:  "host",
+		Image: "ghcr.io/shopify/toxiproxy:2.5.0",
+		//ExposedPorts: []string{fmt.Sprintf("%d/tcp", port)},
+		WaitingFor:  wait.ForHTTP("/version").WithPort(natPort),
+		NetworkMode: "host",
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -535,6 +535,12 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 			s.T().Log("could not terminate toxiproxy container")
 		}
 	})
+
+	inspectResp, err := container.Inspect(ctx)
+	s.Require().NoError(err)
+
+	portMap := inspectResp.NetworkSettings.Ports
+	s.T().Logf("portMap: %#+v\n", portMap)
 
 	mappedPort, err := container.MappedPort(ctx, natPort)
 	s.Require().NoError(err)
