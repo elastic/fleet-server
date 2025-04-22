@@ -119,7 +119,7 @@ spec:
         everyone:
           access_level: READ_ONLY
       schedules:
-        Daily main:
+        Daily 7.17:
           branch: "7.17"
           cronline: "@daily"
           message: Builds daily `7.17` dra
