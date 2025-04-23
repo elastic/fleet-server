@@ -261,6 +261,9 @@ type ActionUnenroll = interface{}
 
 // ActionUpgrade the UPGRADE action data.
 type ActionUpgrade struct {
+	// Rollback Indicates if this version change should be performed as a rollback to a previous version.
+	Rollback *bool `json:"rollback,omitempty"`
+
 	// SourceUri The source of the upgrade artifact.
 	SourceUri *string `json:"source_uri,omitempty"`
 
