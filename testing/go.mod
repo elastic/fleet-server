@@ -10,6 +10,7 @@ replace (
 require (
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/docker/docker v28.1.1+incompatible
+	github.com/docker/go-connections v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
@@ -28,7 +29,6 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/elastic/elastic-agent-libs v0.19.2 // indirect
