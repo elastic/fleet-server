@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	toxiproxy "github.com/Shopify/toxiproxy/client"
+	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -512,10 +514,13 @@ func (s *Scaffold) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 }
 
 func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
+	port := 8474 //randomEphemeralPort()
+	natPort := nat.Port(fmt.Sprintf("%d/tcp", port))
+
 	req := testcontainers.ContainerRequest{
 		Image:        "ghcr.io/shopify/toxiproxy:2.5.0",
-		ExposedPorts: []string{"8474/tcp"},
-		WaitingFor:   wait.ForHTTP("/version").WithPort("8474/tcp"),
+		ExposedPorts: []string{fmt.Sprintf("%d/tcp", port)},
+		WaitingFor:   wait.ForHTTP("/version").WithPort(natPort),
 		NetworkMode:  "host",
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -531,7 +536,13 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 		}
 	})
 
-	mappedPort, err := container.MappedPort(ctx, "8474")
+	inspectResp, err := container.Inspect(ctx)
+	s.Require().NoError(err)
+
+	portMap := inspectResp.NetworkSettings.Ports
+	s.T().Logf("portMap: %#+v\n", portMap)
+
+	mappedPort, err := container.MappedPort(ctx, natPort)
 	s.Require().NoError(err)
 
 	hostIP, err := container.Host(ctx)
@@ -607,4 +618,20 @@ func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides 
 	s.Require().NoError(err)
 	defer resp.Body.Close()
 	s.Require().Equal(http.StatusOK, resp.StatusCode)
+}
+
+// randomEphemeralPort returns a random port number in the 49152-65535 range, as
+// per https://datatracker.ietf.org/doc/html/rfc6335#section-6
+func randomEphemeralPort() uint {
+	return randomUintInRange(49152, 65535)
+}
+
+// randomInRange returns a random integer between min and max, inclusive.
+func randomUintInRange(min, max uint) uint {
+	// swap to ensure min is less than or equal to max
+	if min > max {
+		min, max = max, min
+	}
+
+	return uint(rand.Intn(int(max-min+1))) + min
 }
