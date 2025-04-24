@@ -143,16 +143,17 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	proxyClient, err := suite.StartToxiproxy(ctx)
-	suite.Require().NoError(err)
+	proxyClient := suite.StartToxiproxy(ctx)
 	proxy, err := proxyClient.CreateProxy("es", "localhost:0", suite.ESHosts)
 	suite.Require().NoError(err)
 
 	suite.T().Cleanup(func() {
 		if suite.T().Failed() {
-			suite.T().Logf("Proxies present: %v\n", proxyClient.Proxies())
-			prx, err := proxyClient.Proxy("es")
-			suite.T().Logf("ES proxy: %v, err : %v", prx, err)
+			proxies, err := proxyClient.Proxies()
+			suite.T().Logf("Proxies present: %d, err: %v\n", len(proxies), err)
+			for k, v := range proxies {
+				suite.T().Logf("%s: %v ", k, v)
+			}
 		}
 		if err := proxy.Delete(); err != nil {
 			suite.T().Logf("error deleting proxy: %v", err)
