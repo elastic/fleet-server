@@ -143,8 +143,21 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.ESHosts)
+	proxyClient, err := suite.StartToxiproxy(ctx)
 	suite.Require().NoError(err)
+	proxy, err := proxyClient.CreateProxy("es", "localhost:0", suite.ESHosts)
+	suite.Require().NoError(err)
+
+	suite.T().Cleanup(func() {
+		if suite.T().Failed() {
+			suite.T().Logf("Proxies present: %v\n", proxyClient.Proxies())
+			prx, err := proxyClient.Proxy("es")
+			suite.T().Logf("ES proxy: %v, err : %v", prx, err)
+		}
+		if err := proxy.Delete(); err != nil {
+			suite.T().Logf("error deleting proxy: %v", err)
+		}
+	})
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{
 		Template:    "stand-alone-http.tpl",
