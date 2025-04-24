@@ -513,7 +513,7 @@ func (s *Scaffold) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 
 func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0", testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
-		testcontainers.ContainerRequest{
+		ContainerRequest: testcontainers.ContainerRequest{
 			NetworkMode: "host",
 		},
 	}))
