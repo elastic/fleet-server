@@ -22,10 +22,9 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
-	toxiproxy "github.com/Shopify/toxiproxy/client"
+	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 	"github.com/stretchr/testify/suite"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
+	toxitc "github.com/testcontainers/testcontainers-go/modules/toxiproxy"
 )
 
 // Scaffold contains attributes and methods that are applicable to multiple test cases
@@ -512,16 +511,7 @@ func (s *Scaffold) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 }
 
 func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
-	req := testcontainers.ContainerRequest{
-		Image:        "ghcr.io/shopify/toxiproxy:2.5.0",
-		ExposedPorts: []string{"8474/tcp"},
-		WaitingFor:   wait.ForHTTP("/version").WithPort("8474/tcp"),
-		NetworkMode:  "host",
-	}
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
+	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0")
 	s.Require().NoError(err)
 
 	s.T().Cleanup(func() {
@@ -531,13 +521,8 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 		}
 	})
 
-	mappedPort, err := container.MappedPort(ctx, "8474")
+	endpoint, err := container.URI(ctx)
 	s.Require().NoError(err)
-
-	hostIP, err := container.Host(ctx)
-	s.Require().NoError(err)
-
-	endpoint := fmt.Sprintf("%s:%s", hostIP, mappedPort.Port())
 	return toxiproxy.NewClient(endpoint)
 }
 

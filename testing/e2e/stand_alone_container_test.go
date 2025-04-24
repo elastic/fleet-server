@@ -17,7 +17,7 @@ import (
 
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
 
-	toxiproxy "github.com/Shopify/toxiproxy/client"
+	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
