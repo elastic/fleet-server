@@ -23,7 +23,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
-	toxiproxy "github.com/Shopify/toxiproxy/client"
+	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -518,7 +518,7 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 	natPort := nat.Port(fmt.Sprintf("%d/tcp", port))
 
 	req := testcontainers.ContainerRequest{
-		Image:        "ghcr.io/shopify/toxiproxy:2.5.0",
+		Image:        "ghcr.io/shopify/toxiproxy:2.12.0",
 		ExposedPorts: []string{fmt.Sprintf("%d/tcp", port)},
 		WaitingFor:   wait.ForHTTP("/version").WithPort(natPort),
 		NetworkMode:  "host",
