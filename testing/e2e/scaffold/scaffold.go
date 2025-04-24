@@ -514,7 +514,7 @@ func (s *Scaffold) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 }
 
 func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
-	port := 8474 //randomEphemeralPort()
+	port := randomEphemeralPort()
 	natPort := nat.Port(fmt.Sprintf("%d/tcp", port))
 
 	req := testcontainers.ContainerRequest{
