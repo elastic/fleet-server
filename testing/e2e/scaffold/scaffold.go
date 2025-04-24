@@ -14,7 +14,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -593,20 +592,4 @@ func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides 
 	s.Require().NoError(err)
 	defer resp.Body.Close()
 	s.Require().Equal(http.StatusOK, resp.StatusCode)
-}
-
-// randomEphemeralPort returns a random port number in the 49152-65535 range, as
-// per https://datatracker.ietf.org/doc/html/rfc6335#section-6
-func randomEphemeralPort() uint {
-	return randomUintInRange(49152, 65535)
-}
-
-// randomInRange returns a random integer between min and max, inclusive.
-func randomUintInRange(min, max uint) uint {
-	// swap to ensure min is less than or equal to max
-	if min > max {
-		min, max = max, min
-	}
-
-	return uint(rand.Intn(int(max-min+1))) + min
 }
