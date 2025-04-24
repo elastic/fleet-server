@@ -24,6 +24,7 @@ import (
 
 	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 	"github.com/stretchr/testify/suite"
+	"github.com/testcontainers/testcontainers-go"
 	toxitc "github.com/testcontainers/testcontainers-go/modules/toxiproxy"
 )
 
@@ -511,7 +512,11 @@ func (s *Scaffold) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 }
 
 func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
-	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0")
+	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0", testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
+		testcontainers.ContainerRequest{
+			NetworkMode: "host",
+		},
+	}))
 	s.Require().NoError(err)
 
 	s.T().Cleanup(func() {
