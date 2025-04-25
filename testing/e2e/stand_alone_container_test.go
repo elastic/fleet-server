@@ -154,7 +154,7 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 		}
 	})
 
-	esHost, esPort, err := proxyContainer.ProxiedEndpoint(9200)
+	esHost, esPort, err := proxyContainer.ProxiedEndpoint(8666) // first port from toxiproxy is 8666
 	suite.Require().NoError(err)
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{
