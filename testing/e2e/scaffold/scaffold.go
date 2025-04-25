@@ -515,8 +515,9 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
 	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0", testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			NetworkMode: "host",
-		},
-	}))
+		}}),
+		testcontainers.WithExposedPorts(toxitc.ControlPort),
+	)
 	s.Require().NoError(err)
 
 	s.T().Cleanup(func() {
