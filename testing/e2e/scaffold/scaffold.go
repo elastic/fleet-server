@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -511,12 +512,23 @@ func (s *Scaffold) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 	}
 }
 
-func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
-	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0", testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			NetworkMode: "host",
-		}}),
-		testcontainers.WithExposedPorts(toxitc.ControlPort),
+type logger struct {
+	*testing.T
+}
+
+func (l *logger) Printf(format string, v ...interface{}) {
+	l.Helper()
+	l.Logf(format, v...)
+}
+
+func (s *Scaffold) StartToxiproxy(ctx context.Context, esUpstream string) *toxiproxy.Client {
+	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0",
+		toxitc.WithProxy("es", esUpstream),
+		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				NetworkMode: "host",
+			}}),
+		testcontainers.WithLogger(&logger{s.T()}),
 	)
 	s.Require().NoError(err)
 

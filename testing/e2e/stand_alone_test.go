@@ -103,7 +103,8 @@ func (suite *StandAloneSuite) TestHTTP() {
 func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
-	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.ESHosts)
+	proxyClient := suite.StartToxiproxy(ctx, suite.ESHosts)
+	proxy, err := proxyClient.Proxy("es")
 	suite.Require().NoError(err)
 
 	// Create a config file from a template in the test temp dir
@@ -150,7 +151,8 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 func (suite *StandAloneSuite) TestWithElasticsearchConnectionFlakyness() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
-	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.ESHosts)
+	proxyClient := suite.StartToxiproxy(ctx, suite.ESHosts)
+	proxy, err := proxyClient.Proxy("es")
 	suite.Require().NoError(err)
 
 	// Create a config file from a template in the test temp dir
@@ -352,7 +354,8 @@ func (suite *StandAloneSuite) TestElasticsearch429OnStartup() {
 func (suite *StandAloneSuite) TestElasticsearchTimeoutOnStartup() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 
-	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.ESHosts)
+	proxyClient := suite.StartToxiproxy(ctx, suite.ESHosts)
+	proxy, err := proxyClient.Proxy("es")
 	suite.Require().NoError(err)
 	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 1.0, toxiproxy.Attributes{})
 	suite.Require().NoError(err)
