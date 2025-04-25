@@ -8,7 +8,6 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"html/template"
 	"io"
 	"os"
@@ -154,14 +153,14 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 		}
 	})
 
-	esHost, esPort, err := proxyContainer.ProxiedEndpoint(8666) // first port from toxiproxy is 8666
+	esProxy, err := proxyContainer.PortEndpoint(ctx, "8666", "http")
 	suite.Require().NoError(err)
-	suite.T().Logf("ES Host %s:%s", esHost, esPort)
+	suite.T().Logf("ES Host proxy: %s", esProxy)
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{
 		Template: "stand-alone-http.tpl",
 		TemplateData: map[string]string{
-			"Hosts":        fmt.Sprintf("http://%s:%s", esHost, esPort),
+			"Hosts":        esProxy,
 			"ServiceToken": suite.ServiceToken,
 		},
 	})
