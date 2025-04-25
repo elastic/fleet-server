@@ -156,6 +156,7 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 
 	esHost, esPort, err := proxyContainer.ProxiedEndpoint(8666) // first port from toxiproxy is 8666
 	suite.Require().NoError(err)
+	suite.T().Logf("ES Host %s:%s", esHost, esPort)
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{
 		Template: "stand-alone-http.tpl",
@@ -173,6 +174,7 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 
 	proxy, err := proxyClient.Proxy("es")
 	suite.Require().NoError(err)
+	suite.T().Logf("Proxy: %+v", proxy)
 
 	// Provoke timeouts and wait for the healthcheck to fail.
 	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 1.0, toxiproxy.Attributes{})
