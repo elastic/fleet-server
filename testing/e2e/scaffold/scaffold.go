@@ -533,13 +533,13 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context, esUpstream string) *toxit
 	s.Require().NoError(err)
 
 	s.T().Cleanup(func() {
-		if suite.T().Failed() {
-			rc, err := suite.container.Logs(context.Background())
+		if s.T().Failed() {
+			rc, err := container.Logs(context.Background())
 			if err != nil {
-				suite.T().Logf("unable to get proxy container logs: %v", err)
+				s.T().Logf("unable to get proxy container logs: %v", err)
 			} else {
 				p, err := io.ReadAll(rc)
-				suite.T().Logf("failed test log read err: %v, proxy container logs:\n%s", err, string(p))
+				s.T().Logf("failed test log read err: %v, proxy container logs:\n%s", err, string(p))
 				rc.Close()
 			}
 		}
