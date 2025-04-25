@@ -8,6 +8,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"io"
 	"os"
@@ -18,12 +19,13 @@ import (
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
 
 	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
-	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 )
+
+const fleetPort = "8220/tcp"
 
 type StandAloneContainerSuite struct {
 	scaffold.Scaffold
@@ -85,12 +87,6 @@ func (suite *StandAloneContainerSuite) startFleetServer(ctx context.Context, opt
 	f.Close()
 	suite.Require().NoError(err)
 
-	networks := []string{"integration_default"}
-	networkMode := container.NetworkMode(options.NetworkMode)
-	if networkMode == "host" {
-		networks = nil
-	}
-
 	v, ok := os.LookupEnv("STANDALONE_E2E_IMAGE")
 	suite.Require().True(ok, "expected STANDALONE_E2E_IMAGE to be defined")
 	suite.dockerImg = v
@@ -99,9 +95,8 @@ func (suite *StandAloneContainerSuite) startFleetServer(ctx context.Context, opt
 	req := testcontainers.ContainerRequest{
 		Hostname:     "fleet-server",
 		Image:        suite.dockerImg,
-		ExposedPorts: []string{"8220/tcp"},
-		Networks:     networks,
-		NetworkMode:  networkMode,
+		ExposedPorts: []string{fleetPort},
+		Networks:     []string{"integration_default"},
 		Mounts: testcontainers.ContainerMounts{
 			testcontainers.ContainerMount{
 				Source: &testcontainers.GenericBindMountSource{configPath},
@@ -131,7 +126,7 @@ func (suite *StandAloneContainerSuite) TestHTTP() {
 		},
 	})
 
-	endpoint, err := suite.container.PortEndpoint(ctx, "8220/tcp", "http")
+	endpoint, err := suite.container.PortEndpoint(ctx, fleetPort, "http")
 	suite.Require().NoError(err)
 
 	suite.FleetServerStatusOK(ctx, endpoint)
@@ -143,7 +138,10 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	proxyClient := suite.StartToxiproxy(ctx, suite.ESHosts)
+	proxyContainer := suite.StartToxiproxy(ctx, "elasticsearch:9200")
+	proxyEndpoint, err := proxyContainer.URI(ctx)
+	suite.Require().NoError(err)
+	proxyClient := toxiproxy.NewClient(proxyEndpoint)
 
 	suite.T().Cleanup(func() {
 		proxies, err := proxyClient.Proxies()
@@ -156,30 +154,35 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 		}
 	})
 
-	proxy, err := proxyClient.Proxy("es")
+	esHost, esPort, err := proxyContainer.ProxiedEndpoint(9200)
 	suite.Require().NoError(err)
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{
-		Template:    "stand-alone-http.tpl",
-		NetworkMode: "host",
+		Template: "stand-alone-http.tpl",
 		TemplateData: map[string]string{
-			"Hosts":        "http://" + proxy.Listen,
+			"Hosts":        fmt.Sprintf("http://%s:%s", esHost, esPort),
 			"ServiceToken": suite.ServiceToken,
 		},
 	})
 
+	endpoint, err := suite.container.PortEndpoint(ctx, fleetPort, "http")
+	suite.Require().NoError(err)
+
 	// Wait to check that it is healthy.
-	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
+	suite.FleetServerStatusIs(ctx, endpoint, client.UnitStateHealthy)
+
+	proxy, err := proxyClient.Proxy("es")
+	suite.Require().NoError(err)
 
 	// Provoke timeouts and wait for the healthcheck to fail.
 	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 1.0, toxiproxy.Attributes{})
 	suite.Require().NoError(err)
-	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateDegraded)
+	suite.FleetServerStatusIs(ctx, endpoint, client.UnitStateDegraded)
 
 	// Recover the network and wait for the healthcheck to be healthy again.
 	err = proxy.RemoveToxic("force_timeout")
 	suite.Require().NoError(err)
-	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
+	suite.FleetServerStatusIs(ctx, endpoint, client.UnitStateHealthy)
 }
 
 func (suite *StandAloneContainerSuite) TestAPMInstrumentation() {
@@ -196,7 +199,7 @@ func (suite *StandAloneContainerSuite) TestAPMInstrumentation() {
 		},
 	})
 
-	endpoint, err := suite.container.PortEndpoint(ctx, "8220/tcp", "http")
+	endpoint, err := suite.container.PortEndpoint(ctx, fleetPort, "http")
 	suite.Require().NoError(err)
 
 	suite.FleetServerStatusOK(ctx, endpoint)

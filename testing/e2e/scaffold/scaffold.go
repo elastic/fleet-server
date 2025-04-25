@@ -23,7 +23,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
-	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	toxitc "github.com/testcontainers/testcontainers-go/modules/toxiproxy"
@@ -521,14 +520,15 @@ func (l *logger) Printf(format string, v ...interface{}) {
 	l.Logf(format, v...)
 }
 
-func (s *Scaffold) StartToxiproxy(ctx context.Context, esUpstream string) *toxiproxy.Client {
+func (s *Scaffold) StartToxiproxy(ctx context.Context, esUpstream string) *toxitc.Container {
 	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0",
-		toxitc.WithProxy("es", esUpstream),
 		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
-				NetworkMode: "host",
+				Networks: []string{"integration_default"},
+				//NetworkMode: "host",
 			}}),
 		testcontainers.WithLogger(&logger{s.T()}),
+		toxitc.WithProxy("es", esUpstream),
 	)
 	s.Require().NoError(err)
 
@@ -539,9 +539,7 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context, esUpstream string) *toxip
 		}
 	})
 
-	endpoint, err := container.URI(ctx)
-	s.Require().NoError(err)
-	return toxiproxy.NewClient(endpoint)
+	return container
 }
 
 // HasTestStatusTrace will search elasticsearch for an APM trace to GET /api/status with labels.testName: name
