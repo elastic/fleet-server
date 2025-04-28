@@ -137,7 +137,7 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	proxyContainer := suite.StartToxiproxy(ctx, "elasticsearch:9200")
+	proxyContainer := suite.StartToxiproxy(ctx)
 	proxyEndpoint, err := proxyContainer.URI(ctx)
 	suite.Require().NoError(err)
 	proxyClient := toxiproxy.NewClient(proxyEndpoint)
@@ -156,7 +156,7 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 	suite.startFleetServer(ctx, standaloneContainerOptions{
 		Template: "stand-alone-http.tpl",
 		TemplateData: map[string]string{
-			"Hosts":        "http://toxi:8666", // Toxiproxy ports start at 8666
+			"Hosts":        "http://toxi:8666", // Toxiproxy ports start at 8666, fleet-server starts in the integration test network and can use the port directly.
 			"ServiceToken": suite.ServiceToken,
 		},
 	})
