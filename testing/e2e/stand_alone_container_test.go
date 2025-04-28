@@ -8,6 +8,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"io"
 	"os"
@@ -153,20 +154,14 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 		}
 	})
 
-	esProxy, err := proxyContainer.PortEndpoint(ctx, "8666", "http")
-	suite.Require().NoError(err)
-	suite.T().Logf("ES Host proxy: %s", esProxy)
-	pHost, pPort, err := proxyContainer.ProxiedEndpoint(8666)
-	suite.T().Logf("Proxied endpoint %s:%s, err :%v", pHost, pPort, err)
 	mPort, err := proxyContainer.MappedPort(ctx, "8666/tcp")
-	suite.T().Logf("Mapped port %v, err: %v", mPort, err)
-	h, err := proxyContainer.Host(ctx)
-	suite.T().Logf("Host: %v, err: %v", h, err)
+	suite.Require().NoError(err)
+	suite.T().Logf("Mapped port %v", mPort)
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{
 		Template: "stand-alone-http.tpl",
 		TemplateData: map[string]string{
-			"Hosts":        esProxy,
+			"Hosts":        fmt.Sprintf("http://toxi:%s", mPort.Port()),
 			"ServiceToken": suite.ServiceToken,
 		},
 	})
