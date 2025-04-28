@@ -524,7 +524,7 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context, esUpstream string) *toxit
 	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0",
 		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
-				HostName: "toxi",
+				Hostname: "toxi",
 				Name:     "toxi",
 				Networks: []string{"integration_default"},
 				//NetworkMode: "host",
