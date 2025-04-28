@@ -8,7 +8,6 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"html/template"
 	"io"
 	"os"
@@ -154,14 +153,10 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 		}
 	})
 
-	mPort, err := proxyContainer.MappedPort(ctx, "8666/tcp")
-	suite.Require().NoError(err)
-	suite.T().Logf("Mapped port %v", mPort)
-
 	suite.startFleetServer(ctx, standaloneContainerOptions{
 		Template: "stand-alone-http.tpl",
 		TemplateData: map[string]string{
-			"Hosts":        fmt.Sprintf("http://toxi:%s", mPort.Port()),
+			"Hosts":        "http://toxi:8666", // Toxiproxy ports start at 8666
 			"ServiceToken": suite.ServiceToken,
 		},
 	})
