@@ -5,7 +5,10 @@
 // Package build contains build inforamtion that can be exposed during runtime.
 package build
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 const ServiceName = "fleet-server"
 
@@ -13,6 +16,10 @@ const ServiceName = "fleet-server"
 type Info struct {
 	Version, Commit string
 	BuildTime       time.Time
+}
+
+func (i Info) FullVersion() string {
+	return fmt.Sprintf("%s [%s built %s] (FIPS-distribution: %v)", i.Version, i.Commit, i.BuildTime, FIPSDistribution)
 }
 
 // Time parses the given string using RFC3339, or returns an empty time.Time.
