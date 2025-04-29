@@ -536,8 +536,10 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxitc.Container {
 	s.Require().NoError(err)
 
 	s.T().Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute) // use context.Background instead of s.T().Context() because this is a cleanup task
+		defer cancel()
 		if s.T().Failed() {
-			rc, err := container.Logs(context.Background())
+			rc, err := container.Logs(ctx)
 			if err != nil {
 				s.T().Logf("unable to get proxy container logs: %v", err)
 			} else {
@@ -546,7 +548,7 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxitc.Container {
 				rc.Close()
 			}
 		}
-		err := container.Terminate(context.Background())
+		err := container.Terminate(ctx)
 		if err != nil {
 			s.T().Log("could not terminate toxiproxy container")
 		}
