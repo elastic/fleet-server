@@ -222,9 +222,6 @@ type ActionMigrate struct {
 	// EnrollmentToken Enrollment token used to enroll agent to a new cluster.
 	EnrollmentToken string `json:"enrollment_token"`
 
-	// PolicyId Type of the action.
-	PolicyId string `json:"policy_id"`
-
 	// Settings An embedded JSON object that holds user-provided settings like TLS.
 	// Defined in fleet-server as a `json.RawMessage`.
 	Settings *json.RawMessage `json:"settings,omitempty"`
