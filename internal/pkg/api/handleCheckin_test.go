@@ -125,13 +125,13 @@ func TestConvertActionData(t *testing.T) {
 		name:   "migrate action - missing required field",
 		aType:  MIGRATE,
 		raw:    json.RawMessage(`{}`),
-		expect: Action_Data{json.RawMessage(`{"enrollment_token":"","policy_id":"","target_uri":""}`)},
+		expect: Action_Data{json.RawMessage(`{"enrollment_token":"","target_uri":""}`)},
 		hasErr: false,
 	}, {
 		name:   "migrate action",
 		aType:  MIGRATE,
-		raw:    json.RawMessage(`{"enrollment_token":"et","policy_id":"pid","target_uri":"turi"}`),
-		expect: Action_Data{json.RawMessage(`{"enrollment_token":"et","policy_id":"pid","target_uri":"turi"}`)},
+		raw:    json.RawMessage(`{"enrollment_token":"et","target_uri":"turi"}`),
+		expect: Action_Data{json.RawMessage(`{"enrollment_token":"et","target_uri":"turi"}`)},
 		hasErr: false,
 	}, {
 		name:   "unknown action type",
@@ -218,7 +218,7 @@ func TestConvertActions(t *testing.T) {
 			AgentId: "agent-id",
 			Id:      "91011",
 			Type:    MIGRATE,
-			Data:    Action_Data{json.RawMessage(`{"enrollment_token":"et","policy_id":"pid","target_uri":"turi"}`)},
+			Data:    Action_Data{json.RawMessage(`{"enrollment_token":"et","target_uri":"turi"}`)},
 		}},
 		token: "",
 	}}
