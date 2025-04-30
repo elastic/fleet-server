@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	toxiproxy "github.com/Shopify/toxiproxy/client"
+	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -103,7 +103,12 @@ func (suite *StandAloneSuite) TestHTTP() {
 func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
-	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.ESHosts)
+	proxyContainer := suite.StartToxiproxy(ctx)
+	proxyEndpoint, err := proxyContainer.URI(ctx)
+	suite.Require().NoError(err)
+	proxyClient := toxiproxy.NewClient(proxyEndpoint)
+
+	pHost, pPort, err := proxyContainer.ProxiedEndpoint(8666) // Toxiproxy port starts at 8666
 	suite.Require().NoError(err)
 
 	// Create a config file from a template in the test temp dir
@@ -113,7 +118,7 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 	f, err := os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]string{
-		"Hosts":        "http://" + proxy.Listen,
+		"Hosts":        fmt.Sprintf("http://%s:%s", pHost, pPort),
 		"ServiceToken": suite.ServiceToken,
 	})
 	f.Close()
@@ -132,6 +137,8 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
 
 	// Provoke timeouts and wait for the healthcheck to fail.
+	proxy, err := proxyClient.Proxy("es")
+	suite.Require().NoError(err)
 	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 1.0, toxiproxy.Attributes{})
 	suite.Require().NoError(err)
 	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateDegraded)
@@ -150,7 +157,12 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 func (suite *StandAloneSuite) TestWithElasticsearchConnectionFlakyness() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
-	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.ESHosts)
+	proxyContainer := suite.StartToxiproxy(ctx)
+	proxyEndpoint, err := proxyContainer.URI(ctx)
+	suite.Require().NoError(err)
+	proxyClient := toxiproxy.NewClient(proxyEndpoint)
+
+	pHost, pPort, err := proxyContainer.ProxiedEndpoint(8666) // Toxiproxy port starts at 8666
 	suite.Require().NoError(err)
 
 	// Create a config file from a template in the test temp dir
@@ -160,7 +172,7 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFlakyness() {
 	f, err := os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]string{
-		"Hosts":        "http://" + proxy.Listen,
+		"Hosts":        fmt.Sprintf("http://%s:%s", pHost, pPort),
 		"ServiceToken": suite.ServiceToken,
 	})
 	f.Close()
@@ -176,6 +188,8 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFlakyness() {
 	suite.Require().NoError(err)
 
 	// Wait to check that it is healthy.
+	proxy, err := proxyClient.Proxy("es")
+	suite.Require().NoError(err)
 	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
 
 	// Provoke timeouts and wait for the healthcheck to fail.
@@ -352,9 +366,16 @@ func (suite *StandAloneSuite) TestElasticsearch429OnStartup() {
 func (suite *StandAloneSuite) TestElasticsearchTimeoutOnStartup() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 
-	proxy, err := suite.StartToxiproxy(ctx).CreateProxy("es", "localhost:0", suite.ESHosts)
+	proxyContainer := suite.StartToxiproxy(ctx)
+	proxyEndpoint, err := proxyContainer.URI(ctx)
+	suite.Require().NoError(err)
+	proxyClient := toxiproxy.NewClient(proxyEndpoint)
+	proxy, err := proxyClient.Proxy("es")
 	suite.Require().NoError(err)
 	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 1.0, toxiproxy.Attributes{})
+	suite.Require().NoError(err)
+
+	pHost, pPort, err := proxyContainer.ProxiedEndpoint(8666) // Toxiproxy port starts at 8666
 	suite.Require().NoError(err)
 
 	// Create a config file from a template in the test temp dir
@@ -364,7 +385,7 @@ func (suite *StandAloneSuite) TestElasticsearchTimeoutOnStartup() {
 	f, err := os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]string{
-		"Hosts":        "http://" + proxy.Listen,
+		"Hosts":        fmt.Sprintf("http://%s:%s", pHost, pPort),
 		"ServiceToken": suite.ServiceToken,
 	})
 	f.Close()
