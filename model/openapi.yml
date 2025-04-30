@@ -608,6 +608,9 @@ components:
         source_uri:
           description: The source of the upgrade artifact.
           type: string
+        rollback:
+          description: Indicates if this version change should be performed as a rollback to a previous version.
+          type: boolean
     actionSettings:
       description: The SETTINGS action data.
       type: object
