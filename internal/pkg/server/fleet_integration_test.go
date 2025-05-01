@@ -505,12 +505,13 @@ func stubAPMServer(t *testing.T, ch chan<- struct{}) http.Handler {
 func TestServerInstrumentation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
+
 	tracerConnected := make(chan struct{}, 1)
 	server := httptest.NewServer(stubAPMServer(t, tracerConnected))
 	defer server.Close()
 
 	// Start test server with instrumentation disabled
-	srv, err := startTestServer(t, t.Context(), policyData, WithAPM(server.URL, false))
+	srv, err := startTestServer(t, ctx, policyData, WithAPM(server.URL, false))
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
