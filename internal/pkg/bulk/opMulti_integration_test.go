@@ -18,7 +18,7 @@ import (
 // benchmarkMultiUpdate runs a series of CRUD operations through elastic.
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
 func benchmarkMultiUpdate(n int, b *testing.B) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(b.Context())
 	defer cn()
 	ctx = testlog.SetLogger(b).WithContext(ctx)
 

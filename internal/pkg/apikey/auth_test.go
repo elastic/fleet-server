@@ -24,7 +24,7 @@ func setup(t *testing.T, statusCode int) (context.Context, *APIKey, *elasticsear
 	token := base64.StdEncoding.EncodeToString([]byte(rawToken))
 	apiKey, err := NewAPIKeyFromToken(token)
 	assert.NoError(t, err)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	mockES, mockTransport := esutil.MockESClient(t)
 	mockTransport.RoundTripFn = func(req *http.Request) (*http.Response, error) { return &http.Response{StatusCode: statusCode}, nil }

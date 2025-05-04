@@ -5,7 +5,6 @@
 package es
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -42,7 +41,7 @@ func TestClientCerts(t *testing.T) {
 		defer server.Close()
 
 		// client does not use client certs
-		client, err := NewClient(context.Background(), &config.Config{
+		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
 					Protocol: "https",
@@ -56,7 +55,7 @@ func TestClientCerts(t *testing.T) {
 		}, false)
 		require.NoError(t, err)
 
-		req, err := http.NewRequestWithContext(context.Background(), "GET", server.URL, nil)
+		req, err := http.NewRequestWithContext(t.Context(), "GET", server.URL, nil)
 		require.NoError(t, err)
 
 		resp, err := client.Perform(req)
@@ -87,7 +86,7 @@ func TestClientCerts(t *testing.T) {
 		cert := certs.GenCert(t, ca)
 
 		// client uses valid, matching certs
-		client, err := NewClient(context.Background(), &config.Config{
+		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
 					Protocol: "https",
@@ -105,7 +104,7 @@ func TestClientCerts(t *testing.T) {
 		}, false)
 		require.NoError(t, err)
 
-		req, err := http.NewRequestWithContext(context.Background(), "GET", server.URL, nil)
+		req, err := http.NewRequestWithContext(t.Context(), "GET", server.URL, nil)
 		require.NoError(t, err)
 
 		resp, err := client.Perform(req)
@@ -137,7 +136,7 @@ func TestClientCerts(t *testing.T) {
 		cert := certs.GenCert(t, certCA)
 
 		// client uses certs that are signed by a different CA
-		client, err := NewClient(context.Background(), &config.Config{
+		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
 					Protocol: "https",
@@ -155,7 +154,7 @@ func TestClientCerts(t *testing.T) {
 		}, false)
 		require.NoError(t, err)
 
-		req, err := http.NewRequestWithContext(context.Background(), "GET", server.URL, nil)
+		req, err := http.NewRequestWithContext(t.Context(), "GET", server.URL, nil)
 		require.NoError(t, err)
 
 		_, err = client.Perform(req) //nolint:bodyclose // no response is expected

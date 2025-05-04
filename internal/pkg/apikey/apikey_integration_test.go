@@ -32,7 +32,7 @@ const testFleetRoles = `
 `
 
 func TestRead_existingKey(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -84,7 +84,7 @@ func TestRead_existingKey(t *testing.T) {
 }
 
 func TestRead_noKey(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -116,7 +116,7 @@ func TestCreateAPIKeyWithMetadata(t *testing.T) {
 
 	for _, tt := range tts {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cn := context.WithCancel(context.Background())
+			ctx, cn := context.WithCancel(t.Context())
 			defer cn()
 			ctx = testlog.SetLogger(t).WithContext(ctx)
 

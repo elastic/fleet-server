@@ -7,7 +7,6 @@ package logger
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -43,7 +42,7 @@ func Test_Logger_Reload(t *testing.T) {
 		logger.cfg = stderrcfg()
 		logger.sync = &nopSync{}
 
-		err := logger.Reload(context.Background(), stderrcfg())
+		err := logger.Reload(t.Context(), stderrcfg())
 		require.NoError(t, err)
 		log.Info().Msg("Hello, World!")
 
@@ -59,7 +58,7 @@ func Test_Logger_Reload(t *testing.T) {
 
 		cfg := stderrcfg()
 		cfg.Logging.Level = "debug"
-		err := logger.Reload(context.Background(), cfg)
+		err := logger.Reload(t.Context(), cfg)
 		require.NoError(t, err)
 		log.Info().Msg("Hello, World!")
 
@@ -75,7 +74,7 @@ func Test_Logger_Reload(t *testing.T) {
 
 		cfg := stderrcfg()
 		cfg.Logging.ToStderr = false
-		err := logger.Reload(context.Background(), cfg)
+		err := logger.Reload(t.Context(), cfg)
 		require.NoError(t, err)
 		log.Info().Msg("Hello, World!")
 
@@ -92,7 +91,7 @@ func Test_Logger_Reload(t *testing.T) {
 		cfg := stderrcfg()
 		cfg.Logging.ToStderr = false
 		cfg.Logging.Level = "warn"
-		err := logger.Reload(context.Background(), cfg)
+		err := logger.Reload(t.Context(), cfg)
 		require.NoError(t, err)
 		log.Info().Msg("Hello, World!")
 
@@ -106,15 +105,15 @@ func Test_Logger_Reload(t *testing.T) {
 		logger.cfg = stderrcfg()
 		logger.sync = &nopSync{}
 
-		zerolog.Ctx(context.Background()).Error().Msg("Hello, World!")
+		zerolog.Ctx(t.Context()).Error().Msg("Hello, World!")
 		assert.NotEmpty(t, b, "expected something to be written")
 		b.Reset()
 
 		cfg := stderrcfg()
 		cfg.Logging.Level = "debug"
-		err := logger.Reload(context.Background(), cfg)
+		err := logger.Reload(t.Context(), cfg)
 		require.NoError(t, err)
-		zerolog.Ctx(context.Background()).Error().Msg("Hello, World!")
+		zerolog.Ctx(t.Context()).Error().Msg("Hello, World!")
 
 		assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel())
 		assert.NotEmpty(t, b, "expected something to be written")

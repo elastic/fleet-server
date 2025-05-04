@@ -7,7 +7,6 @@
 package gc
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -52,7 +51,7 @@ func testCleanupActionsWithSelectSize(t *testing.T, _ int) {
 		err                               error
 	)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetActions)
