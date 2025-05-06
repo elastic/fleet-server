@@ -5067,11 +5067,19 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/sync
+<<<<<<< HEAD
 Version: v0.12.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/golang.org/x/sync@v0.12.0/LICENSE:
+=======
+Version: v0.14.0
+Licence type (autodetected): BSD-3-Clause
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/golang.org/x/sync@v0.14.0/LICENSE:
+>>>>>>> f0317ae (build(deps): bump golang.org/x/sync from 0.13.0 to 0.14.0 (#4884))
 
 Copyright 2009 The Go Authors.
 
