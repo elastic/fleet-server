@@ -1,0 +1,35 @@
+// begin 9.0.1 relnotes
+
+[[release-notes-9.0.1]]
+==  9.0.1
+
+Review important information about the  9.0.1 release.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-9.0.1]]
+=== Bug fixes
+
+
+fleet-server::
+
+* Fix Host Parsing In Elasticsearch Output Diagnostics. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4765[#https://github.com/elastic/fleet-server/pull/4765] 
+* Redact Output In Bootstrap Config Logs. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4775[#https://github.com/elastic/fleet-server/pull/4775] 
+* Mutex Protection For Remote Bulker Config. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4776[#https://github.com/elastic/fleet-server/pull/4776] 
+* Enable Dead Code Elimination. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4784[#https://github.com/elastic/fleet-server/pull/4784] 
+
+// end 9.0.1 relnotes
