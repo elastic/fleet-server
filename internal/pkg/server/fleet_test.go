@@ -5,6 +5,7 @@
 package server
 
 import (
+	"context"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -143,7 +144,7 @@ func Test_initTracer(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := testlog.SetLogger(t).WithContext(t.Context())
+			ctx := testlog.SetLogger(t).WithContext(context.Background())
 			f := Fleet{}
 			t.Setenv("ELASTIC_APM_ACTIVE", tc.apmActiveEnvVariable)
 			tarcer, err := f.initTracer(ctx, tc.cfg)

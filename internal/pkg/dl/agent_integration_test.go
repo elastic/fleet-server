@@ -23,7 +23,7 @@ import (
 )
 
 func TestFindAgent_NewModel(t *testing.T) {
-	ctx, cn := context.WithCancel(t.Context())
+	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 

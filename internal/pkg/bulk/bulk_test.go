@@ -253,7 +253,7 @@ func TestCancelCtx(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancelF := context.WithCancel(t.Context())
+			ctx, cancelF := context.WithCancel(context.Background())
 
 			cancelF()
 			var wg sync.WaitGroup
@@ -273,7 +273,7 @@ func TestCancelCtx(t *testing.T) {
 func TestCancelCtxChildBulker(t *testing.T) {
 	bulker := NewBulker(nil, nil)
 
-	ctx, cancelF := context.WithCancel(t.Context())
+	ctx, cancelF := context.WithCancel(context.Background())
 
 	outputMap := make(map[string]map[string]interface{})
 	outputMap["remote"] = map[string]interface{}{
@@ -306,7 +306,7 @@ func TestCancelCtxChildBulker(t *testing.T) {
 func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 	mock := &mockBulkTransport{}
 
-	ctx, cancelF := context.WithCancel(b.Context())
+	ctx, cancelF := context.WithCancel(context.Background())
 	defer cancelF()
 
 	n := len(samples)

@@ -154,7 +154,7 @@ func CheckActionResultsNamespace(t *testing.T, ctx context.Context, srv *tserver
 
 func Test_Agent_Namespace_test1(t *testing.T) {
 	testNamespace := "test1"
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
