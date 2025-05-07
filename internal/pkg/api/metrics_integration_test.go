@@ -29,7 +29,7 @@ func TestMetricsEndpoints(t *testing.T) {
 			Port:    8080,
 		},
 	}
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 

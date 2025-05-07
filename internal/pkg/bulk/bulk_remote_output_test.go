@@ -91,7 +91,7 @@ func Test_hasChangedAndUpdateRemoteOutputConfig(t *testing.T) {
 }
 
 func Test_CreateAndGetBulkerNew(t *testing.T) {
-	ctx, cn := context.WithCancel(t.Context())
+	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	bulker := NewBulker(nil, nil)
 	outputMap := make(map[string]map[string]interface{})
@@ -107,7 +107,7 @@ func Test_CreateAndGetBulkerNew(t *testing.T) {
 }
 
 func Test_CreateAndGetBulkerExisting(t *testing.T) {
-	ctx, cn := context.WithCancel(t.Context())
+	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	bulker := NewBulker(nil, nil)
 	outputBulker := NewBulker(nil, nil)
@@ -127,7 +127,7 @@ func Test_CreateAndGetBulkerExisting(t *testing.T) {
 }
 
 func Test_CreateAndGetBulkerChanged(t *testing.T) {
-	ctx, cn := context.WithCancel(t.Context())
+	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	bulker := NewBulker(nil, nil)
 	outputBulker := NewBulker(nil, nil)
@@ -154,7 +154,7 @@ func Test_CreateAndGetBulkerChanged(t *testing.T) {
 
 func Benchmark_CreateAndGetBulker(b *testing.B) {
 	b.Skip("Crashes on remote runner")
-	ctx, cancel := context.WithCancel(b.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	log := zerolog.Nop()
 	outputMap := map[string]map[string]any{

@@ -53,7 +53,7 @@ func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index st
 }
 
 func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
-	ctx, cn := context.WithCancel(t.Context())
+	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -86,7 +86,7 @@ func TestSearchEnrollmentAPIKeyByID(t *testing.T) {
 
 func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
 	t.Skip("Flaky test see https://github.com/elastic/fleet-server/issues/1289")
-	ctx, cn := context.WithCancel(t.Context())
+	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -118,7 +118,7 @@ func TestSearchEnrollmentAPIKeyByPolicyID(t *testing.T) {
 }
 
 func TestSearchEnrollmentAPIKeyByPolicyIDWithInactiveIDs(t *testing.T) {
-	ctx, cn := context.WithCancel(t.Context())
+	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 

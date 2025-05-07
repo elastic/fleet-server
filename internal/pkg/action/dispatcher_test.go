@@ -259,7 +259,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 			}
 
 			now := time.Now()
-			ctx, cancel := context.WithCancel(t.Context())
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			go func() {
 				err := d.Run(ctx)
@@ -366,7 +366,7 @@ func Test_offsetStartTime(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := offsetStartTime(t.Context(), tt.start, tt.dur, tt.i, tt.total)
+			r := offsetStartTime(context.Background(), tt.start, tt.dur, tt.i, tt.total)
 			assert.Equal(t, tt.result, r)
 		})
 	}

@@ -48,7 +48,7 @@ func Test_ErrorResp(t *testing.T) {
 			tracer.ResetPayloads()
 
 			tx := tracer.StartTransaction("test", "test")
-			ctx := apm.ContextWithTransaction(t.Context(), tx)
+			ctx := apm.ContextWithTransaction(context.Background(), tx)
 			ctx = logger.WithContext(ctx)
 
 			wr := httptest.NewRecorder()
@@ -78,7 +78,7 @@ func Test_ErrorResp(t *testing.T) {
 
 func Test_ErrorResp_NoTransaction(t *testing.T) {
 	tracer := apmtest.NewRecordingTracer()
-	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	ctx := testlog.SetLogger(t).WithContext(context.Background())
 
 	wr := httptest.NewRecorder()
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost", nil)

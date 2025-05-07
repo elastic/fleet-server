@@ -228,6 +228,7 @@ func Test_UpgradeDetailsMetadata_Downloading(t *testing.T) {
 	}}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataDownloading()
 			if tc.err == nil {
@@ -285,6 +286,7 @@ func Test_UpgradeDetailsMetadata_Failed(t *testing.T) {
 	}}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataFailed()
 			if tc.err == nil {
@@ -340,6 +342,7 @@ func Test_UpgradeDetailsMetadata_Scheduled(t *testing.T) {
 	}}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataScheduled()
 			if tc.err == nil {
@@ -382,6 +385,7 @@ func TestUpgradeDetailsSerialization(t *testing.T) {
 		TargetVersion: "1.2.3",
 	}}
 	for _, d := range details {
+		d := d
 		t.Run(string(d.State), func(t *testing.T) {
 			p, err := json.Marshal(d)
 			require.NoError(t, err)

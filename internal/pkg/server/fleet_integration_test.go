@@ -296,7 +296,7 @@ func (m *MockReporter) UpdateState(state client.UnitState, message string, paylo
 }
 
 func TestServerConfigErrorReload(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// don't use startTestServer as we need failing initial config.
@@ -402,7 +402,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 }
 
 func TestServerUnauthorized(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -503,7 +503,7 @@ func stubAPMServer(t *testing.T, ch chan<- struct{}) http.Handler {
 }
 
 func TestServerInstrumentation(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	tracerConnected := make(chan struct{}, 1)
@@ -592,7 +592,7 @@ func TestServerInstrumentation(t *testing.T) {
 // make a followup checkin request to get the policy action
 // make another followup ack request for the action
 func Test_SmokeTest_Agent_Calls(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -741,7 +741,7 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 		"tags": []
 	    }
 	}`
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -788,7 +788,7 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 		"tags": []
 	    }
 	}`
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -846,7 +846,7 @@ func Test_Agent_Id_No_ReplaceToken(t *testing.T) {
 		"tags": []
 	    }
 	}`
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -890,7 +890,7 @@ func Test_Agent_Id_ReplaceToken_Mismatch(t *testing.T) {
 		"tags": []
 	    }
 	}`
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -945,7 +945,7 @@ func Test_Agent_Id(t *testing.T) {
 		"tags": []
 	    }
 	}`
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -992,7 +992,7 @@ func Test_Agent_Id(t *testing.T) {
 }
 
 func Test_Agent_Auth_errors(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -1117,7 +1117,7 @@ func Test_Agent_Auth_errors(t *testing.T) {
 }
 
 func Test_Agent_request_errors(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -1199,7 +1199,7 @@ func Test_Agent_request_errors(t *testing.T) {
 }
 
 func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -1331,7 +1331,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 }
 
 func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -1445,7 +1445,7 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 
 // Test_SmokeTest_Verify_v85Migrate will ensure that the policy regenerates output keys when the agent doc contains an empty key
 func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -1589,7 +1589,7 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 }
 
 func Test_SmokeTest_AuditUnenroll(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
