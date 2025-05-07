@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/dev-tools
 
-go 1.24.0
+go 1.24.2
 
 tool (
 	github.com/deepmap/oapi-codegen/v2/cmd/oapi-codegen
