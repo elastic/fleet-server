@@ -21,7 +21,7 @@ func TestRunProfiler(t *testing.T) {
 	}
 	ln.Close()
 
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	errCh := make(chan error)

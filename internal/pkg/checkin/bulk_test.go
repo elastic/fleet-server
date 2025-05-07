@@ -199,7 +199,7 @@ func TestBulkSimple(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			ctx := testlog.SetLogger(t).WithContext(t.Context())
+			ctx := testlog.SetLogger(t).WithContext(context.Background())
 			mockBulk := ftesting.NewMockBulk()
 			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
 			bc := NewBulk(mockBulk)

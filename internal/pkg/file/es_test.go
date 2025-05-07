@@ -5,6 +5,7 @@
 package file
 
 import (
+	"context"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -49,7 +50,7 @@ func TestChunkInfoResultsParseCorrectly(t *testing.T) {
 		},
 	}, nil)
 
-	chunks, err := GetChunkInfos(t.Context(), fakeBulk, "", baseID, GetChunkInfoOpt{IncludeSize: true})
+	chunks, err := GetChunkInfos(context.Background(), fakeBulk, "", baseID, GetChunkInfoOpt{IncludeSize: true})
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 2)
 

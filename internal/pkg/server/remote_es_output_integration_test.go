@@ -140,7 +140,7 @@ func Ack(t *testing.T, ctx context.Context, srv *tserver, actionID, agentID, key
 }
 
 func Test_Agent_Remote_ES_Output(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -294,7 +294,7 @@ func verifyRemoteAPIKey(t *testing.T, ctx context.Context, apiKeyID string, inva
 }
 
 func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
@@ -415,7 +415,7 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 }
 
 func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start test server
