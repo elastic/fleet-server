@@ -5,7 +5,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -119,7 +118,7 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 				},
 			}
 
-			content, err := pt.getPGPKey(context.Background(), testlog.SetLogger(t))
+			content, err := pt.getPGPKey(t.Context(), testlog.SetLogger(t))
 			require.ErrorIs(t, err, tc.err)
 			require.Equal(t, tc.content, content)
 			mockCache.AssertExpectations(t)

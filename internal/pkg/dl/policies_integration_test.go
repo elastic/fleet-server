@@ -56,7 +56,7 @@ func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string) (mod
 }
 
 func TestQueryLatestPolicies(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -87,7 +87,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 }
 
 func TestCreatePolicy(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -107,7 +107,7 @@ func TestCreatePolicy(t *testing.T) {
 }
 
 func TestQueryOutputFromPolicy(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 

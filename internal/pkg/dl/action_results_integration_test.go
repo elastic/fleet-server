@@ -101,7 +101,7 @@ func (acrs ActionsResults) find(ar model.ActionResult) *model.ActionResult {
 }
 
 func TestActionsResultsStored(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 

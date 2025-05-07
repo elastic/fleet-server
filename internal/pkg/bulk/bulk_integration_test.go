@@ -22,7 +22,7 @@ import (
 )
 
 func TestBulkCreate(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy, WithFlushThresholdCount(1))
@@ -124,7 +124,7 @@ func TestBulkCreate(t *testing.T) {
 }
 
 func TestBulkCreateBody(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy, WithFlushThresholdCount(1))
@@ -177,7 +177,7 @@ func TestBulkCreateBody(t *testing.T) {
 }
 
 func TestBulkIndex(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -201,7 +201,7 @@ func TestBulkIndex(t *testing.T) {
 }
 
 func TestBulkUpdate(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -240,7 +240,7 @@ func TestBulkUpdate(t *testing.T) {
 }
 
 func TestBulkSearch(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -283,7 +283,7 @@ func TestBulkSearch(t *testing.T) {
 }
 
 func TestBulkSearchWithIgnoreUnavailable(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -306,7 +306,7 @@ func TestBulkSearchWithIgnoreUnavailable(t *testing.T) {
 }
 
 func TestBulkDelete(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -344,7 +344,7 @@ func TestBulkDelete(t *testing.T) {
 func benchmarkCreate(n int, b *testing.B) {
 	b.ReportAllocs()
 
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(b.Context())
 	defer cn()
 	ctx = testlog.SetLogger(b).WithContext(ctx)
 
@@ -396,7 +396,7 @@ func BenchmarkCreate(b *testing.B) {
 // Not a particularly useful benchmark, but gives some idea of memory overhead.
 
 func benchmarkCRUD(n int, b *testing.B) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(b.Context())
 	defer cn()
 	ctx = testlog.SetLogger(b).WithContext(ctx)
 

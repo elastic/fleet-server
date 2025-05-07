@@ -29,7 +29,7 @@ import (
 )
 
 func TestSimpleMonitorEmptyIndex(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -39,7 +39,7 @@ func TestSimpleMonitorEmptyIndex(t *testing.T) {
 }
 
 func TestSimpleMonitorNonEmptyIndex(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -49,7 +49,7 @@ func TestSimpleMonitorNonEmptyIndex(t *testing.T) {
 }
 
 func TestSimpleMonitorWithDebounce(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -109,7 +109,7 @@ func TestSimpleMonitorWithDebounce(t *testing.T) {
 }
 
 func TestSimpleMonitorCheckpointOutOfSync(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 

@@ -72,7 +72,7 @@ func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIK
 }
 
 func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -164,7 +164,7 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 }
 
 func TestMigrateOutputs_dontMigrateTwice(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -193,7 +193,7 @@ func TestMigrateOutputs_dontMigrateTwice(t *testing.T) {
 }
 
 func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -294,7 +294,7 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 }
 
 func TestMigrateOutputs_no_agent_document(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
+	ctx, cn := context.WithCancel(t.Context())
 	defer cn()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 

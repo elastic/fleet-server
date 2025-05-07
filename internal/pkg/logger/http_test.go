@@ -30,7 +30,7 @@ func TestMiddleware(t *testing.T) {
 
 	var b bytes.Buffer
 	logger := zerolog.New(&b).Level(zerolog.InfoLevel)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	srv := httptest.NewUnstartedServer(Middleware(h))
 	srv.Config.BaseContext = func(_ net.Listener) context.Context {
@@ -38,7 +38,7 @@ func TestMiddleware(t *testing.T) {
 	}
 	srv.Start()
 	defer srv.Close()
-	reqCtx, cancel := context.WithCancel(context.Background())
+	reqCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	req, err := http.NewRequestWithContext(reqCtx, "GET", srv.URL, nil)
 	require.NoError(t, err)

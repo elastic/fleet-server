@@ -5,7 +5,6 @@
 package ver
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -88,7 +87,7 @@ func TestCheckCompatibilityInternal(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := testlog.SetLogger(t).WithContext(context.Background())
+			ctx := testlog.SetLogger(t).WithContext(t.Context())
 			err := checkCompatibility(ctx, tc.fleetVersion, tc.esVersion)
 			if tc.err != nil {
 				if err == nil {

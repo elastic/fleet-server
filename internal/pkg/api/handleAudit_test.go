@@ -5,7 +5,6 @@
 package api
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -98,7 +97,7 @@ func Test_Audit_markUnenroll(t *testing.T) {
 	bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	audit := AuditT{bulk: bulker}
 	logger := testlog.SetLogger(t)
-	err := audit.markUnenroll(context.Background(), logger, &AuditUnenrollRequest{Reason: Uninstall, Timestamp: time.Now().UTC()}, agent)
+	err := audit.markUnenroll(t.Context(), logger, &AuditUnenrollRequest{Reason: Uninstall, Timestamp: time.Now().UTC()}, agent)
 	require.NoError(t, err)
 	bulker.AssertExpectations(t)
 }
