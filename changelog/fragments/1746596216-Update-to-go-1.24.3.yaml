@@ -11,7 +11,7 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: Update go to v1.24.2
+summary: Update go to v1.24.3
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
@@ -19,7 +19,7 @@ summary: Update go to v1.24.2
 #description:
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component:
+component: fleet-server
 
 # PR URL; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
