@@ -2,7 +2,12 @@
 run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   timeout: 1m
+<<<<<<< HEAD
   build-tags: integration
+=======
+  build-tags:
+    - integration
+>>>>>>> c1873d5 ([Automation] Bump Golang version to 1.24.3 (#4904))
   go: "1.24.3"
 
 issues:
