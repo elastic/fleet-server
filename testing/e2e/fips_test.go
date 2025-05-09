@@ -61,6 +61,7 @@ func (suite *FIPSStandAlone) TestVerifyArtifact() {
 		case "-tags":
 			foundTags = true
 			suite.Require().Contains(setting.Value, "requirefips")
+			suite.Require().Contains(setting.Value, "ms_tls13kdf")
 			continue
 		case "GOEXPERIMENT":
 			foundExperiment = true

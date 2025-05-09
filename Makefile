@@ -102,7 +102,7 @@ ifeq "${FIPS}" "true"
 BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
 DOCKER_IMAGE:=docker.elastic.co/fleet-server/fleet-server-fips
 STANDALONE_DOCKERFILE=Dockerfile.fips
-gobuildtags += requirefips
+gobuildtags += requirefips ms_tls13kdf
 GOFIPSEXPERIMENT=GOEXPERIMENT=systemcrypto CGO_ENABLED=1
 FIPSSUFFIX=-fips
 endif
