@@ -487,6 +487,7 @@ components:
             - $ref: "#/components/schemas/actionCancel"
             - $ref: "#/components/schemas/actionRequestDiagnostics"
             - $ref: "#/components/schemas/actionInputAction"
+            - $ref: "#/components/schemas/actionMigrate"
         id:
           description: The action ID.
           type: string
@@ -511,6 +512,7 @@ components:
             - "INPUT_ACTION"
             - "CANCEL"
             - "REQUEST_DIAGNOSTICS"
+            - "MIGRATE"
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
@@ -630,6 +632,26 @@ components:
     actionInputAction:
       description: The INPUT_ACTION action data.
       type: object # FIXME: needs security team to define fields as the action is passed from the agent to their componenets.
+    actionMigrate:
+      description: The MIGRATE action data.
+      type: object
+      properties:
+        target_uri:
+          type: string
+          description: URI of Fleet Server in a target cluster.
+        enrollment_token:
+          type: string
+          description: Enrollment token used to enroll agent to a new cluster.
+        settings:
+          type: string
+          description: |
+            An embedded JSON object that holds user-provided settings like TLS.
+            Defined in fleet-server as a `json.RawMessage`.
+          format: application/json
+          x-go-type: json.RawMessage
+      required:
+       - enrollment_token
+       - target_uri
     checkinResponse:
       type: object
       required:
