@@ -45,6 +45,16 @@ steps:
           cpu: "8"
           memory: "4G"
 
+      - label: ":building_construction: Run local FIPS build"
+        key: make-local-fips
+        command: ".buildkite/scripts/local_build.sh"
+        agents:
+          image: "${GO_AGENT_IMAGE}"
+          cpu: "8"
+          memory: "4G"
+        env:
+          FIPS: "true"
+
       - label: ":building_construction: Run local build: MacOS"
         key: make-local-macos
         command: ".buildkite/scripts/local_build.sh"
@@ -119,6 +129,17 @@ steps:
         env:
           FIPS: "true"
           GODEBUG: "fips140=only"
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - build/*.xml
+          - build/coverage*.out
+
+      - label: ":smartbear-testexecute: Run FIPS provider unit tests"
+        key: unit-test-fips-provider
+        command: ".buildkite/scripts/fips_provider_test.sh"
+        env:
+          FIPS: "true"
         agents:
           provider: "gcp"
         artifact_paths:
