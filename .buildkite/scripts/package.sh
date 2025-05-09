@@ -45,5 +45,4 @@ case "${TYPE}" in
     ;;
 esac
 
-google_cloud_auth
 upload_mbp_packages_to_gcp_bucket "build/distributions/**/*" "${TYPE}"
