@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
@@ -56,9 +56,7 @@ func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string) (mod
 }
 
 func TestQueryLatestPolicies(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
@@ -87,9 +85,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 }
 
 func TestCreatePolicy(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
@@ -107,9 +103,7 @@ func TestCreatePolicy(t *testing.T) {
 }
 
 func TestQueryOutputFromPolicy(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 

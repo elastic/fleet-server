@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/rs/xid"
 	"github.com/stretchr/testify/mock"
 

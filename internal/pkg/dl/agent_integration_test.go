@@ -7,12 +7,11 @@
 package dl
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,9 +22,7 @@ import (
 )
 
 func TestFindAgent_NewModel(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
 
