@@ -11,4 +11,6 @@ else
     with_go
 fi
 
-make local
+with_mage
+
+mage build:local
