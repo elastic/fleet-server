@@ -6,6 +6,7 @@ WORKDIR /usr/src/fleet-server
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
+RUN go install github.com/magefile/mage@latest
 
 COPY . .
 
@@ -14,7 +15,7 @@ ARG LDFLAGS=""
 ARG DEV=""
 ARG TARGETPLATFORM
 
-RUN GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" DEV="${DEV}" make release-${TARGETPLATFORM}
+RUN GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" DEV="${DEV}" PLATFORMS="${TARGETPLATFORM}" mage build:release
 
 FROM cgr.dev/chainguard/wolfi-base:latest
 ARG VERSION

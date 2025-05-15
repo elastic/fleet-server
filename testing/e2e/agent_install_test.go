@@ -75,6 +75,9 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	if arch == "amd64" {
 		arch = "x86_64"
 	}
+	if runtime.GOOS == "darwin" && arch == "arm64" {
+		arch = "aarch64"
+	}
 
 	suite.Setup() // base setup
 	suite.SetupKibana()

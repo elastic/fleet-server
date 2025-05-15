@@ -16,6 +16,12 @@ variable "elastic_agent_docker_image" {
   description = "Elastic agent docker image with tag."
 }
 
+variable "git_commit" {
+  type        = string
+  default     = ""
+  description = "The git commit id"
+}
+
 locals {
   match           = regex("const DefaultVersion = \"(.*)\"", file("${path.module}/../../../version/version.go"))[0]
   stack_version   = format("%s-SNAPSHOT", local.match)
@@ -23,24 +29,6 @@ locals {
 }
 
 resource "random_uuid" "name" {
-}
-
-variable "pull_request" {
-  type=string
-  default=""
-  description="The github pull request number"
-}
-
-variable "buildkite_id" {
-  type=string
-  default=""
-  description="The Buildkite build id associated with this deployment"
-}
-
-variable "creator" {
-  type=string
-  default=""
-  description="The Buildkite user who created the job"
 }
 
 resource "ec_deployment" "deployment" {
@@ -51,12 +39,11 @@ resource "ec_deployment" "deployment" {
 
   tags = {
     "created_with_terraform" = "true"
+    "source_repo"            = "elastic/fleet-server"
+    "provisioner"            = "terraform"
     "docker_image_ea"        = local.docker_image_ea
-    "provisioner" = "terraform"
-    "pull_request" = var.pull_request
-    "buildkite_id" = var.buildkite_id
-    "creator" = var.creator
-}
+    "git_commit"             = var.git_commit
+  }
 
   elasticsearch = {
     hot = {

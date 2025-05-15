@@ -7,16 +7,11 @@ RUN \
   && apt-get install --no-install-recommends -y zip \
   && apt-get clean
 
-WORKDIR /go/src/github.com/elastic/fleet-server
-
-RUN groupadd --gid 1000 fleet-server && \
-    useradd -M --uid 1000 --gid 1000 fleet-server
-
-USER fleet-server
-
+WORKDIR /fleet-server/
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
-
-ENTRYPOINT [ "make" ]
-CMD [ "release" ]
+RUN go install github.com/magefile/mage@latest
+ENV PATH="$PATH:/go/bin"
+ENTRYPOINT [ "mage" ]
+CMD [ "build:release" ]

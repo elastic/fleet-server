@@ -52,9 +52,7 @@ Vagrant.configure("2") do |config|
          echo "alias ll='ls -la'" > /etc/profile.d/ll.sh
          echo 'export PATH=$PATH:/usr/local/go/bin' > /etc/profile.d/go.sh
          echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> /etc/profile.d/go.sh
-         curl -sL -o /tmp/mage.tar.gz https://github.com/magefile/mage/releases/download/v1.13.0/mage_1.13.0_Linux-64bit.tar.gz
-         tar -xf /tmp/mage.tar.gz
-         mv mage /usr/local/bin
+         go install github.com/magefile/mage@latest
       SHELL
       nodeconfig.vm.provision "shell", reboot: true
     end

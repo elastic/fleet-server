@@ -12,4 +12,35 @@ with_Terraform
 
 with_docker_compose
 
-USER=fleetserverci make test-cloude2e
+with_mage
+
+cleanup() {
+  r=$?
+
+  if [ -f dev-tools/cloud/terraform/.terraform.lock.hcl ] ; then
+    echo "--- Cleaning deployment"
+    mage test:cloudE2EDown
+  else
+      echo "Skipped cleaning deployment, no Terraform files"
+  fi
+  exit $r
+}
+
+USER=fleetserverci mage test:cloudE2EDeploy
+FLEET_SERVER_URL=$(terraform output --raw --state=dev-tools/cloud/terraform/terraform.tfstate fleet_url)
+echo "Fleet server: \"${FLEET_SERVER_URL}\""
+
+if [[ "${FLEET_SERVER_URL}" == "" ]]; then
+    message="FLEET_SERVER_URL is empty, cloud e2e tests cannot be executed"
+    if [[ "${CI}" == "true" ]]; then
+        buildkite-agent annotate \
+            "${message}" \
+            --context "ctx-cloude2e-test" \
+            --style "error"
+    fi
+    echo "${message}"
+    exit 0
+fi
+
+echo "--- Trigger cloud E2E test"
+mage test:cloudE2ERun | tee build/test-cloude2e-set
