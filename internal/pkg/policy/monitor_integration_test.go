@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -34,7 +34,7 @@ var intPolData = model.PolicyData{
 }
 
 func TestMonitor_Integration(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -130,7 +130,7 @@ func TestMonitor_Integration(t *testing.T) {
 }
 
 func TestMonitor_Debounce_Integration(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -321,7 +321,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 }
 
 func TestMonitor_Revisions(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
@@ -443,7 +443,7 @@ func TestMonitor_Revisions(t *testing.T) {
 }
 
 func TestMonitor_KickDeploy(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 

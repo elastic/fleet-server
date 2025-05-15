@@ -11,7 +11,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 func CreateOutputHealth(ctx context.Context, bulker bulk.Bulk, doc model.OutputHealth) error {
