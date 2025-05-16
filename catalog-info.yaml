@@ -66,6 +66,8 @@ spec:
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
+        observablt-ci:
+          access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: READ_ONLY
 
@@ -116,6 +118,8 @@ spec:
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
+        observablt-ci:
+          access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: READ_ONLY
       schedules:
@@ -155,6 +159,8 @@ spec:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
         cloud-tooling:
+          access_level: MANAGE_BUILD_AND_READ
+        observablt-ci:
           access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: READ_ONLY
@@ -201,6 +207,8 @@ spec:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
         cloud-tooling:
+          access_level: MANAGE_BUILD_AND_READ
+        observablt-ci:
           access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: READ_ONLY
