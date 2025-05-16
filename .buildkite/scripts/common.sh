@@ -107,13 +107,6 @@ with_Terraform() {
     terraform version
 }
 
-google_cloud_auth() {
-    local secretFileLocation=$(mktemp -d -p "${WORKSPACE}" -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
-    echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
-    gcloud auth activate-service-account --key-file ${secretFileLocation} 2> /dev/null
-    export GOOGLE_APPLICATION_CREDENTIALS=${secretFileLocation}
-}
-
 upload_packages_to_gcp_bucket() {
     local pattern=${1}
     local baseUri="gs://${JOB_GCS_BUCKET}/${REPO}"
@@ -124,7 +117,7 @@ upload_packages_to_gcp_bucket() {
         bucketUriDefault="${baseUri}/pull-requests/pr-${GITHUB_PR_NUMBER}"
     fi
     for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
-        gsutil -m -q cp -r ${pattern} "${bucketUri}"
+        gcloud storage cp --recursive --quiet ${pattern} "${bucketUri}"
     done
 }
 
@@ -143,7 +136,7 @@ upload_mbp_packages_to_gcp_bucket() {
     local pattern=${1}
     local type=${2}
     get_bucket_uri "${type}"
-    gsutil -m -q cp -r ${pattern} ${bucketUri}
+    gcloud storage cp --recursive --quiet ${pattern} ${bucketUri}
 }
 
 download_mbp_packages_from_gcp_bucket() {
@@ -151,7 +144,7 @@ download_mbp_packages_from_gcp_bucket() {
     local type=${2}
     mkdir -p ${WORKSPACE}/${pattern}
     get_bucket_uri "${type}"
-    gsutil -m -q cp -r ${bucketUri}/* ${WORKSPACE}/${pattern}
+    gcloud storage cp --recursive --quiet ${bucketUri}/* ${WORKSPACE}/${pattern}
 }
 
 with_mage() {
