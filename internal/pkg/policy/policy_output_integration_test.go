@@ -254,7 +254,7 @@ func TestPolicyOutputESPrepareRemoteES(t *testing.T) {
 }
 
 func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
-	ctx := testlog.SetLogger(t).WithContext(context.Background())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
 	// simulate a previous remote output, that is removed from outputMap

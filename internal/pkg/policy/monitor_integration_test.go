@@ -74,7 +74,7 @@ func TestMonitor_Integration(t *testing.T) {
 			merr = nil
 		}
 	}()
-	err = m.(*monitorT).waitStart(ctx)
+	err = pm.waitStart(ctx)
 	require.NoError(t, err)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
@@ -170,7 +170,7 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 			merr = nil
 		}
 	}()
-	err = m.(*monitorT).waitStart(ctx)
+	err = pm.waitStart(ctx)
 	require.NoError(t, err)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
@@ -361,7 +361,7 @@ func TestMonitor_Revisions(t *testing.T) {
 			merr = nil
 		}
 	}()
-	err = m.(*monitorT).waitStart(ctx)
+	err = pm.waitStart(ctx)
 	require.NoError(t, err)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
@@ -483,7 +483,7 @@ func TestMonitor_KickDeploy(t *testing.T) {
 			merr = nil
 		}
 	}()
-	err = m.(*monitorT).waitStart(ctx)
+	err = pm.waitStart(ctx)
 	require.NoError(t, err)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
