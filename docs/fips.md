@@ -13,7 +13,7 @@ This toolchain must be present for local compilation.
 
 As we are using Microsfot/go as a base we follow their conventions.
 
-The buildtag `requirefips` is passed when FIPS is enabled/required.
+The buildtags `requirefips`, and `ms_tls13kdf` are passed when FIPS is enabled/required.
 Additionally when compiling `GOEXPERIMENT=systemcrypto` is specified.
 
 The `FIPS=true` env var is used by our Makefile as the indicator that controls FIPS.
@@ -23,8 +23,8 @@ The following make commands have different behaviour when FIPS is enabled:
 - `make multipass` - Provision a multipass VM with the Microsoft/go toolchain. See [Multipass VM Usage](#multipass-vm-usage) for additional details.
 - `make local` - Compile a fleet-server targetting the machine's GOOS/GOARCH with FIPS enabled
 - `make cover-*` - Compile a coverage and fips enabled fleet-server for e2e tests
-- `make test-unit` - Run unit tests passing the `requirefips` build tag.
-- `make benchmark` - Run benchmarks passing the `requirefips` build tag.
+- `make test-unit` - Run unit tests passing the `requirefips`, and `ms_tls13kdf` build tags.
+- `make benchmark` - Run benchmarks passing the `requirefips`, and  `ms_tls13kdf` build tags.
 - `make release-*` - Compile a release binary with FIPS enabled. Will have the name fleet-server-$VERSION-$OS-$ARCH-fips
 - `make package-target` - Will package a FIPS enabled release and produce the sha512 checksum for it.
 - `make build-releaser` - Will create the fleet-server builder image based on Microsoft's FIPS enabled golang image.
