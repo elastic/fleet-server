@@ -87,9 +87,25 @@ linters-settings:
     # minimal occurrences count to trigger, 3 by default
     min-occurrences: 2
 
+<<<<<<< HEAD
   dupl:
     # tokens count to trigger issue, 150 by default
     threshold: 100
+=======
+    gomoddirectives:
+      # Allow local `replace` directives. Default is false.
+      replace-local: false
+    gomodguard:
+      blocked:
+        # List of blocked modules.
+        modules:
+          - github.com/bytedance/sonic:
+              reason: "Federal restriction on bytedance"
+          - github.com/elastic/beats/v7:
+              reason: "There must be no Beats dependency, use elastic-agent-libs instead."
+          - github.com/elastic/beats/elastic-agent:
+              reason: "There must be no elastic-agent dependency, use elastic-agent-libs instead."
+>>>>>>> fc7115f (build(deps): bump github.com/getkin/kin-openapi from 0.118.0 to 0.131.0 in /dev-tools (#4920))
 
   forbidigo:
     # Forbid the following identifiers
