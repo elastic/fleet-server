@@ -89,12 +89,28 @@ linters-settings:
     # tokens count to trigger issue, 150 by default
     threshold: 100
 
+<<<<<<< HEAD
   forbidigo:
     # Forbid the following identifiers
     forbid:
       - fmt.Print.* # too much log noise
     # Exclude godoc examples from forbidigo checks.  Default is true.
     exclude_godoc_examples: true
+=======
+    gomoddirectives:
+      # Allow local `replace` directives. Default is false.
+      replace-local: false
+    gomodguard:
+      blocked:
+        # List of blocked modules.
+        modules:
+          - github.com/bytedance/sonic:
+              reason: "Federal restriction on bytedance"
+          - github.com/elastic/beats/v7:
+              reason: "There must be no Beats dependency, use elastic-agent-libs instead."
+          - github.com/elastic/beats/elastic-agent:
+              reason: "There must be no elastic-agent dependency, use elastic-agent-libs instead."
+>>>>>>> fc7115f (build(deps): bump github.com/getkin/kin-openapi from 0.118.0 to 0.131.0 in /dev-tools (#4920))
 
   gomoddirectives:
     # Allow local `replace` directives. Default is false.
