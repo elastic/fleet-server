@@ -6,6 +6,17 @@ env:
   IMAGE_UBUNTU_X86_64: "family/core-ubuntu-2004"
   IMAGE_UBUNTU_ARM_64: "core-ubuntu-2004-aarch64"
 
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - oidc_plugin: &oidc
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.2.0:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
+
 steps:
   - label: "Package x86_64 snapshot"
     # skip building + packaging snapshot for pre-releases (flagged by a non-empty VERSION_QUALIFIER env var/BK param)
@@ -17,6 +28,8 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+    plugins:
+      - *oidc_plugin
 
   - label: "Package x86_64 staging"
     key: "package-x86-64-staging"
@@ -27,7 +40,39 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+    plugins:
+      - *oidc_plugin
 
+<<<<<<< HEAD
+=======
+  - label: "Package FIPS x86_64 snapshot"
+    if: "build.env('VERSION_QUALIFIER') == null"
+    key: "package-fips-x86-64-snapshot"
+    command: ".buildkite/scripts/package.sh snapshot"
+    env:
+      FIPS: "true"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+      machineType: "c2-standard-16"
+    plugins:
+      - *oidc_plugin
+
+  - label: "Package FIPS x86_64 staging"
+    key: "package-fips-x86-64-staging"
+    command: |
+      source .buildkite/scripts/version_qualifier.sh
+      .buildkite/scripts/package.sh staging
+    env:
+      FIPS: "true"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+      machineType: "c2-standard-16"
+    plugins:
+      - *oidc_plugin
+
+>>>>>>> d4d19b2 (bk: use GCP OIDC (#4895))
   - label: "Package aarch64 snapshot"
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-arm-snapshot"
@@ -36,6 +81,8 @@ steps:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
       instanceType: "t4g.2xlarge"
+    plugins:
+      - *oidc_plugin
 
   - label: "Package aarch64 staging"
     key: "package-arm-staging"
@@ -46,7 +93,39 @@ steps:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
       instanceType: "t4g.2xlarge"
+    plugins:
+      - *oidc_plugin
 
+<<<<<<< HEAD
+=======
+  - label: "Package FIPS aarch64 snapshot"
+    if: "build.env('VERSION_QUALIFIER') == null"
+    key: "package-fips-arm-snapshot"
+    command: ".buildkite/scripts/package.sh snapshot"
+    env:
+      FIPS: "true"
+    agents:
+      provider: "aws"
+      imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+      instanceType: "t4g.2xlarge"
+    plugins:
+      - *oidc_plugin
+
+  - label: "Package FIPS aarch64 staging"
+    key: "package-fips-arm-staging"
+    command: |
+      source .buildkite/scripts/version_qualifier.sh
+      .buildkite/scripts/package.sh staging
+    env:
+      FIPS: "true"
+    agents:
+      provider: "aws"
+      imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+      instanceType: "t4g.2xlarge"
+    plugins:
+      - *oidc_plugin
+
+>>>>>>> d4d19b2 (bk: use GCP OIDC (#4895))
   - label: "DRA snapshot"
     if: "${FILE_EXISTS_IN_REPO} && build.env('VERSION_QUALIFIER') == null"
     key: "dra-snapshot"
@@ -55,6 +134,8 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+    plugins:
+      - *oidc_plugin
     depends_on:
       - step: "package-x86-64-snapshot"
         allow_failure: false
@@ -73,6 +154,8 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+    plugins:
+      - *oidc_plugin
     depends_on:
       - step: "package-x86-64-staging"
         allow_failure: false
