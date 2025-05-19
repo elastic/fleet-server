@@ -94,8 +94,6 @@ linters:
     gomoddirectives:
       # Allow local `replace` directives. Default is false.
       replace-local: false
-      replace-allow-list:
-        - github.com/deepmap/oapi-codegen
     gomodguard:
       blocked:
         # List of blocked modules.
