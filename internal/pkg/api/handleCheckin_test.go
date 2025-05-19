@@ -115,6 +115,24 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{},
 		hasErr: false,
 	}, {
+		name:   "migrate action - nil input fails",
+		aType:  MIGRATE,
+		raw:    nil,
+		expect: Action_Data{},
+		hasErr: true,
+	}, {
+		name:   "migrate action - missing required field",
+		aType:  MIGRATE,
+		raw:    json.RawMessage(`{}`),
+		expect: Action_Data{json.RawMessage(`{"enrollment_token":"","target_uri":""}`)},
+		hasErr: false,
+	}, {
+		name:   "migrate action",
+		aType:  MIGRATE,
+		raw:    json.RawMessage(`{"enrollment_token":"et","target_uri":"turi"}`),
+		expect: Action_Data{json.RawMessage(`{"enrollment_token":"et","target_uri":"turi"}`)},
+		hasErr: false,
+	}, {
 		name:   "unknown action type",
 		aType:  ActionType("UNKNOWN"),
 		expect: Action_Data{},
@@ -178,6 +196,11 @@ func TestConvertActions(t *testing.T) {
 				Data:     json.RawMessage(`{}`),
 				Signed:   &model.Signed{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="},
 			},
+			{
+				ActionID: "91011",
+				Type:     "MIGRATE",
+				Data:     json.RawMessage(`{"enrollment_token":"et","policy_id":"pid","target_uri":"turi"}`),
+			},
 		},
 		resp: []Action{{
 			AgentId: "agent-id",
@@ -190,6 +213,11 @@ func TestConvertActions(t *testing.T) {
 			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YX==", Signature: "U6NOg4ssxpFQ="},
 			Type:    REQUESTDIAGNOSTICS,
 			Data:    Action_Data{json.RawMessage(`{}`)},
+		}, {
+			AgentId: "agent-id",
+			Id:      "91011",
+			Type:    MIGRATE,
+			Data:    Action_Data{json.RawMessage(`{"enrollment_token":"et","target_uri":"turi"}`)},
 		}},
 		token: "",
 	}}
