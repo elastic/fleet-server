@@ -59,16 +59,6 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
   export EC_API_KEY=${EC_API_KEY_SECRET}
 fi
 
-# BK analytics
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "int-test" || "$BUILDKITE_STEP_KEY" == "e2e-test" || "$BUILDKITE_STEP_KEY" == "fips-e2e-test" ]]; then
-    echo "--- Prepare BK test analytics token :vault:"
-    BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_fleet_server_analytics_token)
-    export BUILDKITE_ANALYTICS_TOKEN
-  fi
-fi
-
-
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
     export DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
