@@ -15,12 +15,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-<<<<<<< HEAD
   if [[ "$BUILDKITE_STEP_KEY" == package-x86-64* || "$BUILDKITE_STEP_KEY" == package-arm* || "$BUILDKITE_STEP_KEY" == "dra-snapshot" && "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
-    unset GOOGLE_APPLICATION_CREDENTIALS
-=======
-  if [[ "$BUILDKITE_STEP_KEY" == package-x86-64* || "$BUILDKITE_STEP_KEY" == package-fips-x86-64* || "$BUILDKITE_STEP_KEY" == package-arm* || "$BUILDKITE_STEP_KEY" == package-fips-arm* || "$BUILDKITE_STEP_KEY" == "dra-snapshot" && "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
->>>>>>> d4d19b2 (bk: use GCP OIDC (#4895))
     unset VAULT_ROLE_ID_SECRET
     unset VAULT_ADDR_SECRET
     unset VAULT_SECRET_ID_SECRET
