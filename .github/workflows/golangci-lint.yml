@@ -10,28 +10,45 @@ permissions:
   contents: read
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
   pull-requests: read
+  checks: write
 jobs:
   golangci:
+    strategy:
+      matrix:
+        include:
+          - GOOS: linux
+          #- GOOS: windows
+          #- GOOS: darwin
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Echo details
+        env:
+          GOOS: ${{ matrix.GOOS }}
+        run: echo Go GOOS=$GOOS
 
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
         with:
           go-version-file: .go-version
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+        env:
+          GOOS: ${{ matrix.GOOS }}
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9  # v8.0.0
         with:
           # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
-          version: v1.51.2
+          version: v2.1.0
 
           # Give the job more time to execute.
-          args: --timeout=5m
-
-          # Optional: if set to true then the action will use pre-installed Go.
-          skip-go-installation: true
+          # Regarding `--whole-files`, the linter is supposed to support linting of changed a patch only but,
+          # for some reason, it's very unreliable this way - sometimes it does not report any or some
+          # issues without linting the whole files, so we have to use `--whole-files`
+          # which can lead to some frustration from developers who would like to
+          # fix a single line in an existing codebase and the linter would force them
+          # into fixing all linting issues in the whole file instead.
+          args: --timeout=30m --whole-files
 
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           only-new-issues: true
