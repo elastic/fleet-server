@@ -52,18 +52,6 @@ sources:
         kind: regex
         pattern: go1\.{{ source "minor" }}\.(\d*)$
 
-  gomod:
-    dependson:
-      - latestGoVersion
-    name: Get version in go.mod format
-    kind: shell
-    transformers:
-      - findsubmatch:
-          pattern: '^(\d+.\d+).\d+'
-          captureindex: 1
-    spec:
-      command: echo {{ source "latestGoVersion" }}
-
 conditions:
   dockerTag:
     name: Is docker image golang:{{ source "latestGoVersion" }} published
@@ -101,10 +89,28 @@ targets:
       matchpattern: '\d+.\d+.\d+'
   update-gomod:
     name: "Update go.mod"
-    sourceid: gomod
+    sourceid: latestGoVersion
     scmid: githubConfig
     kind: file
     spec:
-      content: 'go {{ source "gomod" }}'
+      content: 'go {{ source "latestGoVersion" }}'
       file: go.mod
-      matchpattern: 'go \d+.\d+'
+      matchpattern: 'go \d+.\d+.\d+'
+  update-testing-gomod:
+    name: "Update go.mod"
+    sourceid: latestGoVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      content: 'go {{ source "latestGoVersion" }}'
+      file: testing/go.mod
+      matchpattern: 'go \d+.\d+.\d+'
+  update-dev-tools-gomod:
+    name: "Update go.mod"
+    sourceid: latestGoVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      content: 'go {{ source "latestGoVersion" }}'
+      file: dev-tools/go.mod
+      matchpattern: 'go \d+.\d+.\d+'
