@@ -29,7 +29,6 @@ output:
 linters:
   disable-all: true
   enable:
-    - deadcode # finds unused code
     - errcheck # checking for unchecked errors in go programs
     - errorlint # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
     - goconst # finds repeated strings that could be replaced by a constant
@@ -46,23 +45,26 @@ linters:
     - unparam # reports unused function parameters
     - unused # checks Go code for unused constants, variables, functions and types
 
+    - gomodguard
     - govet # Vet examines Go source code and reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
     - ineffassign # detects when assignments to existing variables are not used
-    - structcheck # finds unused struct fields
     - typecheck # Like the front-end of a Go compiler, parses and type-checks Go code
-    - varcheck # Finds unused global variables and constants
     - asciicheck # simple linter to check that your code does not contain non-ASCII identifiers
     - bodyclose # checks whether HTTP response body is closed successfully
     - durationcheck # check for two durations multiplied together
-    - exportloopref # checks for pointers to enclosing loop variables
     - goimports # Goimports does everything that gofmt does. Additionally it checks unused imports
     - gosec # inspects source code for security problems
     - importas # enforces consistent import aliases
     - nilerr # finds the code that returns nil even if it checks that the error is not nil.
     - noctx # noctx finds sending http request without context.Context
     - unconvert # Remove unnecessary type conversions
-    - wastedassign # wastedassign finds wasted assignment statements.
-    - godox # tool for detection of FIXME, TODO and other comment keywords
+    #- wastedassign # wastedassign finds wasted assignment statements. # NOTE disabled due to lack of generics support
+    #- godox # tool for detection of FIXME, TODO and other comment keywords
+    - asasalint
+    - bidichk
+    - gocheckcompilerdirectives
+    - tenv
+
 
 # all available settings of specific linters
 linters-settings:
@@ -99,18 +101,8 @@ linters-settings:
   gomoddirectives:
     # Allow local `replace` directives. Default is false.
     replace-local: false
-
-  gosimple:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.19.5"
-
-  misspell:
-    # Correct spellings using locale preferences for US or UK.
-    # Default is to use a neutral variety of English.
-    # Setting locale to US will correct the British spelling of 'colour' to 'color'.
-    # locale: US
-    # ignore-words:
-    #   - IdP
+    replace-allow-list:
+      - github.com/deepmap/oapi-codegen
 
   nakedret:
     # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
@@ -135,13 +127,8 @@ linters-settings:
     # Enable to require nolint directives to mention the specific linter being suppressed. Default is false.
     require-specific: true
 
-  staticcheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.19.5"
-
   stylecheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.19.5"
+    initialisms: ["ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS", "ECS"]
 
   unparam:
     # Inspect exported functions, default is false. Set to true if no external program/library imports your code.
@@ -150,6 +137,13 @@ linters-settings:
     # with golangci-lint call it on a directory with the changed file.
     check-exported: false
 
-  unused:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.19.5"
+  gomodguard:
+    blocked:
+      # List of blocked modules.
+      modules:
+        - github.com/bytedance/sonic:
+            reason: "Federal restriction on bytedance"
+        - github.com/elastic/beats/v7:
+            reason: "There must be no Beats dependency, use elastic-agent-libs instead."
+        - github.com/elastic/beats/elastic-agent:
+            reason: "There must be no elastic-agent dependency, use elastic-agent-libs instead."
