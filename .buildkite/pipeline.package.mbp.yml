@@ -33,40 +33,7 @@ steps:
 
   - label: "Package x86_64 staging"
     key: "package-x86-64-staging"
-<<<<<<< HEAD
     command: ".buildkite/scripts/package.sh staging"
-=======
-    command: |
-      source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh staging
-    agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_X86_64}"
-      machineType: "c2-standard-16"
-    plugins:
-      - *oidc_plugin
-
-  - label: "Package FIPS x86_64 snapshot"
-    if: "build.env('VERSION_QUALIFIER') == null"
-    key: "package-fips-x86-64-snapshot"
-    command: ".buildkite/scripts/package.sh snapshot"
-    env:
-      FIPS: "true"
-    agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_X86_64}"
-      machineType: "c2-standard-16"
-    plugins:
-      - *oidc_plugin
-
-  - label: "Package FIPS x86_64 staging"
-    key: "package-fips-x86-64-staging"
-    command: |
-      source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh staging
-    env:
-      FIPS: "true"
->>>>>>> d4d19b2 (bk: use GCP OIDC (#4895))
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -87,40 +54,7 @@ steps:
 
   - label: "Package aarch64 staging"
     key: "package-arm-staging"
-<<<<<<< HEAD
     command: ".buildkite/scripts/package.sh staging"
-=======
-    command: |
-      source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh staging
-    agents:
-      provider: "aws"
-      imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
-      instanceType: "t4g.2xlarge"
-    plugins:
-      - *oidc_plugin
-
-  - label: "Package FIPS aarch64 snapshot"
-    if: "build.env('VERSION_QUALIFIER') == null"
-    key: "package-fips-arm-snapshot"
-    command: ".buildkite/scripts/package.sh snapshot"
-    env:
-      FIPS: "true"
-    agents:
-      provider: "aws"
-      imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
-      instanceType: "t4g.2xlarge"
-    plugins:
-      - *oidc_plugin
-
-  - label: "Package FIPS aarch64 staging"
-    key: "package-fips-arm-staging"
-    command: |
-      source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh staging
-    env:
-      FIPS: "true"
->>>>>>> d4d19b2 (bk: use GCP OIDC (#4895))
     agents:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
