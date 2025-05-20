@@ -68,20 +68,6 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
   fi
 fi
 
-<<<<<<< HEAD
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "release-test" ]]; then
-  export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
-  export JOB_GCS_BUCKET
-fi
-
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == package-x86-64* || "$BUILDKITE_STEP_KEY" == package-arm* || "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
-    export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
-    export JOB_GCS_BUCKET
-  fi
-fi
-=======
->>>>>>> d4d19b2 (bk: use GCP OIDC (#4895))
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
@@ -94,13 +80,3 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
     export VAULT_SECRET_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.secret_id')
   fi
 fi
-<<<<<<< HEAD
-
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == package-x86-64* || "$BUILDKITE_STEP_KEY" == package-arm* ]]; then
-    export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
-    export JOB_GCS_BUCKET
-  fi
-fi
-=======
->>>>>>> d4d19b2 (bk: use GCP OIDC (#4895))
