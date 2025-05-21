@@ -986,6 +986,7 @@ func (Docker) CustomAgentImage() error {
 	if err := os.WriteFile(filepath.Join("build", "custom-image"), []byte(dockerImage+":"+tag), 0o644); err != nil {
 		log.Printf("Unable to save reference to custom agent image: %v", err)
 	}
+	log.Printf("Custom docker image: %s:%s\n", dockerImage, tag)
 
 	return nil
 }
@@ -1683,6 +1684,8 @@ func (Test) E2eRun(ctx context.Context) error {
 		"CGO_ENABLED=1",
 	)
 
+	log.Println("Running go test for e2e tests with additional tags:", getTagsString())
+	log.Printf("Env set to: %v", cmdEnv)
 	cmd := exec.Command("go", "test", "-v", "-timeout", "30m", "-tags="+strings.Join([]string{"e2e", getTagsString()}, ","), "-count=1", "-race", "-p", "1", "./...")
 	cmd.Dir = "testing"
 	cmd.Env = cmdEnv

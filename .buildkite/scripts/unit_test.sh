@@ -11,4 +11,4 @@ with_go
 with_mage
 
 echo "Starting the unit tests..."
-mage test:unit test:junitReport
+mage -v test:unit test:junitReport

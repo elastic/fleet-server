@@ -13,4 +13,4 @@ with_docker_compose
 with_mage
 
 echo "Starting the E2E tests..."
-mage test:e2e test:junitReport
+mage -v test:e2e test:junitReport
