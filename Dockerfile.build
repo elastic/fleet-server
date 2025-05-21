@@ -13,5 +13,6 @@ COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 RUN go install github.com/magefile/mage@latest
 ENV PATH="$PATH:/go/bin"
+ENV MAGEFILE_CACHE=/fleet-server/build/.magefile
 ENTRYPOINT [ "mage" ]
 CMD [ "build:release" ]

@@ -613,7 +613,7 @@ func (Build) Binary() {
 		pSplit := strings.Split(platform, "/")
 		deps = append(deps, mg.F(goBuild, pSplit[0], pSplit[1], false))
 	}
-	mg.Deps(deps...)
+	mg.SerialDeps(deps...)
 }
 
 // goBuild runs go build for the passed osArg/archArg.
@@ -674,7 +674,7 @@ func (Build) Cover() {
 		pSplit := strings.Split(platform, "/")
 		deps = append(deps, mg.F(goBuild, pSplit[0], pSplit[1], true))
 	}
-	mg.Deps(deps...)
+	mg.SerialDeps(deps...)
 }
 
 // Release builds and packages release artifacts for the specified platforms.
@@ -698,7 +698,7 @@ func (Build) Release() {
 		}
 		deps = append(deps, mg.F(packageNix, osName, archName))
 	}
-	mg.Deps(deps...)
+	mg.SerialDeps(deps...)
 }
 
 // mkDir is an internal function to be used as a dependency when a directory is needed.
@@ -851,7 +851,7 @@ func (Docker) Builder() error {
 
 // Release builds releases within a docker image produced by docker:builder.
 func (Docker) Release() error {
-	mg.Deps(Docker.Builder)
+	mg.Deps(mg.F(mkDir, filepath.Join("build", ".magefile")), Docker.Builder)
 	return dockerRun("build:release")
 }
 
@@ -881,13 +881,13 @@ func dockerRun(target string) error {
 
 // Binary builds binaries within a docker image produced by docker:builder.
 func (Docker) Binary() error {
-	mg.Deps(Docker.Builder)
+	mg.Deps(mg.F(mkDir, filepath.Join("build", ".magefile")), Docker.Builder)
 	return dockerRun("build:binary")
 }
 
 // Cover builds coverage enabled binaries within a docker image produced by docker:builder.
 func (Docker) Cover() error {
-	mg.Deps(Docker.Builder)
+	mg.Deps(mg.F(mkDir, filepath.Join("build", ".magefile")), Docker.Builder)
 	return dockerRun("build:cover")
 }
 
