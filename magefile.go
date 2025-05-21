@@ -405,7 +405,7 @@ func (Check) Headers() error {
 
 // Notice generates the NOTICE.txt and NOTICE-FIPS.txt files.
 func (Check) Notice() {
-	mg.Deps(mg.F(genNotice, false), mg.F(genNotice, true))
+	mg.SerialDeps(mg.F(genNotice, false), mg.F(genNotice, true))
 }
 
 // genNotice generates the NOTICE.txt or the NOTICE-FIPS.txt file.
@@ -514,7 +514,9 @@ func (Check) NoChanges() error {
 	}
 	log.Println("Running git diff...")
 	out, err := exec.Command("git", "diff").CombinedOutput()
-	fmt.Println(string(out))
+	if len(out) > 0 {
+		fmt.Println(string(out))
+	}
 	if err != nil {
 		return fmt.Errorf("git diff failure: %w", err)
 	}
