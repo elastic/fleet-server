@@ -508,14 +508,14 @@ func getModules(extraTags ...string) ([]string, error) {
 // NoChanges ensures that there are no local changes to the codebase.
 func (Check) NoChanges() error {
 	log.Println("Running go mod tidy...")
-	out, err := exec.Command("go", "mod", "tidy", "-v").CombinedOutput()
-	fmt.Println(string(out))
-	if err != nil {
+	if out, err := exec.Command("go", "mod", "tidy", "-v").CombinedOutput(); err != nil {
+		fmt.Println(string(out))
 		return fmt.Errorf("go mod tidy failure: %w", err)
 	}
 	log.Println("Running git diff...")
-	if out, err := exec.Command("git", "diff").CombinedOutput(); err != nil {
-		fmt.Println(string(out))
+	out, err := exec.Command("git", "diff").CombinedOutput()
+	fmt.Println(string(out))
+	if err != nil {
 		return fmt.Errorf("git diff failure: %w", err)
 	}
 	log.Println("Running git update-index...")
