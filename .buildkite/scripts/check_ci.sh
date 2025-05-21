@@ -10,4 +10,4 @@ with_go
 
 with_mage
 
-mage check:ci
+mage -v check:ci
