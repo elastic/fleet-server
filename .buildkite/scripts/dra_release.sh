@@ -26,8 +26,6 @@ fi
 
 add_bin_path
 
-google_cloud_auth
-
 download_mbp_packages_from_gcp_bucket "${FOLDER_PATH}" "${TYPE}"
 
 with_go
