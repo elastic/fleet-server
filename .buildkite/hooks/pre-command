@@ -6,10 +6,11 @@ source .buildkite/scripts/common.sh
 
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
 EC_KEY_SECRET_PATH="kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-PRIVATE_CI_GCS_CREDENTIALS_PATH="kv/ci-shared/platform-ingest/gcp-platform-ingest-ci-service-account"
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
-JOB_GCS_BUCKET="ingest-buildkite-ci"
+JOB_GCS_BUCKET="fleet-server-ci-internal"
 GITHUB_REPO_TOKEN=$VAULT_GITHUB_TOKEN
+
+export JOB_GCS_BUCKET
 
 # Usage:
 #check_if_file_exist_in_repo "infra" "main"
@@ -67,17 +68,6 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
   fi
 fi
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "release-test" ]]; then
-  export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
-  export JOB_GCS_BUCKET
-fi
-
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == package-x86-64* || "$BUILDKITE_STEP_KEY" == package-arm* || "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
-    export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
-    export JOB_GCS_BUCKET
-  fi
-fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
@@ -88,12 +78,5 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
     export VAULT_ADDR_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.vault_addr')
     export VAULT_ROLE_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.role_id')
     export VAULT_SECRET_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.secret_id')
-  fi
-fi
-
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == package-x86-64* || "$BUILDKITE_STEP_KEY" == package-arm* ]]; then
-    export PRIVATE_CI_GCS_CREDENTIALS_SECRET=$(retry 5 vault kv get -field plaintext -format=json ${PRIVATE_CI_GCS_CREDENTIALS_PATH})
-    export JOB_GCS_BUCKET
   fi
 fi
