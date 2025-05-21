@@ -30,11 +30,8 @@ if [[ "${PROJECT}" == "" ]]; then
     exit 1
 fi
 
-google_cloud_auth
-
 download_mbp_packages_from_gcp_bucket "${FOLDER_PATH}" "${TYPE}"
 export RM_VERSION="${VERSION}"
-
 
 if [[ ${TYPE} == "snapshot" ]]; then
     export SNAPSHOT=true

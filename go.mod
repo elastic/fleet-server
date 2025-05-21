@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/v7
 
-go 1.24.1
+go 1.24.3
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
@@ -8,8 +8,8 @@ require (
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
-	github.com/elastic/elastic-agent-libs v0.19.4
-	github.com/elastic/elastic-agent-system-metrics v0.11.11
+	github.com/elastic/elastic-agent-libs v0.19.5
+	github.com/elastic/elastic-agent-system-metrics v0.11.12
 	github.com/elastic/go-elasticsearch/v8 v8.18.0
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.8.0
@@ -39,7 +39,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.14.0
 	golang.org/x/time v0.11.0
-	google.golang.org/grpc v1.72.0
+	google.golang.org/grpc v1.72.1
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 )

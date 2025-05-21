@@ -35,10 +35,10 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk4MDDLWA0d8iHHOxLA=
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
-github.com/elastic/elastic-agent-libs v0.19.4 h1:ydeIBvNmfvJKwmmRQKAad4R9KcRsmYaPfzw9pGYu5+w=
-github.com/elastic/elastic-agent-libs v0.19.4/go.mod h1:1HNxREH8C27kGrJCtKZh/ot8pV8joH8VREP21+FrH5s=
-github.com/elastic/elastic-agent-system-metrics v0.11.11 h1:Qjh3Zef23PfGlG91AF+9ciNLNQf/8cDJ4CalnLZtV3g=
-github.com/elastic/elastic-agent-system-metrics v0.11.11/go.mod h1:GNqmKfvOt8PwORjbS6GllNdMfkLpOWyTa7P8oQq4E5o=
+github.com/elastic/elastic-agent-libs v0.19.5 h1:br0kvmwowHu4KQpPy5C4DjkFdiGafbp8BV4CeXR4wUs=
+github.com/elastic/elastic-agent-libs v0.19.5/go.mod h1:1HNxREH8C27kGrJCtKZh/ot8pV8joH8VREP21+FrH5s=
+github.com/elastic/elastic-agent-system-metrics v0.11.12 h1:2SnN3arw2MrWV7eWjm+8zLuyQcsCtEyMasi1w9eFHU8=
+github.com/elastic/elastic-agent-system-metrics v0.11.12/go.mod h1:GNqmKfvOt8PwORjbS6GllNdMfkLpOWyTa7P8oQq4E5o=
 github.com/elastic/elastic-transport-go/v8 v8.7.0 h1:OgTneVuXP2uip4BA658Xi6Hfw+PeIOod2rY3GVMGoVE=
 github.com/elastic/elastic-transport-go/v8 v8.7.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
 github.com/elastic/go-elasticsearch/v8 v8.18.0 h1:ANNq1h7DEiPUaALb8+5w3baQzaS08WfHV0DNzp0VG4M=
@@ -294,8 +294,8 @@ golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8T
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a h1:51aaUVRocpvUOSQKM6Q7VuoaktNIaMCLuhZB6DKksq4=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a/go.mod h1:uRxBH1mhmO8PGhU89cMcHaXKZqO+OfakD8QQO0oYwlQ=
-google.golang.org/grpc v1.72.0 h1:S7UkcVa60b5AAQTaO6ZKamFp1zMZSU0fGDK2WZLbBnM=
-google.golang.org/grpc v1.72.0/go.mod h1:wH5Aktxcg25y1I3w7H69nHfXdOG3UiadoBtjh3izSDM=
+google.golang.org/grpc v1.72.1 h1:HR03wO6eyZ7lknl75XlxABNVLLFc2PAb6mHlYh756mA=
+google.golang.org/grpc v1.72.1/go.mod h1:wH5Aktxcg25y1I3w7H69nHfXdOG3UiadoBtjh3izSDM=
 google.golang.org/protobuf v1.36.6 h1:z1NpPI8ku2WgiWnf+t9wTPsn6eP1L7ksHUlkfLvd9xY=
 google.golang.org/protobuf v1.36.6/go.mod h1:jduwjTPXsFjZGTmRluh+L6NjiWu7pchiJ2/5YcXBHnY=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
