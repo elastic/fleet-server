@@ -149,7 +149,8 @@ download_mbp_packages_from_gcp_bucket() {
 
 with_mage() {
     create_workspace
-    go install github.com/magefile/mage@latest
+    MAGE_VERSION="$(grep magefile/mage go.mod | cut -d ' ' -f2)"
+    go install github.com/magefile/mage@${MAGE_VERSION}
     mage -clean
 }
 
