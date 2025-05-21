@@ -425,7 +425,7 @@ func genNotice(fips bool) error {
 	if err != nil {
 		return fmt.Errorf("go mod tidy failure: %w", err)
 	}
-	err = sh.Run("go", "mod", "download", "all")
+	err = sh.Run("go", "mod", "download")
 	if err != nil {
 		return fmt.Errorf("go mod download failure: %w", err)
 	}
