@@ -152,6 +152,8 @@ with_mage() {
     MAGE_VERSION="$(grep magefile/mage go.mod | cut -d ' ' -f2)"
     go install github.com/magefile/mage@${MAGE_VERSION}
     mage -clean
+    mage -version
+    which mage
 }
 
 cleanup() {
