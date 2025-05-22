@@ -648,7 +648,7 @@ func goBuild(osArg, archArg string, cover bool) error {
 	osName := osArg
 	archName := archArg
 	if v, ok := platformRemap[osArg+"/"+archArg]; ok {
-		osName, archName, _ = strings.Cut(platform, "/")
+		osName, archName, _ = strings.Cut(v, "/")
 	}
 	distArr = append(distArr, getVersion(), osName, archName)
 	outFile := filepath.Join("build", "binaries", strings.Join(distArr, "-"), binary)
