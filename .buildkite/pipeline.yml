@@ -111,10 +111,9 @@ steps:
 
       - label: ":smartbear-testexecute: Run fips140=only unit tests"
         key: unit-test-fips140-only
-        command: ".buildkite/scripts/unit_test.sh"
+        command: ".buildkite/scripts/unit_test_fipsonly.sh"
         env:
           FIPS: "true"
-          GODEBUG: "fips140=only"
         agents:
           provider: "gcp"
         artifact_paths:

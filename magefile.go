@@ -167,7 +167,7 @@ var (
 	getCommitID = sync.OnceValue(func() string {
 		id, err := sh.Output("git", "rev-parse", "--short", "HEAD")
 		if err != nil {
-			log.Printf("Cannot retrieve hash: %v.", err)
+			log.Printf("Cannot retrieve hash: %v", err)
 			return ""
 		}
 		return id
@@ -194,7 +194,7 @@ var (
 	getLinterVersion = sync.OnceValue(func() string {
 		p, err := os.ReadFile(filepath.Join(".github", "workflows", "golangci-lint.yml"))
 		if err != nil {
-			log.Printf("Unable to read golangci-lint.yml: %v.", err)
+			log.Printf("Unable to read golangci-lint.yml: %v", err)
 			return ""
 		}
 		obj := struct {
@@ -210,7 +210,7 @@ var (
 			} `yaml:"jobs"`
 		}{}
 		if err := yaml.Unmarshal(p, &obj); err != nil {
-			log.Printf("Unmarshal golangci-lint.yml failure: %v.", err)
+			log.Printf("Unmarshal golangci-lint.yml failure: %v", err)
 			return ""
 		}
 		for _, step := range obj.Jobs.Golangci.Steps {
@@ -490,7 +490,7 @@ func genNotice(fips bool) error {
 	w.Close()
 
 	if err := detectorCmd.Wait(); err != nil {
-		log.Printf("go-licence-dector error: %v stderr: %s.", err, buf.String())
+		log.Printf("go-licence-dector error: %v stderr: %s", err, buf.String())
 		return fmt.Errorf("go-licence-detector failure: %w", err)
 	}
 
@@ -589,7 +589,7 @@ func getLinter() error {
 	cmd := exec.Command("sh", "-s", "--", "-b", filepath.Join(strings.TrimSpace(pathOut), "bin"), getLinterVersion())
 	cmd.Stdin = resp.Body
 	if out, err := cmd.CombinedOutput(); err != nil {
-		log.Printf("Unable to install golangci-lint err: %v output: %s.", err, string(out))
+		log.Printf("Unable to install golangci-lint err: %v output: %s", err, string(out))
 		return fmt.Errorf("golangci-lint installation failure: %w", err)
 	}
 	log.Printf("Linter version %s has been installed to %s.", getLinterVersion(), filepath.Join(strings.TrimSpace(pathOut), "bin"))
@@ -673,7 +673,6 @@ func goBuild(osArg, archArg string, cover bool) error {
 	}
 	args = append(args, ".")
 
-	log.Printf("Use env: %v", env)
 	return sh.RunWithV(env, "go", args...)
 }
 
@@ -718,7 +717,7 @@ func mkDir(dir string) error {
 
 // packageWindows creates a Windows zip distribution for the specified architecture and provides the sha512 sum of the zip.
 func packageWindows(arch string) error {
-	log.Printf("Packaging windows distribution for %s", arch)
+	log.Printf("Packaging windows distribution for %s.", arch)
 
 	distArr := []string{"fleet-server"}
 	if isFIPS() {
@@ -993,7 +992,7 @@ func (Docker) CustomAgentImage() error {
 	if err := os.WriteFile(filepath.Join("build", "custom-image"), []byte(dockerImage+":"+tag), 0o644); err != nil {
 		log.Printf("Unable to save reference to custom agent image: %v", err)
 	}
-	log.Printf("Custom docker image: %s:%s\n", dockerImage, tag)
+	log.Printf("Custom docker image: %s:%s", dockerImage, tag)
 
 	return nil
 }
@@ -1007,6 +1006,18 @@ func (Test) Unit() error {
 	mg.Deps(mg.F(mkDir, "build"))
 	output, err := teeCommand(environMap(), "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-"+runtime.GOOS+".out"), output, 0o644))
+	return err
+}
+
+// UnitFIPSOnly runs unit tests and injects GODEBUG=fips140=only into the environment.
+// This is done because mage may have issues when running with fips140=only set.
+// Produces a unit test output file, and test coverage file in the build directory.
+func (Test) UnitFIPSOnly() error {
+	mg.Deps(mg.F(mkDir, "build"))
+	env := environMap()
+	env["GODEBUG"] = "fips140=only"
+	output, err := teeCommand(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fipsonly-"+runtime.GOOS+".out"), output, 0o644))
 	return err
 }
 
@@ -1052,7 +1063,6 @@ func (Test) IntegrationRun(ctx context.Context) error {
 	env["REMOTE_ELASTICSEARCH_SERVICE_TOKEN"] = esRemoteToken
 	env["REMOTE_ELASTICSEARCH_CA_CRT_BASE64"] = remoteCA
 
-	log.Printf("env: %v", env)
 	output, err := teeCommand(env, "go", "test", "-v", "-tags="+strings.Join([]string{"integration", getTagsString()}, ","), "-count=1", "-race", "-p", "1", "./...")
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-int-"+runtime.GOOS+".out"), output, 0o644))
 	return err
@@ -1361,7 +1371,7 @@ func unzip(sourceFile, destinationDir string) error {
 
 // checkFIPSBinary ensures the binary located at path has fips capable markers set.
 func checkFIPSBinary(path string) error {
-	log.Printf("Verifiying binary in %q for FIPS capable markers", path)
+	log.Printf("Verifiying binary in %q for FIPS capable markers.", path)
 	info, err := buildinfo.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("unable to read buildinfo: %w", err)
@@ -1440,7 +1450,7 @@ func (Test) JunitReport() error {
 
 		err = cmd.Run()
 		if err != nil {
-			log.Printf("junit report stderr: %s", stderr.String())
+			log.Printf("Junit report stderr: %s", stderr.String())
 		}
 		return errors.Join(err, os.WriteFile(name+".xml", output.Bytes(), 0o644))
 	})
@@ -1635,14 +1645,14 @@ func waitForAPMServer(ctx context.Context) error {
 		case <-ticker.C:
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Printf("request error: %v", err)
+				log.Printf("Request error: %v", err)
 				continue
 			}
 			resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
-			log.Printf("waiting for apm-server to return 200, got: %d", resp.StatusCode)
+			log.Printf("Waiting for apm-server to return 200, got: %d.", resp.StatusCode)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
