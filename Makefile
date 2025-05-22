@@ -36,8 +36,16 @@ ifdef VERSION_QUALIFIER
 DEFAULT_VERSION:=${DEFAULT_VERSION}-${VERSION_QUALIFIER}
 endif
 
+<<<<<<< HEAD
 ifeq ($(SNAPSHOT),true)
 VERSION=${DEFAULT_VERSION}-SNAPSHOT
+=======
+# gobuildtags is an intermediate variable that is used to properly assemble GOBUILDTAGS, a comma seperated list of tags to use with go build
+gobuildtags=grpcnotrace
+ifeq ($(SNAPSHOT),true)
+VERSION=${DEFAULT_VERSION}-SNAPSHOT
+gobuildtags += snapshot
+>>>>>>> 6c35557 (fix: add grpcnotrace to go build tags (#4784))
 else
 VERSION=${DEFAULT_VERSION}
 endif
