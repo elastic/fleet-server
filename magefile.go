@@ -481,7 +481,6 @@ func genNotice(fips bool) error {
 	detectorCmd.Stdin = r
 	detectorCmd.Stderr = &buf
 
-	log.Println("Piping modules from go list into license detector...")
 	if err := listCmd.Start(); err != nil {
 		return fmt.Errorf("error starting go list: %w", err)
 	}
@@ -583,7 +582,6 @@ func getLinter() error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("expected 200 status, got %d", resp.StatusCode)
 	}
-	log.Println("Request OK.")
 
 	pathOut, err := sh.Output("go", "env", "GOPATH")
 	if err != nil {
@@ -633,7 +631,6 @@ func (Build) Local() error {
 // VERSION_QUALIFIER may be used to manually specify a version qualifer for the produced binary.
 func (Build) Binary() {
 	mg.Deps(mg.F(mkDir, filepath.Join("build", "binaries")))
-	log.Printf("Building binaries for: %v", getPlatforms())
 	deps := make([]interface{}, 0)
 	for _, platform := range getPlatforms() {
 		osArg, archArg, _ := strings.Cut(platform, "/")
@@ -692,7 +689,6 @@ func goBuild(osArg, archArg string, cover bool) error {
 // VERSION_QUALIFIER may be used to manually specify a version qualifer for the produced binary.
 func (Build) Cover() {
 	mg.Deps(mg.F(mkDir, filepath.Join("build", "cover")))
-	log.Printf("Building coverage enabled binaries for: %v", getPlatforms())
 	deps := make([]interface{}, 0)
 	for _, platform := range getPlatforms() {
 		osArg, archArg, _ := strings.Cut(platform, "/")
@@ -731,8 +727,6 @@ func mkDir(dir string) error {
 
 // packageWindows creates a Windows zip distribution for the specified architecture and provides the sha512 sum of the zip.
 func packageWindows(arch string) error {
-	log.Printf("Packaging windows distribution for %s.", arch)
-
 	distArr := []string{"fleet-server"}
 	if isFIPS() {
 		distArr = append(distArr, "fips")
@@ -802,8 +796,6 @@ func genSha512(fileName string) error {
 
 // packgeNix creates a .tar.gz archive for the specified os/arch and provides a sha512 sum for the distribution.
 func packageNix(osArg, archArg string) error {
-	log.Printf("Packaging .tar.gz for %s/%s.", osArg, archArg)
-
 	distArr := []string{"fleet-server"}
 	if isFIPS() {
 		distArr = append(distArr, "fips")
@@ -1581,7 +1573,6 @@ func (Test) E2e() {
 		"linux/" + runtime.GOARCH,
 	}
 	os.Setenv(envPlatforms, strings.Join(slices.Compact(pList), ","))
-	log.Printf("Platforms set to: %v", getPlatforms())
 	mg.SerialDeps(mg.F(mkDir, "build"), mg.F(mkDir, filepath.Join("build", "e2e-cover")), Build.Cover, Docker.Image, Docker.CustomAgentImage, Test.E2eCerts, Test.E2eUp, Test.E2eRun, Test.E2eDown, Test.ConvertCoverage)
 }
 
@@ -1669,12 +1660,13 @@ func requestAPIKey(ctx context.Context, username, password, url string, body io.
 	}
 
 	obj := struct {
+		ID     string `json:"id"`
 		ApiKey string `json:"api_key"`
 	}{}
 	if err := json.NewDecoder(resp.Body).Decode(&obj); err != nil {
 		return "", fmt.Errorf("unable to decode response: %w", err)
 	}
-	return obj.ApiKey, nil
+	return obj.ID + ":" + obj.ApiKey, nil
 }
 
 // waitForAPMServer waits unit the apm-server is online and healthy.
@@ -1759,8 +1751,6 @@ func (Test) E2eRun(ctx context.Context) error {
 		"CGO_ENABLED=1",
 	)
 
-	log.Println("Running go test for e2e tests with additional tags:", getTagsString())
-	log.Printf("Env set to: %v", cmdEnv)
 	var b bytes.Buffer
 	w := io.MultiWriter(&b, os.Stdout)
 
