@@ -194,6 +194,8 @@ steps:
 
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
+        env:
+          DOCKER_REGISTRY: "docker.elastic.co"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
@@ -210,6 +212,7 @@ steps:
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
     env:
+      DOCKER_REGISTRY: "docker.elastic.co"
       DOCKER_IMAGE: "docker.elastic.co/observability-ci/fleet-server" # needs to rename for rollback
       DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
       DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
