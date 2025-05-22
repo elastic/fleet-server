@@ -12,8 +12,6 @@ with_mage
 
 export TYPE=${1}
 
-echo "Running in: $(pwd)"
-
 if [[ ${TYPE} == "pr" ]]; then
     echo "Starting the go benchmark for the pull request"
     BENCH_BASE=next.out mage test:benchmark

@@ -319,6 +319,16 @@ func envToBool(s string) bool {
 	return b
 }
 
+// environMap returns a map of all os.Environ values.
+func environMap() map[string]string {
+	env := make(map[string]string)
+	for _, s := range os.Environ() {
+		k, v, _ := strings.Cut(s, "=")
+		env[k] = v
+	}
+	return env
+}
+
 // addFIPSEnvVars mutates the passed env map by adding settings needed to produce a FIPS-capable binary.
 func addFIPSEnvVars(env map[string]string) {
 	env["GOEXPERIMENT"] = "systemcrypto"
@@ -593,7 +603,7 @@ func (Check) All() {
 // Local builds a binary for the local environment.
 // The DEV, SNAPSHOT, and FIPS env vars are used to determine what is built.
 func (Build) Local() error {
-	env := make(map[string]string)
+	env := environMap()
 	if isFIPS() {
 		addFIPSEnvVars(env)
 	}
@@ -613,8 +623,8 @@ func (Build) Binary() {
 	log.Printf("Building binaries for: %v", getPlatforms())
 	deps := make([]interface{}, 0)
 	for _, platform := range getPlatforms() {
-		pSplit := strings.Split(platform, "/")
-		deps = append(deps, mg.F(goBuild, pSplit[0], pSplit[1], false))
+		osArg, archArg, _ := strings.Cut(platform, "/")
+		deps = append(deps, mg.F(goBuild, osArg, archArg, false))
 	}
 	mg.SerialDeps(deps...)
 }
@@ -623,10 +633,9 @@ func (Build) Binary() {
 // If cover is true the binary will be build with coverage enabled.
 // The DEV, SNAPSHOT, and FIPS env vars are used to determine what is built.
 func goBuild(osArg, archArg string, cover bool) error {
-	env := map[string]string{
-		"GOOS":   osArg,
-		"GOARCH": archArg,
-	}
+	env := environMap()
+	env["GOOS"] = osArg
+	env["GOARCH"] = archArg
 	distArr := []string{"fleet-server"}
 	if isFIPS() {
 		addFIPSEnvVars(env)
@@ -639,9 +648,7 @@ func goBuild(osArg, archArg string, cover bool) error {
 	osName := osArg
 	archName := archArg
 	if v, ok := platformRemap[osArg+"/"+archArg]; ok {
-		arr := strings.Split(v, "/")
-		osName = arr[0]
-		archName = arr[1]
+		osName, archName, _ = strings.Cut(platform, "/")
 	}
 	distArr = append(distArr, getVersion(), osName, archName)
 	outFile := filepath.Join("build", "binaries", strings.Join(distArr, "-"), binary)
@@ -674,8 +681,8 @@ func (Build) Cover() {
 	log.Printf("Building coverage enabled binaries for: %v", getPlatforms())
 	deps := make([]interface{}, 0)
 	for _, platform := range getPlatforms() {
-		pSplit := strings.Split(platform, "/")
-		deps = append(deps, mg.F(goBuild, pSplit[0], pSplit[1], true))
+		osArg, archArg, _ := strings.Cut(platform, "/")
+		deps = append(deps, mg.F(goBuild, osArg, archArg, true))
 	}
 	mg.SerialDeps(deps...)
 }
@@ -687,13 +694,9 @@ func (Build) Release() {
 	mg.Deps(Build.Binary, mg.F(mkDir, filepath.Join("build", "distributions")))
 	deps := make([]interface{}, 0)
 	for _, platform := range getPlatforms() {
-		pSplit := strings.Split(platform, "/")
-		osName := pSplit[0]
-		archName := pSplit[1]
+		osName, archName, _ := strings.Cut(platform, "/")
 		if v, ok := platformRemap[platform]; ok {
-			arr := strings.Split(v, "/")
-			osName = arr[0]
-			archName = arr[1]
+			osName, archName, _ = strings.Cut(v, "/")
 		}
 		if osName == "windows" { // windows distributions are zip not tar.gz
 			deps = append(deps, mg.F(packageWindows, archName))
@@ -998,7 +1001,7 @@ func (Docker) CustomAgentImage() error {
 // Produces a unit test output file, and test coverage file in the build directory.
 func (Test) Unit() error {
 	mg.Deps(mg.F(mkDir, "build"))
-	output, err := sh.Output("go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
+	output, err := sh.OutputWith(environMap(), "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-"+runtime.GOOS+".out"), []byte(output), 0o644))
 	fmt.Println(output)
 	return err
@@ -1075,8 +1078,8 @@ func readEnvFile(path string) (map[string]string, error) {
 		if strings.HasPrefix(line, "#") { // Skip comments
 			continue
 		}
-		split := strings.Split(line, "=")
-		env[split[0]] = split[1]
+		k, v, _ := strings.Cut(line, "=")
+		env[k] = v
 	}
 	return env, nil
 }
@@ -1142,13 +1145,9 @@ func (Test) Release() error {
 		namePrefix = "fleet-server-fips-" + getVersion()
 	}
 	for _, platform := range pList {
-		split := strings.Split(platform, "/")
-		osName := split[0]
-		archName := split[1]
+		osName, archName, _ := strings.Cut(platform, "/")
 		if v, ok := platformRemap[platform]; ok {
-			arr := strings.Split(v, "/")
-			osName = arr[0]
-			archName = arr[1]
+			osName, archName, _ = strings.Cut(v, "/")
 		}
 		path := filepath.Join("build", "distributions", namePrefix+"-"+osName+"-"+archName+".tar.gz")
 		if osName == "windows" {
@@ -1470,7 +1469,7 @@ func (Test) Benchmark() error {
 	args = append(args, strings.Split(benchmarkArgs, " ")...)
 	args = append(args, "./...")
 
-	output, err := sh.Output("go", args...)
+	output, err := sh.OutputWith(environMap(), "go", args...)
 
 	outFile := "benchmark-" + getCommitID() + ".out"
 	if v, ok := os.LookupEnv(envBenchBase); ok && v != "" {
@@ -1725,7 +1724,7 @@ func (Test) FipsProviderUnit() error {
 	if !isFIPS() {
 		return fmt.Errorf("FIPS must be set to true.")
 	}
-	env := make(map[string]string)
+	env := environMap()
 	addFIPSEnvVars(env)
 	output, err := sh.OutputWith(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-fips-provider-"+runtime.GOOS+".out"), "./...")
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fips-provider-"+runtime.GOOS+".out"), []byte(output), 0o644))
@@ -1790,7 +1789,7 @@ func (Test) CloudE2ERun() error {
 
 	cmd := exec.Command("go", "test", "-v", "-timeout", "30m", "-tags=cloude2e", "-count=1", "-p", "1", "./...")
 	cmd.Dir = "testing"
-	cmd.Env = []string{"FLEET_SERVER_URL=" + url}
+	cmd.Env = append(os.Environ(), "FLEET_SERVER_URL="+url)
 	output, err := cmd.CombinedOutput()
 	fmt.Println(output)
 	return err
