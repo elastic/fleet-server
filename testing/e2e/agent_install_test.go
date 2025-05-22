@@ -99,7 +99,7 @@ func (suite *AgentInstallSuite) SetupSuite() {
 
 	// Unarchive download in temp dir
 	suite.downloadPath = filepath.Join(os.TempDir(), "e2e-agent_install_test")
-	err = os.Mkdir(suite.downloadPath, 0755)
+	err = os.MkdirAll(suite.downloadPath, 0755)
 	suite.Require().NoError(err)
 	switch runtime.GOOS {
 	case "windows":

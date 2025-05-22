@@ -335,6 +335,14 @@ func addFIPSEnvVars(env map[string]string) {
 	env["CGO_ENABLED"] = "1"
 }
 
+// teeCommand runs the specified command, stdout and stederr will be written to stdout and will be collected and returned.
+func teeCommand(env map[string]string, cmd string, args ...string) ([]byte, error) {
+	var b bytes.Buffer
+	w := io.MultiWriter(&b, os.Stdout)
+	_, err := sh.Exec(env, w, w, cmd, args...)
+	return b.Bytes(), err
+}
+
 // ---- TARGETS BELOW ----
 
 // GetVersion displays the fleet-server version with all qualifiers.
@@ -517,27 +525,23 @@ func getModules(extraTags ...string) ([]string, error) {
 
 // NoChanges ensures that there are no local changes to the codebase.
 func (Check) NoChanges() error {
-	log.Println("Running go mod tidy...")
-	if out, err := exec.Command("go", "mod", "tidy", "-v").CombinedOutput(); err != nil {
-		fmt.Println(string(out))
+	if out, err := sh.Output("go", "mod", "tidy", "-v"); err != nil {
+		fmt.Println(out)
 		return fmt.Errorf("go mod tidy failure: %w", err)
 	}
-	log.Println("Running git diff...")
-	out, err := exec.Command("git", "diff").CombinedOutput()
+	out, err := sh.Output("git", "diff")
 	if len(out) > 0 {
-		fmt.Println(string(out))
+		fmt.Println(out)
 	}
 	if err != nil {
 		return fmt.Errorf("git diff failure: %w", err)
 	}
-	log.Println("Running git update-index...")
-	if out, err := exec.Command("git", "update-index", "--refresh").CombinedOutput(); err != nil {
-		fmt.Println(string(out))
+	if out, err := sh.Output("git", "update-index", "--refresh"); err != nil {
+		fmt.Println(out)
 		return fmt.Errorf("git update-index failure: %w", err)
 	}
-	log.Println("Running git diff-index...")
-	if out, err := exec.Command("git", "diff-index", "--exit-code", "HEAD", "--").CombinedOutput(); err != nil {
-		fmt.Println(string(out))
+	if out, err := sh.Output("git", "diff-index", "--exit-code", "HEAD", "--"); err != nil {
+		fmt.Println(out)
 		return fmt.Errorf("git diff-index failure: %w", err)
 	}
 	return nil
@@ -1001,9 +1005,8 @@ func (Docker) CustomAgentImage() error {
 // Produces a unit test output file, and test coverage file in the build directory.
 func (Test) Unit() error {
 	mg.Deps(mg.F(mkDir, "build"))
-	output, err := sh.OutputWith(environMap(), "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-"+runtime.GOOS+".out"), []byte(output), 0o644))
-	fmt.Println(output)
+	output, err := teeCommand(environMap(), "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-"+runtime.GOOS+".out"), output, 0o644))
 	return err
 }
 
@@ -1050,9 +1053,8 @@ func (Test) IntegrationRun(ctx context.Context) error {
 	env["REMOTE_ELASTICSEARCH_CA_CRT_BASE64"] = remoteCA
 
 	log.Printf("env: %v", env)
-	output, err := sh.OutputWith(env, "go", "test", "-v", "-tags="+strings.Join([]string{"integration", getTagsString()}, ","), "-count=1", "-race", "-p", "1", "./...")
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-int-"+runtime.GOOS+".out"), []byte(output), 0o644))
-	fmt.Println(output)
+	output, err := teeCommand(env, "go", "test", "-v", "-tags="+strings.Join([]string{"integration", getTagsString()}, ","), "-count=1", "-race", "-p", "1", "./...")
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-int-"+runtime.GOOS+".out"), output, 0o644))
 	return err
 }
 
@@ -1469,14 +1471,13 @@ func (Test) Benchmark() error {
 	args = append(args, strings.Split(benchmarkArgs, " ")...)
 	args = append(args, "./...")
 
-	output, err := sh.OutputWith(environMap(), "go", args...)
+	output, err := teeCommand(environMap(), "go", args...)
 
 	outFile := "benchmark-" + getCommitID() + ".out"
 	if v, ok := os.LookupEnv(envBenchBase); ok && v != "" {
 		outFile = v
 	}
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", outFile), []byte(output), 0o644))
-	fmt.Println(output)
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", outFile), output, 0o644))
 	return err
 }
 
@@ -1528,6 +1529,8 @@ func (Test) E2eCerts() error {
 
 // E2eUp provisions the e2e test envionment with docker compose.
 func (Test) E2eUp(ctx context.Context) error {
+	os.Setenv(envDev, "true")
+	os.Setenv(envSnapshot, "true")
 	mg.Deps(Test.IntegrationUp)
 	mg.SerialDeps(mg.F(mkDir, "build"), mg.F(mkDir, filepath.Join("build", "e2e-cover")), Build.Cover, Docker.Image, Docker.CustomAgentImage, Test.E2eCerts)
 	env, err := readEnvFile(filepath.Join("dev-tools", "integration", ".env"))
@@ -1650,6 +1653,8 @@ func waitForAPMServer(ctx context.Context) error {
 // Assumes that the test environment has been provisioned with test:e2eUp.
 // Produces a e2e test report file in the build directory, and may provide go coverage doata in build/e2e-cover.
 func (Test) E2eRun(ctx context.Context) error {
+	os.Setenv(envDev, "true")
+	os.Setenv(envSnapshot, "true")
 	env, err := readEnvFile(filepath.Join("dev-tools", "integration", ".env"))
 	if err != nil {
 		return fmt.Errorf("unable to read env file: %w", err)
@@ -1667,6 +1672,9 @@ func (Test) E2eRun(ctx context.Context) error {
 		image += "-fips"
 	}
 	tag := getVersion()
+	if isDEV() { // tags can have an addtional -dev
+		tag += "-dev"
+	}
 	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
 		tag = v
 	}
@@ -1685,12 +1693,16 @@ func (Test) E2eRun(ctx context.Context) error {
 
 	log.Println("Running go test for e2e tests with additional tags:", getTagsString())
 	log.Printf("Env set to: %v", cmdEnv)
+	var b bytes.Buffer
+	w := io.MultiWriter(&b, os.Stdout)
+
 	cmd := exec.Command("go", "test", "-v", "-timeout", "30m", "-tags="+strings.Join([]string{"e2e", getTagsString()}, ","), "-count=1", "-race", "-p", "1", "./...")
 	cmd.Dir = "testing"
 	cmd.Env = cmdEnv
-	out, err := cmd.CombinedOutput()
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-e2e-"+runtime.GOOS+".out"), []byte(out), 0o644))
-	fmt.Println(string(out))
+	cmd.Stdout = w
+	cmd.Stderr = w
+	err = cmd.Run()
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-e2e-"+runtime.GOOS+".out"), b.Bytes(), 0o644))
 	return err
 }
 
@@ -1726,9 +1738,8 @@ func (Test) FipsProviderUnit() error {
 	}
 	env := environMap()
 	addFIPSEnvVars(env)
-	output, err := sh.OutputWith(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-fips-provider-"+runtime.GOOS+".out"), "./...")
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fips-provider-"+runtime.GOOS+".out"), []byte(output), 0o644))
-	fmt.Println(output)
+	output, err := teeCommand(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-fips-provider-"+runtime.GOOS+".out"), "./...")
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fips-provider-"+runtime.GOOS+".out"), output, 0o644))
 	return err
 }
 
@@ -1766,18 +1777,18 @@ func (Test) CloudE2EUp() error {
 	}
 	applyCmd := exec.Command("terraform", "apply", "-auto-approve", "-var=\"git_commit="+getCommitID()+"\"", "-var=\"elastic_agent_docker_image="+string(p)+"\"")
 	applyCmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
-	output, err := applyCmd.CombinedOutput()
-	fmt.Println(output)
-	return err
+	applyCmd.Stdout = os.Stdout
+	applyCmd.Stderr = os.Stderr
+	return applyCmd.Run()
 }
 
 // CloudE2EDown destroys the testing cloud deployment.
 func (Test) CloudE2EDown() error {
 	cmd := exec.Command("terraform", "destroy", "-auto-approve")
 	cmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
-	output, err := cmd.CombinedOutput()
-	fmt.Println(output)
-	return err
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // CloudE2ERun runs tests against the remote cloud deployment.
@@ -1790,7 +1801,7 @@ func (Test) CloudE2ERun() error {
 	cmd := exec.Command("go", "test", "-v", "-timeout", "30m", "-tags=cloude2e", "-count=1", "-p", "1", "./...")
 	cmd.Dir = "testing"
 	cmd.Env = append(os.Environ(), "FLEET_SERVER_URL="+url)
-	output, err := cmd.CombinedOutput()
-	fmt.Println(output)
-	return err
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
