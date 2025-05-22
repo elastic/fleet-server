@@ -29,7 +29,6 @@ go.work.sum
 .service_token*
 .kibana_service_token
 .apm_server_api_key
-.apm_key
 
 # direnv
 .envrc*

@@ -116,35 +116,38 @@ const apmRole = `{
   "name": "apm-server-key",
   "role_descriptors": {
     "apm_writer": {
-      "indices": [{
-        "names": ["apm-*"],
-        "privileges": ["create_index", "create_doc"]
-      }, {
-        "names": [".apm-source-map"],
-        "privileges": ["read"]
-      }, {
-        "names": [".apm-agent-configuration"],
-        "privileges": ["read"],
-        "allow_restricted_indices": true
-      }, {
-        "names": ["traces-apm*", "logs-apm*", "metrics-apm*"],
-        "privileges": ["auto_configure", "create_doc"]
-      }],
-      "cluster": ["monitor"]
+      "cluster": ["monitor"],
+      "index": [
+        {
+          "names": ["traces-apm*","logs-apm*", "metrics-apm*"],
+          "privileges": ["auto_configure", "create_doc"]
+        }
+      ]
     },
-    "apm_monitoring_writer": {
-      "indices": [{
-        "names": [".monitoring-beats-*"],
-        "privileges": ["create_index", "create_doc"]
-      }]
+    "apm_sourcemap": {
+      "index": [
+        {
+          "names": [".apm-source-map"],
+          "privileges": ["read"]
+        }
+      ]
     },
-    "apm_api_key": {
-      "cluster": ["manage_own_api_key"],
-      "applications": [{
-        "application": "apm",
-        "privileges": ["event:write"],
-        "resources": ["*"]
-      }]
+    "apm_agentcfg": {
+      "index": [
+        {
+          "names": [".apm-agent-configuration"],
+          "privileges": ["read"],
+          "allow_restricted_indices": true
+        }
+      ]
+    },
+    "apm_tail_based_sampling": {
+        "index": [
+            {
+                "names": ["traces-apm.sampled"],
+                "privileges": ["read"]
+            }
+        ]
     }
   }
 }`
@@ -320,6 +323,7 @@ func envToBool(s string) bool {
 }
 
 // environMap returns a map of all os.Environ values.
+// this is not done in a sync.OnceValue as other methods, such as addFIPSEnvVars may alter the map.
 func environMap() map[string]string {
 	env := make(map[string]string)
 	for _, s := range os.Environ() {
@@ -356,7 +360,7 @@ func Platforms() {
 }
 
 // Multipass launches a mulitpass instance for development.
-// Set FIPS=true to provision microsoft/go in the VM.
+// FIPS may be used  to provision microsoft/go in the VM.
 func Multipass() error {
 	params := map[string]string{
 		"Arch":        runtime.GOARCH,
@@ -394,7 +398,7 @@ func Multipass() error {
 // Clean removes build artifacts.
 func Clean() error {
 	var err error
-	for _, s := range []string{"bin", "build", ".service_token_kibana", ".service_token_fleet-server", ".service_token_fleet-server-remote", ".apm_key"} {
+	for _, s := range []string{"bin", "build", ".service_token_kibana", ".service_token_fleet-server", ".service_token_fleet-server-remote", ".apm_server_api_key"} {
 		log.Println("Removing:", s)
 		if e := os.RemoveAll(s); e != nil {
 			err = errors.Join(err, fmt.Errorf("error removing %q: %w", s, e))
@@ -553,7 +557,7 @@ func (Check) Ci() {
 }
 
 // Go installs and runs golangci-lint.
-// Use FIPS=true to enable linting for files containing the requirefips tag.
+// FIPS enables linting for files containing the requirefips tag.
 func (Check) Go() error {
 	mg.Deps(getLinter)
 	if isFIPS() {
@@ -597,7 +601,7 @@ func getLinter() error {
 }
 
 // All runs all code checks: check:ci, check:go.
-// Setting FIPS=true will pass the requirefips tag to the linter.
+// FIPS passes the requirefips tag to the linter.
 func (Check) All() {
 	mg.SerialDeps(Check.Ci, Check.Go)
 }
@@ -605,7 +609,9 @@ func (Check) All() {
 // ---- BUILD TARGETS BELOW ----
 
 // Local builds a binary for the local environment.
-// The DEV, SNAPSHOT, and FIPS env vars are used to determine what is built.
+// DEV creates a development build.
+// SNAPSHOT creates a snapshot build.
+// FIPS creates a FIPS capable binary.
 func (Build) Local() error {
 	env := environMap()
 	if isFIPS() {
@@ -620,8 +626,11 @@ func (Build) Local() error {
 }
 
 // Binary builds release binaries for the specified platforms.
-// Use PLATFORMS to specify which target binaries should be built.
-// The DEV, SNAPSHOT, and FIPS env vars are used to determine what is built.
+// PLATFORMS may be used to set os/arch for compiled binaries.
+// DEV creates a development build.
+// SNAPSHOT creates a snapshot build.
+// FIPS creates a FIPS capable binary.
+// VERSION_QUALIFIER may be used to manually specify a version qualifer for the produced binary.
 func (Build) Binary() {
 	mg.Deps(mg.F(mkDir, filepath.Join("build", "binaries")))
 	log.Printf("Building binaries for: %v", getPlatforms())
@@ -635,7 +644,6 @@ func (Build) Binary() {
 
 // goBuild runs go build for the passed osArg/archArg.
 // If cover is true the binary will be build with coverage enabled.
-// The DEV, SNAPSHOT, and FIPS env vars are used to determine what is built.
 func goBuild(osArg, archArg string, cover bool) error {
 	env := environMap()
 	env["GOOS"] = osArg
@@ -677,8 +685,11 @@ func goBuild(osArg, archArg string, cover bool) error {
 }
 
 // Cover builds coverage enabled binaries for all specified platforms.
-// Use PLATFORMS to specify which target binaries should be built.
-// The DEV, SNAPSHOT, and FIPS env vars are used to determine what is built.
+// PLATFORMS may be used to set os/arch for compiled binaries.
+// DEV creates a development build.
+// SNAPSHOT creates a snapshot build.
+// FIPS creates a FIPS capable binary.
+// VERSION_QUALIFIER may be used to manually specify a version qualifer for the produced binary.
 func (Build) Cover() {
 	mg.Deps(mg.F(mkDir, filepath.Join("build", "cover")))
 	log.Printf("Building coverage enabled binaries for: %v", getPlatforms())
@@ -691,8 +702,11 @@ func (Build) Cover() {
 }
 
 // Release builds and packages release artifacts for the specified platforms.
-// Use PLATFORMS to specify which target releases should be built.
-// Use FIPS to enable fips-capable builds.
+// PLATFORMS may be used to set os/arch for artifacts.
+// DEV creates a development artifact.
+// SNAPSHOT creates a snapshot artifact.
+// FIPS creates a FIPS capable artifact.
+// VERSION_QUALIFIER may be used to manually specify a version qualifer for the produced artifact.
 func (Build) Release() {
 	mg.Deps(Build.Binary, mg.F(mkDir, filepath.Join("build", "distributions")))
 	deps := make([]interface{}, 0)
@@ -839,10 +853,10 @@ func packageNix(osArg, archArg string) error {
 
 // ---- DOCKER TARGETS BELOW ----
 
-// Builder creates a docker image that can be used to cross-compile binaries.
-// The FIPS var will result in an image that has the microsoft/go tool available.
+// Builder creates a docker image used to cross-compile binaries.
 // This image is only built locally and should not be pushed to remote registries.
 // Image produced is tagged as: fleet-server-builder:$GO_VERSION
+// FIPS is used to create ina image that has the microsoft/go tool available so FIPS binaries may be compiled.
 func (Docker) Builder() error {
 	suffix := dockerSuffix
 	if runtime.GOARCH == "arm64" {
@@ -859,13 +873,17 @@ func (Docker) Builder() error {
 }
 
 // Release builds releases within a docker image produced by docker:builder.
+// PLATFORMS may be used to set os/arch for artifacts.
+// DEV creates a development artifact.
+// SNAPSHOT creates a snapshot artifact.
+// FIPS creates a FIPS capable artifact.
+// VERSION_QUALIFIER may be used to manually specify a version qualifer for the produced artifact.
 func (Docker) Release() error {
 	mg.Deps(mg.F(mkDir, filepath.Join("build", ".magefile")), Docker.Builder)
 	return dockerRun("build:release")
 }
 
 // dockerRun runs the target on a container produced by docker:builder.
-// All env vars that control build targets will be passed to the container.
 func dockerRun(target string) error {
 	userInfo, err := user.Current()
 	if err != nil {
@@ -889,18 +907,34 @@ func dockerRun(target string) error {
 }
 
 // Binary builds binaries within a docker image produced by docker:builder.
+// PLATFORMS may be used to set os/arch for compiled binaries.
+// DEV creates a development build.
+// SNAPSHOT creates a snapshot build.
+// FIPS creates a FIPS capable binary.
+// VERSION_QUALIFIER may be used to manually specify a version qualifer for the produced binary.
 func (Docker) Binary() error {
 	mg.Deps(mg.F(mkDir, filepath.Join("build", ".magefile")), Docker.Builder)
 	return dockerRun("build:binary")
 }
 
 // Cover builds coverage enabled binaries within a docker image produced by docker:builder.
+// PLATFORMS may be used to set os/arch for compiled binaries.
+// DEV creates a development build.
+// SNAPSHOT creates a snapshot build.
+// FIPS creates a FIPS capable binary.
+// VERSION_QUALIFIER may be used to manually specify a version qualifer for the produced binary.
 func (Docker) Cover() error {
 	mg.Deps(mg.F(mkDir, filepath.Join("build", ".magefile")), Docker.Builder)
 	return dockerRun("build:cover")
 }
 
 // Image creates a stand-alone fleet-server image.
+// The name of the image is docker.elastic.co/beats-ci/elastic-agent-cloud-fleet by default.
+// FIPS creates a FIPS capable image, adds the -fips suffix to the image name.
+// DEV creates a development image.
+// SNAPSHOT creates a snapshot image.
+// VERSION_QUALIFIER may be used to manually specify a version qualifer for the image tag.
+// DOCKER_IMAGE_TAG may be used to completely specify the image tag.
 func (Docker) Image() error {
 	dockerFile := "Dockerfile"
 	image := dockerImage
@@ -930,6 +964,8 @@ func (Docker) Image() error {
 }
 
 // Push pushs an image created by docker:image to the registry.
+// FIPS may be used to push a FIPS capable image.
+// DOCKER_IMAGE_TAG may be used to specify the image tag.
 func (Docker) Push() error {
 	image := dockerImage
 	if isFIPS() {
@@ -944,6 +980,11 @@ func (Docker) Push() error {
 }
 
 // CustomAgentImage creates a custom elastic-agent image where the fleet-server component has been replaced by one built locally.
+// This step requires a coverage enabled binary to be used.
+// FIPS is used to control if a FIPS compliant image should be created.
+// DOCKER_BASE_IMAGE may be used to specify the elastic-agent base image. docker.elastic.co/cloud-release/elastic-agent-cloud by default.
+// DOCKER_IMAGE is used to specify the resulting image name.
+// DOCKER_IMAGE_TAG is used to specify the resulting image tag.
 func (Docker) CustomAgentImage() error {
 	mg.Deps(Build.Cover)
 	env, err := readEnvFile(filepath.Join("dev-tools", "integration", ".env"))
@@ -1000,8 +1041,9 @@ func (Docker) CustomAgentImage() error {
 // ---- TEST TARGETS BELOW ----
 
 // Unit runs unit tests.
-// The DEV, SNAPSHOT, and FIPS env vars are used to determine build tags.
 // Produces a unit test output file, and test coverage file in the build directory.
+// SNAPSHOT adds the snapshot build tag.
+// FIPS adds the requirefips and ms_tls13kdf build tags.
 func (Test) Unit() error {
 	mg.Deps(mg.F(mkDir, "build"))
 	output, err := teeCommand(environMap(), "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
@@ -1012,6 +1054,8 @@ func (Test) Unit() error {
 // UnitFIPSOnly runs unit tests and injects GODEBUG=fips140=only into the environment.
 // This is done because mage may have issues when running with fips140=only set.
 // Produces a unit test output file, and test coverage file in the build directory.
+// SNAPSHOT adds the snapshot build tag.
+// FIPS adds the requirefips and ms_tls13kdf build tags.
 func (Test) UnitFIPSOnly() error {
 	mg.Deps(mg.F(mkDir, "build"))
 	env := environMap()
@@ -1022,7 +1066,8 @@ func (Test) UnitFIPSOnly() error {
 }
 
 // Integration provisions the integration test environment with docker compose, runs the integration tests, then destroys the environment.
-// The FIPS env var can be used to run integration tests that include the requirefips build tag.
+// SNAPSHOT runs integration tests with the snapshot build tag.
+// FIPS runs the integration tests the requirefips and ms_tls13kdf build tags.
 func (Test) Integration() {
 	mg.SerialDeps(mg.F(mkDir, "build"), Test.IntegrationUp, Test.IntegrationRun, Test.IntegrationDown)
 }
@@ -1034,8 +1079,9 @@ func (Test) IntegrationUp() error {
 
 // IntegrationRun runs integration tests.
 // Assumes that the integration test environment is up.
-// The DEV, SNAPSHOT, and FIPS env vars are used to determine build tags.
 // Produces an integration test output file in the build directory.
+// SNAPSHOT runs integration tests with the snapshot build tag.
+// FIPS runs the integration tests the requirefips and ms_tls13kdf build tags.
 func (Test) IntegrationRun(ctx context.Context) error {
 	env, err := readEnvFile(filepath.Join("dev-tools", "integration", ".env"))
 	if err != nil {
@@ -1150,6 +1196,10 @@ func requestServiceToken(ctx context.Context, username, password, url string) (s
 }
 
 // Release checks that all release files are present within the build/distributions directory and asserts that the archive layouts are correct.
+// PLATFORMS specifies the list of os/arch platforms to test.
+// VERSION_QUALIFIER specifies if a version qualifier for the artifact versions should be used.
+// SNAPSHOT runs release tests for a SNAPSHOT artifact
+// FIPS runs the release test for a FIPS capable artifact - includes extra checks to see if the binary was compiled with the expected env vars, and tags.
 func (Test) Release() error {
 	pList := getPlatforms()
 	namePrefix := "fleet-server-" + getVersion()
@@ -1415,7 +1465,7 @@ func checkFIPSBinary(path string) error {
 		if err != nil {
 			return fmt.Errorf("go tool nm failed: %w", err)
 		}
-		if !strings.Contains(output, "OpenSSL_version") { // TODO may need different check for windows/darwin
+		if runtime.GOOS == "linux" && !strings.Contains(output, "OpenSSL_version") { // TODO may need different check for windows/darwin
 			return fmt.Errorf("failed to find OpenSSL symbol links within binary")
 		}
 	}
@@ -1457,16 +1507,19 @@ func (Test) JunitReport() error {
 }
 
 // All runs unit and integration tests and produces junit reports for all the tests.
+// SNAPSHOT adds the snapshot build tag.
+// FIPS adds the requirefips and ms_tls13kdf build tags.
 func (Test) All() {
-	mg.Deps(mg.F(mkDir, "build"))
-	mg.SerialDeps(Test.Unit, Test.Integration)
-	mg.Deps(Test.JunitReport)
+	mg.SerialDeps(mg.F(mkDir, "build"), Test.Unit, Test.Integration, Test.JunitReport)
 }
 
 // Benchmark runs the included benchmarks
-// BENCHMARK_FILTER can be used to filter what benchmarks run.
-// The DEV, SNAPSHOT, and FIPS env vars are used to determine build tags.
 // Produces a benchmark file in the build directory.
+// SNAPSHOT adds the snapshot build tag.
+// FIPS adds the requirefips and ms_tls13kdf build tags.
+// BENCHMARK_FILTER can be used to filter what benchmarks run.
+// BENCHMARK_ARGS can be used to change what is being benchmarked. Default: -count=10 -benchtime=3s -benchmem.
+// BENCH_BASE can be used to change the output file name.
 func (Test) Benchmark() error {
 	mg.Deps(mg.F(mkDir, "build"))
 	bFilter := "Bench"
@@ -1492,7 +1545,8 @@ func (Test) Benchmark() error {
 }
 
 // Benchstat runs the benchstat tool to compare benchmarks.
-// Inputs are controlled by the BENCH_BASE and BENCH_NEXT env vars.
+// BENCH_BASE can be used to specify the base input file name.
+// BENCH_NEXT can be used tp specify the comparison input file name.
 func (Test) Benchstat() error {
 	base := filepath.Join("build", "benchmark-"+getCommitID()+".out")
 	if v, ok := os.LookupEnv(envBenchBase); ok && v != "" {
@@ -1513,8 +1567,10 @@ func (Test) Benchstat() error {
 
 // E2e provisions the e2e test environment with docker compose, runs e2e tests, then destroys the environment.
 // The e2e test environment is providisioned ontop of the integration test environment.
+// The e2e test will attempt to force DEV and SNAPSHOT to true, and set DOCKER_IMAGE to fleet-server-e2e-agent.
+// The PLATFORMS list will also be set to: [linux/arch, os/arch].
+// FIPS can be used to test a FIPS capable fleet-server (support in progress).
 func (Test) E2e() {
-	// Force DEV=true, SNAPSHOT=true
 	os.Setenv(envDev, "true")
 	os.Setenv(envSnapshot, "true")
 	os.Setenv(envDockerImage, "fleet-server-e2e-agent")
@@ -1538,11 +1594,11 @@ func (Test) E2eCerts() error {
 }
 
 // E2eUp provisions the e2e test envionment with docker compose.
+// Attempts to force DEV and SNAPSHOT to true.
 func (Test) E2eUp(ctx context.Context) error {
 	os.Setenv(envDev, "true")
 	os.Setenv(envSnapshot, "true")
-	mg.Deps(Test.IntegrationUp)
-	mg.SerialDeps(mg.F(mkDir, "build"), mg.F(mkDir, filepath.Join("build", "e2e-cover")), Build.Cover, Docker.Image, Docker.CustomAgentImage, Test.E2eCerts)
+	mg.SerialDeps(mg.F(mkDir, "build"), mg.F(mkDir, filepath.Join("build", "e2e-cover")), Test.IntegrationUp, Build.Cover, Docker.Image, Docker.CustomAgentImage, Test.E2eCerts)
 	env, err := readEnvFile(filepath.Join("dev-tools", "integration", ".env"))
 	if err != nil {
 		return fmt.Errorf("unable to read env file: %w", err)
@@ -1570,15 +1626,15 @@ func (Test) E2eUp(ctx context.Context) error {
 	return waitForAPMServer(ctx)
 }
 
-// getAPMKey returns the contents of .apm_key or gets a new ApiKey and persists it to .apm_key.
+// getAPMKey returns the contents of .apm_server_api_key or gets a new ApiKey and persists it to .apm_server_api_key.
 func getAPMKey(ctx context.Context, username, password, host string, body io.Reader) (string, error) {
-	p, err := os.ReadFile(".apm_key")
+	p, err := os.ReadFile(".apm_server_api_key")
 	if err != nil {
 		key, err := requestAPIKey(ctx, username, password, host+"/_security/api_key", body)
 		if err != nil {
 			return "", fmt.Errorf("unable to request new apm key: %w", err)
 		}
-		if err := os.WriteFile(".apm_key", []byte(key), 0o640); err != nil {
+		if err := os.WriteFile(".apm_server_api_key", []byte(key), 0o640); err != nil {
 			log.Printf("Unable to persist API key for apm-server: %v", err)
 		}
 		return key, nil
@@ -1662,6 +1718,8 @@ func waitForAPMServer(ctx context.Context) error {
 // E2eRun runs the e2e tests.
 // Assumes that the test environment has been provisioned with test:e2eUp.
 // Produces a e2e test report file in the build directory, and may provide go coverage doata in build/e2e-cover.
+// Attempts to force DEV and SNAPSHOT to true.
+// FIPS can be used to test a FIPS capable fleet-server (support in progress).
 func (Test) E2eRun(ctx context.Context) error {
 	os.Setenv(envDev, "true")
 	os.Setenv(envSnapshot, "true")
@@ -1724,7 +1782,7 @@ func (Test) E2eDown() error {
 	}
 	if err := errors.Join(
 		os.RemoveAll(".service_token_kibana"),
-		os.RemoveAll(".apm_key"),
+		os.RemoveAll(".apm_server_api_key"),
 	); err != nil {
 		return err
 	}
@@ -1755,6 +1813,7 @@ func (Test) FipsProviderUnit() error {
 
 // CloudE2E provisions a cloud deployment, tests the remote fleet-server instance, then destroys the deployment.
 // The cloud ECH deployment is provisioned in the cloud first test region using a custom agent image that has it's fleet-server replaced.
+// SNAPSHOT will be set to true, PLATFORMS will be set to: [linux/amd64], DOCKER_IMAGE will be set to docker.elastic.co/beats-ci/elastic-agent-cloud-fleet, and DOCKER_IMAGE_TAG will be set to one that reflects the git commit and current Unix epoch time.
 func (Test) CloudE2E() {
 	os.Setenv(envSnapshot, "true")
 	os.Setenv(envPlatforms, "linux/amd64")
@@ -1764,6 +1823,8 @@ func (Test) CloudE2E() {
 }
 
 // CloudE2EUp provisions the cloud deployment for testing.
+// DOCKER_IMAGE can be used to specify the custom integration server image.
+// DOCKER_IMAGE_TAG can be used to specify the tag of the custom integration server.
 func (Test) CloudE2EUp() error {
 	os.Setenv(envPlatforms, "linux/amd64")
 	if _, ok := os.LookupEnv(envDockerImage); !ok {
