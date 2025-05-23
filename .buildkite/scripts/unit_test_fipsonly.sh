@@ -10,5 +10,5 @@ with_go
 
 with_mage
 
-echo "Starting the unit tests..."
-mage test:unit test:junitReport
+echo "Starting the fips140=only unit tests..."
+mage test:unitFIPSOnly test:junitReport

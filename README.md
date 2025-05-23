@@ -14,7 +14,7 @@ For more detailed instructions see the [Developer's Guide](./docs/developers-gui
 ### Requirements
 
 - Golang see [.go-version](./go-version) file for the current supported version.
-- Make
+- [mage](https://magefile.org/), may be installed with the `make mage` shortcut.
 
 ### Elasticsearch + Kibana
 
@@ -33,7 +33,7 @@ For instructions/options on how to run the Elastic stack please refer to the [De
 To build the fleet-server binary to run locally use:
 
 ```bash
-make local # Use SNAPSHOT=true if targetting a SNAPSHOT build.
+mage build:local # Use SNAPSHOT=true if targetting a SNAPSHOT build.
 ```
 
 In order to run the fleet-server instance run:
