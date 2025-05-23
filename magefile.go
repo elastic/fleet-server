@@ -764,7 +764,15 @@ func packageWindows(arch string) error {
 	}
 
 	// Create the parent dir
-	_, err = zw.Create(distName + "/")
+	dirStat, err := os.Stat(filepath.Join("build", "binaries", distName))
+	if err != nil {
+		return fmt.Errorf("unable to stat dir: %w", err)
+	}
+	dirHeader, err := zip.FileInfoHeader(dirStat)
+	if err != nil {
+		return fmt.Errorf("unable to turn dir stat into header: %w", err)
+	}
+	_, err = zw.CreateHeader(dirHeader)
 	if err != nil {
 		return fmt.Errorf("unable to create zip dir: %w", err)
 	}
@@ -1236,7 +1244,10 @@ func (Test) Release() error {
 // testArchive unpacks the archive located in path and verifies its contents.
 // If FIPS=true then the binary will be checked for fips capable indicators.
 func testArchive(path string) error {
-	dir := os.TempDir()
+	dir, err := os.MkdirTemp("build", "release-test-*")
+	if err != nil {
+		return fmt.Errorf("unable to create temp dir for artifact extraction: %w", err)
+	}
 	defer os.RemoveAll(dir)
 	var dName string
 	var binary string
@@ -1283,7 +1294,6 @@ func testArchive(path string) error {
 		}
 	}
 	return nil
-
 }
 
 // untar extracts the sourceFile to the destinationDir.
@@ -1326,7 +1336,7 @@ func untar(sourceFile, destinationDir string) error {
 				return err
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				return err
 			}
 
@@ -1348,7 +1358,7 @@ func untar(sourceFile, destinationDir string) error {
 				return err
 			}
 		case tar.TypeSymlink:
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				return err
 			}
 			if err := os.Symlink(header.Linkname, path); err != nil {
@@ -1371,7 +1381,7 @@ func unzip(sourceFile, destinationDir string) error {
 	}
 	defer r.Close()
 
-	if err = os.MkdirAll(destinationDir, 0755); err != nil {
+	if err = os.MkdirAll(destinationDir, 0o755); err != nil {
 		return err
 	}
 
@@ -1392,7 +1402,7 @@ func unzip(sourceFile, destinationDir string) error {
 			return os.MkdirAll(path, f.Mode())
 		}
 
-		if err = os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		if err = os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
 
