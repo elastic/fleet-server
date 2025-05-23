@@ -1833,7 +1833,14 @@ func (Test) CloudE2EUp() error {
 		log.Printf("terraform init output: %s", string(initOut))
 		return fmt.Errorf("terraform init failed: %w", err)
 	}
-	applyCmd := exec.Command("terraform", "apply", "-auto-approve", "-var", "'git_commit="+getCommitID()+"'", "-var", "'elastic_agent_docker_image="+string(p)+"'")
+	args := []string{
+		"apply",
+		"-auto-approve",
+		"-var", "git_commit=" + getCommitID(),
+		"-var", "elastic_agent_docker_image=" + string(p),
+	}
+	log.Printf("Running terraform %s", strings.Join(args, " "))
+	applyCmd := exec.Command("terraform", args...)
 	applyCmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
 	applyCmd.Stdout = os.Stdout
 	applyCmd.Stderr = os.Stderr
