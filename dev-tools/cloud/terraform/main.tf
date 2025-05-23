@@ -19,13 +19,13 @@ variable "elastic_agent_docker_image" {
 variable "git_commit" {
   type        = string
   default     = ""
-  description = "The git commit id"
+  description = "The git commit ID."
 }
 
-variable "pr_num" {
+variable "pull_request" {
   type        = string
   default     = ""
-  description = "The PR associated with this deployment."
+  description = "The github pull request number."
 }
 
 locals {
@@ -35,7 +35,7 @@ locals {
 }
 
 resource "ec_deployment" "deployment" {
-  name                   = format("fleet server PR-%s-%s", var.pr_num, var.git_commit)
+  name                   = format("fleet server PR-%s-%s", var.pull_request, var.git_commit)
   region                 = "gcp-us-west2"
   version                = local.stack_version
   deployment_template_id = "gcp-general-purpose"
@@ -45,7 +45,7 @@ resource "ec_deployment" "deployment" {
     "provisioner"     = "terraform"
     "docker_image_ea" = local.docker_image_ea
     "git_commit"      = var.git_commit
-    "pr_num"          = var.pr_num
+    "pull_request"    = var.pull_request
   }
 
   elasticsearch = {

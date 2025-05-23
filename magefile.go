@@ -1999,15 +1999,14 @@ func (Test) CloudE2E() {
 // DOCKER_IMAGE can be used to specify the custom integration server image.
 // DOCKER_IMAGE_TAG can be used to specify the tag of the custom integration server.
 func (Test) CloudE2EUp() error {
-	if _, ok := os.LookupEnv(envDockerImage); !ok {
-		os.Setenv(envDockerImage, dockerImage)
+	imageName := dockerImage
+	imageTag := getVersion()
+
+	if name, ok := os.LookupEnv(envDockerImage); ok && name != "" {
+		imageName = name
 	}
-	if _, ok := os.LookupEnv(envDockerTag); !ok {
-		os.Setenv(envDockerTag, fmt.Sprintf("git-%s-%d", getCommitID(), time.Now().Unix()))
-	}
-	p, err := os.ReadFile(filepath.Join("build", "custom-image"))
-	if err != nil {
-		return fmt.Errorf("unable to get agent custom image: %w", err)
+	if tag, ok := os.LookupEnv(envDockerTag); ok && tag != "" {
+		imageTag = tag
 	}
 
 	initCmd := exec.Command("terraform", "init")
@@ -2021,7 +2020,7 @@ func (Test) CloudE2EUp() error {
 		"apply",
 		"-auto-approve",
 		"-var", "git_commit=" + getCommitID(),
-		"-var", "elastic_agent_docker_image=" + string(p),
+		"-var", "elastic_agent_docker_image=" + imageName + ":" + imageTag,
 	}
 	log.Printf("Running terraform %s", strings.Join(args, " "))
 	applyCmd := exec.Command("terraform", args...)
@@ -2033,12 +2032,17 @@ func (Test) CloudE2EUp() error {
 
 // CloudE2EDown destroys the testing cloud deployment.
 func (Test) CloudE2EDown() error {
-	p, err := os.ReadFile(filepath.Join("build", "custom-image"))
-	if err != nil {
-		return fmt.Errorf("unable to get agent custom image: %w", err)
+	imageName := dockerImage
+	imageTag := getVersion()
+
+	if name, ok := os.LookupEnv(envDockerImage); ok && name != "" {
+		imageName = name
+	}
+	if tag, ok := os.LookupEnv(envDockerTag); ok && tag != "" {
+		imageTag = tag
 	}
 
-	args := []string{"destroy", "-auto-approve", "-var", "elastic_agent_docker_image=" + string(p)}
+	args := []string{"destroy", "-auto-approve", "-var", "elastic_agent_docker_image=" + imageName + ":" + imageTag}
 	log.Printf("Running terraform %s", strings.Join(args, " "))
 	cmd := exec.Command("terraform", args...)
 	cmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
