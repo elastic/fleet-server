@@ -1816,7 +1816,6 @@ func (Test) CloudE2E() {
 // DOCKER_IMAGE can be used to specify the custom integration server image.
 // DOCKER_IMAGE_TAG can be used to specify the tag of the custom integration server.
 func (Test) CloudE2EUp() error {
-	os.Setenv(envPlatforms, "linux/amd64")
 	if _, ok := os.LookupEnv(envDockerImage); !ok {
 		os.Setenv(envDockerImage, dockerImage)
 	}

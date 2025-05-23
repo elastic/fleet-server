@@ -26,7 +26,7 @@ cleanup() {
   exit $r
 }
 
-USER=fleetserverci mage test:cloudE2EDeploy
+USER=fleetserverci SNAPSHOT=true mage -v docker:customAgentImage docker:push test:cloudE2EUp
 FLEET_SERVER_URL=$(terraform output --raw --state=dev-tools/cloud/terraform/terraform.tfstate fleet_url)
 echo "Fleet server: \"${FLEET_SERVER_URL}\""
 
@@ -43,4 +43,4 @@ if [[ "${FLEET_SERVER_URL}" == "" ]]; then
 fi
 
 echo "--- Trigger cloud E2E test"
-mage test:cloudE2ERun | tee build/test-cloude2e-set
+SNAPSHOT=true mage test:cloudE2ERun | tee build/test-cloude2e-set

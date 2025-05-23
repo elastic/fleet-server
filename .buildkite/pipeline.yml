@@ -196,6 +196,7 @@ steps:
         key: "cloud-e2e-test"
         env:
           DOCKER_REGISTRY: "docker.elastic.co"
+          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
