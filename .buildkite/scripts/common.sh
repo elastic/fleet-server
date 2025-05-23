@@ -149,8 +149,7 @@ download_mbp_packages_from_gcp_bucket() {
 
 with_mage() {
     create_workspace
-    MAGE_VERSION="$(grep magefile/mage go.mod | cut -d ' ' -f2)"
-    go install github.com/magefile/mage@${MAGE_VERSION}
+    go install github.com/magefile/mage # uses go.mod implicitly
     mage -clean
     mage -version
     which mage

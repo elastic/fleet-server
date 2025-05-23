@@ -52,7 +52,7 @@ Vagrant.configure("2") do |config|
          echo "alias ll='ls -la'" > /etc/profile.d/ll.sh
          echo 'export PATH=$PATH:/usr/local/go/bin' > /etc/profile.d/go.sh
          echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> /etc/profile.d/go.sh
-         go install github.com/magefile/mage@latest
+         cd /vagrant/fleet-server; go install github.com/magefile/mage
       SHELL
       nodeconfig.vm.provision "shell", reboot: true
     end

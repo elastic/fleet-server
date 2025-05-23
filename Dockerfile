@@ -6,7 +6,7 @@ WORKDIR /fleet-server
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
-RUN go install github.com/magefile/mage@latest
+RUN go install github.com/magefile/mage # Uses version from go.mod implicitly
 
 COPY . .
 

@@ -15,9 +15,11 @@ import (
 	"context"
 	"crypto/sha512"
 	"crypto/tls"
+	"crypto/x509"
 	"debug/buildinfo"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"html/template"
@@ -30,6 +32,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
@@ -41,6 +44,8 @@ import (
 	"github.com/magefile/mage/sh"
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/version"
 )
 
@@ -85,6 +90,16 @@ const (
 	dockerBuilderName = "fleet-server-builder"
 	dockerImage       = "docker.elastic.co/beats-ci/elastic-agent-cloud-fleet"
 	dockerAgentImage  = "fleet-server-e2e-agent"
+)
+
+// e2e test certs
+var (
+	certDir   = filepath.Join("build", "e2e-certs")
+	caFile    = filepath.Join(certDir, "e2e-test-ca.crt")
+	caKeyFile = filepath.Join(certDir, "e2e-test-ca.key")
+	certFile  = filepath.Join(certDir, "fleet-server.crt")
+	keyFile   = filepath.Join(certDir, "fleet-server.key")
+	passFile  = filepath.Join(certDir, "passphrase")
 )
 
 var (
@@ -422,7 +437,7 @@ func Generate() error {
 
 // Headers ensures files have copyright headers.
 func (Check) Headers() error {
-	return sh.RunV("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/elastic/go-licenser", "-license", "Elastic")
+	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/elastic/go-licenser", "-license", "Elastic")
 }
 
 // Notice generates the NOTICE.txt and NOTICE-FIPS.txt files.
@@ -528,15 +543,10 @@ func getModules(extraTags ...string) ([]string, error) {
 
 // NoChanges ensures that there are no local changes to the codebase.
 func (Check) NoChanges() error {
-	if out, err := sh.Output("go", "mod", "tidy", "-v"); err != nil {
-		fmt.Println(out)
+	if err := sh.Run("go", "mod", "tidy", "-v"); err != nil {
 		return fmt.Errorf("go mod tidy failure: %w", err)
 	}
-	out, err := sh.Output("git", "diff")
-	if len(out) > 0 {
-		fmt.Println(out)
-	}
-	if err != nil {
+	if err := sh.RunV("git", "diff"); err != nil {
 		return fmt.Errorf("git diff failure: %w", err)
 	}
 	if out, err := sh.Output("git", "update-index", "--refresh"); err != nil {
@@ -947,7 +957,7 @@ func (Docker) Image() error {
 		"--build-arg", "FIPS="+strconv.FormatBool(isFIPS()),
 		"--build-arg", "SNAPSHOT="+strconv.FormatBool(isSnapshot()),
 		"--build-arg", "VERSION="+getVersion(),
-		"--build-arg", "GCFLAGS="+getGCFlags(), // FIXME Once we change the images we should not pass these.
+		"--build-arg", "GCFLAGS="+getGCFlags(),
 		"--build-arg", "LDFLAGS="+getLDFlags(),
 		"-f", dockerFile,
 		"-t", image+":"+version,
@@ -1576,11 +1586,185 @@ func (Test) E2e() {
 }
 
 // E2eCerts generates the e2e test CA and certs.
+// TODO use go instead of openssl?
 func (Test) E2eCerts() error {
-	certDir := filepath.Join("build", "e2e-certs")
-	mg.Deps(mg.F(mkDir, certDir))
-	// TODO move CA + cert generation into magefile
-	return sh.RunV("bash", filepath.Join("dev-tools", "e2e", "certs.sh"))
+	mg.Deps(mg.F(mkDir, certDir), createCA, createPassphrase, createPrivateKey)
+
+	openSSLVersion, err := sh.Output("openssl", "version")
+	if err != nil {
+		return fmt.Errorf("unable to get openssl version: %w", err)
+	}
+	verRegExp := regexp.MustCompile(`^OpenSSL ([\d]+)\.`)
+	matches := verRegExp.FindStringSubmatch(openSSLVersion)
+	// Ensure PKCS#1 format is used (https://github.com/elastic/elastic-agent-libs/issues/134)
+	if len(matches) == 2 {
+		i, err := strconv.Atoi(matches[1])
+		if err != nil {
+			mg.Deps(mg.F(createPKCS1Key, false))
+		} else if i >= 3 {
+			mg.Deps(mg.F(createPKCS1Key, true))
+		} else {
+			mg.Deps(mg.F(createPKCS1Key, false))
+		}
+	} else {
+		mg.Deps(mg.F(createPKCS1Key, false))
+	}
+	mg.SerialDeps(createFleetCert, validateCerts, validateCertUnpacking)
+	return nil
+}
+
+func createCA() error {
+	err := sh.Run("openssl",
+		"req", "-x509",
+		"-sha256",
+		"-days", "356",
+		"-nodes",
+		"-newkey", "rsa:2048",
+		"-subj", "/CN=e2e-test-ca",
+		"-keyout", caKeyFile,
+		"-out", caFile,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create CA: %w", err)
+	}
+	return nil
+}
+
+func createPassphrase() error {
+	return os.WriteFile(passFile, []byte("abcd1234"), 0o640)
+}
+
+func createPrivateKey() error {
+	err := sh.Run("openssl",
+		"genpkey",
+		"-algorithm", "RSA",
+		"-aes-128-cbc",
+		"-pkeyopt", "rsa_keygen_bits:2048",
+		"-pass", "file:"+passFile,
+		"-out", filepath.Join(certDir, "fleet-server-key"),
+	)
+	if err != nil {
+		return fmt.Errorf("unable to create encrypted private key: %w", err)
+	}
+	return nil
+}
+
+func createPKCS1Key(traditional bool) error {
+	args := []string{"rsa", "-aes-128-cbc"}
+	if traditional {
+		args = append(args, "-traditional")
+	}
+	args = append(args,
+		"-in", filepath.Join(certDir, "fleet-server-key"),
+		"-out", keyFile,
+		"-passin", "pass:abcd1234",
+		"-passout", "file:"+passFile,
+	)
+	err := sh.Run("openssl", args...)
+	if err != nil {
+		return fmt.Errorf("failed to create pkcs1: %w", err)
+	}
+	return nil
+}
+
+func createFleetCert() error {
+	err := sh.Run("openssl",
+		"req", "-new",
+		"-key", keyFile,
+		"-passin", "file:"+passFile,
+		"-subj", "/CN=localhost",
+		"-addext", "subjectAltName=IP:127.0.0.1,DNS:localhost,DNS:fleet-server",
+		"-out", filepath.Join(certDir, "fleet-server.csr"),
+	)
+	if err != nil {
+		return fmt.Errorf("csr error: %w", err)
+	}
+
+	f, err := os.CreateTemp(certDir, "extFile-*")
+	if err != nil {
+		return fmt.Errorf("unable to create temp file: %w", err)
+	}
+	fName := f.Name()
+	defer os.Remove(fName)
+	defer f.Close()
+	if _, err := fmt.Fprintln(f, "subjectAltName=IP:127.0.0.1,DNS:localhost,DNS:fleet-server"); err != nil {
+		return fmt.Errorf("unable to write file: %w", err)
+	}
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("unable to persist temp file to disk: %w", err)
+	}
+
+	err = sh.Run("openssl",
+		"x509", "-req",
+		"-in", filepath.Join(certDir, "fleet-server.csr"),
+		"-days", "356",
+		"-extfile", fName,
+		"-CA", caFile,
+		"-CAkey", caKeyFile,
+		"-CAcreateserial",
+		"-out", certFile,
+	)
+	if err != nil {
+		return fmt.Errorf("cert error: %w", err)
+	}
+	return nil
+}
+
+func validateCerts() error {
+	output, err := sh.Output("openssl",
+		"verify", "-verbose",
+		"-CAfile", caFile,
+		certFile,
+	)
+	if err != nil {
+		fmt.Println(output)
+		return fmt.Errorf("unable to verify fleet-server cert with openssl: %w", err)
+	}
+	output, err = sh.Output("openssl",
+		"rsa", "-check", "-noout",
+		"-in", keyFile,
+		"-passin", "file:"+passFile,
+	)
+	if err != nil {
+		fmt.Println(output)
+		return fmt.Errorf("unable to verify fleet-server key with openssl: %w", err)
+	}
+	return nil
+}
+
+func validateCertUnpacking() error {
+	config := tlscommon.Config{
+		CAs: []string{
+			caFile,
+		},
+		Certificate: tlscommon.CertificateConfig{
+			Certificate:    certFile,
+			Key:            keyFile,
+			PassphrasePath: passFile,
+		},
+	}
+
+	_, err := tlscommon.LoadTLSConfig(&config)
+	if err != nil {
+		log.Printf("tlscommon load error: %v", err)
+		passphrase, err := os.ReadFile(passFile)
+		if err != nil {
+			return fmt.Errorf("unable to read passphrase: %w", err)
+		}
+		keyPEM, err := tlscommon.ReadPEMFile(logp.NewLogger("certs"), keyFile, string(passphrase))
+		if err != nil {
+			return fmt.Errorf("unable to read PEMFile: %w", err)
+		}
+
+		keyDER, _ := pem.Decode(keyPEM)
+		log.Println("Key DER Block Type:", keyDER.Type)
+
+		_, err1 := x509.ParsePKCS1PrivateKey(keyDER.Bytes)
+		_, err8 := x509.ParsePKCS8PrivateKey(keyDER.Bytes)
+		_, errEC := x509.ParseECPrivateKey(keyDER.Bytes)
+		return errors.Join(err1, err8, errEC)
+	}
+	return nil
 }
 
 // E2eUp provisions the e2e test envionment with docker compose.
@@ -1863,10 +2047,14 @@ func (Test) CloudE2ERun() error {
 		return fmt.Errorf("unable to retrive fleet-server cloud url: %w", err)
 	}
 
+	var b bytes.Buffer
+	w := io.MultiWriter(&b, os.Stdout)
 	cmd := exec.Command("go", "test", "-v", "-timeout", "30m", "-tags=cloude2e", "-count=1", "-p", "1", "./...")
 	cmd.Dir = "testing"
 	cmd.Env = append(os.Environ(), "FLEET_SERVER_URL="+url)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	cmd.Stdout = w
+	cmd.Stderr = w
+	err = cmd.Run()
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-cloude2e.out"), b.Bytes(), 0o644))
+	return err
 }

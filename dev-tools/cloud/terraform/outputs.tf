@@ -34,3 +34,8 @@ output "integrations_url" {
   value       = ec_deployment.deployment.integrations_server.https_endpoint
   description = "The secure integrations server URL"
 }
+
+output "deployment_id" {
+  value       = ec_deployment.deployment.id
+  description = "The deployment ID"
+}
