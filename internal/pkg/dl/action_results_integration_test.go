@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -101,9 +101,7 @@ func (acrs ActionsResults) find(ar model.ActionResult) *model.ActionResult {
 }
 
 func TestActionsResultsStored(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker, acrs := setupActionResults(ctx, t)
 
