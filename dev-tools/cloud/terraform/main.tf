@@ -4,7 +4,7 @@ terraform {
   required_providers {
     ec = {
       source  = "elastic/ec"
-      version = "0.12.1"
+      version = "0.12.2"
     }
   }
 }
@@ -62,10 +62,8 @@ resource "ec_deployment" "deployment" {
   }
 
   integrations_server = {
-    topology = {
-      size       = "1g"
-      zone_count = 1
-    }
+    size       = "1g"
+    zone_count = 1
     config = {
       docker_image = local.docker_image_ea
     }
