@@ -978,7 +978,6 @@ func (Docker) Push() error {
 // DOCKER_IMAGE is used to specify the resulting image name.
 // DOCKER_IMAGE_TAG is used to specify the resulting image tag.
 func (Docker) CustomAgentImage() error {
-	mg.Deps(Build.Cover)
 	env, err := readEnvFile(filepath.Join("dev-tools", "integration", ".env"))
 	if err != nil {
 		return fmt.Errorf("unable to read env file: %w", err)
@@ -1809,7 +1808,7 @@ func (Test) CloudE2E() {
 	os.Setenv(envPlatforms, "linux/amd64")
 	os.Setenv(envDockerImage, dockerImage)
 	os.Setenv(envDockerTag, fmt.Sprintf("git-%s-%d", getCommitID(), time.Now().Unix()))
-	mg.SerialDeps(mg.F(mkDir, "build"), Build.Cover, Docker.CustomAgentImage, Docker.Push, Test.CloudE2EUp, Test.CloudE2ERun, Test.CloudE2EDown)
+	mg.SerialDeps(mg.F(mkDir, "build"), Docker.Cover, Docker.CustomAgentImage, Docker.Push, Test.CloudE2EUp, Test.CloudE2ERun, Test.CloudE2EDown)
 }
 
 // CloudE2EUp provisions the cloud deployment for testing.
@@ -1822,7 +1821,6 @@ func (Test) CloudE2EUp() error {
 	if _, ok := os.LookupEnv(envDockerTag); !ok {
 		os.Setenv(envDockerTag, fmt.Sprintf("git-%s-%d", getCommitID(), time.Now().Unix()))
 	}
-	mg.SerialDeps(mg.F(mkDir, "build"), Build.Cover, Docker.CustomAgentImage, Docker.Push)
 	p, err := os.ReadFile(filepath.Join("build", "custom-image"))
 	if err != nil {
 		return fmt.Errorf("unable to get agent custom image: %w", err)

@@ -34,6 +34,6 @@ RUN groupadd --gid 1000 fleet-server && \
 USER fleet-server
 
 COPY --chown=fleet-server:fleet-server --chmod=644 fleet-server.yml /etc/fleet-server.yml
-COPY --chown=fleet-server:fleet-server --chmod=755 --from=builder /fleet-server/build/binaries/fleet-server-${VERSION}-linux-*/fleet-server /usr/bin/fleet-server
+COPY --chown=fleet-server:fleet-server --chmod=555 --from=builder /fleet-server/build/binaries/fleet-server-${VERSION}-linux-*/fleet-server /usr/bin/fleet-server
 
 CMD /usr/bin/fleet-server -c /etc/fleet-server.yml
