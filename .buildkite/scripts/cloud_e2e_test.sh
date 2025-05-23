@@ -29,6 +29,7 @@ cleanup() {
 USER=fleetserverci mage -v docker:cover docker:customAgentImage docker:push test:cloudE2EUp
 FLEET_SERVER_URL=$(terraform output --raw --state=dev-tools/cloud/terraform/terraform.tfstate fleet_url)
 echo "Fleet server: \"${FLEET_SERVER_URL}\""
+echo "Integrations URL: $(terraform output --raw --state=dev-tools/cloud/terraform/terraform.tfstate integrations_url)"
 
 if [[ "${FLEET_SERVER_URL}" == "" ]]; then
     message="FLEET_SERVER_URL is empty, cloud e2e tests cannot be executed"

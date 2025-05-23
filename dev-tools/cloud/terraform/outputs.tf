@@ -29,3 +29,8 @@ output "fleet_url" {
   value       = ec_deployment.deployment.integrations_server.endpoints != null ? ec_deployment.deployment.integrations_server.endpoints.fleet : ""
   description = "The secure Fleet URL"
 }
+
+output "integrations_url" {
+  value       = ec_deployment.deployment.integrations_server.https_endpoint
+  description = "The secure integrations server URL"
+}
