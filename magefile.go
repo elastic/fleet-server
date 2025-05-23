@@ -2033,7 +2033,14 @@ func (Test) CloudE2EUp() error {
 
 // CloudE2EDown destroys the testing cloud deployment.
 func (Test) CloudE2EDown() error {
-	cmd := exec.Command("terraform", "destroy", "-auto-approve")
+	p, err := os.ReadFile(filepath.Join("build", "custom-image"))
+	if err != nil {
+		return fmt.Errorf("unable to get agent custom image: %w", err)
+	}
+
+	args := []string{"destroy", "-auto-approve", "-var", "elastic_agent_docker_image=" + string(p)}
+	log.Printf("Running terraform %s", strings.Join(args, " "))
+	cmd := exec.Command("terraform", args...)
 	cmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
