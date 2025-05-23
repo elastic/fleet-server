@@ -1588,7 +1588,7 @@ func (Test) E2e() {
 // E2eCerts generates the e2e test CA and certs.
 // TODO use go instead of openssl?
 func (Test) E2eCerts() error {
-	mg.Deps(mg.F(mkDir, certDir), createCA, createPassphrase, createPrivateKey)
+	mg.SerialDeps(mg.F(mkDir, certDir), createCA, createPassphrase, createPrivateKey)
 
 	openSSLVersion, err := sh.Output("openssl", "version")
 	if err != nil {

@@ -5,10 +5,10 @@ CMD_COLOR_OFF=\033[0m
 
 .PHONY: mage
 mage:
-	@go install github.com/magefile/mage@latest
+	@go install github.com/magefile/mage
 	@printf "${CMD_COLOR_ON} Mage installed\n${CMD_COLOR_OFF}"
 
 .PHONY: clean
 clean:
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
-	rm -rf .service_token* .apm_key ./bin/ ./build/
+	rm -rf .service_token* .apm_server_api_key ./bin/ ./build/
