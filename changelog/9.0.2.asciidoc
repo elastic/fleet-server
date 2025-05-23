@@ -1,0 +1,43 @@
+// begin 9.0.2 relnotes
+
+[[release-notes-9.0.2]]
+==  9.0.2
+
+Review important information about the  9.0.2 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-9.0.2]]
+=== New features
+
+The 9.0.2 release adds the following new and notable features.
+
+
+fleet-server::
+
+* Migrate-Action. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4786[#https://github.com/elastic/fleet-server/pull/4786] 
++
+Added new MIGRATE action type for moving agent to different cluster.
+
+
+[discrete]
+[[enhancements-9.0.2]]
+=== Enhancements
+
+
+fleet-server::
+
+* Update Go Version To V1.24.3. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4891[#https://github.com/elastic/fleet-server/pull/4891] 
+
+
+
+
+
+// end 9.0.2 relnotes
