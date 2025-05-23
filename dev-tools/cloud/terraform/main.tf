@@ -22,38 +22,50 @@ variable "git_commit" {
   description = "The git commit id"
 }
 
+variable "pr_num" {
+  type        = string
+  default     = ""
+  description = "The PR associated with this deployment."
+}
+
 locals {
   match           = regex("const DefaultVersion = \"(.*)\"", file("${path.module}/../../../version/version.go"))[0]
   stack_version   = format("%s-SNAPSHOT", local.match)
   docker_image_ea = var.elastic_agent_docker_image
 }
 
-resource "random_uuid" "name" {
-}
-
 resource "ec_deployment" "deployment" {
-  name                   = format("fleet server PR %s", random_uuid.name.result)
+  name                   = format("fleet server PR-%s-%s", var.pr_num, var.git_commit)
   region                 = "gcp-us-west2"
   version                = local.stack_version
   deployment_template_id = "gcp-general-purpose"
 
   tags = {
-    "created_with_terraform" = "true"
-    "source_repo"            = "elastic/fleet-server"
-    "provisioner"            = "terraform"
-    "docker_image_ea"        = local.docker_image_ea
-    "git_commit"             = var.git_commit
+    "source_repo"     = "elastic/fleet-server"
+    "provisioner"     = "terraform"
+    "docker_image_ea" = local.docker_image_ea
+    "git_commit"      = var.git_commit
+    "pr_num"          = var.pr_num
   }
 
   elasticsearch = {
     hot = {
       autoscaling = {}
+      size        = "8g"
+      zone_count  = 2
     }
   }
 
-  kibana = {}
+  kibana = {
+    size       = "1g"
+    zone_count = 1
+  }
 
   integrations_server = {
+    topology = {
+      size       = "1g"
+      zone_count = 1
+    }
     config = {
       docker_image = local.docker_image_ea
     }

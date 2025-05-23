@@ -16,12 +16,14 @@ with_mage
 
 cleanup() {
   r=$?
+  echo "cleanup starting, previous command had exit status: ${r}"
 
   if [ -f dev-tools/cloud/terraform/.terraform.lock.hcl ] ; then
-    echo "--- Cleaning deployment"
-    mage test:cloudE2EDown
+    echo "--- Deployment detected, running cleanup."
+    mage -v test:cloudE2EDown
+    echo "deployment cleanup exit status is $?"
   else
-      echo "Skipped cleaning deployment, no Terraform files"
+      echo "--- No deployment detected, skipping cleanup."
   fi
   exit $r
 }
@@ -45,4 +47,4 @@ if [[ "${FLEET_SERVER_URL}" == "" ]]; then
 fi
 
 echo "--- Trigger cloud E2E test"
-mage test:cloudE2ERun
+mage -v test:cloudE2ERun
