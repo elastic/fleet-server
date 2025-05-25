@@ -13,19 +13,6 @@ Review important information about the  9.0.2 release.
 
 
 
-[discrete]
-[[new-features-9.0.2]]
-=== New features
-
-The 9.0.2 release adds the following new and notable features.
-
-
-fleet-server::
-
-* Migrate-Action. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4786[#https://github.com/elastic/fleet-server/pull/4786] 
-+
-Added new MIGRATE action type for moving agent to different cluster.
-
 
 [discrete]
 [[enhancements-9.0.2]]
