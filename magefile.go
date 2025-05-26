@@ -49,6 +49,15 @@ import (
 	"github.com/elastic/fleet-server/v7/version"
 )
 
+var Default = Build.Binary
+
+var Aliases = map[string]interface{}{
+	"build":   Build.Binary,
+	"release": Build.Release,
+	"check":   Check.All,
+	"test":    Test.All,
+}
+
 // env vars that a user can use to control targets.
 const (
 	// envSnapshot is the bool env var to indicate if it's a snapshot build.
@@ -560,9 +569,14 @@ func (Check) NoChanges() error {
 	return nil
 }
 
-// Ci runs CI related checks - runs generate, checkHeaders, notice, checkNoChanges.
+// Imports runs goimports to reorder imports.
+func (Check) Imports() error {
+	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "golang.org/x/tools/cmd/goimports", "-w", ".")
+}
+
+// Ci runs CI related checks - runs generate, imports, checkHeaders, notice, checkNoChanges.
 func (Check) Ci() {
-	mg.SerialDeps(Generate, Check.Headers, Check.Notice, Check.NoChanges)
+	mg.SerialDeps(Generate, Check.Imports, Check.Headers, Check.Notice, Check.NoChanges)
 }
 
 // Go installs and runs golangci-lint.
