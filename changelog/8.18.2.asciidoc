@@ -11,6 +11,6 @@ Review important information about the  8.18.2 release.
 
 fleet-server::
 
-* Update Go To V1.24.3. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4891[#https://github.com/elastic/fleet-server/pull/4891] 
+* Update Go version to v1.24.3 {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4891[#https://github.com/elastic/fleet-server/pull/4891] 
 
 // end 8.18.2 relnotes
