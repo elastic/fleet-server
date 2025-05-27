@@ -18,7 +18,16 @@ ENV MAGEFILE_CACHE=/fleet-server/build/.magefile
 ENTRYPOINT [ "mage" ]
 CMD [ "build:release" ]
 
-FROM base AS builder
+# FIPS docker image defined below
+# Does not use base as the lowest layer so we don't have to deal with user/ownership issues when building the image.
+ARG GO_VERSION
+FROM --platform=${BUILDPLATFORM:-linux} mcr.microsoft.com/oss/go/microsoft/golang:${GO_VERSION}-1-fips-bookworm AS builder
+
+WORKDIR /fleet-server
+
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+RUN go install github.com/magefile/mage # uses version in go.mod
 
 COPY . .
 
