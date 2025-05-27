@@ -1,0 +1,16 @@
+// begin 8.18.2 relnotes
+
+[[release-notes-8.18.2]]
+==  8.18.2
+
+Review important information about the  8.18.2 release.
+
+[discrete]
+[[enhancements-8.18.2]]
+=== Enhancements
+
+fleet-server::
+
+* Update Go version to v1.24.3 {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4891[#https://github.com/elastic/fleet-server/pull/4891] 
+
+// end 8.18.2 relnotes
