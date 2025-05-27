@@ -1,16 +1,20 @@
 ARG GO_VERSION
-FROM mcr.microsoft.com/oss/go/microsoft/golang:${GO_VERSION}-1-fips-bookworm AS base
+FROM --platform=${BUILDPLATFORM:-linux} mcr.microsoft.com/oss/go/microsoft/golang:${GO_VERSION}-1-fips-bookworm AS base
 
-ENV FIPS=true
-ENV CGO_ENABLED=1
-
+RUN groupadd --gid 1000 fleet-server && \
+    useradd -M -d /fleet-server/ --uid 1000 --gid 1000 fleet-server
+USER fleet-server
 WORKDIR /fleet-server/
+
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 RUN go install github.com/magefile/mage # uses version in go.mod
-ENV PATH="$PATH:/go/bin"
 
+ENV PATH="$PATH:/go/bin"
+ENV FIPS=true
+ENV CGO_ENABLED=1
+ENV MAGEFILE_CACHE=/fleet-server/build/.magefile
 ENTRYPOINT [ "mage" ]
 CMD [ "build:release" ]
 
