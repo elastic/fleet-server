@@ -1,13 +1,6 @@
-# Makefile for fleet-server
-# Many of the targets can change behaviour based on the following flags:
-# - SNAPSHOT - true/false (default false); Make a SNAPSHOT build; fleet-server will allow agents on the next minor version to connect
-# - DEV - true/false (default false); Make a dev build, compiler inlining and optimizations are disabled and the symbols table is kept
-# - FIPS - true/false (default false); Make a FIPS build.
-#
-# Additionally the PLATFORMS env var can be used to deterimine outputs for specific targets, such as release.
-
 SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
+<<<<<<< HEAD
 DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
@@ -149,10 +142,20 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
 	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
 	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(FIPSSUFFIX)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+=======
+CMD_COLOR_ON=\033[32m\xE2\x9c\x93
+CMD_COLOR_OFF=\033[0m
+
+.PHONY: mage
+mage:
+	@go install github.com/magefile/mage
+	@printf "${CMD_COLOR_ON} Mage installed\n${CMD_COLOR_OFF}"
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
 
 .PHONY: clean
-clean: ## - Clean up build artifacts
+clean:
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
+<<<<<<< HEAD
 	rm -rf .service_token* .kibana_service_token ./bin/ ./build/
 
 .PHONY: generate
@@ -473,3 +476,6 @@ test-cloude2e-set: ## Run cloude2e test
 	$(eval FLEET_SERVER_URL := $(shell make --no-print-directory -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
 	make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url
 	FLEET_SERVER_URL="${FLEET_SERVER_URL}" go test -v -tags=cloude2e -count=1 -race -p 1 ./testing/cloude2e
+=======
+	rm -rf .service_token* .apm_server_api_key ./bin/ ./build/
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))

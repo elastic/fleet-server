@@ -4,14 +4,22 @@ FROM --platform=linux/amd64 ${ELASTIC_AGENT_IMAGE} as elastic_agent_amd64
 ARG STACK_VERSION # e.g. 8.5.0-SNAPSHOT
 ARG FLEET_SUFFIX # e.g. -linux-x86_64
 ARG VCS_REF_SHORT # e.g. abc123
+<<<<<<< HEAD
 ONBUILD COPY --chmod=0755 --chown=elastic-agent cover/fleet-server-${STACK_VERSION}${FLEET_SUFFIX}/fleet-server \
+=======
+COPY --chmod=0755 --chown=elastic-agent cover/fleet-server${FLEET_FIPS}-${STACK_VERSION}-linux-x86_64/fleet-server \
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
              ./data/elastic-agent-${VCS_REF_SHORT}/components/fleet-server
 
 FROM --platform=linux/arm64 ${ELASTIC_AGENT_IMAGE} as elastic_agent_arm64
 ARG STACK_VERSION # e.g. 8.5.0-SNAPSHOT
 ARG FLEET_SUFFIX # e.g. -linux-x86_64
 ARG VCS_REF_SHORT # e.g. abc123
+<<<<<<< HEAD
 ONBUILD COPY --chmod=0755 --chown=elastic-agent cover/fleet-server-${STACK_VERSION}${FLEET_SUFFIX}/fleet-server \
+=======
+COPY --chmod=0755 --chown=elastic-agent cover/fleet-server${FLEET_FIPS}-${STACK_VERSION}-linux-arm64/fleet-server \
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
              ./data/elastic-agent-${VCS_REF_SHORT}/components/fleet-server
 
 FROM elastic_agent_${TARGETARCH}

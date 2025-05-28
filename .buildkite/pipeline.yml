@@ -2,12 +2,6 @@
 
 env:
   DOCKER_COMPOSE_VERSION: "1.25.5"
-  DOCKER_REGISTRY: "docker.elastic.co"
-  DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/fleet-server" # needs to rename for rollback
-  DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
-  DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
-  DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
-  GO_AGENT_IMAGE: "golang:${GO_VERSION}"
   TERRAFORM_VERSION: "1.6.4"
 
 steps:
@@ -16,19 +10,15 @@ steps:
     steps:
       - label: ":white_check_mark: Run check-ci"
         key: check-ci
-        command: "make check-ci"
+        command: ".buildkite/scripts/check_ci.sh"
         agents:
-          image: "${GO_AGENT_IMAGE}"
-          cpu: "8"
-          memory: "4G"
+          provider: "gcp"
 
       - label: ":building_construction: Run local build"
         key: make-local
-        command: "make local"
+        command: ".buildkite/scripts/local_build.sh"
         agents:
-          image: "${GO_AGENT_IMAGE}"
-          cpu: "8"
-          memory: "4G"
+          provider: "gcp"
 
       - label: ":building_construction: Run local build: MacOS"
         key: make-local-macos
@@ -43,6 +33,8 @@ steps:
       - label: "Run go benchmark for PR branch"
         key: "go-benchmark-pr"
         command: ".buildkite/scripts/run_benchmark.sh pr"
+        env:
+          BENCHMARK_ARGS: "-count=8 -benchmem"
         artifact_paths:
           - build/next.out
           - build/next.stat
@@ -51,8 +43,11 @@ steps:
           machineType: "c2-standard-8"
 
       - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+        skip: true # FIXME: Temporarily disabled until mage is on main
         key: "go-benchmark-base"
         command: ".buildkite/scripts/run_benchmark.sh base"
+        env:
+          BENCHMARK_ARGS: "-count=8 -benchmem"
         artifact_paths:
           - build/base.out
           - build/base.stat
@@ -61,6 +56,7 @@ steps:
           machineType: "c2-standard-8"
 
       - label: "Compare results"
+        skip: true # FIXME: Temporarily disabled until mage is on main
         key: "go-benchmark-compare"
         command: ".buildkite/scripts/run_benchmark.sh compare"
         artifact_paths:
@@ -98,6 +94,20 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
+<<<<<<< HEAD
+=======
+      - label: ":smartbear-testexecute: Run fips140=only unit tests"
+        key: unit-test-fips140-only
+        command: ".buildkite/scripts/unit_test_fipsonly.sh"
+        env:
+          FIPS: "true"
+        agents:
+          provider: "gcp"
+        artifact_paths:
+          - build/*.xml
+          - build/coverage*.out
+
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
       - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
         key: unit-test-macos-13
         command: ".buildkite/scripts/unit_test.sh"
@@ -128,8 +138,11 @@ steps:
       - label: "E2E Test"
         key: "e2e-test"
         command: ".buildkite/scripts/e2e_test.sh"
+<<<<<<< HEAD
         env:
           TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
+=======
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
         agents:
           provider: "gcp"
         artifact_paths:
@@ -177,6 +190,13 @@ steps:
 
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
+        env:
+          DOCKER_REGISTRY: "docker.elastic.co"
+          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fleet"
+          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
+          SNAPSHOT: "true"
+          PLATFORMS: "linux/amd64"
+          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
@@ -192,6 +212,12 @@ steps:
   - label: ":docker: Publish docker image"
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
+    env:
+      DOCKER_REGISTRY: "docker.elastic.co"
+      DOCKER_IMAGE: "docker.elastic.co/observability-ci/fleet-server" # needs to rename for rollback
+      DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
+      DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
+      DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
     if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_BRANCH') == 'main'"
     agents:
       provider: "gcp"

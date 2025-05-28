@@ -8,9 +8,7 @@ add_bin_path
 
 with_go
 
-with_docker_compose
-
 with_mage
 
-echo "Starting the integration tests..."
-mage test:integration test:junitReport
+echo "Starting the fips140=only unit tests..."
+mage test:unitFIPSOnly test:junitReport
