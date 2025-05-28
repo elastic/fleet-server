@@ -16,6 +16,7 @@ fleet-server.dev.yml
 dev-tools/integration/.env.bck
 dev-tools/cloud/terraform/.terraform
 dev-tools/cloud/terraform/terraform.tfstate*
+dev-tools/cloud/terraform/.terraform.lock.hcl
 dev-tools/cloud/terraform/*.tfvars*
 
 go.work
