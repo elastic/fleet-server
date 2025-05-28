@@ -791,6 +791,9 @@ func packageWindows(arch string) error {
 	if err != nil {
 		return fmt.Errorf("unable to turn dir stat into header: %w", err)
 	}
+	if !strings.HasSuffix(dirHeader.Name, "/") {
+		dirHeader.Name += "/"
+	}
 	_, err = zw.CreateHeader(dirHeader)
 	if err != nil {
 		return fmt.Errorf("unable to create zip dir: %w", err)
