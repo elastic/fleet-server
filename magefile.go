@@ -1424,10 +1424,6 @@ func unzip(sourceFile, destinationDir string) error {
 			return os.MkdirAll(path, f.Mode())
 		}
 
-		if err = os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
-		}
-
 		out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 		if err != nil {
 			return err
