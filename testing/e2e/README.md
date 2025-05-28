@@ -4,7 +4,7 @@ Fleet-server E2E tests are black-box tests where a fleet-server binary is starte
 
 The tests can be ran from the repo's root directory by running:
 ```bash
-make test-e2e
+mage test:e2e
 ```
 
 Please note that by default only the `StandAlone*` suites are executed.
@@ -53,7 +53,7 @@ The `TestSomething` methods will automatically be ran as part of the API test su
 An example of adding a test is adding a new endpoint to the API.
 Here is how the `GET /api/agents/upgrades/:version/pgp-public-key` was added as a test.
 
-First, make sure that the client implementation in `../pkg/api` has the new endpoint by running `make generate` in the repo's root directory.
+First, make sure that the client implementation in `../pkg/api` has the new endpoint by running `mage generate` in the repo's root directory.
 
 Next you should add a wrapper to the call in `api_version/client_api_current.go` that other test cases may use, this method should make and validate the call.
 For example:
