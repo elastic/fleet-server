@@ -555,7 +555,12 @@ func (Check) NoChanges() error {
 	if err := sh.Run("go", "mod", "tidy", "-v"); err != nil {
 		return fmt.Errorf("go mod tidy failure: %w", err)
 	}
-	if err := sh.RunV("git", "diff"); err != nil {
+	// sh.Output instead of sh.RunV as RunV has some level of terminal control that makes buildkite hang.
+	out, err := sh.Output("git", "diff")
+	if len(out) > 0 {
+		fmt.Println(out)
+	}
+	if err != nil {
 		return fmt.Errorf("git diff failure: %w", err)
 	}
 	if out, err := sh.Output("git", "update-index", "--refresh"); err != nil {
