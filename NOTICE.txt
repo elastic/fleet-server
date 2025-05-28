@@ -5111,11 +5111,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/grpc
-Version: v1.72.1
+Version: v1.72.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.72.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.72.2/LICENSE:
 
 
                                  Apache License
@@ -5323,11 +5323,11 @@ Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.72.1/LIC
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/protobuf
-Version: v1.36.5
+Version: v1.36.6
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/protobuf@v1.36.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/protobuf@v1.36.6/LICENSE:
 
 Copyright (c) 2018 The Go Authors. All rights reserved.
 
