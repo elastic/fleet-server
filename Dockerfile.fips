@@ -1,14 +1,11 @@
 ARG GO_VERSION
 FROM --platform=${BUILDPLATFORM:-linux} mcr.microsoft.com/oss/go/microsoft/golang:${GO_VERSION}-1-fips-bookworm AS base
 
-<<<<<<< HEAD
-=======
 RUN groupadd --gid 1000 fleet-server && \
     useradd -M -d /fleet-server/ --uid 1000 --gid 1000 fleet-server
 USER fleet-server
 WORKDIR /fleet-server/
 
->>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
