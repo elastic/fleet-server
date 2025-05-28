@@ -217,7 +217,7 @@ steps:
         env:
           DOCKER_REGISTRY: "docker.elastic.co"
           DOCKER_BASE_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
-          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud-fleet"
+          DOCKER_IMAGE: "docker.elastic.co/cloud-release/elastic-agent-fips-cloud"
           DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
           SNAPSHOT: "true"
           PLATFORMS: "linux/amd64"
