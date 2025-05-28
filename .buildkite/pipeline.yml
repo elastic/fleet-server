@@ -43,7 +43,6 @@ steps:
           machineType: "c2-standard-8"
 
       - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-        skip: true # FIXME: Temporarily disabled until mage is on main
         key: "go-benchmark-base"
         command: ".buildkite/scripts/run_benchmark.sh base"
         env:
@@ -56,7 +55,6 @@ steps:
           machineType: "c2-standard-8"
 
       - label: "Compare results"
-        skip: true # FIXME: Temporarily disabled until mage is on main
         key: "go-benchmark-compare"
         command: ".buildkite/scripts/run_benchmark.sh compare"
         artifact_paths:
