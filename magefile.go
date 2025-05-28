@@ -2028,6 +2028,7 @@ func (Test) CloudE2E() {
 // DOCKER_IMAGE can be used to specify the custom integration server image.
 // DOCKER_IMAGE_TAG can be used to specify the tag of the custom integration server.
 func (Test) CloudE2EUp() error {
+	os.Setenv(envSnapshot, "true")
 	imageName := dockerImage
 	imageTag := getVersion()
 
@@ -2082,16 +2083,35 @@ func (Test) CloudE2EDown() error {
 
 // CloudE2ERun runs tests against the remote cloud deployment.
 func (Test) CloudE2ERun() error {
-	url, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "fleet_url")
+	fleetURL, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "fleet_url")
 	if err != nil {
 		return fmt.Errorf("unable to retrive fleet-server cloud url: %w", err)
+	}
+
+	kibanaURL, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "kibana_url")
+	if err != nil {
+		return fmt.Errorf("unable to retrive kibana cloud url: %w", err)
+	}
+
+	user, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "elasticsearch_username")
+	if err != nil {
+		return fmt.Errorf("unable to retrive es username: %w", err)
+	}
+	pass, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "elasticsearch_password")
+	if err != nil {
+		return fmt.Errorf("unable to retrive es password: %w", err)
 	}
 
 	var b bytes.Buffer
 	w := io.MultiWriter(&b, os.Stdout)
 	cmd := exec.Command("go", "test", "-v", "-timeout", "30m", "-tags=cloude2e", "-count=1", "-p", "1", "./...")
 	cmd.Dir = "testing"
-	cmd.Env = append(os.Environ(), "FLEET_SERVER_URL="+url)
+	cmd.Env = append(os.Environ(),
+		"FLEET_SERVER_URL="+fleetURL,
+		"KIBANA_URL="+kibanaURL,
+		"ELASTIC_USER="+user,
+		"ELASTIC_PASS="+pass,
+	)
 	cmd.Stdout = w
 	cmd.Stderr = w
 	err = cmd.Run()
