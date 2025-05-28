@@ -8,6 +8,7 @@ package bulk
 
 import (
 	json "encoding/json"
+
 	es "github.com/elastic/fleet-server/v7/internal/pkg/es"
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"

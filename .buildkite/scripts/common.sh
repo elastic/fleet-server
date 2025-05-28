@@ -55,7 +55,7 @@ with_msft_go() {
     echo "Setting up microsoft/go"
     create_workspace
     check_platform_architeture
-    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version)-1.${platform_type}-${arch_type}.tar.gz
+    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version).${platform_type}-${arch_type}.tar.gz
     retry 5 $(curl -sL -o - $MSFT_DOWNLOAD_URL | tar -xz -f - -C ${WORKSPACE})
     export PATH="${PATH}:${WORKSPACE}/go/bin"
     go version
@@ -148,17 +148,11 @@ download_mbp_packages_from_gcp_bucket() {
 }
 
 with_mage() {
-    local install_packages=(
-            "github.com/magefile/mage"
-            "github.com/elastic/go-licenser"
-            "golang.org/x/tools/cmd/goimports"
-            "github.com/jstemmer/go-junit-report"
-            "gotest.tools/gotestsum"
-    )
     create_workspace
-    for pkg in "${install_packages[@]}"; do
-        go install "${pkg}@latest"
-    done
+    go install github.com/magefile/mage # uses go.mod implicitly
+    mage -clean
+    mage -version
+    which mage
 }
 
 cleanup() {

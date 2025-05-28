@@ -1,13 +1,6 @@
-# Makefile for fleet-server
-# Many of the targets can change behaviour based on the following flags:
-# - SNAPSHOT - true/false (default false); Make a SNAPSHOT build; fleet-server will allow agents on the next minor version to connect
-# - DEV - true/false (default false); Make a dev build, compiler inlining and optimizations are disabled and the symbols table is kept
-# - FIPS - true/false (default false); Make a FIPS build.
-#
-# Additionally the PLATFORMS env var can be used to deterimine outputs for specific targets, such as release.
-
 SHELL=/usr/bin/env bash
 GO_VERSION=$(shell cat '.go-version')
+<<<<<<< HEAD
 DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version.go | tr -d '"')
 
 # Set FIPS=true to force FIPS compliance when building
@@ -77,86 +70,20 @@ PLATFORM_TARGETS=$(addprefix release-, $(PLATFORMS))
 COVER_TARGETS=$(addprefix cover-, $(PLATFORMS))
 COMMIT=$(shell git rev-parse --short HEAD)
 NOW=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+=======
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
 CMD_COLOR_ON=\033[32m\xE2\x9c\x93
 CMD_COLOR_OFF=\033[0m
 
-LDFLAGS=-X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=$(NOW)
-ifeq ($(strip $(DEV)),)
-GCFLAGS ?=
-LDFLAGS:=-s -w ${LDFLAGS}
-else
-GCFLAGS ?= all=-N -l
-endif
-
-# Directory to dump build tools into
-GOBIN=$(shell go env GOPATH)/bin/
-
-OS_NAME:=$(shell uname -s)
-
-# NOTE: We are assuming that the only GOEXPIREMENT flag will be associated with FIPS
-GOFIPSEXPERIMENT?=
-FIPSSUFFIX=
-ifeq "${FIPS}" "true"
-BUILDER_IMAGE=fleet-server-fips-builder:${GO_VERSION}
-DOCKER_IMAGE:=docker.elastic.co/fleet-server/fleet-server-fips
-STANDALONE_DOCKERFILE=Dockerfile.fips
-gobuildtags += requirefips ms_tls13kdf
-GOFIPSEXPERIMENT=GOEXPERIMENT=systemcrypto CGO_ENABLED=1
-FIPSSUFFIX=-fips
-endif
-
-# Assemble GOBUILDTAGS with some Makefile trickery as we need to avoid sending multiple -tags flags
-# the character of a comma needs a variable so it can be used as a value in a subst call
-comma=,
-# transform the space-seperated values in gobuildtags to a comma seperated string
-GOBUILDTAGS=$(subst $() $(),$(comma),$(gobuildtags))
-
-.EXPORT_ALL_VARIABLES:
-	FIPS=${FIPS}
-
-.PHONY: help
-help: ## - Show help message
-	@printf "${CMD_COLOR_ON} usage: make [target]\n\n${CMD_COLOR_OFF}"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | sed -e "s/^Makefile://" | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
-
-.PHONY: multipass
-multipass: ## - Launch a multipass instance for development
-ifeq ($(shell uname -p),arm)
-	$(eval ARCH := arm64)
-else
-	$(eval ARCH := amd64)
-endif
-ifeq "${FIPS}" "true"
-	$(eval DOWNLOAD_URL := https://aka.ms/golang/release/latest/go${GO_VERSION}-1.linux-${ARCH}.tar.gz)
-else
-	$(eval DOWNLOAD_URL := https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz)
-endif
-	@cat dev-tools/multipass-cloud-init.yml.envsubst | DOWNLOAD_URL=${DOWNLOAD_URL} ARCH=${ARCH} envsubst > dev-tools/multipass-cloud-init.yml
-	@multipass launch --cloud-init=dev-tools/multipass-cloud-init.yml --mount ..:~/git --name fleet-server-dev --memory 8G --cpus 2 --disk 50G noble
-	@rm dev-tools/multipass-cloud-init.yml
-
-.PHONY: list-platforms
-list-platforms: ## - Show the possible PLATFORMS
-	@echo  "${PLATFORMS}"
-
-.PHONY: local
-local: ## - Build local binary for local environment (bin/fleet-server)
-	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
-	${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
-	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
-
-.PHONY: $(COVER_TARGETS)
-$(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integration testing
-	@mkdir -p build/cover
-	$(eval $@_OS := $(firstword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
-	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
-	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
-	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server$(FIPSSUFFIX)-$(VERSION)-$($@_OS)-$($@_ARCH)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+.PHONY: mage
+mage:
+	@go install github.com/magefile/mage
+	@printf "${CMD_COLOR_ON} Mage installed\n${CMD_COLOR_OFF}"
 
 .PHONY: clean
-clean: ## - Clean up build artifacts
+clean:
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
+<<<<<<< HEAD
 	rm -rf .service_token* .kibana_service_token ./bin/ ./build/
 
 .PHONY: generate
@@ -474,3 +401,6 @@ test-cloude2e-set: ## Run cloude2e test
 	$(eval FLEET_SERVER_URL := $(shell make --no-print-directory -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
 	make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url
 	FLEET_SERVER_URL="${FLEET_SERVER_URL}" go test -v -tags=cloude2e -count=1 -race -p 1 ./testing/cloude2e
+=======
+	rm -rf .service_token* .apm_server_api_key ./bin/ ./build/
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
