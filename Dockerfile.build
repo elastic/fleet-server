@@ -7,11 +7,21 @@ RUN \
   && apt-get install --no-install-recommends -y zip \
   && apt-get clean
 
+<<<<<<< HEAD
 WORKDIR /go/src/github.com/elastic/fleet-server
 
+=======
+RUN groupadd --gid 1000 fleet-server && \
+    useradd -M -d /fleet-server/ --uid 1000 --gid 1000 fleet-server
+USER fleet-server
+WORKDIR /fleet-server/
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
+RUN go install github.com/magefile/mage # uses version in go.mod
 
-ENTRYPOINT [ "make" ]
-CMD [ "release" ]
+ENV PATH="$PATH:/go/bin"
+ENV MAGEFILE_CACHE=/fleet-server/build/.magefile
+ENTRYPOINT [ "mage" ]
+CMD [ "build:release" ]

@@ -2,24 +2,29 @@
 
 **NOTE: FIPS Support is in-progress**
 
-The fleet-server can be built in FIPS mode.
-This forces the use of a FIPS compliant provider to handle any cryptographic calls.
+The fleet-server can be built in a FIPS capable mode.
+This forces the use of a FIPS provider to handle any cryptographic calls.
 
 Currently FIPS is provided by compiling with the [microsoft/go](https://github.com/microsoft/go) distribution.
 This toolchain must be present for local compilation.
 
-
 ## Build changes
 
-As we are using Microsfot/go as a base we follow their conventions.
+As we are using micrsoft/go as a base we follow their conventions.
 
+<<<<<<< HEAD
 The buildtag `requirefips` is passed when FIPS is enabled/required.
 Additionally when compiling `GOEXPERIMENT=systemcrypto` is specified.
+=======
+Our FIPS changes require the `requirefips` and `ms_tls13kdf` buildtags.
+When compiling `GOEXPERIMENT=systemcrypto` and `CGO_ENABLED=1` must be set.
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
 
-The `FIPS=true` env var is used by our Makefile as the indicator that controls FIPS.
-This env var is also passed to every child process the Makefile starts.
-The following make commands have different behaviour when FIPS is enabled:
+The `FIPS=true` env var is used by our magefile as the FIPS toggle.
+This env var applies to all targets, at a minimum the `requirefips` and `ms_tls13kdf` tags will be set.
+For targets that compile binaries, the `GOEXPERIMENT=systemcrypto` and `CGO_ENABLED=1` env vars are set.
 
+<<<<<<< HEAD
 - `make multipass` - Provision a multipass VM with the Microsoft/go toolchain. See [Multipass VM Usage](#multipass-vm-usage) for additional details.
 - `make local` - Compile a fleet-server targetting the machine's GOOS/GOARCH with FIPS enabled
 - `make cover-*` - Compile a coverage and fips enabled fleet-server for e2e tests
@@ -30,10 +35,14 @@ The following make commands have different behaviour when FIPS is enabled:
 - `make build-releaser` - Will create the fleet-server builder image based on Microsoft's FIPS enabled golang image.
 - `make docker-release` - Runs `make release` to produce FIPS enabled binaries in a FIPS docker container.
 - `make docker-cover-e2e-binaries` - Will produce coverage and FIPS enabled binaries for e2e tests from within the same docker container that `build-release` makes
+=======
+For developer conveniance, running `FIPS=true mage multipass` will provision a multipass VM with the Microsoft/go toolchain.
+See [Multipass VM Usage](#multipass-vm-usage) for additional details.
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
 
 ### Multipass VM Usage
 
-A Multipass VM created with `FIPS=true make multipass` is able to compile FIPS enabled golang programs, but is not able to run them.
+A Multipass VM created with `FIPS=true mage multipass` is able to compile FIPS enabled golang programs, but is not able to run them.
 When you try to run one the following error occurs:
 ```
 GOFIPS=1 ./bin/fleet-server -c fleet-server.yml
@@ -101,5 +110,10 @@ i...
 
 ## Usage
 
+<<<<<<< HEAD
 A FIPS enabled binary should be ran with the env var `GOFIPS=1` set.
 The system/image is required to have a FIPS compliant provider available.
+=======
+Binaries produced with the `FIPS=true` env var will panic on startup if they cannot find a FIPS provider.
+The system/image is required to have a FIPS provider available.
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))

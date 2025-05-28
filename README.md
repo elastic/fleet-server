@@ -13,8 +13,34 @@ Fleet server is always on the exact same version as the Elastic Agent running fl
 Any Elastic Agent enrolling into a fleet-server must be the same version or older.
 For Kibana it is assumed it is on the same version as Elasticsearch. With this the compatibility looks as following:
 
+<<<<<<< HEAD
 ```
 Elastic Agent <= Elastic Agent with fleet-server <= Elasticsearch / Kibana
+=======
+### Requirements
+
+- Golang see [.go-version](./go-version) file for the current supported version.
+- [mage](https://magefile.org/), may be installed with the `make mage` shortcut.
+
+### Elasticsearch + Kibana
+
+An Elasticsearch instance is needed in order to run fleet-server.
+The following environment variables will need to be set with values from Elasticsearch/Kibana in order to run fleet-server:
+
+- `ELASTICSEARCH_HOSTS` - The `schema://host:port` for Elasticsearch.
+- `ELASTICSEARCH_CA_TRUSTED_FINGERPRINT` - The CA fingerprint for Elasticsearch.
+- `ELASTICSEARCH_SERVICE_TOKEN` - The fleet-server service token.
+- `FLEET_SERVER_POLICY_ID` - The fleet policy with the fleet-server integration.
+
+For instructions/options on how to run the Elastic stack please refer to the [Developer's Guide](./docs/developers-guide.md).
+
+### Build and run
+
+To build the fleet-server binary to run locally use:
+
+```bash
+mage build:local # Use SNAPSHOT=true if targetting a SNAPSHOT build.
+>>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
 ```
 
 There might be differences on the bugfix version.
