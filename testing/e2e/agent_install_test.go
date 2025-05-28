@@ -61,6 +61,9 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	if arch == "amd64" {
 		arch = "x86_64"
 	}
+	if runtime.GOOS == "darwin" && arch == "arm64" {
+		arch = "aarch64"
+	}
 
 	suite.Setup() // base setup
 	suite.SetupKibana()
@@ -82,7 +85,7 @@ func (suite *AgentInstallSuite) SetupSuite() {
 
 	// Unarchive download in temp dir
 	suite.downloadPath = filepath.Join(os.TempDir(), "e2e-agent_install_test")
-	err = os.Mkdir(suite.downloadPath, 0755)
+	err = os.MkdirAll(suite.downloadPath, 0755)
 	suite.Require().NoError(err)
 	switch runtime.GOOS {
 	case "windows":
