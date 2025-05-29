@@ -999,12 +999,17 @@ func (Docker) Image() error {
 
 // Push pushs an image created by docker:image to the registry.
 // FIPS may be used to push a FIPS capable image.
+// DOCKER_IMAGE may be used to specify the image name.
 // DOCKER_IMAGE_TAG may be used to specify the image tag.
 func (Docker) Push() error {
 	image := dockerImage
 	if isFIPS() {
 		image += "-fips"
 	}
+	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
+		image = v
+	}
+
 	version := getVersion()
 	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
 		version = v
