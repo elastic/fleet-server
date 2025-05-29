@@ -82,8 +82,10 @@ const (
 	envDockerImage = "DOCKER_IMAGE"
 	// envDockerTag is used to indicate tag for images produced by the docker:image target. Defaults to version. It
 	envDockerTag = "DOCKER_IMAGE_TAG"
-	// envDockerBaseImage is the image:tag for the base elastic-agent-cloud images used by e2e tests.
+	// envDockerBaseImage is the base image for elastic-agent-cloud images used by e2e tests.
 	envDockerBaseImage = "DOCKER_BASE_IMAGE"
+	// envDockerBaseImageTag is the tag for the base image used by e2e tests.
+	envDockerBaseImageTag = "DOCKER_BASE_IMAGE_TAG"
 )
 
 // const and vars used by magefile.
@@ -1012,6 +1014,7 @@ func (Docker) Push() error {
 // This step requires a coverage enabled binary to be used.
 // FIPS is used to control if a FIPS compliant image should be created.
 // DOCKER_BASE_IMAGE may be used to specify the elastic-agent base image. docker.elastic.co/cloud-release/elastic-agent-cloud by default.
+// DOCKER_BASE_IMAGE_TAG may be used to specify the elastic-agent base image tag. Uses the ELASTICESRCH version from dev-tools/integration/.env.
 // DOCKER_IMAGE is used to specify the resulting image name.
 // DOCKER_IMAGE_TAG is used to specify the resulting image tag.
 func (Docker) CustomAgentImage() error {
@@ -1020,12 +1023,17 @@ func (Docker) CustomAgentImage() error {
 		return fmt.Errorf("unable to read env file: %w", err)
 	}
 
-	baseImage := "docker.elastic.co/cloud-release/elastic-agent-cloud:" + env["ELASTICSEARCH_VERSION"]
+	baseImage := "docker.elastic.co/cloud-release/elastic-agent-cloud"
 	if v, ok := os.LookupEnv(envDockerBaseImage); ok && v != "" {
 		baseImage = v
 	}
+	baseImageTag := env["ELASTICSEARCH_VERSION"]
+	if v, ok := os.LookupEnv(envDockerBaseImageTag); ok && v != "" {
+		baseImageTag = v
+	}
+
 	dockerEnv := map[string]string{"DOCKER_BUILDKIT": "1"}
-	err = sh.RunWithV(dockerEnv, "docker", "pull", "--platform", "linux/"+runtime.GOARCH, baseImage)
+	err = sh.RunWithV(dockerEnv, "docker", "pull", "--platform", "linux/"+runtime.GOARCH, baseImage+":"+baseImageTag)
 	if err != nil {
 		return fmt.Errorf("failed to pull image: %w", err)
 	}
@@ -1047,7 +1055,7 @@ func (Docker) CustomAgentImage() error {
 	}
 	err = sh.RunWithV(dockerEnv, "docker", "build",
 		"-f", filepath.Join("dev-tools", "e2e", "Dockerfile"),
-		"--build-arg", "ELASTIC_AGENT_IMAGE="+baseImage,
+		"--build-arg", "ELASTIC_AGENT_IMAGE="+baseImage+":"+baseImageTag,
 		"--build-arg", "STACK_VERSION="+getVersion(),
 		"--build-arg", "VCS_REF_SHORT="+vcsRef[:6],
 		"--build-arg", "FLEET_FIPS="+fips,
