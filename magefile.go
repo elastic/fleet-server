@@ -791,6 +791,9 @@ func packageWindows(arch string) error {
 	if err != nil {
 		return fmt.Errorf("unable to turn dir stat into header: %w", err)
 	}
+	if !strings.HasSuffix(dirHeader.Name, "/") {
+		dirHeader.Name += "/"
+	}
 	_, err = zw.CreateHeader(dirHeader)
 	if err != nil {
 		return fmt.Errorf("unable to create zip dir: %w", err)
@@ -1419,10 +1422,6 @@ func unzip(sourceFile, destinationDir string) error {
 
 		if f.FileInfo().IsDir() {
 			return os.MkdirAll(path, f.Mode())
-		}
-
-		if err = os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
 		}
 
 		out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
