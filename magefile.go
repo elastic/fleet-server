@@ -1040,7 +1040,7 @@ func (Docker) CustomAgentImage() error {
 	if err != nil {
 		return fmt.Errorf("failed to pull image: %w", err)
 	}
-	vcsRef, err := sh.OutputWith(dockerEnv, "docker", "inspect", "-f", "{{index .Config.Labels \"org.label-schema.vcs-ref\" }}", baseImage)
+	vcsRef, err := sh.OutputWith(dockerEnv, "docker", "inspect", "-f", "{{index .Config.Labels \"org.label-schema.vcs-ref\" }}", baseImage+":"+baseImageTag)
 	if err != nil {
 		return fmt.Errorf("unable to find vcs-ref label: %w", err)
 	}
