@@ -520,6 +520,7 @@ func (l *logger) Printf(format string, v ...interface{}) {
 
 func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxitc.Container {
 	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0",
+		testcontainers.WithLogger(&logger{s.T()}),
 		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
 				Hostname: "toxi",
@@ -527,9 +528,22 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxitc.Container {
 				// NOTE: the container will not become healthy when using `testcontainers-go 0.36.x+ if set to NetworkMode: "host"
 				Networks: []string{"integration_default"},
 			}}),
-		testcontainers.WithLogger(&logger{s.T()}),
 		toxitc.WithProxy("es", "elasticsearch:9200"),
 	)
+	if err != nil {
+		s.T().Logf("Toxiproxy container creation failed, will retry: %v", err)
+		container, err = toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0",
+			testcontainers.WithLogger(&logger{s.T()}),
+			testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
+				ContainerRequest: testcontainers.ContainerRequest{
+					Hostname: "toxi",
+					// Network is set to the integration test network instead of using host mode so it can easily communicate with other containers.
+					// NOTE: the container will not become healthy when using `testcontainers-go 0.36.x+ if set to NetworkMode: "host"
+					Networks: []string{"integration_default"},
+				}}),
+			toxitc.WithProxy("es", "elasticsearch:9200"),
+		)
+	}
 	s.Require().NoError(err)
 
 	s.T().Cleanup(func() {
