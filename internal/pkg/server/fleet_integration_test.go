@@ -1233,7 +1233,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 			AgentId:  agentID,
 			Message:  "test-message",
 			Type:     api.ACTIONRESULT,
-			Subtype:  api.ACKNOWLEDGED,
+			Subtype:  api.EventSubtypeACKNOWLEDGED,
 		}
 		ev := api.AckRequest_Events_Item{}
 		err := ev.FromGenericEvent(event)
@@ -1365,7 +1365,7 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 			AgentId:  agentID,
 			Message:  "test-message",
 			Type:     api.ACTIONRESULT,
-			Subtype:  api.ACKNOWLEDGED,
+			Subtype:  api.EventSubtypeACKNOWLEDGED,
 		}
 		ev := api.AckRequest_Events_Item{}
 		err := ev.FromGenericEvent(event)
