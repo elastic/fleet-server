@@ -35,15 +35,14 @@ with_mage
 case "${TYPE}" in
     "snapshot")
         export SNAPSHOT=true
-        make release
+        mage build:release
         ;;
     "staging")
-        make release
+        mage build:release
         ;;
     *)
     echo "The option is unsupported yet"
     ;;
 esac
 
-google_cloud_auth
 upload_mbp_packages_to_gcp_bucket "build/distributions/**/*" "${TYPE}"

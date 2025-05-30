@@ -4,6 +4,12 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
+add_bin_path
+
+with_go
+
+with_mage
+
 FOLDER_PATH="build/distributions"
 BASE_DIR="${WORKSPACE}/${FOLDER_PATH}"
 DRA_OUTPUT="release-manager.out"
@@ -12,7 +18,7 @@ export TYPE=${1}
 # DRA_BRANCH can be used for manually testing packaging with PRs
 # e.g. define `DRA_BRANCH="main"` under Options/Environment Variables in the Buildkite UI after clicking new Build
 export BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
-export VERSION="$(make get-version)"
+export VERSION="$(mage getVersion)"
 
 if [[ "${VERSION}" == *"-SNAPSHOT"* || "${VERSION}" == "" ]]; then
     echo "The 'version' parameter is required and it cannot contain the suffix '-SNAPSHOT'."
@@ -24,16 +30,7 @@ if [[ "${PROJECT}" == "" ]]; then
     exit 1
 fi
 
-add_bin_path
-
-google_cloud_auth
-
 download_mbp_packages_from_gcp_bucket "${FOLDER_PATH}" "${TYPE}"
-
-with_go
-
-with_mage
-
 export RM_VERSION="${VERSION}"
 
 if [[ ${TYPE} == "snapshot" ]]; then

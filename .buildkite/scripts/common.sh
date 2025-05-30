@@ -55,7 +55,7 @@ with_msft_go() {
     echo "Setting up microsoft/go"
     create_workspace
     check_platform_architeture
-    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version)-1.${platform_type}-${arch_type}.tar.gz
+    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version).${platform_type}-${arch_type}.tar.gz
     retry 5 $(curl -sL -o - $MSFT_DOWNLOAD_URL | tar -xz -f - -C ${WORKSPACE})
     export PATH="${PATH}:${WORKSPACE}/go/bin"
     go version
@@ -107,13 +107,6 @@ with_Terraform() {
     terraform version
 }
 
-google_cloud_auth() {
-    local secretFileLocation=$(mktemp -d -p "${WORKSPACE}" -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
-    echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
-    gcloud auth activate-service-account --key-file ${secretFileLocation} 2> /dev/null
-    export GOOGLE_APPLICATION_CREDENTIALS=${secretFileLocation}
-}
-
 upload_packages_to_gcp_bucket() {
     local pattern=${1}
     local baseUri="gs://${JOB_GCS_BUCKET}/${REPO}"
@@ -124,7 +117,7 @@ upload_packages_to_gcp_bucket() {
         bucketUriDefault="${baseUri}/pull-requests/pr-${GITHUB_PR_NUMBER}"
     fi
     for bucketUri in "${bucketUriCommit}" "${bucketUriDefault}"; do
-        gsutil -m -q cp -r ${pattern} "${bucketUri}"
+        gcloud storage cp --recursive --quiet ${pattern} "${bucketUri}"
     done
 }
 
@@ -143,7 +136,7 @@ upload_mbp_packages_to_gcp_bucket() {
     local pattern=${1}
     local type=${2}
     get_bucket_uri "${type}"
-    gsutil -m -q cp -r ${pattern} ${bucketUri}
+    gcloud storage cp --recursive --quiet ${pattern} ${bucketUri}
 }
 
 download_mbp_packages_from_gcp_bucket() {
@@ -151,21 +144,15 @@ download_mbp_packages_from_gcp_bucket() {
     local type=${2}
     mkdir -p ${WORKSPACE}/${pattern}
     get_bucket_uri "${type}"
-    gsutil -m -q cp -r ${bucketUri}/* ${WORKSPACE}/${pattern}
+    gcloud storage cp --recursive --quiet ${bucketUri}/* ${WORKSPACE}/${pattern}
 }
 
 with_mage() {
-    local install_packages=(
-            "github.com/magefile/mage"
-            "github.com/elastic/go-licenser"
-            "golang.org/x/tools/cmd/goimports"
-            "github.com/jstemmer/go-junit-report"
-            "gotest.tools/gotestsum"
-    )
     create_workspace
-    for pkg in "${install_packages[@]}"; do
-        go install "${pkg}@latest"
-    done
+    go install github.com/magefile/mage # uses go.mod implicitly
+    mage -clean
+    mage -version
+    which mage
 }
 
 cleanup() {

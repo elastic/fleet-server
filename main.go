@@ -3,9 +3,9 @@
 // you may not use this file except in compliance with the Elastic License.
 
 //go:generate go tool -modfile ./dev-tools/go.mod github.com/elastic/go-json-schema-generate/cmd/schema-generate -esdoc -s -cm "{\"Api\": \"API\", \"Id\": \"ID\"}" -o internal/pkg/model/schema.go -p model model/schema.json
-//go:generate go tool -modfile ./dev-tools/go.mod github.com/deepmap/oapi-codegen/v2/cmd/oapi-codegen --config model/oapi-cfg.yml model/openapi.yml
-//go:generate go tool -modfile ./dev-tools/go.mod github.com/deepmap/oapi-codegen/v2/cmd/oapi-codegen -generate types -package api -o pkg/api/types.gen.go  model/openapi.yml
-//go:generate go tool -modfile ./dev-tools/go.mod github.com/deepmap/oapi-codegen/v2/cmd/oapi-codegen -generate client -package api -o pkg/api/client.gen.go  model/openapi.yml
+//go:generate go tool -modfile ./dev-tools/go.mod github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config model/oapi-cfg.yml model/openapi.yml
+//go:generate go tool -modfile ./dev-tools/go.mod github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen -generate types -package api -o pkg/api/types.gen.go  model/openapi.yml
+//go:generate go tool -modfile ./dev-tools/go.mod github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen -generate client -package api -o pkg/api/client.gen.go  model/openapi.yml
 //go:generate go fmt internal/pkg/model/schema.go
 //go:generate go fmt internal/pkg/api/openapi.gen.go
 //go:generate go fmt pkg/api/types.gen.go

@@ -21,7 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/stretchr/testify/require"
 )
@@ -154,7 +154,7 @@ func CheckActionResultsNamespace(t *testing.T, ctx context.Context, srv *tserver
 
 func Test_Agent_Namespace_test1(t *testing.T) {
 	testNamespace := "test1"
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// Start test server
