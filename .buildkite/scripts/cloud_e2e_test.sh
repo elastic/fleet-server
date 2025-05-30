@@ -27,7 +27,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-USER=fleetserverci mage -v docker:cover docker:customAgentImage docker:push test:cloudE2EUp
+USER=fleetserverci mage docker:cover docker:customAgentImage docker:push test:cloudE2EUp
 FLEET_SERVER_URL=$(terraform output --raw --state=dev-tools/cloud/terraform/terraform.tfstate fleet_url)
 echo "Fleet server: \"${FLEET_SERVER_URL}\""
 echo "Deployment ID: $(terraform output --raw --state=dev-tools/cloud/terraform/terraform.tfstate deployment_id)"
