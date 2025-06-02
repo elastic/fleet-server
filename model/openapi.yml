@@ -86,14 +86,14 @@ components:
             A Unit state that fleet-server may report.
             Unit state is defined in the elastic-agent-client specification.
           enum:
-            - starting
-            - configuring
-            - healthy
-            - degraded
-            - failed
-            - stopping
-            - stopped
-            - unknown
+            - STARTING
+            - CONFIGURING
+            - HEALTHY
+            - DEGRADED
+            - FAILED
+            - STOPPING
+            - STOPPED
+            - UNKNOWN
         version:
           $ref: "#/components/schemas/statusResponseVersion"
     enrollMetadata:
