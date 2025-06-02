@@ -29,6 +29,7 @@ steps:
 
   - group: "Performance test"
     key: "performance-test"
+    depends_on: "check"
     steps:
       - label: "Run go benchmark for PR branch"
         key: "go-benchmark-pr"
@@ -67,10 +68,9 @@ steps:
         agents:
           provider: "gcp"
 
-    depends_on: "check"
-
   - group: "Run tests"
     key: "tests"
+    depends_on: "check"
     steps:
       - label: ":smartbear-testexecute: Run unit tests"
         key: unit-test
@@ -182,7 +182,28 @@ steps:
             allow_failure: false
           - step: "e2e-test"
             allow_failure: false
-    depends_on: "check"
+
+      - label: ":gcloud: Cloud e2e FIPS Test"
+        key: "cloud-e2e-fips-test"
+        env:
+          DOCKER_REGISTRY: "docker.elastic.co"
+          DOCKER_BASE_IMAGE: "docker.elastic.co/cloud-release/elastic-agent-fips-cloud"
+          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
+          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
+          SNAPSHOT: "true"
+          PLATFORMS: "linux/amd64"
+          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
+          FIPS: "true"
+        command: ".buildkite/scripts/cloud_e2e_test.sh"
+        agents:
+          provider: "gcp"
+        depends_on:
+          - step: "unit-test"
+            allow_failure: false
+          - step: "int-test"
+            allow_failure: false
+          - step: "e2e-test"
+            allow_failure: false
 
   - label: ":docker: Publish docker image"
     key: "publish"
