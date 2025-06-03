@@ -451,19 +451,19 @@ func (Check) Headers() error {
 	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/elastic/go-licenser", "-license", "Elastic")
 }
 
-// Notice generates the NOTICE.txt and NOTICE-FIPS.txt files.
+// Notice generates the NOTICE.txt and NOTICE-fips.txt files.
 func (Check) Notice() {
 	mg.SerialDeps(mg.F(genNotice, false), mg.F(genNotice, true))
 }
 
-// genNotice generates the NOTICE.txt or the NOTICE-FIPS.txt file.
+// genNotice generates the NOTICE.txt or the NOTICE-fips.txt file.
 func genNotice(fips bool) error {
 	tags := []string{}
 	outFile := "NOTICE.txt"
 	if fips {
-		log.Println("Generating NOTICE-FIPS.txt.")
+		log.Println("Generating NOTICE-fips.txt.")
 		tags = append(tags, "requirefips", "ms_tls13kdf")
-		outFile = "NOTICE-FIPS.txt"
+		outFile = "NOTICE-fips.txt"
 	} else {
 		log.Println("Generating NOTICE.txt.")
 	}
