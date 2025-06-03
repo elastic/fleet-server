@@ -1619,7 +1619,6 @@ func (Test) Benchstat() error {
 func (Test) E2e() {
 	os.Setenv(envDev, "true")
 	os.Setenv(envSnapshot, "true")
-	os.Setenv(envDockerImage, "fleet-server-e2e-agent")
 
 	// Set PLATFORMS to linux/$GOARCH + a binary for the local system
 	pList := []string{
