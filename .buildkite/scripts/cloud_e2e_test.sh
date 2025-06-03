@@ -41,7 +41,7 @@ if [[ "${FLEET_SERVER_URL}" == "" ]]; then
             --style "error"
     fi
     echo "${message}"
-    exit 0
+    exit 1
 fi
 
 echo "--- Trigger cloud E2E test"
