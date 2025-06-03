@@ -23,7 +23,7 @@ jobs:
           go-version-file: .go-version
 
       - name: update NOTICE.txt and NOTICE-FIPS.txt
-        run: mage check-notice
+        run: mage check:notice
 
       - name: run go mod tidy in testing/
         run: cd testing; go mod tidy
