@@ -530,14 +530,14 @@ func genNotice(fips bool) error {
 // getModules returns a list of direct and indirect modules that are used by the main package and its dependencies.
 // Test and tooling packages are excluded.
 func getModules(extraTags ...string) ([]string, error) {
+	tags := append([]string{"linux", "darwin", "windows"}, extraTags...)
 	args := []string{
 		"list",
 		"-deps",
 		"-f",
 		"{{with .Module}}{{if not .Main}}{{.Path}}{{end}}{{end}}",
-	}
-	if len(extraTags) > 0 {
-		args = append(args, "-tags", strings.Join(extraTags, ","))
+		"-tags",
+		strings.Join(tags, ","),
 	}
 	output, err := sh.Output("go", args...)
 	if err != nil {
