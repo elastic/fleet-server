@@ -968,7 +968,7 @@ func (Docker) Cover() error {
 // DEV creates a development image.
 // SNAPSHOT creates a snapshot image.
 // VERSION_QUALIFIER may be used to manually specify a version qualifer for the image tag.
-// DOCKER_IMAGE may be used to completly specify the image name.
+// DOCKER_IMAGE may be used to completely specify the image name.
 // DOCKER_IMAGE_TAG may be used to completely specify the image tag.
 func (Docker) Image() error {
 	dockerFile := "Dockerfile"
