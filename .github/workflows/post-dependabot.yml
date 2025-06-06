@@ -34,14 +34,22 @@ jobs:
 
       - name: check for modified files
         id: check-files
+<<<<<<< HEAD
         run: echo "modified=$(if git diff-index --quiet HEAD -- NOTICE.txt testing/go.mod testing/go.sum; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+=======
+        run: echo "modified=$(if git diff-index --quiet HEAD -- NOTICE.txt NOTICE-fips.txt testing/go.mod testing/go.sum; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+>>>>>>> 046ed54 (fix: typo of NOTICE-fips.txt filename in post-dependabot.yml (#5017))
 
       - name: commit modified files
         if: steps.check-files.outputs.modified == 'true'
         run: |
           git config --global user.name 'dependabot[bot]'
           git config --global user.email 'dependabot[bot]@users.noreply.github.com'
+<<<<<<< HEAD
           git add NOTICE.txt testing/go.mod testing/go.sum
+=======
+          git add NOTICE.txt NOTICE-fips.txt testing/go.mod testing/go.sum
+>>>>>>> 046ed54 (fix: typo of NOTICE-fips.txt filename in post-dependabot.yml (#5017))
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git commit -m "Post dependabot file modifications"
           git push
