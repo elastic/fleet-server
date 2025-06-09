@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/testing
 
-go 1.24.3
+go 1.24.4
 
 replace (
 	github.com/elastic/fleet-server/pkg/api => ../pkg/api
