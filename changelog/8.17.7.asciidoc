@@ -1,0 +1,16 @@
+// begin 8.17.7 relnotes
+
+[[release-notes-8.17.7]]
+==  8.17.7
+
+Review important information about the  8.17.7 release.
+
+[discrete]
+[[enhancements-8.17.7]]
+=== Enhancements
+
+fleet-server::
+
+* Update Go To V1.24.3. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4891[#https://github.com/elastic/fleet-server/pull/4891] 
+
+// end 8.17.7 relnotes
