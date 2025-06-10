@@ -1,5 +1,5 @@
 ARG GO_VERSION
-# Suffix should be main-debian11-fips or arm-fips
+# Suffix should be main-debian11-fips or base-arm-debian11-fips
 ARG SUFFIX
 FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX} AS base
 
@@ -23,7 +23,7 @@ CMD [ "build:release" ]
 # FIPS docker image defined below
 # Does not use base as the lowest layer so we don't have to deal with user/ownership issues when building the image.
 ARG GO_VERSION
-# Suffix should be main-debian11-fips or arm-fips
+# Suffix should be main-debian11-fips or base-arm-debian11-fips
 ARG SUFFIX
 FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX} AS builder
 
