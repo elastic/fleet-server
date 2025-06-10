@@ -95,7 +95,7 @@ const (
 	binaryExe  = "fleet-server.exe"
 
 	dockerSuffix      = "main-debian11"
-	dockerArmSuffix   = "base-arm-debian9"
+	dockerArmSuffix   = "base-arm-debian11"
 	dockerBuilderFile = "Dockerfile.build"
 	dockerBuilderFIPS = "Dockerfile.fips"
 	dockerBuilderName = "fleet-server-builder"
@@ -899,7 +899,7 @@ func (Docker) Builder() error {
 
 	args := []string{"build", "-t", dockerBuilderName + ":" + getGoVersion(), "--build-arg", "GO_VERSION=" + getGoVersion()}
 	if isFIPS() {
-		args = append(args, "-f", dockerBuilderFIPS, "--target", "base", ".")
+		args = append(args, "-f", dockerBuilderFIPS, "--build-arg", "SUFFIX="+suffix+"-fips", "--target", "base", ".")
 	} else {
 		args = append(args, "-f", dockerBuilderFile, "--build-arg", "SUFFIX="+suffix, ".")
 	}
