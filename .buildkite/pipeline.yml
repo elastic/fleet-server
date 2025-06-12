@@ -182,6 +182,11 @@ steps:
             allow_failure: false
           - step: "e2e-test"
             allow_failure: false
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
 
       - label: ":gcloud: Cloud e2e FIPS Test"
         key: "cloud-e2e-fips-test"
@@ -204,6 +209,11 @@ steps:
             allow_failure: false
           - step: "e2e-test"
             allow_failure: false
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
 
   - label: ":docker: Publish docker image"
     key: "publish"
