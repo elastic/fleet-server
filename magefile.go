@@ -363,6 +363,7 @@ func environMap() map[string]string {
 func addFIPSEnvVars(env map[string]string) {
 	env["GOEXPERIMENT"] = "systemcrypto"
 	env["CGO_ENABLED"] = "1"
+	env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
 }
 
 // teeCommand runs the specified command, stdout and stederr will be written to stdout and will be collected and returned.
