@@ -90,13 +90,13 @@ func TestQueryLatestPolicies(t *testing.T) {
 	}
 }
 
-func TestQueryLatestPolicies30k(t *testing.T) {
+func TestQueryLatestPolicies300k(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
 
 	for i := 0; i < 4; i++ {
-		_, err := storeRandomPolicy(ctx, bulker, index, 10000)
+		_, err := storeRandomPolicy(ctx, bulker, index, 100000) // aggregation has a size limit of 10k, let's go over it
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,7 +108,7 @@ func TestQueryLatestPolicies30k(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, policy := range policies {
-		if policy.RevisionIdx != 9999 {
+		if policy.RevisionIdx != 99999 {
 			t.Errorf("Expected to find revision_idx 9999 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
 		}
 	}
