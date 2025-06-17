@@ -41,7 +41,7 @@ func createRandomPolicy(id string, revisionIdx int) model.Policy {
 	}
 }
 
-func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string, maxRev int) (model.Policy, error) {
+func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string, maxRev int) error {
 	var rec model.Policy
 	id := uuid.Must(uuid.NewV4()).String()
 	ops := make([]bulk.MultiOp, 0, maxRev)
@@ -69,7 +69,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
 
 	for i := 0; i < 4; i++ {
-		_, err := storeRandomPolicy(ctx, bulker, index, 4)
+		err := storeRandomPolicy(ctx, bulker, index, 4)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +96,7 @@ func TestQueryLatestPolicies300k(t *testing.T) {
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
 
 	for i := 0; i < 4; i++ {
-		_, err := storeRandomPolicy(ctx, bulker, index, 100000) // aggregation has a size limit of 10k, let's go over it
+		err := storeRandomPolicy(ctx, bulker, index, 100000) // aggregation has a size limit of 10k, let's go over it
 		if err != nil {
 			t.Fatal(err)
 		}
