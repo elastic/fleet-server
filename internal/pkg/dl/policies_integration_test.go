@@ -42,14 +42,13 @@ func createRandomPolicy(id string, revisionIdx int) model.Policy {
 }
 
 func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string, maxRev int) error {
-	var rec model.Policy
 	id := uuid.Must(uuid.NewV4()).String()
 	ops := make([]bulk.MultiOp, 0, maxRev)
 	for i := 1; i < maxRev; i++ {
-		rec = createRandomPolicy(id, i)
+		rec := createRandomPolicy(id, i)
 		p, err := json.Marshal(&rec)
 		if err != nil {
-			return model.Policy{}, err
+			return err
 		}
 		ops = append(ops, bulk.MultiOp{
 			Index: index,
@@ -58,9 +57,9 @@ func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string, maxR
 	}
 	_, err := bulker.MIndex(ctx, ops, bulk.WithRefresh())
 	if err != nil {
-		return model.Policy{}, err
+		return err
 	}
-	return rec, nil
+	return nil
 }
 
 func TestQueryLatestPolicies(t *testing.T) {
