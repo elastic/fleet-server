@@ -14,6 +14,7 @@ As we are using micrsoft/go as a base we follow their conventions.
 
 Our FIPS changes require the `requirefips` and `ms_tls13kdf` buildtags.
 When compiling `GOEXPERIMENT=systemcrypto` and `CGO_ENABLED=1` must be set.
+Additionally the `MS_GOTOOLCHAIN_TELEMETRY_ENABLED=0` env var is set to disable telemetry for [microsoft/go](https://github.com/microsoft/go).
 
 The `FIPS=true` env var is used by our magefile as the FIPS toggle.
 This env var applies to all targets, at a minimum the `requirefips` and `ms_tls13kdf` tags will be set.
