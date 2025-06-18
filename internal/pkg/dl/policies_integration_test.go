@@ -62,6 +62,7 @@ func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string, maxR
 	return nil
 }
 
+//nolint:dupl // test duplication
 func TestQueryLatestPolicies(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
@@ -89,6 +90,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 	}
 }
 
+//nolint:dupl // test duplication
 func TestQueryLatestPolicies300k(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
