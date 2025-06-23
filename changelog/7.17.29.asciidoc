@@ -1,0 +1,44 @@
+// begin 7.17.29 relnotes
+
+[[release-notes-7.17.29]]
+==  7.17.29
+
+Review important information about the  7.17.29 release.
+
+[discrete]
+[[security-updates-7.17.29]]
+=== Security updates
+
+
+fleet-server::
+
+* Upgrade To Go 1.21.10. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/3528[#https://github.com/elastic/fleet-server/pull/3528] 
+* Upgrade Golang.org/X/Net To V0.34.0 And Golang.org/X/Crypto To V0.32.0. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4405[#https://github.com/elastic/fleet-server/pull/4405] 
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-7.17.29]]
+=== Enhancements
+
+
+
+
+* Update Go To V1.21.11. {-pull}https://github.com/elastic/fleet-server/pull/3607[#https://github.com/elastic/fleet-server/pull/3607] 
+fleet-server::
+
+* Bump Go To V1.23.5. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4353[#https://github.com/elastic/fleet-server/pull/4353] 
+* Update Go To V1.24.3. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4891[#https://github.com/elastic/fleet-server/pull/4891] 
+
+
+
+
+
+// end 7.17.29 relnotes

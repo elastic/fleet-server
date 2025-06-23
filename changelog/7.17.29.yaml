@@ -1,0 +1,57 @@
+version: 7.17.29
+entries:
+    - kind: security
+      summary: Upgrade to Go 1.21.10.
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/3528
+      issue: []
+      timestamp: 1715195075
+      file:
+        name: 1715195075-Upgrade-to-Go-1.21.10.yaml
+        checksum: fe819b2650e3c1d9850955e6fd9f6b83034c445e
+    - kind: enhancement
+      summary: Update go to v1.21.11
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/fleet-server/pull/3607
+      issue: []
+      timestamp: 1717799096
+      file:
+        name: 1717799096-Update-go-to-v1.21.11.yaml
+        checksum: 1ae44eaa3df28be530794f0e9e317ee984c516ef
+    - kind: enhancement
+      summary: Bump go to v1.23.5
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4353
+      issue: []
+      timestamp: 1738103621
+      file:
+        name: 1738103621-Bump-go-to-v1.23.5.yaml
+        checksum: 6809398a3b2aa1e7a51d323f9851cb66aa5404fe
+    - kind: security
+      summary: Upgrade golang.org/x/net to v0.34.0 and golang.org/x/crypto to v0.32.0.
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4405
+      issue: []
+      timestamp: 1738701949
+      file:
+        name: 1738701949-Upgrade-golang.org-x-net-to-v0.34.0-and-golang.org-x-crypto-to-v0.32.0..yaml
+        checksum: da5ec97b618c213e9f055bd024d7551fba47e3d7
+    - kind: enhancement
+      summary: Update go to v1.24.3
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4891
+      issue: []
+      timestamp: 1746596216
+      file:
+        name: 1746596216-Update-to-go-1.24.3.yaml
+        checksum: 5f97bc9a96cf140dba16165d6e8472f9bcc92e44
