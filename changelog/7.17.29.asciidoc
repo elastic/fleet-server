@@ -1,0 +1,16 @@
+// begin 7.17.29 relnotes
+
+[[release-notes-7.17.29]]
+==  7.17.29
+
+Review important information about the  7.17.29 release.
+
+[discrete]
+[[enhancements-7.17.29]]
+=== Enhancements
+
+fleet-server::
+
+* Update Go To V1.24.4. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5021[#https://github.com/elastic/fleet-server/pull/5021] 
+
+// end 7.17.29 relnotes
