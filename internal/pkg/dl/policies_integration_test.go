@@ -41,19 +41,21 @@ func createRandomPolicy(id string, revisionIdx int) model.Policy {
 	}
 }
 
-func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string, maxRev int) error {
-	id := uuid.Must(uuid.NewV4()).String()
-	ops := make([]bulk.MultiOp, 0, maxRev)
-	for i := 1; i < maxRev; i++ {
-		rec := createRandomPolicy(id, i)
-		p, err := json.Marshal(&rec)
-		if err != nil {
-			return err
+func storeRandomPolicies(ctx context.Context, bulker bulk.Bulk, index string, count, maxRev int) error {
+	ops := make([]bulk.MultiOp, 0, count*maxRev)
+	for range count {
+		id := uuid.Must(uuid.NewV4()).String()
+		for i := 1; i <= maxRev; i++ {
+			rec := createRandomPolicy(id, i)
+			p, err := json.Marshal(&rec)
+			if err != nil {
+				return err
+			}
+			ops = append(ops, bulk.MultiOp{
+				Index: index,
+				Body:  p,
+			})
 		}
-		ops = append(ops, bulk.MultiOp{
-			Index: index,
-			Body:  p,
-		})
 	}
 	_, err := bulker.MIndex(ctx, ops, bulk.WithRefresh())
 	if err != nil {
@@ -68,11 +70,9 @@ func TestQueryLatestPolicies(t *testing.T) {
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
 
-	for i := 0; i < 4; i++ {
-		err := storeRandomPolicy(ctx, bulker, index, 4)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err := storeRandomPolicies(ctx, bulker, index, 4, 4)
+	if err != nil {
+		t.Fatal(err)
 	}
 	time.Sleep(time.Second * 2) // FIXME ES does not refresh instantly?
 
@@ -81,7 +81,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, policy := range policies {
-		if policy.RevisionIdx != 3 {
+		if policy.RevisionIdx != 4 {
 			t.Errorf("Expected to find revision_idx 3 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
 		}
 	}
@@ -90,17 +90,17 @@ func TestQueryLatestPolicies(t *testing.T) {
 	}
 }
 
+// TestQueryLatestPolicies400k tests to see if  to see if the latest revision is correctly selected when a lot the revision count is very large
+//
 //nolint:dupl // test duplication
-func TestQueryLatestPolicies300k(t *testing.T) {
+func TestQueryLatestPolicies400k(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
 
-	for i := 0; i < 4; i++ {
-		err := storeRandomPolicy(ctx, bulker, index, 100000) // aggregation has a size limit of 10k, let's go over it
-		if err != nil {
-			t.Fatal(err)
-		}
+	err := storeRandomPolicies(ctx, bulker, index, 4, 100000)
+	if err != nil {
+		t.Fatal(err)
 	}
 	time.Sleep(time.Second * 2) // FIXME ES does not refresh instantly?
 
@@ -109,13 +109,43 @@ func TestQueryLatestPolicies300k(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, policy := range policies {
-		if policy.RevisionIdx != 99999 {
-			t.Errorf("Expected to find revision_idx 9999 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
+		if policy.RevisionIdx != 100000 {
+			t.Errorf("Expected to find revision_idx 100000 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
 		}
 	}
 
 	if len(policies) != 4 {
 		t.Errorf("Expected 4 policies, got %d", len(policies))
+	}
+}
+
+// TesyQueryLatestPolices11kUnique tests behaviour when 11k unique policies are used, there is a 10k size specification in the aggregation.
+//
+//nolint:dupl // test duplication
+func TestQueryLatestPolicies11kUnique(t *testing.T) {
+	t.Skip("Re-enable after policy load issues have been sorted: https://github.com/elastic/fleet-server/issues/3254")
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
+
+	err := storeRandomPolicies(ctx, bulker, index, 11000, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second * 2) // FIXME ES does not refresh instantly?
+
+	policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, policy := range policies {
+		if policy.RevisionIdx != 2 {
+			t.Errorf("Expected to find revision_idx 1 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
+		}
+	}
+
+	if len(policies) != 11000 {
+		t.Errorf("Expected 11000 policies, got %d", len(policies))
 	}
 }
 
