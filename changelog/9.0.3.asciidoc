@@ -1,0 +1,17 @@
+// begin 9.0.3 relnotes
+
+[[release-notes-9.0.3]]
+==  9.0.3
+
+Review important information about the  9.0.3 release.
+
+[discrete]
+[[enhancements-9.0.3]]
+=== Enhancements
+
+
+fleet-server::
+
+* Update Go Version To V1.24.4. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5025[#https://github.com/elastic/fleet-server/pull/5025] 
+
+// end 9.0.3 relnotes
