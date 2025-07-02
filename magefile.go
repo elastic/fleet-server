@@ -976,6 +976,7 @@ func (Docker) Cover() error {
 // VERSION_QUALIFIER may be used to manually specify a version qualifer for the image tag.
 // DOCKER_IMAGE may be used to completely specify the image name.
 // DOCKER_IMAGE_TAG may be used to completely specify the image tag.
+// PLATFORMS may be used to specify multiplatform build targets. Defaults to [linux/amd64, linux/arm64].
 func (Docker) Image() error {
 	dockerFile := "Dockerfile"
 	image := dockerImage
@@ -997,8 +998,17 @@ func (Docker) Image() error {
 		return fmt.Errorf("docker buildx create failed: %w", err)
 	}
 
+	// get PLATFORMS from env and filter down into those supported by Docker
+	pEnv := getPlatforms()
+	platforms := make([]string, 0, len(platformsDocker))
+	for _, platform := range pEnv {
+		if slices.Contains(platformsDocker, platform) {
+			platforms = append(platforms, platform)
+		}
+	}
+
 	return sh.RunWithV(dockerEnv, "docker", "buildx", "build",
-		"--platform", strings.Join(platformsDocker, ","),
+		"--platform", strings.Join(platforms, ","),
 		"--build-arg", "GO_VERSION="+getGoVersion(),
 		"--build-arg", "DEV="+strconv.FormatBool(isDEV()),
 		"--build-arg", "FIPS="+strconv.FormatBool(isFIPS()),
@@ -1016,6 +1026,7 @@ func (Docker) Image() error {
 // FIPS may be used to push a FIPS capable image.
 // DOCKER_IMAGE may be used to specify the image name.
 // DOCKER_IMAGE_TAG may be used to specify the image tag.
+// PLATFORMS may be used to specify multiplatform build targets. Defaults to [linux/amd64, linux/arm64].
 func (Docker) Push() error {
 	image := dockerImage
 	if isFIPS() {
@@ -1030,8 +1041,17 @@ func (Docker) Push() error {
 		version = v
 	}
 
+	// get PLATFORMS from env and filter down into those supported by Docker
+	pEnv := getPlatforms()
+	platforms := make([]string, 0, len(platformsDocker))
+	for _, platform := range pEnv {
+		if slices.Contains(platformsDocker, platform) {
+			platforms = append(platforms, platform)
+		}
+	}
+
 	return sh.RunV("docker", "push",
-		"--platform", strings.Join(platformsDocker, ","),
+		"--platform", strings.Join(platforms, ","),
 		image+":"+version,
 	)
 }
