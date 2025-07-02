@@ -128,6 +128,7 @@ var (
 		"linux/arm64",
 	}
 
+	// platformsDocker is the list of all platforms that are supported by docker multiplatform builds.
 	platformsDocker = []string{
 		"linux/amd64",
 		"linux/arm64",
@@ -266,6 +267,26 @@ var (
 			list = platformsFIPS
 		}
 		// If env var is used ensure values are supported.
+		if pList, ok := os.LookupEnv(envPlatforms); ok {
+			filtered := make([]string, 0)
+			for _, plat := range strings.Split(pList, ",") {
+				if slices.Contains(list, plat) {
+					filtered = append(filtered, plat)
+				} else {
+					log.Printf("Skipping %q platform is not in the list of allowed platforms.", plat)
+				}
+			}
+			if len(filtered) > 0 {
+				return filtered
+			}
+			log.Printf("%s env var detected but value %q does not contain valid platforms. Using default list.", envPlatforms, pList)
+		}
+		return list
+	})
+
+	// getDockerPlatforms returns a list of supported docker multiplatform targets.
+	getDockerPlatforms = sync.OnceValue(func() []string {
+		list := platformsDocker
 		if pList, ok := os.LookupEnv(envPlatforms); ok {
 			filtered := make([]string, 0)
 			for _, plat := range strings.Split(pList, ",") {
@@ -998,17 +1019,8 @@ func (Docker) Image() error {
 		return fmt.Errorf("docker buildx create failed: %w", err)
 	}
 
-	// get PLATFORMS from env and filter down into those supported by Docker
-	pEnv := getPlatforms()
-	platforms := make([]string, 0, len(platformsDocker))
-	for _, platform := range pEnv {
-		if slices.Contains(platformsDocker, platform) {
-			platforms = append(platforms, platform)
-		}
-	}
-
 	return sh.RunWithV(dockerEnv, "docker", "buildx", "build",
-		"--platform", strings.Join(platforms, ","),
+		"--platform", strings.Join(getDockerPlatforms(), ","),
 		"--build-arg", "GO_VERSION="+getGoVersion(),
 		"--build-arg", "DEV="+strconv.FormatBool(isDEV()),
 		"--build-arg", "FIPS="+strconv.FormatBool(isFIPS()),
@@ -1041,17 +1053,8 @@ func (Docker) Push() error {
 		version = v
 	}
 
-	// get PLATFORMS from env and filter down into those supported by Docker
-	pEnv := getPlatforms()
-	platforms := make([]string, 0, len(platformsDocker))
-	for _, platform := range pEnv {
-		if slices.Contains(platformsDocker, platform) {
-			platforms = append(platforms, platform)
-		}
-	}
-
 	return sh.RunV("docker", "push",
-		"--platform", strings.Join(platforms, ","),
+		"--platform", strings.Join(getDockerPlatforms(), ","),
 		image+":"+version,
 	)
 }
