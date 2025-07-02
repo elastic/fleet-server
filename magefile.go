@@ -1030,7 +1030,10 @@ func (Docker) Push() error {
 		version = v
 	}
 
-	return sh.RunV("docker", "push", image+":"+version)
+	return sh.RunV("docker", "push",
+		"--platform", strings.Join(platformsDocker, ","),
+		image+":"+version,
+	)
 }
 
 // CustomAgentImage creates a custom elastic-agent image where the fleet-server component has been replaced by one built locally.
