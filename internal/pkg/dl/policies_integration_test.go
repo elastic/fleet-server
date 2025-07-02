@@ -74,19 +74,20 @@ func TestQueryLatestPolicies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(time.Second * 2) // FIXME ES does not refresh instantly?
 
-	policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
-	if err != nil {
-		t.Fatal(err)
-	}
+	var policies []model.Policy
+	require.Eventually(t, func() bool {
+		policies, err = QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(policies) == 4
+	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 4 policies, found: %d", len(policies))
+
 	for _, policy := range policies {
 		if policy.RevisionIdx != 4 {
-			t.Errorf("Expected to find revision_idx 3 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
+			t.Errorf("Expected to find revision_idx 4 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
 		}
-	}
-	if len(policies) != 4 {
-		t.Errorf("Expected 4 policies, got %d", len(policies))
 	}
 }
 
@@ -102,20 +103,20 @@ func TestQueryLatestPolicies400k(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(time.Second * 2) // FIXME ES does not refresh instantly?
 
-	policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
-	if err != nil {
-		t.Fatal(err)
-	}
+	var policies []model.Policy
+	require.Eventually(t, func() bool {
+		policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(policies) == 4
+	}, time.Second*2, time.Millisecond*100, "Expected to eventuually have 4 policies found: %d", len(policies))
+
 	for _, policy := range policies {
 		if policy.RevisionIdx != 100000 {
 			t.Errorf("Expected to find revision_idx 100000 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
 		}
-	}
-
-	if len(policies) != 4 {
-		t.Errorf("Expected 4 policies, got %d", len(policies))
 	}
 }
 
@@ -130,20 +131,20 @@ func TestQueryLatestPolicies11kUnique(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(time.Second * 2) // FIXME ES does not refresh instantly?
 
-	policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
-	if err != nil {
-		t.Fatal(err)
-	}
+	var policies []model.Policy
+	require.Eventually(t, func() bool {
+		policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(policies) != 11000
+	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 11000 policies found: %d", len(policies))
+
 	for _, policy := range policies {
 		if policy.RevisionIdx != 2 {
 			t.Errorf("Expected to find revision_idx 1 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
 		}
-	}
-
-	if len(policies) != 11000 {
-		t.Errorf("Expected 11000 policies, got %d", len(policies))
 	}
 }
 
