@@ -128,6 +128,11 @@ var (
 		"linux/arm64",
 	}
 
+	platformsDocker = []string{
+		"linux/amd64",
+		"linux/arm64",
+	}
+
 	// platformRemap contains mappings for platforms where if the GOOS/GOARCH key is used, artifacts should use the value instead. Missing keys are unalted.
 	platformRemap = map[string]string{
 		"darwin/amd64":  "darwin/x86_64",
@@ -987,8 +992,13 @@ func (Docker) Image() error {
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
 	}
+	dockerEnv := map[string]string{"DOCKER_BUILDKIT": "1"}
+	if err := sh.RunWithV(dockerEnv, "docker", "buildx", "create", "--use"); err != nil {
+		return fmt.Errorf("docker buildx create failed: %w", err)
+	}
 
-	return sh.RunWithV(map[string]string{"DOCKER_BUILDKIT": "1"}, "docker", "build",
+	return sh.RunWithV(dockerEnv, "docker", "buildx", "build",
+		"--platform", strings.Join(platformsDocker, ","),
 		"--build-arg", "GO_VERSION="+getGoVersion(),
 		"--build-arg", "DEV="+strconv.FormatBool(isDEV()),
 		"--build-arg", "FIPS="+strconv.FormatBool(isFIPS()),
