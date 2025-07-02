@@ -101,6 +101,7 @@ const (
 	dockerBuilderName = "fleet-server-builder"
 	dockerImage       = "docker.elastic.co/beats-ci/elastic-agent-cloud-fleet"
 	dockerAgentImage  = "fleet-server-e2e-agent"
+	dockerFleetImage  = "docker.elastic.co/observability-ci/fleet-server"
 )
 
 // e2e test certs
@@ -997,7 +998,6 @@ func (Docker) Cover() error {
 // VERSION_QUALIFIER may be used to manually specify a version qualifer for the image tag.
 // DOCKER_IMAGE may be used to completely specify the image name.
 // DOCKER_IMAGE_TAG may be used to completely specify the image tag.
-// PLATFORMS may be used to specify multiplatform build targets. Defaults to [linux/amd64, linux/arm64].
 func (Docker) Image() error {
 	dockerFile := "Dockerfile"
 	image := dockerImage
@@ -1014,12 +1014,50 @@ func (Docker) Image() error {
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
 	}
+
+	return sh.RunWithV(map[string]string{"DOCKER_BUILDKIT": "1"}, "docker", "build",
+		"--build-arg", "GO_VERSION="+getGoVersion(),
+		"--build-arg", "DEV="+strconv.FormatBool(isDEV()),
+		"--build-arg", "FIPS="+strconv.FormatBool(isFIPS()),
+		"--build-arg", "SNAPSHOT="+strconv.FormatBool(isSnapshot()),
+		"--build-arg", "VERSION="+getVersion(),
+		"--build-arg", "GCFLAGS="+getGCFlags(),
+		"--build-arg", "LDFLAGS="+getLDFlags(),
+		"-f", dockerFile,
+		"-t", image+":"+version,
+		".",
+	)
+}
+
+// Publish creates a multiplatform images and pushes them to the registry.
+// The name of the image is docker.elastic.co/observability-ci/fleet-server by default.
+// FIPS creates a FIPS capable image, adds the -fips suffix to the image name.
+// DEV creates a development image.
+// SNAPSHOT creates a snapshot image.
+// VERSION_QUALIFIER may be used to manually specify a version qualifer for the image tag.
+// DOCKER_IMAGE may be used to completely specify the image name.
+// DOCKER_IMAGE_TAG may be used to completely specify the image tag.
+// PLATFORMS may be used to specify multiplatform build targets. Defaults to [linux/amd64, linux/arm64].
+func (Docker) Publish() error {
+	dockerFile := "Dockerfile"
+	image := dockerFleetImage
+	version := getVersion()
+	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
+		version = v
+	}
+	if isFIPS() {
+		dockerFile = dockerBuilderFIPS
+		image += "-fips"
+	}
+	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
+		image = v
+	}
 	dockerEnv := map[string]string{"DOCKER_BUILDKIT": "1"}
 	if err := sh.RunWithV(dockerEnv, "docker", "buildx", "create", "--use"); err != nil {
 		return fmt.Errorf("docker buildx create failed: %w", err)
 	}
 
-	return sh.RunWithV(dockerEnv, "docker", "buildx", "build",
+	return sh.RunWithV(dockerEnv, "docker", "buildx", "build", "--push",
 		"--platform", strings.Join(getDockerPlatforms(), ","),
 		"--build-arg", "GO_VERSION="+getGoVersion(),
 		"--build-arg", "DEV="+strconv.FormatBool(isDEV()),
@@ -1038,7 +1076,6 @@ func (Docker) Image() error {
 // FIPS may be used to push a FIPS capable image.
 // DOCKER_IMAGE may be used to specify the image name.
 // DOCKER_IMAGE_TAG may be used to specify the image tag.
-// PLATFORMS may be used to specify multiplatform build targets. Defaults to [linux/amd64, linux/arm64].
 func (Docker) Push() error {
 	image := dockerImage
 	if isFIPS() {
@@ -1053,10 +1090,7 @@ func (Docker) Push() error {
 		version = v
 	}
 
-	return sh.RunV("docker", "push",
-		"--platform", strings.Join(getDockerPlatforms(), ","),
-		image+":"+version,
-	)
+	return sh.RunV("docker", "push", image+":"+version)
 }
 
 // CustomAgentImage creates a custom elastic-agent image where the fleet-server component has been replaced by one built locally.
