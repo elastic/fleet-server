@@ -8,10 +8,14 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	_ "embed"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -161,4 +165,85 @@ func TestClientCerts(t *testing.T) {
 		_, err = client.Perform(req) //nolint:bodyclose // no response is expected
 		require.Error(t, err)
 	})
+}
+
+// TestConnectionTLS tries to connect to a test HTTPS server (pretending
+// to be an Elasticsearch cluster), that deliberately presents TLS options
+// that are not FIPS-compliant.
+// - If the test is running with a FIPS-capable build, the client, being FIPS-
+// capable, should fail the TLS handshake. Concretely, the conn.Connect() method
+// should return an error.
+// - If the test is not running with a FIPS-capable build, the client should
+// complete the TLS handshake successfully. Concretely, the conn.Connect() method
+// should not return an error.
+func TestConnectionTLS(t *testing.T) {
+	server := startTLSServer(t)
+	defer server.Close()
+
+	cfg := &config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Protocol: "https",
+				Hosts:    []string{server.URL},
+				TLS: &tlscommon.Config{
+					Enabled: &enabled,
+					CAs:     []string{string(caCertPEM)},
+				},
+			},
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	client, err := NewClient(ctx, cfg, false)
+	require.NoError(t, err)
+
+	_, err = FetchESVersion(ctx, client)
+
+	if build.FIPSDistribution {
+		require.ErrorContains(t, err, "tls: internal error")
+	} else {
+		require.NoError(t, err)
+	}
+}
+
+//go:embed testdata/ca.crt
+var caCertPEM []byte
+
+//go:embed testdata/fips_invalid.key
+var serverKeyPEM []byte // RSA key with length = 1024 bits
+
+//go:embed testdata/fips_invalid.crt
+var serverCertPEM []byte
+
+//go:embed testdata/es_ping_response.json
+var esPingResponse []byte
+
+func startTLSServer(t *testing.T) *httptest.Server {
+	// Configure server and start it
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCertPEM)
+
+	// Create HTTPS server
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Elastic-Product", "Elasticsearch")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(esPingResponse)
+	}))
+
+	serverCert, err := tls.X509KeyPair(serverCertPEM, serverKeyPEM)
+	require.NoError(t, err)
+
+	server.TLS = &tls.Config{
+		RootCAs:      caCertPool,
+		Certificates: []tls.Certificate{serverCert},
+		ClientCAs:    caCertPool,
+		ClientAuth:   tls.NoClientCert,
+	}
+
+	server.StartTLS()
+
+	return server
 }
