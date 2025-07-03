@@ -10,6 +10,7 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -929,7 +930,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 			req: &http.Request{
 				Body: io.NopCloser(strings.NewReader(`{"invalidJson":}`)),
 			},
-			expErr: &BadRequestErr{msg: "unable to decode checkin request"},
+			expErr: &BadRequestErr{msg: "unable to decode checkin request", nextErr: errors.New("invalid character '}' looking for beginning of value")},
 			cfg: &config.Server{
 				Limits: config.ServerLimits{
 					CheckinLimit: config.Limit{
@@ -959,7 +960,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 			req: &http.Request{
 				Body: io.NopCloser(strings.NewReader(`{"validJson": "test", "status": "test", "poll_timeout": "not a timeout", "message": "test message"}`)),
 			},
-			expErr: &BadRequestErr{msg: "poll_timeout cannot be parsed as duration"},
+			expErr: &BadRequestErr{msg: "poll_timeout cannot be parsed as duration", nextErr: errors.New("time: invalid duration \"not a timeout\"")},
 			cfg: &config.Server{
 				Limits: config.ServerLimits{
 					CheckinLimit: config.Limit{
