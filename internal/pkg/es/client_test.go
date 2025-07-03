@@ -15,9 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/build"
-
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
 	"github.com/stretchr/testify/require"
