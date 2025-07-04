@@ -6,6 +6,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,13 +14,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_Audit_validateUnenrollRequst(t *testing.T) {
@@ -47,7 +49,7 @@ func Test_Audit_validateUnenrollRequst(t *testing.T) {
 		},
 		cfg:   &config.Server{},
 		valid: nil,
-		err:   &BadRequestErr{msg: "unable to decode audit/unenroll request"},
+		err:   &BadRequestErr{msg: "unable to decode audit/unenroll request", nextErr: errors.New("invalid character '}' looking for beginning of value")},
 	}, {
 		name: "bad reason",
 		req: &http.Request{
@@ -69,7 +71,7 @@ func Test_Audit_validateUnenrollRequst(t *testing.T) {
 			},
 		},
 		valid: nil,
-		err:   &BadRequestErr{msg: "unable to decode audit/unenroll request"},
+		err:   &BadRequestErr{msg: "unable to decode audit/unenroll request", nextErr: errors.New("http: request body too large")},
 	}}
 
 	for _, tc := range tests {
