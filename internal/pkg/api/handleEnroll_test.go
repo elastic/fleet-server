@@ -253,7 +253,7 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 func TestValidateEnrollRequest(t *testing.T) {
 	t.Run("invalid json", func(t *testing.T) {
 		req, err := validateRequest(context.Background(), strings.NewReader("not a json"))
-		assert.Equal(t, "Bad request: unable to decode enroll request", err.Error())
+		assert.Equal(t, "Bad request: unable to decode enroll request: invalid character 'o' in literal null (expecting 'u')", err.Error())
 		assert.Nil(t, req)
 	})
 	t.Run("fips attribute in local metadata", func(t *testing.T) {
