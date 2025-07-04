@@ -90,11 +90,6 @@ retry() {
     return 0
 }
 
-docker_logout() {
-    echo "Logging out from Docker..."
-    docker logout ${DOCKER_REGISTRY}
-}
-
 with_Terraform() {
     echo "Setting up the Terraform environment..."
     local path_to_file="${WORKSPACE}/terraform.zip"
