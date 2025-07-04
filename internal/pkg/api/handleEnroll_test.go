@@ -13,6 +13,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -21,9 +25,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestRemoveDuplicateStr(t *testing.T) {
@@ -250,7 +251,9 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 }
 
 func TestValidateEnrollRequest(t *testing.T) {
-	req, err := validateRequest(context.Background(), strings.NewReader("not a json"))
-	assert.Equal(t, "Bad request: unable to decode enroll request", err.Error())
-	assert.Nil(t, req)
+	t.Run("invalid json", func(t *testing.T) {
+		req, err := validateRequest(context.Background(), strings.NewReader("not a json"))
+		assert.Equal(t, "Bad request: unable to decode enroll request: invalid character 'o' in literal null (expecting 'u')", err.Error())
+		assert.Nil(t, req)
+	})
 }
