@@ -461,23 +461,10 @@ func Test_Monitor_cancel_pending(t *testing.T) {
 	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
 	}
-
-	var merr error
-	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
-		merr = monitor.Run(ctx)
-	}()
-
-	err := monitor.(*monitorT).waitStart(ctx)
-	require.NoError(t, err)
+	pm.dispatchCh = make(chan struct{}, 1)
 
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
-	s, err := monitor.Subscribe(agentId, policyId, 0)
-	defer monitor.Unsubscribe(s)
-	require.NoError(t, err)
 
 	rId := xid.New().String()
 	policy := model.Policy{
@@ -505,8 +492,7 @@ func Test_Monitor_cancel_pending(t *testing.T) {
 	policyData2, err := json.Marshal(&policy2)
 	require.NoError(t, err)
 
-	// Lock the monitor so it does not process until both policies are sent
-	monitor.(*monitorT).mut.Lock()
+	// Send both revisions to monitor as as seperate hits
 	chHitT <- []es.HitT{{
 		ID:      rId,
 		SeqNo:   1,
@@ -519,7 +505,27 @@ func Test_Monitor_cancel_pending(t *testing.T) {
 		Version: 1,
 		Source:  policyData2,
 	}}
-	monitor.(*monitorT).mut.Unlock()
+
+	// start monitor
+	var merr error
+	var mwg sync.WaitGroup
+	mwg.Add(1)
+	go func() {
+		defer mwg.Done()
+		merr = monitor.Run(ctx)
+	}()
+	err = monitor.(*monitorT).waitStart(ctx)
+	require.NoError(t, err)
+
+	// subscribe with revision 0
+	s, err := monitor.Subscribe(agentId, policyId, 0)
+	defer monitor.Unsubscribe(s)
+	require.NoError(t, err)
+
+	// This sleep allows the main run to call dispatch
+	// but dispatch will not proceed until there is a signal from the dispatchCh
+	time.Sleep(100 * time.Millisecond)
+	pm.dispatchCh <- struct{}{}
 
 	tm := time.NewTimer(time.Second)
 	policies := make([]*ParsedPolicy, 0, 2)
@@ -532,6 +538,7 @@ LOOP:
 			break LOOP
 		}
 	}
+
 	cancel()
 	mwg.Wait()
 	if merr != nil && merr != context.Canceled {
