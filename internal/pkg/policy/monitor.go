@@ -136,7 +136,7 @@ func (m *monitorT) Run(ctx context.Context) error {
 
 	close(m.startCh)
 
-	// use a cancellable context so we can stop dispatching changes if another change is received.
+	// use a cancellable context so we can stop dispatching changes if a new hit is received.
 	// the cancel func is manually called before return, or after policies have been dispatched.
 	iCtx, iCancel := context.WithCancel(ctx)
 	var trans *apm.Transaction
@@ -254,7 +254,7 @@ func (m *monitorT) waitStart(ctx context.Context) error {
 // dispatchPending will dispatch all pending policy changes to the subscriptions in the queue.
 // dispatches are rate limited by the monitor's limiter.
 func (m *monitorT) dispatchPending(ctx context.Context) {
-	// dispatchCh is used in tests to be able to control when a dispatch execution
+	// dispatchCh is used in tests to be able to control when a dispatch execution proceeds
 	if m.dispatchCh != nil {
 		select {
 		case <-m.dispatchCh:
