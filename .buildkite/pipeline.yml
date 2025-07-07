@@ -138,12 +138,6 @@ steps:
           provider: "gcp"
         artifact_paths:
           - build/*.xml
-<<<<<<< HEAD
-=======
-        plugins:
-          - *bk_analytics_token_plugin
-          - *test_collector_plugin
->>>>>>> ec8f085 (bk: use buildkite plugins (#5042))
 
       - label: "E2E Test"
         key: "e2e-test"
@@ -153,12 +147,6 @@ steps:
         artifact_paths:
           - build/*.xml
           - build/e2e-coverage.out
-<<<<<<< HEAD
-=======
-        plugins:
-          - *bk_analytics_token_plugin
-          - *test_collector_plugin
->>>>>>> ec8f085 (bk: use buildkite plugins (#5042))
 
       - label: ":junit: Junit annotate"
         plugins:
