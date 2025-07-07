@@ -23,8 +23,12 @@ updates:
   - package-ecosystem: github-actions
     directories:
       - '/'
+<<<<<<< HEAD
     reviewers:
       - "elastic/observablt-ci"
+=======
+      - '/.github/actions/*'
+>>>>>>> d5efd19 (ci: move from dependabot reviewers to CODEOWNERS (#5090))
     schedule:
       interval: "weekly"
       day: "sunday"
