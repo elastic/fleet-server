@@ -135,14 +135,17 @@ func (m *monitorT) Run(ctx context.Context) error {
 
 	close(m.startCh)
 
-	var iCtx context.Context
+	// use a cancellable context so we can stop dispatching changes if another change is recieved.
+	iCtx, iCancel := context.WithCancel(ctx)
+	defer iCancel()
 	var trans *apm.Transaction
 LOOP:
 	for {
 		m.log.Trace().Msg("policy monitor loop start")
-		iCtx = ctx
 		select {
 		case <-m.kickCh:
+			iCancel()
+			iCtx, iCancel = context.WithCancel(ctx)
 			m.log.Trace().Msg("policy monitor kicked")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("initial policies", "policy_monitor")
@@ -153,18 +156,26 @@ LOOP:
 				endTrans(trans)
 				return err
 			}
-			m.dispatchPending(iCtx)
-			endTrans(trans)
+			go func(ctx context.Context, trans *apm.Transaction) {
+				m.dispatchPending(ctx)
+				endTrans(trans)
+			}(iCtx, trans)
 		case <-m.deployCh:
+			iCancel()
+			iCtx, iCancel = context.WithCancel(ctx)
 			m.log.Trace().Msg("policy monitor deploy ch")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("forced policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
 			}
 
-			m.dispatchPending(iCtx)
-			endTrans(trans)
+			go func(ctx context.Context, trans *apm.Transaction) {
+				m.dispatchPending(ctx)
+				endTrans(trans)
+			}(iCtx, trans)
 		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
+			iCancel()
+			iCtx, iCancel = context.WithCancel(ctx)
 			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("output policies", "policy_monitor")
@@ -175,8 +186,10 @@ LOOP:
 				endTrans(trans)
 				return err
 			}
-			m.dispatchPending(iCtx)
-			endTrans(trans)
+			go func(ctx context.Context, trans *apm.Transaction) {
+				m.dispatchPending(ctx)
+				endTrans(trans)
+			}(iCtx, trans)
 		case <-ctx.Done():
 			break LOOP
 		}
@@ -243,6 +256,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
 		err := m.limit.Wait(ctx)
 		if err != nil {
+			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.log.Warn().Err(err).Msg("Policy limit error")
 			return
 		}
@@ -257,6 +271,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 
 		select {
 		case <-ctx.Done():
+			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.log.Debug().Err(ctx.Err()).Msg("context termination detected in policy dispatch")
 			return
 		case s.ch <- &policy.pp:
