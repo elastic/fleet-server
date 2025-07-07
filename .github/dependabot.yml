@@ -18,3 +18,19 @@ updates:
       elastic-apm:
         patterns:
           - "go.elastic.co/apm/*"
+<<<<<<< HEAD
+=======
+
+  - package-ecosystem: github-actions
+    directories:
+      - '/'
+      - '/.github/actions/*'
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "22:00"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+>>>>>>> d5efd19 (ci: move from dependabot reviewers to CODEOWNERS (#5090))
