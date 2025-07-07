@@ -10,6 +10,24 @@ env:
   GO_AGENT_IMAGE: "golang:${GO_VERSION}"
   TERRAFORM_VERSION: "1.6.4"
 
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - test_collector_plugin: &test_collector_plugin
+      test-collector#v1.11.0:
+        files: "build/test-*.xml"
+        format: "junit"
+        branches: "main"
+        debug: true
+  - bk_analytics_token_plugin: &bk_analytics_token_plugin
+      elastic/vault-secrets#v0.1.0:
+        path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+        field: "token"
+        env_var: "BUILDKITE_ANALYTICS_TOKEN"
+  - docker_elastic_login_plugin: &docker_elastic_login_plugin
+      elastic/vault-docker-login#v0.6.0:
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
 steps:
   - group: "Check and build"
     key: "check"
@@ -104,6 +122,12 @@ steps:
           provider: "gcp"
         artifact_paths:
           - build/*.xml
+<<<<<<< HEAD
+=======
+        plugins:
+          - *bk_analytics_token_plugin
+          - *test_collector_plugin
+>>>>>>> ec8f085 (bk: use buildkite plugins (#5042))
 
       - label: "E2E Test"
         key: "e2e-test"
@@ -113,6 +137,12 @@ steps:
         artifact_paths:
           - build/*.xml
           - build/e2e-coverage.out
+<<<<<<< HEAD
+=======
+        plugins:
+          - *bk_analytics_token_plugin
+          - *test_collector_plugin
+>>>>>>> ec8f085 (bk: use buildkite plugins (#5042))
 
       - label: ":junit: Junit annotate"
         plugins:
@@ -149,9 +179,20 @@ steps:
 
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
+<<<<<<< HEAD
+=======
+        env:
+          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fleet"
+          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
+          SNAPSHOT: "true"
+          PLATFORMS: "linux/amd64"
+          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
+>>>>>>> ec8f085 (bk: use buildkite plugins (#5042))
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
+        plugins:
+          - *docker_elastic_login_plugin
         depends_on:
           - step: "unit-test"
             allow_failure: false
@@ -159,14 +200,60 @@ steps:
             allow_failure: false
           - step: "e2e-test"
             allow_failure: false
+<<<<<<< HEAD
     depends_on: "check"
+=======
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+
+      - label: ":gcloud: Cloud e2e FIPS Test"
+        key: "cloud-e2e-fips-test"
+        env:
+          DOCKER_BASE_IMAGE: "docker.elastic.co/cloud-release/elastic-agent-cloud-fips"
+          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
+          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
+          SNAPSHOT: "true"
+          PLATFORMS: "linux/amd64"
+          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
+          FIPS: "true"
+        command: ".buildkite/scripts/cloud_e2e_test.sh"
+        agents:
+          provider: "gcp"
+        plugins:
+          - *docker_elastic_login_plugin
+        depends_on:
+          - step: "unit-test"
+            allow_failure: false
+          - step: "int-test"
+            allow_failure: false
+          - step: "e2e-test"
+            allow_failure: false
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+>>>>>>> ec8f085 (bk: use buildkite plugins (#5042))
 
   - label: ":docker: Publish docker image"
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
+<<<<<<< HEAD
+=======
+    env:
+      DOCKER_IMAGE: "docker.elastic.co/observability-ci/fleet-server" # needs to rename for rollback
+      DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
+      DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
+      DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
+>>>>>>> ec8f085 (bk: use buildkite plugins (#5042))
     if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_BRANCH') == 'main'"
     agents:
       provider: "gcp"
+    plugins:
+      - *docker_elastic_login_plugin
     depends_on:
       - step: "tests"
         allow_failure: false
