@@ -135,16 +135,16 @@ func (m *monitorT) Run(ctx context.Context) error {
 
 	close(m.startCh)
 
-	// use a cancellable context so we can stop dispatching changes if another change is recieved.
+	// use a cancellable context so we can stop dispatching changes if another change is received.
+	// the cancel func is manually called before return, or after policies have been dispatched.
 	iCtx, iCancel := context.WithCancel(ctx)
-	defer iCancel()
 	var trans *apm.Transaction
 LOOP:
 	for {
 		m.log.Trace().Msg("policy monitor loop start")
 		select {
 		case <-m.kickCh:
-			iCancel()
+			cancelOnce(iCtx, iCancel)
 			iCtx, iCancel = context.WithCancel(ctx)
 			m.log.Trace().Msg("policy monitor kicked")
 			if m.bulker.HasTracer() {
@@ -154,14 +154,16 @@ LOOP:
 
 			if err := m.loadPolicies(iCtx); err != nil {
 				endTrans(trans)
+				cancelOnce(iCtx, iCancel)
 				return err
 			}
-			go func(ctx context.Context, trans *apm.Transaction) {
+			go func(ctx context.Context, cancel context.CancelFunc, trans *apm.Transaction) {
 				m.dispatchPending(ctx)
 				endTrans(trans)
-			}(iCtx, trans)
+				cancelOnce(ctx, cancel)
+			}(iCtx, iCancel, trans)
 		case <-m.deployCh:
-			iCancel()
+			cancelOnce(iCtx, iCancel)
 			iCtx, iCancel = context.WithCancel(ctx)
 			m.log.Trace().Msg("policy monitor deploy ch")
 			if m.bulker.HasTracer() {
@@ -169,12 +171,13 @@ LOOP:
 				iCtx = apm.ContextWithTransaction(ctx, trans)
 			}
 
-			go func(ctx context.Context, trans *apm.Transaction) {
+			go func(ctx context.Context, cancel context.CancelFunc, trans *apm.Transaction) {
 				m.dispatchPending(ctx)
 				endTrans(trans)
-			}(iCtx, trans)
+				cancelOnce(ctx, cancel)
+			}(iCtx, iCancel, trans)
 		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
-			iCancel()
+			cancelOnce(iCtx, iCancel)
 			iCtx, iCancel = context.WithCancel(ctx)
 			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
 			if m.bulker.HasTracer() {
@@ -184,18 +187,31 @@ LOOP:
 
 			if err := m.processHits(iCtx, hits); err != nil {
 				endTrans(trans)
+				cancelOnce(iCtx, iCancel)
 				return err
 			}
-			go func(ctx context.Context, trans *apm.Transaction) {
+			go func(ctx context.Context, cancel context.CancelFunc, trans *apm.Transaction) {
 				m.dispatchPending(ctx)
 				endTrans(trans)
-			}(iCtx, trans)
+				cancelOnce(ctx, cancel)
+			}(iCtx, iCancel, trans)
 		case <-ctx.Done():
 			break LOOP
 		}
 	}
 
+	iCancel()
 	return nil
+}
+
+// cancelOnce calls cancel if the context is not done.
+func cancelOnce(ctx context.Context, cancel context.CancelFunc) {
+	select {
+	case <-ctx.Done():
+		return
+	default:
+		cancel()
+	}
 }
 
 func unmarshalHits(hits []es.HitT) ([]model.Policy, error) {
