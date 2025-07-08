@@ -3,6 +3,7 @@
 env:
   DOCKER_COMPOSE_VERSION: "1.25.5"
   TERRAFORM_VERSION: "1.6.4"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1750467641"
 
 steps:
 
@@ -96,24 +97,30 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
-      - label: ":smartbear-testexecute: Run unit tests with requirefips build tag"
+      - label: ":smartbear-testexecute: Run unit tests with requirefips build tag and FIPS provider"
         key: unit-test-fips-tag
         command: ".buildkite/scripts/unit_test.sh"
         env:
           FIPS: "true"
+          GOEXPERIMENT: "systemcrypto"
         agents:
-          provider: "gcp"
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          instanceType: "m5.2xlarge"
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
 
-      - label: ":smartbear-testexecute: Run fips140=only unit tests"
+      - label: ":smartbear-testexecute: Run fips140=only unit tests with FIPS provider"
         key: unit-test-fips140-only
         command: ".buildkite/scripts/unit_test_fipsonly.sh"
         env:
           FIPS: "true"
+          GOEXPERIMENT: "systemcrypto"
         agents:
-          provider: "gcp"
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          instanceType: "m5.2xlarge"
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
