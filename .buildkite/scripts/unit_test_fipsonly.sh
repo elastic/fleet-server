@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -euo pipefail
+set -o xtrace
 
 source .buildkite/scripts/common.sh
 
