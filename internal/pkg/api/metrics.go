@@ -74,7 +74,7 @@ func init() {
 	cntGetPGP.Register(routesRegistry.newRegistry("getPGPKey"))
 	cntAuditUnenroll.Register(routesRegistry.newRegistry("auditUnenroll"))
 
-	err := report.SetupMetrics(logger.NewZapStub("instance-metrics"), build.ServiceName, version.DefaultVersion, registry.registry, registry.registry)
+	err := report.SetupMetrics(logger.NewZapStub("instance-metrics"), build.ServiceName, version.DefaultVersion, monitoring.NewRegistry(), registry.registry)
 	if err != nil {
 		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics") // TODO is used because this may logged during the package load
 	}
