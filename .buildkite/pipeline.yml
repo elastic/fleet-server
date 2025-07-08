@@ -274,7 +274,6 @@ steps:
         allow_failure: false
 
   - label: ":serverless::argo: Run synthetics tests and update fleet to ${BUILDKITE_COMMIT:0:12} in serverless-gitops"
-    async: true
     branches: main
     trigger: gpctl-promote-after-serverless-devenv-synthetics
     build:
@@ -303,7 +302,6 @@ steps:
   - label: ":jenkins: Release - Package Registry Distribution"
     key: "release-package-registry"
     trigger: "package-registry-release-package-registry-distribution"
-    async: true
     build:
       branch: "main"
       meta_data:
@@ -313,7 +311,6 @@ steps:
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
-    async: true
     if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
     build:
       branch: "${BUILDKITE_BRANCH}"
