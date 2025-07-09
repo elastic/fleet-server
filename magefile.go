@@ -101,6 +101,7 @@ const (
 	dockerBuilderName = "fleet-server-builder"
 	dockerImage       = "docker.elastic.co/beats-ci/elastic-agent-cloud-fleet"
 	dockerAgentImage  = "fleet-server-e2e-agent"
+	dockerFleetImage  = "docker.elastic.co/observability-ci/fleet-server"
 )
 
 // e2e test certs
@@ -124,6 +125,12 @@ var (
 	}
 	// plaformsFIPS is the list of all FIPS-capable platforms.
 	platformsFIPS = []string{
+		"linux/amd64",
+		"linux/arm64",
+	}
+
+	// platformsDocker is the list of all platforms that are supported by docker multiplatform builds.
+	platformsDocker = []string{
 		"linux/amd64",
 		"linux/arm64",
 	}
@@ -261,6 +268,26 @@ var (
 			list = platformsFIPS
 		}
 		// If env var is used ensure values are supported.
+		if pList, ok := os.LookupEnv(envPlatforms); ok {
+			filtered := make([]string, 0)
+			for _, plat := range strings.Split(pList, ",") {
+				if slices.Contains(list, plat) {
+					filtered = append(filtered, plat)
+				} else {
+					log.Printf("Skipping %q platform is not in the list of allowed platforms.", plat)
+				}
+			}
+			if len(filtered) > 0 {
+				return filtered
+			}
+			log.Printf("%s env var detected but value %q does not contain valid platforms. Using default list.", envPlatforms, pList)
+		}
+		return list
+	})
+
+	// getDockerPlatforms returns a list of supported docker multiplatform targets.
+	getDockerPlatforms = sync.OnceValue(func() []string {
+		list := platformsDocker
 		if pList, ok := os.LookupEnv(envPlatforms); ok {
 			filtered := make([]string, 0)
 			for _, plat := range strings.Split(pList, ",") {
@@ -989,6 +1016,49 @@ func (Docker) Image() error {
 	}
 
 	return sh.RunWithV(map[string]string{"DOCKER_BUILDKIT": "1"}, "docker", "build",
+		"--build-arg", "GO_VERSION="+getGoVersion(),
+		"--build-arg", "DEV="+strconv.FormatBool(isDEV()),
+		"--build-arg", "FIPS="+strconv.FormatBool(isFIPS()),
+		"--build-arg", "SNAPSHOT="+strconv.FormatBool(isSnapshot()),
+		"--build-arg", "VERSION="+getVersion(),
+		"--build-arg", "GCFLAGS="+getGCFlags(),
+		"--build-arg", "LDFLAGS="+getLDFlags(),
+		"-f", dockerFile,
+		"-t", image+":"+version,
+		".",
+	)
+}
+
+// Publish creates a multiplatform images and pushes them to the registry.
+// The name of the image is docker.elastic.co/observability-ci/fleet-server by default.
+// FIPS creates a FIPS capable image, adds the -fips suffix to the image name.
+// DEV creates a development image.
+// SNAPSHOT creates a snapshot image.
+// VERSION_QUALIFIER may be used to manually specify a version qualifer for the image tag.
+// DOCKER_IMAGE may be used to completely specify the image name.
+// DOCKER_IMAGE_TAG may be used to completely specify the image tag.
+// PLATFORMS may be used to specify multiplatform build targets. Defaults to [linux/amd64, linux/arm64].
+func (Docker) Publish() error {
+	dockerFile := "Dockerfile"
+	image := dockerFleetImage
+	version := getVersion()
+	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
+		version = v
+	}
+	if isFIPS() {
+		dockerFile = dockerBuilderFIPS
+		image += "-fips"
+	}
+	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
+		image = v
+	}
+	dockerEnv := map[string]string{"DOCKER_BUILDKIT": "1"}
+	if err := sh.RunWithV(dockerEnv, "docker", "buildx", "create", "--use"); err != nil {
+		return fmt.Errorf("docker buildx create failed: %w", err)
+	}
+
+	return sh.RunWithV(dockerEnv, "docker", "buildx", "build", "--push",
+		"--platform", strings.Join(getDockerPlatforms(), ","),
 		"--build-arg", "GO_VERSION="+getGoVersion(),
 		"--build-arg", "DEV="+strconv.FormatBool(isDEV()),
 		"--build-arg", "FIPS="+strconv.FormatBool(isFIPS()),

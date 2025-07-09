@@ -52,7 +52,11 @@ type BadRequestErr struct {
 }
 
 func (e *BadRequestErr) Error() string {
-	return fmt.Sprintf("Bad request: %s", e.msg)
+	s := fmt.Sprintf("Bad request: %s", e.msg)
+	if e.nextErr != nil {
+		s += ": " + e.nextErr.Error()
+	}
+	return s
 }
 
 func (e *BadRequestErr) Unwrap() error {
