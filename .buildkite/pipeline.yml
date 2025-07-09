@@ -103,6 +103,7 @@ steps:
         env:
           FIPS: "true"
           GOEXPERIMENT: "systemcrypto"
+          GO_DISTRO: "microsoft"
         agents:
           provider: "aws"
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
@@ -117,6 +118,7 @@ steps:
         env:
           FIPS: "true"
           GOEXPERIMENT: "systemcrypto"
+          GO_DISTRO: "stdlib"
         agents:
           provider: "aws"
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
