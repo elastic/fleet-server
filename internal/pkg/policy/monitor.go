@@ -282,7 +282,9 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		err := m.limit.Wait(ctx)
 		if err != nil {
 			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
-			m.log.Warn().Err(err).Msg("Policy limit error")
+			if !errors.Is(err, context.Canceled) {
+				m.log.Warn().Err(err).Msg("Policy limit error")
+			}
 			return
 		}
 		// Lookup the latest policy for this subscription
