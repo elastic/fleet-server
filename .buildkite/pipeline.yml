@@ -117,7 +117,6 @@ steps:
         command: ".buildkite/scripts/unit_test_fipsonly.sh"
         env:
           FIPS: "true"
-          GOEXPERIMENT: "systemcrypto"
           GO_DISTRO: "stdlib"
         agents:
           provider: "aws"
