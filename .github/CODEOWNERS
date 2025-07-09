@@ -3,3 +3,8 @@
 
 # Allow to auto-merge PRs with Mergify
 dev-tools/integration/.env
+<<<<<<< HEAD
+=======
+
+/.github/workflows @elastic/observablt-ci
+>>>>>>> 34a1057 (github(codeowners): robots-ci can review .github/workflows only (#5112))
