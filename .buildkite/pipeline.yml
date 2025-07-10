@@ -107,7 +107,7 @@ steps:
         agents:
           provider: "aws"
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.2xlarge"
+          instanceType: "m5.xlarge"
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
@@ -121,7 +121,7 @@ steps:
         agents:
           provider: "aws"
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.2xlarge"
+          instanceType: "m5.xlarge"
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
