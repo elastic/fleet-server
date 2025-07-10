@@ -2,8 +2,8 @@
 name: "fleet server package mbp"
 env:
   REPO: 'fleet-server'
-  IMAGE_UBUNTU_X86_64: "family/core-ubuntu-2004"
-  IMAGE_UBUNTU_ARM_64: "core-ubuntu-2004-aarch64"
+  IMAGE_UBUNTU_X86_64: "family/core-ubuntu-2204"
+  IMAGE_UBUNTU_ARM_64: "core-ubuntu-2204-aarch64"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
