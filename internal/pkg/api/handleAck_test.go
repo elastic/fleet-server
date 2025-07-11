@@ -812,7 +812,7 @@ func TestValidateAckRequest(t *testing.T) {
 			cfg: &config.Server{
 				Limits: config.ServerLimits{},
 			},
-			expErr: &BadRequestErr{msg: "unable to decode ack request"},
+			expErr: &BadRequestErr{msg: "unable to decode ack request", nextErr: errors.New("invalid character 'o' in literal null (expecting 'u')")},
 			expAck: nil,
 		},
 	}
