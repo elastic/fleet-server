@@ -1,0 +1,32 @@
+// begin 9.0.4 relnotes
+
+[[release-notes-9.0.4]]
+==  9.0.4
+
+Review important information about the  9.0.4 release.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-9.0.4]]
+=== Bug fixes
+
+
+fleet-server::
+
+* Include The Base Error For Json Decode Error Responses. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5069[#https://github.com/elastic/fleet-server/pull/5069] 
+
+// end 9.0.4 relnotes
