@@ -1,11 +1,17 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
 env:
-  DOCKER_REGISTRY: "docker.elastic.co"
-  DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/fleet-server" # needs to rename for rollback
+  DOCKER_IMAGE: "docker.elastic.co/observability-ci/fleet-server" # needs to rename for rollback
   DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
   DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
   DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
+
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - docker_elastic_login_plugin: &docker_elastic_login_plugin
+      elastic/vault-docker-login#v0.6.0:
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
 steps:
   - label: ":docker: Publish docker image"
@@ -13,6 +19,8 @@ steps:
     command: ".buildkite/scripts/build_push_docker_image.sh"
     agents:
       provider: "gcp"
+    plugins:
+      - *docker_elastic_login_plugin
 
   - label: "perf test"
     key: "obs-perf-test"
