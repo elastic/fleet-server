@@ -23,7 +23,7 @@ actions:
       automerge: false
       labels:
         - dependencies
-        - backport-skip
+        - backport-active-all
       title: '[Automation] Bump Golang version to {{ source "latestGoVersion" }}'
 
 sources:

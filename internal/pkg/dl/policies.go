@@ -9,11 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/rs/zerolog"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 )
