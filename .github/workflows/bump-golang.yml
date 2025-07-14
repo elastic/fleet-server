@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Updatecli in the runner
-        uses: updatecli/updatecli-action@307ce72e224b82157cc31c78828f168b8e55d47d # v2.84.0
+        uses: updatecli/updatecli-action@b1405b899ee27cdaf56637d3cc7b9bc6a689b37c # v2.88.0
 
       - name: Run Updatecli in Apply mode
         run: updatecli apply --config .ci/bump-golang.yml
@@ -33,7 +33,7 @@ jobs:
           GIT_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
 
       - if: ${{ failure()  }}
-        uses: slackapi/slack-github-action@b0fa283ad8fea605de13dc3f449259339835fc52 # v2.1.0
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}

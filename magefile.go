@@ -82,8 +82,10 @@ const (
 	envDockerImage = "DOCKER_IMAGE"
 	// envDockerTag is used to indicate tag for images produced by the docker:image target. Defaults to version. It
 	envDockerTag = "DOCKER_IMAGE_TAG"
-	// envDockerBaseImage is the image:tag for the base elastic-agent-cloud images used by e2e tests.
+	// envDockerBaseImage is the base image for elastic-agent-cloud images used by e2e tests.
 	envDockerBaseImage = "DOCKER_BASE_IMAGE"
+	// envDockerBaseImageTag is the tag for the base image used by e2e tests.
+	envDockerBaseImageTag = "DOCKER_BASE_IMAGE_TAG"
 )
 
 // const and vars used by magefile.
@@ -93,12 +95,13 @@ const (
 	binaryExe  = "fleet-server.exe"
 
 	dockerSuffix      = "main-debian11"
-	dockerArmSuffix   = "base-arm-debian9"
+	dockerArmSuffix   = "base-arm-debian11"
 	dockerBuilderFile = "Dockerfile.build"
 	dockerBuilderFIPS = "Dockerfile.fips"
 	dockerBuilderName = "fleet-server-builder"
 	dockerImage       = "docker.elastic.co/beats-ci/elastic-agent-cloud-fleet"
 	dockerAgentImage  = "fleet-server-e2e-agent"
+	dockerFleetImage  = "docker.elastic.co/observability-ci/fleet-server"
 )
 
 // e2e test certs
@@ -122,6 +125,12 @@ var (
 	}
 	// plaformsFIPS is the list of all FIPS-capable platforms.
 	platformsFIPS = []string{
+		"linux/amd64",
+		"linux/arm64",
+	}
+
+	// platformsDocker is the list of all platforms that are supported by docker multiplatform builds.
+	platformsDocker = []string{
 		"linux/amd64",
 		"linux/arm64",
 	}
@@ -276,6 +285,26 @@ var (
 		return list
 	})
 
+	// getDockerPlatforms returns a list of supported docker multiplatform targets.
+	getDockerPlatforms = sync.OnceValue(func() []string {
+		list := platformsDocker
+		if pList, ok := os.LookupEnv(envPlatforms); ok {
+			filtered := make([]string, 0)
+			for _, plat := range strings.Split(pList, ",") {
+				if slices.Contains(list, plat) {
+					filtered = append(filtered, plat)
+				} else {
+					log.Printf("Skipping %q platform is not in the list of allowed platforms.", plat)
+				}
+			}
+			if len(filtered) > 0 {
+				return filtered
+			}
+			log.Printf("%s env var detected but value %q does not contain valid platforms. Using default list.", envPlatforms, pList)
+		}
+		return list
+	})
+
 	// isFIPS returns a bool indicator of the FIPS env var.
 	isFIPS = sync.OnceValue(func() bool {
 		return envToBool(envFIPS)
@@ -361,6 +390,7 @@ func environMap() map[string]string {
 func addFIPSEnvVars(env map[string]string) {
 	env["GOEXPERIMENT"] = "systemcrypto"
 	env["CGO_ENABLED"] = "1"
+	env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
 }
 
 // teeCommand runs the specified command, stdout and stederr will be written to stdout and will be collected and returned.
@@ -449,19 +479,19 @@ func (Check) Headers() error {
 	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/elastic/go-licenser", "-license", "Elastic")
 }
 
-// Notice generates the NOTICE.txt and NOTICE-FIPS.txt files.
+// Notice generates the NOTICE.txt and NOTICE-fips.txt files.
 func (Check) Notice() {
 	mg.SerialDeps(mg.F(genNotice, false), mg.F(genNotice, true))
 }
 
-// genNotice generates the NOTICE.txt or the NOTICE-FIPS.txt file.
+// genNotice generates the NOTICE.txt or the NOTICE-fips.txt file.
 func genNotice(fips bool) error {
 	tags := []string{}
 	outFile := "NOTICE.txt"
 	if fips {
-		log.Println("Generating NOTICE-FIPS.txt.")
+		log.Println("Generating NOTICE-fips.txt.")
 		tags = append(tags, "requirefips", "ms_tls13kdf")
-		outFile = "NOTICE-FIPS.txt"
+		outFile = "NOTICE-fips.txt"
 	} else {
 		log.Println("Generating NOTICE.txt.")
 	}
@@ -528,14 +558,14 @@ func genNotice(fips bool) error {
 // getModules returns a list of direct and indirect modules that are used by the main package and its dependencies.
 // Test and tooling packages are excluded.
 func getModules(extraTags ...string) ([]string, error) {
+	tags := append([]string{"linux", "darwin", "windows"}, extraTags...)
 	args := []string{
 		"list",
 		"-deps",
 		"-f",
 		"{{with .Module}}{{if not .Main}}{{.Path}}{{end}}{{end}}",
-	}
-	if len(extraTags) > 0 {
-		args = append(args, "-tags", strings.Join(extraTags, ","))
+		"-tags",
+		strings.Join(tags, ","),
 	}
 	output, err := sh.Output("go", args...)
 	if err != nil {
@@ -897,7 +927,7 @@ func (Docker) Builder() error {
 
 	args := []string{"build", "-t", dockerBuilderName + ":" + getGoVersion(), "--build-arg", "GO_VERSION=" + getGoVersion()}
 	if isFIPS() {
-		args = append(args, "-f", dockerBuilderFIPS, "--target", "base", ".")
+		args = append(args, "-f", dockerBuilderFIPS, "--build-arg", "SUFFIX="+suffix+"-fips", "--target", "base", ".")
 	} else {
 		args = append(args, "-f", dockerBuilderFile, "--build-arg", "SUFFIX="+suffix, ".")
 	}
@@ -966,6 +996,7 @@ func (Docker) Cover() error {
 // DEV creates a development image.
 // SNAPSHOT creates a snapshot image.
 // VERSION_QUALIFIER may be used to manually specify a version qualifer for the image tag.
+// DOCKER_IMAGE may be used to completely specify the image name.
 // DOCKER_IMAGE_TAG may be used to completely specify the image tag.
 func (Docker) Image() error {
 	dockerFile := "Dockerfile"
@@ -979,6 +1010,9 @@ func (Docker) Image() error {
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
 		image += "-fips"
+	}
+	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
+		image = v
 	}
 
 	return sh.RunWithV(map[string]string{"DOCKER_BUILDKIT": "1"}, "docker", "build",
@@ -995,14 +1029,62 @@ func (Docker) Image() error {
 	)
 }
 
+// Publish creates a multiplatform images and pushes them to the registry.
+// The name of the image is docker.elastic.co/observability-ci/fleet-server by default.
+// FIPS creates a FIPS capable image, adds the -fips suffix to the image name.
+// DEV creates a development image.
+// SNAPSHOT creates a snapshot image.
+// VERSION_QUALIFIER may be used to manually specify a version qualifer for the image tag.
+// DOCKER_IMAGE may be used to completely specify the image name.
+// DOCKER_IMAGE_TAG may be used to completely specify the image tag.
+// PLATFORMS may be used to specify multiplatform build targets. Defaults to [linux/amd64, linux/arm64].
+func (Docker) Publish() error {
+	dockerFile := "Dockerfile"
+	image := dockerFleetImage
+	version := getVersion()
+	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
+		version = v
+	}
+	if isFIPS() {
+		dockerFile = dockerBuilderFIPS
+		image += "-fips"
+	}
+	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
+		image = v
+	}
+	dockerEnv := map[string]string{"DOCKER_BUILDKIT": "1"}
+	if err := sh.RunWithV(dockerEnv, "docker", "buildx", "create", "--use"); err != nil {
+		return fmt.Errorf("docker buildx create failed: %w", err)
+	}
+
+	return sh.RunWithV(dockerEnv, "docker", "buildx", "build", "--push",
+		"--platform", strings.Join(getDockerPlatforms(), ","),
+		"--build-arg", "GO_VERSION="+getGoVersion(),
+		"--build-arg", "DEV="+strconv.FormatBool(isDEV()),
+		"--build-arg", "FIPS="+strconv.FormatBool(isFIPS()),
+		"--build-arg", "SNAPSHOT="+strconv.FormatBool(isSnapshot()),
+		"--build-arg", "VERSION="+getVersion(),
+		"--build-arg", "GCFLAGS="+getGCFlags(),
+		"--build-arg", "LDFLAGS="+getLDFlags(),
+		"-f", dockerFile,
+		"-t", image+":"+version,
+		".",
+	)
+}
+
 // Push pushs an image created by docker:image to the registry.
 // FIPS may be used to push a FIPS capable image.
+// DOCKER_IMAGE may be used to specify the image name.
 // DOCKER_IMAGE_TAG may be used to specify the image tag.
 func (Docker) Push() error {
 	image := dockerImage
 	if isFIPS() {
 		image += "-fips"
 	}
+	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
+		image = v
+	}
+
 	version := getVersion()
 	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
 		version = v
@@ -1015,6 +1097,7 @@ func (Docker) Push() error {
 // This step requires a coverage enabled binary to be used.
 // FIPS is used to control if a FIPS compliant image should be created.
 // DOCKER_BASE_IMAGE may be used to specify the elastic-agent base image. docker.elastic.co/cloud-release/elastic-agent-cloud by default.
+// DOCKER_BASE_IMAGE_TAG may be used to specify the elastic-agent base image tag. Uses the ELASTICESRCH version from dev-tools/integration/.env.
 // DOCKER_IMAGE is used to specify the resulting image name.
 // DOCKER_IMAGE_TAG is used to specify the resulting image tag.
 func (Docker) CustomAgentImage() error {
@@ -1023,16 +1106,21 @@ func (Docker) CustomAgentImage() error {
 		return fmt.Errorf("unable to read env file: %w", err)
 	}
 
-	baseImage := "docker.elastic.co/cloud-release/elastic-agent-cloud:" + env["ELASTICSEARCH_VERSION"]
+	baseImage := "docker.elastic.co/cloud-release/elastic-agent-cloud"
 	if v, ok := os.LookupEnv(envDockerBaseImage); ok && v != "" {
 		baseImage = v
 	}
+	baseImageTag := env["ELASTICSEARCH_VERSION"]
+	if v, ok := os.LookupEnv(envDockerBaseImageTag); ok && v != "" {
+		baseImageTag = v
+	}
+
 	dockerEnv := map[string]string{"DOCKER_BUILDKIT": "1"}
-	err = sh.RunWithV(dockerEnv, "docker", "pull", "--platform", "linux/"+runtime.GOARCH, baseImage)
+	err = sh.RunWithV(dockerEnv, "docker", "pull", "--platform", "linux/"+runtime.GOARCH, baseImage+":"+baseImageTag)
 	if err != nil {
 		return fmt.Errorf("failed to pull image: %w", err)
 	}
-	vcsRef, err := sh.OutputWith(dockerEnv, "docker", "inspect", "-f", "{{index .Config.Labels \"org.label-schema.vcs-ref\" }}", baseImage)
+	vcsRef, err := sh.OutputWith(dockerEnv, "docker", "inspect", "-f", "{{index .Config.Labels \"org.label-schema.vcs-ref\" }}", baseImage+":"+baseImageTag)
 	if err != nil {
 		return fmt.Errorf("unable to find vcs-ref label: %w", err)
 	}
@@ -1050,7 +1138,7 @@ func (Docker) CustomAgentImage() error {
 	}
 	err = sh.RunWithV(dockerEnv, "docker", "build",
 		"-f", filepath.Join("dev-tools", "e2e", "Dockerfile"),
-		"--build-arg", "ELASTIC_AGENT_IMAGE="+baseImage,
+		"--build-arg", "ELASTIC_AGENT_IMAGE="+baseImage+":"+baseImageTag,
 		"--build-arg", "STACK_VERSION="+getVersion(),
 		"--build-arg", "VCS_REF_SHORT="+vcsRef[:6],
 		"--build-arg", "FLEET_FIPS="+fips,
@@ -1602,7 +1690,6 @@ func (Test) Benchstat() error {
 func (Test) E2e() {
 	os.Setenv(envDev, "true")
 	os.Setenv(envSnapshot, "true")
-	os.Setenv(envDockerImage, "fleet-server-e2e-agent")
 
 	// Set PLATFORMS to linux/$GOARCH + a binary for the local system
 	pList := []string{
@@ -2027,6 +2114,7 @@ func (Test) CloudE2E() {
 // DOCKER_IMAGE can be used to specify the custom integration server image.
 // DOCKER_IMAGE_TAG can be used to specify the tag of the custom integration server.
 func (Test) CloudE2EUp() error {
+	os.Setenv(envSnapshot, "true")
 	imageName := dockerImage
 	imageTag := getVersion()
 
@@ -2081,16 +2169,35 @@ func (Test) CloudE2EDown() error {
 
 // CloudE2ERun runs tests against the remote cloud deployment.
 func (Test) CloudE2ERun() error {
-	url, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "fleet_url")
+	fleetURL, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "fleet_url")
 	if err != nil {
 		return fmt.Errorf("unable to retrive fleet-server cloud url: %w", err)
+	}
+
+	kibanaURL, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "kibana_url")
+	if err != nil {
+		return fmt.Errorf("unable to retrive kibana cloud url: %w", err)
+	}
+
+	user, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "elasticsearch_username")
+	if err != nil {
+		return fmt.Errorf("unable to retrive es username: %w", err)
+	}
+	pass, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "elasticsearch_password")
+	if err != nil {
+		return fmt.Errorf("unable to retrive es password: %w", err)
 	}
 
 	var b bytes.Buffer
 	w := io.MultiWriter(&b, os.Stdout)
 	cmd := exec.Command("go", "test", "-v", "-timeout", "30m", "-tags=cloude2e", "-count=1", "-p", "1", "./...")
 	cmd.Dir = "testing"
-	cmd.Env = append(os.Environ(), "FLEET_SERVER_URL="+url)
+	cmd.Env = append(os.Environ(),
+		"FLEET_SERVER_URL="+fleetURL,
+		"KIBANA_URL="+kibanaURL,
+		"ELASTIC_USER="+user,
+		"ELASTIC_PASS="+pass,
+	)
 	cmd.Stdout = w
 	cmd.Stderr = w
 	err = cmd.Run()

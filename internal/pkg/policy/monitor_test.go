@@ -226,7 +226,6 @@ func TestMonitor_SamePolicy(t *testing.T) {
 }
 
 func TestMonitor_NewPolicyExists(t *testing.T) {
-
 	tests := []struct {
 		name  string
 		delay time.Duration
@@ -439,6 +438,114 @@ LOOP:
 		d *= -1
 	}
 	assert.LessOrEqual(t, 45*time.Millisecond, d) // use 45ms instead of 50ms because we are testing buffered channel output here, not dispatch from the run loop which means we are measuring something that may be smaller then the delay
+	ms.AssertExpectations(t)
+	mm.AssertExpectations(t)
+}
+
+func Test_Monitor_cancel_pending(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	chHitT := make(chan []es.HitT, 2)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
+	monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+	pm := monitor.(*monitorT)
+	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+		return []model.Policy{}, nil
+	}
+	pm.dispatchCh = make(chan struct{}, 1)
+
+	agentId := uuid.Must(uuid.NewV4()).String()
+	policyId := uuid.Must(uuid.NewV4()).String()
+
+	rId := xid.New().String()
+	policy := model.Policy{
+		ESDocument: model.ESDocument{
+			Id:      rId,
+			Version: 1,
+			SeqNo:   1,
+		},
+		PolicyID:    policyId,
+		Data:        policyDataDefault,
+		RevisionIdx: 1,
+	}
+	policyData, err := json.Marshal(&policy)
+	require.NoError(t, err)
+	policy2 := model.Policy{
+		ESDocument: model.ESDocument{
+			Id:      rId,
+			Version: 1,
+			SeqNo:   1,
+		},
+		PolicyID:    policyId,
+		Data:        policyDataDefault,
+		RevisionIdx: 2,
+	}
+	policyData2, err := json.Marshal(&policy2)
+	require.NoError(t, err)
+
+	// Send both revisions to monitor as as seperate hits
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   1,
+		Version: 1,
+		Source:  policyData,
+	}}
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   2,
+		Version: 1,
+		Source:  policyData2,
+	}}
+
+	// start monitor
+	var merr error
+	var mwg sync.WaitGroup
+	mwg.Add(1)
+	go func() {
+		defer mwg.Done()
+		merr = monitor.Run(ctx)
+	}()
+	err = monitor.(*monitorT).waitStart(ctx)
+	require.NoError(t, err)
+
+	// subscribe with revision 0
+	s, err := monitor.Subscribe(agentId, policyId, 0)
+	defer monitor.Unsubscribe(s)
+	require.NoError(t, err)
+
+	// This sleep allows the main run to call dispatch
+	// but dispatch will not proceed until there is a signal from the dispatchCh
+	time.Sleep(100 * time.Millisecond)
+	pm.dispatchCh <- struct{}{}
+
+	tm := time.NewTimer(time.Second)
+	policies := make([]*ParsedPolicy, 0, 2)
+LOOP:
+	for {
+		select {
+		case p := <-s.Output():
+			policies = append(policies, p)
+		case <-tm.C:
+			break LOOP
+		}
+	}
+
+	cancel()
+	mwg.Wait()
+	if merr != nil && merr != context.Canceled {
+		t.Fatal(merr)
+	}
+	require.Len(t, policies, 1, "expected to recieve one revision")
+	require.Equal(t, policies[0].Policy.RevisionIdx, int64(2))
 	ms.AssertExpectations(t)
 	mm.AssertExpectations(t)
 }

@@ -71,16 +71,16 @@ const (
 
 // Defines values for EventSubtype.
 const (
-	ACKNOWLEDGED EventSubtype = "ACKNOWLEDGED"
-	CONFIG       EventSubtype = "CONFIG"
-	DATADUMP     EventSubtype = "DATA_DUMP"
-	FAILED       EventSubtype = "FAILED"
-	INPROGRESS   EventSubtype = "IN_PROGRESS"
-	RUNNING      EventSubtype = "RUNNING"
-	STARTING     EventSubtype = "STARTING"
-	STOPPED      EventSubtype = "STOPPED"
-	STOPPING     EventSubtype = "STOPPING"
-	UNKNOWN      EventSubtype = "UNKNOWN"
+	EventSubtypeACKNOWLEDGED EventSubtype = "ACKNOWLEDGED"
+	EventSubtypeCONFIG       EventSubtype = "CONFIG"
+	EventSubtypeDATADUMP     EventSubtype = "DATA_DUMP"
+	EventSubtypeFAILED       EventSubtype = "FAILED"
+	EventSubtypeINPROGRESS   EventSubtype = "IN_PROGRESS"
+	EventSubtypeRUNNING      EventSubtype = "RUNNING"
+	EventSubtypeSTARTING     EventSubtype = "STARTING"
+	EventSubtypeSTOPPED      EventSubtype = "STOPPED"
+	EventSubtypeSTOPPING     EventSubtype = "STOPPING"
+	EventSubtypeUNKNOWN      EventSubtype = "UNKNOWN"
 )
 
 // Defines values for EventType.
@@ -93,14 +93,14 @@ const (
 
 // Defines values for StatusResponseStatus.
 const (
-	Configuring StatusResponseStatus = "configuring"
-	Degraded    StatusResponseStatus = "degraded"
-	Failed      StatusResponseStatus = "failed"
-	Healthy     StatusResponseStatus = "healthy"
-	Starting    StatusResponseStatus = "starting"
-	Stopped     StatusResponseStatus = "stopped"
-	Stopping    StatusResponseStatus = "stopping"
-	Unknown     StatusResponseStatus = "unknown"
+	StatusResponseStatusCONFIGURING StatusResponseStatus = "CONFIGURING"
+	StatusResponseStatusDEGRADED    StatusResponseStatus = "DEGRADED"
+	StatusResponseStatusFAILED      StatusResponseStatus = "FAILED"
+	StatusResponseStatusHEALTHY     StatusResponseStatus = "HEALTHY"
+	StatusResponseStatusSTARTING    StatusResponseStatus = "STARTING"
+	StatusResponseStatusSTOPPED     StatusResponseStatus = "STOPPED"
+	StatusResponseStatusSTOPPING    StatusResponseStatus = "STOPPING"
+	StatusResponseStatusUNKNOWN     StatusResponseStatus = "UNKNOWN"
 )
 
 // Defines values for UpgradeDetailsState.
