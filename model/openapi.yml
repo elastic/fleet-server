@@ -443,12 +443,13 @@ components:
       properties:
         username:
           type: string
-          description: Username of the intended user.
+          description: Username of custom user used to run Elastic Agent.
         password:
           type: string
           description: Password for user specified by username.
         groupname:
           type: string
+          description: Custom group used to access Elastic Agent files.
     action:
       description: |
         An action for an elastic-agent.

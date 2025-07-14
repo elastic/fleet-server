@@ -869,12 +869,13 @@ type UploadCompleteRequest struct {
 
 // UserInfo Optional user info data.
 type UserInfo struct {
+	// Groupname Custom group used to access Elastic Agent files.
 	Groupname *string `json:"groupname,omitempty"`
 
 	// Password Password for user specified by username.
 	Password *string `json:"password,omitempty"`
 
-	// Username Username of the intended user.
+	// Username Username of custom user used to run Elastic Agent.
 	Username *string `json:"username,omitempty"`
 }
 
