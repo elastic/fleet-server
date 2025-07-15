@@ -11,9 +11,15 @@ require (
 	github.com/elastic/elastic-agent-system-metrics v0.11.15
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-ucfg v0.8.8
+<<<<<<< HEAD
 	github.com/fxamacker/cbor/v2 v2.8.0
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/gofrs/uuid v4.4.0+incompatible
+=======
+	github.com/fxamacker/cbor/v2 v2.9.0
+	github.com/go-chi/chi/v5 v5.2.2
+	github.com/gofrs/uuid/v5 v5.3.2
+>>>>>>> 9ac161c (build(deps): bump github.com/fxamacker/cbor/v2 from 2.8.0 to 2.9.0 (#5156))
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-version v1.7.0
