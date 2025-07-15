@@ -1,0 +1,17 @@
+// begin 8.17.9 relnotes
+
+[[release-notes-8.17.9]]
+==  8.17.9
+
+Review important information about the  8.17.9 release.
+
+[discrete]
+[[bug-fixes-8.17.9]]
+=== Bug fixes
+
+
+fleet-server::
+
+* Include The Base Error For Json Decode Error Responses. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5069[#https://github.com/elastic/fleet-server/pull/5069] 
+
+// end 8.17.9 relnotes
