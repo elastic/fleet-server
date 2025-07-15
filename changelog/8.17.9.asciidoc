@@ -5,21 +5,6 @@
 
 Review important information about the  8.17.9 release.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 [discrete]
 [[bug-fixes-8.17.9]]
 === Bug fixes
