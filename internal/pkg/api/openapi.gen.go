@@ -25,15 +25,16 @@ const (
 
 // Defines values for ActionType.
 const (
-	CANCEL             ActionType = "CANCEL"
-	INPUTACTION        ActionType = "INPUT_ACTION"
-	MIGRATE            ActionType = "MIGRATE"
-	POLICYCHANGE       ActionType = "POLICY_CHANGE"
-	POLICYREASSIGN     ActionType = "POLICY_REASSIGN"
-	REQUESTDIAGNOSTICS ActionType = "REQUEST_DIAGNOSTICS"
-	SETTINGS           ActionType = "SETTINGS"
-	UNENROLL           ActionType = "UNENROLL"
-	UPGRADE            ActionType = "UPGRADE"
+	CANCEL               ActionType = "CANCEL"
+	INPUTACTION          ActionType = "INPUT_ACTION"
+	MIGRATE              ActionType = "MIGRATE"
+	POLICYCHANGE         ActionType = "POLICY_CHANGE"
+	POLICYREASSIGN       ActionType = "POLICY_REASSIGN"
+	PRIVILEGELEVELCHANGE ActionType = "PRIVILEGE_LEVEL_CHANGE"
+	REQUESTDIAGNOSTICS   ActionType = "REQUEST_DIAGNOSTICS"
+	SETTINGS             ActionType = "SETTINGS"
+	UNENROLL             ActionType = "UNENROLL"
+	UPGRADE              ActionType = "UPGRADE"
 )
 
 // Defines values for ActionRequestDiagnosticsAdditionalMetrics.
@@ -242,6 +243,15 @@ type ActionPolicyChange struct {
 // ActionPolicyReassign The POLICY_REASSIGN action data.
 type ActionPolicyReassign struct {
 	PolicyId string `json:"policy_id"`
+}
+
+// ActionPrivilegeLevelChange The PRIVILEGE_LEVEL_CHANGE action.
+type ActionPrivilegeLevelChange struct {
+	// Unprivileged Flag indicating whether target level is unprivileged. If not provided unprivileged is assumed.
+	Unprivileged bool `json:"unprivileged"`
+
+	// UserInfo Optional user info data.
+	UserInfo *UserInfo `json:"user_info,omitempty"`
 }
 
 // ActionRequestDiagnostics The REQUEST_DIAGNOSTICS action data.
@@ -855,6 +865,18 @@ type UploadCompleteRequest struct {
 		// Sha256 SHA256 hash
 		Sha256 string `json:"sha256"`
 	} `json:"transithash"`
+}
+
+// UserInfo Optional user info data.
+type UserInfo struct {
+	// Groupname Custom group used to access Elastic Agent files.
+	Groupname *string `json:"groupname,omitempty"`
+
+	// Password Password for user specified by username.
+	Password *string `json:"password,omitempty"`
+
+	// Username Username of custom user used to run Elastic Agent.
+	Username *string `json:"username,omitempty"`
 }
 
 // ApiVersion defines model for apiVersion.
@@ -1593,6 +1615,32 @@ func (t *Action_Data) FromActionMigrate(v ActionMigrate) error {
 
 // MergeActionMigrate performs a merge with any union data inside the Action_Data, using the provided ActionMigrate
 func (t *Action_Data) MergeActionMigrate(v ActionMigrate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsActionPrivilegeLevelChange returns the union data inside the Action_Data as a ActionPrivilegeLevelChange
+func (t Action_Data) AsActionPrivilegeLevelChange() (ActionPrivilegeLevelChange, error) {
+	var body ActionPrivilegeLevelChange
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromActionPrivilegeLevelChange overwrites any union data inside the Action_Data as the provided ActionPrivilegeLevelChange
+func (t *Action_Data) FromActionPrivilegeLevelChange(v ActionPrivilegeLevelChange) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeActionPrivilegeLevelChange performs a merge with any union data inside the Action_Data, using the provided ActionPrivilegeLevelChange
+func (t *Action_Data) MergeActionPrivilegeLevelChange(v ActionPrivilegeLevelChange) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err

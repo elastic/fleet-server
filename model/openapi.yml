@@ -437,6 +437,19 @@ components:
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "signature"
             json: "signature,omitempty"
+    userInfo:
+      description: Optional user info data.
+      type: object
+      properties:
+        username:
+          type: string
+          description: Username of custom user used to run Elastic Agent.
+        password:
+          type: string
+          description: Password for user specified by username.
+        groupname:
+          type: string
+          description: Custom group used to access Elastic Agent files.
     action:
       description: |
         An action for an elastic-agent.
@@ -488,6 +501,7 @@ components:
             - $ref: "#/components/schemas/actionRequestDiagnostics"
             - $ref: "#/components/schemas/actionInputAction"
             - $ref: "#/components/schemas/actionMigrate"
+            - $ref: "#/components/schemas/actionPrivilegeLevelChange"
         id:
           description: The action ID.
           type: string
@@ -513,6 +527,7 @@ components:
             - "CANCEL"
             - "REQUEST_DIAGNOSTICS"
             - "MIGRATE"
+            - "PRIVILEGE_LEVEL_CHANGE"
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
@@ -655,6 +670,17 @@ components:
       required:
        - enrollment_token
        - target_uri
+    actionPrivilegeLevelChange:
+      description: The PRIVILEGE_LEVEL_CHANGE action.
+      type: object
+      properties:
+        unprivileged:
+          type: boolean
+          description: Flag indicating whether target level is unprivileged. If not provided unprivileged is assumed.
+        user_info:
+          $ref: "#/components/schemas/userInfo"
+      required: 
+        - unprivileged
     checkinResponse:
       type: object
       required:

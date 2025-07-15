@@ -130,6 +130,19 @@ func TestEventToActionResult(t *testing.T) {
 		assert.Equal(t, "2022-02-23T18:26:08.506128Z", r.Timestamp)
 		assert.Equal(t, "error message", r.Error)
 	})
+	t.Run("privilege level change action", func(t *testing.T) {
+		r := eventToActionResult(agentID, "PRIVILEGE_LEVEL_CHANGE", []string{}, AckRequest_Events_Item{json.RawMessage(`{
+		"action_id": "test-action-id",
+		"message": "action message",
+		"timestamp": "2022-02-23T18:26:08.506128Z",
+		"data": {"unprivileged":"true","user_info":{"username": "demo", "password": "1q2w3e"}},
+		"error": "error message"
+		}`)})
+		assert.Equal(t, agentID, r.AgentID)
+		assert.Equal(t, "test-action-id", r.ActionID)
+		assert.Equal(t, "2022-02-23T18:26:08.506128Z", r.Timestamp)
+		assert.Equal(t, "error message", r.Error)
+	})
 }
 
 type searchRequestFilter struct {

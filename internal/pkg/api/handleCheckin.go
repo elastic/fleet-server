@@ -57,14 +57,15 @@ const (
 // unlisted or invalid types are removed with filterActions().
 // action types should have a corresponding case in convertActionData.
 var validActionTypes = map[string]bool{
-	string(CANCEL):             true,
-	string(INPUTACTION):        true,
-	string(POLICYREASSIGN):     true,
-	string(REQUESTDIAGNOSTICS): true,
-	string(SETTINGS):           true,
-	string(UNENROLL):           true,
-	string(UPGRADE):            true,
-	string(MIGRATE):            true,
+	string(CANCEL):               true,
+	string(INPUTACTION):          true,
+	string(POLICYREASSIGN):       true,
+	string(REQUESTDIAGNOSTICS):   true,
+	string(SETTINGS):             true,
+	string(UNENROLL):             true,
+	string(UPGRADE):              true,
+	string(MIGRATE):              true,
+	string(PRIVILEGELEVELCHANGE): true,
 }
 
 type CheckinT struct {
@@ -767,6 +768,14 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 			return
 		}
 		err = ad.FromActionMigrate(d)
+		return
+	case PRIVILEGELEVELCHANGE:
+		d := ActionPrivilegeLevelChange{}
+		err = json.Unmarshal(raw, &d)
+		if err != nil {
+			return
+		}
+		err = ad.FromActionPrivilegeLevelChange(d)
 		return
 	default:
 		return ad, fmt.Errorf("data conversion unsupported action type: %s", aType)
