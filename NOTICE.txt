@@ -2384,11 +2384,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/oapi-codegen/runtime
-Version: v1.1.1
+Version: v1.1.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/oapi-codegen/runtime@v1.1.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/oapi-codegen/runtime@v1.1.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
