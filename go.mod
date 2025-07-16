@@ -22,7 +22,7 @@ require (
 	github.com/magefile/mage v1.15.0
 	github.com/mailru/easyjson v0.9.0
 	github.com/miolini/datacounter v1.0.3
-	github.com/oapi-codegen/runtime v1.1.1
+	github.com/oapi-codegen/runtime v1.1.2
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/xid v1.6.0
