@@ -34,7 +34,7 @@ jobs:
 
       - name: check for modified files
         id: check-files
-        run: echo "modified=$(if git diff-index --quiet HEAD -- NOTICE.txt NOTICE-fips.txt testing/go.mod testing/go.sum; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+        run: echo "modified=$(if git diff --quiet HEAD -- NOTICE.txt NOTICE-fips.txt testing/go.mod testing/go.sum; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
 
       - name: commit modified files
         if: steps.check-files.outputs.modified == 'true'
