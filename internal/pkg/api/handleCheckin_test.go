@@ -135,6 +135,18 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{json.RawMessage(`{"enrollment_token":"et","target_uri":"turi"}`)},
 		hasErr: false,
 	}, {
+		name:   "privilege level change action - with data",
+		aType:  PRIVILEGELEVELCHANGE,
+		raw:    json.RawMessage(`{"unprivileged":true,"user_info":{"password":"1q2w3e","username":"demo"}}`),
+		expect: Action_Data{json.RawMessage(`{"unprivileged":true,"user_info":{"password":"1q2w3e","username":"demo"}}`)},
+		hasErr: false,
+	}, {
+		name:   "privilege level change action",
+		aType:  PRIVILEGELEVELCHANGE,
+		raw:    json.RawMessage(`{}`),
+		expect: Action_Data{json.RawMessage(`{"unprivileged":false}`)},
+		hasErr: false,
+	}, {
 		name:   "unknown action type",
 		aType:  ActionType("UNKNOWN"),
 		expect: Action_Data{},
