@@ -870,6 +870,37 @@
             }
           }
         },
+        "receivers": {
+          "description": "OTel collector receivers",
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "processors": {
+          "description": "OTel collector processors",
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "service": {
+          "description": "OTel collector pipelines setup",
+          "type": "object",
+          "properties": {
+            "extensions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "pipelines": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
         "secret_references": {
           "description": "A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.",
           "type": "array",
