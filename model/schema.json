@@ -880,6 +880,16 @@
           "type": "object",
           "additionalProperties": {}
         },
+        "connectors": {
+          "description": "OTel collector connectors",
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "exporters": {
+          "description": "OTel collector exporters",
+          "type": "object",
+          "additionalProperties": {}
+        },
         "service": {
           "description": "OTel collector pipelines setup",
           "type": "object",
