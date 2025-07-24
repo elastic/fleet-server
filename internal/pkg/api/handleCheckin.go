@@ -1136,6 +1136,7 @@ func downloadingBytesFixed(metadata *UpgradeDetails_Metadata) error {
 	// Test to see if metadata unmarshalls directly as a float
 	_, err := metadata.AsUpgradeMetadataDownloading()
 	if err == nil {
+		zerolog.Ctx(context.Background()).Info().Msg("UNPACK UPGRADE NO INITIAL ERR")
 		return nil
 	}
 
