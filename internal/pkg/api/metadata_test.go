@@ -8,7 +8,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -43,7 +42,6 @@ func Test_ParseDownloadRate(t *testing.T) {
 
 			res, err := parseDownloadRate(tc.raw)
 			if tc.expectedErrMsg != "" {
-				fmt.Printf("TEST %v+", err)
 				require.ErrorContains(t, err, tc.expectedErrMsg)
 			} else {
 				require.NoError(t, err)
