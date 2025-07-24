@@ -1130,7 +1130,7 @@ func calcPollDuration(zlog zerolog.Logger, pollDuration, setupDuration, jitterDu
 
 // downloadingBytesFixed will attempt to unpack upgrade details as upgrade metadata
 // However it can encounter an error from earlier agent versions sending a string as the download rate instead of a float.
-// If it encounters this error, it will attemp to fix the download rate when unpacking the object
+// If it encounters this error, it will attempt to fix the download rate when unpacking the object
 // FIXME UpgradeMetadataDownloading has an UnmarshalJSON function that is not being called correctly?
 func downloadingBytesFixed(metadata *UpgradeDetails_Metadata) error {
 	// Test to see if metadata unmarshalls directly as a float
