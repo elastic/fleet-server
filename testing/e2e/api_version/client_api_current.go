@@ -129,6 +129,9 @@ func (tester *ClientAPITester) Checkin(ctx context.Context, apiKey, agentID stri
 		}
 	}
 	requestBody.AckToken = ackToken
+	if dur != nil {
+		requestBody.PollTimeout = dur
+	}
 
 	resp, err := client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, *requestBody)
 	tester.Require().NoError(err)
@@ -481,16 +484,22 @@ func (tester *ClientAPITester) TestEnrollUpgradeAction_MetadataDownloadRate_Stri
 	tester.T().Log("test ack")
 	tester.Acks(ctx, agentKey, agentID, actions)
 
+	tester.T().Logf("Request upgrade for agent: %s", agentID)
 	tester.UpgradeAgent(ctx, agentID, "9.0.0")
 
-	ackToken, actions, statusCode = tester.Checkin(ctx, agentKey, agentID, ackToken, nil, nil)
+	tester.T().Logf("test checkin 2: agent %s", agentID)
+	checkin2Ctx, checkin2Cancel := context.WithTimeout(ctx, time.Second*15) // use a short checking here - the action should be immediatly returned
+	defer checkin2Cancel()
+	ackToken, actions, statusCode = tester.Checkin(checkin2Ctx, agentKey, agentID, ackToken, nil, nil)
 	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
 	tester.Require().NotEmpty(actions)
 
 	// Checkin with a request body that has a string download rate
+	dur := "1m" // 1m is min pollDuration value
 	body := &api.AgentCheckinJSONRequestBody{
-		Status:  api.CheckinRequestStatusOnline,
-		Message: "test checkin",
+		Status:      api.CheckinRequestStatusOnline,
+		Message:     "test checkin",
+		PollTimeout: &dur,
 		UpgradeDetails: &api.UpgradeDetails{
 			ActionId:      actions[0], // Assume action 0 is upgrade
 			State:         api.UpgradeDetailsStateUPGDOWNLOADING,
@@ -501,6 +510,7 @@ func (tester *ClientAPITester) TestEnrollUpgradeAction_MetadataDownloadRate_Stri
 	err := body.UpgradeDetails.Metadata.UnmarshalJSON([]byte(`{"download_percent": 10,"download_rate": "10kbps"}`))
 	tester.Require().NoError(err)
 
-	_, _, statusCode = tester.Checkin(ctx, agentKey, agentID, ackToken, nil, body)
+	tester.T().Logf("test checkin 3: agent %s", agentID)
+	_, _, statusCode = tester.Checkin(ctx, agentKey, agentID, ackToken, &dur, body)
 	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
 }

@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"reflect"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -33,7 +32,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
-	"github.com/docker/go-units"
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
@@ -473,10 +471,13 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			vSpan.End()
 			break // no validation
 		}
-		err := downloadingBytesFixed(details.Metadata)
+		upgradeDetails, err := details.Metadata.AsUpgradeMetadataDownloading()
 		if err != nil {
 			vSpan.End()
 			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
+		}
+		if err = details.Metadata.FromUpgradeMetadataDownloading(upgradeDetails); err != nil {
+			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
 		}
 	case UpgradeDetailsStateUPGFAILED:
 		if details.Metadata == nil {
@@ -1126,53 +1127,4 @@ func calcPollDuration(zlog zerolog.Logger, pollDuration, setupDuration, jitterDu
 	}
 
 	return pollDuration, jitter
-}
-
-// downloadingBytesFixed will attempt to unpack upgrade details as upgrade metadata
-// However it can encounter an error from earlier agent versions sending a string as the download rate instead of a float.
-// If it encounters this error, it will attempt to fix the download rate when unpacking the object
-// FIXME UpgradeMetadataDownloading has an UnmarshalJSON function that is not being called correctly?
-func downloadingBytesFixed(metadata *UpgradeDetails_Metadata) error {
-	// Test to see if metadata unmarshalls directly as a float
-	_, err := metadata.AsUpgradeMetadataDownloading()
-	if err == nil {
-		zerolog.Ctx(context.Background()).Info().Msg("UNPACK UPGRADE NO INITIAL ERR")
-		return nil
-	}
-
-	// error with unmarshalling, download_rate may be set to a string (occurs in some agents before 8.16)
-	obj := struct {
-		DownloadPercent float64    `json:"download_percent"`
-		DownloadRate    *string    `json:"download_rate,omitempty"`
-		RetryErrorMsg   *string    `json:"retry_error_msg,omitempty"`
-		RetryUntil      *time.Time `json:"retry_until,omitempty"`
-	}{}
-	err = json.Unmarshal(metadata.union, &obj)
-	if err != nil {
-		return fmt.Errorf("unmarshal downloading metadata object with download_rate: string failed: %w", err)
-	}
-
-	// convert the string into a float that represents bps
-	var rate float64
-	if obj.DownloadRate != nil {
-		rateString, _ := strings.CutSuffix(*obj.DownloadRate, "ps")
-		intRate, err := units.FromHumanSize(rateString)
-		if err != nil {
-			return fmt.Errorf("unable to convert download_rate %q to float: %w", *obj.DownloadRate, err)
-		}
-		rate = float64(intRate)
-	}
-
-	// replace union with fixed value
-	metadata.union, err = json.Marshal(&UpgradeMetadataDownloading{
-		DownloadPercent: obj.DownloadPercent,
-		DownloadRate:    &rate,
-		RetryErrorMsg:   obj.RetryErrorMsg,
-		RetryUntil:      obj.RetryUntil,
-	})
-	if err != nil {
-		return fmt.Errorf("marshal from UpgradeMetadataDoewnloading failed: %w", err)
-	}
-
-	return nil
 }
