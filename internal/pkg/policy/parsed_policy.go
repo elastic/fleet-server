@@ -52,6 +52,13 @@ type ParsedPolicy struct {
 	Inputs     []map[string]interface{}
 	SecretKeys []string
 	Links      apm.SpanLink
+
+	// OTel Collector
+	Extensions map[string]any
+	Receivers  map[string]any
+	Processors map[string]any
+	Connectors map[string]any
+	Service    *model.Service
 }
 
 func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*ParsedPolicy, error) {
@@ -96,6 +103,13 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		},
 		Inputs:     policyInputs,
 		SecretKeys: secretKeys,
+
+		// OTel Collector
+		Extensions: p.Data.Extensions,
+		Receivers:  p.Data.Receivers,
+		Processors: p.Data.Processors,
+		Connectors: p.Data.Connectors,
+		Service:    p.Data.Service,
 	}
 	if trace := apm.TransactionFromContext(ctx); trace != nil {
 		// Pass current transaction link (should be a monitor transaction) to caller (likely a client request).

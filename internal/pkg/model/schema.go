@@ -441,6 +441,9 @@ type PolicyData struct {
 	// OTel collector exporters
 	Exporters map[string]interface{} `json:"exporters,omitempty"`
 
+	// OTel collector extensions
+	Extensions map[string]interface{} `json:"extensions,omitempty"`
+
 	// The policy's fleet configuration details
 	Fleet json.RawMessage `json:"fleet,omitempty"`
 
@@ -530,8 +533,8 @@ type ServerMetadata struct {
 
 // Service OTel collector pipelines setup
 type Service struct {
-	Extensions []string            `json:"extensions,omitempty"`
-	Pipelines  map[string][]string `json:"pipelines,omitempty"`
+	Extensions []string                       `json:"extensions,omitempty"`
+	Pipelines  map[string]map[string][]string `json:"pipelines,omitempty"`
 }
 
 // Signed The action signed data and signature.

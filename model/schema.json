@@ -870,6 +870,11 @@
             }
           }
         },
+        "extensions": {
+          "description": "OTel collector extensions",
+          "type": "object",
+          "additionalProperties": {}
+        },
         "receivers": {
           "description": "OTel collector receivers",
           "type": "object",
@@ -903,9 +908,12 @@
             "pipelines": {
               "type": "object",
               "additionalProperties": {
-                "type": "array",
-                "items": {
-                  "type": "string"
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               }
             }
