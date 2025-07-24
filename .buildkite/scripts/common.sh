@@ -55,9 +55,12 @@ with_msft_go() {
     echo "Setting up microsoft/go"
     create_workspace
     check_platform_architeture
+
+    # Use a temporary folder to house the Go SDK downloaded from Microsoft
+    tempfolder=$(mktemp -d)
     MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version).${platform_type}-${arch_type}.tar.gz
-    retry 5 $(curl -sL -o - $MSFT_DOWNLOAD_URL | tar -xz -f - -C ${WORKSPACE})
-    export PATH="${PATH}:${WORKSPACE}/go/bin"
+    retry 5 $(curl -sL -o - $MSFT_DOWNLOAD_URL | tar -xz -f - -C ${tempfolder}/)
+    export PATH="${PATH}:${tempfolder}/go/bin"
     go version
     which go
     export PATH="${PATH}:$(go env GOPATH)/bin"
@@ -88,11 +91,6 @@ retry() {
         fi
     done
     return 0
-}
-
-docker_logout() {
-    echo "Logging out from Docker..."
-    docker logout ${DOCKER_REGISTRY}
 }
 
 with_Terraform() {
