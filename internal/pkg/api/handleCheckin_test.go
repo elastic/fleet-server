@@ -578,8 +578,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
 				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
-					// dl.FieldUpgradeDetails: details
-					// details is metadata above
+					// match doc that gets sent to ES
 					doc := struct {
 						Doc struct {
 							UpgradeDetails struct {
@@ -615,8 +614,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
 				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
-					// dl.FieldUpgradeDetails: details
-					// details is metadata above
+					// match doc that gets sent to ES
 					doc := struct {
 						Doc struct {
 							UpgradeDetails struct {
