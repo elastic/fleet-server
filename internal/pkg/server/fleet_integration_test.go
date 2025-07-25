@@ -1226,8 +1226,8 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Ack actions for agent %s", agentID)
-	events := make([]api.AckRequest_Events_Item, 0, len(*checkinResponse.Actions))
-	for _, action := range *checkinResponse.Actions {
+	events := make([]api.AckRequest_Events_Item, 0, len(checkinResponse.Actions))
+	for _, action := range checkinResponse.Actions {
 		event := api.GenericEvent{
 			ActionId: action.Id,
 			AgentId:  agentID,
@@ -1358,8 +1358,8 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Ack actions for agent %s", agentID)
-	events := make([]api.AckRequest_Events_Item, 0, len(*checkinResponse.Actions))
-	for _, action := range *checkinResponse.Actions {
+	events := make([]api.AckRequest_Events_Item, 0, len(checkinResponse.Actions))
+	for _, action := range checkinResponse.Actions {
 		event := api.GenericEvent{
 			ActionId: action.Id,
 			AgentId:  agentID,

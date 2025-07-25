@@ -394,7 +394,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	resp := CheckinResponse{
 		AckToken: &ackToken,
 		Action:   "checkin",
-		Actions:  &actions,
+		Actions:  actions,
 	}
 
 	return ct.writeResponse(zlog, w, r, agent, resp)
@@ -549,7 +549,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	ctx := r.Context()
 	var links []apm.SpanLink
 	if ct.bulker.HasTracer() {
-		for _, a := range fromPtr(resp.Actions) {
+		for _, a := range resp.Actions {
 			if fromPtr(a.Traceparent) != "" {
 				traceContext, err := apmhttp.ParseTraceparentHeader(fromPtr(a.Traceparent))
 				if err != nil {
@@ -567,17 +567,17 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 		}
 	}
 
-	if len(fromPtr(resp.Actions)) > 0 {
+	if len(resp.Actions) > 0 {
 		var span *apm.Span
 		span, ctx = apm.StartSpanOptions(ctx, "action delivery", "fleet-server", apm.SpanOptions{
 			Links: links,
 		})
-		span.Context.SetLabel("action_count", len(fromPtr(resp.Actions)))
+		span.Context.SetLabel("action_count", len(resp.Actions))
 		span.Context.SetLabel("agent_id", agent.Id)
 		defer span.End()
 	}
 
-	for _, action := range fromPtr(resp.Actions) {
+	for _, action := range resp.Actions {
 		zlog.Info().
 			Str("ackToken", fromPtr(resp.AckToken)).
 			Str("createdAt", action.CreatedAt).
@@ -892,7 +892,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// remove duplicates from secretkeys
 	slices.Sort(pp.SecretKeys)
 	keys := slices.Compact(pp.SecretKeys)
-	d.SecretPaths = &keys
+	d.SecretPaths = keys
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})
 	if err != nil {
@@ -947,20 +947,20 @@ func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*mod
 // parseMeta compares the agent and the request local_metadata content
 // and returns fields to update the agent record or nil
 func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
-	if req.LocalMetadata == nil {
+	if len(req.LocalMetadata) == 0 {
 		return nil, nil
 	}
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
-	if bytes.Equal(*req.LocalMetadata, agent.LocalMetadata) {
+	if bytes.Equal(req.LocalMetadata, agent.LocalMetadata) {
 		zlog.Trace().Msg("quick comparing local metadata is equal")
 		return nil, nil
 	}
 
 	// Deserialize the request metadata
 	var reqLocalMeta interface{}
-	if err := json.Unmarshal(*req.LocalMetadata, &reqLocalMeta); err != nil {
+	if err := json.Unmarshal(req.LocalMetadata, &reqLocalMeta); err != nil {
 		return nil, fmt.Errorf("parseMeta request: %w", err)
 	}
 
@@ -982,14 +982,14 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 
 		zlog.Trace().
 			RawJSON("oldLocalMeta", agent.LocalMetadata).
-			RawJSON("newLocalMeta", *req.LocalMetadata).
+			RawJSON("newLocalMeta", req.LocalMetadata).
 			Msg("local metadata not equal")
 
 		zlog.Info().
-			RawJSON("req.LocalMeta", *req.LocalMetadata).
+			RawJSON("req.LocalMeta", req.LocalMetadata).
 			Msg("applying new local metadata")
 
-		outMeta = *req.LocalMetadata
+		outMeta = req.LocalMetadata
 	}
 
 	return outMeta, nil
@@ -1016,15 +1016,15 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
-	if bytes.Equal(*req.Components, agentComponentsJSON) {
+	if bytes.Equal(req.Components, agentComponentsJSON) {
 		zlog.Trace().Msg("quick comparing agent components data is equal")
 		return nil, &unhealthyReason, nil
 	}
 
 	// Deserialize the request components data
 	var reqComponents []model.ComponentsItems
-	if len(*req.Components) > 0 {
-		if err := json.Unmarshal(*req.Components, &reqComponents); err != nil {
+	if len(req.Components) > 0 {
+		if err := json.Unmarshal(req.Components, &reqComponents); err != nil {
 			return nil, &unhealthyReason, fmt.Errorf("parseComponents request: %w", err)
 		}
 	}
@@ -1038,8 +1038,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 
 	// Compare the deserialized meta structures and return the bytes to update if different
 	if !reflect.DeepEqual(reqComponents, agent.Components) {
-
-		reqComponentsJSON, _ := json.Marshal(*req.Components)
+		reqComponentsJSON, _ := json.Marshal(req.Components)
 		zlog.Trace().
 			Str("oldComponents", string(agentComponentsJSON)).
 			Str("req.Components", string(reqComponentsJSON)).
@@ -1047,7 +1046,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 
 		zlog.Info().Msg("applying new components data")
 
-		outComponents = *req.Components
+		outComponents = req.Components
 		compUnhealthyReason := calcUnhealthyReason(reqComponents)
 		if len(compUnhealthyReason) > 0 {
 			unhealthyReason = compUnhealthyReason

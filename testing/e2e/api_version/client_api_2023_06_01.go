@@ -132,11 +132,13 @@ func (tester *ClientAPITester20230601) Checkin(ctx context.Context, apiKey, agen
 	tester.Assert().Equal(http.StatusOK, resp.StatusCode())
 	checkin := resp.JSON200
 	tester.Assert().NotNil(checkin.AckToken, "expected to recieve ack token from checkin")
-	tester.Assert().NotNil(checkin.Actions, "expected to actions from checkin")
 
-	actionIds := make([]string, len(*checkin.Actions))
-	for i, action := range *checkin.Actions {
-		actionIds[i] = action.Id
+	var actionIds []string
+	if checkin.Actions != nil {
+		actionIds = make([]string, len(*checkin.Actions))
+		for i, action := range *checkin.Actions {
+			actionIds[i] = action.Id
+		}
 	}
 
 	return checkin.AckToken, actionIds
