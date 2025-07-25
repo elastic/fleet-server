@@ -476,7 +476,8 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			vSpan.End()
 			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
 		}
-		if err = details.Metadata.FromUpgradeMetadataDownloading(upgradeDetails); err != nil {
+		if err := details.Metadata.FromUpgradeMetadataDownloading(upgradeDetails); err != nil {
+			vSpan.End()
 			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
 		}
 	case UpgradeDetailsStateUPGFAILED:
@@ -492,6 +493,11 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		if meta.ErrorMsg == "" {
 			vSpan.End()
 			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
+		}
+		// Repack metadata in failed case as the agent may send UPG_DOWNLOADING attributes.
+		if err = details.Metadata.FromUpgradeMetadataFailed(meta); err != nil {
+			vSpan.End()
+			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
 	case UpgradeDetailsStateUPGSCHEDULED:
 		if details.Metadata == nil {
