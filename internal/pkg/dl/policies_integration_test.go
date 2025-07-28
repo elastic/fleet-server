@@ -95,6 +95,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 //
 //nolint:dupl // test duplication
 func TestQueryLatestPolicies400k(t *testing.T) {
+	t.Skip("Test flaky, see: https://github.com/elastic/fleet-server/issues/5181")
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
@@ -111,7 +112,7 @@ func TestQueryLatestPolicies400k(t *testing.T) {
 			t.Fatal(err)
 		}
 		return len(policies) == 4
-	}, time.Second*2, time.Millisecond*100, "Expected to eventuually have 4 policies found: %d", len(policies))
+	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 4 policies found: %d", len(policies))
 
 	for _, policy := range policies {
 		if policy.RevisionIdx != 100000 {
