@@ -28,6 +28,10 @@ func Test_ParseDownloadRate(t *testing.T) {
 		raw:           json.RawMessage(`"1MBps"`),
 		expectedValue: 1000000.00,
 	}, {
+		name:          "download rate has decimal",
+		raw:           json.RawMessage(`"320.822575kBps"`),
+		expectedValue: 320822.0, // Decimal is truncated
+	}, {
 		name:           "download only MBps",
 		raw:            json.RawMessage(`"MBps"`),
 		expectedErrMsg: "error converting download_rate from human size: invalid size: 'MB'",
