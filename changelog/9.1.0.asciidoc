@@ -1,0 +1,200 @@
+// begin 9.1.0 relnotes
+
+[[release-notes-9.1.0]]
+==  9.1.0
+
+Review important information about the  9.1.0 release.
+
+[discrete]
+[[security-updates-9.1.0]]
+=== Security updates
+
+
+fleet-server::
+
+* Upgrade Golang.org/X/Net To V0.34.0 And Golang.org/X/Crypto To V0.32.0. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4405[#https://github.com/elastic/fleet-server/pull/4405] 
+
+
+
+
+
+
+
+[discrete]
+[[new-features-9.1.0]]
+=== New features
+
+The 9.1.0 release adds the following new and notable features.
+
+
+
+
+* Add Policy Static Token. {-pull}2654[#2654] 
++
+Adds a new policy token that can be used to enroll Elastic Agent into fleet server.
+The policy ID must exist in Elasticsearch in order to successfully enroll the agent.
+
+* Add Kafka Output Type For Agent Policies.  {-issue}https://github.com/elastic/elastic-agent-shipper/issues/116[#https://github.com/elastic/elastic-agent-shipper/issues/116]
+* Replacing Secret References With Secret Values. {-pull}2863[#2863] {-issue}2485[#2485]
++
+Secrets are being stored in a separate index in elasticsearch, and secret references are included in an agent policy. Secret references are replaced with secret values in the agent policy before sending it out to agents on checkin.
+* Add Support For Upgrade_details On Checkin. {-pull}2901[#2901] 
++
+Add new upgrade_details attribute to checkin requests and the agent index.
+Keep old ack based upgrade logic in place.
+
+* Add Pgp Key Endpoint. {-pull}2977[#2977] {-issue}2887[#2887]
++
+Add endpoint to serve PGP keys that clients can use when validating
+upgrades in cases where the embedded PGP key in a client is
+compromised and the client can&#39;t reach the Internet.
+Endpoint will serve a key on-disk if available, otherwise will attempt
+to retrieve from an upstream source.
+Endpoint will only serve TLS enabled requests and respond with a 501 to
+plain HTTP requests.
+
+* Add Action-Dispatcher Rate Limiter. {-pull}2994[#2994] 
++
+Add a sync.Pool to share gzip writers among all resquests in order to avoid new gzip.Writer allocations.
+Each writer allocation is around 1.2MB and is a limiting factor of hitting larger scales.
+Add a rate limiter to the action-dispatcher used by checkins (disabled by default) to control how responses are written.
+
+* Support For Remote Elasticsearch Output. {-pull}3051[#3051] 
+* Report Output Health State To Logs-Fleet_server.output_health-Default Data Stream. {-pull}https://github.com/owner/repo/3127[#https://github.com/owner/repo/3127] {-issue}https://github.com/owner/repo/3116[#https://github.com/owner/repo/3116]
+* Add Policy_debounce_time To Monitor. {-pull}3234[#3234] 
++
+Add a policy_debounce_time configuration to add a forced delay to the
+policy index monitor when it successfully gathers new documents. This
+is needed to stop fleet-server from dispatching all policies in cases
+where policy changes occur frequently and fleet-server is unable to
+dispatch all policy change actions before the policy is updated.
+
+* Agent Mode Support For Bootstrap Output.  {-issue}3464[#3464]
++
+When fleet-server is running in agent mode output expecteced config will be checked for a &#34;bootstrap&#34; attribute.
+This should allow the elastic-agent to pass the policy output values under output.elasticsearch as expected, and
+also pass the values provided at enrollement, such as the service token under output.elasticsearch.bootstrap.
+This will allow fleet-server to use output settings from the policy, and have the enrollment configuration options
+as a fallback.
+
+* Add Audit/Unenroll Api. {-pull}https://github.com/elastic/fleet-server/pull/3818[#https://github.com/elastic/fleet-server/pull/3818] {-issue}https://github.com/elastic/elastic-agent/issues/484[#https://github.com/elastic/elastic-agent/issues/484]
++
+Add the /api/fleet/agents/:id/audit/unenroll API that elastic-agent
+and Endpoint instances may use to annotate the agent document when
+the agent is uninstalled or Endpoint detects it is in an orphaned
+state.
+
+* Add Secret Paths List To Policies Sent To Agents. {-pull}https://github.com/elastic/fleet-server/pull/3908[#https://github.com/elastic/fleet-server/pull/3908] 
++
+Add a secret_paths attribute as part of the policy response data. This attribute is a list of keys where secret substitution has occured.
+The agent should redact the values of these keys when outputting them.
+
+* Dont Fail Checkin If Upgrade Action Not Found. {-pull}https://github.com/elastic/fleet-server/pull/3991[#https://github.com/elastic/fleet-server/pull/3991] 
++
+On agent checkin, when an agent has upgrade details, the corresponding agent action is looked up and linked with APM spans. However, there may be cases where such an action does not exist, e.g. when running `elastic-agent upgrade` for a Fleet-managed agent. This change ensures that agent checkin does not fail if the agent has upgrade details but no corresponding action.
+* Fleet Server Uses &#39;Ssl.verification_mode: Certificate&#39; By Default For Incoming Client Connections
+.  
++
+Fleet Server now uses [github/com/elastic/elastic-agent-libs v0.14.0](https://github.com/elastic/elastic-agent-libs/releases/tag/v0.14.0) 
+which by default configures server TLS verification mode as &#39;certificate&#39;.
+With this new default, when Fleet Server runs with Mutual TLS (mTLS) enabled,
+it will only verify the presented client certificate during the TLS handshake,
+without further validation against the `server_name` extension. Therefore
+respecting the correct use of the &#39;server_name&#39; extension as defined by
+[RFC 6066](https://datatracker.ietf.org/doc/html/rfc6066). Previously
+Fleet Server would attempt to perform a match, between the &#39;server_name&#39; sent
+by the client to either the client&#39;s certificate CN (common name), SANs or IPs.
+Such verification would cause a rejection of the client&#39;s certificate if it
+did not contain Fleet Server&#39;s host in either the CN, SANs or IPs.
+
+fleet-server::
+
+* Support Output Secrets. {fleet-server-pull}3061[#3061] {fleet-server-issue}2966[#2966]
++
+Add support for outputs secrets, secrets are being stored in a separate index in elasticsearch
+and replaced when processing the policy in fleet server.
+
+* Support-Namespaces. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/3535[#https://github.com/elastic/fleet-server/pull/3535] 
++
+Add suport for namespaces, Fleet server will now add the Namespaces property to created .fleet-* documennts.
+* Add Ability For Enrollment To Take An Agent Id. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4290[#https://github.com/elastic/fleet-server/pull/4290] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4226[#https://github.com/elastic/fleet-server/issues/4226]
+* Migrate-Action. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4786[#https://github.com/elastic/fleet-server/pull/4786] 
++
+Added new MIGRATE action type for moving agent to different cluster.
+
+
+[discrete]
+[[enhancements-9.1.0]]
+=== Enhancements
+
+
+
+
+* Keep The Service Running When Elasticsearch Is Not Available. {-pull}https://github.com/elastic/fleet-server/pull/2693[#https://github.com/elastic/fleet-server/pull/2693] {-issue}https://github.com/elastic/fleet-server/issues/2683[#https://github.com/elastic/fleet-server/issues/2683]
+* File Transfers With Integrations Now Use Datastreams. {-pull}2741[#2741] 
+* Using Unique Id For Action Results. {-pull}2782[#2782] {-issue}2596[#2596]
+* Expand Apm Traces. {-pull}2929[#2929] 
+* Relax Version Checks In Snapshot Builds.  {-issue}2960[#2960]
+* Send Errors In Api Calls And Bulker Flushes To Apm. {-pull}https://github.com/elastic/fleet-server/pull/3053[#https://github.com/elastic/fleet-server/pull/3053] 
+* Define Policy Data Schema.  
+* Enrich Transaction Apm Errors.  {-issue}3098[#3098]
+* Unauthorized Api Keys Return 401.  {-issue}2861[#2861]
+* Drain Http Connections On Shutdown. {-pull}3165[#3165] {-issue}2902[#2902]
+* Replace Policy Throttle With Limiter.  {-issue}3008[#3008]
+* Change Response Codes For Elasticsearch Failures To 503.  {-issue}2852[#2852]
+* Prefer Elastic-Agent-Client Apmconfig In Agent Mode. {-pull}3277[#3277] {-issue}2868[#2868]
+* Respond With 429 If Elasticsearch Api Key Auth Gives 429. {-pull}3278[#3278] 
+* Calculate Unhealthy Reason (Input/Output/Other) In Agent Document. {-pull}3338[#3338] 
+* Allow Level: Trace For Settings Actions. {-pull}3350[#3350] 
+* Add Tlscommon And Httpcommon Diagnostic Information. {-pull}https://github.com/elastic/fleet-server/pull/3587[#https://github.com/elastic/fleet-server/pull/3587] 
+* Update Go To V1.22.5. {-pull}https://github.com/elastic/fleet-server/pull/3681[#https://github.com/elastic/fleet-server/pull/3681] 
+* Checkin After Audit/Unenroll Api. {-pull}https://github.com/elastic/fleet-server/pull/3827[#https://github.com/elastic/fleet-server/pull/3827] {-issue}https://github.com/elastic/elastic-agent/issues/484[#https://github.com/elastic/elastic-agent/issues/484]
+* Update Go To V1.23.1. {-pull}https://github.com/elastic/fleet-server/pull/3924[#https://github.com/elastic/fleet-server/pull/3924] 
+api::
+
+* Define Action.data And Ack Event Schema. {api-pull}3060[#3060] 
+fleet-server::
+
+* Bump Go To V1.23.5. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4353[#https://github.com/elastic/fleet-server/pull/4353] 
+* Clear Agent.upgrade_attempts When Upgrade Is Complete. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4528[#https://github.com/elastic/fleet-server/pull/4528] 
+* Pbkdf2 Settings Validation Is Fips Compliant. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4542[#https://github.com/elastic/fleet-server/pull/4542] 
+* Update To Go V1.24.0. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4543[#https://github.com/elastic/fleet-server/pull/4543] 
+* Add Version Metadata To Version Command Output. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4820[#https://github.com/elastic/fleet-server/pull/4820] 
+* Add Rollback Attribute To Upgrade Actions.  {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4838[#https://github.com/elastic/fleet-server/issues/4838]
+* Update Go To V1.24.3. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4891[#https://github.com/elastic/fleet-server/pull/4891] 
+
+
+
+
+[discrete]
+[[bug-fixes-9.1.0]]
+=== Bug fixes
+
+
+
+
+* Fix Bulker Error Message Attribute To Be Ecs Complient.  {-issue}3033[#3033]
+* Replace All Secret References In Input Objects.  {-issue}3083[#3083]
+* Deprecate Fleet.agent.logging.level.  {-issue}3126[#3126]
+* Stricter Validation For Required Checkin Api Attributes.  {-issue}2420[#2420]
+* Fixed A Bug Where Agents Were Stuck In Non-Upgradeable State After Upgrade. {-pull}3264[#3264] {-issue}3263[#3263]
+* Fix File Reassembly For Large Files. {-pull}3283[#3283] 
+* Self Monitor Stops Output Health Reporting If Output Config Is Not Acked By Agents. {-pull}3335[#3335] {-issue}3334[#3334]
+* Updated Endpoints To Return 400 Status Code Instead Of 500 For Bad Requests. {-pull}https://github.com/elastic/fleet-server/pull/3407[#https://github.com/elastic/fleet-server/pull/3407] {-issue}https://github.com/elastic/fleet-server/issues/3110[#https://github.com/elastic/fleet-server/issues/3110]
+* Fix Authentication Return Error Code. {-pull}https://github.com/elastic/fleet-server/pull/3935[#https://github.com/elastic/fleet-server/pull/3935] {-issue}https://github.com/elastic/fleet-server/issues/3929[#https://github.com/elastic/fleet-server/issues/3929]
+* Added Context Deadline Around Flush Bulk Queue.  
+fleet-server::
+
+* Fix Download Rate Parsing. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/3677[#https://github.com/elastic/fleet-server/pull/3677] 
+* Fix Server.address Field In Http Logs.  
+* Remove Race In Remote Bulker Access.  {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4170[#https://github.com/elastic/fleet-server/issues/4170]
+* Audit/Unenroll Should Not Set Unenrolled_at Attribute. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4221[#https://github.com/elastic/fleet-server/pull/4221] {fleet-server-issue}https://github.com/elastic/elastic-agent/issues/6213[#https://github.com/elastic/elastic-agent/issues/6213]
+* Remove Auth Requirement From Pgp Key Endpoint.  {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4255[#https://github.com/elastic/fleet-server/issues/4255]
+* Return Http 429 When Conn Limit Is Reached.  {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4200[#https://github.com/elastic/fleet-server/issues/4200]
+* Fix Host Parsing In Elasticsearch Output Diagnostics. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4765[#https://github.com/elastic/fleet-server/pull/4765] 
+* Redact Output In Bootstrap Config Logs. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4775[#https://github.com/elastic/fleet-server/pull/4775] 
+* Mutex Protection For Remote Bulker Config. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4776[#https://github.com/elastic/fleet-server/pull/4776] 
+* Enable Dead Code Elimination. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4784[#https://github.com/elastic/fleet-server/pull/4784] 
+* Include The Base Error For Json Decode Error Responses. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5069[#https://github.com/elastic/fleet-server/pull/5069] 
+
+// end 9.1.0 relnotes
