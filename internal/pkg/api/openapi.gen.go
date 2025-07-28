@@ -228,7 +228,7 @@ type ActionMigrate struct {
 
 	// Settings An embedded JSON object that holds user-provided settings like TLS.
 	// Defined in fleet-server as a `json.RawMessage`.
-	Settings *json.RawMessage `json:"settings,omitempty"`
+	Settings json.RawMessage `json:"settings,omitempty"`
 
 	// TargetUri URI of Fleet Server in a target cluster.
 	TargetUri string `json:"target_uri"`
@@ -257,7 +257,7 @@ type ActionPrivilegeLevelChange struct {
 // ActionRequestDiagnostics The REQUEST_DIAGNOSTICS action data.
 type ActionRequestDiagnostics struct {
 	// AdditionalMetrics list optional additional metrics.
-	AdditionalMetrics *[]ActionRequestDiagnosticsAdditionalMetrics `json:"additional_metrics,omitempty"`
+	AdditionalMetrics []ActionRequestDiagnosticsAdditionalMetrics `json:"additional_metrics,omitempty"`
 }
 
 // ActionRequestDiagnosticsAdditionalMetrics defines model for ActionRequestDiagnostics.AdditionalMetrics.
@@ -316,13 +316,13 @@ type CheckinRequest struct {
 	// Components An embedded JSON object that holds component information that the agent is running.
 	// Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
 	// fleet-server will update the components in an agent record if they differ from this object.
-	Components *json.RawMessage `json:"components,omitempty"`
+	Components json.RawMessage `json:"components,omitempty"`
 
 	// LocalMetadata An embedded JSON object that holds meta-data values.
 	// Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
 	// elastic-agent will populate the object with information from the binary and host/system environment.
 	// fleet-server will update the agent record if a checkin response contains different data from the record.
-	LocalMetadata *json.RawMessage `json:"local_metadata,omitempty"`
+	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
 
 	// Message State message, may be overridden or use the error message of a failing component.
 	Message string `json:"message"`
@@ -352,7 +352,7 @@ type CheckinResponse struct {
 	Action string `json:"action"`
 
 	// Actions A list of actions that the agent must execute.
-	Actions *[]Action `json:"actions,omitempty"`
+	Actions []Action `json:"actions,omitempty"`
 }
 
 // DiagnosticsEvent defines model for diagnosticsEvent.
@@ -408,7 +408,7 @@ type EnrollMetadata struct {
 
 	// Tags User provided tags for the agent.
 	// fleet-server will pass the tags to the agent record on enrollment.
-	Tags []string `json:"tags"`
+	Tags []string `json:"tags,omitempty"`
 
 	// UserProvided An embedded JSON object that holds user-provided meta-data values.
 	// Defined in fleet-server as a `json.RawMessage`.
@@ -480,7 +480,7 @@ type EnrollResponseItem struct {
 	//
 	// Never used by agent.
 	// Deprecated: Not used by elastic-agent.
-	Actions []map[string]interface{} `json:"actions"`
+	Actions []map[string]interface{} `json:"actions,omitempty"`
 
 	// Active If the agent is active in fleet.
 	// Set to true upon enrollment.
@@ -649,28 +649,28 @@ type InputEvent struct {
 // PolicyData The full policy that an agent should run after combining with local configuration/env vars.
 type PolicyData struct {
 	// Agent Agent configuration details associated with the policy. May include configuration toggling monitoring, uninstallation protection, etc.
-	Agent *map[string]interface{} `json:"agent,omitempty"`
+	Agent map[string]interface{} `json:"agent,omitempty"`
 
 	// Fleet Agent configuration to describe how to connect to fleet-server.
-	Fleet *map[string]interface{} `json:"fleet,omitempty"`
+	Fleet map[string]interface{} `json:"fleet,omitempty"`
 
 	// Id The policy's ID.
-	Id *string `json:"id,omitempty"`
+	Id string `json:"id,omitempty"`
 
 	// Inputs A list of all inputs that the agent should run.
-	Inputs *[]map[string]interface{} `json:"inputs,omitempty"`
+	Inputs []map[string]interface{} `json:"inputs,omitempty"`
 
 	// OutputPermissions Elasticsearch permissions that the agent requires in order to run the policy.
-	OutputPermissions *map[string]interface{} `json:"output_permissions,omitempty"`
+	OutputPermissions map[string]interface{} `json:"output_permissions,omitempty"`
 
 	// Outputs A map of all outputs that the agent running the policy can use to send data to.
-	Outputs *map[string]interface{} `json:"outputs,omitempty"`
+	Outputs map[string]interface{} `json:"outputs,omitempty"`
 
 	// Revision The revision number of the policy. Should match revision_idx.
-	Revision *int `json:"revision,omitempty"`
+	Revision int `json:"revision,omitempty"`
 
 	// SecretPaths A list of keys that reference secret values that have been injected into the policy.
-	SecretPaths *[]string `json:"secret_paths,omitempty"`
+	SecretPaths []string `json:"secret_paths,omitempty"`
 
 	// Signed Optional action signing data.
 	Signed *ActionSignature `json:"signed,omitempty" yaml:"signed"`
