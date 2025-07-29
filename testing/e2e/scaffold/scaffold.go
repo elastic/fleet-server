@@ -384,7 +384,13 @@ func (s *Scaffold) UpgradeAgent(ctx context.Context, id, version string) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.Client.Do(req)
 	s.Require().NoError(err)
-	defer resp.Body.Close()
+	defer func() {
+		if s.T().Failed() {
+			p, err := io.ReadAll(resp.Body)
+			s.T().Logf("response body: %s read err: %v", string(p), err)
+		}
+		resp.Body.Close()
+	}()
 	s.Require().Equal(http.StatusOK, resp.StatusCode)
 }
 
