@@ -64,7 +64,6 @@ func storeRandomPolicies(ctx context.Context, bulker bulk.Bulk, index string, co
 	return nil
 }
 
-//nolint:dupl // test duplication
 func TestQueryLatestPolicies(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
@@ -122,6 +121,8 @@ func TestQueryLatestPolicies400k(t *testing.T) {
 }
 
 // TesyQueryLatestPolices11kUnique tests behaviour when 11k unique policies are used, there is a 10k size specification in the aggregation.
+//
+//nolint:dupl // test duplication
 func TestQueryLatestPolicies11kUnique(t *testing.T) {
 	t.Skip("Re-enable after policy load issues have been sorted: https://github.com/elastic/fleet-server/issues/3254")
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
