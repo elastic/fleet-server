@@ -18,6 +18,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+<<<<<<< HEAD
+=======
+	"strings"
+	"testing"
+>>>>>>> c94d8d9 (Fix download_rate as string on checkin handling (#5176))
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -392,6 +397,19 @@ func (s *Scaffold) RequestDiagnosticsForAgent(ctx context.Context, id string) st
 	resp.Body.Close()
 	s.Require().NotEmpty(obj.ActionID)
 	return obj.ActionID
+}
+
+func (s *Scaffold) UpgradeAgent(ctx context.Context, id, version string) {
+	body := strings.NewReader(fmt.Sprintf(`{"version": "%s", "force": true}`, version))
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:5601/api/fleet/agents/"+id+"/upgrade", body)
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-setup")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	s.Require().Equal(http.StatusOK, resp.StatusCode)
 }
 
 // VerifyAgentInKibana checks Kibana's fleet API for the specified agent.
