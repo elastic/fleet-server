@@ -1,0 +1,277 @@
+version: 8.19.0
+entries:
+    - kind: bug-fix
+      summary: Fix server.address field in HTTP logs
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5179
+        - https://github.com/elastic/fleet-server/pull/5043
+        - https://github.com/elastic/fleet-server/pull/5062
+        - https://github.com/elastic/fleet-server/pull/5063
+        - https://github.com/elastic/fleet-server/pull/4142
+      issue: []
+      timestamp: 1732279064
+      file:
+        name: 1732279064-Fix-server.address-field-in-HTTP-logs.yaml
+        checksum: c4ca72f9d8ad093fe0877414093929c6b8283e41
+    - kind: bug-fix
+      summary: Added context deadline around flush bulk queue
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5179
+        - https://github.com/elastic/fleet-server/pull/5043
+        - https://github.com/elastic/fleet-server/pull/5062
+        - https://github.com/elastic/fleet-server/pull/5063
+        - https://github.com/elastic/fleet-server/pull/3986
+      issue: []
+      timestamp: 1732889737
+      file:
+        name: 1732889737-deadline-bulk-flush.yaml
+        checksum: d338de6339643b8a7c9e936767177f5bd29e3dd9
+    - kind: other
+      summary: Replace use of context.TODO
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5179
+        - https://github.com/elastic/fleet-server/pull/5043
+        - https://github.com/elastic/fleet-server/pull/5062
+        - https://github.com/elastic/fleet-server/pull/5063
+        - https://github.com/elastic/fleet-server/pull/4168
+      issue:
+        - https://github.com/elastic/fleet-server/issues/3087
+      timestamp: 1733164018
+      file:
+        name: 1733164018-Replace-use-of-context.TODO.yaml
+        checksum: a791b38b44b9c599401ef245c6c111b52bb89c74
+    - kind: other
+      summary: Refactor API struct constructor
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5179
+        - https://github.com/elastic/fleet-server/pull/5043
+        - https://github.com/elastic/fleet-server/pull/5062
+        - https://github.com/elastic/fleet-server/pull/5063
+        - https://github.com/elastic/fleet-server/pull/4169
+      issue:
+        - https://github.com/elastic/fleet-server/issues/3823
+      timestamp: 1733164563
+      file:
+        name: 1733164563-Refactor-API-struct-constructor.yaml
+        checksum: 3bf6ae8fccd25de08aa93b9c20a30b492c6c4f04
+    - kind: bug-fix
+      summary: Remove race in remote bulker access
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5179
+        - https://github.com/elastic/fleet-server/pull/5043
+        - https://github.com/elastic/fleet-server/pull/5062
+        - https://github.com/elastic/fleet-server/pull/5063
+        - https://github.com/elastic/fleet-server/pull/4171
+      issue:
+        - https://github.com/elastic/fleet-server/issues/4170
+      timestamp: 1733181546
+      file:
+        name: 1733181546-Remove-race-in-remote-bulker-access.yaml
+        checksum: 9b3a24038af50eeaf37c8ef11f649e566166a92a
+    - kind: bug-fix
+      summary: Audit/unenroll should not set unenrolled_at attribute
+      description: |
+        The audit/unenroll endpoint should not set the unenrolled_at attribute as
+        it's used by the UI.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4221
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6213
+      timestamp: 1734380253
+      file:
+        name: 1734380253-Audit-unenroll-does-not-set-unenrolled_at-attribute.yaml
+        checksum: 316b85086b65a1ec9d99aa4c008b38f04cd9978f
+    - kind: bug-fix
+      summary: Remove auth requirement from PGP key endpoint
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5179
+        - https://github.com/elastic/fleet-server/pull/5043
+        - https://github.com/elastic/fleet-server/pull/5062
+        - https://github.com/elastic/fleet-server/pull/5063
+        - https://github.com/elastic/fleet-server/pull/4256
+      issue:
+        - https://github.com/elastic/fleet-server/issues/4255
+      timestamp: 1735593163
+      file:
+        name: 1735593163-Remove-auth-requirement-from-PGP-key-endpoint.yaml
+        checksum: 3fa819b9bedbd2fcec9ccc61157600a0c69659c2
+    - kind: feature
+      summary: Add ability for enrollment to take an agent ID
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4290
+      issue:
+        - https://github.com/elastic/fleet-server/issues/4226
+      timestamp: 1736300562
+      file:
+        name: 1736300562-Add-ability-for-enrollment-to-take-an-agent-ID.yaml
+        checksum: 0c77725924a04f556339998f2675ef3907c9f9aa
+    - kind: enhancement
+      summary: Bump go to v1.23.5
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4353
+      issue: []
+      timestamp: 1738103621
+      file:
+        name: 1738103621-Bump-go-to-v1.23.5.yaml
+        checksum: 6809398a3b2aa1e7a51d323f9851cb66aa5404fe
+    - kind: bug-fix
+      summary: Return HTTP 429 when conn limit is reached
+      description: |
+        fleet-server will return a 429 instead of silently close connections when the conn limit is reached.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5179
+        - https://github.com/elastic/fleet-server/pull/5062
+        - https://github.com/elastic/fleet-server/pull/5063
+        - https://github.com/elastic/fleet-server/pull/4402
+      issue:
+        - https://github.com/elastic/fleet-server/issues/4200
+      timestamp: 1738613859
+      file:
+        name: 1738613859-Return-HTTP-429-when-conn-limit-is-reached.yaml
+        checksum: 93480152e40ff5668cdf194c6ed8d09c3e75c41c
+    - kind: security
+      summary: Upgrade golang.org/x/net to v0.34.0 and golang.org/x/crypto to v0.32.0.
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4405
+      issue: []
+      timestamp: 1738701949
+      file:
+        name: 1738701949-Upgrade-golang.org-x-net-to-v0.34.0-and-golang.org-x-crypto-to-v0.32.0..yaml
+        checksum: da5ec97b618c213e9f055bd024d7551fba47e3d7
+    - kind: enhancement
+      summary: Clear agent.upgrade_attempts when upgrade is complete.
+      description: |
+        The new AutomaticAgentUpgradeTask Kibana task sets the upgrade_attempts property in agents it upgrades.
+        This property is used to track upgrade retries and should therefore be cleared when the upgrade is complete.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4528
+      issue: []
+      timestamp: 1740760469
+      file:
+        name: 1740760469-Clear-agent-upgrade-attempts-when-upgrade-complete.yaml
+        checksum: 0a60441032d76299c1f874d9e0a472b548ad3115
+    - kind: enhancement
+      summary: pbkdf2 settings validation is FIPS compliant
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4542
+      issue: []
+      timestamp: 1741108238
+      file:
+        name: 1741108238-pbkdf2-settings-is-FIPS-compliant.yaml
+        checksum: 6545fb33c7d0edacf8a312d3f48c71bf9d024c3e
+    - kind: enhancement
+      summary: Update to go v1.24.0
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4543
+      issue: []
+      timestamp: 1741109055
+      file:
+        name: 1741109055-Update-to-go-v1.24.0.yaml
+        checksum: ff7500453cb014aa12751065b583dc70a02d9a91
+    - kind: bug-fix
+      summary: Fix host parsing in Elasticsearch output diagnostics
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4765
+      issue: []
+      timestamp: 1743692296
+      file:
+        name: 1743692296-fix-url-parsing-es-output-diagnostics.yaml
+        checksum: 6cd827f9b6e9bc06e029b8f6dda743ee5e9d7d27
+    - kind: bug-fix
+      summary: Redact output in bootstrap config logs
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4775
+      issue: []
+      timestamp: 1744046917
+      file:
+        name: 1744046917-Redact-output-in-bootstrap-config-logs.yaml
+        checksum: 9c205aceff761a5834bb50567d6e5243eb402c8b
+    - kind: bug-fix
+      summary: Mutex protection for remote bulker config
+      description: |
+        Use existing remote bulker mutex to control access to remote bulker configs.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4776
+      issue: []
+      timestamp: 1744054552
+      file:
+        name: 1744054552-Mutex-protection-for-remote-bulker-config.yaml
+        checksum: af8b1abeba1b9bbf0aa4f64a2ca494120758aea6
+    - kind: enhancement
+      summary: Add version metadata to version command output
+      description: |
+        Add commit, buildtime, and FIPS distribution indicators to output of version command.
+        Add fips-distribution attribute to initial startup log.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4820
+      issue: []
+      timestamp: 1744831791
+      file:
+        name: 1744831791-Add-version-metadata-to-version-command-output.yaml
+        checksum: 3cf850bfe2fc06b290181a8e7706fa3dd432c764
+    - kind: bug-fix
+      summary: Enable dead code elimination
+      description: |
+        Add grpcnotrace build tags and ensure DCE (dead code elimination) is enabled.
+        Reduce binary size by 34%
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4784
+      issue: []
+      timestamp: 1744852233
+      file:
+        name: 1744852233-enable-dce.yaml
+        checksum: 836d912f8375f0f5a3a946a90afbb50978c431c4
+    - kind: enhancement
+      summary: Update go to v1.24.3
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4891
+      issue: []
+      timestamp: 1746596216
+      file:
+        name: 1746596216-Update-to-go-1.24.3.yaml
+        checksum: 5f97bc9a96cf140dba16165d6e8472f9bcc92e44
+    - kind: bug-fix
+      summary: Include the base error for json decode error responses
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5069
+      issue: []
+      timestamp: 1750971846
+      file:
+        name: 1750971846-Include-error-on-json-decode-error-responses.yaml
+        checksum: 3f2eb0595d1edbb7a31ecf2e2d49dd712f481f96

@@ -1,0 +1,73 @@
+// begin 8.19.0 relnotes
+
+[[release-notes-8.19.0]]
+==  8.19.0
+
+Review important information about the  8.19.0 release.
+
+[discrete]
+[[security-updates-8.19.0]]
+=== Security updates
+
+
+fleet-server::
+
+* Upgrade Golang.org/X/Net To V0.34.0 And Golang.org/X/Crypto To V0.32.0. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4405[#https://github.com/elastic/fleet-server/pull/4405] 
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.19.0]]
+=== New features
+
+The 8.19.0 release adds the following new and notable features.
+
+
+fleet-server::
+
+* Add Ability For Enrollment To Take An Agent Id. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4290[#https://github.com/elastic/fleet-server/pull/4290] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4226[#https://github.com/elastic/fleet-server/issues/4226]
+
+
+[discrete]
+[[enhancements-8.19.0]]
+=== Enhancements
+
+
+fleet-server::
+
+* Bump Go To V1.23.5. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4353[#https://github.com/elastic/fleet-server/pull/4353] 
+* Clear Agent.upgrade_attempts When Upgrade Is Complete. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4528[#https://github.com/elastic/fleet-server/pull/4528] 
+* Pbkdf2 Settings Validation Is Fips Compliant. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4542[#https://github.com/elastic/fleet-server/pull/4542] 
+* Update To Go V1.24.0. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4543[#https://github.com/elastic/fleet-server/pull/4543] 
+* Add Version Metadata To Version Command Output. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4820[#https://github.com/elastic/fleet-server/pull/4820] 
+* Update Go To V1.24.3. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4891[#https://github.com/elastic/fleet-server/pull/4891] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.0]]
+=== Bug fixes
+
+
+
+
+* Added Context Deadline Around Flush Bulk Queue. {-pull}https://github.com/elastic/fleet-server/pull/5179[#https://github.com/elastic/fleet-server/pull/5179] {-pull}https://github.com/elastic/fleet-server/pull/5043[#https://github.com/elastic/fleet-server/pull/5043] {-pull}https://github.com/elastic/fleet-server/pull/5062[#https://github.com/elastic/fleet-server/pull/5062] {-pull}https://github.com/elastic/fleet-server/pull/5063[#https://github.com/elastic/fleet-server/pull/5063] {-pull}https://github.com/elastic/fleet-server/pull/3986[#https://github.com/elastic/fleet-server/pull/3986] 
+fleet-server::
+
+* Fix Server.address Field In Http Logs. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5179[#https://github.com/elastic/fleet-server/pull/5179] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5043[#https://github.com/elastic/fleet-server/pull/5043] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5062[#https://github.com/elastic/fleet-server/pull/5062] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5063[#https://github.com/elastic/fleet-server/pull/5063] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4142[#https://github.com/elastic/fleet-server/pull/4142] 
+* Remove Race In Remote Bulker Access. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5179[#https://github.com/elastic/fleet-server/pull/5179] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5043[#https://github.com/elastic/fleet-server/pull/5043] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5062[#https://github.com/elastic/fleet-server/pull/5062] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5063[#https://github.com/elastic/fleet-server/pull/5063] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4171[#https://github.com/elastic/fleet-server/pull/4171] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4170[#https://github.com/elastic/fleet-server/issues/4170]
+* Audit/Unenroll Should Not Set Unenrolled_at Attribute. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4221[#https://github.com/elastic/fleet-server/pull/4221] {fleet-server-issue}https://github.com/elastic/elastic-agent/issues/6213[#https://github.com/elastic/elastic-agent/issues/6213]
+* Remove Auth Requirement From Pgp Key Endpoint. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5179[#https://github.com/elastic/fleet-server/pull/5179] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5043[#https://github.com/elastic/fleet-server/pull/5043] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5062[#https://github.com/elastic/fleet-server/pull/5062] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5063[#https://github.com/elastic/fleet-server/pull/5063] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4256[#https://github.com/elastic/fleet-server/pull/4256] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4255[#https://github.com/elastic/fleet-server/issues/4255]
+* Return Http 429 When Conn Limit Is Reached. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5179[#https://github.com/elastic/fleet-server/pull/5179] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5062[#https://github.com/elastic/fleet-server/pull/5062] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5063[#https://github.com/elastic/fleet-server/pull/5063] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4402[#https://github.com/elastic/fleet-server/pull/4402] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4200[#https://github.com/elastic/fleet-server/issues/4200]
+* Fix Host Parsing In Elasticsearch Output Diagnostics. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4765[#https://github.com/elastic/fleet-server/pull/4765] 
+* Redact Output In Bootstrap Config Logs. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4775[#https://github.com/elastic/fleet-server/pull/4775] 
+* Mutex Protection For Remote Bulker Config. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4776[#https://github.com/elastic/fleet-server/pull/4776] 
+* Enable Dead Code Elimination. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4784[#https://github.com/elastic/fleet-server/pull/4784] 
+* Include The Base Error For Json Decode Error Responses. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5069[#https://github.com/elastic/fleet-server/pull/5069] 
+
+// end 8.19.0 relnotes
