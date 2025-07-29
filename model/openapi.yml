@@ -9,7 +9,6 @@ info:
     The fleet-server API that is used by agents when enrolled with fleet.
 
     Note that the current implementations in the fleet-server and elastic-agent may have some difference specifically when it comes to some objects.
-    This is most notable when comparing the `Action` implementations. Fleet-server uses a general template for all actions and the elastic-agent will have more specific representations.
 
     The implementation of fleet-server by default also includes a connection count limiter, as well as limiters for request body sizes.
     If an agent attempts to make request but there are no remaining connections, the attempt will be blocked and the agent will get an error.
@@ -102,7 +101,6 @@ components:
       required:
         - user_provided
         - local
-        - tags
       properties:
         user_provided:
           deprecated: true
@@ -130,6 +128,7 @@ components:
           description: |
             User provided tags for the agent.
             fleet-server will pass the tags to the agent record on enrollment.
+          x-go-type-skip-optional-pointer: true
           type: array
           items:
             type: string
@@ -190,7 +189,6 @@ components:
         - enrolled_at
         - user_provided_metadata
         - local_metadata
-        - actions
         - access_api_key_id
         - access_api_key
         - status
@@ -233,6 +231,7 @@ components:
           type: string
           format: application/json
           x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
         local_metadata:
           deprecated: true
           x-deprecated-reason: Not used by elastic-agent.
@@ -243,8 +242,10 @@ components:
           type: string
           format: application/json
           x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
         actions:
           deprecated: true
+          x-go-type-skip-optional-pointer: true
           x-deprecated-reason: Not used by elastic-agent.
           description: |
             Defined in fleet-server and elastic-agent as `[]interface{}`.
@@ -401,6 +402,7 @@ components:
           type: string
           format: application/json
           x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
         components:
           description: |
             An embedded JSON object that holds component information that the agent is running.
@@ -409,6 +411,7 @@ components:
           type: string
           format: application/json
           x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
         poll_timeout:
           description: |
             An optional timeout value that informs fleet-server of when a client will time out on it's checkin request.
@@ -497,6 +500,7 @@ components:
           # oapi-codegen type should be: interface{}
           description: An embedded action-specific object.
           x-go-custom-tag: yaml:"data"
+          x-go-type-skip-optional-pointer: true
           x-oapi-codegen-extra-tags:
             yaml: "data"
           oneOf:
@@ -561,33 +565,41 @@ components:
         id:
           description: The policy's ID.
           type: string
+          x-go-type-skip-optional-pointer: true
         secret_paths:
           description: A list of keys that reference secret values that have been injected into the policy.
           type: array
           items:
             type: string
+          x-go-type-skip-optional-pointer: true
         outputs:
           description: A map of all outputs that the agent running the policy can use to send data to.
           type: object
+          x-go-type-skip-optional-pointer: true
         inputs:
           description: A list of all inputs that the agent should run.
           type: array
           items:
             type: object
+          x-go-type-skip-optional-pointer: true
         revision:
           description: The revision number of the policy. Should match revision_idx.
           type: integer
+          x-go-type-skip-optional-pointer: true
         agent:
           description: Agent configuration details associated with the policy. May include configuration toggling monitoring, uninstallation protection, etc.
           type: object
+          x-go-type-skip-optional-pointer: true
         signed:
           $ref: "#/components/schemas/actionSignature"
         output_permissions:
           description: Elasticsearch permissions that the agent requires in order to run the policy.
           type: object
+          x-go-type-skip-optional-pointer: true
         fleet:
           description: Agent configuration to describe how to connect to fleet-server.
           type: object
+          x-go-type-skip-optional-pointer: true
     actionUnenroll:
       description: The UNENROLL action data.
       # unenroll actions have no `data` attribute
@@ -602,6 +614,7 @@ components:
             enum:
               - CPU
               - CONN
+          x-go-type-skip-optional-pointer: true
     actionPolicyReassign:
       description: The POLICY_REASSIGN action data.
       type: object
@@ -675,6 +688,7 @@ components:
             Defined in fleet-server as a `json.RawMessage`.
           format: application/json
           x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
       required:
        - enrollment_token
        - target_uri
@@ -705,6 +719,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/action"
+          x-go-type-skip-optional-pointer: true
     eventType:
       deprecated: true
       x-deprecated-reason: Not used by fleet-server. # TODO check if this is used by security integrations and should be undeprecated.
@@ -880,8 +895,6 @@ components:
       type: object
       required:
         - action
-        - items # NOTE: work around as we don't want a pointer here
-        - errors # NOTE: work around as we don't want a pointer here
       properties:
         action:
           description: The action result. Will have the value "acks".
@@ -891,6 +904,7 @@ components:
           type: boolean
           x-oapi-codegen-extra-tags:
             json: "errors,omitempty"
+          x-go-type-skip-optional-pointer: true
         items:
           description: The in-order list of results from processing events.
           type: array
@@ -898,6 +912,7 @@ components:
             $ref: "#/components/schemas/ackResponseItem"
           x-oapi-codegen-extra-tags:
             json: "items,omitempty"
+          x-go-type-skip-optional-pointer: true
     uploadBeginRequest:
       title: "Upload Operation Start request body"
       type: object

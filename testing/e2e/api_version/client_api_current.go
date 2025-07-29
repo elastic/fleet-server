@@ -142,10 +142,9 @@ func (tester *ClientAPITester) Checkin(ctx context.Context, apiKey, agentID stri
 	// Process a successful check-in response.
 	checkin := resp.JSON200
 	tester.Require().NotNil(checkin.AckToken, "expected to recieve ack token from checkin")
-	tester.Require().NotNil(checkin.Actions, "expected to actions from checkin")
 
-	actionIds := make([]string, len(*checkin.Actions))
-	for i, action := range *checkin.Actions {
+	actionIds := make([]string, len(checkin.Actions))
+	for i, action := range checkin.Actions {
 		actionIds[i] = action.Id
 	}
 

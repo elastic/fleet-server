@@ -148,8 +148,8 @@ func (suite *TestSuite) TestFleetServerSmoke() {
 	suite.Require().NotNil(checkin.AckToken, "expected to recieve ack token from checkin")
 	suite.Require().NotNil(checkin.Actions, "expected to actions from checkin")
 
-	events := make([]api.AckRequest_Events_Item, 0, len(*checkin.Actions))
-	for _, action := range *checkin.Actions {
+	events := make([]api.AckRequest_Events_Item, 0, len(checkin.Actions))
+	for _, action := range checkin.Actions {
 		event := api.AckRequest_Events_Item{}
 		err = event.FromGenericEvent(api.GenericEvent{
 			ActionId: action.Id,
