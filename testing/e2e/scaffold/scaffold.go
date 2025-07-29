@@ -18,11 +18,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-<<<<<<< HEAD
-=======
 	"strings"
-	"testing"
->>>>>>> c94d8d9 (Fix download_rate as string on checkin handling (#5176))
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
