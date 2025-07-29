@@ -69,7 +69,7 @@ services:
       - bootstrap.memory_lock=true
       - "ELASTIC_USERNAME=${ELASTICSEARCH_USERNAME}"
       - "ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}"
-    mem_limit: 4294967296  # 4g
+    mem_limit: 8589934592  # 8g
     healthcheck:
       test: ["CMD-SHELL", "curl -s ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"]
       start_period: 10s
