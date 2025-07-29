@@ -485,7 +485,7 @@ func (tester *ClientAPITester) TestEnrollUpgradeAction_MetadataDownloadRate_Stri
 	tester.Acks(ctx, agentKey, agentID, actions)
 
 	tester.T().Logf("Request upgrade for agent: %s", agentID)
-	tester.UpgradeAgent(ctx, agentID, "9.0.0")
+	tester.UpgradeAgent(ctx, agentID, "8.18.0")
 
 	tester.T().Logf("test checkin 2: agent %s", agentID)
 	checkin2Ctx, checkin2Cancel := context.WithTimeout(ctx, time.Second*15) // use a short checking here - the action should be immediatly returned
@@ -503,7 +503,7 @@ func (tester *ClientAPITester) TestEnrollUpgradeAction_MetadataDownloadRate_Stri
 		UpgradeDetails: &api.UpgradeDetails{
 			ActionId:      actions[0], // Assume action 0 is upgrade
 			State:         api.UpgradeDetailsStateUPGDOWNLOADING,
-			TargetVersion: "9.0.0", // FIXME
+			TargetVersion: "8.18.0", // FIXME
 			Metadata:      &api.UpgradeDetails_Metadata{},
 		},
 	}
