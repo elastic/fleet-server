@@ -651,6 +651,15 @@ type PolicyData struct {
 	// Agent Agent configuration details associated with the policy. May include configuration toggling monitoring, uninstallation protection, etc.
 	Agent map[string]interface{} `json:"agent,omitempty"`
 
+	// Connectors OTel collector connectors.
+	Connectors map[string]interface{} `json:"connectors,omitempty"`
+
+	// Exporters OTel collector exporters.
+	Exporters map[string]interface{} `json:"exporters,omitempty"`
+
+	// Extensions OTel collector extensions.
+	Extensions map[string]interface{} `json:"extensions,omitempty"`
+
 	// Fleet Agent configuration to describe how to connect to fleet-server.
 	Fleet map[string]interface{} `json:"fleet,omitempty"`
 
@@ -666,11 +675,24 @@ type PolicyData struct {
 	// Outputs A map of all outputs that the agent running the policy can use to send data to.
 	Outputs map[string]interface{} `json:"outputs,omitempty"`
 
+	// Processors OTel collector processors.
+	Processors map[string]interface{} `json:"processors,omitempty"`
+
+	// Receivers OTel collector receivers.
+	Receivers map[string]interface{} `json:"receivers,omitempty"`
+
 	// Revision The revision number of the policy. Should match revision_idx.
 	Revision int `json:"revision,omitempty"`
 
 	// SecretPaths A list of keys that reference secret values that have been injected into the policy.
 	SecretPaths []string `json:"secret_paths,omitempty"`
+
+	// Service OTel collector pipelines setup.
+	Service struct {
+		// Extensions List of enabled extensions.
+		Extensions []string                       `json:"extensions,omitempty"`
+		Pipelines  map[string]map[string][]string `json:"pipelines,omitempty"`
+	} `json:"service,omitempty"`
 
 	// Signed Optional action signing data.
 	Signed *ActionSignature `json:"signed,omitempty" yaml:"signed"`

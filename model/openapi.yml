@@ -582,6 +582,47 @@ components:
           items:
             type: object
           x-go-type-skip-optional-pointer: true
+        extensions:
+          description: OTel collector extensions.
+          type: object
+          x-go-type-skip-optional-pointer: true
+        receivers:
+          description: OTel collector receivers.
+          type: object
+          x-go-type-skip-optional-pointer: true
+        processors:
+          description: OTel collector processors.
+          type: object
+          x-go-type-skip-optional-pointer: true
+        connectors:
+          description: OTel collector connectors.
+          type: object
+          x-go-type-skip-optional-pointer: true
+        exporters:
+          description: OTel collector exporters.
+          type: object
+          x-go-type-skip-optional-pointer: true
+        service:
+          description: OTel collector pipelines setup.
+          type: object
+          properties:
+            extensions:
+              description: List of enabled extensions.
+              type: array
+              items:
+                type: string
+              x-go-type-skip-optional-pointer: true
+            pipelines:
+              type: object
+              additionalProperties:
+                type: object
+                additionalProperties:
+                  description: List of enabled components for each pipeline.
+                  type: array
+                  items:
+                    type: string
+              x-go-type-skip-optional-pointer: true
+          x-go-type-skip-optional-pointer: true
         revision:
           description: The revision number of the policy. Should match revision_idx.
           type: integer
