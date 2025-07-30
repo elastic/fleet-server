@@ -1,0 +1,56 @@
+// begin 9.1.0 relnotes
+
+[[release-notes-9.1.0]]
+==  9.1.0
+
+Review important information about the  9.1.0 release.
+
+[discrete]
+[[security-updates-9.1.0]]
+=== Security updates
+
+fleet-server::
+
+* Upgrade Golang.org/X/Net To V0.34.0 And Golang.org/X/Crypto To V0.32.0. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4405[#https://github.com/elastic/fleet-server/pull/4405] 
+* Update Go To V1.24.3. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4891[#https://github.com/elastic/fleet-server/pull/4891] 
+
+
+[discrete]
+[[new-features-9.1.0]]
+=== New features
+
+The 9.1.0 release adds the following new and notable features.
+
+fleet-server::
+
+* Add Ability For Enrollment To Take An Agent Id. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4290[#https://github.com/elastic/fleet-server/pull/4290] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4226[#https://github.com/elastic/fleet-server/issues/4226]
+* Migrate-Action. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4786[#https://github.com/elastic/fleet-server/pull/4786] 
++
+Added new MIGRATE action type for moving agent to different cluster.
+
+
+[discrete]
+[[enhancements-9.1.0]]
+=== Enhancements
+
+fleet-server::
+
+* Clear Agent.upgrade_attempts When Upgrade Is Complete. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4528[#https://github.com/elastic/fleet-server/pull/4528] 
+* Pbkdf2 Settings Validation Is Fips Compliant. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4542[#https://github.com/elastic/fleet-server/pull/4542] 
+* Update To Go V1.24.0. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4543[#https://github.com/elastic/fleet-server/pull/4543] 
+* Add Version Metadata To Version Command Output. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4820[#https://github.com/elastic/fleet-server/pull/4820] 
+* Add Rollback Attribute To Upgrade Actions.  {fleet-server-issue}https://github.com/elastic/fleet-server/issues/4838[#https://github.com/elastic/fleet-server/issues/4838]
+
+[discrete]
+[[bug-fixes-9.1.0]]
+=== Bug fixes
+
+fleet-server::
+
+* Fix Host Parsing In Elasticsearch Output Diagnostics. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4765[#https://github.com/elastic/fleet-server/pull/4765] 
+* Redact Output In Bootstrap Config Logs. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4775[#https://github.com/elastic/fleet-server/pull/4775] 
+* Mutex Protection For Remote Bulker Config. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4776[#https://github.com/elastic/fleet-server/pull/4776] 
+* Enable Dead Code Elimination. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/4784[#https://github.com/elastic/fleet-server/pull/4784] 
+* Include The Base Error For Json Decode Error Responses. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5069[#https://github.com/elastic/fleet-server/pull/5069] 
+
+// end 9.1.0 relnotes
