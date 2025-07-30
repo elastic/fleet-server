@@ -220,7 +220,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		}
 
 		wTime := pollDuration + time.Minute
-		rc := http.NewResponseController(w) //nolint:bodyclose // we are working with a ResponseWriter not a Respons
+		rc := http.NewResponseController(w)
 		if err := rc.SetWriteDeadline(start.Add(wTime)); err != nil {
 			zlog.Warn().Err(err).Time("write_deadline", start.Add(wTime)).Msg("Unable to set checkin write deadline.")
 		} else {
@@ -460,10 +460,14 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			vSpan.End()
 			break // no validation
 		}
-		_, err := details.Metadata.AsUpgradeMetadataDownloading()
+		upgradeDetails, err := details.Metadata.AsUpgradeMetadataDownloading()
 		if err != nil {
 			vSpan.End()
 			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
+		}
+		if err := details.Metadata.FromUpgradeMetadataDownloading(upgradeDetails); err != nil {
+			vSpan.End()
+			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
 		}
 	case UpgradeDetailsStateUPGFAILED:
 		if details.Metadata == nil {
@@ -478,6 +482,11 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		if meta.ErrorMsg == "" {
 			vSpan.End()
 			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
+		}
+		// Repack metadata in failed case as the agent may send UPG_DOWNLOADING attributes.
+		if err = details.Metadata.FromUpgradeMetadataFailed(meta); err != nil {
+			vSpan.End()
+			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
 	case UpgradeDetailsStateUPGSCHEDULED:
 		if details.Metadata == nil {
