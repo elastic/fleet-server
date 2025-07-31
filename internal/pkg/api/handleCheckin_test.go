@@ -525,7 +525,24 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+					// match doc that gets sent to ES
+					doc := struct {
+						Doc struct {
+							UpgradeDetails struct {
+								Metadata UpgradeMetadataDownloading `json:"metadata"`
+							} `json:"upgrade_details"`
+						} `json:"doc"`
+					}{}
+					err := json.Unmarshal(p, &doc)
+					if err != nil {
+						t.Logf("Unmarshal update body failed: %v", err)
+						return false
+					}
+					require.Equal(t, float64(12.3), doc.Doc.UpgradeDetails.Metadata.DownloadPercent, "download_percent does not match")
+					require.Equal(t, float64(1000000), *doc.Doc.UpgradeDetails.Metadata.DownloadRate, "download_rate does not match")
+					return true
+				}), mock.Anything, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -544,7 +561,25 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+					// match doc that gets sent to ES
+					doc := struct {
+						Doc struct {
+							UpgradeDetails struct {
+								Metadata UpgradeMetadataDownloading `json:"metadata"`
+							} `json:"upgrade_details"`
+						} `json:"doc"`
+					}{}
+					t.Logf("Attempting to match %s", string(p))
+					err := json.Unmarshal(p, &doc)
+					if err != nil {
+						t.Logf("Unmarshal update body failed: %v", err)
+						return false
+					}
+					require.Equal(t, float64(12.3), doc.Doc.UpgradeDetails.Metadata.DownloadPercent, "download_percent does not match")
+					require.Equal(t, float64(1000000), *doc.Doc.UpgradeDetails.Metadata.DownloadRate, "download_rate does not match")
+					return true
+				}), mock.Anything, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
