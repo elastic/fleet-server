@@ -41,8 +41,8 @@ github.com/elastic/elastic-agent-system-metrics v0.11.18 h1:MuFLvHc3kQN/59+3KmRW
 github.com/elastic/elastic-agent-system-metrics v0.11.18/go.mod h1:qiZC5p1hd8te4XVnhh7FkXdcYhxFnl5i9GJpROtf6zo=
 github.com/elastic/elastic-transport-go/v8 v8.7.0 h1:OgTneVuXP2uip4BA658Xi6Hfw+PeIOod2rY3GVMGoVE=
 github.com/elastic/elastic-transport-go/v8 v8.7.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
-github.com/elastic/go-elasticsearch/v8 v8.18.1 h1:lPsN2Wk6+QqBeD4ckmOax7G/Y8tAZgroDYG8j6/5Ce0=
-github.com/elastic/go-elasticsearch/v8 v8.18.1/go.mod h1:F3j9e+BubmKvzvLjNui/1++nJuJxbkhHefbaT0kFKGY=
+github.com/elastic/go-elasticsearch/v8 v8.19.0 h1:VmfBLNRORY7RZL+9hTxBD97ehl9H8Nxf2QigDh6HuMU=
+github.com/elastic/go-elasticsearch/v8 v8.19.0/go.mod h1:F3j9e+BubmKvzvLjNui/1++nJuJxbkhHefbaT0kFKGY=
 github.com/elastic/go-structform v0.0.12 h1:HXpzlAKyej8T7LobqKDThUw7BMhwV6Db24VwxNtgxCs=
 github.com/elastic/go-structform v0.0.12/go.mod h1:CZWf9aIRYY5SuKSmOhtXScE5uQiLZNqAFnwKR4OrIM4=
 github.com/elastic/go-sysinfo v1.15.1 h1:zBmTnFEXxIQ3iwcQuk7MzaUotmKRp3OabbbWM8TdzIQ=
