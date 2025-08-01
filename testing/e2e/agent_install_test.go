@@ -146,6 +146,7 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 	suite.Require().NoError(err)
 	resp, err = suite.Client.Do(req)
 	suite.Require().NoError(err)
+	suite.T().Logf("Downloading elastic-agent from %s", pkg.URL)
 	return resp.Body
 }
 
