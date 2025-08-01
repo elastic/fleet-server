@@ -44,6 +44,19 @@ type AgentInstallSuite struct {
 
 }
 
+// SearchResp is the response body for the artifacts search API
+type SearchResp struct {
+	Packages map[string]Artifact `json:"packages"`
+}
+
+// Artifact describes an elastic artifact available through the API.
+type Artifact struct {
+	URL string `json:"url"`
+	//SHAURL       string `json:"sha_url"`      // Unused
+	//Type         string `json:"type"`         // Unused
+	//Architecture string `json:"architecture"` // Unused
+}
+
 func TestAgentInstallSuite(t *testing.T) {
 	suite.Run(t, new(AgentInstallSuite))
 }
