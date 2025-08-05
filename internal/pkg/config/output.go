@@ -18,8 +18,11 @@ import (
 	"time"
 
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 )
@@ -53,6 +56,8 @@ type Elasticsearch struct {
 	MaxConnPerHost   int               `config:"max_conn_per_host"`
 	Timeout          time.Duration     `config:"timeout"`
 	MaxContentLength int               `config:"max_content_length"`
+
+	logger *logp.Logger
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -63,6 +68,7 @@ func (c *Elasticsearch) InitDefaults() {
 	c.MaxRetries = 3
 	c.MaxConnPerHost = 128
 	c.MaxContentLength = 100 * 1024 * 1024
+	c.logger = logger.NewZapStub("elasticsearch-output")
 }
 
 // Validate ensures that the configuration is valid.
@@ -73,7 +79,7 @@ func (c *Elasticsearch) Validate() error {
 		}
 	}
 	if c.TLS != nil && c.TLS.IsEnabled() {
-		_, err := tlscommon.LoadTLSConfig(c.TLS)
+		_, err := tlscommon.LoadTLSConfig(c.TLS, c.logger)
 		if err != nil {
 			return err
 		}
@@ -121,7 +127,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	}
 
 	if c.TLS != nil && c.TLS.IsEnabled() {
-		tls, err := tlscommon.LoadTLSConfig(c.TLS)
+		tls, err := tlscommon.LoadTLSConfig(c.TLS, c.logger)
 		if err != nil {
 			return elasticsearch.Config{}, err
 		}
