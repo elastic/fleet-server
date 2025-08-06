@@ -80,7 +80,7 @@ func (z zapStub) Write(p []byte) (n int, err error) {
 	return 0, nil
 }
 
-func NewZapStub(selector string) *logp.Logger {
+func NewStub(selector string) *logp.Logger {
 
 	wrapF := func(zapcore.Core) zapcore.Core {
 		enc := zapcore.NewJSONEncoder(encoderConfig())

@@ -42,7 +42,7 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 		addr:    addr,
 		cfg:     cfg,
 		handler: newRouter(&cfg.Limits, a, a.tracer),
-		logger:  zap.NewZapStub("api-server"),
+		logger:  zap.NewStub("api-server"),
 	}
 }
 

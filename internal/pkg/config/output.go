@@ -68,7 +68,7 @@ func (c *Elasticsearch) InitDefaults() {
 	c.MaxRetries = 3
 	c.MaxConnPerHost = 128
 	c.MaxContentLength = 100 * 1024 * 1024
-	c.logger = zap.NewZapStub("elasticsearch-output")
+	c.logger = zap.NewStub("elasticsearch-output")
 }
 
 // Validate ensures that the configuration is valid.
