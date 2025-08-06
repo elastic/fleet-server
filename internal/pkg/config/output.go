@@ -21,8 +21,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 )
@@ -68,7 +68,7 @@ func (c *Elasticsearch) InitDefaults() {
 	c.MaxRetries = 3
 	c.MaxConnPerHost = 128
 	c.MaxContentLength = 100 * 1024 * 1024
-	c.logger = logger.NewZapStub("elasticsearch-output")
+	c.logger = zap.NewZapStub("elasticsearch-output")
 }
 
 // Validate ensures that the configuration is valid.

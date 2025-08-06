@@ -17,8 +17,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 	"github.com/rs/zerolog"
 )
 
@@ -42,7 +42,7 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 		addr:    addr,
 		cfg:     cfg,
 		handler: newRouter(&cfg.Limits, a, a.tracer),
-		logger:  logger.NewZapStub("api-server"),
+		logger:  zap.NewZapStub("api-server"),
 	}
 }
 
@@ -152,7 +152,7 @@ type stubLogger struct {
 }
 
 func (s *stubLogger) Write(p []byte) (n int, err error) {
-	s.log.Error().Bytes(logger.ECSMessage, p).Send()
+	s.log.Error().Bytes(ecs.ECSMessage, p).Send()
 	return len(p), nil
 }
 

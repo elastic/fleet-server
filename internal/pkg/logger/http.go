@@ -22,6 +22,7 @@ import (
 	"go.elastic.co/apm/module/apmzerolog/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 )
 
 const (
@@ -129,65 +130,65 @@ func stripHTTP(h string) string {
 func httpMeta(r *http.Request, e *zerolog.Event) {
 	oldForce := r.URL.ForceQuery
 	r.URL.ForceQuery = false
-	e.Str(ECSURLFull, r.URL.String())
+	e.Str(ecs.ECSURLFull, r.URL.String())
 	r.URL.ForceQuery = oldForce
 
 	if domain := r.URL.Hostname(); domain != "" {
-		e.Str(ECSURLDomain, domain)
+		e.Str(ecs.ECSURLDomain, domain)
 	}
 
 	port := r.URL.Port()
 	if port != "" {
 		if v, err := strconv.Atoi(port); err == nil {
-			e.Int(ECSURLPort, v)
+			e.Int(ecs.ECSURLPort, v)
 		}
 	}
 
 	// HTTP info
-	e.Str(ECSHTTPVersion, stripHTTP(r.Proto))
-	e.Str(ECSHTTPRequestMethod, r.Method)
+	e.Str(ecs.ECSHTTPVersion, stripHTTP(r.Proto))
+	e.Str(ecs.ECSHTTPRequestMethod, r.Method)
 
 	// ApiKey
 	if apiKey, err := apikey.ExtractAPIKey(r); err == nil {
-		e.Str(APIKeyID, apiKey.ID)
+		e.Str(ecs.APIKeyID, apiKey.ID)
 	}
 
 	// Client info
 	if r.RemoteAddr != "" {
-		e.Str(ECSClientAddress, r.RemoteAddr)
+		e.Str(ecs.ECSClientAddress, r.RemoteAddr)
 	}
 
 	// TLS info
-	e.Bool(ECSTLSEstablished, r.TLS != nil)
+	e.Bool(ecs.ECSTLSEstablished, r.TLS != nil)
 }
 
 func httpDebug(r *http.Request, e *zerolog.Event) {
 	// Client info
 	if r.RemoteAddr != "" {
 		remoteIP, remotePort := splitAddr(r.RemoteAddr)
-		e.Str(ECSClientIP, remoteIP)
-		e.Int(ECSClientPort, remotePort)
+		e.Str(ecs.ECSClientIP, remoteIP)
+		e.Int(ecs.ECSClientPort, remotePort)
 	}
 
 	if r.TLS != nil {
 
-		e.Str(ECSTLSVersion, TLSVersionToString(r.TLS.Version))
-		e.Str(ECSTLSCipher, tls.CipherSuiteName(r.TLS.CipherSuite))
-		e.Bool(ECSTLSsResumed, r.TLS.DidResume)
+		e.Str(ecs.ECSTLSVersion, TLSVersionToString(r.TLS.Version))
+		e.Str(ecs.ECSTLSCipher, tls.CipherSuiteName(r.TLS.CipherSuite))
+		e.Bool(ecs.ECSTLSsResumed, r.TLS.DidResume)
 
 		if r.TLS.ServerName != "" {
-			e.Str(ECSTLSClientServerName, r.TLS.ServerName)
+			e.Str(ecs.ECSTLSClientServerName, r.TLS.ServerName)
 		}
 
 		if len(r.TLS.PeerCertificates) > 0 && r.TLS.PeerCertificates[0] != nil {
 			leaf := r.TLS.PeerCertificates[0]
 			if leaf.SerialNumber != nil {
-				e.Str(ECSTLSClientSerialNumber, leaf.SerialNumber.String())
+				e.Str(ecs.ECSTLSClientSerialNumber, leaf.SerialNumber.String())
 			}
-			e.Str(ECSTLSClientIssuer, leaf.Issuer.String())
-			e.Str(ECSTLSClientSubject, leaf.Subject.String())
-			e.Str(ECSTLSClientNotBefore, leaf.NotBefore.UTC().Format(ECSTLSClientTimeFormat))
-			e.Str(ECSTLSClientNotAfter, leaf.NotAfter.UTC().Format(ECSTLSClientTimeFormat))
+			e.Str(ecs.ECSTLSClientIssuer, leaf.Issuer.String())
+			e.Str(ecs.ECSTLSClientSubject, leaf.Subject.String())
+			e.Str(ecs.ECSTLSClientNotBefore, leaf.NotBefore.UTC().Format(ecs.ECSTLSClientTimeFormat))
+			e.Str(ecs.ECSTLSClientNotAfter, leaf.NotAfter.UTC().Format(ecs.ECSTLSClientTimeFormat))
 		}
 	}
 }
@@ -227,7 +228,7 @@ func Middleware(next http.Handler) http.Handler {
 		zlog := zerolog.Ctx(ctx).Hook(apmzerolog.TraceContextHook(ctx))
 		// Update request context
 		// NOTE this injects the request id and addr into all logs that use the request logger
-		zlog = zlog.With().Str(ECSHTTPRequestID, reqID).Str(ECSServerAddress, addr).Logger()
+		zlog = zlog.With().Str(ecs.ECSHTTPRequestID, reqID).Str(ecs.ECSServerAddress, addr).Logger()
 		ctx = zlog.WithContext(ctx)
 		ctx = context.WithValue(ctx, ctxTSKey{}, start)
 		r = r.WithContext(ctx)
@@ -256,10 +257,10 @@ func Middleware(next http.Handler) http.Handler {
 
 		// Write an info level log line for each HTTP request if debug is enabled, or a non-2XX status is returned.
 		if zlog.Debug().Enabled() || (wrCounter.statusCode < 200 || wrCounter.statusCode >= 300) {
-			e.Uint64(ECSHTTPRequestBodyBytes, rdCounter.Count())
-			e.Uint64(ECSHTTPResponseBodyBytes, wrCounter.Count())
-			e.Int(ECSHTTPResponseCode, wrCounter.statusCode)
-			e.Int64(ECSEventDuration, time.Since(start).Nanoseconds())
+			e.Uint64(ecs.ECSHTTPRequestBodyBytes, rdCounter.Count())
+			e.Uint64(ecs.ECSHTTPResponseBodyBytes, wrCounter.Count())
+			e.Int(ecs.ECSHTTPResponseCode, wrCounter.statusCode)
+			e.Int64(ecs.ECSEventDuration, time.Since(start).Nanoseconds())
 			e.Msg("HTTP Request")
 		}
 	}

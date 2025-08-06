@@ -24,23 +24,23 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 )
 
 // Alias logger constants
 const (
-	ECSHTTPRequestID         = logger.ECSHTTPRequestID
-	ECSEventDuration         = logger.ECSEventDuration
-	ECSHTTPResponseCode      = logger.ECSHTTPResponseCode
-	ECSHTTPResponseBodyBytes = logger.ECSHTTPResponseBodyBytes
+	ECSHTTPRequestID         = ecs.ECSHTTPRequestID
+	ECSEventDuration         = ecs.ECSEventDuration
+	ECSHTTPResponseCode      = ecs.ECSHTTPResponseCode
+	ECSHTTPResponseBodyBytes = ecs.ECSHTTPResponseBodyBytes
 
-	LogAPIKeyID       = logger.APIKeyID
-	LogPolicyID       = logger.PolicyID
-	LogAgentID        = logger.AgentID
-	LogEnrollAPIKeyID = logger.EnrollAPIKeyID
-	LogAccessAPIKeyID = logger.AccessAPIKeyID
+	LogAPIKeyID       = ecs.APIKeyID
+	LogPolicyID       = ecs.PolicyID
+	LogAgentID        = ecs.AgentID
+	LogEnrollAPIKeyID = ecs.EnrollAPIKeyID
+	LogAccessAPIKeyID = ecs.AccessAPIKeyID
 )
 
 // BadRequestErr is used for request validation errors. These can be json

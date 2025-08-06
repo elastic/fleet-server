@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 )
 
 var once sync.Once
@@ -85,7 +86,7 @@ func Init(cfg *config.Config, svcName string) (*Logger, error) {
 		}
 		l := ecszerolog.New(out)
 		if svcName != "" {
-			l = l.With().Str(ECSServiceName, svcName).Str(ECSServiceType, svcName).Logger()
+			l = l.With().Str(ecs.ECSServiceName, svcName).Str(ecs.ECSServiceType, svcName).Logger()
 		}
 
 		log.Logger = l
