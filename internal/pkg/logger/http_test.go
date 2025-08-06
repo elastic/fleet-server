@@ -55,7 +55,7 @@ func TestMiddleware(t *testing.T) {
 	var obj map[string]any
 	err = json.Unmarshal(b.Bytes(), &obj)
 	require.NoError(t, err)
-	v, ok := obj[ecs.ECSServerAddress]
-	require.Truef(t, ok, "expected to find key: %s in %v", ecs.ECSServerAddress, obj)
+	v, ok := obj[ecs.ServerAddress]
+	require.Truef(t, ok, "expected to find key: %s in %v", ecs.ServerAddress, obj)
 	require.NotEmpty(t, v)
 }

@@ -86,7 +86,7 @@ func Init(cfg *config.Config, svcName string) (*Logger, error) {
 		}
 		l := ecszerolog.New(out)
 		if svcName != "" {
-			l = l.With().Str(ecs.ECSServiceName, svcName).Str(ecs.ECSServiceType, svcName).Logger()
+			l = l.With().Str(ecs.ServiceName, svcName).Str(ecs.ServiceType, svcName).Logger()
 		}
 
 		log.Logger = l

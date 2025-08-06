@@ -18,12 +18,12 @@ import (
 
 func encoderConfig() zapcore.EncoderConfig {
 	return zapcore.EncoderConfig{
-		MessageKey:     ecs.ECSMessage,
-		LevelKey:       ecs.ECSLogLevel,
-		NameKey:        ecs.ECSLogName,
-		TimeKey:        ecs.ECSTimestamp,
-		CallerKey:      ecs.ECSLogCaller,
-		StacktraceKey:  ecs.ECSLogStackTrace,
+		MessageKey:     ecs.Message,
+		LevelKey:       ecs.LogLevel,
+		NameKey:        ecs.LogName,
+		TimeKey:        ecs.Timestamp,
+		CallerKey:      ecs.LogCaller,
+		StacktraceKey:  ecs.LogStackTrace,
 		LineEnding:     "\n",
 		EncodeTime:     zapcore.EpochTimeEncoder,
 		EncodeLevel:    zapcore.LowercaseLevelEncoder,
@@ -71,7 +71,7 @@ func (z zapStub) Write(p []byte) (n int, err error) {
 	for key, val := range m {
 
 		// Don't dupe the timestamp, use the fleet formatted timestamp.
-		if key != ecs.ECSTimestamp {
+		if key != ecs.Timestamp {
 			e.Interface(key, val)
 		}
 	}

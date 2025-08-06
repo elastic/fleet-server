@@ -7,54 +7,54 @@ package ecs
 const (
 
 	// Basic logging
-	ECSLogLevel      = "log.level"
-	ECSLogName       = "log.logger"
-	ECSLogCaller     = "log.origin"
-	ECSLogStackTrace = "log.origin.stack_trace"
-	ECSMessage       = "message"
-	ECSTimestamp     = "@timestamp"
-	ECSErrorMessage  = "error.message"
+	LogLevel      = "log.level"
+	LogName       = "log.logger"
+	LogCaller     = "log.origin"
+	LogStackTrace = "log.origin.stack_trace"
+	Message       = "message"
+	Timestamp     = "@timestamp"
+	ErrorMessage  = "error.message"
 
 	// HTTP
-	ECSHTTPVersion           = "http.version"
-	ECSHTTPRequestID         = "http.request.id"
-	ECSHTTPRequestMethod     = "http.request.method"
-	ECSHTTPRequestBodyBytes  = "http.request.body.bytes"
-	ECSHTTPResponseCode      = "http.response.status_code"
-	ECSHTTPResponseBodyBytes = "http.response.body.bytes"
+	HTTPVersion           = "http.version"
+	HTTPRequestID         = "http.request.id"
+	HTTPRequestMethod     = "http.request.method"
+	HTTPRequestBodyBytes  = "http.request.body.bytes"
+	HTTPResponseCode      = "http.response.status_code"
+	HTTPResponseBodyBytes = "http.response.body.bytes"
 
 	// URL
-	ECSURLFull   = "url.full"
-	ECSURLDomain = "url.domain"
-	ECSURLPort   = "url.port"
+	URLFull   = "url.full"
+	URLDomain = "url.domain"
+	URLPort   = "url.port"
 
 	// Client
-	ECSClientAddress = "client.address"
-	ECSClientIP      = "client.ip"
-	ECSClientPort    = "client.port"
+	ClientAddress = "client.address"
+	ClientIP      = "client.ip"
+	ClientPort    = "client.port"
 
 	// Server
-	ECSServerAddress = "server.address"
+	ServerAddress = "server.address"
 
 	// TLS
-	ECSTLSEstablished        = "tls.established"
-	ECSTLSsResumed           = "tls.resumed"
-	ECSTLSVersion            = "tls.version"
-	ECSTLSClientServerName   = "tls.client.server_name"
-	ECSTLSCipher             = "tls.cipher"
-	ECSTLSClientIssuer       = "tls.client.issuer"
-	ECSTLSClientSubject      = "tls.client.subject"
-	ECSTLSClientNotBefore    = "tls.client.not_before"
-	ECSTLSClientNotAfter     = "tls.client.not_after"
-	ECSTLSClientSerialNumber = "tls.client.x509.serial_number"
-	ECSTLSClientTimeFormat   = "2006-01-02T15:04:05.999Z"
+	TLSEstablished        = "tls.established"
+	TLSResumed            = "tls.resumed"
+	TLSVersion            = "tls.version"
+	TLSClientServerName   = "tls.client.server_name"
+	TLSCipher             = "tls.cipher"
+	TLSClientIssuer       = "tls.client.issuer"
+	TLSClientSubject      = "tls.client.subject"
+	TLSClientNotBefore    = "tls.client.not_before"
+	TLSClientNotAfter     = "tls.client.not_after"
+	TLSClientSerialNumber = "tls.client.x509.serial_number"
+	TLSClientTimeFormat   = "2006-01-02T15:04:05.999Z"
 
 	// Event
-	ECSEventDuration = "event.duration"
+	EventDuration = "event.duration"
 
 	// Service
-	ECSServiceName = "service.name"
-	ECSServiceType = "service.type"
+	ServiceName = "service.name"
+	ServiceType = "service.type"
 )
 
 // Non ECS compliant contants used in logging

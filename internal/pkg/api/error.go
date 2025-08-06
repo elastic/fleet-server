@@ -31,10 +31,10 @@ import (
 
 // Alias logger constants
 const (
-	ECSHTTPRequestID         = ecs.ECSHTTPRequestID
-	ECSEventDuration         = ecs.ECSEventDuration
-	ECSHTTPResponseCode      = ecs.ECSHTTPResponseCode
-	ECSHTTPResponseBodyBytes = ecs.ECSHTTPResponseBodyBytes
+	ECSHTTPRequestID         = ecs.HTTPRequestID
+	ECSEventDuration         = ecs.EventDuration
+	ECSHTTPResponseCode      = ecs.HTTPResponseCode
+	ECSHTTPResponseBodyBytes = ecs.HTTPResponseBodyBytes
 
 	LogAPIKeyID       = ecs.APIKeyID
 	LogPolicyID       = ecs.PolicyID

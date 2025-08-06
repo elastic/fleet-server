@@ -130,23 +130,23 @@ func stripHTTP(h string) string {
 func httpMeta(r *http.Request, e *zerolog.Event) {
 	oldForce := r.URL.ForceQuery
 	r.URL.ForceQuery = false
-	e.Str(ecs.ECSURLFull, r.URL.String())
+	e.Str(ecs.URLFull, r.URL.String())
 	r.URL.ForceQuery = oldForce
 
 	if domain := r.URL.Hostname(); domain != "" {
-		e.Str(ecs.ECSURLDomain, domain)
+		e.Str(ecs.URLDomain, domain)
 	}
 
 	port := r.URL.Port()
 	if port != "" {
 		if v, err := strconv.Atoi(port); err == nil {
-			e.Int(ecs.ECSURLPort, v)
+			e.Int(ecs.URLPort, v)
 		}
 	}
 
 	// HTTP info
-	e.Str(ecs.ECSHTTPVersion, stripHTTP(r.Proto))
-	e.Str(ecs.ECSHTTPRequestMethod, r.Method)
+	e.Str(ecs.HTTPVersion, stripHTTP(r.Proto))
+	e.Str(ecs.HTTPRequestMethod, r.Method)
 
 	// ApiKey
 	if apiKey, err := apikey.ExtractAPIKey(r); err == nil {
@@ -155,40 +155,40 @@ func httpMeta(r *http.Request, e *zerolog.Event) {
 
 	// Client info
 	if r.RemoteAddr != "" {
-		e.Str(ecs.ECSClientAddress, r.RemoteAddr)
+		e.Str(ecs.ClientAddress, r.RemoteAddr)
 	}
 
 	// TLS info
-	e.Bool(ecs.ECSTLSEstablished, r.TLS != nil)
+	e.Bool(ecs.TLSEstablished, r.TLS != nil)
 }
 
 func httpDebug(r *http.Request, e *zerolog.Event) {
 	// Client info
 	if r.RemoteAddr != "" {
 		remoteIP, remotePort := splitAddr(r.RemoteAddr)
-		e.Str(ecs.ECSClientIP, remoteIP)
-		e.Int(ecs.ECSClientPort, remotePort)
+		e.Str(ecs.ClientIP, remoteIP)
+		e.Int(ecs.ClientPort, remotePort)
 	}
 
 	if r.TLS != nil {
 
-		e.Str(ecs.ECSTLSVersion, TLSVersionToString(r.TLS.Version))
-		e.Str(ecs.ECSTLSCipher, tls.CipherSuiteName(r.TLS.CipherSuite))
-		e.Bool(ecs.ECSTLSsResumed, r.TLS.DidResume)
+		e.Str(ecs.TLSVersion, TLSVersionToString(r.TLS.Version))
+		e.Str(ecs.TLSCipher, tls.CipherSuiteName(r.TLS.CipherSuite))
+		e.Bool(ecs.TLSResumed, r.TLS.DidResume)
 
 		if r.TLS.ServerName != "" {
-			e.Str(ecs.ECSTLSClientServerName, r.TLS.ServerName)
+			e.Str(ecs.TLSClientServerName, r.TLS.ServerName)
 		}
 
 		if len(r.TLS.PeerCertificates) > 0 && r.TLS.PeerCertificates[0] != nil {
 			leaf := r.TLS.PeerCertificates[0]
 			if leaf.SerialNumber != nil {
-				e.Str(ecs.ECSTLSClientSerialNumber, leaf.SerialNumber.String())
+				e.Str(ecs.TLSClientSerialNumber, leaf.SerialNumber.String())
 			}
-			e.Str(ecs.ECSTLSClientIssuer, leaf.Issuer.String())
-			e.Str(ecs.ECSTLSClientSubject, leaf.Subject.String())
-			e.Str(ecs.ECSTLSClientNotBefore, leaf.NotBefore.UTC().Format(ecs.ECSTLSClientTimeFormat))
-			e.Str(ecs.ECSTLSClientNotAfter, leaf.NotAfter.UTC().Format(ecs.ECSTLSClientTimeFormat))
+			e.Str(ecs.TLSClientIssuer, leaf.Issuer.String())
+			e.Str(ecs.TLSClientSubject, leaf.Subject.String())
+			e.Str(ecs.TLSClientNotBefore, leaf.NotBefore.UTC().Format(ecs.TLSClientTimeFormat))
+			e.Str(ecs.TLSClientNotAfter, leaf.NotAfter.UTC().Format(ecs.TLSClientTimeFormat))
 		}
 	}
 }
@@ -228,7 +228,7 @@ func Middleware(next http.Handler) http.Handler {
 		zlog := zerolog.Ctx(ctx).Hook(apmzerolog.TraceContextHook(ctx))
 		// Update request context
 		// NOTE this injects the request id and addr into all logs that use the request logger
-		zlog = zlog.With().Str(ecs.ECSHTTPRequestID, reqID).Str(ecs.ECSServerAddress, addr).Logger()
+		zlog = zlog.With().Str(ecs.HTTPRequestID, reqID).Str(ecs.ServerAddress, addr).Logger()
 		ctx = zlog.WithContext(ctx)
 		ctx = context.WithValue(ctx, ctxTSKey{}, start)
 		r = r.WithContext(ctx)
@@ -257,10 +257,10 @@ func Middleware(next http.Handler) http.Handler {
 
 		// Write an info level log line for each HTTP request if debug is enabled, or a non-2XX status is returned.
 		if zlog.Debug().Enabled() || (wrCounter.statusCode < 200 || wrCounter.statusCode >= 300) {
-			e.Uint64(ecs.ECSHTTPRequestBodyBytes, rdCounter.Count())
-			e.Uint64(ecs.ECSHTTPResponseBodyBytes, wrCounter.Count())
-			e.Int(ecs.ECSHTTPResponseCode, wrCounter.statusCode)
-			e.Int64(ecs.ECSEventDuration, time.Since(start).Nanoseconds())
+			e.Uint64(ecs.HTTPRequestBodyBytes, rdCounter.Count())
+			e.Uint64(ecs.HTTPResponseBodyBytes, wrCounter.Count())
+			e.Int(ecs.HTTPResponseCode, wrCounter.statusCode)
+			e.Int64(ecs.EventDuration, time.Since(start).Nanoseconds())
 			e.Msg("HTTP Request")
 		}
 	}
