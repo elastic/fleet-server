@@ -661,11 +661,11 @@ SOFTWARE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.21.2
+Version: v0.21.4
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.21.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.21.4/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -872,11 +872,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-l
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-system-metrics
-Version: v0.11.16
+Version: v0.11.18
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.11.16/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.11.18/LICENSE.txt:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -1083,11 +1083,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-s
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/go-elasticsearch/v8
-Version: v8.18.1
+Version: v8.19.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearch/v8@v8.18.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearch/v8@v8.19.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -2634,11 +2634,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/client_golang
-Version: v1.22.0
+Version: v1.23.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.22.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.23.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7144,11 +7144,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/client_model
-Version: v0.6.1
+Version: v0.6.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model@v0.6.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model@v0.6.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7355,11 +7355,11 @@ Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/common
-Version: v0.62.0
+Version: v0.65.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.62.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.65.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7566,11 +7566,11 @@ Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.62
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/procfs
-Version: v0.15.1
+Version: v0.16.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/procfs@v0.15.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/procfs@v0.16.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
