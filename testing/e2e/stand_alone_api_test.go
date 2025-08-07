@@ -7,8 +7,10 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
 	"html/template"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -66,6 +68,7 @@ type StandAloneAPIBase struct {
 
 	cancel   context.CancelFunc
 	cmd      *exec.Cmd
+	stderr   io.Reader
 	endpoint string
 	key      string
 }
@@ -98,6 +101,11 @@ func (suite *StandAloneAPIBase) SetupSuite() {
 
 	// Run the fleet-server binary, cancelling context should stop process
 	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	// collect logs from stderr in case there is a failure
+	var errBuff bytes.Buffer
+	cmd.Stderr = &errBuff
+	suite.stderr = &errBuff
+
 	cmd.Cancel = func() error {
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}
@@ -119,4 +127,8 @@ func (suite *StandAloneAPIBase) TearDownSuite() {
 	suite.T().Log("Stopping fleet-server process")
 	suite.cancel()
 	suite.cmd.Wait()
+	if suite.T().Failed() {
+		stderr, err := io.ReadAll(suite.stderr)
+		suite.T().Logf("Test failure detected, printing fleet-server stderr: %s\nread err: %v", string(stderr), err)
+	}
 }
