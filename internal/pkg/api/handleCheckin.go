@@ -26,7 +26,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -258,7 +258,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 
 func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
 	zlog = zlog.With().
-		Str(logger.AgentID, agent.Id).Logger()
+		Str(ecs.AgentID, agent.Id).Logger()
 	validated, err := ct.validateRequest(zlog, w, r, start, agent)
 	if err != nil {
 		return err
@@ -299,7 +299,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer func() {
 		err := ct.pm.Unsubscribe(sub)
 		if err != nil {
-			zlog.Error().Err(err).Str(logger.PolicyID, agent.PolicyID).Msg("unable to unsubscribe from policy")
+			zlog.Error().Err(err).Str(ecs.PolicyID, agent.PolicyID).Msg("unable to unsubscribe from policy")
 		}
 	}()
 
@@ -327,7 +327,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	// 8.16.x releases would incorrectly set unenrolled_at
 	err = ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, rawMeta, rawComponents, seqno, ver, unhealthyReason, agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != "")
 	if err != nil {
-		zlog.Error().Err(err).Str(logger.AgentID, agent.Id).Msg("checkin failed")
+		zlog.Error().Err(err).Str(ecs.AgentID, agent.Id).Msg("checkin failed")
 	}
 
 	// Initial fetch for pending actions
@@ -382,7 +382,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 			case <-tick.C:
 				err := ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, nil, rawComponents, nil, ver, unhealthyReason, false)
 				if err != nil {
-					zlog.Error().Err(err).Str(logger.AgentID, agent.Id).Msg("checkin failed")
+					zlog.Error().Err(err).Str(ecs.AgentID, agent.Id).Msg("checkin failed")
 				}
 			}
 		}
@@ -574,8 +574,8 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 		zlog.Info().
 			Str("ackToken", fromPtr(resp.AckToken)).
 			Str("createdAt", action.CreatedAt).
-			Str(logger.ActionID, action.Id).
-			Str(logger.ActionType, string(action.Type)).
+			Str(ecs.ActionID, action.Id).
+			Str(ecs.ActionType, string(action.Type)).
 			Str("inputType", action.InputType).
 			Int64("timeout", fromPtr(action.Timeout)).
 			Msg("Action delivered to agent on checkin")
@@ -682,7 +682,7 @@ func filterActions(zlog zerolog.Logger, agentID string, actions []model.Action) 
 	resp := make([]model.Action, 0, len(actions))
 	for _, action := range actions {
 		if valid := validActionTypes[action.Type]; !valid {
-			zlog.Info().Str(logger.AgentID, agentID).Str(logger.ActionID, action.ActionID).Str(logger.ActionType, action.Type).Msg("Removing action found in index from check in response")
+			zlog.Info().Str(ecs.AgentID, agentID).Str(ecs.ActionID, action.ActionID).Str(ecs.ActionType, action.Type).Msg("Removing action found in index from check in response")
 			continue
 		}
 		resp = append(resp, action)
@@ -767,7 +767,7 @@ func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action)
 	for _, action := range actions {
 		ad, err := convertActionData(ActionType(action.Type), action.Data)
 		if err != nil {
-			zlog.Error().Err(err).Str(logger.ActionID, action.ActionID).Str(logger.ActionType, action.Type).Msg("Failed to convert action.Data")
+			zlog.Error().Err(err).Str(ecs.ActionID, action.ActionID).Str(ecs.ActionType, action.Type).Msg("Failed to convert action.Data")
 			continue
 		}
 		r := Action{
@@ -818,7 +818,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	defer span.End()
 	zlog = zlog.With().
 		Str("fleet.ctx", "processPolicy").
-		Int64(logger.RevisionIdx, pp.Policy.RevisionIdx).
+		Int64(ecs.RevisionIdx, pp.Policy.RevisionIdx).
 		Str(LogPolicyID, pp.Policy.PolicyID).
 		Logger()
 
