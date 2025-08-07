@@ -128,6 +128,10 @@ func (tester *ClientAPITester) Checkin(ctx context.Context, apiKey, agentID stri
 			PollTimeout: dur,
 		}
 	}
+	requestBody.AckToken = ackToken
+	if dur != nil {
+		requestBody.PollTimeout = dur
+	}
 
 	resp, err := client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, *requestBody)
 	tester.Require().NoError(err)
@@ -136,6 +140,24 @@ func (tester *ClientAPITester) Checkin(ctx context.Context, apiKey, agentID stri
 	// just return the status code
 	// For valid requests, process as usual
 	if resp.StatusCode() != http.StatusOK {
+		var respErr *api.Error
+		switch {
+		case resp.JSON400 != nil:
+			respErr = resp.JSON400
+		case resp.JSON401 != nil:
+			respErr = resp.JSON401
+		case resp.JSON403 != nil:
+			respErr = resp.JSON403
+		case resp.JSON404 != nil:
+			respErr = resp.JSON404
+		case resp.JSON408 != nil:
+			respErr = resp.JSON408
+		case resp.JSON500 != nil:
+			respErr = resp.JSON500
+		case resp.JSON503 != nil:
+			respErr = resp.JSON503
+		}
+		tester.T().Logf("Response error detected: %+v", respErr)
 		return nil, nil, resp.StatusCode()
 	}
 
@@ -442,4 +464,53 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 		_, ok := obj.Source["audit_unenrolled_reason"]
 		return !ok
 	}, time.Second*20, time.Second, "agent document in elasticsearch should not have audit_unenrolled_reason attribute")
+}
+
+// TestEnrollUpgradeAction_MetadataDownloadRate_String checks that download metadata rates can be sent as strings
+// Prevents: https://github.com/elastic/fleet-server/issues/5164
+func (tester *ClientAPITester) TestEnrollUpgradeAction_MetadataDownloadRate_String() {
+	ctx, cancel := context.WithCancel(tester.T().Context())
+	defer cancel()
+
+	tester.T().Log("enroll agent")
+	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	tester.VerifyAgentInKibana(ctx, agentID)
+
+	tester.T().Logf("test checkin 1: agent %s", agentID)
+	ackToken, actions, statusCode := tester.Checkin(ctx, agentKey, agentID, nil, nil, nil)
+	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
+	tester.Require().NotEmpty(actions)
+
+	tester.T().Log("test ack")
+	tester.Acks(ctx, agentKey, agentID, actions)
+
+	tester.T().Logf("Request upgrade for agent: %s", agentID)
+	tester.UpgradeAgent(ctx, agentID, "8.19.0")
+
+	tester.T().Logf("test checkin 2: agent %s", agentID)
+	checkin2Ctx, checkin2Cancel := context.WithTimeout(ctx, time.Second*15) // use a short checking here - the action should be immediatly returned
+	defer checkin2Cancel()
+	ackToken, actions, statusCode = tester.Checkin(checkin2Ctx, agentKey, agentID, ackToken, nil, nil)
+	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
+	tester.Require().NotEmpty(actions)
+
+	// Checkin with a request body that has a string download rate
+	dur := "1m" // 1m is min pollDuration value
+	body := &api.AgentCheckinJSONRequestBody{
+		Status:      api.CheckinRequestStatusOnline,
+		Message:     "test checkin",
+		PollTimeout: &dur,
+		UpgradeDetails: &api.UpgradeDetails{
+			ActionId:      actions[0], // Assume action 0 is upgrade
+			State:         api.UpgradeDetailsStateUPGDOWNLOADING,
+			TargetVersion: "8.19.0", // FIXME
+			Metadata:      &api.UpgradeDetails_Metadata{},
+		},
+	}
+	err := body.UpgradeDetails.Metadata.UnmarshalJSON([]byte(`{"download_percent": 10,"download_rate": "10kbps"}`))
+	tester.Require().NoError(err)
+
+	tester.T().Logf("test checkin 3: agent %s", agentID)
+	_, _, statusCode = tester.Checkin(ctx, agentKey, agentID, ackToken, &dur, body)
+	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
 }
