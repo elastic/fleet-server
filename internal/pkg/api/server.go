@@ -15,10 +15,16 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+<<<<<<< HEAD
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+=======
+>>>>>>> 13bea07 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.21.4 to 0.21.6 (#5211))
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 	"github.com/rs/zerolog"
 )
 
@@ -43,7 +49,11 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 		addr:    addr,
 		cfg:     cfg,
 		handler: newRouter(&cfg.Limits, a, a.tracer),
+<<<<<<< HEAD
 		logger:  logp.NewLogger("api-server"),
+=======
+		logger:  zap.NewStub("api-server"),
+>>>>>>> 13bea07 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.21.4 to 0.21.6 (#5211))
 	}
 }
 
@@ -160,7 +170,7 @@ type stubLogger struct {
 }
 
 func (s *stubLogger) Write(p []byte) (n int, err error) {
-	s.log.Error().Bytes(logger.ECSMessage, p).Send()
+	s.log.Error().Bytes(ecs.Message, p).Send()
 	return len(p), nil
 }
 

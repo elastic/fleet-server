@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
@@ -84,7 +84,7 @@ func (d *Dispatcher) Subscribe(log zerolog.Logger, agentID string, seqNo sqn.Seq
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentID, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
+	log.Trace().Str(ecs.AgentID, agentID).Int("sz", sz).Msg("Subscribed to action dispatcher")
 
 	return &sub
 }
@@ -101,7 +101,7 @@ func (d *Dispatcher) Unsubscribe(log zerolog.Logger, sub *Sub) {
 	sz := len(d.subs)
 	d.mx.Unlock()
 
-	log.Trace().Str(logger.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
+	log.Trace().Str(ecs.AgentID, sub.agentID).Int("sz", sz).Msg("Unsubscribed from action dispatcher")
 }
 
 // process gathers actions from the monitor and dispatches them to the corresponding subscriptions.
@@ -167,7 +167,7 @@ func (d *Dispatcher) getSub(agentID string) (Sub, bool) {
 func (d *Dispatcher) dispatch(ctx context.Context, agentID string, acdocs []model.Action) {
 	sub, ok := d.getSub(agentID)
 	if !ok {
-		zerolog.Ctx(ctx).Debug().Str(logger.AgentID, agentID).Msg("Agent is not currently connected. Not dispatching actions.")
+		zerolog.Ctx(ctx).Debug().Str(ecs.AgentID, agentID).Msg("Agent is not currently connected. Not dispatching actions.")
 		return
 	}
 	select {
