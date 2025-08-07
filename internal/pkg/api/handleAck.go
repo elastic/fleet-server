@@ -25,7 +25,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
@@ -243,8 +243,8 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		span.Context.SetLabel("agent_id", agent.Agent.ID)
 		span.Context.SetLabel("action_id", event.ActionId)
 		log := zlog.With().
-			Str(logger.ActionID, event.ActionId).
-			Str(logger.AgentID, event.AgentId).
+			Str(ecs.ActionID, event.ActionId).
+			Str(ecs.AgentID, event.AgentId).
 			Time("timestamp", event.Timestamp).
 			Int("n", n).Logger()
 		log.Info().Msg("ack event")
@@ -365,14 +365,14 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 
 	// Save action result document
 	if err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
-		zlog.Error().Err(err).Str(logger.AgentID, agent.Agent.ID).Str(logger.ActionID, action.Id).Msg("create action result")
+		zlog.Error().Err(err).Str(ecs.AgentID, agent.Agent.ID).Str(ecs.ActionID, action.Id).Msg("create action result")
 		return err
 	}
 
 	if action.Type == TypeUpgrade {
 		event, _ := ev.AsUpgradeEvent()
 		if err := ack.handleUpgrade(ctx, zlog, agent, event); err != nil {
-			zlog.Error().Err(err).Str(logger.AgentID, agent.Agent.ID).Str(logger.ActionID, action.Id).Msg("handle upgrade event")
+			zlog.Error().Err(err).Str(ecs.AgentID, agent.Agent.ID).Str(ecs.ActionID, action.Id).Msg("handle upgrade event")
 			return err
 		}
 	}
@@ -397,7 +397,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 			Str("agent.policyId", agent.PolicyID).
 			Int64("agent.revisionIdx", currRev).
 			Str("rev.policyId", rev.PolicyID).
-			Int64(logger.RevisionIdx, rev.RevisionIdx).
+			Int64(ecs.RevisionIdx, rev.RevisionIdx).
 			Msg("ack policy revision")
 
 		if ok && rev.PolicyID == agent.PolicyID && rev.RevisionIdx > currRev {
@@ -446,7 +446,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	if outputName != "" {
 		outputBulk := ack.bulk.GetBulker(outputName)
 		if outputBulk != nil {
-			zlog.Debug().Str(logger.PolicyOutputName, outputName).Msg("Using output bulker in updateAPIKey")
+			zlog.Debug().Str(ecs.PolicyOutputName, outputName).Msg("Using output bulker in updateAPIKey")
 			bulk = outputBulk
 		}
 	}
@@ -457,14 +457,14 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 				zlog.Warn().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
-					Str(logger.PolicyOutputName, outputName).
+					Str(ecs.PolicyOutputName, outputName).
 					Msg("Failed to read API Key roles")
 			} else {
 				// race when API key was invalidated before acking
 				zlog.Info().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
-					Str(logger.PolicyOutputName, outputName).
+					Str(ecs.PolicyOutputName, outputName).
 					Msg("Failed to read invalidated API Key roles")
 
 				// prevents future checks
@@ -480,14 +480,14 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 					Msg("Failed to cleanup roles")
 			} else if removedRolesCount > 0 {
 				if err := bulk.APIKeyUpdate(ctx, apiKeyID, permissionHash, clean); err != nil {
-					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, apiKeyID).Str(logger.PolicyOutputName, outputName).Msg("Failed to update API Key")
+					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, apiKeyID).Str(ecs.PolicyOutputName, outputName).Msg("Failed to update API Key")
 				} else {
 					zlog.Debug().
 						Str("hash.sha256", permissionHash).
 						Str(LogAPIKeyID, apiKeyID).
 						RawJSON("roles", clean).
 						Int("removedRoles", removedRolesCount).
-						Str(logger.PolicyOutputName, outputName).
+						Str(ecs.PolicyOutputName, outputName).
 						Msg("Updating agent record to pick up reduced roles.")
 				}
 			}
@@ -637,8 +637,8 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 	zlog.Info().
 		Str("lastReportedVersion", agent.Agent.Version).
 		Str("upgradedAt", now).
-		Str(logger.AgentID, agent.Agent.ID).
-		Str(logger.ActionID, event.ActionId).
+		Str(ecs.AgentID, agent.Agent.ID).
+		Str(ecs.ActionID, event.ActionId).
 		Msg("ack upgrade")
 
 	return nil
@@ -719,17 +719,17 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 			// read output config from .fleet-policies, not filtering by policy id as agent could be reassigned
 			policy, err := dl.QueryOutputFromPolicy(ctx, bulk, outputName)
 			if err != nil || policy == nil {
-				zlog.Warn().Str(logger.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Output policy not found, API keys will be orphaned")
+				zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Output policy not found, API keys will be orphaned")
 			} else {
 				outputBulk, _, err = bulk.CreateAndGetBulker(ctx, zlog, outputName, policy.Data.Outputs)
 				if err != nil {
-					zlog.Warn().Str(logger.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Failed to recreate output bulker, API keys will be orphaned")
+					zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Failed to recreate output bulker, API keys will be orphaned")
 				}
 			}
 		}
 		if outputBulk != nil {
 			if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
-				zlog.Info().Err(err).Strs("ids", outputIds).Str(logger.PolicyOutputName, outputName).Msg("Failed to invalidate API keys")
+				zlog.Info().Err(err).Strs("ids", outputIds).Str(ecs.PolicyOutputName, outputName).Msg("Failed to invalidate API keys")
 			}
 		}
 	}
