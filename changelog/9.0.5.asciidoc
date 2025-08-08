@@ -5,25 +5,9 @@
 
 Review important information about the  9.0.5 release.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 [discrete]
 [[bug-fixes-9.0.5]]
 === Bug fixes
-
 
 fleet-server::
 
