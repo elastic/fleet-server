@@ -1,0 +1,17 @@
+// begin 8.17.10 relnotes
+
+[[release-notes-8.17.10]]
+==  8.17.10
+
+Review important information about the  8.17.10 release.
+
+[discrete]
+[[bug-fixes-8.17.10]]
+=== Bug fixes
+
+
+fleet-server::
+
+* Fix Upgrade Details Download_rate As String Handling. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5219[#https://github.com/elastic/fleet-server/pull/5219] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5225[#https://github.com/elastic/fleet-server/pull/5225] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5176[#https://github.com/elastic/fleet-server/pull/5176] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/5164[#https://github.com/elastic/fleet-server/issues/5164]
+
+// end 8.17.10 relnotes
