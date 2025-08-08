@@ -1,0 +1,16 @@
+// begin 8.18.5 relnotes
+
+[[release-notes-8.18.5]]
+==  8.18.5
+
+Review important information about the  8.18.5 release.
+
+[discrete]
+[[bug-fixes-8.18.5]]
+=== Bug fixes
+
+fleet-server::
+
+* Fix Upgrade Details Download_rate As String Handling. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5218[#https://github.com/elastic/fleet-server/pull/5218] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5224[#https://github.com/elastic/fleet-server/pull/5224] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5176[#https://github.com/elastic/fleet-server/pull/5176] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/5164[#https://github.com/elastic/fleet-server/issues/5164]
+
+// end 8.18.5 relnotes
