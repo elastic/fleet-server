@@ -1,0 +1,16 @@
+// begin 9.0.5 relnotes
+
+[[release-notes-9.0.5]]
+==  9.0.5
+
+Review important information about the  9.0.5 release.
+
+[discrete]
+[[bug-fixes-9.0.5]]
+=== Bug fixes
+
+fleet-server::
+
+* Fix Upgrade Details Download_rate As String Handling. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5217[#https://github.com/elastic/fleet-server/pull/5217] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5227[#https://github.com/elastic/fleet-server/pull/5227] {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5176[#https://github.com/elastic/fleet-server/pull/5176] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/5164[#https://github.com/elastic/fleet-server/issues/5164]
+
+// end 9.0.5 relnotes
