@@ -133,6 +133,25 @@ func Test_Audit_unenroll(t *testing.T) {
 		bulker.AssertExpectations(t)
 	})
 
+	t.Run("agent has audit_unenroll_reason: migrated", func(t *testing.T) {
+		agent := &model.Agent{
+			AuditUnenrolledReason: string(Migrated),
+		}
+		bulker := ftesting.NewMockBulk()
+		bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+		audit := &AuditT{
+			bulk: bulker,
+			cfg:  &config.Server{},
+		}
+		req := &http.Request{
+			Body: io.NopCloser(strings.NewReader(`{"reason": "migrated", "timestamp": "2024-01-01T12:00:00.000Z"}`)),
+		}
+		err := audit.unenroll(testlog.SetLogger(t), httptest.NewRecorder(), req, agent)
+		require.NoError(t, err)
+		bulker.AssertExpectations(t)
+	})
+
 	t.Run("ok", func(t *testing.T) {
 		agent := &model.Agent{
 			ESDocument: model.ESDocument{
