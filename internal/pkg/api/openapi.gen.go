@@ -646,6 +646,13 @@ type InputEvent struct {
 	Type EventType `json:"type"`
 }
 
+// OtelConfigService OTel collector pipelines setup.
+type OtelConfigService struct {
+	// Extensions List of enabled extensions.
+	Extensions []string                       `json:"extensions,omitempty"`
+	Pipelines  map[string]map[string][]string `json:"pipelines,omitempty"`
+}
+
 // PolicyData The full policy that an agent should run after combining with local configuration/env vars.
 type PolicyData struct {
 	// Agent Agent configuration details associated with the policy. May include configuration toggling monitoring, uninstallation protection, etc.
@@ -688,11 +695,7 @@ type PolicyData struct {
 	SecretPaths []string `json:"secret_paths,omitempty"`
 
 	// Service OTel collector pipelines setup.
-	Service struct {
-		// Extensions List of enabled extensions.
-		Extensions []string                       `json:"extensions,omitempty"`
-		Pipelines  map[string]map[string][]string `json:"pipelines,omitempty"`
-	} `json:"service,omitempty"`
+	Service *OtelConfigService `json:"service,omitempty"`
 
 	// Signed Optional action signing data.
 	Signed *ActionSignature `json:"signed,omitempty" yaml:"signed"`

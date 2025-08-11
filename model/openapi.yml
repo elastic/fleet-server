@@ -603,26 +603,7 @@ components:
           type: object
           x-go-type-skip-optional-pointer: true
         service:
-          description: OTel collector pipelines setup.
-          type: object
-          properties:
-            extensions:
-              description: List of enabled extensions.
-              type: array
-              items:
-                type: string
-              x-go-type-skip-optional-pointer: true
-            pipelines:
-              type: object
-              additionalProperties:
-                type: object
-                additionalProperties:
-                  description: List of enabled components for each pipeline.
-                  type: array
-                  items:
-                    type: string
-              x-go-type-skip-optional-pointer: true
-          x-go-type-skip-optional-pointer: true
+          $ref: "#/components/schemas/otelConfigService"
         revision:
           description: The revision number of the policy. Should match revision_idx.
           type: integer
@@ -640,6 +621,26 @@ components:
         fleet:
           description: Agent configuration to describe how to connect to fleet-server.
           type: object
+          x-go-type-skip-optional-pointer: true
+    otelConfigService:
+      description: OTel collector pipelines setup.
+      type: object
+      properties:
+        extensions:
+          description: List of enabled extensions.
+          type: array
+          items:
+            type: string
+          x-go-type-skip-optional-pointer: true
+        pipelines:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              description: List of enabled components for each pipeline.
+              type: array
+              items:
+                type: string
           x-go-type-skip-optional-pointer: true
     actionUnenroll:
       description: The UNENROLL action data.

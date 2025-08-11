@@ -6,6 +6,7 @@ package model
 
 import (
 	"maps"
+	"slices"
 	"time"
 )
 
@@ -92,16 +93,30 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		OutputPermissions: d.OutputPermissions,
 		Outputs:           cloneMap(d.Outputs),
 		Revision:          d.Revision,
-		SecretReferences:  make([]SecretReferencesItems, 0, len(d.SecretReferences)),
+		SecretReferences:  slices.Clone(d.SecretReferences),
+
+		// OTel config.
+		Connectors: maps.Clone(d.Connectors),
+		Exporters:  maps.Clone(d.Exporters),
+		Extensions: maps.Clone(d.Extensions),
+		Processors: maps.Clone(d.Processors),
+		Receivers:  maps.Clone(d.Receivers),
 	}
 	for _, m := range d.Inputs {
 		res.Inputs = append(res.Inputs, maps.Clone(m))
 	}
-	res.SecretReferences = append(res.SecretReferences, d.SecretReferences...)
 	if d.Signed != nil {
 		res.Signed = &Signed{
 			Data:      d.Signed.Data,
 			Signature: d.Signed.Signature,
+		}
+	}
+	if d.Service != nil {
+		res.Service = &Service{
+			Extensions: slices.Clone(d.Service.Extensions),
+		}
+		for id, pipeline := range d.Service.Pipelines {
+			res.Service.Pipelines[id] = maps.Clone(pipeline)
 		}
 	}
 	return res
