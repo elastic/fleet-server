@@ -46,7 +46,7 @@ func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return fmt.Errorf("fail InvalidateAPIKey: %s", es.TranslateError(res.StatusCode, nil))
+		return fmt.Errorf("fail InvalidateAPIKey: %w", es.TranslateError(res.StatusCode, nil))
 	}
 
 	return nil
