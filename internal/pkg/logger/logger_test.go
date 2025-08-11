@@ -10,11 +10,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
 
 func stderrcfg() *config.Config {
