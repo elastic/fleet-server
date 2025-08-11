@@ -12,6 +12,8 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 // Invalidate invalidates the provided API keys by ID.
@@ -44,7 +46,7 @@ func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return fmt.Errorf("fail InvalidateAPIKey: %s", res.String())
+		return fmt.Errorf("fail InvalidateAPIKey: %s", es.TranslateError(res.StatusCode, nil))
 	}
 
 	return nil
