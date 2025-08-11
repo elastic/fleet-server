@@ -21,10 +21,10 @@ import (
 	"time"
 
 	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
-	"github.com/elastic/fleet-server/pkg/api"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/fleet-server/pkg/api"
 	"github.com/elastic/fleet-server/testing/e2e/api_version"
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
 	"github.com/elastic/fleet-server/v7/version"
