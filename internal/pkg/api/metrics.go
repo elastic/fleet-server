@@ -25,7 +25,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 	"github.com/elastic/fleet-server/v7/version"
 )
 
@@ -55,11 +55,6 @@ var (
 // metrics must be explicitly exposed with a call to InitMetrics
 // FIXME we have global metrics but an internal and external API; this may lead to some confusion.
 func init() {
-	err := report.SetupMetrics(logger.NewZapStub("instance-metrics"), build.ServiceName, version.DefaultVersion)
-	if err != nil {
-		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics") // TODO is used because this may logged during the package load
-	}
-
 	registry = newMetricsRegistry("http_server")
 	cntHTTPNew = newCounter(registry, "tcp_open")
 	cntHTTPClose = newCounter(registry, "tcp_close")
@@ -78,6 +73,11 @@ func init() {
 	cntFileDeliv.Register(routesRegistry.newRegistry("deliverFile"))
 	cntGetPGP.Register(routesRegistry.newRegistry("getPGPKey"))
 	cntAuditUnenroll.Register(routesRegistry.newRegistry("auditUnenroll"))
+
+	err := report.SetupMetrics(zap.NewStub("instance-metrics"), build.ServiceName, version.DefaultVersion, monitoring.NewRegistry(), registry.registry)
+	if err != nil {
+		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics") // TODO is used because this may logged during the package load
+	}
 }
 
 // metricsRegistry wraps libbeat and prometheus registries
@@ -256,7 +256,7 @@ func InitMetrics(ctx context.Context, cfg *config.Config, bi build.Info, tracer 
 	}
 
 	// Start local api server; largely for metrics.
-	zapStub := logger.NewZapStub("fleet-metrics")
+	zapStub := zap.NewStub("fleet-metrics")
 	cfgStub, err := cfglib.NewConfigFrom(&cfg.HTTP)
 	if err != nil {
 		return nil, err

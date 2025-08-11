@@ -3,7 +3,7 @@
 env:
   DOCKER_COMPOSE_VERSION: "1.25.5"
   TERRAFORM_VERSION: "1.6.4"
-  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips-1751684469"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -24,21 +24,6 @@ common:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
 steps:
-
-  - label: "Validate catalog-info"
-    if: build.pull_request.id != null
-    plugins:
-      monorepo-diff#v1.3.0:
-        diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
-        wait: true
-        watch:
-          # if our catalog-info.yaml is changed, make sure it's well-formed according to our internal standards as well as Backstage's validation
-          - path: "catalog-info.yaml"
-            config:
-              command: "/agent/check-catalog-info.sh"
-              agents:
-                image: "docker.elastic.co/ci-agent-images/pipelib:0.13.0@sha256:190464950de81cb3390bd5e07bb1cc171dd4a765c1ce5de58ebca476f9a6839f"
-
   - group: "Check and build"
     key: "check"
     steps:
@@ -124,7 +109,7 @@ steps:
           GO_DISTRO: "microsoft"
         agents:
           provider: "aws"
-          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.xlarge"
         artifact_paths:
           - build/*.xml

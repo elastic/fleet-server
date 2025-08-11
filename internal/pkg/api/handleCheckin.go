@@ -26,7 +26,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -57,14 +57,15 @@ const (
 // unlisted or invalid types are removed with filterActions().
 // action types should have a corresponding case in convertActionData.
 var validActionTypes = map[string]bool{
-	string(CANCEL):             true,
-	string(INPUTACTION):        true,
-	string(POLICYREASSIGN):     true,
-	string(REQUESTDIAGNOSTICS): true,
-	string(SETTINGS):           true,
-	string(UNENROLL):           true,
-	string(UPGRADE):            true,
-	string(MIGRATE):            true,
+	string(CANCEL):               true,
+	string(INPUTACTION):          true,
+	string(POLICYREASSIGN):       true,
+	string(REQUESTDIAGNOSTICS):   true,
+	string(SETTINGS):             true,
+	string(UNENROLL):             true,
+	string(UPGRADE):              true,
+	string(MIGRATE):              true,
+	string(PRIVILEGELEVELCHANGE): true,
 }
 
 type CheckinT struct {
@@ -259,7 +260,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 
 func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent, ver string) error {
 	zlog = zlog.With().
-		Str(logger.AgentID, agent.Id).Logger()
+		Str(ecs.AgentID, agent.Id).Logger()
 	validated, err := ct.validateRequest(zlog, w, r, start, agent)
 	if err != nil {
 		return err
@@ -300,7 +301,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer func() {
 		err := ct.pm.Unsubscribe(sub)
 		if err != nil {
-			zlog.Error().Err(err).Str(logger.PolicyID, agent.PolicyID).Msg("unable to unsubscribe from policy")
+			zlog.Error().Err(err).Str(ecs.PolicyID, agent.PolicyID).Msg("unable to unsubscribe from policy")
 		}
 	}()
 
@@ -328,7 +329,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	// 8.16.x releases would incorrectly set unenrolled_at
 	err = ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, rawMeta, rawComponents, seqno, ver, unhealthyReason, agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != "")
 	if err != nil {
-		zlog.Error().Err(err).Str(logger.AgentID, agent.Id).Msg("checkin failed")
+		zlog.Error().Err(err).Str(ecs.AgentID, agent.Id).Msg("checkin failed")
 	}
 
 	// Initial fetch for pending actions
@@ -383,7 +384,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 			case <-tick.C:
 				err := ct.bc.CheckIn(agent.Id, string(req.Status), req.Message, nil, rawComponents, nil, ver, unhealthyReason, false)
 				if err != nil {
-					zlog.Error().Err(err).Str(logger.AgentID, agent.Id).Msg("checkin failed")
+					zlog.Error().Err(err).Str(ecs.AgentID, agent.Id).Msg("checkin failed")
 				}
 			}
 		}
@@ -393,7 +394,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	resp := CheckinResponse{
 		AckToken: &ackToken,
 		Action:   "checkin",
-		Actions:  &actions,
+		Actions:  actions,
 	}
 
 	return ct.writeResponse(zlog, w, r, agent, resp)
@@ -470,10 +471,14 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			vSpan.End()
 			break // no validation
 		}
-		_, err := details.Metadata.AsUpgradeMetadataDownloading()
+		upgradeDetails, err := details.Metadata.AsUpgradeMetadataDownloading()
 		if err != nil {
 			vSpan.End()
 			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
+		}
+		if err := details.Metadata.FromUpgradeMetadataDownloading(upgradeDetails); err != nil {
+			vSpan.End()
+			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
 		}
 	case UpgradeDetailsStateUPGFAILED:
 		if details.Metadata == nil {
@@ -488,6 +493,11 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		if meta.ErrorMsg == "" {
 			vSpan.End()
 			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
+		}
+		// Repack metadata in failed case as the agent may send UPG_DOWNLOADING attributes.
+		if err = details.Metadata.FromUpgradeMetadataFailed(meta); err != nil {
+			vSpan.End()
+			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
 	case UpgradeDetailsStateUPGSCHEDULED:
 		if details.Metadata == nil {
@@ -548,7 +558,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	ctx := r.Context()
 	var links []apm.SpanLink
 	if ct.bulker.HasTracer() {
-		for _, a := range fromPtr(resp.Actions) {
+		for _, a := range resp.Actions {
 			if fromPtr(a.Traceparent) != "" {
 				traceContext, err := apmhttp.ParseTraceparentHeader(fromPtr(a.Traceparent))
 				if err != nil {
@@ -566,22 +576,22 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 		}
 	}
 
-	if len(fromPtr(resp.Actions)) > 0 {
+	if len(resp.Actions) > 0 {
 		var span *apm.Span
 		span, ctx = apm.StartSpanOptions(ctx, "action delivery", "fleet-server", apm.SpanOptions{
 			Links: links,
 		})
-		span.Context.SetLabel("action_count", len(fromPtr(resp.Actions)))
+		span.Context.SetLabel("action_count", len(resp.Actions))
 		span.Context.SetLabel("agent_id", agent.Id)
 		defer span.End()
 	}
 
-	for _, action := range fromPtr(resp.Actions) {
+	for _, action := range resp.Actions {
 		zlog.Info().
 			Str("ackToken", fromPtr(resp.AckToken)).
 			Str("createdAt", action.CreatedAt).
-			Str(logger.ActionID, action.Id).
-			Str(logger.ActionType, string(action.Type)).
+			Str(ecs.ActionID, action.Id).
+			Str(ecs.ActionType, string(action.Type)).
 			Str("inputType", action.InputType).
 			Int64("timeout", fromPtr(action.Timeout)).
 			Msg("Action delivered to agent on checkin")
@@ -688,7 +698,7 @@ func filterActions(zlog zerolog.Logger, agentID string, actions []model.Action) 
 	resp := make([]model.Action, 0, len(actions))
 	for _, action := range actions {
 		if valid := validActionTypes[action.Type]; !valid {
-			zlog.Info().Str(logger.AgentID, agentID).Str(logger.ActionID, action.ActionID).Str(logger.ActionType, action.Type).Msg("Removing action found in index from check in response")
+			zlog.Info().Str(ecs.AgentID, agentID).Str(ecs.ActionID, action.ActionID).Str(ecs.ActionType, action.Type).Msg("Removing action found in index from check in response")
 			continue
 		}
 		resp = append(resp, action)
@@ -768,6 +778,14 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		}
 		err = ad.FromActionMigrate(d)
 		return
+	case PRIVILEGELEVELCHANGE:
+		d := ActionPrivilegeLevelChange{}
+		err = json.Unmarshal(raw, &d)
+		if err != nil {
+			return
+		}
+		err = ad.FromActionPrivilegeLevelChange(d)
+		return
 	default:
 		return ad, fmt.Errorf("data conversion unsupported action type: %s", aType)
 	}
@@ -781,7 +799,7 @@ func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action)
 	for _, action := range actions {
 		ad, err := convertActionData(ActionType(action.Type), action.Data)
 		if err != nil {
-			zlog.Error().Err(err).Str(logger.ActionID, action.ActionID).Str(logger.ActionType, action.Type).Msg("Failed to convert action.Data")
+			zlog.Error().Err(err).Str(ecs.ActionID, action.ActionID).Str(ecs.ActionType, action.Type).Msg("Failed to convert action.Data")
 			continue
 		}
 		r := Action{
@@ -832,7 +850,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	defer span.End()
 	zlog = zlog.With().
 		Str("fleet.ctx", "processPolicy").
-		Int64(logger.RevisionIdx, pp.Policy.RevisionIdx).
+		Int64(ecs.RevisionIdx, pp.Policy.RevisionIdx).
 		Str(LogPolicyID, pp.Policy.PolicyID).
 		Logger()
 
@@ -883,7 +901,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// remove duplicates from secretkeys
 	slices.Sort(pp.SecretKeys)
 	keys := slices.Compact(pp.SecretKeys)
-	d.SecretPaths = &keys
+	d.SecretPaths = keys
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})
 	if err != nil {
@@ -938,20 +956,20 @@ func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*mod
 // parseMeta compares the agent and the request local_metadata content
 // and returns fields to update the agent record or nil
 func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
-	if req.LocalMetadata == nil {
+	if len(req.LocalMetadata) == 0 {
 		return nil, nil
 	}
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
-	if bytes.Equal(*req.LocalMetadata, agent.LocalMetadata) {
+	if bytes.Equal(req.LocalMetadata, agent.LocalMetadata) {
 		zlog.Trace().Msg("quick comparing local metadata is equal")
 		return nil, nil
 	}
 
 	// Deserialize the request metadata
 	var reqLocalMeta interface{}
-	if err := json.Unmarshal(*req.LocalMetadata, &reqLocalMeta); err != nil {
+	if err := json.Unmarshal(req.LocalMetadata, &reqLocalMeta); err != nil {
 		return nil, fmt.Errorf("parseMeta request: %w", err)
 	}
 
@@ -973,14 +991,14 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 
 		zlog.Trace().
 			RawJSON("oldLocalMeta", agent.LocalMetadata).
-			RawJSON("newLocalMeta", *req.LocalMetadata).
+			RawJSON("newLocalMeta", req.LocalMetadata).
 			Msg("local metadata not equal")
 
 		zlog.Info().
-			RawJSON("req.LocalMeta", *req.LocalMetadata).
+			RawJSON("req.LocalMeta", req.LocalMetadata).
 			Msg("applying new local metadata")
 
-		outMeta = *req.LocalMetadata
+		outMeta = req.LocalMetadata
 	}
 
 	return outMeta, nil
@@ -1007,15 +1025,15 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
-	if bytes.Equal(*req.Components, agentComponentsJSON) {
+	if bytes.Equal(req.Components, agentComponentsJSON) {
 		zlog.Trace().Msg("quick comparing agent components data is equal")
 		return nil, &unhealthyReason, nil
 	}
 
 	// Deserialize the request components data
 	var reqComponents []model.ComponentsItems
-	if len(*req.Components) > 0 {
-		if err := json.Unmarshal(*req.Components, &reqComponents); err != nil {
+	if len(req.Components) > 0 {
+		if err := json.Unmarshal(req.Components, &reqComponents); err != nil {
 			return nil, &unhealthyReason, fmt.Errorf("parseComponents request: %w", err)
 		}
 	}
@@ -1029,8 +1047,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 
 	// Compare the deserialized meta structures and return the bytes to update if different
 	if !reflect.DeepEqual(reqComponents, agent.Components) {
-
-		reqComponentsJSON, _ := json.Marshal(*req.Components)
+		reqComponentsJSON, _ := json.Marshal(req.Components)
 		zlog.Trace().
 			Str("oldComponents", string(agentComponentsJSON)).
 			Str("req.Components", string(reqComponentsJSON)).
@@ -1038,7 +1055,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 
 		zlog.Info().Msg("applying new components data")
 
-		outComponents = *req.Components
+		outComponents = req.Components
 		compUnhealthyReason := calcUnhealthyReason(reqComponents)
 		if len(compUnhealthyReason) > 0 {
 			unhealthyReason = compUnhealthyReason

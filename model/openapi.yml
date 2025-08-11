@@ -1,4 +1,4 @@
-openapi: 3.1.0
+openapi: 3.0.4
 info:
   title: fleet-server API
   version: "0000-00-00"
@@ -9,7 +9,6 @@ info:
     The fleet-server API that is used by agents when enrolled with fleet.
 
     Note that the current implementations in the fleet-server and elastic-agent may have some difference specifically when it comes to some objects.
-    This is most notable when comparing the `Action` implementations. Fleet-server uses a general template for all actions and the elastic-agent will have more specific representations.
 
     The implementation of fleet-server by default also includes a connection count limiter, as well as limiters for request body sizes.
     If an agent attempts to make request but there are no remaining connections, the attempt will be blocked and the agent will get an error.
@@ -102,10 +101,10 @@ components:
       required:
         - user_provided
         - local
-        - tags
       properties:
         user_provided:
           deprecated: true
+          x-deprecated-reason: Not used by elastic-agent.
           description: |
             An embedded JSON object that holds user-provided meta-data values.
             Defined in fleet-server as a `json.RawMessage`.
@@ -129,6 +128,7 @@ components:
           description: |
             User provided tags for the agent.
             fleet-server will pass the tags to the agent record on enrollment.
+          x-go-type-skip-optional-pointer: true
           type: array
           items:
             type: string
@@ -169,6 +169,7 @@ components:
             The existing agent with a matching enrollment_id will be deleted if it never checked in. The new agent will be enrolled with the enrollment_id.
         shared_id:
           deprecated: true
+          x-deprecated-reason: Never implemented.
           type: string
           description: |
             The shared ID of the agent.
@@ -188,7 +189,6 @@ components:
         - enrolled_at
         - user_provided_metadata
         - local_metadata
-        - actions
         - access_api_key_id
         - access_api_key
         - status
@@ -199,6 +199,7 @@ components:
           type: string
         active:
           deprecated: true
+          x-deprecated-reason: Handling of other values is undefined.
           description: |
             If the agent is active in fleet.
             Set to true upon enrollment.
@@ -210,6 +211,7 @@ components:
           type: string
         type:
           deprecated: true
+          x-deprecated-reason: Handling of other values is undefined.
           description: |
             The enrollment request type.
 
@@ -221,6 +223,7 @@ components:
           #format: date-time
         user_provided_metadata:
           deprecated: true
+          x-deprecated-reason: Not used by elastic-agent.
           description: |
             A copy of the user provided metadata from the enrollment request.
 
@@ -228,8 +231,10 @@ components:
           type: string
           format: application/json
           x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
         local_metadata:
           deprecated: true
+          x-deprecated-reason: Not used by elastic-agent.
           description: |
             A copy of the (updated) local metadata provided in the enrollment request.
 
@@ -237,8 +242,11 @@ components:
           type: string
           format: application/json
           x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
         actions:
           deprecated: true
+          x-go-type-skip-optional-pointer: true
+          x-deprecated-reason: Not used by elastic-agent.
           description: |
             Defined in fleet-server and elastic-agent as `[]interface{}`.
 
@@ -255,6 +263,7 @@ components:
           format: password
         status:
           deprecated: true
+          x-deprecated-reason: Not used by elastic-agent.
           description: |
             Agent status from fleet-server.
             fleet-ui may differ.
@@ -393,6 +402,7 @@ components:
           type: string
           format: application/json
           x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
         components:
           description: |
             An embedded JSON object that holds component information that the agent is running.
@@ -401,6 +411,7 @@ components:
           type: string
           format: application/json
           x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
         poll_timeout:
           description: |
             An optional timeout value that informs fleet-server of when a client will time out on it's checkin request.
@@ -437,6 +448,19 @@ components:
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "signature"
             json: "signature,omitempty"
+    userInfo:
+      description: Optional user info data.
+      type: object
+      properties:
+        username:
+          type: string
+          description: Username of custom user used to run Elastic Agent.
+        password:
+          type: string
+          description: Password for user specified by username.
+        groupname:
+          type: string
+          description: Custom group used to access Elastic Agent files.
     action:
       description: |
         An action for an elastic-agent.
@@ -476,6 +500,7 @@ components:
           # oapi-codegen type should be: interface{}
           description: An embedded action-specific object.
           x-go-custom-tag: yaml:"data"
+          x-go-type-skip-optional-pointer: true
           x-oapi-codegen-extra-tags:
             yaml: "data"
           oneOf:
@@ -488,6 +513,7 @@ components:
             - $ref: "#/components/schemas/actionRequestDiagnostics"
             - $ref: "#/components/schemas/actionInputAction"
             - $ref: "#/components/schemas/actionMigrate"
+            - $ref: "#/components/schemas/actionPrivilegeLevelChange"
         id:
           description: The action ID.
           type: string
@@ -513,6 +539,7 @@ components:
             - "CANCEL"
             - "REQUEST_DIAGNOSTICS"
             - "MIGRATE"
+            - "PRIVILEGE_LEVEL_CHANGE"
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
@@ -538,33 +565,41 @@ components:
         id:
           description: The policy's ID.
           type: string
+          x-go-type-skip-optional-pointer: true
         secret_paths:
           description: A list of keys that reference secret values that have been injected into the policy.
           type: array
           items:
             type: string
+          x-go-type-skip-optional-pointer: true
         outputs:
           description: A map of all outputs that the agent running the policy can use to send data to.
           type: object
+          x-go-type-skip-optional-pointer: true
         inputs:
           description: A list of all inputs that the agent should run.
           type: array
           items:
             type: object
+          x-go-type-skip-optional-pointer: true
         revision:
           description: The revision number of the policy. Should match revision_idx.
           type: integer
+          x-go-type-skip-optional-pointer: true
         agent:
           description: Agent configuration details associated with the policy. May include configuration toggling monitoring, uninstallation protection, etc.
           type: object
+          x-go-type-skip-optional-pointer: true
         signed:
           $ref: "#/components/schemas/actionSignature"
         output_permissions:
           description: Elasticsearch permissions that the agent requires in order to run the policy.
           type: object
+          x-go-type-skip-optional-pointer: true
         fleet:
           description: Agent configuration to describe how to connect to fleet-server.
           type: object
+          x-go-type-skip-optional-pointer: true
     actionUnenroll:
       description: The UNENROLL action data.
       # unenroll actions have no `data` attribute
@@ -579,6 +614,7 @@ components:
             enum:
               - CPU
               - CONN
+          x-go-type-skip-optional-pointer: true
     actionPolicyReassign:
       description: The POLICY_REASSIGN action data.
       type: object
@@ -652,9 +688,21 @@ components:
             Defined in fleet-server as a `json.RawMessage`.
           format: application/json
           x-go-type: json.RawMessage
+          x-go-type-skip-optional-pointer: true
       required:
        - enrollment_token
        - target_uri
+    actionPrivilegeLevelChange:
+      description: The PRIVILEGE_LEVEL_CHANGE action.
+      type: object
+      properties:
+        unprivileged:
+          type: boolean
+          description: Flag indicating whether target level is unprivileged. If not provided unprivileged is assumed.
+        user_info:
+          $ref: "#/components/schemas/userInfo"
+      required:
+        - unprivileged
     checkinResponse:
       type: object
       required:
@@ -671,8 +719,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/action"
+          x-go-type-skip-optional-pointer: true
     eventType:
       deprecated: true
+      x-deprecated-reason: Not used by fleet-server. # TODO check if this is used by security integrations and should be undeprecated.
       description: |
         The event type of the ack.
         Currently the elastic-agent will only generate ACTION_RESULT events.
@@ -688,6 +738,7 @@ components:
         - ACTION
     eventSubtype:
       deprecated: true
+      x-deprecated-reason: Not used by fleet-server. # TODO check if this is used by security integrations and should be undeprecated.
       description: |
         The subtype of the ack event.
         The elastic-agent will only generate ACKNOWLEDGED events.
@@ -747,9 +798,11 @@ components:
         - $ref: "#/components/schemas/genericEvent"
         - type: object
           deprecated: true # replaced by upgrade_details in checkin requests in more recent agent releases.
+          x-deprecated-reason: Replaced in newer elastic-agent releases by the checkin request's upgrade_details attribute.
           properties:
             payload:
               deprecated: true
+              x-deprecated-reason: Replaced in newer elastic-agent releases by the checkin request's upgrade_details attribute.
               description: |
                 If the payload is part of an upgrade event action ack it will include information about if the agent  will retry the upgrade.
                 Payload is only used by upgrade acks and has been replaced in more recent versions by the checkin's upgrade_details attribute.
@@ -842,8 +895,6 @@ components:
       type: object
       required:
         - action
-        - items # NOTE: work around as we don't want a pointer here
-        - errors # NOTE: work around as we don't want a pointer here
       properties:
         action:
           description: The action result. Will have the value "acks".
@@ -853,6 +904,7 @@ components:
           type: boolean
           x-oapi-codegen-extra-tags:
             json: "errors,omitempty"
+          x-go-type-skip-optional-pointer: true
         items:
           description: The in-order list of results from processing events.
           type: array
@@ -860,6 +912,7 @@ components:
             $ref: "#/components/schemas/ackResponseItem"
           x-oapi-codegen-extra-tags:
             json: "items,omitempty"
+          x-go-type-skip-optional-pointer: true
     uploadBeginRequest:
       title: "Upload Operation Start request body"
       type: object
@@ -975,6 +1028,7 @@ components:
             - uninstall
             - orphaned
             - key_revoked # here for completeness, fleet-ui should set this reason when a FORCE_UNENROLL action is made.
+            - migrated
           examples:
             - uninstall
         timestamp:
