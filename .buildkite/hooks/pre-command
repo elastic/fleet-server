@@ -45,15 +45,6 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
 fi
 
 # TODO: use a builkite plugin to handle this
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-fips-test"  ]]; then
-    export EC_API_KEY_SECRET=$(retry 5 vault kv get -field apiKey "${EC_KEY_SECRET_PATH}")
-    # Environment variables required by the Elastic Cloud service deployer
-    export EC_API_KEY=${EC_API_KEY_SECRET}
-  fi
-fi
-
-# TODO: use a builkite plugin to handle this
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
     DRA_CREDS_SECRET=$(retry 5 vault kv get -field=data -format=json ${CI_DRA_ROLE_PATH})

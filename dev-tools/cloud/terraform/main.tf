@@ -28,6 +28,18 @@ variable "pull_request" {
   description = "The github pull request number."
 }
 
+variable "ess_region" {
+  type        = string
+  default     = "gcp-us-west2"
+  description = "The ESS region to use"
+}
+
+variable "deployment_template_id" {
+  type        = string
+  default     = "gcp-general-purpose"
+  description = "The ess deployment template to use"
+}
+
 locals {
   match           = regex("const DefaultVersion = \"(.*)\"", file("${path.module}/../../../version/version.go"))[0]
   stack_version   = format("%s-SNAPSHOT", local.match)
@@ -36,9 +48,9 @@ locals {
 
 resource "ec_deployment" "deployment" {
   name                   = format("fleet server PR-%s-%s", var.pull_request, var.git_commit)
-  region                 = "gcp-us-west2"
+  region                 = var.ess_region
   version                = local.stack_version
-  deployment_template_id = "gcp-general-purpose"
+  deployment_template_id = var.deployment_template_id
 
   tags = {
     "source_repo"     = "elastic/fleet-server"
