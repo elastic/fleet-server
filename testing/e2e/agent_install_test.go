@@ -34,6 +34,19 @@ import (
 
 // NOTE: GOCOVERDIR is specied when manipulating the agent, but is not defined in the fleet-server spec and is not passed to fleet-server
 
+// SearchResp is the response body for the artifacts search API
+type SearchResp struct {
+	Packages map[string]Artifact `json:"packages"`
+}
+
+// Artifact describes an elastic artifact available through the API.
+type Artifact struct {
+	URL string `json:"url"`
+	//SHAURL       string `json:"sha_url"`      // Unused
+	//Type         string `json:"type"`         // Unused
+	//Architecture string `json:"architecture"` // Unused
+}
+
 type AgentInstallSuite struct {
 	scaffold.Scaffold
 
@@ -144,7 +157,7 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 
 	req, err = http.NewRequestWithContext(ctx, "GET", pkg.URL, nil)
 	suite.Require().NoError(err)
-	resp, err := suite.Client.Do(req)
+	resp, err = suite.Client.Do(req)
 	suite.Require().NoError(err)
 	suite.T().Logf("Downloading elastic-agent from https://artifacts-api.elastic.co/v1/downloads/elastic-agent-package/%s", fileName)
 	return resp.Body
