@@ -4,7 +4,6 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-EC_KEY_SECRET_PATH="kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 JOB_GCS_BUCKET="fleet-server-ci-internal"
 GITHUB_REPO_TOKEN=$VAULT_GITHUB_TOKEN
