@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -100,8 +101,6 @@ func (suite *AgentInstallSuite) SetupSuite() {
 // downloadAgent will return the stream to the download for the current OS + ARCH.
 func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser {
 	suite.T().Helper()
-<<<<<<< HEAD
-=======
 	// Use version associated with latest DRA instead of fleet-server's version to avoid breaking on fleet-server version bumps
 	draVersion, ok := os.LookupEnv("ELASTICSEARCH_VERSION")
 	if !ok || draVersion == "" {
@@ -126,7 +125,6 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 	resp.Body.Close()
 	suite.Require().NoError(err)
 
->>>>>>> 78bd648 (Use ELASTICSEARCH_VERSION instead of fleet-server's version when downloading agent (#5246))
 	fType := "tar.gz"
 	if runtime.GOOS == "windows" {
 		fType = "zip"
@@ -140,16 +138,11 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 		arch = "aarch64"
 	}
 
-<<<<<<< HEAD
-	fileName := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s-%s.%s", version.DefaultVersion, runtime.GOOS, arch, fType)
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://artifacts-api.elastic.co/v1/downloads/elastic-agent-package/"+fileName, nil)
-=======
 	fileName := fmt.Sprintf("elastic-agent-%s-%s-%s.%s", draVersion, runtime.GOOS, arch, fType)
 	pkg, ok := body.Packages[fileName]
 	suite.Require().Truef(ok, "unable to find package download for fileName = %s", fileName)
 
 	req, err = http.NewRequestWithContext(ctx, "GET", pkg.URL, nil)
->>>>>>> 78bd648 (Use ELASTICSEARCH_VERSION instead of fleet-server's version when downloading agent (#5246))
 	suite.Require().NoError(err)
 	resp, err := suite.Client.Do(req)
 	suite.Require().NoError(err)
