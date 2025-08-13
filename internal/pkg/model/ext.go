@@ -115,8 +115,11 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		res.Service = &Service{
 			Extensions: slices.Clone(d.Service.Extensions),
 		}
-		for id, pipeline := range d.Service.Pipelines {
-			res.Service.Pipelines[id] = maps.Clone(pipeline)
+		if len(d.Service.Pipelines) > 0 {
+			res.Service.Pipelines = make(map[string]map[string][]string)
+			for id, pipeline := range d.Service.Pipelines {
+				res.Service.Pipelines[id] = maps.Clone(pipeline)
+			}
 		}
 	}
 	return res
