@@ -100,6 +100,33 @@ func (suite *AgentInstallSuite) SetupSuite() {
 // downloadAgent will return the stream to the download for the current OS + ARCH.
 func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser {
 	suite.T().Helper()
+<<<<<<< HEAD
+=======
+	// Use version associated with latest DRA instead of fleet-server's version to avoid breaking on fleet-server version bumps
+	draVersion, ok := os.LookupEnv("ELASTICSEARCH_VERSION")
+	if !ok || draVersion == "" {
+		suite.T().Fatal("ELASTICSEARCH_VERSION is not set")
+	}
+	draSplit := strings.Split(draVersion, "-")
+	if len(draSplit) == 3 {
+		draVersion = draSplit[0] + "-" + draSplit[2] // remove hash
+	} else if len(draSplit) > 3 {
+		suite.T().Fatalf("Unsupported ELASTICSEARCH_VERSION format, expected 3 segments got: %s", draVersion)
+	}
+	suite.T().Logf("Using ELASTICSARCH_VERSION=%s", draVersion)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://artifacts-api.elastic.co/v1/search/"+draVersion, nil)
+	suite.Require().NoError(err)
+
+	resp, err := suite.Client.Do(req)
+	suite.Require().NoError(err)
+
+	var body SearchResp
+	err = json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	suite.Require().NoError(err)
+
+>>>>>>> 78bd648 (Use ELASTICSEARCH_VERSION instead of fleet-server's version when downloading agent (#5246))
 	fType := "tar.gz"
 	if runtime.GOOS == "windows" {
 		fType = "zip"
@@ -113,8 +140,16 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 		arch = "aarch64"
 	}
 
+<<<<<<< HEAD
 	fileName := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s-%s.%s", version.DefaultVersion, runtime.GOOS, arch, fType)
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://artifacts-api.elastic.co/v1/downloads/elastic-agent-package/"+fileName, nil)
+=======
+	fileName := fmt.Sprintf("elastic-agent-%s-%s-%s.%s", draVersion, runtime.GOOS, arch, fType)
+	pkg, ok := body.Packages[fileName]
+	suite.Require().Truef(ok, "unable to find package download for fileName = %s", fileName)
+
+	req, err = http.NewRequestWithContext(ctx, "GET", pkg.URL, nil)
+>>>>>>> 78bd648 (Use ELASTICSEARCH_VERSION instead of fleet-server's version when downloading agent (#5246))
 	suite.Require().NoError(err)
 	resp, err := suite.Client.Do(req)
 	suite.Require().NoError(err)
