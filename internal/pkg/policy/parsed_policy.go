@@ -54,6 +54,7 @@ type ParsedPolicy struct {
 	Links      apm.SpanLink
 
 	// OTel Collector
+	Exporters  map[string]any
 	Extensions map[string]any
 	Receivers  map[string]any
 	Processors map[string]any
@@ -105,12 +106,14 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		SecretKeys: secretKeys,
 
 		// OTel Collector
+		Exporters:  p.Data.Exporters,
 		Extensions: p.Data.Extensions,
 		Receivers:  p.Data.Receivers,
 		Processors: p.Data.Processors,
 		Connectors: p.Data.Connectors,
 		Service:    p.Data.Service,
 	}
+
 	if trace := apm.TransactionFromContext(ctx); trace != nil {
 		// Pass current transaction link (should be a monitor transaction) to caller (likely a client request).
 		tCtx := trace.TraceContext()

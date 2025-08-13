@@ -636,11 +636,22 @@ components:
           type: object
           additionalProperties:
             type: object
-            additionalProperties:
-              description: List of enabled components for each pipeline.
-              type: array
-              items:
-                type: string
+            properties:
+              exporters:
+                description: list of enabled exporters for each pipeline.
+                type: array
+                items:
+                  type: string
+              processors:
+                description: list of enabled processors for each pipeline.
+                type: array
+                items:
+                  type: string
+              receivers:
+                description: list of enabled receivers for each pipeline.
+                type: array
+                items:
+                  type: string
           x-go-type-skip-optional-pointer: true
     actionUnenroll:
       description: The UNENROLL action data.

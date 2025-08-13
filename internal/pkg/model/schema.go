@@ -402,6 +402,14 @@ type OutputHealth struct {
 	Timestamp string `json:"@timestamp,omitempty"`
 }
 
+// PipelinesItem
+type PipelinesItem struct {
+	ESDocument
+	Exporters  []string `json:"exporters,omitempty"`
+	Processors []string `json:"processors,omitempty"`
+	Receivers  []string `json:"receivers,omitempty"`
+}
+
 // Policy A policy that an Elastic Agent is attached to
 type Policy struct {
 	ESDocument
@@ -533,8 +541,8 @@ type ServerMetadata struct {
 
 // Service OTel collector pipelines setup
 type Service struct {
-	Extensions []string                       `json:"extensions,omitempty"`
-	Pipelines  map[string]map[string][]string `json:"pipelines,omitempty"`
+	Extensions []string                  `json:"extensions,omitempty"`
+	Pipelines  map[string]*PipelinesItem `json:"pipelines,omitempty"`
 }
 
 // Signed The action signed data and signature.

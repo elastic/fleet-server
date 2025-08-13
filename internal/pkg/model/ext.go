@@ -112,17 +112,25 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		}
 	}
 	if d.Service != nil {
-		res.Service = &Service{
-			Extensions: slices.Clone(d.Service.Extensions),
-		}
-		if len(d.Service.Pipelines) > 0 {
-			res.Service.Pipelines = make(map[string]map[string][]string)
-			for id, pipeline := range d.Service.Pipelines {
-				res.Service.Pipelines[id] = maps.Clone(pipeline)
+		res.Service = cloneOTelService(d.Service)
+	}
+	return res
+}
+
+func cloneOTelService(s *Service) *Service {
+	var clone Service
+	clone.Extensions = slices.Clone(s.Extensions)
+	if len(s.Pipelines) > 0 {
+		clone.Pipelines = make(map[string]*PipelinesItem)
+		for id, pipeline := range s.Pipelines {
+			clone.Pipelines[id] = &PipelinesItem{
+				Exporters:  slices.Clone(pipeline.Exporters),
+				Processors: slices.Clone(pipeline.Processors),
+				Receivers:  slices.Clone(pipeline.Receivers),
 			}
 		}
 	}
-	return res
+	return &clone
 }
 
 // cloneMap does a deep copy on a map of objects
