@@ -114,7 +114,20 @@ func (suite *AgentInstallSuite) SetupSuite() {
 // downloadAgent will search the artifacts repo for the latest snapshot and return the stream to the download for the current OS + ARCH.
 func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser {
 	suite.T().Helper()
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s-SNAPSHOT", version.DefaultVersion), nil)
+	// Use version associated with latest DRA instead of fleet-server's version to avoid breaking on fleet-server version bumps
+	draVersion, ok := os.LookupEnv("ELASTICSEARCH_VERSION")
+	if !ok || draVersion == "" {
+		suite.T().Fatal("ELASTICSEARCH_VERSION is not set")
+	}
+	draSplit := strings.Split(draVersion, "-")
+	if len(draSplit) == 3 {
+		draVersion = draSplit[0] + "-" + draSplit[2] // remove hash
+	} else if len(draSplit) > 3 {
+		suite.T().Fatalf("Unsupported ELASTICSEARCH_VERSION format, expected 3 segments got: %s", draVersion)
+	}
+	suite.T().Logf("Using ELASTICSARCH_VERSION=%s", draVersion)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://artifacts-api.elastic.co/v1/search/"+draVersion, nil)
 	suite.Require().NoError(err)
 
 	resp, err := suite.Client.Do(req)
@@ -138,7 +151,7 @@ func (suite *AgentInstallSuite) downloadAgent(ctx context.Context) io.ReadCloser
 		arch = "aarch64"
 	}
 
-	fileName := fmt.Sprintf("elastic-agent-%s-SNAPSHOT-%s-%s.%s", version.DefaultVersion, runtime.GOOS, arch, fType)
+	fileName := fmt.Sprintf("elastic-agent-%s-%s-%s.%s", draVersion, runtime.GOOS, arch, fType)
 	pkg, ok := body.Packages[fileName]
 	suite.Require().Truef(ok, "unable to find package download for fileName = %s", fileName)
 
