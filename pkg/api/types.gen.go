@@ -52,6 +52,7 @@ const (
 // Defines values for AuditUnenrollRequestReason.
 const (
 	KeyRevoked AuditUnenrollRequestReason = "key_revoked"
+	Migrated   AuditUnenrollRequestReason = "migrated"
 	Orphaned   AuditUnenrollRequestReason = "orphaned"
 	Uninstall  AuditUnenrollRequestReason = "uninstall"
 )

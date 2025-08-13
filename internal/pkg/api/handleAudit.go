@@ -87,7 +87,7 @@ func (audit *AuditT) validateUnenrollRequest(zlog zerolog.Logger, w http.Respons
 	}
 
 	switch req.Reason {
-	case Uninstall, Orphaned, KeyRevoked:
+	case Uninstall, Orphaned, KeyRevoked, Migrated:
 	default:
 		return nil, &BadRequestErr{msg: "audit/unenroll request invalid reason"}
 	}

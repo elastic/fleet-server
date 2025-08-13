@@ -1070,6 +1070,7 @@ components:
             - uninstall
             - orphaned
             - key_revoked # here for completeness, fleet-ui should set this reason when a FORCE_UNENROLL action is made.
+            - migrated
           examples:
             - uninstall
         timestamp:
