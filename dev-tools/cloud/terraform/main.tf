@@ -34,6 +34,12 @@ variable "ess_region" {
   description = "The ESS region to use"
 }
 
+variable "deployment_template_id" {
+  type        = string
+  default     = "gcp-general-purpose"
+  description = "The ess deployment template to use"
+}
+
 locals {
   // strip hash found in ELASTICSEARCH_VERSION in integration/.env to get stack_version
   dra_match       = regex("ELASTICSEARCH_VERSION=([0-9]+\\.[0-9]+\\.[0-9]+)(?:-[[:alpha:]]+-)?-?(SNAPSHOT)?", file("${path.module}/../../integration/.env"))
@@ -49,8 +55,9 @@ data "ec_stack" "latest" {
 resource "ec_deployment" "deployment" {
   name                   = format("fleet server PR-%s-%s", var.pull_request, var.git_commit)
   region                 = var.ess_region
+  deployment_template_id = var.deployment_template_id
   version                = data.ec_stack.latest.version
-  deployment_template_id = "gcp-general-purpose"
+
 
   tags = {
     "source_repo"     = "elastic/fleet-server"
