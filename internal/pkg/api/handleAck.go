@@ -34,6 +34,7 @@ import (
 const (
 	TypeUnenroll = "UNENROLL"
 	TypeUpgrade  = "UPGRADE"
+	TypeMigrate  = "MIGRATE"
 )
 
 var (
@@ -305,7 +306,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			setResult(n, http.StatusOK)
 		}
 
-		if event.Error == nil && action.Type == TypeUnenroll {
+		if event.Error == nil && (action.Type == TypeUnenroll || action.Type == TypeMigrate) {
 			unenrollIdxs = append(unenrollIdxs, n)
 		}
 		span.End()
