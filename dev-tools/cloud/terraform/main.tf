@@ -16,47 +16,49 @@ variable "elastic_agent_docker_image" {
   description = "Elastic agent docker image with tag."
 }
 
-locals {
-  match           = regex("const DefaultVersion = \"(.*)\"", file("${path.module}/../../../version/version.go"))[0]
-  stack_version   = format("%s-SNAPSHOT", local.match)
-  docker_image_ea = var.elastic_agent_docker_image
-}
-
-resource "random_uuid" "name" {
+variable "git_commit" {
+  type        = string
+  default     = ""
+  description = "The git commit ID."
 }
 
 variable "pull_request" {
-  type=string
-  default=""
-  description="The github pull request number"
+  type        = string
+  default     = ""
+  description = "The github pull request number."
 }
 
-variable "buildkite_id" {
-  type=string
-  default=""
-  description="The Buildkite build id associated with this deployment"
+variable "ess_region" {
+  type        = string
+  default     = "gcp-us-west2"
+  description = "The ESS region to use"
 }
 
-variable "creator" {
-  type=string
-  default=""
-  description="The Buildkite user who created the job"
+locals {
+  // strip hash found in ELASTICSEARCH_VERSION in integration/.env to get stack_version
+  dra_match       = regex("ELASTICSEARCH_VERSION=([0-9]+\\.[0-9]+\\.[0-9]+)(?:-[[:alpha:]]+-)?-?(SNAPSHOT)?", file("${path.module}/../../integration/.env"))
+  stack_version   = local.dra_match[1] == "SNAPSHOT" ? format("%s-SNAPSHOT", local.dra_match[0]) : local.dra_match[0]
+  docker_image_ea = var.elastic_agent_docker_image
+}
+
+data "ec_stack" "latest" {
+  version_regex = local.stack_version
+  region        = var.ess_region
 }
 
 resource "ec_deployment" "deployment" {
-  name                   = format("fleet server PR %s", random_uuid.name.result)
-  region                 = "gcp-us-west2"
-  version                = local.stack_version
+  name                   = format("fleet server PR-%s-%s", var.pull_request, var.git_commit)
+  region                 = var.ess_region
+  version                = data.ec_stack.latest.version
   deployment_template_id = "gcp-general-purpose"
 
   tags = {
-    "created_with_terraform" = "true"
-    "docker_image_ea"        = local.docker_image_ea
-    "provisioner" = "terraform"
-    "pull_request" = var.pull_request
-    "buildkite_id" = var.buildkite_id
-    "creator" = var.creator
-}
+    "source_repo"     = "elastic/fleet-server"
+    "provisioner"     = "terraform"
+    "docker_image_ea" = local.docker_image_ea
+    "git_commit"      = var.git_commit
+    "pull_request"    = var.pull_request
+  }
 
   elasticsearch = {
     hot = {
