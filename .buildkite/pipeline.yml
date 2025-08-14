@@ -1,9 +1,15 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
 env:
+#  macOS arm does not exist: https://github.com/docker/compose/releases/tag/1.25.5
+#  DOCKER_COMPOSE_VERSION: "v2.1.1"
   DOCKER_COMPOSE_VERSION: "1.25.5"
   TERRAFORM_VERSION: "1.6.4"
   IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips"
+  IMAGE_MACOS: "generic-13-ventura"
+  IMAGE_MACOS_ARM: "generic-13-ventura-arm"
+  IMAGE_MACOS_15_ARM: "generic-base-15-arm-002"
+  IMAGE_MACOS_15: "generic-base-15-002"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -27,305 +33,356 @@ steps:
   - group: "Check and build"
     key: "check"
     steps:
-      - label: ":white_check_mark: Run check-ci"
-        key: check-ci
-        command: ".buildkite/scripts/check_ci.sh"
-        agents:
-          provider: "gcp"
-
-      - label: ":building_construction: Run local build"
-        key: make-local
-        command: ".buildkite/scripts/local_build.sh"
-        agents:
-          provider: "gcp"
-
+#      - label: ":white_check_mark: Run check-ci"
+#        key: check-ci
+#        command: ".buildkite/scripts/check_ci.sh"
+#        agents:
+#          provider: "gcp"
+#
+#      - label: ":building_construction: Run local build"
+#        key: make-local
+#        command: ".buildkite/scripts/local_build.sh"
+#        agents:
+#          provider: "gcp"
+#
       - label: ":building_construction: Run local build: MacOS"
         key: make-local-macos
         command: ".buildkite/scripts/local_build.sh"
         agents:
           provider: orka
-          imagePrefix: generic-13-ventura-arm
-
-  - group: "Performance test"
-    key: "performance-test"
-    depends_on: "check"
-    steps:
-      - label: "Run go benchmark for PR branch"
-        key: "go-benchmark-pr"
-        command: ".buildkite/scripts/run_benchmark.sh pr"
-        env:
-          BENCHMARK_ARGS: "-count=8 -benchmem"
-        artifact_paths:
-          - build/next.out
-          - build/next.stat
-        agents:
-          provider: "gcp"
-          machineType: "c2-standard-8"
-
-      - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-        key: "go-benchmark-base"
-        command: ".buildkite/scripts/run_benchmark.sh base"
-        env:
-          BENCHMARK_ARGS: "-count=8 -benchmem"
-        artifact_paths:
-          - build/base.out
-          - build/base.stat
-        agents:
-          provider: "gcp"
-          machineType: "c2-standard-8"
-
-      - label: "Compare results"
-        key: "go-benchmark-compare"
-        command: ".buildkite/scripts/run_benchmark.sh compare"
-        artifact_paths:
-          - build/failed_summary.md
-          - build/failed_report.json
-          - build/full_report.json
-        depends_on:
-          - go-benchmark-pr
-          - go-benchmark-base
-        agents:
-          provider: "gcp"
+          imagePrefix: ${IMAGE_MACOS}
+#
+#      - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+#        key: "go-benchmark-base"
+#        command: ".buildkite/scripts/run_benchmark.sh base"
+#        env:
+#          BENCHMARK_ARGS: "-count=8 -benchmem"
+#        artifact_paths:
+#          - build/base.out
+#          - build/base.stat
+#        agents:
+#          provider: "gcp"
+#          machineType: "c2-standard-8"
+#
+#      - label: "Compare results"
+#        key: "go-benchmark-compare"
+#        command: ".buildkite/scripts/run_benchmark.sh compare"
+#        artifact_paths:
+#          - build/failed_summary.md
+#          - build/failed_report.json
+#          - build/full_report.json
+#        depends_on:
+#          - go-benchmark-pr
+#          - go-benchmark-base
+#        agents:
+#          provider: "gcp"
 
   - group: "Run tests"
     key: "tests"
     depends_on: "check"
     steps:
-      - label: ":smartbear-testexecute: Run unit tests"
-        key: unit-test
-        command: ".buildkite/scripts/unit_test.sh"
-        agents:
-          provider: "gcp"
-        artifact_paths:
-          - build/*.xml
-          - build/coverage*.out
+#      - label: ":smartbear-testexecute: Run unit tests"
+#        key: unit-test
+#        command: ".buildkite/scripts/unit_test.sh"
+#        agents:
+#          provider: "gcp"
+#        artifact_paths:
+#          - build/*.xml
+#          - build/coverage*.out
+#
+#      - label: ":smartbear-testexecute: Run unit tests with requirefips build tag and FIPS provider"
+#        key: unit-test-fips-tag
+#        command: ".buildkite/scripts/unit_test.sh"
+#        env:
+#          FIPS: "true"
+#          GOEXPERIMENT: "systemcrypto"
+#          GO_DISTRO: "microsoft"
+#        agents:
+#          provider: "aws"
+#          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
+#          instanceType: "m5.xlarge"
+#        artifact_paths:
+#          - build/*.xml
+#          - build/coverage*.out
+#
+#      - label: ":smartbear-testexecute: Run fips140=only unit tests with FIPS provider"
+#        key: unit-test-fips140-only
+#        command: ".buildkite/scripts/unit_test_fipsonly.sh"
+#        env:
+#          FIPS: "true"
+#          GO_DISTRO: "stdlib"
+#        agents:
+#          provider: "aws"
+#          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+#          instanceType: "m5.xlarge"
+#        artifact_paths:
+#          - build/*.xml
+#          - build/coverage*.out
+#
+#      - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
+#        key: unit-test-macos-13
+#        command: ".buildkite/scripts/unit_test.sh"
+#        agents:
+#          provider: orka
+#          imagePrefix: generic-13-ventura-arm
+#        artifact_paths:
+#          - build/*.xml
+#          - build/coverage*.out
+#
+#      - label: ":smartbear-testexecute: Run integration tests"
+#        key: int-test
+#        command: ".buildkite/scripts/integration_test.sh"
+#        agents:
+#          provider: "gcp"
+#        artifact_paths:
+#          - build/*.xml
+#        plugins:
+#          - *bk_analytics_token_plugin
+#          - *test_collector_plugin
+#
+#      - label: ":smartbear-testexecute: Run unit tests with requirefips build tag and FIPS provider"
+#        key: unit-test-fips-tag
+#        command: ".buildkite/scripts/unit_test.sh"
+#        env:
+#          FIPS: "true"
+#          GOEXPERIMENT: "systemcrypto"
+#          GO_DISTRO: "microsoft"
+#        agents:
+#          provider: "aws"
+#          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
+#          instanceType: "m5.xlarge"
+#        artifact_paths:
+#          - build/*.xml
+#          - build/coverage*.out
+#
+#      - label: ":smartbear-testexecute: Run fips140=only unit tests with FIPS provider"
+#        key: unit-test-fips140-only
+#        command: ".buildkite/scripts/unit_test_fipsonly.sh"
+#        env:
+#          FIPS: "true"
+#          GO_DISTRO: "stdlib"
+#        agents:
+#          provider: "aws"
+#          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+#          instanceType: "m5.xlarge"
+#        artifact_paths:
+#          - build/*.xml
+#          - build/coverage*.out
+#
+#      - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
+#        key: unit-test-macos-13
+#        command: ".buildkite/scripts/unit_test.sh"
+#        agents:
+#          provider: orka
+#          imagePrefix: generic-13-ventura-arm
+#        artifact_paths:
+#          - build/*.xml
+#          - build/coverage*.out
+#
+#      - label: ":smartbear-testexecute: Run integration tests"
+#        key: int-test
+#        command: ".buildkite/scripts/integration_test.sh"
+#        agents:
+#          provider: "gcp"
+#        artifact_paths:
+#          - build/*.xml
+#        plugins:
+#          - *bk_analytics_token_plugin
+#          - *test_collector_plugin
+#        retry:
+#          automatic:
+#            limit: 1
+#
+#      - label: "E2E Test"
+#        key: "e2e-test"
+#        command: ".buildkite/scripts/e2e_test.sh"
+#        env:
+#          TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
+#        agents:
+#          provider: "gcp"
+#        artifact_paths:
+#          - build/*.xml
+#          - build/e2e-coverage.out
+#        plugins:
+#          - *bk_analytics_token_plugin
+#          - *test_collector_plugin
+#        retry:
+#          automatic:
+#            limit: 1
 
-      - label: ":smartbear-testexecute: Run unit tests with requirefips build tag and FIPS provider"
-        key: unit-test-fips-tag
-        command: ".buildkite/scripts/unit_test.sh"
-        env:
-          FIPS: "true"
-          GOEXPERIMENT: "systemcrypto"
-          GO_DISTRO: "microsoft"
-        agents:
-          provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.xlarge"
-        artifact_paths:
-          - build/*.xml
-          - build/coverage*.out
-
-      - label: ":smartbear-testexecute: Run fips140=only unit tests with FIPS provider"
-        key: unit-test-fips140-only
-        command: ".buildkite/scripts/unit_test_fipsonly.sh"
-        env:
-          FIPS: "true"
-          GO_DISTRO: "stdlib"
-        agents:
-          provider: "aws"
-          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.xlarge"
-        artifact_paths:
-          - build/*.xml
-          - build/coverage*.out
-
-      - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
-        key: unit-test-macos-13
-        command: ".buildkite/scripts/unit_test.sh"
-        agents:
-          provider: orka
-          imagePrefix: generic-13-ventura-arm
-        artifact_paths:
-          - build/*.xml
-          - build/coverage*.out
-
-      - label: ":smartbear-testexecute: Run integration tests"
-        key: int-test
-        command: ".buildkite/scripts/integration_test.sh"
-        agents:
-          provider: "gcp"
-        artifact_paths:
-          - build/*.xml
-        plugins:
-          - *bk_analytics_token_plugin
-          - *test_collector_plugin
-        retry:
-          automatic:
-            limit: 1
-
-      - label: "E2E Test"
-        key: "e2e-test"
-        command: ".buildkite/scripts/e2e_test.sh"
+      - label: "E2E Test / macOS"
+        key: "e2e-test-macos"
+        command: |
+          .buildkite/scripts/install_macos_tools.sh
         env:
           TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
         agents:
-          provider: "gcp"
+          provider: orka
+          imagePrefix: ${IMAGE_MACOS}
         artifact_paths:
           - build/*.xml
-          - build/e2e-coverage.out
+          - build/e2e-coverage-macos.out
         plugins:
           - *bk_analytics_token_plugin
           - *test_collector_plugin
-        retry:
-          automatic:
-            limit: 1
 
-      - label: ":junit: Junit annotate"
-        plugins:
-          - junit-annotate#v2.4.1:
-              artifacts: "build/*.xml"
-        agents:
-          provider: "gcp"
-        depends_on:
-          - step: "unit-test"
-            allow_failure: true
-          - step: "unit-test-macos-13"
-            allow_failure: true
-          - step: "int-test"
-            allow_failure: true
-          - step: "e2e-test"
-            allow_failure: true
 
-      - label: ":sonarqube: Continuous Code Inspection"
-        env:
-          VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/fleet-server/sonar-analyze-token"
-        agents:
-          image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-        command:
-          - "buildkite-agent artifact download build/*coverage*.out ."
-          - "buildkite-agent artifact download build/test-unit*.out.xml ."
-          - "/scan-source-code.sh"
-        depends_on:
-          - step: "unit-test"
-            allow_failure: false
-          - step: "e2e-test"
-            allow_failure: false
-          - step: "unit-test-macos-13"
-            allow_failure: false
-
-      - label: ":gcloud: Cloud e2e Test"
-        key: "cloud-e2e-test"
-        env:
-          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fleet"
-          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
-          SNAPSHOT: "true"
-          PLATFORMS: "linux/amd64"
-          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
-        command: ".buildkite/scripts/cloud_e2e_test.sh"
-        agents:
-          provider: "gcp"
-        plugins:
-          - *docker_elastic_login_plugin
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
-        depends_on:
-          - step: "unit-test"
-            allow_failure: false
-          - step: "int-test"
-            allow_failure: false
-          - step: "e2e-test"
-            allow_failure: false
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
-      - label: ":gcloud: Cloud e2e FIPS Test"
-        key: "cloud-e2e-fips-test"
-        env:
-          DOCKER_BASE_IMAGE: "docker.elastic.co/cloud-release/elastic-agent-cloud-fips"
-          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
-          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
-          SNAPSHOT: "true"
-          PLATFORMS: "linux/amd64"
-          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
-          FIPS: "true"
-          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-          TF_VAR_ess_region: "us-gov-east-1"
-          TF_VAR_deployment_template_id: "aws-general-purpose"
-        command: ".buildkite/scripts/cloud_e2e_test.sh"
-        agents:
-          provider: "gcp"
-        plugins:
-          - *docker_elastic_login_plugin
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
-        depends_on:
-          - step: "unit-test"
-            allow_failure: false
-          - step: "int-test"
-            allow_failure: false
-          - step: "e2e-test"
-            allow_failure: false
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
-  - label: ":docker: Publish docker image"
-    key: "publish"
-    command: ".buildkite/scripts/build_push_docker_image.sh"
-    env:
-      DOCKER_IMAGE: "docker.elastic.co/observability-ci/fleet-server" # needs to rename for rollback
-      DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
-      DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
-      DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
-    if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_BRANCH') == 'main'"
-    agents:
-      provider: "gcp"
-    plugins:
-      - *docker_elastic_login_plugin
-    depends_on:
-      - step: "tests"
-        allow_failure: false
-
-  - label: ":serverless::argo: Run synthetics tests and update fleet to ${BUILDKITE_COMMIT:0:12} in serverless-gitops"
-    branches: main
-    trigger: gpctl-promote-after-serverless-devenv-synthetics
-    build:
-      env:
-        SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
-        SERVICE: fleet
-    depends_on:
-      - step: "publish"
-
-  - label: ":gcloud: Release test"
-    key: "release-test"
-    command: ".buildkite/scripts/release_test.sh"
-    agents:
-      provider: "gcp"
-    depends_on:
-      - step: "tests"
-        allow_failure: false
-    plugins:
-      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
-      # This plugin authenticates to Google Cloud using the OIDC token.
-      - elastic/oblt-google-auth#v1.2.0:
-          lifetime: 10800 # seconds
-          project-id: "elastic-observability-ci"
-          project-number: "911195782929"
-
-  - label: ":jenkins: Release - Package Registry Distribution"
-    key: "release-package-registry"
-    trigger: "package-registry-release-package-registry-distribution"
-    build:
-      branch: "main"
-      meta_data:
-        DOCKER_TAG: "${BUILDKITE_TAG}"
-    if: "build.env('BUILDKITE_TAG') != ''"
-
-  - trigger: "fleet-server-package-mbp"
-    label: ":esbuild: Downstream - Package"
-    key: "downstream-package"
-    if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
-    build:
-      branch: "${BUILDKITE_BRANCH}"
-    depends_on:
-      - step: "release-test"
-        allow_failure: false
+#      - label: ":junit: Junit annotate"
+#        plugins:
+#          - junit-annotate#v2.4.1:
+#              artifacts: "build/*.xml"
+#        agents:
+#          provider: "gcp"
+#        depends_on:
+#          - step: "unit-test"
+#            allow_failure: true
+#          - step: "unit-test-macos-13"
+#            allow_failure: true
+#          - step: "int-test"
+#            allow_failure: true
+#          - step: "e2e-test"
+#            allow_failure: true
+#
+#      - label: ":sonarqube: Continuous Code Inspection"
+#        env:
+#          VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/fleet-server/sonar-analyze-token"
+#        agents:
+#          image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
+#        command:
+#          - "buildkite-agent artifact download build/*coverage*.out ."
+#          - "buildkite-agent artifact download build/test-unit*.out.xml ."
+#          - "/scan-source-code.sh"
+#        depends_on:
+#          - step: "unit-test"
+#            allow_failure: false
+#          - step: "e2e-test"
+#            allow_failure: false
+#          - step: "unit-test-macos-13"
+#            allow_failure: false
+#
+#      - label: ":gcloud: Cloud e2e Test"
+#        key: "cloud-e2e-test"
+#        env:
+#          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fleet"
+#          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
+#          SNAPSHOT: "true"
+#          PLATFORMS: "linux/amd64"
+#          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
+#        command: ".buildkite/scripts/cloud_e2e_test.sh"
+#        agents:
+#          provider: "gcp"
+#        plugins:
+#          - *docker_elastic_login_plugin
+#          - elastic/vault-secrets#v0.1.0:
+#              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+#              field: "apiKey"
+#              env_var: "EC_API_KEY"
+#        depends_on:
+#          - step: "unit-test"
+#            allow_failure: false
+#          - step: "int-test"
+#            allow_failure: false
+#          - step: "e2e-test"
+#            allow_failure: false
+#        retry:
+#          automatic:
+#            limit: 1
+#          manual:
+#            allowed: true
+#
+#      - label: ":gcloud: Cloud e2e FIPS Test"
+#        key: "cloud-e2e-fips-test"
+#        env:
+#          DOCKER_BASE_IMAGE: "docker.elastic.co/cloud-release/elastic-agent-cloud-fips"
+#          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
+#          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
+#          SNAPSHOT: "true"
+#          PLATFORMS: "linux/amd64"
+#          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
+#          FIPS: "true"
+#          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
+#          TF_VAR_ess_region: "us-gov-east-1"
+#          TF_VAR_deployment_template_id: "aws-general-purpose"
+#        command: ".buildkite/scripts/cloud_e2e_test.sh"
+#        agents:
+#          provider: "gcp"
+#        plugins:
+#          - *docker_elastic_login_plugin
+#          - elastic/vault-secrets#v0.1.0:
+#              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
+#              field: "apiKey"
+#              env_var: "EC_API_KEY"
+#        depends_on:
+#          - step: "unit-test"
+#            allow_failure: false
+#          - step: "int-test"
+#            allow_failure: false
+#          - step: "e2e-test"
+#            allow_failure: false
+#        retry:
+#          automatic:
+#            limit: 1
+#          manual:
+#            allowed: true
+#
+#  - label: ":docker: Publish docker image"
+#    key: "publish"
+#    command: ".buildkite/scripts/build_push_docker_image.sh"
+#    env:
+#      DOCKER_IMAGE: "docker.elastic.co/observability-ci/fleet-server" # needs to rename for rollback
+#      DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
+#      DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
+#      DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
+#    if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_BRANCH') == 'main'"
+#    agents:
+#      provider: "gcp"
+#    plugins:
+#      - *docker_elastic_login_plugin
+#    depends_on:
+#      - step: "tests"
+#        allow_failure: false
+#
+#  - label: ":serverless::argo: Run synthetics tests and update fleet to ${BUILDKITE_COMMIT:0:12} in serverless-gitops"
+#    branches: main
+#    trigger: gpctl-promote-after-serverless-devenv-synthetics
+#    build:
+#      env:
+#        SERVICE_COMMIT_HASH: ${BUILDKITE_COMMIT:0:12}
+#        SERVICE: fleet
+#    depends_on:
+#      - step: "publish"
+#
+#  - label: ":gcloud: Release test"
+#    key: "release-test"
+#    command: ".buildkite/scripts/release_test.sh"
+#    agents:
+#      provider: "gcp"
+#    depends_on:
+#      - step: "tests"
+#        allow_failure: false
+#    plugins:
+#      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
+#      # This plugin authenticates to Google Cloud using the OIDC token.
+#      - elastic/oblt-google-auth#v1.2.0:
+#          lifetime: 10800 # seconds
+#          project-id: "elastic-observability-ci"
+#          project-number: "911195782929"
+#
+#  - label: ":jenkins: Release - Package Registry Distribution"
+#    key: "release-package-registry"
+#    trigger: "package-registry-release-package-registry-distribution"
+#    build:
+#      branch: "main"
+#      meta_data:
+#        DOCKER_TAG: "${BUILDKITE_TAG}"
+#    if: "build.env('BUILDKITE_TAG') != ''"
+#
+#  - trigger: "fleet-server-package-mbp"
+#    label: ":esbuild: Downstream - Package"
+#    key: "downstream-package"
+#    if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
+#    build:
+#      branch: "${BUILDKITE_BRANCH}"
+#    depends_on:
+#      - step: "release-test"
+#        allow_failure: false
