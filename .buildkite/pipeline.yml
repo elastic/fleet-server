@@ -149,10 +149,15 @@ steps:
         plugins:
           - *bk_analytics_token_plugin
           - *test_collector_plugin
+        retry:
+          automatic:
+            limit: 1
 
       - label: "E2E Test"
         key: "e2e-test"
         command: ".buildkite/scripts/e2e_test.sh"
+        env:
+          TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
         agents:
           provider: "gcp"
         artifact_paths:
@@ -161,6 +166,9 @@ steps:
         plugins:
           - *bk_analytics_token_plugin
           - *test_collector_plugin
+        retry:
+          automatic:
+            limit: 1
 
       - label: ":junit: Junit annotate"
         plugins:
