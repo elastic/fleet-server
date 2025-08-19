@@ -96,7 +96,9 @@ with_Terraform() {
 }
 
 fix_gsutil() {
-    # Decide if we need to replace a non-working gsutil (e.g. when it requires Python 3.9 on an old distro like Ubuntu 20.04) with a snap version
+    # this function checks if gsutil is working and if not, replaces it with a Python virtualenv version (and installs a supported Python version without affecting the system Python)
+    # TODO remove once the core ubuntu 20.04 aarch64 images gets fixed to include a working gsutil
+
     if gsutil --version >/dev/null 2>&1; then
         echo "--- gsutil works; nothing to do."
     else
