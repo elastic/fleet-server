@@ -96,6 +96,36 @@ with_Terraform() {
 }
 
 google_cloud_auth() {
+    # Decide if we need to replace/install
+    if ! command -v gsutil >/dev/null 2>&1; then
+        echo "--- Installing gsutil via snap and removing old installs..."
+        # Remove apt-based Cloud SDKs if present
+        sudo apt-get update || true
+        sudo DEBIAN_FRONTEND=noninteractive apt-get -y purge google-cloud-cli google-cloud-sdk || true
+
+        # Remove common archive-install locations and stray shims
+        sudo rm -rf /opt/google-cloud-sdk /usr/lib/google-cloud-sdk || true
+        sudo rm -f /usr/bin/gsutil /usr/local/bin/gsutil /usr/bin/gcloud /usr/local/bin/gcloud || true
+
+        # Ensure snapd is available
+        if ! command -v snap >/dev/null 2>&1; then
+            sudo DEBIAN_FRONTEND=noninteractive apt-get -y install snapd
+        fi
+
+        # Install (or refresh) the snap
+        if snap list google-cloud-cli >/dev/null 2>&1; then
+            sudo snap refresh google-cloud-cli
+        else
+            sudo snap install google-cloud-cli --classic
+        fi
+
+        # Make sure /snap/bin is on PATH for this shell
+        export PATH="/snap/bin:$PATH"
+
+        echo "--- gsutil installed at: $(command -v gsutil)"
+        gsutil version -l
+    fi
+
     local secretFileLocation=$(mktemp -d -p "${WORKSPACE}" -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
     echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
     gcloud auth activate-service-account --key-file ${secretFileLocation} 2> /dev/null
