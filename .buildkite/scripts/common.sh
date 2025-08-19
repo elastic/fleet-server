@@ -109,20 +109,100 @@ fix_gsutil() {
         sudo rm -rf /opt/google-cloud-sdk /usr/lib/google-cloud-sdk || true
         sudo rm -f /usr/bin/gsutil /usr/local/bin/gsutil /usr/bin/gcloud /usr/local/bin/gcloud || true
 
-        # Ensure snapd is available
-        if ! command -v snap >/dev/null 2>&1; then
-            sudo DEBIAN_FRONTEND=noninteractive apt-get -y install snapd
+        SDK_DIR="/opt/google-cloud-sdk"
+        VENV="/opt/gcloud-py"
+        CONFIG_DIR="/opt/buildkite-agent/.config/gcloud"
+        
+        # Set architecture-specific archive URL
+        check_platform_architeture
+        case "${arch_type}" in
+            "amd64")
+                ARCHIVE_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz"
+                ;;
+            "arm64")
+                ARCHIVE_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-arm.tar.gz"
+                ;;
+            *)
+                echo "Unsupported architecture: ${arch_type}"
+                return 1
+                ;;
+        esac
+
+        # Ensure config dir exists and is writable by the current user
+        sudo mkdir -p "$CONFIG_DIR"
+        sudo chown -R "$(id -u)":"$(id -g)" "$CONFIG_DIR"
+
+        # Install a modern Python alongside (3.10) -- this doesn't affect the system Python
+        sudo apt-get update -y
+        sudo apt-get install -y software-properties-common curl ca-certificates gnupg
+        if ! command -v python3.10 >/dev/null 2>&1; then
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt-get update -y
+        sudo apt-get install -y python3.10 python3.10-venv
         fi
 
-        # Install (or refresh) the snap
-        if snap list google-cloud-cli >/dev/null 2>&1; then
-            sudo snap refresh google-cloud-cli
-        else
-            sudo snap install google-cloud-cli --classic
+        if [[ ! -d "$VENV" ]]; then
+        sudo python3.10 -m venv "$VENV"
+        sudo "$VENV/bin/python" -m pip install --upgrade pip
         fi
 
-        # Make sure /snap/bin is on PATH for this shell
-        export PATH="/snap/bin:$PATH"
+        # Install the Cloud SDK from tarball (no system Python dependency)
+        if [[ ! -d "$SDK_DIR" ]]; then
+        curl -fsSLo /tmp/google-cloud-cli.tar.gz "$ARCHIVE_URL"
+        sudo tar -C /opt -xzf /tmp/google-cloud-cli.tar.gz
+        sudo /opt/google-cloud-sdk/install.sh --quiet
+        fi
+
+        # Make it work NOW in this shell
+        export CLOUDSDK_PYTHON="$VENV/bin/python"
+        export CLOUDSDK_CONFIG="$CONFIG_DIR"
+        export PATH="/opt/google-cloud-sdk/bin:$PATH"
+        hash -r || true
+
+        # Persist for future shells (all users)
+        sudo tee /etc/profile.d/gcloud.sh >/dev/null <<EOF
+        # Google Cloud CLI env
+        export CLOUDSDK_PYTHON="$VENV/bin/python"
+        export CLOUDSDK_CONFIG="$CONFIG_DIR"
+        case ":\$PATH:" in *:/opt/google-cloud-sdk/bin:*) ;; *) export PATH="/opt/google-cloud-sdk/bin:\$PATH";; esac
+        EOF
+        sudo chmod 644 /etc/profile.d/gcloud.sh
+
+        # 5) Handy symlinks (works even if some shells ignore /etc/profile.d)
+        for b in gcloud gsutil bq; do
+        sudo ln -sf "/opt/google-cloud-sdk/bin/\$b" "/usr/local/bin/\$b"
+        done
+
+        echo "[ok] gsutil at: $(command -v gsutil)"
+        gsutil --version
+
+
+
+        sudo apt-get update
+        sudo apt-get install -y software-properties-common curl
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt-get update
+        sudo apt-get install -y python3.9 python3.9-venv python3.9-distutils
+
+        # Optional but tidy: put Cloud SDK on its own venv
+        sudo python3.9 -m venv /opt/gcloud-py
+        sudo /opt/gcloud-py/bin/python -m pip install --upgrade pip
+
+        # Get the ARM64 Cloud SDK archive and install
+        curl -fsSLO https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-arm.tar.gz
+        sudo tar -C /opt -xzf google-cloud-cli-linux-arm.tar.gz
+        sudo /opt/google-cloud-sdk/install.sh --quiet
+
+        # Make the SDK use your private Python, and add to PATH
+        sudo tee /etc/profile.d/gcloud.sh >/dev/null <<'EOF'
+        export CLOUDSDK_PYTHON=/opt/gcloud-py/bin/python
+        . /opt/google-cloud-sdk/path.bash.inc
+EOF
+
+        # Verify (new shell or source the file)
+        source /etc/profile.d/gcloud.sh
+        gsutil version -l
+
 
         echo "--- gsutil installed at: $(command -v gsutil)"
         gsutil version -l
