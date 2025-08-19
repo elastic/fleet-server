@@ -5,7 +5,6 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -100,7 +99,7 @@ func Test_Audit_markUnenroll(t *testing.T) {
 	bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	audit := AuditT{bulk: bulker}
 	logger := testlog.SetLogger(t)
-	err := audit.markUnenroll(context.Background(), logger, &AuditUnenrollRequest{Reason: Uninstall, Timestamp: time.Now().UTC()}, agent)
+	err := audit.markUnenroll(t.Context(), logger, &AuditUnenrollRequest{Reason: Uninstall, Timestamp: time.Now().UTC()}, agent)
 	require.NoError(t, err)
 	bulker.AssertExpectations(t)
 }
@@ -114,24 +113,27 @@ func Test_Audit_unenroll(t *testing.T) {
 		err := audit.unenroll(testlog.SetLogger(t), nil, nil, agent)
 		require.EqualError(t, err, ErrAuditUnenrollReason.Error())
 	})
-	t.Run("agent has audit_unenroll_reason: uninstalled", func(t *testing.T) {
-		agent := &model.Agent{
-			AuditUnenrolledReason: string(Uninstall),
-		}
-		bulker := ftesting.NewMockBulk()
-		bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		audit := &AuditT{
-			bulk: bulker,
-			cfg:  &config.Server{},
-		}
-		req := &http.Request{
-			Body: io.NopCloser(strings.NewReader(`{"reason": "orphaned", "timestamp": "2024-01-01T12:00:00.000Z"}`)),
-		}
-		err := audit.unenroll(testlog.SetLogger(t), httptest.NewRecorder(), req, agent)
-		require.NoError(t, err)
-		bulker.AssertExpectations(t)
-	})
+	for _, reason := range []string{string(Uninstall), string(Migrated)} {
+		t.Run("agent has audit_unenroll_reason: "+reason, func(t *testing.T) {
+			agent := &model.Agent{
+				AuditUnenrolledReason: reason,
+			}
+			bulker := ftesting.NewMockBulk()
+			bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			audit := &AuditT{
+				bulk: bulker,
+				cfg:  &config.Server{},
+			}
+			req := &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"reason": "` + reason + `", "timestamp": "2024-01-01T12:00:00.000Z"}`)),
+			}
+			err := audit.unenroll(testlog.SetLogger(t), httptest.NewRecorder(), req, agent)
+			require.NoError(t, err)
+			bulker.AssertExpectations(t)
+		})
+	}
 
 	t.Run("ok", func(t *testing.T) {
 		agent := &model.Agent{

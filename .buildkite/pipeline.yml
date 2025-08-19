@@ -216,6 +216,10 @@ steps:
           provider: "gcp"
         plugins:
           - *docker_elastic_login_plugin
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         depends_on:
           - step: "unit-test"
             allow_failure: false
@@ -239,11 +243,18 @@ steps:
           PLATFORMS: "linux/amd64"
           TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
           FIPS: "true"
+          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
+          TF_VAR_ess_region: "us-gov-east-1"
+          TF_VAR_deployment_template_id: "aws-general-purpose"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
         plugins:
           - *docker_elastic_login_plugin
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         depends_on:
           - step: "unit-test"
             allow_failure: false

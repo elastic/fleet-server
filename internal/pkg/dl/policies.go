@@ -12,11 +12,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
 var (
@@ -111,6 +110,6 @@ func QueryOutputFromPolicy(ctx context.Context, bulker bulk.Bulk, outputName str
 			return &policy, nil
 		}
 	}
-	zerolog.Ctx(ctx).Debug().Str(logger.PolicyOutputName, outputName).Msg("policy with output not found")
+	zerolog.Ctx(ctx).Debug().Str(ecs.PolicyOutputName, outputName).Msg("policy with output not found")
 	return nil, nil
 }
