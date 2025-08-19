@@ -95,6 +95,95 @@ with_Terraform() {
     terraform version
 }
 
+fix_gsutil() {
+    # this function checks if gsutil is working and if not, replaces it with a Python virtualenv version (and installs a supported Python version without affecting the system Python)
+    # TODO remove once the core ubuntu 20.04 aarch64 images gets fixed to include a working gsutil
+
+    if gsutil --version >/dev/null 2>&1; then
+        echo "--- gsutil works; nothing to do."
+    else
+        echo "--- gsutil doesn't work -- uninstalling it and installing a supported Python version and gsutil via virtualenv..."
+        # Remove apt-based Cloud SDKs if present
+        sudo apt-get update || true
+        sudo DEBIAN_FRONTEND=noninteractive apt-get -y purge google-cloud-cli google-cloud-sdk || true
+
+        # Remove common archive-install locations and stray shims
+        sudo rm -rf /opt/google-cloud-sdk /usr/lib/google-cloud-sdk || true
+        sudo rm -f /usr/bin/gsutil /usr/local/bin/gsutil /usr/bin/gcloud /usr/local/bin/gcloud || true
+
+        SDK_DIR="/opt/google-cloud-sdk"
+        VENV="/opt/gcloud-py"
+        CONFIG_DIR="/opt/buildkite-agent/.config/gcloud"
+        
+        # Set architecture-specific archive URL
+        check_platform_architeture
+        case "${arch_type}" in
+            "amd64")
+                ARCHIVE_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz"
+                ;;
+            "arm64")
+                ARCHIVE_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-arm.tar.gz"
+                ;;
+            *)
+                echo "Unsupported architecture: ${arch_type}"
+                return 1
+                ;;
+        esac
+
+        # Ensure config dir exists and is writable by the current user
+        sudo mkdir -p "$CONFIG_DIR"
+        sudo chown -R "$(id -u)":"$(id -g)" "$CONFIG_DIR"
+
+        # Install a modern Python alongside (3.10) -- this doesn't affect the system Python
+        export DEBIAN_FRONTEND=noninteractive
+        sudo apt-get update -y
+        sudo apt-get install -y software-properties-common curl ca-certificates gnupg
+        if ! command -v python3.10 >/dev/null 2>&1; then
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt-get update -y
+        sudo apt-get install -y python3.10 python3.10-venv
+        fi
+
+        if [[ ! -d "$VENV" ]]; then
+        sudo python3.10 -m venv "$VENV"
+        sudo "$VENV/bin/python" -m pip install --upgrade pip
+        fi
+
+        # Install the Cloud SDK from tarball (no system Python dependency)
+        if [[ ! -d "$SDK_DIR" ]]; then
+        curl -fsSLo /tmp/google-cloud-cli.tar.gz "$ARCHIVE_URL"
+        sudo tar -C /opt -xzf /tmp/google-cloud-cli.tar.gz
+        sudo /opt/google-cloud-sdk/install.sh --quiet
+        fi
+
+        # Make it work NOW in this shell
+        export CLOUDSDK_PYTHON="$VENV/bin/python"
+        export CLOUDSDK_CONFIG="$CONFIG_DIR"
+        export PATH="/opt/google-cloud-sdk/bin:$PATH"
+        hash -r || true
+
+        # Persist for future shells (all users)
+        sudo tee /etc/profile.d/gcloud.sh >/dev/null <<EOF
+        # Google Cloud CLI env
+        export CLOUDSDK_PYTHON="$VENV/bin/python"
+        export CLOUDSDK_CONFIG="$CONFIG_DIR"
+        case ":\$PATH:" in *:/opt/google-cloud-sdk/bin:*) ;; *) export PATH="/opt/google-cloud-sdk/bin:\$PATH";; esac
+EOF
+        sudo chmod 644 /etc/profile.d/gcloud.sh
+
+        # Handy symlinks (works even if some shells ignore /etc/profile.d)
+        for b in gcloud gsutil bq; do
+            sudo ln -sf "/opt/google-cloud-sdk/bin/$b" "/usr/local/bin/$b"
+        done
+
+        # Verify (new shell or source the file)
+        source /etc/profile.d/gcloud.sh
+        gsutil version -l
+
+        echo "--- gsutil installed at: $(command -v gsutil)"
+    fi
+}
+
 google_cloud_auth() {
     local secretFileLocation=$(mktemp -d -p "${WORKSPACE}" -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
     echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
