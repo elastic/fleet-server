@@ -3,6 +3,7 @@
 set -euo pipefail
 
 source .buildkite/scripts/common.sh
+fix_gsutil
 
 VERSION="$(make get-version)"
 PLATFORM_TYPE=$(uname -m)

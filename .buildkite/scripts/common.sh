@@ -95,8 +95,8 @@ with_Terraform() {
     terraform version
 }
 
-google_cloud_auth() {
-    # Decide if we need to replace/install
+fix_gsutil() {
+    # Decide if we need to replace a non-working gsutil (e.g. when it requires Python 3.9 on an old distro like Ubuntu 20.04) with a snap version
     if ! command -v gsutil >/dev/null 2>&1; then
         echo "--- Installing gsutil via snap and removing old installs..."
         # Remove apt-based Cloud SDKs if present
@@ -125,7 +125,9 @@ google_cloud_auth() {
         echo "--- gsutil installed at: $(command -v gsutil)"
         gsutil version -l
     fi
+}
 
+google_cloud_auth() {
     local secretFileLocation=$(mktemp -d -p "${WORKSPACE}" -t "${TMP_FOLDER_TEMPLATE_BASE}.XXXXXXXXX")/google-cloud-credentials.json
     echo "${PRIVATE_CI_GCS_CREDENTIALS_SECRET}" > ${secretFileLocation}
     gcloud auth activate-service-account --key-file ${secretFileLocation} 2> /dev/null
