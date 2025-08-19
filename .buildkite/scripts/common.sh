@@ -100,7 +100,7 @@ fix_gsutil() {
     if gsutil --version >/dev/null 2>&1; then
         echo "--- gsutil works; nothing to do."
     else
-        echo "--- Installing gsutil via snap and removing old installs..."
+        echo "--- gsutil doesn't work -- uninstalling it and installing a supported Python version and gsutil via virtualenv..."
         # Remove apt-based Cloud SDKs if present
         sudo apt-get update || true
         sudo DEBIAN_FRONTEND=noninteractive apt-get -y purge google-cloud-cli google-cloud-sdk || true
@@ -165,47 +165,19 @@ fix_gsutil() {
         export CLOUDSDK_PYTHON="$VENV/bin/python"
         export CLOUDSDK_CONFIG="$CONFIG_DIR"
         case ":\$PATH:" in *:/opt/google-cloud-sdk/bin:*) ;; *) export PATH="/opt/google-cloud-sdk/bin:\$PATH";; esac
-        EOF
+EOF
         sudo chmod 644 /etc/profile.d/gcloud.sh
 
-        # 5) Handy symlinks (works even if some shells ignore /etc/profile.d)
+        # Handy symlinks (works even if some shells ignore /etc/profile.d)
         for b in gcloud gsutil bq; do
-        sudo ln -sf "/opt/google-cloud-sdk/bin/\$b" "/usr/local/bin/\$b"
+            sudo ln -sf "/opt/google-cloud-sdk/bin/\$b" "/usr/local/bin/\$b"
         done
-
-        echo "[ok] gsutil at: $(command -v gsutil)"
-        gsutil --version
-
-
-
-        sudo apt-get update
-        sudo apt-get install -y software-properties-common curl
-        sudo add-apt-repository -y ppa:deadsnakes/ppa
-        sudo apt-get update
-        sudo apt-get install -y python3.9 python3.9-venv python3.9-distutils
-
-        # Optional but tidy: put Cloud SDK on its own venv
-        sudo python3.9 -m venv /opt/gcloud-py
-        sudo /opt/gcloud-py/bin/python -m pip install --upgrade pip
-
-        # Get the ARM64 Cloud SDK archive and install
-        curl -fsSLO https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-arm.tar.gz
-        sudo tar -C /opt -xzf google-cloud-cli-linux-arm.tar.gz
-        sudo /opt/google-cloud-sdk/install.sh --quiet
-
-        # Make the SDK use your private Python, and add to PATH
-        sudo tee /etc/profile.d/gcloud.sh >/dev/null <<'EOF'
-        export CLOUDSDK_PYTHON=/opt/gcloud-py/bin/python
-        . /opt/google-cloud-sdk/path.bash.inc
-EOF
 
         # Verify (new shell or source the file)
         source /etc/profile.d/gcloud.sh
         gsutil version -l
 
-
         echo "--- gsutil installed at: $(command -v gsutil)"
-        gsutil version -l
     fi
 }
 
