@@ -97,7 +97,9 @@ with_Terraform() {
 
 fix_gsutil() {
     # Decide if we need to replace a non-working gsutil (e.g. when it requires Python 3.9 on an old distro like Ubuntu 20.04) with a snap version
-    if ! command -v gsutil >/dev/null 2>&1; then
+    if gsutil --version >/dev/null 2>&1; then
+        echo "--- gsutil works; nothing to do."
+    else
         echo "--- Installing gsutil via snap and removing old installs..."
         # Remove apt-based Cloud SDKs if present
         sudo apt-get update || true

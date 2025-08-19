@@ -2,15 +2,6 @@
 
 set -euo pipefail
 
-echo "--- debug"
-set +x
-gsutil --version
-which gsutil
-python --version
-python3 --version
-# exit here
-exit 1
-
 source .buildkite/scripts/common.sh
 fix_gsutil
 
