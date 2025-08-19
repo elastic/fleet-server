@@ -135,6 +135,7 @@ fix_gsutil() {
         sudo chown -R "$(id -u)":"$(id -g)" "$CONFIG_DIR"
 
         # Install a modern Python alongside (3.10) -- this doesn't affect the system Python
+        export DEBIAN_FRONTEND=noninteractive
         sudo apt-get update -y
         sudo apt-get install -y software-properties-common curl ca-certificates gnupg
         if ! command -v python3.10 >/dev/null 2>&1; then
@@ -172,7 +173,7 @@ EOF
 
         # Handy symlinks (works even if some shells ignore /etc/profile.d)
         for b in gcloud gsutil bq; do
-            sudo ln -sf "/opt/google-cloud-sdk/bin/\$b" "/usr/local/bin/\$b"
+            sudo ln -sf "/opt/google-cloud-sdk/bin/$b" "/usr/local/bin/$b"
         done
 
         # Verify (new shell or source the file)
