@@ -11,7 +11,11 @@ require (
 	github.com/Shopify/toxiproxy/v2 v2.12.0
 	github.com/docker/docker v28.3.0+incompatible
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-libs v0.20.1
+=======
+	github.com/elastic/elastic-agent-libs v0.23.0
+>>>>>>> 14a3c5c (build(deps): bump github.com/elastic/elastic-agent-libs from 0.22.2 to 0.23.0 (#5286))
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/gofrs/uuid/v5 v5.3.2
