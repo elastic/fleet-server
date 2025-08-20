@@ -4,7 +4,6 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-EC_KEY_SECRET_PATH="kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 JOB_GCS_BUCKET="fleet-server-ci-internal"
 GITHUB_REPO_TOKEN=$VAULT_GITHUB_TOKEN
@@ -42,15 +41,6 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   _branch="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 
   check_if_file_exist_in_repo "infra" "${_branch}"                  #TODO should be changed to "main" for rollback...
-fi
-
-# TODO: use a builkite plugin to handle this
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-fips-test"  ]]; then
-    export EC_API_KEY_SECRET=$(retry 5 vault kv get -field apiKey "${EC_KEY_SECRET_PATH}")
-    # Environment variables required by the Elastic Cloud service deployer
-    export EC_API_KEY=${EC_API_KEY_SECRET}
-  fi
 fi
 
 # TODO: use a builkite plugin to handle this
