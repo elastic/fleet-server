@@ -17,9 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/go-elasticsearch/v8"
