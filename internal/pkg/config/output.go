@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -75,7 +75,7 @@ func (c *Elasticsearch) Validate() error {
 		}
 	}
 	if c.TLS != nil && c.TLS.IsEnabled() {
-		_, err := tlscommon.LoadTLSConfig(c.TLS, zap.NewStub("elasticsearch-output")))
+		_, err := tlscommon.LoadTLSConfig(c.TLS, logp.NewLogger("elasticsearch-output"))
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	}
 
 	if c.TLS != nil && c.TLS.IsEnabled() {
-		tls, err := tlscommon.LoadTLSConfig(c.TLS, zap.NewStub("elasticsearch-output")))
+		tls, err := tlscommon.LoadTLSConfig(c.TLS, logp.NewLogger("elasticsearch-output"))
 		if err != nil {
 			return elasticsearch.Config{}, err
 		}
