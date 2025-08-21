@@ -11,6 +11,10 @@ require (
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/docker/docker v26.1.5+incompatible
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
+<<<<<<< HEAD
+=======
+	github.com/elastic/elastic-agent-libs v0.23.1
+>>>>>>> ad11d37 (build(deps): bump github.com/elastic/elastic-agent-libs in /testing (#5308))
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.10.0
