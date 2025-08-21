@@ -1859,7 +1859,8 @@ func validateCertUnpacking() error {
 		},
 	}
 
-	_, err := tlscommon.LoadTLSConfig(&config)
+	logger := logp.NewLogger("certs")
+	_, err := tlscommon.LoadTLSConfig(&config, logger)
 	if err != nil {
 		log.Printf("tlscommon load error: %v", err)
 		passphrase, err := os.ReadFile(passFile)
