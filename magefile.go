@@ -1859,14 +1859,15 @@ func validateCertUnpacking() error {
 		},
 	}
 
-	_, err := tlscommon.LoadTLSConfig(&config)
+	logger := logp.NewLogger("certs")
+	_, err := tlscommon.LoadTLSConfig(&config, logger)
 	if err != nil {
 		log.Printf("tlscommon load error: %v", err)
 		passphrase, err := os.ReadFile(passFile)
 		if err != nil {
 			return fmt.Errorf("unable to read passphrase: %w", err)
 		}
-		keyPEM, err := tlscommon.ReadPEMFile(logp.NewLogger("certs"), keyFile, string(passphrase))
+		keyPEM, err := tlscommon.ReadPEMFile(logger, keyFile, string(passphrase))
 		if err != nil {
 			return fmt.Errorf("unable to read PEMFile: %w", err)
 		}
