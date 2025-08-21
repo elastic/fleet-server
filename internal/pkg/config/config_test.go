@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
@@ -629,7 +630,7 @@ func TestTLSDefaults(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, c.Output.Elasticsearch.TLS)
 
-	common, err := tlscommon.LoadTLSConfig(c.Output.Elasticsearch.TLS)
+	common, err := tlscommon.LoadTLSConfig(c.Output.Elasticsearch.TLS, logp.NewNopLogger())
 	require.NoError(t, err)
 	cfg := common.ToConfig()
 	assert.Equal(t, uint16(tls.VersionTLS11), cfg.MinVersion)
@@ -641,7 +642,7 @@ func TestTLS10(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, c.Output.Elasticsearch.TLS)
 
-	common, err := tlscommon.LoadTLSConfig(c.Output.Elasticsearch.TLS)
+	common, err := tlscommon.LoadTLSConfig(c.Output.Elasticsearch.TLS, logp.NewNopLogger())
 	require.NoError(t, err)
 	cfg := common.ToConfig()
 	assert.Equal(t, uint16(tls.VersionTLS10), cfg.MinVersion)
