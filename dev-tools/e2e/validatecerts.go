@@ -40,14 +40,15 @@ func main() {
 		},
 	}
 
-	_, err := tlscommon.LoadTLSConfig(&config)
+	logger := logp.NewLogger("certs")
+	_, err := tlscommon.LoadTLSConfig(&config, logger)
 	if err != nil {
 		log.Print(err)
 		passphrase, err := os.ReadFile(passFile)
 		if err != nil {
 			log.Fatal(err)
 		}
-		keyPEM, err := tlscommon.ReadPEMFile(logp.NewLogger("certs"), keyFile, string(passphrase))
+		keyPEM, err := tlscommon.ReadPEMFile(logger, keyFile, string(passphrase))
 		if err != nil {
 			log.Fatal("reading pem:", err)
 		}
