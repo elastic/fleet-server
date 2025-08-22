@@ -121,8 +121,6 @@ steps:
               format: "junit"
               branches: "main"
               debug: true
-          - *bk_analytics_token_plugin
-          - *test_collector_plugin
         retry:
           automatic:
             limit: 1
