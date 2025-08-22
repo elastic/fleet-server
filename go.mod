@@ -38,11 +38,7 @@ require (
 	golang.org/x/sync v0.15.0
 	golang.org/x/time v0.11.0
 	google.golang.org/grpc v1.75.0
-<<<<<<< HEAD
-	google.golang.org/protobuf v1.36.6
-=======
 	google.golang.org/protobuf v1.36.8
->>>>>>> f93a917 (build(deps): bump google.golang.org/protobuf from 1.36.7 to 1.36.8 (#5307))
 	gopkg.in/yaml.v3 v3.0.1
 )
 

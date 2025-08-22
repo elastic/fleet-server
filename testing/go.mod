@@ -73,11 +73,6 @@ require (
 	golang.org/x/tools v0.33.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	google.golang.org/grpc v1.75.0 // indirect
-<<<<<<< HEAD
-	google.golang.org/protobuf v1.36.6 // indirect
-=======
 	google.golang.org/protobuf v1.36.8 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
->>>>>>> f93a917 (build(deps): bump google.golang.org/protobuf from 1.36.7 to 1.36.8 (#5307))
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
