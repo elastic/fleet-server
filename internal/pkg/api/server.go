@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -24,6 +25,7 @@ type server struct {
 	cfg     *config.Server
 	addr    string
 	handler http.Handler
+	logger  *logp.Logger
 }
 
 // NewServer creates a new HTTP api for the passed addr.
@@ -39,6 +41,7 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 		addr:    addr,
 		cfg:     cfg,
 		handler: newRouter(&cfg.Limits, a, a.tracer),
+		logger:  logp.NewLogger("api-server"),
 	}
 }
 
@@ -76,7 +79,7 @@ func (s *server) Run(ctx context.Context) error {
 	}()
 
 	if s.cfg.TLS != nil && s.cfg.TLS.IsEnabled() {
-		commonTLSCfg, err := tlscommon.LoadTLSServerConfig(s.cfg.TLS)
+		commonTLSCfg, err := tlscommon.LoadTLSServerConfig(s.cfg.TLS, s.logger)
 		if err != nil {
 			return err
 		}
