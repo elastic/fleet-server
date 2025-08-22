@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -23,6 +24,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/fleet-server/pkg/api"
 	"github.com/elastic/fleet-server/testing/e2e/api_version"
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
 	"github.com/elastic/fleet-server/v7/version"
@@ -302,6 +304,135 @@ func (suite *StandAloneSuite) TestElasticsearch429OnStartup() {
 
 	cancel()
 	cmd.Wait()
+}
+
+// TestElasticsearch503OnStartup will check to ensure fleet-server functions as expected (does not crash)
+// if Elasticsearch returns 503s on startup.
+func (suite *StandAloneSuite) TestElasticsearch503OnStartup() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+
+	// Create a proxy that returns 503s
+	proxy := NewStatusProxy(suite.T(), http.StatusServiceUnavailable)
+	proxy.Enable()
+	server := httptest.NewServer(proxy)
+
+	// Create a config file from a template in the test temp dir
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-http-proxy.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"Hosts":        suite.ESHosts,
+		"ServiceToken": suite.ServiceToken,
+		"Proxy":        server.URL,
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	//cmd.Stderr = os.Stderr // NOTE: This can be uncommented to put out logs
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	suite.T().Log("Starting fleet-server")
+	err = cmd.Start()
+	suite.Require().NoError(err)
+
+	// FIXME timeout to make sure fleet-server has started
+	time.Sleep(5 * time.Second)
+	suite.T().Log("Checking fleet-server status")
+	// Wait to check that it is Starting.
+	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateStarting) // fleet-server returns 503:starting if upstream ES returns 429.
+
+	// Disable proxy and ensure fleet-server recovers
+	suite.T().Log("Disable proxy")
+	proxy.Disable()
+	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
+
+	cancel()
+	cmd.Wait()
+}
+
+// TestElasticsearch503OnEnroll will check to ensure fleet-server returns a 503 error when elasticsearch returns a
+// 503 gateway error.
+func (suite *StandAloneSuite) TestElasticsearch503OnEnroll() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+
+	// Create a proxy that returns 503s
+	proxy := NewStatusProxy(suite.T(), http.StatusServiceUnavailable)
+	proxy.Disable() // start off
+	server := httptest.NewServer(proxy)
+
+	// Create a config file from a template in the test temp dir
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-http-proxy.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]any{
+		"Hosts":                    suite.ESHosts,
+		"ServiceToken":             suite.ServiceToken,
+		"Proxy":                    server.URL,
+		"StaticPolicyTokenEnabled": true,
+		"StaticTokenKey":           "abcdefg",
+		"StaticPolicyID":           "dummy-policy",
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Stderr = os.Stderr // NOTE: This can be uncommented to put out logs
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	suite.T().Log("Starting fleet-server")
+	err = cmd.Start()
+	suite.Require().NoError(err)
+	defer func() {
+		cancel()
+		cmd.Wait()
+	}()
+
+	// FIXME timeout to make sure fleet-server has started
+	time.Sleep(5 * time.Second)
+	suite.T().Log("Checking fleet-server status")
+	// Should start healthy as the proxy is disabled.
+	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
+
+	// Ensure enrollment works correctly
+	suite.T().Log("Checking enrollment works")
+	enrollmentToken := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+	tester := api_version.NewClientAPITesterCurrent(
+		suite.Scaffold,
+		"http://localhost:8220",
+		enrollmentToken,
+	)
+	tester.Enroll(ctx, enrollmentToken)
+
+	// Enable the proxy which will cause enrollment to fail
+	suite.T().Log("Force 503 error from proxy")
+	proxy.Enable()
+
+	// Perform enrollment again should error with 503
+	suite.T().Log("Perform enrollment again")
+	client, err := api.NewClientWithResponses("http://localhost:8220", api.WithHTTPClient(tester.Client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+		req.Header.Set("Authorization", "ApiKey "+enrollmentToken)
+		return nil
+	}))
+	tester.Require().NoError(err)
+	enrollResp, err := client.AgentEnrollWithResponse(ctx,
+		&api.AgentEnrollParams{UserAgent: "elastic agent " + version.DefaultVersion},
+		api.AgentEnrollJSONRequestBody{
+			Type: api.PERMANENT,
+		},
+	)
+	tester.Require().NoError(err)
+	tester.Require().Equal(http.StatusServiceUnavailable, enrollResp.StatusCode())
 }
 
 // TestElasticsearchTimeoutOnStartup will check to ensure fleet-server functions as expected (does not crash)

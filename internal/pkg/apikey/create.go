@@ -12,6 +12,8 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
 // Create generates a new APIKey in Elasticsearch using the given client.
@@ -48,7 +50,7 @@ func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refres
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, fmt.Errorf("fail CreateAPIKey: %s", res.String())
+		return nil, fmt.Errorf("fail CreateAPIKey: %w", es.TranslateError(res.StatusCode, nil))
 	}
 
 	type APIKeyResponse struct {
