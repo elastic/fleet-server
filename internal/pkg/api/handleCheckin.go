@@ -369,7 +369,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				actions = append(actions, acs...)
 				break LOOP
 			case policy := <-sub.Output():
-				actionResp, err := processPolicy(ctx, zlog, ct.bulker, agent.Id, policy)
+				actionResp, err := processPolicy(ctx, zlog, ct.bulker, agent, policy)
 				if err != nil {
 					span.End()
 					return fmt.Errorf("processPolicy: %w", err)
@@ -809,7 +809,7 @@ func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action)
 // A new policy exists for this agent.  Perform the following:
 //   - Generate and update default ApiKey if roles have changed.
 //   - Rewrite the policy for delivery to the agent injecting the key material.
-func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID string, pp *policy.ParsedPolicy) (*Action, error) {
+func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, pp *policy.ParsedPolicy) (*Action, error) {
 	var links []apm.SpanLink = nil // set to a nil array to preserve default behaviour if no policy links are found
 	if err := pp.Links.Trace.Validate(); err == nil {
 		links = []apm.SpanLink{pp.Links}
@@ -822,15 +822,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Str(LogPolicyID, pp.Policy.PolicyID).
 		Logger()
 
-	// Repull and decode the agent object. Do not trust the cache.
-	bSpan, bCtx := apm.StartSpan(ctx, "findAgent", "search")
-	agent, err := dl.FindAgent(bCtx, bulker, dl.QueryAgentByID, dl.FieldID, agentID)
-	bSpan.End()
-	if err != nil {
-		zlog.Error().Err(err).Msg("fail find agent record")
-		return nil, err
-	}
-
 	if len(pp.Policy.Data.Outputs) == 0 {
 		return nil, ErrNoPolicyOutput
 	}
@@ -838,7 +829,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	data := model.ClonePolicyData(pp.Policy.Data)
 	for policyName, policyOutput := range data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
-		ks, err := policy.ProcessOutputSecret(ctx, policyOutput, bulker)
+		ks, err := policy.ProcessOutputSecret(ctx, policyOutput, bulker) // makes a bulk request to get secret values
 		if err != nil {
 			return nil, fmt.Errorf("failed to process output secrets %q: %w",
 				policyName, err)
@@ -847,8 +838,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-		err = policyOutput.Prepare(ctx, zlog, bulker, &agent, data.Outputs)
-		if err != nil {
+		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, data.Outputs); err != nil {
 			return nil, fmt.Errorf("failed to prepare output %q: %w",
 				policyOutput.Name, err)
 		}
