@@ -104,15 +104,9 @@ steps:
           provider: "gcp"
         artifact_paths:
           - build/*.xml
-<<<<<<< HEAD
-=======
-        plugins:
-          - *bk_analytics_token_plugin
-          - *test_collector_plugin
         retry:
           automatic:
             limit: 1
->>>>>>> f30b83d (Enable agent container e2e tests (#4870))
 
       - label: "E2E Test"
         key: "e2e-test"
@@ -124,15 +118,9 @@ steps:
         artifact_paths:
           - build/*.xml
           - build/e2e-coverage.out
-<<<<<<< HEAD
-=======
-        plugins:
-          - *bk_analytics_token_plugin
-          - *test_collector_plugin
         retry:
           automatic:
             limit: 1
->>>>>>> f30b83d (Enable agent container e2e tests (#4870))
 
       - label: ":junit: Junit annotate"
         plugins:
