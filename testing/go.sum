@@ -47,8 +47,8 @@ github.com/ebitengine/purego v0.8.2 h1:jPPGWs2sZ1UgOSgD2bClL0MJIqu58nOmIcBuXr62z
 github.com/ebitengine/purego v0.8.2/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
 github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk4MDDLWA0d8iHHOxLA=
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
-github.com/elastic/elastic-agent-libs v0.23.0 h1:xpMKkrw59QUYWUx/q2TMpJU+6vwB3Mw1VPhRPcGhBMo=
-github.com/elastic/elastic-agent-libs v0.23.0/go.mod h1:xSeIP3NtOIT4N2pPS4EyURmS1Q8mK0lWZ8Wd1Du6q3w=
+github.com/elastic/elastic-agent-libs v0.23.1 h1:5w1fAuK7mMUpr2jZKC7OyZApfUpYEoHnWMWNpDkSDTM=
+github.com/elastic/elastic-agent-libs v0.23.1/go.mod h1:xSeIP3NtOIT4N2pPS4EyURmS1Q8mK0lWZ8Wd1Du6q3w=
 github.com/elastic/go-sysinfo v1.15.1 h1:zBmTnFEXxIQ3iwcQuk7MzaUotmKRp3OabbbWM8TdzIQ=
 github.com/elastic/go-sysinfo v1.15.1/go.mod h1:jPSuTgXG+dhhh0GKIyI2Cso+w5lPJ5PvVqKlL8LV/Hk=
 github.com/elastic/go-ucfg v0.8.8 h1:54KIF/2zFKfl0MzsSOCGOsZ3O2bnjFQJ0nDJcLhviyk=
@@ -291,8 +291,8 @@ google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 h1:
 google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7/go.mod h1:qQ0YXyHHx3XkvlzUtpXDkS29lDSafHMZBAZDc03LQ3A=
 google.golang.org/grpc v1.75.0 h1:+TW+dqTd2Biwe6KKfhE5JpiYIBWq865PhKGSXiivqt4=
 google.golang.org/grpc v1.75.0/go.mod h1:JtPAzKiq4v1xcAB2hydNlWI2RnF85XXcV0mhKXr2ecQ=
-google.golang.org/protobuf v1.36.6 h1:z1NpPI8ku2WgiWnf+t9wTPsn6eP1L7ksHUlkfLvd9xY=
-google.golang.org/protobuf v1.36.6/go.mod h1:jduwjTPXsFjZGTmRluh+L6NjiWu7pchiJ2/5YcXBHnY=
+google.golang.org/protobuf v1.36.8 h1:xHScyCOEuuwZEc6UtSOvPbAT4zRh0xcNRYekJwfqyMc=
+google.golang.org/protobuf v1.36.8/go.mod h1:fuxRtAxBytpl4zzqUh6/eyUujkJdNiuEkXntxiD/uRU=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
