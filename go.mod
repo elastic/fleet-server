@@ -28,7 +28,7 @@ require (
 	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.9.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	go.elastic.co/apm/module/apmchiv5/v2 v2.7.1
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.1
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.1
