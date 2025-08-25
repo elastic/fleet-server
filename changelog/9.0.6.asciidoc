@@ -1,0 +1,33 @@
+// begin 9.0.6 relnotes
+
+[[release-notes-9.0.6]]
+==  9.0.6
+
+Review important information about the  9.0.6 release.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-9.0.6]]
+=== Bug fixes
+
+
+fleet-server::
+
+* Fix 503 Handling In Enrollment. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5232[#https://github.com/elastic/fleet-server/pull/5232] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/5197[#https://github.com/elastic/fleet-server/issues/5197]
+* Remove Extra Es Search When Preparing Agent Policy. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5283[#https://github.com/elastic/fleet-server/pull/5283] 
+
+// end 9.0.6 relnotes
