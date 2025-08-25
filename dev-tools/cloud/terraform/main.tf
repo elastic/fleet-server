@@ -28,17 +28,36 @@ variable "pull_request" {
   description = "The github pull request number."
 }
 
+variable "ess_region" {
+  type        = string
+  default     = "gcp-us-west2"
+  description = "The ESS region to use"
+}
+
+variable "deployment_template_id" {
+  type        = string
+  default     = "gcp-general-purpose"
+  description = "The ess deployment template to use"
+}
+
 locals {
-  match           = regex("const DefaultVersion = \"(.*)\"", file("${path.module}/../../../version/version.go"))[0]
-  stack_version   = format("%s-SNAPSHOT", local.match)
+  // strip hash found in ELASTICSEARCH_VERSION in integration/.env to get stack_version
+  dra_match       = regex("ELASTICSEARCH_VERSION=([0-9]+\\.[0-9]+\\.[0-9]+)(?:-[[:alpha:]]+-)?-?(SNAPSHOT)?", file("${path.module}/../../integration/.env"))
+  stack_version   = local.dra_match[1] == "SNAPSHOT" ? format("%s-SNAPSHOT", local.dra_match[0]) : local.dra_match[0]
   docker_image_ea = var.elastic_agent_docker_image
+}
+
+data "ec_stack" "latest" {
+  version_regex = local.stack_version
+  region        = var.ess_region
 }
 
 resource "ec_deployment" "deployment" {
   name                   = format("fleet server PR-%s-%s", var.pull_request, var.git_commit)
-  region                 = "gcp-us-west2"
-  version                = local.stack_version
-  deployment_template_id = "gcp-general-purpose"
+  region                 = var.ess_region
+  deployment_template_id = var.deployment_template_id
+  version                = data.ec_stack.latest.version
+
 
   tags = {
     "source_repo"     = "elastic/fleet-server"

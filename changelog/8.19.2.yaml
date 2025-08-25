@@ -1,0 +1,17 @@
+version: 8.19.2
+entries:
+    - kind: bug-fix
+      summary: Fix upgrade details download_rate as string handling
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5062
+        - https://github.com/elastic/fleet-server/pull/5232
+        - https://github.com/elastic/fleet-server/pull/5238
+        - https://github.com/elastic/fleet-server/pull/5176
+      issue:
+        - https://github.com/elastic/fleet-server/issues/5164
+      timestamp: 1753372819
+      file:
+        name: 1753372819-Fix-download_rate-as-string-handling.yaml
+        checksum: 492e665f43229a00e0b0a1590387273b77e26b36

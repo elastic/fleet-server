@@ -1,5 +1,5 @@
 output "stack_version" {
-  value       = local.stack_version
+  value       = data.ec_stack.latest.version
   description = "Stack version"
 }
 
