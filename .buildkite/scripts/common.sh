@@ -67,11 +67,31 @@ with_msft_go() {
 }
 
 with_docker_compose() {
-    echo "Setting up the Docker-compose environment..."
-    create_workspace
-    retry 5 curl -sSL -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${platform_type}-${hw_type}"
-    chmod +x ${WORKSPACE}/docker-compose
-    docker-compose version
+  local url
+  url="https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${platform_type}-${hw_type}"
+  echo "Compose download url: $url"
+
+  echo "Setting up the Docker-compose environment..."
+  create_workspace
+  retry 5 curl -sSL -o ${WORKSPACE}/docker-compose "$url"
+  ls -la ${WORKSPACE}
+  chmod +x ${WORKSPACE}/docker-compose
+  export PATH="${WORKSPACE}:${PATH}"
+  docker-compose version
+#    local arch
+#    if [[ ${hw_type} == "arm64" ]]; then
+#      arch="aarch64"
+#    elif [[ ${hw_type} == "x86_64" ]]; then
+#      arch="x86_64"
+#    fi
+#    echo "Setting up the Docker-compose environment..."
+#    echo "--- HW_TYPE: ${hw_type}"
+#    echo "--- ARCH: ${arch}"
+#    create_workspace
+#    retry 5 curl -sSL -v -o ${WORKSPACE}/docker-compose "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${platform_type}-${arch}"
+#    chmod +x ${WORKSPACE}/docker-compose
+#    export PATH="${WORKSPACE}:${PATH}"
+#    docker-compose version
 }
 
 retry() {
