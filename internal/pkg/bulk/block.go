@@ -73,6 +73,7 @@ func (blk *bulkT) reset() {
 	blk.idx = 0
 	blk.buf.Reset()
 	blk.next = nil
+	blk.spanLink = nil
 }
 
 type respT struct {
