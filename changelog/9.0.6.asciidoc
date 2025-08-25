@@ -5,21 +5,6 @@
 
 Review important information about the  9.0.6 release.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 [discrete]
 [[bug-fixes-9.0.6]]
 === Bug fixes
