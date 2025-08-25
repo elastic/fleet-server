@@ -13,15 +13,8 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
-<<<<<<< HEAD
-	github.com/stretchr/testify v1.10.0
-	github.com/testcontainers/testcontainers-go v0.31.0
-=======
-	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/stretchr/testify v1.11.0
-	github.com/testcontainers/testcontainers-go v0.38.0
-	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.38.0
->>>>>>> 1e2532f (build(deps): bump github.com/stretchr/testify from 1.10.0 to 1.11.0 (#5329))
+	github.com/testcontainers/testcontainers-go v0.31.0
 )
 
 require (
