@@ -1673,3 +1673,112 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	cancel()
 	srv.waitExit() //nolint:errcheck // test case
 }
+
+func TestCheckinOTelColPolicy(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	idSuffix := uuid.Must(uuid.NewV4()).String()
+	componentID := func(id string) string {
+		return fmt.Sprintf("%s/%s", id, idSuffix)
+	}
+	policyData := model.PolicyData{
+		Outputs: map[string]map[string]interface{}{
+			"default": {
+				"type": "elasticsearch",
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {}}`),
+		Inputs:            []map[string]any{},
+		Receivers: map[string]any{
+			componentID("somereceiver"): map[string]any{},
+		},
+		Processors: map[string]any{
+			componentID("someprocessor"): map[string]any{},
+		},
+		Connectors: map[string]any{
+			componentID("forward"): map[string]any{},
+		},
+		Exporters: map[string]any{
+			componentID("someexporter"): map[string]any{},
+		},
+		Service: &model.Service{
+			Pipelines: map[string]*model.PipelinesItem{
+				componentID("metrics"): &model.PipelinesItem{
+					Receivers:  []string{componentID("somereceiver")},
+					Processors: []string{componentID("someprocessor")},
+					Exporters:  []string{componentID("forward")},
+				},
+				"metrics": &model.PipelinesItem{
+					Receivers: []string{componentID("forward")},
+					Exporters: []string{componentID("someexporter")},
+				},
+			},
+		},
+	}
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	cli := cleanhttp.DefaultClient()
+	// enroll an agent
+	t.Log("Enroll an agent")
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.buildURL("", "enroll"), strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Agent enrollment successful")
+	p, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	var obj map[string]interface{}
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	item := obj["item"]
+	mm, ok := item.(map[string]interface{})
+	require.True(t, ok, "expected attribute item to be an object")
+	agentID, ok := mm["id"].(string)
+	require.True(t, ok, "expected attribute id to be a string")
+
+	apiKey, ok := mm["access_api_key"].(string)
+	require.True(t, ok, "expected attribute apiKey to be a string")
+
+	// checkin
+	t.Logf("Fake a checkin for agent %s", agentID)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.buildURL(agentID, "checkin"), strings.NewReader(checkinBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Checkin successful, verify body")
+	p, err = io.ReadAll(res.Body)
+	require.NoError(t, err)
+
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	actionsRaw, ok := obj["actions"]
+	require.True(t, ok, "expected actions is missing")
+	actions, ok := actionsRaw.([]interface{})
+	require.True(t, ok, "expected actions to be an array")
+	require.Greater(t, len(actions), 0, "expected at least 1 action")
+	action, ok := actions[0].(map[string]interface{})
+	require.True(t, ok, "expected action to be an object")
+	_, ok = action["id"].(string)
+	require.True(t, ok, "expected action id to be string")
+	aAgentID, ok := action["agent_id"].(string)
+	require.True(t, ok, "expected action agent_id to be string")
+	require.Equal(t, agentID, aAgentID)
+}
