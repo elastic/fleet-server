@@ -1,0 +1,36 @@
+version: 8.19.3
+entries:
+    - kind: bug-fix
+      summary: Fix 503 handling in enrollment
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5232
+      issue:
+        - https://github.com/elastic/fleet-server/issues/5197
+      timestamp: 1754931919
+      file:
+        name: 1754931919-Fix-503-handling-in-enrollment.yaml
+        checksum: b6c03da0ddbd3a2b4f742d952a5d7178e77a9ac3
+    - kind: bug-fix
+      summary: Remove extra ES search when preparing agent policy
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5283
+      issue: []
+      timestamp: 1755644662
+      file:
+        name: 1755644662-Remove-extra-ES-search-when-preparing-agent-policy.yaml
+        checksum: 0814e746cce14762e3d22aeee0c5f6fad0eda38c
+    - kind: bug-fix
+      summary: Reset trace links on bulk items when returning to pool
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5317
+      issue: []
+      timestamp: 1755810145
+      file:
+        name: 1755810145-Reset-trace-headers-on-bulk-items-when-returning-to-pool.yaml
+        checksum: e95e0e1b1ea66a2c365ba00d6bd7e9def2b07ace
