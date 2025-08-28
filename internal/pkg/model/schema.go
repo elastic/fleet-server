@@ -402,6 +402,14 @@ type OutputHealth struct {
 	Timestamp string `json:"@timestamp,omitempty"`
 }
 
+// PipelinesItem
+type PipelinesItem struct {
+	ESDocument
+	Exporters  []string `json:"exporters,omitempty"`
+	Processors []string `json:"processors,omitempty"`
+	Receivers  []string `json:"receivers,omitempty"`
+}
+
 // Policy A policy that an Elastic Agent is attached to
 type Policy struct {
 	ESDocument
@@ -435,6 +443,15 @@ type PolicyData struct {
 	// The policy's agent configuration details
 	Agent json.RawMessage `json:"agent,omitempty"`
 
+	// OTel collector connectors
+	Connectors map[string]interface{} `json:"connectors,omitempty"`
+
+	// OTel collector exporters
+	Exporters map[string]interface{} `json:"exporters,omitempty"`
+
+	// OTel collector extensions
+	Extensions map[string]interface{} `json:"extensions,omitempty"`
+
 	// The policy's fleet configuration details
 	Fleet json.RawMessage `json:"fleet,omitempty"`
 
@@ -450,12 +467,21 @@ type PolicyData struct {
 	// A map of all outputs that the agent running the policy can use to send data to.
 	Outputs map[string]map[string]interface{} `json:"outputs"`
 
+	// OTel collector processors
+	Processors map[string]interface{} `json:"processors,omitempty"`
+
+	// OTel collector receivers
+	Receivers map[string]interface{} `json:"receivers,omitempty"`
+
 	// The policy revision number. Should match revision_idx
 	Revision int64 `json:"revision"`
 
 	// A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.
 	SecretReferences []SecretReferencesItems `json:"secret_references,omitempty"`
-	Signed           *Signed                 `json:"signed,omitempty"`
+
+	// OTel collector pipelines setup
+	Service *Service `json:"service,omitempty"`
+	Signed  *Signed  `json:"signed,omitempty"`
 }
 
 // PolicyLeader The current leader Fleet Server for a policy
@@ -511,6 +537,12 @@ type ServerMetadata struct {
 
 	// The version of the Fleet Server
 	Version string `json:"version"`
+}
+
+// Service OTel collector pipelines setup
+type Service struct {
+	Extensions []string                  `json:"extensions,omitempty"`
+	Pipelines  map[string]*PipelinesItem `json:"pipelines,omitempty"`
 }
 
 // Signed The action signed data and signature.
