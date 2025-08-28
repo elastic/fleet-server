@@ -1565,11 +1565,19 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-chi/chi/v5
+<<<<<<< HEAD
 Version: v5.2.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/go-chi/chi/v5@v5.2.1/LICENSE:
+=======
+Version: v5.2.3
+Licence type (autodetected): MIT
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/github.com/go-chi/chi/v5@v5.2.3/LICENSE:
+>>>>>>> 2878d55 (build(deps): bump github.com/go-chi/chi/v5 from 5.2.2 to 5.2.3 (#5360))
 
 Copyright (c) 2015-present Peter Kieltyka (https://github.com/pkieltyka), Google Inc.
 
