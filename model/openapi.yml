@@ -642,16 +642,19 @@ components:
                 type: array
                 items:
                   type: string
+                x-go-type-skip-optional-pointer: true
               processors:
                 description: list of enabled processors for each pipeline.
                 type: array
                 items:
                   type: string
+                x-go-type-skip-optional-pointer: true
               receivers:
                 description: list of enabled receivers for each pipeline.
                 type: array
                 items:
                   type: string
+                x-go-type-skip-optional-pointer: true
           x-go-type-skip-optional-pointer: true
     actionUnenroll:
       description: The UNENROLL action data.

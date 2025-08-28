@@ -653,13 +653,13 @@ type OtelConfigService struct {
 	Extensions []string `json:"extensions,omitempty"`
 	Pipelines  map[string]struct {
 		// Exporters list of enabled exporters for each pipeline.
-		Exporters *[]string `json:"exporters,omitempty"`
+		Exporters []string `json:"exporters,omitempty"`
 
 		// Processors list of enabled processors for each pipeline.
-		Processors *[]string `json:"processors,omitempty"`
+		Processors []string `json:"processors,omitempty"`
 
 		// Receivers list of enabled receivers for each pipeline.
-		Receivers *[]string `json:"receivers,omitempty"`
+		Receivers []string `json:"receivers,omitempty"`
 	} `json:"pipelines,omitempty"`
 }
 
