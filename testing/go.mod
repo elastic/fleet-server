@@ -15,15 +15,9 @@ require (
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/gofrs/uuid/v5 v5.3.2
-<<<<<<< HEAD
-	github.com/stretchr/testify v1.11.0
+	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.37.0
-=======
-	github.com/stretchr/testify v1.11.1
-	github.com/testcontainers/testcontainers-go v0.38.0
-	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.38.0
->>>>>>> 16466e9 (build(deps): bump github.com/stretchr/testify from 1.11.0 to 1.11.1 (#5359))
 )
 
 require (
