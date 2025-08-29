@@ -1,0 +1,19 @@
+// begin 8.18.6 relnotes
+
+[[release-notes-8.18.6]]
+==  8.18.6
+
+Review important information about the  8.18.6 release.
+
+[discrete]
+[[bug-fixes-8.18.6]]
+=== Bug fixes
+
+
+fleet-server::
+
+* Fix 503 Handling In Enrollment. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5232[#https://github.com/elastic/fleet-server/pull/5232] {fleet-server-issue}https://github.com/elastic/fleet-server/issues/5197[#https://github.com/elastic/fleet-server/issues/5197]
+* Remove Extra Es Search When Preparing Agent Policy. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5283[#https://github.com/elastic/fleet-server/pull/5283] 
+* Reset Trace Links On Bulk Items When Returning To Pool. {fleet-server-pull}https://github.com/elastic/fleet-server/pull/5317[#https://github.com/elastic/fleet-server/pull/5317] 
+
+// end 8.18.6 relnotes
