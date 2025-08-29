@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 )
 
 // Derived from netutil.LimitListener but works slightly differently.
@@ -67,8 +67,8 @@ func (l *limitListener) Accept() (net.Conn, error) {
 		var err error
 		if c != nil {
 			err = c.Close()
-			zlog.Str(ecs.ServerAddress, c.LocalAddr().String())
-			zlog.Str(ecs.ClientAddress, c.RemoteAddr().String())
+			zlog.Str(logger.ECSServerAddress, c.LocalAddr().String())
+			zlog.Str(logger.ECSClientAddress, c.RemoteAddr().String())
 			zlog.Err(err)
 		}
 		zlog.Int("max", cap(l.sem)).Msg("Connection closed due to max limit")
