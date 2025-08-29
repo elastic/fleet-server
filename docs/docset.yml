@@ -1,0 +1,19 @@
+project: Fleet Server docs
+products:
+  - id: fleet
+exclude:
+  - "*.md"
+cross_links:
+  - docs-content
+  - beats
+toc:
+  - toc: release-notes
+subs:
+  agent:                "Elastic Agent"
+  agents:               "Elastic Agents"
+  beats:                "Beats"
+  elastic-defend:       "Elastic Defend"
+  fleet-server-issue:   "https://github.com/elastic/fleet-server/issues/"
+  fleet-server-pull:    "https://github.com/elastic/fleet-server/pull/"
+  fleet:                "Fleet"
+  kib-pull:             "https://github.com/elastic/kibana/pull/"
