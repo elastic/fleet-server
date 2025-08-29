@@ -17,23 +17,14 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-<<<<<<< HEAD
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 
 	"github.com/rs/zerolog"
-=======
-
-	"github.com/rs/zerolog"
-
-	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
->>>>>>> 39199ef (Restore connection-level limiter (#5372))
 )
 
 type server struct {
