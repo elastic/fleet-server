@@ -13,7 +13,7 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.18.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.8.0
-	github.com/go-chi/chi/v5 v5.2.2
+	github.com/go-chi/chi/v5 v5.2.3
 	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
@@ -28,7 +28,7 @@ require (
 	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.9.1
-	github.com/stretchr/testify v1.11.0
+	github.com/stretchr/testify v1.11.1
 	go.elastic.co/apm/module/apmchiv5/v2 v2.7.1
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.1
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.1
@@ -37,6 +37,7 @@ require (
 	go.elastic.co/apm/v2 v2.7.1
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.27.0
+	golang.org/x/net v0.41.0
 	golang.org/x/sync v0.15.0
 	golang.org/x/time v0.12.0
 	google.golang.org/grpc v1.75.0
@@ -92,7 +93,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/mod v0.25.0 // indirect
-	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/tools v0.33.0 // indirect
