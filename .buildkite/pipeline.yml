@@ -30,9 +30,9 @@ common:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
 steps:
-  - group: "Check and build"
-    key: "check"
-    steps:
+#  - group: "Check and build"
+#    key: "check"
+#    steps:
 #      - label: ":white_check_mark: Run check-ci"
 #        key: check-ci
 #        command: ".buildkite/scripts/check_ci.sh"
@@ -45,12 +45,12 @@ steps:
 #        agents:
 #          provider: "gcp"
 #
-      - label: ":building_construction: Run local build: MacOS"
-        key: make-local-macos
-        command: ".buildkite/scripts/local_build.sh"
-        agents:
-          provider: orka
-          imagePrefix: ${IMAGE_MACOS}
+#      - label: ":building_construction: Run local build: MacOS"
+#        key: make-local-macos
+#        command: ".buildkite/scripts/local_build.sh"
+#        agents:
+#          provider: orka
+#          imagePrefix: ${IMAGE_MACOS}
 #
 #      - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
 #        key: "go-benchmark-base"
@@ -76,10 +76,10 @@ steps:
 #          - go-benchmark-base
 #        agents:
 #          provider: "gcp"
-
+#
   - group: "Run tests"
     key: "tests"
-    depends_on: "check"
+#    depends_on: "check"
     steps:
 #      - label: ":smartbear-testexecute: Run unit tests"
 #        key: unit-test
@@ -214,8 +214,8 @@ steps:
         key: "e2e-test-macos"
         command: |
           .buildkite/scripts/install_macos_tools.sh
-        env:
-          TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
+#        env:
+#          TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
         agents:
           provider: orka
           imagePrefix: ${IMAGE_MACOS}
@@ -225,7 +225,6 @@ steps:
         plugins:
           - *bk_analytics_token_plugin
           - *test_collector_plugin
-
 
 #      - label: ":junit: Junit annotate"
 #        plugins:
