@@ -29,10 +29,10 @@ var (
 )
 
 // CheckCompatiblility will check the remote Elasticsearch version retrieved by the Elasticsearch client with the passed fleet version.
-// Versions are compatible when Elasticsearch's version is greater then or equal to fleet-server's version/
+// Versions are compatible when Elasticsearch's version is greater then or equal to fleet-server's version
 func CheckCompatibility(ctx context.Context, esCli *elasticsearch.Client, fleetVersion string) (string, error) {
 	// Version checks may run concurrently with other operations
-	// This can causee some flakeyness with tests so we need to get the logger from the context before its cancelled
+	// This can cause some flakiness with tests so we need to get the logger from the context before its cancelled
 	var logger *zerolog.Logger
 	select {
 	case <-ctx.Done():
