@@ -582,6 +582,28 @@ components:
           items:
             type: object
           x-go-type-skip-optional-pointer: true
+        extensions:
+          description: OTel collector extensions.
+          type: object
+          x-go-type-skip-optional-pointer: true
+        receivers:
+          description: OTel collector receivers.
+          type: object
+          x-go-type-skip-optional-pointer: true
+        processors:
+          description: OTel collector processors.
+          type: object
+          x-go-type-skip-optional-pointer: true
+        connectors:
+          description: OTel collector connectors.
+          type: object
+          x-go-type-skip-optional-pointer: true
+        exporters:
+          description: OTel collector exporters.
+          type: object
+          x-go-type-skip-optional-pointer: true
+        service:
+          $ref: "#/components/schemas/otelConfigService"
         revision:
           description: The revision number of the policy. Should match revision_idx.
           type: integer
@@ -599,6 +621,40 @@ components:
         fleet:
           description: Agent configuration to describe how to connect to fleet-server.
           type: object
+          x-go-type-skip-optional-pointer: true
+    otelConfigService:
+      description: OTel collector pipelines setup.
+      type: object
+      properties:
+        extensions:
+          description: List of enabled extensions.
+          type: array
+          items:
+            type: string
+          x-go-type-skip-optional-pointer: true
+        pipelines:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              exporters:
+                description: list of enabled exporters for each pipeline.
+                type: array
+                items:
+                  type: string
+                x-go-type-skip-optional-pointer: true
+              processors:
+                description: list of enabled processors for each pipeline.
+                type: array
+                items:
+                  type: string
+                x-go-type-skip-optional-pointer: true
+              receivers:
+                description: list of enabled receivers for each pipeline.
+                type: array
+                items:
+                  type: string
+                x-go-type-skip-optional-pointer: true
           x-go-type-skip-optional-pointer: true
     actionUnenroll:
       description: The UNENROLL action data.

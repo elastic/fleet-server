@@ -12,6 +12,7 @@ updates:
       - automation
       - dependency
       - Team:Elastic-Agent-Control-Plane
+      - backport-active-all
     open-pull-requests-limit: 10
     groups:
       elastic-apm:

@@ -6,6 +6,7 @@ package model
 
 import (
 	"maps"
+	"slices"
 	"time"
 )
 
@@ -92,19 +93,44 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		OutputPermissions: d.OutputPermissions,
 		Outputs:           cloneMap(d.Outputs),
 		Revision:          d.Revision,
-		SecretReferences:  make([]SecretReferencesItems, 0, len(d.SecretReferences)),
+		SecretReferences:  slices.Clone(d.SecretReferences),
+
+		// OTel config.
+		Connectors: maps.Clone(d.Connectors),
+		Exporters:  maps.Clone(d.Exporters),
+		Extensions: maps.Clone(d.Extensions),
+		Processors: maps.Clone(d.Processors),
+		Receivers:  maps.Clone(d.Receivers),
 	}
 	for _, m := range d.Inputs {
 		res.Inputs = append(res.Inputs, maps.Clone(m))
 	}
-	res.SecretReferences = append(res.SecretReferences, d.SecretReferences...)
 	if d.Signed != nil {
 		res.Signed = &Signed{
 			Data:      d.Signed.Data,
 			Signature: d.Signed.Signature,
 		}
 	}
+	if d.Service != nil {
+		res.Service = cloneOTelService(d.Service)
+	}
 	return res
+}
+
+func cloneOTelService(s *Service) *Service {
+	var clone Service
+	clone.Extensions = slices.Clone(s.Extensions)
+	if len(s.Pipelines) > 0 {
+		clone.Pipelines = make(map[string]*PipelinesItem)
+		for id, pipeline := range s.Pipelines {
+			clone.Pipelines[id] = &PipelinesItem{
+				Exporters:  slices.Clone(pipeline.Exporters),
+				Processors: slices.Clone(pipeline.Processors),
+				Receivers:  slices.Clone(pipeline.Receivers),
+			}
+		}
+	}
+	return &clone
 }
 
 // cloneMap does a deep copy on a map of objects
