@@ -89,7 +89,7 @@ func TestCLIOverrides(t *testing.T) {
 		agent:      clientMock,
 	}
 
-	generatedCfg, err := agent.configFromUnits(context.Background())
+	generatedCfg, err := agent.configFromUnits(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, httpEnabledExpected, generatedCfg.HTTP.Enabled)
 	require.Equal(t, httpHostExpected, generatedCfg.HTTP.Host)
@@ -109,29 +109,29 @@ func (c *mockClientV2) RegisterOptionalDiagnosticHook(paramTag string, name stri
 
 func (c *mockClientV2) Start(ctx context.Context) error {
 	args := c.Called()
-	return args.Get(0).(error)
+	return args.Get(0).(error) //nolint:errcheck // testing mock
 }
 
 func (c *mockClientV2) Stop() {}
 
 func (c *mockClientV2) UnitChanges() <-chan client.UnitChanged {
 	args := c.Called()
-	return args.Get(0).(<-chan client.UnitChanged)
+	return args.Get(0).(<-chan client.UnitChanged) //nolint:errcheck // testing mock
 }
 
 func (c *mockClientV2) Errors() <-chan error {
 	args := c.Called()
-	return args.Get(0).(<-chan error)
+	return args.Get(0).(<-chan error) //nolint:errcheck // testing mock
 }
 
 func (c *mockClientV2) Artifacts() client.ArtifactsClient {
 	args := c.Called()
-	return args.Get(0).(client.ArtifactsClient)
+	return args.Get(0).(client.ArtifactsClient) //nolint:errcheck // testing mock
 }
 
 func (c *mockClientV2) AgentInfo() *client.AgentInfo {
 	args := c.Called()
-	return args.Get(0).(*client.AgentInfo)
+	return args.Get(0).(*client.AgentInfo) //nolint:errcheck // testing mock
 }
 
 type mockClientUnit struct {
@@ -141,12 +141,12 @@ type mockClientUnit struct {
 func (u *mockClientUnit) Expected() client.Expected {
 	args := u.Called()
 
-	return args.Get(0).(client.Expected)
+	return args.Get(0).(client.Expected) //nolint:errcheck // testing mock
 }
 
 func (u *mockClientUnit) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
 	args := u.Called()
-	return args.Get(0).(error)
+	return args.Get(0).(error) //nolint:errcheck // testing mock
 }
 
 func Test_Agent_configFromUnits(t *testing.T) {
@@ -235,7 +235,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			outputUnit: mockOutClient,
 		}
 
-		cfg, err := a.configFromUnits(context.Background())
+		cfg, err := a.configFromUnits(t.Context())
 		require.NoError(t, err)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
 		require.Len(t, cfg.Output.Elasticsearch.Hosts, 2)
@@ -296,7 +296,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			outputUnit: mockOutClient,
 		}
 
-		cfg, err := a.configFromUnits(context.Background())
+		cfg, err := a.configFromUnits(t.Context())
 		require.NoError(t, err)
 		require.Len(t, cfg.Inputs, 1)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
@@ -376,7 +376,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			outputUnit: mockOutClient,
 		}
 
-		cfg, err := a.configFromUnits(context.Background())
+		cfg, err := a.configFromUnits(t.Context())
 		require.NoError(t, err)
 		require.Len(t, cfg.Inputs, 1)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
@@ -440,7 +440,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			outputUnit: mockOutClient,
 		}
 
-		cfg, err := a.configFromUnits(context.Background())
+		cfg, err := a.configFromUnits(t.Context())
 		require.NoError(t, err)
 		require.Len(t, cfg.Inputs, 1)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
@@ -519,7 +519,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			outputUnit: mockOutClient,
 		}
 
-		cfg, err := a.configFromUnits(context.Background())
+		cfg, err := a.configFromUnits(t.Context())
 		require.NoError(t, err)
 		require.Len(t, cfg.Inputs, 1)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
@@ -572,7 +572,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			outputUnit: mockOutClient,
 		}
 
-		cfg, err := a.configFromUnits(context.Background())
+		cfg, err := a.configFromUnits(t.Context())
 		require.NoError(t, err)
 		require.Len(t, cfg.Inputs, 1)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
@@ -626,7 +626,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			outputUnit: mockOutClient,
 		}
 
-		cfg, err := a.configFromUnits(context.Background())
+		cfg, err := a.configFromUnits(t.Context())
 		require.NoError(t, err)
 		require.Len(t, cfg.Inputs, 1)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
@@ -685,7 +685,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			},
 		}
 
-		ctx := testlog.SetLogger(t).WithContext(context.Background())
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
 		cfg, err := a.configFromUnits(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
@@ -735,7 +735,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			},
 		}
 
-		ctx := testlog.SetLogger(t).WithContext(context.Background())
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
 		cfg, err := a.configFromUnits(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
@@ -840,7 +840,7 @@ func TestInjectMissingOutputAttributes(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			injectMissingOutputAttributes(context.Background(), tc.input, bootstrap)
+			injectMissingOutputAttributes(t.Context(), tc.input, bootstrap)
 			assert.Equal(t, len(tc.expect), len(tc.input), "expected map sizes don't match")
 			assert.Equal(t, tc.expect, tc.input)
 		})
@@ -915,7 +915,7 @@ func TestInjectMissingOutputAttributes(t *testing.T) {
 
 	for _, tc := range sslTests {
 		t.Run(tc.name, func(t *testing.T) {
-			injectMissingOutputAttributes(context.Background(), tc.input, bootstrapVerifyNone)
+			injectMissingOutputAttributes(t.Context(), tc.input, bootstrapVerifyNone)
 			assert.Equal(t, len(tc.expect), len(tc.input), "expected map sizes don't match")
 			assert.Equal(t, tc.expect, tc.input)
 		})
@@ -929,7 +929,7 @@ func Test_Agent_esOutputCheckLoop(t *testing.T) {
 			chReconfigure: make(chan struct{}, 1),
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{})
 		assert.Empty(t, a.chReconfigure)
@@ -949,7 +949,7 @@ func Test_Agent_esOutputCheckLoop(t *testing.T) {
 			},
 			chReconfigure: make(chan struct{}, 1),
 		}
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{
 			"service_token": "test-token",
@@ -978,7 +978,7 @@ func Test_Agent_esOutputCheckLoop(t *testing.T) {
 			},
 			chReconfigure: make(chan struct{}, 1),
 		}
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{
 			"service_token": "test-token",
