@@ -26,6 +26,8 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
@@ -38,6 +40,8 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
@@ -51,6 +55,8 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
@@ -65,6 +71,8 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
@@ -76,6 +84,8 @@ steps:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
       instanceType: "t4g.2xlarge"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
@@ -88,6 +98,8 @@ steps:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
       instanceType: "t4g.2xlarge"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
@@ -101,6 +113,8 @@ steps:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
       instanceType: "t4g.2xlarge"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
@@ -115,6 +129,8 @@ steps:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
       instanceType: "t4g.2xlarge"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
