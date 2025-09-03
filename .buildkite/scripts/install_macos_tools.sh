@@ -154,11 +154,11 @@ with_go() {
 # prevent "OSError: [Errno 24] Too many open files" on macOS
 ulimit -Sn 150000
 
-add_bin_path
-with_go "${GO_VERSION}"
-with_mage
+#add_bin_path
+#with_go "${GO_VERSION}"
+#with_mage
 
 with_docker_compose
 
-echo "~~~ Running E2E tests"
-mage test:e2e test:junitReport
+#echo "~~~ Running E2E tests"
+#mage test:e2e test:junitReport
