@@ -11,16 +11,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 	"github.com/elastic/fleet-server/v7/version"
 	"github.com/elastic/go-ucfg"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestCLIOverrides(t *testing.T) {
@@ -194,7 +195,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 			outputUnit: mockOutClient,
 		}
 
-		cfg, err := a.configFromUnits(context.Background())
+		cfg, err := a.configFromUnits(t.Context())
 		require.NoError(t, err)
 		require.Len(t, cfg.Inputs, 1)
 		assert.Equal(t, "fleet-server", cfg.Inputs[0].Type)
