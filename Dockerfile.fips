@@ -1,36 +1,51 @@
 ARG GO_VERSION
-FROM mcr.microsoft.com/oss/go/microsoft/golang:${GO_VERSION}-1-fips-bookworm AS base
-
-ENV FIPS=true
-ENV CGO_ENABLED=1
-
-WORKDIR /go/src/github.com/elastic/fleet-server
+# Suffix should be main-debian11-fips or base-arm-debian11-fips
+ARG SUFFIX
+FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX} AS base
 
 RUN groupadd --gid 1000 fleet-server && \
-    useradd -M --uid 1000 --gid 1000 fleet-server
-    
+    useradd -M -d /fleet-server/ --uid 1000 --gid 1000 fleet-server
+USER fleet-server
+WORKDIR /fleet-server/
+
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
+RUN go install github.com/magefile/mage # uses version in go.mod
 
-ENTRYPOINT [ "make" ]
-CMD [ "release" ]
+ENV PATH="$PATH:/go/bin"
+ENV FIPS=true
+ENV CGO_ENABLED=1
+ENV MAGEFILE_CACHE=/fleet-server/build/.magefile
+ENV MS_GOTOOLCHAIN_TELEMETRY_ENABLED=0
+ENTRYPOINT [ "mage" ]
+CMD [ "build:release" ]
 
-FROM base AS builder
+# FIPS docker image defined below
+# Does not use base as the lowest layer so we don't have to deal with user/ownership issues when building the image.
+ARG GO_VERSION
+# Suffix should be main-debian11-fips or base-arm-debian11-fips
+ARG SUFFIX
+FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX} AS builder
+
+WORKDIR /fleet-server
+
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+RUN go install github.com/magefile/mage # uses version in go.mod
 
 COPY . .
 
 ARG GCFLAGS=""
 ARG LDFLAGS=""
 ARG DEV=""
+ARG SNAPSHOT=""
 ARG TARGETPLATFORM
 
-RUN FIPS=true CGO_ENABLED=1 GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" DEV="${DEV}" make release-${TARGETPLATFORM}
+RUN MS_GOTOOLCHAIN_TELEMETRY_ENABLED=0 FIPS=true CGO_ENABLED=1 GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" SNAPSHOT="${SNAPSHOT}" DEV="${DEV}" PLATFORMS="${TARGETPLATFORM}" mage build:release
 
 FROM docker.elastic.co/wolfi/chainguard-base-fips:latest
 ARG VERSION
-ARG TARGETOS
-ARG TARGETARCH
 
 RUN addgroup --gid 1000 fleet-server && \
     adduser -H -D -u 1000 -G fleet-server fleet-server
@@ -38,7 +53,7 @@ RUN addgroup --gid 1000 fleet-server && \
 USER fleet-server
 
 COPY --chown=fleet-server:fleet-server --chmod=644 fleet-server.yml /etc/fleet-server.yml
-COPY --chown=fleet-server:fleet-server --chmod=555 --from=builder /go/src/github.com/elastic/fleet-server/build/binaries/fleet-server-fips-${VERSION}-${TARGETOS:-linux}-*/fleet-server /usr/bin/fleet-server
+COPY --chown=fleet-server:fleet-server --chmod=555 --from=builder /fleet-server/build/binaries/fleet-server-fips-${VERSION}-linux-*/fleet-server /usr/bin/fleet-server
 
 ENV GODEBUG=fips140=on
 

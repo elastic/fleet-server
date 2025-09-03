@@ -12,8 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
-	"github.com/google/go-cmp/cmp"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -42,54 +41,117 @@ func createRandomPolicy(id string, revisionIdx int) model.Policy {
 	}
 }
 
-func storeRandomPolicy(ctx context.Context, bulker bulk.Bulk, index string) (model.Policy, error) {
-	var rec model.Policy
-	id := uuid.Must(uuid.NewV4()).String()
-	for i := 1; i < 4; i++ {
-		rec = createRandomPolicy(id, i)
-		_, err := CreatePolicy(ctx, bulker, rec, WithIndexName(index))
-		if err != nil {
-			return model.Policy{}, err
+func storeRandomPolicies(ctx context.Context, bulker bulk.Bulk, index string, count, maxRev int) error {
+	ops := make([]bulk.MultiOp, 0, count*maxRev)
+	for range count {
+		id := uuid.Must(uuid.NewV4()).String()
+		for i := 1; i <= maxRev; i++ {
+			rec := createRandomPolicy(id, i)
+			p, err := json.Marshal(&rec)
+			if err != nil {
+				return err
+			}
+			ops = append(ops, bulk.MultiOp{
+				Index: index,
+				Body:  p,
+			})
 		}
 	}
-	return rec, nil
+	_, err := bulker.MIndex(ctx, ops, bulk.WithRefresh())
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func TestQueryLatestPolicies(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
-	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
 
-	recs := map[string]model.Policy{}
-	for i := 0; i < 0; i++ {
-		rec, err := storeRandomPolicy(ctx, bulker, index)
-		if err != nil {
-			t.Fatal(err)
-		}
-		recs[rec.PolicyID] = rec
-	}
-
-	policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+	err := storeRandomPolicies(ctx, bulker, index, 4, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
-	byID := map[string]model.Policy{}
+
+	var policies []model.Policy
+	require.Eventually(t, func() bool {
+		policies, err = QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(policies) == 4
+	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 4 policies, found: %d", len(policies))
+
 	for _, policy := range policies {
-		byID[policy.PolicyID] = policy
+		if policy.RevisionIdx != 4 {
+			t.Errorf("Expected to find revision_idx 4 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
+		}
+	}
+}
+
+// TestQueryLatestPolicies400k tests to see if  to see if the latest revision is correctly selected when a lot the revision count is very large
+//
+//nolint:dupl // test duplication
+func TestQueryLatestPolicies400k(t *testing.T) {
+	t.Skip("Test flaky, see: https://github.com/elastic/fleet-server/issues/5181")
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
+
+	err := storeRandomPolicies(ctx, bulker, index, 4, 100000)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	diff := cmp.Diff(recs, byID)
-	if diff != "" {
-		t.Fatal(diff)
+	var policies []model.Policy
+	require.Eventually(t, func() bool {
+		policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(policies) == 4
+	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 4 policies found: %d", len(policies))
+
+	for _, policy := range policies {
+		if policy.RevisionIdx != 100000 {
+			t.Errorf("Expected to find revision_idx 100000 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
+		}
+	}
+}
+
+// TesyQueryLatestPolices11kUnique tests behaviour when 11k unique policies are used, there is a 10k size specification in the aggregation.
+//
+//nolint:dupl // test duplication
+func TestQueryLatestPolicies11kUnique(t *testing.T) {
+	t.Skip("Re-enable after policy load issues have been sorted: https://github.com/elastic/fleet-server/issues/3254")
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
+
+	err := storeRandomPolicies(ctx, bulker, index, 11000, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var policies []model.Policy
+	require.Eventually(t, func() bool {
+		policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(policies) != 11000
+	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 11000 policies found: %d", len(policies))
+
+	for _, policy := range policies {
+		if policy.RevisionIdx != 2 {
+			t.Errorf("Expected to find revision_idx 1 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
+		}
 	}
 }
 
 func TestCreatePolicy(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
@@ -107,9 +169,7 @@ func TestCreatePolicy(t *testing.T) {
 }
 
 func TestQueryOutputFromPolicy(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 

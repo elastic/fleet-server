@@ -10,6 +10,7 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -132,6 +133,18 @@ func TestConvertActionData(t *testing.T) {
 		aType:  MIGRATE,
 		raw:    json.RawMessage(`{"enrollment_token":"et","target_uri":"turi"}`),
 		expect: Action_Data{json.RawMessage(`{"enrollment_token":"et","target_uri":"turi"}`)},
+		hasErr: false,
+	}, {
+		name:   "privilege level change action - with data",
+		aType:  PRIVILEGELEVELCHANGE,
+		raw:    json.RawMessage(`{"unprivileged":true,"user_info":{"password":"1q2w3e","username":"demo"}}`),
+		expect: Action_Data{json.RawMessage(`{"unprivileged":true,"user_info":{"password":"1q2w3e","username":"demo"}}`)},
+		hasErr: false,
+	}, {
+		name:   "privilege level change action",
+		aType:  PRIVILEGELEVELCHANGE,
+		raw:    json.RawMessage(`{}`),
+		expect: Action_Data{json.RawMessage(`{"unprivileged":false}`)},
 		hasErr: false,
 	}, {
 		name:   "unknown action type",
@@ -564,7 +577,24 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+					// match doc that gets sent to ES
+					doc := struct {
+						Doc struct {
+							UpgradeDetails struct {
+								Metadata UpgradeMetadataDownloading `json:"metadata"`
+							} `json:"upgrade_details"`
+						} `json:"doc"`
+					}{}
+					err := json.Unmarshal(p, &doc)
+					if err != nil {
+						t.Logf("Unmarshal update body failed: %v", err)
+						return false
+					}
+					require.Equal(t, float64(12.3), doc.Doc.UpgradeDetails.Metadata.DownloadPercent, "download_percent does not match")
+					require.Equal(t, float64(1000000), *doc.Doc.UpgradeDetails.Metadata.DownloadRate, "download_rate does not match")
+					return true
+				}), mock.Anything, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -583,7 +613,25 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+					// match doc that gets sent to ES
+					doc := struct {
+						Doc struct {
+							UpgradeDetails struct {
+								Metadata UpgradeMetadataDownloading `json:"metadata"`
+							} `json:"upgrade_details"`
+						} `json:"doc"`
+					}{}
+					t.Logf("Attempting to match %s", string(p))
+					err := json.Unmarshal(p, &doc)
+					if err != nil {
+						t.Logf("Unmarshal update body failed: %v", err)
+						return false
+					}
+					require.Equal(t, float64(12.3), doc.Doc.UpgradeDetails.Metadata.DownloadPercent, "download_percent does not match")
+					require.Equal(t, float64(1000000), *doc.Doc.UpgradeDetails.Metadata.DownloadRate, "download_rate does not match")
+					return true
+				}), mock.Anything, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -939,7 +987,7 @@ func TestParseComponents(t *testing.T) {
 				}},
 			},
 			req: &CheckinRequest{
-				Components: &degradedInputReqComponents,
+				Components: degradedInputReqComponents,
 			},
 			outComponents:   nil,
 			unhealthyReason: &[]string{"input"},
@@ -959,7 +1007,7 @@ func TestParseComponents(t *testing.T) {
 			},
 			req: &CheckinRequest{
 				Status:     "DEGRADED",
-				Components: &degradedInputReqComponents,
+				Components: degradedInputReqComponents,
 			},
 			outComponents:   degradedInputReqComponents,
 			unhealthyReason: &[]string{"input"},
@@ -991,7 +1039,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 			req: &http.Request{
 				Body: io.NopCloser(strings.NewReader(`{"invalidJson":}`)),
 			},
-			expErr: &BadRequestErr{msg: "unable to decode checkin request"},
+			expErr: &BadRequestErr{msg: "unable to decode checkin request", nextErr: errors.New("invalid character '}' looking for beginning of value")},
 			cfg: &config.Server{
 				Limits: config.ServerLimits{
 					CheckinLimit: config.Limit{
@@ -1021,7 +1069,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 			req: &http.Request{
 				Body: io.NopCloser(strings.NewReader(`{"validJson": "test", "status": "test", "poll_timeout": "not a timeout", "message": "test message"}`)),
 			},
-			expErr: &BadRequestErr{msg: "poll_timeout cannot be parsed as duration"},
+			expErr: &BadRequestErr{msg: "poll_timeout cannot be parsed as duration", nextErr: errors.New("time: invalid duration \"not a timeout\"")},
 			cfg: &config.Server{
 				Limits: config.ServerLimits{
 					CheckinLimit: config.Limit{

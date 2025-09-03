@@ -20,6 +20,8 @@ import (
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
+
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 )
@@ -73,7 +75,7 @@ func (c *Elasticsearch) Validate() error {
 		}
 	}
 	if c.TLS != nil && c.TLS.IsEnabled() {
-		_, err := tlscommon.LoadTLSConfig(c.TLS)
+		_, err := tlscommon.LoadTLSConfig(c.TLS, zap.NewStub("elasticsearch-output"))
 		if err != nil {
 			return err
 		}
@@ -121,7 +123,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	}
 
 	if c.TLS != nil && c.TLS.IsEnabled() {
-		tls, err := tlscommon.LoadTLSConfig(c.TLS)
+		tls, err := tlscommon.LoadTLSConfig(c.TLS, zap.NewStub("elasticsearch-output"))
 		if err != nil {
 			return elasticsearch.Config{}, err
 		}

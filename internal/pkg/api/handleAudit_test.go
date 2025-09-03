@@ -5,7 +5,7 @@
 package api
 
 import (
-	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,13 +13,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_Audit_validateUnenrollRequst(t *testing.T) {
@@ -47,7 +48,7 @@ func Test_Audit_validateUnenrollRequst(t *testing.T) {
 		},
 		cfg:   &config.Server{},
 		valid: nil,
-		err:   &BadRequestErr{msg: "unable to decode audit/unenroll request"},
+		err:   &BadRequestErr{msg: "unable to decode audit/unenroll request", nextErr: errors.New("invalid character '}' looking for beginning of value")},
 	}, {
 		name: "bad reason",
 		req: &http.Request{
@@ -69,7 +70,7 @@ func Test_Audit_validateUnenrollRequst(t *testing.T) {
 			},
 		},
 		valid: nil,
-		err:   &BadRequestErr{msg: "unable to decode audit/unenroll request"},
+		err:   &BadRequestErr{msg: "unable to decode audit/unenroll request", nextErr: errors.New("http: request body too large")},
 	}}
 
 	for _, tc := range tests {
@@ -98,7 +99,7 @@ func Test_Audit_markUnenroll(t *testing.T) {
 	bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	audit := AuditT{bulk: bulker}
 	logger := testlog.SetLogger(t)
-	err := audit.markUnenroll(context.Background(), logger, &AuditUnenrollRequest{Reason: Uninstall, Timestamp: time.Now().UTC()}, agent)
+	err := audit.markUnenroll(t.Context(), logger, &AuditUnenrollRequest{Reason: Uninstall, Timestamp: time.Now().UTC()}, agent)
 	require.NoError(t, err)
 	bulker.AssertExpectations(t)
 }
@@ -112,24 +113,27 @@ func Test_Audit_unenroll(t *testing.T) {
 		err := audit.unenroll(testlog.SetLogger(t), nil, nil, agent)
 		require.EqualError(t, err, ErrAuditUnenrollReason.Error())
 	})
-	t.Run("agent has audit_unenroll_reason: uninstalled", func(t *testing.T) {
-		agent := &model.Agent{
-			AuditUnenrolledReason: string(Uninstall),
-		}
-		bulker := ftesting.NewMockBulk()
-		bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		audit := &AuditT{
-			bulk: bulker,
-			cfg:  &config.Server{},
-		}
-		req := &http.Request{
-			Body: io.NopCloser(strings.NewReader(`{"reason": "orphaned", "timestamp": "2024-01-01T12:00:00.000Z"}`)),
-		}
-		err := audit.unenroll(testlog.SetLogger(t), httptest.NewRecorder(), req, agent)
-		require.NoError(t, err)
-		bulker.AssertExpectations(t)
-	})
+	for _, reason := range []string{string(Uninstall), string(Migrated)} {
+		t.Run("agent has audit_unenroll_reason: "+reason, func(t *testing.T) {
+			agent := &model.Agent{
+				AuditUnenrolledReason: reason,
+			}
+			bulker := ftesting.NewMockBulk()
+			bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			audit := &AuditT{
+				bulk: bulker,
+				cfg:  &config.Server{},
+			}
+			req := &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"reason": "` + reason + `", "timestamp": "2024-01-01T12:00:00.000Z"}`)),
+			}
+			err := audit.unenroll(testlog.SetLogger(t), httptest.NewRecorder(), req, agent)
+			require.NoError(t, err)
+			bulker.AssertExpectations(t)
+		})
+	}
 
 	t.Run("ok", func(t *testing.T) {
 		agent := &model.Agent{

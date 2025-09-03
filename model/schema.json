@@ -529,7 +529,7 @@
         "audit_unenrolled_reason": {
           "description": "Agent reason for unenroll/uninstall annotation.",
           "type": "string",
-          "enum": ["uninstall", "orphaned", "key_revoked"]
+          "enum": ["uninstall", "orphaned", "key_revoked", "migrated"]
         },
         "upgraded_at": {
           "description": "Date/time the Elastic Agent was last upgraded",
@@ -867,6 +867,69 @@
             "type": "object",
             "additionalProperties": {
               "$comment": "embedded additionalProperties type results in `outputs map[string]interface{}`"
+            }
+          }
+        },
+        "extensions": {
+          "description": "OTel collector extensions",
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "receivers": {
+          "description": "OTel collector receivers",
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "processors": {
+          "description": "OTel collector processors",
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "connectors": {
+          "description": "OTel collector connectors",
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "exporters": {
+          "description": "OTel collector exporters",
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "service": {
+          "description": "OTel collector pipelines setup",
+          "type": "object",
+          "properties": {
+            "extensions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "pipelines": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "exporters": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "processors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "receivers": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
             }
           }
         },

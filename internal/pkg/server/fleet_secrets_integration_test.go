@@ -17,7 +17,7 @@ import (
 
 	"testing"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -157,7 +157,7 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 }
 
 func Test_Agent_Policy_Secrets(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// Start test server
@@ -223,14 +223,14 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	require.NoError(t, err)
 
 	// expect 1 POLICY_CHANGE action
-	assert.Equal(t, 1, len(*checkinResponse.Actions))
-	assert.Equal(t, api.POLICYCHANGE, (*checkinResponse.Actions)[0].Type)
-	actionData, err := (*checkinResponse.Actions)[0].Data.AsActionPolicyChange()
+	assert.Equal(t, 1, len(checkinResponse.Actions))
+	assert.Equal(t, api.POLICYCHANGE, checkinResponse.Actions[0].Type)
+	actionData, err := checkinResponse.Actions[0].Data.AsActionPolicyChange()
 	require.NoError(t, err)
 	require.NotNil(t, actionData.Policy.Inputs)
-	require.NotNil(t, (*actionData.Policy.Inputs)[0])
+	require.NotNil(t, actionData.Policy.Inputs[0])
 
-	input := (*actionData.Policy.Inputs)[0]
+	input := actionData.Policy.Inputs[0]
 	// expect secret reference replaced with secret value
 	assert.Equal(t, map[string]interface{}{
 		"package_var_secret": "secret_value",
@@ -238,7 +238,7 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	}, input)
 
 	// expect output secret to be replaced
-	output := (*actionData.Policy.Outputs)["default"]
+	output := actionData.Policy.Outputs["default"]
 	assert.Conditionf(t, func() bool {
 		mp, ok := output.(map[string]interface{})
 		if !ok {
@@ -256,5 +256,5 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	}, "expected output to contain secret-key: output_secret_value, got %v", output)
 	assert.NotContains(t, output, "secrets")
 	// expect that secret_paths lists the key
-	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "outputs.default.secret-key"}, *actionData.Policy.SecretPaths)
+	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "outputs.default.secret-key"}, actionData.Policy.SecretPaths)
 }

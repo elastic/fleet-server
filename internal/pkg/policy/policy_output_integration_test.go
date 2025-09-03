@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,7 +48,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 			outputName := "output_" + tt.name
 			outputAPIKey := bulk.APIKey{ID: "new_ID", Key: "new-key"}
 
-			ctx := testlog.SetLogger(t).WithContext(context.Background())
+			ctx := testlog.SetLogger(t).WithContext(t.Context())
 			index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
 			now := time.Now().UTC()
@@ -132,7 +132,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 }
 
 func TestPolicyOutputESPrepareRealES(t *testing.T) {
-	ctx := testlog.SetLogger(t).WithContext(context.Background())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
 	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
@@ -205,7 +205,7 @@ func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bu
 }
 
 func TestPolicyOutputESPrepareRemoteES(t *testing.T) {
-	ctx := testlog.SetLogger(t).WithContext(context.Background())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
 	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
@@ -254,7 +254,7 @@ func TestPolicyOutputESPrepareRemoteES(t *testing.T) {
 }
 
 func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
-	ctx := testlog.SetLogger(t).WithContext(context.Background())
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
 	// simulate a previous remote output, that is removed from outputMap

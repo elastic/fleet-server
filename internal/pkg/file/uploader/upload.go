@@ -16,7 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"go.elastic.co/apm/v2"
 )
 

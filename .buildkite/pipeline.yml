@@ -2,48 +2,42 @@
 
 env:
   DOCKER_COMPOSE_VERSION: "1.25.5"
-  DOCKER_REGISTRY: "docker.elastic.co"
-  DOCKER_IMAGE: "${DOCKER_REGISTRY}/observability-ci/fleet-server" # needs to rename for rollback
-  DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
-  DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
-  DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
-  GO_AGENT_IMAGE: "golang:${GO_VERSION}"
   TERRAFORM_VERSION: "1.6.4"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips"
+
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - test_collector_plugin: &test_collector_plugin
+      test-collector#v1.11.0:
+        files: "build/test-*.xml"
+        format: "junit"
+        branches: "main"
+        debug: true
+  - bk_analytics_token_plugin: &bk_analytics_token_plugin
+      elastic/vault-secrets#v0.1.0:
+        path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+        field: "token"
+        env_var: "BUILDKITE_ANALYTICS_TOKEN"
+  - docker_elastic_login_plugin: &docker_elastic_login_plugin
+      elastic/vault-docker-login#v0.6.0:
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
 steps:
-
-  - label: "Validate catalog-info"
-    if: build.pull_request.id != null
-    plugins:
-      monorepo-diff#v1.3.0:
-        diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
-        wait: true
-        watch:
-          # if our catalog-info.yaml is changed, make sure it's well-formed according to our internal standards as well as Backstage's validation
-          - path: "catalog-info.yaml"
-            config:
-              command: "/agent/check-catalog-info.sh"
-              agents:
-                image: "docker.elastic.co/ci-agent-images/pipelib:0.13.0@sha256:190464950de81cb3390bd5e07bb1cc171dd4a765c1ce5de58ebca476f9a6839f"
-
   - group: "Check and build"
     key: "check"
     steps:
       - label: ":white_check_mark: Run check-ci"
         key: check-ci
-        command: "make check-ci"
+        command: ".buildkite/scripts/check_ci.sh"
         agents:
-          image: "${GO_AGENT_IMAGE}"
-          cpu: "8"
-          memory: "4G"
+          provider: "gcp"
 
       - label: ":building_construction: Run local build"
         key: make-local
-        command: "make local"
+        command: ".buildkite/scripts/local_build.sh"
         agents:
-          image: "${GO_AGENT_IMAGE}"
-          cpu: "8"
-          memory: "4G"
+          provider: "gcp"
 
       - label: ":building_construction: Run local build: MacOS"
         key: make-local-macos
@@ -54,10 +48,13 @@ steps:
 
   - group: "Performance test"
     key: "performance-test"
+    depends_on: "check"
     steps:
       - label: "Run go benchmark for PR branch"
         key: "go-benchmark-pr"
         command: ".buildkite/scripts/run_benchmark.sh pr"
+        env:
+          BENCHMARK_ARGS: "-count=8 -benchmem"
         artifact_paths:
           - build/next.out
           - build/next.stat
@@ -68,6 +65,8 @@ steps:
       - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
         key: "go-benchmark-base"
         command: ".buildkite/scripts/run_benchmark.sh base"
+        env:
+          BENCHMARK_ARGS: "-count=8 -benchmem"
         artifact_paths:
           - build/base.out
           - build/base.stat
@@ -88,10 +87,9 @@ steps:
         agents:
           provider: "gcp"
 
-    depends_on: "check"
-
   - group: "Run tests"
     key: "tests"
+    depends_on: "check"
     steps:
       - label: ":smartbear-testexecute: Run unit tests"
         key: unit-test
@@ -102,25 +100,31 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
-      - label: ":smartbear-testexecute: Run unit tests with requirefips build tag"
+      - label: ":smartbear-testexecute: Run unit tests with requirefips build tag and FIPS provider"
         key: unit-test-fips-tag
         command: ".buildkite/scripts/unit_test.sh"
         env:
           FIPS: "true"
+          GOEXPERIMENT: "systemcrypto"
+          GO_DISTRO: "microsoft"
         agents:
-          provider: "gcp"
+          provider: "aws"
+          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          instanceType: "m5.xlarge"
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
 
-      - label: ":smartbear-testexecute: Run fips140=only unit tests"
+      - label: ":smartbear-testexecute: Run fips140=only unit tests with FIPS provider"
         key: unit-test-fips140-only
-        command: ".buildkite/scripts/unit_test.sh"
+        command: ".buildkite/scripts/unit_test_fipsonly.sh"
         env:
           FIPS: "true"
-          GODEBUG: "fips140=only"
+          GO_DISTRO: "stdlib"
         agents:
-          provider: "gcp"
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          instanceType: "m5.xlarge"
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
@@ -143,43 +147,28 @@ steps:
         artifact_paths:
           - build/*.xml
         plugins:
-          - test-collector#v1.10.2:
-              files: "build/test-*.xml"
-              format: "junit"
-              branches: "main"
-              debug: true
+          - *bk_analytics_token_plugin
+          - *test_collector_plugin
+        retry:
+          automatic:
+            limit: 1
 
       - label: "E2E Test"
         key: "e2e-test"
         command: ".buildkite/scripts/e2e_test.sh"
-        agents:
-          provider: "gcp"
-        artifact_paths:
-          - build/*.xml
-          - build/e2e-coverage.out
-        plugins:
-          - test-collector#v1.10.2:
-              files: "build/test-*.xml"
-              format: "junit"
-              branches: "main"
-              debug: true
-
-      - label: "FIPS E2E Test"
-        key: "fips-e2e-test"
         env:
-          FIPS: true
-        command: ".buildkite/scripts/e2e_test.sh"
+          TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
         agents:
           provider: "gcp"
         artifact_paths:
           - build/*.xml
           - build/e2e-coverage.out
         plugins:
-          - test-collector#v1.10.2:
-              files: "build/test-*.xml"
-              format: "junit"
-              branches: "main"
-              debug: true
+          - *bk_analytics_token_plugin
+          - *test_collector_plugin
+        retry:
+          automatic:
+            limit: 1
 
       - label: ":junit: Junit annotate"
         plugins:
@@ -216,9 +205,21 @@ steps:
 
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
+        env:
+          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fleet"
+          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
+          SNAPSHOT: "true"
+          PLATFORMS: "linux/amd64"
+          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
+        plugins:
+          - *docker_elastic_login_plugin
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         depends_on:
           - step: "unit-test"
             allow_failure: false
@@ -226,20 +227,65 @@ steps:
             allow_failure: false
           - step: "e2e-test"
             allow_failure: false
-    depends_on: "check"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+
+      - label: ":gcloud: Cloud e2e FIPS Test"
+        key: "cloud-e2e-fips-test"
+        env:
+          DOCKER_BASE_IMAGE: "docker.elastic.co/cloud-release/elastic-agent-cloud-fips"
+          DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
+          DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
+          SNAPSHOT: "true"
+          PLATFORMS: "linux/amd64"
+          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
+          FIPS: "true"
+          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
+          TF_VAR_ess_region: "us-gov-east-1"
+          TF_VAR_deployment_template_id: "aws-general-purpose"
+        command: ".buildkite/scripts/cloud_e2e_test.sh"
+        agents:
+          provider: "gcp"
+        plugins:
+          - *docker_elastic_login_plugin
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
+        depends_on:
+          - step: "unit-test"
+            allow_failure: false
+          - step: "int-test"
+            allow_failure: false
+          - step: "e2e-test"
+            allow_failure: false
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
 
   - label: ":docker: Publish docker image"
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
+    env:
+      DOCKER_IMAGE: "docker.elastic.co/observability-ci/fleet-server" # needs to rename for rollback
+      DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
+      DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
+      DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
     if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_BRANCH') == 'main'"
     agents:
       provider: "gcp"
+    plugins:
+      - *docker_elastic_login_plugin
     depends_on:
       - step: "tests"
         allow_failure: false
 
   - label: ":serverless::argo: Run synthetics tests and update fleet to ${BUILDKITE_COMMIT:0:12} in serverless-gitops"
-    async: true
     branches: main
     trigger: gpctl-promote-after-serverless-devenv-synthetics
     build:
@@ -268,7 +314,6 @@ steps:
   - label: ":jenkins: Release - Package Registry Distribution"
     key: "release-package-registry"
     trigger: "package-registry-release-package-registry-distribution"
-    async: true
     build:
       branch: "main"
       meta_data:
@@ -278,7 +323,6 @@ steps:
   - trigger: "fleet-server-package-mbp"
     label: ":esbuild: Downstream - Package"
     key: "downstream-package"
-    async: true
     if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_TAG') == '' && build.env('BUILDKITE_BRANCH') != ''"
     build:
       branch: "${BUILDKITE_BRANCH}"

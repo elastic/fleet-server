@@ -16,28 +16,32 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: .go-version
 
-      - name: update NOTICE.txt
-        run: make notice
+      - uses: magefile/mage-action@6f50bbb8ea47d56e62dee92392788acbc8192d0b # v3.1.0
+        with:
+          install-only: true
+
+      - name: update NOTICE.txt and NOTICE-FIPS.txt
+        run: mage check:notice
 
       - name: run go mod tidy in testing/
         run: cd testing; go mod tidy
 
       - name: check for modified files
         id: check-files
-        run: echo "modified=$(if git diff-index --quiet HEAD -- NOTICE.txt testing/go.mod testing/go.sum; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+        run: echo "modified=$(if git diff --quiet HEAD -- NOTICE.txt NOTICE-fips.txt testing/go.mod testing/go.sum; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
 
       - name: commit modified files
         if: steps.check-files.outputs.modified == 'true'
         run: |
           git config --global user.name 'dependabot[bot]'
           git config --global user.email 'dependabot[bot]@users.noreply.github.com'
-          git add NOTICE.txt testing/go.mod testing/go.sum
+          git add NOTICE.txt NOTICE-fips.txt testing/go.mod testing/go.sum
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git commit -m "Post dependabot file modifications"
           git push

@@ -24,7 +24,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/go-ucfg"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"

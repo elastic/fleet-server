@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
@@ -296,7 +296,7 @@ func (m *MockReporter) UpdateState(state client.UnitState, message string, paylo
 }
 
 func TestServerConfigErrorReload(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// don't use startTestServer as we need failing initial config.
@@ -402,7 +402,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 }
 
 func TestServerUnauthorized(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// Start test server
@@ -503,7 +503,7 @@ func stubAPMServer(t *testing.T, ch chan<- struct{}) http.Handler {
 }
 
 func TestServerInstrumentation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	tracerConnected := make(chan struct{}, 1)
@@ -592,13 +592,10 @@ func TestServerInstrumentation(t *testing.T) {
 // make a followup checkin request to get the policy action
 // make another followup ack request for the action
 func Test_SmokeTest_Agent_Calls(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Start test server
-	srv, err := startTestServer(t, ctx, policyData)
+	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	cli := cleanhttp.DefaultClient()
 
@@ -741,13 +738,11 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 		"tags": []
 	    }
 	}`
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx, policyData)
+	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	t.Log("Enroll the first agent with enrollment_id")
 	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
@@ -788,13 +783,11 @@ func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
 		"tags": []
 	    }
 	}`
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx, policyData)
+	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	t.Log("Enroll the first agent with enrollment_id")
 	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWEnrollmentID)
@@ -846,13 +839,11 @@ func Test_Agent_Id_No_ReplaceToken(t *testing.T) {
 		"tags": []
 	    }
 	}`
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx, policyData)
+	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	t.Log("Enroll the first agent with id")
 	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWID)
@@ -890,13 +881,11 @@ func Test_Agent_Id_ReplaceToken_Mismatch(t *testing.T) {
 		"tags": []
 	    }
 	}`
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx, policyData)
+	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	t.Log("Enroll the first agent with id")
 	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWID)
@@ -945,13 +934,11 @@ func Test_Agent_Id(t *testing.T) {
 		"tags": []
 	    }
 	}`
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Start test server
-	srv, err := startTestServer(t, ctx, policyData)
+	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	t.Log("Enroll the first agent with id")
 	firstEnroll := EnrollAgent(t, ctx, srv, enrollBodyWID)
@@ -992,13 +979,10 @@ func Test_Agent_Id(t *testing.T) {
 }
 
 func Test_Agent_Auth_errors(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Start test server
-	srv, err := startTestServer(t, ctx, policyData)
+	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	cli := cleanhttp.DefaultClient()
 
@@ -1117,13 +1101,10 @@ func Test_Agent_Auth_errors(t *testing.T) {
 }
 
 func Test_Agent_request_errors(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Start test server
-	srv, err := startTestServer(t, ctx, policyData)
+	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	cli := cleanhttp.DefaultClient()
 	t.Run("no auth", func(t *testing.T) {
@@ -1199,13 +1180,10 @@ func Test_Agent_request_errors(t *testing.T) {
 }
 
 func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Start test server
-	srv, err := startTestServer(t, ctx, policyData)
+	srv, err := startTestServer(t, t.Context(), policyData)
 	require.NoError(t, err)
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	cli := cleanhttp.DefaultClient()
 
@@ -1248,14 +1226,14 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Ack actions for agent %s", agentID)
-	events := make([]api.AckRequest_Events_Item, 0, len(*checkinResponse.Actions))
-	for _, action := range *checkinResponse.Actions {
+	events := make([]api.AckRequest_Events_Item, 0, len(checkinResponse.Actions))
+	for _, action := range checkinResponse.Actions {
 		event := api.GenericEvent{
 			ActionId: action.Id,
 			AgentId:  agentID,
 			Message:  "test-message",
 			Type:     api.ACTIONRESULT,
-			Subtype:  api.ACKNOWLEDGED,
+			Subtype:  api.EventSubtypeACKNOWLEDGED,
 		}
 		ev := api.AckRequest_Events_Item{}
 		err := ev.FromGenericEvent(event)
@@ -1275,7 +1253,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.StatusCode)
 
 	t.Logf("checkin 2: agent %s poll_timeout 3m", agentID)
-	ctx, cancel = context.WithTimeout(ctx, 3*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	req, err = http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(fmt.Sprintf(`{
 	    "ack_token": "%s",
@@ -1331,7 +1309,7 @@ func Test_SmokeTest_CheckinPollTimeout(t *testing.T) {
 }
 
 func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// Start test server
@@ -1380,14 +1358,14 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Ack actions for agent %s", agentID)
-	events := make([]api.AckRequest_Events_Item, 0, len(*checkinResponse.Actions))
-	for _, action := range *checkinResponse.Actions {
+	events := make([]api.AckRequest_Events_Item, 0, len(checkinResponse.Actions))
+	for _, action := range checkinResponse.Actions {
 		event := api.GenericEvent{
 			ActionId: action.Id,
 			AgentId:  agentID,
 			Message:  "test-message",
 			Type:     api.ACTIONRESULT,
-			Subtype:  api.ACKNOWLEDGED,
+			Subtype:  api.EventSubtypeACKNOWLEDGED,
 		}
 		ev := api.AckRequest_Events_Item{}
 		err := ev.FromGenericEvent(event)
@@ -1445,7 +1423,7 @@ func Test_SmokeTest_CheckinPollShutdown(t *testing.T) {
 
 // Test_SmokeTest_Verify_v85Migrate will ensure that the policy regenerates output keys when the agent doc contains an empty key
 func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// Start test server
@@ -1589,7 +1567,7 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 }
 
 func Test_SmokeTest_AuditUnenroll(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	// Start test server
@@ -1694,4 +1672,113 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	}, time.Second*20, time.Second, "agent document should not have the audit_unenrolled_reason or unenrolled_at attributes. agent doc: %v", obj)
 	cancel()
 	srv.waitExit() //nolint:errcheck // test case
+}
+
+func TestCheckinOTelColPolicy(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	idSuffix := uuid.Must(uuid.NewV4()).String()
+	componentID := func(id string) string {
+		return fmt.Sprintf("%s/%s", id, idSuffix)
+	}
+	policyData := model.PolicyData{
+		Outputs: map[string]map[string]interface{}{
+			"default": {
+				"type": "elasticsearch",
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {}}`),
+		Inputs:            []map[string]any{},
+		Receivers: map[string]any{
+			componentID("somereceiver"): map[string]any{},
+		},
+		Processors: map[string]any{
+			componentID("someprocessor"): map[string]any{},
+		},
+		Connectors: map[string]any{
+			componentID("forward"): map[string]any{},
+		},
+		Exporters: map[string]any{
+			componentID("someexporter"): map[string]any{},
+		},
+		Service: &model.Service{
+			Pipelines: map[string]*model.PipelinesItem{
+				componentID("metrics"): &model.PipelinesItem{
+					Receivers:  []string{componentID("somereceiver")},
+					Processors: []string{componentID("someprocessor")},
+					Exporters:  []string{componentID("forward")},
+				},
+				"metrics": &model.PipelinesItem{
+					Receivers: []string{componentID("forward")},
+					Exporters: []string{componentID("someexporter")},
+				},
+			},
+		},
+	}
+
+	// Start test server
+	srv, err := startTestServer(t, ctx, policyData)
+	require.NoError(t, err)
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	cli := cleanhttp.DefaultClient()
+	// enroll an agent
+	t.Log("Enroll an agent")
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.buildURL("", "enroll"), strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cli.Do(req)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Agent enrollment successful")
+	p, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	var obj map[string]interface{}
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	item := obj["item"]
+	mm, ok := item.(map[string]interface{})
+	require.True(t, ok, "expected attribute item to be an object")
+	agentID, ok := mm["id"].(string)
+	require.True(t, ok, "expected attribute id to be a string")
+
+	apiKey, ok := mm["access_api_key"].(string)
+	require.True(t, ok, "expected attribute apiKey to be a string")
+
+	// checkin
+	t.Logf("Fake a checkin for agent %s", agentID)
+	req, err = http.NewRequestWithContext(ctx, "POST", srv.buildURL(agentID, "checkin"), strings.NewReader(checkinBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err = cli.Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	t.Log("Checkin successful, verify body")
+	p, err = io.ReadAll(res.Body)
+	require.NoError(t, err)
+
+	err = json.Unmarshal(p, &obj)
+	require.NoError(t, err)
+
+	actionsRaw, ok := obj["actions"]
+	require.True(t, ok, "expected actions is missing")
+	actions, ok := actionsRaw.([]interface{})
+	require.True(t, ok, "expected actions to be an array")
+	require.Greater(t, len(actions), 0, "expected at least 1 action")
+	action, ok := actions[0].(map[string]interface{})
+	require.True(t, ok, "expected action to be an object")
+	_, ok = action["id"].(string)
+	require.True(t, ok, "expected action id to be string")
+	aAgentID, ok := action["agent_id"].(string)
+	require.True(t, ok, "expected action agent_id to be string")
+	require.Equal(t, agentID, aAgentID)
 }

@@ -4,8 +4,6 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
-EC_KEY_SECRET_PATH="kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 JOB_GCS_BUCKET="fleet-server-ci-internal"
 GITHUB_REPO_TOKEN=$VAULT_GITHUB_TOKEN
@@ -45,35 +43,9 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   check_if_file_exist_in_repo "infra" "${_branch}"                  #TODO should be changed to "main" for rollback...
 fi
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" || "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-perf-tests" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "publish" || "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" || "$BUILDKITE_STEP_KEY" == "create-image" ]]; then
-    export DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
-    export DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
-    docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
-  fi
-fi
-
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" && "$BUILDKITE_STEP_KEY" == "cloud-e2e-test" ]]; then
-  export EC_API_KEY_SECRET=$(retry 5 vault kv get -field apiKey "${EC_KEY_SECRET_PATH}")
-  # Environment variables required by the Elastic Cloud service deployer
-  export EC_API_KEY=${EC_API_KEY_SECRET}
-fi
-
-# BK analytics
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "int-test" || "$BUILDKITE_STEP_KEY" == "e2e-test" || "$BUILDKITE_STEP_KEY" == "fips-e2e-test" ]]; then
-    echo "--- Prepare BK test analytics token :vault:"
-    BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_fleet_server_analytics_token)
-    export BUILDKITE_ANALYTICS_TOKEN
-  fi
-fi
-
-
+# TODO: use a builkite plugin to handle this
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
-    export DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
-    export DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
-    docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
     DRA_CREDS_SECRET=$(retry 5 vault kv get -field=data -format=json ${CI_DRA_ROLE_PATH})
     export VAULT_ADDR_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.vault_addr')
     export VAULT_ROLE_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.role_id')

@@ -1,5 +1,5 @@
 output "stack_version" {
-  value       = local.stack_version
+  value       = data.ec_stack.latest.version
   description = "Stack version"
 }
 
@@ -28,4 +28,14 @@ output "kibana_url" {
 output "fleet_url" {
   value       = ec_deployment.deployment.integrations_server.endpoints != null ? ec_deployment.deployment.integrations_server.endpoints.fleet : ""
   description = "The secure Fleet URL"
+}
+
+output "integrations_url" {
+  value       = ec_deployment.deployment.integrations_server.https_endpoint
+  description = "The secure integrations server URL"
+}
+
+output "deployment_id" {
+  value       = ec_deployment.deployment.id
+  description = "The deployment ID"
 }
