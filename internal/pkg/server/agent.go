@@ -726,8 +726,7 @@ func (a *Agent) esOutputCheck(ctx context.Context, cfg map[string]interface{}) e
 func (a *Agent) esOutputCheckLoop(ctx context.Context, delay time.Duration, cfg map[string]interface{}) {
 	for {
 		if err := sleep.WithContext(ctx, delay); err != nil {
-			zerolog.Ctx(ctx).Debug().Msg("Async output check context cancelled")
-			return
+			return // context cancelled
 		}
 		err := a.esOutputCheck(ctx, cfg)
 		if err == nil {
