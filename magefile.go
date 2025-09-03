@@ -478,7 +478,7 @@ func (Check) Headers() error {
 
 // Notice generates the NOTICE.txt and NOTICE-FIPS.txt files.
 func (Check) Notice() {
-	mg.Deps(mg.F(genNotice, false))
+	mg.SerialDeps(mg.F(genNotice, false))
 }
 
 // genNotice generates the NOTICE.txt or the NOTICE-FIPS.txt file.
