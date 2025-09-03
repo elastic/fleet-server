@@ -28,11 +28,16 @@ variable "pull_request" {
   description = "The github pull request number."
 }
 
-<<<<<<< HEAD
 variable "ess_region" {
   type        = string
   default     = "gcp-us-west2"
   description = "The ESS region to use"
+}
+
+variable "deployment_template_id" {
+  type        = string
+  default     = "gcp-general-purpose"
+  description = "The ess deployment template to use"
 }
 
 locals {
@@ -50,20 +55,9 @@ data "ec_stack" "latest" {
 resource "ec_deployment" "deployment" {
   name                   = format("fleet server PR-%s-%s", var.pull_request, var.git_commit)
   region                 = var.ess_region
+  deployment_template_id = var.deployment_template_id
   version                = data.ec_stack.latest.version
-=======
-locals {
-  match           = regex("const DefaultVersion = \"(.*)\"", file("${path.module}/../../../version/version.go"))[0]
-  stack_version   = format("%s-SNAPSHOT", local.match)
-  docker_image_ea = var.elastic_agent_docker_image
-}
 
-resource "ec_deployment" "deployment" {
-  name                   = format("fleet server PR-%s-%s", var.pull_request, var.git_commit)
-  region                 = "gcp-us-west2"
-  version                = local.stack_version
->>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
-  deployment_template_id = "gcp-general-purpose"
 
   tags = {
     "source_repo"     = "elastic/fleet-server"

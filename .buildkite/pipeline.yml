@@ -83,31 +83,6 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
-<<<<<<< HEAD
-=======
-      - label: ":smartbear-testexecute: Run unit tests with requirefips build tag"
-        key: unit-test-fips-tag
-        command: ".buildkite/scripts/unit_test.sh"
-        env:
-          FIPS: "true"
-        agents:
-          provider: "gcp"
-        artifact_paths:
-          - build/*.xml
-          - build/coverage*.out
-
-      - label: ":smartbear-testexecute: Run fips140=only unit tests"
-        key: unit-test-fips140-only
-        command: ".buildkite/scripts/unit_test_fipsonly.sh"
-        env:
-          FIPS: "true"
-        agents:
-          provider: "gcp"
-        artifact_paths:
-          - build/*.xml
-          - build/coverage*.out
-
->>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
       - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
         key: unit-test-macos-13
         command: ".buildkite/scripts/unit_test.sh"
@@ -132,25 +107,19 @@ steps:
       - label: "E2E Test"
         key: "e2e-test"
         command: ".buildkite/scripts/e2e_test.sh"
-<<<<<<< HEAD
         env:
           TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
-=======
->>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
         agents:
           provider: "gcp"
         artifact_paths:
           - build/*.xml
           - build/e2e-coverage.out
-<<<<<<< HEAD
-=======
         plugins:
           - test-collector#v1.10.2:
               files: "build/test-*.xml"
               format: "junit"
               branches: "main"
               debug: true
->>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
 
       - label: ":junit: Junit annotate"
         plugins:

@@ -51,21 +51,6 @@ with_go() {
     export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
 }
 
-<<<<<<< HEAD
-=======
-with_msft_go() {
-    echo "Setting up microsoft/go"
-    create_workspace
-    check_platform_architeture
-    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version).${platform_type}-${arch_type}.tar.gz
-    retry 5 $(curl -sL -o - $MSFT_DOWNLOAD_URL | tar -xz -f - -C ${WORKSPACE})
-    export PATH="${PATH}:${WORKSPACE}/go/bin"
-    go version
-    which go
-    export PATH="${PATH}:$(go env GOPATH)/bin"
-}
-
->>>>>>> db5f46b (Convert Makefile to magefile.go (#4912))
 with_docker_compose() {
     echo "Setting up the Docker-compose environment..."
     create_workspace

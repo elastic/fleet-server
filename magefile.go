@@ -478,7 +478,7 @@ func (Check) Headers() error {
 
 // Notice generates the NOTICE.txt and NOTICE-FIPS.txt files.
 func (Check) Notice() {
-	mg.SerialDeps(mg.F(genNotice, false), mg.F(genNotice, true))
+	mg.Deps(mg.F(genNotice, false))
 }
 
 // genNotice generates the NOTICE.txt or the NOTICE-FIPS.txt file.
@@ -1845,7 +1845,7 @@ func validateCertUnpacking() error {
 		},
 	}
 
-	_, err := tlscommon.LoadTLSConfig(&config)
+	_, err := tlscommon.LoadTLSConfig(&config, logp.NewNopLogger())
 	if err != nil {
 		log.Printf("tlscommon load error: %v", err)
 		passphrase, err := os.ReadFile(passFile)
