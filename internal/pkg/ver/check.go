@@ -13,8 +13,9 @@ import (
 	"strconv"
 	"strings"
 
-	esh "github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/rs/zerolog"
+
+	esh "github.com/elastic/fleet-server/v7/internal/pkg/es"
 
 	"github.com/hashicorp/go-version"
 
@@ -30,15 +31,24 @@ var (
 // CheckCompatiblility will check the remote Elasticsearch version retrieved by the Elasticsearch client with the passed fleet version.
 // Versions are compatible when Elasticsearch's version is greater then or equal to fleet-server's version
 func CheckCompatibility(ctx context.Context, esCli *elasticsearch.Client, fleetVersion string) (string, error) {
-	zerolog.Ctx(ctx).Debug().Str("fleet_version", fleetVersion).Msg("check version compatibility with elasticsearch")
+	// Version checks may run concurrently with other operations
+	// This can cause some flakiness with tests so we need to get the logger from the context before its cancelled
+	var logger *zerolog.Logger
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	default:
+		logger = zerolog.Ctx(ctx)
+	}
+	logger.Debug().Str("fleet_version", fleetVersion).Msg("check version compatibility with elasticsearch")
 
 	esVersion, err := esh.FetchESVersion(ctx, esCli)
 
 	if err != nil {
-		zerolog.Ctx(ctx).Error().Err(err).Msg("failed to fetch elasticsearch version")
+		logger.Error().Err(err).Msg("failed to fetch elasticsearch version")
 		return "", err
 	}
-	zerolog.Ctx(ctx).Debug().Str("elasticsearch_version", esVersion).Msg("fetched elasticsearch version")
+	logger.Debug().Str("elasticsearch_version", esVersion).Msg("fetched elasticsearch version")
 
 	return esVersion, checkCompatibility(ctx, fleetVersion, esVersion)
 }
