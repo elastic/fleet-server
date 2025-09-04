@@ -1,0 +1,7 @@
+project: Fleet Server docs
+products:
+  - id: fleet
+exclude:
+  - "*.md"
+toc:
+  - toc: release-notes
