@@ -24,15 +24,9 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/xid v1.6.0
-<<<<<<< HEAD
 	github.com/rs/zerolog v1.32.0
-	github.com/spf13/cobra v1.9.1
-	github.com/stretchr/testify v1.10.0
-=======
-	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.1
-	github.com/stretchr/testify v1.11.1
->>>>>>> cecd810 (build(deps): bump github.com/spf13/cobra from 1.9.1 to 1.10.1 (#5399))
+	github.com/stretchr/testify v1.10.0
 	go.elastic.co/apm/module/apmchiv5/v2 v2.7.1
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.1
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.1
