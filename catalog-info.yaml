@@ -68,6 +68,8 @@ spec:
           access_level: MANAGE_BUILD_AND_READ
         observablt-ci:
           access_level: MANAGE_BUILD_AND_READ
+        observablt-ci-contractors:
+          access_level: BUILD_AND_READ
         everyone:
           access_level: READ_ONLY
 
