@@ -282,50 +282,48 @@ func (a *Agent) unitModified(ctx context.Context, unit *client.Unit) error {
 			// not our input unit; would have been marked failed in unitAdded; do nothing
 			return nil
 		}
-		if exp.State == client.UnitStateHealthy {
+		switch exp.State {
+		case client.UnitStateHealthy:
 			if a.outputUnit == nil {
 				// still no output unit; would have been marked starting already; do nothing
 				return nil
 			}
-
 			// configuration modified (should still be running)
 			return a.reconfigure(ctx)
-		} else if exp.State == client.UnitStateStopped {
+		case client.UnitStateStopped:
 			// unit should be stopped
 			a.stop()
 			return nil
+		default:
+			return fmt.Errorf("unknown unit state %v", exp.State)
 		}
-		return fmt.Errorf("unknown unit state %v", exp.State)
 	}
 	if unit.Type() == client.UnitTypeOutput {
 		if a.outputUnit != unit {
 			// not our output unit; would have been marked failed in unitAdded; do nothing
 			return nil
 		}
-		if exp.State == client.UnitStateHealthy {
+		switch exp.State {
+		case client.UnitStateHealthy:
 			if a.inputUnit == nil {
 				// still no input unit; would have been marked starting already; do nothing
 				return nil
 			}
-
 			// configuration modified (should still be running)
 			return a.reconfigure(ctx)
-		} else if exp.State == client.UnitStateStopped {
+		case client.UnitStateStopped:
 			// unit should be stopped
 			a.stop()
 			return nil
+		default:
+			return fmt.Errorf("unknown unit state %v", exp.State)
 		}
-		return fmt.Errorf("unknown unit state %v", exp.State)
 	}
 	return fmt.Errorf("unknown unit type %v", unit.Type())
 }
 
 func (a *Agent) unitRemoved(unit *client.Unit) {
-	stop := false
 	if a.inputUnit == unit || a.outputUnit == unit {
-		stop = true
-	}
-	if stop {
 		a.stop()
 	}
 	if a.inputUnit == unit {
@@ -726,8 +724,7 @@ func (a *Agent) esOutputCheck(ctx context.Context, cfg map[string]interface{}) e
 func (a *Agent) esOutputCheckLoop(ctx context.Context, delay time.Duration, cfg map[string]interface{}) {
 	for {
 		if err := sleep.WithContext(ctx, delay); err != nil {
-			zerolog.Ctx(ctx).Debug().Msg("Async output check context cancelled")
-			return
+			return // context cancelled
 		}
 		err := a.esOutputCheck(ctx, cfg)
 		if err == nil {
