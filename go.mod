@@ -27,7 +27,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.34.0
-	github.com/spf13/cobra v1.9.1
+	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
 	go.elastic.co/apm/module/apmchiv5/v2 v2.7.1
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.1
@@ -78,7 +78,7 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/shirou/gopsutil/v4 v4.24.7 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
-	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
