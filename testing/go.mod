@@ -9,7 +9,11 @@ replace (
 
 require (
 	github.com/Shopify/toxiproxy/v2 v2.12.0
+<<<<<<< HEAD
 	github.com/docker/docker v28.1.1+incompatible
+=======
+	github.com/docker/docker v28.4.0+incompatible
+>>>>>>> dfd376b (build(deps): bump github.com/docker/docker in /testing (#5408))
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/elastic-agent-libs v0.23.1
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
@@ -44,7 +48,6 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.25.1 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
