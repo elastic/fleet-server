@@ -70,7 +70,10 @@ with_docker_compose() {
 #  colima start --vm-type=qemu --cpu 4 --memory 4 --disk 20 > /dev/null
 
   echo "~~~ macos version: $(sw_vers)"
-  echo "~~~ virtualization: $(sysctl -a | grep kern.hv)"
+  echo "~~~ virtualization"
+  sysctl -a | grep kern.hv
+  sysctl hw.optional.arm64
+  sysctl kern.hv_vmm_present
   echo "~~~ colima version: $(brew info colima)"
   echo "~~~ lima version: $(brew info lima)"
 #  echo "~~~ limactl version: $(limactl info)"
@@ -86,6 +89,11 @@ with_docker_compose() {
   rm -rf ~/.colima/_lima || true
   rm -rf ~/.lima || true
 
+  limactl start template://docker
+  export DOCKER_HOST=$(limactl list docker --format 'unix://{{.Dir}}/sock/docker.sock')
+  docker run --rm hello-world
+  limactl stop
+
   local retryCount=3
   local try=1
   local sleep=5
@@ -96,7 +104,7 @@ with_docker_compose() {
     local logfile="runlogs-$try"
 
     touch "$logfile"
-    colima start --vm-type=vz --network-address --cpu 4 --memory 4 --disk 20 -v > "$logfile" && break
+    colima start --vm-type=vz  --arch aarch64 --network-address --cpu 2 --memory 2 --disk 20 -v > "$logfile" && break
 
     echo "~~~ Logfile"
     cat "$logfile"
