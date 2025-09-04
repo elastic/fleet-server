@@ -1,0 +1,13 @@
+version: 9.0.3
+entries:
+    - kind: enhancement
+      summary: Update Go version to v1.24.4
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5025
+      issue: []
+      timestamp: 1746596216
+      file:
+        name: 1746596216-Update-to-go-1.24.4.yaml
+        checksum: 5f97bc9a96cf140dba16165d6e8472f9bcc92e44
