@@ -226,20 +226,25 @@ func (s *Scaffold) AgentIsOnline(ctx context.Context, id string) {
 			req.Header.Set("kbn-xsrf", "e2e-setup")
 
 			resp, err := s.Client.Do(req)
-			s.Require().NoError(err)
-			defer resp.Body.Close()
+			s.Require().NoError(err, "kibana agent request failure")
 			if resp.StatusCode != http.StatusOK {
 				timer.Reset(time.Second)
+				resp.Body.Close()
 				continue
 			}
+
+			p, err := io.ReadAll(resp.Body)
+			s.Require().NoError(err, "unable to read kibana agent response")
+			resp.Body.Close()
 
 			var obj struct {
 				Item struct {
 					Status string `json:"status"`
 				} `json:"item"`
 			}
-			err = json.NewDecoder(resp.Body).Decode(&obj)
-			s.Require().NoError(err)
+			s.T().Logf("Kibana agent response: %s", string(p))
+			err = json.Unmarshal(p, &obj)
+			s.Require().NoError(err, "unmarshal failure")
 			if obj.Item.Status == "online" {
 				return
 			}
