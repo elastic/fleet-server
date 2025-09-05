@@ -9,6 +9,37 @@ env:
   DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
   GO_AGENT_IMAGE: "golang:${GO_VERSION}"
   TERRAFORM_VERSION: "1.6.4"
+<<<<<<< HEAD
+=======
+  IMAGE_UBUNTU_X86_64: "family/core-ubuntu-2204"
+  IMAGE_UBUNTU_ARM_64: "core-ubuntu-2204-aarch64"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips"
+
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - test_collector_plugin: &test_collector_plugin
+      test-collector#v1.11.0:
+        files: "build/test-*.xml"
+        format: "junit"
+        branches: "main"
+        debug: true
+  - bk_analytics_token_plugin: &bk_analytics_token_plugin
+      elastic/vault-secrets#v0.1.0:
+        path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+        field: "token"
+        env_var: "BUILDKITE_ANALYTICS_TOKEN"
+  - docker_elastic_login_plugin: &docker_elastic_login_plugin
+      elastic/vault-docker-login#v0.6.0:
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+  # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
+  # This plugin authenticates to Google Cloud using the OIDC token.
+  - oidc_plugin: &oidc_plugin
+      elastic/oblt-google-auth#v1.2.0:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
+>>>>>>> 7da3f69 (fix: package fleet-server using golang-crossbuild  (#5392))
 
 steps:
   - group: "Check and build"
@@ -22,6 +53,7 @@ steps:
           cpu: "8"
           memory: "4G"
 
+<<<<<<< HEAD
       - label: ":building_construction: Run local build"
         key: make-local
         command: "make local"
@@ -29,13 +61,65 @@ steps:
           image: "${GO_AGENT_IMAGE}"
           cpu: "8"
           memory: "4G"
-
-      - label: ":building_construction: Run local build: MacOS"
-        key: make-local-macos
-        command: ".buildkite/scripts/local_build.sh"
+=======
+      - label: "Package x86_64"
+        key: "package-x86-64-pr"
+        env:
+          PLATFORMS: "linux/amd64,darwin/amd64,windows/amd64"
+        command: ".buildkite/scripts/release_test.sh"
+        artifact_paths:
+          - build/distributions/**
         agents:
-          provider: orka
-          imagePrefix: generic-13-ventura-arm
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_X86_64}"
+          machineType: "c2-standard-16"
+        plugins:
+          - *oidc_plugin
+>>>>>>> 7da3f69 (fix: package fleet-server using golang-crossbuild  (#5392))
+
+      - label: "Package x86_64 FIPS"
+        key: "package-fips-x86-64-pr"
+        env:
+          FIPS: "true"
+          PLATFORMS: "linux/amd64"
+        command: ".buildkite/scripts/release_test.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_X86_64}"
+          machineType: "c2-standard-16"
+        plugins:
+          - *oidc_plugin
+
+      - label: "Package aarch64"
+        key: "package-arm64-pr"
+        env:
+          PLATFORMS: "linux/arm64,darwin/arm64"
+        command: ".buildkite/scripts/release_test.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "aws"
+          imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+          instanceType: "t4g.2xlarge"
+        plugins:
+          - *oidc_plugin
+
+      - label: "Package aarch64 FIPS"
+        key: "package-fips-arm64-pr"
+        env:
+          FIPS: "true"
+          PLATFORMS: "linux/arm64"
+        command: ".buildkite/scripts/release_test.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "aws"
+          imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+          instanceType: "t4g.2xlarge"
+        plugins:
+          - *oidc_plugin
 
   - group: "Performance test"
     key: "performance-test"
@@ -186,22 +270,6 @@ steps:
         SERVICE: fleet
     depends_on:
       - step: "publish"
-
-  - label: ":gcloud: Release test"
-    key: "release-test"
-    command: ".buildkite/scripts/release_test.sh"
-    agents:
-      provider: "gcp"
-    depends_on:
-      - step: "tests"
-        allow_failure: false
-    plugins:
-      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
-      # This plugin authenticates to Google Cloud using the OIDC token.
-      - elastic/oblt-google-auth#v1.2.0:
-          lifetime: 10800 # seconds
-          project-id: "elastic-observability-ci"
-          project-number: "911195782929"
 
   - label: ":jenkins: Release - Package Registry Distribution"
     key: "release-package-registry"

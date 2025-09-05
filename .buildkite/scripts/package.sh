@@ -27,10 +27,17 @@ with_mage
 case "${TYPE}" in
     "snapshot")
         export SNAPSHOT=true
+<<<<<<< HEAD
         make release
         ;;
     "staging")
         make release
+=======
+        mage docker:release
+        ;;
+    "staging")
+        mage docker:release
+>>>>>>> 7da3f69 (fix: package fleet-server using golang-crossbuild  (#5392))
         ;;
     *)
     echo "The option is unsupported yet"
