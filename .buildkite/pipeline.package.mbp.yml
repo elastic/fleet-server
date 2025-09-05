@@ -28,6 +28,8 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
@@ -40,9 +42,45 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
+<<<<<<< HEAD
+=======
+  - label: "Package FIPS x86_64 snapshot"
+    if: "build.env('VERSION_QUALIFIER') == null"
+    key: "package-fips-x86-64-snapshot"
+    command: ".buildkite/scripts/package.sh snapshot"
+    env:
+      FIPS: "true"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+      machineType: "c2-standard-16"
+    artifact_paths:
+      - build/distributions/**
+    plugins:
+      - *oidc_plugin
+
+  - label: "Package FIPS x86_64 staging"
+    key: "package-fips-x86-64-staging"
+    command: |
+      source .buildkite/scripts/version_qualifier.sh
+      .buildkite/scripts/package.sh staging
+    env:
+      FIPS: "true"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+      machineType: "c2-standard-16"
+    artifact_paths:
+      - build/distributions/**
+    plugins:
+      - *oidc_plugin
+
+>>>>>>> 7da3f69 (fix: package fleet-server using golang-crossbuild  (#5392))
   - label: "Package aarch64 snapshot"
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-arm-snapshot"
@@ -51,6 +89,8 @@ steps:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
       instanceType: "t4g.2xlarge"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
@@ -63,9 +103,45 @@ steps:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
       instanceType: "t4g.2xlarge"
+    artifact_paths:
+      - build/distributions/**
     plugins:
       - *oidc_plugin
 
+<<<<<<< HEAD
+=======
+  - label: "Package FIPS aarch64 snapshot"
+    if: "build.env('VERSION_QUALIFIER') == null"
+    key: "package-fips-arm-snapshot"
+    command: ".buildkite/scripts/package.sh snapshot"
+    env:
+      FIPS: "true"
+    agents:
+      provider: "aws"
+      imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+      instanceType: "t4g.2xlarge"
+    artifact_paths:
+      - build/distributions/**
+    plugins:
+      - *oidc_plugin
+
+  - label: "Package FIPS aarch64 staging"
+    key: "package-fips-arm-staging"
+    command: |
+      source .buildkite/scripts/version_qualifier.sh
+      .buildkite/scripts/package.sh staging
+    env:
+      FIPS: "true"
+    agents:
+      provider: "aws"
+      imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+      instanceType: "t4g.2xlarge"
+    artifact_paths:
+      - build/distributions/**
+    plugins:
+      - *oidc_plugin
+
+>>>>>>> 7da3f69 (fix: package fleet-server using golang-crossbuild  (#5392))
   - label: "DRA snapshot"
     if: "${FILE_EXISTS_IN_REPO} && build.env('VERSION_QUALIFIER') == null"
     key: "dra-snapshot"
