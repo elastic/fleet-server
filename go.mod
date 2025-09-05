@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/v7
 
-go 1.24.6
+go 1.24.7
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
