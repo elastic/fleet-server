@@ -3044,19 +3044,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/client_golang
-<<<<<<< HEAD
-Version: v1.22.0
-Licence type (autodetected): Apache-2.0
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.22.0/LICENSE:
-=======
 Version: v1.23.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.23.1/LICENSE:
->>>>>>> d532de4 (build(deps): bump github.com/prometheus/client_golang from 1.23.0 to 1.23.1 (#5424))
 
                                  Apache License
                            Version 2.0, January 2004
@@ -12893,7 +12885,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 --------------------------------------------------------------------------------
-<<<<<<< HEAD
 Dependency : github.com/gorilla/css
 Version: v1.0.0
 Licence type (autodetected): BSD-3-Clause
@@ -12928,7 +12919,9 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
 ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-=======
+
+
+--------------------------------------------------------------------------------
 Dependency : github.com/grafana/regexp
 Version: v0.0.0-20240518133315-a468a5bfb3bc
 Licence type (autodetected): BSD-3-Clause
@@ -12963,7 +12956,6 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
->>>>>>> d532de4 (build(deps): bump github.com/prometheus/client_golang from 1.23.0 to 1.23.1 (#5424))
 
 
 --------------------------------------------------------------------------------
@@ -16743,11 +16735,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/client_model
-Version: v0.6.1
+Version: v0.6.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model@v0.6.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model@v0.6.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -16954,19 +16946,11 @@ Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/common
-<<<<<<< HEAD
-Version: v0.62.0
-Licence type (autodetected): Apache-2.0
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.62.0/LICENSE:
-=======
 Version: v0.66.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.66.0/LICENSE:
->>>>>>> d532de4 (build(deps): bump github.com/prometheus/client_golang from 1.23.0 to 1.23.1 (#5424))
 
                                  Apache License
                            Version 2.0, January 2004
@@ -17173,11 +17157,11 @@ Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.66
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/procfs
-Version: v0.15.1
+Version: v0.16.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/procfs@v0.15.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/procfs@v0.16.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -21776,6 +21760,35 @@ Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel/trace@v1.
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+
+--------------------------------------------------------------------------------
+Dependency : go.uber.org/atomic
+Version: v1.11.0
+Licence type (autodetected): MIT
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/go.uber.org/atomic@v1.11.0/LICENSE.txt:
+
+Copyright (c) 2016 Uber Technologies, Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 
 --------------------------------------------------------------------------------
