@@ -231,5 +231,7 @@ steps:
     build:
       branch: "${BUILDKITE_BRANCH}"
     depends_on:
-      - step: "release-test"
+      - step: "package-x86-64-pr"
+        allow_failure: false
+      - step: "package-arm64-pr"
         allow_failure: false
