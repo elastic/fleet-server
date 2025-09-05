@@ -90,7 +90,6 @@ const (
 
 // const and vars used by magefile.
 const (
-	buildMode  = "pie"
 	binaryName = "fleet-server"
 	binaryExe  = "fleet-server.exe"
 
@@ -671,6 +670,7 @@ func (Check) All() {
 // FIPS creates a FIPS capable binary.
 func (Build) Local() error {
 	env := environMap()
+	env["CGO_ENABLED"] = "0"
 	if isFIPS() {
 		addFIPSEnvVars(env)
 	}
@@ -704,6 +704,7 @@ func goBuild(osArg, archArg string, cover bool) error {
 	env := environMap()
 	env["GOOS"] = osArg
 	env["GOARCH"] = archArg
+	env["CGO_ENABLED"] = "0"
 	distArr := []string{"fleet-server"}
 	if isFIPS() {
 		addFIPSEnvVars(env)
@@ -729,7 +730,6 @@ func goBuild(osArg, archArg string, cover bool) error {
 		"-tags=" + getTagsString(),
 		"-gcflags=" + getGCFlags(),
 		"-ldflags=" + getLDFlags(),
-		"-buildmode=" + buildMode,
 		"-o", outFile,
 	}
 	if cover {
@@ -1007,9 +1007,14 @@ func (Docker) Image() error {
 	} else if isDEV() {
 		version += "-dev"
 	}
+	suffix := dockerSuffix
+	if runtime.GOARCH == "arm64" {
+		suffix = dockerArmSuffix
+	}
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
 		image += "-fips"
+		suffix += "-fips"
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
@@ -1023,6 +1028,7 @@ func (Docker) Image() error {
 		"--build-arg", "VERSION="+getVersion(),
 		"--build-arg", "GCFLAGS="+getGCFlags(),
 		"--build-arg", "LDFLAGS="+getLDFlags(),
+		"--build-arg", "SUFFIX="+suffix,
 		"-f", dockerFile,
 		"-t", image+":"+version,
 		".",
