@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-bullseye AS builder
+FROM --platform=${BUILDPLATFORM:-linux} docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX} AS builder
 
 WORKDIR /fleet-server
 
