@@ -2634,19 +2634,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/client_golang
-<<<<<<< HEAD
-Version: v1.22.0
-Licence type (autodetected): Apache-2.0
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.22.0/LICENSE:
-=======
 Version: v1.23.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.23.1/LICENSE:
->>>>>>> d532de4 (build(deps): bump github.com/prometheus/client_golang from 1.23.0 to 1.23.1 (#5424))
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7226,11 +7218,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/client_model
-Version: v0.6.1
+Version: v0.6.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model@v0.6.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model@v0.6.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7437,19 +7429,11 @@ Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/common
-<<<<<<< HEAD
-Version: v0.62.0
-Licence type (autodetected): Apache-2.0
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.62.0/LICENSE:
-=======
 Version: v0.66.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.66.0/LICENSE:
->>>>>>> d532de4 (build(deps): bump github.com/prometheus/client_golang from 1.23.0 to 1.23.1 (#5424))
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7656,11 +7640,11 @@ Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.66
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/procfs
-Version: v0.15.1
+Version: v0.16.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/procfs@v0.15.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/procfs@v0.16.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
