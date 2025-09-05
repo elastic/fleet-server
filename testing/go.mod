@@ -11,10 +11,6 @@ require (
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/docker/docker v28.4.0+incompatible
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
-<<<<<<< HEAD
-=======
-	github.com/elastic/elastic-agent-libs v0.24.0
->>>>>>> aa136dd (build(deps): bump github.com/elastic/elastic-agent-libs from 0.23.1 to 0.23.2 (#5425))
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.11.1
@@ -37,7 +33,7 @@ require (
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
-	github.com/elastic/elastic-agent-libs v0.23.2 // indirect
+	github.com/elastic/elastic-agent-libs v0.24.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
