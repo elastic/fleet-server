@@ -29,7 +29,7 @@ ARG SUFFIX
 FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX} AS builder
 
 WORKDIR /fleet-server
-
+ENV PATH="$PATH:/go/bin"
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 RUN go install github.com/magefile/mage # uses version in go.mod
