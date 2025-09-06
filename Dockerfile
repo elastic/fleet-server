@@ -1,6 +1,5 @@
 ARG GO_VERSION
-ARG SUFFIX
-FROM --platform=${BUILDPLATFORM:-linux} docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX} AS builder
+FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-trixie AS builder
 
 WORKDIR /fleet-server
 

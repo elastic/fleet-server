@@ -1051,9 +1051,17 @@ func (Docker) Publish() error {
 	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
 		version = v
 	}
+	suffix := dockerSuffix
+	if runtime.GOARCH == "arm64" {
+		suffix = dockerArmSuffix
+	}
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
 		image += "-fips"
+		suffix += "-fips"
+	}
+	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
+		image = v
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
@@ -1072,6 +1080,7 @@ func (Docker) Publish() error {
 		"--build-arg", "VERSION="+getVersion(),
 		"--build-arg", "GCFLAGS="+getGCFlags(),
 		"--build-arg", "LDFLAGS="+getLDFlags(),
+		"--build-arg", "SUFFIX="+suffix,
 		"-f", dockerFile,
 		"-t", image+":"+version,
 		".",
