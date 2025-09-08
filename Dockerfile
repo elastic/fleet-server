@@ -1,15 +1,11 @@
 ARG GO_VERSION
-ARG SUFFIX
-FROM --platform=${BUILDPLATFORM:-linux} docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX} AS builder
+FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-trixie AS builder
 
 WORKDIR /usr/src/fleet-server
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
-RUN go install github.com/magefile/mage # Uses version from go.mod implicitly
-ENV PATH="$PATH:/go/bin"
-ENV MAGEFILE_CACHE=/fleet-server/build/.magefile
 
 COPY . .
 
