@@ -22,7 +22,11 @@ require (
 	github.com/miolini/datacounter v1.0.3
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
+<<<<<<< HEAD
 	github.com/prometheus/client_golang v1.22.0
+=======
+	github.com/prometheus/client_golang v1.23.2
+>>>>>>> 41cd3bf (build(deps): bump github.com/prometheus/client_golang from 1.23.1 to 1.23.2 (#5458))
 	github.com/rs/xid v1.6.0
 	github.com/rs/zerolog v1.32.0
 	github.com/spf13/cobra v1.9.1
@@ -72,9 +76,15 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
+<<<<<<< HEAD
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
+=======
+	github.com/prometheus/client_model v0.6.2 // indirect
+	github.com/prometheus/common v0.66.1 // indirect
+	github.com/prometheus/procfs v0.16.1 // indirect
+>>>>>>> 41cd3bf (build(deps): bump github.com/prometheus/client_golang from 1.23.1 to 1.23.2 (#5458))
 	github.com/shirou/gopsutil/v4 v4.24.7 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
@@ -90,6 +100,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.37.0 // indirect
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/mod v0.26.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
