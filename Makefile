@@ -12,11 +12,6 @@ DEFAULT_VERSION=$(shell awk '/const DefaultVersion/{print $$NF}' version/version
 TARGET_ARCH_amd64=x86_64
 TARGET_ARCH_arm64=arm64
 PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
-BUILDMODE_linux_amd64=-buildmode=pie
-BUILDMODE_linux_arm64=-buildmode=pie
-BUILDMODE_windows_amd64=-buildmode=pie
-BUILDMODE_darwin_amd64=-buildmode=pie
-BUILDMODE_darwin_arm64=-buildmode=pie
 
 CROSSBUILD_SUFFIX=main-debian11
 CROSSBUILD_ARM_SUFFIX=base-arm-debian9
@@ -64,6 +59,10 @@ endif
 ifeq "${FIPS}" "true"
 DOCKER_IMAGE_TAG:=${DOCKER_IMAGE_TAG}-fips
 endif
+endif
+CGO_ENABLED?=0
+ifeq "${FIPS}" "true"
+CGO_ENABLED=1
 endif
 DOCKER_IMAGE?=docker.elastic.co/fleet-server/fleet-server
 
@@ -138,7 +137,7 @@ list-platforms: ## - Show the possible PLATFORMS
 .PHONY: local
 local: ## - Build local binary for local environment (bin/fleet-server)
 	@printf "${CMD_COLOR_ON} Build binaries using local go installation\n${CMD_COLOR_OFF}"
-	${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
+	CGO_ENABLED=${CGO_ENABLED} ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o ./bin/fleet-server .
 	@printf "${CMD_COLOR_ON} Binaries in ./bin/\n${CMD_COLOR_OFF}"
 
 .PHONY: $(COVER_TARGETS)
@@ -147,8 +146,7 @@ $(COVER_TARGETS): cover-%: ## - Build a binary with the -cover flag for integrat
 	$(eval $@_OS := $(firstword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst cover-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
-	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(FIPSSUFFIX)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
+	CGO_ENABLED=${CGO_ENABLED} GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -cover -coverpkg=./... -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o build/cover/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(FIPSSUFFIX)/fleet-server$(if $(filter windows,$($@_OS)),.exe,) .
 
 .PHONY: clean
 clean: ## - Clean up build artifacts
@@ -223,11 +221,11 @@ test-release:  ## - Check that all release binaries are created
 
 .PHONY: test-unit
 test-unit: prepare-test-context  ## - Run unit tests only
-	set -o pipefail; go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
+	set -o pipefail; CGO_ENABLED=1 go test ${GO_TEST_FLAG} -tags=$(GOBUILDTAGS) -v -race -coverprofile=build/coverage-${OS_NAME}.out ./... | tee build/test-unit-${OS_NAME}.out
 
 .PHONY: benchmark
 benchmark: prepare-test-context install-benchstat  ## - Run benchmark tests only
-	set -o pipefail; go test -bench=$(BENCHMARK_FILTER) -tags=$(GOBUILDTAGS) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
+	set -o pipefail; CGO_ENABLED=1 go test -bench=$(BENCHMARK_FILTER) -tags=$(GOBUILDTAGS) -run=$(BENCHMARK_FILTER) $(BENCHMARK_ARGS) $(BENCHMARK_PACKAGE) | tee "build/$(BENCH_BASE)"
 
 .PHONY: install-benchstat
 install-benchstat: ## - Install the benchstat package
@@ -262,8 +260,7 @@ $(PLATFORM_TARGETS): release-%:
 	$(eval $@_OS := $(firstword $(subst /, ,$(lastword $(subst release-, ,$@)))))
 	$(eval $@_GO_ARCH := $(lastword $(subst /, ,$(lastword $(subst release-, ,$@)))))
 	$(eval $@_ARCH := $(TARGET_ARCH_$($@_GO_ARCH)))
-	$(eval $@_BUILDMODE:= $(BUILDMODE_$($@_OS)_$($@_GO_ARCH)))
-	GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" $($@_BUILDMODE) -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(FIPSSUFFIX)/fleet-server .
+	CGO_ENABLED=${CGO_ENABLED} GOOS=$($@_OS) GOARCH=$($@_GO_ARCH) ${GOFIPSEXPERIMENT} go build -tags=${GOBUILDTAGS} -gcflags="${GCFLAGS}" -ldflags="${LDFLAGS}" -o build/binaries/fleet-server-$(VERSION)-$($@_OS)-$($@_ARCH)$(FIPSSUFFIX)/fleet-server .
 	@$(MAKE) OS=$($@_OS) ARCH=$($@_ARCH) package-target
 
 .PHONY: build-docker
@@ -314,6 +311,8 @@ endif
 build-releaser: ## - Build a Docker image to run make package including all build tools
 ifeq ($(shell uname -p),arm)
 	$(eval SUFFIX := ${CROSSBUILD_ARM_SUFFIX})
+else ifeq ($(shell uname -p),aarch64)
+	$(eval SUFFIX := ${CROSSBUILD_ARM_SUFFIX})
 else
 	$(eval SUFFIX := ${CROSSBUILD_SUFFIX})
 endif
@@ -325,16 +324,16 @@ endif
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
-	docker run --rm -u $(shell id -u):$(shell id -g) --env=GOCACHE=/go/cache --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) release
+	docker run --rm -u $(shell id -u):$(shell id -g) --env=GOCACHE=/go/cache --env='PLATFORMS=${PLATFORMS}' --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) release
 
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser
 ifeq "${FIPS}" "true"
 	## non-linux is currently unsupported for FIPS
-	docker run --rm -u $(shell id -u):$(shell id -g) --env=GOCACHE=/go/cache --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true -e DEV=$(DEV) -e FIPS=$(FIPS) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH)
+	docker run --rm -u $(shell id -u):$(shell id -g) --env=GOCACHE=/go/cache --env='PLATFORMS=${PLATFORMS}' --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true -e DEV=$(DEV) -e FIPS=$(FIPS) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH)
 else
 	## Build for local architecture and for linux/$ARCH for docker images.
-	docker run --rm -u $(shell id -u):$(shell id -g) --env=GOCACHE=/go/cache --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true -e DEV=$(DEV) -e FIPS=$(FIPS) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
+	docker run --rm -u $(shell id -u):$(shell id -g) --env=GOCACHE=/go/cache --env='PLATFORMS=${PLATFORMS}' --volume $(PWD):/go/src/github.com/elastic/fleet-server -e SNAPSHOT=true -e DEV=$(DEV) -e FIPS=$(FIPS) $(BUILDER_IMAGE) cover-linux/$(shell go env GOARCH) cover-$(shell go env GOOS)/$(shell go env GOARCH)
 endif
 
 .PHONY: release
@@ -404,6 +403,7 @@ test-int-set: ## - Run integration tests without setup
 	REMOTE_ELASTICSEARCH_SERVICE_TOKEN=$(shell ./dev-tools/integration/get-elasticsearch-servicetoken.sh https://${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}@${TEST_REMOTE_ELASTICSEARCH_HOST} "fleet-server-remote") \
 	REMOTE_ELASTICSEARCH_CA_CRT_BASE64="$(shell COMPOSE_PROJECT_NAME=integration docker compose  -f ./dev-tools/e2e/docker-compose.yml --env-file ./dev-tools/integration/.env exec elasticsearch-remote /bin/bash -c "cat /usr/share/elasticsearch/config/certs/ca/ca.crt" | base64)" \
 	ELASTICSEARCH_HOSTS=${TEST_ELASTICSEARCH_HOSTS} ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME} ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} \
+	CGO_ENABLED=1 \
 	go test -v -tags=integration -count=1 -race -p 1 ./...
 
 ##################################################
@@ -465,4 +465,4 @@ test-cloude2e: prepare-test-context  ## - Run cloude2e tests with full setup (sl
 test-cloude2e-set: ## Run cloude2e test
 	$(eval FLEET_SERVER_URL := $(shell make --no-print-directory -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url))
 	make -C ${CLOUD_TESTING_BASE} cloud-get-fleet-url
-	FLEET_SERVER_URL="${FLEET_SERVER_URL}" go test -v -tags=cloude2e -count=1 -race -p 1 ./testing/cloude2e
+	FLEET_SERVER_URL="${FLEET_SERVER_URL}" CGO_ENABLED=1 go test -v -tags=cloude2e -count=1 -race -p 1 ./testing/cloude2e
