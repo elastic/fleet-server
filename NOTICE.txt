@@ -4640,19 +4640,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/time
-<<<<<<< HEAD
-Version: v0.11.0
-Licence type (autodetected): BSD-3-Clause
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/golang.org/x/time@v0.11.0/LICENSE:
-=======
 Version: v0.13.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/golang.org/x/time@v0.13.0/LICENSE:
->>>>>>> 00c415e (build(deps): bump golang.org/x/time from 0.12.0 to 0.13.0 (#5459))
 
 Copyright 2009 The Go Authors.
 
