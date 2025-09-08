@@ -331,7 +331,7 @@ endif
 
 .PHONY: docker-release
 docker-release: build-releaser ## - Builds a release for all platforms in a dockerised environment
-	docker run --rm -u $(shell id -u):$(shell id -g) --env=GOCACHE=/go/cache --env='PLATFORMS=${PLATFORMS}' --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) release
+	docker run --rm -u $(shell id -u):$(shell id -g) -e SNAPSHOT=$(or $(SNAPSHOT),false) --env=GOCACHE=/go/cache --env='PLATFORMS=${PLATFORMS}' --volume $(PWD):/go/src/github.com/elastic/fleet-server $(BUILDER_IMAGE) release
 
 .PHONY: docker-cover-e2e-binaries
 docker-cover-e2e-binaries: build-releaser
