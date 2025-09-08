@@ -11,3 +11,4 @@ mage:
 .PHONY: clean
 clean:
 	@printf "${CMD_COLOR_ON} Clean up build artifacts\n${CMD_COLOR_OFF}"
+	rm -rf .service_token* .kibana_service_token ./bin/ ./build/

@@ -3,11 +3,26 @@
 set -euo pipefail
 
 FLEET_SERVER_VERSION=${1:?"Fleet Server version is needed"}
+PLATFORMS=${PLATFORMS:-"darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64"}
 
-PLATFORM_FILES=(darwin-aarch64.tar.gz darwin-x86_64.tar.gz linux-arm64.tar.gz linux-x86_64.tar.gz windows-x86_64.zip)
-if [ "$FIPS" = "true" ] ; then
-    PLATFORM_FILES=(linux-arm64-fips.tar.gz linux-x86_64-fips.tar.gz)
-fi
+PLATFORM_FILES=()
+for p in $PLATFORMS; do
+  os="${p%%/*}"
+  arch="${p##*/}"
+
+  case "$os/$arch" in
+    darwin/arm64) arch="aarch64" ;;
+    */amd64) arch="x86_64" ;;
+  esac
+
+  case "$os" in
+    windows) ext="zip" ;;
+    *) ext="tar.gz" ;;
+  esac
+
+  file="${os}-${arch}.${ext}"
+  PLATFORM_FILES+=("$file")
+done
 
 #make release
 
@@ -23,10 +38,10 @@ for PLATFORM_FILE in "${PLATFORM_FILES[@]}"
 do
     file="${FILE_PREFIX}${PLATFORM_FILE}"
     if [ ! -f "${file}" ]; then
-        echo -e "${RED}!! ${PLATFORM_FILE}: The file was not created.${NO_COLOR}"
+        echo -e "${RED}!! ${file}: The file was not created.${NO_COLOR}"
         exit 1
     else
-        echo -e "- ${PLATFORM_FILE} ${GREEN}OK${NO_COLOR}"
+        echo -e "- ${file} ${GREEN}OK${NO_COLOR}"
     fi
 
     fileSha512="${file}.sha512"
@@ -34,6 +49,6 @@ do
         echo -e "${RED}!! ${fileSha512}: The file was not created.${NO_COLOR}"
         exit 1
     else
-        echo -e "- ${PLATFORM_FILE}.sha512 ${GREEN}OK${NO_COLOR}"
+        echo -e "- ${file}.sha512 ${GREEN}OK${NO_COLOR}"
     fi
 done
