@@ -27,10 +27,10 @@ with_mage
 case "${TYPE}" in
     "snapshot")
         export SNAPSHOT=true
-        mage build:release
+        mage docker:release
         ;;
     "staging")
-        mage build:release
+        mage docker:release
         ;;
     *)
     echo "The option is unsupported yet"
