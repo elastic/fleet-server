@@ -9,6 +9,19 @@ env:
   DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
   GO_AGENT_IMAGE: "golang:${GO_VERSION}"
   TERRAFORM_VERSION: "1.6.4"
+  IMAGE_UBUNTU_X86_64: "family/core-ubuntu-2204"
+  IMAGE_UBUNTU_ARM_64: "core-ubuntu-2204-aarch64"
+
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
+  # This plugin authenticates to Google Cloud using the OIDC token.
+  - oidc_plugin: &oidc_plugin
+      elastic/oblt-google-auth#v1.2.0:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
 
 steps:
   - group: "Check and build"
@@ -22,20 +35,33 @@ steps:
           cpu: "8"
           memory: "4G"
 
-      - label: ":building_construction: Run local build"
-        key: make-local
-        command: "make local"
+      - label: "Package x86_64"
+        key: "package-x86-64-pr"
+        env:
+          PLATFORMS: "linux/amd64 darwin/amd64 windows/amd64"
+        command: ".buildkite/scripts/release_test.sh"
+        artifact_paths:
+          - build/distributions/**
         agents:
-          image: "${GO_AGENT_IMAGE}"
-          cpu: "8"
-          memory: "4G"
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_X86_64}"
+          machineType: "c2-standard-16"
+        plugins:
+          - *oidc_plugin
 
-      - label: ":building_construction: Run local build: MacOS"
-        key: make-local-macos
-        command: ".buildkite/scripts/local_build.sh"
+      - label: "Package aarch64"
+        key: "package-arm64-pr"
+        env:
+          PLATFORMS: "linux/arm64 darwin/arm64"
+        command: ".buildkite/scripts/release_test.sh"
+        artifact_paths:
+          - build/distributions/**
         agents:
-          provider: orka
-          imagePrefix: generic-13-ventura-arm
+          provider: "aws"
+          imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+          instanceType: "t4g.2xlarge"
+        plugins:
+          - *oidc_plugin
 
   - group: "Performance test"
     key: "performance-test"
@@ -187,22 +213,6 @@ steps:
     depends_on:
       - step: "publish"
 
-  - label: ":gcloud: Release test"
-    key: "release-test"
-    command: ".buildkite/scripts/release_test.sh"
-    agents:
-      provider: "gcp"
-    depends_on:
-      - step: "tests"
-        allow_failure: false
-    plugins:
-      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
-      # This plugin authenticates to Google Cloud using the OIDC token.
-      - elastic/oblt-google-auth#v1.2.0:
-          lifetime: 10800 # seconds
-          project-id: "elastic-observability-ci"
-          project-number: "911195782929"
-
   - label: ":jenkins: Release - Package Registry Distribution"
     key: "release-package-registry"
     trigger: "package-registry-release-package-registry-distribution"
@@ -221,5 +231,7 @@ steps:
     build:
       branch: "${BUILDKITE_BRANCH}"
     depends_on:
-      - step: "release-test"
+      - step: "package-x86-64-pr"
+        allow_failure: false
+      - step: "package-arm64-pr"
         allow_failure: false
