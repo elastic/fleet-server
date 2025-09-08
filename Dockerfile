@@ -1,5 +1,9 @@
 ARG GO_VERSION
+<<<<<<< HEAD
 FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-bullseye AS builder
+=======
+FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-trixie AS builder
+>>>>>>> a7e0e73 (fix: switch Dockerfile of serverless image to trixie because golang-crossbuild isn't compatible with buildx multiplatforms (#5455))
 
 WORKDIR /usr/src/fleet-server
 
