@@ -83,7 +83,7 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 	u := New(nil, fakeBulk, c, int64(size), time.Hour)
-	info, err := u.Begin(context.Background(), []string{}, data)
+	info, err := u.Begin(t.Context(), []string{}, data)
 	assert.NoError(t, err)
 
 	assert.Equal(t, int64(size), info.Total)
@@ -127,7 +127,7 @@ func TestUploadBeginWritesDocumentFromInputs(t *testing.T) {
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 	u := New(nil, fakeBulk, c, int64(size), time.Hour)
-	_, err = u.Begin(context.Background(), []string{}, data)
+	_, err = u.Begin(t.Context(), []string{}, data)
 	assert.NoError(t, err)
 
 	payload, ok := fakeBulk.Calls[0].Arguments[3].([]byte)
@@ -171,7 +171,7 @@ func TestUploadBeginCalculatesCorrectChunkCount(t *testing.T) {
 			data := makeUploadRequestDict(map[string]interface{}{
 				"file.size": tc.FileSize,
 			})
-			info, err := u.Begin(context.Background(), []string{}, data)
+			info, err := u.Begin(t.Context(), []string{}, data)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.ExpectedCount, info.Count)
 		})
@@ -211,7 +211,7 @@ func TestUploadBeginMaxFileSize(t *testing.T) {
 			data := makeUploadRequestDict(map[string]interface{}{
 				"file.size": tc.FileSize,
 			})
-			_, err := u.Begin(context.Background(), []string{}, data)
+			_, err := u.Begin(t.Context(), []string{}, data)
 			if tc.ShouldError {
 				assert.ErrorIs(t, err, ErrFileSizeTooLarge)
 			} else {
@@ -265,7 +265,7 @@ func TestUploadRejectsMissingRequiredFields(t *testing.T) {
 				}
 			}
 
-			_, err = u.Begin(context.Background(), []string{}, data)
+			_, err = u.Begin(t.Context(), []string{}, data)
 			assert.Errorf(t, err, "%s is a required field and should error if not provided", field)
 		})
 
@@ -343,13 +343,13 @@ func TestChunkMarksFinal(t *testing.T) {
 				"file.size": tc.FileSize,
 			})
 
-			info, err := u.Begin(context.Background(), []string{}, data)
+			info, err := u.Begin(t.Context(), []string{}, data)
 			assert.NoError(t, err)
 
 			// for anything larger than 1-chunk, check for off-by-ones
 			if tc.FinalChunk > 0 {
 				mockUploadInfoResult(fakeBulk, info)
-				_, prev, err := u.Chunk(context.Background(), info.ID, tc.FinalChunk-1, "")
+				_, prev, err := u.Chunk(t.Context(), info.ID, tc.FinalChunk-1, "")
 				assert.NoError(t, err)
 				assert.Falsef(t, prev.Last, "penultimate chunk number (%d) should not be marked final", tc.FinalChunk-1)
 			}
@@ -357,7 +357,7 @@ func TestChunkMarksFinal(t *testing.T) {
 			mockUploadInfoResult(fakeBulk, info)
 
 			// make sure the final chunk is marked as such
-			_, chunk, err := u.Chunk(context.Background(), info.ID, tc.FinalChunk, "")
+			_, chunk, err := u.Chunk(t.Context(), info.ID, tc.FinalChunk, "")
 			assert.NoError(t, err)
 			assert.Truef(t, chunk.Last, "chunk number %d should be marked as Last", tc.FinalChunk)
 		})
