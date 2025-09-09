@@ -73,7 +73,7 @@ func (u *Uploader) Begin(ctx context.Context, namespaces []string, data JSDict) 
 	}
 
 	size, _ := data.Int64("file", "size")
-	if size > u.sizeLimit {
+	if u.sizeLimit != 0 && size > u.sizeLimit {
 		vSpan.End()
 		return file.Info{}, ErrFileSizeTooLarge
 	}

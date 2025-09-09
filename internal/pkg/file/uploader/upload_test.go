@@ -185,6 +185,7 @@ func TestUploadBeginMaxFileSize(t *testing.T) {
 		ShouldError     bool
 		Name            string
 	}{
+		{0, 1024 * 1024 * 300, false, "0 limit is unlimited"},
 		{500, 800, true, "800 is too large"},
 		{800, 500, false, "file within limits"},
 		{1024, 1023, false, "1-less than limit"},
