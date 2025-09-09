@@ -9,6 +9,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -946,7 +947,7 @@ func prepareOTelExporters(outputs map[string]map[string]interface{}, exporters m
 			if !ok || apiKey == "" {
 				return fmt.Errorf("api key not found in output %q for exporter %q", name, id)
 			}
-			config["api_key"] = apiKey
+			config["api_key"] = base64.StdEncoding.EncodeToString([]byte(apiKey))
 		default:
 			return fmt.Errorf("OTel exporter %q not supported", exporterType)
 		}
