@@ -940,7 +940,7 @@ func prepareOTelExporters(outputs map[string]map[string]interface{}, exporters m
 
 		switch exporterType {
 		case "elasticsearch":
-			if ot, ok := output["type"].(string); !ok || ot != "elasticsearch" {
+			if ot, ok := output["type"].(string); !ok || ot != policy.OutputTypeElasticsearch {
 				return fmt.Errorf("unexpected output type %q found for exporter %q", name, id)
 			}
 			apiKey, ok := output["api_key"].(string)
