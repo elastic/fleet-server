@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-bullseye AS builder
+FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-trixie AS builder
 
 WORKDIR /fleet-server
 
@@ -7,6 +7,8 @@ WORKDIR /fleet-server
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 RUN go install github.com/magefile/mage # Uses version from go.mod implicitly
+ENV PATH="$PATH:/go/bin"
+ENV MAGEFILE_CACHE=/fleet-server/build/.magefile
 
 COPY . .
 
