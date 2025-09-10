@@ -129,6 +129,7 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 		}
 
 		action.Data = secretData
+		action.SecretReferences = nil
 
 		numAgents := len(action.Agents)
 		for i, agentID := range action.Agents {
