@@ -5037,11 +5037,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/net
-Version: v0.43.0
+Version: v0.44.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/net@v0.43.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/net@v0.44.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -22466,6 +22466,7 @@ Contents of probable licence file $GOMODCACHE/google.golang.org/genproto@v0.0.0-
 
 
 --------------------------------------------------------------------------------
+<<<<<<< HEAD
 Dependency : google.golang.org/genproto/googleapis/api
 Version: v0.0.0-20250707201910-8d1bb00bc6a7
 Licence type (autodetected): Apache-2.0
@@ -22479,6 +22480,51 @@ Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googlea
                         http://www.apache.org/licenses/
 
    TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+=======
+Dependency : golang.org/x/crypto
+Version: v0.42.0
+Licence type (autodetected): BSD-3-Clause
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/golang.org/x/crypto@v0.42.0/LICENSE:
+
+Copyright 2009 The Go Authors.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google LLC nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--------------------------------------------------------------------------------
+Dependency : golang.org/x/sys
+Version: v0.36.0
+Licence type (autodetected): BSD-3-Clause
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.36.0/LICENSE:
+>>>>>>> 80b580e (build(deps): bump golang.org/x/net from 0.43.0 to 0.44.0 (#5480))
 
    1. Definitions.
 
@@ -22499,6 +22545,7 @@ Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googlea
       "You" (or "Your") shall mean an individual or Legal Entity
       exercising permissions granted by this License.
 
+<<<<<<< HEAD
       "Source" form shall mean the preferred form for making modifications,
       including but not limited to software source code, documentation
       source, and configuration files.
@@ -22507,6 +22554,15 @@ Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googlea
       transformation or translation of a Source form, including but
       not limited to compiled object code, generated documentation,
       and conversions to other media types.
+=======
+--------------------------------------------------------------------------------
+Dependency : golang.org/x/text
+Version: v0.29.0
+Licence type (autodetected): BSD-3-Clause
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/golang.org/x/text@v0.29.0/LICENSE:
+>>>>>>> 80b580e (build(deps): bump golang.org/x/net from 0.43.0 to 0.44.0 (#5480))
 
       "Work" shall mean the work of authorship, whether in Source or
       Object form, made available under the License, as indicated by a
