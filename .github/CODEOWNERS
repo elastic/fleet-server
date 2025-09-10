@@ -5,3 +5,5 @@
 dev-tools/integration/.env
 
 /.github/workflows @elastic/observablt-ci
+/docs/release-notes @elastic/ingest-docs
+/docs/docset.yml @elastic/ingest-docs
