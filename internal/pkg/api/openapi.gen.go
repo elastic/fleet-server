@@ -332,7 +332,7 @@ type CheckinRequest struct {
 	Message string `json:"message"`
 
 	// PolicyRevisionIdx The revision of the policy that the agent is currently running.
-	PolicyRevisionIdx *int `json:"policy_revision_idx,omitempty"`
+	PolicyRevisionIdx *int64 `json:"policy_revision_idx,omitempty"`
 
 	// PollTimeout An optional timeout value that informs fleet-server of when a client will time out on it's checkin request.
 	// If not specified fleet-server will use the timeout values specified in the config (defaults to 5m polling and a 10m write timeout).
