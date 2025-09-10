@@ -430,6 +430,7 @@ components:
           description: |
             The revision of the policy that the agent is currently running.
           type: integer
+          format: int64
     actionSignature:
       description: Optional action signing data.
       type: object

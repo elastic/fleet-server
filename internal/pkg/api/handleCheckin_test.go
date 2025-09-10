@@ -1118,3 +1118,131 @@ func TestValidateCheckinRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessPolicyDetails(t *testing.T) {
+	policyID := "policy-id"
+	revIDX2 := int64(2)
+	tests := []struct {
+		name       string
+		agent      *model.Agent
+		req        *CheckinRequest
+		revIDX     int64
+		returnsOps bool
+		err        error
+	}{{
+		name: "request has no policy details",
+		agent: &model.Agent{
+			PolicyRevisionIdx: 1,
+		},
+		req:        &CheckinRequest{},
+		revIDX:     1,
+		returnsOps: false,
+		err:        nil,
+	}, {
+		name: "policy reassign detected",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          "new-policy-id",
+			AgentPolicyID:     policyID,
+			PolicyRevisionIdx: 2,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		revIDX:     0,
+		returnsOps: true,
+		err:        nil,
+	}, {
+		name: "revision updated",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			AgentPolicyID:     policyID,
+			PolicyRevisionIdx: 1,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		revIDX:     2,
+		returnsOps: true,
+		err:        nil,
+	}, {
+		name: "agent_policy_id has changed",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			AgentPolicyID:     "old-policy-id",
+			PolicyRevisionIdx: 1,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		revIDX:     2,
+		returnsOps: true,
+		err:        nil,
+	}, {
+		name: "agent does not have agent_policy_id present",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			PolicyRevisionIdx: 2,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		revIDX:     2,
+		returnsOps: false,
+		err:        nil,
+	}, {
+		name: "details present with no changes from agent doc",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			AgentPolicyID:     policyID,
+			PolicyID:          policyID,
+			PolicyRevisionIdx: revIDX2,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		revIDX:     2,
+		returnsOps: false,
+		err:        nil,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			checkin := &CheckinT{
+				bulker: ftesting.NewMockBulk(),
+			}
+
+			revIDX, opts, err := checkin.processPolicyDetails(t.Context(), logger, tc.agent, tc.req)
+			assert.Equal(t, tc.revIDX, revIDX)
+			if tc.returnsOps {
+				assert.NotEmpty(t, opts)
+			} else {
+				assert.Empty(t, opts)
+			}
+			if tc.err != nil {
+				assert.ErrorIs(t, tc.err, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

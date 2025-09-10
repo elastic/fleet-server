@@ -34,6 +34,7 @@ const (
 	FieldLastCheckinMessage            = "last_checkin_message"
 	FieldLocalMetadata                 = "local_metadata"
 	FieldComponents                    = "components"
+	FieldAgentPolicyID                 = "agent_policy_id"
 	FieldPolicyID                      = "policy_id"
 	FieldPolicyOutputAPIKey            = "api_key"
 	FieldPolicyOutputAPIKeyID          = "api_key_id"
