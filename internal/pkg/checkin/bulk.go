@@ -41,6 +41,78 @@ func WithFlushInterval(d time.Duration) Opt {
 	}
 }
 
+// Option is an optional type that describes options for agent checkin
+type Option func(*pendingT)
+
+func WithStatus(status string) Option {
+	return func(pending *pendingT) {
+		pending.status = status
+	}
+}
+
+func WithMessage(message string) Option {
+	return func(pending *pendingT) {
+		pending.message = message
+	}
+}
+
+func WithUnhealthyReason(reason *[]string) Option {
+	return func(pending *pendingT) {
+		pending.unhealthyReason = reason
+	}
+}
+
+func WithMeta(meta []byte) Option {
+	return func(pending *pendingT) {
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.meta = meta
+	}
+}
+
+func WithSeqNo(seqno sqn.SeqNo) Option {
+	return func(pending *pendingT) {
+		if !seqno.IsSet() {
+			return
+		}
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.seqNo = seqno
+	}
+}
+
+func WithVer(ver string) Option {
+	return func(pending *pendingT) {
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.ver = ver
+	}
+}
+
+func WithComponents(components []byte) Option {
+	return func(pending *pendingT) {
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.components = components
+	}
+}
+
+func WithDeleteAudit(del bool) Option {
+	return func(pending *pendingT) {
+		if !del {
+			return
+		}
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.deleteAudit = del
+	}
+}
+
 type extraT struct {
 	meta        []byte
 	seqNo       sqn.SeqNo
@@ -82,7 +154,6 @@ func NewBulk(bulker bulk.Bulk, opts ...Opt) *Bulk {
 }
 
 func parseOpts(opts ...Opt) optionsT {
-
 	outOpts := optionsT{
 		flushInterval: defaultFlushInterval,
 	}
@@ -97,7 +168,6 @@ func parseOpts(opts ...Opt) optionsT {
 // Generate and cache timestamp on seconds change.
 // Avoid thousands of formats of an identical string.
 func (bc *Bulk) timestamp() string {
-
 	// WARNING: Expects mutex locked.
 	now := time.Now()
 	if now.Unix() != bc.unix {
@@ -112,33 +182,20 @@ func (bc *Bulk) timestamp() string {
 // The pending agents are sent to elasticsearch as a bulk update at each flush interval.
 // NOTE: If Checkin is called after Run has returned it will just add the entry to the pending map and not do any operations, this may occur when the fleet-server is shutting down.
 // WARNING: Bulk will take ownership of fields, so do not use after passing in.
-func (bc *Bulk) CheckIn(id string, status string, message string, meta []byte, components []byte, seqno sqn.SeqNo, newVer string, unhealthyReason *[]string, deleteAudit bool) error {
-	// Separate out the extra data to minimize
-	// the memory footprint of the 90% case of just
-	// updating the timestamp.
-	var extra *extraT
-	if meta != nil || seqno.IsSet() || newVer != "" || components != nil || deleteAudit {
-		extra = &extraT{
-			meta:        meta,
-			seqNo:       seqno,
-			ver:         newVer,
-			components:  components,
-			deleteAudit: deleteAudit,
-		}
-	}
-
+func (bc *Bulk) CheckIn(id string, opts ...Option) error {
 	bc.mut.Lock()
-
-	bc.pending[id] = pendingT{
-		ts:              bc.timestamp(),
-		status:          status,
-		message:         message,
-		extra:           extra,
-		unhealthyReason: unhealthyReason,
+	pending := pendingT{
+		ts: bc.timestamp(),
 	}
 
+	for _, opt := range opts {
+		opt(&pending)
+	}
+
+	bc.pending[id] = pending
 	bc.mut.Unlock()
 	return nil
+
 }
 
 // Run starts the flush timer and exit only when the context is cancelled.
@@ -181,32 +238,27 @@ func (bc *Bulk) flush(ctx context.Context) error {
 	var err error
 	var needRefresh bool
 	for id, pendingData := range pending {
-
-		// In the simple case, there are no fields and no seqNo.
-		// When that is true, we can reuse an already generated
-		// JSON body containing just the timestamp updates.
 		var body []byte
 		if pendingData.extra == nil {
+			// agents that checkin without extra attributes are cachable
+			// this prevents an extra JSON serialization.
 			var ok bool
 			body, ok = simpleCache[pendingData]
 			if !ok {
-				fields := bulk.UpdateFields{
-					dl.FieldLastCheckin:        pendingData.ts,
-					dl.FieldUpdatedAt:          nowTimestamp,
-					dl.FieldLastCheckinStatus:  pendingData.status,
-					dl.FieldLastCheckinMessage: pendingData.message,
-					dl.FieldUnhealthyReason:    pendingData.unhealthyReason,
-				}
-				if body, err = fields.Marshal(); err != nil {
+				body, err = toUpdateBody(nowTimestamp, pendingData)
+				if err != nil {
 					return err
 				}
 				simpleCache[pendingData] = body
 			}
 		} else if pendingData.extra.deleteAudit {
+			if pendingData.extra.seqNo.IsSet() {
+				needRefresh = true
+			}
 			// Use a script instead of a partial doc to update if attributes need to be removed
 			params, err := encodeParams(nowTimestamp, pendingData)
 			if err != nil {
-				return err
+				return fmt.Errorf("unable to parse checkin details as params: %w", err)
 			}
 			action := &estypes.UpdateAction{
 				Script: &estypes.Script{
@@ -220,48 +272,12 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not marshall script action: %w", err)
 			}
-			if pendingData.extra.seqNo.IsSet() {
-				needRefresh = true
-			}
 		} else {
-			fields := bulk.UpdateFields{
-				dl.FieldLastCheckin:        pendingData.ts,      // Set the checkin timestamp
-				dl.FieldUpdatedAt:          nowTimestamp,        // Set "updated_at" to the current timestamp
-				dl.FieldLastCheckinStatus:  pendingData.status,  // Set the pending status
-				dl.FieldLastCheckinMessage: pendingData.message, // Set the status message
-				dl.FieldUnhealthyReason:    pendingData.unhealthyReason,
-			}
-
-			// If the agent version is not empty it needs to be updated
-			// Assuming the agent can by upgraded keeping the same id, but incrementing the version
-			if pendingData.extra.ver != "" {
-				fields[dl.FieldAgent] = map[string]interface{}{
-					dl.FieldAgentVersion: pendingData.extra.ver,
-				}
-			}
-
-			// Update local metadata if provided
-			if pendingData.extra.meta != nil {
-				// Surprise: The json encodeer compacts this raw JSON during
-				// the encode process, so there my be unexpected memory overhead:
-				// https://github.com/golang/go/blob/go1.16.3/src/encoding/json/encode.go#L499
-				fields[dl.FieldLocalMetadata] = json.RawMessage(pendingData.extra.meta)
-			}
-
-			// Update components if provided
-			if pendingData.extra.components != nil {
-				fields[dl.FieldComponents] = json.RawMessage(pendingData.extra.components)
-			}
-
-			// If seqNo changed, set the field appropriately
 			if pendingData.extra.seqNo.IsSet() {
-				fields[dl.FieldActionSeqNo] = pendingData.extra.seqNo
-
-				// Only refresh if seqNo changed; dropping metadata not important.
 				needRefresh = true
 			}
-
-			if body, err = fields.Marshal(); err != nil {
+			body, err = toUpdateBody(nowTimestamp, pendingData)
+			if err != nil {
 				return err
 			}
 		}
@@ -290,19 +306,60 @@ func (bc *Bulk) flush(ctx context.Context) error {
 	return err
 }
 
+func toUpdateBody(now string, pending pendingT) ([]byte, error) {
+	fields := bulk.UpdateFields{
+		dl.FieldUpdatedAt:          now,             // Set "updated_at" to the current timestamp
+		dl.FieldLastCheckin:        pending.ts,      // Set the checkin timestamp
+		dl.FieldLastCheckinStatus:  pending.status,  // Set the pending status
+		dl.FieldLastCheckinMessage: pending.message, // Set the status message
+		dl.FieldUnhealthyReason:    pending.unhealthyReason,
+	}
+	if pending.extra != nil {
+		// If the agent version is not empty it needs to be updated
+		// Assuming the agent can by upgraded keeping the same id, but incrementing the version
+		if pending.extra.ver != "" {
+			fields[dl.FieldAgent] = map[string]interface{}{
+				dl.FieldAgentVersion: pending.extra.ver,
+			}
+		}
+
+		// Update local metadata if provided
+		if pending.extra.meta != nil {
+			// Surprise: The json encodeer compacts this raw JSON during
+			// the encode process, so there my be unexpected memory overhead:
+			// https://github.com/golang/go/blob/go1.16.3/src/encoding/json/encode.go#L499
+			fields[dl.FieldLocalMetadata] = json.RawMessage(pending.extra.meta)
+		}
+
+		// Update components if provided
+		if pending.extra.components != nil {
+			fields[dl.FieldComponents] = json.RawMessage(pending.extra.components)
+		}
+
+		// If seqNo changed, set the field appropriately
+		if pending.extra.seqNo.IsSet() {
+			fields[dl.FieldActionSeqNo] = pending.extra.seqNo
+		}
+	}
+	return fields.Marshal()
+}
+
 func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error) {
 	var (
-		tsNow      json.RawMessage
-		ts         json.RawMessage
-		status     json.RawMessage
-		message    json.RawMessage
-		reason     json.RawMessage
+		tsNow   json.RawMessage
+		ts      json.RawMessage
+		status  json.RawMessage
+		message json.RawMessage
+		reason  json.RawMessage
+
+		// optional attributes below
 		ver        json.RawMessage
 		meta       json.RawMessage
 		components json.RawMessage
 		isSet      json.RawMessage
 		seqNo      json.RawMessage
-		err        error
+
+		err error
 	)
 	tsNow, err = json.Marshal(now)
 	Err := errors.Join(err)
