@@ -25,7 +25,7 @@ type mockMonitor struct {
 
 func (m *mockMonitor) Output() <-chan []es.HitT {
 	args := m.Called()
-	return args.Get(0).(<-chan []es.HitT) //nolint:errcheck we don't need to check here
+	return args.Get(0).(<-chan []es.HitT) //nolint:errcheck // we don't need to check here
 }
 
 func (m *mockMonitor) Run(ctx context.Context) error {
@@ -35,7 +35,7 @@ func (m *mockMonitor) Run(ctx context.Context) error {
 
 func (m *mockMonitor) GetCheckpoint() sqn.SeqNo {
 	args := m.Called()
-	return args.Get(0).(sqn.SeqNo) //nolint:errcheck we don't need to check here
+	return args.Get(0).(sqn.SeqNo) //nolint:errcheck // we don't need to check here
 }
 
 func TestNewDispatcher(t *testing.T) {
