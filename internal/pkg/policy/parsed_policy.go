@@ -14,13 +14,13 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/secret"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
 const (
 	FieldOutputs            = "outputs"
 	FieldOutputType         = "type"
-	FieldOutputSecrets      = "secrets"
 	FieldOutputFleetServer  = "fleet_server"
 	FieldOutputServiceToken = "service_token"
 	FieldOutputPermissions  = "output_permissions"
@@ -68,7 +68,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		return nil, err
 	}
 	for name, policyOutput := range p.Data.Outputs {
-		ks, err := ProcessOutputSecret(ctx, policyOutput, bulker)
+		ks, err := secret.ProcessOutputSecret(ctx, policyOutput, bulker)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +80,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	if err != nil {
 		return nil, err
 	}
-	policyInputs, keys, err := getPolicyInputsWithSecrets(ctx, p.Data, bulker)
+	policyInputs, keys, err := secret.GetPolicyInputsWithSecrets(ctx, p.Data, bulker)
 	if err != nil {
 		return nil, err
 	}

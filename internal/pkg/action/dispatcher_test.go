@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/time/rate"
@@ -39,10 +40,12 @@ func (m *mockMonitor) GetCheckpoint() sqn.SeqNo {
 
 func TestNewDispatcher(t *testing.T) {
 	m := &mockMonitor{}
-	d := NewDispatcher(m, 0, 0)
+	bulker := ftesting.NewMockBulk()
+	d := NewDispatcher(m, 0, 0, bulker)
 
 	assert.NotNil(t, d.am)
 	assert.NotNil(t, d.subs)
+	assert.NotNil(t, d.bulker)
 }
 
 func compareActions(t *testing.T, expects, results []model.Action) {

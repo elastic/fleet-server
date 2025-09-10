@@ -75,6 +75,9 @@ type Action struct {
 
 	// The ID of the user who created the action.
 	UserID string `json:"user_id,omitempty"`
+
+	// A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.
+	SecretReferences []SecretReferencesItems `json:"secret_references,omitempty"`
 }
 
 // ActionResult An Elastic Agent action results
