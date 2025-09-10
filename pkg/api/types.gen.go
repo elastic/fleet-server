@@ -311,6 +311,9 @@ type CheckinRequest struct {
 	// Translated to a sequence number in fleet-server in order to retrieve any new actions for the agent from the last checkin.
 	AckToken *string `json:"ack_token,omitempty"`
 
+	// AgentPolicyId The ID of the policy that the agent is currently running.
+	AgentPolicyId *string `json:"agent_policy_id,omitempty"`
+
 	// Components An embedded JSON object that holds component information that the agent is running.
 	// Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
 	// fleet-server will update the components in an agent record if they differ from this object.
@@ -324,6 +327,9 @@ type CheckinRequest struct {
 
 	// Message State message, may be overridden or use the error message of a failing component.
 	Message string `json:"message"`
+
+	// PolicyRevisionIdx The revision of the policy that the agent is currently running.
+	PolicyRevisionIdx *int `json:"policy_revision_idx,omitempty"`
 
 	// PollTimeout An optional timeout value that informs fleet-server of when a client will time out on it's checkin request.
 	// If not specified fleet-server will use the timeout values specified in the config (defaults to 5m polling and a 10m write timeout).
