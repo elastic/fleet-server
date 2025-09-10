@@ -132,6 +132,9 @@ type Agent struct {
 	Active bool           `json:"active"`
 	Agent  *AgentMetadata `json:"agent,omitempty"`
 
+	// The policy ID that the Elastic Agent is currently running.
+	AgentPolicyID string `json:"agent_policy_id,omitempty"`
+
 	// Agent reason for unenroll/uninstall annotation.
 	AuditUnenrolledReason string `json:"audit_unenrolled_reason,omitempty"`
 
@@ -183,7 +186,7 @@ type Agent struct {
 	// The current policy coordinator for the Elastic Agent
 	PolicyCoordinatorIdx int64 `json:"policy_coordinator_idx,omitempty"`
 
-	// The policy ID for the Elastic Agent
+	// The policy ID that the Elastic Agent should run.
 	PolicyID string `json:"policy_id,omitempty"`
 
 	// Deprecated. Use Outputs instead. The policy output permissions hash

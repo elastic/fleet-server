@@ -422,6 +422,14 @@ components:
           format: duration
         upgrade_details:
           $ref: "#/components/schemas/upgrade_details"
+        agent_policy_id:
+          description: |
+            The ID of the policy that the agent is currently running.
+          type: string
+        policy_revision_idx:
+          description: |
+            The revision of the policy that the agent is currently running.
+          type: integer
     actionSignature:
       description: Optional action signing data.
       type: object
