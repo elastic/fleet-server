@@ -41,7 +41,7 @@ func WithFlushInterval(d time.Duration) Opt {
 	}
 }
 
-// Option is an optional type that describes options for agent checkin
+// Option is the type for optional arguments for agent checkins.
 type Option func(*pendingT)
 
 func WithStatus(status string) Option {
@@ -195,7 +195,6 @@ func (bc *Bulk) CheckIn(id string, opts ...Option) error {
 	bc.pending[id] = pending
 	bc.mut.Unlock()
 	return nil
-
 }
 
 // Run starts the flush timer and exit only when the context is cancelled.
@@ -241,7 +240,8 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		var body []byte
 		if pendingData.extra == nil {
 			// agents that checkin without extra attributes are cachable
-			// this prevents an extra JSON serialization.
+			// Cacheable agents can share the same status, message, and unhealthy reason. Timestamps are ignored.
+			// This prevents an extra JSON serialization when agents have the same update body.
 			var ok bool
 			body, ok = simpleCache[pendingData]
 			if !ok {
@@ -325,9 +325,9 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 
 		// Update local metadata if provided
 		if pending.extra.meta != nil {
-			// Surprise: The json encodeer compacts this raw JSON during
+			// Surprise: The json encoder compacts this raw JSON during
 			// the encode process, so there my be unexpected memory overhead:
-			// https://github.com/golang/go/blob/go1.16.3/src/encoding/json/encode.go#L499
+			// https://github.com/golang/go/blob/de5d7eccb99088e3ab42c0d907da6852d8f9cebe/src/encoding/json/encode.go#L503-L507
 			fields[dl.FieldLocalMetadata] = json.RawMessage(pending.extra.meta)
 		}
 
