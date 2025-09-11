@@ -3,3 +3,10 @@
 
 # Allow to auto-merge PRs with Mergify
 dev-tools/integration/.env
+<<<<<<< HEAD
+=======
+
+/.github/workflows @elastic/observablt-ci
+/docs/release-notes @elastic/ingest-docs
+/docs/docset.yml @elastic/ingest-docs
+>>>>>>> 461aa39 (add ingest-docs team as CODEOWNERS for release notes and docset.yml (#5492))
