@@ -94,7 +94,7 @@ func GetActionDataWithSecrets(ctx context.Context, data json.RawMessage, refs []
 		return data, err
 	}
 
-	return json.RawMessage(b), nil
+	return b, nil
 }
 
 // replaceMapRef replaces all nested secret values in the passed input and returns the resulting input along with a list of keys where inputs have been replaced.
