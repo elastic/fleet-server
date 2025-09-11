@@ -40,8 +40,13 @@ require (
 	golang.org/x/net v0.43.0
 	golang.org/x/sync v0.16.0
 	golang.org/x/time v0.13.0
+<<<<<<< HEAD
 	google.golang.org/grpc v1.75.0
 	google.golang.org/protobuf v1.36.8
+=======
+	google.golang.org/grpc v1.75.1
+	google.golang.org/protobuf v1.36.9
+>>>>>>> bbfbaa3 (build(deps): bump google.golang.org/grpc from 1.75.0 to 1.75.1 (#5495))
 	gopkg.in/yaml.v3 v3.0.1
 )
 
