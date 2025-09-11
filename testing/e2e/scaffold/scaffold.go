@@ -18,11 +18,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-<<<<<<< HEAD
 	"strings"
-=======
 	"testing"
->>>>>>> 4b4dbf2 (Update testing dependencies and fix issues with toxiproxy (#4847))
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"

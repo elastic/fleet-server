@@ -154,69 +154,6 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 	cmd.Wait()
 }
 
-<<<<<<< HEAD
-=======
-// TestWithElasticsearchConnectionFlakyness checks the behaviour of stand alone Fleet Server
-// when Elasticsearch is not reachable portion of the time.
-func (suite *StandAloneSuite) TestWithElasticsearchConnectionFlakyness() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-
-	proxyContainer := suite.StartToxiproxy(ctx)
-	proxyEndpoint, err := proxyContainer.URI(ctx)
-	suite.Require().NoError(err)
-	proxyClient := toxiproxy.NewClient(proxyEndpoint)
-
-	pHost, pPort, err := proxyContainer.ProxiedEndpoint(8666) // Toxiproxy port starts at 8666
-	suite.Require().NoError(err)
-
-	// Create a config file from a template in the test temp dir
-	dir := suite.T().TempDir()
-	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-http.tpl"))
-	suite.Require().NoError(err)
-	f, err := os.Create(filepath.Join(dir, "config.yml"))
-	suite.Require().NoError(err)
-	err = tpl.Execute(f, map[string]string{
-		"Hosts":        fmt.Sprintf("http://%s:%s", pHost, pPort),
-		"ServiceToken": suite.ServiceToken,
-	})
-	f.Close()
-	suite.Require().NoError(err)
-
-	// Run the fleet-server binary
-	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
-	cmd.Cancel = func() error {
-		return cmd.Process.Signal(syscall.SIGTERM)
-	}
-	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
-	err = cmd.Start()
-	suite.Require().NoError(err)
-
-	// Wait to check that it is healthy.
-	proxy, err := proxyClient.Proxy("es")
-	suite.Require().NoError(err)
-	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
-
-	// Provoke timeouts and wait for the healthcheck to fail.
-	_, err = proxy.AddToxic("force_timeout", "timeout", "upstream", 0.4, toxiproxy.Attributes{}) // we have 5 retries, test with failure 4 out of 10 should be ok
-	suite.Require().NoError(err)
-
-	// wait for unit state degraded
-	timeoutCtx, tCancel := context.WithTimeout(ctx, 30*time.Second)
-	suite.FleetServerStatusNeverBecomes(timeoutCtx, "http://localhost:8220", client.UnitStateDegraded)
-
-	// test should not fail at this point
-	tCancel()
-
-	// Recover the network and wait for the healthcheck to be healthy again.
-	err = proxy.RemoveToxic("force_timeout")
-	suite.Require().NoError(err)
-	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
-
-	cancel()
-	cmd.Wait()
-}
-
->>>>>>> 4b4dbf2 (Update testing dependencies and fix issues with toxiproxy (#4847))
 // TestWithSecretFiles tests starting an HTTPS server using a service-token file, public/private keys + passphrase file.
 func (suite *StandAloneSuite) TestWithSecretFiles() {
 	// Create a service token file in the temp test dir
