@@ -27,7 +27,7 @@ import (
 // Test with seq no
 
 // matchOp is used with mock.MatchedBy to match and validate the operation
-func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) bool {
+func matchOp(tb testing.TB, c testcase, ts time.Time) func(ops []bulk.MultiOp) bool {
 	return func(ops []bulk.MultiOp) bool {
 		if len(ops) != 1 {
 			return false
@@ -79,8 +79,8 @@ func matchOp(tb testing.TB, c bulkcase, ts time.Time) func(ops []bulk.MultiOp) b
 	}
 }
 
-type bulkcase struct {
-	desc            string
+type testcase struct {
+	name            string
 	id              string
 	status          string
 	message         string
@@ -95,7 +95,7 @@ func TestBulkSimple(t *testing.T) {
 	start := time.Now()
 
 	const ver = "8.9.0"
-	cases := []bulkcase{
+	cases := []testcase{
 		{
 			"Simple case",
 			"simpleId",
@@ -198,13 +198,30 @@ func TestBulkSimple(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.desc, func(t *testing.T) {
-			ctx := testlog.SetLogger(t).WithContext(context.Background())
+		t.Run(c.name, func(t *testing.T) {
+			ctx := testlog.SetLogger(t).WithContext(t.Context())
 			mockBulk := ftesting.NewMockBulk()
 			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
 			bc := NewBulk(mockBulk)
 
-			if err := bc.CheckIn(c.id, c.status, c.message, c.meta, c.components, c.seqno, c.ver, c.unhealthyReason, false); err != nil {
+			opts := []Option{WithStatus(c.status), WithMessage(c.message)}
+			if c.meta != nil {
+				opts = append(opts, WithMeta(c.meta))
+			}
+			if c.components != nil {
+				opts = append(opts, WithComponents(c.components))
+			}
+			if c.seqno != nil {
+				opts = append(opts, WithSeqNo(c.seqno))
+			}
+			if c.ver != "" {
+				opts = append(opts, WithVer(c.ver))
+			}
+			if c.unhealthyReason != nil {
+				opts = append(opts, WithUnhealthyReason(c.unhealthyReason))
+			}
+
+			if err := bc.CheckIn(c.id, opts...); err != nil {
 				t.Fatal(err)
 			}
 
@@ -239,7 +256,7 @@ func benchmarkBulk(n int, b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for _, id := range ids {
-			err := bc.CheckIn(id, "", "", nil, nil, nil, "", nil, false)
+			err := bc.CheckIn(id)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -265,7 +282,7 @@ func benchmarkFlush(n int, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		for _, id := range ids {
-			err := bc.CheckIn(id, "", "", nil, nil, nil, "", nil, false)
+			err := bc.CheckIn(id) // TODO ths benchmark is not very interesting as the simplecache is used
 			if err != nil {
 				b.Fatal(err)
 			}
