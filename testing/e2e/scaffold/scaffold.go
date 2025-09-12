@@ -19,14 +19,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
-	toxiproxy "github.com/Shopify/toxiproxy/client"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
+	toxitc "github.com/testcontainers/testcontainers-go/modules/toxiproxy"
 )
 
 // Scaffold contains attributes and methods that are applicable to multiple test cases
@@ -516,34 +516,50 @@ func (s *Scaffold) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 	}
 }
 
-func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxiproxy.Client {
-	req := testcontainers.ContainerRequest{
-		Image:        "ghcr.io/shopify/toxiproxy:2.5.0",
-		ExposedPorts: []string{"8474/tcp"},
-		WaitingFor:   wait.ForHTTP("/version").WithPort("8474/tcp"),
-		NetworkMode:  "host",
-	}
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
+type logger struct {
+	*testing.T
+}
+
+func (l *logger) Printf(format string, v ...interface{}) {
+	l.Helper()
+	l.Logf(format, v...)
+}
+
+func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxitc.Container {
+	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0",
+		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Hostname: "toxi",
+				Name:     "toxi",
+				// Network is set to the integration test network instead of using host mode so it can easily communicate with other containers.
+				// NOTE: the container will not become healthy when using `testcontainers-go 0.36.x+ if set to NetworkMode: "host"
+				Networks: []string{"integration_default"},
+			}}),
+		testcontainers.WithLogger(&logger{s.T()}),
+		toxitc.WithProxy("es", "elasticsearch:9200"),
+	)
 	s.Require().NoError(err)
 
 	s.T().Cleanup(func() {
-		err := container.Terminate(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute) // use context.Background instead of s.T().Context() because this is a cleanup task
+		defer cancel()
+		if s.T().Failed() {
+			rc, err := container.Logs(ctx)
+			if err != nil {
+				s.T().Logf("unable to get proxy container logs: %v", err)
+			} else {
+				p, err := io.ReadAll(rc)
+				s.T().Logf("failed test log read err: %v, proxy container logs:\n%s", err, string(p))
+				rc.Close()
+			}
+		}
+		err := container.Terminate(ctx)
 		if err != nil {
 			s.T().Log("could not terminate toxiproxy container")
 		}
 	})
 
-	mappedPort, err := container.MappedPort(ctx, "8474")
-	s.Require().NoError(err)
-
-	hostIP, err := container.Host(ctx)
-	s.Require().NoError(err)
-
-	endpoint := fmt.Sprintf("%s:%s", hostIP, mappedPort.Port())
-	return toxiproxy.NewClient(endpoint)
+	return container
 }
 
 // HasTestStatusTrace will search elasticsearch for an APM trace to GET /api/status with labels.testName: name
