@@ -518,7 +518,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	}
 	g.Go(loggedRunFunc(ctx, "Action monitor", am.Run))
 
-	ad := action.NewDispatcher(am, cfg.Inputs[0].Server.Limits.ActionLimit.Interval, cfg.Inputs[0].Server.Limits.ActionLimit.Burst)
+	ad := action.NewDispatcher(am, cfg.Inputs[0].Server.Limits.ActionLimit.Interval, cfg.Inputs[0].Server.Limits.ActionLimit.Burst, bulker)
 	g.Go(loggedRunFunc(ctx, "Action dispatcher", ad.Run))
 
 	bc := checkin.NewBulk(bulker)

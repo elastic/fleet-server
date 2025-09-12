@@ -55,8 +55,11 @@ type Action struct {
 	Namespaces []string `json:"namespaces,omitempty"`
 
 	// The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.
-	RolloutDurationSeconds int64   `json:"rollout_duration_seconds,omitempty"`
-	Signed                 *Signed `json:"signed,omitempty"`
+	RolloutDurationSeconds int64 `json:"rollout_duration_seconds,omitempty"`
+
+	// A list of all secrets fleet-server needs to inject into the actions data before passing it to the agent. This attribute is removed when action data is send to an agent.
+	SecretReferences []SecretReferencesItems `json:"secret_references,omitempty"`
+	Signed           *Signed                 `json:"signed,omitempty"`
 
 	// The action start date/time
 	StartTime string `json:"start_time,omitempty"`

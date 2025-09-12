@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/time/rate"
@@ -24,7 +25,7 @@ type mockMonitor struct {
 
 func (m *mockMonitor) Output() <-chan []es.HitT {
 	args := m.Called()
-	return args.Get(0).(<-chan []es.HitT)
+	return args.Get(0).(<-chan []es.HitT) //nolint:errcheck // we don't need to check here
 }
 
 func (m *mockMonitor) Run(ctx context.Context) error {
@@ -34,15 +35,17 @@ func (m *mockMonitor) Run(ctx context.Context) error {
 
 func (m *mockMonitor) GetCheckpoint() sqn.SeqNo {
 	args := m.Called()
-	return args.Get(0).(sqn.SeqNo)
+	return args.Get(0).(sqn.SeqNo) //nolint:errcheck // we don't need to check here
 }
 
 func TestNewDispatcher(t *testing.T) {
 	m := &mockMonitor{}
-	d := NewDispatcher(m, 0, 0)
+	bulker := ftesting.NewMockBulk()
+	d := NewDispatcher(m, 0, 0, bulker)
 
 	assert.NotNil(t, d.am)
 	assert.NotNil(t, d.subs)
+	assert.NotNil(t, d.bulker)
 }
 
 func compareActions(t *testing.T, expects, results []model.Action) {
@@ -259,7 +262,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 			}
 
 			now := time.Now()
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			go func() {
 				err := d.Run(ctx)
@@ -366,7 +369,7 @@ func Test_offsetStartTime(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := offsetStartTime(context.Background(), tt.start, tt.dur, tt.i, tt.total)
+			r := offsetStartTime(t.Context(), tt.start, tt.dur, tt.i, tt.total)
 			assert.Equal(t, tt.result, r)
 		})
 	}
