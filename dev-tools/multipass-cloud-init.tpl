@@ -1,16 +1,7 @@
-#cloud-init
-# cloud-init script for Ubuntu VMs.
-# VM contains all fleet-server development requirements:
-# - go
-# - docker
-# - make
-# - gcc (for cgo support)
-#
-# Run with "mulitpass laucn --cloud-init=multipass-cloud-init.yml"
 apt:
   sources:
     docker.list:
-      source: deb [arch=${ARCH}] https://download.docker.com/linux/ubuntu noble stable
+      source: deb [arch={{.Arch}}] https://download.docker.com/linux/ubuntu noble stable
       keyid: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
 groups:
   - docker
@@ -39,15 +30,11 @@ write_files:
       export PATH=$PATH:/usr/local/go/bin
       export PATH=$PATH:$(go env GOPATH)/bin
     path: /etc/profile.d/go-bin.sh
-  # backwords compatibilityi alias for docker-compose
-  # makefile does not use the alias
-  - content: |
-      alias docker-compose='docker compose'
-    path: /etc/profile.d/docker-compose-alias.sh
 runcmd:
   - [ mkdir, /run/go ]
-  - [ wget, ${DOWNLOAD_URL}, -O, /run/go/go.tar.gz ]
+  - [ wget, {{.DownloadURL}}, -O, /run/go/go.tar.gz ]
   - [ tar, -xzf, /run/go/go.tar.gz, -C, /usr/local/ ]
   - [ rm, -rf, /run/go ]
   - [ su, ubuntu, -c, "/usr/local/go/bin/go install github.com/magefile/mage@latest" ]
   - [ su, ubuntu, -c, "/usr/local/go/bin/go install github.com/go-delve/delve/cmd/dlv@latest" ]
+
