@@ -1,5 +1,0 @@
-kind: bug-fix
-summary: Build fleet-server as fully static binary to restore OS matrix compatibility
-component: fleet-server
-pr: https://github.com/elastic/fleet-server/pull/5392
-issue: https://github.com/elastic/fleet-server/issues/5262
