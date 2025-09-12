@@ -1,0 +1,47 @@
+version: 9.0.7
+entries:
+    - kind: bug-fix
+      summary: Reset trace links on bulk items when returning to pool
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5317
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1755810145
+      file:
+        name: 1755810145-Reset-trace-headers-on-bulk-items-when-returning-to-pool.yaml
+        checksum: e95e0e1b1ea66a2c365ba00d6bd7e9def2b07ace
+    - kind: bug-fix
+      summary: Restore connection limiter
+      description: |
+        Restore connection level limiter to prevent OOM incidents.
+        This limiter is used in addition to the request-level throttle so that once
+        our in-flight requests reaches max_connections a 429 is returned, but if the
+        total connections the server uses is over max_connections*1.1 the server drops
+        the connection before the TLS handshake.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5372
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1756409821
+      file:
+        name: 1756409821-Restore-connection-limiter.yaml
+        checksum: 7ae8e8521ecea4ac5d8944328b4ffcc51c1a609b
+    - kind: bug-fix
+      summary: Build fleet-server as fully static binary to restore OS matrix compatibility
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5392
+      issue:
+        - https://github.com/elastic/fleet-server/issues/5262
+      impact: ""
+      action: ""
+      timestamp: 1756940128
+      file:
+        name: 1756940128-fix-binary-compilation.yaml
+        checksum: 7d4f89d7775d01ca5c63dd022364a5eec262cae0
