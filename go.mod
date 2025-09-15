@@ -9,13 +9,8 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/elastic-agent-libs v0.24.0
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-system-metrics v0.11.16
-	github.com/elastic/go-elasticsearch/v8 v8.18.1
-=======
 	github.com/elastic/elastic-agent-system-metrics v0.13.2
-	github.com/elastic/go-elasticsearch/v8 v8.19.0
->>>>>>> 898abd5 (build(deps): bump github.com/elastic/elastic-agent-system-metrics from 0.11.18 to 0.12.0 (#5273))
+	github.com/elastic/go-elasticsearch/v8 v8.18.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.8.0
 	github.com/go-chi/chi/v5 v5.2.3
