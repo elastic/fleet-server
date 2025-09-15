@@ -55,7 +55,11 @@ var (
 // metrics must be explicitly exposed with a call to InitMetrics
 // FIXME we have global metrics but an internal and external API; this may lead to some confusion.
 func init() {
-	err := report.SetupMetrics(logger.NewZapStub("instance-metrics"), build.ServiceName, version.DefaultVersion)
+	err := report.SetupMetricsOptions(report.MetricOptions{
+		Logger:  logger.NewZapStub("instance-metrics"),
+		Name:    build.ServiceName,
+		Version: version.DefaultVersion,
+	})
 	if err != nil {
 		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics") // TODO is used because this may logged during the package load
 	}
@@ -78,20 +82,6 @@ func init() {
 	cntFileDeliv.Register(routesRegistry.newRegistry("deliverFile"))
 	cntGetPGP.Register(routesRegistry.newRegistry("getPGPKey"))
 	cntAuditUnenroll.Register(routesRegistry.newRegistry("auditUnenroll"))
-<<<<<<< HEAD
-=======
-
-	err := report.SetupMetricsOptions(report.MetricOptions{
-		Logger:         zap.NewStub("instance-metrics"),
-		Name:           build.ServiceName,
-		Version:        version.DefaultVersion,
-		SystemMetrics:  monitoring.NewRegistry(),
-		ProcessMetrics: registry.registry,
-	})
-	if err != nil {
-		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics") // TODO is used because this may logged during the package load
-	}
->>>>>>> 898abd5 (build(deps): bump github.com/elastic/elastic-agent-system-metrics from 0.11.18 to 0.12.0 (#5273))
 }
 
 // metricsRegistry wraps libbeat and prometheus registries
