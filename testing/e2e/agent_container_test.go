@@ -420,6 +420,7 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 			if agentID == "" {
 				// getAgents should (eventually) return the fleet-server and the agent
 				status, agents := suite.GetAgents(ctx)
+				suite.T().Logf("[%s] GetAgents status: %d, agents: %+v", time.Now().Format(time.RFC3339), status, agents)
 				if status != 200 {
 					timer.Reset(time.Second)
 					continue
