@@ -56,7 +56,7 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 		chunkClient: chunkClient,
 		bulker:      bulker,
 		cache:       cache,
-		uploader:    uploader.New(chunkClient, bulker, cache, cfg.Limits.MaxFileStorageSize, maxUploadTimer),
+		uploader:    uploader.New(chunkClient, bulker, cache, cfg.Limits.MaxFileStorageByteSize, maxUploadTimer),
 		authAgent:   authAgent,
 		authAPIKey:  authAPIKey,
 	}
