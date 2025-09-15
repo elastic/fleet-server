@@ -82,3 +82,25 @@ Until a bug fix is available in a later release, you can resolve the issue tempo
 2. After the output confirms all files were successfully processed, run the `enroll` command again.
 
 :::
+
+:::{dropdown} .fleet-agents template is missing `local_metadata.complete` mapping
+
+**Applies to**: {{fleet}} 8.17, 8.18, 8.19, 9.0, 9.1
+On May 2, 2025 a known issue was discovered that the `.fleet-agents` index template was missing a mapping for the `local_metadata.complete` attribute. This may cause agent checkins to be rejected and the agents to appear as offline.
+
+In this {{fleet}}'s logs this will appear as:
+```shell
+elastic fail 400: document_parsing_exception: [1:209] object mapping for [local_metadata] tried to parse field [local_metadata] as object, but found a concrete value
+Eat bulk checkin error; Keep on truckin'
+```
+
+and in the {{agent}} it will appear as:
+```shell
+"log.level":"error","@timestamp":"2025-04-22:12:35:25.295Z","message":"Eat bulk checkin error; Keep on truckin'","component":{"binary":"fleet-server","dataset":"elastic_agent.fleet_server","id":"fleet-server-es-containerhost","type":"fleet-server"},"log":{"source":"fleet-server-es-containerhost"},"service.type":"fleet-server","error.message":"elastic fail 400: document_parsing_exception: [1:209] object mapping for [local_metadata] tried to parse field [local_metadata] as object, but found a concrete value","ecs.version":"1.6.0","service.name":"fleet-server","ecs.version":"1.6.0"
+```
+
+**Workaround**
+Versions 8.17.11+, 8.18.3+, 8.19.3+, 9.0.3+, and 9.1.0+ include the attribute in the template mapping but do not bump the template's `_meta.managed_index_mappings_version` indicator so the new attribute may not be properly applied.
+Users should upgrade to a version with the template fix and re-enroll an agent.
+
+:::
