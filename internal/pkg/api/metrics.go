@@ -97,7 +97,7 @@ func newMetricsRegistry(name string) *metricsRegistry {
 	reg := monitoring.Default
 	return &metricsRegistry{
 		fullName: name,
-		registry: reg.NewRegistry(name),
+		registry: reg.GetOrCreateRegistry(name),
 		promReg:  prometheus.NewRegistry(),
 	}
 }
@@ -109,7 +109,7 @@ func (r *metricsRegistry) newRegistry(name string) *metricsRegistry {
 	}
 	return &metricsRegistry{
 		fullName: fullName,
-		registry: r.registry.NewRegistry(name),
+		registry: r.registry.GetOrCreateRegistry(name),
 		promReg:  r.promReg,
 	}
 }
