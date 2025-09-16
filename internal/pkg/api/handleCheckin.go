@@ -1144,7 +1144,7 @@ func calcPollDuration(zlog zerolog.Logger, pollDuration, setupDuration, jitterDu
 }
 
 // processPolicyDetails handles the agent_policy_id and revision_idx included in the checkin request.
-// The API keys will be managed if the agent reports a new policy id from its last checkin, or if the revision is greater than what the last checkin reported.
+// The API keys will be managed if the agent reports a new policy id from its last checkin, or if the revision is different than what the last checkin reported.
 // It returns the revision idx that should be used when subscribing for new POLICY_CHANGE actons and optional args to use when doing the non-tick checkin.
 func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) (int64, []checkin.Option, error) {
 	// no details specified
@@ -1162,7 +1162,7 @@ func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logge
 
 	// update agent doc if policy id or revision idx does not match
 	var opts []checkin.Option
-	if policyID != agent.PolicyID || revisionIDX != agent.PolicyRevisionIdx {
+	if policyID != agent.AgentPolicyID || revisionIDX != agent.PolicyRevisionIdx {
 		opts = []checkin.Option{
 			checkin.WithAgentPolicyID(policyID),
 			checkin.WithPolicyRevisionIDX(revisionIDX),
@@ -1174,8 +1174,14 @@ func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logge
 		return 0, opts, nil
 	}
 
-	// Update API keys if the policy has changed, or if the revision increments.
-	if policyID != agent.AgentPolicyID || revisionIDX > agent.PolicyRevisionIdx {
+	// Check if the checkin revision_idx is greater than the latest available
+	latestRev := ct.pm.LatestRev(ctx, agent.PolicyID)
+	if latestRev != 0 && revisionIDX > latestRev {
+		return 0, opts, nil
+	}
+
+	// Update API keys if the policy has changed, or if the revision differs.
+	if policyID != agent.AgentPolicyID || revisionIDX != agent.PolicyRevisionIdx {
 		for outputName, output := range agent.Outputs {
 			if output.Type != policy.OutputTypeElasticsearch {
 				continue
