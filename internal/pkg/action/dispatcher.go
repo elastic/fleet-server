@@ -10,10 +10,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
+	"github.com/elastic/fleet-server/v7/internal/pkg/secret"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/rs/zerolog"
@@ -34,23 +36,25 @@ func (s Sub) Ch() chan []model.Action {
 
 // Dispatcher tracks agent subscriptions and emits actions to the subscriptions.
 type Dispatcher struct {
-	am    monitor.SimpleMonitor
-	limit *rate.Limiter
+	am     monitor.SimpleMonitor
+	limit  *rate.Limiter
+	bulker bulk.Bulk
 
 	mx   sync.RWMutex
 	subs map[string]Sub
 }
 
 // NewDispatcher creates a Dispatcher using the provided monitor.
-func NewDispatcher(am monitor.SimpleMonitor, throttle time.Duration, i int) *Dispatcher {
+func NewDispatcher(am monitor.SimpleMonitor, throttle time.Duration, i int, bulker bulk.Bulk) *Dispatcher {
 	r := rate.Inf
 	if throttle > 0 {
 		r = rate.Every(throttle)
 	}
 	return &Dispatcher{
-		am:    am,
-		limit: rate.NewLimiter(r, i),
-		subs:  make(map[string]Sub),
+		am:     am,
+		limit:  rate.NewLimiter(r, i),
+		subs:   make(map[string]Sub),
+		bulker: bulker,
 	}
 }
 
@@ -117,6 +121,16 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 			zerolog.Ctx(ctx).Error().Err(err).Msg("Failed to unmarshal action document")
 			break
 		}
+
+		secretData, err := secret.GetActionDataWithSecrets(ctx, action.Data, action.SecretReferences, d.bulker)
+		if err != nil {
+			zerolog.Ctx(ctx).Error().Err(err).Msg("Failed to replace secrets in action document")
+			break
+		}
+
+		action.Data = secretData
+		action.SecretReferences = nil
+
 		numAgents := len(action.Agents)
 		for i, agentID := range action.Agents {
 			arr := agentActions[agentID]

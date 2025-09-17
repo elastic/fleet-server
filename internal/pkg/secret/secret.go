@@ -2,10 +2,11 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package policy
+package secret
 
 import (
 	"context"
+	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,12 +16,16 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
+const (
+	FieldOutputSecrets = "secrets"
+)
+
 var (
 	secretRegex = regexp.MustCompile(`\$co\.elastic\.secret{([^}]*)}`)
 )
 
 // read secret values that belong to the agent policy's secret references, returns secrets as id:value map
-func getSecretValues(ctx context.Context, secretRefs []model.SecretReferencesItems, bulker bulk.Bulk) (map[string]string, error) {
+func GetSecretValues(ctx context.Context, secretRefs []model.SecretReferencesItems, bulker bulk.Bulk) (map[string]string, error) {
 	if len(secretRefs) == 0 {
 		return nil, nil
 	}
@@ -40,7 +45,7 @@ func getSecretValues(ctx context.Context, secretRefs []model.SecretReferencesIte
 
 // read inputs and secret_references from agent policy
 // replace values of secret refs in inputs and input streams properties
-func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bulker bulk.Bulk) ([]map[string]interface{}, []string, error) {
+func GetPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bulker bulk.Bulk) ([]map[string]interface{}, []string, error) {
 	if len(data.Inputs) == 0 {
 		return nil, nil, nil
 	}
@@ -49,7 +54,7 @@ func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bul
 		return data.Inputs, nil, nil
 	}
 
-	secretValues, err := getSecretValues(ctx, data.SecretReferences, bulker)
+	secretValues, err := GetSecretValues(ctx, data.SecretReferences, bulker)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -65,6 +70,31 @@ func getPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bul
 	}
 	data.SecretReferences = nil
 	return result, keys, nil
+}
+
+func GetActionDataWithSecrets(ctx context.Context, data json.RawMessage, refs []model.SecretReferencesItems, bulker bulk.Bulk) (json.RawMessage, error) {
+	if len(refs) == 0 {
+		return data, nil
+	}
+
+	secretValues, err := GetSecretValues(ctx, refs, bulker)
+	if err != nil {
+		return data, err
+	}
+
+	parsedData, err := smap.Parse(data)
+	if err != nil {
+		return data, err
+	}
+
+	result, _ := replaceMapRef(parsedData, secretValues)
+
+	b, err := json.Marshal(result)
+	if err != nil {
+		return data, err
+	}
+
+	return b, nil
 }
 
 // replaceMapRef replaces all nested secret values in the passed input and returns the resulting input along with a list of keys where inputs have been replaced.
@@ -207,7 +237,7 @@ func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk)
 	if len(secretReferences) == 0 {
 		return nil, nil
 	}
-	secretValues, err := getSecretValues(ctx, secretReferences, bulker)
+	secretValues, err := GetSecretValues(ctx, secretReferences, bulker)
 	if err != nil {
 		return nil, err
 	}

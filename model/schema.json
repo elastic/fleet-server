@@ -61,6 +61,19 @@
           "description": "The optional action timeout in seconds",
           "type": "integer"
         },
+        "secret_references": {
+          "description": "A list of all secrets fleet-server needs to inject into the actions data before passing it to the agent. This attribute is removed when action data is send to an agent.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": ["id"]
+          }
+        },
         "user_id": {
           "description": "The ID of the user who created the action.",
           "type": "string"

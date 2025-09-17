@@ -4,10 +4,11 @@
 
 //go:build !integration
 
-package policy
+package secret
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
@@ -86,13 +87,47 @@ func TestGetSecretValues(t *testing.T) {
 	refs := []model.SecretReferencesItems{{ID: "ref1"}, {ID: "ref2"}}
 	bulker := ftesting.NewMockBulk()
 
-	secretRefs, _ := getSecretValues(context.TODO(), refs, bulker)
+	secretRefs, _ := GetSecretValues(context.TODO(), refs, bulker)
 
 	expectedRefs := map[string]string{
 		"ref1": "ref1_value",
 		"ref2": "ref2_value",
 	}
 	assert.Equal(t, expectedRefs, secretRefs)
+}
+
+func TestGetActionDataWithSecrets(t *testing.T) {
+	refs := []model.SecretReferencesItems{
+		{ID: "ref1"},
+		{ID: "ref2"},
+	}
+	// Input JSON with secret references
+	input := map[string]interface{}{
+		"username": "user1",
+		"password": "$co.elastic.secret{ref1}",
+		"nested": map[string]interface{}{
+			"token": "$co.elastic.secret{ref2}",
+		},
+	}
+	b, err := json.Marshal(input)
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	result, err := GetActionDataWithSecrets(t.Context(), b, refs, bulker)
+	require.NoError(t, err)
+
+	var out map[string]interface{}
+	err = json.Unmarshal(result, &out)
+	require.NoError(t, err)
+
+	assert.Equal(t, "user1", out["username"])
+	assert.Equal(t, "ref1_value", out["password"])
+
+	nestedMap, ok := out["nested"].(map[string]interface{})
+	assert.True(t, ok)
+
+	require.NoError(t, err)
+	assert.Equal(t, "ref2_value", nestedMap["token"])
 }
 
 func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
@@ -126,7 +161,7 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 		{"id": "input2", "streams": []interface{}{expectedStream}},
 	}
 
-	result, keys, _ := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	result, keys, _ := GetPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
 
 	assert.Equal(t, expectedResult, result)
 	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "inputs.0.input_var_secret", "inputs.1.streams.0.package_var_secret", "inputs.1.streams.0.input_var_secret", "inputs.1.streams.0.stream_var_secret"}, keys)
@@ -173,7 +208,7 @@ func TestPolicyInputSteamsEmbedded(t *testing.T) {
 		}},
 	}
 
-	result, keys, err := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	result, keys, err := GetPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
 	require.NoError(t, err)
 
 	assert.Equal(t, expected, result)
@@ -201,7 +236,7 @@ func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 		{"id": "input2", "streams": []interface{}{expectedStream}},
 	}
 
-	result, keys, _ := getPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	result, keys, _ := GetPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
 
 	assert.Equal(t, expectedResult, result)
 	assert.Empty(t, keys)

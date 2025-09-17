@@ -74,7 +74,13 @@ func init() {
 	cntGetPGP.Register(routesRegistry.newRegistry("getPGPKey"))
 	cntAuditUnenroll.Register(routesRegistry.newRegistry("auditUnenroll"))
 
-	err := report.SetupMetrics(zap.NewStub("instance-metrics"), build.ServiceName, version.DefaultVersion, monitoring.NewRegistry(), registry.registry)
+	err := report.SetupMetricsOptions(report.MetricOptions{
+		Logger:         zap.NewStub("instance-metrics"),
+		Name:           build.ServiceName,
+		Version:        version.DefaultVersion,
+		SystemMetrics:  monitoring.NewRegistry(),
+		ProcessMetrics: registry.registry,
+	})
 	if err != nil {
 		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics") // TODO is used because this may logged during the package load
 	}
@@ -91,7 +97,7 @@ func newMetricsRegistry(name string) *metricsRegistry {
 	reg := monitoring.Default
 	return &metricsRegistry{
 		fullName: name,
-		registry: reg.NewRegistry(name),
+		registry: reg.GetOrCreateRegistry(name),
 		promReg:  prometheus.NewRegistry(),
 	}
 }
@@ -103,7 +109,7 @@ func (r *metricsRegistry) newRegistry(name string) *metricsRegistry {
 	}
 	return &metricsRegistry{
 		fullName: fullName,
-		registry: r.registry.NewRegistry(name),
+		registry: r.registry.GetOrCreateRegistry(name),
 		promReg:  r.promReg,
 	}
 }
