@@ -1147,8 +1147,8 @@ func calcPollDuration(zlog zerolog.Logger, pollDuration, setupDuration, jitterDu
 // The API keys will be managed if the agent reports a new policy id from its last checkin, or if the revision is different than what the last checkin reported.
 // It returns the revision idx that should be used when subscribing for new POLICY_CHANGE actons and optional args to use when doing the non-tick checkin.
 func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) (int64, []checkin.Option, error) {
-	// no details specified
-	if req == nil || req.PolicyRevisionIdx == nil || req.AgentPolicyId == nil {
+	// no details specified or attributes are ignored by config
+	if ct.cfg.Features.IgnoreCheckinPolicyID || req == nil || req.PolicyRevisionIdx == nil || req.AgentPolicyId == nil {
 		return agent.PolicyRevisionIdx, nil, nil
 	}
 	policyID := *req.AgentPolicyId

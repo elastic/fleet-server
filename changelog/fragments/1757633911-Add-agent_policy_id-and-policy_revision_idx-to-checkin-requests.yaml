@@ -22,7 +22,9 @@ description: |
   policy. These details will replace the need for an ack on
   policy_change actions, and will be used to determine when to send a
   policy change when there is a new revision available, or when the
-  agent is reassigned to a different policy.
+  agent is reassigned to a different policy. Add a server setting under
+  feature_flags.ignore_checkin_policy_id that disables this behavour and
+  restores the previous approach.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: fleet-server

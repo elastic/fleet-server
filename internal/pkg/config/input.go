@@ -77,6 +77,7 @@ type (
 		StaticPolicyTokens StaticPolicyTokens      `config:"static_policy_tokens"`
 		PGP                PGP                     `config:"pgp"`
 		PDKDF2             PBKDF2                  `config:"pdkdf2"`
+		Features           FeatureFlags            `config:"feature_flags"`
 	}
 
 	StaticPolicyTokens struct {
@@ -90,6 +91,13 @@ type (
 	PolicyToken struct {
 		TokenKey string `config:"token_key"`
 		PolicyID string `config:"policy_id"`
+	}
+
+	// FeatureFlags contains toggles to enable new behaviour, or restore old behaviour.
+	FeatureFlags struct {
+		// IgnoreCheckinPolicyID when true will ignore the agent_policy_id and policy_revision_idx attributes in checkin request bodies.
+		// This setting restores previous behaviour where all POLICY_CHANGE actions need an explicit ack.
+		IgnoreCheckinPolicyID bool `config:"ignore_checkin_policy_id"`
 	}
 )
 

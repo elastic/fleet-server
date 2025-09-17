@@ -1300,6 +1300,7 @@ func TestProcessPolicyDetails(t *testing.T) {
 			logger := testlog.SetLogger(t)
 			pm := tc.getPolicyMonitor()
 			checkin := &CheckinT{
+				cfg:    &config.Server{},
 				bulker: ftesting.NewMockBulk(),
 				pm:     pm,
 			}
@@ -1319,4 +1320,28 @@ func TestProcessPolicyDetails(t *testing.T) {
 			pm.AssertExpectations(t)
 		})
 	}
+
+	t.Run("IgnoreCheckinPolicyID flag is set", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		checkin := &CheckinT{
+			cfg: &config.Server{
+				Features: config.FeatureFlags{
+					IgnoreCheckinPolicyID: true,
+				},
+			},
+		}
+		revIDX, opts, err := checkin.processPolicyDetails(t.Context(), logger,
+			&model.Agent{
+				PolicyID:          policyID,
+				PolicyRevisionIdx: 1,
+			},
+			&CheckinRequest{
+				AgentPolicyId:     &policyID,
+				PolicyRevisionIdx: &revIDX2,
+			},
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), revIDX)
+		assert.Empty(t, opts)
+	})
 }
