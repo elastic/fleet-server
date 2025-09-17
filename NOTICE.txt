@@ -2775,11 +2775,11 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 --------------------------------------------------------------------------------
 Dependency : github.com/mailru/easyjson
-Version: v0.9.0
+Version: v0.9.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/mailru/easyjson@v0.9.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/mailru/easyjson@v0.9.1/LICENSE:
 
 Copyright (c) 2016 Mail.Ru Group
 
