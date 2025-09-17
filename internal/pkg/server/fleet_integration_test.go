@@ -1700,7 +1700,7 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 			componentID("forward"): map[string]any{},
 		},
 		Exporters: map[string]any{
-			componentID("someexporter"): map[string]any{},
+			componentID("elasticsearch/default"): map[string]any{},
 		},
 		Service: &model.Service{
 			Pipelines: map[string]*model.PipelinesItem{
@@ -1711,7 +1711,7 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 				},
 				"metrics": &model.PipelinesItem{
 					Receivers: []string{componentID("forward")},
-					Exporters: []string{componentID("someexporter")},
+					Exporters: []string{componentID("elasticsearch/default")},
 				},
 			},
 		},
