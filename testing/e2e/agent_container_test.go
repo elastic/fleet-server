@@ -416,11 +416,12 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 		case <-ctx.Done():
 			suite.Require().NoError(ctx.Err(), "context expired before agent reported online")
 		case <-timer.C:
+			suite.T().Logf("*** [%s] checking for agent to be listed in kibana... agentID: %s", time.Now().Format(time.RFC3339), agentID)
 			// on the 1st iteration of the loop we don't know the agent ID that the container agent uses
 			if agentID == "" {
 				// getAgents should (eventually) return the fleet-server and the agent
 				status, agents := suite.GetAgents(ctx)
-				suite.T().Logf("[%s] GetAgents status: %d, agents: %+v", time.Now().Format(time.RFC3339), status, agents)
+				suite.T().Logf("*** [%s] GetAgents status: %d, agents: %+v", time.Now().Format(time.RFC3339), status, agents)
 				if status != 200 {
 					timer.Reset(time.Second)
 					continue
