@@ -136,17 +136,11 @@ download_mbp_packages_from_gcp_bucket() {
 }
 
 with_mage() {
-    local install_packages=(
-            "github.com/magefile/mage"
-            "github.com/elastic/go-licenser"
-            "golang.org/x/tools/cmd/goimports"
-            "github.com/jstemmer/go-junit-report"
-            "gotest.tools/gotestsum"
-    )
     create_workspace
-    for pkg in "${install_packages[@]}"; do
-        go install "${pkg}@latest"
-    done
+    go install github.com/magefile/mage # uses go.mod implicitly
+    mage -clean
+    mage -version
+    which mage
 }
 
 cleanup() {
