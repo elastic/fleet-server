@@ -220,6 +220,7 @@ func (s *Scaffold) AgentIsOnline(ctx context.Context, id string) {
 			s.Require().NoError(ctx.Err(), "context expired before agent reported online")
 			return
 		case <-timer.C:
+			s.T().Logf("*** [%s] checking kibana for agent %s online status", time.Now().Format(time.RFC3339), id)
 			req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:5601/api/fleet/agents/"+id, nil)
 			s.Require().NoError(err)
 			req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
@@ -242,7 +243,7 @@ func (s *Scaffold) AgentIsOnline(ctx context.Context, id string) {
 					Status string `json:"status"`
 				} `json:"item"`
 			}
-			s.T().Logf("Kibana agent response: %s", string(p))
+			s.T().Logf("*** [%s] Kibana agent response: %s", time.Now().Format(time.RFC3339), string(p))
 			err = json.Unmarshal(p, &obj)
 			s.Require().NoError(err, "unmarshal failure")
 			if obj.Item.Status == "online" {
