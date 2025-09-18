@@ -18,7 +18,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 )
@@ -250,7 +250,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		policy, ok := m.policies[s.policyID]
 		if !ok {
 			m.log.Warn().
-				Str(logger.PolicyID, s.policyID).
+				Str(ecs.PolicyID, s.policyID).
 				Msg("logic error: policy missing on dispatch")
 			return
 		}
@@ -261,16 +261,16 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			return
 		case s.ch <- &policy.pp:
 			m.log.Debug().
-				Str(logger.PolicyID, s.policyID).
+				Str(ecs.PolicyID, s.policyID).
 				Int64("subscription_revision_idx", s.revIdx).
-				Int64(logger.RevisionIdx, s.revIdx).
+				Int64(ecs.RevisionIdx, s.revIdx).
 				Msg("dispatch policy change")
 		default:
 			// Should never block on a channel; we created a channel of size one.
 			// A block here indicates a logic error somewheres.
 			m.log.Error().
-				Str(logger.PolicyID, s.policyID).
-				Str(logger.AgentID, s.agentID).
+				Str(ecs.PolicyID, s.policyID).
+				Str(ecs.AgentID, s.agentID).
 				Msg("logic error: should never block on policy channel")
 			return
 		}
@@ -321,8 +321,8 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 		return nil
 	}
 
-	m.log.Debug().Int64(logger.RevisionIdx, policies[0].RevisionIdx).
-		Str(logger.PolicyID, policies[0].PolicyID).Msg("process policies")
+	m.log.Debug().Int64(ecs.RevisionIdx, policies[0].RevisionIdx).
+		Str(ecs.PolicyID, policies[0].PolicyID).Msg("process policies")
 
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
@@ -359,13 +359,13 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 	newPolicy := pp.Policy
 
 	span, _ := apm.StartSpan(ctx, "update policy", "process")
-	span.Context.SetLabel(logger.PolicyID, newPolicy.PolicyID)
+	span.Context.SetLabel(ecs.PolicyID, newPolicy.PolicyID)
 	span.Context.SetLabel(dl.FieldRevisionIdx, newPolicy.RevisionIdx)
 	defer span.End()
 
 	zlog := m.log.With().
-		Str(logger.PolicyID, newPolicy.PolicyID).
-		Int64(logger.RevisionIdx, newPolicy.RevisionIdx).
+		Str(ecs.PolicyID, newPolicy.PolicyID).
+		Int64(ecs.RevisionIdx, newPolicy.RevisionIdx).
 		Logger()
 
 	m.mut.Lock()
@@ -378,7 +378,7 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 			head: makeHead(),
 		}
 		m.policies[newPolicy.PolicyID] = p
-		zlog.Info().Str(logger.PolicyID, newPolicy.PolicyID).Msg("New policy found on update and added")
+		zlog.Info().Str(ecs.PolicyID, newPolicy.PolicyID).Msg("New policy found on update and added")
 		return false
 	}
 
@@ -388,7 +388,7 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 	// Update the policy in our data structure
 	p.pp = *pp
 	m.policies[newPolicy.PolicyID] = p
-	zlog.Debug().Str(logger.PolicyID, newPolicy.PolicyID).Msg("Update policy revision")
+	zlog.Debug().Str(ecs.PolicyID, newPolicy.PolicyID).Msg("Update policy revision")
 
 	// Iterate through the subscriptions on this policy;
 	// schedule any subscription for delivery that requires an update.
@@ -411,7 +411,7 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 			}
 
 			zlog.Debug().
-				Str(logger.AgentID, sub.agentID).
+				Str(ecs.AgentID, sub.agentID).
 				Msg("scheduled pendingQ on policy revision")
 
 			nQueued += 1
@@ -421,7 +421,7 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 	zlog.Info().
 		Int64("old_revision_idx", oldPolicy.RevisionIdx).
 		Int("nSubs", nQueued).
-		Str(logger.PolicyID, newPolicy.PolicyID).
+		Str(ecs.PolicyID, newPolicy.PolicyID).
 		Msg("New revision of policy received and added to the queue")
 
 	return true
@@ -448,9 +448,9 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64)
 		return nil, errors.New("revisionIdx must be greater than or equal to 0")
 	}
 	m.log.Debug().
-		Str(logger.AgentID, agentID).
-		Str(logger.PolicyID, policyID).
-		Int64(logger.RevisionIdx, revisionIdx).
+		Str(ecs.AgentID, agentID).
+		Str(ecs.PolicyID, policyID).
+		Int64(ecs.RevisionIdx, revisionIdx).
 		Msg("subscribed to policy monitor")
 
 	s := NewSub(
@@ -467,8 +467,8 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64)
 	case !ok:
 		// We've not seen this policy before, force load.
 		m.log.Info().
-			Str(logger.PolicyID, policyID).
-			Str(logger.AgentID, s.agentID).
+			Str(ecs.PolicyID, policyID).
+			Str(ecs.AgentID, s.agentID).
 			Msg("force load on unknown policyId")
 		p = policyT{head: makeHead()}
 		p.head.pushBack(s)
@@ -478,17 +478,17 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64)
 		empty := m.pendingQ.isEmpty()
 		m.pendingQ.pushBack(s)
 		m.log.Debug().
-			Str(logger.AgentID, s.agentID).
-			Int64(logger.RevisionIdx, (&p.pp.Policy).RevisionIdx).
+			Str(ecs.AgentID, s.agentID).
+			Int64(ecs.RevisionIdx, (&p.pp.Policy).RevisionIdx).
 			Msg("deploy pending on subscribe")
 		if empty {
 			m.kickDeploy()
 		}
 	default:
 		m.log.Debug().
-			Str(logger.PolicyID, policyID).
-			Str(logger.AgentID, s.agentID).
-			Int64(logger.RevisionIdx, (&p.pp.Policy).RevisionIdx).
+			Str(ecs.PolicyID, policyID).
+			Str(ecs.AgentID, s.agentID).
+			Int64(ecs.RevisionIdx, (&p.pp.Policy).RevisionIdx).
 			Msg("subscription added without new revision")
 		p.head.pushBack(s)
 	}
@@ -508,9 +508,9 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 	m.mut.Unlock()
 
 	m.log.Debug().
-		Str(logger.AgentID, s.agentID).
-		Str(logger.PolicyID, s.policyID).
-		Int64(logger.RevisionIdx, s.revIdx).
+		Str(ecs.AgentID, s.agentID).
+		Str(ecs.PolicyID, s.policyID).
+		Int64(ecs.RevisionIdx, s.revIdx).
 		Msg("unsubscribe")
 
 	return nil

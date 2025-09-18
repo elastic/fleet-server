@@ -35,10 +35,17 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk4MDDLWA0d8iHHOxLA=
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
+<<<<<<< HEAD
 github.com/elastic/elastic-agent-libs v0.24.0 h1:8skd0le8Y/zAGVaj4m44ljiJMAp0xuJz07ngDTL/1kM=
 github.com/elastic/elastic-agent-libs v0.24.0/go.mod h1:xSeIP3NtOIT4N2pPS4EyURmS1Q8mK0lWZ8Wd1Du6q3w=
 github.com/elastic/elastic-agent-system-metrics v0.11.16 h1:cLjuO8pE5cUwPGWUHmy1VOERmJVDaep8gY+U4YRQ5vs=
 github.com/elastic/elastic-agent-system-metrics v0.11.16/go.mod h1:qiZC5p1hd8te4XVnhh7FkXdcYhxFnl5i9GJpROtf6zo=
+=======
+github.com/elastic/elastic-agent-libs v0.21.6 h1:hvBAi4KHaYf4hn+rTc9m6A35eZjqb1uoE2exklIdWm0=
+github.com/elastic/elastic-agent-libs v0.21.6/go.mod h1:xSeIP3NtOIT4N2pPS4EyURmS1Q8mK0lWZ8Wd1Du6q3w=
+github.com/elastic/elastic-agent-system-metrics v0.11.18 h1:MuFLvHc3kQN/59+3KmRWhOUoXkL5PDzxEbdYbARGexA=
+github.com/elastic/elastic-agent-system-metrics v0.11.18/go.mod h1:qiZC5p1hd8te4XVnhh7FkXdcYhxFnl5i9GJpROtf6zo=
+>>>>>>> 13bea07 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.21.4 to 0.21.6 (#5211))
 github.com/elastic/elastic-transport-go/v8 v8.7.0 h1:OgTneVuXP2uip4BA658Xi6Hfw+PeIOod2rY3GVMGoVE=
 github.com/elastic/elastic-transport-go/v8 v8.7.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
 github.com/elastic/go-elasticsearch/v8 v8.18.1 h1:lPsN2Wk6+QqBeD4ckmOax7G/Y8tAZgroDYG8j6/5Ce0=

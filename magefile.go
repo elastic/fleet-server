@@ -1874,8 +1874,12 @@ func validateCertUnpacking() error {
 		},
 	}
 
+<<<<<<< HEAD
 	logger := logp.NewLogger("certs")
 	_, err := tlscommon.LoadTLSConfig(&config, logger)
+=======
+	_, err := tlscommon.LoadTLSConfig(&config, logp.NewNopLogger())
+>>>>>>> 13bea07 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.21.4 to 0.21.6 (#5211))
 	if err != nil {
 		log.Printf("tlscommon load error: %v", err)
 		passphrase, err := os.ReadFile(passFile)

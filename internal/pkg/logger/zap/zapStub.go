@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-package logger
+package zap
 
 import (
 	"encoding/json"
@@ -13,16 +13,17 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 )
 
 func encoderConfig() zapcore.EncoderConfig {
 	return zapcore.EncoderConfig{
-		MessageKey:     ECSMessage,
-		LevelKey:       ECSLogLevel,
-		NameKey:        ECSLogName,
-		TimeKey:        ECSTimestamp,
-		CallerKey:      ECSLogCaller,
-		StacktraceKey:  ECSLogStackTrace,
+		MessageKey:     ecs.Message,
+		LevelKey:       ecs.LogLevel,
+		NameKey:        ecs.LogName,
+		TimeKey:        ecs.Timestamp,
+		CallerKey:      ecs.LogCaller,
+		StacktraceKey:  ecs.LogStackTrace,
 		LineEnding:     "\n",
 		EncodeTime:     zapcore.EpochTimeEncoder,
 		EncodeLevel:    zapcore.LowercaseLevelEncoder,
@@ -70,7 +71,7 @@ func (z zapStub) Write(p []byte) (n int, err error) {
 	for key, val := range m {
 
 		// Don't dupe the timestamp, use the fleet formatted timestamp.
-		if key != ECSTimestamp {
+		if key != ecs.Timestamp {
 			e.Interface(key, val)
 		}
 	}
@@ -79,7 +80,7 @@ func (z zapStub) Write(p []byte) (n int, err error) {
 	return 0, nil
 }
 
-func NewZapStub(selector string) *logp.Logger {
+func NewStub(selector string) *logp.Logger {
 
 	wrapF := func(zapcore.Core) zapcore.Core {
 		enc := zapcore.NewJSONEncoder(encoderConfig())
