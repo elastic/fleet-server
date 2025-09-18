@@ -10,5 +10,7 @@ with_go
 
 with_docker_compose
 
+with_mage
+
 echo "Starting the E2E tests..."
-make test-e2e junit-report
+mage test:e2e test:junitReport

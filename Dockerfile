@@ -1,25 +1,25 @@
 ARG GO_VERSION
 FROM --platform=${BUILDPLATFORM:-linux} golang:${GO_VERSION}-trixie AS builder
 
-WORKDIR /usr/src/fleet-server
+WORKDIR /fleet-server
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
+RUN go install github.com/magefile/mage # Uses version from go.mod implicitly
 
 COPY . .
 
 ARG GCFLAGS=""
 ARG LDFLAGS=""
 ARG DEV=""
+ARG SNAPSHOT=""
 ARG TARGETPLATFORM
 
-RUN GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" DEV="${DEV}" make release-${TARGETPLATFORM}
+RUN GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" SNAPSHOT="${SNAPSHOT}" DEV="${DEV}" PLATFORMS="${TARGETPLATFORM}" mage build:release
 
 FROM cgr.dev/chainguard/wolfi-base:latest
 ARG VERSION
-ARG TARGETOS
-ARG TARGETARCH
 
 RUN for iter in {1..10}; do \
         apk update && \
@@ -34,6 +34,6 @@ RUN groupadd --gid 1000 fleet-server && \
 USER fleet-server
 
 COPY --chown=fleet-server:fleet-server --chmod=644 fleet-server.yml /etc/fleet-server.yml
-COPY --chown=fleet-server:fleet-server --chmod=755 --from=builder /usr/src/fleet-server/build/binaries/fleet-server-${VERSION}-${TARGETOS:-linux}-*/fleet-server /usr/bin/fleet-server
+COPY --chown=fleet-server:fleet-server --chmod=555 --from=builder /fleet-server/build/binaries/fleet-server-${VERSION}-linux-*/fleet-server /usr/bin/fleet-server
 
 CMD /usr/bin/fleet-server -c /etc/fleet-server.yml
