@@ -43,7 +43,7 @@ steps:
           provider: "gcp"
 
       - label: "Detect FIPS crypto imports"
-        command: ".buildkite/scripts/detect_fips_crypto.sh"
+        command: ".buildkite/scripts/check_detect_fips_crypto.sh"
 
       - label: "Package x86_64"
         key: "package-x86-64-pr"
