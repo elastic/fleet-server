@@ -31,8 +31,6 @@ import (
 )
 
 const (
-	// TODO: move to a config
-	maxFileSize    = 104857600 // 100 MiB
 	maxUploadTimer = 24 * time.Hour
 )
 
@@ -58,7 +56,7 @@ func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch
 		chunkClient: chunkClient,
 		bulker:      bulker,
 		cache:       cache,
-		uploader:    uploader.New(chunkClient, bulker, cache, maxFileSize, maxUploadTimer),
+		uploader:    uploader.New(chunkClient, bulker, cache, cfg.Limits.MaxFileStorageByteSize, maxUploadTimer),
 		authAgent:   authAgent,
 		authAPIKey:  authAPIKey,
 	}
