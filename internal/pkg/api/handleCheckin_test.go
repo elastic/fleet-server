@@ -1150,7 +1150,7 @@ func TestProcessPolicyDetails(t *testing.T) {
 		req              *CheckinRequest
 		getPolicyMonitor func() *mockPolicyMonitor
 		revIDX           int64
-		returnsOps       bool
+		returnsOpts      bool
 		err              error
 	}{{
 		name: "request has no policy details",
@@ -1161,9 +1161,9 @@ func TestProcessPolicyDetails(t *testing.T) {
 		getPolicyMonitor: func() *mockPolicyMonitor {
 			return &mockPolicyMonitor{}
 		},
-		revIDX:     1,
-		returnsOps: false,
-		err:        nil,
+		revIDX:      1,
+		returnsOpts: false,
+		err:         nil,
 	}, {
 		name: "policy reassign detected",
 		agent: &model.Agent{
@@ -1181,9 +1181,9 @@ func TestProcessPolicyDetails(t *testing.T) {
 		getPolicyMonitor: func() *mockPolicyMonitor {
 			return &mockPolicyMonitor{}
 		},
-		revIDX:     0,
-		returnsOps: false,
-		err:        nil,
+		revIDX:      0,
+		returnsOpts: false,
+		err:         nil,
 	}, {
 		name: "revision updated",
 		agent: &model.Agent{
@@ -1203,9 +1203,9 @@ func TestProcessPolicyDetails(t *testing.T) {
 			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
 			return pm
 		},
-		revIDX:     2,
-		returnsOps: true,
-		err:        nil,
+		revIDX:      2,
+		returnsOpts: true,
+		err:         nil,
 	}, {
 		name: "checkin revision is greater than the policy's latest revision",
 		agent: &model.Agent{
@@ -1225,9 +1225,9 @@ func TestProcessPolicyDetails(t *testing.T) {
 			pm.On("LatestRev", mock.Anything, policyID).Return(int64(1)).Once()
 			return pm
 		},
-		revIDX:     0,
-		returnsOps: true,
-		err:        nil,
+		revIDX:      0,
+		returnsOpts: true,
+		err:         nil,
 	}, {
 		name: "agent_policy_id has changed",
 		agent: &model.Agent{
@@ -1247,9 +1247,9 @@ func TestProcessPolicyDetails(t *testing.T) {
 			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
 			return pm
 		},
-		revIDX:     2,
-		returnsOps: true,
-		err:        nil,
+		revIDX:      2,
+		returnsOpts: true,
+		err:         nil,
 	}, {
 		name: "agent does not have agent_policy_id present",
 		agent: &model.Agent{
@@ -1268,9 +1268,9 @@ func TestProcessPolicyDetails(t *testing.T) {
 			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
 			return pm
 		},
-		revIDX:     2,
-		returnsOps: true,
-		err:        nil,
+		revIDX:      2,
+		returnsOpts: true,
+		err:         nil,
 	}, {
 		name: "details present with no changes from agent doc",
 		agent: &model.Agent{
@@ -1290,9 +1290,9 @@ func TestProcessPolicyDetails(t *testing.T) {
 			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
 			return pm
 		},
-		revIDX:     2,
-		returnsOps: false,
-		err:        nil,
+		revIDX:      2,
+		returnsOpts: false,
+		err:         nil,
 	}}
 
 	for _, tc := range tests {
@@ -1307,7 +1307,7 @@ func TestProcessPolicyDetails(t *testing.T) {
 
 			revIDX, opts, err := checkin.processPolicyDetails(t.Context(), logger, tc.agent, tc.req)
 			assert.Equal(t, tc.revIDX, revIDX)
-			if tc.returnsOps {
+			if tc.returnsOpts {
 				assert.NotEmpty(t, opts)
 			} else {
 				assert.Empty(t, opts)
