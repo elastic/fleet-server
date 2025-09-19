@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
@@ -53,7 +55,7 @@ func TestMiddleware(t *testing.T) {
 	var obj map[string]any
 	err = json.Unmarshal(b.Bytes(), &obj)
 	require.NoError(t, err)
-	v, ok := obj[ECSServerAddress]
-	require.Truef(t, ok, "expected to find key: %s in %v", ECSServerAddress, obj)
+	v, ok := obj[ecs.ServerAddress]
+	require.Truef(t, ok, "expected to find key: %s in %v", ecs.ServerAddress, obj)
 	require.NotEmpty(t, v)
 }

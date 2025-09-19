@@ -19,7 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
@@ -50,8 +50,8 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	defer span.End()
 	span.Context.SetLabel("output_type", p.Type)
 	zlog = zlog.With().
-		Str(logger.AgentID, agent.Id).
-		Str(logger.PolicyOutputName, p.Name).Logger()
+		Str(ecs.AgentID, agent.Id).
+		Str(ecs.PolicyOutputName, p.Name).Logger()
 
 	switch p.Type {
 	case OutputTypeElasticsearch:
@@ -125,7 +125,7 @@ func (p *Output) prepareElasticsearch(
 			}
 		}
 		if !found {
-			zlog.Info().Str(logger.APIKeyID, agentOutput.APIKeyID).Str(logger.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
+			zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
 			toRetireAPIKeys = &model.ToRetireAPIKeyIdsItems{
 				ID:        agentOutput.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
@@ -270,10 +270,10 @@ func (p *Output) prepareElasticsearch(
 					State:   client.UnitStateDegraded.String(),
 					Message: fmt.Sprintf("remote ES could not create API key due to error: %v", err),
 				}
-				zerolog.Ctx(ctx).Warn().Err(err).Str(logger.PolicyOutputName, p.Name).Msg(doc.Message)
+				zerolog.Ctx(ctx).Warn().Err(err).Str(ecs.PolicyOutputName, p.Name).Msg(doc.Message)
 
 				if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
-					zlog.Error().Err(err).Str(logger.PolicyOutputName, p.Name).Msg("error writing output health")
+					zlog.Error().Err(err).Str(ecs.PolicyOutputName, p.Name).Msg("error writing output health")
 				}
 			}
 
@@ -301,7 +301,7 @@ func (p *Output) prepareElasticsearch(
 		// are supported.
 		zlog.Info().
 			Str("fleet.policy.role.hash.sha256", p.Role.Sha2).
-			Str(logger.DefaultOutputAPIKeyID, outputAPIKey.ID).
+			Str(ecs.DefaultOutputAPIKeyID, outputAPIKey.ID).
 			Msg("Updating agent record to pick up default output key.")
 
 		fields := map[string]interface{}{
@@ -519,7 +519,7 @@ func generateOutputAPIKey(
 	outputName string,
 	roles []byte) (*apikey.APIKey, error) {
 	name := fmt.Sprintf("%s:%s", agentID, outputName)
-	zerolog.Ctx(ctx).Info().Str(logger.AgentID, agentID).Msgf("generating output API key %s",
+	zerolog.Ctx(ctx).Info().Str(ecs.AgentID, agentID).Msgf("generating output API key %s",
 		name)
 	return bulk.APIKeyCreate(
 		ctx,
