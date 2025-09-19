@@ -270,6 +270,13 @@ fleet:
 #       upstream_url: "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
 #       # By default dir is the directory containing the fleet-server executable (following symlinks) joined with elastic-agent-upgrade-keys
 #       dir: ./elastic-agent-upgrade-keys
+#
+#      # Toggles to enable new behaviour or restore old behaviour.
+#      feature_flags:
+#        // ignore agent_policy_id and policy_revision_idx attributes that may be present in the checkin request bodies.
+#        // POLICY_CHANGE actions need an explicit ack if this is set.
+#        ignore_checkin_policy_id: false
+#
 #    # monitor options are advanced configuration and should not be adjusted is most cases
 #    monitor:
 #      fetch_size: 1000 # The number of documents that each monitor may fetch at once

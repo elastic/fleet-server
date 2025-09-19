@@ -307,6 +307,30 @@ type KibanaAgent struct {
 	Status string `json:"status"`
 }
 
+type ESAgentDoc struct {
+	Revision      int    `json:"policy_revision_idx"`
+	PolicyID      string `json:"policy_id"`
+	AgentPolicyID string `json:"agent_policy_id"`
+}
+
+func (s *Scaffold) GetAgent(ctx context.Context, id string) ESAgentDoc {
+	// NOTE we use ES instead of Kibana here as Kibana does not support agent_policy_id yet
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:9200/.fleet-agents/_doc/"+id, nil)
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	s.Require().Equal(http.StatusOK, resp.StatusCode)
+	var obj struct {
+		Source ESAgentDoc `json:"_source"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&obj)
+	s.Require().NoError(err)
+	return obj.Source
+}
+
 func (s *Scaffold) GetAgents(ctx context.Context) (int, []KibanaAgent) {
 	// TODO handle pagination if needed in the future
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:5601/api/fleet/agents", nil)
@@ -644,7 +668,11 @@ func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides 
 	}
 	p, err := json.Marshal(&body)
 	s.Require().NoError(err)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, fmt.Sprintf("http://localhost:5601/api/fleet/agent_policies/%s", id), bytes.NewReader(p))
+	s.UpdatePolicy(ctx, id, p)
+}
+
+func (s *Scaffold) UpdatePolicy(ctx context.Context, id string, body []byte) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, fmt.Sprintf("http://localhost:5601/api/fleet/agent_policies/%s", id), bytes.NewReader(body))
 	s.Require().NoError(err)
 	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
 	req.Header.Set("Content-Type", "application/json")
@@ -653,4 +681,18 @@ func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides 
 	s.Require().NoError(err)
 	defer resp.Body.Close()
 	s.Require().Equal(http.StatusOK, resp.StatusCode)
+}
+
+func (s *Scaffold) GetPolicy(ctx context.Context, id string) []byte {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:5601/api/fleet/agent_policies/%s", id), nil)
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-test")
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	s.Require().Equal(http.StatusOK, resp.StatusCode)
+	p, err := io.ReadAll(resp.Body)
+	s.Require().NoError(err)
+	return p
 }

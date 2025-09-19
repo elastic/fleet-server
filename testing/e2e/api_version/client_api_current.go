@@ -33,6 +33,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/fleet-server/pkg/api"
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
 	"github.com/elastic/fleet-server/v7/version"
@@ -512,4 +515,258 @@ func (tester *ClientAPITester) TestEnrollUpgradeAction_MetadataDownloadRate_Stri
 	tester.T().Logf("test checkin 3: agent %s", agentID)
 	_, _, statusCode = tester.Checkin(ctx, agentKey, agentID, ackToken, &dur, body)
 	tester.Require().Equal(http.StatusOK, statusCode, "Expected status code 200 for successful checkin")
+}
+
+func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 4*time.Minute)
+	defer cancel()
+	dur := "60s" // 60s is the min poll duraton fleet-server allows
+
+	tester.T().Log("Enroll an agent")
+	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	tester.VerifyAgentInKibana(ctx, agentID)
+
+	client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.Client), api.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+		req.Header.Set("Authorization", "ApiKey "+agentKey)
+		return nil
+	}))
+	tester.Require().NoError(err)
+
+	tester.T().Logf("test checkin 1: retrieve POLICY_CHANGE action for agent %s", agentID)
+	resp, err := client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, api.AgentCheckinJSONRequestBody{
+		Status:  api.CheckinRequestStatusOnline,
+		Message: "test checkin",
+	})
+	tester.Require().NoError(err)
+	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+
+	checkin := resp.JSON200
+	tester.Require().NotEmpty(checkin.Actions)
+	var policyChange api.ActionPolicyChange
+	found := false
+	for _, action := range checkin.Actions {
+		if action.Type == api.POLICYCHANGE {
+			policyChange, err = action.Data.AsActionPolicyChange()
+			tester.Require().NoError(err)
+			found = true
+			break
+		}
+	}
+	tester.Require().True(found, "unable to find POLICY_CHANGE action in 1st checkin response")
+	policyID := policyChange.Policy.Id
+	revIDX := int64(policyChange.Policy.Revision) // TODO change mapping in openapi?
+
+	// Checkin with policyID revIDX
+	// No actions should be returned
+	// Manage any API keys if present
+	tester.T().Logf("test checkin 2: agent %s with policy %s:%d in request body", agentID, policyID, revIDX)
+	resp, err = client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, api.AgentCheckinJSONRequestBody{
+		Status:            api.CheckinRequestStatusOnline,
+		Message:           "test checkin",
+		PollTimeout:       &dur,
+		AgentPolicyId:     &policyID,
+		PolicyRevisionIdx: &revIDX,
+	})
+	tester.Require().NoError(err)
+	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+	checkin = resp.JSON200
+	tester.Require().Empty(checkin.Actions, "Unexpected action in response")
+
+	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
+		agent := tester.GetAgent(ctx, agentID)
+		assert.Equal(c, policyID, agent.AgentPolicyID)
+		assert.Equal(c, revIDX, int64(agent.Revision))
+	}, time.Second*10, time.Second)
+
+	// Check in with revIDX that does not exist
+	// POLICY_CHANGE should be returned
+	// No API keys changed
+	// agent doc will be updated with sent values
+	newRevIDX := revIDX + 1
+	tester.T().Logf("test checkin 3: agent %s with revision_idx+1 %d (fast forward)", agentID, newRevIDX)
+	resp, err = client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, api.AgentCheckinJSONRequestBody{
+		Status:            api.CheckinRequestStatusOnline,
+		Message:           "test checkin",
+		PollTimeout:       &dur,
+		AgentPolicyId:     &policyID,
+		PolicyRevisionIdx: &newRevIDX,
+	})
+	tester.Require().NoError(err)
+	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+
+	checkin = resp.JSON200
+	found = false
+	for _, action := range checkin.Actions {
+		if action.Type == api.POLICYCHANGE {
+			policyChange, err = action.Data.AsActionPolicyChange()
+			tester.Require().NoError(err)
+			found = true
+			break
+		}
+	}
+	tester.Require().True(found, "unable to find POLICY_CHANGE action in 3rd checkin response")
+	tester.Require().Equal(policyID, policyChange.Policy.Id)
+	tester.Require().Equal(revIDX, int64(policyChange.Policy.Revision))
+
+	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
+		agent := tester.GetAgent(ctx, agentID)
+		assert.Equal(c, policyID, agent.AgentPolicyID)
+		assert.Equal(c, newRevIDX, int64(agent.Revision))
+	}, time.Second*10, time.Second)
+
+	// Update policy
+	// Get the policy then "update" it without changing anything - revision ID should increment
+	tester.T().Logf("Update policy %s", policyID)
+	rawPolicy := tester.GetPolicy(ctx, policyID)
+	var obj map[string]any
+	err = json.Unmarshal(rawPolicy, &obj)
+	tester.Require().NoError(err)
+	item, ok := obj["item"]
+	tester.Require().True(ok, "Expected item in object: %v", obj)
+	obj, ok = item.(map[string]any)
+	tester.Require().True(ok, "Expected item to be object: %T", item)
+	reqObj := make(map[string]any)
+	// Copy some attributes - name and namespace are required.
+	for _, k := range []string{"name", "namespace", "id", "space_ids", "inactivity_timeout"} {
+		reqObj[k] = obj[k]
+	}
+	rawPolicy, err = json.Marshal(reqObj)
+	tester.Require().NoError(err)
+
+	tester.UpdatePolicy(ctx, policyID, rawPolicy)
+	rawPolicy = tester.GetPolicy(ctx, policyID)
+
+	// Verify that the revision has incremented
+	err = json.Unmarshal(rawPolicy, &obj)
+	tester.Require().NoError(err)
+	item, ok = obj["item"]
+	tester.Require().True(ok, "Expected item in object: %v", obj)
+	obj, ok = item.(map[string]any)
+	tester.Require().True(ok, "Expected item to be object: %T", item)
+	oRev, ok := obj["revision"]
+	tester.Require().True(ok, "revision not found in: %v", obj)
+	iRev, ok := oRev.(float64) // numbers will serialize to float64 by default
+	tester.Require().True(ok, "revision is not a float64: %T", oRev)
+	tester.Require().Equal(revIDX+1, int64(iRev), "Expected policy revision to be exactly one greater than last revision.")
+	tester.T().Logf("Policy has been updated to revision %d.", int64(iRev))
+
+	// Do a checkin with revIDX (policy.revision - 1)
+	// Last checkin should have already recorded the agent as running policy_revision, but this checkin must return a POLICY_CHANGE action.
+	// Note that API keys (if any) would be managed here
+	tester.T().Logf("test checkin 4: agent %s with policy.revision-1 %d", agentID, revIDX)
+	resp, err = client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, api.AgentCheckinJSONRequestBody{
+		Status:            api.CheckinRequestStatusOnline,
+		Message:           "test checkin",
+		PollTimeout:       &dur,
+		AgentPolicyId:     &policyID,
+		PolicyRevisionIdx: &revIDX,
+	})
+	tester.Require().NoError(err)
+	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+	checkin = resp.JSON200
+	tester.Require().NotEmpty(checkin.Actions, "Expected an action in the response")
+	found = false
+	for _, action := range checkin.Actions {
+		if action.Type == api.POLICYCHANGE {
+			policyChange, err = action.Data.AsActionPolicyChange()
+			tester.Require().NoError(err)
+			found = true
+			break
+		}
+	}
+	tester.Require().True(found, "unable to find POLICY_CHANGE action in 4th checkin response")
+	revIDX = int64(policyChange.Policy.Revision)
+	tester.Require().Equal(int64(iRev), revIDX, "Expected POLICY_CHANGE action to be for updated policy revision")
+
+	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
+		agent := tester.GetAgent(ctx, agentID)
+		require.Equal(c, policyID, agent.AgentPolicyID)
+		require.Equal(c, revIDX, int64(agent.Revision))
+	}, time.Second*10, time.Second)
+
+	// Do a normal checkin to "reset" to latest revision_idx
+	// no actions are returned
+	// Manage any API keys if present
+	tester.T().Logf("test checkin 5: agent %s with policy %s:%d in request body", agentID, policyID, revIDX)
+	resp, err = client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, api.AgentCheckinJSONRequestBody{
+		Status:            api.CheckinRequestStatusOnline,
+		Message:           "test checkin",
+		PollTimeout:       &dur,
+		AgentPolicyId:     &policyID,
+		PolicyRevisionIdx: &revIDX,
+	})
+	tester.Require().NoError(err)
+	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+	checkin = resp.JSON200
+	tester.Require().Empty(checkin.Actions, "Unexpected action in response")
+
+	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
+		agent := tester.GetAgent(ctx, agentID)
+		require.Equal(c, policyID, agent.AgentPolicyID)
+		require.Equal(c, revIDX, int64(agent.Revision))
+	}, time.Second*10, time.Second)
+
+	// Test that if the agent is "restored" to an earlier revIDX a policy_change is sent
+	prevRev := revIDX - 1
+	tester.T().Logf("test checkin 6: agent %s with policy %s:%d (rewind)", agentID, policyID, prevRev)
+	resp, err = client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, api.AgentCheckinJSONRequestBody{
+		Status:            api.CheckinRequestStatusOnline,
+		Message:           "test checkin",
+		PollTimeout:       &dur,
+		AgentPolicyId:     &policyID,
+		PolicyRevisionIdx: &prevRev,
+	})
+	tester.Require().NoError(err)
+	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+	checkin = resp.JSON200
+	tester.Require().NotEmpty(checkin.Actions, "Expected action in response")
+
+	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
+		agent := tester.GetAgent(ctx, agentID)
+		require.Equal(c, policyID, agent.AgentPolicyID)
+		require.Equal(c, prevRev, int64(agent.Revision))
+	}, time.Second*10, time.Second)
+
+	// agent is now recorded as on a previous revision - check to make sure a checkin without AgentPolicyId and revision result in a POLICY_CHANGE action
+	tester.T().Logf("test checkin 7: agent %s with no policy or revision", agentID)
+	resp, err = client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, api.AgentCheckinJSONRequestBody{
+		Status:      api.CheckinRequestStatusOnline,
+		Message:     "test checkin",
+		PollTimeout: &dur,
+	})
+	tester.Require().NoError(err)
+	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+	checkin = resp.JSON200
+	tester.Require().NotEmpty(checkin.Actions, "Expected action in response")
+	actionID := ""
+	for _, action := range checkin.Actions {
+		if action.Type == api.POLICYCHANGE {
+			actionID = action.Id
+			break
+		}
+	}
+	tester.Require().NotEmptyf(actionID, "expected to find POLICY_CHANGE action id in %+v", checkin.Actions)
+
+	tester.T().Log("Ack the POLICY_CHANGE action")
+	tester.Acks(ctx, agentKey, agentID, []string{actionID})
+
+	tester.T().Logf("test checkin 8: agent %s with no policy or revision should not recieve action", agentID)
+	resp, err = client.AgentCheckinWithResponse(ctx, agentID, &api.AgentCheckinParams{UserAgent: "elastic agent " + version.DefaultVersion}, api.AgentCheckinJSONRequestBody{
+		Status:      api.CheckinRequestStatusOnline,
+		Message:     "test checkin",
+		PollTimeout: &dur,
+	})
+	tester.Require().NoError(err)
+	tester.Require().Equal(http.StatusOK, resp.StatusCode())
+	checkin = resp.JSON200
+	tester.Require().Empty(checkin.Actions, "Unexpected action in response")
+
+	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
+		agent := tester.GetAgent(ctx, agentID)
+		assert.Equal(c, policyID, agent.AgentPolicyID)
+		assert.Equal(c, revIDX, int64(agent.Revision))
+	}, time.Second*10, time.Second)
+
+	// sanity check agent status in kibana
+	tester.AgentIsOnline(ctx, agentID)
 }

@@ -579,7 +579,12 @@
           "format": "raw"
         },
         "policy_id": {
-          "description": "The policy ID for the Elastic Agent",
+          "description": "The policy ID that the Elastic Agent should run.",
+          "type": "string",
+          "format": "uuid"
+        },
+        "agent_policy_id": {
+          "description": "The policy ID that the Elastic Agent is currently running.",
           "type": "string",
           "format": "uuid"
         },
