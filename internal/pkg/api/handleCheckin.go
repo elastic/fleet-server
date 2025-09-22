@@ -9,6 +9,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"net/http"
 	"reflect"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -876,6 +878,11 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 				policyOutput.Name, err)
 		}
 	}
+	// Prepare OTel exporters from the information in outputs.
+	if err := prepareOTelExporters(data.Outputs, data.Exporters); err != nil {
+		return nil, fmt.Errorf("failed to prepare OTel exporters: %w", err)
+	}
+
 	// Add replace inputs with agent prepared version.
 	data.Inputs = pp.Inputs
 
@@ -909,6 +916,49 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	return &resp, nil
+}
+
+// prepareOTelExporters prepares OTel exporters by copying credentials and potentially other
+// settings from already prepared outputs.
+func prepareOTelExporters(outputs map[string]map[string]any, exporters map[string]any) error {
+	for id, c := range exporters {
+		var config map[string]any
+		if c == nil {
+			config = make(map[string]any)
+		} else if cmap, ok := c.(map[string]any); ok {
+			config = cmap
+		} else {
+			return fmt.Errorf("unexpected config type for %q, expected map, found %T", id, c)
+		}
+
+		exporterType, name, found := strings.Cut(id, "/")
+		if !found {
+			return fmt.Errorf("unexpected exporter id format %q", id)
+		}
+
+		output, found := outputs[name]
+		if !found {
+			return fmt.Errorf("output %q not found for exporter %q", name, id)
+		}
+
+		switch exporterType {
+		case policy.OTelExporterTypeElasticsearch:
+			ot, ok := output["type"].(string)
+			if !ok || (ot != policy.OutputTypeElasticsearch && ot != policy.OutputTypeRemoteElasticsearch) {
+				return fmt.Errorf("unexpected output type %q found for exporter %q", name, id)
+			}
+			apiKey, ok := output["api_key"].(string)
+			if !ok || apiKey == "" {
+				return fmt.Errorf("api key not found in output %q for exporter %q", name, id)
+			}
+			config["api_key"] = base64.StdEncoding.EncodeToString([]byte(apiKey))
+		default:
+			return fmt.Errorf("OTel exporter %q not supported", exporterType)
+		}
+
+		exporters[id] = config
+	}
+	return nil
 }
 
 func getAgentAndVerifyAPIKeyID(ctx context.Context, bulker bulk.Bulk, agentID string, apiKeyID string) (*model.Agent, error) {
