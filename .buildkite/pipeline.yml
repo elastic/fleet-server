@@ -72,6 +72,7 @@ steps:
 
       - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
         key: "go-benchmark-base"
+        skip: true # FIXME: Temporarily disabled until mage is on 9.0
         command: ".buildkite/scripts/run_benchmark.sh base"
         env:
           BENCHMARK_ARGS: "-count=8 -benchmem"
