@@ -16,13 +16,8 @@ require (
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/stretchr/testify v1.11.1
-<<<<<<< HEAD
-	github.com/testcontainers/testcontainers-go v0.37.0
-	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.37.0
-=======
 	github.com/testcontainers/testcontainers-go v0.39.0
 	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.38.0
->>>>>>> 83231b1 (build(deps): bump github.com/testcontainers/testcontainers-go (#5541))
 )
 
 require (
@@ -74,11 +69,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
-<<<<<<< HEAD
-	github.com/shirou/gopsutil/v4 v4.25.3 // indirect
-=======
 	github.com/shirou/gopsutil/v4 v4.25.6 // indirect
->>>>>>> 83231b1 (build(deps): bump github.com/testcontainers/testcontainers-go (#5541))
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
