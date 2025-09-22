@@ -918,7 +918,9 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	return &resp, nil
 }
 
-func prepareOTelExporters(outputs map[string]map[string]interface{}, exporters map[string]any) error {
+// prepareOTelExporters prepares OTel exporters by copying credentials and potentially other
+// settings from already prepared outputs.
+func prepareOTelExporters(outputs map[string]map[string]any, exporters map[string]any) error {
 	for id, c := range exporters {
 		var config map[string]any
 		if c == nil {
@@ -940,7 +942,7 @@ func prepareOTelExporters(outputs map[string]map[string]interface{}, exporters m
 		}
 
 		switch exporterType {
-		case "elasticsearch":
+		case policy.OTelExporterTypeElasticsearch:
 			ot, ok := output["type"].(string)
 			if !ok || (ot != policy.OutputTypeElasticsearch && ot != policy.OutputTypeRemoteElasticsearch) {
 				return fmt.Errorf("unexpected output type %q found for exporter %q", name, id)
