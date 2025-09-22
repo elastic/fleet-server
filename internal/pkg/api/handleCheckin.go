@@ -1177,7 +1177,7 @@ func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logge
 	// Check if the checkin revision_idx is greater than the latest available
 	latestRev := ct.pm.LatestRev(ctx, agent.PolicyID)
 	if latestRev != 0 && revisionIDX > latestRev {
-		return 0, opts, nil
+		revisionIDX = 0 // set return val to 0 so the agent gets latest available revision.
 	}
 
 	// Update API keys if the policy has changed, or if the revision differs.
