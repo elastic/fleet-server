@@ -17,7 +17,7 @@ require (
 	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.39.0
-	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.38.0
+	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.39.0
 )
 
 require (
