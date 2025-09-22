@@ -11,6 +11,9 @@ env:
 common:
   # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
   # This plugin authenticates to Google Cloud using the OIDC token.
+  - docker_elastic_login_plugin: &docker_elastic_login_plugin
+      elastic/vault-docker-login#v0.6.0:
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
   - oidc_plugin: &oidc_plugin
       elastic/oblt-google-auth#v1.2.0:
         lifetime: 10800 # seconds
@@ -194,6 +197,8 @@ steps:
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
+        plugins:
+          - *docker_elastic_login_plugin
         depends_on:
           - step: "unit-test"
             allow_failure: false
@@ -207,7 +212,6 @@ steps:
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
     env:
-      DOCKER_REGISTRY: "docker.elastic.co"
       DOCKER_IMAGE: "docker.elastic.co/observability-ci/fleet-server" # needs to rename for rollback
       DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
       DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
@@ -215,6 +219,8 @@ steps:
     if: "build.env('BUILDKITE_PULL_REQUEST') == 'false' && build.env('BUILDKITE_BRANCH') == 'main'"
     agents:
       provider: "gcp"
+    plugins:
+      - *docker_elastic_login_plugin
     depends_on:
       - step: "tests"
         allow_failure: false
