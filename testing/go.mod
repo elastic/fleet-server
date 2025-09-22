@@ -14,22 +14,12 @@ require (
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.11.1
-<<<<<<< HEAD
-	github.com/testcontainers/testcontainers-go v0.38.0
-)
-
-require (
-	dario.cat/mergo v1.0.1 // indirect
-	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-=======
 	github.com/testcontainers/testcontainers-go v0.39.0
-	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.38.0
 )
 
 require (
 	dario.cat/mergo v1.0.2 // indirect
-	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
->>>>>>> 83231b1 (build(deps): bump github.com/testcontainers/testcontainers-go (#5541))
+	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
@@ -65,14 +55,8 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-<<<<<<< HEAD
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/shirou/gopsutil/v4 v4.25.5 // indirect
-=======
-	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
-	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/shirou/gopsutil/v4 v4.25.6 // indirect
->>>>>>> 83231b1 (build(deps): bump github.com/testcontainers/testcontainers-go (#5541))
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
