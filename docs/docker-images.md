@@ -10,10 +10,6 @@ The [Dockerfile](../Dockerfile) contained with this project produces a stand-alo
 
 The [Dockerfile.build](../Dockerfile.build) contained with this project is used to produce release artifacts.
 
-## Dockerfile.fips
-
-The [Dockerfile.fips](../Dockerfile.fips) contained with this project is used to produce FIPS capable artifacts as well as a stand-alone fleet-server image.
-
 ### Minimum MacOSX Version
 
 The [golang-crossbuild](https://github.com/elastic/golang-crossbuild) image is used as the base for the [Dockerfile.build](#dockerfilebuild) container.

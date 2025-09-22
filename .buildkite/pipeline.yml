@@ -71,7 +71,6 @@ steps:
           machineType: "c2-standard-8"
 
       - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-        skip: true # FIXME: Temporarily disabled until mage is on main
         key: "go-benchmark-base"
         command: ".buildkite/scripts/run_benchmark.sh base"
         env:
@@ -224,7 +223,6 @@ steps:
     key: "publish"
     command: ".buildkite/scripts/build_push_docker_image.sh"
     env:
-      DOCKER_REGISTRY: "docker.elastic.co"
       DOCKER_IMAGE: "docker.elastic.co/observability-ci/fleet-server" # needs to rename for rollback
       DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
       DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
