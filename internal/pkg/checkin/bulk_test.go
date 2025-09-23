@@ -5,7 +5,6 @@
 package checkin
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"testing"
@@ -19,7 +18,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // Test simple,
@@ -43,38 +44,36 @@ func matchOp(tb testing.TB, c testcase, ts time.Time) func(ops []bulk.MultiOp) b
 		// Decode and match operation
 		// NOTE putting the extra validation here seems strange, maybe we should read the args in the test body intstead?
 		type updateT struct {
-			LastCheckin string          `json:"last_checkin"`
-			Status      string          `json:"last_checkin_status"`
-			UpdatedAt   string          `json:"updated_at"`
-			Meta        json.RawMessage `json:"local_metadata"`
-			SeqNo       sqn.SeqNo       `json:"action_seq_no"`
+			LastCheckin   string          `json:"last_checkin"`
+			Status        string          `json:"last_checkin_status"`
+			UpdatedAt     string          `json:"updated_at"`
+			AgentPolicyID string          `json:"agent_policy_id,omitempty"`
+			RevisionIDX   int64           `json:"policy_revision_idx,omitempty"`
+			Meta          json.RawMessage `json:"local_metadata"`
+			SeqNo         sqn.SeqNo       `json:"action_seq_no"`
 		}
 
 		m := make(map[string]updateT)
-		if err := json.Unmarshal(ops[0].Body, &m); err != nil {
-			tb.Fatalf("unable to validate operation: %v", err)
-		}
+		err := json.Unmarshal(ops[0].Body, &m)
+		require.NoErrorf(tb, err, "unable to validate operation body %s", string(ops[0].Body))
 
 		sub, ok := m["doc"]
-		if !ok {
-			tb.Fatal("unable to validate operation: expected doc")
-		}
+		require.True(tb, ok, "unable to validate operation: expected doc")
+
 		validateTimestamp(tb, ts.Truncate(time.Second), sub.LastCheckin)
 		validateTimestamp(tb, ts.Truncate(time.Second), sub.UpdatedAt)
+		assert.Equal(tb, c.policyID, sub.AgentPolicyID)
+		assert.Equal(tb, c.revisionIDX, sub.RevisionIDX)
 		if c.seqno != nil {
 			if cdiff := cmp.Diff(c.seqno, sub.SeqNo); cdiff != "" {
 				tb.Error(cdiff)
 			}
 		}
 
-		if c.meta != nil && !bytes.Equal(c.meta, sub.Meta) {
-			tb.Error("meta doesn't match up")
+		if c.meta != nil {
+			assert.Equal(tb, json.RawMessage(c.meta), sub.Meta)
 		}
-
-		if c.status != sub.Status {
-			tb.Error("status mismatch")
-		}
-
+		assert.Equal(tb, c.status, sub.Status)
 		return true
 	}
 }
@@ -84,6 +83,8 @@ type testcase struct {
 	id              string
 	status          string
 	message         string
+	policyID        string
+	revisionIDX     int64
 	meta            []byte
 	components      []byte
 	seqno           sqn.SeqNo
@@ -95,107 +96,73 @@ func TestBulkSimple(t *testing.T) {
 	start := time.Now()
 
 	const ver = "8.9.0"
-	cases := []testcase{
-		{
-			"Simple case",
-			"simpleId",
-			"online",
-			"message",
-			nil,
-			nil,
-			nil,
-			"",
-			nil,
-		},
-		{
-			"has meta with fips attribute",
-			"metaCaseID",
-			"online",
-			"message",
-			[]byte(`{"fips":true,"snapshot":false}`),
-			nil,
-			nil,
-			"",
-			nil,
-		},
-		{
-			"Singled field case",
-			"singleFieldId",
-			"online",
-			"message",
-			[]byte(`{"hey":"now"}`),
-			[]byte(`[{"id":"winlog-default"}]`),
-			nil,
-			"",
-			nil,
-		},
-		{
-			"Multi field case",
-			"multiFieldId",
-			"online",
-			"message",
-			[]byte(`{"hey":"now","brown":"cow"}`),
-			[]byte(`[{"id":"winlog-default","type":"winlog"}]`),
-			nil,
-			ver,
-			nil,
-		},
-		{
-			"Multi field nested case",
-			"multiFieldNestedId",
-			"online",
-			"message",
-			[]byte(`{"hey":"now","wee":{"little":"doggie"}}`),
-			[]byte(`[{"id":"winlog-default","type":"winlog"}]`),
-			nil,
-			"",
-			nil,
-		},
-		{
-			"Simple case with seqNo",
-			"simpleseqno",
-			"online",
-			"message",
-			nil,
-			nil,
-			sqn.SeqNo{1, 2, 3, 4},
-			ver,
-			nil,
-		},
-		{
-			"Field case with seqNo",
-			"simpleseqno",
-			"online",
-			"message",
-			[]byte(`{"uncle":"fester"}`),
-			[]byte(`[{"id":"log-default"}]`),
-			sqn.SeqNo{5, 6, 7, 8},
-			ver,
-			nil,
-		},
-		{
-			"Unusual status",
-			"singleFieldId",
-			"unusual",
-			"message",
-			nil,
-			nil,
-			nil,
-			"",
-			nil,
-		},
-		{
-			"Empty status",
-			"singleFieldId",
-			"",
-			"message",
-			nil,
-			nil,
-			nil,
-			"",
-			nil,
-		},
-	}
+	cases := []testcase{{
+		name:    "Simple case",
+		id:      "simpleId",
+		status:  "online",
+		message: "message",
+	}, {
+		name:        "Simple case with policy id and revision idx",
+		id:          "simpleId",
+		status:      "online",
+		message:     "message",
+		policyID:    "testPolicy",
+		revisionIDX: 1,
+	}, {
+		name:    "has meta with fips attribute",
+		id:      "metaCaseID",
+		status:  "online",
+		message: "message",
+		meta:    []byte(`{"fips":true,"snapshot":false}`),
+	}, {
+		name:       "Singled field case",
+		id:         "singleFieldId",
+		status:     "online",
+		message:    "message",
+		meta:       []byte(`{"hey":"now"}`),
+		components: []byte(`[{"id":"winlog-default"}]`),
+	}, {
+		name:       "Multi field case",
+		id:         "multiFieldId",
+		status:     "online",
+		message:    "message",
+		meta:       []byte(`{"hey":"now","brown":"cow"}`),
+		components: []byte(`[{"id":"winlog-default","type":"winlog"}]`),
+		ver:        ver,
+	}, {
+		name:       "Multi field nested case",
+		id:         "multiFieldNestedId",
+		status:     "online",
+		message:    "message",
+		meta:       []byte(`{"hey":"now","wee":{"little":"doggie"}}`),
+		components: []byte(`[{"id":"winlog-default","type":"winlog"}]`),
+	}, {
+		name:    "Simple case with seqNo",
+		id:      "simpleseqno",
+		status:  "online",
+		message: "message",
+		seqno:   sqn.SeqNo{1, 2, 3, 4},
+		ver:     ver,
+	}, {
+		name:       "Field case with seqNo",
+		id:         "simpleseqno",
+		status:     "online",
+		message:    "message",
+		meta:       []byte(`{"uncle":"fester"}`),
+		components: []byte(`[{"id":"log-default"}]`),
+		seqno:      sqn.SeqNo{5, 6, 7, 8},
+		ver:        ver,
+	}, {
+		name:    "Unusual status",
+		id:      "singleFieldId",
+		status:  "unusual",
+		message: "message",
+	}, {
+		name:    "Empty status",
+		id:      "singleFieldId",
+		status:  "",
+		message: "message",
+	}}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -205,6 +172,9 @@ func TestBulkSimple(t *testing.T) {
 			bc := NewBulk(mockBulk)
 
 			opts := []Option{WithStatus(c.status), WithMessage(c.message)}
+			if c.policyID != "" {
+				opts = append(opts, WithAgentPolicyID(c.policyID), WithPolicyRevisionIDX(c.revisionIDX))
+			}
 			if c.meta != nil {
 				opts = append(opts, WithMeta(c.meta))
 			}
@@ -221,13 +191,10 @@ func TestBulkSimple(t *testing.T) {
 				opts = append(opts, WithUnhealthyReason(c.unhealthyReason))
 			}
 
-			if err := bc.CheckIn(c.id, opts...); err != nil {
-				t.Fatal(err)
-			}
-
-			if err := bc.flush(ctx); err != nil {
-				t.Fatal(err)
-			}
+			err := bc.CheckIn(c.id, opts...)
+			require.NoError(t, err)
+			err = bc.flush(ctx)
+			require.NoError(t, err)
 
 			mockBulk.AssertExpectations(t)
 		})
@@ -235,11 +202,9 @@ func TestBulkSimple(t *testing.T) {
 }
 
 func validateTimestamp(tb testing.TB, start time.Time, ts string) {
-	if t1, err := time.Parse(time.RFC3339, ts); err != nil {
-		tb.Error("expected rfc3999")
-	} else if start.After(t1) {
-		tb.Error("timestamp in the past")
-	}
+	t1, err := time.Parse(time.RFC3339, ts)
+	require.NoErrorf(tb, err, "expected %q to be in RFC 3339 format", ts)
+	require.False(tb, start.After(t1), "timestamp in the past")
 }
 
 func benchmarkBulk(n int, b *testing.B) {

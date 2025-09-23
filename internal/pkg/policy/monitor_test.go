@@ -9,6 +9,7 @@ package policy
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -548,4 +549,77 @@ LOOP:
 	require.Equal(t, policies[0].Policy.RevisionIdx, int64(2))
 	ms.AssertExpectations(t)
 	mm.AssertExpectations(t)
+}
+
+func TestMonitor_LatestRev(t *testing.T) {
+	t.Run("empty policy id", func(t *testing.T) {
+		pm := &monitorT{}
+		idx := pm.LatestRev(t.Context(), "")
+		assert.Equal(t, int64(0), idx)
+	})
+
+	t.Run("policy load error", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		mm := mmock.NewMockMonitor()
+		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+		pm := monitor.(*monitorT)
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return nil, fmt.Errorf("policy fetch error")
+		}
+
+		idx := pm.LatestRev(t.Context(), "test-id")
+		assert.Equal(t, int64(0), idx)
+	})
+
+	t.Run("policy not found", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		mm := mmock.NewMockMonitor()
+		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+		pm := monitor.(*monitorT)
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{}, nil
+		}
+		idx := pm.LatestRev(t.Context(), "test-id")
+		assert.Equal(t, int64(0), idx)
+	})
+
+	t.Run("policy found after load", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		mm := mmock.NewMockMonitor()
+		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+		pm := monitor.(*monitorT)
+		policyId := uuid.Must(uuid.NewV4()).String()
+		rId := xid.New().String()
+		policy := model.Policy{
+			ESDocument: model.ESDocument{
+				Id:      rId,
+				Version: 1,
+				SeqNo:   1,
+			},
+			PolicyID:    policyId,
+			Data:        policyDataDefault,
+			RevisionIdx: 2,
+		}
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{policy}, nil
+		}
+		idx := pm.LatestRev(t.Context(), policyId)
+		assert.Equal(t, int64(2), idx)
+	})
+
+	t.Run("policy found", func(t *testing.T) {
+		pm := &monitorT{
+			policies: map[string]policyT{
+				"test-id": policyT{
+					pp: ParsedPolicy{
+						Policy: model.Policy{
+							RevisionIdx: 1,
+						},
+					},
+				},
+			},
+		}
+		idx := pm.LatestRev(t.Context(), "test-id")
+		assert.Equal(t, int64(1), idx)
+	})
 }

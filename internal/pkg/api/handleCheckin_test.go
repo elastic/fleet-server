@@ -25,7 +25,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	mockmonitor "github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
@@ -38,6 +37,30 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+type mockPolicyMonitor struct {
+	mock.Mock
+}
+
+func (m *mockPolicyMonitor) Run(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *mockPolicyMonitor) Subscribe(agentID, policyID string, revIDX int64) (policy.Subscription, error) {
+	args := m.Called(agentID, policyID, revIDX)
+	return args.Get(0).(policy.Subscription), args.Error(1)
+}
+
+func (m *mockPolicyMonitor) Unsubscribe(sub policy.Subscription) error {
+	args := m.Called(sub)
+	return args.Error(0)
+}
+
+func (m *mockPolicyMonitor) LatestRev(ctx context.Context, id string) int64 {
+	args := m.Called(ctx, id)
+	return args.Get(0).(int64)
+}
 
 func TestConvertActionData(t *testing.T) {
 	tests := []struct {
@@ -339,14 +362,13 @@ func TestResolveSeqNo(t *testing.T) {
 			cfg := &config.Server{}
 			c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 			bc := checkin.NewBulk(nil)
-			bulker := ftesting.NewMockBulk()
-			pim := mockmonitor.NewMockMonitor()
-			pm := policy.NewMonitor(bulker, pim, config.ServerLimits{PolicyLimit: config.Limit{Interval: 5 * time.Millisecond, Burst: 1}})
+			pm := &mockPolicyMonitor{}
 			ct, err := NewCheckinT(verCon, cfg, c, bc, pm, nil, nil, nil)
 			assert.NoError(t, err)
 
 			resp, _ := ct.resolveSeqNo(ctx, logger, tc.req, tc.agent)
 			assert.Equal(t, tc.resp, resp)
+			pm.AssertExpectations(t)
 		})
 	}
 
@@ -1117,4 +1139,209 @@ func TestValidateCheckinRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProcessPolicyDetails(t *testing.T) {
+	policyID := "policy-id"
+	revIDX2 := int64(2)
+	tests := []struct {
+		name             string
+		agent            *model.Agent
+		req              *CheckinRequest
+		getPolicyMonitor func() *mockPolicyMonitor
+		revIDX           int64
+		returnsOpts      bool
+		err              error
+	}{{
+		name: "request has no policy details",
+		agent: &model.Agent{
+			PolicyRevisionIdx: 1,
+		},
+		req: &CheckinRequest{},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			return &mockPolicyMonitor{}
+		},
+		revIDX:      1,
+		returnsOpts: false,
+		err:         nil,
+	}, {
+		name: "policy reassign detected",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          "new-policy-id",
+			AgentPolicyID:     policyID,
+			PolicyRevisionIdx: 2,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			return &mockPolicyMonitor{}
+		},
+		revIDX:      0,
+		returnsOpts: false,
+		err:         nil,
+	}, {
+		name: "revision updated",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			AgentPolicyID:     policyID,
+			PolicyRevisionIdx: 1,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			pm := &mockPolicyMonitor{}
+			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
+			return pm
+		},
+		revIDX:      2,
+		returnsOpts: true,
+		err:         nil,
+	}, {
+		name: "checkin revision is greater than the policy's latest revision",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			AgentPolicyID:     policyID,
+			PolicyRevisionIdx: 1,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			pm := &mockPolicyMonitor{}
+			pm.On("LatestRev", mock.Anything, policyID).Return(int64(1)).Once()
+			return pm
+		},
+		revIDX:      0,
+		returnsOpts: true,
+		err:         nil,
+	}, {
+		name: "agent_policy_id has changed",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			AgentPolicyID:     "old-policy-id",
+			PolicyRevisionIdx: 1,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			pm := &mockPolicyMonitor{}
+			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
+			return pm
+		},
+		revIDX:      2,
+		returnsOpts: true,
+		err:         nil,
+	}, {
+		name: "agent does not have agent_policy_id present",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			PolicyRevisionIdx: 2,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			pm := &mockPolicyMonitor{}
+			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
+			return pm
+		},
+		revIDX:      2,
+		returnsOpts: true,
+		err:         nil,
+	}, {
+		name: "details present with no changes from agent doc",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			AgentPolicyID:     policyID,
+			PolicyID:          policyID,
+			PolicyRevisionIdx: revIDX2,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			pm := &mockPolicyMonitor{}
+			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
+			return pm
+		},
+		revIDX:      2,
+		returnsOpts: false,
+		err:         nil,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			pm := tc.getPolicyMonitor()
+			checkin := &CheckinT{
+				cfg:    &config.Server{},
+				bulker: ftesting.NewMockBulk(),
+				pm:     pm,
+			}
+
+			revIDX, opts, err := checkin.processPolicyDetails(t.Context(), logger, tc.agent, tc.req)
+			assert.Equal(t, tc.revIDX, revIDX)
+			if tc.returnsOpts {
+				assert.NotEmpty(t, opts)
+			} else {
+				assert.Empty(t, opts)
+			}
+			if tc.err != nil {
+				assert.ErrorIs(t, tc.err, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			pm.AssertExpectations(t)
+		})
+	}
+
+	t.Run("IgnoreCheckinPolicyID flag is set", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		checkin := &CheckinT{
+			cfg: &config.Server{
+				Features: config.FeatureFlags{
+					IgnoreCheckinPolicyID: true,
+				},
+			},
+		}
+		revIDX, opts, err := checkin.processPolicyDetails(t.Context(), logger,
+			&model.Agent{
+				PolicyID:          policyID,
+				PolicyRevisionIdx: 1,
+			},
+			&CheckinRequest{
+				AgentPolicyId:     &policyID,
+				PolicyRevisionIdx: &revIDX2,
+			},
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), revIDX)
+		assert.Empty(t, opts)
+	})
 }
