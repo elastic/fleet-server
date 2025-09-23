@@ -285,20 +285,16 @@ steps:
           PLATFORMS: "linux/amd64"
           TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
           FIPS: "true"
-          # PR #5536 redirects Cloud e2e test to prod as new deployments are not able to start on FRH-staging
-          # The following env vars should be uncommented once FRH-staging is fixed
-          #EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-          #TF_VAR_ess_region: "us-gov-east-1"
-          #TF_VAR_deployment_template_id: "aws-general-purpose"
+          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
+          TF_VAR_ess_region: "us-gov-east-1"
+          TF_VAR_deployment_template_id: "aws-general-purpose"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
         plugins:
           - *docker_elastic_login_plugin
           - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              # Use the commented path below instead of the one above when FRH-staging is fixed.
-              #path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
               field: "apiKey"
               env_var: "EC_API_KEY"
         depends_on:
