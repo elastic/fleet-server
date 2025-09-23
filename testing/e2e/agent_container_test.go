@@ -37,7 +37,6 @@ type AgentContainerSuite struct {
 }
 
 func TestAgentContainerSuite(t *testing.T) {
-	t.Skip("Flakey test suite skipped. See https://github.com/elastic/fleet-server/issues/3909")
 	suite.Run(t, new(AgentContainerSuite))
 }
 
@@ -90,7 +89,7 @@ func (suite *AgentContainerSuite) TearDownTest() {
 // It checks the status API on the fleet-server's external port and that the agent listed in Kibana states "online"
 // Tests that enroll another agent explicitly need fleet-server to be online
 func (suite *AgentContainerSuite) FleetIsHealthy(bCtx context.Context, endpoint string) {
-	ctx, cancel := context.WithTimeout(bCtx, time.Minute)
+	ctx, cancel := context.WithTimeout(bCtx, 4*time.Minute)
 	defer cancel()
 	suite.FleetServerStatusOK(ctx, endpoint)
 
