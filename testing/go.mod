@@ -15,6 +15,10 @@ require (
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.39.0
+<<<<<<< HEAD
+=======
+	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.39.0
+>>>>>>> ca23acd (build(deps): bump github.com/testcontainers/testcontainers-go/modules/toxiproxy (#5542))
 )
 
 require (
