@@ -210,6 +210,10 @@ steps:
           provider: "gcp"
         plugins:
           - *docker_elastic_login_plugin
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         depends_on:
           - step: "unit-test"
             allow_failure: false
