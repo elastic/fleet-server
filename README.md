@@ -142,12 +142,11 @@ When compiled in development mode the fleet-server will support debugging.
 i.e.:
 
 ```shell
-SNAPSHOT=true DEV=true make release-darwin/amd64
-GOOS=darwin GOARCH=amd64 go build -tags="dev" -gcflags="all=-N -l" -ldflags="-X main.Version=8.7.0 -X main.Commit=31668e0 -X main.BuildTime=2022-12-23T20:06:20Z" -buildmode=pie -o build/binaries/fleet-server-8.7.0-darwin-x86_64/fleet-server .
+SNAPSHOT=true DEV=true mage build:release
 ```
 
-Change `release-darwin/amd64` to `release-YOUR_OS/platform`.
-Run `make list-platforms` to check out the possible values.
+Use `PLATFORMS` to restrict what platforms are built.
+Run `mage platforms` to check out the possible values.
 
 The `SNAPSHOT` flag sets the snapshot version flag and relaxes client version checks.
 When `SNAPSHOT` is set we allow clients of the next version to communicate with fleet-server.
@@ -155,7 +154,7 @@ For example, if fleet-server is running version `8.11.0` on a `SNAPSHOT` build, 
 
 ### Docker build
 
-You can build a fleet-server docker image with `make build-docker`. This image
+You can build a fleet-server docker image with `mage docker:image`. This image
 includes the default `fleet-server.yml` configuration file and can be customized
 with the available environment variables.
 
@@ -339,10 +338,10 @@ you create a pull request.
 To execute the full unit tests from your local environment you can do the following
 
 ```bash
-make test-unit
+mage test:unit
 ```
 
-This make target will execute the go unit tests and should normally pass without an issue.
+This mage target will execute the go unit tests and should normally pass without an issue.
 
 To run tests in a package or a function, run like this:
 
@@ -358,7 +357,7 @@ To establish the baseline benchmark report you can follow the following workflow
 **Establish a baseline**
 
 ```bash
-BENCH_BASE=base.out make benchmark
+BENCH_BASE=base.out mage test:benchmark
 ```
 
 This will execute all the go benchmark test and write the output into the file build/base.out. If you omit the
@@ -369,7 +368,7 @@ This will execute all the go benchmark test and write the output into the file b
 After applying your changes into the code you can reuse the same command but with different output file.
 
 ```bash
-BENCH_BASE=next.out make benchmark
+BENCH_BASE=next.out mage test:benchmark
 ```
 
 At this point you can compare the 2 reports using benchstat.
@@ -377,7 +376,7 @@ At this point you can compare the 2 reports using benchstat.
 **Comparing the 2 results**
 
 ```bash
-BENCH_BASE=base.out BENCH_NEXT=next.out make benchstat
+BENCH_BASE=base.out BENCH_NEXT=next.out mage test:benchstat
 ```
 
 And this will print the difference between the baseline and next results.
@@ -398,7 +397,7 @@ All E2E tests are located in `testing/e2e`.
 To execute them run:
 
 ```bash
-make test-e2e
+mage test:e2e
 ```
 
 Refer to the [e2e README](./testing/e2e/README.md) for information on how to write new tests.
@@ -410,17 +409,11 @@ Elastic employees can create an Elastic Cloud deployment with a locally built Fl
 To deploy it you can use the following commands:
 
 ```bash
-EC_API_KEY=yourapikey make -C dev-tools/cloud cloud-deploy
+EC_API_KEY=yourapikey mage test:cloudE2EUp
 ```
 
 And then to clean the deployment
 
 ```bash
-EC_API_KEY=yourapikey make -C dev-tools/cloud cloud-clean
-```
-
-For more advanced scenario you can build a custom docker image that you could use in your own terraform.
-
-```
-make -C dev-tools/cloud build-and-push-cloud-image
+EC_API_KEY=yourapikey mage test:cloudE2EDown
 ```

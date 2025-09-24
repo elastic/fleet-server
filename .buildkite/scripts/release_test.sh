@@ -14,10 +14,12 @@ add_bin_path
 
 with_go
 
-make docker-release
+with_mage
+
+mage docker:release
 
 upload_packages_to_gcp_bucket "build/distributions/"
 
-make test-release
+mage test:release
 
-make build-docker
+mage docker:image
