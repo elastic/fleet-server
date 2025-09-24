@@ -90,7 +90,6 @@ const (
 
 // const and vars used by magefile.
 const (
-	buildMode  = "pie"
 	binaryName = "fleet-server"
 	binaryExe  = "fleet-server.exe"
 
@@ -484,6 +483,31 @@ func (Check) Notice() {
 	mg.SerialDeps(mg.F(genNotice, false), mg.F(genNotice, true))
 }
 
+// DetectFIPSCryptoImports will do a best effort attempt to ensure that the imports list for FIPS compatible artifacts does not contain any external crypto libraries.
+// Specifically it will fail if the modules list contains an entry with: "crypto", "gokrb5", or "pbkdf2"
+func (Check) DetectFIPSCryptoImports() error {
+	tags := []string{"requirefips", "ms_tls13kdf"}
+	mods, err := getModules(tags...)
+	if err != nil {
+		return err
+	}
+
+	args := append([]string{"list", "-m"}, mods...)
+	output, err := sh.Output("go", args...)
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(output, "\n") {
+		// keywords are crypto for x/crypto imports, gokrb5 for kerberos, and pbkdf2 for pbkdf2 generation
+		for _, keyword := range []string{"crypto", "gokrb5", "pbkdf2"} {
+			if strings.Contains(line, keyword) {
+				err = errors.Join(err, fmt.Errorf("Detected import %s may implement crypto functionality", line))
+			}
+		}
+	}
+	return err
+}
+
 // genNotice generates the NOTICE.txt or the NOTICE-fips.txt file.
 func genNotice(fips bool) error {
 	tags := []string{}
@@ -671,6 +695,7 @@ func (Check) All() {
 // FIPS creates a FIPS capable binary.
 func (Build) Local() error {
 	env := environMap()
+	env["CGO_ENABLED"] = "0"
 	if isFIPS() {
 		addFIPSEnvVars(env)
 	}
@@ -704,6 +729,7 @@ func goBuild(osArg, archArg string, cover bool) error {
 	env := environMap()
 	env["GOOS"] = osArg
 	env["GOARCH"] = archArg
+	env["CGO_ENABLED"] = "0"
 	distArr := []string{"fleet-server"}
 	if isFIPS() {
 		addFIPSEnvVars(env)
@@ -729,7 +755,6 @@ func goBuild(osArg, archArg string, cover bool) error {
 		"-tags=" + getTagsString(),
 		"-gcflags=" + getGCFlags(),
 		"-ldflags=" + getLDFlags(),
-		"-buildmode=" + buildMode,
 		"-o", outFile,
 	}
 	if cover {
@@ -1007,9 +1032,14 @@ func (Docker) Image() error {
 	} else if isDEV() {
 		version += "-dev"
 	}
+	suffix := dockerSuffix
+	if runtime.GOARCH == "arm64" {
+		suffix = dockerArmSuffix
+	}
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
 		image += "-fips"
+		suffix += "-fips"
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
@@ -1023,6 +1053,7 @@ func (Docker) Image() error {
 		"--build-arg", "VERSION="+getVersion(),
 		"--build-arg", "GCFLAGS="+getGCFlags(),
 		"--build-arg", "LDFLAGS="+getLDFlags(),
+		"--build-arg", "SUFFIX="+suffix,
 		"-f", dockerFile,
 		"-t", image+":"+version,
 		".",
@@ -1045,9 +1076,17 @@ func (Docker) Publish() error {
 	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
 		version = v
 	}
+	suffix := dockerSuffix
+	if runtime.GOARCH == "arm64" {
+		suffix = dockerArmSuffix
+	}
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
 		image += "-fips"
+		suffix += "-fips"
+	}
+	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
+		image = v
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
@@ -1066,6 +1105,7 @@ func (Docker) Publish() error {
 		"--build-arg", "VERSION="+getVersion(),
 		"--build-arg", "GCFLAGS="+getGCFlags(),
 		"--build-arg", "LDFLAGS="+getLDFlags(),
+		"--build-arg", "SUFFIX="+suffix,
 		"-f", dockerFile,
 		"-t", image+":"+version,
 		".",

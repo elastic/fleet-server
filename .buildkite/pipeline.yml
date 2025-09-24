@@ -3,6 +3,8 @@
 env:
   DOCKER_COMPOSE_VERSION: "1.25.5"
   TERRAFORM_VERSION: "1.6.4"
+  IMAGE_UBUNTU_X86_64: "family/core-ubuntu-2204"
+  IMAGE_UBUNTU_ARM_64: "core-ubuntu-2204-aarch64"
   IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips"
 
 # This section is used to define the plugins that will be used in the pipeline.
@@ -22,6 +24,13 @@ common:
   - docker_elastic_login_plugin: &docker_elastic_login_plugin
       elastic/vault-docker-login#v0.6.0:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+  # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
+  # This plugin authenticates to Google Cloud using the OIDC token.
+  - oidc_plugin: &oidc_plugin
+      elastic/oblt-google-auth#v1.2.0:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
 
 steps:
   - group: "Check and build"
@@ -33,18 +42,66 @@ steps:
         agents:
           provider: "gcp"
 
-      - label: ":building_construction: Run local build"
-        key: make-local
-        command: ".buildkite/scripts/local_build.sh"
+      - label: "Detect FIPS crypto imports"
+        command: ".buildkite/scripts/check_detect_fips_crypto.sh"
+
+      - label: "Package x86_64"
+        key: "package-x86-64-pr"
+        env:
+          PLATFORMS: "linux/amd64,darwin/amd64,windows/amd64"
+        command: ".buildkite/scripts/release_test.sh"
+        artifact_paths:
+          - build/distributions/**
         agents:
           provider: "gcp"
+          image: "${IMAGE_UBUNTU_X86_64}"
+          machineType: "c2-standard-16"
+        plugins:
+          - *oidc_plugin
 
-      - label: ":building_construction: Run local build: MacOS"
-        key: make-local-macos
-        command: ".buildkite/scripts/local_build.sh"
+      - label: "Package x86_64 FIPS"
+        key: "package-fips-x86-64-pr"
+        env:
+          FIPS: "true"
+          PLATFORMS: "linux/amd64"
+        command: ".buildkite/scripts/release_test.sh"
+        artifact_paths:
+          - build/distributions/**
         agents:
-          provider: orka
-          imagePrefix: generic-13-ventura-arm
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_X86_64}"
+          machineType: "c2-standard-16"
+        plugins:
+          - *oidc_plugin
+
+      - label: "Package aarch64"
+        key: "package-arm64-pr"
+        env:
+          PLATFORMS: "linux/arm64,darwin/arm64"
+        command: ".buildkite/scripts/release_test.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "aws"
+          imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+          instanceType: "t4g.2xlarge"
+        plugins:
+          - *oidc_plugin
+
+      - label: "Package aarch64 FIPS"
+        key: "package-fips-arm64-pr"
+        env:
+          FIPS: "true"
+          PLATFORMS: "linux/arm64"
+        command: ".buildkite/scripts/release_test.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "aws"
+          imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
+          instanceType: "t4g.2xlarge"
+        plugins:
+          - *oidc_plugin
 
   - group: "Performance test"
     key: "performance-test"
@@ -123,7 +180,7 @@ steps:
           GO_DISTRO: "stdlib"
         agents:
           provider: "aws"
-          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.xlarge"
         artifact_paths:
           - build/*.xml
@@ -171,11 +228,13 @@ steps:
             limit: 1
 
       - label: ":junit: Junit annotate"
-        plugins:
-          - junit-annotate#v2.4.1:
-              artifacts: "build/*.xml"
         agents:
-          provider: "gcp"
+          # requires at least "bash", "curl" and "git"
+          image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
+        plugins:
+          - junit-annotate#v2.7.0:
+              artifacts: "build/*.xml"
+              run-in-docker: false
         depends_on:
           - step: "unit-test"
             allow_failure: true
@@ -243,16 +302,20 @@ steps:
           PLATFORMS: "linux/amd64"
           TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
           FIPS: "true"
-          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-          TF_VAR_ess_region: "us-gov-east-1"
-          TF_VAR_deployment_template_id: "aws-general-purpose"
+          # PR #5536 redirects Cloud e2e test to prod as new deployments are not able to start on FRH-staging
+          # The following env vars should be uncommented once FRH-staging is fixed
+          #EC_ENDPOINT: "https://api.staging.elastic-gov.com"
+          #TF_VAR_ess_region: "us-gov-east-1"
+          #TF_VAR_deployment_template_id: "aws-general-purpose"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
         plugins:
           - *docker_elastic_login_plugin
           - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              # Use the commented path below instead of the one above when FRH-staging is fixed.
+              #path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
               field: "apiKey"
               env_var: "EC_API_KEY"
         depends_on:
@@ -296,22 +359,6 @@ steps:
     depends_on:
       - step: "publish"
 
-  - label: ":gcloud: Release test"
-    key: "release-test"
-    command: ".buildkite/scripts/release_test.sh"
-    agents:
-      provider: "gcp"
-    depends_on:
-      - step: "tests"
-        allow_failure: false
-    plugins:
-      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
-      # This plugin authenticates to Google Cloud using the OIDC token.
-      - elastic/oblt-google-auth#v1.2.0:
-          lifetime: 10800 # seconds
-          project-id: "elastic-observability-ci"
-          project-number: "911195782929"
-
   - label: ":jenkins: Release - Package Registry Distribution"
     key: "release-package-registry"
     trigger: "package-registry-release-package-registry-distribution"
@@ -330,5 +377,11 @@ steps:
     build:
       branch: "${BUILDKITE_BRANCH}"
     depends_on:
-      - step: "release-test"
+      - step: "package-x86-64-pr"
+        allow_failure: false
+      - step: "package-arm64-pr"
+        allow_failure: false
+      - step: "package-fips-x86-64-pr"
+        allow_failure: false
+      - step: "package-fips-arm64-pr"
         allow_failure: false
