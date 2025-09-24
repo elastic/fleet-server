@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -63,18 +64,6 @@ func TestUploadBeginValidation(t *testing.T) {
 			`{
 				"file": {
 					"size": 200,
-					"name": "foo.png",
-					"mime_type": "image/png"
-				},
-				"agent_id": "foo",
-				"action_id": "123",
-				"src": "agent"
-			}`,
-		},
-		{"Oversized file should be rejected", http.StatusBadRequest, "size",
-			`{
-				"file": {
-					"size": ` + strconv.Itoa(maxFileSize+1024) + `,
 					"name": "foo.png",
 					"mime_type": "image/png"
 				},
@@ -346,6 +335,48 @@ func TestUploadBeginBadRequest(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+func TestUploadBeginFileSize(t *testing.T) {
+
+	mockFile := func(size int64) string {
+		return fmt.Sprintf(`{
+				"file": {
+					"size": %d,
+					"name": "foo.png",
+					"mime_type": "image/png"
+				},
+				"agent_id": "foo",
+				"action_id": "123",
+				"src": "agent"
+			}`, size)
+	}
+
+	// now test various body contents
+	tests := []struct {
+		Name         string
+		MaxSize      int64
+		ExpectStatus int
+		InputSize    int64
+	}{
+		{"MaxSize 0 allows uploads", 0, http.StatusOK, 1000},
+		{"MaxSize 0 allows large uploads", 0, http.StatusOK, 1024 * 1024 * 1024 * 2},
+		{"MaxSize 0 does not allow 0-length files", 0, http.StatusBadRequest, 0},
+		{"Sizes larger than MaxSize are denied", 1024, http.StatusBadRequest, 2048},
+		{"Sizes smaller than MaxSize are allowed", 1024, http.StatusOK, 900},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.Name, func(t *testing.T) {
+
+			hr, _, _, _ := configureUploaderMock(t, tc.MaxSize)
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockFile(tc.InputSize)))
+			hr.ServeHTTP(rec, req)
+			assert.Equal(t, tc.ExpectStatus, rec.Code)
+		})
+	}
+
+}
+
 /*
   Chunk data upload route
 */
@@ -377,7 +408,7 @@ func TestChunkUploadRouteParams(t *testing.T) {
 			mockUploadInfoResult(fakebulk, file.Info{
 				DocID:     "bar.foo",
 				ID:        mockUploadID,
-				ChunkSize: maxFileSize,
+				ChunkSize: file.MaxChunkSize,
 				Total:     file.MaxChunkSize + 1,
 				Count:     2, // this is a 2-chunk "file" based on size above
 				Start:     time.Now(),
@@ -410,7 +441,7 @@ func TestChunkUploadRequiresChunkHashHeader(t *testing.T) {
 	mockUploadInfoResult(fakebulk, file.Info{
 		DocID:     "bar.foo",
 		ID:        mockUploadID,
-		ChunkSize: maxFileSize,
+		ChunkSize: file.MaxChunkSize,
 		Total:     10,
 		Count:     1,
 		Start:     time.Now(),
@@ -458,7 +489,7 @@ func TestChunkUploadStatus(t *testing.T) {
 			mockUploadInfoResult(fakebulk, file.Info{
 				DocID:     "bar.foo",
 				ID:        mockUploadID,
-				ChunkSize: maxFileSize,
+				ChunkSize: file.MaxChunkSize,
 				Total:     10,
 				Count:     1,
 				Start:     time.Now(),
@@ -509,7 +540,7 @@ func TestChunkUploadExpiry(t *testing.T) {
 			mockUploadInfoResult(fakebulk, file.Info{
 				DocID:     "bar.foo",
 				ID:        mockUploadID,
-				ChunkSize: maxFileSize,
+				ChunkSize: file.MaxChunkSize,
 				Total:     10,
 				Count:     1,
 				Start:     tc.StartTime,
@@ -547,7 +578,7 @@ func TestChunkUploadWritesTimestamp(t *testing.T) {
 	mockUploadInfoResult(fakebulk, file.Info{
 		DocID:     "bar.foo",
 		ID:        mockUploadID,
-		ChunkSize: maxFileSize,
+		ChunkSize: file.MaxChunkSize,
 		Total:     10,
 		Count:     1,
 		Start:     time.Now(),
@@ -597,7 +628,7 @@ func TestUploadCompleteRequiresMatchingAuth(t *testing.T) {
 			mockInfo := file.Info{
 				DocID:     "bar." + tc.AgentInFileRecord,
 				ID:        mockUploadID,
-				ChunkSize: maxFileSize,
+				ChunkSize: file.MaxChunkSize,
 				Total:     10,
 				Count:     1,
 				Start:     time.Now().Add(-time.Minute),
@@ -998,6 +1029,10 @@ func TestUploadCompleteBadRequests(t *testing.T) {
 
 // prepareUploaderMock sets up common dependencies and registers upload routes to a returned router
 func prepareUploaderMock(t *testing.T) (http.Handler, apiServer, *itesting.MockBulk, *MockTransport) {
+	return configureUploaderMock(t, 0)
+}
+
+func configureUploaderMock(t *testing.T, fileSize int64) (http.Handler, apiServer, *itesting.MockBulk, *MockTransport) {
 	// chunk index operations skip the bulker in order to send binary docs directly
 	// so a mock *elasticsearch.Client needs to be be prepared
 	es, tx := mockESClient(t)
@@ -1034,7 +1069,7 @@ func prepareUploaderMock(t *testing.T) (http.Handler, apiServer, *itesting.MockB
 			bulker:      fakebulk,
 			chunkClient: es,
 			cache:       c,
-			uploader:    uploader.New(es, fakebulk, c, maxFileSize, maxUploadTimer),
+			uploader:    uploader.New(es, fakebulk, c, fileSize, maxUploadTimer),
 			authAgent: func(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
 				return &model.Agent{
 					ESDocument: model.ESDocument{
