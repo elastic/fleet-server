@@ -7,7 +7,6 @@
 //go:generate go tool -modfile ./dev-tools/go.mod github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen -generate types -package api -o pkg/api/types.gen.go  model/openapi.yml
 //go:generate go tool -modfile ./dev-tools/go.mod github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen -generate client -package api -o pkg/api/client.gen.go  model/openapi.yml
 //go:generate go fmt internal/pkg/model/schema.go
-//go:generate go fmt internal/pkg/model/schema.go
 //go:generate go fmt internal/pkg/api/openapi.gen.go
 //go:generate go fmt pkg/api/types.gen.go
 //go:generate go fmt pkg/api/client.gen.go
