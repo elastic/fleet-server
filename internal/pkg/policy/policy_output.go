@@ -29,6 +29,8 @@ const (
 	OutputTypeRemoteElasticsearch = "remote_elasticsearch"
 	OutputTypeLogstash            = "logstash"
 	OutputTypeKafka               = "kafka"
+
+	OTelExporterTypeElasticsearch = "elasticsearch"
 )
 
 var (

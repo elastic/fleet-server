@@ -9,6 +9,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"net/http"
 	"reflect"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -279,16 +281,34 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		return fmt.Errorf("failed to update upgrade_details: %w", err)
 	}
 
+	initialOpts := []checkin.Option{
+		checkin.WithStatus(string(req.Status)),
+		checkin.WithMessage(req.Message),
+		checkin.WithMeta(rawMeta),
+		checkin.WithComponents(rawComponents),
+		checkin.WithSeqNo(seqno),
+		checkin.WithVer(ver),
+		checkin.WithUnhealthyReason(unhealthyReason),
+		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
+	}
+
+	revID, opts, err := ct.processPolicyDetails(r.Context(), zlog, agent, req)
+	if err != nil {
+		return fmt.Errorf("failed to update policy details: %w", err)
+	}
+	if len(opts) > 0 {
+		initialOpts = append(initialOpts, opts...)
+	}
+
 	// Subscribe to actions dispatcher
 	aSub := ct.ad.Subscribe(zlog, agent.Id, seqno)
 	defer ct.ad.Unsubscribe(zlog, aSub)
 	actCh := aSub.Ch()
 
-	// use revision_idx=0 if the agent has a single output where no API key is defined
-	// This will force the policy monitor to emit a new policy to regerate API keys
-	revID := agent.PolicyRevisionIdx
 	for _, output := range agent.Outputs {
 		if output.APIKey == "" {
+			// use revision_idx=0 if the agent has a single output where no API key is defined
+			// This will force the policy monitor to emit a new policy to regerate API keys
 			revID = 0
 			break
 		}
@@ -328,7 +348,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	// Initial update on checkin, and any user fields that might have changed
 	// Run a script to remove audit_unenrolled_* and unenrolled_at attributes if one is set on checkin.
 	// 8.16.x releases would incorrectly set unenrolled_at
-	err = ct.bc.CheckIn(agent.Id, checkin.WithStatus(string(req.Status)), checkin.WithMessage(req.Message), checkin.WithMeta(rawMeta), checkin.WithComponents(rawComponents), checkin.WithSeqNo(seqno), checkin.WithVer(ver), checkin.WithUnhealthyReason(unhealthyReason), checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""))
+	err = ct.bc.CheckIn(agent.Id, initialOpts...)
 	if err != nil {
 		zlog.Error().Err(err).Str(ecs.AgentID, agent.Id).Msg("checkin failed")
 	}
@@ -876,6 +896,11 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 				policyOutput.Name, err)
 		}
 	}
+	// Prepare OTel exporters from the information in outputs.
+	if err := prepareOTelExporters(data.Outputs, data.Exporters); err != nil {
+		return nil, fmt.Errorf("failed to prepare OTel exporters: %w", err)
+	}
+
 	// Add replace inputs with agent prepared version.
 	data.Inputs = pp.Inputs
 
@@ -909,6 +934,49 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	return &resp, nil
+}
+
+// prepareOTelExporters prepares OTel exporters by copying credentials and potentially other
+// settings from already prepared outputs.
+func prepareOTelExporters(outputs map[string]map[string]any, exporters map[string]any) error {
+	for id, c := range exporters {
+		var config map[string]any
+		if c == nil {
+			config = make(map[string]any)
+		} else if cmap, ok := c.(map[string]any); ok {
+			config = cmap
+		} else {
+			return fmt.Errorf("unexpected config type for %q, expected map, found %T", id, c)
+		}
+
+		exporterType, name, found := strings.Cut(id, "/")
+		if !found {
+			return fmt.Errorf("unexpected exporter id format %q", id)
+		}
+
+		output, found := outputs[name]
+		if !found {
+			return fmt.Errorf("output %q not found for exporter %q", name, id)
+		}
+
+		switch exporterType {
+		case policy.OTelExporterTypeElasticsearch:
+			ot, ok := output["type"].(string)
+			if !ok || (ot != policy.OutputTypeElasticsearch && ot != policy.OutputTypeRemoteElasticsearch) {
+				return fmt.Errorf("unexpected output type %q found for exporter %q", name, id)
+			}
+			apiKey, ok := output["api_key"].(string)
+			if !ok || apiKey == "" {
+				return fmt.Errorf("api key not found in output %q for exporter %q", name, id)
+			}
+			config["api_key"] = base64.StdEncoding.EncodeToString([]byte(apiKey))
+		default:
+			return fmt.Errorf("OTel exporter %q not supported", exporterType)
+		}
+
+		exporters[id] = config
+	}
+	return nil
 }
 
 func getAgentAndVerifyAPIKeyID(ctx context.Context, bulker bulk.Bulk, agentID string, apiKeyID string) (*model.Agent, error) {
@@ -1123,4 +1191,56 @@ func calcPollDuration(zlog zerolog.Logger, pollDuration, setupDuration, jitterDu
 	}
 
 	return pollDuration, jitter
+}
+
+// processPolicyDetails handles the agent_policy_id and revision_idx included in the checkin request.
+// The API keys will be managed if the agent reports a new policy id from its last checkin, or if the revision is different than what the last checkin reported.
+// It returns the revision idx that should be used when subscribing for new POLICY_CHANGE actons and optional args to use when doing the non-tick checkin.
+func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) (int64, []checkin.Option, error) {
+	// no details specified or attributes are ignored by config
+	if ct.cfg.Features.IgnoreCheckinPolicyID || req == nil || req.PolicyRevisionIdx == nil || req.AgentPolicyId == nil {
+		return agent.PolicyRevisionIdx, nil, nil
+	}
+	policyID := *req.AgentPolicyId
+	revisionIDX := *req.PolicyRevisionIdx
+
+	span, ctx := apm.StartSpan(ctx, "Process policy details", "process")
+	span.Context.SetLabel("agent_id", agent.Agent.ID)
+	span.Context.SetLabel(dl.FieldAgentPolicyID, policyID)
+	span.Context.SetLabel(dl.FieldPolicyRevisionIdx, revisionIDX)
+	defer span.End()
+
+	// update agent doc if policy id or revision idx does not match
+	var opts []checkin.Option
+	if policyID != agent.AgentPolicyID || revisionIDX != agent.PolicyRevisionIdx {
+		opts = []checkin.Option{
+			checkin.WithAgentPolicyID(policyID),
+			checkin.WithPolicyRevisionIDX(revisionIDX),
+		}
+	}
+	// Policy reassign, subscribe to policy with revision 0
+	if policyID != agent.PolicyID {
+		zlog.Debug().Str(dl.FieldAgentPolicyID, policyID).Str("new_policy_id", agent.PolicyID).Msg("Policy ID mismatch detected, reassigning agent.")
+		return 0, opts, nil
+	}
+
+	// Check if the checkin revision_idx is greater than the latest available
+	latestRev := ct.pm.LatestRev(ctx, agent.PolicyID)
+	if latestRev != 0 && revisionIDX > latestRev {
+		revisionIDX = 0 // set return val to 0 so the agent gets latest available revision.
+	}
+
+	// Update API keys if the policy has changed, or if the revision differs.
+	if policyID != agent.AgentPolicyID || revisionIDX != agent.PolicyRevisionIdx {
+		for outputName, output := range agent.Outputs {
+			if output.Type != policy.OutputTypeElasticsearch {
+				continue
+			}
+			if err := updateAPIKey(ctx, zlog, ct.bulker, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName); err != nil {
+				// Only returns ErrUpdatingInactiveAgent
+				return 0, nil, err
+			}
+		}
+	}
+	return revisionIDX, opts, nil
 }
