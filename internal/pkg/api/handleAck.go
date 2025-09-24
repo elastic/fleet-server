@@ -442,19 +442,28 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	agentID string,
 	apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, outputName string) error {
-	bulk := ack.bulk
+	return updateAPIKey(ctx, zlog, ack.bulk, agentID, apiKeyID, permissionHash, toRetireAPIKeyIDs, outputName)
+}
+
+func updateAPIKey(ctx context.Context,
+	zlog zerolog.Logger,
+	bulk bulk.Bulk,
+	agentID string,
+	apiKeyID, permissionHash string,
+	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, outputName string) error {
 	// use output bulker if exists
+	outBulk := bulk
 	if outputName != "" {
-		outputBulk := ack.bulk.GetBulker(outputName)
+		outputBulk := bulk.GetBulker(outputName)
 		if outputBulk != nil {
 			zlog.Debug().Str(ecs.PolicyOutputName, outputName).Msg("Using output bulker in updateAPIKey")
-			bulk = outputBulk
+			outBulk = outputBulk
 		}
 	}
 	if apiKeyID != "" {
-		res, err := bulk.APIKeyRead(ctx, apiKeyID, true)
+		res, err := outBulk.APIKeyRead(ctx, apiKeyID, true)
 		if err != nil {
-			if isAgentActive(ctx, zlog, ack.bulk, agentID) {
+			if isAgentActive(ctx, zlog, outBulk, agentID) {
 				zlog.Warn().
 					Err(err).
 					Str(LogAPIKeyID, apiKeyID).
@@ -480,7 +489,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 					Str(LogAPIKeyID, apiKeyID).
 					Msg("Failed to cleanup roles")
 			} else if removedRolesCount > 0 {
-				if err := bulk.APIKeyUpdate(ctx, apiKeyID, permissionHash, clean); err != nil {
+				if err := outBulk.APIKeyUpdate(ctx, apiKeyID, permissionHash, clean); err != nil {
 					zlog.Error().Err(err).RawJSON("roles", clean).Str(LogAPIKeyID, apiKeyID).Str(ecs.PolicyOutputName, outputName).Msg("Failed to update API Key")
 				} else {
 					zlog.Debug().
@@ -493,7 +502,7 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 				}
 			}
 		}
-		ack.invalidateAPIKeys(ctx, zlog, toRetireAPIKeyIDs, apiKeyID)
+		invalidateAPIKeys(ctx, zlog, bulk, toRetireAPIKeyIDs, apiKeyID)
 	}
 
 	return nil

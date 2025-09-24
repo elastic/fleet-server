@@ -113,6 +113,18 @@ func WithDeleteAudit(del bool) Option {
 	}
 }
 
+func WithAgentPolicyID(id string) Option {
+	return func(pending *pendingT) {
+		pending.agentPolicyID = id
+	}
+}
+
+func WithPolicyRevisionIDX(idx int64) Option {
+	return func(pending *pendingT) {
+		pending.revisionIDX = idx
+	}
+}
+
 type extraT struct {
 	meta        []byte
 	seqNo       sqn.SeqNo
@@ -128,6 +140,8 @@ type pendingT struct {
 	ts              string
 	status          string
 	message         string
+	agentPolicyID   string // may be empty
+	revisionIDX     int64
 	extra           *extraT
 	unhealthyReason *[]string
 }
@@ -314,6 +328,10 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 		dl.FieldLastCheckinMessage: pending.message, // Set the status message
 		dl.FieldUnhealthyReason:    pending.unhealthyReason,
 	}
+	if pending.agentPolicyID != "" {
+		fields[dl.FieldAgentPolicyID] = pending.agentPolicyID
+		fields[dl.FieldPolicyRevisionIdx] = pending.revisionIDX
+	}
 	if pending.extra != nil {
 		// If the agent version is not empty it needs to be updated
 		// Assuming the agent can by upgraded keeping the same id, but incrementing the version
@@ -353,11 +371,13 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		reason  json.RawMessage
 
 		// optional attributes below
-		ver        json.RawMessage
-		meta       json.RawMessage
-		components json.RawMessage
-		isSet      json.RawMessage
-		seqNo      json.RawMessage
+		policyID    json.RawMessage
+		revisionIDX json.RawMessage
+		ver         json.RawMessage
+		meta        json.RawMessage
+		components  json.RawMessage
+		isSet       json.RawMessage
+		seqNo       json.RawMessage
 
 		err error
 	)
@@ -370,6 +390,10 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 	message, err = json.Marshal(data.message)
 	Err = errors.Join(Err, err)
 	reason, err = json.Marshal(data.unhealthyReason)
+	Err = errors.Join(Err, err)
+	policyID, err = json.Marshal(data.agentPolicyID)
+	Err = errors.Join(Err, err)
+	revisionIDX, err = json.Marshal(data.revisionIDX)
 	Err = errors.Join(Err, err)
 	ver, err = json.Marshal(data.extra.ver)
 	Err = errors.Join(Err, err)
@@ -394,6 +418,8 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		"Status":          status,
 		"Message":         message,
 		"UnhealthyReason": reason,
+		"PolicyID":        policyID,
+		"RevisionIDX":     revisionIDX,
 		"Ver":             ver,
 		"Meta":            meta,
 		"Components":      components,

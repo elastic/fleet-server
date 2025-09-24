@@ -3,6 +3,10 @@ ctx._source.updated_at = params.Now;
 ctx._source.last_checkin_status = params.Status;
 ctx._source.last_checkin_message = params.Message;
 ctx._source.unhealthy_reason = params.UnhealthyReason;
+if (params.PolicyID != "") {
+  ctx._source.agent_policy_id = params.PolicyID;
+  ctx._source.policy_revision_idx = params.RevisionIDX;
+}
 if (params.Ver != "") {
   ctx._source.agent.version = params.Ver;
 }

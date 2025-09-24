@@ -10,6 +10,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -1675,8 +1677,7 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 }
 
 func TestCheckinOTelColPolicy(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 
 	idSuffix := uuid.Must(uuid.NewV4()).String()
 	componentID := func(id string) string {
@@ -1697,21 +1698,21 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 			componentID("someprocessor"): map[string]any{},
 		},
 		Connectors: map[string]any{
-			componentID("forward"): map[string]any{},
+			"forward": map[string]any{},
 		},
 		Exporters: map[string]any{
-			componentID("someexporter"): map[string]any{},
+			"elasticsearch/default": map[string]any{},
 		},
 		Service: &model.Service{
 			Pipelines: map[string]*model.PipelinesItem{
 				componentID("metrics"): &model.PipelinesItem{
 					Receivers:  []string{componentID("somereceiver")},
 					Processors: []string{componentID("someprocessor")},
-					Exporters:  []string{componentID("forward")},
+					Exporters:  []string{"forward"},
 				},
 				"metrics": &model.PipelinesItem{
-					Receivers: []string{componentID("forward")},
-					Exporters: []string{componentID("someexporter")},
+					Receivers: []string{"forward"},
+					Exporters: []string{"elasticsearch/default"},
 				},
 			},
 		},
@@ -1737,18 +1738,16 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 	t.Log("Agent enrollment successful")
 	p, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	var obj map[string]interface{}
-	err = json.Unmarshal(p, &obj)
+	var enrollResponse struct {
+		Item struct {
+			ID           string `json:"id"`
+			AccessApiKey string `json:"access_api_key"`
+		} `json:"item"`
+	}
+	err = json.Unmarshal(p, &enrollResponse)
 	require.NoError(t, err)
-
-	item := obj["item"]
-	mm, ok := item.(map[string]interface{})
-	require.True(t, ok, "expected attribute item to be an object")
-	agentID, ok := mm["id"].(string)
-	require.True(t, ok, "expected attribute id to be a string")
-
-	apiKey, ok := mm["access_api_key"].(string)
-	require.True(t, ok, "expected attribute apiKey to be a string")
+	agentID := enrollResponse.Item.ID
+	apiKey := enrollResponse.Item.AccessApiKey
 
 	// checkin
 	t.Logf("Fake a checkin for agent %s", agentID)
@@ -1766,19 +1765,40 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 	p, err = io.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	err = json.Unmarshal(p, &obj)
+	var checkinResponse struct {
+		Actions []struct {
+			AgentID string `json:"agent_id"`
+			ID      string `json:"id"`
+			Data    struct {
+				Policy struct {
+					Exporters map[string]struct {
+						ApiKey string `json:"api_key"`
+					} `json:"exporters"`
+					Outputs map[string]struct {
+						ApiKey string `json:"api_key"`
+						Type   string `json:"type"`
+					} `json:"outputs"`
+				} `json:"policy"`
+			} `json:"data"`
+		} `json:"actions"`
+	}
+	err = json.Unmarshal(p, &checkinResponse)
 	require.NoError(t, err)
 
-	actionsRaw, ok := obj["actions"]
-	require.True(t, ok, "expected actions is missing")
-	actions, ok := actionsRaw.([]interface{})
-	require.True(t, ok, "expected actions to be an array")
-	require.Greater(t, len(actions), 0, "expected at least 1 action")
-	action, ok := actions[0].(map[string]interface{})
-	require.True(t, ok, "expected action to be an object")
-	_, ok = action["id"].(string)
-	require.True(t, ok, "expected action id to be string")
-	aAgentID, ok := action["agent_id"].(string)
-	require.True(t, ok, "expected action agent_id to be string")
-	require.Equal(t, agentID, aAgentID)
+	require.Len(t, checkinResponse.Actions, 1, "expected 1 action")
+
+	action := checkinResponse.Actions[0]
+	assert.NotEmpty(t, action.ID)
+	assert.Equal(t, agentID, action.AgentID)
+
+	output, found := action.Data.Policy.Outputs["default"]
+	require.True(t, found, "default output not found")
+	require.Equal(t, "elasticsearch", output.Type)
+	require.NotEmpty(t, output.ApiKey)
+
+	exporter, found := action.Data.Policy.Exporters["elasticsearch/default"]
+	require.True(t, found, "default exporter not found")
+	encodedApiKey := base64.StdEncoding.EncodeToString([]byte(output.ApiKey))
+
+	assert.Equal(t, encodedApiKey, exporter.ApiKey)
 }
