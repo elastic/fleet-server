@@ -82,3 +82,37 @@ Until a bug fix is available in a later release, you can resolve the issue tempo
 2. After the output confirms all files were successfully processed, run the `enroll` command again.
 
 :::
+
+:::{dropdown} .fleet-agents template is missing mappings
+
+**Applies to** {{fleet}} versions:
+* 8.17.x (all patch versions)
+* 8.18.0 to 8.18.7
+* 8.19.0 to 8.19.3
+* 9.0.0 to 9.0.7
+* 9.1.0 to 9.1.3
+
+On May 2, 2025 a known issue was discovered that the `.fleet-agents` index template was missing a mapping for the `local_metadata.complete` attribute. This may cause agent checkins to be rejected and the agents to appear as offline.
+
+In this {{fleet}}'s logs this will appear as:
+```shell
+elastic fail 400: document_parsing_exception: [1:209] object mapping for [local_metadata] tried to parse field [local_metadata] as object, but found a concrete value
+Eat bulk checkin error; Keep on truckin'
+```
+
+And in the {{agent}} logs it will appear as:
+```shell
+"log.level":"error","@timestamp":"2025-04-22:12:35:25.295Z","message":"Eat bulk checkin error; Keep on truckin'","component":{"binary":"fleet-server","dataset":"elastic_agent.fleet_server","id":"fleet-server-es-containerhost","type":"fleet-server"},"log":{"source":"fleet-server-es-containerhost"},"service.type":"fleet-server","error.message":"elastic fail 400: document_parsing_exception: [1:209] object mapping for [local_metadata] tried to parse field [local_metadata] as object, but found a concrete value","ecs.version":"1.6.0","service.name":"fleet-server","ecs.version":"1.6.0"
+```
+
+This attribute was added to the template in versions: 8.17.11 8.18.3, 8.19.3, 9.0.3, 9.1.0.
+
+Further investigation revealed that the `.fleet-agents` index template was not correctly applied due to an unchanged `_meta.managed_index_mappings_version` number.
+This change also affects other attributes as well, such as `upgrade_attempts`, `namespaces`, `unprivileged`, and `unhealthy_reason`.
+If there is an error related to any of these attributes, there will be a similar error message in the logs.
+
+**Workaround**
+Updating to a version with a fixed `_meta.managed_index_mappings_version` will correctly apply the new index template.
+The fixed versions are 8.18.8, 8.19.4, 9.0.8, 9.1.4.
+
+:::
