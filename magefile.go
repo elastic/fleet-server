@@ -1217,6 +1217,16 @@ func (Test) Unit() error {
 // FIPS adds the requirefips build tag.
 func (Test) UnitFIPSOnly() error {
 	mg.Deps(mg.F(mkDir, "build"))
+
+	// We pre-cache go module dependencies before running the unit tests with
+	// GODEBUG=fips140=only.  Otherwise, the command that runs the unit tests
+	// will try to download the dependencies and could fail because the TLS
+	// negotiation with the Go module proxy could use a non-FIPS compliant
+	// key exchange protocol, e.g. X25519.
+	if err := sh.RunV(mg.GoCmd(), "mod", "download"); err != nil {
+		return err
+	}
+
 	env := environMap()
 	env["GODEBUG"] = "fips140=only"
 	output, err := teeCommand(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
