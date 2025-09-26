@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/v7
 
-go 1.24.7
+go 1.25.1
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
@@ -101,3 +101,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect
 )
+
+replace github.com/elastic/elastic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20250926122109-345a0542c79e
