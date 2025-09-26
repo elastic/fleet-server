@@ -8,7 +8,6 @@ package api
 
 import (
 	"context"
-	"crypto/fips140"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -111,7 +110,7 @@ func Test_server_ClientCert(t *testing.T) {
 	require.NoError(t, err)
 
 	var tlsPreferredCurves []tls.CurveID
-	if fips140.Enabled() {
+	if ftesting.IsFIPS140Only() {
 		// Exclude X25519 curves when in FIPS mode, otherwise we get the error:
 		// crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
 		// Note that we only use FIPS 140-only mode, set via GODEBUG=fips140=only,
