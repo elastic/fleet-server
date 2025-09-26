@@ -8,6 +8,7 @@ package api
 
 import (
 	"context"
+	"crypto/fips140"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -109,6 +110,15 @@ func Test_server_ClientCert(t *testing.T) {
 	err = tlsCFG.Unpack(libsconfig.C(*ucfg))
 	require.NoError(t, err)
 
+	var tlsPreferredCurves []tls.CurveID
+	if fips140.Enabled() {
+		// Exclude X25519 curves when in FIPS mode, otherwise we get the error:
+		// crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
+		// Note that we only use FIPS 140-only mode, set via GODEBUG=fips140=only,
+		// while testing.
+		tlsPreferredCurves = []tls.CurveID{tls.CurveP256, tls.CurveP384, tls.CurveP521}
+	}
+
 	t.Run("no client certs", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -132,7 +142,8 @@ func Test_server_ClientCert(t *testing.T) {
 		httpClient := &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					RootCAs: certPool,
+					RootCAs:          certPool,
+					CurvePreferences: tlsPreferredCurves,
 				},
 			},
 		}
@@ -203,8 +214,9 @@ func Test_server_ClientCert(t *testing.T) {
 		httpClient := &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					RootCAs:      certPool,
-					Certificates: []tls.Certificate{clientCert},
+					RootCAs:          certPool,
+					Certificates:     []tls.Certificate{clientCert},
+					CurvePreferences: tlsPreferredCurves,
 				},
 			},
 		}
@@ -358,8 +370,9 @@ key: %s`,
 		httpClient := &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					RootCAs:      certPool,
-					Certificates: []tls.Certificate{clientCert},
+					RootCAs:          certPool,
+					Certificates:     []tls.Certificate{clientCert},
+					CurvePreferences: tlsPreferredCurves,
 				},
 			},
 		}
