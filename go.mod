@@ -101,5 +101,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect
 )
-
-replace github.com/elastic/elastic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20250926122109-345a0542c79e
