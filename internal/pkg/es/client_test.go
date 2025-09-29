@@ -18,7 +18,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
 	"github.com/stretchr/testify/require"
 )
@@ -26,19 +25,6 @@ import (
 var enabled bool = true
 
 func TestClientCerts(t *testing.T) {
-	var tlsPreferredCurves []tlscommon.TLSCurveType
-	if ftesting.IsFIPS140Only() {
-		// Exclude X25519 curves when in FIPS mode, otherwise we get the error:
-		// crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
-		// Note that we only use FIPS 140-only mode, set via GODEBUG=fips140=only,
-		// while testing.
-		tlsPreferredCurves = []tlscommon.TLSCurveType{
-			tlscommon.TLSCurveType(tls.CurveP256),
-			tlscommon.TLSCurveType(tls.CurveP384),
-			tlscommon.TLSCurveType(tls.CurveP521),
-		}
-	}
-
 	t.Run("no certs", func(t *testing.T) {
 		ca := certs.GenCA(t)
 		server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,9 +51,8 @@ func TestClientCerts(t *testing.T) {
 					Protocol: "https",
 					Hosts:    []string{server.URL},
 					TLS: &tlscommon.Config{
-						Enabled:    &enabled,
-						CAs:        []string{certs.CertToFile(t, ca, "ca")},
-						CurveTypes: tlsPreferredCurves,
+						Enabled: &enabled,
+						CAs:     []string{certs.CertToFile(t, ca, "ca")},
 					},
 				},
 			},
@@ -117,7 +102,6 @@ func TestClientCerts(t *testing.T) {
 							Certificate: certs.CertToFile(t, cert, "cert"),
 							Key:         certs.KeyToFile(t, cert, "key"),
 						},
-						CurveTypes: tlsPreferredCurves,
 					},
 				},
 			},
