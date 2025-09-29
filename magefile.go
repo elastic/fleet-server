@@ -1218,15 +1218,6 @@ func (Test) Unit() error {
 func (Test) UnitFIPSOnly() error {
 	mg.Deps(mg.F(mkDir, "build"))
 
-	// We pre-cache go module dependencies before running the unit tests with
-	// GODEBUG=fips140=only.  Otherwise, the command that runs the unit tests
-	// will try to download the dependencies and could fail because the TLS
-	// negotiation with the Go module proxy could use a non-FIPS compliant
-	// key exchange protocol, e.g. X25519.
-	if err := sh.RunV(mg.GoCmd(), "mod", "download"); err != nil {
-		return err
-	}
-
 	// We also set GODEBUG=tlsmlkem=0 to disable the X25519MLKEM768 TLS key
 	// exchange mechanism; without this setting and with the GODEBUG=fips140=only
 	// setting, we get errors in tests like so:
