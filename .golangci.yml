@@ -20,9 +20,6 @@ formatters:
   enable:
     - goimports
 
-output:
-  sort-results: true
-
 # Uncomment and add a path if needed to exclude
 # skip-dirs:
 #   - some/path
@@ -97,8 +94,6 @@ linters:
     gomoddirectives:
       # Allow local `replace` directives. Default is false.
       replace-local: false
-      replace-allow-list:
-        - github.com/deepmap/oapi-codegen
     gomodguard:
       blocked:
         # List of blocked modules.
@@ -161,7 +156,7 @@ linters:
       # Which file paths to exclude: they will be analyzed, but issues from them won't be reported.
       # "/" will be replaced by the current OS file path separator to properly work on Windows.
       # Default: []
-      paths:
+    paths:
       - third_party$
       - builtin$
       - examples$
