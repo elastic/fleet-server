@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 :::{include} /release-notes/_snippets/9.0.6/breaking.md
 :::
 
@@ -17,4 +18,10 @@
 :::
 
 :::{include} /release-notes/_snippets/9.0.0/breaking.md
+=======
+:::{include} /release-notes/_snippets/breaking-changes/9.1.md
+:::
+
+:::{include} /release-notes/_snippets/breaking-changes/9.0.md
+>>>>>>> a02bf19 (break out minor versions (#5565))
 :::
