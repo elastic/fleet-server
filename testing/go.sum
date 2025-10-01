@@ -49,6 +49,7 @@ github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
 github.com/elastic/elastic-agent-libs v0.24.0 h1:8skd0le8Y/zAGVaj4m44ljiJMAp0xuJz07ngDTL/1kM=
 github.com/elastic/elastic-agent-libs v0.24.0/go.mod h1:xSeIP3NtOIT4N2pPS4EyURmS1Q8mK0lWZ8Wd1Du6q3w=
+github.com/elastic/elastic-agent-libs v0.24.1/go.mod h1:o/iXtbHYaojpG4BOY7Z3hFMQAgEoqq2owO17JPGpf3A=
 github.com/elastic/go-sysinfo v1.15.0 h1:54pRFlAYUlVNQ2HbXzLVZlV+fxS7Eax49stzg95M4Xw=
 github.com/elastic/go-sysinfo v1.15.0/go.mod h1:jPSuTgXG+dhhh0GKIyI2Cso+w5lPJ5PvVqKlL8LV/Hk=
 github.com/elastic/go-ucfg v0.8.8 h1:54KIF/2zFKfl0MzsSOCGOsZ3O2bnjFQJ0nDJcLhviyk=
