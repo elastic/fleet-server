@@ -21,6 +21,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
+
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 )
@@ -74,7 +76,11 @@ func (c *Elasticsearch) Validate() error {
 		}
 	}
 	if c.TLS != nil && c.TLS.IsEnabled() {
+<<<<<<< HEAD
 		_, err := tlscommon.LoadTLSConfig(c.TLS, logp.NewLogger("elasticsearch-output"))
+=======
+		_, err := tlscommon.LoadTLSConfig(c.TLS, zap.NewStub("elasticsearch-output"))
+>>>>>>> 13bea07 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.21.4 to 0.21.6 (#5211))
 		if err != nil {
 			return err
 		}
@@ -122,7 +128,11 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	}
 
 	if c.TLS != nil && c.TLS.IsEnabled() {
+<<<<<<< HEAD
 		tls, err := tlscommon.LoadTLSConfig(c.TLS, logp.NewLogger("elasticsearch-output"))
+=======
+		tls, err := tlscommon.LoadTLSConfig(c.TLS, zap.NewStub("elasticsearch-output"))
+>>>>>>> 13bea07 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.21.4 to 0.21.6 (#5211))
 		if err != nil {
 			return elasticsearch.Config{}, err
 		}

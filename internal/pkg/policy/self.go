@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
@@ -275,15 +275,15 @@ func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, zlog zerolog.Logg
 		if err != nil {
 			doc.State = client.UnitStateDegraded.String()
 			doc.Message = fmt.Sprintf("remote ES is not reachable due to error: %s", err.Error())
-			zlog.Error().Err(err).Str(logger.PolicyOutputName, outputName).Msg(doc.Message)
+			zlog.Error().Err(err).Str(ecs.PolicyOutputName, outputName).Msg(doc.Message)
 
 		} else if res.StatusCode != 200 {
 			doc.State = client.UnitStateDegraded.String()
 			doc.Message = fmt.Sprintf("remote ES is not reachable due to unexpected status code %d", res.StatusCode)
-			zlog.Error().Err(err).Str(logger.PolicyOutputName, outputName).Msg(doc.Message)
+			zlog.Error().Err(err).Str(ecs.PolicyOutputName, outputName).Msg(doc.Message)
 		}
 		if err := dl.CreateOutputHealth(ctx, bulker, doc); err != nil {
-			zlog.Error().Err(err).Str(logger.PolicyOutputName, outputName).Msg("error writing output health")
+			zlog.Error().Err(err).Str(ecs.PolicyOutputName, outputName).Msg("error writing output health")
 		}
 	}
 }
