@@ -3,3 +3,11 @@
 
 # Allow to auto-merge PRs with Mergify
 dev-tools/integration/.env
+<<<<<<< HEAD
+=======
+
+/.github/workflows @elastic/observablt-ci
+/.github/workflows/golangci-lint.yml @elastic/elastic-agent-control-plane
+/docs/release-notes @elastic/ingest-docs
+/docs/docset.yml @elastic/ingest-docs
+>>>>>>> 743de0d (Update CODEOWNERS (#5580))
