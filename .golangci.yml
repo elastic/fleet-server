@@ -20,9 +20,6 @@ formatters:
   enable:
     - goimports
 
-output:
-  sort-results: true
-
 # Uncomment and add a path if needed to exclude
 # skip-dirs:
 #   - some/path
