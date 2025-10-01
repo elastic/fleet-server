@@ -309,6 +309,12 @@ var (
 		if isSnapshot() {
 			tags = append(tags, "snapshot")
 		}
+<<<<<<< HEAD
+=======
+		if isFIPS() {
+			tags = append(tags, "requirefips")
+		}
+>>>>>>> 15b8c8a (Bump Go version to 1.25.1 (#5562))
 		return strings.Join(tags, ",")
 	})
 
@@ -453,11 +459,50 @@ func (Check) Notice() {
 	mg.SerialDeps(mg.F(genNotice))
 }
 
+<<<<<<< HEAD
 // genNotice generates the NOTICE.txt
 func genNotice() error {
 	tags := []string{}
 	outFile := "NOTICE.txt"
 	log.Println("Generating NOTICE.txt.")
+=======
+// DetectFIPSCryptoImports will do a best effort attempt to ensure that the imports list for FIPS compatible artifacts does not contain any external crypto libraries.
+// Specifically it will fail if the modules list contains an entry with: "crypto", "gokrb5", or "pbkdf2"
+func (Check) DetectFIPSCryptoImports() error {
+	tags := []string{"requirefips"}
+	mods, err := getModules(tags...)
+	if err != nil {
+		return err
+	}
+
+	args := append([]string{"list", "-m"}, mods...)
+	output, err := sh.Output("go", args...)
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(output, "\n") {
+		// keywords are crypto for x/crypto imports, gokrb5 for kerberos, and pbkdf2 for pbkdf2 generation
+		for _, keyword := range []string{"crypto", "gokrb5", "pbkdf2"} {
+			if strings.Contains(line, keyword) {
+				err = errors.Join(err, fmt.Errorf("Detected import %s may implement crypto functionality", line))
+			}
+		}
+	}
+	return err
+}
+
+// genNotice generates the NOTICE.txt or the NOTICE-fips.txt file.
+func genNotice(fips bool) error {
+	tags := []string{}
+	outFile := "NOTICE.txt"
+	if fips {
+		log.Println("Generating NOTICE-fips.txt.")
+		tags = append(tags, "requirefips")
+		outFile = "NOTICE-fips.txt"
+	} else {
+		log.Println("Generating NOTICE.txt.")
+	}
+>>>>>>> 15b8c8a (Bump Go version to 1.25.1 (#5562))
 
 	// Clean up modfile and download all needed files before building NOTICE
 	err := sh.Run("go", "mod", "tidy")
@@ -1072,6 +1117,10 @@ func (Docker) CustomAgentImage() error {
 // Unit runs unit tests.
 // Produces a unit test output file, and test coverage file in the build directory.
 // SNAPSHOT adds the snapshot build tag.
+<<<<<<< HEAD
+=======
+// FIPS adds the requirefips build tag.
+>>>>>>> 15b8c8a (Bump Go version to 1.25.1 (#5562))
 func (Test) Unit() error {
 	mg.Deps(mg.F(mkDir, "build"))
 	output, err := teeCommand(environMap(), "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
@@ -1079,8 +1128,35 @@ func (Test) Unit() error {
 	return err
 }
 
+<<<<<<< HEAD
 // Integration provisions the integration test environment with docker compose, runs the integration tests, then destroys the environment.
 // SNAPSHOT runs integration tests with the snapshot build tag.
+=======
+// UnitFIPSOnly runs unit tests and injects GODEBUG=fips140=only into the environment.
+// This is done because mage may have issues when running with fips140=only set.
+// Produces a unit test output file, and test coverage file in the build directory.
+// SNAPSHOT adds the snapshot build tag.
+// FIPS adds the requirefips build tag.
+func (Test) UnitFIPSOnly() error {
+	mg.Deps(mg.F(mkDir, "build"))
+
+	// We also set GODEBUG=tlsmlkem=0 to disable the X25519MLKEM768 TLS key
+	// exchange mechanism; without this setting and with the GODEBUG=fips140=only
+	// setting, we get errors in tests like so:
+	// Failed to connect: crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
+	// Note that we are only disabling this TLS key exchange mechanism in tests!
+	env := environMap()
+	env["GODEBUG"] = "fips140=only,tlsmlkem=0"
+
+	output, err := teeCommand(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fipsonly-"+runtime.GOOS+".out"), output, 0o644))
+	return err
+}
+
+// Integration provisions the integration test environment with docker compose, runs the integration tests, then destroys the environment.
+// SNAPSHOT runs integration tests with the snapshot build tag.
+// FIPS runs the integration tests the requirefips build tag.
+>>>>>>> 15b8c8a (Bump Go version to 1.25.1 (#5562))
 func (Test) Integration() {
 	mg.SerialDeps(mg.F(mkDir, "build"), Test.IntegrationUp, Test.IntegrationRun, Test.IntegrationDown)
 }
@@ -1094,6 +1170,10 @@ func (Test) IntegrationUp() error {
 // Assumes that the integration test environment is up.
 // Produces an integration test output file in the build directory.
 // SNAPSHOT runs integration tests with the snapshot build tag.
+<<<<<<< HEAD
+=======
+// FIPS runs the integration tests the requirefips build tag.
+>>>>>>> 15b8c8a (Bump Go version to 1.25.1 (#5562))
 func (Test) IntegrationRun(ctx context.Context) error {
 	env, err := readEnvFile(filepath.Join("dev-tools", "integration", ".env"))
 	if err != nil {
@@ -1419,6 +1499,59 @@ func unzip(sourceFile, destinationDir string) error {
 	return nil
 }
 
+<<<<<<< HEAD
+=======
+// checkFIPSBinary ensures the binary located at path has fips capable markers set.
+func checkFIPSBinary(path string) error {
+	log.Printf("Verifiying binary in %q for FIPS capable markers.", path)
+	info, err := buildinfo.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("unable to read buildinfo: %w", err)
+	}
+	var checkLinks, foundTags, foundExperiment bool
+
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "-tags":
+			foundTags = true
+			if !strings.Contains(setting.Value, "requirefips") {
+				return fmt.Errorf("requirefips tag not found in %s", setting.Value)
+			}
+			continue
+		case "GOEXPERIMENT":
+			foundExperiment = true
+			if !strings.Contains(setting.Value, "systemcrypto") {
+				return fmt.Errorf("did not find GOEXPIRIMENT=systemcrypto")
+			}
+			continue
+		case "-ldflags":
+			if !strings.Contains(setting.Value, "-s") {
+				checkLinks = true
+				continue
+			}
+		}
+	}
+
+	if !foundTags {
+		return fmt.Errorf("did not find build tags")
+	}
+	if !foundExperiment {
+		return fmt.Errorf("did not find GOEXPERIMENT")
+	}
+	if checkLinks {
+		log.Println("Binary is not stripped, checking symbols table.")
+		output, err := sh.Output("go", "tool", "nm", path)
+		if err != nil {
+			return fmt.Errorf("go tool nm failed: %w", err)
+		}
+		if runtime.GOOS == "linux" && !strings.Contains(output, "OpenSSL_version") { // TODO may need different check for windows/darwin
+			return fmt.Errorf("failed to find OpenSSL symbol links within binary")
+		}
+	}
+	return nil
+}
+
+>>>>>>> 15b8c8a (Bump Go version to 1.25.1 (#5562))
 // JunitReport produces junit report files from test-output files in the build dir.
 func (Test) JunitReport() error {
 	return filepath.WalkDir("build", func(name string, d fs.DirEntry, err error) error {
@@ -1455,6 +1588,10 @@ func (Test) JunitReport() error {
 
 // All runs unit and integration tests and produces junit reports for all the tests.
 // SNAPSHOT adds the snapshot build tag.
+<<<<<<< HEAD
+=======
+// FIPS adds the requirefips build tag.
+>>>>>>> 15b8c8a (Bump Go version to 1.25.1 (#5562))
 func (Test) All() {
 	mg.SerialDeps(mg.F(mkDir, "build"), Test.Unit, Test.Integration, Test.JunitReport)
 }
@@ -1462,6 +1599,10 @@ func (Test) All() {
 // Benchmark runs the included benchmarks
 // Produces a benchmark file in the build directory.
 // SNAPSHOT adds the snapshot build tag.
+<<<<<<< HEAD
+=======
+// FIPS adds the requirefips build tag.
+>>>>>>> 15b8c8a (Bump Go version to 1.25.1 (#5562))
 // BENCHMARK_FILTER can be used to filter what benchmarks run.
 // BENCHMARK_ARGS can be used to change what is being benchmarked. Default: -count=10 -benchtime=3s -benchmem.
 // BENCH_BASE can be used to change the output file name.
