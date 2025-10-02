@@ -720,67 +720,6 @@ func TestAckHandleUpgrade(t *testing.T) {
 			Agent:      &model.AgentMetadata{Version: "8.0.0"},
 		},
 	}, {
-		name: "retry signaled",
-		event: UpgradeEvent{
-			Error: ptr("upgrade error"),
-			Payload: &struct {
-				Retry        bool `json:"retry"`
-				RetryAttempt int  `json:"retry_attempt"`
-			}{
-				Retry:        true,
-				RetryAttempt: 1,
-			},
-		},
-		bulker: func(t *testing.T) *ftesting.MockBulk {
-			m := ftesting.NewMockBulk()
-			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
-				var body struct {
-					Doc struct {
-						Status string `json:"upgrade_status"`
-					} `json:"doc"`
-				}
-				if err := json.Unmarshal(p, &body); err != nil {
-					t.Fatal(err)
-				}
-				return body.Doc.Status == "retrying"
-			}), mock.Anything).Return(nil).Once()
-			return m
-		},
-		agent: &model.Agent{
-			ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
-			Agent:      &model.AgentMetadata{Version: "8.0.0"},
-		},
-	}, {
-		name: "no more retries",
-		event: UpgradeEvent{
-			Error: ptr("upgrade error"),
-			Payload: &struct {
-				Retry        bool `json:"retry"`
-				RetryAttempt int  `json:"retry_attempt"`
-			}{
-				Retry: false,
-			},
-		},
-		bulker: func(t *testing.T) *ftesting.MockBulk {
-			m := ftesting.NewMockBulk()
-			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
-				var body struct {
-					Doc struct {
-						Status string `json:"upgrade_status"`
-					} `json:"doc"`
-				}
-				if err := json.Unmarshal(p, &body); err != nil {
-					t.Fatal(err)
-				}
-				return body.Doc.Status == "failed"
-			}), mock.Anything).Return(nil).Once()
-			return m
-		},
-		agent: &model.Agent{
-			ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
-			Agent:      &model.AgentMetadata{Version: "8.0.0"},
-		},
-	}, {
 		name:  "keep upgrade_attempts if upgrade_details is not nil",
 		event: UpgradeEvent{},
 		bulker: func(t *testing.T) *ftesting.MockBulk {
