@@ -53,7 +53,6 @@ const (
 	FieldUnenrolledAt     = "unenrolled_at"
 	FieldUpgradedAt       = "upgraded_at"
 	FieldUpgradeStartedAt = "upgrade_started_at"
-	FieldUpgradeStatus    = "upgrade_status"
 	FieldUpgradeDetails   = "upgrade_details"
 	FieldUpgradeAttempts  = "upgrade_attempts"
 
