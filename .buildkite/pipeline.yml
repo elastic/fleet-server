@@ -190,23 +190,6 @@ steps:
           - step: "e2e-test"
             allow_failure: true
 
-      - label: ":sonarqube: Continuous Code Inspection"
-        env:
-          VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/fleet-server/sonar-analyze-token"
-        agents:
-          image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-        command:
-          - "buildkite-agent artifact download build/*coverage*.out ."
-          - "buildkite-agent artifact download build/test-unit*.out.xml ."
-          - "/scan-source-code.sh"
-        depends_on:
-          - step: "unit-test"
-            allow_failure: false
-          - step: "e2e-test"
-            allow_failure: false
-          - step: "unit-test-macos-13"
-            allow_failure: false
-
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
         env:
