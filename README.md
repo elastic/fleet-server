@@ -1,10 +1,6 @@
 # Fleet Server
 
-<<<<<<< HEAD
-[![Build status](https://badge.buildkite.com/e97572322f4d22804d550aa300c7d4cfe807f3463c999e8c8f.svg?branch=main)](https://buildkite.com/elastic/fleet-server) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=elastic_fleet-server&metric=coverage)](https://sonarcloud.io/summary/new_code?id=elastic_fleet-server)
-=======
 [![Build status](https://badge.buildkite.com/e97572322f4d22804d550aa300c7d4cfe807f3463c999e8c8f.svg?branch=main)](https://buildkite.com/elastic/fleet-server)
->>>>>>> eb3dbd8 (ci: remove sonarqube (#5628))
 
 Fleet server is the control server to manage a fleet of [elastic-agents](https://github.com/elastic/elastic-agent).
 
