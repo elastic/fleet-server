@@ -4596,19 +4596,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/net
-<<<<<<< HEAD
-Version: v0.43.0
-Licence type (autodetected): BSD-3-Clause
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/golang.org/x/net@v0.43.0/LICENSE:
-=======
 Version: v0.45.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/golang.org/x/net@v0.45.0/LICENSE:
->>>>>>> 7066c3c (build(deps): bump golang.org/x/net from 0.44.0 to 0.45.0 (#5637))
 
 Copyright 2009 The Go Authors.
 
