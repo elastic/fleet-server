@@ -8,8 +8,13 @@ replace (
 )
 
 require (
+<<<<<<< HEAD
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/docker/docker v28.5.0+incompatible
+=======
+	github.com/Shopify/toxiproxy/v2 v2.12.0
+	github.com/docker/docker v28.5.1+incompatible
+>>>>>>> 9f51ba8 (build(deps): bump github.com/docker/docker in /testing (#5653))
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
