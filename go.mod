@@ -39,8 +39,13 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.45.0
 	golang.org/x/sync v0.17.0
+<<<<<<< HEAD
 	golang.org/x/time v0.13.0
 	google.golang.org/grpc v1.75.1
+=======
+	golang.org/x/time v0.14.0
+	google.golang.org/grpc v1.76.0
+>>>>>>> a603b8a (build(deps): bump golang.org/x/time from 0.13.0 to 0.14.0 (#5652))
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
 )
