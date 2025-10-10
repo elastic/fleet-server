@@ -1,0 +1,4 @@
+owner: elastic
+repo: fleet-server
+rendered_changelog_destination: changelog
+file_type: asciidoc
