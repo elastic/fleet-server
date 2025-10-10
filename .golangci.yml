@@ -4,7 +4,7 @@ run:
   timeout: 1m
   build-tags:
     - integration
-  go: "1.25.1"
+  go: "1.25.2"
 
 issues:
   # Maximum count of issues with the same text.
