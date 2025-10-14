@@ -1,11 +1,6 @@
 # Team responsible for Fleet Server
 * @elastic/elastic-agent-control-plane
 
-<<<<<<< HEAD
-# Allow to auto-merge PRs with Mergify
-dev-tools/integration/.env
-=======
->>>>>>> e9366da (Remove exception for dev-tools/integration/.env (#5693))
 /.github/workflows @elastic/observablt-ci
 /.github/workflows/golangci-lint.yml @elastic/elastic-agent-control-plane
 /docs/release-notes @elastic/ingest-docs
