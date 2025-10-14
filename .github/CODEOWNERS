@@ -1,9 +1,6 @@
 # Team responsible for Fleet Server
 * @elastic/elastic-agent-control-plane
 
-# Allow to auto-merge PRs with Mergify
-dev-tools/integration/.env
-
 /.github/workflows @elastic/observablt-ci
 /.github/workflows/golangci-lint.yml @elastic/elastic-agent-control-plane
 /docs/release-notes @elastic/ingest-docs
