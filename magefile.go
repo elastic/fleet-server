@@ -628,6 +628,12 @@ func (Check) All() {
 // SNAPSHOT creates a snapshot build.
 func (Build) Local() error {
 	env := environMap()
+<<<<<<< HEAD
+=======
+	if isFIPS() {
+		addFIPSEnvVars(env)
+	}
+>>>>>>> 693bd7b (re-enable CGO and buildmode pie (#5715))
 	outFile := filepath.Join("bin", binaryName)
 	if runtime.GOOS == "windows" {
 		outFile = filepath.Join("bin", binaryExe)
