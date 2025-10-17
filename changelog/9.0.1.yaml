@@ -1,0 +1,49 @@
+version: 9.0.1
+entries:
+    - kind: bug-fix
+      summary: Fix host parsing in Elasticsearch output diagnostics
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4765
+      issue: []
+      timestamp: 1743692296
+      file:
+        name: 1743692296-fix-url-parsing-es-output-diagnostics.yaml
+        checksum: 6cd827f9b6e9bc06e029b8f6dda743ee5e9d7d27
+    - kind: bug-fix
+      summary: Redact output in bootstrap config logs
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4775
+      issue: []
+      timestamp: 1744046917
+      file:
+        name: 1744046917-Redact-output-in-bootstrap-config-logs.yaml
+        checksum: 9c205aceff761a5834bb50567d6e5243eb402c8b
+    - kind: bug-fix
+      summary: Mutex protection for remote bulker config
+      description: |
+        Use existing remote bulker mutex to control access to remote bulker configs.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4776
+      issue: []
+      timestamp: 1744054552
+      file:
+        name: 1744054552-Mutex-protection-for-remote-bulker-config.yaml
+        checksum: af8b1abeba1b9bbf0aa4f64a2ca494120758aea6
+    - kind: bug-fix
+      summary: Enable dead code elimination
+      description: |
+        Add grpcnotrace build tags and ensure DCE (dead code elimination) is enabled.
+        Reduce binary size by 34%
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/4784
+      issue: []
+      timestamp: 1744852233
+      file:
+        name: 1744852233-enable-dce.yaml
+        checksum: 836d912f8375f0f5a3a946a90afbb50978c431c4

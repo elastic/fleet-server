@@ -1,0 +1,25 @@
+version: 9.0.6
+entries:
+    - kind: bug-fix
+      summary: Fix 503 handling in enrollment
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5232
+      issue:
+        - https://github.com/elastic/fleet-server/issues/5197
+      timestamp: 1754931919
+      file:
+        name: 1754931919-Fix-503-handling-in-enrollment.yaml
+        checksum: b6c03da0ddbd3a2b4f742d952a5d7178e77a9ac3
+    - kind: bug-fix
+      summary: Remove extra ES search when preparing agent policy
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5283
+      issue: []
+      timestamp: 1755644662
+      file:
+        name: 1755644662-Remove-extra-ES-search-when-preparing-agent-policy.yaml
+        checksum: 0814e746cce14762e3d22aeee0c5f6fad0eda38c

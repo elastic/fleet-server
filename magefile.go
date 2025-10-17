@@ -326,7 +326,7 @@ var (
 			tags = append(tags, "snapshot")
 		}
 		if isFIPS() {
-			tags = append(tags, "requirefips", "ms_tls13kdf")
+			tags = append(tags, "requirefips")
 		}
 		return strings.Join(tags, ",")
 	})
@@ -483,13 +483,38 @@ func (Check) Notice() {
 	mg.SerialDeps(mg.F(genNotice, false), mg.F(genNotice, true))
 }
 
+// DetectFIPSCryptoImports will do a best effort attempt to ensure that the imports list for FIPS compatible artifacts does not contain any external crypto libraries.
+// Specifically it will fail if the modules list contains an entry with: "crypto", "gokrb5", or "pbkdf2"
+func (Check) DetectFIPSCryptoImports() error {
+	tags := []string{"requirefips"}
+	mods, err := getModules(tags...)
+	if err != nil {
+		return err
+	}
+
+	args := append([]string{"list", "-m"}, mods...)
+	output, err := sh.Output("go", args...)
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(output, "\n") {
+		// keywords are crypto for x/crypto imports, gokrb5 for kerberos, and pbkdf2 for pbkdf2 generation
+		for _, keyword := range []string{"crypto", "gokrb5", "pbkdf2"} {
+			if strings.Contains(line, keyword) {
+				err = errors.Join(err, fmt.Errorf("Detected import %s may implement crypto functionality", line))
+			}
+		}
+	}
+	return err
+}
+
 // genNotice generates the NOTICE.txt or the NOTICE-fips.txt file.
 func genNotice(fips bool) error {
 	tags := []string{}
 	outFile := "NOTICE.txt"
 	if fips {
 		log.Println("Generating NOTICE-fips.txt.")
-		tags = append(tags, "requirefips", "ms_tls13kdf")
+		tags = append(tags, "requirefips")
 		outFile = "NOTICE-fips.txt"
 	} else {
 		log.Println("Generating NOTICE.txt.")
@@ -1177,7 +1202,7 @@ func (Docker) CustomAgentImage() error {
 // Unit runs unit tests.
 // Produces a unit test output file, and test coverage file in the build directory.
 // SNAPSHOT adds the snapshot build tag.
-// FIPS adds the requirefips and ms_tls13kdf build tags.
+// FIPS adds the requirefips build tag.
 func (Test) Unit() error {
 	mg.Deps(mg.F(mkDir, "build"))
 	output, err := teeCommand(environMap(), "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
@@ -1189,11 +1214,18 @@ func (Test) Unit() error {
 // This is done because mage may have issues when running with fips140=only set.
 // Produces a unit test output file, and test coverage file in the build directory.
 // SNAPSHOT adds the snapshot build tag.
-// FIPS adds the requirefips and ms_tls13kdf build tags.
+// FIPS adds the requirefips build tag.
 func (Test) UnitFIPSOnly() error {
 	mg.Deps(mg.F(mkDir, "build"))
+
+	// We also set GODEBUG=tlsmlkem=0 to disable the X25519MLKEM768 TLS key
+	// exchange mechanism; without this setting and with the GODEBUG=fips140=only
+	// setting, we get errors in tests like so:
+	// Failed to connect: crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
+	// Note that we are only disabling this TLS key exchange mechanism in tests!
 	env := environMap()
-	env["GODEBUG"] = "fips140=only"
+	env["GODEBUG"] = "fips140=only,tlsmlkem=0"
+
 	output, err := teeCommand(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fipsonly-"+runtime.GOOS+".out"), output, 0o644))
 	return err
@@ -1201,7 +1233,7 @@ func (Test) UnitFIPSOnly() error {
 
 // Integration provisions the integration test environment with docker compose, runs the integration tests, then destroys the environment.
 // SNAPSHOT runs integration tests with the snapshot build tag.
-// FIPS runs the integration tests the requirefips and ms_tls13kdf build tags.
+// FIPS runs the integration tests the requirefips build tag.
 func (Test) Integration() {
 	mg.SerialDeps(mg.F(mkDir, "build"), Test.IntegrationUp, Test.IntegrationRun, Test.IntegrationDown)
 }
@@ -1215,7 +1247,7 @@ func (Test) IntegrationUp() error {
 // Assumes that the integration test environment is up.
 // Produces an integration test output file in the build directory.
 // SNAPSHOT runs integration tests with the snapshot build tag.
-// FIPS runs the integration tests the requirefips and ms_tls13kdf build tags.
+// FIPS runs the integration tests the requirefips build tag.
 func (Test) IntegrationRun(ctx context.Context) error {
 	env, err := readEnvFile(filepath.Join("dev-tools", "integration", ".env"))
 	if err != nil {
@@ -1567,9 +1599,6 @@ func checkFIPSBinary(path string) error {
 			if !strings.Contains(setting.Value, "requirefips") {
 				return fmt.Errorf("requirefips tag not found in %s", setting.Value)
 			}
-			if !strings.Contains(setting.Value, "ms_tls13kdf") {
-				return fmt.Errorf("requirefips tag not found in %s", setting.Value)
-			}
 			continue
 		case "GOEXPERIMENT":
 			foundExperiment = true
@@ -1640,7 +1669,7 @@ func (Test) JunitReport() error {
 
 // All runs unit and integration tests and produces junit reports for all the tests.
 // SNAPSHOT adds the snapshot build tag.
-// FIPS adds the requirefips and ms_tls13kdf build tags.
+// FIPS adds the requirefips build tag.
 func (Test) All() {
 	mg.SerialDeps(mg.F(mkDir, "build"), Test.Unit, Test.Integration, Test.JunitReport)
 }
@@ -1648,7 +1677,7 @@ func (Test) All() {
 // Benchmark runs the included benchmarks
 // Produces a benchmark file in the build directory.
 // SNAPSHOT adds the snapshot build tag.
-// FIPS adds the requirefips and ms_tls13kdf build tags.
+// FIPS adds the requirefips build tag.
 // BENCHMARK_FILTER can be used to filter what benchmarks run.
 // BENCHMARK_ARGS can be used to change what is being benchmarked. Default: -count=10 -benchtime=3s -benchmem.
 // BENCH_BASE can be used to change the output file name.

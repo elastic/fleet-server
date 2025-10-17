@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
@@ -55,7 +56,17 @@ var (
 // metrics must be explicitly exposed with a call to InitMetrics
 // FIXME we have global metrics but an internal and external API; this may lead to some confusion.
 func init() {
-	err := report.SetupMetrics(logger.NewZapStub("instance-metrics"), build.ServiceName, version.DefaultVersion)
+	// maintain original behaviour from deprecated report.SetupMetrics
+	ephemeralID, _ := uuid.NewV4()
+	err := report.SetupMetricsOptions(report.MetricOptions{
+		Name:           build.ServiceName,
+		Version:        version.DefaultVersion,
+		EphemeralID:    ephemeralID.String(),
+		Logger:         logger.NewZapStub("instance-metrics"),
+		SystemMetrics:  monitoring.Default.GetOrCreateRegistry("system"),
+		ProcessMetrics: monitoring.Default.GetOrCreateRegistry("beat"),
+	})
+
 	if err != nil {
 		zerolog.Ctx(context.TODO()).Error().Err(err).Msg("unable to initialize metrics") // TODO is used because this may logged during the package load
 	}
@@ -91,7 +102,7 @@ func newMetricsRegistry(name string) *metricsRegistry {
 	reg := monitoring.Default
 	return &metricsRegistry{
 		fullName: name,
-		registry: reg.NewRegistry(name),
+		registry: reg.GetOrCreateRegistry(name),
 		promReg:  prometheus.NewRegistry(),
 	}
 }
@@ -103,7 +114,7 @@ func (r *metricsRegistry) newRegistry(name string) *metricsRegistry {
 	}
 	return &metricsRegistry{
 		fullName: fullName,
-		registry: r.registry.NewRegistry(name),
+		registry: r.registry.GetOrCreateRegistry(name),
 		promReg:  r.promReg,
 	}
 }

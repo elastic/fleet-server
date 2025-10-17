@@ -1,0 +1,13 @@
+version: 9.0.4
+entries:
+    - kind: bug-fix
+      summary: Include the base error for json decode error responses.
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5069
+      issue: []
+      timestamp: 1750971846
+      file:
+        name: 1750971846-Include-error-on-json-decode-error-responses.yaml
+        checksum: 3f2eb0595d1edbb7a31ecf2e2d49dd712f481f96

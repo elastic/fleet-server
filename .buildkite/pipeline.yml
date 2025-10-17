@@ -42,6 +42,9 @@ steps:
         agents:
           provider: "gcp"
 
+      - label: "Detect FIPS crypto imports"
+        command: ".buildkite/scripts/check_detect_fips_crypto.sh"
+
       - label: "Package x86_64"
         key: "package-x86-64-pr"
         env:
@@ -177,7 +180,7 @@ steps:
           GO_DISTRO: "stdlib"
         agents:
           provider: "aws"
-          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.xlarge"
         artifact_paths:
           - build/*.xml
@@ -203,10 +206,15 @@ steps:
         plugins:
           - *bk_analytics_token_plugin
           - *test_collector_plugin
+        retry:
+          automatic:
+            limit: 1
 
       - label: "E2E Test"
         key: "e2e-test"
         command: ".buildkite/scripts/e2e_test.sh"
+        env:
+          TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
         agents:
           provider: "gcp"
         artifact_paths:
@@ -215,13 +223,18 @@ steps:
         plugins:
           - *bk_analytics_token_plugin
           - *test_collector_plugin
+        retry:
+          automatic:
+            limit: 1
 
       - label: ":junit: Junit annotate"
-        plugins:
-          - junit-annotate#v2.4.1:
-              artifacts: "build/*.xml"
         agents:
-          provider: "gcp"
+          # requires at least "bash", "curl" and "git"
+          image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
+        plugins:
+          - junit-annotate#v2.7.0:
+              artifacts: "build/*.xml"
+              run-in-docker: false
         depends_on:
           - step: "unit-test"
             allow_failure: true
@@ -231,23 +244,6 @@ steps:
             allow_failure: true
           - step: "e2e-test"
             allow_failure: true
-
-      - label: ":sonarqube: Continuous Code Inspection"
-        env:
-          VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/fleet-server/sonar-analyze-token"
-        agents:
-          image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-        command:
-          - "buildkite-agent artifact download build/*coverage*.out ."
-          - "buildkite-agent artifact download build/test-unit*.out.xml ."
-          - "/scan-source-code.sh"
-        depends_on:
-          - step: "unit-test"
-            allow_failure: false
-          - step: "e2e-test"
-            allow_failure: false
-          - step: "unit-test-macos-13"
-            allow_failure: false
 
       - label: ":gcloud: Cloud e2e Test"
         key: "cloud-e2e-test"
@@ -289,16 +285,20 @@ steps:
           PLATFORMS: "linux/amd64"
           TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
           FIPS: "true"
-          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-          TF_VAR_ess_region: "us-gov-east-1"
-          TF_VAR_deployment_template_id: "aws-general-purpose"
+          # PR #5536 redirects Cloud e2e test to prod as new deployments are not able to start on FRH-staging
+          # The following env vars should be uncommented once FRH-staging is fixed
+          #EC_ENDPOINT: "https://api.staging.elastic-gov.com"
+          #TF_VAR_ess_region: "us-gov-east-1"
+          #TF_VAR_deployment_template_id: "aws-general-purpose"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
         plugins:
           - *docker_elastic_login_plugin
           - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              # Use the commented path below instead of the one above when FRH-staging is fixed.
+              #path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
               field: "apiKey"
               env_var: "EC_API_KEY"
         depends_on:
