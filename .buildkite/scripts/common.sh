@@ -42,10 +42,10 @@ with_go() {
     echo "Setting up the Go environment..."
     create_workspace
     check_platform_architeture
-    SETUP_GVM_VERSION=v0.5.2
+    SETUP_GVM_VERSION=v0.6.0
     retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform_type}-${arch_type}"
     chmod +x ${WORKSPACE}/gvm
-    eval "$(gvm --url=https://go.dev/dl $(cat .go-version))"
+    eval "$(gvm $(cat .go-version))"
     go version
     which go
     export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
