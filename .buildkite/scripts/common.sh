@@ -45,7 +45,7 @@ with_go() {
     SETUP_GVM_VERSION=v0.5.2
     retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform_type}-${arch_type}"
     chmod +x ${WORKSPACE}/gvm
-    eval "$(gvm $(cat .go-version))"
+    eval "$(gvm --url=https://go.dev/dl $(cat .go-version))"
     go version
     which go
     export PATH="${PATH}:$(go env GOPATH):$(go env GOPATH)/bin"
