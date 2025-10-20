@@ -90,6 +90,7 @@ const (
 
 // const and vars used by magefile.
 const (
+	buildMode  = "pie"
 	binaryName = "fleet-server"
 	binaryExe  = "fleet-server.exe"
 
@@ -695,7 +696,6 @@ func (Check) All() {
 // FIPS creates a FIPS capable binary.
 func (Build) Local() error {
 	env := environMap()
-	env["CGO_ENABLED"] = "0"
 	if isFIPS() {
 		addFIPSEnvVars(env)
 	}
@@ -729,7 +729,6 @@ func goBuild(osArg, archArg string, cover bool) error {
 	env := environMap()
 	env["GOOS"] = osArg
 	env["GOARCH"] = archArg
-	env["CGO_ENABLED"] = "0"
 	distArr := []string{"fleet-server"}
 	if isFIPS() {
 		addFIPSEnvVars(env)
@@ -755,6 +754,7 @@ func goBuild(osArg, archArg string, cover bool) error {
 		"-tags=" + getTagsString(),
 		"-gcflags=" + getGCFlags(),
 		"-ldflags=" + getLDFlags(),
+		"-buildmode=" + buildMode,
 		"-o", outFile,
 	}
 	if cover {
