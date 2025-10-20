@@ -58,7 +58,7 @@ with_msft_go() {
 
     # Use a temporary folder to house the Go SDK downloaded from Microsoft
     tempfolder=$(mktemp -d)
-    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version).${platform_type}-${arch_type}.tar.gz
+    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version)-1.${platform_type}-${arch_type}.tar.gz
     retry 5 $(curl -sL -o - $MSFT_DOWNLOAD_URL | tar -xz -f - -C ${tempfolder}/)
     export PATH="${PATH}:${tempfolder}/go/bin"
     go version
