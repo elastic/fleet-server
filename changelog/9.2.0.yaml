@@ -65,7 +65,7 @@ entries:
         name: 1758147274-Add-credentials-to-Elasticsearch-exporters.yaml
         checksum: 4239f225a3ca83335170653a1d3b1db39c56bc0c
     - kind: enhancement
-      summary: Update Golang version to v1.25.1.
+      summary: Update Golang version to v1.25.3.
       description: ""
       component: fleet-server
       pr:
