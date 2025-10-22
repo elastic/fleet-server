@@ -1,0 +1,32 @@
+// begin 8.19.6 relnotes
+
+[[release-notes-8.19.6]]
+==  8.19.6
+
+Review important information about the  8.19.6 release.
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.19.6]]
+=== Enhancements
+
+
+**fleet-server**
+
+* Update Go to v1.25.3. https://github.com/elastic/fleet-server/pull/5699[#5699] 
+
+
+
+
+
+// end 8.19.6 relnotes
