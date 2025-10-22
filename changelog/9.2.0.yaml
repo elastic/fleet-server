@@ -1,0 +1,79 @@
+version: 9.2.0
+entries:
+    - kind: feature
+      summary: Add OTel collector properties to policy schema
+      description: |
+        Add OTel collector properties to the policy schema. This way policies defined in Fleet that include
+        this data are forwarded to agents.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5169
+      issue:
+        - https://github.com/elastic/fleet-server/issues/5241
+      impact: ""
+      action: ""
+      timestamp: 1756122604
+      file:
+        name: 1756122604-Add-OTel-collector-properties-to-policy-schema.yaml
+        checksum: cece41ca8a4e87167871137a7b8b2b18e6afec87
+    - kind: enhancement
+      summary: Refactor bulk checkin handler
+      description: Refactor the bulk checkin handler to allow for future extensions
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5493
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1757539949
+      file:
+        name: 1757539949-Refactor-bulk-checkin-handler.yaml
+        checksum: 1f7ce6c66be9d582383db6fc49ffd8a016109209
+    - kind: feature
+      summary: Add agent_policy_id and policy_revision_idx to checkin requests
+      description: |
+        Add the agent_policy_id and policy_revision_idx attributes to checkin
+        request bodies so an agent is able to inform fleet-server of its exact
+        policy. These details will replace the need for an ack on
+        policy_change actions, and will be used to determine when to send a
+        policy change when there is a new revision available, or when the
+        agent is reassigned to a different policy. Add a server setting under
+        feature_flags.ignore_checkin_policy_id that disables this behavour and
+        restores the previous approach.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5501
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6446
+      impact: ""
+      action: ""
+      timestamp: 1757633911
+      file:
+        name: 1757633911-Add-agent_policy_id-and-policy_revision_idx-to-checkin-requests.yaml
+        checksum: 841fad0cf01931e2d46d6f69b3089a63e69a0e0f
+    - kind: enhancement
+      summary: Add credentials to OTel Elasticsearch exporters
+      description: When a policy includes OTel configuration with Elasticsearch exporters, it configures their credentials using the credentials in the Elasticsearch output.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5469
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1758147274
+      file:
+        name: 1758147274-Add-credentials-to-Elasticsearch-exporters.yaml
+        checksum: 4239f225a3ca83335170653a1d3b1db39c56bc0c
+    - kind: enhancement
+      summary: Update Golang version to v1.25.1.
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5562
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1758819869
+      file:
+        name: 1758819869-bump-golang-1.25.1.yaml
+        checksum: 5e177a285a6483dfddfd4e117d0e6f9c5fb368ec
