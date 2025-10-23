@@ -11,7 +11,7 @@ metadata:
     pagerduty.com/service-id: PW0VP7P
 
 spec:
-  type: tool
+  type: service
   owner: group:ingest-fp
   system: platform-ingest
   lifecycle: production
