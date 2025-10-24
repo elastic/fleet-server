@@ -42,7 +42,7 @@ with_go() {
     echo "Setting up the Go environment..."
     create_workspace
     check_platform_architeture
-    SETUP_GVM_VERSION=v0.5.2
+    SETUP_GVM_VERSION=v0.6.0
     retry 5 curl -sL -o ${WORKSPACE}/gvm "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${platform_type}-${arch_type}"
     chmod +x ${WORKSPACE}/gvm
     eval "$(gvm $(cat .go-version))"
@@ -58,7 +58,7 @@ with_msft_go() {
 
     # Use a temporary folder to house the Go SDK downloaded from Microsoft
     tempfolder=$(mktemp -d)
-    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version).${platform_type}-${arch_type}.tar.gz
+    MSFT_DOWNLOAD_URL=https://aka.ms/golang/release/latest/go$(cat .go-version)-1.${platform_type}-${arch_type}.tar.gz
     retry 5 $(curl -sL -o - $MSFT_DOWNLOAD_URL | tar -xz -f - -C ${tempfolder}/)
     export PATH="${PATH}:${tempfolder}/go/bin"
     go version
