@@ -67,6 +67,7 @@ steps:
     plugins:
       - *oidc_plugin
       - *dockerhub_login_plugin
+      - *docker_elastic_login_plugin
 
   - label: "Package FIPS x86_64 staging"
     key: "package-fips-x86-64-staging"
@@ -84,6 +85,7 @@ steps:
     plugins:
       - *oidc_plugin
       - *dockerhub_login_plugin
+      - *docker_elastic_login_plugin
 
   - label: "Package aarch64 snapshot"
     if: "build.env('VERSION_QUALIFIER') == null"
@@ -129,6 +131,7 @@ steps:
     plugins:
       - *oidc_plugin
       - *dockerhub_login_plugin
+      - *docker_elastic_login_plugin
 
   - label: "Package FIPS aarch64 staging"
     key: "package-fips-arm-staging"
@@ -146,6 +149,7 @@ steps:
     plugins:
       - *oidc_plugin
       - *dockerhub_login_plugin
+      - *docker_elastic_login_plugin
 
   - label: "DRA snapshot"
     if: "${FILE_EXISTS_IN_REPO} && build.env('VERSION_QUALIFIER') == null"
