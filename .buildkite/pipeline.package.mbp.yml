@@ -66,7 +66,6 @@ steps:
       - build/distributions/**
     plugins:
       - *oidc_plugin
-      - *dockerhub_login_plugin
       - *docker_elastic_login_plugin
 
   - label: "Package FIPS x86_64 staging"
@@ -84,7 +83,6 @@ steps:
       - build/distributions/**
     plugins:
       - *oidc_plugin
-      - *dockerhub_login_plugin
       - *docker_elastic_login_plugin
 
   - label: "Package aarch64 snapshot"
@@ -130,7 +128,6 @@ steps:
       - build/distributions/**
     plugins:
       - *oidc_plugin
-      - *dockerhub_login_plugin
       - *docker_elastic_login_plugin
 
   - label: "Package FIPS aarch64 staging"
@@ -148,7 +145,6 @@ steps:
       - build/distributions/**
     plugins:
       - *oidc_plugin
-      - *dockerhub_login_plugin
       - *docker_elastic_login_plugin
 
   - label: "DRA snapshot"
