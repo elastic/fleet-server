@@ -201,6 +201,60 @@ func TestBulkSimple(t *testing.T) {
 	}
 }
 
+func TestBulkReusePending(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+	const (
+		agentID = "test-agent-id"
+		status  = "online"
+		message = "test message"
+	)
+
+	meta := []byte(`{"test":"metadata"}`)
+
+	// Matcher that validates both the existing field (status) and new field (meta) are present
+	matchAccumulatedOps := func(ops []bulk.MultiOp) bool {
+		if len(ops) != 1 {
+			t.Errorf("Expected 1 operation, got %d", len(ops))
+			return false
+		}
+		if ops[0].ID != agentID {
+			t.Errorf("Expected ID %s, got %s", agentID, ops[0].ID)
+			return false
+		}
+
+		type updateT struct {
+			Status string          `json:"last_checkin_status"`
+			Meta   json.RawMessage `json:"local_metadata"`
+		}
+
+		m := make(map[string]updateT)
+		err := json.Unmarshal(ops[0].Body, &m)
+		require.NoErrorf(t, err, "unable to validate operation body %s", string(ops[0].Body))
+
+		sub, ok := m["doc"]
+		require.True(t, ok, "unable to validate operation: expected doc")
+
+		assert.Equal(t, status, sub.Status, "Expected status from first CheckIn to be preserved")
+		assert.Equal(t, json.RawMessage(meta), sub.Meta, "Expected metadata from second CheckIn to be added")
+		return true
+	}
+
+	mockBulk := ftesting.NewMockBulk()
+	mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchAccumulatedOps), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
+
+	bc := NewBulk(mockBulk)
+
+	err := bc.CheckIn(agentID, WithStatus(status), WithMessage(message))
+	require.NoError(t, err)
+	err = bc.CheckIn(agentID, WithMeta(meta))
+	require.NoError(t, err)
+	err = bc.flush(ctx)
+	require.NoError(t, err)
+
+	mockBulk.AssertExpectations(t)
+}
+
 func validateTimestamp(tb testing.TB, start time.Time, ts string) {
 	t1, err := time.Parse(time.RFC3339, ts)
 	require.NoErrorf(tb, err, "expected %q to be in RFC 3339 format", ts)

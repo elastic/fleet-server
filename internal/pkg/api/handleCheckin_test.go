@@ -1050,11 +1050,12 @@ func TestValidateCheckinRequest(t *testing.T) {
 	verCon := mustBuildConstraints("8.0.0")
 
 	tests := []struct {
-		name     string
-		req      *http.Request
-		cfg      *config.Server
-		expErr   error
-		expValid validatedCheckin
+		name        string
+		req         *http.Request
+		cfg         *config.Server
+		currentMeta json.RawMessage
+		expErr      error
+		expValid    validatedCheckin
 	}{
 		{
 			name: "Invalid JSON",
@@ -1118,6 +1119,121 @@ func TestValidateCheckinRequest(t *testing.T) {
 				rawMeta: []byte(`{"elastic": {"agent": {"id": "testid", "fips": true}}}`),
 			},
 		},
+		{
+			name: "local metadata matches",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"status": "online", "message": "test message", "local_metadata": {"elastic": {"agent": {"id": "testid", "fips": true}}}}`)),
+			},
+			expErr:      nil,
+			currentMeta: json.RawMessage(`{"elastic": {"agent": {"id": "testid", "fips": true}}}`),
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{
+				rawMeta: nil, // no need to update
+			},
+		},
+		{
+			name: "local metadata different JSON formatting",
+			req: &http.Request{
+				// JSON with specific key ordering
+				Body: io.NopCloser(strings.NewReader(`{"status": "online", "message": "test message", "local_metadata": {"elastic": {"agent": {"id": "testid", "version": "8.0.0"}}, "host": {"hostname": "test-host"}}}`)),
+			},
+			expErr: nil,
+			// Same content but different key ordering in JSON - when unmarshaled and compared
+			// with reflect.DeepEqual they should be equal, but raw bytes are different
+			currentMeta: json.RawMessage(`{"host":{"hostname":"test-host"},"elastic":{"agent":{"version":"8.0.0","id":"testid"}}}`),
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{
+				rawMeta: nil, // should recognize as same content despite different formatting
+			},
+		},
+		{
+			name: "local metadata is empty string and agent has nil",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"status": "online", "message": "test message", "local_metadata": ""}`)),
+			},
+			expErr:      nil,
+			currentMeta: nil,
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{
+				// don't update metadata
+				rawMeta: nil,
+			},
+		},
+		{
+			name: "local metadata is empty string and agent has different value",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"status": "online", "message": "test message", "local_metadata": ""}`)),
+			},
+			expErr:      nil,
+			currentMeta: json.RawMessage(`{"host": {"hostname": "test-host"}}`),
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{
+				// don't update metadata
+				rawMeta: nil,
+			},
+		},
+		{
+			name: "local metadata is null and agent has nil",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"status": "online", "message": "test message", "local_metadata": null}`)),
+			},
+			expErr:      nil,
+			currentMeta: nil,
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{
+				// don't update metadata
+				rawMeta: nil,
+			},
+		},
+		{
+			name: "local metadata is null and agent has existing metadata",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"status": "online", "message": "test message", "local_metadata": null}`)),
+			},
+			expErr:      nil,
+			currentMeta: json.RawMessage(`{"host": {"hostname": "test-host"}}`),
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{
+				// don't update metadata
+				rawMeta: nil,
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -1126,7 +1242,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 			assert.NoError(t, err)
 			wr := httptest.NewRecorder()
 			logger := testlog.SetLogger(t)
-			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, &model.Agent{LocalMetadata: json.RawMessage(`{}`)})
+			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, &model.Agent{LocalMetadata: tc.currentMeta})
 			if tc.expErr == nil {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expValid.rawMeta, valid.rawMeta)

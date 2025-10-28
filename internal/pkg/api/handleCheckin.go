@@ -1037,30 +1037,36 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 		return nil, nil
 	}
 
+	// Check for empty string - not valid metadata
+	if str, ok := reqLocalMeta.(string); ok && str == "" {
+		zlog.Warn().Msg("local metadata empty; won't update metadata")
+		return nil, nil
+	}
+
 	// Deserialize the agent's metadata copy
 	var agentLocalMeta interface{}
-	if err := json.Unmarshal(agent.LocalMetadata, &agentLocalMeta); err != nil {
-		return nil, fmt.Errorf("parseMeta local: %w", err)
+	if agent.LocalMetadata != nil {
+		if err := json.Unmarshal(agent.LocalMetadata, &agentLocalMeta); err != nil {
+			// if it has metadata in the document it has to be JSON or the mapping is incorrect
+			return nil, fmt.Errorf("parseMeta local: %w", err)
+		}
 	}
 
-	var outMeta []byte
-
-	// Compare the deserialized meta structures and return the bytes to update if different
-	if !reflect.DeepEqual(reqLocalMeta, agentLocalMeta) {
-
-		zlog.Trace().
-			RawJSON("oldLocalMeta", agent.LocalMetadata).
-			RawJSON("newLocalMeta", req.LocalMetadata).
-			Msg("local metadata not equal")
-
-		zlog.Info().
-			RawJSON("req.LocalMeta", req.LocalMetadata).
-			Msg("applying new local metadata")
-
-		outMeta = req.LocalMetadata
+	// Compare the deserialized meta structures, already the same means no update needs to occur.
+	if reflect.DeepEqual(reqLocalMeta, agentLocalMeta) {
+		return nil, nil
 	}
 
-	return outMeta, nil
+	zlog.Trace().
+		RawJSON("oldLocalMeta", agent.LocalMetadata).
+		RawJSON("newLocalMeta", req.LocalMetadata).
+		Msg("local metadata not equal")
+
+	zlog.Info().
+		RawJSON("req.LocalMeta", req.LocalMetadata).
+		Msg("applying new local metadata")
+
+	return req.LocalMetadata, nil
 }
 
 func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, *[]string, error) {

@@ -64,6 +64,10 @@ func WithUnhealthyReason(reason *[]string) Option {
 
 func WithMeta(meta []byte) Option {
 	return func(pending *pendingT) {
+		if len(meta) == 0 {
+			// no real meta; do nothing
+			return
+		}
 		if pending.extra == nil {
 			pending.extra = &extraT{}
 		}
@@ -94,6 +98,10 @@ func WithVer(ver string) Option {
 
 func WithComponents(components []byte) Option {
 	return func(pending *pendingT) {
+		if len(components) == 0 {
+			// no real components; do nothing
+			return
+		}
 		if pending.extra == nil {
 			pending.extra = &extraT{}
 		}
@@ -198,8 +206,16 @@ func (bc *Bulk) timestamp() string {
 // WARNING: Bulk will take ownership of fields, so do not use after passing in.
 func (bc *Bulk) CheckIn(id string, opts ...Option) error {
 	bc.mut.Lock()
-	pending := pendingT{
-		ts: bc.timestamp(),
+	defer bc.mut.Unlock()
+
+	// possible there is already a check-in queued for the same ID
+	// if that is present we need to be sure to use that pending
+	// instead of creating a new one
+	pending, ok := bc.pending[id]
+	if !ok {
+		pending = pendingT{
+			ts: bc.timestamp(),
+		}
 	}
 
 	for _, opt := range opts {
@@ -207,7 +223,6 @@ func (bc *Bulk) CheckIn(id string, opts ...Option) error {
 	}
 
 	bc.pending[id] = pending
-	bc.mut.Unlock()
 	return nil
 }
 
@@ -341,16 +356,16 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 			}
 		}
 
-		// Update local metadata if provided
-		if pending.extra.meta != nil {
+		// Update local metadata if provided (and has a value)
+		if len(pending.extra.meta) > 0 {
 			// Surprise: The json encoder compacts this raw JSON during
 			// the encode process, so there my be unexpected memory overhead:
 			// https://github.com/golang/go/blob/de5d7eccb99088e3ab42c0d907da6852d8f9cebe/src/encoding/json/encode.go#L503-L507
 			fields[dl.FieldLocalMetadata] = json.RawMessage(pending.extra.meta)
 		}
 
-		// Update components if provided
-		if pending.extra.components != nil {
+		// Update components if provided (and has a value)
+		if len(pending.extra.components) > 0 {
 			fields[dl.FieldComponents] = json.RawMessage(pending.extra.components)
 		}
 
