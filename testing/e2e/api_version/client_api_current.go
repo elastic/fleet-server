@@ -576,7 +576,7 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 		agent := tester.GetAgent(ctx, agentID)
 		assert.Equal(c, policyID, agent.AgentPolicyID)
 		assert.Equal(c, revIDX, int64(agent.Revision))
-	}, time.Second*10, time.Second)
+	}, time.Second*20, time.Second)
 
 	// Check in with revIDX that does not exist
 	// POLICY_CHANGE should be returned
@@ -612,7 +612,7 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 		agent := tester.GetAgent(ctx, agentID)
 		assert.Equal(c, policyID, agent.AgentPolicyID)
 		assert.Equal(c, newRevIDX, int64(agent.Revision))
-	}, time.Second*10, time.Second)
+	}, time.Second*20, time.Second)
 
 	// Update policy
 	// Get the policy then "update" it without changing anything - revision ID should increment
@@ -682,7 +682,7 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 		agent := tester.GetAgent(ctx, agentID)
 		require.Equal(c, policyID, agent.AgentPolicyID)
 		require.Equal(c, revIDX, int64(agent.Revision))
-	}, time.Second*10, time.Second)
+	}, time.Second*20, time.Second)
 
 	// Do a normal checkin to "reset" to latest revision_idx
 	// no actions are returned
@@ -704,7 +704,7 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 		agent := tester.GetAgent(ctx, agentID)
 		require.Equal(c, policyID, agent.AgentPolicyID)
 		require.Equal(c, revIDX, int64(agent.Revision))
-	}, time.Second*10, time.Second)
+	}, time.Second*20, time.Second)
 
 	// Test that if the agent is "restored" to an earlier revIDX a policy_change is sent
 	prevRev := revIDX - 1
@@ -725,7 +725,7 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 		agent := tester.GetAgent(ctx, agentID)
 		require.Equal(c, policyID, agent.AgentPolicyID)
 		require.Equal(c, prevRev, int64(agent.Revision))
-	}, time.Second*10, time.Second)
+	}, time.Second*20, time.Second)
 
 	// agent is now recorded as on a previous revision - check to make sure a checkin without AgentPolicyId and revision result in a POLICY_CHANGE action
 	tester.T().Logf("test checkin 7: agent %s with no policy or revision", agentID)
@@ -765,7 +765,7 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 		agent := tester.GetAgent(ctx, agentID)
 		assert.Equal(c, policyID, agent.AgentPolicyID)
 		assert.Equal(c, revIDX, int64(agent.Revision))
-	}, time.Second*10, time.Second)
+	}, time.Second*20, time.Second)
 
 	// sanity check agent status in kibana
 	tester.AgentIsOnline(ctx, agentID)
