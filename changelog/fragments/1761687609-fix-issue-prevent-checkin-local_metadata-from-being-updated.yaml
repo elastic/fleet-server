@@ -28,7 +28,7 @@ summary: fix issue prevent checkin local_metadata from being updated
 
 # REQUIRED for all kinds
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component:
+component: fleet-server
 
 # AUTOMATED
 # OPTIONAL to manually add other PR URLs
