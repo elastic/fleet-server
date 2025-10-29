@@ -1038,7 +1038,7 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	}
 
 	// Check for empty string - not valid metadata
-	if str, ok := reqLocalMeta.(string); ok && str == "" {
+	if str, ok := reqLocalMeta.(string); ok && strings.TrimSpace(str) == "" {
 		zlog.Warn().Msg("local metadata empty; won't update metadata")
 		return nil, nil
 	}
