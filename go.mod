@@ -13,11 +13,7 @@ require (
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/fxamacker/cbor/v2 v2.8.0
 	github.com/go-chi/chi/v5 v5.2.3
-<<<<<<< HEAD
-	github.com/gofrs/uuid v4.4.0+incompatible
-=======
 	github.com/gofrs/uuid/v5 v5.4.0
->>>>>>> 3ace395 (build(deps): bump github.com/gofrs/uuid/v5 from 5.3.2 to 5.4.0 (#5803))
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-version v1.7.0
