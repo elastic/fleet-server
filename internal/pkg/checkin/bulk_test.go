@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -28,21 +27,8 @@ import (
 // Test with seq no
 
 // matchOp is used with mock.MatchedBy to match and validate the operation
-func matchOp(tb testing.TB, c testcase, ts time.Time) func(ops []bulk.MultiOp) bool {
-	return func(ops []bulk.MultiOp) bool {
-		if len(ops) != 1 {
-			return false
-		}
-		if ops[0].ID != c.id {
-			return false
-		}
-		if ops[0].Index != dl.FleetAgents {
-			return false
-		}
-		tb.Log("Operation match! validating details...")
-
-		// Decode and match operation
-		// NOTE putting the extra validation here seems strange, maybe we should read the args in the test body intstead?
+func matchOp(tb testing.TB, c testcase) func([]byte) bool {
+	return func(body []byte) bool {
 		type updateT struct {
 			LastCheckin   string          `json:"last_checkin"`
 			Status        string          `json:"last_checkin_status"`
@@ -54,14 +40,14 @@ func matchOp(tb testing.TB, c testcase, ts time.Time) func(ops []bulk.MultiOp) b
 		}
 
 		m := make(map[string]updateT)
-		err := json.Unmarshal(ops[0].Body, &m)
-		require.NoErrorf(tb, err, "unable to validate operation body %s", string(ops[0].Body))
+		err := json.Unmarshal(body, &m)
+		require.NoErrorf(tb, err, "unable to validate operation body %s", string(body))
 
 		sub, ok := m["doc"]
 		require.True(tb, ok, "unable to validate operation: expected doc")
 
-		validateTimestamp(tb, ts.Truncate(time.Second), sub.LastCheckin)
-		validateTimestamp(tb, ts.Truncate(time.Second), sub.UpdatedAt)
+		assert.NotEmpty(tb, sub.LastCheckin)
+		assert.Equal(tb, sub.LastCheckin, sub.UpdatedAt) // should have same timestamp
 		assert.Equal(tb, c.policyID, sub.AgentPolicyID)
 		assert.Equal(tb, c.revisionIDX, sub.RevisionIDX)
 		if c.seqno != nil {
@@ -93,8 +79,6 @@ type testcase struct {
 }
 
 func TestBulkSimple(t *testing.T) {
-	start := time.Now()
-
 	const ver = "8.9.0"
 	cases := []testcase{{
 		name:    "Simple case",
@@ -168,7 +152,7 @@ func TestBulkSimple(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := testlog.SetLogger(t).WithContext(t.Context())
 			mockBulk := ftesting.NewMockBulk()
-			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
+			mockBulk.On("Update", mock.Anything, dl.FleetAgents, c.id, mock.MatchedBy(matchOp(t, c)), mock.Anything).Return(nil).Once()
 			bc := NewBulk(mockBulk)
 
 			opts := []Option{WithStatus(c.status), WithMessage(c.message)}
@@ -191,74 +175,12 @@ func TestBulkSimple(t *testing.T) {
 				opts = append(opts, WithUnhealthyReason(c.unhealthyReason))
 			}
 
-			err := bc.CheckIn(c.id, opts...)
-			require.NoError(t, err)
-			err = bc.flush(ctx)
+			err := bc.CheckIn(ctx, c.id, opts...)
 			require.NoError(t, err)
 
 			mockBulk.AssertExpectations(t)
 		})
 	}
-}
-
-func TestBulkReusePending(t *testing.T) {
-	ctx := testlog.SetLogger(t).WithContext(t.Context())
-
-	const (
-		agentID = "test-agent-id"
-		status  = "online"
-		message = "test message"
-	)
-
-	meta := []byte(`{"test":"metadata"}`)
-
-	// Matcher that validates both the existing field (status) and new field (meta) are present
-	matchAccumulatedOps := func(ops []bulk.MultiOp) bool {
-		if len(ops) != 1 {
-			t.Errorf("Expected 1 operation, got %d", len(ops))
-			return false
-		}
-		if ops[0].ID != agentID {
-			t.Errorf("Expected ID %s, got %s", agentID, ops[0].ID)
-			return false
-		}
-
-		type updateT struct {
-			Status string          `json:"last_checkin_status"`
-			Meta   json.RawMessage `json:"local_metadata"`
-		}
-
-		m := make(map[string]updateT)
-		err := json.Unmarshal(ops[0].Body, &m)
-		require.NoErrorf(t, err, "unable to validate operation body %s", string(ops[0].Body))
-
-		sub, ok := m["doc"]
-		require.True(t, ok, "unable to validate operation: expected doc")
-
-		assert.Equal(t, status, sub.Status, "Expected status from first CheckIn to be preserved")
-		assert.Equal(t, json.RawMessage(meta), sub.Meta, "Expected metadata from second CheckIn to be added")
-		return true
-	}
-
-	mockBulk := ftesting.NewMockBulk()
-	mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchAccumulatedOps), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
-
-	bc := NewBulk(mockBulk)
-
-	err := bc.CheckIn(agentID, WithStatus(status), WithMessage(message))
-	require.NoError(t, err)
-	err = bc.CheckIn(agentID, WithMeta(meta))
-	require.NoError(t, err)
-	err = bc.flush(ctx)
-	require.NoError(t, err)
-
-	mockBulk.AssertExpectations(t)
-}
-
-func validateTimestamp(tb testing.TB, start time.Time, ts string) {
-	t1, err := time.Parse(time.RFC3339, ts)
-	require.NoErrorf(tb, err, "expected %q to be in RFC 3339 format", ts)
-	require.False(tb, start.After(t1), "timestamp in the past")
 }
 
 func benchmarkBulk(n int, b *testing.B) {
@@ -275,10 +197,7 @@ func benchmarkBulk(n int, b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for _, id := range ids {
-			err := bc.CheckIn(id)
-			if err != nil {
-				b.Fatal(err)
-			}
+			bc.Add(id)
 		}
 	}
 }
@@ -301,14 +220,11 @@ func benchmarkFlush(n int, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		for _, id := range ids {
-			err := bc.CheckIn(id) // TODO ths benchmark is not very interesting as the simplecache is used
-			if err != nil {
-				b.Fatal(err)
-			}
+			bc.Add(id)
 		}
 		b.StartTimer()
 
-		err := bc.flush(ctx)
+		err := bc.flushConnected(ctx)
 		if err != nil {
 			b.Fatal(err)
 		}

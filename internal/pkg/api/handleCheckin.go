@@ -277,13 +277,31 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
 	// Older agents will communicate any issues with upgrades via the Ack endpoint.
-	if err := ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails); err != nil {
+	upgradeCheckinOpts, err := ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails)
+	if err != nil {
 		return fmt.Errorf("failed to update upgrade_details: %w", err)
 	}
 
-	initialOpts := []checkin.Option{
+	// Handle the policy ID and the revision idx upon check-in. We want to always ensure that
+	// the agent document represents the current state of this check-in.
+	policyID := agent.PolicyID
+	revIdx := agent.PolicyRevisionIdx
+	if !ct.cfg.Features.IgnoreCheckinPolicyID && req.AgentPolicyId != nil && req.PolicyRevisionIdx != nil {
+		policyID = *req.AgentPolicyId
+		revIdx = *req.PolicyRevisionIdx
+		zlog.Debug().
+			Str("policy_id", agent.PolicyID).
+			Str("checkin_policy_id", policyID).
+			Int64("revision_idx", agent.PolicyRevisionIdx).
+			Int64("checkin_revision_idx", revIdx).
+			Msg("checkin included policy_id and revision_idx")
+	}
+
+	checkinOpts := []checkin.Option{
 		checkin.WithStatus(string(req.Status)),
 		checkin.WithMessage(req.Message),
+		checkin.WithAgentPolicyID(policyID),
+		checkin.WithPolicyRevisionIDX(revIdx),
 		checkin.WithMeta(rawMeta),
 		checkin.WithComponents(rawComponents),
 		checkin.WithSeqNo(seqno),
@@ -291,13 +309,46 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		checkin.WithUnhealthyReason(unhealthyReason),
 		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
 	}
-
-	revID, opts, err := ct.processPolicyDetails(r.Context(), zlog, agent, req)
-	if err != nil {
-		return fmt.Errorf("failed to update policy details: %w", err)
+	if upgradeCheckinOpts != nil {
+		checkinOpts = append(checkinOpts, upgradeCheckinOpts...)
 	}
-	if len(opts) > 0 {
-		initialOpts = append(initialOpts, opts...)
+
+	// determine the effective policy ID and revision idx to use for the policy monitor.
+	// this can be different based on the situations to force a POLICY_CHANGE.
+	effectivePolicyID := policyID
+	effectiveRevIdx := revIdx
+	for _, output := range agent.Outputs {
+		if output.APIKey == "" {
+			// use revision_idx=0 if the agent has a single output where no API key is defined
+			// This will force the policy monitor to emit a new policy to regerate API keys
+			effectiveRevIdx = 0
+			break
+		}
+	}
+	if effectivePolicyID != agent.PolicyID || effectiveRevIdx != agent.PolicyRevisionIdx {
+		// the agent is either on the wrong policy or the wrong revision of that policy
+		zlog.Info().
+			Str("policy_id", agent.PolicyID).
+			Str("effective_policy_id", effectivePolicyID).
+			Int64("revision_idx", agent.PolicyRevisionIdx).
+			Int64("effective_revision_idx", effectiveRevIdx).
+			Msg("effective policy is different; resulting in a POLICY_CHANGE")
+
+		// skipped when ignore checkin is enabled, because this never used to occur until this started
+		// using the policy information in the checkin body
+		if !ct.cfg.Features.IgnoreCheckinPolicyID {
+			// this invalidates any of the API keys
+			for outputName, output := range agent.Outputs {
+				if output.Type != policy.OutputTypeElasticsearch {
+					continue
+				}
+				err = updateAPIKey(r.Context(), zlog, ct.bulker, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName)
+				if err != nil {
+					// Only returns ErrUpdatingInactiveAgent
+					return fmt.Errorf("failed to update policy details: %w", err)
+				}
+			}
+		}
 	}
 
 	// Subscribe to actions dispatcher
@@ -305,30 +356,17 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	defer ct.ad.Unsubscribe(zlog, aSub)
 	actCh := aSub.Ch()
 
-	for _, output := range agent.Outputs {
-		if output.APIKey == "" {
-			// use revision_idx=0 if the agent has a single output where no API key is defined
-			// This will force the policy monitor to emit a new policy to regerate API keys
-			revID = 0
-			break
-		}
-	}
-
 	// Subscribe to policy manager for changes on PolicyId > policyRev
-	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, revID)
+	sub, err := ct.pm.Subscribe(agent.Id, effectivePolicyID, effectiveRevIdx)
 	if err != nil {
 		return fmt.Errorf("subscribe policy monitor: %w", err)
 	}
 	defer func() {
 		err := ct.pm.Unsubscribe(sub)
 		if err != nil {
-			zlog.Error().Err(err).Str(ecs.PolicyID, agent.PolicyID).Msg("unable to unsubscribe from policy")
+			zlog.Error().Err(err).Str(ecs.PolicyID, effectivePolicyID).Msg("unable to unsubscribe from policy")
 		}
 	}()
-
-	// Update check-in timestamp on timeout
-	tick := time.NewTicker(ct.cfg.Timeouts.CheckinTimestamp)
-	defer tick.Stop()
 
 	setupDuration := time.Since(start)
 	pollDuration, jitter := calcPollDuration(zlog, pollDuration, setupDuration, ct.cfg.Timeouts.CheckinJitter)
@@ -345,13 +383,17 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	longPoll := time.NewTicker(pollDuration)
 	defer longPoll.Stop()
 
-	// Initial update on checkin, and any user fields that might have changed
-	// Run a script to remove audit_unenrolled_* and unenrolled_at attributes if one is set on checkin.
-	// 8.16.x releases would incorrectly set unenrolled_at
-	err = ct.bc.CheckIn(agent.Id, initialOpts...)
+	// Initial update on checkin updates any user fields that might have changed.
+	err = ct.bc.CheckIn(r.Context(), agent.Id, checkinOpts...)
 	if err != nil {
 		zlog.Error().Err(err).Str(ecs.AgentID, agent.Id).Msg("checkin failed")
+		return err
 	}
+
+	// Register the agent with the checkin to keep the `updated_at` field updated while connected.
+	// The defer will ensure that on return or panic that it is removed.
+	ct.bc.Add(agent.Id)
+	defer ct.bc.Remove(agent.Id)
 
 	// Initial fetch for pending actions
 	var (
@@ -402,11 +444,6 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 			case <-longPoll.C:
 				zlog.Trace().Msg("fire long poll")
 				break LOOP
-			case <-tick.C:
-				err := ct.bc.CheckIn(agent.Id, checkin.WithStatus(string(req.Status)), checkin.WithMessage(req.Message), checkin.WithComponents(rawComponents), checkin.WithVer(ver), checkin.WithUnhealthyReason(unhealthyReason)) // FIXME If we change to properly handle empty strings we could stop passing optional args here.
-				if err != nil {
-					zlog.Error().Err(err).Str(ecs.AgentID, agent.Id).Msg("checkin failed")
-				}
 			}
 		}
 	}
@@ -445,23 +482,26 @@ func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, ag
 // if the agent doc and checkin details are both nil the method is a nop
 // if the checkin upgrade_details is nil but there was a previous value in the agent doc, fleet-server treats it as a successful upgrade
 // otherwise the details are validated; action_id is checked and upgrade_details.metadata is validated based on upgrade_details.state and the agent doc is updated.
-func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) error {
+func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) ([]checkin.Option, error) {
 	if details == nil {
-		err := ct.markUpgradeComplete(ctx, agent)
-		if err != nil {
-			return err
+		if agent.UpgradeDetails == nil {
+			return nil, nil
 		}
-		return nil
+		return []checkin.Option{
+			checkin.WithUpgradeDetails(nil),
+			checkin.WithUpgradeStartedAt(nil),
+			checkin.WithUpgradeStatus(nil),
+		}, nil
 	}
-	// update docs with in progress details
 
+	// update docs with in progress details
 	vSpan, vCtx := apm.StartSpan(ctx, "Check update action", "validate")
 	action, err := ct.verifyActionExists(ctx, vSpan, agent, details)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if action == nil {
-		return nil
+		return nil, nil
 	}
 
 	// link action with APM spans
@@ -495,84 +535,61 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		upgradeDetails, err := details.Metadata.AsUpgradeMetadataDownloading()
 		if err != nil {
 			vSpan.End()
-			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
+			return nil, fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
 		}
 		if err := details.Metadata.FromUpgradeMetadataDownloading(upgradeDetails); err != nil {
 			vSpan.End()
-			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
+			return nil, fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGDOWNLOADING, err)
 		}
 	case UpgradeDetailsStateUPGFAILED:
 		if details.Metadata == nil {
 			vSpan.End()
-			return fmt.Errorf("%w: metadata missing", ErrInvalidUpgradeMetadata)
+			return nil, fmt.Errorf("%w: metadata missing", ErrInvalidUpgradeMetadata)
 		}
 		meta, err := details.Metadata.AsUpgradeMetadataFailed()
 		if err != nil {
 			vSpan.End()
-			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
+			return nil, fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
 		if meta.ErrorMsg == "" {
 			vSpan.End()
-			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
+			return nil, fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
 		}
 		// Repack metadata in failed case as the agent may send UPG_DOWNLOADING attributes.
 		if err = details.Metadata.FromUpgradeMetadataFailed(meta); err != nil {
 			vSpan.End()
-			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
+			return nil, fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
 	case UpgradeDetailsStateUPGSCHEDULED:
 		if details.Metadata == nil {
 			vSpan.End()
-			return fmt.Errorf("%w: metadata missing", ErrInvalidUpgradeMetadata)
+			return nil, fmt.Errorf("%w: metadata missing", ErrInvalidUpgradeMetadata)
 		}
 		meta, err := details.Metadata.AsUpgradeMetadataScheduled()
 		if err != nil {
 			vSpan.End()
-			return fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGSCHEDULED, err)
+			return nil, fmt.Errorf("%w %s: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGSCHEDULED, err)
 		}
 		if meta.ScheduledAt.IsZero() {
 			vSpan.End()
-			return fmt.Errorf("%w: %s metadata contains empty scheduled_at attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGSCHEDULED)
+			return nil, fmt.Errorf("%w: %s metadata contains empty scheduled_at attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGSCHEDULED)
 
 		}
 	default:
 	}
 	vSpan.End()
 
-	doc := bulk.UpdateFields{
-		dl.FieldUpgradeDetails: details,
+	detailsBody, err := json.Marshal(details)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal upgrade details: %w", err)
+	}
+	opts := []checkin.Option{
+		checkin.WithUpgradeDetails(&detailsBody),
 	}
 	if agent.UpgradeAttempts != nil && details.State == UpgradeDetailsStateUPGWATCHING {
-		doc[dl.FieldUpgradeAttempts] = nil
+		opts = append(opts, checkin.WithUpgradeAttempts(nil))
 	}
-
-	body, err := doc.Marshal()
-	if err != nil {
-		return err
-	}
-	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
-}
-
-func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent) error {
-	// nop if there are no checkin details, and the agent has no details
-	if agent.UpgradeDetails == nil {
-		return nil
-	}
-	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
-	span.Context.SetLabel("agent_id", agent.Agent.ID)
-	defer span.End()
-	// if the checkin had no details, but agent has details treat like a successful upgrade
-	doc := bulk.UpdateFields{
-		dl.FieldUpgradeDetails:   nil,
-		dl.FieldUpgradeStartedAt: nil,
-		dl.FieldUpgradeStatus:    nil,
-		dl.FieldUpgradedAt:       time.Now().UTC().Format(time.RFC3339),
-	}
-	body, err := doc.Marshal()
-	if err != nil {
-		return err
-	}
-	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+	return opts, nil
 }
 
 func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
@@ -1197,56 +1214,4 @@ func calcPollDuration(zlog zerolog.Logger, pollDuration, setupDuration, jitterDu
 	}
 
 	return pollDuration, jitter
-}
-
-// processPolicyDetails handles the agent_policy_id and revision_idx included in the checkin request.
-// The API keys will be managed if the agent reports a new policy id from its last checkin, or if the revision is different than what the last checkin reported.
-// It returns the revision idx that should be used when subscribing for new POLICY_CHANGE actons and optional args to use when doing the non-tick checkin.
-func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) (int64, []checkin.Option, error) {
-	// no details specified or attributes are ignored by config
-	if ct.cfg.Features.IgnoreCheckinPolicyID || req == nil || req.PolicyRevisionIdx == nil || req.AgentPolicyId == nil {
-		return agent.PolicyRevisionIdx, nil, nil
-	}
-	policyID := *req.AgentPolicyId
-	revisionIDX := *req.PolicyRevisionIdx
-
-	span, ctx := apm.StartSpan(ctx, "Process policy details", "process")
-	span.Context.SetLabel("agent_id", agent.Agent.ID)
-	span.Context.SetLabel(dl.FieldAgentPolicyID, policyID)
-	span.Context.SetLabel(dl.FieldPolicyRevisionIdx, revisionIDX)
-	defer span.End()
-
-	// update agent doc if policy id or revision idx does not match
-	var opts []checkin.Option
-	if policyID != agent.AgentPolicyID || revisionIDX != agent.PolicyRevisionIdx {
-		opts = []checkin.Option{
-			checkin.WithAgentPolicyID(policyID),
-			checkin.WithPolicyRevisionIDX(revisionIDX),
-		}
-	}
-	// Policy reassign, subscribe to policy with revision 0
-	if policyID != agent.PolicyID {
-		zlog.Debug().Str(dl.FieldAgentPolicyID, policyID).Str("new_policy_id", agent.PolicyID).Msg("Policy ID mismatch detected, reassigning agent.")
-		return 0, opts, nil
-	}
-
-	// Check if the checkin revision_idx is greater than the latest available
-	latestRev := ct.pm.LatestRev(ctx, agent.PolicyID)
-	if latestRev != 0 && revisionIDX > latestRev {
-		revisionIDX = 0 // set return val to 0 so the agent gets latest available revision.
-	}
-
-	// Update API keys if the policy has changed, or if the revision differs.
-	if policyID != agent.AgentPolicyID || revisionIDX != agent.PolicyRevisionIdx {
-		for outputName, output := range agent.Outputs {
-			if output.Type != policy.OutputTypeElasticsearch {
-				continue
-			}
-			if err := updateAPIKey(ctx, zlog, ct.bulker, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName); err != nil {
-				// Only returns ErrUpdatingInactiveAgent
-				return 0, nil, err
-			}
-		}
-	}
-	return revisionIDX, opts, nil
 }

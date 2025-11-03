@@ -391,16 +391,13 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		name    string
 		agent   *model.Agent
 		details *UpgradeDetails
-		bulk    func() *ftesting.MockBulk
+		opts    []checkin.Option
 		cache   func() *testcache.MockCache
 		err     error
 	}{{
 		name:    "agent and checkin details are nil",
 		agent:   &model.Agent{ESDocument: esd},
 		details: nil,
-		bulk: func() *ftesting.MockBulk {
-			return ftesting.NewMockBulk()
-		},
 		cache: func() *testcache.MockCache {
 			return testcache.NewMockCache()
 		},
@@ -765,7 +762,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				bulker: mBulk,
 			}
 
-			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details)
+			opts, err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details)
 			if tc.err == nil {
 				assert.NoError(t, err)
 			} else {

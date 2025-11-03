@@ -65,7 +65,14 @@ const (
 	}`
 	checkinBody = `{
 	    "status": "online",
-	    "message": "checkin ok"
+	    "message": "checkin ok",
+		"local_metadata": {
+			"elastic": {
+				"agent": {
+					"version":"9.3.0"
+				}
+			}
+		}
 	}`
 )
 
