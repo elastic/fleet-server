@@ -169,8 +169,8 @@ func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, 
 type validatedCheckin struct {
 	req             *CheckinRequest
 	dur             time.Duration
-	rawMeta         []byte
-	rawComp         []byte
+	rawMeta         json.RawMessage
+	rawComp         json.RawMessage
 	seqno           sqn.SeqNo
 	unhealthyReason *[]string
 }
@@ -275,80 +275,37 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	seqno := validated.seqno
 	unhealthyReason := validated.unhealthyReason
 
+	checkinOpts := make([]checkin.Option, 0, 14) // maximum of 14 (pre-allocate to reduce allocs)
+	checkinOpts = append(checkinOpts,
+		checkin.WithStatus(string(req.Status)),
+		checkin.WithMessage(req.Message),
+		checkin.WithSeqNo(seqno),
+		checkin.WithVer(ver),
+		checkin.WithUnhealthyReason(unhealthyReason),
+		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
+	)
+	if rawMeta != nil && len(rawMeta) > 0 {
+		checkinOpts = append(checkinOpts, checkin.WithMeta(&rawMeta))
+	}
+	if rawComponents != nil && len(rawComponents) > 0 {
+		checkinOpts = append(checkinOpts, checkin.WithComponents(&rawComponents))
+	}
+
 	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
 	// Older agents will communicate any issues with upgrades via the Ack endpoint.
-	upgradeCheckinOpts, err := ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails)
+	// checkinOpts is passed in to reducing allocations
+	checkinOpts, err = ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails, checkinOpts)
 	if err != nil {
 		return fmt.Errorf("failed to update upgrade_details: %w", err)
 	}
 
 	// Handle the policy ID and the revision idx upon check-in. We want to always ensure that
 	// the agent document represents the current state of this check-in.
-	policyID := agent.PolicyID
-	revIdx := agent.PolicyRevisionIdx
-	if !ct.cfg.Features.IgnoreCheckinPolicyID && req.AgentPolicyId != nil && req.PolicyRevisionIdx != nil {
-		policyID = *req.AgentPolicyId
-		revIdx = *req.PolicyRevisionIdx
-		zlog.Debug().
-			Str("policy_id", agent.PolicyID).
-			Str("checkin_policy_id", policyID).
-			Int64("revision_idx", agent.PolicyRevisionIdx).
-			Int64("checkin_revision_idx", revIdx).
-			Msg("checkin included policy_id and revision_idx")
-	}
-
-	checkinOpts := []checkin.Option{
-		checkin.WithStatus(string(req.Status)),
-		checkin.WithMessage(req.Message),
-		checkin.WithAgentPolicyID(policyID),
-		checkin.WithPolicyRevisionIDX(revIdx),
-		checkin.WithMeta(rawMeta),
-		checkin.WithComponents(rawComponents),
-		checkin.WithSeqNo(seqno),
-		checkin.WithVer(ver),
-		checkin.WithUnhealthyReason(unhealthyReason),
-		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
-	}
-	if upgradeCheckinOpts != nil {
-		checkinOpts = append(checkinOpts, upgradeCheckinOpts...)
-	}
-
-	// determine the effective policy ID and revision idx to use for the policy monitor.
-	// this can be different based on the situations to force a POLICY_CHANGE.
-	effectivePolicyID := policyID
-	effectiveRevIdx := revIdx
-	for _, output := range agent.Outputs {
-		if output.APIKey == "" {
-			// use revision_idx=0 if the agent has a single output where no API key is defined
-			// This will force the policy monitor to emit a new policy to regerate API keys
-			effectiveRevIdx = 0
-			break
-		}
-	}
-	if effectivePolicyID != agent.PolicyID || effectiveRevIdx != agent.PolicyRevisionIdx {
-		// the agent is either on the wrong policy or the wrong revision of that policy
-		zlog.Info().
-			Str("policy_id", agent.PolicyID).
-			Str("effective_policy_id", effectivePolicyID).
-			Int64("revision_idx", agent.PolicyRevisionIdx).
-			Int64("effective_revision_idx", effectiveRevIdx).
-			Msg("effective policy is different; resulting in a POLICY_CHANGE")
-
-		// skipped when ignore checkin is enabled, because this never used to occur until this started
-		// using the policy information in the checkin body
-		if !ct.cfg.Features.IgnoreCheckinPolicyID {
-			// this invalidates any of the API keys
-			for outputName, output := range agent.Outputs {
-				if output.Type != policy.OutputTypeElasticsearch {
-					continue
-				}
-				err = updateAPIKey(r.Context(), zlog, ct.bulker, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName)
-				if err != nil {
-					// Only returns ErrUpdatingInactiveAgent
-					return fmt.Errorf("failed to update policy details: %w", err)
-				}
-			}
-		}
+	var effectivePolicyID string
+	var effectiveRevIdx int64
+	checkinOpts, effectivePolicyID, effectiveRevIdx, err = ct.processPolicyDetails(r.Context(), zlog, agent, req, checkinOpts)
+	if err != nil {
+		return fmt.Errorf("failed to process policy details: %w", err)
 	}
 
 	// Subscribe to actions dispatcher
@@ -482,16 +439,17 @@ func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, ag
 // if the agent doc and checkin details are both nil the method is a nop
 // if the checkin upgrade_details is nil but there was a previous value in the agent doc, fleet-server treats it as a successful upgrade
 // otherwise the details are validated; action_id is checked and upgrade_details.metadata is validated based on upgrade_details.state and the agent doc is updated.
-func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) ([]checkin.Option, error) {
+func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails, checkinOpts []checkin.Option) ([]checkin.Option, error) {
 	if details == nil {
 		if agent.UpgradeDetails == nil {
 			return nil, nil
 		}
-		return []checkin.Option{
+		checkinOpts = append(checkinOpts,
 			checkin.WithUpgradeDetails(nil),
 			checkin.WithUpgradeStartedAt(nil),
 			checkin.WithUpgradeStatus(nil),
-		}, nil
+		)
+		return checkinOpts, nil
 	}
 
 	// update docs with in progress details
@@ -583,13 +541,12 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal upgrade details: %w", err)
 	}
-	opts := []checkin.Option{
-		checkin.WithUpgradeDetails(&detailsBody),
-	}
+	detailsBodyJSON := json.RawMessage(detailsBody)
+	checkinOpts = append(checkinOpts, checkin.WithUpgradeDetails(&detailsBodyJSON))
 	if agent.UpgradeAttempts != nil && details.State == UpgradeDetailsStateUPGWATCHING {
-		opts = append(opts, checkin.WithUpgradeAttempts(nil))
+		checkinOpts = append(checkinOpts, checkin.WithUpgradeAttempts(nil))
 	}
-	return opts, nil
+	return checkinOpts, nil
 }
 
 func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
@@ -1214,4 +1171,66 @@ func calcPollDuration(zlog zerolog.Logger, pollDuration, setupDuration, jitterDu
 	}
 
 	return pollDuration, jitter
+}
+
+func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest, checkinOpts []checkin.Option) ([]checkin.Option, string, int64, error) {
+	// Handle the policy ID and the revision idx upon check-in. We want to always ensure that
+	// the agent document represents the current state of this check-in.
+	policyID := agent.PolicyID
+	revIdx := agent.PolicyRevisionIdx
+	if !ct.cfg.Features.IgnoreCheckinPolicyID && req.AgentPolicyId != nil && *req.AgentPolicyId != "" && req.PolicyRevisionIdx != nil && *req.PolicyRevisionIdx >= 0 {
+		policyID = *req.AgentPolicyId
+		revIdx = *req.PolicyRevisionIdx
+		zlog.Debug().
+			Str("policy_id", agent.PolicyID).
+			Str("checkin_policy_id", policyID).
+			Int64("revision_idx", agent.PolicyRevisionIdx).
+			Int64("checkin_revision_idx", revIdx).
+			Msg("checkin included policy_id and revision_idx")
+		checkinOpts = append(checkinOpts, checkin.WithAgentPolicyID(policyID), checkin.WithPolicyRevisionIDX(revIdx))
+	}
+
+	// determine the effective policy ID and revision idx to use for the policy monitor.
+	// this can be different based on the situations to force a POLICY_CHANGE.
+	effectivePolicyID := policyID
+	effectiveRevIdx := revIdx
+	for _, output := range agent.Outputs {
+		if output.APIKey == "" {
+			// use revision_idx=0 if the agent has a single output where no API key is defined
+			// This will force the policy monitor to emit a new policy to regenerate API keys
+			effectiveRevIdx = 0
+			break
+		}
+	}
+	if effectivePolicyID != agent.PolicyID {
+		// different policyID so the revisionIdx gets cleared
+		effectiveRevIdx = 0
+	}
+	if effectivePolicyID != agent.PolicyID || effectiveRevIdx != agent.PolicyRevisionIdx {
+		// the agent is either on the wrong policy or the wrong revision of that policy
+		zlog.Info().
+			Str("policy_id", agent.PolicyID).
+			Str("effective_policy_id", effectivePolicyID).
+			Int64("revision_idx", agent.PolicyRevisionIdx).
+			Int64("effective_revision_idx", effectiveRevIdx).
+			Msg("effective policy is different; resulting in a POLICY_CHANGE")
+
+		// skipped when ignore checkin is enabled, because this never used to occur until this started
+		// using the policy information in the checkin body
+		if !ct.cfg.Features.IgnoreCheckinPolicyID {
+			// this invalidates any of the API keys
+			for outputName, output := range agent.Outputs {
+				if output.Type != policy.OutputTypeElasticsearch {
+					continue
+				}
+				err := updateAPIKey(ctx, zlog, ct.bulker, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName)
+				if err != nil {
+					// Only returns ErrUpdatingInactiveAgent
+					return nil, "", 0, fmt.Errorf("failed to update policy details: %w", err)
+				}
+			}
+		}
+	}
+
+	return checkinOpts, effectivePolicyID, effectiveRevIdx, nil
 }

@@ -72,7 +72,14 @@ const (
 					"version":"9.3.0"
 				}
 			}
-		}
+		},
+		"components": [
+			{
+				"id": "filestream-default",
+				"status": "Healthy",
+				"message": "Healthy"
+			}
+		]
 	}`
 )
 

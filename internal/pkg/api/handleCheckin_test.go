@@ -18,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -376,28 +375,22 @@ func TestResolveSeqNo(t *testing.T) {
 
 func TestProcessUpgradeDetails(t *testing.T) {
 	esd := model.ESDocument{Id: "doc-ID"}
-	doc := bulk.UpdateFields{
-		dl.FieldUpgradeDetails: &UpgradeDetails{
-			ActionId: "test-action",
-			State:    UpgradeDetailsStateUPGWATCHING,
-		},
-		dl.FieldUpgradeAttempts: nil,
-	}
-	body, err := doc.Marshal()
-	if err != nil {
-		t.Fatalf("marshal error: %v", err)
-	}
 	tests := []struct {
 		name    string
 		agent   *model.Agent
 		details *UpgradeDetails
-		opts    []checkin.Option
+		bulk    func() *ftesting.MockBulk
 		cache   func() *testcache.MockCache
 		err     error
 	}{{
 		name:    "agent and checkin details are nil",
 		agent:   &model.Agent{ESDocument: esd},
 		details: nil,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			noUpgradeDetailsMockCheck(t, mBulk)
+			return mBulk
+		},
 		cache: func() *testcache.MockCache {
 			return testcache.NewMockCache()
 		},
@@ -470,6 +463,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		bulk: func() *ftesting.MockBulk {
 			mBulk := ftesting.NewMockBulk()
 			mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(&es.ResultT{}, es.ErrNotFound)
+			noUpgradeDetailsMockCheck(t, mBulk)
 			return mBulk
 		},
 		cache: func() *testcache.MockCache {
@@ -506,7 +500,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"scheduled_at":"2023:01:02T12:00:00Z"}`)},
 		},
 		bulk: func() *ftesting.MockBulk {
-			return ftesting.NewMockBulk()
+			mBulk := ftesting.NewMockBulk()
+			noUpgradeDetailsMockCheck(t, mBulk)
+			return mBulk
 		},
 		cache: func() *testcache.MockCache {
 			mCache := testcache.NewMockCache()
@@ -523,7 +519,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"scheduled_at":""}`)},
 		},
 		bulk: func() *ftesting.MockBulk {
-			return ftesting.NewMockBulk()
+			mBulk := ftesting.NewMockBulk()
+			noUpgradeDetailsMockCheck(t, mBulk)
+			return mBulk
 		},
 		cache: func() *testcache.MockCache {
 			mCache := testcache.NewMockCache()
@@ -539,7 +537,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			State:    UpgradeDetailsStateUPGSCHEDULED,
 		},
 		bulk: func() *ftesting.MockBulk {
-			return ftesting.NewMockBulk()
+			mBulk := ftesting.NewMockBulk()
+			noUpgradeDetailsMockCheck(t, mBulk)
+			return mBulk
 		},
 		cache: func() *testcache.MockCache {
 			mCache := testcache.NewMockCache()
@@ -557,7 +557,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		},
 		bulk: func() *ftesting.MockBulk {
 			mBulk := ftesting.NewMockBulk()
-			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			upgradeDetailsMockCheck(t, mBulk)
 			return mBulk
 		},
 		cache: func() *testcache.MockCache {
@@ -576,7 +576,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		},
 		bulk: func() *ftesting.MockBulk {
 			mBulk := ftesting.NewMockBulk()
-			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			upgradeDetailsMockCheck(t, mBulk)
 			return mBulk
 		},
 		cache: func() *testcache.MockCache {
@@ -668,7 +668,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				upgradeDetailsMockCheck(t, mBulk)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -687,7 +687,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				upgradeDetailsMockCheck(t, mBulk)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -706,7 +706,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				upgradeDetailsMockCheck(t, mBulk)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -724,7 +724,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":""}`)},
 			},
 			bulk: func() *ftesting.MockBulk {
-				return ftesting.NewMockBulk()
+				mBulk := ftesting.NewMockBulk()
+				noUpgradeDetailsMockCheck(t, mBulk)
+				return mBulk
 			},
 			cache: func() *testcache.MockCache {
 				mCache := testcache.NewMockCache()
@@ -741,7 +743,18 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", body, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+					doc := struct {
+						Doc map[string]interface{} `json:"doc"`
+					}{}
+					if err := json.Unmarshal(p, &doc); err != nil {
+						t.Logf("bulk match unmarshal error: %v", err)
+						return false
+					}
+					_, upgradeDetails := doc.Doc[dl.FieldUpgradeDetails]
+					upgradeAttempts, ok := doc.Doc[dl.FieldUpgradeAttempts]
+					return upgradeDetails && ok && upgradeAttempts == nil && doc.Doc[dl.FieldUpgradedAt] != ""
+				}), mock.Anything, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -757,21 +770,61 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk := tc.bulk()
 			mCache := tc.cache()
 
+			bc := checkin.NewBulk(mBulk)
 			ct := &CheckinT{
 				cache:  mCache,
+				bc:     bc,
 				bulker: mBulk,
 			}
 
-			opts, err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details)
+			var err error
+			opts := make([]checkin.Option, 0, 3)
+			opts, err = ct.processUpgradeDetails(context.Background(), tc.agent, tc.details, opts)
 			if tc.err == nil {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.ErrorIs(t, err, tc.err)
+				require.ErrorIs(t, err, tc.err)
 			}
+
+			err = bc.CheckIn(context.Background(), tc.agent.Id, opts...)
+			if err != nil {
+				require.NoError(t, err)
+			}
+
 			mBulk.AssertExpectations(t)
 			mCache.AssertExpectations(t)
 		})
 	}
+}
+
+func noUpgradeDetailsMockCheck(t *testing.T, mBulk *ftesting.MockBulk) {
+	mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+		doc := struct {
+			Doc map[string]interface{} `json:"doc"`
+		}{}
+		if err := json.Unmarshal(p, &doc); err != nil {
+			t.Logf("bulk match unmarshal error: %v", err)
+			return false
+		}
+		_, noUpgradeDetails := doc.Doc[dl.FieldUpgradeDetails]
+		_, noUpgradeStartedAt := doc.Doc[dl.FieldUpgradeStartedAt]
+		_, noUpgradeStatus := doc.Doc[dl.FieldUpgradeStatus]
+		return !noUpgradeDetails && !noUpgradeStartedAt && !noUpgradeStatus && doc.Doc[dl.FieldUpgradedAt] != ""
+	}), mock.Anything, mock.Anything).Return(nil)
+}
+
+func upgradeDetailsMockCheck(t *testing.T, mBulk *ftesting.MockBulk) {
+	mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+		doc := struct {
+			Doc map[string]interface{} `json:"doc"`
+		}{}
+		if err := json.Unmarshal(p, &doc); err != nil {
+			t.Logf("bulk match unmarshal error: %v", err)
+			return false
+		}
+		_, upgradeDetails := doc.Doc[dl.FieldUpgradeDetails]
+		return upgradeDetails && doc.Doc[dl.FieldUpgradedAt] != ""
+	}), mock.Anything, mock.Anything).Return(nil)
 }
 
 func Test_CheckinT_writeResponse(t *testing.T) {
@@ -1255,34 +1308,36 @@ func TestValidateCheckinRequest(t *testing.T) {
 }
 
 func TestProcessPolicyDetails(t *testing.T) {
+	esd := model.ESDocument{Id: "doc-ID"}
 	policyID := "policy-id"
 	revIDX2 := int64(2)
 	tests := []struct {
-		name             string
-		agent            *model.Agent
-		req              *CheckinRequest
-		getPolicyMonitor func() *mockPolicyMonitor
-		revIDX           int64
-		returnsOpts      bool
-		err              error
+		name          string
+		agent         *model.Agent
+		req           *CheckinRequest
+		policyID      string
+		revIdx        int64
+		bulk          func() *ftesting.MockBulk
+		ignoreCheckin bool
 	}{{
 		name: "request has no policy details",
 		agent: &model.Agent{
+			ESDocument:        esd,
+			PolicyID:          policyID,
 			PolicyRevisionIdx: 1,
 		},
-		req: &CheckinRequest{},
-		getPolicyMonitor: func() *mockPolicyMonitor {
-			return &mockPolicyMonitor{}
+		req:      &CheckinRequest{},
+		policyID: policyID,
+		revIdx:   1,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			noPolicyDetailsMockCheck(t, mBulk)
+			return mBulk
 		},
-		revIDX:      1,
-		returnsOpts: false,
-		err:         nil,
 	}, {
 		name: "policy reassign detected",
 		agent: &model.Agent{
-			Agent: &model.AgentMetadata{
-				ID: "agent-id",
-			},
+			ESDocument:        esd,
 			PolicyID:          "new-policy-id",
 			AgentPolicyID:     policyID,
 			PolicyRevisionIdx: 2,
@@ -1291,18 +1346,17 @@ func TestProcessPolicyDetails(t *testing.T) {
 			AgentPolicyId:     &policyID,
 			PolicyRevisionIdx: &revIDX2,
 		},
-		getPolicyMonitor: func() *mockPolicyMonitor {
-			return &mockPolicyMonitor{}
+		policyID: policyID,
+		revIdx:   0,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			policyDetailsMockCheck(t, mBulk, policyID, revIDX2)
+			return mBulk
 		},
-		revIDX:      0,
-		returnsOpts: false,
-		err:         nil,
 	}, {
 		name: "revision updated",
 		agent: &model.Agent{
-			Agent: &model.AgentMetadata{
-				ID: "agent-id",
-			},
+			ESDocument:        esd,
 			PolicyID:          policyID,
 			AgentPolicyID:     policyID,
 			PolicyRevisionIdx: 1,
@@ -1311,64 +1365,17 @@ func TestProcessPolicyDetails(t *testing.T) {
 			AgentPolicyId:     &policyID,
 			PolicyRevisionIdx: &revIDX2,
 		},
-		getPolicyMonitor: func() *mockPolicyMonitor {
-			pm := &mockPolicyMonitor{}
-			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
-			return pm
+		policyID: policyID,
+		revIdx:   revIDX2,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			policyDetailsMockCheck(t, mBulk, policyID, revIDX2)
+			return mBulk
 		},
-		revIDX:      2,
-		returnsOpts: true,
-		err:         nil,
-	}, {
-		name: "checkin revision is greater than the policy's latest revision",
-		agent: &model.Agent{
-			Agent: &model.AgentMetadata{
-				ID: "agent-id",
-			},
-			PolicyID:          policyID,
-			AgentPolicyID:     policyID,
-			PolicyRevisionIdx: 1,
-		},
-		req: &CheckinRequest{
-			AgentPolicyId:     &policyID,
-			PolicyRevisionIdx: &revIDX2,
-		},
-		getPolicyMonitor: func() *mockPolicyMonitor {
-			pm := &mockPolicyMonitor{}
-			pm.On("LatestRev", mock.Anything, policyID).Return(int64(1)).Once()
-			return pm
-		},
-		revIDX:      0,
-		returnsOpts: true,
-		err:         nil,
-	}, {
-		name: "agent_policy_id has changed",
-		agent: &model.Agent{
-			Agent: &model.AgentMetadata{
-				ID: "agent-id",
-			},
-			PolicyID:          policyID,
-			AgentPolicyID:     "old-policy-id",
-			PolicyRevisionIdx: 1,
-		},
-		req: &CheckinRequest{
-			AgentPolicyId:     &policyID,
-			PolicyRevisionIdx: &revIDX2,
-		},
-		getPolicyMonitor: func() *mockPolicyMonitor {
-			pm := &mockPolicyMonitor{}
-			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
-			return pm
-		},
-		revIDX:      2,
-		returnsOpts: true,
-		err:         nil,
 	}, {
 		name: "agent does not have agent_policy_id present",
 		agent: &model.Agent{
-			Agent: &model.AgentMetadata{
-				ID: "agent-id",
-			},
+			ESDocument:        esd,
 			PolicyID:          policyID,
 			PolicyRevisionIdx: 2,
 		},
@@ -1376,20 +1383,17 @@ func TestProcessPolicyDetails(t *testing.T) {
 			AgentPolicyId:     &policyID,
 			PolicyRevisionIdx: &revIDX2,
 		},
-		getPolicyMonitor: func() *mockPolicyMonitor {
-			pm := &mockPolicyMonitor{}
-			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
-			return pm
+		policyID: policyID,
+		revIdx:   revIDX2,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			policyDetailsMockCheck(t, mBulk, policyID, revIDX2)
+			return mBulk
 		},
-		revIDX:      2,
-		returnsOpts: true,
-		err:         nil,
 	}, {
-		name: "details present with no changes from agent doc",
+		name: "details present with no changes for agent doc",
 		agent: &model.Agent{
-			Agent: &model.AgentMetadata{
-				ID: "agent-id",
-			},
+			ESDocument:        esd,
 			AgentPolicyID:     policyID,
 			PolicyID:          policyID,
 			PolicyRevisionIdx: revIDX2,
@@ -1398,63 +1402,101 @@ func TestProcessPolicyDetails(t *testing.T) {
 			AgentPolicyId:     &policyID,
 			PolicyRevisionIdx: &revIDX2,
 		},
-		getPolicyMonitor: func() *mockPolicyMonitor {
-			pm := &mockPolicyMonitor{}
-			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
-			return pm
+		policyID: policyID,
+		revIdx:   revIDX2,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			policyDetailsMockCheck(t, mBulk, policyID, revIDX2)
+			return mBulk
 		},
-		revIDX:      2,
-		returnsOpts: false,
-		err:         nil,
+	}, {
+		name: "details present ignore checkin",
+		agent: &model.Agent{
+			ESDocument:        esd,
+			AgentPolicyID:     policyID,
+			PolicyID:          policyID,
+			PolicyRevisionIdx: revIDX2,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		policyID: policyID,
+		revIdx:   revIDX2,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			noPolicyDetailsMockCheck(t, mBulk)
+			return mBulk
+		},
+		ignoreCheckin: true,
 	}}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := testlog.SetLogger(t)
-			pm := tc.getPolicyMonitor()
-			checkin := &CheckinT{
-				cfg:    &config.Server{},
-				bulker: ftesting.NewMockBulk(),
-				pm:     pm,
+
+			mBulk := tc.bulk()
+			bc := checkin.NewBulk(mBulk)
+			cfg := &config.Server{}
+			if tc.ignoreCheckin {
+				cfg.Features.IgnoreCheckinPolicyID = true
+			}
+			ct := &CheckinT{
+				bc:     bc,
+				bulker: mBulk,
+				cfg:    cfg,
 			}
 
-			revIDX, opts, err := checkin.processPolicyDetails(t.Context(), logger, tc.agent, tc.req)
-			assert.Equal(t, tc.revIDX, revIDX)
-			if tc.returnsOpts {
-				assert.NotEmpty(t, opts)
-			} else {
-				assert.Empty(t, opts)
-			}
-			if tc.err != nil {
-				assert.ErrorIs(t, tc.err, err)
-			} else {
-				assert.NoError(t, err)
-			}
-			pm.AssertExpectations(t)
+			opts := make([]checkin.Option, 0, 2)
+			opts, ePolicyID, eRevIdx, err := ct.processPolicyDetails(t.Context(), logger, tc.agent, tc.req, opts)
+			require.NoError(t, err)
+			assert.Equal(t, tc.policyID, ePolicyID)
+			assert.Equal(t, tc.revIdx, eRevIdx)
+
+			err = bc.CheckIn(t.Context(), tc.agent.Id, opts...)
+			assert.NoError(t, err)
+
+			mBulk.AssertExpectations(t)
 		})
 	}
+}
 
-	t.Run("IgnoreCheckinPolicyID flag is set", func(t *testing.T) {
-		logger := testlog.SetLogger(t)
-		checkin := &CheckinT{
-			cfg: &config.Server{
-				Features: config.FeatureFlags{
-					IgnoreCheckinPolicyID: true,
-				},
-			},
+func noPolicyDetailsMockCheck(t *testing.T, mBulk *ftesting.MockBulk) {
+	mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+		doc := struct {
+			Doc map[string]interface{} `json:"doc"`
+		}{}
+		if err := json.Unmarshal(p, &doc); err != nil {
+			t.Logf("bulk match unmarshal error: %v", err)
+			return false
 		}
-		revIDX, opts, err := checkin.processPolicyDetails(t.Context(), logger,
-			&model.Agent{
-				PolicyID:          policyID,
-				PolicyRevisionIdx: 1,
-			},
-			&CheckinRequest{
-				AgentPolicyId:     &policyID,
-				PolicyRevisionIdx: &revIDX2,
-			},
-		)
-		assert.NoError(t, err)
-		assert.Equal(t, int64(1), revIDX)
-		assert.Empty(t, opts)
-	})
+		_, noAgentPolicyID := doc.Doc[dl.FieldAgentPolicyID]
+		_, noPolicyRevisionIdx := doc.Doc[dl.FieldPolicyRevisionIdx]
+		return !noAgentPolicyID && !noPolicyRevisionIdx && doc.Doc[dl.FieldUpgradedAt] != ""
+	}), mock.Anything, mock.Anything).Return(nil)
+}
+
+func policyDetailsMockCheck(t *testing.T, mBulk *ftesting.MockBulk, policyID string, revIdx int64) {
+	mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+		doc := struct {
+			Doc map[string]interface{} `json:"doc"`
+		}{}
+		if err := json.Unmarshal(p, &doc); err != nil {
+			t.Logf("bulk match unmarshal error: %v", err)
+			return false
+		}
+		oPolicyID, hasPolicy := doc.Doc[dl.FieldAgentPolicyID]
+		if !hasPolicy {
+			return false
+		}
+		oRevIdx, hasRevIdx := doc.Doc[dl.FieldPolicyRevisionIdx]
+		if !hasRevIdx {
+			return false
+		}
+		oRevIdxF, ok := oRevIdx.(float64)
+		if !ok {
+			return false
+		}
+		return oPolicyID == policyID && int64(oRevIdxF) == revIdx && doc.Doc[dl.FieldUpgradedAt] != ""
+	}), mock.Anything, mock.Anything).Return(nil)
 }

@@ -71,14 +71,14 @@ type testcase struct {
 	message         string
 	policyID        string
 	revisionIDX     int64
-	meta            []byte
-	components      []byte
+	meta            json.RawMessage
+	components      json.RawMessage
 	seqno           sqn.SeqNo
 	ver             string
 	unhealthyReason *[]string
 }
 
-func TestBulkSimple(t *testing.T) {
+func TestBulkCheckin(t *testing.T) {
 	const ver = "8.9.0"
 	cases := []testcase{{
 		name:    "Simple case",
@@ -159,11 +159,11 @@ func TestBulkSimple(t *testing.T) {
 			if c.policyID != "" {
 				opts = append(opts, WithAgentPolicyID(c.policyID), WithPolicyRevisionIDX(c.revisionIDX))
 			}
-			if c.meta != nil {
-				opts = append(opts, WithMeta(c.meta))
+			if c.meta != nil && len(c.meta) > 0 {
+				opts = append(opts, WithMeta(&c.meta))
 			}
-			if c.components != nil {
-				opts = append(opts, WithComponents(c.components))
+			if c.components != nil && len(c.components) > 0 {
+				opts = append(opts, WithComponents(&c.components))
 			}
 			if c.seqno != nil {
 				opts = append(opts, WithSeqNo(c.seqno))
