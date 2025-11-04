@@ -321,12 +321,10 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 	seqNo, err = json.Marshal(data.extra.seqNo)
 	Err = errors.Join(Err, err)
 	if data.extra.meta != nil {
-		meta, err = json.Marshal(data.extra.meta)
-		Err = errors.Join(Err, err)
+		meta = data.extra.meta
 	}
 	if data.extra.components != nil {
-		components, err = json.Marshal(data.extra.components)
-		Err = errors.Join(Err, err)
+		components = data.extra.components
 	}
 	if Err != nil {
 		return nil, Err
