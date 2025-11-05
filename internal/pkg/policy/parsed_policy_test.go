@@ -12,10 +12,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 //go:embed testdata/test_policy.json
