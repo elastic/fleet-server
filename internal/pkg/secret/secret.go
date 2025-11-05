@@ -59,6 +59,10 @@ func ProcessInputsSecrets(ctx context.Context, data *model.PolicyData, bulker bu
 		return nil, nil, err
 	}
 
+	// Unfortunately, there are two ways (formats) of specifying secret references in
+	// policies: inline and path (see https://github.com/elastic/fleet-server/pull/5852).
+	// So we try replacing secret references in both formats.
+
 	inputs, keys, err := processInputsWithInlineSecrets(data, secretValues)
 	if err != nil {
 		return nil, nil, err
