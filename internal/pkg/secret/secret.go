@@ -59,6 +59,32 @@ func ProcessInputsSecrets(ctx context.Context, data *model.PolicyData, bulker bu
 		return nil, nil, err
 	}
 
+	inputsOld, keysOld, err := processInputsSecretsOld(data, secretValues)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	inputsNew, keysNew, err := processInputsSecretsNew(data, secretValues)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	inputs := make([]map[string]interface{}, 0)
+	inputs = append(inputs, inputsOld...)
+	inputs = append(inputs, inputsNew...)
+
+	keys := make([]string, 0)
+	keys = append(keys, keysOld...)
+	keys = append(keys, keysNew...)
+
+	data.SecretReferences = nil
+	return inputs, keys, nil
+}
+
+// processInputsSecretsOld reads inputs and secret_references from agent policy and replaces
+// the values of secret refs in inputs and input streams properties using the old format
+// for specifying secrets: <path>: $co.elastic.secret{<secret ref>}
+func processInputsSecretsOld(data *model.PolicyData, secretValues map[string]string) ([]map[string]interface{}, []string, error) {
 	result := make([]map[string]interface{}, 0)
 	keys := make([]string, 0)
 	for i, input := range data.Inputs {
@@ -68,7 +94,119 @@ func ProcessInputsSecrets(ctx context.Context, data *model.PolicyData, bulker bu
 		}
 		result = append(result, newInput)
 	}
-	data.SecretReferences = nil
+	return result, keys, nil
+}
+
+// processInputsSecretsNew reads inputs and secret_references from agent policy and replaces
+// the values of secret refs in inputs and input streams properties using the new format
+// for specifying secrets: secrets.<path-to-key>.<key>.id:<secret ref>
+func processInputsSecretsNew(data *model.PolicyData, secretValues map[string]string) ([]map[string]interface{}, []string, error) {
+	result := make([]map[string]interface{}, 0)
+	keys := make([]string, 0)
+
+	for i, inp := range data.Inputs {
+		input := smap.Map(inp)
+		newInput, ks, err := replaceMapRefNew(input, secretValues)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		for _, key := range ks {
+			keys = append(keys, "inputs."+strconv.Itoa(i)+"."+key)
+		}
+		result = append(result, newInput)
+	}
+
+	return result, keys, nil
+}
+
+func replaceMapRefNew(m smap.Map, secretValues map[string]string) (map[string]any, []string, error) {
+	result := make(map[string]any, len(m))
+	keys := make([]string, 0)
+
+	// Check if there are any secrets at the top level of the map
+	// and replace them.
+	mSecrets := m.GetMap(FieldOutputSecrets)
+	delete(m, FieldOutputSecrets)
+
+	secrets, err := getSecretIDAndPath(mSecrets)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, secret := range secrets {
+		var key string
+		for _, p := range secret.Path {
+			if key == "" {
+				key = p
+				continue
+			}
+			key = key + "." + p
+		}
+		keys = append(keys, key)
+		err = setSecretPath(m, secretValues[secret.ID], secret.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// Next, recurse into nested fields and replace any secrets found there.
+	for k, v := range m {
+		var r any
+		var ks []string
+
+		switch t := v.(type) {
+		case map[string]any:
+			r, ks, err = replaceMapRefNew(t, secretValues)
+			if err != nil {
+				return nil, nil, err
+			}
+		case []any:
+			r, ks, err = replaceSliceRefNew(t, secretValues)
+			if err != nil {
+				return nil, nil, err
+			}
+		default:
+			r = v
+		}
+
+		keys = append(keys, ks...)
+		result[k] = r
+	}
+
+	return result, keys, nil
+}
+
+func replaceSliceRefNew(arr []any, secretValues map[string]string) ([]any, []string, error) {
+	result := make([]any, len(arr))
+	keys := make([]string, 0)
+
+	for i, v := range arr {
+		var r any
+		var ks []string
+		var err error
+
+		switch value := v.(type) {
+		case map[string]any:
+			r, ks, err = replaceMapRefNew(value, secretValues)
+			if err != nil {
+				return nil, nil, err
+			}
+		case []any:
+			r, ks, err = replaceSliceRefNew(value, secretValues)
+			if err != nil {
+				return nil, nil, err
+			}
+		default:
+			r = v
+		}
+
+		for _, key := range ks {
+			keys = append(keys, strconv.Itoa(i)+"."+key)
+		}
+		result[i] = r
+	}
+
 	return result, keys, nil
 }
 
