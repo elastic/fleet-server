@@ -57,7 +57,7 @@ func matchOp(tb testing.TB, c testcase) func([]byte) bool {
 		}
 
 		if c.meta != nil {
-			assert.Equal(tb, json.RawMessage(c.meta), sub.Meta)
+			assert.Equal(tb, c.meta, sub.Meta)
 		}
 		assert.Equal(tb, c.status, sub.Status)
 		return true
@@ -159,10 +159,10 @@ func TestBulkCheckin(t *testing.T) {
 			if c.policyID != "" {
 				opts = append(opts, WithAgentPolicyID(c.policyID), WithPolicyRevisionIDX(c.revisionIDX))
 			}
-			if c.meta != nil && len(c.meta) > 0 {
+			if len(c.meta) > 0 {
 				opts = append(opts, WithMeta(&c.meta))
 			}
-			if c.components != nil && len(c.components) > 0 {
+			if len(c.components) > 0 {
 				opts = append(opts, WithComponents(&c.components))
 			}
 			if c.seqno != nil {

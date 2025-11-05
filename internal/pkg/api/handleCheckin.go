@@ -284,10 +284,10 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		checkin.WithUnhealthyReason(unhealthyReason),
 		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
 	)
-	if rawMeta != nil && len(rawMeta) > 0 {
+	if len(rawMeta) > 0 {
 		checkinOpts = append(checkinOpts, checkin.WithMeta(&rawMeta))
 	}
-	if rawComponents != nil && len(rawComponents) > 0 {
+	if len(rawComponents) > 0 {
 		checkinOpts = append(checkinOpts, checkin.WithComponents(&rawComponents))
 	}
 
