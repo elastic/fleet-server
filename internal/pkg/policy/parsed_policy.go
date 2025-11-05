@@ -87,6 +87,19 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	policyInputs, keys := secret.ProcessInputsSecrets(p.Data, secretValues)
 	secretKeys = append(secretKeys, keys...)
 
+	// FIXME: Replace secrets in 'agent.download' section of policy
+	if agentDownload, exists := p.Data.Agent["download"]; exists {
+		if section, ok := agentDownload.(map[string]interface{}); ok {
+			agentDownloadSecretKeys, err := secret.ProcessAgentDownloadSecrets(ctx, section, bulker)
+			if err != nil {
+				return nil, fmt.Errorf("error processing agent secrets: %w", err)
+			}
+			for _, key := range agentDownloadSecretKeys {
+				secretKeys = append(secretKeys, "agent.download."+key)
+			}
+		}
+	}
+
 	// Done replacing secrets.
 	p.Data.SecretReferences = nil
 

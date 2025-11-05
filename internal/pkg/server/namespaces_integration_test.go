@@ -171,7 +171,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 		},
 		OutputPermissions: json.RawMessage(`{"default": {} }`),
 		Inputs:            []map[string]interface{}{},
-		Agent:             json.RawMessage(`{"monitoring": {"use_output":"default"}}`),
+		Agent:             map[string]interface{}{"monitoring": {"use_output": "default"}},
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{

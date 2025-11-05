@@ -274,52 +274,52 @@ func replaceInlineSecretRefsInSlice(arr []any, secrets map[string]string) ([]any
 	return result, keys
 }
 
-type OutputSecret struct {
+type Secret struct {
 	Path []string
 	ID   string
 }
 
-func getSecretIDAndPath(secret smap.Map) []OutputSecret {
-	outputSecrets := make([]OutputSecret, 0)
+func getSecretIDAndPath(secret smap.Map) []Secret {
+	secrets := make([]Secret, 0)
 
 	secretID := secret.GetString("id")
 	if secretID != "" {
-		outputSecrets = append(outputSecrets, OutputSecret{
+		secrets = append(secrets, Secret{
 			Path: make([]string, 0),
 			ID:   secretID,
 		})
 
-		return outputSecrets
+		return secrets
 	}
 
 	for secretKey := range secret {
-		newOutputSecrets := getSecretIDAndPath(secret.GetMap(secretKey))
+		newSecrets := getSecretIDAndPath(secret.GetMap(secretKey))
 
-		for _, secret := range newOutputSecrets {
-			path := append([]string{secretKey}, secret.Path...)
-			outputSecrets = append(outputSecrets, OutputSecret{
+		for _, newSecret := range newSecrets {
+			path := append([]string{secretKey}, newSecret.Path...)
+			secrets = append(secrets, Secret{
 				Path: path,
-				ID:   secret.ID,
+				ID:   newSecret.ID,
 			})
 		}
 	}
 
-	return outputSecrets
+	return secrets
 }
 
-func setSecretPath(output smap.Map, secretValue string, secretPaths []string) {
+func setSecretPath(section smap.Map, secretValue string, secretPaths []string) {
 	// Break the recursion
 	if len(secretPaths) == 1 {
-		output[secretPaths[0]] = secretValue
+		section[secretPaths[0]] = secretValue
 		return
 	}
 	path, secretPaths := secretPaths[0], secretPaths[1:]
 
-	if output.GetMap(path) == nil {
-		output[path] = make(map[string]interface{})
+	if section.GetMap(path) == nil {
+		section[path] = make(map[string]interface{})
 	}
 
-	setSecretPath(output.GetMap(path), secretValue, secretPaths)
+	setSecretPath(section.GetMap(path), secretValue, secretPaths)
 }
 
 // Read secret from output and mutate output with secret value
@@ -376,6 +376,42 @@ func processOutputWithInlineSecrets(output smap.Map, secretValues map[string]str
 		output[key] = replacedOutput[key]
 	}
 	return keys
+}
+
+// ProcessAgentDownloadSecrets reads and replaces secrets in the agent.download section of the policy
+func ProcessAgentDownloadSecrets(ctx context.Context, agentDownload smap.Map, bulker bulk.Bulk) ([]string, error) {
+	secrets := agentDownload.GetMap(FieldSecrets)
+	delete(agentDownload, FieldSecrets)
+
+	secretReferences := make([]model.SecretReferencesItems, 0)
+	agentDownloadSecrets := getSecretIDAndPath(secrets)
+	keys := make([]string, 0, len(agentDownloadSecrets))
+
+	for _, secret := range agentDownloadSecrets {
+		secretReferences = append(secretReferences, model.SecretReferencesItems{
+			ID: secret.ID,
+		})
+	}
+	if len(secretReferences) == 0 {
+		return nil, nil
+	}
+	secretValues, err := GetSecretValues(ctx, secretReferences, bulker)
+	if err != nil {
+		return nil, err
+	}
+	for _, secret := range agentDownloadSecrets {
+		var key string
+		for _, p := range secret.Path {
+			if key == "" {
+				key = p
+				continue
+			}
+			key = key + "." + p
+		}
+		keys = append(keys, key)
+		setSecretPath(agentDownload, secretValues[secret.ID], secret.Path)
+	}
+	return keys, nil
 }
 
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
