@@ -125,11 +125,12 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate that secrets were identified
-	require.Len(t, pp.SecretKeys, 4)
+	require.Len(t, pp.SecretKeys, 5)
 	require.Contains(t, pp.SecretKeys, "outputs.fs-output.type")
 	require.Contains(t, pp.SecretKeys, "outputs.fs-output.ssl.key")
 	require.Contains(t, pp.SecretKeys, "inputs.0.streams.0.auth.basic.password")
 	require.Contains(t, pp.SecretKeys, "inputs.0.streams.1.auth.basic.password")
+	require.Contains(t, pp.SecretKeys, "agent.download.ssl.key")
 
 	// Validate that secret references were replaced
 	firstInputStreams := pp.Inputs[0]["streams"].([]any)
