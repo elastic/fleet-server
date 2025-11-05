@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 //go:embed testdata/test_policy.json
@@ -28,6 +29,9 @@ var logstashOutputPolicy string
 
 //go:embed testdata/remote_es_policy.json
 var testPolicyRemoteES string
+
+//go:embed testdata/policy_with_secrets_mixed.json
+var policyWithSecretsMixed string
 
 func TestNewParsedPolicy(t *testing.T) {
 	// Run two formatting of the same payload to validate that the sha2 remains the same
@@ -101,4 +105,31 @@ func TestNewParsedPolicyRemoteES(t *testing.T) {
 
 	// Validate that default was found
 	require.Equal(t, "remote", pp.Default.Name)
+}
+
+// TestParsedPolicyMixedSecretsReplacement tests that secrets specified in a policy
+// using either the `secrets.<path-to-key>.<key>.id:<secret ref>` format or the
+// `<path>: $co.elastic.secret{<secret ref>}` format are both replaced correctly.
+func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
+	// Load the model into the policy object
+	var m model.Policy
+	var d model.PolicyData
+	err := json.Unmarshal([]byte(policyWithSecretsMixed), &d)
+	require.NoError(t, err)
+
+	m.Data = &d
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := NewParsedPolicy(context.TODO(), bulker, m)
+	require.NoError(t, err)
+
+	// Validate that secrets where identified
+	require.Len(t, pp.SecretKeys, 4)
+	require.Contains(t, pp.SecretKeys, "outputs.fs-output.type")
+	require.Contains(t, pp.SecretKeys, "outputs.fs-output.ssl.key")
+	require.Contains(t, pp.SecretKeys, "inputs.0.streams.0.auth.basic.password")
+	require.Contains(t, pp.SecretKeys, "inputs.0.streams.1.auth.basic.password")
+	// TODO: uncomment two assertions below once https://github.com/elastic/fleet-server/pull/5837 is merged.
+	//require.Contains(t, pp.SecretKeys, "agent.download.sourceURI")
+	//require.Contains(t, pp.SecretKeys, "agent.download.ssl.key")
 }
