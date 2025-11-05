@@ -8,6 +8,7 @@ package policy
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"testing"
 
@@ -15,6 +16,18 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
+
+//go:embed testdata/test_policy.json
+var testPolicy string
+
+//go:embed testdata/test_policy_minified.json
+var minified string
+
+//go:embed testdata/logstash_output_policy.json
+var logstashOutputPolicy string
+
+//go:embed testdata/remote_es_policy.json
+var testPolicyRemoteES string
 
 func TestNewParsedPolicy(t *testing.T) {
 	// Run two formatting of the same payload to validate that the sha2 remains the same
