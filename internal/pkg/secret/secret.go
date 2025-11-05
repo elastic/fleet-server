@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	FieldOutputSecrets = "secrets"
+	FieldSecrets = "secrets"
 )
 
 var (
@@ -125,8 +125,8 @@ func replacePathSecretRefsInMap(m smap.Map, secretValues map[string]string) (map
 
 	// Check if there are any secrets at the top level of the map
 	// and replace them.
-	mSecrets := m.GetMap(FieldOutputSecrets)
-	delete(m, FieldOutputSecrets)
+	mSecrets := m.GetMap(FieldSecrets)
+	delete(m, FieldSecrets)
 
 	secrets, err := getSecretIDAndPath(mSecrets)
 	if err != nil {
@@ -362,9 +362,9 @@ func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk)
 // processOutputSecretNew reads secrets from the output and mutates the output with the secret values using
 // the new format for specifying secrets: secrets.<path-to-field>.<field>.id:<secret ref>
 func processOutputSecretNew(ctx context.Context, output smap.Map, bulker bulk.Bulk) ([]string, error) {
-	secrets := output.GetMap(FieldOutputSecrets)
+	secrets := output.GetMap(FieldSecrets)
 
-	delete(output, FieldOutputSecrets)
+	delete(output, FieldSecrets)
 	secretReferences := make([]model.SecretReferencesItems, 0)
 	outputSecrets, err := getSecretIDAndPath(secrets)
 	keys := make([]string, 0, len(outputSecrets))
