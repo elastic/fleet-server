@@ -1325,6 +1325,11 @@ func TestProcessPolicyDetails(t *testing.T) {
 			ESDocument:        esd,
 			PolicyID:          policyID,
 			PolicyRevisionIdx: 1,
+			Outputs: map[string]*model.PolicyOutput{
+				"default": &model.PolicyOutput{
+					APIKey: "123",
+				},
+			},
 		},
 		req:      &CheckinRequest{},
 		policyID: policyID,
@@ -1341,6 +1346,11 @@ func TestProcessPolicyDetails(t *testing.T) {
 			PolicyID:          "new-policy-id",
 			AgentPolicyID:     policyID,
 			PolicyRevisionIdx: 2,
+			Outputs: map[string]*model.PolicyOutput{
+				"default": &model.PolicyOutput{
+					APIKey: "123",
+				},
+			},
 		},
 		req: &CheckinRequest{
 			AgentPolicyId:     &policyID,
@@ -1354,12 +1364,55 @@ func TestProcessPolicyDetails(t *testing.T) {
 			return mBulk
 		},
 	}, {
+		name: "no outputs",
+		agent: &model.Agent{
+			ESDocument:        esd,
+			PolicyID:          policyID,
+			AgentPolicyID:     policyID,
+			PolicyRevisionIdx: 2,
+		},
+		req:      &CheckinRequest{},
+		policyID: policyID,
+		revIdx:   0,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			noPolicyDetailsMockCheck(t, mBulk)
+			return mBulk
+		},
+	}, {
+		name: "missing output APIKey",
+		agent: &model.Agent{
+			ESDocument:        esd,
+			PolicyID:          policyID,
+			AgentPolicyID:     policyID,
+			PolicyRevisionIdx: 2,
+			Outputs: map[string]*model.PolicyOutput{
+				"default": &model.PolicyOutput{
+					APIKey: "123",
+				},
+				"remote": &model.PolicyOutput{},
+			},
+		},
+		req:      &CheckinRequest{},
+		policyID: policyID,
+		revIdx:   0,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			noPolicyDetailsMockCheck(t, mBulk)
+			return mBulk
+		},
+	}, {
 		name: "revision updated",
 		agent: &model.Agent{
 			ESDocument:        esd,
 			PolicyID:          policyID,
 			AgentPolicyID:     policyID,
 			PolicyRevisionIdx: 1,
+			Outputs: map[string]*model.PolicyOutput{
+				"default": &model.PolicyOutput{
+					APIKey: "123",
+				},
+			},
 		},
 		req: &CheckinRequest{
 			AgentPolicyId:     &policyID,
@@ -1378,6 +1431,11 @@ func TestProcessPolicyDetails(t *testing.T) {
 			ESDocument:        esd,
 			PolicyID:          policyID,
 			PolicyRevisionIdx: 2,
+			Outputs: map[string]*model.PolicyOutput{
+				"default": &model.PolicyOutput{
+					APIKey: "123",
+				},
+			},
 		},
 		req: &CheckinRequest{
 			AgentPolicyId:     &policyID,
@@ -1397,6 +1455,11 @@ func TestProcessPolicyDetails(t *testing.T) {
 			AgentPolicyID:     policyID,
 			PolicyID:          policyID,
 			PolicyRevisionIdx: revIDX2,
+			Outputs: map[string]*model.PolicyOutput{
+				"default": &model.PolicyOutput{
+					APIKey: "123",
+				},
+			},
 		},
 		req: &CheckinRequest{
 			AgentPolicyId:     &policyID,
@@ -1416,6 +1479,11 @@ func TestProcessPolicyDetails(t *testing.T) {
 			AgentPolicyID:     policyID,
 			PolicyID:          policyID,
 			PolicyRevisionIdx: revIDX2,
+			Outputs: map[string]*model.PolicyOutput{
+				"default": &model.PolicyOutput{
+					APIKey: "123",
+				},
+			},
 		},
 		req: &CheckinRequest{
 			AgentPolicyId:     &policyID,
