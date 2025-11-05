@@ -45,7 +45,7 @@ func GetSecretValues(ctx context.Context, secretRefs []model.SecretReferencesIte
 
 // read inputs and secret_references from agent policy
 // replace values of secret refs in inputs and input streams properties
-func GetPolicyInputsWithSecrets(ctx context.Context, data *model.PolicyData, bulker bulk.Bulk) ([]map[string]interface{}, []string, error) {
+func ProcessInputsSecrets(ctx context.Context, data *model.PolicyData, bulker bulk.Bulk) ([]map[string]interface{}, []string, error) {
 	if len(data.Inputs) == 0 {
 		return nil, nil, nil
 	}

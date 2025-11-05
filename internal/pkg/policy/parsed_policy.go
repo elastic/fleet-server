@@ -80,7 +80,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	if err != nil {
 		return nil, err
 	}
-	policyInputs, keys, err := secret.GetPolicyInputsWithSecrets(ctx, p.Data, bulker)
+	policyInputs, keys, err := secret.ProcessInputsSecrets(ctx, p.Data, bulker)
 	if err != nil {
 		return nil, err
 	}

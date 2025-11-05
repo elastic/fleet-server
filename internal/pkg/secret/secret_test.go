@@ -161,7 +161,7 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 		{"id": "input2", "streams": []interface{}{expectedStream}},
 	}
 
-	result, keys, _ := GetPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	result, keys, _ := ProcessInputsSecrets(context.TODO(), &pData, bulker)
 
 	assert.Equal(t, expectedResult, result)
 	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "inputs.0.input_var_secret", "inputs.1.streams.0.package_var_secret", "inputs.1.streams.0.input_var_secret", "inputs.1.streams.0.stream_var_secret"}, keys)
@@ -208,7 +208,7 @@ func TestPolicyInputSteamsEmbedded(t *testing.T) {
 		}},
 	}
 
-	result, keys, err := GetPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	result, keys, err := ProcessInputsSecrets(context.TODO(), &pData, bulker)
 	require.NoError(t, err)
 
 	assert.Equal(t, expected, result)
@@ -236,7 +236,7 @@ func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 		{"id": "input2", "streams": []interface{}{expectedStream}},
 	}
 
-	result, keys, _ := GetPolicyInputsWithSecrets(context.TODO(), &pData, bulker)
+	result, keys, _ := ProcessInputsSecrets(context.TODO(), &pData, bulker)
 
 	assert.Equal(t, expectedResult, result)
 	assert.Empty(t, keys)
