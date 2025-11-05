@@ -442,7 +442,7 @@ func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, ag
 func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails, checkinOpts []checkin.Option) ([]checkin.Option, error) {
 	if details == nil {
 		if agent.UpgradeDetails == nil {
-			return nil, nil
+			return checkinOpts, nil
 		}
 		checkinOpts = append(checkinOpts,
 			checkin.WithUpgradeDetails(nil),
@@ -459,7 +459,7 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		return nil, err
 	}
 	if action == nil {
-		return nil, nil
+		return checkinOpts, nil
 	}
 
 	// link action with APM spans
@@ -1194,12 +1194,17 @@ func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logge
 	// this can be different based on the situations to force a POLICY_CHANGE.
 	effectivePolicyID := policyID
 	effectiveRevIdx := revIdx
-	for _, output := range agent.Outputs {
-		if output.APIKey == "" {
-			// use revision_idx=0 if the agent has a single output where no API key is defined
-			// This will force the policy monitor to emit a new policy to regenerate API keys
-			effectiveRevIdx = 0
-			break
+	if len(agent.Outputs) == 0 {
+		// no outputs yet, force policy regeneration
+		effectiveRevIdx = 0
+	} else {
+		for _, output := range agent.Outputs {
+			if output.APIKey == "" {
+				// use revision_idx=0 if the agent has a single output where no API key is defined
+				// This will force the policy monitor to emit a new policy to regenerate API keys
+				effectiveRevIdx = 0
+				break
+			}
 		}
 	}
 	if effectivePolicyID != agent.PolicyID {

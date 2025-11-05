@@ -175,9 +175,11 @@ type checkinT struct {
 
 func (c *checkinT) toBody() ([]byte, error) {
 	fields := bulk.UpdateFields{
-		dl.FieldUpdatedAt:       c.ts,
-		dl.FieldLastCheckin:     c.ts,
-		dl.FieldUnhealthyReason: c.unhealthyReason,
+		dl.FieldUpdatedAt:   c.ts,
+		dl.FieldLastCheckin: c.ts,
+	}
+	if c.unhealthyReason.isSet {
+		fields[dl.FieldUnhealthyReason] = c.unhealthyReason.value
 	}
 	if c.status.isSet {
 		fields[dl.FieldLastCheckinStatus] = c.status.value
