@@ -75,10 +75,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		return nil, err
 	}
 	for name, policyOutput := range p.Data.Outputs {
-		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues)
-		if err != nil {
-			return nil, err
-		}
+		ks := secret.ProcessOutputSecret(policyOutput, secretValues)
 		for _, key := range ks {
 			secretKeys = append(secretKeys, "outputs."+name+"."+key)
 		}
@@ -87,10 +84,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	if err != nil {
 		return nil, err
 	}
-	policyInputs, keys, err := secret.ProcessInputsSecrets(p.Data, secretValues)
-	if err != nil {
-		return nil, err
-	}
+	policyInputs, keys := secret.ProcessInputsSecrets(p.Data, secretValues)
 	secretKeys = append(secretKeys, keys...)
 
 	// Done replacing secrets.
