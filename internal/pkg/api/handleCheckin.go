@@ -1037,11 +1037,10 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 		return nil, nil
 	}
 
-	// Deserialize the agent's metadata copy
+	// Deserialize the agent's metadata copy. If it fails, it's ignored as it will just
+	// be replaced with the correct contents from the clients checkin.
 	var agentLocalMeta interface{}
-	if err := json.Unmarshal(agent.LocalMetadata, &agentLocalMeta); err != nil {
-		return nil, fmt.Errorf("parseMeta local: %w", err)
-	}
+	_ = json.Unmarshal(agent.LocalMetadata, &agentLocalMeta)
 
 	var outMeta []byte
 
@@ -1077,14 +1076,9 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 		return nil, &unhealthyReason, nil
 	}
 
-	agentComponentsJSON, err := json.Marshal(agent.Components)
-	if err != nil {
-		return nil, &unhealthyReason, fmt.Errorf("agent.Components marshal: %w", err)
-	}
-
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
-	if bytes.Equal(req.Components, agentComponentsJSON) {
+	if bytes.Equal(req.Components, agent.Components) {
 		zlog.Trace().Msg("quick comparing agent components data is equal")
 		return nil, &unhealthyReason, nil
 	}
@@ -1102,13 +1096,18 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 		return nil, &unhealthyReason, nil
 	}
 
+	// Deserialize the agent's components. If it fails, it's ignored as it will just
+	// be replaced with the correct contents from the clients checkin.
+	var agentComponents []model.ComponentsItems
+	_ = json.Unmarshal(agent.Components, &agentComponents) // error is ignored
+
 	var outComponents []byte
 
 	// Compare the deserialized meta structures and return the bytes to update if different
-	if !reflect.DeepEqual(reqComponents, agent.Components) {
+	if !reflect.DeepEqual(reqComponents, agentComponents) {
 		reqComponentsJSON, _ := json.Marshal(req.Components)
 		zlog.Trace().
-			Str("oldComponents", string(agentComponentsJSON)).
+			Str("oldComponents", string(agent.Components)).
 			Str("req.Components", string(reqComponentsJSON)).
 			Msg("local components data is not equal")
 

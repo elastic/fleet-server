@@ -1001,12 +1001,12 @@ func TestParseComponents(t *testing.T) {
 			agent: &model.Agent{
 				LastCheckinStatus: FailedStatus,
 				UnhealthyReason:   []string{"input"},
-				Components: []model.ComponentsItems{{
+				Components: mustMarshalJSON([]model.ComponentsItems{{
 					Status: "DEGRADED",
 					Units: []model.UnitsItems{{
 						Status: "DEGRADED", Type: "input",
 					}},
-				}},
+				}}),
 			},
 			req: &CheckinRequest{
 				Components: degradedInputReqComponents,
@@ -1020,12 +1020,40 @@ func TestParseComponents(t *testing.T) {
 			agent: &model.Agent{
 				LastCheckinStatus: "online",
 				UnhealthyReason:   nil,
-				Components: []model.ComponentsItems{{
+				Components: mustMarshalJSON([]model.ComponentsItems{{
 					Status: "HEALTHY",
 					Units: []model.UnitsItems{{
 						Status: "HEALTHY", Type: "input",
 					}},
-				}},
+				}}),
+			},
+			req: &CheckinRequest{
+				Status:     "DEGRADED",
+				Components: degradedInputReqComponents,
+			},
+			outComponents:   degradedInputReqComponents,
+			unhealthyReason: &[]string{"input"},
+			err:             nil,
+		}, {
+			name: "bad stored components",
+			agent: &model.Agent{
+				LastCheckinStatus: "online",
+				UnhealthyReason:   nil,
+				Components:        mustMarshalJSON("string stored in components incorrectly"),
+			},
+			req: &CheckinRequest{
+				Status:     "DEGRADED",
+				Components: degradedInputReqComponents,
+			},
+			outComponents:   degradedInputReqComponents,
+			unhealthyReason: &[]string{"input"},
+			err:             nil,
+		}, {
+			name: "invalid JSON ignored",
+			agent: &model.Agent{
+				LastCheckinStatus: "online",
+				UnhealthyReason:   nil,
+				Components:        json.RawMessage("{s"),
 			},
 			req: &CheckinRequest{
 				Status:     "DEGRADED",
@@ -1044,6 +1072,14 @@ func TestParseComponents(t *testing.T) {
 			assert.Equal(t, tc.err, err)
 		})
 	}
+}
+
+func mustMarshalJSON(obj interface{}) json.RawMessage {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		panic(err)
+	}
+	return data
 }
 
 func TestValidateCheckinRequest(t *testing.T) {
