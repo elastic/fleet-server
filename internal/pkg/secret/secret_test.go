@@ -148,7 +148,6 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 		SecretReferences: refs,
 		Inputs:           inputs,
 	}
-	bulker := ftesting.NewMockBulk()
 	expectedStream := map[string]interface{}{
 		"id":                 "stream1",
 		"package_var_secret": "ref1_value",
@@ -161,11 +160,15 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 		{"id": "input2", "streams": []interface{}{expectedStream}},
 	}
 
-	result, keys, _ := ProcessInputsSecrets(context.TODO(), &pData, bulker)
+	secretValues := map[string]string{
+		"ref1": "ref1_value",
+		"ref2": "ref2_value",
+		"ref3": "ref3_value",
+	}
+	result, keys := ProcessInputsSecrets(&pData, secretValues)
 
 	assert.Equal(t, expectedResult, result)
 	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "inputs.0.input_var_secret", "inputs.1.streams.0.package_var_secret", "inputs.1.streams.0.input_var_secret", "inputs.1.streams.0.stream_var_secret"}, keys)
-	assert.Nil(t, pData.SecretReferences)
 }
 
 func TestPolicyInputSteamsEmbedded(t *testing.T) {
@@ -190,7 +193,6 @@ func TestPolicyInputSteamsEmbedded(t *testing.T) {
 		SecretReferences: refs,
 		Inputs:           inputs,
 	}
-	bulker := ftesting.NewMockBulk()
 	expected := []map[string]interface{}{{
 		"id": "input1",
 		"streams": []interface{}{
@@ -208,8 +210,10 @@ func TestPolicyInputSteamsEmbedded(t *testing.T) {
 		}},
 	}
 
-	result, keys, err := ProcessInputsSecrets(context.TODO(), &pData, bulker)
-	require.NoError(t, err)
+	secretValues := map[string]string{
+		"ref1": "ref1_value",
+	}
+	result, keys := ProcessInputsSecrets(&pData, secretValues)
 
 	assert.Equal(t, expected, result)
 	assert.ElementsMatch(t, []string{"inputs.0.streams.0.embedded.embedded-arr.0.embedded-secret"}, keys)
@@ -227,7 +231,6 @@ func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 	pData := model.PolicyData{
 		Inputs: inputs,
 	}
-	bulker := ftesting.NewMockBulk()
 	expectedStream := map[string]interface{}{
 		"id": "stream1",
 	}
@@ -236,7 +239,7 @@ func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 		{"id": "input2", "streams": []interface{}{expectedStream}},
 	}
 
-	result, keys, _ := ProcessInputsSecrets(context.TODO(), &pData, bulker)
+	result, keys := ProcessInputsSecrets(&pData, nil)
 
 	assert.Equal(t, expectedResult, result)
 	assert.Empty(t, keys)
@@ -295,14 +298,18 @@ func TestProcessOutputSecret(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			bulker := ftesting.NewMockBulk()
 			output, err := smap.Parse([]byte(tc.outputJSON))
 			assert.NoError(t, err)
 
 			expectOutput, err := smap.Parse([]byte(tc.expectOutputJSON))
 			assert.NoError(t, err)
 
-			keys, err := ProcessOutputSecret(context.Background(), output, bulker)
+			secretValues := map[string]string{
+				"passwordid": "passwordid_value",
+				"sslother":   "sslother_value",
+				"sslkey":     "sslkey_value",
+			}
+			keys := ProcessOutputSecret(output, secretValues)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expectOutput, output)
