@@ -133,11 +133,9 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	// Validate that secret references were replaced
 	firstInputStreams := pp.Inputs[0]["streams"].([]any)
 	firstInputFirstStream := firstInputStreams[0].(map[string]any)
-	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputFirstStream["auth.basic.password"])
 	firstInputSecondStream := firstInputStreams[1].(map[string]any)
+	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputFirstStream["auth.basic.password"])
 	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputSecondStream["auth.basic.password"])
-
-	// TODO: outputs
-	//require.Equal(t, "abcdef123_value", pp.Policy.Data.Outputs["fs-output"]["type"])
-	//require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Outputs["fs-output"]["ssl"].(map[string]interface{})["key"])
+	require.Equal(t, "abcdef123_value", pp.Policy.Data.Outputs["fs-output"]["type"])
+	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Outputs["fs-output"]["ssl"].(map[string]interface{})["key"])
 }
