@@ -372,7 +372,9 @@ func processOutputWithPathSecrets(output smap.Map, secretValues map[string]strin
 
 func processOutputWithInlineSecrets(output smap.Map, secretValues map[string]string) []string {
 	replacedOutput, keys := replaceInlineSecretRefsInMap(output, secretValues)
-	output = replacedOutput
+	for _, key := range keys {
+		output[key] = replacedOutput[key]
+	}
 	return keys
 }
 
