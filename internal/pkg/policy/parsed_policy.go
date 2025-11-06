@@ -88,7 +88,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	secretKeys = append(secretKeys, keys...)
 
 	// Done replacing secrets.
-	//p.Data.SecretReferences = nil
+	p.Data.SecretReferences = nil
 
 	// We are cool and the gang
 	pp := &ParsedPolicy{
