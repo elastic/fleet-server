@@ -129,9 +129,6 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	require.Contains(t, pp.SecretKeys, "outputs.fs-output.ssl.key")
 	require.Contains(t, pp.SecretKeys, "inputs.0.streams.0.auth.basic.password")
 	require.Contains(t, pp.SecretKeys, "inputs.0.streams.1.auth.basic.password")
-	// TODO: uncomment two assertions below once https://github.com/elastic/fleet-server/pull/5837 is merged.
-	//require.Contains(t, pp.SecretKeys, "agent.download.sourceURI")
-	//require.Contains(t, pp.SecretKeys, "agent.download.ssl.key")
 
 	// Validate that secret references were replaced
 	firstInputStreams := pp.Inputs[0]["streams"].([]any)
