@@ -1001,7 +1001,7 @@ func TestParseComponents(t *testing.T) {
 			agent: &model.Agent{
 				LastCheckinStatus: FailedStatus,
 				UnhealthyReason:   []string{"input"},
-				Components: mustMarshalJSON([]model.ComponentsItems{{
+				Components: requireMarshalJSON(t, []model.ComponentsItems{{
 					Status: "DEGRADED",
 					Units: []model.UnitsItems{{
 						Status: "DEGRADED", Type: "input",
@@ -1020,7 +1020,7 @@ func TestParseComponents(t *testing.T) {
 			agent: &model.Agent{
 				LastCheckinStatus: "online",
 				UnhealthyReason:   nil,
-				Components: mustMarshalJSON([]model.ComponentsItems{{
+				Components: requireMarshalJSON(t, []model.ComponentsItems{{
 					Status: "HEALTHY",
 					Units: []model.UnitsItems{{
 						Status: "HEALTHY", Type: "input",
@@ -1039,7 +1039,7 @@ func TestParseComponents(t *testing.T) {
 			agent: &model.Agent{
 				LastCheckinStatus: "online",
 				UnhealthyReason:   nil,
-				Components:        mustMarshalJSON("string stored in components incorrectly"),
+				Components:        requireMarshalJSON(t, "string stored in components incorrectly"),
 			},
 			req: &CheckinRequest{
 				Status:     "DEGRADED",
@@ -1074,11 +1074,9 @@ func TestParseComponents(t *testing.T) {
 	}
 }
 
-func mustMarshalJSON(obj interface{}) json.RawMessage {
+func requireMarshalJSON(t *testing.T, obj interface{}) json.RawMessage {
 	data, err := json.Marshal(obj)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	return data
 }
 

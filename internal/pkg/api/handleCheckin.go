@@ -1040,7 +1040,9 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	// Deserialize the agent's metadata copy. If it fails, it's ignored as it will just
 	// be replaced with the correct contents from the clients checkin.
 	var agentLocalMeta interface{}
-	_ = json.Unmarshal(agent.LocalMetadata, &agentLocalMeta)
+	if err := json.Unmarshal(agent.LocalMetadata, &agentLocalMeta); err != nil {
+		zlog.Warn().Err(err).Msg("local_metadata in document invalid; ignoring it")
+	}
 
 	var outMeta []byte
 
@@ -1099,7 +1101,9 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	// Deserialize the agent's components. If it fails, it's ignored as it will just
 	// be replaced with the correct contents from the clients checkin.
 	var agentComponents []model.ComponentsItems
-	_ = json.Unmarshal(agent.Components, &agentComponents) // error is ignored
+	if err := json.Unmarshal(agent.Components, &agentComponents); err != nil {
+		zlog.Warn().Err(err).Msg("components in document invalid; ignoring it")
+	}
 
 	var outComponents []byte
 
