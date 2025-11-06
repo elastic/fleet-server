@@ -123,7 +123,7 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	pp, err := NewParsedPolicy(context.TODO(), bulker, m)
 	require.NoError(t, err)
 
-	// Validate that secrets where identified
+	// Validate that secrets were identified
 	require.Len(t, pp.SecretKeys, 4)
 	require.Contains(t, pp.SecretKeys, "outputs.fs-output.type")
 	require.Contains(t, pp.SecretKeys, "outputs.fs-output.ssl.key")
@@ -132,4 +132,15 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	// TODO: uncomment two assertions below once https://github.com/elastic/fleet-server/pull/5837 is merged.
 	//require.Contains(t, pp.SecretKeys, "agent.download.sourceURI")
 	//require.Contains(t, pp.SecretKeys, "agent.download.ssl.key")
+
+	// Validate that secret references were replaced
+	firstInputStreams := pp.Inputs[0]["streams"].([]any)
+	firstInputFirstStream := firstInputStreams[0].(map[string]any)
+	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputFirstStream["auth.basic.password"])
+	firstInputSecondStream := firstInputStreams[1].(map[string]any)
+	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputSecondStream["auth.basic.password"])
+
+	// TODO: outputs
+	//require.Equal(t, "abcdef123_value", pp.Policy.Data.Outputs["fs-output"]["type"])
+	//require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Outputs["fs-output"]["ssl"].(map[string]interface{})["key"])
 }

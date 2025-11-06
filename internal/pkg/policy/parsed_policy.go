@@ -63,12 +63,19 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		return nil, err
 	}
 
+	// Get secret values so secret references in outputs and inputs can be replaced
+	// with their corresponding values.
+	secretValues, err := secret.GetSecretValues(ctx, p.Data.SecretReferences, bulker)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get secret values: %w", err)
+	}
+
 	policyOutputs, err := constructPolicyOutputs(p.Data.Outputs, roles)
 	if err != nil {
 		return nil, err
 	}
 	for name, policyOutput := range p.Data.Outputs {
-		ks, err := secret.ProcessOutputSecret(ctx, policyOutput, bulker)
+		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues)
 		if err != nil {
 			return nil, err
 		}
@@ -80,11 +87,14 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	if err != nil {
 		return nil, err
 	}
-	policyInputs, keys, err := secret.ProcessInputsSecrets(ctx, p.Data, bulker)
+	policyInputs, keys, err := secret.ProcessInputsSecrets(p.Data, secretValues)
 	if err != nil {
 		return nil, err
 	}
 	secretKeys = append(secretKeys, keys...)
+
+	// Done replacing secrets.
+	p.Data.SecretReferences = nil
 
 	// We are cool and the gang
 	pp := &ParsedPolicy{

@@ -879,10 +879,17 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, ErrNoPolicyOutput
 	}
 
+	// Get secret values so secret references in outputs and inputs can be replaced
+	// with their corresponding values.
+	secretValues, err := secret.GetSecretValues(ctx, pp.Policy.Data.SecretReferences, bulker)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get secret values: %w", err)
+	}
+
 	data := model.ClonePolicyData(pp.Policy.Data)
 	for policyName, policyOutput := range data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
-		ks, err := secret.ProcessOutputSecret(ctx, policyOutput, bulker) // makes a bulk request to get secret values
+		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues) // makes a bulk request to get secret values
 		if err != nil {
 			return nil, fmt.Errorf("failed to process output secrets %q: %w",
 				policyName, err)

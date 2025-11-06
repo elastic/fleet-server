@@ -7,6 +7,7 @@ package secret
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -45,18 +46,15 @@ func GetSecretValues(ctx context.Context, secretRefs []model.SecretReferencesIte
 
 // read inputs and secret_references from agent policy
 // replace values of secret refs in inputs and input streams properties
-func ProcessInputsSecrets(ctx context.Context, data *model.PolicyData, bulker bulk.Bulk) ([]map[string]interface{}, []string, error) {
+func ProcessInputsSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]interface{}, []string, error) {
 	if len(data.Inputs) == 0 {
+		// No inputs, so no secret references in them to replace.
 		return nil, nil, nil
 	}
 
 	if len(data.SecretReferences) == 0 {
+		// No list of secret references to replace. Return inputs as is.
 		return data.Inputs, nil, nil
-	}
-
-	secretValues, err := GetSecretValues(ctx, data.SecretReferences, bulker)
-	if err != nil {
-		return nil, nil, err
 	}
 
 	// Unfortunately, there are two ways (formats) of specifying secret references in
@@ -65,18 +63,18 @@ func ProcessInputsSecrets(ctx context.Context, data *model.PolicyData, bulker bu
 
 	inputs, keys, err := processInputsWithInlineSecrets(data, secretValues)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed processing inputs with inline secrets: %w", err)
 	}
 
+	data.Inputs = inputs
 	i, k, err := processInputsWithPathSecrets(data, secretValues)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed processing inputs with path secrets: %w", err)
 	}
 
-	inputs = append(inputs, i...)
+	inputs = i
 	keys = append(keys, k...)
 
-	data.SecretReferences = nil
 	return inputs, keys, nil
 }
 
@@ -160,16 +158,20 @@ func replacePathSecretRefsInMap(m smap.Map, secretValues map[string]string) (map
 			if err != nil {
 				return nil, nil, err
 			}
+			for _, key := range ks {
+				keys = append(keys, k+"."+key)
+			}
 		case []any:
 			r, ks, err = replacePathSecretRefsInSlice(t, secretValues)
 			if err != nil {
 				return nil, nil, err
 			}
+			for _, key := range ks {
+				keys = append(keys, k+"."+key)
+			}
 		default:
 			r = v
 		}
-
-		keys = append(keys, ks...)
 		result[k] = r
 	}
 
@@ -355,13 +357,29 @@ func setSecretPath(output smap.Map, secretValue string, secretPaths []string) er
 }
 
 // Read secret from output and mutate output with secret value
-func ProcessOutputSecret(ctx context.Context, output smap.Map, bulker bulk.Bulk) ([]string, error) {
-	return processOutputSecretNew(ctx, output, bulker)
+func ProcessOutputSecret(output smap.Map, secretValues map[string]string) ([]string, error) {
+
+	// Unfortunately, there are two ways (formats) of specifying secret references in
+	// policies: inline and path (see https://github.com/elastic/fleet-server/pull/5852).
+	// So we try replacing secret references in both formats.
+
+	keys, err := processOutputWithInlineSecrets(output, secretValues)
+	if err != nil {
+		return nil, fmt.Errorf("failed processing output with inline secrets: %w", err)
+	}
+
+	k, err := processOutputWithPathSecrets(output, secretValues)
+	if err != nil {
+		return nil, fmt.Errorf("failed processing output with path secrets: %w", err)
+	}
+
+	keys = append(keys, k...)
+	return keys, nil
 }
 
-// processOutputSecretNew reads secrets from the output and mutates the output with the secret values using
+// processOutputWithPathSecrets reads secrets from the output and mutates the output with the secret values using
 // the new format for specifying secrets: secrets.<path-to-field>.<field>.id:<secret ref>
-func processOutputSecretNew(ctx context.Context, output smap.Map, bulker bulk.Bulk) ([]string, error) {
+func processOutputWithPathSecrets(output smap.Map, secretValues map[string]string) ([]string, error) {
 	secrets := output.GetMap(FieldSecrets)
 
 	delete(output, FieldSecrets)
@@ -380,10 +398,7 @@ func processOutputSecretNew(ctx context.Context, output smap.Map, bulker bulk.Bu
 	if len(secretReferences) == 0 {
 		return nil, nil
 	}
-	secretValues, err := GetSecretValues(ctx, secretReferences, bulker)
-	if err != nil {
-		return nil, err
-	}
+
 	for _, secret := range outputSecrets {
 		var key string
 		for _, p := range secret.Path {
@@ -399,6 +414,12 @@ func processOutputSecretNew(ctx context.Context, output smap.Map, bulker bulk.Bu
 			return nil, err
 		}
 	}
+	return keys, nil
+}
+
+func processOutputWithInlineSecrets(output smap.Map, secretValues map[string]string) ([]string, error) {
+	replacedOutput, keys := replaceInlineSecretRefsInMap(output, secretValues)
+	output = replacedOutput
 	return keys, nil
 }
 
