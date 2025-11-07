@@ -993,7 +993,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
-	if bytes.Equal([]byte(req.Components), agent.Components) {
+	if bytes.Equal([]byte(*req.Components), agent.Components) {
 		zlog.Trace().Msg("quick comparing agent components data is equal")
 		return nil, &unhealthyReason, nil
 	}
