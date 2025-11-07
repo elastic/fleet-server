@@ -1002,11 +1002,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
-<<<<<<< HEAD
-	if bytes.Equal(*req.Components, agentComponentsJSON) {
-=======
 	if bytes.Equal(req.Components, agent.Components) {
->>>>>>> f9dbe41 (Handle malformatted JSON in `.fleet-agents` `components` field (#5858))
 		zlog.Trace().Msg("quick comparing agent components data is equal")
 		return nil, &unhealthyReason, nil
 	}
@@ -1034,14 +1030,8 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	var outComponents []byte
 
 	// Compare the deserialized meta structures and return the bytes to update if different
-<<<<<<< HEAD
-	if !reflect.DeepEqual(reqComponents, agent.Components) {
-
-		reqComponentsJSON, _ := json.Marshal(*req.Components)
-=======
 	if !reflect.DeepEqual(reqComponents, agentComponents) {
 		reqComponentsJSON, _ := json.Marshal(req.Components)
->>>>>>> f9dbe41 (Handle malformatted JSON in `.fleet-agents` `components` field (#5858))
 		zlog.Trace().
 			Str("oldComponents", string(agent.Components)).
 			Str("req.Components", string(reqComponentsJSON)).
