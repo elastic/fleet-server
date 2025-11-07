@@ -995,7 +995,7 @@ func TestParseComponents(t *testing.T) {
 			},
 			req: &CheckinRequest{
 				Status:     "DEGRADED",
-				Components: degradedInputReqComponents,
+				Components: &degradedInputReqComponents,
 			},
 			outComponents:   degradedInputReqComponents,
 			unhealthyReason: &[]string{"input"},
@@ -1009,7 +1009,7 @@ func TestParseComponents(t *testing.T) {
 			},
 			req: &CheckinRequest{
 				Status:     "DEGRADED",
-				Components: degradedInputReqComponents,
+				Components: &degradedInputReqComponents,
 			},
 			outComponents:   degradedInputReqComponents,
 			unhealthyReason: &[]string{"input"},
