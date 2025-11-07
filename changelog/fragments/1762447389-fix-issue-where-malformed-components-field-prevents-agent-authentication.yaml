@@ -13,7 +13,7 @@ kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: fix issue prevent checkin local_metadata from being updated
+summary: fix issue where malformed components field prevents agent authentication
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
@@ -28,7 +28,7 @@ summary: fix issue prevent checkin local_metadata from being updated
 
 # REQUIRED for all kinds
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component:
+component: fleet-server
 
 # AUTOMATED
 # OPTIONAL to manually add other PR URLs
