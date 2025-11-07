@@ -1052,9 +1052,10 @@ func calcUnhealthyReason(reqComponents []model.ComponentsItems) []string {
 			hasUnhealthyComponent = true
 			for _, unit := range component.Units {
 				if unit.Status == FailedStatus || unit.Status == DegradedStatus {
-					if unit.Type == "input" {
+					switch unit.Type {
+					case "input":
 						hasUnhealthyInput = true
-					} else if unit.Type == "output" {
+					case "output":
 						hasUnhealthyOutput = true
 					}
 				}
