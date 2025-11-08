@@ -140,4 +140,5 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputSecondStream["auth.basic.password"])
 	require.Equal(t, "abcdef123_value", pp.Policy.Data.Outputs["fs-output"]["type"])
 	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Outputs["fs-output"]["ssl"].(map[string]interface{})["key"])
+	//TODO: require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Agent.Download.SSL.Key)
 }
