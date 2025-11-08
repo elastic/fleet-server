@@ -87,7 +87,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	policyInputs, keys := secret.ProcessInputsSecrets(p.Data, secretValues)
 	secretKeys = append(secretKeys, keys...)
 
-	// FIXME: Replace secrets in 'agent.download' section of policy
+	// Replace secrets in 'agent.download' section of policy
 	if agentDownload, exists := p.Data.Agent["download"]; exists {
 		if section, ok := agentDownload.(map[string]interface{}); ok {
 			agentDownloadSecretKeys, err := secret.ProcessAgentDownloadSecrets(section, secretValues)
