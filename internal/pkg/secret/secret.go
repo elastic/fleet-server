@@ -379,26 +379,13 @@ func processOutputWithInlineSecrets(output smap.Map, secretValues map[string]str
 }
 
 // ProcessAgentDownloadSecrets reads and replaces secrets in the agent.download section of the policy
-func ProcessAgentDownloadSecrets(ctx context.Context, agentDownload smap.Map, bulker bulk.Bulk) ([]string, error) {
+func ProcessAgentDownloadSecrets(agentDownload smap.Map, secretValues map[string]string) ([]string, error) {
 	secrets := agentDownload.GetMap(FieldSecrets)
 	delete(agentDownload, FieldSecrets)
 
-	secretReferences := make([]model.SecretReferencesItems, 0)
 	agentDownloadSecrets := getSecretIDAndPath(secrets)
 	keys := make([]string, 0, len(agentDownloadSecrets))
 
-	for _, secret := range agentDownloadSecrets {
-		secretReferences = append(secretReferences, model.SecretReferencesItems{
-			ID: secret.ID,
-		})
-	}
-	if len(secretReferences) == 0 {
-		return nil, nil
-	}
-	secretValues, err := GetSecretValues(ctx, secretReferences, bulker)
-	if err != nil {
-		return nil, err
-	}
 	for _, secret := range agentDownloadSecrets {
 		var key string
 		for _, p := range secret.Path {
