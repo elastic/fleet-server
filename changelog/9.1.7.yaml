@@ -1,0 +1,31 @@
+version: 9.1.7
+entries:
+    - kind: bug-fix
+      summary: Fix issue prevent checkin local_metadata from being updated
+      description: |
+        Once an Elastic Agent is marked with audit unenrolled Fleet Server fails to update the document in
+        Elasticsearch when it checks in. This fixes that issue an now the Fleet Server will be able to update the
+        document in Elasticsearch reflecting the actual status of the Elastic Agent.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5824
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762210175
+      file:
+        name: 1762210175-fix-issue-prevent-checkin-local_metadata-from-being-updated.yaml
+        checksum: 27de39080457cd252bfbeaa067a1a3e76cd32cc7
+    - kind: bug-fix
+      summary: fix issue where malformed components field prevents agent authentication
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5858
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762447389
+      file:
+        name: 1762447389-fix-issue-where-malformed-components-field-prevents-agent-authentication.yaml
+        checksum: 4bda681dfd6bbbfa4cc4bd1d511d56a74dfc87cf
