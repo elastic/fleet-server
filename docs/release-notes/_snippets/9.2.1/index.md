@@ -7,7 +7,7 @@
 ### Fixes [fleet-server-9.2.1-fixes]
 
 
-* Fix issue prevent checkin local_metadata from being updated. [#5824](https://github.com/elastic/fleet-server/pull/5824) 
+* Fix issue that was preventing checkin local_metadata from being updated. [#5824](https://github.com/elastic/fleet-server/pull/5824) 
 
   Once an Elastic Agent is marked with audit unenrolled Fleet Server fails to update the document in
   Elasticsearch when it checks in. This fixes that issue an now the Fleet Server will be able to update the
