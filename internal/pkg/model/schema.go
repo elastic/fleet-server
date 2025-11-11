@@ -142,7 +142,7 @@ type Agent struct {
 	AuditUnenrolledTime string `json:"audit_unenrolled_time,omitempty"`
 
 	// Elastic Agent components detailed status information
-	Components []ComponentsItems `json:"components,omitempty"`
+	Components json.RawMessage `json:"components,omitempty"`
 
 	// Deprecated. Use Outputs instead. API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKey string `json:"default_api_key,omitempty"`
@@ -335,8 +335,9 @@ type CheckinPolicyInputItems struct {
 	TemplateID string `json:"template_id"`
 }
 
-// ComponentsItems
+// ComponentsItems Elastic Agent component detailed status information
 type ComponentsItems struct {
+	ESDocument
 	ID      string       `json:"id,omitempty"`
 	Message string       `json:"message,omitempty"`
 	Status  string       `json:"status,omitempty"`

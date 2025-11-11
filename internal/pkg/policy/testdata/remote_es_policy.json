@@ -1,0 +1,51 @@
+{
+  "id": "remote1",
+  "revision": 33,
+  "outputs": {
+    "remote": {
+      "type": "remote_elasticsearch",
+      "hosts": [
+        "https://5a8bb94bfbe0401a909e1496a9e884c2.us-central1.gcp.foundit.no:443"
+      ],
+      "service_token": "token1"
+    }
+  },
+  "output_permissions": {
+    "remote": {
+      "_fallback": {
+        "cluster": [
+          "monitor"
+        ],
+        "indices": [
+          {
+            "names": [
+              "logs-*",
+              "metrics-*",
+              "traces-*",
+              ".logs-endpoint.diagnostic.collection-*"
+            ],
+            "privileges": [
+              "auto_configure",
+              "create_doc"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "agent": {
+    "monitoring": {
+      "enabled": true,
+      "use_output": "remote",
+      "logs": true,
+      "metrics": true
+    }
+  },
+  "inputs": [
+  ],
+  "fleet": {
+    "hosts": [
+      "http://10.128.0.4:8220"
+    ]
+  }
+}
