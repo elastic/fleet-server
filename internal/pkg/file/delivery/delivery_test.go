@@ -237,11 +237,12 @@ func TestSendFileMultipleChunksUsesBackingIndex(t *testing.T) {
 	esMock.RoundTripFn = func(req *http.Request) (*http.Response, error) {
 		parts := strings.Split(req.URL.Path, "/") // ["", ".fleet-filedelivery-data-endpoint-0001", "_doc", "xyz.1"]
 
-		if parts[3] == fileID+".0" {
+		switch parts[3] {
+		case fileID + ".0":
 			assert.Equal(t, idx1, parts[1])
-		} else if parts[3] == fileID+".1" {
+		case fileID + ".1":
 			assert.Equal(t, idx2, parts[1])
-		} else {
+		default:
 			return nil, errors.New("invalid chunk index!")
 		}
 
