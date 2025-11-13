@@ -16,10 +16,10 @@ type Limit struct {
 }
 
 type ServerLimits struct {
-	MaxAgents              int   `config:"max_agents"`
-	MaxHeaderByteSize      int   `config:"max_header_byte_size"`
-	MaxConnections         int   `config:"max_connections"`
-	MaxFileStorageByteSize int64 `config:"max_file_storage_size"`
+	MaxAgents              int     `config:"max_agents"`
+	MaxHeaderByteSize      int     `config:"max_header_byte_size"`
+	MaxConnections         int     `config:"max_connections"`
+	MaxFileStorageByteSize *uint64 `config:"max_file_storage_size"`
 
 	ActionLimit        Limit `config:"action_limit"`
 	PolicyLimit        Limit `config:"policy_limit"`

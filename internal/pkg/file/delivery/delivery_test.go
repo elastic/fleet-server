@@ -68,7 +68,7 @@ func TestFindFile(t *testing.T) {
 		},
 	}, nil)
 
-	d := New(nil, fakeBulk, -1)
+	d := New(nil, fakeBulk, nil)
 
 	info, err := d.FindFileForAgent(context.Background(), fileID, agentID)
 	require.NoError(t, err)
@@ -92,7 +92,7 @@ func TestFindFileHandlesNoResults(t *testing.T) {
 		},
 	}, nil)
 
-	d := New(nil, fakeBulk, -1)
+	d := New(nil, fakeBulk, nil)
 
 	_, err := d.FindFileForAgent(context.Background(), "somefile", "anyagent")
 	assert.ErrorIs(t, ErrNoFile, err)
@@ -132,7 +132,7 @@ func TestLocateChunks(t *testing.T) {
 		},
 	}, nil)
 
-	d := New(nil, fakeBulk, -1)
+	d := New(nil, fakeBulk, nil)
 
 	chunks, err := d.LocateChunks(context.Background(), zerolog.Logger{}, baseID)
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestLocateChunksEmpty(t *testing.T) {
 		},
 	}, nil)
 
-	d := New(nil, fakeBulk, -1)
+	d := New(nil, fakeBulk, nil)
 
 	_, err := d.LocateChunks(context.Background(), zerolog.Logger{}, "afile")
 	assert.Error(t, err)
@@ -172,7 +172,7 @@ func TestSendFile(t *testing.T) {
 	}
 	// Chunk data from a tiny PNG, as a full CBOR document
 	esMock.Response = sendBodyBytes(hexDecode("bf665f696e64657878212e666c6565742d66696c6564656c69766572792d646174612d656e64706f696e74635f6964654142432e30685f76657273696f6e02675f7365715f6e6f016d5f7072696d6172795f7465726d0165666f756e64f5666669656c6473bf64646174619f586789504e470d0a1a0a0000000d494844520000010000000100010300000066bc3a2500000003504c5445b5d0d0630416ea0000001f494441546881edc1010d000000c2a0f74f6d0e37a00000000000000000be0d210000019a60e1d50000000049454e44ae426082ffffff")) //nolint:bodyclose // nopcloser is used, linter does not see it
-	d := New(esClient, fakeBulk, -1)
+	d := New(esClient, fakeBulk, nil)
 	err := d.SendFile(context.Background(), zerolog.Logger{}, buf, chunks, fileID)
 	require.NoError(t, err)
 
@@ -208,7 +208,7 @@ func TestSendFileMultipleChunks(t *testing.T) {
 		}
 	}
 
-	d := New(esClient, fakeBulk, -1)
+	d := New(esClient, fakeBulk, nil)
 	err := d.SendFile(context.Background(), zerolog.Logger{}, buf, chunks, fileID)
 	require.NoError(t, err)
 
@@ -248,7 +248,7 @@ func TestSendFileMultipleChunksUsesBackingIndex(t *testing.T) {
 		return sendBodyBytes(mockData), nil
 	}
 
-	d := New(esClient, fakeBulk, -1)
+	d := New(esClient, fakeBulk, nil)
 	err := d.SendFile(context.Background(), zerolog.Logger{}, buf, chunks, fileID)
 	require.NoError(t, err)
 }
@@ -306,7 +306,7 @@ func TestSendFileHandlesDisorderedChunks(t *testing.T) {
 		return sendBodyBytes(sampleDocBody), nil
 	}
 
-	d := New(esClient, fakeBulk, -1)
+	d := New(esClient, fakeBulk, nil)
 	err := d.SendFile(context.Background(), zerolog.Logger{}, buf, chunks, fileID)
 	require.NoError(t, err)
 }

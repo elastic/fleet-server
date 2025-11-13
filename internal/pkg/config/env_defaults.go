@@ -57,8 +57,6 @@ const (
 	defaultStatusMax      = 50
 	defaultStatusMaxBody  = 0
 
-	defaultFileStorageByteSize = 0 // no limit
-
 	defaultUploadStartInterval = time.Second * 2
 	defaultUploadStartBurst    = 5
 	defaultUploadStartMax      = 10
@@ -145,7 +143,7 @@ type limit struct {
 type serverLimitDefaults struct {
 	PolicyThrottle         time.Duration `config:"policy_throttle"` // deprecated: replaced by policy_limit
 	MaxConnections         int           `config:"max_connections"`
-	MaxFileStorageByteSize int64         `config:"max_file_storage_size"`
+	MaxFileStorageByteSize *uint64       `config:"max_file_storage_size"`
 
 	ActionLimit        limit `config:"action_limit"`
 	PolicyLimit        limit `config:"policy_limit"`
@@ -164,8 +162,7 @@ type serverLimitDefaults struct {
 
 func defaultserverLimitDefaults() *serverLimitDefaults {
 	return &serverLimitDefaults{
-		MaxConnections:         defaultMaxConnections,
-		MaxFileStorageByteSize: defaultFileStorageByteSize,
+		MaxConnections: defaultMaxConnections,
 		ActionLimit: limit{
 			Interval: defaultActionInterval,
 			Burst:    defaultActionBurst,

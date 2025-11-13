@@ -82,7 +82,7 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
-	u := New(nil, fakeBulk, c, int64(size), time.Hour)
+	u := New(nil, fakeBulk, c, size_ptr(size), time.Hour)
 	info, err := u.Begin(t.Context(), []string{}, data)
 	assert.NoError(t, err)
 
@@ -100,7 +100,7 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 // tests the document sent to elasticsearch passes through
 // the correct fields from input
 func TestUploadBeginWritesDocumentFromInputs(t *testing.T) {
-	size := 3096
+	size := uint64(3096)
 	src := "foo"
 	action := "abcd-ef"
 	agent := "xyz-123"
@@ -126,7 +126,7 @@ func TestUploadBeginWritesDocumentFromInputs(t *testing.T) {
 
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
-	u := New(nil, fakeBulk, c, int64(size), time.Hour)
+	u := New(nil, fakeBulk, c, &size, time.Hour)
 	_, err = u.Begin(t.Context(), []string{}, data)
 	assert.NoError(t, err)
 
@@ -164,7 +164,7 @@ func TestUploadBeginCalculatesCorrectChunkCount(t *testing.T) {
 
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
-	u := New(nil, fakeBulk, c, file.MaxChunkSize*3000, time.Hour)
+	u := New(nil, fakeBulk, c, size_ptr(file.MaxChunkSize*3000), time.Hour)
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -179,18 +179,21 @@ func TestUploadBeginCalculatesCorrectChunkCount(t *testing.T) {
 }
 
 func TestUploadBeginMaxFileSize(t *testing.T) {
+
 	tests := []struct {
-		UploadSizeLimit int64
+		UploadSizeLimit *uint64
 		FileSize        int64
 		ShouldError     bool
 		Name            string
 	}{
-		{0, 1024 * 1024 * 300, false, "0 limit is unlimited"},
-		{500, 800, true, "800 is too large"},
-		{800, 500, false, "file within limits"},
-		{1024, 1023, false, "1-less than limit"},
-		{1024, 1024, false, "file is exactly limit"},
-		{1024, 1025, true, "file is 1 over limit"},
+		{size_ptr(0), 4096, true, "0 in config disables feature"},
+		{size_ptr(10), 5, false, "any positive value should keep feature enabled"},
+		{size_ptr(500), 800, true, "file of 800 is larger than limit 500"},
+		{size_ptr(800), 500, false, "file within limits"},
+		{size_ptr(1024), 1023, false, "1-less than limit"},
+		{size_ptr(1024), 1024, false, "file is exactly limit"},
+		{size_ptr(1024), 1025, true, "file is 1 over limit"},
+		{nil, 1024 * 1024 * 300, false, "nil as limit is unlimited"},
 	}
 
 	fakeBulk := itesting.NewMockBulk()
@@ -244,7 +247,7 @@ func TestUploadRejectsMissingRequiredFields(t *testing.T) {
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 
-	u := New(nil, fakeBulk, c, 2048, time.Hour)
+	u := New(nil, fakeBulk, c, size_ptr(2048), time.Hour)
 
 	var ok bool
 	for _, field := range tests {
@@ -337,7 +340,7 @@ func TestChunkMarksFinal(t *testing.T) {
 			c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 			require.NoError(t, err)
 
-			u := New(nil, fakeBulk, c, 8388608000, time.Hour)
+			u := New(nil, fakeBulk, c, size_ptr(8388608000), time.Hour)
 
 			data := makeUploadRequestDict(map[string]interface{}{
 				"file.size": tc.FileSize,
@@ -362,4 +365,9 @@ func TestChunkMarksFinal(t *testing.T) {
 			assert.Truef(t, chunk.Last, "chunk number %d should be marked as Last", tc.FinalChunk)
 		})
 	}
+}
+
+func size_ptr(x int) *uint64 {
+	y := uint64(x) //nolint:gosec // disable G115
+	return &y
 }
