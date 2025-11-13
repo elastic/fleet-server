@@ -353,15 +353,17 @@ func TestUploadBeginFileSize(t *testing.T) {
 	// now test various body contents
 	tests := []struct {
 		Name         string
-		MaxSize      int64
+		MaxSize      *uint64
 		ExpectStatus int
 		InputSize    int64
 	}{
-		{"MaxSize 0 allows uploads", 0, http.StatusOK, 1000},
-		{"MaxSize 0 allows large uploads", 0, http.StatusOK, 1024 * 1024 * 1024 * 2},
-		{"MaxSize 0 does not allow 0-length files", 0, http.StatusBadRequest, 0},
-		{"Sizes larger than MaxSize are denied", 1024, http.StatusBadRequest, 2048},
-		{"Sizes smaller than MaxSize are allowed", 1024, http.StatusOK, 900},
+		{"MaxSize nil allows uploads", nil, http.StatusOK, 1000},
+		{"MaxSize nil allows large uploads", nil, http.StatusOK, 1024 * 1024 * 1024 * 2},
+		{"MaxSize nil does not allow 0-length files", nil, http.StatusBadRequest, 0},
+		{"MaxSize 0 does not allow uploads", size_ptr(0), http.StatusForbidden, 1000},
+		{"MaxSize 0 does not allow 0-sized uploads", size_ptr(0), http.StatusForbidden, 0},
+		{"Sizes larger than MaxSize are denied", size_ptr(1024), http.StatusBadRequest, 2048},
+		{"Sizes smaller than MaxSize are allowed", size_ptr(1024), http.StatusOK, 900},
 	}
 
 	for _, tc := range tests {
@@ -1029,10 +1031,10 @@ func TestUploadCompleteBadRequests(t *testing.T) {
 
 // prepareUploaderMock sets up common dependencies and registers upload routes to a returned router
 func prepareUploaderMock(t *testing.T) (http.Handler, apiServer, *itesting.MockBulk, *MockTransport) {
-	return configureUploaderMock(t, 0)
+	return configureUploaderMock(t, nil)
 }
 
-func configureUploaderMock(t *testing.T, fileSize int64) (http.Handler, apiServer, *itesting.MockBulk, *MockTransport) {
+func configureUploaderMock(t *testing.T, fileSize *uint64) (http.Handler, apiServer, *itesting.MockBulk, *MockTransport) {
 	// chunk index operations skip the bulker in order to send binary docs directly
 	// so a mock *elasticsearch.Client needs to be be prepared
 	es, tx := mockESClient(t)
@@ -1226,4 +1228,9 @@ func sendBody(body io.Reader) *http.Response {
 			"Content-Type":      []string{"application/cbor"},
 		},
 	}
+}
+
+func size_ptr(x int) *uint64 {
+	y := uint64(x) //nolint:gosec // disable G115
+	return &y
 }
