@@ -1,0 +1,15 @@
+version: 9.2.2-TEST-ONLY
+entries:
+    - kind: enhancement
+      summary: Accept secret references in policies in either inline or path formats
+      description: "Elastic Agent policies can contain secret references in one of two formats: inline or path.\nWith the inline format, the reference looks like this: `<path>: $co.elastic.secret{<secret ref>}`. \nWith the path format, the reference looks like this: `secrets.<path>.id:<secret ref>`.\nThis change ensures that Fleet Server accepts secret references in policies in either format.\n"
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/5832
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762435732
+      file:
+        name: 1762435732-secrets-fallback.yaml
+        checksum: 5b929a1761bf0cd924d72ba2016afee132dbb163
