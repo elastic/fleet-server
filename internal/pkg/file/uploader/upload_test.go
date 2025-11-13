@@ -100,7 +100,7 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 // tests the document sent to elasticsearch passes through
 // the correct fields from input
 func TestUploadBeginWritesDocumentFromInputs(t *testing.T) {
-	size := uint64(3096)
+	size := 3096
 	src := "foo"
 	action := "abcd-ef"
 	agent := "xyz-123"
@@ -126,7 +126,7 @@ func TestUploadBeginWritesDocumentFromInputs(t *testing.T) {
 
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
-	u := New(nil, fakeBulk, c, &size, time.Hour)
+	u := New(nil, fakeBulk, c, size_ptr(size), time.Hour)
 	_, err = u.Begin(t.Context(), []string{}, data)
 	assert.NoError(t, err)
 
@@ -216,7 +216,11 @@ func TestUploadBeginMaxFileSize(t *testing.T) {
 			})
 			_, err := u.Begin(t.Context(), []string{}, data)
 			if tc.ShouldError {
-				assert.ErrorIs(t, err, ErrFileSizeTooLarge)
+				if tc.UploadSizeLimit != nil && *tc.UploadSizeLimit == 0 {
+					assert.ErrorIs(t, err, ErrFeatureDisabled)
+				} else {
+					assert.ErrorIs(t, err, ErrFileSizeTooLarge)
+				}
 			} else {
 				assert.NoError(t, err)
 			}
