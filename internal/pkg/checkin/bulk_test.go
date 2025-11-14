@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
@@ -28,21 +27,8 @@ import (
 // Test with seq no
 
 // matchOp is used with mock.MatchedBy to match and validate the operation
-func matchOp(tb testing.TB, c testcase, ts time.Time) func(ops []bulk.MultiOp) bool {
-	return func(ops []bulk.MultiOp) bool {
-		if len(ops) != 1 {
-			return false
-		}
-		if ops[0].ID != c.id {
-			return false
-		}
-		if ops[0].Index != dl.FleetAgents {
-			return false
-		}
-		tb.Log("Operation match! validating details...")
-
-		// Decode and match operation
-		// NOTE putting the extra validation here seems strange, maybe we should read the args in the test body intstead?
+func matchOp(tb testing.TB, c testcase) func([]byte) bool {
+	return func(body []byte) bool {
 		type updateT struct {
 			LastCheckin   string          `json:"last_checkin"`
 			Status        string          `json:"last_checkin_status"`
@@ -54,14 +40,14 @@ func matchOp(tb testing.TB, c testcase, ts time.Time) func(ops []bulk.MultiOp) b
 		}
 
 		m := make(map[string]updateT)
-		err := json.Unmarshal(ops[0].Body, &m)
-		require.NoErrorf(tb, err, "unable to validate operation body %s", string(ops[0].Body))
+		err := json.Unmarshal(body, &m)
+		require.NoErrorf(tb, err, "unable to validate operation body %s", string(body))
 
 		sub, ok := m["doc"]
 		require.True(tb, ok, "unable to validate operation: expected doc")
 
-		validateTimestamp(tb, ts.Truncate(time.Second), sub.LastCheckin)
-		validateTimestamp(tb, ts.Truncate(time.Second), sub.UpdatedAt)
+		assert.NotEmpty(tb, sub.LastCheckin)
+		assert.Equal(tb, sub.LastCheckin, sub.UpdatedAt) // should have same timestamp
 		assert.Equal(tb, c.policyID, sub.AgentPolicyID)
 		assert.Equal(tb, c.revisionIDX, sub.RevisionIDX)
 		if c.seqno != nil {
@@ -71,7 +57,7 @@ func matchOp(tb testing.TB, c testcase, ts time.Time) func(ops []bulk.MultiOp) b
 		}
 
 		if c.meta != nil {
-			assert.Equal(tb, json.RawMessage(c.meta), sub.Meta)
+			assert.Equal(tb, c.meta, sub.Meta)
 		}
 		assert.Equal(tb, c.status, sub.Status)
 		return true
@@ -85,16 +71,14 @@ type testcase struct {
 	message         string
 	policyID        string
 	revisionIDX     int64
-	meta            []byte
-	components      []byte
+	meta            json.RawMessage
+	components      json.RawMessage
 	seqno           sqn.SeqNo
 	ver             string
 	unhealthyReason *[]string
 }
 
-func TestBulkSimple(t *testing.T) {
-	start := time.Now()
-
+func TestBulkCheckin(t *testing.T) {
 	const ver = "8.9.0"
 	cases := []testcase{{
 		name:    "Simple case",
@@ -168,18 +152,18 @@ func TestBulkSimple(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := testlog.SetLogger(t).WithContext(t.Context())
 			mockBulk := ftesting.NewMockBulk()
-			mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchOp(t, c, start)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
+			mockBulk.On("Update", mock.Anything, dl.FleetAgents, c.id, mock.MatchedBy(matchOp(t, c)), mock.Anything).Return(nil).Once()
 			bc := NewBulk(mockBulk)
 
 			opts := []Option{WithStatus(c.status), WithMessage(c.message)}
 			if c.policyID != "" {
 				opts = append(opts, WithAgentPolicyID(c.policyID), WithPolicyRevisionIDX(c.revisionIDX))
 			}
-			if c.meta != nil {
-				opts = append(opts, WithMeta(c.meta))
+			if len(c.meta) > 0 {
+				opts = append(opts, WithMeta(&c.meta))
 			}
-			if c.components != nil {
-				opts = append(opts, WithComponents(c.components))
+			if len(c.components) > 0 {
+				opts = append(opts, WithComponents(&c.components))
 			}
 			if c.seqno != nil {
 				opts = append(opts, WithSeqNo(c.seqno))
@@ -191,20 +175,12 @@ func TestBulkSimple(t *testing.T) {
 				opts = append(opts, WithUnhealthyReason(c.unhealthyReason))
 			}
 
-			err := bc.CheckIn(c.id, opts...)
-			require.NoError(t, err)
-			err = bc.flush(ctx)
+			err := bc.CheckIn(ctx, c.id, opts...)
 			require.NoError(t, err)
 
 			mockBulk.AssertExpectations(t)
 		})
 	}
-}
-
-func validateTimestamp(tb testing.TB, start time.Time, ts string) {
-	t1, err := time.Parse(time.RFC3339, ts)
-	require.NoErrorf(tb, err, "expected %q to be in RFC 3339 format", ts)
-	require.False(tb, start.After(t1), "timestamp in the past")
 }
 
 func benchmarkBulk(n int, b *testing.B) {
@@ -221,10 +197,7 @@ func benchmarkBulk(n int, b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for _, id := range ids {
-			err := bc.CheckIn(id)
-			if err != nil {
-				b.Fatal(err)
-			}
+			bc.Add(id)
 		}
 	}
 }
@@ -247,14 +220,11 @@ func benchmarkFlush(n int, b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		for _, id := range ids {
-			err := bc.CheckIn(id) // TODO ths benchmark is not very interesting as the simplecache is used
-			if err != nil {
-				b.Fatal(err)
-			}
+			bc.Add(id)
 		}
 		b.StartTimer()
 
-		err := bc.flush(ctx)
+		err := bc.flushConnected(ctx)
 		if err != nil {
 			b.Fatal(err)
 		}

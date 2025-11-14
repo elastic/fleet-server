@@ -1685,7 +1685,7 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 		_, ok = obj["audit_unenrolled_reason"]
 		_, ok2 := obj["unenrolled_at"]
 		return !ok && !ok2
-	}, time.Second*20, time.Second, "agent document should not have the audit_unenrolled_reason or unenrolled_at attributes. agent doc: %v", obj)
+	}, time.Second*10, time.Second, "agent document should not have the audit_unenrolled_reason or unenrolled_at attributes. agent doc: %v", obj)
 	cancel()
 	srv.waitExit() //nolint:errcheck // test case
 }
