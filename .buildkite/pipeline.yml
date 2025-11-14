@@ -24,6 +24,9 @@ common:
   - docker_elastic_login_plugin: &docker_elastic_login_plugin
       elastic/vault-docker-login#v0.6.0:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+  - dockerhub_login_plugin: &dockerhub_login_plugin
+      elastic/vault-docker-login#v0.6.0:
+        secret_path: 'kv/ci-shared/observability-github-secrets/shared/docker/dockerhub/observabilityrobots'
   # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
   # This plugin authenticates to Google Cloud using the OIDC token.
   - oidc_plugin: &oidc_plugin
@@ -58,6 +61,7 @@ steps:
           machineType: "c2-standard-16"
         plugins:
           - *oidc_plugin
+          - *dockerhub_login_plugin
 
       - label: "Package x86_64 FIPS"
         key: "package-fips-x86-64-pr"
@@ -73,6 +77,7 @@ steps:
           machineType: "c2-standard-16"
         plugins:
           - *oidc_plugin
+          - *dockerhub_login_plugin
 
       - label: "Package aarch64"
         key: "package-arm64-pr"
@@ -87,6 +92,7 @@ steps:
           instanceType: "t4g.2xlarge"
         plugins:
           - *oidc_plugin
+          - *dockerhub_login_plugin
 
       - label: "Package aarch64 FIPS"
         key: "package-fips-arm64-pr"
@@ -102,6 +108,7 @@ steps:
           instanceType: "t4g.2xlarge"
         plugins:
           - *oidc_plugin
+          - *dockerhub_login_plugin
 
   - group: "Performance test"
     key: "performance-test"
