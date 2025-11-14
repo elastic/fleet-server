@@ -341,6 +341,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			uploader.ErrFeatureDisabled,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"ErrFileFeatureDisable",
+				"File Transfer is disabled in Fleet Server configuration",
+				zerolog.WarnLevel,
+			},
+		},
+		{
 			uploader.ErrMissingChunks,
 			HTTPErrResp{
 				http.StatusBadRequest,

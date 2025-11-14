@@ -25,13 +25,13 @@ var (
 )
 
 type Deliverer struct {
-	sizeLimit int64
+	sizeLimit *uint64
 
 	client *elasticsearch.Client
 	bulker bulk.Bulk
 }
 
-func New(client *elasticsearch.Client, bulker bulk.Bulk, sizeLimit int64) *Deliverer {
+func New(client *elasticsearch.Client, bulker bulk.Bulk, sizeLimit *uint64) *Deliverer {
 	return &Deliverer{
 		client:    client,
 		bulker:    bulker,

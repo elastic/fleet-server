@@ -405,7 +405,7 @@ func prepareFileDeliveryMock(t *testing.T) (http.Handler, apiServer, *MockTransp
 		ft: &FileDeliveryT{
 			bulker:    fakebulk,
 			cache:     c,
-			deliverer: delivery.New(mockES, fakebulk, maxFileSize),
+			deliverer: delivery.New(mockES, fakebulk, nil),
 			authAgent: func(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
 				return &model.Agent{
 					ESDocument: model.ESDocument{
