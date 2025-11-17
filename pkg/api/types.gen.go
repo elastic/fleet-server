@@ -305,6 +305,15 @@ type AuditUnenrollRequest struct {
 // AuditUnenrollRequestReason The unenroll reason
 type AuditUnenrollRequestReason string
 
+// AvailableRollbacks Target versions available for a rollback
+type AvailableRollbacks = []struct {
+	// ValidUntil timestamp indicating when the rollback target will expire
+	ValidUntil time.Time `json:"valid_until"`
+
+	// Version version of the available rollback target, represented as string
+	Version string `json:"version"`
+}
+
 // CheckinRequest defines model for checkinRequest.
 type CheckinRequest struct {
 	// AckToken The ack_token form a previous response if the agent has checked in before.
@@ -336,6 +345,9 @@ type CheckinRequest struct {
 	// The value, if specified is expected to be a string that is parsable by [time.ParseDuration](https://pkg.go.dev/time#ParseDuration).
 	// If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
 	PollTimeout *string `json:"poll_timeout,omitempty"`
+
+	// Rollbacks Target versions available for a rollback
+	Rollbacks *AvailableRollbacks `json:"rollbacks,omitempty"`
 
 	// Status The agent state, inferred from agent control protocol states.
 	Status CheckinRequestStatus `json:"status"`
