@@ -30,7 +30,7 @@ func NewFileDeliveryT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elastic
 	return &FileDeliveryT{
 		bulker:    bulker,
 		cache:     cache,
-		deliverer: delivery.New(chunkClient, bulker, maxFileSize),
+		deliverer: delivery.New(chunkClient, bulker, cfg.Limits.MaxFileStorageByteSize),
 		authAgent: authAgent,
 	}
 }

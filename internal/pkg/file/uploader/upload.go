@@ -23,6 +23,7 @@ import (
 var (
 	ErrInvalidUploadID  = errors.New("active upload not found with this ID, it may be expired")
 	ErrFileSizeTooLarge = errors.New("this file exceeds the maximum allowed file size")
+	ErrFeatureDisabled  = errors.New("feature is disabled via fleet server configuration")
 	ErrMissingChunks    = errors.New("file data incomplete, not all chunks were uploaded")
 	ErrHashMismatch     = errors.New("hash does not match")
 	ErrUploadExpired    = errors.New("upload has expired")
@@ -37,14 +38,14 @@ var (
 
 type Uploader struct {
 	cache     cache.Cache // cache of file metadata doc info
-	sizeLimit int64
+	sizeLimit *uint64
 	timeLimit time.Duration
 
 	chunkClient *elasticsearch.Client
 	bulker      bulk.Bulk
 }
 
-func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, cache cache.Cache, sizeLimit int64, timeLimit time.Duration) *Uploader {
+func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, cache cache.Cache, sizeLimit *uint64, timeLimit time.Duration) *Uploader {
 	return &Uploader{
 		chunkClient: chunkClient,
 		bulker:      bulker,
@@ -56,6 +57,10 @@ func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, cache cache.Cache,
 
 // Start an upload operation
 func (u *Uploader) Begin(ctx context.Context, namespaces []string, data JSDict) (file.Info, error) {
+	if u.sizeLimit != nil && *u.sizeLimit == 0 {
+		return file.Info{}, ErrFeatureDisabled
+	}
+
 	vSpan, _ := apm.StartSpan(ctx, "validateFileInfo", "validate")
 	if data == nil {
 		vSpan.End()
@@ -73,7 +78,7 @@ func (u *Uploader) Begin(ctx context.Context, namespaces []string, data JSDict) 
 	}
 
 	size, _ := data.Int64("file", "size")
-	if size > u.sizeLimit {
+	if u.sizeLimit != nil && uint64(size) > *u.sizeLimit { //nolint:gosec // disable G115 - negatives are checked for in payload validation
 		vSpan.End()
 		return file.Info{}, ErrFileSizeTooLarge
 	}
