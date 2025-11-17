@@ -371,6 +371,23 @@ components:
             - $ref: "#/components/schemas/upgrade_metadata_scheduled"
             - $ref: "#/components/schemas/upgrade_metadata_downloading"
             - $ref: "#/components/schemas/upgrade_metadata_failed"
+    available_rollbacks:
+      description: |
+        Target versions available for a rollback
+      type: array
+      items:
+        type: object
+        required:
+          - version
+          - valid_until
+        properties:
+          version:
+            description: version of the available rollback target, represented as string
+            type: string
+          valid_until:
+            description: timestamp indicating when the rollback target will expire
+            type: string
+            format: date-time
     checkinRequest:
       type: object
       required:
@@ -431,6 +448,8 @@ components:
             The revision of the policy that the agent is currently running.
           type: integer
           format: int64
+        rollbacks:
+          $ref: "#/components/schemas/available_rollbacks"
     actionSignature:
       description: Optional action signing data.
       type: object
