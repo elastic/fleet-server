@@ -70,7 +70,7 @@ const (
 	defaultUploadChunkInterval = time.Millisecond * 3
 	defaultUploadChunkBurst    = 5
 	defaultUploadChunkMax      = 10
-	defaultUploadChunkMaxBody  = 1024 * 1024 * 4 // this is also enforced in handler, a chunk MAY NOT be larger than 4 MiB
+	defaultUploadChunkMaxBody  = 1024 * 1024 * 4 // this is also enforced in handler, a chunk MUST NOT be larger than 4 MiB
 
 	defaultFileDelivInterval = time.Millisecond * 100
 	defaultFileDelivBurst    = 5
@@ -141,8 +141,9 @@ type limit struct {
 }
 
 type serverLimitDefaults struct {
-	PolicyThrottle time.Duration `config:"policy_throttle"` // deprecated: replaced by policy_limit
-	MaxConnections int           `config:"max_connections"`
+	PolicyThrottle         time.Duration `config:"policy_throttle"` // deprecated: replaced by policy_limit
+	MaxConnections         int           `config:"max_connections"`
+	MaxFileStorageByteSize *uint64       `config:"max_file_storage_size"`
 
 	ActionLimit        limit `config:"action_limit"`
 	PolicyLimit        limit `config:"policy_limit"`
