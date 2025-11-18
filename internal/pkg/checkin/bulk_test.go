@@ -14,6 +14,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	estypes "github.com/elastic/go-elasticsearch/v8/typedapi/types"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/scriptlanguage"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
@@ -64,6 +66,31 @@ func matchOp(tb testing.TB, c testcase) func([]byte) bool {
 	}
 }
 
+// matchMOp is used with mock.MatchedBy to match and validate a multi update operation
+func matchMOp(tb testing.TB, c testcase) func([]bulk.MultiOp) bool {
+	return func(updates []bulk.MultiOp) bool {
+		require.Len(tb, updates, 2)
+
+		// first is the same body as matchOp checks
+		assert.Equal(tb, c.id, updates[0].ID)
+		assert.Equal(tb, dl.FleetAgents, updates[0].Index)
+		assert.True(tb, matchOp(tb, c)(updates[0].Body))
+
+		// second is the painless script to remove the audit fields
+		assert.Equal(tb, c.id, updates[1].ID)
+		assert.Equal(tb, dl.FleetAgents, updates[1].Index)
+
+		var action estypes.UpdateAction
+		err := json.Unmarshal(updates[1].Body, &action)
+		require.NoError(tb, err, "second update body not an update action")
+		require.NotNil(tb, action.Script)
+		assert.Equal(tb, &scriptlanguage.Painless, action.Script.Lang)
+		assert.Equal(tb, &deleteAuditAttributesScript, action.Script.Source)
+
+		return true
+	}
+}
+
 type testcase struct {
 	name            string
 	id              string
@@ -76,6 +103,7 @@ type testcase struct {
 	seqno           sqn.SeqNo
 	ver             string
 	unhealthyReason *[]string
+	deleteAudit     bool
 }
 
 func TestBulkCheckin(t *testing.T) {
@@ -113,6 +141,15 @@ func TestBulkCheckin(t *testing.T) {
 		meta:       []byte(`{"hey":"now","brown":"cow"}`),
 		components: []byte(`[{"id":"winlog-default","type":"winlog"}]`),
 		ver:        ver,
+	}, {
+		name:        "Multi field case w/ delete audit",
+		id:          "multiFieldId",
+		status:      "online",
+		message:     "message",
+		meta:        []byte(`{"hey":"now","brown":"cow"}`),
+		components:  []byte(`[{"id":"winlog-default","type":"winlog"}]`),
+		ver:         ver,
+		deleteAudit: true,
 	}, {
 		name:       "Multi field nested case",
 		id:         "multiFieldNestedId",
@@ -152,7 +189,11 @@ func TestBulkCheckin(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := testlog.SetLogger(t).WithContext(t.Context())
 			mockBulk := ftesting.NewMockBulk()
-			mockBulk.On("Update", mock.Anything, dl.FleetAgents, c.id, mock.MatchedBy(matchOp(t, c)), mock.Anything).Return(nil).Once()
+			if c.deleteAudit {
+				mockBulk.On("MUpdate", mock.Anything, mock.MatchedBy(matchMOp(t, c)), mock.Anything).Return([]bulk.BulkIndexerResponseItem{}, nil).Once()
+			} else {
+				mockBulk.On("Update", mock.Anything, dl.FleetAgents, c.id, mock.MatchedBy(matchOp(t, c)), mock.Anything).Return(nil).Once()
+			}
 			bc := NewBulk(mockBulk)
 
 			opts := []Option{WithStatus(c.status), WithMessage(c.message)}
@@ -173,6 +214,9 @@ func TestBulkCheckin(t *testing.T) {
 			}
 			if c.unhealthyReason != nil {
 				opts = append(opts, WithUnhealthyReason(c.unhealthyReason))
+			}
+			if c.deleteAudit {
+				opts = append(opts, WithDeleteAudit(true))
 			}
 
 			err := bc.CheckIn(ctx, c.id, opts...)

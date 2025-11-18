@@ -145,6 +145,13 @@ func WithUpgradeAttempts(attempts *[]string) Option {
 	}
 }
 
+func WithUpgradedAt(upgradedAt *string) Option {
+	return func(state *checkinT) {
+		state.upgradedAt.isSet = true
+		state.upgradedAt.value = upgradedAt
+	}
+}
+
 type setT[T any] struct {
 	isSet bool
 	value T
@@ -169,6 +176,7 @@ type checkinT struct {
 	upgradeStartedAt setT[*string]
 	upgradeStatus    setT[*string]
 	upgradeAttempts  setT[*[]string]
+	upgradedAt       setT[*string]
 
 	deleteAudit bool
 }
@@ -225,6 +233,9 @@ func (c *checkinT) toBody() ([]byte, error) {
 	}
 	if c.upgradeAttempts.isSet {
 		fields[dl.FieldUpgradeAttempts] = c.upgradeAttempts.value
+	}
+	if c.upgradedAt.isSet {
+		fields[dl.FieldUpgradedAt] = c.upgradedAt.value
 	}
 
 	// If seqNo changed, set the field appropriately
@@ -301,31 +312,44 @@ func (bc *Bulk) CheckIn(ctx context.Context, id string, opts ...Option) error {
 	if checkin.seqNo.IsSet() {
 		bulkOpts = append(bulkOpts, bulk.WithRefresh())
 	}
-	err = bc.bulker.Update(ctx, dl.FleetAgents, id, body, bulkOpts...)
+
+	// no deleteAudit so a simple update will work
+	if !checkin.deleteAudit {
+		err = bc.bulker.Update(ctx, dl.FleetAgents, id, body, bulkOpts...)
+		if err != nil {
+			return fmt.Errorf("failed to update document: %w", err)
+		}
+		return nil
+	}
+
+	// deleteAudit requires the usage of MUpdate to allow updating the body and then removing the needed fields.
+	action := &estypes.UpdateAction{
+		Script: &estypes.Script{
+			Lang:    &scriptlanguage.Painless,
+			Source:  &deleteAuditAttributesScript,
+			Options: map[string]string{},
+		},
+	}
+	actionBody, err := json.Marshal(&action)
 	if err != nil {
-		return fmt.Errorf("failed to update document: %w", err)
+		return fmt.Errorf("could not marshall script action: %w", err)
 	}
-
-	// deleteAudit performs a second request (being that this should not happen very often
-	// it's safer to only use this script when it is needed).
-	if checkin.deleteAudit {
-		action := &estypes.UpdateAction{
-			Script: &estypes.Script{
-				Lang:    &scriptlanguage.Painless,
-				Source:  &deleteAuditAttributesScript,
-				Options: map[string]string{},
-			},
-		}
-		body, err = json.Marshal(&action)
-		if err != nil {
-			return fmt.Errorf("could not marshall script action: %w", err)
-		}
-		err = bc.bulker.Update(ctx, dl.FleetAgents, id, body, bulk.WithRetryOnConflict(3))
-		if err != nil {
-			return fmt.Errorf("failed to remove audit fields with script update: %w", err)
-		}
+	updates := []bulk.MultiOp{
+		{
+			ID:    id,
+			Index: dl.FleetAgents,
+			Body:  body,
+		},
+		{
+			ID:    id,
+			Index: dl.FleetAgents,
+			Body:  actionBody,
+		},
 	}
-
+	_, err = bc.bulker.MUpdate(ctx, updates, bulkOpts...)
+	if err != nil {
+		return fmt.Errorf("failed update document and remove audit fields: %w", err)
+	}
 	return nil
 }
 

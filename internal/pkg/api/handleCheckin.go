@@ -444,10 +444,12 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		if agent.UpgradeDetails == nil {
 			return checkinOpts, nil
 		}
+		upgradedAt := time.Now().UTC().Format(time.RFC3339)
 		checkinOpts = append(checkinOpts,
 			checkin.WithUpgradeDetails(nil),
 			checkin.WithUpgradeStartedAt(nil),
 			checkin.WithUpgradeStatus(nil),
+			checkin.WithUpgradedAt(&upgradedAt),
 		)
 		return checkinOpts, nil
 	}

@@ -409,7 +409,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 					t.Logf("bulk match unmarshal error: %v", err)
 					return false
 				}
-				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradeStatus] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradeStatus] == nil && getFieldStringValue(doc.Doc, dl.FieldUpgradedAt) != ""
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
@@ -753,7 +753,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 					}
 					_, upgradeDetails := doc.Doc[dl.FieldUpgradeDetails]
 					upgradeAttempts, ok := doc.Doc[dl.FieldUpgradeAttempts]
-					return upgradeDetails && ok && upgradeAttempts == nil && doc.Doc[dl.FieldUpgradedAt] != ""
+					_, noUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+					return upgradeDetails && ok && upgradeAttempts == nil && !noUpgradedAt
 				}), mock.Anything, mock.Anything).Return(nil)
 				return mBulk
 			},
@@ -809,7 +810,8 @@ func noUpgradeDetailsMockCheck(t *testing.T, mBulk *ftesting.MockBulk) {
 		_, noUpgradeDetails := doc.Doc[dl.FieldUpgradeDetails]
 		_, noUpgradeStartedAt := doc.Doc[dl.FieldUpgradeStartedAt]
 		_, noUpgradeStatus := doc.Doc[dl.FieldUpgradeStatus]
-		return !noUpgradeDetails && !noUpgradeStartedAt && !noUpgradeStatus && doc.Doc[dl.FieldUpgradedAt] != ""
+		_, noUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+		return !noUpgradeDetails && !noUpgradeStartedAt && !noUpgradeStatus && !noUpgradedAt
 	}), mock.Anything, mock.Anything).Return(nil)
 }
 
@@ -823,7 +825,8 @@ func upgradeDetailsMockCheck(t *testing.T, mBulk *ftesting.MockBulk) {
 			return false
 		}
 		_, upgradeDetails := doc.Doc[dl.FieldUpgradeDetails]
-		return upgradeDetails && doc.Doc[dl.FieldUpgradedAt] != ""
+		_, noUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+		return upgradeDetails && !noUpgradedAt
 	}), mock.Anything, mock.Anything).Return(nil)
 }
 
@@ -1574,7 +1577,7 @@ func noPolicyDetailsMockCheck(t *testing.T, mBulk *ftesting.MockBulk) {
 		}
 		_, noAgentPolicyID := doc.Doc[dl.FieldAgentPolicyID]
 		_, noPolicyRevisionIdx := doc.Doc[dl.FieldPolicyRevisionIdx]
-		return !noAgentPolicyID && !noPolicyRevisionIdx && doc.Doc[dl.FieldUpgradedAt] != ""
+		return !noAgentPolicyID && !noPolicyRevisionIdx
 	}), mock.Anything, mock.Anything).Return(nil)
 }
 
@@ -1599,6 +1602,17 @@ func policyDetailsMockCheck(t *testing.T, mBulk *ftesting.MockBulk, policyID str
 		if !ok {
 			return false
 		}
-		return oPolicyID == policyID && int64(oRevIdxF) == revIdx && doc.Doc[dl.FieldUpgradedAt] != ""
+		return oPolicyID == policyID && int64(oRevIdxF) == revIdx
 	}), mock.Anything, mock.Anything).Return(nil)
+}
+
+func getFieldStringValue(doc map[string]interface{}, key string) string {
+	raw, ok := doc[key]
+	if ok {
+		s, ok := raw.(string)
+		if ok {
+			return s
+		}
+	}
+	return ""
 }
