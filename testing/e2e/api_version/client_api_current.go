@@ -465,7 +465,7 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 		tester.Require().NoError(err)
 		_, ok := obj.Source["audit_unenrolled_reason"]
 		return !ok
-	}, time.Second*20, time.Second, "agent document in elasticsearch should not have audit_unenrolled_reason attribute")
+	}, time.Second*10, time.Second, "agent document in elasticsearch should not have audit_unenrolled_reason attribute")
 }
 
 // TestEnrollUpgradeAction_MetadataDownloadRate_String checks that download metadata rates can be sent as strings
@@ -675,14 +675,20 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 		}
 	}
 	tester.Require().True(found, "unable to find POLICY_CHANGE action in 4th checkin response")
-	revIDX = int64(policyChange.Policy.Revision)
-	tester.Require().Equal(int64(iRev), revIDX, "Expected POLICY_CHANGE action to be for updated policy revision")
+	tester.Require().Equal(int64(iRev), int64(policyChange.Policy.Revision), "Expected POLICY_CHANGE action to be for updated policy revision")
 
+	// Document should reflect the current state of the Elastic Agent, which is always the revision_idx it used
+	// to check-in. Only an ACK or the next check-in that states the next revision would it be updated to the
+	// revision_idx that comes from the policy.
 	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
 		agent := tester.GetAgent(ctx, agentID)
 		require.Equal(c, policyID, agent.AgentPolicyID)
 		require.Equal(c, revIDX, int64(agent.Revision))
 	}, time.Second*10, time.Second)
+
+	// Bump the revision_idx to the same as the policy to signal to Fleet that the Elastic Agent is now
+	// running the latest revision that it was sent.
+	revIDX = int64(policyChange.Policy.Revision)
 
 	// Do a normal checkin to "reset" to latest revision_idx
 	// no actions are returned

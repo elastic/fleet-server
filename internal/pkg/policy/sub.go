@@ -77,7 +77,7 @@ func (n *subT) isEmpty() bool {
 func (n *subT) isUpdate(policy *model.Policy) bool {
 	pRevIdx := policy.RevisionIdx
 
-	return pRevIdx > n.revIdx
+	return pRevIdx != n.revIdx
 }
 
 // Output returns a new policy that needs to be sent based on the current subscription.
