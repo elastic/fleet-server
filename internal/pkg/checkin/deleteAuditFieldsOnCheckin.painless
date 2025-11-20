@@ -1,3 +1,24 @@
+ctx._source.last_checkin = params.TS;
+ctx._source.updated_at = params.Now;
+ctx._source.last_checkin_status = params.Status;
+ctx._source.last_checkin_message = params.Message;
+ctx._source.unhealthy_reason = params.UnhealthyReason;
+if (params.PolicyID != "") {
+  ctx._source.agent_policy_id = params.PolicyID;
+  ctx._source.policy_revision_idx = params.RevisionIDX;
+}
+if (params.Ver != "") {
+  ctx._source.agent.version = params.Ver;
+}
+if (params.Meta != null) {
+  ctx._source.local_metadata = params.Meta;
+}
+if (params.Components != null) {
+  ctx._source.components = params.Components;
+}
+if (params.SeqNoSet) {
+    ctx._source.action_seq_no = params.SeqNo;
+}
 ctx._source.remove('audit_unenrolled_reason');
 ctx._source.remove('audit_unenrolled_time');
 ctx._source.remove('unenrolled_at'); // audit/unenroll no longer sets this but it did in the 8.16.x releases, so we need to clear it.
