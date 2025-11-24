@@ -6,6 +6,7 @@
 package checkin
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
@@ -125,12 +127,29 @@ func WithPolicyRevisionIDX(idx int64) Option {
 	}
 }
 
+func WithRollbacks(rollbacks *api.AvailableRollbacks) Option {
+	return func(pending *pendingT) {
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		if rollbacks == nil {
+			pending.extra.rollbacks = nil
+			return
+		}
+		// FIXME this should be done in the validated checkin
+		buf := bytes.NewBuffer(nil)
+		json.
+			pending.extra.rollbacks = rollbacks
+	}
+}
+
 type extraT struct {
 	meta        []byte
 	seqNo       sqn.SeqNo
 	ver         string
 	components  []byte
 	deleteAudit bool
+	rollbacks   []byte
 }
 
 // Minimize the size of this structure.

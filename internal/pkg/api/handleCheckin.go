@@ -22,6 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dustin/go-humanize"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -173,6 +175,7 @@ type validatedCheckin struct {
 	rawComp         []byte
 	seqno           sqn.SeqNo
 	unhealthyReason *[]string
+	rawRollbacks    []byte
 }
 
 func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent) (validatedCheckin, error) {
@@ -251,6 +254,11 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		return val, err
 	}
 
+	rawRollbacks, err := parseRollbacks(zlog, agent, &req)
+	if err != nil {
+		return val, err
+	}
+
 	return validatedCheckin{
 		req:             &req,
 		dur:             pollDuration,
@@ -258,6 +266,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		rawComp:         rawComponents,
 		seqno:           seqno,
 		unhealthyReason: unhealthyReason,
+		rawRollbacks:    rawRollbacks,
 	}, nil
 }
 
@@ -290,6 +299,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		checkin.WithVer(ver),
 		checkin.WithUnhealthyReason(unhealthyReason),
 		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
+		checkin.WithRollbacks(req.Rollbacks),
 	}
 
 	revID, opts, err := ct.processPolicyDetails(r.Context(), zlog, agent, req)
@@ -1129,6 +1139,40 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	zlog.Debug().Any("unhealthy_reason", unhealthyReason).Msg("unhealthy reason")
 
 	return outComponents, &unhealthyReason, nil
+}
+
+func parseRollbacks(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
+	if req.Rollbacks == nil && agent.Rollbacks == nil {
+		return nil, nil
+	}
+
+	var reqRollbacks []model.Rollback
+	if req.Rollbacks != nil {
+		reqRollbacks = make([]model.Rollback, len(*req.Rollbacks))
+		for i, rr := range *req.Rollbacks {
+			reqRollbacks[i] = model.Rollback{
+				ValidUntil: rr.ValidUntil.UTC().Format(time.RFC3339),
+				Version:    rr.Version,
+			}
+		}
+	}
+
+	var outRollbacks []byte
+	// Compare the deserialized meta structures and return the bytes to update if different
+	if !reflect.DeepEqual(reqRollbacks, agent.Rollbacks) {
+		zlog.Trace().
+			Any("oldRollbacks", agent.Rollbacks).
+			Any("req.Rollbacks", req.Rollbacks).
+			Msg("available rollback data is not equal")
+
+		zlog.Info().Msg("applying new rollback data")
+		marshalled, err := json.Marshal(reqRollbacks)
+		if err != nil {
+			return nil, fmt.Errorf("marshalling rollbacks: %w", err)
+		}
+		outRollbacks = marshalled
+	}
+	return outRollbacks, nil
 }
 
 func calcUnhealthyReason(reqComponents []model.ComponentsItems) []string {

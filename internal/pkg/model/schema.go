@@ -198,6 +198,9 @@ type Agent struct {
 	// hash of token provided during enrollment that allows replacement by another enrollment with same ID
 	ReplaceToken string `json:"replace_token,omitempty"`
 
+	// list of available rollbacks for the agent
+	Rollbacks []Rollback `json:"rollbacks,omitempty"`
+
 	// Shared ID
 	SharedID string `json:"shared_id,omitempty"`
 
@@ -284,6 +287,13 @@ type Artifact struct {
 
 	// Name of the package that owns this artifact
 	PackageName string `json:"package_name,omitempty"`
+}
+
+// AvailableRollback
+type AvailableRollback struct {
+	ESDocument
+	ValidUntil string `json:"valid_until,omitempty"`
+	Version    string `json:"version,omitempty"`
 }
 
 // Checkin An Elastic Agent checkin to Fleet
@@ -518,6 +528,12 @@ type PolicyOutput struct {
 
 	// Type is the output type. Currently only Elasticsearch is supported.
 	Type string `json:"type"`
+}
+
+// Rollback
+type Rollback struct {
+	ValidUntil string `json:"valid_until,omitempty"`
+	Version    string `json:"version,omitempty"`
 }
 
 // SecretReferencesItems
