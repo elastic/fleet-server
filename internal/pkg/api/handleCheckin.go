@@ -878,14 +878,17 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, ErrNoPolicyOutput
 	}
 
+	// Get secret values so secret references in outputs and inputs can be replaced
+	// with their corresponding values.
+	secretValues, err := secret.GetSecretValues(ctx, pp.Policy.Data.SecretReferences, bulker)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get secret values: %w", err)
+	}
+
 	data := model.ClonePolicyData(pp.Policy.Data)
-	for policyName, policyOutput := range data.Outputs {
+	for _, policyOutput := range data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
-		ks, err := secret.ProcessOutputSecret(ctx, policyOutput, bulker) // makes a bulk request to get secret values
-		if err != nil {
-			return nil, fmt.Errorf("failed to process output secrets %q: %w",
-				policyName, err)
-		}
+		ks := secret.ProcessOutputSecret(policyOutput, secretValues)
 		pp.SecretKeys = append(pp.SecretKeys, ks...)
 	}
 	// Iterate through the policy outputs and prepare them
@@ -1036,10 +1039,11 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 		return nil, nil
 	}
 
-	// Deserialize the agent's metadata copy
+	// Deserialize the agent's metadata copy. If it fails, it's ignored as it will just
+	// be replaced with the correct contents from the clients checkin.
 	var agentLocalMeta interface{}
 	if err := json.Unmarshal(agent.LocalMetadata, &agentLocalMeta); err != nil {
-		return nil, fmt.Errorf("parseMeta local: %w", err)
+		zlog.Warn().Err(err).Msg("local_metadata in document invalid; ignoring it")
 	}
 
 	var outMeta []byte
@@ -1076,14 +1080,9 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 		return nil, &unhealthyReason, nil
 	}
 
-	agentComponentsJSON, err := json.Marshal(agent.Components)
-	if err != nil {
-		return nil, &unhealthyReason, fmt.Errorf("agent.Components marshal: %w", err)
-	}
-
 	// Quick comparison first; compare the JSON payloads.
 	// If the data is not consistently normalized, this short-circuit will not work.
-	if bytes.Equal(req.Components, agentComponentsJSON) {
+	if bytes.Equal(req.Components, agent.Components) {
 		zlog.Trace().Msg("quick comparing agent components data is equal")
 		return nil, &unhealthyReason, nil
 	}
@@ -1101,13 +1100,20 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 		return nil, &unhealthyReason, nil
 	}
 
+	// Deserialize the agent's components. If it fails, it's ignored as it will just
+	// be replaced with the correct contents from the clients checkin.
+	var agentComponents []model.ComponentsItems
+	if err := json.Unmarshal(agent.Components, &agentComponents); err != nil {
+		zlog.Warn().Err(err).Msg("components in document invalid; ignoring it")
+	}
+
 	var outComponents []byte
 
 	// Compare the deserialized meta structures and return the bytes to update if different
-	if !reflect.DeepEqual(reqComponents, agent.Components) {
+	if !reflect.DeepEqual(reqComponents, agentComponents) {
 		reqComponentsJSON, _ := json.Marshal(req.Components)
 		zlog.Trace().
-			Str("oldComponents", string(agentComponentsJSON)).
+			Str("oldComponents", string(agent.Components)).
 			Str("req.Components", string(reqComponentsJSON)).
 			Msg("local components data is not equal")
 
