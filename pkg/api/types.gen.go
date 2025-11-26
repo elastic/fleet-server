@@ -323,6 +323,9 @@ type CheckinRequest struct {
 	// AgentPolicyId The ID of the policy that the agent is currently running.
 	AgentPolicyId *string `json:"agent_policy_id,omitempty"`
 
+	// AvailableRollbacks Target versions available for a rollback
+	AvailableRollbacks *AvailableRollbacks `json:"available_rollbacks,omitempty"`
+
 	// Components An embedded JSON object that holds component information that the agent is running.
 	// Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
 	// fleet-server will update the components in an agent record if they differ from this object.
@@ -345,9 +348,6 @@ type CheckinRequest struct {
 	// The value, if specified is expected to be a string that is parsable by [time.ParseDuration](https://pkg.go.dev/time#ParseDuration).
 	// If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
 	PollTimeout *string `json:"poll_timeout,omitempty"`
-
-	// Rollbacks Target versions available for a rollback
-	Rollbacks *AvailableRollbacks `json:"rollbacks,omitempty"`
 
 	// Status The agent state, inferred from agent control protocol states.
 	Status CheckinRequestStatus `json:"status"`

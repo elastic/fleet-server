@@ -22,8 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dustin/go-humanize"
-
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -169,13 +167,13 @@ func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, 
 
 // validatedCheckin is a struct to wrap all the things that validateRequest returns.
 type validatedCheckin struct {
-	req             *CheckinRequest
-	dur             time.Duration
-	rawMeta         []byte
-	rawComp         []byte
-	seqno           sqn.SeqNo
-	unhealthyReason *[]string
-	rawRollbacks    []byte
+	req                   *CheckinRequest
+	dur                   time.Duration
+	rawMeta               []byte
+	rawComp               []byte
+	seqno                 sqn.SeqNo
+	unhealthyReason       *[]string
+	rawAvailableRollbacks []byte
 }
 
 func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent) (validatedCheckin, error) {
@@ -254,19 +252,19 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		return val, err
 	}
 
-	rawRollbacks, err := parseRollbacks(zlog, agent, &req)
+	rawRollbacks, err := parseAvailableRollbacks(zlog, agent, &req)
 	if err != nil {
 		return val, err
 	}
 
 	return validatedCheckin{
-		req:             &req,
-		dur:             pollDuration,
-		rawMeta:         rawMeta,
-		rawComp:         rawComponents,
-		seqno:           seqno,
-		unhealthyReason: unhealthyReason,
-		rawRollbacks:    rawRollbacks,
+		req:                   &req,
+		dur:                   pollDuration,
+		rawMeta:               rawMeta,
+		rawComp:               rawComponents,
+		seqno:                 seqno,
+		unhealthyReason:       unhealthyReason,
+		rawAvailableRollbacks: rawRollbacks,
 	}, nil
 }
 
@@ -299,7 +297,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		checkin.WithVer(ver),
 		checkin.WithUnhealthyReason(unhealthyReason),
 		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
-		checkin.WithRollbacks(req.Rollbacks),
+		checkin.WithAvailableRollbacks(validated.rawAvailableRollbacks),
 	}
 
 	revID, opts, err := ct.processPolicyDetails(r.Context(), zlog, agent, req)
@@ -1141,34 +1139,33 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	return outComponents, &unhealthyReason, nil
 }
 
-func parseRollbacks(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
-	if req.Rollbacks == nil && agent.Rollbacks == nil {
-		return nil, nil
-	}
-
-	var reqRollbacks []model.Rollback
-	if req.Rollbacks != nil {
-		reqRollbacks = make([]model.Rollback, len(*req.Rollbacks))
-		for i, rr := range *req.Rollbacks {
-			reqRollbacks[i] = model.Rollback{
+func parseAvailableRollbacks(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
+	var reqRollbacks []model.AvailableRollback
+	if req.AvailableRollbacks != nil {
+		reqRollbacks = make([]model.AvailableRollback, len(*req.AvailableRollbacks))
+		for i, rr := range *req.AvailableRollbacks {
+			reqRollbacks[i] = model.AvailableRollback{
 				ValidUntil: rr.ValidUntil.UTC().Format(time.RFC3339),
 				Version:    rr.Version,
 			}
 		}
+	} else {
+		// still set an empty slice in order to clear obsolete information, if any
+		reqRollbacks = []model.AvailableRollback{}
 	}
 
 	var outRollbacks []byte
 	// Compare the deserialized meta structures and return the bytes to update if different
-	if !reflect.DeepEqual(reqRollbacks, agent.Rollbacks) {
+	if !reflect.DeepEqual(reqRollbacks, agent.AvailableRollbacks) {
 		zlog.Trace().
-			Any("oldRollbacks", agent.Rollbacks).
-			Any("req.Rollbacks", req.Rollbacks).
+			Any("oldAvailableRollbacks", agent.AvailableRollbacks).
+			Any("req.AvailableRollbacks", req.AvailableRollbacks).
 			Msg("available rollback data is not equal")
 
 		zlog.Info().Msg("applying new rollback data")
 		marshalled, err := json.Marshal(reqRollbacks)
 		if err != nil {
-			return nil, fmt.Errorf("marshalling rollbacks: %w", err)
+			return nil, fmt.Errorf("marshalling available rollbacks: %w", err)
 		}
 		outRollbacks = marshalled
 	}

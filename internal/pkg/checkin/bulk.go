@@ -6,7 +6,6 @@
 package checkin
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -15,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
@@ -127,29 +125,22 @@ func WithPolicyRevisionIDX(idx int64) Option {
 	}
 }
 
-func WithRollbacks(rollbacks *api.AvailableRollbacks) Option {
+func WithAvailableRollbacks(availableRollbacks []byte) Option {
 	return func(pending *pendingT) {
 		if pending.extra == nil {
 			pending.extra = &extraT{}
 		}
-		if rollbacks == nil {
-			pending.extra.rollbacks = nil
-			return
-		}
-		// FIXME this should be done in the validated checkin
-		buf := bytes.NewBuffer(nil)
-		json.
-			pending.extra.rollbacks = rollbacks
+		pending.extra.availableRollbacks = availableRollbacks
 	}
 }
 
 type extraT struct {
-	meta        []byte
-	seqNo       sqn.SeqNo
-	ver         string
-	components  []byte
-	deleteAudit bool
-	rollbacks   []byte
+	meta               []byte
+	seqNo              sqn.SeqNo
+	ver                string
+	components         []byte
+	deleteAudit        bool
+	availableRollbacks []byte
 }
 
 // Minimize the size of this structure.
@@ -376,6 +367,10 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 		// If seqNo changed, set the field appropriately
 		if pending.extra.seqNo.IsSet() {
 			fields[dl.FieldActionSeqNo] = pending.extra.seqNo
+		}
+
+		if pending.extra.availableRollbacks != nil {
+			fields[dl.FieldAvailableRollbacks] = json.RawMessage(pending.extra.availableRollbacks)
 		}
 	}
 	return fields.Marshal()

@@ -141,6 +141,9 @@ type Agent struct {
 	// Agent timestamp for audit unenroll/uninstall action
 	AuditUnenrolledTime string `json:"audit_unenrolled_time,omitempty"`
 
+	// list of available rollbacks for the agent
+	AvailableRollbacks []AvailableRollback `json:"available_rollbacks,omitempty"`
+
 	// Elastic Agent components detailed status information
 	Components json.RawMessage `json:"components,omitempty"`
 
@@ -197,9 +200,6 @@ type Agent struct {
 
 	// hash of token provided during enrollment that allows replacement by another enrollment with same ID
 	ReplaceToken string `json:"replace_token,omitempty"`
-
-	// list of available rollbacks for the agent
-	Rollbacks []Rollback `json:"rollbacks,omitempty"`
 
 	// Shared ID
 	SharedID string `json:"shared_id,omitempty"`
@@ -291,7 +291,6 @@ type Artifact struct {
 
 // AvailableRollback
 type AvailableRollback struct {
-	ESDocument
 	ValidUntil string `json:"valid_until,omitempty"`
 	Version    string `json:"version,omitempty"`
 }
@@ -528,12 +527,6 @@ type PolicyOutput struct {
 
 	// Type is the output type. Currently only Elasticsearch is supported.
 	Type string `json:"type"`
-}
-
-// Rollback
-type Rollback struct {
-	ValidUntil string `json:"valid_until,omitempty"`
-	Version    string `json:"version,omitempty"`
 }
 
 // SecretReferencesItems
