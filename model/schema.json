@@ -973,7 +973,8 @@
         },
         "agent": {
           "description": "The policy's agent configuration details",
-          "format": "object"
+          "format": "object",
+          "additionalProperties": {}
         },
         "signed": {
           "$ref": "#/definitions/signed"
