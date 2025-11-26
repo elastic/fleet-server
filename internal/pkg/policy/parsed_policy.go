@@ -103,7 +103,6 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	p.Data.SecretReferences = nil
 
 	// We are cool and the gang
-	// TODO: Make sure `agent` section makes it all the way to the agent
 	pp := &ParsedPolicy{
 		Policy:  p,
 		Roles:   roles,

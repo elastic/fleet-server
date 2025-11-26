@@ -158,6 +158,8 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 }
 
 func Test_Agent_Policy_Secrets(t *testing.T) {
+	// TODO: Make sure secret in `agent.download` section works as well
+
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
