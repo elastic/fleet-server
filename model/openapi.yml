@@ -448,7 +448,7 @@ components:
             The revision of the policy that the agent is currently running.
           type: integer
           format: int64
-        rollbacks:
+        available_rollbacks:
           $ref: "#/components/schemas/available_rollbacks"
     actionSignature:
       description: Optional action signing data.
