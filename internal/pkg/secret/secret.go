@@ -329,19 +329,19 @@ func ProcessOutputSecret(output smap.Map, secretValues map[string]string) []stri
 	// policies: inline and path (see https://github.com/elastic/fleet-server/pull/5852).
 	// So we try replacing secret references in both formats.
 
-	keys := processOutputWithInlineSecrets(output, secretValues)
-	k := processOutputWithPathSecrets(output, secretValues)
+	keys := processMapWithInlineSecrets(output, secretValues)
+	k := processMapWithPathSecrets(output, secretValues)
 
 	keys = append(keys, k...)
 	return keys
 }
 
-// processOutputWithPathSecrets reads secrets from the output and mutates the output with the secret values using
+// processMapWithPathSecrets reads secrets from the output and mutates the output with the secret values using
 // the new format for specifying secrets: secrets.<path-to-field>.<field>.id:<secret ref>
-func processOutputWithPathSecrets(output smap.Map, secretValues map[string]string) []string {
-	secrets := output.GetMap(FieldSecrets)
+func processMapWithPathSecrets(m smap.Map, secretValues map[string]string) []string {
+	secrets := m.GetMap(FieldSecrets)
 
-	delete(output, FieldSecrets)
+	delete(m, FieldSecrets)
 	secretReferences := make([]model.SecretReferencesItems, 0)
 	outputSecrets := getSecretIDAndPath(secrets)
 	keys := make([]string, 0, len(outputSecrets))
@@ -365,40 +365,30 @@ func processOutputWithPathSecrets(output smap.Map, secretValues map[string]strin
 			key = key + "." + p
 		}
 		keys = append(keys, key)
-		setSecretPath(output, secretValues[secret.ID], secret.Path)
+		setSecretPath(m, secretValues[secret.ID], secret.Path)
 	}
 	return keys
 }
 
-func processOutputWithInlineSecrets(output smap.Map, secretValues map[string]string) []string {
-	replacedOutput, keys := replaceInlineSecretRefsInMap(output, secretValues)
+func processMapWithInlineSecrets(m smap.Map, secretValues map[string]string) []string {
+	replacedM, keys := replaceInlineSecretRefsInMap(m, secretValues)
 	for _, key := range keys {
-		output[key] = replacedOutput[key]
+		m[key] = replacedM[key]
 	}
 	return keys
 }
 
-// ProcessAgentDownloadSecrets reads and replaces secrets in the agent.download section of the policy
-func ProcessAgentDownloadSecrets(agentDownload smap.Map, secretValues map[string]string) ([]string, error) {
-	secrets := agentDownload.GetMap(FieldSecrets)
-	delete(agentDownload, FieldSecrets)
+// ProcessMapSecrets reads and replaces secrets in the agent.download section of the policy
+func ProcessMapSecrets(m smap.Map, secretValues map[string]string) []string {
+	// Unfortunately, there are two ways (formats) of specifying secret references in
+	// policies: inline and path (see https://github.com/elastic/fleet-server/pull/5852).
+	// So we try replacing secret references in both formats.
 
-	agentDownloadSecrets := getSecretIDAndPath(secrets)
-	keys := make([]string, 0, len(agentDownloadSecrets))
+	keys := processMapWithInlineSecrets(m, secretValues)
+	k := processMapWithPathSecrets(m, secretValues)
 
-	for _, secret := range agentDownloadSecrets {
-		var key string
-		for _, p := range secret.Path {
-			if key == "" {
-				key = p
-				continue
-			}
-			key = key + "." + p
-		}
-		keys = append(keys, key)
-		setSecretPath(agentDownload, secretValues[secret.ID], secret.Path)
-	}
-	return keys, nil
+	keys = append(keys, k...)
+	return keys
 }
 
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
