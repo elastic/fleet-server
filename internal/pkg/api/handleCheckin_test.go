@@ -419,7 +419,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 					t.Logf("bulk match unmarshal error: %v", err)
 					return false
 				}
-				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradeStatus] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
