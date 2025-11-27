@@ -167,12 +167,13 @@ func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, 
 
 // validatedCheckin is a struct to wrap all the things that validateRequest returns.
 type validatedCheckin struct {
-	req             *CheckinRequest
-	dur             time.Duration
-	rawMeta         []byte
-	rawComp         []byte
-	seqno           sqn.SeqNo
-	unhealthyReason *[]string
+	req                   *CheckinRequest
+	dur                   time.Duration
+	rawMeta               []byte
+	rawComp               []byte
+	seqno                 sqn.SeqNo
+	unhealthyReason       *[]string
+	rawAvailableRollbacks []byte
 }
 
 func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent) (validatedCheckin, error) {
@@ -251,13 +252,19 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		return val, err
 	}
 
+	rawRollbacks, err := parseAvailableRollbacks(zlog, agent, &req)
+	if err != nil {
+		return val, err
+	}
+
 	return validatedCheckin{
-		req:             &req,
-		dur:             pollDuration,
-		rawMeta:         rawMeta,
-		rawComp:         rawComponents,
-		seqno:           seqno,
-		unhealthyReason: unhealthyReason,
+		req:                   &req,
+		dur:                   pollDuration,
+		rawMeta:               rawMeta,
+		rawComp:               rawComponents,
+		seqno:                 seqno,
+		unhealthyReason:       unhealthyReason,
+		rawAvailableRollbacks: rawRollbacks,
 	}, nil
 }
 
@@ -290,6 +297,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		checkin.WithVer(ver),
 		checkin.WithUnhealthyReason(unhealthyReason),
 		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
+		checkin.WithAvailableRollbacks(validated.rawAvailableRollbacks),
 	}
 
 	revID, opts, err := ct.processPolicyDetails(r.Context(), zlog, agent, req)
@@ -1130,6 +1138,39 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	zlog.Debug().Any("unhealthy_reason", unhealthyReason).Msg("unhealthy reason")
 
 	return outComponents, &unhealthyReason, nil
+}
+
+func parseAvailableRollbacks(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
+	var reqRollbacks []model.AvailableRollback
+	if req.AvailableRollbacks != nil {
+		reqRollbacks = make([]model.AvailableRollback, len(*req.AvailableRollbacks))
+		for i, rr := range *req.AvailableRollbacks {
+			reqRollbacks[i] = model.AvailableRollback{
+				ValidUntil: rr.ValidUntil.UTC().Format(time.RFC3339),
+				Version:    rr.Version,
+			}
+		}
+	} else {
+		// still set an empty slice in order to clear obsolete information, if any
+		reqRollbacks = []model.AvailableRollback{}
+	}
+
+	var outRollbacks []byte
+	// Compare the deserialized meta structures and return the bytes to update if different
+	if !reflect.DeepEqual(reqRollbacks, agent.AvailableRollbacks) {
+		zlog.Trace().
+			Any("oldAvailableRollbacks", agent.AvailableRollbacks).
+			Any("req.AvailableRollbacks", req.AvailableRollbacks).
+			Msg("available rollback data is not equal")
+
+		zlog.Info().Msg("applying new rollback data")
+		marshalled, err := json.Marshal(reqRollbacks)
+		if err != nil {
+			return nil, fmt.Errorf("marshalling available rollbacks: %w", err)
+		}
+		outRollbacks = marshalled
+	}
+	return outRollbacks, nil
 }
 
 func calcUnhealthyReason(reqComponents []model.ComponentsItems) []string {

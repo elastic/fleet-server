@@ -141,6 +141,9 @@ type Agent struct {
 	// Agent timestamp for audit unenroll/uninstall action
 	AuditUnenrolledTime string `json:"audit_unenrolled_time,omitempty"`
 
+	// list of available rollbacks for the agent
+	AvailableRollbacks []AvailableRollback `json:"available_rollbacks,omitempty"`
+
 	// Elastic Agent components detailed status information
 	Components json.RawMessage `json:"components,omitempty"`
 
@@ -284,6 +287,12 @@ type Artifact struct {
 
 	// Name of the package that owns this artifact
 	PackageName string `json:"package_name,omitempty"`
+}
+
+// AvailableRollback
+type AvailableRollback struct {
+	ValidUntil string `json:"valid_until,omitempty"`
+	Version    string `json:"version,omitempty"`
 }
 
 // Checkin An Elastic Agent checkin to Fleet

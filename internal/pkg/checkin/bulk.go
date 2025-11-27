@@ -125,12 +125,22 @@ func WithPolicyRevisionIDX(idx int64) Option {
 	}
 }
 
+func WithAvailableRollbacks(availableRollbacks []byte) Option {
+	return func(pending *pendingT) {
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.availableRollbacks = availableRollbacks
+	}
+}
+
 type extraT struct {
-	meta        []byte
-	seqNo       sqn.SeqNo
-	ver         string
-	components  []byte
-	deleteAudit bool
+	meta               []byte
+	seqNo              sqn.SeqNo
+	ver                string
+	components         []byte
+	deleteAudit        bool
+	availableRollbacks []byte
 }
 
 // Minimize the size of this structure.
@@ -357,6 +367,10 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 		// If seqNo changed, set the field appropriately
 		if pending.extra.seqNo.IsSet() {
 			fields[dl.FieldActionSeqNo] = pending.extra.seqNo
+		}
+
+		if pending.extra.availableRollbacks != nil {
+			fields[dl.FieldAvailableRollbacks] = json.RawMessage(pending.extra.availableRollbacks)
 		}
 	}
 	return fields.Marshal()
