@@ -515,7 +515,7 @@
     },
 
     "available_rollback": {
-      "title": "Rollback",
+      "title": "AvailableRollback",
       "type": "object",
       "properties": {
         "version": {
