@@ -165,7 +165,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
 		Inputs:            []map[string]interface{}{},
-		Agent:             json.RawMessage(`{"monitoring": {"use_output":"remoteES"}}`),
+		Agent:             map[string]interface{}{"monitoring": map[string]string{"use_output": "remoteES"}},
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -319,7 +319,7 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
 		Inputs:            []map[string]interface{}{},
-		Agent:             json.RawMessage(`{"monitoring": {"use_output":"remoteES"}}`),
+		Agent:             map[string]interface{}{"monitoring": map[string]string{"use_output": "remoteES"}},
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -440,7 +440,7 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
 		Inputs:            []map[string]interface{}{},
-		Agent:             json.RawMessage(`{"monitoring": {"use_output":"remoteES"}}`),
+		Agent:             map[string]interface{}{"monitoring": map[string]string{"use_output": "remoteES"}},
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
