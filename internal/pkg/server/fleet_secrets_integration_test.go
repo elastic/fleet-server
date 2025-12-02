@@ -82,25 +82,37 @@ func createSecret(t *testing.T, ctx context.Context, bulker bulk.Bulk, value str
 	return resp.ID
 }
 
-func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk.Bulk, secretID, secretRef, outputID string) string {
+func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk.Bulk, inlineSecretID, inlineSecretRef, pathSecretID string) string {
 	policyID := uuid.Must(uuid.NewV4()).String()
 	var policyData = model.PolicyData{
 		Outputs: map[string]map[string]interface{}{
 			"default": {
 				"type": "elasticsearch",
 				"secrets": map[string]interface{}{
-					"secret-key": map[string]interface{}{"id": outputID},
+					"secret-key": map[string]interface{}{"id": pathSecretID},
 				},
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default":{}}`),
 		Inputs: []map[string]interface{}{{
 			"type":               "fleet-server",
-			"package_var_secret": secretRef,
+			"package_var_secret": inlineSecretRef,
 		}},
+		Agent: map[string]interface{}{
+			"download": map[string]interface{}{
+				"sourceURI": inlineSecretRef,
+				"secrets": map[string]interface{}{
+					"ssl": map[string]interface{}{
+						"key": map[string]interface{}{
+							"id": pathSecretID,
+						},
+					},
+				},
+			},
+		},
 		SecretReferences: []model.SecretReferencesItems{
-			{ID: secretID},
-			{ID: outputID},
+			{ID: inlineSecretID},
+			{ID: pathSecretID},
 		},
 	}
 
@@ -166,14 +178,14 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	require.NoError(t, err)
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
-	// create secret for use with output
-	outputSecretID := createSecret(t, ctx, srv.bulker, "output_secret_value")
-	// create secret with kibana_system user
-	secretID := createSecret(t, ctx, srv.bulker, "secret_value")
-	secretRef := fmt.Sprintf("$co.elastic.secret{%s}", secretID)
+	// create path secret for use with output and agent.download.sourceURI
+	pathSecretID := createSecret(t, ctx, srv.bulker, "path_secret_value")
+	// create inline secret for use with input and agent.download.ssl.key
+	inlineSecretID := createSecret(t, ctx, srv.bulker, "inline_secret_value")
+	inlineSecretRef := fmt.Sprintf("$co.elastic.secret{%s}", inlineSecretID)
 
 	// create agent policy with secret reference
-	enrollKey := createAgentPolicyWithSecrets(t, ctx, srv.bulker, secretID, secretRef, outputSecretID)
+	enrollKey := createAgentPolicyWithSecrets(t, ctx, srv.bulker, inlineSecretID, inlineSecretRef, pathSecretID)
 	cli := cleanhttp.DefaultClient()
 	// enroll an agent
 	t.Log("Enroll an agent")
@@ -234,7 +246,7 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	input := actionData.Policy.Inputs[0]
 	// expect secret reference replaced with secret value
 	assert.Equal(t, map[string]interface{}{
-		"package_var_secret": "secret_value",
+		"package_var_secret": "inline_secret_value",
 		"type":               "fleet-server",
 	}, input)
 
@@ -253,9 +265,18 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 		if !ok {
 			return false
 		}
-		return s == "output_secret_value"
+		return s == "path_secret_value"
 	}, "expected output to contain secret-key: output_secret_value, got %v", output)
+
+	// expect agent.download secrets to be replaced
+	assert.Equal(t, map[string]interface{}{
+		"sourceURI": "inline_secret_value",
+		"ssl": map[string]interface{}{
+			"key": "path_secret_value",
+		},
+	}, actionData.Policy.Agent["download"])
+
 	assert.NotContains(t, output, "secrets")
 	// expect that secret_paths lists the key
-	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "outputs.default.secret-key"}, actionData.Policy.SecretPaths)
+	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "outputs.default.secret-key", "agent.download.sourceURI", "agent.download.ssl.key"}, actionData.Policy.SecretPaths)
 }
