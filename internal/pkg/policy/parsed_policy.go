@@ -51,6 +51,7 @@ type ParsedPolicy struct {
 	Default    ParsedPolicyDefaults
 	Inputs     []map[string]interface{}
 	Agent      map[string]interface{}
+	Fleet      map[string]interface{}
 	SecretKeys []string
 	Links      apm.SpanLink
 }
@@ -99,6 +100,12 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		}
 	}
 
+	// Replace secrets in `fleet` section of policy
+	fleetSecretKeys := secret.ProcessMapSecrets(p.Data.Fleet, secretValues)
+	for _, key := range fleetSecretKeys {
+		secretKeys = append(secretKeys, "fleet."+key)
+	}
+
 	// Done replacing secrets.
 	p.Data.SecretReferences = nil
 
@@ -112,6 +119,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		},
 		Inputs:     policyInputs,
 		Agent:      p.Data.Agent,
+		Fleet:      p.Data.Fleet,
 		SecretKeys: secretKeys,
 	}
 
