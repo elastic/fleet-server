@@ -12,10 +12,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 //go:embed testdata/test_policy.json
@@ -124,11 +125,13 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate that secrets were identified
-	require.Len(t, pp.SecretKeys, 4)
+	require.Len(t, pp.SecretKeys, 6)
 	require.Contains(t, pp.SecretKeys, "outputs.fs-output.type")
 	require.Contains(t, pp.SecretKeys, "outputs.fs-output.ssl.key")
 	require.Contains(t, pp.SecretKeys, "inputs.0.streams.0.auth.basic.password")
 	require.Contains(t, pp.SecretKeys, "inputs.0.streams.1.auth.basic.password")
+	require.Contains(t, pp.SecretKeys, "agent.download.sourceURI")
+	require.Contains(t, pp.SecretKeys, "agent.download.ssl.key")
 
 	// Validate that secret references were replaced
 	firstInputStreams := pp.Inputs[0]["streams"].([]any)
@@ -138,4 +141,6 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputSecondStream["auth.basic.password"])
 	require.Equal(t, "abcdef123_value", pp.Policy.Data.Outputs["fs-output"]["type"])
 	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Outputs["fs-output"]["ssl"].(map[string]interface{})["key"])
+	require.Equal(t, "bcdefg234_value", pp.Policy.Data.Agent["download"].(map[string]interface{})["sourceURI"])
+	require.Equal(t, "rwXzUJoBxE9I-QCxFt9m_value", pp.Policy.Data.Agent["download"].(map[string]interface{})["ssl"].(map[string]interface{})["key"])
 }

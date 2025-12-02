@@ -50,6 +50,7 @@ type ParsedPolicy struct {
 	Outputs    map[string]Output
 	Default    ParsedPolicyDefaults
 	Inputs     []map[string]interface{}
+	Agent      map[string]interface{}
 	SecretKeys []string
 	Links      apm.SpanLink
 }
@@ -87,6 +88,17 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	policyInputs, keys := secret.ProcessInputsSecrets(p.Data, secretValues)
 	secretKeys = append(secretKeys, keys...)
 
+	// Replace secrets in 'agent.download' section of policy
+	if agentDownload, exists := p.Data.Agent["download"]; exists {
+		if section, ok := agentDownload.(map[string]interface{}); ok {
+			agentDownloadSecretKeys := secret.ProcessMapSecrets(section, secretValues)
+			for _, key := range agentDownloadSecretKeys {
+				secretKeys = append(secretKeys, "agent.download."+key)
+			}
+			p.Data.Agent["download"] = section
+		}
+	}
+
 	// Done replacing secrets.
 	p.Data.SecretReferences = nil
 
@@ -99,6 +111,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 			Name: defaultName,
 		},
 		Inputs:     policyInputs,
+		Agent:      p.Data.Agent,
 		SecretKeys: secretKeys,
 	}
 
