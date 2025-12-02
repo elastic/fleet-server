@@ -99,7 +99,7 @@ func (m Map) Get(keyPath string) any {
 			if !ok {
 				return nil
 			}
-			if index < 0 || index >= uint(len(sCurr)) {
+			if index >= uint(len(sCurr)) {
 				return nil
 			}
 			curr = sCurr[index]
@@ -147,7 +147,7 @@ func (m Map) Set(keyPath string, value any) error {
 				if !ok {
 					return fmt.Errorf("expected slice at %s, got %T", parentPath, parent)
 				}
-				if index < 0 || index >= uint(len(sParent)) {
+				if index >= uint(len(sParent)) {
 					return fmt.Errorf("index out of bounds at %s: %d", parentPath, index)
 				}
 				sParent[index] = value
@@ -167,7 +167,7 @@ func (m Map) Set(keyPath string, value any) error {
 			if !ok {
 				return fmt.Errorf("expected slice at %s, got %T", parentPath, curr)
 			}
-			if index < 0 || index >= uint(len(sCurr)) {
+			if index >= uint(len(sCurr)) {
 				return fmt.Errorf("index out of bounds at %s: %d", parentPath, index)
 			}
 			curr = sCurr[index]
