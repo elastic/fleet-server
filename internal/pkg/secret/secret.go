@@ -373,7 +373,8 @@ func processMapWithPathSecrets(m smap.Map, secretValues map[string]string) []str
 func processMapWithInlineSecrets(m smap.Map, secretValues map[string]string) []string {
 	replacedM, keys := replaceInlineSecretRefsInMap(m, secretValues)
 	for _, key := range keys {
-		m[key] = replacedM[key]
+		rm := smap.Map(replacedM)
+		m.Set(key, rm.Get(key))
 	}
 	return keys
 }
