@@ -7,6 +7,7 @@ package secret
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -323,17 +324,20 @@ func setSecretPath(section smap.Map, secretValue string, secretPaths []string) {
 }
 
 // Read secret from output and mutate output with secret value
-func ProcessOutputSecret(output smap.Map, secretValues map[string]string) []string {
+func ProcessOutputSecret(output smap.Map, secretValues map[string]string) ([]string, error) {
 
 	// Unfortunately, there are two ways (formats) of specifying secret references in
 	// policies: inline and path (see https://github.com/elastic/fleet-server/pull/5852).
 	// So we try replacing secret references in both formats.
 
-	keys := processMapWithInlineSecrets(output, secretValues)
+	keys, err := processMapWithInlineSecrets(output, secretValues)
+	if err != nil {
+		return nil, fmt.Errorf("failed processing output secret with inline secrets: %w", err)
+	}
 	k := processMapWithPathSecrets(output, secretValues)
 
 	keys = append(keys, k...)
-	return keys
+	return keys, nil
 }
 
 // processMapWithPathSecrets reads secrets from the output and mutates the output with the secret values using
@@ -370,26 +374,31 @@ func processMapWithPathSecrets(m smap.Map, secretValues map[string]string) []str
 	return keys
 }
 
-func processMapWithInlineSecrets(m smap.Map, secretValues map[string]string) []string {
+func processMapWithInlineSecrets(m smap.Map, secretValues map[string]string) ([]string, error) {
 	replacedM, keys := replaceInlineSecretRefsInMap(m, secretValues)
 	for _, key := range keys {
 		rm := smap.Map(replacedM)
-		m.Set(key, rm.Get(key))
+		if err := m.Set(key, rm.Get(key)); err != nil {
+			return nil, fmt.Errorf("failed processing map with inline secrets: failed to set secret value for key %s: %w", key, err)
+		}
 	}
-	return keys
+	return keys, nil
 }
 
 // ProcessMapSecrets reads and replaces secrets in the agent.download section of the policy
-func ProcessMapSecrets(m smap.Map, secretValues map[string]string) []string {
+func ProcessMapSecrets(m smap.Map, secretValues map[string]string) ([]string, error) {
 	// Unfortunately, there are two ways (formats) of specifying secret references in
 	// policies: inline and path (see https://github.com/elastic/fleet-server/pull/5852).
 	// So we try replacing secret references in both formats.
 
-	keys := processMapWithInlineSecrets(m, secretValues)
+	keys, err := processMapWithInlineSecrets(m, secretValues)
+	if err != nil {
+		return nil, fmt.Errorf("failed processing map secrets with inline secrets: %w", err)
+	}
 	k := processMapWithPathSecrets(m, secretValues)
 
 	keys = append(keys, k...)
-	return keys
+	return keys, nil
 }
 
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
