@@ -115,7 +115,7 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 			"secrets": map[string]interface{}{
 				"ssl": map[string]interface{}{
 					"key": map[string]interface{}{
-						"id": inlineSecretID,
+						"id": pathSecretID,
 					},
 				},
 			},
