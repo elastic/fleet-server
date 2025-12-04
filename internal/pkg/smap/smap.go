@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -200,11 +201,11 @@ func Parse(data []byte) (Map, error) {
 
 func parseIndex(str string) (uint, bool) {
 	// Try to read str as an integer
-	var index uint
-	if _, err := fmt.Sscanf(str, "%d", &index); err != nil {
+	index, err := strconv.ParseUint(str, 10, 0)
+	if err != nil {
 		return 0, false
 	}
-	return index, true
+	return uint(index), true
 }
 
 func isSMap(v any) (map[string]any, bool) {
