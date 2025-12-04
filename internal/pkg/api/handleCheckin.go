@@ -565,7 +565,6 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent)
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails:   nil,
 		dl.FieldUpgradeStartedAt: nil,
-		dl.FieldUpgradeStatus:    nil,
 		dl.FieldUpgradedAt:       time.Now().UTC().Format(time.RFC3339),
 	}
 	body, err := doc.Marshal()
