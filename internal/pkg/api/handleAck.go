@@ -612,22 +612,18 @@ func (ack *AckT) handleUpgrade(ctx context.Context, zlog zerolog.Logger, agent *
 			zlog.Info().Msg("marking agent upgrade as failed, agent logs contain failure message")
 			doc = bulk.UpdateFields{
 				dl.FieldUpgradeStartedAt: nil,
-				dl.FieldUpgradeStatus:    "failed",
 			}
 		} else if event.Payload.Retry {
 			zlog.Info().Int("retry_attempt", event.Payload.RetryAttempt).Msg("marking agent upgrade as retrying")
-			doc[dl.FieldUpgradeStatus] = "retrying" // Keep FieldUpgradeStatedAt abd FieldUpgradeded at to original values
 		} else {
 			zlog.Info().Int("retry_attempt", event.Payload.RetryAttempt).Msg("marking agent upgrade as failed, agent logs contain failure message")
 			doc = bulk.UpdateFields{
 				dl.FieldUpgradeStartedAt: nil,
-				dl.FieldUpgradeStatus:    "failed",
 			}
 		}
 	} else {
 		doc = bulk.UpdateFields{
 			dl.FieldUpgradeStartedAt: nil,
-			dl.FieldUpgradeStatus:    nil,
 			dl.FieldUpgradedAt:       now,
 		}
 		if agent.UpgradeDetails == nil {
