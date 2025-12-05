@@ -309,7 +309,7 @@ func TestProcessOutputSecret(t *testing.T) {
 				"sslother":   "sslother_value",
 				"sslkey":     "sslkey_value",
 			}
-			keys := ProcessOutputSecret(output, secretValues)
+			keys, err := ProcessOutputSecret(output, secretValues)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expectOutput, output)

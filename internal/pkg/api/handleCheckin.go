@@ -888,7 +888,10 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	data := model.ClonePolicyData(pp.Policy.Data)
 	for _, policyOutput := range data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
-		ks := secret.ProcessOutputSecret(policyOutput, secretValues)
+		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process output secret for output %q: %w", policyOutput["name"], err)
+		}
 		pp.SecretKeys = append(pp.SecretKeys, ks...)
 	}
 	// Iterate through the policy outputs and prepare them
