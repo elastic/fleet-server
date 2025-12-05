@@ -98,6 +98,31 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 			"type":               "fleet-server",
 			"package_var_secret": secretRef,
 		}},
+<<<<<<< HEAD
+=======
+		Agent: map[string]interface{}{
+			"download": map[string]interface{}{
+				"sourceURI": inlineSecretRef,
+				"secrets": map[string]interface{}{
+					"ssl": map[string]interface{}{
+						"key": map[string]interface{}{
+							"id": pathSecretID,
+						},
+					},
+				},
+			},
+		},
+		Fleet: map[string]interface{}{
+			"hosts": []string{inlineSecretRef},
+			"secrets": map[string]interface{}{
+				"ssl": map[string]interface{}{
+					"key": map[string]interface{}{
+						"id": pathSecretID,
+					},
+				},
+			},
+		},
+>>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 		SecretReferences: []model.SecretReferencesItems{
 			{ID: secretID},
 			{ID: outputID},
@@ -255,7 +280,41 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 		}
 		return s == "output_secret_value"
 	}, "expected output to contain secret-key: output_secret_value, got %v", output)
+<<<<<<< HEAD
 	assert.NotContains(t, output, "secrets")
 	// expect that secret_paths lists the key
 	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "outputs.default.secret-key"}, actionData.Policy.SecretPaths)
+=======
+
+	// expect agent.download secrets to be replaced
+	assert.Equal(t, map[string]interface{}{
+		"sourceURI": "inline_secret_value",
+		"ssl": map[string]interface{}{
+			"key": "path_secret_value",
+		},
+	}, actionData.Policy.Agent["download"])
+
+	// expect fleet secrets to be replaced
+	assert.Equal(t, map[string]interface{}{
+		"hosts": []interface{}{"inline_secret_value"},
+		"ssl": map[string]interface{}{
+			"key": "path_secret_value",
+		},
+	}, actionData.Policy.Fleet)
+
+	assert.NotContains(t, output, "secrets")
+	// expect that secret_paths lists the key
+	assert.ElementsMatch(
+		t,
+		[]string{
+			"inputs.0.package_var_secret",
+			"outputs.default.secret-key",
+			"agent.download.sourceURI",
+			"agent.download.ssl.key",
+			"fleet.hosts.0",
+			"fleet.ssl.key",
+		},
+		actionData.Policy.SecretPaths,
+	)
+>>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 }

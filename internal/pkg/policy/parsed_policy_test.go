@@ -124,11 +124,22 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate that secrets were identified
+<<<<<<< HEAD
 	require.Len(t, pp.SecretKeys, 4)
+=======
+	require.Len(t, pp.SecretKeys, 8)
+>>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 	require.Contains(t, pp.SecretKeys, "outputs.fs-output.type")
 	require.Contains(t, pp.SecretKeys, "outputs.fs-output.ssl.key")
 	require.Contains(t, pp.SecretKeys, "inputs.0.streams.0.auth.basic.password")
 	require.Contains(t, pp.SecretKeys, "inputs.0.streams.1.auth.basic.password")
+<<<<<<< HEAD
+=======
+	require.Contains(t, pp.SecretKeys, "agent.download.sourceURI")
+	require.Contains(t, pp.SecretKeys, "agent.download.ssl.key")
+	require.Contains(t, pp.SecretKeys, "fleet.hosts.0")
+	require.Contains(t, pp.SecretKeys, "fleet.ssl.key")
+>>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 
 	// Validate that secret references were replaced
 	firstInputStreams := pp.Inputs[0]["streams"].([]any)
@@ -138,4 +149,11 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputSecondStream["auth.basic.password"])
 	require.Equal(t, "abcdef123_value", pp.Policy.Data.Outputs["fs-output"]["type"])
 	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Outputs["fs-output"]["ssl"].(map[string]interface{})["key"])
+<<<<<<< HEAD
+=======
+	require.Equal(t, "bcdefg234_value", pp.Policy.Data.Agent["download"].(map[string]interface{})["sourceURI"])
+	require.Equal(t, "rwXzUJoBxE9I-QCxFt9m_value", pp.Policy.Data.Agent["download"].(map[string]interface{})["ssl"].(map[string]interface{})["key"])
+	require.Equal(t, "abcdef123_value", pp.Policy.Data.Fleet["hosts"].([]interface{})[0])
+	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Fleet["ssl"].(map[string]interface{})["key"])
+>>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 }

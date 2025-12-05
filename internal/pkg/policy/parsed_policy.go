@@ -50,6 +50,11 @@ type ParsedPolicy struct {
 	Outputs    map[string]Output
 	Default    ParsedPolicyDefaults
 	Inputs     []map[string]interface{}
+<<<<<<< HEAD
+=======
+	Agent      map[string]interface{}
+	Fleet      map[string]interface{}
+>>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 	SecretKeys []string
 	Links      apm.SpanLink
 }
@@ -75,7 +80,10 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		return nil, err
 	}
 	for name, policyOutput := range p.Data.Outputs {
-		ks := secret.ProcessOutputSecret(policyOutput, secretValues)
+		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues)
+		if err != nil {
+			return nil, fmt.Errorf("failed to replace secrets in output section of policy '%s': %w", name, err)
+		}
 		for _, key := range ks {
 			secretKeys = append(secretKeys, "outputs."+name+"."+key)
 		}
@@ -87,6 +95,32 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	policyInputs, keys := secret.ProcessInputsSecrets(p.Data, secretValues)
 	secretKeys = append(secretKeys, keys...)
 
+<<<<<<< HEAD
+=======
+	// Replace secrets in 'agent.download' section of policy
+	if agentDownload, exists := p.Data.Agent["download"]; exists {
+		if section, ok := agentDownload.(map[string]interface{}); ok {
+			agentDownloadSecretKeys, err := secret.ProcessMapSecrets(section, secretValues)
+			if err != nil {
+				return nil, fmt.Errorf("failed to replace secrets in agent.download section of policy: %w", err)
+			}
+			for _, key := range agentDownloadSecretKeys {
+				secretKeys = append(secretKeys, "agent.download."+key)
+			}
+			p.Data.Agent["download"] = section
+		}
+	}
+
+	// Replace secrets in `fleet` section of policy
+	fleetSecretKeys, err := secret.ProcessMapSecrets(p.Data.Fleet, secretValues)
+	if err != nil {
+		return nil, fmt.Errorf("failed to replace secrets in fleet section of policy: %w", err)
+	}
+	for _, key := range fleetSecretKeys {
+		secretKeys = append(secretKeys, "fleet."+key)
+	}
+
+>>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 	// Done replacing secrets.
 	p.Data.SecretReferences = nil
 
@@ -99,6 +133,11 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 			Name: defaultName,
 		},
 		Inputs:     policyInputs,
+<<<<<<< HEAD
+=======
+		Agent:      p.Data.Agent,
+		Fleet:      p.Data.Fleet,
+>>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 		SecretKeys: secretKeys,
 	}
 
