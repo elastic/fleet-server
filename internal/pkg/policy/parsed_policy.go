@@ -51,6 +51,7 @@ type ParsedPolicy struct {
 	Default    ParsedPolicyDefaults
 	Inputs     []map[string]interface{}
 	Agent      map[string]interface{}
+	Fleet      map[string]interface{}
 	SecretKeys []string
 	Links      apm.SpanLink
 }
@@ -76,7 +77,10 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		return nil, err
 	}
 	for name, policyOutput := range p.Data.Outputs {
-		ks := secret.ProcessOutputSecret(policyOutput, secretValues)
+		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues)
+		if err != nil {
+			return nil, fmt.Errorf("failed to replace secrets in output section of policy '%s': %w", name, err)
+		}
 		for _, key := range ks {
 			secretKeys = append(secretKeys, "outputs."+name+"."+key)
 		}
@@ -91,12 +95,24 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	// Replace secrets in 'agent.download' section of policy
 	if agentDownload, exists := p.Data.Agent["download"]; exists {
 		if section, ok := agentDownload.(map[string]interface{}); ok {
-			agentDownloadSecretKeys := secret.ProcessMapSecrets(section, secretValues)
+			agentDownloadSecretKeys, err := secret.ProcessMapSecrets(section, secretValues)
+			if err != nil {
+				return nil, fmt.Errorf("failed to replace secrets in agent.download section of policy: %w", err)
+			}
 			for _, key := range agentDownloadSecretKeys {
 				secretKeys = append(secretKeys, "agent.download."+key)
 			}
 			p.Data.Agent["download"] = section
 		}
+	}
+
+	// Replace secrets in `fleet` section of policy
+	fleetSecretKeys, err := secret.ProcessMapSecrets(p.Data.Fleet, secretValues)
+	if err != nil {
+		return nil, fmt.Errorf("failed to replace secrets in fleet section of policy: %w", err)
+	}
+	for _, key := range fleetSecretKeys {
+		secretKeys = append(secretKeys, "fleet."+key)
 	}
 
 	// Done replacing secrets.
@@ -112,6 +128,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		},
 		Inputs:     policyInputs,
 		Agent:      p.Data.Agent,
+		Fleet:      p.Data.Fleet,
 		SecretKeys: secretKeys,
 	}
 

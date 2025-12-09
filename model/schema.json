@@ -985,7 +985,8 @@
         },
         "fleet": {
           "description": "The policy's fleet configuration details",
-          "format": "raw"
+          "type": "object",
+          "additionalProperties": {}
         }
       },
       "required": ["id", "revision", "outputs"]

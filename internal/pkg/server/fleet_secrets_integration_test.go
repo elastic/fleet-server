@@ -110,6 +110,16 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 				},
 			},
 		},
+		Fleet: map[string]interface{}{
+			"hosts": []string{inlineSecretRef},
+			"secrets": map[string]interface{}{
+				"ssl": map[string]interface{}{
+					"key": map[string]interface{}{
+						"id": pathSecretID,
+					},
+				},
+			},
+		},
 		SecretReferences: []model.SecretReferencesItems{
 			{ID: inlineSecretID},
 			{ID: pathSecretID},
@@ -276,7 +286,26 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 		},
 	}, actionData.Policy.Agent["download"])
 
+	// expect fleet secrets to be replaced
+	assert.Equal(t, map[string]interface{}{
+		"hosts": []interface{}{"inline_secret_value"},
+		"ssl": map[string]interface{}{
+			"key": "path_secret_value",
+		},
+	}, actionData.Policy.Fleet)
+
 	assert.NotContains(t, output, "secrets")
 	// expect that secret_paths lists the key
-	assert.ElementsMatch(t, []string{"inputs.0.package_var_secret", "outputs.default.secret-key", "agent.download.sourceURI", "agent.download.ssl.key"}, actionData.Policy.SecretPaths)
+	assert.ElementsMatch(
+		t,
+		[]string{
+			"inputs.0.package_var_secret",
+			"outputs.default.secret-key",
+			"agent.download.sourceURI",
+			"agent.download.ssl.key",
+			"fleet.hosts.0",
+			"fleet.ssl.key",
+		},
+		actionData.Policy.SecretPaths,
+	)
 }
