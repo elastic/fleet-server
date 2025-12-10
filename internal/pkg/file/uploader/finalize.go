@@ -42,6 +42,12 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 		return info, ErrStatusNoUploads
 	}
 
+	// complete may be called before most recent chunks are available for search yet
+	// this explicitly calls refresh once at the end, instead of refreshing on each chunk
+	if err := EnsureChunksIndexed(ctx, u.bulker.Client(), info.Source); err != nil {
+		return info, err
+	}
+
 	chunks, err := file.GetChunkInfos(ctx, u.bulker, UploadDataIndexPattern, info.DocID, file.GetChunkInfoOpt{IncludeSize: true, RequireHash: true})
 	if err != nil {
 		return info, err
