@@ -732,11 +732,17 @@
           "description": "hash of token provided during enrollment that allows replacement by another enrollment with same ID",
           "type": "string"
         },
-        "available_rollbacks": {
-          "description": "list of available rollbacks for the agent",
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/available_rollback"
+        "upgrade" : {
+          "description": "Container for upgrade-related agent data",
+          "type": "object",
+          "properties": {
+            "rollbacks": {
+              "description": "list of available rollbacks for the agent",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/available_rollback"
+              }
+            }
           }
         }
       },

@@ -252,7 +252,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		return val, err
 	}
 
-	rawRollbacks, err := parseAvailableRollbacks(zlog, agent, &req)
+	rawRollbacks, err := parseAvailableRollbacks(zlog, agent.Upgrade, &req)
 	if err != nil {
 		zlog.Warn().Err(err).Msg("unable to parse available rollbacks")
 		rawRollbacks = nil
@@ -1148,7 +1148,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 // If the value needs to be updated, this function will return a non-nil []byte (possibly empty if we need to clear the information)
 // Nil []byte returned means that no storage operation should happen for the available rollbacks (it means that we already have
 // the correct value on the model). See ProcessRequest and checkin.WithAvailableRollbacks for reference.
-func parseAvailableRollbacks(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
+func parseAvailableRollbacks(zlog zerolog.Logger, upgradeInfo *model.Upgrade, req *CheckinRequest) ([]byte, error) {
 	var reqRollbacks []model.AvailableRollback
 	if len(req.AvailableRollbacks) > 0 {
 		err := json.Unmarshal(req.AvailableRollbacks, &reqRollbacks)
@@ -1161,10 +1161,16 @@ func parseAvailableRollbacks(zlog zerolog.Logger, agent *model.Agent, req *Check
 	}
 
 	var outRollbacks []byte
+
+	var agentRollbacks []model.AvailableRollback
+	if upgradeInfo != nil {
+		agentRollbacks = upgradeInfo.Rollbacks
+	}
+
 	// Compare the deserialized meta structures and return the bytes to update if different
-	if !reflect.DeepEqual(reqRollbacks, agent.AvailableRollbacks) {
+	if !reflect.DeepEqual(reqRollbacks, agentRollbacks) {
 		zlog.Trace().
-			Any("oldAvailableRollbacks", agent.AvailableRollbacks).
+			Any("oldAvailableRollbacks", agentRollbacks).
 			Any("req.AvailableRollbacks", req.AvailableRollbacks).
 			Msg("available rollback data is not equal")
 

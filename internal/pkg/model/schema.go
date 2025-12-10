@@ -141,9 +141,6 @@ type Agent struct {
 	// Agent timestamp for audit unenroll/uninstall action
 	AuditUnenrolledTime string `json:"audit_unenrolled_time,omitempty"`
 
-	// list of available rollbacks for the agent
-	AvailableRollbacks []AvailableRollback `json:"available_rollbacks,omitempty"`
-
 	// Elastic Agent components detailed status information
 	Components json.RawMessage `json:"components,omitempty"`
 
@@ -224,6 +221,9 @@ type Agent struct {
 
 	// Date/time the Elastic Agent was last updated
 	UpdatedAt string `json:"updated_at,omitempty"`
+
+	// Container for upgrade-related agent data
+	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
 	// List of timestamps of attempts of Elastic Agent automatic upgrades
 	UpgradeAttempts []string `json:"upgrade_attempts,omitempty"`
@@ -590,6 +590,13 @@ type UnitsItems struct {
 	Message string `json:"message,omitempty"`
 	Status  string `json:"status,omitempty"`
 	Type    string `json:"type,omitempty"`
+}
+
+// Upgrade Container for upgrade-related agent data
+type Upgrade struct {
+
+	// list of available rollbacks for the agent
+	Rollbacks []AvailableRollback `json:"rollbacks,omitempty"`
 }
 
 // UpgradeDetails Additional upgrade status details.

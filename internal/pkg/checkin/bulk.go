@@ -370,7 +370,17 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 		}
 
 		if pending.extra.availableRollbacks != nil {
-			fields[dl.FieldAvailableRollbacks] = json.RawMessage(pending.extra.availableRollbacks)
+			if _, ok := fields[dl.FieldUpgradeInfo]; !ok {
+				fields[dl.FieldUpgradeInfo] = bulk.UpdateFields{}
+			}
+
+			if upgradeInfo, ok := fields[dl.FieldUpgradeInfo].(bulk.UpdateFields); ok {
+				upgradeInfo[dl.FieldAvailableRollbacks] = json.RawMessage(pending.extra.availableRollbacks)
+			} else {
+				// return an error as we have an unexpected value for the upgrade info container
+				return nil, fmt.Errorf("unexpected value %T for key %s in agent document", fields[dl.FieldUpgradeInfo], dl.FieldUpgradeInfo)
+			}
+
 		}
 	}
 	return fields.Marshal()

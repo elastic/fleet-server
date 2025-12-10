@@ -55,7 +55,8 @@ const (
 	FieldUpgradeStartedAt   = "upgrade_started_at"
 	FieldUpgradeDetails     = "upgrade_details"
 	FieldUpgradeAttempts    = "upgrade_attempts"
-	FieldAvailableRollbacks = "available_rollbacks"
+	FieldUpgradeInfo        = "upgrade"
+	FieldAvailableRollbacks = "rollbacks"
 
 	FieldAuditUnenrolledTime   = "audit_unenrolled_time"
 	FieldAuditUnenrolledReason = "audit_unenrolled_reason"
