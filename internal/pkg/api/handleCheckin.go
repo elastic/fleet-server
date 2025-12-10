@@ -254,7 +254,8 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 
 	rawRollbacks, err := parseAvailableRollbacks(zlog, agent, &req)
 	if err != nil {
-		return val, err
+		zlog.Warn().Err(err).Msg("unable to parse available rollbacks")
+		rawRollbacks = nil
 	}
 
 	return validatedCheckin{
@@ -297,7 +298,10 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		checkin.WithVer(ver),
 		checkin.WithUnhealthyReason(unhealthyReason),
 		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
-		checkin.WithAvailableRollbacks(validated.rawAvailableRollbacks),
+	}
+
+	if validated.rawAvailableRollbacks != nil {
+		initialOpts = append(initialOpts, checkin.WithAvailableRollbacks(validated.rawAvailableRollbacks))
 	}
 
 	revID, opts, err := ct.processPolicyDetails(r.Context(), zlog, agent, req)
@@ -1139,15 +1143,17 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	return outComponents, &unhealthyReason, nil
 }
 
+// parseAvailableRollbacks will pull the available rollbacks contained in the checkin request and compare them to what
+// we have currently in the model, returning the value that we want to persist expressed as a []byte.
+// If the value needs to be updated, this function will return a non-nil []byte (possibly empty if we need to clear the information)
+// Nil []byte returned means that no storage operation should happen for the available rollbacks (it means that we already have
+// the correct value on the model). See ProcessRequest and checkin.WithAvailableRollbacks for reference.
 func parseAvailableRollbacks(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]byte, error) {
 	var reqRollbacks []model.AvailableRollback
-	if req.AvailableRollbacks != nil {
-		reqRollbacks = make([]model.AvailableRollback, len(*req.AvailableRollbacks))
-		for i, rr := range *req.AvailableRollbacks {
-			reqRollbacks[i] = model.AvailableRollback{
-				ValidUntil: rr.ValidUntil.UTC().Format(time.RFC3339),
-				Version:    rr.Version,
-			}
+	if len(req.AvailableRollbacks) > 0 {
+		err := json.Unmarshal(req.AvailableRollbacks, &reqRollbacks)
+		if err != nil {
+			return nil, fmt.Errorf("parsing request available rollbacks: %w", err)
 		}
 	} else {
 		// still set an empty slice in order to clear obsolete information, if any

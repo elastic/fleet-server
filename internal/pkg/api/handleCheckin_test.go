@@ -1170,6 +1170,23 @@ func TestValidateCheckinRequest(t *testing.T) {
 				rawAvailableRollbacks: []byte(`[{"version": "1.2.3-SNAPSHOT", "valid_until": "2025-11-27T15:12:44Z"}]`),
 			},
 		},
+		{
+			name: "Available rollbacks are incorrectly formatted (string instead of array): no error returned but the rawAvailableRollbacks are set to nil",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"validJson": "test", "status": "test", "message": "test message", "available_rollbacks": "foobar"}`)),
+			},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expErr: nil,
+			expValid: validatedCheckin{
+				rawAvailableRollbacks: nil,
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -1182,7 +1199,11 @@ func TestValidateCheckinRequest(t *testing.T) {
 			if tc.expErr == nil {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expValid.rawMeta, valid.rawMeta)
-				assert.JSONEq(t, string(tc.expValid.rawAvailableRollbacks), string(valid.rawAvailableRollbacks))
+				if tc.expValid.rawAvailableRollbacks == nil {
+					assert.Nil(t, valid.rawAvailableRollbacks)
+				} else {
+					assert.JSONEq(t, string(tc.expValid.rawAvailableRollbacks), string(valid.rawAvailableRollbacks))
+				}
 			} else {
 				// Asserting error messages prior to ErrorAs becuase ErrorAs modifies
 				// the target error. If we assert error messages after calling ErrorAs

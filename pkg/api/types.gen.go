@@ -306,13 +306,7 @@ type AuditUnenrollRequest struct {
 type AuditUnenrollRequestReason string
 
 // AvailableRollbacks Target versions available for a rollback
-type AvailableRollbacks = []struct {
-	// ValidUntil timestamp indicating when the rollback target will expire
-	ValidUntil time.Time `json:"valid_until"`
-
-	// Version version of the available rollback target, represented as string
-	Version string `json:"version"`
-}
+type AvailableRollbacks = json.RawMessage
 
 // CheckinRequest defines model for checkinRequest.
 type CheckinRequest struct {
@@ -324,7 +318,7 @@ type CheckinRequest struct {
 	AgentPolicyId *string `json:"agent_policy_id,omitempty"`
 
 	// AvailableRollbacks Target versions available for a rollback
-	AvailableRollbacks *AvailableRollbacks `json:"available_rollbacks,omitempty"`
+	AvailableRollbacks AvailableRollbacks `json:"available_rollbacks,omitempty"`
 
 	// Components An embedded JSON object that holds component information that the agent is running.
 	// Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
