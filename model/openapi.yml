@@ -375,8 +375,6 @@ components:
       description: |
         Target versions available for a rollback
       type: array
-      x-go-type: json.RawMessage
-      x-go-type-skip-optional-pointer: true
       items:
         type: object
         required:
@@ -390,6 +388,16 @@ components:
             description: timestamp indicating when the rollback target will expire
             type: string
             format: date-time
+    upgrade_information:
+      description: |
+        Container for upgrade information coming from agent
+      type: object
+      x-go-type: json.RawMessage
+      x-go-type-skip-optional-pointer: true
+      properties:
+        rollbacks:
+          $ref: "#/components/schemas/available_rollbacks"
+
     checkinRequest:
       type: object
       required:
@@ -450,8 +458,8 @@ components:
             The revision of the policy that the agent is currently running.
           type: integer
           format: int64
-        available_rollbacks:
-          $ref: "#/components/schemas/available_rollbacks"
+        upgrade:
+          $ref: "#/components/schemas/upgrade_information"
     actionSignature:
       description: Optional action signing data.
       type: object

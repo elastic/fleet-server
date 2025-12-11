@@ -1149,15 +1149,13 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 // Nil []byte returned means that no storage operation should happen for the available rollbacks (it means that we already have
 // the correct value on the model). See ProcessRequest and checkin.WithAvailableRollbacks for reference.
 func parseAvailableRollbacks(zlog zerolog.Logger, upgradeInfo *model.Upgrade, req *CheckinRequest) ([]byte, error) {
-	var reqRollbacks []model.AvailableRollback
-	if len(req.AvailableRollbacks) > 0 {
-		err := json.Unmarshal(req.AvailableRollbacks, &reqRollbacks)
+
+	reqUpgradeInfo := model.Upgrade{}
+	if len(req.Upgrade) > 0 {
+		err := json.Unmarshal(req.Upgrade, &reqUpgradeInfo)
 		if err != nil {
-			return nil, fmt.Errorf("parsing request available rollbacks: %w", err)
+			return nil, fmt.Errorf("parsing request upgrade information: %w", err)
 		}
-	} else {
-		// still set an empty slice in order to clear obsolete information, if any
-		reqRollbacks = []model.AvailableRollback{}
 	}
 
 	var outRollbacks []byte
@@ -1168,14 +1166,14 @@ func parseAvailableRollbacks(zlog zerolog.Logger, upgradeInfo *model.Upgrade, re
 	}
 
 	// Compare the deserialized meta structures and return the bytes to update if different
-	if !reflect.DeepEqual(reqRollbacks, agentRollbacks) {
+	if !reflect.DeepEqual(reqUpgradeInfo.Rollbacks, agentRollbacks) {
 		zlog.Trace().
 			Any("oldAvailableRollbacks", agentRollbacks).
-			Any("req.AvailableRollbacks", req.AvailableRollbacks).
+			Any("reqAvailableRollbacks", reqUpgradeInfo.Rollbacks).
 			Msg("available rollback data is not equal")
 
 		zlog.Info().Msg("applying new rollback data")
-		marshalled, err := json.Marshal(reqRollbacks)
+		marshalled, err := json.Marshal(reqUpgradeInfo.Rollbacks)
 		if err != nil {
 			return nil, fmt.Errorf("marshalling available rollbacks: %w", err)
 		}

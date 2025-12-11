@@ -306,7 +306,13 @@ type AuditUnenrollRequest struct {
 type AuditUnenrollRequestReason string
 
 // AvailableRollbacks Target versions available for a rollback
-type AvailableRollbacks = json.RawMessage
+type AvailableRollbacks = []struct {
+	// ValidUntil timestamp indicating when the rollback target will expire
+	ValidUntil time.Time `json:"valid_until"`
+
+	// Version version of the available rollback target, represented as string
+	Version string `json:"version"`
+}
 
 // CheckinRequest defines model for checkinRequest.
 type CheckinRequest struct {
@@ -316,9 +322,6 @@ type CheckinRequest struct {
 
 	// AgentPolicyId The ID of the policy that the agent is currently running.
 	AgentPolicyId *string `json:"agent_policy_id,omitempty"`
-
-	// AvailableRollbacks Target versions available for a rollback
-	AvailableRollbacks AvailableRollbacks `json:"available_rollbacks,omitempty"`
 
 	// Components An embedded JSON object that holds component information that the agent is running.
 	// Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
@@ -345,6 +348,9 @@ type CheckinRequest struct {
 
 	// Status The agent state, inferred from agent control protocol states.
 	Status CheckinRequestStatus `json:"status"`
+
+	// Upgrade Container for upgrade information coming from agent
+	Upgrade UpgradeInformation `json:"upgrade,omitempty"`
 
 	// UpgradeDetails Additional details describing the status of an UPGRADE action delivered by the client (agent) on checkin.
 	UpgradeDetails *UpgradeDetails `json:"upgrade_details,omitempty"`
@@ -820,6 +826,9 @@ type UpgradeDetails_Metadata struct {
 
 // UpgradeDetailsState The upgrade state.
 type UpgradeDetailsState string
+
+// UpgradeInformation Container for upgrade information coming from agent
+type UpgradeInformation = json.RawMessage
 
 // UpgradeMetadataDownloading Upgrade metadata for an upgrade that is downloading.
 type UpgradeMetadataDownloading struct {
