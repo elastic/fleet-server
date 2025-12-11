@@ -1150,7 +1150,7 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 // the correct value on the model). See ProcessRequest and checkin.WithAvailableRollbacks for reference.
 func parseAvailableRollbacks(zlog zerolog.Logger, upgradeInfo *model.Upgrade, req *CheckinRequest) ([]byte, error) {
 
-	reqUpgradeInfo := model.Upgrade{}
+	reqUpgradeInfo := model.Upgrade{Rollbacks: []model.AvailableRollback{}}
 	if len(req.Upgrade) > 0 {
 		err := json.Unmarshal(req.Upgrade, &reqUpgradeInfo)
 		if err != nil {

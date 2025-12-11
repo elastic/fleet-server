@@ -1156,7 +1156,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 		{
 			name: "Available rollbacks are correctly parsed",
 			req: &http.Request{
-				Body: io.NopCloser(strings.NewReader(`{"validJson": "test", "status": "test", "message": "test message", "available_rollbacks": [{"version": "1.2.3-SNAPSHOT", "valid_until": "2025-11-27T15:12:44Z"}]}`)),
+				Body: io.NopCloser(strings.NewReader(`{"validJson": "test", "status": "test", "message": "test message", "upgrade":{ "rollbacks": [{"version": "1.2.3-SNAPSHOT", "valid_until": "2025-11-27T15:12:44Z"}]}}`)),
 			},
 			cfg: &config.Server{
 				Limits: config.ServerLimits{
@@ -1173,7 +1173,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 		{
 			name: "Available rollbacks are incorrectly formatted (string instead of array): no error returned but the rawAvailableRollbacks are set to nil",
 			req: &http.Request{
-				Body: io.NopCloser(strings.NewReader(`{"validJson": "test", "status": "test", "message": "test message", "available_rollbacks": "foobar"}`)),
+				Body: io.NopCloser(strings.NewReader(`{"validJson": "test", "status": "test", "message": "test message", "upgrade":{"rollbacks": "foobar"}}`)),
 			},
 			cfg: &config.Server{
 				Limits: config.ServerLimits{
