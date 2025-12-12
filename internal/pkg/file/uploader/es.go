@@ -130,7 +130,6 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 		}
 		req.Header.Set("Content-Type", "application/cbor")
 		req.Header.Set("Accept", "application/json")
-		req.Refresh = "true"
 	})
 	if err != nil {
 		return err
@@ -184,5 +183,13 @@ func DeleteAllChunksForFile(ctx context.Context, bulker bulk.Bulk, source string
 	}
 	client := bulker.Client()
 	_, err = client.DeleteByQuery([]string{fmt.Sprintf(UploadDataIndexPattern, source)}, bytes.NewReader(q), client.DeleteByQuery.WithContext(ctx))
+	return err
+}
+
+func EnsureChunksIndexed(ctx context.Context, client *elasticsearch.Client, source string) error {
+	req := esapi.IndicesRefreshRequest{
+		Index: []string{fmt.Sprintf(UploadDataIndexPattern, source)},
+	}
+	_, err := req.Do(ctx, client)
 	return err
 }
