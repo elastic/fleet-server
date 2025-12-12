@@ -222,6 +222,9 @@ type Agent struct {
 	// Date/time the Elastic Agent was last updated
 	UpdatedAt string `json:"updated_at,omitempty"`
 
+	// Container for upgrade-related agent data
+	Upgrade *Upgrade `json:"upgrade,omitempty"`
+
 	// List of timestamps of attempts of Elastic Agent automatic upgrades
 	UpgradeAttempts []string `json:"upgrade_attempts,omitempty"`
 
@@ -284,6 +287,12 @@ type Artifact struct {
 
 	// Name of the package that owns this artifact
 	PackageName string `json:"package_name,omitempty"`
+}
+
+// AvailableRollback
+type AvailableRollback struct {
+	ValidUntil string `json:"valid_until,omitempty"`
+	Version    string `json:"version,omitempty"`
 }
 
 // Checkin An Elastic Agent checkin to Fleet
@@ -581,6 +590,13 @@ type UnitsItems struct {
 	Message string `json:"message,omitempty"`
 	Status  string `json:"status,omitempty"`
 	Type    string `json:"type,omitempty"`
+}
+
+// Upgrade Container for upgrade-related agent data
+type Upgrade struct {
+
+	// list of available rollbacks for the agent
+	Rollbacks []AvailableRollback `json:"rollbacks,omitempty"`
 }
 
 // UpgradeDetails Additional upgrade status details.
