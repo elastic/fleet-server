@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
@@ -454,22 +455,21 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		return nil
 	}
 	// update docs with in progress details
-
 	vSpan, vCtx := apm.StartSpan(ctx, "Check update action", "validate")
-	action, err := ct.verifyActionExists(ctx, vSpan, agent, details)
-	if err != nil {
+
+	var actionTraceparent string
+	if action, err := ct.verifyActionExists(ctx, vSpan, agent, details); err == nil && action != nil {
+		actionTraceparent = action.Traceparent
+	} else if !errors.Is(err, es.ErrNotFound) {
 		return err
-	}
-	if action == nil {
-		return nil
 	}
 
 	// link action with APM spans
 	var links []apm.SpanLink
-	if ct.bulker.HasTracer() && action.Traceparent != "" {
-		traceCtx, err := apmhttp.ParseTraceparentHeader(action.Traceparent)
+	if ct.bulker.HasTracer() && actionTraceparent != "" {
+		traceCtx, err := apmhttp.ParseTraceparentHeader(actionTraceparent)
 		if err != nil {
-			zerolog.Ctx(vCtx).Trace().Err(err).Msgf("Error parsing traceparent: %s %s", action.Traceparent, err)
+			zerolog.Ctx(vCtx).Trace().Err(err).Msgf("Error parsing traceparent: %s %s", actionTraceparent, err)
 		} else {
 			links = []apm.SpanLink{
 				{

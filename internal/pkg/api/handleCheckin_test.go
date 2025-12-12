@@ -467,12 +467,13 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		},
 		err: nil,
 	}, {
-		name:    "upgrade requested action invalid",
+		name:    "upgrade requested action not found",
 		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
 		details: &UpgradeDetails{ActionId: "test-action", State: UpgradeDetailsStateUPGREQUESTED},
 		bulk: func() *ftesting.MockBulk {
 			mBulk := ftesting.NewMockBulk()
 			mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(&es.ResultT{}, es.ErrNotFound)
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
 		cache: func() *testcache.MockCache {
@@ -480,7 +481,22 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mCache.On("GetAction", "test-action").Return(model.Action{}, false)
 			return mCache
 		},
-		err: es.ErrNotFound,
+		err: nil,
+	}, {
+		name:    "upgrade requested action failed to fetch",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+		details: &UpgradeDetails{ActionId: "test-action", State: UpgradeDetailsStateUPGREQUESTED},
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(&es.ResultT{}, es.ErrTimeout)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			mCache := testcache.NewMockCache()
+			mCache.On("GetAction", "test-action").Return(model.Action{}, false)
+			return mCache
+		},
+		err: es.ErrTimeout,
 	}, {
 		name:  "upgrade scheduled action in cache",
 		agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
