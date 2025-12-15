@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
@@ -167,12 +168,13 @@ func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, 
 
 // validatedCheckin is a struct to wrap all the things that validateRequest returns.
 type validatedCheckin struct {
-	req             *CheckinRequest
-	dur             time.Duration
-	rawMeta         []byte
-	rawComp         []byte
-	seqno           sqn.SeqNo
-	unhealthyReason *[]string
+	req                   *CheckinRequest
+	dur                   time.Duration
+	rawMeta               []byte
+	rawComp               []byte
+	seqno                 sqn.SeqNo
+	unhealthyReason       *[]string
+	rawAvailableRollbacks []byte
 }
 
 func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent) (validatedCheckin, error) {
@@ -251,13 +253,20 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		return val, err
 	}
 
+	rawRollbacks, err := parseAvailableRollbacks(zlog, agent.Upgrade, &req)
+	if err != nil {
+		zlog.Warn().Err(err).Msg("unable to parse available rollbacks")
+		rawRollbacks = nil
+	}
+
 	return validatedCheckin{
-		req:             &req,
-		dur:             pollDuration,
-		rawMeta:         rawMeta,
-		rawComp:         rawComponents,
-		seqno:           seqno,
-		unhealthyReason: unhealthyReason,
+		req:                   &req,
+		dur:                   pollDuration,
+		rawMeta:               rawMeta,
+		rawComp:               rawComponents,
+		seqno:                 seqno,
+		unhealthyReason:       unhealthyReason,
+		rawAvailableRollbacks: rawRollbacks,
 	}, nil
 }
 
@@ -290,6 +299,10 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		checkin.WithVer(ver),
 		checkin.WithUnhealthyReason(unhealthyReason),
 		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
+	}
+
+	if validated.rawAvailableRollbacks != nil {
+		initialOpts = append(initialOpts, checkin.WithAvailableRollbacks(validated.rawAvailableRollbacks))
 	}
 
 	revID, opts, err := ct.processPolicyDetails(r.Context(), zlog, agent, req)
@@ -454,22 +467,21 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		return nil
 	}
 	// update docs with in progress details
-
 	vSpan, vCtx := apm.StartSpan(ctx, "Check update action", "validate")
-	action, err := ct.verifyActionExists(ctx, vSpan, agent, details)
-	if err != nil {
+
+	var actionTraceparent string
+	if action, err := ct.verifyActionExists(ctx, vSpan, agent, details); err == nil && action != nil {
+		actionTraceparent = action.Traceparent
+	} else if !errors.Is(err, es.ErrNotFound) {
 		return err
-	}
-	if action == nil {
-		return nil
 	}
 
 	// link action with APM spans
 	var links []apm.SpanLink
-	if ct.bulker.HasTracer() && action.Traceparent != "" {
-		traceCtx, err := apmhttp.ParseTraceparentHeader(action.Traceparent)
+	if ct.bulker.HasTracer() && actionTraceparent != "" {
+		traceCtx, err := apmhttp.ParseTraceparentHeader(actionTraceparent)
 		if err != nil {
-			zerolog.Ctx(vCtx).Trace().Err(err).Msgf("Error parsing traceparent: %s %s", action.Traceparent, err)
+			zerolog.Ctx(vCtx).Trace().Err(err).Msgf("Error parsing traceparent: %s %s", actionTraceparent, err)
 		} else {
 			links = []apm.SpanLink{
 				{
@@ -1132,6 +1144,45 @@ func parseComponents(zlog zerolog.Logger, agent *model.Agent, req *CheckinReques
 	zlog.Debug().Any("unhealthy_reason", unhealthyReason).Msg("unhealthy reason")
 
 	return outComponents, &unhealthyReason, nil
+}
+
+// parseAvailableRollbacks will pull the available rollbacks contained in the checkin request and compare them to what
+// we have currently in the model, returning the value that we want to persist expressed as a []byte.
+// If the value needs to be updated, this function will return a non-nil []byte (possibly empty if we need to clear the information)
+// Nil []byte returned means that no storage operation should happen for the available rollbacks (it means that we already have
+// the correct value on the model). See ProcessRequest and checkin.WithAvailableRollbacks for reference.
+func parseAvailableRollbacks(zlog zerolog.Logger, upgradeInfo *model.Upgrade, req *CheckinRequest) ([]byte, error) {
+
+	reqUpgradeInfo := model.Upgrade{Rollbacks: []model.AvailableRollback{}}
+	if len(req.Upgrade) > 0 {
+		err := json.Unmarshal(req.Upgrade, &reqUpgradeInfo)
+		if err != nil {
+			return nil, fmt.Errorf("parsing request upgrade information: %w", err)
+		}
+	}
+
+	var outRollbacks []byte
+
+	var agentRollbacks []model.AvailableRollback
+	if upgradeInfo != nil {
+		agentRollbacks = upgradeInfo.Rollbacks
+	}
+
+	// Compare the deserialized meta structures and return the bytes to update if different
+	if !reflect.DeepEqual(reqUpgradeInfo.Rollbacks, agentRollbacks) {
+		zlog.Trace().
+			Any("oldAvailableRollbacks", agentRollbacks).
+			Any("reqAvailableRollbacks", reqUpgradeInfo.Rollbacks).
+			Msg("available rollback data is not equal")
+
+		zlog.Info().Msg("applying new rollback data")
+		marshalled, err := json.Marshal(reqUpgradeInfo.Rollbacks)
+		if err != nil {
+			return nil, fmt.Errorf("marshalling available rollbacks: %w", err)
+		}
+		outRollbacks = marshalled
+	}
+	return outRollbacks, nil
 }
 
 func calcUnhealthyReason(reqComponents []model.ComponentsItems) []string {

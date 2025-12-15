@@ -514,6 +514,20 @@
       }
     },
 
+    "available_rollback": {
+      "title": "AvailableRollback",
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+
     "agent": {
       "title": "Agent",
       "description": "An Elastic Agent that has enrolled into Fleet",
@@ -717,6 +731,19 @@
         "replace_token": {
           "description": "hash of token provided during enrollment that allows replacement by another enrollment with same ID",
           "type": "string"
+        },
+        "upgrade" : {
+          "description": "Container for upgrade-related agent data",
+          "type": "object",
+          "properties": {
+            "rollbacks": {
+              "description": "list of available rollbacks for the agent",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/available_rollback"
+              }
+            }
+          }
         }
       },
       "required": ["_id", "type", "active", "enrolled_at", "status"]

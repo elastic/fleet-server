@@ -305,6 +305,15 @@ type AuditUnenrollRequest struct {
 // AuditUnenrollRequestReason The unenroll reason
 type AuditUnenrollRequestReason string
 
+// AvailableRollbacks Target versions available for a rollback
+type AvailableRollbacks = []struct {
+	// ValidUntil timestamp indicating when the rollback target will expire
+	ValidUntil time.Time `json:"valid_until"`
+
+	// Version version of the available rollback target, represented as string
+	Version string `json:"version"`
+}
+
 // CheckinRequest defines model for checkinRequest.
 type CheckinRequest struct {
 	// AckToken The ack_token form a previous response if the agent has checked in before.
@@ -339,6 +348,9 @@ type CheckinRequest struct {
 
 	// Status The agent state, inferred from agent control protocol states.
 	Status CheckinRequestStatus `json:"status"`
+
+	// Upgrade Container for upgrade information coming from agent
+	Upgrade UpgradeInformation `json:"upgrade,omitempty"`
 
 	// UpgradeDetails Additional details describing the status of an UPGRADE action delivered by the client (agent) on checkin.
 	UpgradeDetails *UpgradeDetails `json:"upgrade_details,omitempty"`
@@ -814,6 +826,9 @@ type UpgradeDetails_Metadata struct {
 
 // UpgradeDetailsState The upgrade state.
 type UpgradeDetailsState string
+
+// UpgradeInformation Container for upgrade information coming from agent
+type UpgradeInformation = json.RawMessage
 
 // UpgradeMetadataDownloading Upgrade metadata for an upgrade that is downloading.
 type UpgradeMetadataDownloading struct {
