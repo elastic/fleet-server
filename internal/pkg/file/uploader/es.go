@@ -190,6 +190,9 @@ func EnsureChunksIndexed(ctx context.Context, client *elasticsearch.Client, sour
 	req := esapi.IndicesRefreshRequest{
 		Index: []string{fmt.Sprintf(UploadDataIndexPattern, source)},
 	}
-	_, err := req.Do(ctx, client)
+	resp, err := req.Do(ctx, client)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		zerolog.Ctx(ctx).Warn().Int("status_code", resp.StatusCode).Msg("File Chunk Index refresh gave abnormal response")
+	}
 	return err
 }
