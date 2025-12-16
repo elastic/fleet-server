@@ -123,6 +123,8 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 	span, _ := apm.StartSpan(ctx, "createChunk", "create")
 	defer span.End()
 	chunkDocID := fmt.Sprintf("%s.%d", fileID, chunkNum)
+	// This create doc happens *many* times per file, so it must not use any expensive parameters (e.g. refresh)
+	// for a 5GB file, that is 1,280 create calls
 	resp, err := client.Create(fmt.Sprintf(UploadDataIndexPattern, source), chunkDocID, body, func(req *esapi.CreateRequest) {
 		req.DocumentID = chunkDocID
 		if req.Header == nil {
