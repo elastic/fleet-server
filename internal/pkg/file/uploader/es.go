@@ -123,6 +123,8 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 	span, _ := apm.StartSpan(ctx, "createChunk", "create")
 	defer span.End()
 	chunkDocID := fmt.Sprintf("%s.%d", fileID, chunkNum)
+	// This create doc happens *many* times per file, so it must not use any expensive parameters (e.g. refresh)
+	// for a 5GB file, that is 1,280 create calls
 	resp, err := client.Create(fmt.Sprintf(UploadDataIndexPattern, source), chunkDocID, body, func(req *esapi.CreateRequest) {
 		req.DocumentID = chunkDocID
 		if req.Header == nil {
@@ -130,7 +132,6 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 		}
 		req.Header.Set("Content-Type", "application/cbor")
 		req.Header.Set("Accept", "application/json")
-		req.Refresh = "true"
 	})
 	if err != nil {
 		return err
@@ -184,5 +185,16 @@ func DeleteAllChunksForFile(ctx context.Context, bulker bulk.Bulk, source string
 	}
 	client := bulker.Client()
 	_, err = client.DeleteByQuery([]string{fmt.Sprintf(UploadDataIndexPattern, source)}, bytes.NewReader(q), client.DeleteByQuery.WithContext(ctx))
+	return err
+}
+
+func EnsureChunksIndexed(ctx context.Context, client *elasticsearch.Client, source string) error {
+	req := esapi.IndicesRefreshRequest{
+		Index: []string{fmt.Sprintf(UploadDataIndexPattern, source)},
+	}
+	resp, err := req.Do(ctx, client)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		zerolog.Ctx(ctx).Warn().Int("status_code", resp.StatusCode).Msg("File Chunk Index refresh gave abnormal response")
+	}
 	return err
 }

@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -40,6 +41,12 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 	// if already done, failed or deleted, exit
 	if !info.StatusCanUpload() {
 		return info, ErrStatusNoUploads
+	}
+
+	// complete may be called before most recent chunks are available for search yet
+	// this explicitly calls refresh once at the end, instead of refreshing on each chunk
+	if err := EnsureChunksIndexed(ctx, u.bulker.Client(), info.Source); err != nil {
+		return info, fmt.Errorf("unable to refresh chunk data index: %w", err)
 	}
 
 	chunks, err := file.GetChunkInfos(ctx, u.bulker, UploadDataIndexPattern, info.DocID, file.GetChunkInfoOpt{IncludeSize: true, RequireHash: true})
