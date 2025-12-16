@@ -3,7 +3,7 @@
 [[release-notes-8.19.9]]
 ==  8.19.9
 
-Review important information about the  8.19.9 release.
+No significant changes.
 
 
 
