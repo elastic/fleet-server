@@ -15,6 +15,7 @@ const (
 	FleetEnrollmentAPIKeys = ".fleet-enrollment-api-keys"
 	FleetPolicies          = ".fleet-policies"
 	FleetOutputHealth      = "logs-fleet_server.output_health-default"
+	OpAmpAgents            = ".opamp-agents" // Index for OpAmp agents (OpenTelemetry Collectors)
 )
 
 // Query fields

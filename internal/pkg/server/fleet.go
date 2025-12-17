@@ -541,6 +541,15 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	pt := api.NewPGPRetrieverT(&cfg.Inputs[0].Server, bulker, f.cache)
 	auditT := api.NewAuditT(&cfg.Inputs[0].Server, bulker, f.cache)
 
+	// Create OpAmp handler if enabled
+	var opampT *api.OpAmpT
+	if cfg.Inputs[0].Server.OpAmp.Enabled {
+		opampT = api.NewOpAmpT(&cfg.Inputs[0].Server, bulker, f.cache)
+		zerolog.Ctx(ctx).Info().
+			Str("path", opampT.GetPath()).
+			Msg("OpAmp endpoint enabled")
+	}
+
 	for _, endpoint := range (&cfg.Inputs[0].Server).BindEndpoints() {
 		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server,
 			api.WithCheckin(ct),
@@ -552,6 +561,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 			api.WithFileDelivery(ft),
 			api.WithPGP(pt),
 			api.WithAudit(auditT),
+			api.WithOpAmp(opampT),
 			api.WithTracer(tracer),
 		)
 		g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {

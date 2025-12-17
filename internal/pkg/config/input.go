@@ -78,6 +78,7 @@ type (
 		PGP                PGP                     `config:"pgp"`
 		PDKDF2             PBKDF2                  `config:"pdkdf2"`
 		Features           FeatureFlags            `config:"feature_flags"`
+		OpAmp              OpAmpConfig             `config:"opamp"`
 	}
 
 	StaticPolicyTokens struct {
@@ -98,6 +99,14 @@ type (
 		// IgnoreCheckinPolicyID when true will ignore the agent_policy_id and policy_revision_idx attributes in checkin request bodies.
 		// This setting restores previous behaviour where all POLICY_CHANGE actions need an explicit ack.
 		IgnoreCheckinPolicyID bool `config:"ignore_checkin_policy_id"`
+	}
+
+	// OpAmpConfig is the configuration for OpAmp protocol support
+	OpAmpConfig struct {
+		// Enabled enables the OpAmp HTTP endpoint for OpenTelemetry Collector management
+		Enabled bool `config:"enabled"`
+		// Path is the HTTP path for the OpAmp endpoint (defaults to "/v1/opamp")
+		Path string `config:"path"`
 	}
 )
 

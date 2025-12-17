@@ -223,6 +223,12 @@ fleet:
 #         burst: 100
 #         max: 50
 #         max_body_byte_size: 1024
+#       # OpAmp endpoint rate limiting
+#       opamp_limit:
+#         interval: 1ms
+#         burst: 1000
+#         max: 0
+#         max_body_byte_size: 1048576 # 1MiB
 #
 #     # go runtime limits
 #     runtime:
@@ -276,6 +282,14 @@ fleet:
 #        // ignore agent_policy_id and policy_revision_idx attributes that may be present in the checkin request bodies.
 #        // POLICY_CHANGE actions need an explicit ack if this is set.
 #        ignore_checkin_policy_id: false
+#
+#      # OpAmp protocol configuration for OpenTelemetry Collector management
+#      # When enabled, fleet-server exposes an HTTP endpoint for OpAmp protocol connections
+#      opamp:
+#        # Enable the OpAmp endpoint (default: false)
+#        enabled: false
+#        # HTTP path for the OpAmp endpoint (default: /v1/opamp)
+#        path: "/v1/opamp"
 #
 #    # monitor options are advanced configuration and should not be adjusted is most cases
 #    monitor:

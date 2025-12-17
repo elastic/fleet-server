@@ -34,6 +34,7 @@ type ServerLimits struct {
 	DeliverFileLimit   Limit `config:"file_delivery_limit"`
 	GetPGPKey          Limit `config:"pgp_retrieval_limit"`
 	AuditUnenrollLimit Limit `config:"audit_unenroll_limit"`
+	OpAmpLimit         Limit `config:"opamp_limit"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -63,6 +64,7 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	c.DeliverFileLimit = mergeEnvLimit(c.DeliverFileLimit, l.DeliverFileLimit)
 	c.GetPGPKey = mergeEnvLimit(c.GetPGPKey, l.GetPGPKeyLimit)
 	c.AuditUnenrollLimit = mergeEnvLimit(c.AuditUnenrollLimit, l.AuditUnenrollLimit)
+	c.OpAmpLimit = mergeEnvLimit(c.OpAmpLimit, l.OpAmpLimit)
 }
 
 func mergeEnvLimit(L Limit, l limit) Limit {

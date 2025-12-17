@@ -13,6 +13,8 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 
@@ -41,10 +43,17 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 	for _, opt := range opts {
 		opt(a)
 	}
+	handler := newRouter(&cfg.Limits, a, a.tracer)
+
+	// Add OpAmp endpoint if enabled and handler is configured
+	if a.ot != nil && a.ot.IsEnabled() {
+		handler = addOpAmpRoute(handler, a.ot)
+	}
+
 	return &server{
 		addr:    addr,
 		cfg:     cfg,
-		handler: newRouter(&cfg.Limits, a, a.tracer),
+		handler: handler,
 		logger:  zap.NewStub("api-server"),
 	}
 }
@@ -188,4 +197,25 @@ func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) 
 	}
 
 	return ln
+}
+
+// addOpAmpRoute wraps the existing handler and adds the OpAmp endpoint
+func addOpAmpRoute(handler http.Handler, ot *OpAmpT) http.Handler {
+	r := chi.NewRouter()
+
+	// Mount the OpAmp handler at its configured path
+	opampHandler, err := ot.GetHTTPHandler()
+	if err != nil {
+		// Log error and return original handler without OpAmp
+		zerolog.Ctx(context.Background()).Error().Err(err).Msg("Failed to create OpAmp handler")
+		return handler
+	}
+
+	path := ot.GetPath()
+	r.Post(path, opampHandler)
+
+	// Mount the existing handler for all other routes
+	r.Mount("/", handler)
+
+	return r
 }

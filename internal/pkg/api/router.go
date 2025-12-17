@@ -54,6 +54,7 @@ type limiter struct {
 	deliverFile    *limit.Limiter
 	getPGPKey      *limit.Limiter
 	auditUnenroll  *limit.Limiter
+	opamp          *limit.Limiter
 }
 
 func Limiter(cfg *config.ServerLimits) *limiter {
@@ -69,6 +70,7 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 		deliverFile:    limit.NewLimiter(&cfg.DeliverFileLimit),
 		getPGPKey:      limit.NewLimiter(&cfg.GetPGPKey),
 		auditUnenroll:  limit.NewLimiter(&cfg.AuditUnenrollLimit),
+		opamp:          limit.NewLimiter(&cfg.OpAmpLimit),
 	}
 }
 
@@ -88,6 +90,9 @@ func pathToOperation(path string) string {
 	}
 	if pgpReg.MatchString(path) {
 		return "getPGPKey"
+	}
+	if strings.HasPrefix(path, "/v1/opamp") {
+		return "opamp"
 	}
 
 	if strings.HasPrefix(path, "/api/fleet/") {
@@ -142,6 +147,8 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 			l.status.Wrap("status", &cntStatus, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "audit-unenroll":
 			l.auditUnenroll.Wrap("audit-unenroll", &cntAuditUnenroll, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+		case "opamp":
+			l.opamp.Wrap("opamp", &cntOpAmp, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		default:
 			// no tracking or limits
 			next.ServeHTTP(w, r)

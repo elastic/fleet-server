@@ -70,6 +70,12 @@ func WithAudit(audit *AuditT) APIOpt {
 	}
 }
 
+func WithOpAmp(ot *OpAmpT) APIOpt {
+	return func(a *apiServer) {
+		a.ot = ot
+	}
+}
+
 func WithTracer(tracer *apm.Tracer) APIOpt {
 	return func(a *apiServer) {
 		a.tracer = tracer
@@ -88,6 +94,7 @@ type apiServer struct {
 	ft    *FileDeliveryT
 	pt    *PGPRetrieverT
 	audit *AuditT
+	ot    *OpAmpT
 
 	// tracer is used by the wrapping server to instrument the API server
 	tracer *apm.Tracer

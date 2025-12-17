@@ -46,6 +46,7 @@ var (
 	cntFileDeliv     routeStats
 	cntGetPGP        routeStats
 	cntAuditUnenroll routeStats
+	cntOpAmp         routeStats
 	cntArtifacts     artifactStats
 
 	infoReg sync.Once
@@ -73,6 +74,7 @@ func init() {
 	cntFileDeliv.Register(routesRegistry.newRegistry("deliverFile"))
 	cntGetPGP.Register(routesRegistry.newRegistry("getPGPKey"))
 	cntAuditUnenroll.Register(routesRegistry.newRegistry("auditUnenroll"))
+	cntOpAmp.Register(routesRegistry.newRegistry("opamp"))
 
 	err := report.SetupMetricsOptions(report.MetricOptions{
 		Logger:         zap.NewStub("instance-metrics"),
