@@ -6,10 +6,14 @@ package api
 
 import (
 	"context"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
@@ -18,50 +22,78 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
+//go:embed opamp_index_settings.json
+var opampIndexSettings string
+
 const (
-	kOpAmpMod           = "opamp"
-	kOpAmpDefaultPath   = "/v1/opamp"
-	kOpAmpAgentType     = "opamp-agent"
-	kOpAmpProtocolHTTP  = "http"
-	kOpAmpStatusOnline  = "online"
-	kOpAmpStatusHealthy = "healthy"
+	kOpAmpMod            = "opamp"
+	kOpAmpDefaultPath    = "/v1/opamp"
+	kOpAmpAgentType      = "opamp-agent"
+	kOpAmpProtocolHTTP   = "http"
+	kOpAmpStatusOnline   = "online"
+	kOpAmpStatusHealthy  = "healthy"
 	kOpAmpStatusDegraded = "degraded"
 )
 
 // OpAmpT handles OpAmp protocol connections from OpenTelemetry Collectors
 type OpAmpT struct {
-	cfg      *config.Server
-	bulker   bulk.Bulk
-	cache    cache.Cache
-	opampSrv opampserver.OpAMPServer
-	logger   zerolog.Logger
+	cfg         *config.Server
+	bulker      bulk.Bulk
+	opampSrv    opampserver.OpAMPServer
+	logger      zerolog.Logger
+	handler     http.HandlerFunc
+	connContext func(ctx context.Context, c net.Conn) context.Context
+	indexOnce   sync.Once
+	indexErr    error
 }
 
 // NewOpAmpT creates a new OpAmp handler instance
-func NewOpAmpT(cfg *config.Server, bulker bulk.Bulk, c cache.Cache) *OpAmpT {
-	logger := zerolog.Nop().With().Str("mod", kOpAmpMod).Logger()
+func NewOpAmpT(cfg *config.Server, bulker bulk.Bulk, logger zerolog.Logger) *OpAmpT {
+	log := logger.With().Str("mod", kOpAmpMod).Logger()
+
 	ot := &OpAmpT{
 		cfg:    cfg,
 		bulker: bulker,
-		cache:  c,
-		logger: logger,
+		logger: log,
 	}
 
 	// Create opamp-go server with Fleet's logger adapter
-	ot.opampSrv = opampserver.New(&opampLogger{logger: ot.logger})
+	ot.opampSrv = opampserver.New(&opampLogger{logger: log})
+
+	// Initialize the handler and connection context
+	if err := ot.initHandler(); err != nil {
+		log.Error().Err(err).Msg("Failed to initialize OpAmp handler")
+	}
 
 	return ot
 }
 
-// SetLogger sets the logger for the OpAmp handler
-func (ot *OpAmpT) SetLogger(logger zerolog.Logger) {
-	ot.logger = logger.With().Str("mod", kOpAmpMod).Logger()
+// initHandler initializes the HTTP handler and connection context
+func (ot *OpAmpT) initHandler() error {
+	settings := opampserver.Settings{
+		Callbacks: types.Callbacks{
+			OnConnecting: ot.onConnecting,
+		},
+		EnableCompression: true,
+	}
+
+	handler, connCtx, err := ot.opampSrv.Attach(settings)
+	if err != nil {
+		return fmt.Errorf("failed to attach opamp server: %w", err)
+	}
+
+	// Store the handler wrapped as http.HandlerFunc
+	ot.handler = func(w http.ResponseWriter, r *http.Request) {
+		handler(w, r)
+	}
+	ot.connContext = connCtx
+
+	return nil
 }
 
 // opampLogger adapts zerolog to opamp-go's logger interface
@@ -78,24 +110,22 @@ func (l *opampLogger) Errorf(_ context.Context, format string, v ...interface{})
 }
 
 // GetHTTPHandler returns the HTTP handler function for integration with Fleet Server's router
-// Rate limiting is handled by the router middleware
-func (ot *OpAmpT) GetHTTPHandler() (http.HandlerFunc, error) {
-	settings := opampserver.Settings{
-		Callbacks: types.Callbacks{
-			OnConnecting: ot.onConnecting,
-		},
-		EnableCompression: true,
-	}
+// Returns nil if handler initialization failed
+func (ot *OpAmpT) GetHTTPHandler() http.HandlerFunc {
+	return ot.handler
+}
 
-	handler, _, err := ot.opampSrv.Attach(settings)
-	if err != nil {
-		return nil, fmt.Errorf("failed to attach opamp server: %w", err)
-	}
+// GetConnContext returns the connection context function required by opamp-go
+// This should be used with http.Server.ConnContext to properly store
+// the connection in the request context (required by opamp-go for plain HTTP mode)
+// Returns nil if handler initialization failed
+func (ot *OpAmpT) GetConnContext() func(ctx context.Context, c net.Conn) context.Context {
+	return ot.connContext
+}
 
-	// Wrap the opamp handler to match http.HandlerFunc signature
-	return func(w http.ResponseWriter, r *http.Request) {
-		handler(w, r)
-	}, nil
+// IsReady returns true if the handler was successfully initialized
+func (ot *OpAmpT) IsReady() bool {
+	return ot.handler != nil && ot.connContext != nil
 }
 
 // GetPath returns the configured OpAmp endpoint path
@@ -154,9 +184,15 @@ func (ot *OpAmpT) onMessage(
 	_ types.Connection,
 	msg *protobufs.AgentToServer,
 ) *protobufs.ServerToAgent {
+	// Get logger from context if available, fall back to instance logger
+	zlog := zerolog.Ctx(ctx)
+	if zlog.GetLevel() == zerolog.Disabled {
+		zlog = &ot.logger
+	}
+
 	// Validate instance_uid (must be 16 bytes UUID v7)
 	if len(msg.InstanceUid) != 16 {
-		ot.logger.Error().Int("uid_len", len(msg.InstanceUid)).Msg("Invalid instance_uid length")
+		zlog.Error().Int("uid_len", len(msg.InstanceUid)).Msg("Invalid instance_uid length")
 		return &protobufs.ServerToAgent{
 			ErrorResponse: &protobufs.ServerErrorResponse{
 				Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
@@ -167,7 +203,7 @@ func (ot *OpAmpT) onMessage(
 
 	instanceUID := hex.EncodeToString(msg.InstanceUid)
 
-	ot.logger.Debug().
+	zlog.Debug().
 		Str("instance_uid", instanceUID).
 		Uint64("sequence_num", msg.SequenceNum).
 		Uint64("capabilities", msg.Capabilities).
@@ -176,7 +212,7 @@ func (ot *OpAmpT) onMessage(
 	// Build Elasticsearch document from message
 	doc, err := ot.buildAgentDocument(msg)
 	if err != nil {
-		ot.logger.Error().Err(err).Msg("Failed to build agent document")
+		zlog.Error().Err(err).Msg("Failed to build agent document")
 		return &protobufs.ServerToAgent{
 			InstanceUid: msg.InstanceUid,
 			ErrorResponse: &protobufs.ServerErrorResponse{
@@ -188,7 +224,10 @@ func (ot *OpAmpT) onMessage(
 
 	// Write to Elasticsearch
 	if err := ot.writeAgentStatus(ctx, instanceUID, doc); err != nil {
-		ot.logger.Error().Err(err).Str("instance_uid", instanceUID).Msg("Failed to write agent status")
+		zlog.Error().Err(err).Str("instance_uid", instanceUID).Msg("Failed to write agent status")
+		// Note: We don't return an error to the client here because ES write failures
+		// shouldn't prevent the OpAmp protocol from functioning. The agent will retry
+		// on its next poll interval.
 	}
 
 	// Build read-only response (no config push)
@@ -265,9 +304,16 @@ func (ot *OpAmpT) buildAgentDocument(msg *protobufs.AgentToServer) (*model.OpAmp
 
 	// Extract effective config (store hash, optionally full config)
 	if msg.EffectiveConfig != nil && msg.EffectiveConfig.ConfigMap != nil {
-		configBytes, _ := json.Marshal(msg.EffectiveConfig.ConfigMap.ConfigMap)
-		doc.OpAmp.EffectiveConfig = &model.OpAmpEffectiveConfig{
-			ConfigMap: configBytes,
+		// Extract the body from the ConfigMap
+		configMap := msg.EffectiveConfig.ConfigMap.ConfigMap[""]
+
+		if len(configMap.Body) != 0 {
+			bodyBytes := configMap.Body
+
+			doc.OpAmp.EffectiveConfig = &model.OpAmpEffectiveConfig{
+				ConfigMap: bodyBytes,
+				Hash:      hex.EncodeToString(bodyBytes),
+			}
 		}
 	}
 
@@ -334,8 +380,82 @@ func convertHealth(h *protobufs.ComponentHealth) *model.OpAmpHealth {
 	return health
 }
 
+// ensureIndex ensures the OpAmp agents index exists in Elasticsearch
+// This is called once on the first write attempt
+func (ot *OpAmpT) ensureIndex(ctx context.Context) error {
+	ot.indexOnce.Do(func() {
+		ot.indexErr = ot.createIndex(ctx)
+	})
+	return ot.indexErr
+}
+
+// createIndex creates the OpAmp agents index, deleting it first if it exists
+func (ot *OpAmpT) createIndex(ctx context.Context) error {
+	if ot.bulker == nil {
+		return fmt.Errorf("bulker not configured")
+	}
+
+	client := ot.bulker.Client()
+	if client == nil {
+		return fmt.Errorf("elasticsearch client not available")
+	}
+
+	indexName := dl.OpAmpAgents
+
+	// Check if index exists
+	res, err := client.Indices.Exists(
+		[]string{indexName},
+		client.Indices.Exists.WithContext(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to check index existence: %w", err)
+	}
+	res.Body.Close()
+
+	// If index exists (status 200), delete it first
+	if res.StatusCode == http.StatusOK {
+		ot.logger.Info().Str("index", indexName).Msg("Deleting existing OpAmp agents index")
+		res, err = client.Indices.Delete(
+			[]string{indexName},
+			client.Indices.Delete.WithContext(ctx),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to delete index: %w", err)
+		}
+		res.Body.Close()
+		if res.IsError() {
+			return fmt.Errorf("failed to delete index: %s", res.String())
+		}
+	}
+
+	// Create the index with settings and mappings
+	ot.logger.Info().Str("index", indexName).Msg("Creating OpAmp agents index")
+	res, err = client.Indices.Create(
+		indexName,
+		client.Indices.Create.WithContext(ctx),
+		client.Indices.Create.WithBody(strings.NewReader(opampIndexSettings)),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create index: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("failed to create index: %s", res.String())
+	}
+
+	ot.logger.Info().Str("index", indexName).Msg("OpAmp agents index created successfully")
+	return nil
+}
+
 // writeAgentStatus writes or updates agent status in Elasticsearch
 func (ot *OpAmpT) writeAgentStatus(ctx context.Context, instanceUID string, doc *model.OpAmpAgent) error {
+	// Ensure index exists before first write
+	if err := ot.ensureIndex(ctx); err != nil {
+		ot.logger.Warn().Err(err).Msg("Failed to ensure OpAmp agents index exists")
+		// Continue anyway - ES might auto-create the index
+	}
+
 	body, err := json.Marshal(doc)
 	if err != nil {
 		return fmt.Errorf("failed to marshal document: %w", err)
@@ -369,4 +489,3 @@ func (ot *OpAmpT) writeAgentStatus(ctx context.Context, instanceUID string, doc 
 
 	return nil
 }
-

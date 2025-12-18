@@ -544,7 +544,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	// Create OpAmp handler if enabled
 	var opampT *api.OpAmpT
 	if cfg.Inputs[0].Server.OpAmp.Enabled {
-		opampT = api.NewOpAmpT(&cfg.Inputs[0].Server, bulker, f.cache)
+		opampT = api.NewOpAmpT(&cfg.Inputs[0].Server, bulker, *zerolog.Ctx(ctx))
 		zerolog.Ctx(ctx).Info().
 			Str("path", opampT.GetPath()).
 			Msg("OpAmp endpoint enabled")

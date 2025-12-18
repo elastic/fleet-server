@@ -110,6 +110,12 @@ type (
 	}
 )
 
+// InitDefaults initializes the defaults for the OpAmp configuration.
+func (c *OpAmpConfig) InitDefaults() {
+	c.Enabled = false
+	c.Path = "/v1/opamp"
+}
+
 // InitDefaults initializes the defaults for the configuration.
 func (c *Server) InitDefaults() {
 	c.Host = kDefaultHost
@@ -125,6 +131,7 @@ func (c *Server) InitDefaults() {
 	c.GC.InitDefaults()
 	c.PGP.InitDefaults()
 	c.PDKDF2.InitDefaults()
+	c.OpAmp.InitDefaults()
 }
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.
