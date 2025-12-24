@@ -78,6 +78,7 @@ type (
 		PGP                PGP                     `config:"pgp"`
 		PDKDF2             PBKDF2                  `config:"pdkdf2"`
 		Features           FeatureFlags            `config:"feature_flags"`
+		OpAmp              OpAmpConfig             `config:"opamp"`
 	}
 
 	StaticPolicyTokens struct {
@@ -99,7 +100,21 @@ type (
 		// This setting restores previous behaviour where all POLICY_CHANGE actions need an explicit ack.
 		IgnoreCheckinPolicyID bool `config:"ignore_checkin_policy_id"`
 	}
+
+	// OpAmpConfig is the configuration for OpAmp protocol support
+	OpAmpConfig struct {
+		// Enabled enables the OpAmp HTTP endpoint for OpenTelemetry Collector management
+		Enabled bool `config:"enabled"`
+		// Path is the HTTP path for the OpAmp endpoint (defaults to "/v1/opamp")
+		Path string `config:"path"`
+	}
 )
+
+// InitDefaults initializes the defaults for the OpAmp configuration.
+func (c *OpAmpConfig) InitDefaults() {
+	c.Enabled = false
+	c.Path = "/v1/opamp"
+}
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *Server) InitDefaults() {
@@ -116,6 +131,7 @@ func (c *Server) InitDefaults() {
 	c.GC.InitDefaults()
 	c.PGP.InitDefaults()
 	c.PDKDF2.InitDefaults()
+	c.OpAmp.InitDefaults()
 }
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.
