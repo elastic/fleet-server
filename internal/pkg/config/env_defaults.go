@@ -86,6 +86,11 @@ const (
 	defaultAuditUnenrollBurst    = 50
 	defaultAuditUnenrollMax      = 100
 	defaultAuditUnenrollMaxBody  = 1024
+
+	defaultOpAmpInterval = time.Millisecond
+	defaultOpAmpBurst    = 1000
+	defaultOpAmpMax      = 0
+	defaultOpAmpMaxBody  = 1024 * 1024
 )
 
 type valueRange struct {
@@ -158,6 +163,7 @@ type serverLimitDefaults struct {
 	DeliverFileLimit   limit `config:"file_delivery_limit"`
 	GetPGPKeyLimit     limit `config:"pgp_retrieval_limit"`
 	AuditUnenrollLimit limit `config:"audit_unenroll_limit"`
+	OpAmpLimit         limit `config:"opamp_limit"`
 }
 
 func defaultserverLimitDefaults() *serverLimitDefaults {
@@ -236,6 +242,12 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Burst:    defaultAuditUnenrollBurst,
 			Max:      defaultAuditUnenrollMax,
 			MaxBody:  defaultAuditUnenrollMaxBody,
+		},
+		OpAmpLimit: limit{
+			Interval: defaultOpAmpInterval,
+			Burst:    defaultOpAmpBurst,
+			Max:      defaultOpAmpMax,
+			MaxBody:  defaultOpAmpMaxBody,
 		},
 	}
 }
