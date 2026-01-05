@@ -137,6 +137,9 @@ type ClientInterface interface {
 
 	// Status request
 	Status(ctx context.Context, params *StatusParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// OpAMPWithBody request with any body
+	OpAMPWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) GetPGPKey(ctx context.Context, major int, minor int, patch int, params *GetPGPKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -333,6 +336,18 @@ func (c *Client) UploadChunkWithBody(ctx context.Context, id string, chunkNum in
 
 func (c *Client) Status(ctx context.Context, params *StatusParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewStatusRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) OpAMPWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewOpAMPRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1128,6 +1143,35 @@ func NewStatusRequest(server string, params *StatusParams) (*http.Request, error
 	return req, nil
 }
 
+// NewOpAMPRequestWithBody generates requests for OpAMP with any type of body
+func NewOpAMPRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/opamp")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1215,6 +1259,9 @@ type ClientWithResponsesInterface interface {
 
 	// StatusWithResponse request
 	StatusWithResponse(ctx context.Context, params *StatusParams, reqEditors ...RequestEditorFn) (*StatusResponse, error)
+
+	// OpAMPWithBodyWithResponse request with any body
+	OpAMPWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*OpAMPResponse, error)
 }
 
 type GetPGPKeyResponse struct {
@@ -1513,6 +1560,27 @@ func (r StatusResponse) StatusCode() int {
 	return 0
 }
 
+type OpAMPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r OpAMPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r OpAMPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // GetPGPKeyWithResponse request returning *GetPGPKeyResponse
 func (c *ClientWithResponses) GetPGPKeyWithResponse(ctx context.Context, major int, minor int, patch int, params *GetPGPKeyParams, reqEditors ...RequestEditorFn) (*GetPGPKeyResponse, error) {
 	rsp, err := c.GetPGPKey(ctx, major, minor, patch, params, reqEditors...)
@@ -1658,6 +1726,15 @@ func (c *ClientWithResponses) StatusWithResponse(ctx context.Context, params *St
 		return nil, err
 	}
 	return ParseStatusResponse(rsp)
+}
+
+// OpAMPWithBodyWithResponse request with arbitrary body returning *OpAMPResponse
+func (c *ClientWithResponses) OpAMPWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*OpAMPResponse, error) {
+	rsp, err := c.OpAMPWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseOpAMPResponse(rsp)
 }
 
 // ParseGetPGPKeyResponse parses an HTTP response from a GetPGPKeyWithResponse call
@@ -2310,6 +2387,22 @@ func ParseStatusResponse(rsp *http.Response) (*StatusResponse, error) {
 	case rsp.StatusCode == 503:
 		// Content-type (text/plain) unsupported
 
+	}
+
+	return response, nil
+}
+
+// ParseOpAMPResponse parses an HTTP response from a OpAMPWithResponse call
+func ParseOpAMPResponse(rsp *http.Response) (*OpAMPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &OpAMPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil

@@ -48,6 +48,7 @@ type limiter struct {
 	enroll         *limit.Limiter
 	ack            *limit.Limiter
 	status         *limit.Limiter
+	opAMP          *limit.Limiter
 	uploadBegin    *limit.Limiter
 	uploadChunk    *limit.Limiter
 	uploadComplete *limit.Limiter
@@ -63,6 +64,7 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 		enroll:         limit.NewLimiter(&cfg.EnrollLimit),
 		ack:            limit.NewLimiter(&cfg.AckLimit),
 		status:         limit.NewLimiter(&cfg.StatusLimit),
+		opAMP:          limit.NewLimiter(&cfg.OpAMPLimit),
 		uploadBegin:    limit.NewLimiter(&cfg.UploadStartLimit),
 		uploadChunk:    limit.NewLimiter(&cfg.UploadChunkLimit),
 		uploadComplete: limit.NewLimiter(&cfg.UploadEndLimit),
