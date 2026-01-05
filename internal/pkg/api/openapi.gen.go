@@ -1843,6 +1843,9 @@ type ServerInterface interface {
 
 	// (GET /api/status)
 	Status(w http.ResponseWriter, r *http.Request, params StatusParams)
+	// Receive OpAMP AgentToServer messages
+	// (POST /v1/opamp)
+	OpAMP(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -1907,6 +1910,12 @@ func (_ Unimplemented) UploadChunk(w http.ResponseWriter, r *http.Request, id st
 
 // (GET /api/status)
 func (_ Unimplemented) Status(w http.ResponseWriter, r *http.Request, params StatusParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Receive OpAMP AgentToServer messages
+// (POST /v1/opamp)
+func (_ Unimplemented) OpAMP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2824,6 +2833,26 @@ func (siw *ServerInterfaceWrapper) Status(w http.ResponseWriter, r *http.Request
 	handler.ServeHTTP(w, r)
 }
 
+// OpAMP operation middleware
+func (siw *ServerInterfaceWrapper) OpAMP(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, AgentApiKeyScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OpAMP(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -2969,6 +2998,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/status", wrapper.Status)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/opamp", wrapper.OpAMP)
 	})
 
 	return r

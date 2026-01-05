@@ -2054,3 +2054,11 @@ paths:
           $ref: "#/components/responses/internalServerError"
         "503":
           $ref: "#/components/responses/unavailable"
+  /v1/opamp:
+    post:
+      operationId: opAMP
+      summary: Receive OpAMP AgentToServer messages
+      security:
+        - agentApiKey: []
+      requestBody:
+        required: true
