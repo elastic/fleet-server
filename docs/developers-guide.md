@@ -440,11 +440,47 @@ This section describes how to connect a OpenTelemetry Collector instance to Flee
    ```
    ./build/binaries/fleet-server-9.4.0-darwin-aarch64/fleet-server -c fleet-server.dev.yml
    ```
-6. Create OpenTelemetry Collector configuration for connecting to the Fleet Server instance and save it as `otel-opamp.yaml`.
+6. Create an Elasticsearch API key using Kibana > Console > Dev Tools. Copy the value of the `encoded` field from
+   the response.
+   ```
+   POST /_security/api_key
+   {
+     "name": "opamp-api-key",
+     "expiration": "30d"
+   }
+   ```
+7. Create OpenTelemetry Collector configuration for connecting to the Fleet Server instance and save it as `otel-opamp.yaml`.
    ```yaml
+   receivers:
+     otlp:
+       protocols:
+         grpc:
+           endpoint: 0.0.0.0:4317
+
+   exporters:
+     debug:
+       verbosity: detailed
+
+   extensions:
+     opamp:
+       server:
+         http:
+           endpoint: http://localhost:8220/v1/opamp
+           tls:
+             insecure: true
+           headers:
+             Authorization: ApiKey ${env:API_KEY}
+       instance_uid: "019b8d7a-2da8-7657-b52d-492a9de33319"
+
+   service:
+     pipelines:
+       logs:
+         receivers: [otlp]
+         exporters: [debug]
+         extensions: [opamp]
    ```
 7. Download and extract an OpenTelemetry Collector Contrib release for your platform from https://github.com/open-telemetry/opentelemetry-collector-releases/releases
 8. Run the OpenTelemetry Collector with the above configuration.
    ```
-   ./otelcol-contrib --config ./otel-opamp.yaml
+   API_KEY=<your api key> ./otelcol-contrib --config ./otel-opamp.yaml
    ```
