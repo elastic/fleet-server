@@ -46,6 +46,12 @@ func WithStatus(st *StatusT) APIOpt {
 	}
 }
 
+func WithOpAMP(oa *OpAMPT) APIOpt {
+	return func(a *apiServer) {
+		a.oa = oa
+	}
+}
+
 func WithUpload(ut *UploadT) APIOpt {
 	return func(a *apiServer) {
 		a.ut = ut
@@ -84,6 +90,7 @@ type apiServer struct {
 	at    *ArtifactT
 	ack   *AckT
 	st    *StatusT
+	oa    *OpAMPT
 	ut    *UploadT
 	ft    *FileDeliveryT
 	pt    *PGPRetrieverT
@@ -227,6 +234,16 @@ func (a *apiServer) Status(w http.ResponseWriter, r *http.Request, params Status
 	err := a.st.handleStatus(zlog, r, w)
 	if err != nil {
 		cntStatus.IncError(err)
+		ErrorResp(w, r, err)
+	}
+}
+func (a *apiServer) OpAMP(w http.ResponseWriter, r *http.Request) {
+	zlog := hlog.FromRequest(r).With().
+		Str("mod", kOpAMPMod).
+		Logger()
+	w.Header().Set("Content-Type", "application/x-protobuf")
+	if err := a.oa.handleOpAMP(zlog, r, w); err != nil {
+		cntOpAMP.IncError(err)
 		ErrorResp(w, r, err)
 	}
 }
