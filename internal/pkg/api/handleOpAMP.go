@@ -5,11 +5,16 @@
 package api
 
 import (
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
+	"github.com/gofrs/uuid/v5"
+	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/rs/zerolog"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -34,6 +39,33 @@ func (oa OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.Respon
 		zlog.Debug().Err(err).Msg("unauthenticated opamp request")
 		return err
 	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return &BadRequestErr{msg: "failed to read AgentToServer request body"}
+	}
+	defer r.Body.Close()
+
+	var aToS protobufs.AgentToServer
+	if err := proto.Unmarshal(body, &aToS); err != nil {
+		return &BadRequestErr{msg: "failed to unmarshal AgentToServer message"}
+	}
+
+	instanceUID, err := uuid.FromBytes(aToS.InstanceUid)
+	if err != nil {
+		return &BadRequestErr{msg: "failed to parse instance_uid from AgentToServer message"}
+	}
+	zlog.Debug().
+		Str("instance_uid", instanceUID.String()).
+		Msg("received AgentToServer message from agent")
+
+	sToA := protobufs.ServerToAgent{}
+	resp, err := proto.Marshal(&sToA)
+	if err != nil {
+		return fmt.Errorf("failed to marshal ServerToAgent response body: %w", err)
+	}
+
+	w.Write(resp)
 
 	return nil
 }
