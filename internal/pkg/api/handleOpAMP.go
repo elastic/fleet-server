@@ -19,11 +19,11 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/gofrs/uuid/v5"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/rs/zerolog"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -35,6 +35,8 @@ type OpAMPT struct {
 	bulk  bulk.Bulk
 	cache cache.Cache
 	bc    *checkin.Bulk
+
+	agentMetas map[string]localMetadata
 }
 
 func NewOpAMPT(
@@ -43,9 +45,10 @@ func NewOpAMPT(
 	bc *checkin.Bulk,
 ) *OpAMPT {
 	oa := &OpAMPT{
-		bulk:  bulker,
-		cache: cache,
-		bc:    bc,
+		bulk:       bulker,
+		cache:      cache,
+		bc:         bc,
+		agentMetas: map[string]localMetadata{},
 	}
 	return oa
 }
@@ -86,14 +89,14 @@ func (oa OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.Respon
 		Bool("is_enrolled", isEnrolled).
 		Str("agent_id", instanceUID.String()).
 		Msg("agent enrollment status")
-	if isEnrolled {
-		if err := oa.updateAgent(zlog, instanceUID.String(), aToS); err != nil {
-			return fmt.Errorf("failed to update persisted Agent information: %w", err)
-		}
-	} else {
+	if !isEnrolled {
 		if err := oa.enrollAgent(zlog, instanceUID.String(), aToS, apiKey); err != nil {
 			return fmt.Errorf("failed to enroll agent: %w", err)
 		}
+	}
+
+	if err := oa.updateAgent(zlog, instanceUID.String(), aToS); err != nil {
+		return fmt.Errorf("failed to update persisted Agent information: %w", err)
 	}
 
 	sToA := protobufs.ServerToAgent{}
@@ -135,6 +138,42 @@ func (oa OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS protobufs
 	}
 
 	now := time.Now()
+
+	// Extract the agent version from the agent description's identifying attributes. Also, extract
+	// the hostname from the agent description's non-identifying attributes. However, the agent
+	// description is only sent if any of its fields change.
+	meta := localMetadata{}
+	meta.Elastic.Agent.ID = agentID
+	if aToS.AgentDescription != nil {
+		// Extract agent version
+		for _, ia := range aToS.AgentDescription.IdentifyingAttributes {
+			switch attribute.Key(ia.Key) {
+			case semconv.ServiceVersionKey:
+				meta.Elastic.Agent.Version = ia.GetValue().GetStringValue()
+			}
+		}
+		zlog.Debug().Str("agent_version", meta.Elastic.Agent.Version).Msg("extracted agent version")
+
+		// Extract hostname
+		for _, nia := range aToS.AgentDescription.NonIdentifyingAttributes {
+			switch attribute.Key(nia.Key) {
+			case semconv.HostNameKey:
+				hostname := nia.GetValue().GetStringValue()
+				meta.Host.Name = hostname
+				meta.Host.Hostname = hostname
+			}
+		}
+		zlog.Debug().Str("hostname", meta.Host.Hostname).Msg("extracted hostname")
+	}
+
+	// Update local metadata if something has changed
+	data, err := json.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("failed to marshal local metadata: %w", err)
+	}
+
+	zlog.Debug().RawJSON("meta", data).Msg("updating local metadata")
+
 	agent := model.Agent{
 		ESDocument: model.ESDocument{Id: agentID},
 		Active:     true,
@@ -143,9 +182,10 @@ func (oa OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS protobufs
 		Agent: &model.AgentMetadata{
 			ID: agentID,
 		},
+		LocalMetadata: data,
 	}
 
-	data, err := json.Marshal(agent)
+	data, err = json.Marshal(agent)
 	if err != nil {
 		return err
 	}
@@ -163,28 +203,9 @@ func (oa OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS protobufs
 func (oa OpAMPT) updateAgent(zlog zerolog.Logger, agentID string, aToS protobufs.AgentToServer) error {
 	zlog.Debug().
 		Str("aToS", aToS.String()).
-		Msg("updating fleet-agents doc")
+		Msg("updating .fleet-agents doc")
 
-	initialOpts := []checkin.Option{
-		checkin.WithSeqNo(sqn.SeqNo{int64(aToS.SequenceNum)}),
-		//checkin.WithMessage(),
-		//checkin.WithMeta(rawMeta),
-		//checkin.WithComponents(rawComponents),
-		//checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
-	}
-
-	// Extract the agent version from the identifying attributes. However, agent description is
-	// only sent if any of its fields, including identifying attributes, change.
-	if aToS.AgentDescription != nil {
-		var agentVersion string
-		for _, ia := range aToS.AgentDescription.IdentifyingAttributes {
-			switch ia.Key {
-			case string(semconv.ServiceVersionKey):
-				agentVersion = ia.String()
-			}
-		}
-		initialOpts = append(initialOpts, checkin.WithVer(agentVersion))
-	}
+	initialOpts := make([]checkin.Option, 0)
 
 	// Extract the health status from the health message if it exists.
 	if aToS.Health != nil {
@@ -198,4 +219,17 @@ func (oa OpAMPT) updateAgent(zlog zerolog.Logger, agentID string, aToS protobufs
 	}
 
 	return oa.bc.CheckIn(agentID, initialOpts...)
+}
+
+type localMetadata struct {
+	Elastic struct {
+		Agent struct {
+			ID      string `json:"id,omitempty"`
+			Version string `json:"version,omitempty"`
+		} `json:"agent,omitempty"`
+	} `json:"elastic,omitempty"`
+	Host struct {
+		Hostname string `json:"hostname,omitempty"`
+		Name     string `json:"name,omitempty"`
+	} `json:"host,omitempty"`
 }
