@@ -208,6 +208,8 @@ steps:
         command: ".buildkite/scripts/integration_test.sh"
         agents:
           provider: "gcp"
+          image: "${IMAGE_UBUNTU_X86_64}"
+          machineType: "c2-standard-16"
         artifact_paths:
           - build/*.xml
         plugins:
@@ -224,6 +226,8 @@ steps:
           TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
         agents:
           provider: "gcp"
+          image: "${IMAGE_UBUNTU_X86_64}"
+          machineType: "c2-standard-16"
         artifact_paths:
           - build/*.xml
           - build/e2e-coverage.out
