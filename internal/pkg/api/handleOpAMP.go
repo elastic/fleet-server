@@ -241,12 +241,12 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS prot
 	// Extract the health status from the health message if it exists.
 	if aToS.Health != nil {
 		initialOpts = append(initialOpts, checkin.WithStatus(aToS.Health.Status))
-	}
 
-	// Extract the unhealthy reason from the health message if it exists.
-	if aToS.Health != nil && aToS.Health.LastError != "" {
-		unhealthyReason := []string{aToS.Health.LastError}
-		initialOpts = append(initialOpts, checkin.WithUnhealthyReason(&unhealthyReason))
+		// Extract the unhealthy reason from the health message if it exists.
+		if aToS.Health.LastError != "" {
+			unhealthyReason := []string{aToS.Health.LastError}
+			initialOpts = append(initialOpts, checkin.WithUnhealthyReason(&unhealthyReason))
+		}
 	}
 
 	return oa.bc.CheckIn(agent.Id, initialOpts...)
