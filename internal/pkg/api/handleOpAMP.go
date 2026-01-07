@@ -37,9 +37,12 @@ type OpAMPT struct {
 	bc    *checkin.Bulk
 
 	agentMetas map[string]localMetadata
+
+	flags uint64
 }
 
 func NewOpAMPT(
+	ctx context.Context,
 	bulker bulk.Bulk,
 	cache cache.Cache,
 	bc *checkin.Bulk,
@@ -49,11 +52,31 @@ func NewOpAMPT(
 		cache:      cache,
 		bc:         bc,
 		agentMetas: map[string]localMetadata{},
+		flags:      uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportAvailableComponents),
 	}
+
+	go oa.startTimers(ctx)
 	return oa
 }
 
-func (oa OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.ResponseWriter) error {
+func (oa *OpAMPT) startTimers(ctx context.Context) {
+	zerolog.Ctx(ctx).Debug().Msg("starting opAMP timers")
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			zerolog.Ctx(ctx).Debug().Msg("stopping opAMP timers")
+			return
+		case <-ticker.C:
+			zerolog.Ctx(ctx).Debug().Msg("opAMP timer tick; setting flags")
+			oa.flags = uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportAvailableComponents)
+		}
+	}
+}
+
+func (oa *OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.ResponseWriter) error {
 	apiKey, err := authAPIKey(r, oa.bulk, oa.cache)
 	if err != nil {
 		zlog.Debug().Err(err).Msg("unauthenticated opamp request")
@@ -77,6 +100,7 @@ func (oa OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.Respon
 	}
 	zlog.Debug().
 		Str("instance_uid", instanceUID.String()).
+		Str("aToS", aToS.String()).
 		Msg("received AgentToServer message from agent")
 
 	// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
@@ -99,13 +123,22 @@ func (oa OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.Respon
 		return fmt.Errorf("failed to update persisted Agent information: %w", err)
 	}
 
-	sToA := protobufs.ServerToAgent{}
+	sToA := protobufs.ServerToAgent{
+		Flags: oa.flags,
+	}
+
 	resp, err := proto.Marshal(&sToA)
 	if err != nil {
 		return fmt.Errorf("failed to marshal ServerToAgent response body: %w", err)
 	}
 
+	zlog.Debug().Str("resp", sToA.String()).Msg("sending ServerToAgent response")
 	_, err = w.Write(resp)
+
+	// Reset flags; timer will set them again
+	zlog.Debug().Msg("resetting flags")
+	oa.flags = 0
+
 	return err
 }
 
