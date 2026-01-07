@@ -104,22 +104,22 @@ func (oa *OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.Respo
 		Msg("received AgentToServer message from agent")
 
 	// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
-	isEnrolled, err := oa.isAgentEnrolled(zlog, instanceUID.String())
+	agent, err := oa.findEnrolledAgent(zlog, instanceUID.String())
 	if err != nil {
 		return fmt.Errorf("failed to check if agent is enrolled: %w", err)
 	}
 
 	zlog.Debug().
-		Bool("is_enrolled", isEnrolled).
+		Bool("is_enrolled", agent != nil).
 		Str("agent_id", instanceUID.String()).
 		Msg("agent enrollment status")
-	if !isEnrolled {
-		if err := oa.enrollAgent(zlog, instanceUID.String(), aToS, apiKey); err != nil {
+	if agent == nil {
+		if agent, err = oa.enrollAgent(zlog, instanceUID.String(), aToS, apiKey); err != nil {
 			return fmt.Errorf("failed to enroll agent: %w", err)
 		}
 	}
 
-	if err := oa.updateAgent(zlog, instanceUID.String(), aToS); err != nil {
+	if err := oa.updateAgent(zlog, agent, aToS); err != nil {
 		return fmt.Errorf("failed to update persisted Agent information: %w", err)
 	}
 
@@ -142,32 +142,32 @@ func (oa *OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.Respo
 	return err
 }
 
-func (oa OpAMPT) isAgentEnrolled(zlog zerolog.Logger, agentID string) (bool, error) {
+func (oa *OpAMPT) findEnrolledAgent(zlog zerolog.Logger, agentID string) (*model.Agent, error) {
 	ctx := context.TODO()
 	agent, err := dl.FindAgent(ctx, oa.bulk, dl.QueryAgentByID, dl.FieldID, agentID)
 	if errors.Is(err, dl.ErrNotFound) {
-		return false, nil
+		return nil, nil
 	}
 
 	if err != nil {
-		return false, fmt.Errorf("failed to find agent: %w", err)
+		return nil, fmt.Errorf("failed to find agent: %w", err)
 	}
 
 	if agent.Id == "" {
-		return false, nil
+		return nil, nil
 	}
 
-	return true, nil
+	return &agent, nil
 }
 
-func (oa OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS protobufs.AgentToServer, apiKey *apikey.APIKey) error {
+func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS protobufs.AgentToServer, apiKey *apikey.APIKey) (*model.Agent, error) {
 	zlog.Debug().
 		Str("agentID", agentID).
 		Msg("enrolling agent")
 	ctx := context.TODO()
 	rec, err := dl.FindEnrollmentAPIKey(ctx, oa.bulk, dl.QueryEnrollmentAPIKeyByID, dl.FieldAPIKeyID, apiKey.ID)
 	if err != nil {
-		return fmt.Errorf("failed to find enrollment API key: %w", err)
+		return nil, fmt.Errorf("failed to find enrollment API key: %w", err)
 	}
 
 	now := time.Now()
@@ -202,7 +202,7 @@ func (oa OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS protobufs
 	// Update local metadata if something has changed
 	data, err := json.Marshal(meta)
 	if err != nil {
-		return fmt.Errorf("failed to marshal local metadata: %w", err)
+		return nil, fmt.Errorf("failed to marshal local metadata: %w", err)
 	}
 
 	zlog.Debug().RawJSON("meta", data).Msg("updating local metadata")
@@ -220,23 +220,21 @@ func (oa OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS protobufs
 
 	data, err = json.Marshal(agent)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	zlog.Debug().
 		Str("agent document", string(data)).
 		Msg("creating .fleet-agents doc")
 	if _, err = oa.bulk.Create(ctx, dl.FleetAgents, agentID, data, bulk.WithRefresh()); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &agent, nil
 }
 
-func (oa OpAMPT) updateAgent(zlog zerolog.Logger, agentID string, aToS protobufs.AgentToServer) error {
-	zlog.Debug().
-		Str("aToS", aToS.String()).
-		Msg("updating .fleet-agents doc")
+func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS protobufs.AgentToServer) error {
+	zlog.Debug().Msg("updating .fleet-agents doc")
 
 	initialOpts := make([]checkin.Option, 0)
 
@@ -251,7 +249,7 @@ func (oa OpAMPT) updateAgent(zlog zerolog.Logger, agentID string, aToS protobufs
 		initialOpts = append(initialOpts, checkin.WithUnhealthyReason(&unhealthyReason))
 	}
 
-	return oa.bc.CheckIn(agentID, initialOpts...)
+	return oa.bc.CheckIn(agent.Id, initialOpts...)
 }
 
 type localMetadata struct {
