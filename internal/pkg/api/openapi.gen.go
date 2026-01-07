@@ -259,6 +259,9 @@ type ActionPrivilegeLevelChange struct {
 type ActionRequestDiagnostics struct {
 	// AdditionalMetrics list optional additional metrics.
 	AdditionalMetrics []ActionRequestDiagnosticsAdditionalMetrics `json:"additional_metrics,omitempty"`
+
+	// ExcludeEventsLog Excludes the Events Log from the diagnostic collection.
+	ExcludeEventsLog bool `json:"exclude_events_log,omitempty"`
 }
 
 // ActionRequestDiagnosticsAdditionalMetrics defines model for ActionRequestDiagnostics.AdditionalMetrics.
