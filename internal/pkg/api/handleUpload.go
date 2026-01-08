@@ -43,6 +43,7 @@ var (
 
 // FIXME Should we use the structs in openapi.gen.go instead of the generic ones? Will need to rework the uploader if we do
 type UploadT struct {
+	cfg         *config.Server
 	bulker      bulk.Bulk
 	chunkClient *elasticsearch.Client
 	cache       cache.Cache
@@ -53,6 +54,7 @@ type UploadT struct {
 
 func NewUploadT(cfg *config.Server, bulker bulk.Bulk, chunkClient *elasticsearch.Client, cache cache.Cache) *UploadT {
 	return &UploadT{
+		cfg:         cfg,
 		chunkClient: chunkClient,
 		bulker:      bulker,
 		cache:       cache,
@@ -71,6 +73,11 @@ func (ut *UploadT) validateUploadBeginRequest(ctx context.Context, reader io.Rea
 		if errors.Is(err, io.EOF) {
 			return nil, "", fmt.Errorf("%w: %w", ErrFileInfoBodyRequired, err)
 		}
+
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return nil, "", fmt.Errorf("payload is too large, %w", err)
+		}
 		return nil, "", &BadRequestErr{msg: "unable to decode upload begin request", nextErr: err}
 	}
 
@@ -83,9 +90,20 @@ func (ut *UploadT) validateUploadBeginRequest(ctx context.Context, reader io.Rea
 }
 
 func (ut *UploadT) handleUploadBegin(_ zerolog.Logger, w http.ResponseWriter, r *http.Request) error {
+	// ensure body is not excessively large to prevent memory exhaustion DoS attach
+	if ut.cfg.Limits.UploadStartLimit.MaxBody > 0 {
+		r.Body = http.MaxBytesReader(w, r.Body, ut.cfg.Limits.UploadStartLimit.MaxBody)
+	}
+
 	// decode early to match agentID in the payload
 	payload, agentID, err := ut.validateUploadBeginRequest(r.Context(), r.Body)
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			return err
+		}
+
 		return err
 	}
 
