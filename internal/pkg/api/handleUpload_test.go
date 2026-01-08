@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/go-units"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -106,6 +107,10 @@ func TestUploadBeginValidation(t *testing.T) {
 				"action_id": "123",
 				"src": "agent"
 			}`,
+		},
+		{
+			"file that is too large is rejected", http.StatusRequestEntityTooLarge, "payload is too large",
+			generateLargeFileInput(2 * units.KB),
 		},
 		{"file name is required", http.StatusBadRequest, "file.name is required",
 			`{
@@ -1065,9 +1070,12 @@ func configureUploaderMock(t *testing.T, fileSize *uint64) (http.Handler, apiSer
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 
+	cfg := config.Server{Limits: config.ServerLimits{UploadStartLimit: config.Limit{MaxBody: 1 * units.KB}}}
+
 	// create an apiServer with an UploadT that will handle the incoming requests
 	si := apiServer{
 		ut: &UploadT{
+			cfg:         &cfg,
 			bulker:      fakebulk,
 			chunkClient: es,
 			cache:       c,
@@ -1233,4 +1241,20 @@ func sendBody(body io.Reader) *http.Response {
 func size_ptr(x int) *uint64 {
 	y := uint64(x) //nolint:gosec // disable G115
 	return &y
+}
+
+func generateLargeFileInput(paddingSize int) string {
+	payload := `{
+  "file": {
+    "size": 1,
+    "name": "foo.png",
+    "mime_type": "image/png"
+  },
+  "agent_id": "foo",
+  "action_id": "123",
+  "src": "agent",
+  "pad": "%s"
+}`
+	padding := strings.Repeat("a", paddingSize)
+	return fmt.Sprintf(payload, padding)
 }
