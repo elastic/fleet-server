@@ -709,6 +709,10 @@ components:
               - CPU
               - CONN
           x-go-type-skip-optional-pointer: true
+        exclude_events_log:
+          description: Excludes the Events Log from the diagnostic collection.
+          type: boolean
+          x-go-type-skip-optional-pointer: true
     actionPolicyReassign:
       description: The POLICY_REASSIGN action data.
       type: object
