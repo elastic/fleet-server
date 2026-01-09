@@ -1,12 +1,11 @@
 version: 9.2.4
 entries:
     - kind: bug-fix
-      summary: make action optional when upgrade details are provided
+      summary: Make action optional when upgrade details are provided
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6153
-        - https://github.com/elastic/fleet-server/pull/6158
+        - https://github.com/elastic/fleet-server/pull/5609
       issue: []
       impact: ""
       action: ""
