@@ -4,9 +4,6 @@
 ### Features and enhancements [fleet-server-9.1.0-features-enhancements]
 
 * Add ability for enrollment to take an agent ID. [#4290](https://github.com/elastic/fleet-server/pull/4290) [#4226](https://github.com/elastic/fleet-server/issues/4226)
-* Add migrate-action. [#4786](https://github.com/elastic/fleet-server/pull/4786)
-
-  Added new MIGRATE action type for moving agent to different cluster.
 * Clear `agent.upgrade_attempts` when upgrade is complete. [#4528](https://github.com/elastic/fleet-server/pull/4528)
 
   The new AutomaticAgentUpgradeTask Kibana task sets the upgrade_attempts property in agents it upgrades.
