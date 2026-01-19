@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/dev-tools
 
-go 1.25.5
+go 1.25.6
 
 tool (
 	github.com/elastic/go-json-schema-generate/cmd/schema-generate
