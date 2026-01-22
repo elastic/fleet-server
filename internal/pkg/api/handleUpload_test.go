@@ -109,8 +109,8 @@ func TestUploadBeginValidation(t *testing.T) {
 			}`,
 		},
 		{
-			"file that is too large is rejected", http.StatusRequestEntityTooLarge, "payload is too large",
-			generateLargeFileInput(2 * units.KB),
+			"UploadBegin request payload that is too large is rejected", http.StatusRequestEntityTooLarge, "payload is too large",
+			generateLargePayload(2 * units.KB),
 		},
 		{"file name is required", http.StatusBadRequest, "file.name is required",
 			`{
@@ -1243,7 +1243,7 @@ func size_ptr(x int) *uint64 {
 	return &y
 }
 
-func generateLargeFileInput(paddingSize int) string {
+func generateLargePayload(paddingSize int) string {
 	payload := `{
   "file": {
     "size": 1,
