@@ -11,7 +11,7 @@
 kind: security
 
 # Change summary; a 80ish characters long description of the change.
-summary: Enforce payload size limit, when configured, for file uploads
+summary: Enforce UploadBegin request body size
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
