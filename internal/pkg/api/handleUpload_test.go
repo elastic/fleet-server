@@ -1030,6 +1030,61 @@ func TestUploadCompleteBadRequests(t *testing.T) {
 	assert.Equal(t, rec.Body.String(), "{\"statusCode\":400,\"error\":\"BadRequest\",\"message\":\"Bad request: unable to decode upload complete request\"}")
 }
 
+func TestUploadCompletePayloadSize(t *testing.T) {
+	mockUploadID := "abc123"
+
+	hr, _, fakebulk, _ := prepareUploaderMock(t)
+	mockInfo := file.Info{
+		DocID:     "bar.foo",
+		ID:        mockUploadID,
+		ChunkSize: file.MaxChunkSize,
+		Total:     file.MaxChunkSize * 3,
+		Count:     3,
+		Start:     time.Now().Add(-time.Minute),
+		Status:    file.StatusProgress,
+		Source:    "agent",
+		AgentID:   "foo",
+		ActionID:  "bar",
+	}
+
+	mockUploadedFile(fakebulk, mockInfo, []file.ChunkInfo{
+		{
+			Last: false,
+			BID:  mockInfo.DocID,
+			Size: int(file.MaxChunkSize),
+			Pos:  0,
+			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
+		},
+		{
+			Last: true,
+			BID:  mockInfo.DocID,
+			Size: int(file.MaxChunkSize),
+			Pos:  1,
+			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
+		},
+		{
+			Last: true,
+			BID:  mockInfo.DocID,
+			Size: int(file.MaxChunkSize),
+			Pos:  2,
+			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
+		},
+	})
+
+	longHash := strings.Repeat("a", 2*units.KB)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/fleet/uploads/"+mockUploadID,
+		strings.NewReader(`{"transithash": {"sha256": "`+longHash+`"}}`),
+	)
+
+	hr.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+	assert.Equal(t, rec.Body.String(), `{"statusCode":413,"error":"ErrPayloadSizeTooLarge","message":"the request body exceeds the maximum allowed size"}`)
+}
+
 /*
 	Helpers and mocks
 */
@@ -1070,7 +1125,10 @@ func configureUploaderMock(t *testing.T, fileSize *uint64) (http.Handler, apiSer
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 
-	cfg := config.Server{Limits: config.ServerLimits{UploadStartLimit: config.Limit{MaxBody: 1 * units.KB}}}
+	cfg := config.Server{Limits: config.ServerLimits{
+		UploadStartLimit: config.Limit{MaxBody: 1 * units.KB},
+		UploadEndLimit:   config.Limit{MaxBody: 1 * units.KB},
+	}}
 
 	// create an apiServer with an UploadT that will handle the incoming requests
 	si := apiServer{

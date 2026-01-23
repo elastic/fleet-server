@@ -197,6 +197,11 @@ func (ut *UploadT) validateUploadCompleteRequest(r *http.Request, id string) (st
 
 	var req UploadCompleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return "", uploader.ErrPayloadSizeTooLarge
+		}
+
 		return "", &BadRequestErr{msg: "unable to decode upload complete request"}
 	}
 
@@ -208,6 +213,11 @@ func (ut *UploadT) validateUploadCompleteRequest(r *http.Request, id string) (st
 }
 
 func (ut *UploadT) handleUploadComplete(_ zerolog.Logger, w http.ResponseWriter, r *http.Request, uplID string) error {
+	// ensure body is not excessively large to prevent memory exhaustion DoS attach
+	if ut.cfg.Limits.UploadEndLimit.MaxBody > 0 {
+		r.Body = http.MaxBytesReader(w, r.Body, ut.cfg.Limits.UploadEndLimit.MaxBody)
+	}
+
 	hash, err := ut.validateUploadCompleteRequest(r, uplID)
 	if err != nil {
 		return err
