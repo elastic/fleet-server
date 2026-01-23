@@ -109,7 +109,7 @@ func TestUploadBeginValidation(t *testing.T) {
 			}`,
 		},
 		{
-			"UploadBegin request payload that is too large is rejected", http.StatusRequestEntityTooLarge, "payload is too large",
+			"UploadBegin request payload that is too large is rejected", http.StatusRequestEntityTooLarge, "the request body exceeds the maximum allowed size",
 			generateLargePayload(2 * units.KB),
 		},
 		{"file name is required", http.StatusBadRequest, "file.name is required",

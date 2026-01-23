@@ -76,7 +76,7 @@ func (ut *UploadT) validateUploadBeginRequest(ctx context.Context, reader io.Rea
 
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
-			return nil, "", fmt.Errorf("payload is too large: %w", err)
+			return nil, "", uploader.ErrPayloadSizeTooLarge
 		}
 		return nil, "", &BadRequestErr{msg: "unable to decode upload begin request", nextErr: err}
 	}
@@ -98,12 +98,6 @@ func (ut *UploadT) handleUploadBegin(_ zerolog.Logger, w http.ResponseWriter, r 
 	// decode early to match agentID in the payload
 	payload, agentID, err := ut.validateUploadBeginRequest(r.Context(), r.Body)
 	if err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			w.WriteHeader(http.StatusRequestEntityTooLarge)
-			return err
-		}
-
 		return err
 	}
 
