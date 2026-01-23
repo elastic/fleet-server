@@ -76,7 +76,7 @@ func (ut *UploadT) validateUploadBeginRequest(ctx context.Context, reader io.Rea
 
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
-			return nil, "", fmt.Errorf("payload is too large, %w", err)
+			return nil, "", fmt.Errorf("payload is too large: %w", err)
 		}
 		return nil, "", &BadRequestErr{msg: "unable to decode upload begin request", nextErr: err}
 	}
