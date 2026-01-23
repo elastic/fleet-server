@@ -1,0 +1,86 @@
+version: 9.3.0
+entries:
+    - kind: enhancement
+      summary: Makes file storage size configurable
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6224
+        - https://github.com/elastic/fleet-server/pull/6230
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1757423719
+      file:
+        name: 1757423719-Make-file-storage-size-configurable.yaml
+        checksum: 5b49b7b0f324f8b66190ea3295b7337668010978
+    - kind: enhancement
+      summary: Accept secret references in policies in either inline or path formats
+      description: "Elastic Agent policies can contain secret references in one of two formats: inline or path.\nWith the inline format, the reference looks like this: `<path>: $co.elastic.secret{<secret ref>}`. \nWith the path format, the reference looks like this: `secrets.<path>.id:<secret ref>`.\nThis change ensures that Fleet Server accepts secret references in policies in either format.\n"
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6224
+        - https://github.com/elastic/fleet-server/pull/6230
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762435732
+      file:
+        name: 1762435732-secrets-fallback.yaml
+        checksum: 5b929a1761bf0cd924d72ba2016afee132dbb163
+    - kind: bug-fix
+      summary: make action optional when upgrade details are provided
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6224
+        - https://github.com/elastic/fleet-server/pull/6230
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764085508
+      file:
+        name: 1764085508-make-action-optional-when-upgrade-details-are-provided.yaml
+        checksum: d17410e2cc764fac53628750d5cd4f7409c9618a
+    - kind: feature
+      summary: Support secrets in agent.download section of policy
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6224
+        - https://github.com/elastic/fleet-server/pull/6230
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764192755
+      file:
+        name: 1764192755-ssl-secrets.yaml
+        checksum: d5c90a81749c0e4b28b1bb2aefdc0b857463cd66
+    - kind: feature
+      summary: Support secrets in fleet section of policy
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6224
+        - https://github.com/elastic/fleet-server/pull/6230
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764638389
+      file:
+        name: 1764638389-secrets-fleet-ssl.yaml
+        checksum: b0c2b503cefaaca00701643576e74684b6b5ad8f
+    - kind: enhancement
+      summary: improves file upload performance for large files
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6224
+        - https://github.com/elastic/fleet-server/pull/6230
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1765396860
+      file:
+        name: 1765396860-improve-upload-performance.yaml
+        checksum: aaa86af125eb60be56dae5615e9522e6276a0e2d
