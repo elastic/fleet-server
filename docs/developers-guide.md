@@ -6,7 +6,7 @@ These notes might change at any time.
 ## Developing Fleet Server and Kibana at the same time
 
 When developing features for Fleet, it may become necessary to run both Fleet Server and Kibana from source in order to implement features end-to-end.
-To faciliate this, we've created a separate guide hosted [here](https://github.com/elastic/kibana/blob/main/x-pack/plugins/fleet/dev_docs/developing_kibana_and_fleet_server.md).
+To faciliate this, we've created a separate guide hosted [here](https://github.com/elastic/kibana/blob/main/x-pack/platform/plugins/shared/fleet/dev_docs/local_setup/developing_kibana_and_fleet_server.md).
 
 ## Mage usage
 
