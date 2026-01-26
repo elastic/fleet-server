@@ -34,6 +34,8 @@ var (
 	ErrFileSizeRequired = errors.New("file.size is required")
 	ErrInvalidFileSize  = errors.New("invalid filesize")
 	ErrFieldRequired    = errors.New("field required")
+
+	ErrPayloadSizeTooLarge = errors.New("payload size too large")
 )
 
 type Uploader struct {
