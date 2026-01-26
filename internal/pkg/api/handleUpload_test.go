@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -1258,13 +1259,6 @@ func sendBody(body io.Reader) *http.Response {
 		},
 	}
 }
-<<<<<<< HEAD
-=======
-
-func size_ptr(x int) *uint64 {
-	y := uint64(x) //nolint:gosec // disable G115
-	return &y
-}
 
 func generateLargePayload(paddingSize int) string {
 	payload := `{
@@ -1281,4 +1275,3 @@ func generateLargePayload(paddingSize int) string {
 	padding := strings.Repeat("a", paddingSize)
 	return fmt.Sprintf(payload, padding)
 }
->>>>>>> b91dc36 (Enforce size limit on `POST /api/fleet/uploads` (#6159))
