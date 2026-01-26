@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/go-units"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -117,6 +118,10 @@ func TestUploadBeginValidation(t *testing.T) {
 				"action_id": "123",
 				"src": "agent"
 			}`,
+		},
+		{
+			"UploadBegin request payload that is too large is rejected", http.StatusRequestEntityTooLarge, "the request body exceeds the maximum allowed size",
+			generateLargePayload(2 * units.KB),
 		},
 		{"file name is required", http.StatusBadRequest, "file.name is required",
 			`{
@@ -992,6 +997,61 @@ func TestUploadCompleteBadRequests(t *testing.T) {
 	assert.Equal(t, rec.Body.String(), "{\"statusCode\":400,\"error\":\"BadRequest\",\"message\":\"Bad request: unable to decode upload complete request\"}")
 }
 
+func TestUploadCompletePayloadSize(t *testing.T) {
+	mockUploadID := "abc123"
+
+	hr, _, fakebulk, _ := prepareUploaderMock(t)
+	mockInfo := file.Info{
+		DocID:     "bar.foo",
+		ID:        mockUploadID,
+		ChunkSize: file.MaxChunkSize,
+		Total:     file.MaxChunkSize * 3,
+		Count:     3,
+		Start:     time.Now().Add(-time.Minute),
+		Status:    file.StatusProgress,
+		Source:    "agent",
+		AgentID:   "foo",
+		ActionID:  "bar",
+	}
+
+	mockUploadedFile(fakebulk, mockInfo, []file.ChunkInfo{
+		{
+			Last: false,
+			BID:  mockInfo.DocID,
+			Size: int(file.MaxChunkSize),
+			Pos:  0,
+			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
+		},
+		{
+			Last: true,
+			BID:  mockInfo.DocID,
+			Size: int(file.MaxChunkSize),
+			Pos:  1,
+			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
+		},
+		{
+			Last: true,
+			BID:  mockInfo.DocID,
+			Size: int(file.MaxChunkSize),
+			Pos:  2,
+			SHA2: "0c4a81b85a6b7ff00bde6c32e1e8be33b4b793b3b7b5cb03db93f77f7c9374d1", // sample value
+		},
+	})
+
+	longHash := strings.Repeat("a", 2*units.KB)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/fleet/uploads/"+mockUploadID,
+		strings.NewReader(`{"transithash": {"sha256": "`+longHash+`"}}`),
+	)
+
+	hr.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+	assert.Equal(t, rec.Body.String(), `{"statusCode":413,"error":"ErrPayloadSizeTooLarge","message":"the request body exceeds the maximum allowed size"}`)
+}
+
 /*
 	Helpers and mocks
 */
@@ -1028,9 +1088,15 @@ func prepareUploaderMock(t *testing.T) (http.Handler, apiServer, *itesting.MockB
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
 	require.NoError(t, err)
 
+	cfg := config.Server{Limits: config.ServerLimits{
+		UploadStartLimit: config.Limit{MaxBody: 1 * units.KB},
+		UploadEndLimit:   config.Limit{MaxBody: 1 * units.KB},
+	}}
+
 	// create an apiServer with an UploadT that will handle the incoming requests
 	si := apiServer{
 		ut: &UploadT{
+			cfg:         &cfg,
 			bulker:      fakebulk,
 			chunkClient: es,
 			cache:       c,
@@ -1192,3 +1258,27 @@ func sendBody(body io.Reader) *http.Response {
 		},
 	}
 }
+<<<<<<< HEAD
+=======
+
+func size_ptr(x int) *uint64 {
+	y := uint64(x) //nolint:gosec // disable G115
+	return &y
+}
+
+func generateLargePayload(paddingSize int) string {
+	payload := `{
+  "file": {
+    "size": 1,
+    "name": "foo.png",
+    "mime_type": "image/png"
+  },
+  "agent_id": "foo",
+  "action_id": "123",
+  "src": "agent",
+  "pad": "%s"
+}`
+	padding := strings.Repeat("a", paddingSize)
+	return fmt.Sprintf(payload, padding)
+}
+>>>>>>> b91dc36 (Enforce size limit on `POST /api/fleet/uploads` (#6159))
