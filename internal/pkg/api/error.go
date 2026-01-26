@@ -496,6 +496,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				zerolog.InfoLevel,
 			},
 		},
+		{
+			target: uploader.ErrPayloadSizeTooLarge,
+			meta: HTTPErrResp{
+				StatusCode: http.StatusRequestEntityTooLarge,
+				Error:      "ErrPayloadSizeTooLarge",
+				Message:    "the request body exceeds the maximum allowed size",
+				Level:      zerolog.InfoLevel,
+			},
+		},
 	}
 
 	for _, e := range errTable {
