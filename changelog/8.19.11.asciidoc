@@ -1,0 +1,31 @@
+// begin 8.19.11 relnotes
+
+[[release-notes-8.19.11]]
+==  8.19.11
+
+Review important information about the  8.19.11 release.
+
+[discrete]
+[[security-updates-8.19.11]]
+=== Security updates
+
+
+
+
+* Enforce maximum limits on UploadBegin and UploadComplete request body sizes. https://github.com/elastic/fleet-server/pull/6243[#6243] https://github.com/elastic/fleet-server/pull/6246[#6246] https://github.com/elastic/fleet-server/pull/6250[#6250] 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// end 8.19.11 relnotes
