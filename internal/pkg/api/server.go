@@ -13,6 +13,8 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 
@@ -29,6 +31,7 @@ type server struct {
 	addr    string
 	handler http.Handler
 	logger  *logp.Logger
+	ot      *OpAmpT // OpAmp handler for ConnContext support
 }
 
 // NewServer creates a new HTTP api for the passed addr.
@@ -41,11 +44,23 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 	for _, opt := range opts {
 		opt(a)
 	}
+	handler := newRouter(&cfg.Limits, a, a.tracer)
+
+	// Store OpAmpT reference for ConnContext support
+	var ot *OpAmpT
+
+	// Add OpAmp endpoint if enabled and handler is configured
+	if a.ot != nil && a.ot.IsEnabled() {
+		handler = addOpAmpRoute(handler, a.ot, &cfg.Limits)
+		ot = a.ot
+	}
+
 	return &server{
 		addr:    addr,
 		cfg:     cfg,
-		handler: newRouter(&cfg.Limits, a, a.tracer),
+		handler: handler,
 		logger:  zap.NewStub("api-server"),
+		ot:      ot,
 	}
 }
 
@@ -67,6 +82,14 @@ func (s *server) Run(ctx context.Context) error {
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		ErrorLog:          errLogger(ctx),
 		ConnState:         getDiagConnFunc(ctx),
+	}
+
+	// Set ConnContext if OpAmp is enabled - required by opamp-go for plain HTTP mode
+	if s.ot != nil {
+		connCtx := s.ot.GetConnContext()
+		if connCtx != nil {
+			srv.ConnContext = connCtx
+		}
 	}
 
 	var listenCfg net.ListenConfig
@@ -188,4 +211,29 @@ func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) 
 	}
 
 	return ln
+}
+
+// addOpAmpRoute wraps the existing handler and adds the OpAmp endpoint
+func addOpAmpRoute(handler http.Handler, ot *OpAmpT, cfg *config.ServerLimits) http.Handler {
+	r := chi.NewRouter()
+
+	// Check if handler is ready
+	if !ot.IsReady() {
+		zerolog.Ctx(context.Background()).Error().Msg("OpAmp handler not initialized")
+		return handler
+	}
+
+	opampHandler := ot.GetHTTPHandler()
+	path := ot.GetPath()
+
+	// Apply rate limiting middleware to OpAmp handler
+	limiter := limit.NewLimiter(&cfg.OpAmpLimit)
+	wrappedHandler := limiter.Wrap("opamp", &cntOpAmp, zerolog.DebugLevel)(opampHandler)
+
+	r.Post(path, wrappedHandler.ServeHTTP)
+
+	// Mount the existing handler for all other routes
+	r.Mount("/", handler)
+
+	return r
 }

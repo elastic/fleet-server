@@ -1,0 +1,92 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "auto_expand_replicas": "0-1"
+    }
+  },
+  "mappings": {
+    "dynamic": "false",
+    "_meta": {
+      "version": "1.0.0",
+      "managed_by": "fleet-server"
+    },
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "opamp": {
+        "properties": {
+          "agent": {
+            "properties": {
+              "instance_uid": { "type": "keyword" },
+              "type": { "type": "keyword" },
+              "version": { "type": "keyword" },
+              "identifying_attributes": { "type": "flattened" },
+              "non_identifying_attributes": { "type": "flattened" }
+            }
+          },
+          "status": { "type": "keyword" },
+          "health": {
+            "properties": {
+              "healthy": { "type": "boolean" },
+              "start_time_unix_nano": { "type": "long" },
+              "last_error": {
+                "type": "text",
+                "fields": { "keyword": { "type": "keyword", "ignore_above": 1024 } }
+              },
+              "status": { "type": "keyword" },
+              "status_time_unix_nano": { "type": "long" },
+              "component_health_map": { "type": "object", "enabled": false }
+            }
+          },
+          "capabilities": { "type": "keyword" },
+          "effective_config": {
+            "properties": {
+              "hash": { "type": "keyword" },
+              "config_map": { "type": "text" }
+            }
+          },
+          "remote_config_status": {
+            "properties": {
+              "last_config_hash": { "type": "keyword" },
+              "status": { "type": "keyword" },
+              "error_message": { "type": "text" }
+            }
+          },
+          "sequence_num": { "type": "long" }
+        }
+      },
+      "connection": {
+        "properties": {
+          "last_seen": { "type": "date" },
+          "connected_at": { "type": "date" },
+          "server_id": { "type": "keyword" },
+          "protocol": { "type": "keyword" }
+        }
+      },
+      "agent": {
+        "properties": {
+          "id": { "type": "keyword" },
+          "name": { "type": "keyword" },
+          "type": { "type": "keyword" },
+          "version": { "type": "keyword" }
+        }
+      },
+      "host": {
+        "properties": {
+          "hostname": { "type": "keyword" },
+          "os": {
+            "properties": {
+              "type": { "type": "keyword" },
+              "name": { "type": "keyword" },
+              "version": { "type": "keyword" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
