@@ -1,0 +1,17 @@
+version: 8.19.11
+entries:
+    - kind: security
+      summary: Enforce maximum limits on UploadBegin and UploadComplete request body sizes
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6243
+        - https://github.com/elastic/fleet-server/pull/6246
+        - https://github.com/elastic/fleet-server/pull/6250
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1767789965
+      file:
+        name: 1767789965-upload-limit.yaml
+        checksum: c323dada074909f7babd3670577a096154111c59
