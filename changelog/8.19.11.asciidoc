@@ -12,7 +12,7 @@ Review important information about the  8.19.11 release.
 
 
 
-* Enforce maximum limits on UploadBegin and UploadComplete request body sizes. https://github.com/elastic/fleet-server/pull/6243[#6243] https://github.com/elastic/fleet-server/pull/6246[#6246] https://github.com/elastic/fleet-server/pull/6250[#6250] 
+* Enforce maximum limits on UploadBegin and UploadComplete request body sizes. https://github.com/elastic/fleet-server/pull/6159[#6159]
 
 
 

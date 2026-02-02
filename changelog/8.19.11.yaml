@@ -1,13 +1,11 @@
 version: 8.19.11
 entries:
     - kind: security
-      summary: Enforce maximum limits on UploadBegin and UploadComplete request body sizes
+      summary: Enforce maximum limits on UploadBegin and UploadComplete request body sizes.
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6243
-        - https://github.com/elastic/fleet-server/pull/6246
-        - https://github.com/elastic/fleet-server/pull/6250
+        - https://github.com/elastic/fleet-server/pull/6159
       issue: []
       impact: ""
       action: ""
