@@ -86,7 +86,7 @@ func (oa *OpAMPT) startTimers(ctx context.Context) {
 
 func (oa *OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.ResponseWriter) error {
 	// Check if feature flag enabling the OpAMP endpoint is enabled.
-	if !oa.cfg.Features.OpAMPEnabled {
+	if !oa.cfg.Features.EnableOpAMP {
 		zlog.Debug().Msg("opAMP endpoint is disabled")
 		return ErrOpAMPDisabled
 	}
