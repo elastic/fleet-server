@@ -278,7 +278,7 @@ fleet:
 #        ignore_checkin_policy_id: false
 #
 #        // enable OpAMP endpoint
-#        opamp_enabled: false
+#        enable_opamp: false
 #
 #    # monitor options are advanced configuration and should not be adjusted is most cases
 #    monitor:

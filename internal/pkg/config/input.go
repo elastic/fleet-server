@@ -99,8 +99,8 @@ type (
 		// This setting restores previous behaviour where all POLICY_CHANGE actions need an explicit ack.
 		IgnoreCheckinPolicyID bool `config:"ignore_checkin_policy_id"`
 
-		// OpAMPEnabled when true will enable the OpAMP endpoint.
-		OpAMPEnabled bool `config:"opamp_enabled"`
+		// EnableOpAMP when true will enable the OpAMP endpoint.
+		EnableOpAMP bool `config:"enable_opamp"`
 	}
 )
 
