@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
+	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/gofrs/uuid/v5"
@@ -31,7 +32,12 @@ const (
 	kOpAMPMod = "opAMP"
 )
 
+var (
+	ErrOpAMPDisabled = errors.New("OpAMP endpoint is disabled")
+)
+
 type OpAMPT struct {
+	cfg   *config.Server
 	bulk  bulk.Bulk
 	cache cache.Cache
 	bc    *checkin.Bulk
@@ -43,11 +49,13 @@ type OpAMPT struct {
 
 func NewOpAMPT(
 	ctx context.Context,
+	cfg *config.Server,
 	bulker bulk.Bulk,
 	cache cache.Cache,
 	bc *checkin.Bulk,
 ) *OpAMPT {
 	oa := &OpAMPT{
+		cfg:        cfg,
 		bulk:       bulker,
 		cache:      cache,
 		bc:         bc,
@@ -77,6 +85,12 @@ func (oa *OpAMPT) startTimers(ctx context.Context) {
 }
 
 func (oa *OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.ResponseWriter) error {
+	// Check if feature flag enabling the OpAMP endpoint is enabled.
+	if !oa.cfg.Features.OpAMPEnabled {
+		zlog.Debug().Msg("opAMP endpoint is disabled")
+		return ErrOpAMPDisabled
+	}
+
 	apiKey, err := authAPIKey(r, oa.bulk, oa.cache)
 	if err != nil {
 		zlog.Debug().Err(err).Msg("unauthenticated opamp request")
