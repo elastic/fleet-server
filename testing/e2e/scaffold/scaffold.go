@@ -73,7 +73,7 @@ func (s *Scaffold) Setup() {
 	s.ElasticUser = v
 
 	v, ok = os.LookupEnv("ELASTICSEARCH_PASSWORD")
-	s.Require().True(ok, "expected ELASTICSEARCH_PAASWORD to be defined")
+	s.Require().True(ok, "expected ELASTICSEARCH_PASSWORD to be defined")
 	s.ElasticPass = v
 
 	// create http.Client that trusts system CA and custom CA
