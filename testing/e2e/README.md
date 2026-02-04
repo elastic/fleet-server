@@ -7,6 +7,12 @@ The tests can be ran from the repo's root directory by running:
 mage test:e2e
 ```
 
+If you want to run specific tests, you can specify them via the `TEST_RUN` environment variable, as an expression that
+is understood by the `go test -name` flag.
+```bash
+TEST_RUN='TestStandAloneRunningSuite/TestAPMInstrumentation' mage test:e2e
+```
+
 Please note that by default only the `StandAlone*` suites are executed.
 The `Agent*` suites may not be up to date.
 
