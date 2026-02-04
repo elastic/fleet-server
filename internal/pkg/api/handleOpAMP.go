@@ -128,12 +128,12 @@ func (oa *OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.Respo
 		Str("agent_id", instanceUID.String()).
 		Msg("agent enrollment status")
 	if agent == nil {
-		if agent, err = oa.enrollAgent(zlog, instanceUID.String(), aToS, apiKey); err != nil {
+		if agent, err = oa.enrollAgent(zlog, instanceUID.String(), &aToS, apiKey); err != nil {
 			return fmt.Errorf("failed to enroll agent: %w", err)
 		}
 	}
 
-	if err := oa.updateAgent(zlog, agent, aToS); err != nil {
+	if err := oa.updateAgent(zlog, agent, &aToS); err != nil {
 		return fmt.Errorf("failed to update persisted Agent information: %w", err)
 	}
 
@@ -156,7 +156,7 @@ func (oa *OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.Respo
 	return err
 }
 
-func (oa *OpAMPT) findEnrolledAgent(zlog zerolog.Logger, agentID string) (*model.Agent, error) {
+func (oa *OpAMPT) findEnrolledAgent(_ zerolog.Logger, agentID string) (*model.Agent, error) {
 	ctx := context.TODO()
 	agent, err := dl.FindAgent(ctx, oa.bulk, dl.QueryAgentByID, dl.FieldID, agentID)
 	if errors.Is(err, dl.ErrNotFound) {
@@ -174,7 +174,7 @@ func (oa *OpAMPT) findEnrolledAgent(zlog zerolog.Logger, agentID string) (*model
 	return &agent, nil
 }
 
-func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS protobufs.AgentToServer, apiKey *apikey.APIKey) (*model.Agent, error) {
+func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobufs.AgentToServer, apiKey *apikey.APIKey) (*model.Agent, error) {
 	zlog.Debug().
 		Str("agentID", agentID).
 		Msg("enrolling agent")
@@ -247,7 +247,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS protobuf
 	return &agent, nil
 }
 
-func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS protobufs.AgentToServer) error {
+func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *protobufs.AgentToServer) error {
 	zlog.Debug().Msg("updating .fleet-agents doc")
 
 	initialOpts := make([]checkin.Option, 0)
