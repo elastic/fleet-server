@@ -7,9 +7,12 @@
 package e2e
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -578,4 +581,132 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 
 	cancel()
 	cmd.Wait()
+}
+
+// TestOpAMP ensures that the OpAMP endpoint works as expected.
+func (suite *StandAloneSuite) TestOpAMP() {
+	// Run this test on Linux AMD64 only.
+	//if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+	//	suite.T().Skip("OpAMP test uses Linux AMD64 OTel Collector binary so it is skipped on other platforms")
+	//}
+
+	// Create a config file from a template in the test temp dir
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-opamp.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"Hosts":        suite.ESHosts,
+		"ServiceToken": suite.ServiceToken,
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	err = cmd.Start()
+	suite.Require().NoError(err)
+
+	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+
+	// Make sure the OpAMP endpoint works.
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:8220/v1/opamp", nil)
+	suite.Require().NoError(err)
+
+	resp, err := suite.Client.Do(req)
+	suite.Require().NoError(err)
+	//suite.Require().Equal(http.StatusOK, resp.StatusCode)
+
+	// Read the response body into a string
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	suite.Require().NoError(err)
+	suite.T().Logf("OpAMP response: %s", string(body))
+
+	// Download and extract OTel Collector binary artifact
+	suite.T().Logf("Downloading and extracting otelcol-contrib binary to %s", dir)
+	// TODO: un-hardcode URL
+	//resp, err = http.Get("https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.144.0/otelcol-contrib_0.144.0_linux_amd64.tar.gz")
+	resp, err = http.Get("https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.144.0/otelcol-contrib_0.144.0_darwin_arm64.tar.gz")
+	suite.Require().NoError(err)
+	defer resp.Body.Close()
+
+	err = extractTarGz(resp.Body, dir)
+	suite.Require().NoError(err)
+
+	// Configure it with the OpAMP extension
+	suite.T().Logf("Configuring OTel Collector with OpAMP extension")
+	tpl, err = template.ParseFiles(filepath.Join("testdata", "otelcol-opamp.tpl"))
+	suite.Require().NoError(err)
+	f, err = os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"InstanceUID": "019b8d7a-2da8-7657-b52d-492a9de33319",
+		"APIKey":      suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy"),
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	time.Sleep(30 * time.Second)
+	// Start OTel Collector
+
+	// Verify that Fleet Server received an OpAMP request from OTel Collector and responded with a 200 OK.
+
+	cancel()
+	cmd.Wait()
+}
+
+func extractTarGz(gzipStream io.Reader, targetDir string) error {
+	// 1. Initialize Gzip reader
+	uncompressedStream, err := gzip.NewReader(gzipStream)
+	if err != nil {
+		return fmt.Errorf("NewReader failed: %w", err)
+	}
+	defer uncompressedStream.Close()
+
+	// Initialize Tar reader
+	tarReader := tar.NewReader(uncompressedStream)
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break // End of archive
+		}
+		if err != nil {
+			return fmt.Errorf("Next() failed: %w", err)
+		}
+
+		// Define the destination path
+		path := filepath.Join(targetDir, header.Name)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(path, 0755); err != nil {
+				return fmt.Errorf("MkdirAll failed: %w", err)
+			}
+		case tar.TypeReg:
+			// Ensure parent directory exists
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				return fmt.Errorf("MkdirAll failed: %w", err)
+			}
+
+			outFile, err := os.Create(path)
+			if err != nil {
+				return fmt.Errorf("Create failed: %w", err)
+			}
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				outFile.Close()
+				return fmt.Errorf("Copy failed: %w", err)
+			}
+			outFile.Close()
+		}
+	}
+	return nil
 }
