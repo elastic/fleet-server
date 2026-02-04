@@ -8,7 +8,7 @@ mage test:e2e
 ```
 
 If you want to run specific tests, you can specify them via the `TEST_RUN` environment variable, as an expression that
-is understood by the `go test -name` flag.
+is understood by the `go test -run` flag.
 ```bash
 TEST_RUN='TestStandAloneRunningSuite/TestAPMInstrumentation' mage test:e2e
 ```
