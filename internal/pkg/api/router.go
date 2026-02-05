@@ -93,21 +93,23 @@ func pathToOperation(path string) string {
 	if strings.HasPrefix(path, "/api/fleet/") {
 		pp := strings.Split(strings.TrimPrefix(path, "/"), "/")
 		if len(pp) == 4 {
-			if pp[2] == "agents" {
+			switch pp[2] {
+			case "agents":
 				return "enroll"
-			} else if pp[2] == "uploads" {
+			case "uploads":
 				return "uploadComplete"
-			} else if pp[2] == "file" {
+			case "file":
 				return "deliverFile"
 			}
 		} else if len(pp) == 5 {
-			if pp[2] == "agents" {
+			switch pp[2] {
+			case "agents":
 				if pp[4] == "acks" || pp[4] == "checkin" {
 					return pp[4]
 				}
-			} else if pp[2] == "uploads" {
+			case "uploads":
 				return "uploadChunk"
-			} else if pp[2] == "artifacts" {
+			case "artifacts":
 				return "artifact"
 			}
 		} else if len(pp) == 6 && pp[2] == "agents" && pp[4] == "audit" {
