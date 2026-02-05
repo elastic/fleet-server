@@ -86,6 +86,8 @@ const (
 	envDockerBaseImage = "DOCKER_BASE_IMAGE"
 	// envDockerBaseImageTag is the tag for the base image used by e2e tests.
 	envDockerBaseImageTag = "DOCKER_BASE_IMAGE_TAG"
+	// envTestRun is a string environment variable used to indicate which tests to run via `go test -run`
+	envTestRun = "TEST_RUN"
 )
 
 // const and vars used by magefile.
@@ -2054,6 +2056,7 @@ func waitForAPMServer(ctx context.Context) error {
 // Produces a e2e test report file in the build directory, and may provide go coverage doata in build/e2e-cover.
 // Attempts to force DEV and SNAPSHOT to true.
 // FIPS can be used to test a FIPS capable fleet-server (support in progress).
+// TEST_RUN can be used to pass the value to go test -run.
 func (Test) E2eRun(ctx context.Context) error {
 	os.Setenv(envDev, "true")
 	os.Setenv(envSnapshot, "true")
@@ -2096,7 +2099,11 @@ func (Test) E2eRun(ctx context.Context) error {
 	var b bytes.Buffer
 	w := io.MultiWriter(&b, os.Stdout)
 
-	cmd := exec.Command("go", "test", "-v", "-timeout", "30m", "-tags="+strings.Join([]string{"e2e", getTagsString()}, ","), "-count=1", "-race", "-p", "1", "./...")
+	args := []string{"test", "-v", "-timeout", "30m", "-tags=" + strings.Join([]string{"e2e", getTagsString()}, ","), "-count=1", "-race", "-p", "1", "./..."}
+	if v, ok := os.LookupEnv(envTestRun); ok && v != "" {
+		args = append(args, "-run", v)
+	}
+	cmd := exec.Command("go", args...)
 	cmd.Dir = "testing"
 	cmd.Env = cmdEnv
 	cmd.Stdout = w
