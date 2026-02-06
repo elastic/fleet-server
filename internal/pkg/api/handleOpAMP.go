@@ -48,7 +48,6 @@ type OpAMPT struct {
 	connCtx oaServer.ConnContext
 
 	agentMetas map[string]localMetadata
-	flags      uint64
 }
 
 func NewOpAMPT(
@@ -65,10 +64,8 @@ func NewOpAMPT(
 		bc:         bc,
 		srv:        oaServer.New(nil),
 		agentMetas: map[string]localMetadata{},
-		flags:      uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportAvailableComponents),
 	}
 
-	go oa.startTimers(ctx)
 	return oa
 }
 
@@ -109,23 +106,6 @@ func (oa *OpAMPT) Init() error {
 	oa.handler = handler
 	oa.connCtx = connCtx
 	return nil
-}
-
-func (oa *OpAMPT) startTimers(ctx context.Context) {
-	zerolog.Ctx(ctx).Debug().Msg("starting opAMP timers")
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			zerolog.Ctx(ctx).Debug().Msg("stopping opAMP timers")
-			return
-		case <-ticker.C:
-			zerolog.Ctx(ctx).Debug().Msg("opAMP timer tick; setting flags")
-			oa.flags = uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportAvailableComponents)
-		}
-	}
 }
 
 func (oa *OpAMPT) Enabled() bool {
@@ -185,13 +165,8 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 		}
 
-		sToA := protobufs.ServerToAgent{
-			Flags: oa.flags,
-		}
-
-		// Reset flags; timer will set them again
-		zlog.Debug().Msg("resetting flags")
-		oa.flags = 0
+		// Empty message for now since we're only using OpAMP for monitoring.
+		sToA := protobufs.ServerToAgent{}
 
 		zlog.Debug().Str("resp", sToA.String()).Msg("sending ServerToAgent response")
 		return &sToA
