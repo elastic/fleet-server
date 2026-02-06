@@ -2056,7 +2056,7 @@ paths:
           $ref: "#/components/responses/unavailable"
 #  /v1/opamp:
 #    post:
-#      x-oapi-codegen-skip: true # Only document the API; don't generate code for it.
+#      operationId: opamp
 #      summary: Receive OpAMP AgentToServer messages
 #      security:
 #        - agentApiKey: []
