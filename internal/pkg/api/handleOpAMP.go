@@ -130,7 +130,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			Msg("received AgentToServer message from agent")
 
 		// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
-		agent, err := oa.findEnrolledAgent(zlog, instanceUID.String())
+		agent, err := oa.findEnrolledAgent(ctx, zlog, instanceUID.String())
 		if err != nil {
 			return &protobufs.ServerToAgent{
 				ErrorResponse: &protobufs.ServerErrorResponse{
@@ -175,8 +175,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 	}
 }
 
-func (oa *OpAMPT) findEnrolledAgent(_ zerolog.Logger, agentID string) (*model.Agent, error) {
-	ctx := context.TODO()
+func (oa *OpAMPT) findEnrolledAgent(ctx context.Context, _ zerolog.Logger, agentID string) (*model.Agent, error) {
 	agent, err := dl.FindAgent(ctx, oa.bulk, dl.QueryAgentByID, dl.FieldID, agentID)
 	if errors.Is(err, dl.ErrNotFound) {
 		return nil, nil
