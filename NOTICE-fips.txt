@@ -1505,11 +1505,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-chi/chi/v5
-Version: v5.2.4
+Version: v5.2.5
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-chi/chi/v5@v5.2.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-chi/chi/v5@v5.2.5/LICENSE:
 
 Copyright (c) 2015-present Peter Kieltyka (https://github.com/pkieltyka), Google Inc.
 
