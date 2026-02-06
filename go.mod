@@ -28,12 +28,12 @@ require (
 	github.com/rs/zerolog v1.32.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	go.elastic.co/apm/module/apmchiv5/v2 v2.7.2
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.2
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.2
-	go.elastic.co/apm/module/apmprometheus/v2 v2.7.2
-	go.elastic.co/apm/module/apmzerolog/v2 v2.7.2
-	go.elastic.co/apm/v2 v2.7.2
+	go.elastic.co/apm/module/apmchiv5/v2 v2.7.3
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.3
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.3
+	go.elastic.co/apm/module/apmprometheus/v2 v2.7.3
+	go.elastic.co/apm/module/apmzerolog/v2 v2.7.3
+	go.elastic.co/apm/v2 v2.7.3
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/net v0.49.0
