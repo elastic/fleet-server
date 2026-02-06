@@ -52,5 +52,5 @@ This section describes how to connect a OpenTelemetry Collector instance to Flee
 7. Download and extract an OpenTelemetry Collector Contrib release for your platform from https://github.com/open-telemetry/opentelemetry-collector-releases/releases
 8. Run the OpenTelemetry Collector with the above configuration.
    ```
-   FLEET_ENROLLMENT_TOKEN=<enrollment token> ./otelcol-contrib --config ./otel-opamp.yaml
+   API_KEY=<enrollment token> ./otelcol-contrib --config ./otel-opamp.yaml
    ```
