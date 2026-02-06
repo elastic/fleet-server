@@ -85,11 +85,23 @@ func (oa *OpAMPT) Init() error {
 					}
 				}
 
-				return types.ConnectionResponse{
-					Accept: true,
-					ConnectionCallbacks: types.ConnectionCallbacks{
-						OnMessage: oa.handleMessage(zlog, apiKey),
+				zlog.Debug().Msg("authenticated opamp request")
+
+				// Setup connection callbacks.
+				connectionCallbacks := types.ConnectionCallbacks{
+					OnConnected: func(ctx context.Context, conn types.Connection) {
+						zlog.Debug().Msg("opAMP client connected")
 					},
+					OnConnectionClose: func(conn types.Connection) {
+						zlog.Debug().Msg("opAMP client disconnected")
+					},
+					OnMessage: oa.handleMessage(zlog, apiKey),
+				}
+				connectionCallbacks.SetDefaults() // set defaults for other callbacks
+
+				return types.ConnectionResponse{
+					Accept:              true,
+					ConnectionCallbacks: connectionCallbacks,
 				}
 			},
 		},
