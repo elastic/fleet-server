@@ -166,7 +166,9 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		}
 
 		// Empty message for now since we're only using OpAMP for monitoring.
-		sToA := protobufs.ServerToAgent{}
+		sToA := protobufs.ServerToAgent{
+			InstanceUid: instanceUID.Bytes(),
+		}
 
 		zlog.Debug().Str("resp", sToA.String()).Msg("sending ServerToAgent response")
 		return &sToA
