@@ -706,7 +706,7 @@ func (Build) Local() error {
 		outFile = filepath.Join("bin", binaryExe)
 
 	}
-	return sh.RunWithV(env, "go", "build", "-tags="+getTagsString(), "-gcflags="+getGCFlags(), "-ldflags="+getLDFlags(), "-o", outFile, ".")
+	return sh.RunWithV(env, "go", "build", "-buildvcs=false", "-tags="+getTagsString(), "-gcflags="+getGCFlags(), "-ldflags="+getLDFlags(), "-o", outFile, ".")
 }
 
 // Binary builds release binaries for the specified platforms.
@@ -753,6 +753,7 @@ func goBuild(osArg, archArg string, cover bool) error {
 
 	args := []string{
 		"build",
+		"-buildvcs=false",
 		"-tags=" + getTagsString(),
 		"-gcflags=" + getGCFlags(),
 		"-ldflags=" + getLDFlags(),
