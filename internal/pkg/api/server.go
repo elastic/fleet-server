@@ -30,6 +30,8 @@ type server struct {
 	addr    string
 	handler http.Handler
 	logger  *logp.Logger
+
+	connContext func(ctx context.Context, c net.Conn) context.Context // used by OpAMP, if feature is enabled
 }
 
 // NewServer creates a new HTTP api for the passed addr.
@@ -43,18 +45,24 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 		opt(a)
 	}
 
-	handler := newRouter(&cfg.Limits, a, a.tracer)
+	s := server{
+		addr:   addr,
+		cfg:    cfg,
+		logger: zap.NewStub("api-server"),
+	}
 
-	// Add OpAMP route handler to router if OpAMP feature is enabled.
+	handler := newRouter(&cfg.Limits, a, a.tracer)
+	// If OpAMP feature is enabled, add OpAMP route handler to router and
+	// let OpAMP server modify connection context (setup later when HTTP server
+	// object is constructed).
 	if a.oa != nil && a.oa.Enabled() {
 		handler = addOpAMPRouteHandler(handler, a.oa, &cfg.Limits)
+		s.connContext = a.oa.connCtx
 	}
-	return &server{
-		addr:    addr,
-		cfg:     cfg,
-		handler: handler,
-		logger:  zap.NewStub("api-server"),
-	}
+
+	s.handler = handler
+	return &s
+
 }
 
 func (s *server) Run(ctx context.Context) error {
@@ -75,6 +83,7 @@ func (s *server) Run(ctx context.Context) error {
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		ErrorLog:          errLogger(ctx),
 		ConnState:         getDiagConnFunc(ctx),
+		ConnContext:       s.connContext,
 	}
 
 	var listenCfg net.ListenConfig
