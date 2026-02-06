@@ -86,6 +86,7 @@ func (oa *OpAMPT) Init() error {
 				}
 
 				return types.ConnectionResponse{
+					Accept: true,
 					ConnectionCallbacks: types.ConnectionCallbacks{
 						OnMessage: oa.handleMessage(zlog, apiKey),
 					},
