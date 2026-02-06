@@ -40,6 +40,7 @@ var (
 	cntEnroll        routeStats
 	cntAcks          routeStats
 	cntStatus        routeStats
+	cntOpAMP         routeStats
 	cntUploadStart   routeStats
 	cntUploadChunk   routeStats
 	cntUploadEnd     routeStats
@@ -67,6 +68,7 @@ func init() {
 	cntArtifacts.Register(routesRegistry.newRegistry("artifacts"))
 	cntAcks.Register(routesRegistry.newRegistry("acks"))
 	cntStatus.Register(routesRegistry.newRegistry("status"))
+	cntOpAMP.Register(routesRegistry.newRegistry("opAMP"))
 	cntUploadStart.Register(routesRegistry.newRegistry("uploadStart"))
 	cntUploadChunk.Register(routesRegistry.newRegistry("uploadChunk"))
 	cntUploadEnd.Register(routesRegistry.newRegistry("uploadEnd"))
