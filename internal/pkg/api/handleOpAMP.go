@@ -33,10 +33,6 @@ const (
 	kOpAMPMod = "opAMP"
 )
 
-var (
-	ErrOpAMPDisabled = errors.New("OpAMP endpoint is disabled")
-)
-
 type OpAMPT struct {
 	cfg   *config.Server
 	bulk  bulk.Bulk
