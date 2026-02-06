@@ -542,6 +542,10 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	pt := api.NewPGPRetrieverT(&cfg.Inputs[0].Server, bulker, f.cache)
 	auditT := api.NewAuditT(&cfg.Inputs[0].Server, bulker, f.cache)
 
+	if err := oa.Init(); err != nil {
+		return fmt.Errorf("failed to initialize opamp: %w", err)
+	}
+
 	for _, endpoint := range (&cfg.Inputs[0].Server).BindEndpoints() {
 		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server,
 			api.WithCheckin(ct),

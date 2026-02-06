@@ -237,13 +237,3 @@ func (a *apiServer) Status(w http.ResponseWriter, r *http.Request, params Status
 		ErrorResp(w, r, err)
 	}
 }
-func (a *apiServer) OpAMP(w http.ResponseWriter, r *http.Request) {
-	zlog := hlog.FromRequest(r).With().
-		Str("mod", kOpAMPMod).
-		Logger()
-	w.Header().Set("Content-Type", "application/x-protobuf")
-	if err := a.oa.handleOpAMP(zlog, r, w); err != nil {
-		cntOpAMP.IncError(err)
-		ErrorResp(w, r, err)
-	}
-}
