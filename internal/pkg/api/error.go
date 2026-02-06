@@ -514,15 +514,6 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				Level:      zerolog.InfoLevel,
 			},
 		},
-		{
-			target: ErrOpAMPDisabled,
-			meta: HTTPErrResp{
-				StatusCode: http.StatusNotImplemented,
-				Error:      "ErrOpAMPDisabled",
-				Message:    "OpAMP is disabled in Fleet Server configuration",
-				Level:      zerolog.WarnLevel,
-			},
-		},
 	}
 
 	for _, e := range errTable {
