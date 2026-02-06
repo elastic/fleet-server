@@ -142,6 +142,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		agent, err := oa.findEnrolledAgent(ctx, zlog, instanceUID.String())
 		if err != nil {
 			return &protobufs.ServerToAgent{
+				InstanceUid: instanceUID.Bytes(),
 				ErrorResponse: &protobufs.ServerErrorResponse{
 					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
 					ErrorMessage: fmt.Errorf("failed to check if agent is enrolled: %w", err).Error(),
@@ -157,6 +158,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		if agent == nil {
 			if agent, err = oa.enrollAgent(zlog, instanceUID.String(), message, apiKey); err != nil {
 				return &protobufs.ServerToAgent{
+					InstanceUid: instanceUID.Bytes(),
 					ErrorResponse: &protobufs.ServerErrorResponse{
 						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
 						ErrorMessage: fmt.Errorf("failed to enroll agent: %w", err).Error(),
@@ -167,6 +169,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 
 		if err := oa.updateAgent(zlog, agent, message); err != nil {
 			return &protobufs.ServerToAgent{
+				InstanceUid: instanceUID.Bytes(),
 				ErrorResponse: &protobufs.ServerErrorResponse{
 					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
 					ErrorMessage: fmt.Errorf("failed to update persisted Agent information: %w", err).Error(),
