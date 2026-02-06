@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -22,10 +21,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/gofrs/uuid/v5"
 	"github.com/open-telemetry/opamp-go/protobufs"
+	oaServer "github.com/open-telemetry/opamp-go/server"
+	"github.com/open-telemetry/opamp-go/server/types"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/hlog"
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -42,9 +43,12 @@ type OpAMPT struct {
 	cache cache.Cache
 	bc    *checkin.Bulk
 
-	agentMetas map[string]localMetadata
+	srv     oaServer.OpAMPServer
+	handler oaServer.HTTPHandlerFunc
+	connCtx oaServer.ConnContext
 
-	flags uint64
+	agentMetas map[string]localMetadata
+	flags      uint64
 }
 
 func NewOpAMPT(
@@ -59,12 +63,52 @@ func NewOpAMPT(
 		bulk:       bulker,
 		cache:      cache,
 		bc:         bc,
+		srv:        oaServer.New(nil),
 		agentMetas: map[string]localMetadata{},
 		flags:      uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportAvailableComponents),
 	}
 
 	go oa.startTimers(ctx)
 	return oa
+}
+
+func (oa *OpAMPT) Init() error {
+	settings := oaServer.Settings{
+		Callbacks: types.Callbacks{
+			OnConnecting: func(request *http.Request) types.ConnectionResponse {
+				zlog := hlog.FromRequest(request).With().
+					Str("mod", kOpAMPMod).
+					Logger()
+
+				apiKey, err := authAPIKey(request, oa.bulk, oa.cache)
+				if err != nil {
+					zlog.Warn().Err(err).Msg("unauthenticated opamp request")
+					return types.ConnectionResponse{
+						Accept:         false,
+						HTTPStatusCode: http.StatusUnauthorized,
+						HTTPResponseHeader: map[string]string{
+							"Content-Type": "application/x-protobuf",
+						},
+					}
+				}
+
+				return types.ConnectionResponse{
+					ConnectionCallbacks: types.ConnectionCallbacks{
+						OnMessage: oa.handleMessage(zlog, apiKey),
+					},
+				}
+			},
+		},
+	}
+
+	handler, connCtx, err := oa.srv.Attach(settings)
+	if err != nil {
+		return fmt.Errorf("failed to attach opAMP server: %w", err)
+	}
+
+	oa.handler = handler
+	oa.connCtx = connCtx
+	return nil
 }
 
 func (oa *OpAMPT) startTimers(ctx context.Context) {
@@ -84,76 +128,74 @@ func (oa *OpAMPT) startTimers(ctx context.Context) {
 	}
 }
 
-func (oa *OpAMPT) handleOpAMP(zlog zerolog.Logger, r *http.Request, w http.ResponseWriter) error {
-	// Check if feature flag enabling the OpAMP endpoint is enabled.
-	if !oa.cfg.Features.EnableOpAMP {
-		zlog.Debug().Msg("opAMP endpoint is disabled")
-		return ErrOpAMPDisabled
-	}
+func (oa *OpAMPT) Enabled() bool {
+	return oa.cfg.Features.EnableOpAMP
+}
 
-	apiKey, err := authAPIKey(r, oa.bulk, oa.cache)
-	if err != nil {
-		zlog.Debug().Err(err).Msg("unauthenticated opamp request")
-		return err
-	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return &BadRequestErr{msg: "failed to read AgentToServer request body"}
-	}
-	defer r.Body.Close()
-
-	var aToS protobufs.AgentToServer
-	if err := proto.Unmarshal(body, &aToS); err != nil {
-		return &BadRequestErr{msg: "failed to unmarshal AgentToServer message"}
-	}
-
-	instanceUID, err := uuid.FromBytes(aToS.InstanceUid)
-	if err != nil {
-		return &BadRequestErr{msg: "failed to parse instance_uid from AgentToServer message"}
-	}
-	zlog.Debug().
-		Str("instance_uid", instanceUID.String()).
-		Str("aToS", aToS.String()).
-		Msg("received AgentToServer message from agent")
-
-	// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
-	agent, err := oa.findEnrolledAgent(zlog, instanceUID.String())
-	if err != nil {
-		return fmt.Errorf("failed to check if agent is enrolled: %w", err)
-	}
-
-	zlog.Debug().
-		Bool("is_enrolled", agent != nil).
-		Str("agent_id", instanceUID.String()).
-		Msg("agent enrollment status")
-	if agent == nil {
-		if agent, err = oa.enrollAgent(zlog, instanceUID.String(), &aToS, apiKey); err != nil {
-			return fmt.Errorf("failed to enroll agent: %w", err)
+func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func(ctx context.Context, conn types.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
+	return func(ctx context.Context, conn types.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
+		instanceUID, err := uuid.FromBytes(message.InstanceUid)
+		if err != nil {
+			return &protobufs.ServerToAgent{
+				ErrorResponse: &protobufs.ServerErrorResponse{
+					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
+					ErrorMessage: "failed to parse instance_uid from AgentToServer message",
+				},
+			}
 		}
+
+		zlog.Debug().
+			Str("instance_uid", instanceUID.String()).
+			Str("aToS", message.String()).
+			Msg("received AgentToServer message from agent")
+
+		// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
+		agent, err := oa.findEnrolledAgent(zlog, instanceUID.String())
+		if err != nil {
+			return &protobufs.ServerToAgent{
+				ErrorResponse: &protobufs.ServerErrorResponse{
+					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
+					ErrorMessage: fmt.Errorf("failed to check if agent is enrolled: %w", err).Error(),
+				},
+			}
+		}
+
+		zlog.Debug().
+			Bool("is_enrolled", agent != nil).
+			Str("agent_id", instanceUID.String()).
+			Msg("agent enrollment status")
+
+		if agent == nil {
+			if agent, err = oa.enrollAgent(zlog, instanceUID.String(), message, apiKey); err != nil {
+				return &protobufs.ServerToAgent{
+					ErrorResponse: &protobufs.ServerErrorResponse{
+						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
+						ErrorMessage: fmt.Errorf("failed to enroll agent: %w", err).Error(),
+					},
+				}
+			}
+		}
+
+		if err := oa.updateAgent(zlog, agent, message); err != nil {
+			return &protobufs.ServerToAgent{
+				ErrorResponse: &protobufs.ServerErrorResponse{
+					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
+					ErrorMessage: fmt.Errorf("failed to update persisted Agent information: %w", err).Error(),
+				},
+			}
+		}
+
+		sToA := protobufs.ServerToAgent{
+			Flags: oa.flags,
+		}
+
+		// Reset flags; timer will set them again
+		zlog.Debug().Msg("resetting flags")
+		oa.flags = 0
+
+		zlog.Debug().Str("resp", sToA.String()).Msg("sending ServerToAgent response")
+		return &sToA
 	}
-
-	if err := oa.updateAgent(zlog, agent, &aToS); err != nil {
-		return fmt.Errorf("failed to update persisted Agent information: %w", err)
-	}
-
-	sToA := protobufs.ServerToAgent{
-		Flags: oa.flags,
-	}
-
-	resp, err := proto.Marshal(&sToA)
-	if err != nil {
-		return fmt.Errorf("failed to marshal ServerToAgent response body: %w", err)
-	}
-
-	zlog.Debug().Str("resp", sToA.String()).Msg("sending ServerToAgent response")
-	_, err = w.Write(resp)
-
-	// Reset flags; timer will set them again
-	zlog.Debug().Msg("resetting flags")
-	oa.flags = 0
-
-	return err
 }
 
 func (oa *OpAMPT) findEnrolledAgent(_ zerolog.Logger, agentID string) (*model.Agent, error) {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/rs/zerolog"
 
@@ -41,10 +42,17 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 	for _, opt := range opts {
 		opt(a)
 	}
+
+	handler := newRouter(&cfg.Limits, a, a.tracer)
+
+	// Add OpAMP route handler to router if OpAMP feature is enabled.
+	if a.oa != nil && a.oa.Enabled() {
+		handler = addOpAMPRouteHandler(handler, a.oa, &cfg.Limits)
+	}
 	return &server{
 		addr:    addr,
 		cfg:     cfg,
-		handler: newRouter(&cfg.Limits, a, a.tracer),
+		handler: handler,
 		logger:  zap.NewStub("api-server"),
 	}
 }
@@ -132,6 +140,18 @@ func (s *server) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func addOpAMPRouteHandler(existingHandler http.Handler, oa *OpAMPT, limits *config.ServerLimits) http.Handler {
+	r := chi.NewRouter()
+
+	opAMPHandler := oa.handler
+	r.HandleFunc("/v1/opamp", http.HandlerFunc(opAMPHandler))
+
+	// Handle existing routes
+	r.Mount("/", existingHandler)
+
+	return r
 }
 
 func getDiagConnFunc(ctx context.Context) func(c net.Conn, s http.ConnState) {
