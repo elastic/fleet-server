@@ -2058,6 +2058,9 @@ paths:
 #    post:
 #      operationId: opamp
 #      summary: Receive OpAMP AgentToServer messages
+#      description: |
+#        Receive OpAMP AgentToServer messages and respond with ServerToAgent message,
+#        as described in https://opentelemetry.io/docs/specs/opamp/
 #      security:
 #        - agentApiKey: []
 #      requestBody:
