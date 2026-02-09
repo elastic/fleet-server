@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TODO: move to route setup where route itself is not created when feature
-// flag is disabled.
 func TestFeatureFlag(t *testing.T) {
 	cases := map[string]struct {
 		FeatureFlagEnabled bool
