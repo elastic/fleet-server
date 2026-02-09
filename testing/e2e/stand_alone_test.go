@@ -674,7 +674,9 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.Require().NoError(err)
 	defer otelCmd.Wait()
 
-	// TODO: Verify that the OTel Collector was "enrolled" in Fleet.
+	// Verify that the OTel Collector was "enrolled" in Fleet.
+	suite.T().Logf("Waiting for agent %s to come online", instanceUID)
+	suite.AgentIsOnline(ctx, instanceUID)
 }
 
 func extractTarGz(gzipStream io.Reader, targetDir string) error {
