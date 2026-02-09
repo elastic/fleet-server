@@ -646,25 +646,35 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.Require().NoError(err)
 
 	// Configure it with the OpAMP extension
-	suite.T().Logf("Configuring OTel Collector with OpAMP extension")
+	instanceUID := "019b8d7a-2da8-7657-b52d-492a9de33319"
+	apiKey := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+	suite.T().Logf("Configuring OTel Collector with OpAMP extension (instanceUID=%s)", instanceUID)
 	tpl, err = template.ParseFiles(filepath.Join("testdata", "otelcol-opamp.tpl"))
 	suite.Require().NoError(err)
 	f, err = os.Create(filepath.Join(dir, "otelcol.yml"))
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]interface{}{
 		"OpAMP": map[string]string{
-			"InstanceUID": "019b8d7a-2da8-7657-b52d-492a9de33319",
-			"APIKey":      suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy"),
+			"InstanceUID": instanceUID,
+			"APIKey":      apiKey,
 		},
 	})
 	f.Close()
 	suite.Require().NoError(err)
 
-	time.Sleep(30 * time.Second)
-
 	// Start OTel Collector
+	suite.T().Log("Starting OTel Collector")
+	otelCmd := exec.CommandContext(ctx, filepath.Join(dir, "otelcol-contrib"), "--config", filepath.Join(dir, "otelcol.yml"))
+	otelCmd.Cancel = func() error {
+		return otelCmd.Process.Signal(syscall.SIGTERM)
+	}
+	otelCmd.Stdout = os.Stdout
+	otelCmd.Stderr = os.Stderr
+	err = otelCmd.Start()
+	suite.Require().NoError(err)
+	defer otelCmd.Wait()
 
-	// Verify that Fleet Server received an OpAMP request from OTel Collector and responded with a 200 OK.
+	// TODO: Verify that the OTel Collector was "enrolled" in Fleet.
 }
 
 func extractTarGz(gzipStream io.Reader, targetDir string) error {
