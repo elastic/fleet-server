@@ -629,8 +629,8 @@ func (suite *StandAloneSuite) TestOpAMP() {
 
 	// Download and extract OTel Collector binary artifact
 	otelURL := fmt.Sprintf(
-		"https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.144.0/otelcol-contrib_0.144.0_%s_%s.tar.gz",
-		runtime.GOOS, runtime.GOARCH,
+		"https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v%s/otelcol-contrib_%s_%s_%s.tar.gz",
+		otelColContribVersion, otelColContribVersion, runtime.GOOS, runtime.GOARCH,
 	)
 	suite.T().Logf("Downloading and extracting otelcol-contrib binary from %s to %s", otelURL, dir)
 	resp, err = http.Get(otelURL)
