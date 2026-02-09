@@ -35,6 +35,8 @@ func TestPathToOperation(t *testing.T) {
 		{"/api/fleet/file/abc", "deliverFile"},
 		{"/api/fleet/artifacts/some-id/hash", "artifact"},
 		{"/api/fleet/agents/some-id/audit/unenroll", "audit-unenroll"},
+		{"/v1/opamp", "opamp"},
+		{"/v1/opamp/", "opamp"},
 		{"/api/fleet/agents/some-id/other/unenroll", ""},
 		{"/api/fleet/unimplemented/some-id", ""},
 		{"/api/flet/agents/some-id/acks", ""},

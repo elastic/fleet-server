@@ -92,6 +92,10 @@ func pathToOperation(path string) string {
 		return "getPGPKey"
 	}
 
+	if path == "/v1/opamp" {
+		return "opamp"
+	}
+
 	if strings.HasPrefix(path, "/api/fleet/") {
 		pp := strings.Split(strings.TrimPrefix(path, "/"), "/")
 		if len(pp) == 4 {
@@ -146,6 +150,8 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 			l.status.Wrap("status", &cntStatus, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "audit-unenroll":
 			l.auditUnenroll.Wrap("audit-unenroll", &cntAuditUnenroll, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+		case "opamp":
+			l.opAMP.Wrap("opamp", &cntOpAMP, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		default:
 			// no tracking or limits
 			next.ServeHTTP(w, r)
