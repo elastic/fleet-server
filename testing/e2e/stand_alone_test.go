@@ -620,11 +620,8 @@ func (suite *StandAloneSuite) TestOpAMP() {
 
 	resp, err := suite.Client.Do(req)
 	suite.Require().NoError(err)
-	//suite.Require().Equal(http.StatusOK, resp.StatusCode)
-
-	// Read the response body into a string
-	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
 	suite.Require().NoError(err)
 	suite.T().Logf("OpAMP response: %s", string(body))
 
