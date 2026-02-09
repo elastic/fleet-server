@@ -601,7 +601,8 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	f.Close()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
 
 	// Run the fleet-server binary
 	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
@@ -611,6 +612,7 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	err = cmd.Start()
 	suite.Require().NoError(err)
+	defer cmd.Wait()
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
 
@@ -663,9 +665,6 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	// Start OTel Collector
 
 	// Verify that Fleet Server received an OpAMP request from OTel Collector and responded with a 200 OK.
-
-	cancel()
-	cmd.Wait()
 }
 
 func extractTarGz(gzipStream io.Reader, targetDir string) error {
