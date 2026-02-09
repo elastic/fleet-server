@@ -151,8 +151,9 @@ func (s *server) Run(ctx context.Context) error {
 	return nil
 }
 
-func addOpAMPRouteHandler(existingHandler http.Handler, oa *OpAMPT, limits *config.ServerLimits) http.Handler {
+func addOpAMPRouteHandler(existingHandler http.Handler, oa *OpAMPT, cfg *config.ServerLimits) http.Handler {
 	r := chi.NewRouter()
+	r.Use(Limiter(cfg).middleware)
 
 	opAMPHandler := oa.handler
 	r.HandleFunc("/v1/opamp", http.HandlerFunc(opAMPHandler))
