@@ -583,7 +583,10 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 	cmd.Wait()
 }
 
-// TestOpAMP ensures that the OpAMP endpoint works as expected.
+// TestOpAMP ensures that the OpAMP endpoint in Fleet Server works as expected by installing
+// an OTel Collector, configuring it with the OpAMP extension, and having it connect to Fleet
+// Server using OpAMP, and verifying that Fleet Server responds to this request with an HTTP
+// 200 OK status response.
 func (suite *StandAloneSuite) TestOpAMP() {
 	// Run this test on Linux AMD64 only.
 	//if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
@@ -647,14 +650,17 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.Require().NoError(err)
 	f, err = os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
-	err = tpl.Execute(f, map[string]string{
-		"InstanceUID": "019b8d7a-2da8-7657-b52d-492a9de33319",
-		"APIKey":      suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy"),
+	err = tpl.Execute(f, map[string]interface{}{
+		"OpAMP": map[string]string{
+			"InstanceUID": "019b8d7a-2da8-7657-b52d-492a9de33319",
+			"APIKey":      suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy"),
+		},
 	})
 	f.Close()
 	suite.Require().NoError(err)
 
 	time.Sleep(30 * time.Second)
+
 	// Start OTel Collector
 
 	// Verify that Fleet Server received an OpAMP request from OTel Collector and responded with a 200 OK.
