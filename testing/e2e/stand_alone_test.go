@@ -588,11 +588,6 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 // Server using OpAMP, and verifying that Fleet Server responds to this request with an HTTP
 // 200 OK status response.
 func (suite *StandAloneSuite) TestOpAMP() {
-	// Run this test on Linux AMD64 only.
-	//if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
-	//	suite.T().Skip("OpAMP test uses Linux AMD64 OTel Collector binary so it is skipped on other platforms")
-	//}
-
 	// Create a config file from a template in the test temp dir
 	dir := suite.T().TempDir()
 	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-opamp.tpl"))
@@ -634,14 +629,21 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.T().Logf("OpAMP response: %s", string(body))
 
 	// Download and extract OTel Collector binary artifact
-	suite.T().Logf("Downloading and extracting otelcol-contrib binary to %s", dir)
-	// TODO: un-hardcode URL
-	//resp, err = http.Get("https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.144.0/otelcol-contrib_0.144.0_linux_amd64.tar.gz")
-	resp, err = http.Get("https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.144.0/otelcol-contrib_0.144.0_darwin_arm64.tar.gz")
+	otelURL := fmt.Sprintf(
+		"https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.144.0/otelcol-contrib_0.144.0_%s_%s.tar.gz",
+		runtime.GOOS, runtime.GOARCH,
+	)
+	suite.T().Logf("Downloading and extracting otelcol-contrib binary from %s to %s", otelURL, dir)
+	resp, err = http.Get(otelURL)
 	suite.Require().NoError(err)
-	defer resp.Body.Close()
+	suite.Require().Equal(http.StatusOK, resp.StatusCode, "failed to download otelcol-contrib")
 
 	err = extractTarGz(resp.Body, dir)
+	resp.Body.Close()
+	suite.Require().NoError(err)
+
+	// extractTarGz does not preserve file permissions, so make the binary executable.
+	err = os.Chmod(filepath.Join(dir, "otelcol-contrib"), 0755)
 	suite.Require().NoError(err)
 
 	// Configure it with the OpAMP extension
