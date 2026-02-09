@@ -648,7 +648,7 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.T().Logf("Configuring OTel Collector with OpAMP extension")
 	tpl, err = template.ParseFiles(filepath.Join("testdata", "otelcol-opamp.tpl"))
 	suite.Require().NoError(err)
-	f, err = os.Create(filepath.Join(dir, "config.yml"))
+	f, err = os.Create(filepath.Join(dir, "otelcol.yml"))
 	suite.Require().NoError(err)
 	err = tpl.Execute(f, map[string]interface{}{
 		"OpAMP": map[string]string{
