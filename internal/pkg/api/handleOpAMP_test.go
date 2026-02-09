@@ -5,29 +5,24 @@
 package api
 
 import (
-	"net/http"
 	"testing"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
-	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 	"github.com/stretchr/testify/require"
 )
 
-// TODO: move to route setup where route itself is not created when feature
-// flag is disabled.
 func TestFeatureFlag(t *testing.T) {
 	cases := map[string]struct {
 		FeatureFlagEnabled bool
-		WantError          error
+		WantEnabled        bool
 	}{
 		"feature flag is disabled": {
 			FeatureFlagEnabled: false,
-			WantError:          ErrOpAMPDisabled,
+			WantEnabled:        false,
 		},
 		"feature flag is enabled": {
 			FeatureFlagEnabled: true,
-			WantError:          apikey.ErrNoAuthHeader,
+			WantEnabled:        true,
 		},
 	}
 	for name, tc := range cases {
@@ -38,13 +33,8 @@ func TestFeatureFlag(t *testing.T) {
 				},
 			}
 
-			logger := testlog.SetLogger(t)
-			req := http.Request{}
-			var resp http.ResponseWriter
-
 			oa := OpAMPT{cfg: cfg}
-			err := oa.handleOpAMP(logger, &req, resp)
-			require.Equal(t, tc.WantError, err)
+			require.Equal(t, tc.WantEnabled, oa.Enabled())
 		})
 	}
 }
