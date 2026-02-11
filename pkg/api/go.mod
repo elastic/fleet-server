@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/pkg/api
 
-go 1.22
+go 1.25.7
 
 require github.com/oapi-codegen/runtime v1.1.1
 
