@@ -145,7 +145,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 				InstanceUid: instanceUID.Bytes(),
 				ErrorResponse: &protobufs.ServerErrorResponse{
 					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
-					ErrorMessage: fmt.Errorf("failed to check if agent is enrolled: %w", err).Error(),
+					ErrorMessage: fmt.Sprintf("failed to check if agent is enrolled: %v", err)
 				},
 			}
 		}
