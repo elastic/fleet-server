@@ -172,7 +172,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 				InstanceUid: instanceUID.Bytes(),
 				ErrorResponse: &protobufs.ServerErrorResponse{
 					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
-					ErrorMessage: fmt.Errorf("failed to update persisted Agent information: %w", err).Error(),
+					ErrorMessage: fmt.Sprintf("failed to update persisted Agent information: %v", err),
 				},
 			}
 		}
