@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
@@ -56,7 +57,7 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 	// let OpAMP server modify connection context (setup later when HTTP server
 	// object is constructed).
 	if a.oa != nil && a.oa.Enabled() {
-		zerolog.Log().Info().Msg("enabling OpAMP endpoint")
+		zlog.Info().Msg("enabling OpAMP endpoint")
 		handler = addOpAMPRouteHandler(handler, a.oa, &cfg.Limits)
 		s.connContext = a.oa.connCtx
 	}
