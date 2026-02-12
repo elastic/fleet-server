@@ -105,6 +105,7 @@ func (oa *OpAMPT) Init() error {
 				}
 			},
 		},
+		EnableCompression: true,
 	}
 
 	handler, connCtx, err := oa.srv.Attach(settings)
