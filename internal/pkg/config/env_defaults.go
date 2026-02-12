@@ -60,7 +60,7 @@ const (
 	defaultOpAMPInterval = time.Millisecond
 	defaultOpAMPBurst    = 1000
 	defaultOpAMPMax      = 0
-	defaultOpAMPMaxBody  = 0
+	defaultOpAMPMaxBody  = 3 * 1024 * 1024
 
 	defaultUploadStartInterval = time.Second * 2
 	defaultUploadStartBurst    = 5
