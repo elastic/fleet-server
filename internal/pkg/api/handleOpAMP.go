@@ -96,6 +96,12 @@ func (oa *OpAMPT) Init() error {
 						zlog.Debug().Msg("opAMP client disconnected")
 					},
 					OnMessage: oa.handleMessage(zlog, apiKey),
+					OnReadMessageError: func(conn types.Connection, mt int, msgByte []byte, err error) {
+						zlog.Error().Err(err).Int("message_type", mt).Msg("failed to read opAMP message")
+					},
+					OnMessageResponseError: func(conn types.Connection, message *protobufs.ServerToAgent, err error) {
+						zlog.Error().Err(err).Msg("failed to send opAMP response")
+					},
 				}
 				connectionCallbacks.SetDefaults() // set defaults for other callbacks
 
