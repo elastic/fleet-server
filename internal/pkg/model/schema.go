@@ -242,6 +242,16 @@ type Agent struct {
 
 	// User provided metadata information for the Elastic Agent
 	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata,omitempty"`
+
+	IdentifyingAttributes json.RawMessage `json:"identifying_attributes,omitempty"`
+
+	NonIdentifyingAttributes json.RawMessage `json:"non_identifying_attributes,omitempty"`
+
+	SequenceNum uint64 `json:"sequence_num,omitempty"`
+
+	Health json.RawMessage `json:"health,omitempty"`
+	Capabilities []string `json:"capabilities,omitempty"`
+	EffectiveConfig json.RawMessage `json:"effective_config,omitempty"`
 }
 
 // AgentMetadata An Elastic Agent metadata
@@ -252,6 +262,8 @@ type AgentMetadata struct {
 
 	// The version of the Elastic Agent
 	Version string `json:"version"`
+
+	Type string `json:"type,omitempty"`
 }
 
 // Artifact An artifact served by Fleet
@@ -351,6 +363,7 @@ type ComponentsItems struct {
 	Message string       `json:"message,omitempty"`
 	Status  string       `json:"status,omitempty"`
 	Units   []UnitsItems `json:"units,omitempty"`
+	Type    string `json:"type,omitempty"`
 }
 
 // DataStream

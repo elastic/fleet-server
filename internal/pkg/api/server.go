@@ -15,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/rs/zerolog"
 
@@ -29,6 +30,8 @@ type server struct {
 	addr    string
 	handler http.Handler
 	logger  *logp.Logger
+
+	connContext func(ctx context.Context, c net.Conn) context.Context // used by OpAMP, if feature is enabled
 }
 
 // NewServer creates a new HTTP api for the passed addr.
@@ -41,12 +44,25 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 	for _, opt := range opts {
 		opt(a)
 	}
-	return &server{
-		addr:    addr,
-		cfg:     cfg,
-		handler: newRouter(&cfg.Limits, a, a.tracer),
-		logger:  zap.NewStub("api-server"),
+
+	s := server{
+		addr:   addr,
+		cfg:    cfg,
+		logger: zap.NewStub("api-server"),
 	}
+
+	handler := newRouter(&cfg.Limits, a, a.tracer)
+	// If OpAMP feature is enabled, add OpAMP route handler to router and
+	// let OpAMP server modify connection context (setup later when HTTP server
+	// object is constructed).
+	if a.oa != nil && a.oa.Enabled() {
+		handler = addOpAMPRouteHandler(handler, a.oa, &cfg.Limits)
+		s.connContext = a.oa.connCtx
+	}
+
+	s.handler = handler
+	return &s
+
 }
 
 func (s *server) Run(ctx context.Context) error {
@@ -67,6 +83,7 @@ func (s *server) Run(ctx context.Context) error {
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		ErrorLog:          errLogger(ctx),
 		ConnState:         getDiagConnFunc(ctx),
+		ConnContext:       s.connContext,
 	}
 
 	var listenCfg net.ListenConfig
@@ -132,6 +149,19 @@ func (s *server) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func addOpAMPRouteHandler(existingHandler http.Handler, oa *OpAMPT, cfg *config.ServerLimits) http.Handler {
+	r := chi.NewRouter()
+	r.Use(Limiter(cfg).middleware)
+
+	opAMPHandler := oa.handler
+	r.HandleFunc("/v1/opamp", http.HandlerFunc(opAMPHandler))
+
+	// Handle existing routes
+	r.Mount("/", existingHandler)
+
+	return r
 }
 
 func getDiagConnFunc(ctx context.Context) func(c net.Conn, s http.ConnState) {
