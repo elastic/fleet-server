@@ -3,9 +3,9 @@
 env:
   DOCKER_COMPOSE_VERSION: "1.25.5"
   TERRAFORM_VERSION: "1.6.4"
-  IMAGE_UBUNTU_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1767879728"
-  IMAGE_UBUNTU_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1767879728"
-  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips"
+  IMAGE_UBUNTU_X86_64: "platform-ingest-fleets-ubuntu-2204-1770381074"
+  IMAGE_UBUNTU_ARM_64: "platform-ingest-fleet-server-ubuntu-2204-aarch64-1770381074"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips-1770381074"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -173,7 +173,7 @@ steps:
           GO_DISTRO: "microsoft"
         agents:
           provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.xlarge"
         artifact_paths:
           - build/*.xml
@@ -187,7 +187,7 @@ steps:
           GO_DISTRO: "stdlib"
         agents:
           provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.xlarge"
         artifact_paths:
           - build/*.xml
