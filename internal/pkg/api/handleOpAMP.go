@@ -74,6 +74,16 @@ func (oa *OpAMPT) Init() error {
 					Logger()
 
 				apiKey, err := authAPIKey(request, oa.bulk, oa.cache)
+				if errors.Is(err, apikey.ErrElasticsearchAuthLimit) {
+					zlog.Warn().Err(err).Msg("elasticsearch rate limit on opamp request")
+					return types.ConnectionResponse{
+						Accept:         false,
+						HTTPStatusCode: http.StatusTooManyRequests,
+						HTTPResponseHeader: map[string]string{
+							"Content-Type": "application/x-protobuf",
+						},
+					}
+				}
 				if err != nil {
 					zlog.Warn().Err(err).Msg("unauthenticated opamp request")
 					return types.ConnectionResponse{
