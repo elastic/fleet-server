@@ -23,6 +23,7 @@ require (
 	github.com/mailru/easyjson v0.9.1
 	github.com/miolini/datacounter v1.0.3
 	github.com/oapi-codegen/runtime v1.1.2
+	github.com/open-telemetry/opamp-go v0.22.0
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/xid v1.6.0
@@ -36,6 +37,7 @@ require (
 	go.elastic.co/apm/module/apmzerolog/v2 v2.7.3
 	go.elastic.co/apm/v2 v2.7.3
 	go.elastic.co/ecszerolog v0.2.0
+	go.opentelemetry.io/otel v1.39.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/net v0.50.0
 	golang.org/x/sync v0.19.0
@@ -63,6 +65,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
@@ -87,7 +90,6 @@ require (
 	go.elastic.co/ecszap v1.0.3 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/otel v1.39.0 // indirect
 	go.opentelemetry.io/otel/metric v1.39.0 // indirect
 	go.opentelemetry.io/otel/trace v1.39.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
