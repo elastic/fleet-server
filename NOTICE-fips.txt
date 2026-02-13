@@ -4677,11 +4677,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/grpc
-Version: v1.78.0
+Version: v1.79.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.78.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.79.0/LICENSE:
 
 
                                  Apache License
@@ -9033,11 +9033,11 @@ Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/auto/sdk@v1.2.
 
 --------------------------------------------------------------------------------
 Dependency : go.opentelemetry.io/otel
-Version: v1.38.0
+Version: v1.39.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel@v1.38.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel@v1.39.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -9273,11 +9273,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : go.opentelemetry.io/otel/metric
-Version: v1.38.0
+Version: v1.39.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel/metric@v1.38.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel/metric@v1.39.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -9513,11 +9513,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : go.opentelemetry.io/otel/trace
-Version: v1.38.0
+Version: v1.39.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel/trace@v1.38.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel/trace@v1.39.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -10067,11 +10067,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/genproto/googleapis/rpc
-Version: v0.0.0-20251029180050-ab9386a59fda
+Version: v0.0.0-20251202230838-ff82c1b0f217
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googleapis/rpc@v0.0.0-20251029180050-ab9386a59fda/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googleapis/rpc@v0.0.0-20251202230838-ff82c1b0f217/LICENSE:
 
 
                                  Apache License
