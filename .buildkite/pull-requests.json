@@ -11,6 +11,7 @@
         "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
         "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
         "skip_ci_on_only_changed": [ "^.ci/", "^.github/", "catalog-info.yaml", "^.pre-commit-config.yaml", "^.mergify.yml", "\\.md$", "^changelog/", "^docs/"],
+        "use_merge_commit": true,
         "fail_on_not_mergeable": true
       },
       {
@@ -24,6 +25,7 @@
         "build_on_comment": true,
         "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:package)\\W+(?:this|it))|^/package$",
         "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:package)\\W+(?:this|it))|^/package$",
+        "use_merge_commit": true,
         "fail_on_not_mergeable": true
       },
       {
@@ -37,6 +39,7 @@
         "build_on_comment": true,
         "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:run)\\W+(?:perf-tests))|^/perf-tests$",
         "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:run)\\W+(?:perf-tests))|^/perf-tests$",
+        "use_merge_commit": true,
         "fail_on_not_mergeable": true
       }
     ]
