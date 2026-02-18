@@ -152,7 +152,6 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 
 		zlog.Debug().
 			Str("instance_uid", instanceUID.String()).
-			Str("aToS", message.String()).
 			Msg("received AgentToServer message from agent")
 
 		// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
@@ -199,7 +198,6 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			InstanceUid: instanceUID.Bytes(),
 		}
 
-		zlog.Debug().Str("resp", sToA.String()).Msg("sending ServerToAgent response")
 		return &sToA
 	}
 }
