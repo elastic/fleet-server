@@ -246,7 +246,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 				meta.Elastic.Agent.Version = ia.GetValue().GetStringValue()
 			}
 		}
-		zlog.Debug().Str("agent_version", meta.Elastic.Agent.Version).Msg("extracted agent version")
+		zlog.Debug().Str("opamp.agent.version", meta.Elastic.Agent.Version).Msg("extracted agent version")
 
 		// Extract hostname
 		for _, nia := range aToS.AgentDescription.NonIdentifyingAttributes {
