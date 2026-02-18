@@ -9,14 +9,21 @@ This section describes how to connect a OpenTelemetry Collector instance to Flee
    ```
    POST /_security/service/elastic/fleet-server/credential/token/opamp
    ```
-3. Create a `fleet-server.dev.yml` configuration file as described in https://github.com/elastic/kibana/blob/main/x-pack/platform/plugins/shared/fleet/dev_docs/local_setup/developing_kibana_and_fleet_server.md.
+3. Enable the OpAMP feature flag in the `fleet-server.yml` file by adding the following snippet to the `fleet-server` input
+   section, as a sibling of the `policy.id` key:
+   ```yml
+   server:
+     feature_flags:
+       enable_opamp: true
+   ```
+
 4. Build the Fleet Server binary for your platform.
    ```
-   PLATFORMS=darwin/arm64 mage build:binary
+   mage build:local
    ```
 5. Run the Fleet Server binary with the above configuration.
    ```
-   ./build/binaries/fleet-server-9.4.0-darwin-aarch64/fleet-server -c fleet-server.dev.yml
+   ./bin/fleet-server
    ```
 6. Create a new policy in Fleet. Copy the enrollment token for that policy.
 7. Create OpenTelemetry Collector configuration for connecting to the Fleet Server instance and save it as `otel-opamp.yaml`.
