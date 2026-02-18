@@ -630,6 +630,13 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	resp.Body.Close()
 	suite.Require().Equal(http.StatusOK, resp.StatusCode)
 
+	// Enroll a dummy agent to initialize the .fleet-agents index before the OTel Collector connects.
+	// Without this, findEnrolledAgent fails with index_not_found_exception when the OTel Collector
+	// sends its first AgentToServer message, because .fleet-agents doesn't exist yet in a fresh
+	// standalone fleet-server environment (unlike agent-managed fleet-server which self-enrolls).
+	tester := api_version.NewClientAPITesterCurrent(suite.Scaffold, "http://localhost:8220", apiKey)
+	tester.Enroll(ctx, apiKey)
+
 	// Download and extract OTel Collector binary artifact
 	otelURL := fmt.Sprintf(
 		"https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v%s/otelcol-contrib_%s_%s_%s.tar.gz",
@@ -676,9 +683,12 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.Require().NoError(err)
 	defer otelCmd.Wait()
 
-	// Verify that the OTel Collector was "enrolled" in Fleet.
-	suite.T().Logf("Waiting for agent %s to come online", instanceUID)
-	suite.AgentIsOnline(ctx, instanceUID)
+	// Verify that the OTel Collector was enrolled in Fleet. OpAMP agents communicate via the
+	// OpAMP protocol rather than Fleet's normal checkin/ack protocol, so they never acknowledge
+	// the initial policy change action. Kibana therefore shows them as "updating" rather than
+	// "online".
+	suite.T().Logf("Waiting for agent %s to be enrolled in Fleet", instanceUID)
+	suite.AgentIsUpdating(ctx, instanceUID)
 }
 
 func extractTarGz(gzipStream io.Reader, targetDir string) error {
