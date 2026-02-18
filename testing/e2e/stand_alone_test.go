@@ -594,9 +594,10 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.Require().NoError(err)
 	f, err := os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
-	err = tpl.Execute(f, map[string]string{
-		"Hosts":        suite.ESHosts,
-		"ServiceToken": suite.ServiceToken,
+	err = tpl.Execute(f, map[string]interface{}{
+		"Hosts":          suite.ESHosts,
+		"ServiceToken":   suite.ServiceToken,
+		"StaticTokenKey": "opamp-e2e-test-key",
 	})
 	f.Close()
 	suite.Require().NoError(err)
@@ -616,16 +617,18 @@ func (suite *StandAloneSuite) TestOpAMP() {
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
 
+	apiKey := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+
 	// Make sure the OpAMP endpoint works.
 	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:8220/v1/opamp", nil)
 	suite.Require().NoError(err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("Content-Type", "application/x-protobuf")
 
 	resp, err := suite.Client.Do(req)
 	suite.Require().NoError(err)
-	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	suite.Require().NoError(err)
-	suite.T().Logf("OpAMP response: %s", string(body))
+	suite.Require().Equal(http.StatusOK, resp.StatusCode)
 
 	// Download and extract OTel Collector binary artifact
 	otelURL := fmt.Sprintf(
@@ -647,7 +650,6 @@ func (suite *StandAloneSuite) TestOpAMP() {
 
 	// Configure it with the OpAMP extension
 	instanceUID := "019b8d7a-2da8-7657-b52d-492a9de33319"
-	apiKey := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
 	suite.T().Logf("Configuring OTel Collector with OpAMP extension (instanceUID=%s)", instanceUID)
 	tpl, err = template.ParseFiles(filepath.Join("testdata", "otelcol-opamp.tpl"))
 	suite.Require().NoError(err)

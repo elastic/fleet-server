@@ -10,6 +10,11 @@ inputs:
   server:
     feature_flags:
       enable_opamp: true
+    static_policy_tokens:
+      enabled: true
+      policy_tokens:
+        - token_key: {{ .StaticTokenKey }}
+          policy_id: dummy-policy
 
 logging:
   to_stderr: true
