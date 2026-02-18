@@ -262,8 +262,6 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 		return nil, fmt.Errorf("failed to marshal local metadata: %w", err)
 	}
 
-	zlog.Debug().RawJSON("meta", data).Msg("updating local metadata")
-
 	agent := model.Agent{
 		ESDocument: model.ESDocument{Id: agentID},
 		Active:     true,
@@ -281,7 +279,6 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 	}
 
 	zlog.Debug().
-		Str("agent document", string(data)).
 		Msg("creating .fleet-agents doc")
 	if _, err = oa.bulk.Create(ctx, dl.FleetAgents, agentID, data, bulk.WithRefresh()); err != nil {
 		return nil, err
