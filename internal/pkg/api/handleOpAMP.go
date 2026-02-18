@@ -149,7 +149,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		}
 
 		zlog.Debug().
-			Str("instance_uid", instanceUID.String()).
+			Str("opamp.agent.id", instanceUID.String()).
 			Msg("received AgentToServer message from agent")
 
 		// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
