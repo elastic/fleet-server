@@ -42,8 +42,6 @@ type OpAMPT struct {
 	srv     oaServer.OpAMPServer
 	handler oaServer.HTTPHandlerFunc
 	connCtx oaServer.ConnContext
-
-	agentMetas map[string]localMetadata
 }
 
 func NewOpAMPT(
@@ -54,12 +52,11 @@ func NewOpAMPT(
 	bc *checkin.Bulk,
 ) *OpAMPT {
 	oa := &OpAMPT{
-		cfg:        cfg,
-		bulk:       bulker,
-		cache:      cache,
-		bc:         bc,
-		srv:        oaServer.New(nil),
-		agentMetas: map[string]localMetadata{},
+		cfg:   cfg,
+		bulk:  bulker,
+		cache: cache,
+		bc:    bc,
+		srv:   oaServer.New(nil),
 	}
 
 	return oa
