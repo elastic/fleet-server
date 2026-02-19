@@ -1,0 +1,15 @@
+version: 9.3.1
+entries:
+    - kind: enhancement
+      summary: Update Go version to v1.25.7.
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6344
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1770756663
+      file:
+        name: 1770756663-bump-golang-1.25.7.yaml
+        checksum: 068601938f452bb3bf49776879a584eba9222766
