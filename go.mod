@@ -8,10 +8,10 @@ require (
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.0
-	github.com/elastic/elastic-agent-libs v0.32.1
-	github.com/elastic/elastic-agent-system-metrics v0.14.0
-	github.com/elastic/go-elasticsearch/v8 v8.19.2
-	github.com/elastic/go-ucfg v0.8.8
+	github.com/elastic/elastic-agent-libs v0.32.2
+	github.com/elastic/elastic-agent-system-metrics v0.14.1
+	github.com/elastic/go-elasticsearch/v8 v8.19.3
+	github.com/elastic/go-ucfg v0.9.0
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/gofrs/uuid/v5 v5.4.0
@@ -40,7 +40,7 @@ require (
 	golang.org/x/net v0.50.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/time v0.14.0
-	google.golang.org/grpc v1.78.0
+	google.golang.org/grpc v1.79.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -87,9 +87,9 @@ require (
 	go.elastic.co/ecszap v1.0.3 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/otel v1.38.0 // indirect
-	go.opentelemetry.io/otel/metric v1.38.0 // indirect
-	go.opentelemetry.io/otel/trace v1.38.0 // indirect
+	go.opentelemetry.io/otel v1.39.0 // indirect
+	go.opentelemetry.io/otel/metric v1.39.0 // indirect
+	go.opentelemetry.io/otel/trace v1.39.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
@@ -97,7 +97,7 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/tools v0.41.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect
 )
