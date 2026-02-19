@@ -148,8 +148,9 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 		}
 
+		zlog = zlog.With().Str("opamp.agent.uid", instanceUID.String()).Logger()
+
 		zlog.Debug().
-			Str("opamp.agent.id", instanceUID.String()).
 			Msg("received AgentToServer message from agent")
 
 		// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
@@ -166,7 +167,6 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 
 		zlog.Debug().
 			Bool("is_enrolled", agent != nil).
-			Str("opamp.agent.uid", instanceUID.String()).
 			Msg("agent enrollment status")
 
 		if agent == nil {
@@ -219,7 +219,6 @@ func (oa *OpAMPT) findEnrolledAgent(ctx context.Context, _ zerolog.Logger, agent
 
 func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobufs.AgentToServer, apiKey *apikey.APIKey) (*model.Agent, error) {
 	zlog.Debug().
-		Str("opamp.agent.uid", agentID).
 		Msg("enrolling agent")
 	ctx := context.TODO()
 	rec, err := dl.FindEnrollmentAPIKey(ctx, oa.bulk, dl.QueryEnrollmentAPIKeyByID, dl.FieldAPIKeyID, apiKey.ID)
