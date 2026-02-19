@@ -5,9 +5,7 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6375
-        - https://github.com/elastic/fleet-server/pull/6377
-        - https://github.com/elastic/fleet-server/pull/6389
+        - https://github.com/elastic/fleet-server/pull/6322
       issue: []
       impact: ""
       action: ""
