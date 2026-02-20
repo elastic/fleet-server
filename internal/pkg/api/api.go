@@ -46,6 +46,12 @@ func WithStatus(st *StatusT) APIOpt {
 	}
 }
 
+func WithOpAMP(oa *OpAMPT) APIOpt {
+	return func(a *apiServer) {
+		a.oa = oa
+	}
+}
+
 func WithUpload(ut *UploadT) APIOpt {
 	return func(a *apiServer) {
 		a.ut = ut
@@ -84,6 +90,7 @@ type apiServer struct {
 	at    *ArtifactT
 	ack   *AckT
 	st    *StatusT
+	oa    *OpAMPT
 	ut    *UploadT
 	ft    *FileDeliveryT
 	pt    *PGPRetrieverT
