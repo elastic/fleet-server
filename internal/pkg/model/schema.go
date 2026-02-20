@@ -363,7 +363,6 @@ type ComponentsItems struct {
 	Message string       `json:"message,omitempty"`
 	Status  string       `json:"status,omitempty"`
 	Units   []UnitsItems `json:"units,omitempty"`
-	Type    string `json:"type,omitempty"`
 }
 
 // DataStream

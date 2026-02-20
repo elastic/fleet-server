@@ -326,7 +326,7 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 
 	// Extract the health status from the health message if it exists.
 	if aToS.Health != nil {
-		if aToS.Health.Healthy == false {
+		if !aToS.Health.Healthy {
 			status = "error"
 		} else if aToS.Health.Status == "StatusRecoverableError" {
 			status = "degraded"
@@ -390,7 +390,7 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 
 			obj := make(map[string]interface{})
 			if err := yaml.Unmarshal(bodyBytes, &obj); err != nil {
-				return nil, fmt.Errorf("unmarshal effective config failure: %v", err)
+				return nil, fmt.Errorf("unmarshal effective config failure: %w", err)
 			}
 			redactSensitive(obj)
 			effectiveConfigBytes, err := json.Marshal(obj)
@@ -404,11 +404,12 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 }
 
 func redactSensitive(v interface{}) {
+	const redacted = "[REDACTED]"
 	switch typed := v.(type) {
 	case map[string]interface{}:
 		for key, val := range typed {
 			if isSensitiveKey(key) {
-				typed[key] = "[REDACTED]"
+				typed[key] = redacted
 				continue
 			}
 			redactSensitive(val)
@@ -417,7 +418,7 @@ func redactSensitive(v interface{}) {
 		for rawKey, val := range typed {
 			key, ok := rawKey.(string)
 			if ok && isSensitiveKey(key) {
-				typed[rawKey] = "[REDACTED]"
+				typed[rawKey] = redacted
 				continue
 			}
 			redactSensitive(val)

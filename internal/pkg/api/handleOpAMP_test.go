@@ -224,7 +224,8 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	extraVal := extra.Elem()
 
 	capabilitiesVal := getUnexportedField(extraVal, "capabilities")
-	capabilities := capabilitiesVal.Interface().([]string)
+	capabilities, ok := capabilitiesVal.Interface().([]string)
+	require.True(t, ok)
 	require.ElementsMatch(t, []string{"ReportsHealth", "AcceptsRemoteConfig"}, capabilities)
 
 	healthBytes := getUnexportedField(extraVal, "health").Bytes()

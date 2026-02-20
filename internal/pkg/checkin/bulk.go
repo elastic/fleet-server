@@ -140,7 +140,7 @@ func WithHealth(health []byte) Option {
 	}
 }
 
-func WithCapabilities(capabilities []string) Option { 
+func WithCapabilities(capabilities []string) Option {
 	return func(pending *pendingT) {
 		if pending.extra == nil {
 			pending.extra = &extraT{}
@@ -174,8 +174,8 @@ type extraT struct {
 	components         []byte
 	deleteAudit        bool
 	availableRollbacks []byte
-	health			 []byte
-	capabilities		 []string
+	health             []byte
+	capabilities       []string
 	effectiveConfig    []byte
 }
 
@@ -190,7 +190,7 @@ type pendingT struct {
 	revisionIDX     int64
 	extra           *extraT
 	unhealthyReason *[]string
-	sequenceNum	 uint64
+	sequenceNum     uint64
 }
 
 // Bulk will batch pending checkins and update elasticsearch at a set interval.
@@ -374,7 +374,7 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 		dl.FieldLastCheckinStatus:  pending.status,  // Set the pending status
 		dl.FieldLastCheckinMessage: pending.message, // Set the status message
 		dl.FieldUnhealthyReason:    pending.unhealthyReason,
-		dl.FieldSequenceNum:      pending.sequenceNum,
+		dl.FieldSequenceNum:        pending.sequenceNum,
 	}
 	if pending.agentPolicyID != "" {
 		fields[dl.FieldAgentPolicyID] = pending.agentPolicyID
