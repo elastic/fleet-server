@@ -158,14 +158,7 @@ func addOpAMPRouteHandler(existingHandler http.Handler, oa *OpAMPT, cfg *config.
 	r.Use(Limiter(cfg).middleware)
 
 	opAMPHandler := oa.handler
-	r.HandleFunc("/v1/opamp", func(w http.ResponseWriter, r *http.Request) {
-		// Disable HTTP keep-alive for OpAMP requests. The OTel Collector polls
-		// every ~30s and the server's IdleTimeout is also 30s, creating a race
-		// where the server closes the idle connection just as the client tries
-		// to reuse it, resulting in EOF errors on the client side.
-		w.Header().Set("Connection", "close")
-		opAMPHandler(w, r)
-	})
+	r.HandleFunc("/v1/opamp", http.HandlerFunc(opAMPHandler))
 
 	// Handle existing routes
 	r.Mount("/", existingHandler)
