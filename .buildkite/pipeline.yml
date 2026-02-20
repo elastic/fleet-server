@@ -44,6 +44,7 @@ steps:
         command: ".buildkite/scripts/check_ci.sh"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
 
       - label: "Detect FIPS crypto imports"
         command: ".buildkite/scripts/check_detect_fips_crypto.sh"
@@ -57,6 +58,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_UBUNTU_X86_64}"
           machineType: "c2-standard-16"
         plugins:
@@ -73,6 +75,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_UBUNTU_X86_64}"
           machineType: "c2-standard-16"
         plugins:
@@ -124,6 +127,7 @@ steps:
           - build/next.stat
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "c2-standard-8"
 
       - label: "Run go benchmark for ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
@@ -136,6 +140,7 @@ steps:
           - build/base.stat
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "c2-standard-8"
 
       - label: "Compare results"
@@ -150,6 +155,7 @@ steps:
           - go-benchmark-base
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
 
   - group: "Run tests"
     key: "tests"
@@ -160,6 +166,7 @@ steps:
         command: ".buildkite/scripts/unit_test.sh"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
@@ -208,6 +215,7 @@ steps:
         command: ".buildkite/scripts/integration_test.sh"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_UBUNTU_X86_64}"
           machineType: "c2-standard-16"
         artifact_paths:
@@ -226,6 +234,7 @@ steps:
           TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: "true"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_UBUNTU_X86_64}"
           machineType: "c2-standard-16"
         artifact_paths:
@@ -267,6 +276,7 @@ steps:
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
         plugins:
           - *docker_elastic_login_plugin
           - elastic/vault-secrets#v0.1.0:
@@ -302,6 +312,7 @@ steps:
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
         plugins:
           - *docker_elastic_login_plugin
           - elastic/vault-secrets#v0.1.0:
