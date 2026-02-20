@@ -188,6 +188,10 @@
         "version": {
           "description": "The version of the Elastic Agent",
           "type": "string"
+        },
+        "type": {
+          "description": "The type of the Elastic Agent",
+          "type": "string"
         }
       },
       "required": ["id", "version"]
@@ -744,7 +748,34 @@
               }
             }
           }
-        }
+        },
+        "identifying_attributes": {
+          "description": "Identifying attributes of the collector",
+          "format": "raw"
+        },
+        "non_identifying_attributes": {
+          "description": "Non-identifying attributes of the collector",
+          "format": "raw"
+        },
+        "sequence_num": {
+          "description": "The sequence number of the last collector message",
+          "type": "integer"
+        },
+         "health": {
+          "description": "Health information of the collector",
+          "format": "raw"
+        },
+        "capabilities": {
+           "description": "List of capabilities of the collector",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+          "effective_config": {
+            "description": "The effective config that the collector is running",
+            "format": "raw"
+          }
       },
       "required": ["_id", "type", "active", "enrolled_at", "status"]
     },
