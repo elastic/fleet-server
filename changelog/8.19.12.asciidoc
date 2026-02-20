@@ -1,0 +1,14 @@
+// begin 8.19.12 relnotes
+
+[[release-notes-8.19.12]]
+==  8.19.12
+
+Review important information about the  8.19.12 release.
+
+[discrete]
+[[enhancements-8.19.12]]
+=== Enhancements
+
+* Update Go version to v1.25.7. https://github.com/elastic/fleet-server/pull/6322[#6322] 
+
+// end 8.19.12 relnotes
