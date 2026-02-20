@@ -7,9 +7,12 @@
 package e2e
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -578,4 +581,160 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 
 	cancel()
 	cmd.Wait()
+}
+
+// TestOpAMP ensures that the OpAMP endpoint in Fleet Server works as expected by installing
+// an OTel Collector, configuring it with the OpAMP extension, and having it connect to Fleet
+// Server using OpAMP, and verifying that Fleet Server responds to this request with an HTTP
+// 200 OK status response.
+func (suite *StandAloneSuite) TestOpAMP() {
+	// Create a config file from a template in the test temp dir
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-opamp.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]interface{}{
+		"Hosts":          suite.ESHosts,
+		"ServiceToken":   suite.ServiceToken,
+		"StaticTokenKey": "opamp-e2e-test-key",
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	err = cmd.Start()
+	suite.Require().NoError(err)
+	defer cmd.Wait()
+
+	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+
+	apiKey := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+
+	// Make sure the OpAMP endpoint works.
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:8220/v1/opamp", nil)
+	suite.Require().NoError(err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("Content-Type", "application/x-protobuf")
+
+	resp, err := suite.Client.Do(req)
+	suite.Require().NoError(err)
+	resp.Body.Close()
+	suite.Require().Equal(http.StatusOK, resp.StatusCode)
+
+	// Enroll a dummy agent to initialize the .fleet-agents index before the OTel Collector connects.
+	// Without this, findEnrolledAgent fails with index_not_found_exception when the OTel Collector
+	// sends its first AgentToServer message, because .fleet-agents doesn't exist yet in a fresh
+	// standalone fleet-server environment (unlike agent-managed fleet-server which self-enrolls).
+	tester := api_version.NewClientAPITesterCurrent(suite.Scaffold, "http://localhost:8220", apiKey)
+	tester.Enroll(ctx, apiKey)
+
+	// Download and extract OTel Collector binary artifact
+	otelURL := fmt.Sprintf(
+		"https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v%s/otelcol-contrib_%s_%s_%s.tar.gz",
+		otelColContribVersion, otelColContribVersion, runtime.GOOS, runtime.GOARCH,
+	)
+	suite.T().Logf("Downloading and extracting otelcol-contrib binary from %s to %s", otelURL, dir)
+	resp, err = http.Get(otelURL)
+	suite.Require().NoError(err)
+	suite.Require().Equal(http.StatusOK, resp.StatusCode, "failed to download otelcol-contrib")
+
+	err = extractTarGz(resp.Body, dir)
+	resp.Body.Close()
+	suite.Require().NoError(err)
+
+	// extractTarGz does not preserve file permissions, so make the binary executable.
+	err = os.Chmod(filepath.Join(dir, "otelcol-contrib"), 0755)
+	suite.Require().NoError(err)
+
+	// Configure it with the OpAMP extension
+	instanceUID := "019b8d7a-2da8-7657-b52d-492a9de33319"
+	suite.T().Logf("Configuring OTel Collector with OpAMP extension (instanceUID=%s)", instanceUID)
+	tpl, err = template.ParseFiles(filepath.Join("testdata", "otelcol-opamp.tpl"))
+	suite.Require().NoError(err)
+	f, err = os.Create(filepath.Join(dir, "otelcol.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]interface{}{
+		"OpAMP": map[string]string{
+			"InstanceUID": instanceUID,
+			"APIKey":      apiKey,
+		},
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Start OTel Collector
+	suite.T().Log("Starting OTel Collector")
+	otelCmd := exec.CommandContext(ctx, filepath.Join(dir, "otelcol-contrib"), "--config", filepath.Join(dir, "otelcol.yml"))
+	otelCmd.Cancel = func() error {
+		return otelCmd.Process.Signal(syscall.SIGTERM)
+	}
+	otelCmd.Stdout = os.Stdout
+	otelCmd.Stderr = os.Stderr
+	err = otelCmd.Start()
+	suite.Require().NoError(err)
+	defer otelCmd.Wait()
+
+	// Verify that the OTel Collector was enrolled in Fleet. OpAMP agents communicate via the
+	// OpAMP protocol rather than Fleet's normal checkin/ack protocol, so they never acknowledge
+	// the initial policy change action. Kibana therefore shows them as "updating" rather than
+	// "online".
+	suite.T().Logf("Waiting for agent %s to be enrolled in Fleet", instanceUID)
+	suite.AgentIsUpdating(ctx, instanceUID)
+}
+
+func extractTarGz(gzipStream io.Reader, targetDir string) error {
+	// 1. Initialize Gzip reader
+	uncompressedStream, err := gzip.NewReader(gzipStream)
+	if err != nil {
+		return fmt.Errorf("NewReader failed: %w", err)
+	}
+	defer uncompressedStream.Close()
+
+	// Initialize Tar reader
+	tarReader := tar.NewReader(uncompressedStream)
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break // End of archive
+		}
+		if err != nil {
+			return fmt.Errorf("Next() failed: %w", err)
+		}
+
+		// Define the destination path
+		path := filepath.Join(targetDir, header.Name)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(path, 0755); err != nil {
+				return fmt.Errorf("MkdirAll failed: %w", err)
+			}
+		case tar.TypeReg:
+			// Ensure parent directory exists
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				return fmt.Errorf("MkdirAll failed: %w", err)
+			}
+
+			outFile, err := os.Create(path)
+			if err != nil {
+				return fmt.Errorf("Create failed: %w", err)
+			}
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				outFile.Close()
+				return fmt.Errorf("Copy failed: %w", err)
+			}
+			outFile.Close()
+		}
+	}
+	return nil
 }

@@ -231,11 +231,21 @@ func (s *Scaffold) FleetServerStatusCondition(ctx context.Context, url string, c
 // AgentIsOnline will check Kibana if the agent specified by the passed id has the online status.
 // The test is marked as failed if the passed context terminates before that.
 func (s *Scaffold) AgentIsOnline(ctx context.Context, id string) {
+	s.AgentHasStatus(ctx, id, "online")
+}
+
+func (s *Scaffold) AgentIsUpdating(ctx context.Context, id string) {
+	s.AgentHasStatus(ctx, id, "updating")
+}
+
+// AgentHasStatus polls Kibana's Fleet API until the agent with the given ID has one of the
+// specified statuses.
+func (s *Scaffold) AgentHasStatus(ctx context.Context, id string, statuses ...string) {
 	timer := time.NewTimer(time.Second)
 	for {
 		select {
 		case <-ctx.Done():
-			s.Require().NoError(ctx.Err(), "context expired before agent reported online")
+			s.Require().NoError(ctx.Err(), "context expired before agent reached expected status")
 			return
 		case <-timer.C:
 			req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:5601/api/fleet/agents/"+id, nil)
@@ -263,8 +273,10 @@ func (s *Scaffold) AgentIsOnline(ctx context.Context, id string) {
 			s.T().Logf("Kibana agent response: %s", string(p))
 			err = json.Unmarshal(p, &obj)
 			s.Require().NoError(err, "unmarshal failure")
-			if obj.Item.Status == "online" {
-				return
+			for _, status := range statuses {
+				if obj.Item.Status == status {
+					return
+				}
 			}
 			timer.Reset(time.Second)
 		}
