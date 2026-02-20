@@ -98,6 +98,9 @@ type (
 		// IgnoreCheckinPolicyID when true will ignore the agent_policy_id and policy_revision_idx attributes in checkin request bodies.
 		// This setting restores previous behaviour where all POLICY_CHANGE actions need an explicit ack.
 		IgnoreCheckinPolicyID bool `config:"ignore_checkin_policy_id"`
+
+		// EnableOpAMP when true will enable the OpAMP endpoint.
+		EnableOpAMP bool `config:"enable_opamp"`
 	}
 )
 

@@ -48,6 +48,7 @@ type limiter struct {
 	enroll         *limit.Limiter
 	ack            *limit.Limiter
 	status         *limit.Limiter
+	opAMP          *limit.Limiter
 	uploadBegin    *limit.Limiter
 	uploadChunk    *limit.Limiter
 	uploadComplete *limit.Limiter
@@ -63,6 +64,7 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 		enroll:         limit.NewLimiter(&cfg.EnrollLimit),
 		ack:            limit.NewLimiter(&cfg.AckLimit),
 		status:         limit.NewLimiter(&cfg.StatusLimit),
+		opAMP:          limit.NewLimiter(&cfg.OpAMPLimit),
 		uploadBegin:    limit.NewLimiter(&cfg.UploadStartLimit),
 		uploadChunk:    limit.NewLimiter(&cfg.UploadChunkLimit),
 		uploadComplete: limit.NewLimiter(&cfg.UploadEndLimit),
@@ -88,6 +90,10 @@ func pathToOperation(path string) string {
 	}
 	if pgpReg.MatchString(path) {
 		return "getPGPKey"
+	}
+
+	if path == "/v1/opamp" {
+		return "opamp"
 	}
 
 	if strings.HasPrefix(path, "/api/fleet/") {
@@ -144,6 +150,8 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 			l.status.Wrap("status", &cntStatus, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "audit-unenroll":
 			l.auditUnenroll.Wrap("audit-unenroll", &cntAuditUnenroll, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+		case "opamp":
+			l.opAMP.Wrap("opamp", &cntOpAMP, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		default:
 			// no tracking or limits
 			next.ServeHTTP(w, r)
