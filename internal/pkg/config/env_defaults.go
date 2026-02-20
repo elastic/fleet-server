@@ -57,6 +57,11 @@ const (
 	defaultStatusMax      = 50
 	defaultStatusMaxBody  = 0
 
+	defaultOpAMPInterval = time.Millisecond
+	defaultOpAMPBurst    = 1000
+	defaultOpAMPMax      = 0
+	defaultOpAMPMaxBody  = 3 * 1024 * 1024
+
 	defaultUploadStartInterval = time.Second * 2
 	defaultUploadStartBurst    = 5
 	defaultUploadStartMax      = 10
@@ -151,6 +156,7 @@ type serverLimitDefaults struct {
 	EnrollLimit        limit `config:"enroll_limit"`
 	AckLimit           limit `config:"ack_limit"`
 	StatusLimit        limit `config:"status_limit"`
+	OpAMPLimit         limit `config:"opamp_limit"`
 	UploadStartLimit   limit `config:"upload_start_limit"`
 	UploadEndLimit     limit `config:"upload_end_limit"`
 	UploadChunkLimit   limit `config:"upload_chunk_limit"`
@@ -199,6 +205,12 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Burst:    defaultStatusBurst,
 			Max:      defaultStatusMax,
 			MaxBody:  defaultStatusMaxBody,
+		},
+		OpAMPLimit: limit{
+			Interval: defaultOpAMPInterval,
+			Burst:    defaultOpAMPBurst,
+			Max:      defaultOpAMPMax,
+			MaxBody:  defaultOpAMPMaxBody,
 		},
 		UploadStartLimit: limit{
 			Interval: defaultUploadStartInterval,
