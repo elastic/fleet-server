@@ -706,7 +706,7 @@ func (Build) Local() error {
 		outFile = filepath.Join("bin", binaryExe)
 
 	}
-	return sh.RunWithV(env, "go", "build", "-tags="+getTagsString(), "-gcflags="+getGCFlags(), "-ldflags="+getLDFlags(), "-o", outFile, ".")
+	return sh.RunWithV(env, "go", "build", "-buildvcs=false", "-tags="+getTagsString(), "-gcflags="+getGCFlags(), "-ldflags="+getLDFlags(), "-o", outFile, ".")
 }
 
 // Binary builds release binaries for the specified platforms.
@@ -753,6 +753,7 @@ func goBuild(osArg, archArg string, cover bool) error {
 
 	args := []string{
 		"build",
+		"-buildvcs=false",
 		"-tags=" + getTagsString(),
 		"-gcflags=" + getGCFlags(),
 		"-ldflags=" + getLDFlags(),
@@ -973,6 +974,8 @@ func (Docker) Release() error {
 }
 
 // dockerRun runs the target on a container produced by docker:builder.
+// When .git/objects/info/alternates exists and points to paths on the host (e.g. CI git mirrors),
+// those paths are mounted into the container at the same location so Go's VCS stamping can read them.
 func dockerRun(target string) error {
 	userInfo, err := user.Current()
 	if err != nil {
@@ -982,17 +985,56 @@ func dockerRun(target string) error {
 	if err != nil {
 		return fmt.Errorf("unable to get wd: %w", err)
 	}
-	return sh.RunV("docker", "run", "--rm",
-		"-u", userInfo.Uid+":"+userInfo.Gid,
+	args := []string{"run", "--rm",
+		"-u", userInfo.Uid + ":" + userInfo.Gid,
 		"--env=GOCACHE=/go/cache",
-		"--volume", pwd+":/fleet-server/",
-		"-e", envPlatforms+"="+strings.Join(getPlatforms(), ","),
-		"-e", envDev+"="+strconv.FormatBool(isDEV()),
-		"-e", envFIPS+"="+strconv.FormatBool(isFIPS()),
-		"-e", envSnapshot+"="+strconv.FormatBool(isSnapshot()),
-		"-e", envVersionQualifier+"="+os.Getenv(envVersionQualifier),
-		dockerBuilderName+":"+getGoVersion(), target,
-	)
+		"--volume", pwd + ":/fleet-server/",
+		"-e", envPlatforms + "=" + strings.Join(getPlatforms(), ","),
+		"-e", envDev + "=" + strconv.FormatBool(isDEV()),
+		"-e", envFIPS + "=" + strconv.FormatBool(isFIPS()),
+		"-e", envSnapshot + "=" + strconv.FormatBool(isSnapshot()),
+		"-e", envVersionQualifier + "=" + os.Getenv(envVersionQualifier),
+	}
+	for _, vol := range gitAlternatesVolumeMounts() {
+		args = append(args, "--volume", vol)
+	}
+	args = append(args, dockerBuilderName+":"+getGoVersion(), target)
+	return sh.RunV("docker", args...)
+}
+
+// gitAlternatesVolumeMounts returns docker --volume args for paths listed in
+// .git/objects/info/alternates that exist on the host, so the container can
+// access them at the same path (required for Go VCS stamping when using git alternates).
+func gitAlternatesVolumeMounts() []string {
+	alternatesPath := filepath.Join(".git", "objects", "info", "alternates")
+	data, err := os.ReadFile(alternatesPath)
+	if err != nil {
+		return nil
+	}
+	infoDir := filepath.Dir(alternatesPath)
+	var mounts []string
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		path := strings.TrimSpace(scanner.Text())
+		if path == "" || strings.HasPrefix(path, "#") {
+			continue
+		}
+		// Path in alternates is relative to .git/objects/info or absolute.
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(infoDir, path)
+		}
+		path, err = filepath.Abs(path)
+		if err != nil {
+			continue
+		}
+		info, err := os.Stat(path)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		// Mount host path to same path in container so Go's VCS resolution works.
+		mounts = append(mounts, path+":"+path)
+	}
+	return mounts
 }
 
 // Binary builds binaries within a docker image produced by docker:builder.
