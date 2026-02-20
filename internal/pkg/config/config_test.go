@@ -117,7 +117,7 @@ func TestConfig(t *testing.T) {
 							Timeouts: ServerTimeouts{
 								Read:             20 * time.Second,
 								ReadHeader:       5 * time.Second,
-								Idle:             30 * time.Second,
+								Idle:             35 * time.Second,
 								Write:            5 * time.Second,
 								CheckinTimestamp: 30 * time.Second,
 								CheckinLongPoll:  5 * time.Minute,
