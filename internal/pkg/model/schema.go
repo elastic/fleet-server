@@ -141,6 +141,9 @@ type Agent struct {
 	// Agent timestamp for audit unenroll/uninstall action
 	AuditUnenrolledTime string `json:"audit_unenrolled_time,omitempty"`
 
+	// List of capabilities of the collector
+	Capabilities []string `json:"capabilities,omitempty"`
+
 	// Elastic Agent components detailed status information
 	Components json.RawMessage `json:"components,omitempty"`
 
@@ -153,11 +156,20 @@ type Agent struct {
 	// Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch
 	DefaultAPIKeyID string `json:"default_api_key_id,omitempty"`
 
+	// The effective config that the collector is running
+	EffectiveConfig json.RawMessage `json:"effective_config,omitempty"`
+
 	// Date/time the Elastic Agent enrolled
 	EnrolledAt string `json:"enrolled_at"`
 
 	// Enrollment ID
 	EnrollmentID string `json:"enrollment_id,omitempty"`
+
+	// Health information of the collector
+	Health json.RawMessage `json:"health,omitempty"`
+
+	// Identifying attributes of the collector
+	IdentifyingAttributes json.RawMessage `json:"identifying_attributes,omitempty"`
 
 	// Date/time the Elastic Agent checked in last time
 	LastCheckin string `json:"last_checkin,omitempty"`
@@ -176,6 +188,9 @@ type Agent struct {
 
 	// Namespaces
 	Namespaces []string `json:"namespaces,omitempty"`
+
+	// Non-identifying attributes of the collector
+	NonIdentifyingAttributes json.RawMessage `json:"non_identifying_attributes,omitempty"`
 
 	// Outputs is the policy output data, mapping the output name to its data
 	Outputs map[string]*PolicyOutput `json:"outputs,omitempty"`
@@ -197,6 +212,9 @@ type Agent struct {
 
 	// hash of token provided during enrollment that allows replacement by another enrollment with same ID
 	ReplaceToken string `json:"replace_token,omitempty"`
+
+	// The sequence number of the last collector message
+	SequenceNum int64 `json:"sequence_num,omitempty"`
 
 	// Shared ID
 	SharedID string `json:"shared_id,omitempty"`
@@ -242,16 +260,6 @@ type Agent struct {
 
 	// User provided metadata information for the Elastic Agent
 	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata,omitempty"`
-
-	IdentifyingAttributes json.RawMessage `json:"identifying_attributes,omitempty"`
-
-	NonIdentifyingAttributes json.RawMessage `json:"non_identifying_attributes,omitempty"`
-
-	SequenceNum uint64 `json:"sequence_num,omitempty"`
-
-	Health json.RawMessage `json:"health,omitempty"`
-	Capabilities []string `json:"capabilities,omitempty"`
-	EffectiveConfig json.RawMessage `json:"effective_config,omitempty"`
 }
 
 // AgentMetadata An Elastic Agent metadata
@@ -260,10 +268,11 @@ type AgentMetadata struct {
 	// The unique identifier for the Elastic Agent
 	ID string `json:"id"`
 
+	// The type of the Elastic Agent
+	Type string `json:"type,omitempty"`
+
 	// The version of the Elastic Agent
 	Version string `json:"version"`
-
-	Type string `json:"type,omitempty"`
 }
 
 // Artifact An artifact served by Fleet
