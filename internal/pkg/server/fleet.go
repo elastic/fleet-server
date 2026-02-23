@@ -536,10 +536,15 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
 	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache, api.WithSelfMonitor(sm), api.WithBuildInfo(f.bi))
+	oa := api.NewOpAMPT(ctx, &cfg.Inputs[0].Server, bulker, f.cache, bc)
 	ut := api.NewUploadT(&cfg.Inputs[0].Server, bulker, monCli, f.cache) // uses no-retry client for bufferless chunk upload
 	ft := api.NewFileDeliveryT(&cfg.Inputs[0].Server, bulker, monCli, f.cache)
 	pt := api.NewPGPRetrieverT(&cfg.Inputs[0].Server, bulker, f.cache)
 	auditT := api.NewAuditT(&cfg.Inputs[0].Server, bulker, f.cache)
+
+	if err := oa.Init(); err != nil {
+		return fmt.Errorf("failed to initialize opamp: %w", err)
+	}
 
 	for _, endpoint := range (&cfg.Inputs[0].Server).BindEndpoints() {
 		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server,
@@ -548,6 +553,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 			api.WithArtifact(at),
 			api.WithAck(ack),
 			api.WithStatus(st),
+			api.WithOpAMP(oa),
 			api.WithUpload(ut),
 			api.WithFileDelivery(ft),
 			api.WithPGP(pt),
