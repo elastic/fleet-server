@@ -44,7 +44,9 @@ func (c *ServerTimeouts) InitDefaults() {
 	// IdleTimeout is the maximum amount of time to wait for the
 	// next request when keep-alives are enabled.   Because TLS handshakes are expensive
 	// for the server, avoid aggressive connection close with generous idle timeout.
-	c.Idle = 30 * time.Second
+	// Set to 35s (slightly above the OTel Collector's default ~30s OpAMP polling interval)
+	// to ensure idle connections are not closed just as a new OpAMP request comes in.
+	c.Idle = 35 * time.Second
 
 	// The write timeout for HTTPS covers the time from ACCEPT to the end of the response write;
 	// so in that case it covers the TLS handshake.  If the connection is reused, the write timeout

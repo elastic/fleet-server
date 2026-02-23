@@ -277,6 +277,9 @@ fleet:
 #        // POLICY_CHANGE actions need an explicit ack if this is set.
 #        ignore_checkin_policy_id: false
 #
+#        // enable OpAMP endpoint
+#        enable_opamp: false
+#
 #    # monitor options are advanced configuration and should not be adjusted is most cases
 #    monitor:
 #      fetch_size: 1000 # The number of documents that each monitor may fetch at once
