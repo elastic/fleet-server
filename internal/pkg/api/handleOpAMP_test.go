@@ -87,8 +87,8 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 			},
 		},
 	}
-
-	raw, err := ProtobufKVToRawMessage(input)
+	zlog := zerolog.New(io.Discard)
+	raw, err := ProtobufKVToRawMessage(zlog, input)
 	require.NoError(t, err)
 
 	var got map[string]interface{}

@@ -207,13 +207,20 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 	}
 }
 
-func (oa *OpAMPT) findEnrolledAgent(ctx context.Context, _ zerolog.Logger, agentID string) (*model.Agent, error) {
+func (oa *OpAMPT) findEnrolledAgent(ctx context.Context, zlog zerolog.Logger, agentID string) (*model.Agent, error) {
 	agent, err := dl.FindAgent(ctx, oa.bulk, dl.QueryAgentByID, dl.FieldID, agentID)
 	if errors.Is(err, dl.ErrNotFound) {
 		return nil, nil
 	}
 
+	// if agents index doesn't exist yet, it will be created when the first agent document is indexed
+	if err != nil && strings.Contains(err.Error(), "index_not_found_exception") {
+		zlog.Info().Msg("index not found when searching for enrolled agent")
+		return nil, nil
+	}
+
 	if err != nil {
+		zlog.Error().Err(err).Msg("failed to find agent by ID")
 		return nil, fmt.Errorf("failed to find agent: %w", err)
 	}
 
@@ -241,6 +248,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 	meta := localMetadata{}
 	meta.Elastic.Agent.ID = agentID
 	agentType := ""
+	var identifyingAttributes, nonIdentifyingAttributes json.RawMessage
 	if aToS.AgentDescription != nil {
 		// Extract agent version
 		for _, ia := range aToS.AgentDescription.IdentifyingAttributes {
@@ -267,22 +275,22 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 			}
 		}
 		zlog.Debug().Str("hostname", meta.Host.Hostname).Msg("extracted hostname")
+
+		identifyingAttributes, err = ProtobufKVToRawMessage(zlog, aToS.AgentDescription.IdentifyingAttributes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal identifying attributes: %w", err)
+		}
+
+		nonIdentifyingAttributes, err = ProtobufKVToRawMessage(zlog, aToS.AgentDescription.NonIdentifyingAttributes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal non-identifying attributes: %w", err)
+		}
 	}
 
 	// Update local metadata if something has changed
 	data, err := json.Marshal(meta)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal local metadata: %w", err)
-	}
-
-	identifyingAttributes, err := ProtobufKVToRawMessage(aToS.AgentDescription.IdentifyingAttributes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal identifying attributes: %w", err)
-	}
-
-	nonIdentifyingAttributes, err := ProtobufKVToRawMessage(aToS.AgentDescription.NonIdentifyingAttributes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal non-identifying attributes: %w", err)
 	}
 
 	agent := model.Agent{
@@ -295,7 +303,8 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 			Version: meta.Elastic.Agent.Version,
 			Type:    agentType,
 		},
-		LocalMetadata:            data,
+		LocalMetadata: data,
+		// Setting revision to 1, the collector won't receive policy changes and 0 would keep the collector in updating state
 		PolicyRevisionIdx:        1,
 		IdentifyingAttributes:    identifyingAttributes,
 		NonIdentifyingAttributes: nonIdentifyingAttributes,
@@ -448,14 +457,14 @@ func isSensitiveKey(key string) bool {
 		"credential",
 		"credentials",
 	} {
-		if key == token || strings.Contains(key, token) {
+		if key == token {
 			return true
 		}
 	}
 	return false
 }
 
-func ProtobufKVToRawMessage(kv []*protobufs.KeyValue) (json.RawMessage, error) {
+func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json.RawMessage, error) {
 	// 1. Build an intermediate map to represent the JSON object
 	data := make(map[string]interface{}, len(kv))
 	for _, item := range kv {
@@ -477,12 +486,16 @@ func ProtobufKVToRawMessage(kv []*protobufs.KeyValue) (json.RawMessage, error) {
 			if len(v.BytesValue) > 0 {
 				data[item.Key] = v.BytesValue
 			}
+			continue
+		default:
+			return nil, fmt.Errorf("unsupported attribute value type for key %s", item.Key)
 		}
 	}
 
 	// 2. Marshal the map into bytes
 	b, err := json.Marshal(data)
 	if err != nil {
+		zlog.Error().Err(err).Msg("failed to marshal key-value pairs")
 		return nil, err
 	}
 

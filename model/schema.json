@@ -766,16 +766,16 @@
           "format": "raw"
         },
         "capabilities": {
-           "description": "List of capabilities of the collector",
+          "description": "List of capabilities of the collector",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
-          "effective_config": {
-            "description": "The effective config that the collector is running",
-            "format": "raw"
-          }
+        "effective_config": {
+          "description": "The effective config that the collector is running",
+          "format": "raw"
+        }
       },
       "required": ["_id", "type", "active", "enrolled_at", "status"]
     },
