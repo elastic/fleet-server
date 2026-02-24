@@ -417,7 +417,7 @@ func redactSensitive(v interface{}) {
 	switch typed := v.(type) {
 	case map[string]interface{}:
 		for key, val := range typed {
-			if isSensitiveKey(key) {
+			if redactKey(key) {
 				typed[key] = redacted
 				continue
 			}
@@ -426,7 +426,7 @@ func redactSensitive(v interface{}) {
 	case map[interface{}]interface{}:
 		for rawKey, val := range typed {
 			key, ok := rawKey.(string)
-			if ok && isSensitiveKey(key) {
+			if ok && redactKey(key) {
 				typed[rawKey] = redacted
 				continue
 			}
@@ -439,29 +439,22 @@ func redactSensitive(v interface{}) {
 	}
 }
 
-func isSensitiveKey(key string) bool {
-	key = strings.ToLower(strings.TrimSpace(key))
-	if key == "" {
+// TODO move to a common place, same as https://github.com/elastic/elastic-agent/blob/1c3fb4b4c8989cd2cfb692780debd7619820ae72/internal/pkg/diagnostics/diagnostics.go#L454-L468
+func redactKey(k string) bool {
+	// "routekey" shouldn't be redacted.
+	// Add any other exceptions here.
+	if k == "routekey" {
 		return false
 	}
-	for _, token := range []string{
-		"password",
-		"passwd",
-		"pass",
-		"secret",
-		"token",
-		"apikey",
-		"api_key",
-		"access_key",
-		"private_key",
-		"credential",
-		"credentials",
-	} {
-		if key == token {
-			return true
-		}
-	}
-	return false
+
+	k = strings.ToLower(k)
+	return strings.Contains(k, "auth") ||
+		strings.Contains(k, "certificate") ||
+		strings.Contains(k, "passphrase") ||
+		strings.Contains(k, "password") ||
+		strings.Contains(k, "token") ||
+		strings.Contains(k, "key") ||
+		strings.Contains(k, "secret")
 }
 
 func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json.RawMessage, error) {
