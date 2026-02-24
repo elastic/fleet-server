@@ -457,6 +457,39 @@ func redactKey(k string) bool {
 		strings.Contains(k, "secret")
 }
 
+// anyValueToInterface recursively converts protobufs.AnyValue to Go interface{} for JSON marshalling
+func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) interface{} {
+	switch v := av.GetValue().(type) {
+	case *protobufs.AnyValue_StringValue:
+		return v.StringValue
+	case *protobufs.AnyValue_IntValue:
+		return v.IntValue
+	case *protobufs.AnyValue_DoubleValue:
+		return v.DoubleValue
+	case *protobufs.AnyValue_BoolValue:
+		return v.BoolValue
+	case *protobufs.AnyValue_BytesValue:
+		return v.BytesValue
+	case *protobufs.AnyValue_ArrayValue:
+		arr := make([]interface{}, 0, len(v.ArrayValue.Values))
+		for _, av2 := range v.ArrayValue.Values {
+			arr = append(arr, anyValueToInterface(zlog, av2))
+		}
+		return arr
+	case *protobufs.AnyValue_KvlistValue:
+		m := make(map[string]interface{}, len(v.KvlistValue.Values))
+		for _, kv := range v.KvlistValue.Values {
+			if kv.Value != nil {
+				m[kv.Key] = anyValueToInterface(zlog, kv.Value)
+			}
+		}
+		return m
+	default:
+		zlog.Warn().Msg("unknown AnyValue type encountered in anyValueToInterface")
+		return nil
+	}
+}
+
 func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json.RawMessage, error) {
 	// 1. Build an intermediate map to represent the JSON object
 	data := make(map[string]interface{}, len(kv))
@@ -464,25 +497,7 @@ func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json
 		if item.Value == nil {
 			continue
 		}
-		switch v := item.Value.GetValue().(type) {
-		case *protobufs.AnyValue_StringValue:
-			if v.StringValue != "" {
-				data[item.Key] = v.StringValue
-			}
-		case *protobufs.AnyValue_IntValue:
-			data[item.Key] = v.IntValue
-		case *protobufs.AnyValue_DoubleValue:
-			data[item.Key] = v.DoubleValue
-		case *protobufs.AnyValue_BoolValue:
-			data[item.Key] = v.BoolValue
-		case *protobufs.AnyValue_BytesValue:
-			if len(v.BytesValue) > 0 {
-				data[item.Key] = v.BytesValue
-			}
-			continue
-		default:
-			return nil, fmt.Errorf("unsupported attribute value type for key %s", item.Key)
-		}
+		data[item.Key] = anyValueToInterface(zlog, item.Value)
 	}
 
 	// 2. Marshal the map into bytes

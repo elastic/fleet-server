@@ -86,6 +86,38 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 				Value: &protobufs.AnyValue_BytesValue{BytesValue: []byte("bin")},
 			},
 		},
+		{
+			Key: "array_key",
+			Value: &protobufs.AnyValue{
+				Value: &protobufs.AnyValue_ArrayValue{ArrayValue: &protobufs.ArrayValue{
+					Values: []*protobufs.AnyValue{
+						{Value: &protobufs.AnyValue_StringValue{StringValue: "elem1"}},
+						{Value: &protobufs.AnyValue_IntValue{IntValue: 2}},
+					},
+				}},
+			},
+		},
+		{
+			Key: "kvlist_key",
+			Value: &protobufs.AnyValue{
+				Value: &protobufs.AnyValue_KvlistValue{KvlistValue: &protobufs.KeyValueList{
+					Values: []*protobufs.KeyValue{
+						{
+							Key: "nested_string_key",
+							Value: &protobufs.AnyValue{
+								Value: &protobufs.AnyValue_StringValue{StringValue: "nested"},
+							},
+						},
+						{
+							Key: "nested_int_key",
+							Value: &protobufs.AnyValue{
+								Value: &protobufs.AnyValue_IntValue{IntValue: 99},
+							},
+						},
+					},
+				}},
+			},
+		},
 	}
 	zlog := zerolog.New(io.Discard)
 	raw, err := ProtobufKVToRawMessage(zlog, input)
@@ -99,6 +131,8 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 	require.Equal(t, 3.14, got["double_key"])
 	require.Equal(t, true, got["bool_key"])
 	require.Equal(t, base64.StdEncoding.EncodeToString([]byte("bin")), got["bytes_key"])
+	require.Equal(t, []interface{}{"elem1", float64(2)}, got["array_key"])
+	require.Equal(t, map[string]interface{}{"nested_string_key": "nested", "nested_int_key": float64(99)}, got["kvlist_key"])
 }
 
 func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
