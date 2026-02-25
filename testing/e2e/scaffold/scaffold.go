@@ -228,19 +228,9 @@ func (s *Scaffold) FleetServerStatusCondition(ctx context.Context, url string, c
 	}
 }
 
-// AgentIsOnline will check Kibana if the agent specified by the passed id has the online status.
+// AgentIsOnline polls Kibana's Fleet API until the agent with the given ID has the online status.
 // The test is marked as failed if the passed context terminates before that.
 func (s *Scaffold) AgentIsOnline(ctx context.Context, id string) {
-	s.AgentHasStatus(ctx, id, "online")
-}
-
-func (s *Scaffold) AgentIsUpdating(ctx context.Context, id string) {
-	s.AgentHasStatus(ctx, id, "updating")
-}
-
-// AgentHasStatus polls Kibana's Fleet API until the agent with the given ID has one of the
-// specified statuses.
-func (s *Scaffold) AgentHasStatus(ctx context.Context, id string, statuses ...string) {
 	timer := time.NewTimer(time.Second)
 	for {
 		select {
@@ -273,10 +263,8 @@ func (s *Scaffold) AgentHasStatus(ctx context.Context, id string, statuses ...st
 			s.T().Logf("Kibana agent response: %s", string(p))
 			err = json.Unmarshal(p, &obj)
 			s.Require().NoError(err, "unmarshal failure")
-			for _, status := range statuses {
-				if obj.Item.Status == status {
-					return
-				}
+			if obj.Item.Status == "online" {
+				return
 			}
 			timer.Reset(time.Second)
 		}
@@ -324,6 +312,7 @@ type ESAgentDoc struct {
 	PolicyID      string   `json:"policy_id"`
 	AgentPolicyID string   `json:"agent_policy_id"`
 	Type          string   `json:"type"`
+	Status        string   `json:"status"`
 	Tags          []string `json:"tags"`
 	Agent         struct {
 		ID      string `json:"id"`

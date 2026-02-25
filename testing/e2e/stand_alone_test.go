@@ -706,4 +706,5 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	// suite.Equal(otelVersion, agentDoc.Agent.Version, "expected agent.version to match otelcol-contrib binary version")
 	// suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
 	// suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
+	// suite.Equal("online", agentDoc.Status, "expected status to be online")
 }
