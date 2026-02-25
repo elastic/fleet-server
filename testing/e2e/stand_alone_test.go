@@ -7,12 +7,9 @@
 package e2e
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"html/template"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -637,22 +634,32 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	tester := api_version.NewClientAPITesterCurrent(suite.Scaffold, "http://localhost:8220", apiKey)
 	tester.Enroll(ctx, apiKey)
 
-	// Download and extract OTel Collector binary artifact
-	otelURL := fmt.Sprintf(
-		"https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v%s/otelcol-contrib_%s_%s_%s.tar.gz",
-		otelColContribVersion, otelColContribVersion, runtime.GOOS, runtime.GOARCH,
+	// Clone OTel Collector contrib repository (shallow clone of main branch)
+	cloneDir := filepath.Join(dir, "opentelemetry-collector-contrib")
+	suite.T().Logf("Cloning opentelemetry-collector-contrib (main) to %s", cloneDir)
+	cloneCmd := exec.CommandContext(ctx,
+		"git", "clone",
+		"--depth", "1",
+		"https://github.com/open-telemetry/opentelemetry-collector-contrib",
+		cloneDir,
 	)
-	suite.T().Logf("Downloading and extracting otelcol-contrib binary from %s to %s", otelURL, dir)
-	resp, err = http.Get(otelURL)
-	suite.Require().NoError(err)
-	suite.Require().Equal(http.StatusOK, resp.StatusCode, "failed to download otelcol-contrib")
-
-	err = extractTarGz(resp.Body, dir)
-	resp.Body.Close()
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+	err = cloneCmd.Run()
 	suite.Require().NoError(err)
 
-	// extractTarGz does not preserve file permissions, so make the binary executable.
-	err = os.Chmod(filepath.Join(dir, "otelcol-contrib"), 0755)
+	// Build the OTel Collector binary
+	suite.T().Log("Building otelcol-contrib binary via make otelcontribcol")
+	makeCmd := exec.CommandContext(ctx, "make", "otelcontribcol")
+	makeCmd.Dir = cloneDir
+	makeCmd.Stdout = os.Stdout
+	makeCmd.Stderr = os.Stderr
+	err = makeCmd.Run()
+	suite.Require().NoError(err)
+
+	// The make target places the binary under bin/; move it to the expected path.
+	builtBinary := filepath.Join(cloneDir, "bin", fmt.Sprintf("otelcontribcol_%s_%s", runtime.GOOS, runtime.GOARCH))
+	err = os.Rename(builtBinary, filepath.Join(dir, "otelcol-contrib"))
 	suite.Require().NoError(err)
 
 	// Configure it with the OpAMP extension
@@ -691,50 +698,3 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.AgentIsUpdating(ctx, instanceUID)
 }
 
-func extractTarGz(gzipStream io.Reader, targetDir string) error {
-	// 1. Initialize Gzip reader
-	uncompressedStream, err := gzip.NewReader(gzipStream)
-	if err != nil {
-		return fmt.Errorf("NewReader failed: %w", err)
-	}
-	defer uncompressedStream.Close()
-
-	// Initialize Tar reader
-	tarReader := tar.NewReader(uncompressedStream)
-
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break // End of archive
-		}
-		if err != nil {
-			return fmt.Errorf("Next() failed: %w", err)
-		}
-
-		// Define the destination path
-		path := filepath.Join(targetDir, header.Name)
-
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(path, 0755); err != nil {
-				return fmt.Errorf("MkdirAll failed: %w", err)
-			}
-		case tar.TypeReg:
-			// Ensure parent directory exists
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-				return fmt.Errorf("MkdirAll failed: %w", err)
-			}
-
-			outFile, err := os.Create(path)
-			if err != nil {
-				return fmt.Errorf("Create failed: %w", err)
-			}
-			if _, err := io.Copy(outFile, tarReader); err != nil {
-				outFile.Close()
-				return fmt.Errorf("Copy failed: %w", err)
-			}
-			outFile.Close()
-		}
-	}
-	return nil
-}
