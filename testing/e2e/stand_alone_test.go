@@ -697,4 +697,3 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.T().Logf("Waiting for agent %s to be enrolled in Fleet", instanceUID)
 	suite.AgentIsUpdating(ctx, instanceUID)
 }
-
