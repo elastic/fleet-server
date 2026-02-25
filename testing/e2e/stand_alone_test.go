@@ -659,7 +659,8 @@ func (suite *StandAloneSuite) TestOpAMP() {
 
 	// The make target places the binary under bin/; move it to the expected path.
 	builtBinary := filepath.Join(cloneDir, "bin", fmt.Sprintf("otelcontribcol_%s_%s", runtime.GOOS, runtime.GOARCH))
-	err = os.Rename(builtBinary, filepath.Join(dir, "otelcol-contrib"))
+	otelBinaryPath := filepath.Join(dir, "otelcol-contrib")
+	err = os.Rename(builtBinary, otelBinaryPath)
 	suite.Require().NoError(err)
 
 	// Configure it with the OpAMP extension
@@ -680,7 +681,7 @@ func (suite *StandAloneSuite) TestOpAMP() {
 
 	// Start OTel Collector
 	suite.T().Log("Starting OTel Collector")
-	otelCmd := exec.CommandContext(ctx, filepath.Join(dir, "otelcol-contrib"), "--config", filepath.Join(dir, "otelcol.yml"))
+	otelCmd := exec.CommandContext(ctx, otelBinaryPath, "--config", filepath.Join(dir, "otelcol.yml"))
 	otelCmd.Cancel = func() error {
 		return otelCmd.Process.Signal(syscall.SIGTERM)
 	}
@@ -690,10 +691,19 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.Require().NoError(err)
 	defer otelCmd.Wait()
 
-	// Verify that the OTel Collector was enrolled in Fleet. OpAMP agents communicate via the
-	// OpAMP protocol rather than Fleet's normal checkin/ack protocol, so they never acknowledge
-	// the initial policy change action. Kibana therefore shows them as "updating" rather than
-	// "online".
-	suite.T().Logf("Waiting for agent %s to be enrolled in Fleet", instanceUID)
-	suite.AgentIsUpdating(ctx, instanceUID)
+	// Verify that the OTel Collector was enrolled in Fleet by fetching its document from
+	// .fleet-agents and asserting on its contents.
+	suite.T().Logf("Waiting for agent %s to appear in .fleet-agents", instanceUID)
+	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
+
+	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
+	// TODO: uncomment once https://github.com/elastic/fleet-server/pull/6400 is merged
+	// versionOut, err := exec.Command(otelBinaryPath, "--version").Output()
+	// suite.Require().NoError(err)
+	// otelVersion := strings.TrimPrefix(strings.TrimSpace(string(versionOut)), "otelcontribcol version ")
+	// suite.Equal("OPAMP", agentDoc.Type, "expected type to be OPAMP")
+	// suite.Equal("otelcontribcol", agentDoc.Agent.Type, "expected agent.type to be otelcontribcol")
+	// suite.Equal(otelVersion, agentDoc.Agent.Version, "expected agent.version to match otelcol-contrib binary version")
+	// suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
+	// suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
 }
