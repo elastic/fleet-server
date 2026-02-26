@@ -228,14 +228,14 @@ func (s *Scaffold) FleetServerStatusCondition(ctx context.Context, url string, c
 	}
 }
 
-// AgentIsOnline will check Kibana if the agent specified by the passed id has the online status.
+// AgentIsOnline polls Kibana's Fleet API until the agent with the given ID has the online status.
 // The test is marked as failed if the passed context terminates before that.
 func (s *Scaffold) AgentIsOnline(ctx context.Context, id string) {
 	timer := time.NewTimer(time.Second)
 	for {
 		select {
 		case <-ctx.Done():
-			s.Require().NoError(ctx.Err(), "context expired before agent reported online")
+			s.Require().NoError(ctx.Err(), "context expired before agent reached expected status")
 			return
 		case <-timer.C:
 			req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:5601/api/fleet/agents/"+id, nil)
@@ -308,9 +308,49 @@ type KibanaAgent struct {
 }
 
 type ESAgentDoc struct {
-	Revision      int    `json:"policy_revision_idx"`
-	PolicyID      string `json:"policy_id"`
-	AgentPolicyID string `json:"agent_policy_id"`
+	Revision      int      `json:"policy_revision_idx"`
+	PolicyID      string   `json:"policy_id"`
+	AgentPolicyID string   `json:"agent_policy_id"`
+	Type          string   `json:"type"`
+	Status        string   `json:"status"`
+	Tags          []string `json:"tags"`
+	Agent         struct {
+		ID      string `json:"id"`
+		Version string `json:"version"`
+		Type    string `json:"type"`
+	} `json:"agent"`
+}
+
+func (s *Scaffold) WaitForAgentDoc(ctx context.Context, id string) ESAgentDoc {
+	timer := time.NewTimer(time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			s.Require().NoError(ctx.Err(), "context expired before agent document appeared in .fleet-agents")
+			return ESAgentDoc{}
+		case <-timer.C:
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:9200/.fleet-agents/_doc/"+id, nil)
+			s.Require().NoError(err)
+			req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+			resp, err := s.Client.Do(req)
+			if err != nil {
+				timer.Reset(time.Second)
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				timer.Reset(time.Second)
+				continue
+			}
+			var obj struct {
+				Source ESAgentDoc `json:"_source"`
+			}
+			err = json.NewDecoder(resp.Body).Decode(&obj)
+			resp.Body.Close()
+			s.Require().NoError(err)
+			return obj.Source
+		}
+	}
 }
 
 func (s *Scaffold) GetAgent(ctx context.Context, id string) ESAgentDoc {
