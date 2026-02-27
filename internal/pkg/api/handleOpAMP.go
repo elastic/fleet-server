@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
@@ -214,7 +215,7 @@ func (oa *OpAMPT) findEnrolledAgent(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	// if agents index doesn't exist yet, it will be created when the first agent document is indexed
-	if err != nil && strings.Contains(err.Error(), "index_not_found_exception") {
+	if errors.Is(err, es.ErrIndexNotFound) {
 		zlog.Info().Msg("index not found when searching for enrolled agent")
 		return nil, nil
 	}
