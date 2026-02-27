@@ -61,7 +61,11 @@ require (
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
+<<<<<<< HEAD
 	github.com/oapi-codegen/runtime v1.1.1 // indirect
+=======
+	github.com/oapi-codegen/runtime v1.2.0 // indirect
+>>>>>>> d914c38 (build(deps): bump github.com/oapi-codegen/runtime from 1.1.2 to 1.2.0 in /pkg/api (#6443))
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
