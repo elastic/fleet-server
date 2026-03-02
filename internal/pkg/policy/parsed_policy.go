@@ -89,8 +89,10 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	if err != nil {
 		return nil, err
 	}
-	policyInputs, keys := secret.ProcessInputsSecrets(p.Data, secretValues)
-	secretKeys = append(secretKeys, keys...)
+	policyInputs, keys, err := secret.GetPolicyInputsWithSecrets(ctx, p.Data, bulker)
+	if err != nil {
+		return nil, err
+	}
 
 	// Replace secrets in 'agent.download' section of policy
 	if agentDownload, exists := p.Data.Agent["download"]; exists {
@@ -113,6 +115,32 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	}
 	for _, key := range fleetSecretKeys {
 		secretKeys = append(secretKeys, "fleet."+key)
+	}
+
+	// Replace secrets in OTEL sections of policy
+	otelSections := []struct {
+		name string
+		data map[string]any
+	}{
+		{"receivers", p.Data.Receivers},
+		{"exporters", p.Data.Exporters},
+		{"processors", p.Data.Processors},
+		{"extensions", p.Data.Extensions},
+		{"connectors", p.Data.Connectors},
+	}
+	for _, section := range otelSections {
+		for componentName, component := range section.data {
+			if componentMap, ok := component.(map[string]any); ok {
+				ks, err := secret.ProcessMapSecrets(componentMap, secretValues)
+				if err != nil {
+					return nil, fmt.Errorf("failed to replace secrets in %s.%s section of policy: %w", section.name, componentName, err)
+				}
+				for _, key := range ks {
+					secretKeys = append(secretKeys, section.name+"."+componentName+"."+key)
+				}
+				section.data[componentName] = componentMap
+			}
+		}
 	}
 
 	// Done replacing secrets.
