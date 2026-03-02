@@ -842,19 +842,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-l
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-system-metrics
-<<<<<<< HEAD
-Version: v0.14.0
-Licence type (autodetected): Apache-2.0
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.14.0/LICENSE.txt:
-=======
 Version: v0.14.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.14.2/LICENSE.txt:
->>>>>>> 0f4d516 (build(deps): bump github.com/elastic/elastic-agent-system-metrics from 0.14.1 to 0.14.2 (#6440))
 
                                  Apache License
                            Version 2.0, January 2004
