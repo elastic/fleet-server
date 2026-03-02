@@ -34,6 +34,9 @@ var testPolicyRemoteES string
 //go:embed testdata/policy_with_secrets_mixed.json
 var policyWithSecretsMixed string
 
+//go:embed testdata/policy_with_otel_secrets.json
+var policyWithOtelSecrets []byte
+
 func TestNewParsedPolicy(t *testing.T) {
 	// Run two formatting of the same payload to validate that the sha2 remains the same
 	testcases := []struct {
@@ -147,4 +150,46 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	require.Equal(t, "rwXzUJoBxE9I-QCxFt9m_value", pp.Policy.Data.Agent["download"].(map[string]interface{})["ssl"].(map[string]interface{})["key"])
 	require.Equal(t, "abcdef123_value", pp.Policy.Data.Fleet["hosts"].([]interface{})[0])
 	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Fleet["ssl"].(map[string]interface{})["key"])
+}
+
+// TestParsedPolicyOTELSecretsReplacement tests that secrets in OTEL sections of a policy
+// (receivers, exporters, processors, extensions, connectors) are replaced correctly.
+func TestParsedPolicyOTELSecretsReplacement(t *testing.T) {
+	var m model.Policy
+	var d model.PolicyData
+	err := json.Unmarshal(policyWithOtelSecrets, &d)
+	require.NoError(t, err)
+
+	m.Data = &d
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := NewParsedPolicy(t.Context(), bulker, m)
+	require.NoError(t, err)
+
+	// Validate that OTEL secret keys were identified
+	require.Contains(t, pp.SecretKeys, "receivers.otlp.auth")
+	require.Contains(t, pp.SecretKeys, "exporters.otlphttp/default.headers.authorization")
+	require.Contains(t, pp.SecretKeys, "processors.batch.api_key")
+	require.Contains(t, pp.SecretKeys, "extensions.basicauth.password")
+	require.Contains(t, pp.SecretKeys, "connectors.spanmetrics.token")
+
+	// Validate that inline secret references were replaced in receivers
+	otlpMap := pp.Policy.Data.Receivers["otlp"].(map[string]any)
+	require.Equal(t, "receiver-auth-id_value", otlpMap["auth"])
+
+	// Validate that path-based secret references were replaced in exporters
+	otlphttpMap := pp.Policy.Data.Exporters["otlphttp/default"].(map[string]any)
+	require.Equal(t, "exporter-auth-id_value", otlphttpMap["headers"].(map[string]any)["authorization"])
+
+	// Validate that inline secret references were replaced in processors
+	batchMap := pp.Policy.Data.Processors["batch"].(map[string]any)
+	require.Equal(t, "processor-key-id_value", batchMap["api_key"])
+
+	// Validate that path-based secret references were replaced in extensions
+	basicauthMap := pp.Policy.Data.Extensions["basicauth"].(map[string]any)
+	require.Equal(t, "extension-password-id_value", basicauthMap["password"])
+
+	// Validate that inline secret references were replaced in connectors
+	spanmetricsMap := pp.Policy.Data.Connectors["spanmetrics"].(map[string]any)
+	require.Equal(t, "connector-token-id_value", spanmetricsMap["token"])
 }
