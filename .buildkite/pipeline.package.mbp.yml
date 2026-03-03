@@ -32,6 +32,7 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+      imageProject: "elastic-images-qa"
     artifact_paths:
       - build/distributions/**
     plugins:
@@ -46,6 +47,7 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+      imageProject: "elastic-images-qa"
     artifact_paths:
       - build/distributions/**
     plugins:
@@ -62,6 +64,7 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+      imageProject: "elastic-images-qa"
     artifact_paths:
       - build/distributions/**
     plugins:
@@ -79,6 +82,7 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+      imageProject: "elastic-images-qa"
     artifact_paths:
       - build/distributions/**
     plugins:
@@ -155,6 +159,7 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+      imageProject: "elastic-images-qa"
     plugins:
       - *oidc_plugin
       - *docker_elastic_login_plugin
@@ -180,6 +185,7 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
+      imageProject: "elastic-images-qa"
     plugins:
       - *oidc_plugin
       - *docker_elastic_login_plugin

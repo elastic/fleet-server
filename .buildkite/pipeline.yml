@@ -7,11 +7,6 @@ env:
   IMAGE_UBUNTU_ARM_64: "platform-ingest-fleet-server-ubuntu-2204-aarch64-1772547557"
   IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips-1772547557"
 
-providers:
-  gcp:
-    defaults:
-      imageProject: "elastic-images-qa"
-
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
@@ -64,6 +59,7 @@ steps:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_X86_64}"
           machineType: "c2-standard-16"
+          imageProject: "elastic-images-qa"
         plugins:
           - *oidc_plugin
           - *dockerhub_login_plugin
@@ -80,6 +76,7 @@ steps:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_X86_64}"
           machineType: "c2-standard-16"
+          imageProject: "elastic-images-qa"
         plugins:
           - *oidc_plugin
           - *dockerhub_login_plugin
@@ -215,6 +212,7 @@ steps:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_X86_64}"
           machineType: "c2-standard-16"
+          imageProject: "elastic-images-qa"
         artifact_paths:
           - build/*.xml
         plugins:
@@ -233,6 +231,7 @@ steps:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_X86_64}"
           machineType: "c2-standard-16"
+          imageProject: "elastic-images-qa"
         artifact_paths:
           - build/*.xml
           - build/e2e-coverage.out
