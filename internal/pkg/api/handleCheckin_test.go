@@ -7,7 +7,9 @@
 package api
 
 import (
+	"bytes"
 	"compress/flate"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -835,6 +837,70 @@ func Test_CheckinT_writeResponse(t *testing.T) {
 	}
 }
 
+func Test_acceptsEncoding(t *testing.T) {
+	tests := []struct {
+		name     string
+		headers  http.Header
+		encoding string
+		want     bool
+	}{
+		{
+			name:     "exact match",
+			headers:  http.Header{"Accept-Encoding": []string{"gzip"}},
+			encoding: "gzip",
+			want:     true,
+		},
+		{
+			name:     "comma-separated list contains encoding",
+			headers:  http.Header{"Accept-Encoding": []string{"gzip, deflate"}},
+			encoding: "gzip",
+			want:     true,
+		},
+		{
+			name:     "comma-separated list does not contain encoding",
+			headers:  http.Header{"Accept-Encoding": []string{"deflate, br"}},
+			encoding: "gzip",
+			want:     false,
+		},
+		{
+			name:     "with quality value",
+			headers:  http.Header{"Accept-Encoding": []string{"gzip;q=1.0, deflate;q=0.5"}},
+			encoding: "gzip",
+			want:     true,
+		},
+		{
+			name:     "q=0 means explicitly unwanted",
+			headers:  http.Header{"Accept-Encoding": []string{"gzip;q=0, deflate"}},
+			encoding: "gzip",
+			want:     false,
+		},
+		{
+			name:     "wildcard matches any encoding",
+			headers:  http.Header{"Accept-Encoding": []string{"*"}},
+			encoding: "gzip",
+			want:     true,
+		},
+		{
+			name:     "case insensitive",
+			headers:  http.Header{"Accept-Encoding": []string{"GZIP"}},
+			encoding: "gzip",
+			want:     true,
+		},
+		{
+			name:     "no Accept-Encoding header",
+			headers:  http.Header{},
+			encoding: "gzip",
+			want:     false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &http.Request{Header: tt.headers}
+			assert.Equal(t, tt.want, acceptsEncoding(r, tt.encoding))
+		})
+	}
+}
+
 func Benchmark_CheckinT_writeResponse(b *testing.B) {
 	verCon := mustBuildConstraints("8.0.0")
 	cfg := &config.Server{
@@ -1202,6 +1268,46 @@ func TestValidateCheckinRequest(t *testing.T) {
 			expValid: validatedCheckin{
 				rawAvailableRollbacks: nil,
 			},
+		},
+		{
+			name: "gzip-compressed request body is decompressed before JSON decoding",
+			req: func() *http.Request {
+				var buf bytes.Buffer
+				gz := gzip.NewWriter(&buf)
+				_, _ = gz.Write([]byte(`{"status": "online", "message": "test message"}`))
+				_ = gz.Close()
+				return &http.Request{
+					Header: http.Header{"Content-Encoding": []string{"gzip"}},
+					Body:   io.NopCloser(&buf),
+				}
+			}(),
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expErr: nil,
+			expValid: validatedCheckin{
+				rawAvailableRollbacks: []byte(`[]`),
+			},
+		},
+		{
+			name: "invalid gzip request body returns bad request error",
+			req: &http.Request{
+				Header: http.Header{"Content-Encoding": []string{"gzip"}},
+				Body:   io.NopCloser(strings.NewReader(`not gzip data`)),
+			},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expErr:   &BadRequestErr{msg: "unable to create gzip reader for request body", nextErr: gzip.ErrHeader},
+			expValid: validatedCheckin{},
 		},
 	}
 

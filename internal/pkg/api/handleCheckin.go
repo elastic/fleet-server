@@ -188,9 +188,20 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	}
 	readCounter := datacounter.NewReaderCounter(body)
 
+	// Decompress the body when the client signals Content-Encoding: gzip.
+	var bodyReader io.Reader = readCounter
+	if r.Header.Get("Content-Encoding") == kEncodingGzip {
+		gr, err := gzip.NewReader(readCounter)
+		if err != nil {
+			return validatedCheckin{}, &BadRequestErr{msg: "unable to create gzip reader for request body", nextErr: err}
+		}
+		defer gr.Close()
+		bodyReader = gr
+	}
+
 	var val validatedCheckin
 	var req CheckinRequest
-	decoder := json.NewDecoder(readCounter)
+	decoder := json.NewDecoder(bodyReader)
 	if err := decoder.Decode(&req); err != nil {
 		return val, &BadRequestErr{msg: "unable to decode checkin request", nextErr: err}
 	}
@@ -677,10 +688,35 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	return err
 }
 
+// acceptsEncoding reports whether the request advertises support for the named
+// content encoding.  It parses the Accept-Encoding header correctly per
+// RFC 7231 §5.3.4: multiple encodings may appear as comma-separated tokens
+// within a single header value, each optionally followed by a quality value
+// (e.g. "gzip;q=1.0, deflate;q=0.5").  A bare "*" token is treated as
+// matching any encoding.  A quality value of 0 ("gzip;q=0") means the
+// encoding is explicitly unwanted and is treated as a non-match.
 func acceptsEncoding(r *http.Request, encoding string) bool {
-	for _, v := range r.Header.Values("Accept-Encoding") {
-		if v == encoding {
-			return true
+	for _, headerVal := range r.Header.Values("Accept-Encoding") {
+		for _, token := range strings.Split(headerVal, ",") {
+			token = strings.TrimSpace(token)
+			if token == "" {
+				continue
+			}
+			// Split off optional quality value: "gzip;q=0.5" → "gzip", "q=0.5"
+			name, params, _ := strings.Cut(token, ";")
+			name = strings.TrimSpace(name)
+
+			// q=0 means the encoding is explicitly not acceptable.
+			if params != "" {
+				params = strings.TrimSpace(params)
+				if strings.EqualFold(params, "q=0") {
+					continue
+				}
+			}
+
+			if strings.EqualFold(name, encoding) || name == "*" {
+				return true
+			}
 		}
 	}
 	return false
