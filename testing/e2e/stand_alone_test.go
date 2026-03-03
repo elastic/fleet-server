@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -578,4 +579,131 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 
 	cancel()
 	cmd.Wait()
+}
+
+// TestOpAMP ensures that the OpAMP endpoint in Fleet Server works as expected by installing
+// an OTel Collector, configuring it with the OpAMP extension, and having it connect to Fleet
+// Server using OpAMP, and verifying that Fleet Server responds to this request with an HTTP
+// 200 OK status response.
+func (suite *StandAloneSuite) TestOpAMP() {
+	// Create a config file from a template in the test temp dir
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-opamp.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]interface{}{
+		"Hosts":          suite.ESHosts,
+		"ServiceToken":   suite.ServiceToken,
+		"StaticTokenKey": "opamp-e2e-test-key",
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	err = cmd.Start()
+	suite.Require().NoError(err)
+	defer cmd.Wait()
+
+	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+
+	apiKey := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+
+	// Make sure the OpAMP endpoint works.
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:8220/v1/opamp", nil)
+	suite.Require().NoError(err)
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("Content-Type", "application/x-protobuf")
+
+	resp, err := suite.Client.Do(req)
+	suite.Require().NoError(err)
+	resp.Body.Close()
+	suite.Require().Equal(http.StatusOK, resp.StatusCode)
+
+	// Enroll a dummy agent to initialize the .fleet-agents index before the OTel Collector connects.
+	// Without this, findEnrolledAgent fails with index_not_found_exception when the OTel Collector
+	// sends its first AgentToServer message, because .fleet-agents doesn't exist yet in a fresh
+	// standalone fleet-server environment (unlike agent-managed fleet-server which self-enrolls).
+	tester := api_version.NewClientAPITesterCurrent(suite.Scaffold, "http://localhost:8220", apiKey)
+	tester.Enroll(ctx, apiKey)
+
+	// Clone OTel Collector contrib repository (shallow clone of main branch)
+	cloneDir := filepath.Join(dir, "opentelemetry-collector-contrib")
+	suite.T().Logf("Cloning opentelemetry-collector-contrib (main) to %s", cloneDir)
+	cloneCmd := exec.CommandContext(ctx,
+		"git", "clone",
+		"--depth", "1",
+		"https://github.com/open-telemetry/opentelemetry-collector-contrib",
+		cloneDir,
+	)
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+	err = cloneCmd.Run()
+	suite.Require().NoError(err)
+
+	// Build the OTel Collector binary
+	suite.T().Log("Building otelcol-contrib binary via make otelcontribcol")
+	makeCmd := exec.CommandContext(ctx, "make", "otelcontribcol")
+	makeCmd.Dir = cloneDir
+	makeCmd.Stdout = os.Stdout
+	makeCmd.Stderr = os.Stderr
+	err = makeCmd.Run()
+	suite.Require().NoError(err)
+
+	// The make target places the binary under bin/; move it to the expected path.
+	builtBinary := filepath.Join(cloneDir, "bin", fmt.Sprintf("otelcontribcol_%s_%s", runtime.GOOS, runtime.GOARCH))
+	otelBinaryPath := filepath.Join(dir, "otelcol-contrib")
+	err = os.Rename(builtBinary, otelBinaryPath)
+	suite.Require().NoError(err)
+
+	// Configure it with the OpAMP extension
+	instanceUID := "019b8d7a-2da8-7657-b52d-492a9de33319"
+	suite.T().Logf("Configuring OTel Collector with OpAMP extension (instanceUID=%s)", instanceUID)
+	tpl, err = template.ParseFiles(filepath.Join("testdata", "otelcol-opamp.tpl"))
+	suite.Require().NoError(err)
+	f, err = os.Create(filepath.Join(dir, "otelcol.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]interface{}{
+		"OpAMP": map[string]string{
+			"InstanceUID": instanceUID,
+			"APIKey":      apiKey,
+		},
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Start OTel Collector
+	suite.T().Log("Starting OTel Collector")
+	otelCmd := exec.CommandContext(ctx, otelBinaryPath, "--config", filepath.Join(dir, "otelcol.yml"))
+	otelCmd.Cancel = func() error {
+		return otelCmd.Process.Signal(syscall.SIGTERM)
+	}
+	otelCmd.Stdout = os.Stdout
+	otelCmd.Stderr = os.Stderr
+	err = otelCmd.Start()
+	suite.Require().NoError(err)
+	defer otelCmd.Wait()
+
+	// Verify that the OTel Collector was enrolled in Fleet by fetching its document from
+	// .fleet-agents and asserting on its contents.
+	suite.T().Logf("Waiting for agent %s to appear in .fleet-agents", instanceUID)
+	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
+
+	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
+	versionOut, err := exec.Command(otelBinaryPath, "--version").Output()
+	suite.Require().NoError(err)
+	otelVersion := strings.TrimPrefix(strings.TrimSpace(string(versionOut)), "otelcontribcol version ")
+	suite.Equal("OPAMP", agentDoc.Type, "expected type to be OPAMP")
+	suite.Equal("otelcontribcol", agentDoc.Agent.Type, "expected agent.type to be otelcontribcol")
+	suite.Equal(otelVersion, agentDoc.Agent.Version, "expected agent.version to match otelcol-contrib binary version")
+	suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
+	suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
 }
