@@ -98,9 +98,10 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 			"type":               "fleet-server",
 			"package_var_secret": secretRef,
 		}},
-		SecretReferences: []model.SecretReferencesItems{{
-			ID: secretID,
-		}},
+		SecretReferences: []model.SecretReferencesItems{
+			{ID: secretID},
+			{ID: outputID},
+		},
 	}
 
 	_, err := dl.CreatePolicy(ctx, bulker, model.Policy{
