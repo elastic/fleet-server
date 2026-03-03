@@ -7,8 +7,8 @@ require (
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.0
-	github.com/elastic/elastic-agent-libs v0.33.0
-	github.com/elastic/elastic-agent-system-metrics v0.14.0
+	github.com/elastic/elastic-agent-libs v0.33.1
+	github.com/elastic/elastic-agent-system-metrics v0.14.2
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
 	github.com/elastic/go-ucfg v0.9.0
 	github.com/fxamacker/cbor/v2 v2.8.0
@@ -36,7 +36,7 @@ require (
 	go.elastic.co/apm/v2 v2.7.3
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.27.1
-	golang.org/x/net v0.50.0
+	golang.org/x/net v0.51.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/time v0.14.0
 	google.golang.org/grpc v1.79.1
