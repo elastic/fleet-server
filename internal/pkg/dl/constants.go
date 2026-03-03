@@ -45,6 +45,10 @@ const (
 	FieldUnenrolledReason              = "unenrolled_reason"
 	FiledType                          = "type"
 	FieldUnhealthyReason               = "unhealthy_reason"
+	FieldSequenceNum                   = "sequence_num"
+	FieldHealth                        = "health"
+	FieldCapabilities                  = "capabilities"
+	FieldEffectiveConfig               = "effective_config"
 
 	FieldActive             = "active"
 	FieldNamespaces         = "namespaces"
