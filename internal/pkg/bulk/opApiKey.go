@@ -51,7 +51,7 @@ func (b *Bulker) APIKeyAuth(ctx context.Context, key APIKey) (*SecurityInfo, err
 	return key.Authenticate(ctx, b.Client())
 }
 
-func (b *Bulker) APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*APIKey, error) {
+func (b *Bulker) APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta any) (*APIKey, error) {
 	span, ctx := apm.StartSpan(ctx, "createAPIKey", "auth")
 	defer span.End()
 	if err := b.apikeyLimit.Acquire(ctx, 1); err != nil {
@@ -122,7 +122,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 	// merge ids
 	for n := queue.head; n != nil; n = n.next {
 		content := n.buf.Bytes()
-		metaMap := make(map[string]interface{})
+		metaMap := make(map[string]any)
 		dec := json.NewDecoder(bytes.NewReader(content))
 		if err := dec.Decode(&metaMap); err != nil {
 			zerolog.Ctx(ctx).Error().
@@ -190,12 +190,9 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		batches := int(math.Ceil(float64(len(ids)) / float64(idsPerBatch)))
 
 		// batch ids into batches of meaningful size
-		for batch := 0; batch < batches; batch++ {
+		for batch := range batches {
 			// guard against indexing out of range
-			to := (batch + 1) * idsPerBatch
-			if to > len(ids) {
-				to = len(ids)
-			}
+			to := min((batch+1)*idsPerBatch, len(ids))
 
 			// handle ids in batch, we put them into single request
 			// and assign response index to the id so we can notify caller

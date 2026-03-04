@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -47,12 +48,7 @@ func (a *apiVersion) validateVersionFormat(version string) error {
 }
 
 func (a *apiVersion) isVersionSupported(version string) bool {
-	for _, vers := range a.supportedVersions {
-		if vers == version {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(a.supportedVersions, version)
 }
 
 func (a *apiVersion) middleware(next http.Handler) http.Handler {

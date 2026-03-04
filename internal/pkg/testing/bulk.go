@@ -98,7 +98,7 @@ func (m *MockBulk) GetBulkerMap() map[string]bulk.Bulk {
 	return args.Get(0).(map[string]bulk.Bulk)
 }
 
-func (m *MockBulk) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (bulk.Bulk, bool, error) {
+func (m *MockBulk) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]any) (bulk.Bulk, bool, error) {
 	args := m.Called(ctx, zlog, outputName, outputMap)
 	return args.Get(0).(bulk.Bulk), args.Get(1).(bool), nil
 }
@@ -116,7 +116,7 @@ func (m *MockBulk) ReadSecrets(ctx context.Context, secretIds []string) (map[str
 	return result, nil
 }
 
-func (m *MockBulk) APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*bulk.APIKey, error) {
+func (m *MockBulk) APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta any) (*bulk.APIKey, error) {
 	args := m.Called(ctx, name, ttl, roles, meta)
 	return args.Get(0).(*bulk.APIKey), args.Error(1)
 }
@@ -153,7 +153,7 @@ func (m *MockBulk) StartTransactionOptions(name, transactionType string, opts ap
 	return nil
 }
 
-func (m *MockBulk) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+func (m *MockBulk) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]any) bool {
 	return name == "outdated"
 }
 

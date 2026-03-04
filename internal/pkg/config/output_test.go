@@ -8,7 +8,6 @@
 package config
 
 import (
-	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -392,8 +391,7 @@ func Test_Elasticsearch_DiagRequests(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	t.Run("scheme included", func(t *testing.T) {
 		es := &Elasticsearch{}

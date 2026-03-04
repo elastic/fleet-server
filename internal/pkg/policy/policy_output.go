@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -47,7 +48,7 @@ type Output struct {
 
 // Prepare prepares the output p to be sent to the elastic-agent
 // The agent might be mutated for an elasticsearch output
-func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap map[string]map[string]interface{}) error {
+func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap map[string]map[string]any) error {
 	span, ctx := apm.StartSpan(ctx, "prepareOutput", "process")
 	defer span.End()
 	span.Context.SetLabel("output_type", p.Type)
@@ -90,7 +91,7 @@ func (p *Output) prepareElasticsearch(
 	bulker bulk.Bulk,
 	outputBulker bulk.Bulk,
 	agent *model.Agent,
-	outputMap map[string]map[string]interface{},
+	outputMap map[string]map[string]any,
 	hasConfigChanged bool) error {
 	// The role is required to do api key management
 	if p.Role == nil {
@@ -141,7 +142,7 @@ func (p *Output) prepareElasticsearch(
 	if toRetireAPIKeys != nil {
 
 		// adding remote API key to new output toRetireAPIKeys
-		fields := map[string]interface{}{
+		fields := map[string]any{
 			dl.FieldPolicyOutputToRetireAPIKeyIDs: *toRetireAPIKeys,
 		}
 
@@ -157,8 +158,8 @@ func (p *Output) prepareElasticsearch(
 		}
 
 		// remove output from agent doc
-		body, err = json.Marshal(map[string]interface{}{
-			"script": map[string]interface{}{
+		body, err = json.Marshal(map[string]any{
+			"script": map[string]any{
 				"lang":   "painless",
 				"source": fmt.Sprintf("ctx._source['outputs'].remove(\"%s\")", removedOutputName),
 			},
@@ -238,7 +239,7 @@ func (p *Output) prepareElasticsearch(
 			Str("roles", string(p.Role.Raw)).
 			Msg("Updating agent record to pick up most recent roles.")
 
-		fields := map[string]interface{}{
+		fields := map[string]any{
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 		}
 
@@ -306,7 +307,7 @@ func (p *Output) prepareElasticsearch(
 			Str(ecs.DefaultOutputAPIKeyID, outputAPIKey.ID).
 			Msg("Updating agent record to pick up default output key.")
 
-		fields := map[string]interface{}{
+		fields := map[string]any{
 			dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
 			dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
@@ -421,13 +422,11 @@ func mergeRoles(zlog zerolog.Logger, old, new *RoleT) (*RoleT, error) {
 
 	destMap := smap.Map{}
 	// copy all from new
-	for k, v := range newMap {
-		destMap[k] = v
-	}
+	maps.Copy(destMap, newMap)
 
 	findNewKey := func(m smap.Map, candidate string) string {
-		if strings.HasSuffix(candidate, "-rdstale") {
-			candidate = strings.TrimSuffix(candidate, "-rdstale")
+		if before, ok := strings.CutSuffix(candidate, "-rdstale"); ok {
+			candidate = before
 			dashIdx := strings.LastIndex(candidate, "-")
 			if dashIdx >= 0 {
 				candidate = candidate[:dashIdx]
@@ -436,7 +435,7 @@ func mergeRoles(zlog zerolog.Logger, old, new *RoleT) (*RoleT, error) {
 		}
 
 		// 1 should be enough, 100 is just to have some space
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			c := fmt.Sprintf("%s-%d-rdstale", candidate, i)
 
 			if _, exists := m[c]; !exists {
@@ -473,7 +472,7 @@ func mergeRoles(zlog zerolog.Logger, old, new *RoleT) (*RoleT, error) {
 	return r, nil
 }
 
-func renderUpdatePainlessScript(outputName string, fields map[string]interface{}) ([]byte, error) {
+func renderUpdatePainlessScript(outputName string, fields map[string]any) ([]byte, error) {
 	var source strings.Builder
 
 	// prepare agent.elasticsearch_outputs[OUTPUT_NAME]
@@ -503,8 +502,8 @@ ctx._source['outputs']['%s'].%s=params.%s;`,
 		}
 	}
 
-	body, err := json.Marshal(map[string]interface{}{
-		"script": map[string]interface{}{
+	body, err := json.Marshal(map[string]any{
+		"script": map[string]any{
 			"lang":   "painless",
 			"source": source.String(),
 			"params": fields,

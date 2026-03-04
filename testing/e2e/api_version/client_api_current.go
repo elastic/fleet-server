@@ -239,7 +239,7 @@ func (tester *ClientAPITester) FullFileUpload(ctx context.Context, apiKey, agent
 
 	chunkCount := int(math.Ceil(float64(size) / float64(chunkSize)))
 	tHash := sha256.New()
-	for i := 0; i < chunkCount; i++ {
+	for i := range chunkCount {
 		var body bytes.Buffer
 		n := int64(math.Min(float64(chunkSize), float64(size)))
 		size = size - n
@@ -459,7 +459,7 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 			return false
 		}
 		var obj struct {
-			Source map[string]interface{} `json:"_source"`
+			Source map[string]any `json:"_source"`
 		}
 		err = json.NewDecoder(res.Body).Decode(&obj)
 		tester.Require().NoError(err)

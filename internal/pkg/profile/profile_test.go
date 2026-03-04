@@ -34,7 +34,7 @@ func TestRunProfiler(t *testing.T) {
 	require.NoError(t, err)
 
 	var resp *http.Response
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		resp, err = http.DefaultClient.Do(req) //nolint:bodyclose // closed outside the loop
 		if err == nil {
 			break

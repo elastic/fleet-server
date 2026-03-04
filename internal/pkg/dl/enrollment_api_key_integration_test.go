@@ -123,7 +123,7 @@ func TestSearchEnrollmentAPIKeyByPolicyIDWithInactiveIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to store enrollment key: %v", err)
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		_, err = storeRandomEnrollmentAPIKey(ctx, bulker, index, uuid.Must(uuid.NewV4()).String(), false)
 		if err != nil {
 			t.Fatalf("unable to store enrollment key: %v", err)

@@ -85,36 +85,36 @@ func createSecret(t *testing.T, ctx context.Context, bulker bulk.Bulk, value str
 func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk.Bulk, inlineSecretID, inlineSecretRef, pathSecretID string) string {
 	policyID := uuid.Must(uuid.NewV4()).String()
 	var policyData = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
+		Outputs: map[string]map[string]any{
 			"default": {
 				"type": "elasticsearch",
-				"secrets": map[string]interface{}{
-					"secret-key": map[string]interface{}{"id": pathSecretID},
+				"secrets": map[string]any{
+					"secret-key": map[string]any{"id": pathSecretID},
 				},
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default":{}}`),
-		Inputs: []map[string]interface{}{{
+		Inputs: []map[string]any{{
 			"type":               "fleet-server",
 			"package_var_secret": inlineSecretRef,
 		}},
-		Agent: map[string]interface{}{
-			"download": map[string]interface{}{
+		Agent: map[string]any{
+			"download": map[string]any{
 				"sourceURI": inlineSecretRef,
-				"secrets": map[string]interface{}{
-					"ssl": map[string]interface{}{
-						"key": map[string]interface{}{
+				"secrets": map[string]any{
+					"ssl": map[string]any{
+						"key": map[string]any{
 							"id": pathSecretID,
 						},
 					},
 				},
 			},
 		},
-		Fleet: map[string]interface{}{
+		Fleet: map[string]any{
 			"hosts": []string{inlineSecretRef},
-			"secrets": map[string]interface{}{
-				"ssl": map[string]interface{}{
-					"key": map[string]interface{}{
+			"secrets": map[string]any{
+				"ssl": map[string]any{
+					"key": map[string]any{
 						"id": pathSecretID,
 					},
 				},
@@ -156,7 +156,7 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 		    "resources": ["*"]
 		}]
 	    }
-	}`), map[string]interface{}{
+	}`), map[string]any{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",
@@ -211,12 +211,12 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	t.Log("Agent enrollment successful")
 	p, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	var obj map[string]interface{}
+	var obj map[string]any
 	err = json.Unmarshal(p, &obj)
 	require.NoError(t, err)
 
 	item := obj["item"]
-	mm, ok := item.(map[string]interface{})
+	mm, ok := item.(map[string]any)
 	require.True(t, ok, "expected attribute item to be an object")
 	id := mm["id"]
 	str, ok := id.(string)
@@ -255,7 +255,7 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 
 	input := actionData.Policy.Inputs[0]
 	// expect secret reference replaced with secret value
-	assert.Equal(t, map[string]interface{}{
+	assert.Equal(t, map[string]any{
 		"package_var_secret": "inline_secret_value",
 		"type":               "fleet-server",
 	}, input)
@@ -263,7 +263,7 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	// expect output secret to be replaced
 	output := actionData.Policy.Outputs["default"]
 	assert.Conditionf(t, func() bool {
-		mp, ok := output.(map[string]interface{})
+		mp, ok := output.(map[string]any)
 		if !ok {
 			return false
 		}
@@ -279,17 +279,17 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	}, "expected output to contain secret-key: output_secret_value, got %v", output)
 
 	// expect agent.download secrets to be replaced
-	assert.Equal(t, map[string]interface{}{
+	assert.Equal(t, map[string]any{
 		"sourceURI": "inline_secret_value",
-		"ssl": map[string]interface{}{
+		"ssl": map[string]any{
 			"key": "path_secret_value",
 		},
 	}, actionData.Policy.Agent["download"])
 
 	// expect fleet secrets to be replaced
-	assert.Equal(t, map[string]interface{}{
-		"hosts": []interface{}{"inline_secret_value"},
-		"ssl": map[string]interface{}{
+	assert.Equal(t, map[string]any{
+		"hosts": []any{"inline_secret_value"},
+		"ssl": map[string]any{
 			"key": "path_secret_value",
 		},
 	}, actionData.Policy.Fleet)

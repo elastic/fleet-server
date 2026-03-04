@@ -6,13 +6,13 @@ package dsl
 
 type RangeOpt func(nodeMapT)
 
-func WithRangeGT(v interface{}) RangeOpt {
+func WithRangeGT(v any) RangeOpt {
 	return func(nmap nodeMapT) {
 		nmap[kKeywordGreaterThan] = &Node{leaf: v}
 	}
 }
 
-func WithRangeLTE(v interface{}) RangeOpt {
+func WithRangeLTE(v any) RangeOpt {
 	return func(nmap nodeMapT) {
 		nmap[kKeywordLessThanEq] = &Node{leaf: v}
 	}

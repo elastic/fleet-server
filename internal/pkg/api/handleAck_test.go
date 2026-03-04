@@ -48,7 +48,7 @@ func TestMakeUpdatePolicyBody(t *testing.T) {
 
 	data := makeUpdatePolicyBody(policyID, newRev)
 
-	var i interface{}
+	var i any
 	err := json.Unmarshal(data, &i)
 
 	if err != nil {
@@ -276,7 +276,7 @@ func TestHandleAckEvents(t *testing.T) {
 			}},
 			res: newAckResponse(false, []AckResponseItem{{
 				Status:  http.StatusOK,
-				Message: ptr(http.StatusText(http.StatusOK)),
+				Message: new(http.StatusText(http.StatusOK)),
 			}}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				return ftesting.NewMockBulk()
@@ -291,7 +291,7 @@ func TestHandleAckEvents(t *testing.T) {
 			}},
 			res: newAckResponse(false, []AckResponseItem{{
 				Status:  http.StatusOK,
-				Message: ptr(http.StatusText(http.StatusOK)),
+				Message: new(http.StatusText(http.StatusOK)),
 			}}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
@@ -354,7 +354,7 @@ func TestHandleAckEvents(t *testing.T) {
 			}},
 			res: newAckResponse(true, []AckResponseItem{{
 				Status:  http.StatusServiceUnavailable,
-				Message: ptr(http.StatusText(http.StatusServiceUnavailable)),
+				Message: new(http.StatusText(http.StatusServiceUnavailable)),
 			}}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
@@ -405,27 +405,27 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(true, []AckResponseItem{
 				{
 					Status:  http.StatusOK,
-					Message: ptr(http.StatusText(http.StatusOK)),
+					Message: new(http.StatusText(http.StatusOK)),
 				},
 				{
 					Status:  http.StatusOK,
-					Message: ptr(http.StatusText(http.StatusOK)),
+					Message: new(http.StatusText(http.StatusOK)),
 				},
 				{
 					Status:  http.StatusNotFound,
-					Message: ptr(http.StatusText(http.StatusNotFound)),
+					Message: new(http.StatusText(http.StatusNotFound)),
 				},
 				{
 					Status:  http.StatusOK,
-					Message: ptr(http.StatusText(http.StatusOK)),
+					Message: new(http.StatusText(http.StatusOK)),
 				},
 				{
 					Status:  http.StatusOK,
-					Message: ptr(http.StatusText(http.StatusOK)),
+					Message: new(http.StatusText(http.StatusOK)),
 				},
 				{
 					Status:  http.StatusOK,
-					Message: ptr(http.StatusText(http.StatusOK)),
+					Message: new(http.StatusText(http.StatusOK)),
 				},
 			}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
@@ -468,7 +468,7 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(false, []AckResponseItem{
 				{
 					Status:  http.StatusOK,
-					Message: ptr(http.StatusText(http.StatusOK)),
+					Message: new(http.StatusText(http.StatusOK)),
 				},
 			}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
@@ -495,7 +495,7 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(false, []AckResponseItem{
 				{
 					Status:  http.StatusOK,
-					Message: ptr(http.StatusText(http.StatusOK)),
+					Message: new(http.StatusText(http.StatusOK)),
 				},
 			}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
@@ -706,7 +706,7 @@ func TestAckHandleUpgrade(t *testing.T) {
 		bulker: func(t *testing.T) *ftesting.MockBulk {
 			m := ftesting.NewMockBulk()
 			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
-				var body map[string]map[string]interface{}
+				var body map[string]map[string]any
 				if err := json.Unmarshal(p, &body); err != nil {
 					t.Fatal(err)
 				}
@@ -725,7 +725,7 @@ func TestAckHandleUpgrade(t *testing.T) {
 		bulker: func(t *testing.T) *ftesting.MockBulk {
 			m := ftesting.NewMockBulk()
 			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
-				var body map[string]map[string]interface{}
+				var body map[string]map[string]any
 				if err := json.Unmarshal(p, &body); err != nil {
 					t.Fatal(err)
 				}

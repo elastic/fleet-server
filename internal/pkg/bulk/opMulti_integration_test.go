@@ -26,7 +26,7 @@ func benchmarkMultiUpdate(n int, b *testing.B) {
 
 	// Create N samples
 	var ops []MultiOp
-	for i := 0; i < n; i++ {
+	for range n {
 		sample := NewRandomSample()
 		ops = append(ops, MultiOp{
 			Index: index,

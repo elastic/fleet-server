@@ -57,7 +57,7 @@ func TestUploadCompletePerformsRefreshBeforeChunkSearch(t *testing.T) {
 		"action_id": "actionID",
 		"agent_id":  "agentID",
 		"src":       fakeIntegrationSrc,
-		"file": map[string]interface{}{
+		"file": map[string]any{
 			"size":      size,
 			"ChunkSize": file.MaxChunkSize,
 			"Status":    file.StatusProgress,

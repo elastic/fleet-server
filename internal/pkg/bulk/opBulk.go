@@ -170,10 +170,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 
 	const kRoughEstimatePerItem = 200
 
-	bufSz := queue.cnt * kRoughEstimatePerItem
-	if bufSz < queue.pending {
-		bufSz = queue.pending
-	}
+	bufSz := max(queue.cnt*kRoughEstimatePerItem, queue.pending)
 
 	var buf bytes.Buffer
 	buf.Grow(bufSz)
