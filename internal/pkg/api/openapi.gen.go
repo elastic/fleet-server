@@ -137,6 +137,11 @@ const (
 	Endpoint UploadBeginRequestSrc = "endpoint"
 )
 
+// Defines values for AgentCheckinParamsContentEncoding.
+const (
+	Gzip AgentCheckinParamsContentEncoding = "gzip"
+)
+
 // AckRequest The request an elastic-agent sends to fleet-serve to acknowledge the execution of one or more actions.
 type AckRequest struct {
 	Events []AckRequest_Events_Item `json:"events"`
@@ -1017,10 +1022,12 @@ type AuditUnenrollParams struct {
 
 // AgentCheckinParams defines parameters for AgentCheckin.
 type AgentCheckinParams struct {
-	// AcceptEncoding If the agent is able to accept encoded responses.
-	// Used to indicate if GZIP compression may be used by the server.
-	// The elastic-agent does not use the accept-encoding header.
+	// AcceptEncoding Indicates encodings the agent can accept. The only encoding supported by the server currently is gzip.
+	// Comma-separated directive lists and RFC 7231 quality values (e.g. "gzip;q=1.0, deflate;q=0.5") are both accepted.
 	AcceptEncoding *string `json:"Accept-Encoding,omitempty"`
+
+	// ContentEncoding Signals that the request body has been compressed. Server currently only supports gzip compression.
+	ContentEncoding *AgentCheckinParamsContentEncoding `json:"Content-Encoding,omitempty"`
 
 	// UserAgent The user-agent header that is sent.
 	// Must have the format "elastic agent X.Y.Z" where "X.Y.Z" indicates the agent version.
@@ -1033,6 +1040,9 @@ type AgentCheckinParams struct {
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 }
+
+// AgentCheckinParamsContentEncoding defines parameters for AgentCheckin.
+type AgentCheckinParamsContentEncoding string
 
 // ArtifactParams defines parameters for Artifact.
 type ArtifactParams struct {
@@ -2282,6 +2292,25 @@ func (siw *ServerInterfaceWrapper) AgentCheckin(w http.ResponseWriter, r *http.R
 		}
 
 		params.AcceptEncoding = &AcceptEncoding
+
+	}
+
+	// ------------- Optional header parameter "Content-Encoding" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Content-Encoding")]; found {
+		var ContentEncoding AgentCheckinParamsContentEncoding
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Content-Encoding", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Content-Encoding", valueList[0], &ContentEncoding, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Content-Encoding", Err: err})
+			return
+		}
+
+		params.ContentEncoding = &ContentEncoding
 
 	}
 
