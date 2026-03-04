@@ -38,7 +38,7 @@ func TestPolicyLogstashOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
 }
@@ -51,7 +51,7 @@ func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
 	// No permissions are required by logstash currently
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
@@ -69,7 +69,7 @@ func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
 }
@@ -86,7 +86,7 @@ func TestPolicyKafkaOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
 }
@@ -99,7 +99,7 @@ func TestPolicyKafkaOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
 	// No permissions are required by kafka currently
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
@@ -114,7 +114,7 @@ func TestPolicyESOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
 	require.NotNil(t, err, "expected prepare to error")
 	bulker.AssertExpectations(t)
 }
@@ -136,8 +136,8 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			},
 		}
 
-		policyMap := map[string]map[string]interface{}{
-			"test output": map[string]interface{}{},
+		policyMap := map[string]map[string]any{
+			"test output": map[string]any{},
 		}
 
 		testAgent := &model.Agent{
@@ -207,8 +207,8 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			},
 		}
 
-		policyMap := map[string]map[string]interface{}{
-			"test output": map[string]interface{}{},
+		policyMap := map[string]map[string]any{
+			"test output": map[string]any{},
 		}
 
 		testAgent := &model.Agent{
@@ -269,8 +269,8 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			},
 		}
 
-		policyMap := map[string]map[string]interface{}{
-			"test output": map[string]interface{}{},
+		policyMap := map[string]map[string]any{
+			"test output": map[string]any{},
 		}
 
 		testAgent := &model.Agent{Outputs: map[string]*model.PolicyOutput{}}
@@ -311,7 +311,7 @@ func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
 	outputBulker := ftesting.NewMockBulk()
 	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]interface{}{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
 	require.Error(t, err, "expected prepare to error")
 	bulker.AssertExpectations(t)
 }
@@ -336,9 +336,9 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 		outputBulker := ftesting.NewMockBulk()
 		bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(outputBulker, false).Once()
 
-		policyMap := map[string]map[string]interface{}{
-			"test output": map[string]interface{}{
-				"hosts":         []interface{}{"http://localhost"},
+		policyMap := map[string]map[string]any{
+			"test output": map[string]any{
+				"hosts":         []any{"http://localhost"},
 				"service_token": "serviceToken1",
 				"type":          OutputTypeRemoteElasticsearch,
 			},
@@ -412,9 +412,9 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 			},
 		}
 
-		policyMap := map[string]map[string]interface{}{
-			"test output": map[string]interface{}{
-				"hosts":         []interface{}{"http://localhost"},
+		policyMap := map[string]map[string]any{
+			"test output": map[string]any{
+				"hosts":         []any{"http://localhost"},
 				"service_token": "serviceToken1",
 				"type":          OutputTypeRemoteElasticsearch,
 			},
@@ -484,9 +484,9 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 			},
 		}
 
-		policyMap := map[string]map[string]interface{}{
-			"test output": map[string]interface{}{
-				"hosts":         []interface{}{"http://localhost"},
+		policyMap := map[string]map[string]any{
+			"test output": map[string]any{
+				"hosts":         []any{"http://localhost"},
 				"service_token": "serviceToken1",
 				"type":          OutputTypeRemoteElasticsearch,
 			},
@@ -542,9 +542,9 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 			},
 		}
 
-		policyMap := map[string]map[string]interface{}{
-			"test output": map[string]interface{}{
-				"hosts":         []interface{}{"http://localhost"},
+		policyMap := map[string]map[string]any{
+			"test output": map[string]any{
+				"hosts":         []any{"http://localhost"},
 				"service_token": "serviceToken1",
 				"type":          OutputTypeRemoteElasticsearch,
 			},

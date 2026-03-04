@@ -137,7 +137,7 @@ func (s *Scaffold) SetupKibana() {
 // If it is in use it will poll every second for up to 30s for any change.
 func (s *Scaffold) IsFleetServerPortFree() bool {
 	portFree := false
-	for i := 0; i < 30; i++ {
+	for range 30 {
 		ln, err := net.Listen("tcp", ":8220")
 		if err == nil {
 			ln.Close()
@@ -596,7 +596,7 @@ type logger struct {
 	*testing.T
 }
 
-func (l *logger) Printf(format string, v ...interface{}) {
+func (l *logger) Printf(format string, v ...any) {
 	l.Helper()
 	l.Logf(format, v...)
 }
@@ -696,11 +696,11 @@ func (s *Scaffold) HasTestStatusTrace(ctx context.Context, name string, retry fu
 	}
 }
 
-func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides map[string]interface{}) {
+func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides map[string]any) {
 	body := struct {
-		Name      string                 `json:"name"`
-		Namespace string                 `json:"namespace"`
-		Overrides map[string]interface{} `json:"overrides"`
+		Name      string         `json:"name"`
+		Namespace string         `json:"namespace"`
+		Overrides map[string]any `json:"overrides"`
 	}{
 		Name:      id,
 		Namespace: "default",

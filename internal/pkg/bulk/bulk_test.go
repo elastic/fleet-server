@@ -257,12 +257,10 @@ func TestCancelCtx(t *testing.T) {
 
 			cancelF()
 			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 
 				test.test(t, ctx)
-			}()
+			})
 
 			wg.Wait()
 		})
@@ -275,10 +273,10 @@ func TestCancelCtxChildBulker(t *testing.T) {
 
 	ctx, cancelF := context.WithCancel(context.Background())
 
-	outputMap := make(map[string]map[string]interface{})
-	outputMap["remote"] = map[string]interface{}{
+	outputMap := make(map[string]map[string]any)
+	outputMap["remote"] = map[string]any{
 		"type":          "remote_elasticsearch",
-		"hosts":         []interface{}{"https://remote-es:443"},
+		"hosts":         []any{"https://remote-es:443"},
 		"service_token": "token1",
 	}
 
@@ -289,16 +287,14 @@ func TestCancelCtxChildBulker(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 
 		_, err := childBulker.APIKeyAuth(ctx, apikey.APIKey{})
 
 		if !errors.Is(err, context.Canceled) {
 			t.Error("Expected context cancel err: ", err)
 		}
-	}()
+	})
 
 	wg.Wait()
 }
@@ -313,13 +309,11 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 	bulker := NewBulker(mock, nil, WithFlushThresholdCount(n))
 
 	var waitBulker sync.WaitGroup
-	waitBulker.Add(1)
-	go func() {
-		defer waitBulker.Done()
+	waitBulker.Go(func() {
 		if err := bulker.Run(ctx); !errors.Is(err, context.Canceled) {
 			b.Error(err)
 		}
-	}()
+	})
 
 	fieldUpdate := UpdateFields{"kwval": "funkycoldmedina"}
 	fieldData, err := fieldUpdate.Marshal()
@@ -334,7 +328,7 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < n; i++ {
+	for i := range n {
 		go func(sampleData []byte) {
 			defer wait.Done()
 

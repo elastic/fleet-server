@@ -4,7 +4,7 @@
 
 package dsl
 
-func (n *Node) Field(fieldName interface{}) *Node {
+func (n *Node) Field(fieldName any) *Node {
 	n.Param(kKeywordField, fieldName)
 	return n
 }

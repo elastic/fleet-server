@@ -31,8 +31,8 @@ func createRandomActionResults() ([]model.ActionResult, error) {
 
 	results := make([]model.ActionResult, sz)
 
-	for i := 0; i < sz; i++ {
-		payload := map[string]interface{}{
+	for i := range sz {
+		payload := map[string]any{
 			uuid.Must(uuid.NewV4()).String(): uuid.Must(uuid.NewV4()).String(),
 		}
 

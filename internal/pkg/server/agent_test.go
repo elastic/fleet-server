@@ -30,28 +30,28 @@ func TestCLIOverrides(t *testing.T) {
 	loggingFilesNameExpected := "fleet-server-logging"
 	serviceToken := "token-test"
 
-	cliConfig, err := ucfg.NewFrom(map[string]interface{}{
-		"http": map[string]interface{}{
+	cliConfig, err := ucfg.NewFrom(map[string]any{
+		"http": map[string]any{
 			"enabled": httpEnabledExpected,
 			"host":    httpHostExpected,
 		},
-		"logging": map[string]interface{}{
-			"files": map[string]interface{}{
+		"logging": map[string]any{
+			"files": map[string]any{
 				"name": loggingFilesNameExpected,
 			},
 		},
-		"output": map[string]interface{}{
-			"elasticsearch": map[string]interface{}{
+		"output": map[string]any{
+			"elasticsearch": map[string]any{
 				"service_token": serviceToken,
 			},
 		},
 	})
 	require.NoError(t, err, "failed creating CLI config")
 
-	sampleInputConfig, err := structpb.NewStruct(map[string]interface{}{})
+	sampleInputConfig, err := structpb.NewStruct(map[string]any{})
 	require.NoError(t, err)
 
-	sampleOutputConfig, err := structpb.NewStruct(map[string]interface{}{})
+	sampleOutputConfig, err := structpb.NewStruct(map[string]any{})
 	require.NoError(t, err)
 
 	clientMock := &mockClientV2{}
@@ -144,7 +144,7 @@ func (u *mockClientUnit) Expected() client.Expected {
 	return args.Get(0).(client.Expected) //nolint:errcheck // testing mock
 }
 
-func (u *mockClientUnit) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
+func (u *mockClientUnit) UpdateState(state client.UnitState, message string, payload map[string]any) error {
 	args := u.Called()
 	return args.Get(0).(error) //nolint:errcheck // testing mock
 }
@@ -156,7 +156,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		Version: "test-version",
 	})
 	t.Run("input has additional server keys", func(t *testing.T) {
-		outStruct, err := structpb.NewStruct(map[string]interface{}{
+		outStruct, err := structpb.NewStruct(map[string]any{
 			"service_token": "test-token",
 		})
 		require.NoError(t, err)
@@ -168,11 +168,11 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
 			})
 
-		inStruct, err := structpb.NewStruct(map[string]interface{}{
+		inStruct, err := structpb.NewStruct(map[string]any{
 			"type": "fleet-server",
-			"server": map[string]interface{}{
+			"server": map[string]any{
 				"host": "0.0.0.0",
-				"timeouts": map[string]interface{}{
+				"timeouts": map[string]any{
 					"write": "29m",
 				},
 			},
@@ -206,9 +206,9 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
 	})
 	t.Run("output has multiple hosts", func(t *testing.T) {
-		outStruct, err := structpb.NewStruct(map[string]interface{}{
+		outStruct, err := structpb.NewStruct(map[string]any{
 			"service_token": "test-token",
-			"hosts":         []interface{}{"https://localhost:9200", "https://127.0.0.1:9200"},
+			"hosts":         []any{"https://localhost:9200", "https://127.0.0.1:9200"},
 		})
 		require.NoError(t, err)
 		mockOutClient := &mockClientUnit{}
@@ -218,7 +218,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				LogLevel: client.UnitLogLevelInfo,
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
 			})
-		inStruct, err := structpb.NewStruct(map[string]interface{}{"type": "fleet-server"})
+		inStruct, err := structpb.NewStruct(map[string]any{"type": "fleet-server"})
 		require.NoError(t, err)
 		mockInClient := &mockClientUnit{}
 		mockInClient.On("Expected").Return(
@@ -241,7 +241,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		require.Len(t, cfg.Output.Elasticsearch.Hosts, 2)
 	})
 	t.Run("Minimal APM config is specified", func(t *testing.T) {
-		outStruct, err := structpb.NewStruct(map[string]interface{}{
+		outStruct, err := structpb.NewStruct(map[string]any{
 			"service_token": "test-token",
 		})
 		require.NoError(t, err)
@@ -253,12 +253,12 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
 			})
 
-		inStruct, err := structpb.NewStruct(map[string]interface{}{
+		inStruct, err := structpb.NewStruct(map[string]any{
 			"type": "fleet-server",
-			"server": map[string]interface{}{
+			"server": map[string]any{
 				"host": "0.0.0.0",
 			},
-			"policy": map[string]interface{}{
+			"policy": map[string]any{
 				"id": "test-policy",
 			},
 		})
@@ -279,10 +279,10 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				},
 			})
 
-		cliCfg, err := ucfg.NewFrom(map[string]interface{}{
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"policy": map[string]interface{}{
+		cliCfg, err := ucfg.NewFrom(map[string]any{
+			"inputs": []any{
+				map[string]any{
+					"policy": map[string]any{
 						"id": "test-policy",
 					},
 				},
@@ -313,7 +313,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
 	})
 	t.Run("APM config is specified", func(t *testing.T) {
-		outStruct, err := structpb.NewStruct(map[string]interface{}{
+		outStruct, err := structpb.NewStruct(map[string]any{
 			"service_token": "test-token",
 		})
 		require.NoError(t, err)
@@ -325,12 +325,12 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
 			})
 
-		inStruct, err := structpb.NewStruct(map[string]interface{}{
+		inStruct, err := structpb.NewStruct(map[string]any{
 			"type": "fleet-server",
-			"server": map[string]interface{}{
+			"server": map[string]any{
 				"host": "0.0.0.0",
 			},
-			"policy": map[string]interface{}{
+			"policy": map[string]any{
 				"id": "test-policy",
 			},
 		})
@@ -359,10 +359,10 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				},
 			})
 
-		cliCfg, err := ucfg.NewFrom(map[string]interface{}{
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"policy": map[string]interface{}{
+		cliCfg, err := ucfg.NewFrom(map[string]any{
+			"inputs": []any{
+				map[string]any{
+					"policy": map[string]any{
 						"id": "test-policy",
 					},
 				},
@@ -394,7 +394,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, "0.5", cfg.Inputs[0].Server.Instrumentation.TransactionSampleRate)
 	})
 	t.Run("APM config no tls", func(t *testing.T) {
-		outStruct, err := structpb.NewStruct(map[string]interface{}{
+		outStruct, err := structpb.NewStruct(map[string]any{
 			"service_token": "test-token",
 		})
 		require.NoError(t, err)
@@ -406,9 +406,9 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
 			})
 
-		inStruct, err := structpb.NewStruct(map[string]interface{}{
+		inStruct, err := structpb.NewStruct(map[string]any{
 			"type": "fleet-server",
-			"server": map[string]interface{}{
+			"server": map[string]any{
 				"host": "0.0.0.0",
 			},
 		})
@@ -457,7 +457,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, "0.01", cfg.Inputs[0].Server.Instrumentation.TransactionSampleRate)
 	})
 	t.Run("APM config and instrumentation is specified", func(t *testing.T) {
-		outStruct, err := structpb.NewStruct(map[string]interface{}{
+		outStruct, err := structpb.NewStruct(map[string]any{
 			"service_token": "test-token",
 		})
 		require.NoError(t, err)
@@ -469,20 +469,20 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
 			})
 
-		inStruct, err := structpb.NewStruct(map[string]interface{}{
+		inStruct, err := structpb.NewStruct(map[string]any{
 			"type": "fleet-server",
-			"server": map[string]interface{}{
+			"server": map[string]any{
 				"host": "0.0.0.0",
-				"instrumentation": map[string]interface{}{
+				"instrumentation": map[string]any{
 					"enabled": false,
-					"tls": map[string]interface{}{
+					"tls": map[string]any{
 						"skip_verify":        true,
 						"server_certificate": "/path/to/cert.crt",
 					},
 					"environment":             "replace",
 					"api_key":                 "replace",
 					"secret_token":            "replace",
-					"hosts":                   []interface{}{"replace"},
+					"hosts":                   []any{"replace"},
 					"transaction_sample_rate": "0.75",
 				},
 			},
@@ -537,7 +537,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, "0.01", cfg.Inputs[0].Server.Instrumentation.TransactionSampleRate)
 	})
 	t.Run("APM config error", func(t *testing.T) {
-		outStruct, err := structpb.NewStruct(map[string]interface{}{
+		outStruct, err := structpb.NewStruct(map[string]any{
 			"service_token": "test-token",
 		})
 		require.NoError(t, err)
@@ -549,9 +549,9 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
 			})
 
-		inStruct, err := structpb.NewStruct(map[string]interface{}{
+		inStruct, err := structpb.NewStruct(map[string]any{
 			"type": "fleet-server",
-			"server": map[string]interface{}{
+			"server": map[string]any{
 				"host": "0.0.0.0",
 			},
 		})
@@ -581,7 +581,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		assert.Equal(t, "test-token", cfg.Output.Elasticsearch.ServiceToken)
 	})
 	t.Run("no APMConfig has instrumentation config", func(t *testing.T) {
-		outStruct, err := structpb.NewStruct(map[string]interface{}{
+		outStruct, err := structpb.NewStruct(map[string]any{
 			"service_token": "test-token",
 		})
 		require.NoError(t, err)
@@ -594,19 +594,19 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
 			})
 
-		inStruct, err := structpb.NewStruct(map[string]interface{}{
+		inStruct, err := structpb.NewStruct(map[string]any{
 			"type": "fleet-server",
-			"server": map[string]interface{}{
+			"server": map[string]any{
 				"host": "0.0.0.0",
-				"instrumentation": map[string]interface{}{
+				"instrumentation": map[string]any{
 					"enabled": true,
-					"tls": map[string]interface{}{
+					"tls": map[string]any{
 						"skip_verify":        false,
 						"server_certificate": "/path/to/cert.crt",
 					},
 					"environment":  "test",
 					"secret_token": "testToken",
-					"hosts":        []interface{}{"localhost:8080"},
+					"hosts":        []any{"localhost:8080"},
 				},
 			},
 		})
@@ -651,12 +651,12 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		outStruct, err := structpb.NewStruct(map[string]interface{}{
-			"bootstrap": map[string]interface{}{
+		outStruct, err := structpb.NewStruct(map[string]any{
+			"bootstrap": map[string]any{
 				"service_token": "test-token",
-				"hosts":         []interface{}{"https://127.0.0.1:9200"},
+				"hosts":         []any{"https://127.0.0.1:9200"},
 			},
-			"hosts": []interface{}{srv.URL, "https://127.0.0.1:9200"},
+			"hosts": []any{srv.URL, "https://127.0.0.1:9200"},
 		})
 		require.NoError(t, err)
 		mockOutClient := &mockClientUnit{}
@@ -666,7 +666,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				LogLevel: client.UnitLogLevelInfo,
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
 			})
-		inStruct, err := structpb.NewStruct(map[string]interface{}{"type": "fleet-server"})
+		inStruct, err := structpb.NewStruct(map[string]any{"type": "fleet-server"})
 		require.NoError(t, err)
 		mockInClient := &mockClientUnit{}
 		mockInClient.On("Expected").Return(
@@ -701,12 +701,12 @@ func Test_Agent_configFromUnits(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		outStruct, err := structpb.NewStruct(map[string]interface{}{
-			"bootstrap": map[string]interface{}{
+		outStruct, err := structpb.NewStruct(map[string]any{
+			"bootstrap": map[string]any{
 				"service_token": "test-token",
-				"hosts":         []interface{}{"https://127.0.0.1:9200"},
+				"hosts":         []any{"https://127.0.0.1:9200"},
 			},
-			"hosts": []interface{}{srv.URL, "https://127.0.0.1:9200"},
+			"hosts": []any{srv.URL, "https://127.0.0.1:9200"},
 		})
 		require.NoError(t, err)
 		mockOutClient := &mockClientUnit{}
@@ -716,7 +716,7 @@ func Test_Agent_configFromUnits(t *testing.T) {
 				LogLevel: client.UnitLogLevelInfo,
 				Config:   &proto.UnitExpectedConfig{Source: outStruct},
 			})
-		inStruct, err := structpb.NewStruct(map[string]interface{}{"type": "fleet-server"})
+		inStruct, err := structpb.NewStruct(map[string]any{"type": "fleet-server"})
 		require.NoError(t, err)
 		mockInClient := &mockClientUnit{}
 		mockInClient.On("Expected").Return(
@@ -746,95 +746,95 @@ func Test_Agent_configFromUnits(t *testing.T) {
 func TestInjectMissingOutputAttributes(t *testing.T) {
 	tests := []struct {
 		name   string
-		input  map[string]interface{}
-		expect map[string]interface{}
+		input  map[string]any
+		expect map[string]any
 	}{{
 		name:  "empty input",
-		input: map[string]interface{}{},
-		expect: map[string]interface{}{
+		input: map[string]any{},
+		expect: map[string]any{
 			"protocol":      "https",
-			"hosts":         []interface{}{"localhost:9200"},
+			"hosts":         []any{"localhost:9200"},
 			"service_token": "token",
-			"ssl": map[string]interface{}{
+			"ssl": map[string]any{
 				"verification_mode": "full",
 			},
 		},
 	}, {
 		name: "all keys differ",
-		input: map[string]interface{}{
+		input: map[string]any{
 			"NewSetting": 4,
-			"NewMap": map[string]interface{}{
+			"NewMap": map[string]any{
 				"key": "val",
 			},
 		},
-		expect: map[string]interface{}{
+		expect: map[string]any{
 			"NewSetting": 4,
-			"NewMap": map[string]interface{}{
+			"NewMap": map[string]any{
 				"key": "val",
 			},
 			"protocol":      "https",
-			"hosts":         []interface{}{"localhost:9200"},
+			"hosts":         []any{"localhost:9200"},
 			"service_token": "token",
-			"ssl": map[string]interface{}{
+			"ssl": map[string]any{
 				"verification_mode": "full",
 			},
 		},
 	}, {
 		name: "input has same key",
-		input: map[string]interface{}{
-			"hosts": []interface{}{"localhost:9200", "elasticsearch:9200"},
+		input: map[string]any{
+			"hosts": []any{"localhost:9200", "elasticsearch:9200"},
 		},
-		expect: map[string]interface{}{
+		expect: map[string]any{
 			"protocol":      "https",
-			"hosts":         []interface{}{"localhost:9200", "elasticsearch:9200"},
+			"hosts":         []any{"localhost:9200", "elasticsearch:9200"},
 			"service_token": "token",
-			"ssl": map[string]interface{}{
+			"ssl": map[string]any{
 				"verification_mode": "full",
 			},
 		},
 	}, {
 		name: "input has empty ssl object",
-		input: map[string]interface{}{
-			"ssl": map[string]interface{}{},
+		input: map[string]any{
+			"ssl": map[string]any{},
 		},
-		expect: map[string]interface{}{
+		expect: map[string]any{
 			"protocol": "https",
-			"hosts":    []interface{}{"localhost:9200"},
+			"hosts":    []any{"localhost:9200"},
 
 			"service_token": "token",
-			"ssl": map[string]interface{}{
+			"ssl": map[string]any{
 				"verification_mode": "full",
 			},
 		},
 	}, {
 		name: "input has ssl object with same key",
-		input: map[string]interface{}{
-			"ssl": map[string]interface{}{
+		input: map[string]any{
+			"ssl": map[string]any{
 				"certificate":       "cert",
 				"key":               "key",
 				"verification_mode": "none",
 			},
 		},
-		expect: map[string]interface{}{
+		expect: map[string]any{
 			"protocol":      "https",
-			"hosts":         []interface{}{"localhost:9200"},
+			"hosts":         []any{"localhost:9200"},
 			"service_token": "token",
-			"ssl": map[string]interface{}{
+			"ssl": map[string]any{
 				"certificate":       "cert",
 				"key":               "key",
 				"verification_mode": "none",
 			},
 		},
 	}}
-	bootstrap := map[string]interface{}{
+	bootstrap := map[string]any{
 		"protocol":      "https",
-		"hosts":         []interface{}{"localhost:9200"},
+		"hosts":         []any{"localhost:9200"},
 		"service_token": "token",
-		"ssl": map[string]interface{}{
+		"ssl": map[string]any{
 			"verification_mode": "full",
 		},
 		"ignoredKey": "badValue",
-		"ignoredMap": map[string]interface{}{
+		"ignoredMap": map[string]any{
 			"key": "value",
 		},
 	}
@@ -846,68 +846,68 @@ func TestInjectMissingOutputAttributes(t *testing.T) {
 		})
 	}
 
-	bootstrapVerifyNone := map[string]interface{}{
+	bootstrapVerifyNone := map[string]any{
 		"service_token": "token",
-		"ssl": map[string]interface{}{
+		"ssl": map[string]any{
 			"verification_mode": "none",
 		},
 	}
 	sslTests := []struct {
 		name   string
-		input  map[string]interface{}
-		expect map[string]interface{}
+		input  map[string]any
+		expect map[string]any
 	}{{
 		name: "no cas none is injected",
-		input: map[string]interface{}{
-			"ssl": map[string]interface{}{
+		input: map[string]any{
+			"ssl": map[string]any{
 				"certificate": "value",
 			},
 		},
-		expect: map[string]interface{}{
+		expect: map[string]any{
 			"service_token": "token",
-			"ssl": map[string]interface{}{
+			"ssl": map[string]any{
 				"certificate":       "value",
 				"verification_mode": "none",
 			},
 		},
 	}, {
 		name: "certificate_authority provided",
-		input: map[string]interface{}{
-			"ssl": map[string]interface{}{
-				"certificate_authorities": []interface{}{"value"},
+		input: map[string]any{
+			"ssl": map[string]any{
+				"certificate_authorities": []any{"value"},
 			},
 		},
-		expect: map[string]interface{}{
+		expect: map[string]any{
 			"service_token": "token",
-			"ssl": map[string]interface{}{
-				"certificate_authorities": []interface{}{"value"},
+			"ssl": map[string]any{
+				"certificate_authorities": []any{"value"},
 			},
 		},
 	}, {
 		name: "fingerprint provided",
-		input: map[string]interface{}{
-			"ssl": map[string]interface{}{
+		input: map[string]any{
+			"ssl": map[string]any{
 				"ca_trusted_fingerprint": "value",
 			},
 		},
-		expect: map[string]interface{}{
+		expect: map[string]any{
 			"service_token": "token",
-			"ssl": map[string]interface{}{
+			"ssl": map[string]any{
 				"ca_trusted_fingerprint": "value",
 			},
 		},
 	}, {
 		name: "output has CA and verification_mode: none",
-		input: map[string]interface{}{
-			"ssl": map[string]interface{}{
-				"certificate_authorities": []interface{}{"value"},
+		input: map[string]any{
+			"ssl": map[string]any{
+				"certificate_authorities": []any{"value"},
 				"verification_mode":       "none",
 			},
 		},
-		expect: map[string]interface{}{
+		expect: map[string]any{
 			"service_token": "token",
-			"ssl": map[string]interface{}{
-				"certificate_authorities": []interface{}{"value"},
+			"ssl": map[string]any{
+				"certificate_authorities": []any{"value"},
 				"verification_mode":       "none",
 			},
 		},
@@ -931,7 +931,7 @@ func Test_Agent_esOutputCheckLoop(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
-		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{})
+		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]any{})
 		assert.Empty(t, a.chReconfigure)
 	})
 	t.Run("test fails version check", func(t *testing.T) {
@@ -951,9 +951,9 @@ func Test_Agent_esOutputCheckLoop(t *testing.T) {
 		}
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
-		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{
+		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]any{
 			"service_token": "test-token",
-			"hosts":         []interface{}{srv.URL},
+			"hosts":         []any{srv.URL},
 		})
 		assert.Empty(t, a.chReconfigure)
 	})
@@ -980,9 +980,9 @@ func Test_Agent_esOutputCheckLoop(t *testing.T) {
 		}
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
-		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]interface{}{
+		a.esOutputCheckLoop(ctx, time.Millisecond*10, map[string]any{
 			"service_token": "test-token",
-			"hosts":         []interface{}{srv.URL},
+			"hosts":         []any{srv.URL},
 		})
 		assert.NotEmpty(t, a.chReconfigure)
 	})

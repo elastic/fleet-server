@@ -35,8 +35,8 @@ var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
 // Output is the output configuration to elasticsearch.
 type Output struct {
-	Elasticsearch Elasticsearch          `config:"elasticsearch"`
-	Extra         map[string]interface{} `config:",inline"`
+	Elasticsearch Elasticsearch  `config:"elasticsearch"`
+	Extra         map[string]any `config:",inline"`
 }
 
 // Elasticsearch is the configuration for elasticsearch.

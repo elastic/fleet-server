@@ -217,13 +217,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	// sets timeout is set to max(1m, min(pDur-2m, max poll time))
 	// sets the response write timeout to max(2m, timeout+1m)
 	if pDur != time.Duration(0) {
-		pollDuration = pDur - (2 * time.Minute)
-		if pollDuration > ct.cfg.Timeouts.CheckinMaxPoll {
-			pollDuration = ct.cfg.Timeouts.CheckinMaxPoll
-		}
-		if pollDuration < time.Minute {
-			pollDuration = time.Minute
-		}
+		pollDuration = max(min(pDur-(2*time.Minute), ct.cfg.Timeouts.CheckinMaxPoll), time.Minute)
 
 		wTime := pollDuration + time.Minute
 		rc := http.NewResponseController(w)
@@ -678,12 +672,7 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 }
 
 func acceptsEncoding(r *http.Request, encoding string) bool {
-	for _, v := range r.Header.Values("Accept-Encoding") {
-		if v == encoding {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(r.Header.Values("Accept-Encoding"), encoding)
 }
 
 // Resolve AckToken from request, fallback on the agent record
@@ -1044,7 +1033,7 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 	}
 
 	// Deserialize the request metadata
-	var reqLocalMeta interface{}
+	var reqLocalMeta any
 	if err := json.Unmarshal(req.LocalMetadata, &reqLocalMeta); err != nil {
 		return nil, fmt.Errorf("parseMeta request: %w", err)
 	}
@@ -1056,7 +1045,7 @@ func parseMeta(zlog zerolog.Logger, agent *model.Agent, req *CheckinRequest) ([]
 
 	// Deserialize the agent's metadata copy. If it fails, it's ignored as it will just
 	// be replaced with the correct contents from the clients checkin.
-	var agentLocalMeta interface{}
+	var agentLocalMeta any
 	if err := json.Unmarshal(agent.LocalMetadata, &agentLocalMeta); err != nil {
 		zlog.Warn().Err(err).Msg("local_metadata in document invalid; ignoring it")
 	}

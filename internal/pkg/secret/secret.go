@@ -46,7 +46,7 @@ func GetSecretValues(ctx context.Context, secretRefs []model.SecretReferencesIte
 
 // read inputs and secret_references from agent policy
 // replace values of secret refs in inputs and input streams properties
-func ProcessInputsSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]interface{}, []string) {
+func ProcessInputsSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]any, []string) {
 	if len(data.Inputs) == 0 {
 		// No inputs, so no secret references in them to replace.
 		return nil, nil
@@ -75,8 +75,8 @@ func ProcessInputsSecrets(data *model.PolicyData, secretValues map[string]string
 // processInputsWithInlineSecrets reads inputs and secret_references from agent policy and replaces
 // the values of secret refs in inputs and input streams properties using the old format
 // for specifying secrets: <path>: $co.elastic.secret{<secret ref>}
-func processInputsWithInlineSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]interface{}, []string) {
-	result := make([]map[string]interface{}, 0)
+func processInputsWithInlineSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]any, []string) {
+	result := make([]map[string]any, 0)
 	keys := make([]string, 0)
 	for i, input := range data.Inputs {
 		replacedInput, ks := replaceInlineSecretRefsInMap(input, secretValues)
@@ -91,8 +91,8 @@ func processInputsWithInlineSecrets(data *model.PolicyData, secretValues map[str
 // processInputsWithPathSecrets reads inputs and secret_references from agent policy and replaces
 // the values of secret refs in inputs and input streams properties using the new format
 // for specifying secrets: secrets.<path-to-key>.<key>.id:<secret ref>
-func processInputsWithPathSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]interface{}, []string) {
-	result := make([]map[string]interface{}, 0)
+func processInputsWithPathSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]any, []string) {
+	result := make([]map[string]any, 0)
 	keys := make([]string, 0)
 
 	for i, inp := range data.Inputs {
@@ -317,7 +317,7 @@ func setSecretPath(section smap.Map, secretValue string, secretPaths []string) {
 	path, secretPaths := secretPaths[0], secretPaths[1:]
 
 	if section.GetMap(path) == nil {
-		section[path] = make(map[string]interface{})
+		section[path] = make(map[string]any)
 	}
 
 	setSecretPath(section.GetMap(path), secretValue, secretPaths)

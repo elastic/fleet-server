@@ -68,10 +68,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 
 	const kRoughEstimatePerItem = 256
 
-	bufSz := queue.cnt * kRoughEstimatePerItem
-	if bufSz < queue.pending+len(rSuffix) {
-		bufSz = queue.pending + len(rSuffix)
-	}
+	bufSz := max(queue.cnt*kRoughEstimatePerItem, queue.pending+len(rSuffix))
 
 	buf := bytes.NewBufferString(rPrefix)
 	buf.Grow(bufSz)

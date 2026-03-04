@@ -48,7 +48,7 @@ func TestMakeUpdatePolicyBody(t *testing.T) {
 
 	data := makeUpdatePolicyBody(policyID, newRev)
 
-	var i interface{}
+	var i any
 	err := json.Unmarshal(data, &i)
 
 	if err != nil {
@@ -706,7 +706,7 @@ func TestAckHandleUpgrade(t *testing.T) {
 		bulker: func(t *testing.T) *ftesting.MockBulk {
 			m := ftesting.NewMockBulk()
 			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
-				var body map[string]map[string]interface{}
+				var body map[string]map[string]any
 				if err := json.Unmarshal(p, &body); err != nil {
 					t.Fatal(err)
 				}
@@ -725,7 +725,7 @@ func TestAckHandleUpgrade(t *testing.T) {
 		bulker: func(t *testing.T) *ftesting.MockBulk {
 			m := ftesting.NewMockBulk()
 			m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p []byte) bool {
-				var body map[string]map[string]interface{}
+				var body map[string]map[string]any
 				if err := json.Unmarshal(p, &body); err != nil {
 					t.Fatal(err)
 				}

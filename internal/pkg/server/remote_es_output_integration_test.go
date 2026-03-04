@@ -35,7 +35,7 @@ const (
 
 func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType string) (string, string) {
 	cli := cleanhttp.DefaultClient()
-	var obj map[string]interface{}
+	var obj map[string]any
 
 	t.Logf("Fake a checkin for agent %s", agentID)
 	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(checkinBody))
@@ -55,10 +55,10 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 
 	actionsRaw, ok := obj["actions"]
 	require.True(t, ok, "expected actions is missing")
-	actions, ok := actionsRaw.([]interface{})
+	actions, ok := actionsRaw.([]any)
 	require.True(t, ok, "expected actions to be an array")
 	require.Equal(t, len(actions), 1, "expected 1 action")
-	action, ok := actions[0].(map[string]interface{})
+	action, ok := actions[0].(map[string]any)
 	require.True(t, ok, "expected action to be an object")
 
 	aIDRaw, ok := action["id"]
@@ -72,15 +72,15 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 		return "", actionID
 	}
 	dataRaw := action["data"]
-	data, ok := dataRaw.(map[string]interface{})
+	data, ok := dataRaw.(map[string]any)
 	require.True(t, ok, "expected data to be map")
-	policy, ok := data["policy"].(map[string]interface{})
+	policy, ok := data["policy"].(map[string]any)
 	require.True(t, ok, "expected policy to be map")
-	outputs, ok := policy["outputs"].(map[string]interface{})
+	outputs, ok := policy["outputs"].(map[string]any)
 	require.True(t, ok, "expected outputs to be map")
 	var remoteAPIKey string
 	if shouldHaveRemoteES {
-		remoteES, ok := outputs["remoteES"].(map[string]interface{})
+		remoteES, ok := outputs["remoteES"].(map[string]any)
 		require.True(t, ok, "expected remoteES to be map")
 		oType, ok := remoteES["type"].(string)
 		require.True(t, ok, "expected type to be string")
@@ -90,7 +90,7 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 		remoteAPIKey, ok = remoteES["api_key"].(string)
 		require.True(t, ok, "expected remoteAPIKey to be string")
 	}
-	defaultOutput, ok := outputs["default"].(map[string]interface{})
+	defaultOutput, ok := outputs["default"].(map[string]any)
 	require.True(t, ok, "expected default to be map")
 	defaultAPIKey, ok := defaultOutput["api_key"].(string)
 	require.True(t, ok, "expected defaultAPIKey to be string")
@@ -129,7 +129,7 @@ func Ack(t *testing.T, ctx context.Context, srv *tserver, actionID, agentID, key
 	t.Log("Ack successful, verify body")
 	p, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	var ackObj map[string]interface{}
+	var ackObj map[string]any
 	err = json.Unmarshal(p, &ackObj)
 	require.NoError(t, err)
 
@@ -151,7 +151,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
 	var policyDataRemoteES = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
+		Outputs: map[string]map[string]any{
 			"default": {
 				"type": "elasticsearch",
 			},
@@ -164,8 +164,8 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
-		Inputs:            []map[string]interface{}{},
-		Agent:             map[string]interface{}{"monitoring": map[string]string{"use_output": "remoteES"}},
+		Inputs:            []map[string]any{},
+		Agent:             map[string]any{"monitoring": map[string]string{"use_output": "remoteES"}},
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -190,7 +190,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 		    "resources": ["*"]
 		}]
 	    }
-	}`), map[string]interface{}{
+	}`), map[string]any{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",
@@ -234,13 +234,13 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	t.Log("Update policy to remove remote ES output")
 
 	var policyData = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
+		Outputs: map[string]map[string]any{
 			"default": {
 				"type": "elasticsearch",
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}}`),
-		Inputs:            []map[string]interface{}{},
+		Inputs:            []map[string]any{},
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -305,7 +305,7 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
 	var policyDataRemoteES = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
+		Outputs: map[string]map[string]any{
 			"default": {
 				"type": "elasticsearch",
 			},
@@ -318,8 +318,8 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
-		Inputs:            []map[string]interface{}{},
-		Agent:             map[string]interface{}{"monitoring": map[string]string{"use_output": "remoteES"}},
+		Inputs:            []map[string]any{},
+		Agent:             map[string]any{"monitoring": map[string]string{"use_output": "remoteES"}},
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -344,7 +344,7 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 		    "resources": ["*"]
 		}]
 	    }
-	}`), map[string]interface{}{
+	}`), map[string]any{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",
@@ -426,7 +426,7 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
 	var policyDataRemoteES = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
+		Outputs: map[string]map[string]any{
 			"default": {
 				"type": "elasticsearch",
 			},
@@ -439,8 +439,8 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
-		Inputs:            []map[string]interface{}{},
-		Agent:             map[string]interface{}{"monitoring": map[string]string{"use_output": "remoteES"}},
+		Inputs:            []map[string]any{},
+		Agent:             map[string]any{"monitoring": map[string]string{"use_output": "remoteES"}},
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -465,7 +465,7 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 		    "resources": ["*"]
 		}]
 	    }
-	}`), map[string]interface{}{
+	}`), map[string]any{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",

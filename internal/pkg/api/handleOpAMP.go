@@ -380,15 +380,15 @@ type localMetadata struct {
 			ID      string `json:"id,omitempty"`
 			Version string `json:"version,omitempty"`
 			Name    string `json:"name,omitempty"`
-		} `json:"agent,omitempty"`
-	} `json:"elastic,omitempty"`
+		} `json:"agent"`
+	} `json:"elastic"`
 	Host struct {
 		Hostname string `json:"hostname,omitempty"`
 		Name     string `json:"name,omitempty"`
-	} `json:"host,omitempty"`
+	} `json:"host"`
 	Os struct {
 		Platform string `json:"platform,omitempty"`
-	} `json:"os,omitempty"`
+	} `json:"os"`
 }
 
 func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, error) {
@@ -398,7 +398,7 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 		if len(configMap.Body) != 0 {
 			bodyBytes := configMap.Body
 
-			obj := make(map[string]interface{})
+			obj := make(map[string]any)
 			if err := yaml.Unmarshal(bodyBytes, &obj); err != nil {
 				return nil, fmt.Errorf("unmarshal effective config failure: %w", err)
 			}
@@ -413,10 +413,10 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 	return nil, nil
 }
 
-func redactSensitive(v interface{}) {
+func redactSensitive(v any) {
 	const redacted = "[REDACTED]"
 	switch typed := v.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		for key, val := range typed {
 			if redactKey(key) {
 				typed[key] = redacted
@@ -424,7 +424,7 @@ func redactSensitive(v interface{}) {
 			}
 			redactSensitive(val)
 		}
-	case map[interface{}]interface{}:
+	case map[any]any:
 		for rawKey, val := range typed {
 			key, ok := rawKey.(string)
 			if ok && redactKey(key) {
@@ -433,7 +433,7 @@ func redactSensitive(v interface{}) {
 			}
 			redactSensitive(val)
 		}
-	case []interface{}:
+	case []any:
 		for i := range typed {
 			redactSensitive(typed[i])
 		}
@@ -459,7 +459,7 @@ func redactKey(k string) bool {
 }
 
 // anyValueToInterface recursively converts protobufs.AnyValue to Go interface{} for JSON marshalling
-func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) interface{} {
+func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) any {
 	switch v := av.GetValue().(type) {
 	case *protobufs.AnyValue_StringValue:
 		return v.StringValue
@@ -472,13 +472,13 @@ func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) interface{
 	case *protobufs.AnyValue_BytesValue:
 		return v.BytesValue
 	case *protobufs.AnyValue_ArrayValue:
-		arr := make([]interface{}, 0, len(v.ArrayValue.Values))
+		arr := make([]any, 0, len(v.ArrayValue.Values))
 		for _, av2 := range v.ArrayValue.Values {
 			arr = append(arr, anyValueToInterface(zlog, av2))
 		}
 		return arr
 	case *protobufs.AnyValue_KvlistValue:
-		m := make(map[string]interface{}, len(v.KvlistValue.Values))
+		m := make(map[string]any, len(v.KvlistValue.Values))
 		for _, kv := range v.KvlistValue.Values {
 			if kv.Value != nil {
 				m[kv.Key] = anyValueToInterface(zlog, kv.Value)
@@ -493,7 +493,7 @@ func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) interface{
 
 func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json.RawMessage, error) {
 	// 1. Build an intermediate map to represent the JSON object
-	data := make(map[string]interface{}, len(kv))
+	data := make(map[string]any, len(kv))
 	for _, item := range kv {
 		if item.Value == nil {
 			continue

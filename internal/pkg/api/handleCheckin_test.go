@@ -356,8 +356,7 @@ func TestResolveSeqNo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup mock CheckinT
 			logger := testlog.SetLogger(t)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			verCon := mustBuildConstraints("8.0.0")
 			cfg := &config.Server{}
 			c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
@@ -413,7 +412,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk := ftesting.NewMockBulk()
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
 				doc := struct {
-					Doc map[string]interface{} `json:"doc"`
+					Doc map[string]any `json:"doc"`
 				}{}
 				if err := json.Unmarshal(p, &doc); err != nil {
 					t.Logf("bulk match unmarshal error: %v", err)
@@ -1090,7 +1089,7 @@ func TestParseComponents(t *testing.T) {
 	}
 }
 
-func requireMarshalJSON(t *testing.T, obj interface{}) json.RawMessage {
+func requireMarshalJSON(t *testing.T, obj any) json.RawMessage {
 	data, err := json.Marshal(obj)
 	require.NoError(t, err)
 	return data

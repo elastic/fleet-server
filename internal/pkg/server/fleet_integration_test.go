@@ -175,7 +175,7 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 		    "resources": ["*"]
 		}]
 	    }
-	}`), map[string]interface{}{
+	}`), map[string]any{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",
@@ -306,7 +306,7 @@ type MockReporter struct {
 	mock.Mock
 }
 
-func (m *MockReporter) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
+func (m *MockReporter) UpdateState(state client.UnitState, message string, payload map[string]any) error {
 	args := m.Called(state, message, payload)
 	return args.Error(0)
 }
@@ -352,7 +352,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 		    "resources": ["*"]
 		}]
 	    }
-	}`), map[string]interface{}{
+	}`), map[string]any{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",
@@ -629,13 +629,13 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	t.Log("Agent enrollment successful, verify body")
 	p, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	var obj map[string]interface{} // NOTE Should we use response objects?
+	var obj map[string]any // NOTE Should we use response objects?
 	err = json.Unmarshal(p, &obj)
 	require.NoError(t, err)
 
 	item, ok := obj["item"]
 	require.True(t, ok, "expected attribute item is missing")
-	mm, ok := item.(map[string]interface{})
+	mm, ok := item.(map[string]any)
 	require.True(t, ok, "expected attribute item to be an object")
 
 	id, ok := mm["id"]
@@ -674,10 +674,10 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 
 	actionsRaw, ok := obj["actions"]
 	require.True(t, ok, "expected actions is missing")
-	actions, ok := actionsRaw.([]interface{})
+	actions, ok := actionsRaw.([]any)
 	require.True(t, ok, "expected actions to be an array")
 	require.Greater(t, len(actions), 0, "expected at least 1 action")
-	action, ok := actions[0].(map[string]interface{})
+	action, ok := actions[0].(map[string]any)
 	require.True(t, ok, "expected action to be an object")
 	aIDRaw, ok := action["id"]
 	require.True(t, ok, "expected action id attribute missing")
@@ -710,7 +710,7 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	t.Log("Ack successful, verify body")
 	p, _ = io.ReadAll(res.Body)
 	res.Body.Close()
-	var ackObj map[string]interface{}
+	var ackObj map[string]any
 	err = json.Unmarshal(p, &ackObj)
 	require.NoError(t, err)
 
@@ -1016,13 +1016,13 @@ func Test_Agent_Auth_errors(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	p, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	var obj map[string]interface{} // NOTE Should we use response objects?
+	var obj map[string]any // NOTE Should we use response objects?
 	err = json.Unmarshal(p, &obj)
 	require.NoError(t, err)
 
 	item, ok := obj["item"]
 	require.True(t, ok, "expected attribute item is missing")
-	mm, ok := item.(map[string]interface{})
+	mm, ok := item.(map[string]any)
 	require.True(t, ok, "expected attribute item to be an object")
 	keyRaw, ok := mm["access_api_key"]
 	require.True(t, ok, "expected attribute access_api_key is missing")
@@ -1076,13 +1076,13 @@ func Test_Agent_Auth_errors(t *testing.T) {
 		t.Log("Agent enrollment successful, verify body")
 		p, _ := io.ReadAll(res.Body)
 		res.Body.Close()
-		var obj map[string]interface{} // NOTE Should we use response objects?
+		var obj map[string]any // NOTE Should we use response objects?
 		err = json.Unmarshal(p, &obj)
 		require.NoError(t, err)
 
 		item, ok := obj["item"]
 		require.True(t, ok, "expected attribute item is missing")
-		mm, ok := item.(map[string]interface{})
+		mm, ok := item.(map[string]any)
 		require.True(t, ok, "expected attribute item to be an object")
 
 		idRaw, ok := mm["id"]
@@ -1475,7 +1475,7 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 	t.Log("Checkin successful, verify body")
 	p, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	var obj map[string]interface{}
+	var obj map[string]any
 	err = json.Unmarshal(p, &obj)
 	require.NoError(t, err)
 
@@ -1486,10 +1486,10 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 
 	actionsRaw, ok := obj["actions"]
 	require.True(t, ok, "expected actions is missing")
-	actions, ok := actionsRaw.([]interface{})
+	actions, ok := actionsRaw.([]any)
 	require.True(t, ok, "expected actions to be an array")
 	require.Greater(t, len(actions), 0, "expected at least 1 action")
-	action, ok := actions[0].(map[string]interface{})
+	action, ok := actions[0].(map[string]any)
 	require.True(t, ok, "expected action to be an object")
 	aIDRaw, ok := action["id"]
 	require.True(t, ok, "expected action id attribute missing")
@@ -1522,7 +1522,7 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 	t.Log("Ack successful, verify body")
 	p, _ = io.ReadAll(res.Body)
 	res.Body.Close()
-	var ackObj map[string]interface{}
+	var ackObj map[string]any
 	err = json.Unmarshal(p, &ackObj)
 	require.NoError(t, err)
 
@@ -1539,7 +1539,7 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 		outputNames = append(outputNames, name)
 	}
 	require.Len(t, outputNames, 1)
-	p = []byte(fmt.Sprintf(`{"script":{"lang": "painless", "source": "ctx._source['outputs'][params.output].api_key = ''; ctx._source['outputs'][params.output].api_key_id = '';", "params": {"output": "%s"}}}`, outputNames[0]))
+	p = fmt.Appendf(nil, `{"script":{"lang": "painless", "source": "ctx._source['outputs'][params.output].api_key = ''; ctx._source['outputs'][params.output].api_key_id = '';", "params": {"output": "%s"}}}`, outputNames[0])
 	t.Logf("Attempting to remove api_key attribute from: %s, body: %s", resp.Item.Id, string(p))
 	err = srv.bulker.Update(
 		ctx,
@@ -1574,7 +1574,7 @@ func Test_SmokeTest_Verify_v85Migrate(t *testing.T) {
 
 	actionsRaw, ok = obj["actions"]
 	require.True(t, ok, "expected actions is missing")
-	actions, ok = actionsRaw.([]interface{})
+	actions, ok = actionsRaw.([]any)
 	require.True(t, ok, "expected actions to be an array")
 	require.Greater(t, len(actions), 0, "expected at least 1 action")
 
@@ -1659,7 +1659,7 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 	t.Log("Checkin successful, verify body")
 	p, _ := io.ReadAll(res.Body)
 	res.Body.Close()
-	var obj map[string]interface{}
+	var obj map[string]any
 	err = json.Unmarshal(p, &obj)
 	require.NoError(t, err)
 
@@ -1675,12 +1675,12 @@ func Test_SmokeTest_AuditUnenroll(t *testing.T) {
 		}
 		p, err := io.ReadAll(res.Body)
 		require.NoError(t, err)
-		var tmp map[string]interface{}
+		var tmp map[string]any
 		err = json.Unmarshal(p, &tmp)
 		require.NoError(t, err)
 		o, ok := tmp["_source"]
 		require.Truef(t, ok, "expected to find _source in: %v", tmp)
-		obj, ok := o.(map[string]interface{})
+		obj, ok := o.(map[string]any)
 		require.Truef(t, ok, "expected _source to be an object, was: %T", o)
 		_, ok = obj["audit_unenrolled_reason"]
 		_, ok2 := obj["unenrolled_at"]
@@ -1698,7 +1698,7 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 		return fmt.Sprintf("%s/%s", id, idSuffix)
 	}
 	policyData := model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
+		Outputs: map[string]map[string]any{
 			"default": {
 				"type": "elasticsearch",
 			},
