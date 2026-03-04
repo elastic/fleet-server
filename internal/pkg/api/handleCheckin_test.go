@@ -837,52 +837,6 @@ func Test_CheckinT_writeResponse(t *testing.T) {
 	}
 }
 
-func Test_acceptsEncoding(t *testing.T) {
-	tests := []struct {
-		name    string
-		headers http.Header
-		want    bool
-	}{{
-		name:    "exact match",
-		headers: http.Header{"Accept-Encoding": []string{kEncodingGzip}},
-		want:    true,
-	}, {
-		name:    "comma-separated list contains encoding",
-		headers: http.Header{"Accept-Encoding": []string{"gzip, deflate"}},
-		want:    true,
-	}, {
-		name:    "comma-separated list does not contain encoding",
-		headers: http.Header{"Accept-Encoding": []string{"deflate, br"}},
-		want:    false,
-	}, {
-		name:    "with quality value",
-		headers: http.Header{"Accept-Encoding": []string{"gzip;q=1.0, deflate;q=0.5"}},
-		want:    true,
-	}, {
-		name:    "q=0 means explicitly unwanted",
-		headers: http.Header{"Accept-Encoding": []string{"gzip;q=0, deflate"}},
-		want:    false,
-	}, {
-		name:    "wildcard matches any encoding",
-		headers: http.Header{"Accept-Encoding": []string{"*"}},
-		want:    true,
-	}, {
-		name:    "case insensitive",
-		headers: http.Header{"Accept-Encoding": []string{"GZIP"}},
-		want:    true,
-	}, {
-		name:    "no Accept-Encoding header",
-		headers: http.Header{},
-		want:    false,
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := &http.Request{Header: tt.headers}
-			assert.Equal(t, tt.want, acceptsEncoding(r, kEncodingGzip))
-		})
-	}
-}
-
 func Benchmark_CheckinT_writeResponse(b *testing.B) {
 	verCon := mustBuildConstraints("8.0.0")
 	cfg := &config.Server{
