@@ -9,7 +9,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.0
 	github.com/elastic/elastic-agent-libs v0.33.2
-	github.com/elastic/elastic-agent-system-metrics v0.14.2
+	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
 	github.com/elastic/go-ucfg v0.9.0
 	github.com/fxamacker/cbor/v2 v2.9.0
