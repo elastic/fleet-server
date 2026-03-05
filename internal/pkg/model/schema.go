@@ -448,7 +448,7 @@ type Policy struct {
 type PolicyData struct {
 
 	// The policy's agent configuration details
-	Agent json.RawMessage `json:"agent,omitempty"`
+	Agent map[string]interface{} `json:"agent,omitempty"`
 
 	// OTel collector connectors
 	Connectors map[string]interface{} `json:"connectors,omitempty"`

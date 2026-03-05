@@ -275,52 +275,52 @@ func replaceInlineSecretRefsInSlice(arr []any, secrets map[string]string) ([]any
 	return result, keys
 }
 
-type OutputSecret struct {
+type Secret struct {
 	Path []string
 	ID   string
 }
 
-func getSecretIDAndPath(secret smap.Map) []OutputSecret {
-	outputSecrets := make([]OutputSecret, 0)
+func getSecretIDAndPath(secret smap.Map) []Secret {
+	secrets := make([]Secret, 0)
 
 	secretID := secret.GetString("id")
 	if secretID != "" {
-		outputSecrets = append(outputSecrets, OutputSecret{
+		secrets = append(secrets, Secret{
 			Path: make([]string, 0),
 			ID:   secretID,
 		})
 
-		return outputSecrets
+		return secrets
 	}
 
 	for secretKey := range secret {
-		newOutputSecrets := getSecretIDAndPath(secret.GetMap(secretKey))
+		newSecrets := getSecretIDAndPath(secret.GetMap(secretKey))
 
-		for _, secret := range newOutputSecrets {
-			path := append([]string{secretKey}, secret.Path...)
-			outputSecrets = append(outputSecrets, OutputSecret{
+		for _, newSecret := range newSecrets {
+			path := append([]string{secretKey}, newSecret.Path...)
+			secrets = append(secrets, Secret{
 				Path: path,
-				ID:   secret.ID,
+				ID:   newSecret.ID,
 			})
 		}
 	}
 
-	return outputSecrets
+	return secrets
 }
 
-func setSecretPath(output smap.Map, secretValue string, secretPaths []string) {
+func setSecretPath(section smap.Map, secretValue string, secretPaths []string) {
 	// Break the recursion
 	if len(secretPaths) == 1 {
-		output[secretPaths[0]] = secretValue
+		section[secretPaths[0]] = secretValue
 		return
 	}
 	path, secretPaths := secretPaths[0], secretPaths[1:]
 
-	if output.GetMap(path) == nil {
-		output[path] = make(map[string]interface{})
+	if section.GetMap(path) == nil {
+		section[path] = make(map[string]interface{})
 	}
 
-	setSecretPath(output.GetMap(path), secretValue, secretPaths)
+	setSecretPath(section.GetMap(path), secretValue, secretPaths)
 }
 
 // Read secret from output and mutate output with secret value
@@ -330,27 +330,22 @@ func ProcessOutputSecret(output smap.Map, secretValues map[string]string) ([]str
 	// policies: inline and path (see https://github.com/elastic/fleet-server/pull/5852).
 	// So we try replacing secret references in both formats.
 
-<<<<<<< HEAD
-	keys := processOutputWithInlineSecrets(output, secretValues)
-	k := processOutputWithPathSecrets(output, secretValues)
-=======
 	keys, err := processMapWithInlineSecrets(output, secretValues)
 	if err != nil {
 		return nil, fmt.Errorf("failed processing output secret with inline secrets: %w", err)
 	}
 	k := processMapWithPathSecrets(output, secretValues)
->>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 
 	keys = append(keys, k...)
 	return keys, nil
 }
 
-// processOutputWithPathSecrets reads secrets from the output and mutates the output with the secret values using
+// processMapWithPathSecrets reads secrets from the output and mutates the output with the secret values using
 // the new format for specifying secrets: secrets.<path-to-field>.<field>.id:<secret ref>
-func processOutputWithPathSecrets(output smap.Map, secretValues map[string]string) []string {
-	secrets := output.GetMap(FieldSecrets)
+func processMapWithPathSecrets(m smap.Map, secretValues map[string]string) []string {
+	secrets := m.GetMap(FieldSecrets)
 
-	delete(output, FieldSecrets)
+	delete(m, FieldSecrets)
 	secretReferences := make([]model.SecretReferencesItems, 0)
 	outputSecrets := getSecretIDAndPath(secrets)
 	keys := make([]string, 0, len(outputSecrets))
@@ -374,17 +369,11 @@ func processOutputWithPathSecrets(output smap.Map, secretValues map[string]strin
 			key = key + "." + p
 		}
 		keys = append(keys, key)
-		setSecretPath(output, secretValues[secret.ID], secret.Path)
+		setSecretPath(m, secretValues[secret.ID], secret.Path)
 	}
 	return keys
 }
 
-<<<<<<< HEAD
-func processOutputWithInlineSecrets(output smap.Map, secretValues map[string]string) []string {
-	replacedOutput, keys := replaceInlineSecretRefsInMap(output, secretValues)
-	for _, key := range keys {
-		output[key] = replacedOutput[key]
-=======
 func processMapWithInlineSecrets(m smap.Map, secretValues map[string]string) ([]string, error) {
 	replacedM, keys := replaceInlineSecretRefsInMap(m, secretValues)
 	for _, key := range keys {
@@ -392,13 +381,10 @@ func processMapWithInlineSecrets(m smap.Map, secretValues map[string]string) ([]
 		if err := m.Set(key, rm.Get(key)); err != nil {
 			return nil, fmt.Errorf("failed processing map with inline secrets: failed to set secret value for key %s: %w", key, err)
 		}
->>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 	}
 	return keys, nil
 }
 
-<<<<<<< HEAD
-=======
 // ProcessMapSecrets reads and replaces secrets in the agent.download section of the policy
 func ProcessMapSecrets(m smap.Map, secretValues map[string]string) ([]string, error) {
 	// Unfortunately, there are two ways (formats) of specifying secret references in
@@ -415,7 +401,6 @@ func ProcessMapSecrets(m smap.Map, secretValues map[string]string) ([]string, er
 	return keys, nil
 }
 
->>>>>>> 8ea3537 (Replace secrets in `fleet` section of policies (#5997))
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
 // and does this for multiple matches
 // returns the resulting string value, and if any replacements were made
