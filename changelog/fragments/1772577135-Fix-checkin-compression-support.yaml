@@ -18,7 +18,6 @@ summary: Fix checkin endpoint compression support
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
   Adds support for gzip compressed requests to the checkin endpoint.
-  Properly detect accept-encoding headers for gzip responses on the checkin endpoint.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: fleet-server
