@@ -965,6 +965,9 @@ type InternalServerError = Error
 // KeyNotEnabled Error processing request.
 type KeyNotEnabled = Error
 
+// PayloadTooLarge Error processing request.
+type PayloadTooLarge = Error
+
 // Throttle Error processing request.
 type Throttle = Error
 
