@@ -460,7 +460,7 @@ type PolicyData struct {
 	Extensions map[string]interface{} `json:"extensions,omitempty"`
 
 	// The policy's fleet configuration details
-	Fleet json.RawMessage `json:"fleet,omitempty"`
+	Fleet map[string]interface{} `json:"fleet,omitempty"`
 
 	// The policy's ID
 	ID string `json:"id"`
