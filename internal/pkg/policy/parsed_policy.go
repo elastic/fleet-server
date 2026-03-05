@@ -89,10 +89,8 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	if err != nil {
 		return nil, err
 	}
-	policyInputs, keys, err := secret.GetPolicyInputsWithSecrets(ctx, p.Data, bulker)
-	if err != nil {
-		return nil, err
-	}
+	policyInputs, keys := secret.ProcessInputsSecrets(p.Data, secretValues)
+	secretKeys = append(secretKeys, keys...)
 
 	// Replace secrets in 'agent.download' section of policy
 	if agentDownload, exists := p.Data.Agent["download"]; exists {
