@@ -695,35 +695,46 @@ func NewAgentCheckinRequestWithBody(server string, id string, params *AgentCheck
 			req.Header.Set("Accept-Encoding", headerParam0)
 		}
 
-		var headerParam1 string
+		if params.ContentEncoding != nil {
+			var headerParam1 string
 
-		headerParam1, err = runtime.StyleParamWithLocation("simple", false, "User-Agent", runtime.ParamLocationHeader, params.UserAgent)
+			headerParam1, err = runtime.StyleParamWithLocation("simple", false, "Content-Encoding", runtime.ParamLocationHeader, *params.ContentEncoding)
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Content-Encoding", headerParam1)
+		}
+
+		var headerParam2 string
+
+		headerParam2, err = runtime.StyleParamWithLocation("simple", false, "User-Agent", runtime.ParamLocationHeader, params.UserAgent)
 		if err != nil {
 			return nil, err
 		}
 
-		req.Header.Set("User-Agent", headerParam1)
+		req.Header.Set("User-Agent", headerParam2)
 
 		if params.XRequestId != nil {
-			var headerParam2 string
+			var headerParam3 string
 
-			headerParam2, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
+			headerParam3, err = runtime.StyleParamWithLocation("simple", false, "X-Request-Id", runtime.ParamLocationHeader, *params.XRequestId)
 			if err != nil {
 				return nil, err
 			}
 
-			req.Header.Set("X-Request-Id", headerParam2)
+			req.Header.Set("X-Request-Id", headerParam3)
 		}
 
 		if params.ElasticApiVersion != nil {
-			var headerParam3 string
+			var headerParam4 string
 
-			headerParam3, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
+			headerParam4, err = runtime.StyleParamWithLocation("simple", false, "elastic-api-version", runtime.ParamLocationHeader, *params.ElasticApiVersion)
 			if err != nil {
 				return nil, err
 			}
 
-			req.Header.Set("elastic-api-version", headerParam3)
+			req.Header.Set("elastic-api-version", headerParam4)
 		}
 
 	}

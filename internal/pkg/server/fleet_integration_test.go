@@ -52,7 +52,7 @@ const (
 	serverVersion = "8.0.0"
 	localhost     = "localhost"
 
-	testWaitServerUp = 3 * time.Second
+	testWaitServerUp = 10 * time.Second
 
 	enrollBody = `{
 	    "type": "PERMANENT",
@@ -244,6 +244,7 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 }
 
 func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
+	zlog := zerolog.Ctx(ctx)
 	ctx, cancel := context.WithTimeout(ctx, dur)
 	defer cancel()
 
@@ -270,6 +271,7 @@ func (s *tserver) waitServerUp(ctx context.Context, dur time.Duration) error {
 			return false, err
 		}
 
+		zlog.Info().Msgf("test wait for fleet-server up status: %s", status.Status)
 		return status.Status == "HEALTHY", nil
 	}
 

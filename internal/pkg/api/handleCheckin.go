@@ -187,9 +187,20 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	}
 	readCounter := datacounter.NewReaderCounter(body)
 
+	// Decompress the body when the client signals Content-Encoding: gzip.
+	var bodyReader io.Reader = readCounter
+	if r.Header.Get("Content-Encoding") == kEncodingGzip {
+		gr, err := gzip.NewReader(readCounter)
+		if err != nil {
+			return validatedCheckin{}, &BadRequestErr{msg: "unable to create gzip reader for request body", nextErr: err}
+		}
+		defer gr.Close()
+		bodyReader = gr
+	}
+
 	var val validatedCheckin
 	var req CheckinRequest
-	decoder := json.NewDecoder(readCounter)
+	decoder := json.NewDecoder(bodyReader)
 	if err := decoder.Decode(&req); err != nil {
 		return val, &BadRequestErr{msg: "unable to decode checkin request", nextErr: err}
 	}
@@ -666,6 +677,8 @@ func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r 
 	return err
 }
 
+// acceptsEncoding reports whether the request includes the passed encoding.
+// Only an exact match is checked as that is all the agent will send.
 func acceptsEncoding(r *http.Request, encoding string) bool {
 	for _, v := range r.Header.Values("Accept-Encoding") {
 		if v == encoding {
