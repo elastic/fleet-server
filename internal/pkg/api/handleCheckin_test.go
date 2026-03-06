@@ -1121,7 +1121,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 			assert.NoError(t, err)
 			wr := httptest.NewRecorder()
 			logger := testlog.SetLogger(t)
-			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, nil)
+			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, &model.Agent{LocalMetadata: json.RawMessage(`{}`)})
 			if tc.expErr == nil {
 				assert.NoError(t, err)
 			} else {
@@ -1130,8 +1130,8 @@ func TestValidateCheckinRequest(t *testing.T) {
 				// we will end up with false positives.
 				assert.Equal(t, tc.expErr.Error(), err.Error())
 				assert.ErrorAs(t, err, &tc.expErr)
+				assert.Equal(t, tc.expValid, valid)
 			}
-			assert.Equal(t, tc.expValid, valid)
 		})
 	}
 }
