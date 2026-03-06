@@ -1221,6 +1221,7 @@ type GetPGPKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON400      *BadRequest
+	JSON429      *Throttle
 }
 
 // Status returns HTTPResponse.Status
@@ -1245,7 +1246,10 @@ type AgentEnrollResponse struct {
 	JSON200      *EnrollResponse
 	JSON400      *BadRequest
 	JSON401      *KeyNotEnabled
+	JSON403      *Forbidden
 	JSON408      *Deadline
+	JSON413      *PayloadTooLarge
+	JSON429      *Throttle
 	JSON500      *InternalServerError
 	JSON503      *Unavailable
 }
@@ -1275,6 +1279,8 @@ type AgentAcksResponse struct {
 	JSON403      *Forbidden
 	JSON404      *AgentNotFound
 	JSON408      *Deadline
+	JSON413      *PayloadTooLarge
+	JSON429      *Throttle
 	JSON500      *InternalServerError
 	JSON503      *Unavailable
 }
@@ -1300,7 +1306,9 @@ type AuditUnenrollResponse struct {
 	HTTPResponse *http.Response
 	JSON400      *BadRequest
 	JSON401      *KeyNotEnabled
+	JSON403      *Forbidden
 	JSON409      *Conflict
+	JSON429      *Throttle
 	JSON500      *InternalServerError
 	JSON503      *Unavailable
 }
@@ -1330,6 +1338,8 @@ type AgentCheckinResponse struct {
 	JSON403      *Forbidden
 	JSON404      *AgentNotFound
 	JSON408      *Deadline
+	JSON413      *PayloadTooLarge
+	JSON429      *Throttle
 	JSON500      *InternalServerError
 	JSON503      *Unavailable
 }
@@ -1355,9 +1365,10 @@ type ArtifactResponse struct {
 	HTTPResponse *http.Response
 	JSON400      *BadRequest
 	JSON401      *KeyNotEnabled
+	JSON403      *Forbidden
 	JSON404      *AgentNotFound
 	JSON408      *Deadline
-	JSON428      *Throttle
+	JSON429      *Throttle
 	JSON500      *InternalServerError
 	JSON503      *Unavailable
 }
@@ -1384,6 +1395,7 @@ type GetFileResponse struct {
 	JSON400      *BadRequest
 	JSON401      *KeyNotEnabled
 	JSON403      *Error
+	JSON429      *Throttle
 	JSON500      *InternalServerError
 	JSON503      *Unavailable
 }
@@ -1412,6 +1424,8 @@ type UploadBeginResponse struct {
 	JSON401      *KeyNotEnabled
 	JSON403      *Forbidden
 	JSON408      *Deadline
+	JSON413      *PayloadTooLarge
+	JSON429      *Throttle
 	JSON500      *InternalServerError
 	JSON503      *Unavailable
 }
@@ -1469,6 +1483,8 @@ type UploadChunkResponse struct {
 	JSON401      *KeyNotEnabled
 	JSON403      *Forbidden
 	JSON408      *Deadline
+	JSON413      *PayloadTooLarge
+	JSON429      *Throttle
 	JSON500      *InternalServerError
 	JSON503      *Unavailable
 }
@@ -1494,6 +1510,7 @@ type StatusResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *StatusAPIResponse
 	JSON400      *BadRequest
+	JSON429      *Throttle
 	JSON503      *StatusAPIResponse
 }
 
@@ -1681,6 +1698,13 @@ func ParseGetPGPKeyResponse(rsp *http.Response) (*GetPGPKeyResponse, error) {
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Throttle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
 	}
 
 	return response, nil
@@ -1721,12 +1745,33 @@ func ParseAgentEnrollResponse(rsp *http.Response) (*AgentEnrollResponse, error) 
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 408:
 		var dest Deadline
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON408 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest PayloadTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Throttle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
@@ -1803,6 +1848,20 @@ func ParseAgentAcksResponse(rsp *http.Response) (*AgentAcksResponse, error) {
 		}
 		response.JSON408 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest PayloadTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Throttle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1850,12 +1909,26 @@ func ParseAuditUnenrollResponse(rsp *http.Response) (*AuditUnenrollResponse, err
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Conflict
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Throttle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
@@ -1932,6 +2005,20 @@ func ParseAgentCheckinResponse(rsp *http.Response) (*AgentCheckinResponse, error
 		}
 		response.JSON408 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest PayloadTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Throttle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1979,6 +2066,13 @@ func ParseArtifactResponse(rsp *http.Response) (*ArtifactResponse, error) {
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest AgentNotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1993,12 +2087,12 @@ func ParseArtifactResponse(rsp *http.Response) (*ArtifactResponse, error) {
 		}
 		response.JSON408 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest Throttle
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON428 = &dest
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
@@ -2053,6 +2147,13 @@ func ParseGetFileResponse(rsp *http.Response) (*GetFileResponse, error) {
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Throttle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
@@ -2121,6 +2222,20 @@ func ParseUploadBeginResponse(rsp *http.Response) (*UploadBeginResponse, error) 
 			return nil, err
 		}
 		response.JSON408 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest PayloadTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Throttle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
@@ -2253,6 +2368,20 @@ func ParseUploadChunkResponse(rsp *http.Response) (*UploadChunkResponse, error) 
 		}
 		response.JSON408 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest PayloadTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Throttle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2299,6 +2428,13 @@ func ParseStatusResponse(rsp *http.Response) (*StatusResponse, error) {
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Throttle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
 		var dest StatusAPIResponse
