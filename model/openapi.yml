@@ -1518,11 +1518,18 @@ paths:
         - name: Accept-Encoding
           in: header
           description: |
-            If the agent is able to accept encoded responses.
-            Used to indicate if GZIP compression may be used by the server.
-            The elastic-agent does not use the accept-encoding header.
+            Indicates encodings the agent can accept. The only encoding supported by the server currently is gzip.
+            Comma-separated directive lists and RFC 7231 quality values (e.g. "gzip;q=1.0, deflate;q=0.5") are both accepted.
           schema:
             type: string
+        - name: Content-Encoding
+          in: header
+          description: |
+            Signals that the request body has been compressed. Server currently only supports gzip compression.
+          schema:
+            type: string
+            enum:
+              - gzip
         - $ref: "#/components/parameters/userAgent"
         - $ref: "#/components/parameters/requestId"
         - $ref: "#/components/parameters/apiVersion"
@@ -1558,12 +1565,19 @@ paths:
           description: Agent checkin successful. May include actions.
           headers:
             Content-Encoding:
-              description: Responses may be compressed if the accept encoding indicates it. Currently not used by the agent.
+              description: |
+                Present when fleet-server has gzip-compressed the response body.
+                Compression is applied when all three conditions are met: the serialised
+                response exceeds the configured compression threshold, the server compression
+                level is not NoCompression, and the request's Accept-Encoding header
+                advertises gzip support.
               schema:
                 type: string
+                enum:
+                  - gzip
               examples:
                 gzip:
-                  description: Response is gzip encoded as the request headers allowed it.
+                  description: Response body is gzip-compressed.
                   value: gzip
             Elastic-Api-Version:
               $ref: "#/components/headers/apiVersion"
