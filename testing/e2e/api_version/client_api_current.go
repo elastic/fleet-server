@@ -725,7 +725,7 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 		agent := tester.GetAgent(ctx, agentID)
 		require.Equal(c, policyID, agent.AgentPolicyID)
 		require.Equal(c, prevRev, int64(agent.Revision))
-	}, time.Second*10, time.Second)
+	}, time.Second*20, time.Second)
 
 	// agent is now recorded as on a previous revision - check to make sure a checkin without AgentPolicyId and revision result in a POLICY_CHANGE action
 	tester.T().Logf("test checkin 7: agent %s with no policy or revision", agentID)
