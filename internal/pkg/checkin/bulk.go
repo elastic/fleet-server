@@ -125,6 +125,39 @@ func WithPolicyRevisionIDX(idx int64) Option {
 	}
 }
 
+func WithSequenceNum(seq uint64) Option {
+	return func(pending *pendingT) {
+		pending.sequenceNum = seq
+	}
+}
+
+func WithHealth(health []byte) Option {
+	return func(pending *pendingT) {
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.health = health
+	}
+}
+
+func WithCapabilities(capabilities []string) Option {
+	return func(pending *pendingT) {
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.capabilities = capabilities
+	}
+}
+
+func WithEffectiveConfig(effectiveConfig []byte) Option {
+	return func(pending *pendingT) {
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.effectiveConfig = effectiveConfig
+	}
+}
+
 func WithAvailableRollbacks(availableRollbacks []byte) Option {
 	return func(pending *pendingT) {
 		if pending.extra == nil {
@@ -141,6 +174,9 @@ type extraT struct {
 	components         []byte
 	deleteAudit        bool
 	availableRollbacks []byte
+	health             []byte
+	capabilities       []string
+	effectiveConfig    []byte
 }
 
 // Minimize the size of this structure.
@@ -154,6 +190,7 @@ type pendingT struct {
 	revisionIDX     int64
 	extra           *extraT
 	unhealthyReason *[]string
+	sequenceNum     uint64
 }
 
 // Bulk will batch pending checkins and update elasticsearch at a set interval.
@@ -337,6 +374,7 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 		dl.FieldLastCheckinStatus:  pending.status,  // Set the pending status
 		dl.FieldLastCheckinMessage: pending.message, // Set the status message
 		dl.FieldUnhealthyReason:    pending.unhealthyReason,
+		dl.FieldSequenceNum:        pending.sequenceNum,
 	}
 	if pending.agentPolicyID != "" {
 		fields[dl.FieldAgentPolicyID] = pending.agentPolicyID
@@ -362,6 +400,18 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 		// Update components if provided
 		if pending.extra.components != nil {
 			fields[dl.FieldComponents] = json.RawMessage(pending.extra.components)
+		}
+
+		if pending.extra.health != nil {
+			fields[dl.FieldHealth] = json.RawMessage(pending.extra.health)
+		}
+
+		if pending.extra.capabilities != nil {
+			fields[dl.FieldCapabilities] = pending.extra.capabilities
+		}
+
+		if pending.extra.effectiveConfig != nil {
+			fields[dl.FieldEffectiveConfig] = json.RawMessage(pending.extra.effectiveConfig)
 		}
 
 		// If seqNo changed, set the field appropriately
