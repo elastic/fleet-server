@@ -1189,10 +1189,8 @@ func TestValidateCheckinRequest(t *testing.T) {
 					},
 				},
 			},
-			expErr: nil,
-			expValid: validatedCheckin{
-				rawAvailableRollbacks: []byte(`[]`),
-			},
+			expErr:   nil,
+			expValid: validatedCheckin{},
 		},
 		{
 			name: "invalid gzip request body returns bad request error",
