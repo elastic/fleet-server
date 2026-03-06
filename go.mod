@@ -10,13 +10,8 @@ require (
 	github.com/elastic/elastic-agent-libs v0.33.3
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
-<<<<<<< HEAD
-	github.com/elastic/go-ucfg v0.9.0
-	github.com/fxamacker/cbor/v2 v2.8.0
-=======
 	github.com/elastic/go-ucfg v0.9.1
-	github.com/fxamacker/cbor/v2 v2.9.0
->>>>>>> c1a96a9 (build(deps): bump github.com/elastic/go-ucfg from 0.9.0 to 0.9.1 (#6518))
+	github.com/fxamacker/cbor/v2 v2.8.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.7.0
