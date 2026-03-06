@@ -7,7 +7,9 @@
 package api
 
 import (
+	"bytes"
 	"compress/flate"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1073,6 +1075,44 @@ func TestValidateCheckinRequest(t *testing.T) {
 			},
 			expValid: validatedCheckin{},
 		},
+		{
+			name: "gzip-compressed request body is decompressed before JSON decoding",
+			req: func() *http.Request {
+				var buf bytes.Buffer
+				gz := gzip.NewWriter(&buf)
+				_, _ = gz.Write([]byte(`{"status": "online", "message": "test message"}`))
+				_ = gz.Close()
+				return &http.Request{
+					Header: http.Header{"Content-Encoding": []string{"gzip"}},
+					Body:   io.NopCloser(&buf),
+				}
+			}(),
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expErr:   nil,
+			expValid: validatedCheckin{},
+		},
+		{
+			name: "invalid gzip request body returns bad request error",
+			req: &http.Request{
+				Header: http.Header{"Content-Encoding": []string{"gzip"}},
+				Body:   io.NopCloser(strings.NewReader(`not gzip data`)),
+			},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expErr:   &BadRequestErr{msg: "unable to create gzip reader for request body", nextErr: gzip.ErrHeader},
+			expValid: validatedCheckin{},
+		},
 	}
 
 	for _, tc := range tests {
@@ -1081,7 +1121,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 			assert.NoError(t, err)
 			wr := httptest.NewRecorder()
 			logger := testlog.SetLogger(t)
-			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, nil)
+			valid, err := checkin.validateRequest(logger, wr, tc.req, time.Time{}, &model.Agent{LocalMetadata: json.RawMessage(`{}`)})
 			if tc.expErr == nil {
 				assert.NoError(t, err)
 			} else {
@@ -1090,8 +1130,8 @@ func TestValidateCheckinRequest(t *testing.T) {
 				// we will end up with false positives.
 				assert.Equal(t, tc.expErr.Error(), err.Error())
 				assert.ErrorAs(t, err, &tc.expErr)
+				assert.Equal(t, tc.expValid, valid)
 			}
-			assert.Equal(t, tc.expValid, valid)
 		})
 	}
 }
