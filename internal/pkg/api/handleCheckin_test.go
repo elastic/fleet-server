@@ -7,7 +7,9 @@
 package api
 
 import (
+	"bytes"
 	"compress/flate"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1073,6 +1075,101 @@ func TestValidateCheckinRequest(t *testing.T) {
 			},
 			expValid: validatedCheckin{},
 		},
+<<<<<<< HEAD
+=======
+		{
+			name: "local metadata has fips attribute",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"status": "online", "message": "test message", "local_metadata": {"elastic": {"agent": {"id": "testid", "fips": true}}}}`)),
+			},
+			expErr: nil,
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expValid: validatedCheckin{
+				rawMeta:               []byte(`{"elastic": {"agent": {"id": "testid", "fips": true}}}`),
+				rawAvailableRollbacks: []byte(`[]`),
+			},
+		},
+		{
+			name: "Available rollbacks are correctly parsed",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"validJson": "test", "status": "test", "message": "test message", "upgrade":{ "rollbacks": [{"version": "1.2.3-SNAPSHOT", "valid_until": "2025-11-27T15:12:44Z"}]}}`)),
+			},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expErr: nil,
+			expValid: validatedCheckin{
+				rawAvailableRollbacks: []byte(`[{"version": "1.2.3-SNAPSHOT", "valid_until": "2025-11-27T15:12:44Z"}]`),
+			},
+		},
+		{
+			name: "Available rollbacks are incorrectly formatted (string instead of array): no error returned but the rawAvailableRollbacks are set to nil",
+			req: &http.Request{
+				Body: io.NopCloser(strings.NewReader(`{"validJson": "test", "status": "test", "message": "test message", "upgrade":{"rollbacks": "foobar"}}`)),
+			},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expErr: nil,
+			expValid: validatedCheckin{
+				rawAvailableRollbacks: nil,
+			},
+		},
+		{
+			name: "gzip-compressed request body is decompressed before JSON decoding",
+			req: func() *http.Request {
+				var buf bytes.Buffer
+				gz := gzip.NewWriter(&buf)
+				_, _ = gz.Write([]byte(`{"status": "online", "message": "test message"}`))
+				_ = gz.Close()
+				return &http.Request{
+					Header: http.Header{"Content-Encoding": []string{"gzip"}},
+					Body:   io.NopCloser(&buf),
+				}
+			}(),
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expErr: nil,
+			expValid: validatedCheckin{
+				rawAvailableRollbacks: []byte(`[]`),
+			},
+		},
+		{
+			name: "invalid gzip request body returns bad request error",
+			req: &http.Request{
+				Header: http.Header{"Content-Encoding": []string{"gzip"}},
+				Body:   io.NopCloser(strings.NewReader(`not gzip data`)),
+			},
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody: 0,
+					},
+				},
+			},
+			expErr:   &BadRequestErr{msg: "unable to create gzip reader for request body", nextErr: gzip.ErrHeader},
+			expValid: validatedCheckin{},
+		},
+>>>>>>> 122fac1 (Fix checkin endpoint gzip handling (#6491))
 	}
 
 	for _, tc := range tests {
