@@ -83,18 +83,20 @@ Until a bug fix is available in a later release, you can resolve the issue tempo
 
 :::
 
-:::{dropdown} .fleet-agents template is missing mappings
+:::{dropdown} Elastic Agent checkins to Fleet Server fail with "tried to parse field [local_metadata] as object, but found a concrete value" or "cannot unmarshal string into Go struct field Agent.components" errors.
 
 **Applies to** {{fleet}} versions:
 * 8.17.x (all patch versions)
-* 8.18.0 to 8.18.7
-* 8.19.0 to 8.19.3
-* 9.0.0 to 9.0.7
-* 9.1.0 to 9.1.3
+* 8.18.x (all patch versions)
+* 8.19.0 to 8.19.6
+* 9.0.x (all patch versions)
+* 9.1.0 to 9.1.6
+* 9.2.0
 
-On May 2, 2025 a known issue was discovered that the `.fleet-agents` index template was missing a mapping for the `local_metadata.complete` attribute. This may cause agent checkins to be rejected and the agents to appear as offline.
+On May 2, 2025 a series of known issues was uncovered that together cause checkins to Fleet Server to fail to parse the local_metadata field when
+any of the audit_unenrolled_* unenrolled fields are present in an agent's entry in the .fleet-agents system index.
 
-In this {{fleet}}'s logs this will appear as:
+In {{fleet}} server's logs this will appear as:
 ```shell
 elastic fail 400: document_parsing_exception: [1:209] object mapping for [local_metadata] tried to parse field [local_metadata] as object, but found a concrete value
 Eat bulk checkin error; Keep on truckin'
@@ -105,14 +107,19 @@ And in the {{agent}} logs it will appear as:
 "log.level":"error","@timestamp":"2025-04-22:12:35:25.295Z","message":"Eat bulk checkin error; Keep on truckin'","component":{"binary":"fleet-server","dataset":"elastic_agent.fleet_server","id":"fleet-server-es-containerhost","type":"fleet-server"},"log":{"source":"fleet-server-es-containerhost"},"service.type":"fleet-server","error.message":"elastic fail 400: document_parsing_exception: [1:209] object mapping for [local_metadata] tried to parse field [local_metadata] as object, but found a concrete value","ecs.version":"1.6.0","service.name":"fleet-server","ecs.version":"1.6.0"
 ```
 
-This attribute was added to the template in versions: 8.17.11 8.18.3, 8.19.3, 9.0.3, 9.1.0.
+A less common form of this bug can cause an `cannot unmarshal string into Go struct field Agent.components of type []model.ComponentsItem` error during checkin instead:
+```shell
+findAgentByApiKeyId: could not unmarshal ES document into model.Agent: json: cannot unmarshal string into Go struct field Agent.components of type []model.ComponentsItem
+```
 
-Further investigation revealed that the `.fleet-agents` index template was not correctly applied due to an unchanged `_meta.managed_index_mappings_version` number.
-This change also affects other attributes as well, such as `upgrade_attempts`, `namespaces`, `unprivileged`, and `unhealthy_reason`.
-If there is an error related to any of these attributes, there will be a similar error message in the logs.
+For more information, check [Issue #5674](https://github.com/elastic/fleet-server/issues/5674) and [Issue #5857](https://github.com/elastic/fleet-server/issues/5857).
+
+All involved bugs were fixed in versions 8.19.7, 9.1.7, and 9.2.1.
 
 **Workaround**
-Updating to a version with a fixed `_meta.managed_index_mappings_version` will correctly apply the new index template.
-The fixed versions are 8.18.8, 8.19.4, 9.0.8, 9.1.4.
+
+Upgrade to versions 8.19.7, 9.1.7, and 9.2.1 or above. Temporary work arounds are available that use queries to delete the relevant fields from the .fleet-agents index, however the problem can reoccur until the system is upgraded to a fixed version.
+
+Refer to Elastic support knowledge base articles https://support.elastic.dev/knowledge/view/77a3e589 and https://support.elastic.dev/knowledge/view/19f2d377 for details of the work arounds.
 
 :::
