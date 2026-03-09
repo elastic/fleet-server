@@ -84,7 +84,7 @@ Until a bug fix is available in a later release, you can resolve the issue tempo
 :::
 
 :::{dropdown} Elastic Agent checkins to Fleet Server fail with "tried to parse field [local_metadata] as object, but found a concrete value" or "cannot unmarshal string into Go struct field Agent.components" errors.
-#9.2.1, 9.1.7, 8.19.7
+
 **Applies to** {{fleet}} versions:
 * 8.17.x (all patch versions)
 * 8.18.x (all patch versions)
@@ -107,14 +107,19 @@ And in the {{agent}} logs it will appear as:
 "log.level":"error","@timestamp":"2025-04-22:12:35:25.295Z","message":"Eat bulk checkin error; Keep on truckin'","component":{"binary":"fleet-server","dataset":"elastic_agent.fleet_server","id":"fleet-server-es-containerhost","type":"fleet-server"},"log":{"source":"fleet-server-es-containerhost"},"service.type":"fleet-server","error.message":"elastic fail 400: document_parsing_exception: [1:209] object mapping for [local_metadata] tried to parse field [local_metadata] as object, but found a concrete value","ecs.version":"1.6.0","service.name":"fleet-server","ecs.version":"1.6.0"
 ```
 
-A less common form of this bug can cause an `cannot unmarshal string into Go struct field Agent.components of type []model.ComponentsItem` error during checkin instead.
+A less common form of this bug can cause an `cannot unmarshal string into Go struct field Agent.components of type []model.ComponentsItem` error during checkin instead:
+```shell
+findAgentByApiKeyId: could not unmarshal ES document into model.Agent: json: cannot unmarshal string into Go struct field Agent.components of type []model.ComponentsItem
+```
 
 For more information, check [Issue #5674](https://github.com/elastic/fleet-server/issues/5674) and [Issue #5857](https://github.com/elastic/fleet-server/issues/5857).
 
-All involved bugs were fixed in versions 8.19.7, 9.1.7, and 9.2.1. See https://github.com/elastic/fleet-server/issues/5674
+All involved bugs were fixed in versions 8.19.7, 9.1.7, and 9.2.1.
 
 **Workaround**
 
-Upgrade to versions 8.19.7, 9.1.7, and 9.2.1 or above. Temporary work arounds are available that use queries to delete the relevant fields from the .fleet-agents index, however the problem can reoccur until the system is upgraded to a fixed version. Refer to Elastic support knowledge base articles https://support.elastic.dev/knowledge/view/77a3e589 and https://support.elastic.dev/knowledge/view/19f2d377 for details of the work arounds.
+Upgrade to versions 8.19.7, 9.1.7, and 9.2.1 or above. Temporary work arounds are available that use queries to delete the relevant fields from the .fleet-agents index, however the problem can reoccur until the system is upgraded to a fixed version.
+
+Refer to Elastic support knowledge base articles https://support.elastic.dev/knowledge/view/77a3e589 and https://support.elastic.dev/knowledge/view/19f2d377 for details of the work arounds.
 
 :::
