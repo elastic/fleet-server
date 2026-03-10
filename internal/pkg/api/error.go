@@ -96,6 +96,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			// 499 is returned when the request context is canceled (e.g. server shutting down, client disconnect).
 			context.Canceled,
 			HTTPErrResp{
 				499,
@@ -253,7 +254,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			HTTPErrResp{
 				http.StatusBadRequest,
 				"ErrAgentIDMissing",
-				"equired field agent_id is missing",
+				"required field agent_id is missing",
 				zerolog.InfoLevel,
 			},
 		},
@@ -506,6 +507,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			// 413 is returned when the request body exceeds the configured maximum (e.g. upload begin, checkin, acks).
 			target: uploader.ErrPayloadSizeTooLarge,
 			meta: HTTPErrResp{
 				StatusCode: http.StatusRequestEntityTooLarge,
