@@ -12,7 +12,7 @@ info:
 
     The implementation of fleet-server by default also includes a connection count limiter, as well as limiters for request body sizes.
     If an agent attempts to make request but there are no remaining connections, the attempt will be blocked and the agent will get an error.
-    If an agent tries to send a body that is too large the fleet-server will respond with a 400 status code.
+    If an agent tries to send a body that is too large the fleet-server will respond with a 413 status code.
 components:
   headers:
     apiVersion:
@@ -1305,7 +1305,7 @@ components:
                 error: ErrAuditReasonConflict
                 message: agent document contains audit_unenroll_reason
     throttle:
-      description: 428 rate limiting request.
+      description: 429 rate limiting request.
       headers:
         # throttle is checked before api version header is validated
         X-Request-Id:
@@ -1319,9 +1319,28 @@ components:
             rateLimit:
               description: Too many requests - rate limit reached.
               value:
-                statusCode: 428
+                statusCode: 429
                 error: TooManyRequests
                 message: too many requests
+    payloadTooLarge:
+      description: 413 response when the request body exceeds the maximum allowed size.
+      headers:
+        Elastic-Api-Version:
+          $ref: "#/components/headers/apiVersion"
+        X-Request-Id:
+          $ref: "#/components/headers/requestID"
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/error"
+          examples:
+            payloadTooLarge:
+              description: Request body exceeds maximum allowed size.
+              value:
+                statusCode: 413
+                error: ErrPayloadSizeTooLarge
+                message: the request body exceeds the maximum allowed size
     unavailable:
       description: |
         503 response when the server is not available for some reason.
@@ -1390,6 +1409,8 @@ paths:
                       build_time: 2022-12-01T01:02:03Z
         "400":
           $ref: "#/components/responses/badRequest"
+        "429":
+          $ref: "#/components/responses/throttle"
         "503":
           description: Unhealthy fleet-server response.
           headers:
@@ -1491,8 +1512,14 @@ paths:
           $ref: "#/components/responses/badRequest"
         "401":
           $ref: "#/components/responses/keyNotEnabled"
+        "403":
+          $ref: "#/components/responses/forbidden"
         "408":
           $ref: "#/components/responses/deadline"
+        "413":
+          $ref: "#/components/responses/payloadTooLarge"
+        "429":
+          $ref: "#/components/responses/throttle"
         "500":
           $ref: "#/components/responses/internalServerError"
         "503":
@@ -1610,6 +1637,10 @@ paths:
           $ref: "#/components/responses/agentNotFound"
         "408":
           $ref: "#/components/responses/deadline"
+        "413":
+          $ref: "#/components/responses/payloadTooLarge"
+        "429":
+          $ref: "#/components/responses/throttle"
         "500":
           $ref: "#/components/responses/internalServerError"
         "503":
@@ -1682,6 +1713,10 @@ paths:
           $ref: "#/components/responses/agentNotFound"
         "408":
           $ref: "#/components/responses/deadline"
+        "413":
+          $ref: "#/components/responses/payloadTooLarge"
+        "429":
+          $ref: "#/components/responses/throttle"
         "500":
           $ref: "#/components/responses/internalServerError"
         "503":
@@ -1724,11 +1759,13 @@ paths:
           $ref: "#/components/responses/badRequest"
         "401":
           $ref: "#/components/responses/keyNotEnabled"
+        "403":
+          $ref: "#/components/responses/forbidden"
         "404":
           $ref: "#/components/responses/agentNotFound"
         "408":
           $ref: "#/components/responses/deadline"
-        "428":
+        "429":
           $ref: "#/components/responses/throttle"
         "500":
           $ref: "#/components/responses/internalServerError"
@@ -1771,6 +1808,10 @@ paths:
           $ref: "#/components/responses/forbidden"
         "408":
           $ref: "#/components/responses/deadline"
+        "413":
+          $ref: "#/components/responses/payloadTooLarge"
+        "429":
+          $ref: "#/components/responses/throttle"
         "500":
           $ref: "#/components/responses/internalServerError"
         "503":
@@ -1833,6 +1874,10 @@ paths:
           $ref: "#/components/responses/forbidden"
         "408":
           $ref: "#/components/responses/deadline"
+        "413":
+          $ref: "#/components/responses/payloadTooLarge"
+        "429":
+          $ref: "#/components/responses/throttle"
         "500":
           $ref: "#/components/responses/internalServerError"
         "503":
@@ -1956,6 +2001,8 @@ paths:
               $ref: "#/components/headers/apiVersion"
             X-Request-Id:
               $ref: "#/components/headers/requestID"
+        "429":
+          $ref: "#/components/responses/throttle"
         "500":
           $ref: "#/components/responses/internalServerError"
         "503":
@@ -2001,6 +2048,8 @@ paths:
                 format: binary
         "400":
           $ref: "#/components/responses/badRequest"
+        "429":
+          $ref: "#/components/responses/throttle"
         "500":
           description: The server has an error retrieving or reading the local key.
           headers:
@@ -2058,8 +2107,12 @@ paths:
           $ref: "#/components/responses/badRequest"
         "401":
           $ref: "#/components/responses/keyNotEnabled"
+        "403":
+          $ref: "#/components/responses/forbidden"
         "409":
           $ref: "#/components/responses/conflict"
+        "429":
+          $ref: "#/components/responses/throttle"
         "500":
           $ref: "#/components/responses/internalServerError"
         "503":
