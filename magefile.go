@@ -40,6 +40,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/google/go-github/v68/github"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"gopkg.in/yaml.v3"
@@ -363,6 +368,9 @@ type Test mg.Namespace
 
 // Docker is the namespace for docker related tasks.
 type Docker mg.Namespace
+
+// Release is the namespace for release automation.
+type Release mg.Namespace
 
 // envToBool reads the env var string s and parses it as a bool.
 func envToBool(s string) bool {
@@ -2254,4 +2262,536 @@ func (Test) CloudE2ERun() error {
 	err = cmd.Run()
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-cloude2e.out"), b.Bytes(), 0o644))
 	return err
+}
+
+// ============================================================================
+// Release Automation Functions
+// ============================================================================
+
+// ReleaseConfig holds configuration for release operations
+type ReleaseConfig struct {
+	Version       string
+	BaseBranch    string
+	ReleaseBranch string
+	Owner         string
+	Repo          string
+	AuthorName    string
+	AuthorEmail   string
+}
+
+// loadReleaseConfigFromEnv loads release configuration from environment variables
+func loadReleaseConfigFromEnv() (*ReleaseConfig, error) {
+	version := os.Getenv("CURRENT_RELEASE")
+	if version == "" {
+		return nil, fmt.Errorf("CURRENT_RELEASE environment variable not set")
+	}
+
+	baseBranch := os.Getenv("BASE_BRANCH")
+	if baseBranch == "" {
+		baseBranch = "main"
+	}
+
+	// Extract major.minor for release branch (e.g., "9.4.0" -> "9.4")
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid version format: %s (expected X.Y.Z)", version)
+	}
+	releaseBranch := fmt.Sprintf("%s.%s", parts[0], parts[1])
+
+	owner := os.Getenv("PROJECT_OWNER")
+	if owner == "" {
+		owner = "elastic"
+	}
+
+	repo := os.Getenv("PROJECT_REPO")
+	if repo == "" {
+		repo = "fleet-server"
+	}
+
+	authorName := os.Getenv("GITHUB_USERNAME")
+	if authorName == "" {
+		authorName = "elasticmachine"
+	}
+
+	authorEmail := os.Getenv("GITHUB_EMAIL")
+	if authorEmail == "" {
+		authorEmail = "infra-root+elasticmachine@elastic.co"
+	}
+
+	return &ReleaseConfig{
+		Version:       version,
+		BaseBranch:    baseBranch,
+		ReleaseBranch: releaseBranch,
+		Owner:         owner,
+		Repo:          repo,
+		AuthorName:    authorName,
+		AuthorEmail:   authorEmail,
+	}, nil
+}
+
+// UpdateVersion updates the version in version/version.go
+func (Release) UpdateVersion(newVersion string) error {
+	versionFile := "version/version.go"
+
+	content, err := os.ReadFile(versionFile)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", versionFile, err)
+	}
+
+	// Replace the version string
+	// Pattern: const DefaultVersion = "X.Y.Z"
+	re := regexp.MustCompile(`(const\s+DefaultVersion\s*=\s*)"[^"]+"`)
+	newContent := re.ReplaceAllString(string(content), `${1}"`+newVersion+`"`)
+
+	if newContent == string(content) {
+		return fmt.Errorf("version pattern not found in %s", versionFile)
+	}
+
+	err = os.WriteFile(versionFile, []byte(newContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write %s: %w", versionFile, err)
+	}
+
+	fmt.Printf("✓ Updated version to %s in %s\n", newVersion, versionFile)
+	return nil
+}
+
+// UpdateMergify adds a new backport rule to .mergify.yml
+func (Release) UpdateMergify(version string) error {
+	mergifyFile := ".mergify.yml"
+
+	// Read the YAML file
+	content, err := os.ReadFile(mergifyFile)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", mergifyFile, err)
+	}
+
+	// Extract major.minor from version (e.g., "9.4.0" -> "9.4")
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid version format: %s (expected X.Y.Z)", version)
+	}
+	branchVersion := fmt.Sprintf("%s.%s", parts[0], parts[1])
+
+	// Check if rule already exists
+	searchPattern := fmt.Sprintf("backport patches to %s branch", branchVersion)
+	if strings.Contains(string(content), searchPattern) {
+		fmt.Printf("  Backport rule for %s already exists\n", branchVersion)
+		return nil
+	}
+
+	// Create new backport rule following the existing format
+	newRule := fmt.Sprintf(`  - name: backport patches to %s branch
+    conditions:
+      - merged
+      - label=backport-%s
+    actions:
+      backport:
+        branches:
+          - "%s"
+`, branchVersion, branchVersion, branchVersion)
+
+	// Append the new rule to the end of the file
+	output := string(content) + newRule
+
+	// Write back to file
+	err = os.WriteFile(mergifyFile, []byte(output), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write %s: %w", mergifyFile, err)
+	}
+
+	fmt.Printf("✓ Added backport rule for %s to %s\n", branchVersion, mergifyFile)
+	return nil
+}
+
+// GitRepo represents a Git repository with common operations
+type GitRepo struct {
+	repo *git.Repository
+}
+
+// openRepo opens the Git repository at the given path
+func openRepo(path string) (*GitRepo, error) {
+	repo, err := git.PlainOpen(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open git repo: %w", err)
+	}
+	return &GitRepo{repo: repo}, nil
+}
+
+// createBranch creates and checks out a new branch
+func (g *GitRepo) createBranch(branchName string) error {
+	w, err := g.repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	// Get current HEAD reference
+	headRef, err := g.repo.Head()
+	if err != nil {
+		return fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	// Create new branch reference
+	refName := plumbing.NewBranchReferenceName(branchName)
+	ref := plumbing.NewHashReference(refName, headRef.Hash())
+
+	err = g.repo.Storer.SetReference(ref)
+	if err != nil {
+		return fmt.Errorf("failed to create branch: %w", err)
+	}
+
+	// Checkout the new branch
+	err = w.Checkout(&git.CheckoutOptions{
+		Branch: refName,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to checkout branch: %w", err)
+	}
+
+	fmt.Printf("✓ Created and checked out branch: %s\n", branchName)
+	return nil
+}
+
+// commitAll commits all changes with the given message
+func (g *GitRepo) commitAll(message, authorName, authorEmail string) error {
+	w, err := g.repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	// Add all changes
+	err = w.AddWithOptions(&git.AddOptions{
+		All: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to add changes: %w", err)
+	}
+
+	// Create commit
+	commit, err := w.Commit(message, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  authorName,
+			Email: authorEmail,
+			When:  time.Now(),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+
+	fmt.Printf("✓ Committed changes: %s\n", commit.String()[:7])
+	return nil
+}
+
+// push pushes the current branch to the remote
+func (g *GitRepo) push(remoteName string, dryRun bool) error {
+	if dryRun {
+		fmt.Printf("  [DRY RUN] Would push to remote: %s\n", remoteName)
+		return nil
+	}
+
+	err := g.repo.Push(&git.PushOptions{
+		RemoteName: remoteName,
+	})
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return fmt.Errorf("failed to push: %w", err)
+	}
+
+	if errors.Is(err, git.NoErrAlreadyUpToDate) {
+		fmt.Println("  Branch already up to date on remote")
+	} else {
+		fmt.Printf("✓ Pushed to remote: %s\n", remoteName)
+	}
+	return nil
+}
+
+// getCurrentBranch returns the name of the current branch
+func (g *GitRepo) getCurrentBranch() (string, error) {
+	ref, err := g.repo.Head()
+	if err != nil {
+		return "", fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	if !ref.Name().IsBranch() {
+		return "", fmt.Errorf("HEAD is not a branch")
+	}
+
+	return ref.Name().Short(), nil
+}
+
+// setRemoteURL sets the URL for a remote
+func (g *GitRepo) setRemoteURL(remoteName, url string) error {
+	_, err := g.repo.Remote(remoteName)
+	if errors.Is(err, git.ErrRemoteNotFound) {
+		// Remote doesn't exist, create it
+		_, err = g.repo.CreateRemote(&config.RemoteConfig{
+			Name: remoteName,
+			URLs: []string{url},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create remote: %w", err)
+		}
+		fmt.Printf("✓ Created remote %s: %s\n", remoteName, url)
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to get remote: %w", err)
+	}
+
+	// Update remote URL
+	err = g.repo.DeleteRemote(remoteName)
+	if err != nil {
+		return fmt.Errorf("failed to delete remote: %w", err)
+	}
+
+	_, err = g.repo.CreateRemote(&config.RemoteConfig{
+		Name: remoteName,
+		URLs: []string{url},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to recreate remote: %w", err)
+	}
+
+	fmt.Printf("✓ Updated remote %s: %s\n", remoteName, url)
+	return nil
+}
+
+// newGitHubClient creates a new GitHub client from environment
+func newGitHubClient() (*github.Client, error) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		return nil, fmt.Errorf("GITHUB_TOKEN environment variable not set")
+	}
+
+	client := github.NewClient(nil).WithAuthToken(token)
+	return client, nil
+}
+
+// createPR creates a pull request on GitHub
+func createPR(client *github.Client, cfg *ReleaseConfig, title, body, head, base string, dryRun bool) (*github.PullRequest, error) {
+	if dryRun {
+		fmt.Printf("  [DRY RUN] Would create PR:\n")
+		fmt.Printf("    Title: %s\n", title)
+		fmt.Printf("    Head: %s\n", head)
+		fmt.Printf("    Base: %s\n", base)
+		return nil, nil
+	}
+
+	pr, _, err := client.PullRequests.Create(context.Background(), cfg.Owner, cfg.Repo, &github.NewPullRequest{
+		Title: github.String(title),
+		Head:  github.String(head),
+		Base:  github.String(base),
+		Body:  github.String(body),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create PR: %w", err)
+	}
+
+	fmt.Printf("✓ Created PR #%d: %s\n", *pr.Number, *pr.HTMLURL)
+	return pr, nil
+}
+
+// PrepareMajorMinor prepares files for a major/minor release
+func (Release) PrepareMajorMinor() error {
+	cfg, err := loadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Preparing major/minor release for version %s\n", cfg.Version)
+
+	// Update version
+	r := Release{}
+	if err := r.UpdateVersion(cfg.Version); err != nil {
+		return err
+	}
+
+	// Update mergify
+	if err := r.UpdateMergify(cfg.Version); err != nil {
+		return err
+	}
+
+	fmt.Println("✓ Major/minor release preparation complete")
+	fmt.Printf("  Next steps:\n")
+	fmt.Printf("  1. Review changes: git diff\n")
+	fmt.Printf("  2. Create branch: mage release:createBranch\n")
+	fmt.Printf("  3. Create PR: mage release:createPR\n")
+
+	return nil
+}
+
+// CreateBranch creates a release branch with all changes committed
+func (Release) CreateBranch() error {
+	cfg, err := loadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	dryRun := os.Getenv("DRY_RUN") == "true"
+
+	repo, err := openRepo(".")
+	if err != nil {
+		return err
+	}
+
+	branchName := cfg.ReleaseBranch
+	fmt.Printf("Creating release branch: %s\n", branchName)
+
+	if !dryRun {
+		// Create and checkout branch
+		if err := repo.createBranch(branchName); err != nil {
+			return err
+		}
+
+		// Commit all changes
+		commitMsg := fmt.Sprintf("[Release] Prepare %s release", cfg.Version)
+		if err := repo.commitAll(commitMsg, cfg.AuthorName, cfg.AuthorEmail); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("  [DRY RUN] Would create branch %s and commit changes\n", branchName)
+	}
+
+	// Push to remote
+	if err := repo.push("origin", dryRun); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CreatePR creates a pull request for the release
+func (Release) CreatePR() error {
+	cfg, err := loadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	dryRun := os.Getenv("DRY_RUN") == "true"
+
+	client, err := newGitHubClient()
+	if err != nil {
+		return err
+	}
+
+	title := fmt.Sprintf("[Release] %s", cfg.Version)
+	body := fmt.Sprintf("## Release %s\n\nThis PR prepares the %s release.\n\n### Changes\n- Updated version to %s\n- Added mergify backport rule for %s\n",
+		cfg.Version, cfg.Version, cfg.Version, cfg.ReleaseBranch)
+
+	_, err = createPR(client, cfg, title, body, cfg.ReleaseBranch, cfg.BaseBranch, dryRun)
+	return err
+}
+
+// RunMajorMinor orchestrates the complete major/minor release workflow
+func (Release) RunMajorMinor() error {
+	cfg, err := loadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	dryRun := os.Getenv("DRY_RUN") == "true"
+	if dryRun {
+		fmt.Println("🔍 DRY RUN MODE - No changes will be pushed")
+	}
+
+	fmt.Printf("🚀 Starting major/minor release workflow for %s\n\n", cfg.Version)
+
+	// Step 1: Prepare files
+	fmt.Println("Step 1: Preparing release files...")
+	r := Release{}
+	if err := r.PrepareMajorMinor(); err != nil {
+		return fmt.Errorf("failed to prepare release: %w", err)
+	}
+
+	// Step 2: Create branch
+	fmt.Println("\nStep 2: Creating release branch...")
+	if err := r.CreateBranch(); err != nil {
+		return fmt.Errorf("failed to create branch: %w", err)
+	}
+
+	// Step 3: Create PR
+	fmt.Println("\nStep 3: Creating pull request...")
+	if err := r.CreatePR(); err != nil {
+		return fmt.Errorf("failed to create PR: %w", err)
+	}
+
+	fmt.Printf("\n✅ Major/minor release workflow complete for %s\n", cfg.Version)
+	return nil
+}
+
+// PreparePatch prepares files for a patch release
+func (Release) PreparePatch() error {
+	cfg, err := loadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Preparing patch release for version %s\n", cfg.Version)
+
+	// Update version
+	r := Release{}
+	if err := r.UpdateVersion(cfg.Version); err != nil {
+		return err
+	}
+
+	fmt.Println("✓ Patch release preparation complete")
+	return nil
+}
+
+// RunPatch orchestrates the complete patch release workflow
+func (Release) RunPatch() error {
+	cfg, err := loadReleaseConfigFromEnv()
+	if err != nil {
+		return err
+	}
+
+	dryRun := os.Getenv("DRY_RUN") == "true"
+	if dryRun {
+		fmt.Println("🔍 DRY RUN MODE - No changes will be pushed")
+	}
+
+	fmt.Printf("🚀 Starting patch release workflow for %s\n\n", cfg.Version)
+
+	// Prepare files
+	fmt.Println("Preparing patch release files...")
+	r := Release{}
+	if err := r.PreparePatch(); err != nil {
+		return fmt.Errorf("failed to prepare patch release: %w", err)
+	}
+
+	fmt.Printf("\n✅ Patch release workflow complete for %s\n", cfg.Version)
+	fmt.Println("  Review changes and commit to the release branch")
+	return nil
+}
+
+// PrepareNext prepares files for the next development cycle
+func (Release) PrepareNext() error {
+	// Get current version
+	currentVersion := os.Getenv("CURRENT_RELEASE")
+	if currentVersion == "" {
+		return fmt.Errorf("CURRENT_RELEASE environment variable not set")
+	}
+
+	// Calculate next version (increment minor)
+	parts := strings.Split(currentVersion, ".")
+	if len(parts) < 3 {
+		return fmt.Errorf("invalid version format: %s", currentVersion)
+	}
+
+	minor, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return fmt.Errorf("invalid minor version: %s", parts[1])
+	}
+
+	nextVersion := fmt.Sprintf("%s.%d.0", parts[0], minor+1)
+
+	fmt.Printf("Preparing next development cycle: %s -> %s\n", currentVersion, nextVersion)
+
+	// Update version
+	r := Release{}
+	if err := r.UpdateVersion(nextVersion); err != nil {
+		return err
+	}
+
+	fmt.Printf("✓ Next release preparation complete: %s\n", nextVersion)
+	return nil
 }
