@@ -62,11 +62,9 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = monitor.Run(ctx)
-	}()
+	})
 
 	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
 		t.Fatal(err)
@@ -86,7 +84,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	policyID := uuid.Must(uuid.NewV4()).String()
 	rId := xid.New().String()
-	pData := model.PolicyData{Inputs: []map[string]interface{}{}}
+	pData := model.PolicyData{Inputs: []map[string]any{}}
 	policy := model.Policy{
 		ESDocument: model.ESDocument{
 			Id:      rId,
@@ -122,7 +120,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	})
 
 	rId = xid.New().String()
-	pData = model.PolicyData{Inputs: []map[string]interface{}{
+	pData = model.PolicyData{Inputs: []map[string]any{
 		{
 			"type": "fleet-server",
 		},
@@ -213,11 +211,9 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = monitor.Run(ctx)
-	}()
+	})
 
 	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
 		t.Fatal(err)
@@ -237,7 +233,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	policyID := uuid.Must(uuid.NewV4()).String()
 	rId := xid.New().String()
-	pData := model.PolicyData{Inputs: []map[string]interface{}{
+	pData := model.PolicyData{Inputs: []map[string]any{
 		{
 			"type": "fleet-server",
 		},
@@ -357,11 +353,9 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = monitor.Run(ctx)
-	}()
+	})
 
 	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
 		t.Fatal(err)
@@ -380,7 +374,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	rId := xid.New().String()
-	pData := model.PolicyData{Inputs: []map[string]interface{}{}}
+	pData := model.PolicyData{Inputs: []map[string]any{}}
 	policy := model.Policy{
 		ESDocument: model.ESDocument{
 			Id:      rId,
@@ -416,7 +410,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	rId = xid.New().String()
-	pData = model.PolicyData{Inputs: []map[string]interface{}{
+	pData = model.PolicyData{Inputs: []map[string]any{
 		{
 			"type": "fleet-server",
 		},
@@ -507,11 +501,9 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = monitor.Run(ctx)
-	}()
+	})
 
 	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
 		t.Fatal(err)
@@ -530,7 +522,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	rId := xid.New().String()
-	pData := model.PolicyData{Inputs: []map[string]interface{}{
+	pData := model.PolicyData{Inputs: []map[string]any{
 		{
 			"type": "fleet-server",
 		},
@@ -623,10 +615,10 @@ type FakeReporter struct {
 	lock    sync.Mutex
 	state   client.UnitState
 	msg     string
-	payload map[string]interface{}
+	payload map[string]any
 }
 
-func (r *FakeReporter) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
+func (r *FakeReporter) UpdateState(state client.UnitState, message string, payload map[string]any) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r.state = state
@@ -635,15 +627,14 @@ func (r *FakeReporter) UpdateState(state client.UnitState, message string, paylo
 	return nil
 }
 
-func (r *FakeReporter) Current() (client.UnitState, string, map[string]interface{}) {
+func (r *FakeReporter) Current() (client.UnitState, string, map[string]any) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	return r.state, r.msg, r.payload
 }
 
 func TestSelfMonitor_reportOutputHealthyState(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	logger := testlog.SetLogger(t)
 
 	bulker := ftesting.NewMockBulk()
@@ -677,8 +668,7 @@ func TestSelfMonitor_reportOutputHealthyState(t *testing.T) {
 }
 
 func TestSelfMonitor_reportOutputDegradedState(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	logger := testlog.SetLogger(t)
 
 	bulker := ftesting.NewMockBulk()
@@ -714,8 +704,7 @@ func TestSelfMonitor_reportOutputDegradedState(t *testing.T) {
 }
 
 func TestSelfMonitor_reportOutputSkipIfOutdated(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	logger := testlog.SetLogger(t)
 
 	bulker := ftesting.NewMockBulk()
@@ -739,8 +728,7 @@ func TestSelfMonitor_reportOutputSkipIfOutdated(t *testing.T) {
 }
 
 func TestSelfMonitor_reportOutputSkipIfNotFound(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	logger := testlog.SetLogger(t)
 
 	bulker := ftesting.NewMockBulk()

@@ -636,9 +636,9 @@ func (Check) Imports() error {
 	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "golang.org/x/tools/cmd/goimports", "-w", ".")
 }
 
-// Ci runs CI related checks - runs generate, imports, checkHeaders, notice, checkNoChanges.
+// Ci runs CI related checks - runs generate, imports, fix, checkHeaders, notice, checkNoChanges.
 func (Check) Ci() {
-	mg.SerialDeps(Generate, Check.Imports, Check.Headers, Check.Notice, Check.NoChanges)
+	mg.SerialDeps(Generate, Check.Imports, Check.Fix, Check.Headers, Check.Notice, Check.NoChanges)
 }
 
 // Go installs and runs golangci-lint.
@@ -649,6 +649,25 @@ func (Check) Go() error {
 		return sh.RunV("golangci-lint", "run", "-v", "--build-tags", "requirefips")
 	}
 	return sh.RunV("golangci-lint", "run", "-v")
+}
+
+// Fix runs go fix ./... with all build tags used in the repo root, and testing dir.
+func (Check) Fix() error {
+	err := sh.RunV("go", "fix", "./...")
+	for _, tag := range []string{"snapshot", "integration", "requirefips", "requirefips,snapshot", "requirefips,integration"} {
+		if e := sh.RunV("go", "fix", "-tags", tag, "./..."); e != nil {
+			err = errors.Join(err, e)
+		}
+	}
+	for _, tag := range []string{"e2e", "cloude2e", "requirefips,e2e", "requirefips,cloude2e"} {
+		log.Printf("Running in testing with tags: %s", tag)
+		cmd := exec.Command("go", "fix", "-tags", tag, "./...")
+		cmd.Dir = "testing"
+		if out, e := cmd.CombinedOutput(); e != nil {
+			err = errors.Join(err, fmt.Errorf("%w: %s", e, string(out)))
+		}
+	}
+	return err
 }
 
 // getLinter ensures that the linter of the correct version is installed to GOPATH.

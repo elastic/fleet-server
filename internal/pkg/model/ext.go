@@ -89,7 +89,7 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		Agent:             d.Agent,
 		Fleet:             d.Fleet,
 		ID:                d.ID,
-		Inputs:            make([]map[string]interface{}, 0, len(d.Inputs)),
+		Inputs:            make([]map[string]any, 0, len(d.Inputs)),
 		OutputPermissions: d.OutputPermissions,
 		Outputs:           cloneMap(d.Outputs),
 		Revision:          d.Revision,
@@ -135,11 +135,11 @@ func cloneOTelService(s *Service) *Service {
 
 // cloneMap does a deep copy on a map of objects
 // TODO generics?
-func cloneMap(m map[string]map[string]interface{}) map[string]map[string]interface{} {
+func cloneMap(m map[string]map[string]any) map[string]map[string]any {
 	if m == nil {
 		return nil
 	}
-	r := make(map[string]map[string]interface{})
+	r := make(map[string]map[string]any)
 	for k, v := range m {
 		r[k] = maps.Clone(v)
 	}

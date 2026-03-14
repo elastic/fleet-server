@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"slices"
 	"syscall"
 	"time"
 
@@ -129,11 +130,8 @@ func WithMaxRetries(retries int) ConfigOption {
 
 func WithRetryOnStatus(status int) ConfigOption {
 	return func(config *elasticsearch.Config) {
-		for _, s := range config.RetryOnStatus {
-			// check for duplicities
-			if s == status {
-				return
-			}
+		if slices.Contains(config.RetryOnStatus, status) {
+			return
 		}
 
 		config.RetryOnStatus = append(config.RetryOnStatus, status)

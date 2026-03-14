@@ -11,7 +11,7 @@ import (
 )
 
 // Emulate agent_id saved object query
-func makeQuery(leaf interface{}) *Node {
+func makeQuery(leaf any) *Node {
 	const ty = "fleet-agents"
 
 	root := NewRoot()
@@ -21,7 +21,7 @@ func makeQuery(leaf interface{}) *Node {
 	return root
 }
 
-func makeQuery2(leaf1 interface{}, leaf2 interface{}) *Node {
+func makeQuery2(leaf1 any, leaf2 any) *Node {
 	const ty = "fleet-agent-actions"
 
 	root := NewRoot()
@@ -71,7 +71,7 @@ func BenchmarkRender(b *testing.B) {
 	b.ResetTimer()
 	// run the RenderOne function b.N times
 	for n := 0; n < b.N; n++ {
-		if _, err := tmpl.Render(map[string]interface{}{
+		if _, err := tmpl.Render(map[string]any{
 			kName: v,
 		}); err != nil {
 			b.Error(err)
@@ -142,7 +142,7 @@ func BenchmarkRender2(b *testing.B) {
 	// run the RenderOne function b.N times
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		if _, err := tmpl.Render(map[string]interface{}{
+		if _, err := tmpl.Render(map[string]any{
 			kName1: "27e58fc0-09a2-11eb-a8cd-57e98f140de5",
 			kName2: 3,
 		}); err != nil {

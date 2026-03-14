@@ -48,14 +48,12 @@ func Test_server_Run(t *testing.T) {
 	started := make(chan struct{}, 1)
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		started <- struct{}{}
 		if err := srv.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			errCh <- err
 		}
-		wg.Done()
-	}()
+	})
 
 	select { // if the goroutine has started within 500ms something is wrong, test has timed out
 	case <-started:
@@ -140,14 +138,12 @@ func Test_server_ClientCert(t *testing.T) {
 		started := make(chan struct{}, 1)
 		errCh := make(chan error, 1)
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			started <- struct{}{}
 			if err := srv.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				errCh <- err
 			}
-			wg.Done()
-		}()
+		})
 
 		select { // make sure goroutine starts within 500ms
 		case <-started:
@@ -212,14 +208,12 @@ func Test_server_ClientCert(t *testing.T) {
 		started := make(chan struct{}, 1)
 		errCh := make(chan error, 1)
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			started <- struct{}{}
 			if err := srv.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				errCh <- err
 			}
-			wg.Done()
-		}()
+		})
 
 		select {
 		case <-started:
@@ -285,14 +279,12 @@ func Test_server_ClientCert(t *testing.T) {
 		started := make(chan struct{}, 1)
 		errCh := make(chan error, 1)
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			started <- struct{}{}
 			if err := srv.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				errCh <- err
 			}
-			wg.Done()
-		}()
+		})
 
 		select {
 		case <-started:
@@ -367,14 +359,12 @@ key: %s`,
 		started := make(chan struct{}, 1)
 		errCh := make(chan error, 1)
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			started <- struct{}{}
 			if err := srv.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				errCh <- err
 			}
-			wg.Done()
-		}()
+		})
 
 		select {
 		case <-started:

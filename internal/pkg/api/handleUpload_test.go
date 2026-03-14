@@ -299,7 +299,7 @@ func TestUploadBeginWritesTimestampToMeta(t *testing.T) {
 		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-fileds-fromhost-meta") }), // index
 		mock.Anything, // file document ID -- generated, so can be any value
 		mock.MatchedBy(func(body []byte) bool {
-			doc := make(map[string]interface{})
+			doc := make(map[string]any)
 
 			err := json.Unmarshal(body, &doc)
 			require.NoError(t, err)
@@ -1175,11 +1175,11 @@ func mockStartBodyWithAgent(agent string) string {
 func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 
 	// convert info into how it's stored/returned in ES
-	out, _ := json.Marshal(map[string]interface{}{
+	out, _ := json.Marshal(map[string]any{
 		"action_id": info.ActionID,
 		"agent_id":  info.AgentID,
 		"src":       info.Source,
-		"file": map[string]interface{}{
+		"file": map[string]any{
 			"size":      info.Total,
 			"ChunkSize": info.ChunkSize,
 			"Status":    info.Status,
@@ -1213,11 +1213,11 @@ func mockChunkResult(bulker *itesting.MockBulk, chunks []file.ChunkInfo) string 
 	for i, chunk := range chunks {
 		results[i] = es.HitT{
 			ID: chunk.BID + "." + strconv.Itoa(chunk.Pos),
-			Fields: map[string]interface{}{
-				file.FieldBaseID: []interface{}{chunk.BID},
-				file.FieldSHA2:   []interface{}{chunk.SHA2},
-				file.FieldLast:   []interface{}{chunk.Last},
-				"size":           []interface{}{chunk.Size},
+			Fields: map[string]any{
+				file.FieldBaseID: []any{chunk.BID},
+				file.FieldSHA2:   []any{chunk.SHA2},
+				file.FieldLast:   []any{chunk.Last},
+				"size":           []any{chunk.Size},
 			},
 		}
 	}

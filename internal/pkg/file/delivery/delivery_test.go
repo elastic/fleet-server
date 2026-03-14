@@ -115,17 +115,17 @@ func TestLocateChunks(t *testing.T) {
 					ID:     baseID + ".0",
 					Index:  "",
 					Source: []byte(""),
-					Fields: map[string]interface{}{
-						"bid": []interface{}{baseID},
+					Fields: map[string]any{
+						"bid": []any{baseID},
 					},
 				},
 				{
 					ID:     baseID + ".1",
 					Index:  "",
 					Source: []byte(""),
-					Fields: map[string]interface{}{
-						"bid":  []interface{}{baseID},
-						"last": []interface{}{true},
+					Fields: map[string]any{
+						"bid":  []any{baseID},
+						"last": []any{true},
 					},
 				},
 			},

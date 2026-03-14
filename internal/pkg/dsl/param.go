@@ -4,7 +4,7 @@
 
 package dsl
 
-func (n *Node) Param(name string, val interface{}) {
+func (n *Node) Param(name string, val any) {
 	childNode := n.findOrCreateChildByName(name)
 	childNode.leaf = val
 }

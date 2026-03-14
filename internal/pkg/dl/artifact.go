@@ -31,7 +31,7 @@ func prepareQueryArtifact() *dsl.Tmpl {
 
 func FindArtifact(ctx context.Context, bulker bulk.Bulk, ident, sha2 string) (*model.Artifact, error) {
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		FieldDecodedSha256: sha2,
 		FieldIdentifier:    ident,
 	}

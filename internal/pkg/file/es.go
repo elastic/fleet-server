@@ -39,9 +39,9 @@ func prepareChunkInfo(size bool) *dsl.Tmpl {
 	root.Query().Term(FieldBaseID, tmpl.Bind(FieldBaseID), nil)
 	root.Param("fields", []string{FieldSHA2, FieldLast, FieldBaseID})
 	if size {
-		root.Param("script_fields", map[string]interface{}{
-			"size": map[string]interface{}{
-				"script": map[string]interface{}{
+		root.Param("script_fields", map[string]any{
+			"size": map[string]any{
+				"script": map[string]any{
 					"lang":   "painless",
 					"source": "params._source.data.length",
 				},
@@ -64,7 +64,7 @@ func prepareFindMetaByUploadID() *dsl.Tmpl {
 func GetMetadata(ctx context.Context, bulker bulk.Bulk, indexPattern string, uploadID string) ([]es.HitT, error) {
 	span, ctx := apm.StartSpan(ctx, "getFileInfo", "search")
 	defer span.End()
-	query, err := QueryUploadID.Render(map[string]interface{}{
+	query, err := QueryUploadID.Render(map[string]any{
 		FieldUploadID: uploadID,
 	})
 	if err != nil {
@@ -144,7 +144,7 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 	if opt.IncludeSize {
 		tpl = QueryChunkInfoWithSize
 	}
-	query, err := tpl.Render(map[string]interface{}{
+	query, err := tpl.Render(map[string]any{
 		FieldBaseID: baseID,
 	})
 	if err != nil {
@@ -206,8 +206,8 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 
 // convenience function for translating the elasticsearch "field" response format
 // of "field": { "a": [value], "b": [value] }
-func getResultField(fields map[string]interface{}, key string) (interface{}, bool) {
-	array, ok := fields[key].([]interface{})
+func getResultField(fields map[string]any, key string) (any, bool) {
+	array, ok := fields[key].([]any)
 	if !ok {
 		return nil, false
 	}
@@ -217,7 +217,7 @@ func getResultField(fields map[string]interface{}, key string) (interface{}, boo
 	return array[0], true
 }
 
-func getResultsFieldString(fields map[string]interface{}, key string) (string, bool) {
+func getResultsFieldString(fields map[string]any, key string) (string, bool) {
 	val, ok := getResultField(fields, key)
 	if !ok {
 		return "", false
@@ -225,7 +225,7 @@ func getResultsFieldString(fields map[string]interface{}, key string) (string, b
 	str, ok := val.(string)
 	return str, ok
 }
-func getResultsFieldBool(fields map[string]interface{}, key string) (bool, bool) {
+func getResultsFieldBool(fields map[string]any, key string) (bool, bool) {
 	val, ok := getResultField(fields, key)
 	if !ok {
 		return false, false
@@ -233,7 +233,7 @@ func getResultsFieldBool(fields map[string]interface{}, key string) (bool, bool)
 	b, ok := val.(bool)
 	return b, ok
 }
-func getResultsFieldInt(fields map[string]interface{}, key string) (int, bool) {
+func getResultsFieldInt(fields map[string]any, key string) (int, bool) {
 	val, ok := getResultField(fields, key)
 	if !ok {
 		return 0, false

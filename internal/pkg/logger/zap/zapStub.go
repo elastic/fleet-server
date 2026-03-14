@@ -62,7 +62,7 @@ func (z zapStub) Sync() error {
 
 func (z zapStub) Write(p []byte) (n int, err error) {
 	// Unwrap the zap object for logging
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	if err := json.Unmarshal(p, &m); err != nil {
 		return 0, err
 	}

@@ -308,7 +308,7 @@ func (f *Flag) Set(s string) error {
 }
 
 // Get returns the Config object used to store values.
-func (f *Flag) Get() interface{} {
+func (f *Flag) Get() any {
 	return f.Config()
 }
 

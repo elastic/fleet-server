@@ -75,7 +75,7 @@ func TestAckRequest(t *testing.T) {
 	assert.NotNil(t, inputEvent.Error)
 
 	// Sanity check embedded *json.RawMessage here
-	var obj map[string]interface{}
+	var obj map[string]any
 	err = json.Unmarshal(inputEvent.ActionData, &obj)
 	require.NoError(t, err)
 	v, ok := obj["key1"]
@@ -162,7 +162,7 @@ func validateSerialization(t *testing.T, action Action) {
 	b, err := json.Marshal(action)
 	assert.NoError(t, err)
 
-	var m map[string]interface{}
+	var m map[string]any
 	err = json.Unmarshal(b, &m)
 	assert.NoError(t, err)
 
@@ -175,7 +175,7 @@ func validateSerialization(t *testing.T, action Action) {
 	if action.Signed == nil {
 		assert.False(t, ok)
 	} else {
-		sm, ok := signed.(map[string]interface{})
+		sm, ok := signed.(map[string]any)
 		assert.True(t, ok)
 		assert.Equal(t, action.Signed.Data, sm["data"])
 		assert.Equal(t, action.Signed.Signature, sm["signature"])
@@ -228,7 +228,6 @@ func Test_UpgradeDetailsMetadata_Downloading(t *testing.T) {
 	}}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataDownloading()
 			if tc.err == nil {
@@ -286,7 +285,6 @@ func Test_UpgradeDetailsMetadata_Failed(t *testing.T) {
 	}}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataFailed()
 			if tc.err == nil {
@@ -342,7 +340,6 @@ func Test_UpgradeDetailsMetadata_Scheduled(t *testing.T) {
 	}}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			meta, err := tc.md.AsUpgradeMetadataScheduled()
 			if tc.err == nil {
@@ -385,7 +382,6 @@ func TestUpgradeDetailsSerialization(t *testing.T) {
 		TargetVersion: "1.2.3",
 	}}
 	for _, d := range details {
-		d := d
 		t.Run(string(d.State), func(t *testing.T) {
 			p, err := json.Marshal(d)
 			require.NoError(t, err)

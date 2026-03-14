@@ -7,7 +7,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"testing"
 
@@ -29,8 +28,7 @@ func TestMetricsEndpoints(t *testing.T) {
 			Port:    8080,
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	srv, err := InitMetrics(ctx, cfg, bi, nil)

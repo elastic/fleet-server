@@ -145,11 +145,11 @@ func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
 	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputFirstStream["auth.basic.password"])
 	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputSecondStream["auth.basic.password"])
 	require.Equal(t, "abcdef123_value", pp.Policy.Data.Outputs["fs-output"]["type"])
-	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Outputs["fs-output"]["ssl"].(map[string]interface{})["key"])
-	require.Equal(t, "bcdefg234_value", pp.Policy.Data.Agent["download"].(map[string]interface{})["sourceURI"])
-	require.Equal(t, "rwXzUJoBxE9I-QCxFt9m_value", pp.Policy.Data.Agent["download"].(map[string]interface{})["ssl"].(map[string]interface{})["key"])
-	require.Equal(t, "abcdef123_value", pp.Policy.Data.Fleet["hosts"].([]interface{})[0])
-	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Fleet["ssl"].(map[string]interface{})["key"])
+	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Outputs["fs-output"]["ssl"].(map[string]any)["key"])
+	require.Equal(t, "bcdefg234_value", pp.Policy.Data.Agent["download"].(map[string]any)["sourceURI"])
+	require.Equal(t, "rwXzUJoBxE9I-QCxFt9m_value", pp.Policy.Data.Agent["download"].(map[string]any)["ssl"].(map[string]any)["key"])
+	require.Equal(t, "abcdef123_value", pp.Policy.Data.Fleet["hosts"].([]any)[0])
+	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Fleet["ssl"].(map[string]any)["key"])
 }
 
 // TestParsedPolicyOTELSecretsReplacement tests that secrets in OTEL sections of a policy

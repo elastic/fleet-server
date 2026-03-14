@@ -22,16 +22,16 @@ func ReadDict(r io.Reader) (JSDict, error) {
 // helper for accessing nested properties without panics
 // it allows for a safe way to do things like
 // js["foo"].(map[string]interface{})["bar"].(map[string]interface{})["baz"].(string)
-type JSDict map[string]interface{}
+type JSDict map[string]any
 
 // for a given path, retrieves the raw value in the json structure
 // safely, such that if any key is missing, or if any non-leaf key
 // is not an object, returns false instead of panicking
-func (j JSDict) Val(keys ...string) (interface{}, bool) {
+func (j JSDict) Val(keys ...string) (any, bool) {
 	if len(keys) == 0 {
 		return nil, false
 	}
-	var m map[string]interface{} = j
+	var m map[string]any = j
 	for i, k := range keys {
 		value, ok := m[k]
 		if !ok {
@@ -40,7 +40,7 @@ func (j JSDict) Val(keys ...string) (interface{}, bool) {
 		if i == len(keys)-1 {
 			return value, true
 		}
-		m, ok = value.(map[string]interface{})
+		m, ok = value.(map[string]any)
 		if !ok {
 			return nil, false
 		}
@@ -78,7 +78,7 @@ func (j JSDict) Int64(keys ...string) (int64, bool) {
 }
 
 // write values to possibly nested locations
-func (j JSDict) Put(value interface{}, keys ...string) error {
+func (j JSDict) Put(value any, keys ...string) error {
 	if len(keys) == 0 {
 		return errors.New("path not provided")
 	}
@@ -87,14 +87,14 @@ func (j JSDict) Put(value interface{}, keys ...string) error {
 		j[keys[0]] = value
 		return nil
 	}
-	var m map[string]interface{} = j
+	var m map[string]any = j
 	for i, k := range keys {
 		if i == len(keys)-1 {
 			m[k] = value
 			return nil
 		}
 		// otherwise, we have more to nest. Make sure this level is an object
-		x, ok := m[k].(map[string]interface{})
+		x, ok := m[k].(map[string]any)
 		if !ok {
 			return fmt.Errorf("unable to write to %s, missing property at %s", strings.Join(keys, "."), k)
 		}

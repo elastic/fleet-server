@@ -4,7 +4,7 @@
 
 package esutil
 
-type stringMap map[string]interface{}
+type stringMap map[string]any
 
 func (m stringMap) GetMap(k string) stringMap {
 	if m == nil {
@@ -13,7 +13,7 @@ func (m stringMap) GetMap(k string) stringMap {
 
 	v := m[k]
 	if v != nil {
-		if m, ok := v.(map[string]interface{}); ok {
+		if m, ok := v.(map[string]any); ok {
 			return m
 		}
 	}

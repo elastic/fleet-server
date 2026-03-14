@@ -607,16 +607,16 @@ func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 		return data, nil
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	err := json.Unmarshal(data, &m)
 	if err != nil {
 		return nil, err
 	}
 
 	if v, ok := m["elastic"]; ok {
-		if sm, ok := v.(map[string]interface{}); ok {
+		if sm, ok := v.(map[string]any); ok {
 			if v, ok = sm["agent"]; ok {
-				if sm, ok = v.(map[string]interface{}); ok {
+				if sm, ok = v.(map[string]any); ok {
 					if _, ok = sm["id"]; ok {
 						sm["id"] = agentID
 						data, err = json.Marshal(m)

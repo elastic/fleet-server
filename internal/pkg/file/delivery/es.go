@@ -45,7 +45,7 @@ func prepareQueryMetaByIDAndAgent() *dsl.Tmpl {
 }
 
 func findFileForAgent(ctx context.Context, bulker bulk.Bulk, fileID string, agentID string) (*es.ResultT, error) {
-	q, err := MetaByIDAndAgent.Render(map[string]interface{}{
+	q, err := MetaByIDAndAgent.Render(map[string]any{
 		FieldDocID:      fileID,
 		"target_agents": agentID,
 	})

@@ -16,7 +16,7 @@ import (
 	"strings"
 )
 
-type Map map[string]interface{}
+type Map map[string]any
 
 // GetMap will return the value for k as a Map or a nil.
 func (m Map) GetMap(k string) Map {
@@ -26,7 +26,7 @@ func (m Map) GetMap(k string) Map {
 
 	v := m[k]
 	if v != nil {
-		if m, ok := v.(map[string]interface{}); ok {
+		if m, ok := v.(map[string]any); ok {
 			return m
 		}
 	}
@@ -87,8 +87,8 @@ func (m Map) Get(keyPath string) any {
 	var index uint
 	var isIndex bool
 
-	parts := strings.Split(keyPath, ".")
-	for _, part := range parts {
+	parts := strings.SplitSeq(keyPath, ".")
+	for part := range parts {
 		key = part
 
 		// Check if part is an index

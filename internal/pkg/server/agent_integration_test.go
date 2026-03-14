@@ -49,13 +49,13 @@ var biInfo = build.Info{
 }
 
 var policyData = model.PolicyData{
-	Outputs: map[string]map[string]interface{}{
+	Outputs: map[string]map[string]any{
 		"default": {
 			"type": "elasticsearch",
 		},
 	},
 	OutputPermissions: json.RawMessage(`{"default": {}}`),
-	Inputs: []map[string]interface{}{{
+	Inputs: []map[string]any{{
 		"type": "fleet-server",
 	}},
 }
@@ -94,20 +94,20 @@ func TestAgent(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	inputSource, err := structpb.NewStruct(map[string]interface{}{
+	inputSource, err := structpb.NewStruct(map[string]any{
 		"id":       "fleet-server",
 		"type":     "fleet-server",
 		"name":     "fleet-server",
 		"revision": 1,
 	})
 	require.NoError(t, err)
-	outputSource, err := structpb.NewStruct(map[string]interface{}{
+	outputSource, err := structpb.NewStruct(map[string]any{
 		"id":       "default",
 		"type":     "elasticsearch",
 		"name":     "elasticsearch",
 		"revision": 1,
 		"hosts":    getESHosts(),
-		"bootstrap": map[string]interface{}{
+		"bootstrap": map[string]any{
 			// check to make sure the service_token is injected into the output
 			"service_token": getESServiceToken(),
 		},
@@ -118,9 +118,7 @@ func TestAgent(t *testing.T) {
 	defer control.Stop()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 
 		a := &Agent{
 			cliCfg:      ucfg.New(),
@@ -133,7 +131,7 @@ func TestAgent(t *testing.T) {
 		}, client.WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
 		err = a.Run(ctx)
 		assert.NoError(t, err)
-	}()
+	})
 
 	t.Log("'bootstrap' fleet-server test")
 	// wait for fleet-server to report as degraded (starting mode without agent.id)
@@ -164,12 +162,12 @@ func TestAgent(t *testing.T) {
 
 	t.Log("Test bad configuration can recover")
 	// trigger update with bad configuration
-	badSource, err := structpb.NewStruct(map[string]interface{}{
+	badSource, err := structpb.NewStruct(map[string]any{
 		"id":            "default",
 		"type":          "elasticsearch",
 		"name":          "elasticsearch",
 		"revision":      1,
-		"hosts":         []interface{}{"localhost:63542"},
+		"hosts":         []any{"localhost:63542"},
 		"service_token": getESServiceToken(),
 	})
 	require.NoError(t, err)
@@ -187,14 +185,14 @@ func TestAgent(t *testing.T) {
 
 	// reconfigure to good config with debug log level
 	// the good config in this case is the bootstrap config.
-	goodSource, err := structpb.NewStruct(map[string]interface{}{
+	goodSource, err := structpb.NewStruct(map[string]any{
 		"id":            "default",
 		"type":          "elasticsearch",
 		"name":          "elasticsearch",
 		"revision":      1,
-		"hosts":         []interface{}{"localhost:63542"},
+		"hosts":         []any{"localhost:63542"},
 		"service_token": getESServiceToken(),
-		"bootstrap": map[string]interface{}{
+		"bootstrap": map[string]any{
 			"id":            "default",
 			"type":          "elasticsearch",
 			"name":          "elasticsearch",
@@ -254,15 +252,15 @@ func TestAgentAPM(t *testing.T) {
 	bulker := ftesting.SetupBulk(ctx, t)
 
 	policyWithInstrumentation := model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
+		Outputs: map[string]map[string]any{
 			"default": {
 				"type": "elasticsearch",
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}}`),
-		Inputs: []map[string]interface{}{{
+		Inputs: []map[string]any{{
 			"type": "fleet-server",
-			"instrumentation": map[string]interface{}{ // expect this config to not send traces
+			"instrumentation": map[string]any{ // expect this config to not send traces
 				"enabled": true,
 				"hosts":   []string{"example"},
 			},
@@ -289,20 +287,20 @@ func TestAgentAPM(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	inputSource, err := structpb.NewStruct(map[string]interface{}{
+	inputSource, err := structpb.NewStruct(map[string]any{
 		"id":       "fleet-server",
 		"type":     "fleet-server",
 		"name":     "fleet-server",
 		"revision": 1,
 	})
 	require.NoError(t, err)
-	outputSource, err := structpb.NewStruct(map[string]interface{}{
+	outputSource, err := structpb.NewStruct(map[string]any{
 		"id":       "default",
 		"type":     "elasticsearch",
 		"name":     "elasticsearch",
 		"revision": 1,
 		"hosts":    getESHosts(),
-		"bootstrap": map[string]interface{}{
+		"bootstrap": map[string]any{
 			// check to make sure the service_token is injected into the output
 			"service_token": getESServiceToken(),
 		},
@@ -553,13 +551,13 @@ func (s *StubV2Control) Actions(server proto.ElasticAgent_ActionsServer) error {
 	return nil
 }
 
-func getESHosts() []interface{} {
+func getESHosts() []any {
 	hosts := os.Getenv("ELASTICSEARCH_HOSTS")
 	if hosts == "" {
-		return []interface{}{"localhost:9200"}
+		return []any{"localhost:9200"}
 	}
 	hostsSplit := strings.Split(hosts, ",")
-	rawHosts := make([]interface{}, 0, len(hostsSplit))
+	rawHosts := make([]any, 0, len(hostsSplit))
 	for _, host := range hostsSplit {
 		rawHosts = append(rawHosts, host)
 	}
