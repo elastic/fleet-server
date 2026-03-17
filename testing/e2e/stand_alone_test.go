@@ -650,7 +650,10 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.Require().NoError(err)
 
 	// Build the OTel Collector binary
+	// The make target outputs to bin/ which must exist first.
 	suite.T().Log("Building otelcol-contrib binary via make otelcontribcol")
+	err = os.MkdirAll(filepath.Join(cloneDir, "bin"), 0755)
+	suite.Require().NoError(err)
 	makeCmd := exec.CommandContext(ctx, "make", "otelcontribcol")
 	makeCmd.Dir = cloneDir
 	makeCmd.Stdout = os.Stdout
@@ -706,4 +709,107 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.Equal(otelVersion, agentDoc.Agent.Version, "expected agent.version to match otelcol-contrib binary version")
 	suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
 	suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
+}
+
+// TestEDOTOpAMP ensures that the EDOT (Elastic Distribution of OpenTelemetry) Collector,
+// bundled inside the Elastic Agent package, can connect to Fleet Server over OpAMP and
+// enroll as an agent in the .fleet-agents index.
+func (suite *StandAloneSuite) TestEDOTOpAMP() {
+	// Create a config file from a template in the test temp dir
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-opamp.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]interface{}{
+		"Hosts":          suite.ESHosts,
+		"ServiceToken":   suite.ServiceToken,
+		"StaticTokenKey": "edot-opamp-e2e-test-key",
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	err = cmd.Start()
+	suite.Require().NoError(err)
+	defer cmd.Wait()
+
+	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+
+	apiKey := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+
+	// Enroll a dummy agent to initialize the .fleet-agents index before the EDOT Collector connects.
+	// Without this, WaitForAgentDoc fails with index_not_found_exception when the EDOT Collector
+	// sends its first AgentToServer message, because .fleet-agents doesn't exist yet in a fresh
+	// standalone fleet-server environment.
+	tester := api_version.NewClientAPITesterCurrent(suite.Scaffold, "http://localhost:8220", apiKey)
+	tester.Enroll(ctx, apiKey)
+
+	// Download and extract the Elastic Agent package to obtain the bundled EDOT Collector binary.
+	suite.T().Log("Downloading Elastic Agent package to extract EDOT Collector binary")
+	downloadCtx, downloadCancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer downloadCancel()
+	rc := downloadElasticAgent(downloadCtx, suite.T(), suite.Client)
+	defer rc.Close()
+
+	agentExtractDir := filepath.Join(dir, "elastic-agent-package")
+	err = os.MkdirAll(agentExtractDir, 0755)
+	suite.Require().NoError(err)
+	paths := extractAgentArchive(suite.T(), rc, agentExtractDir, nil)
+	rc.Close()
+
+	edotBinaryPath, ok := paths[edotCollectorName]
+	suite.Require().Truef(ok, "EDOT Collector binary %q not found in elastic-agent package", edotCollectorName)
+	suite.T().Logf("Found EDOT Collector binary at %s", edotBinaryPath)
+
+	// Configure the EDOT Collector with the OpAMP extension
+	instanceUID := "029c9e8b-3eb9-8768-c63e-593b0ef44430"
+	suite.T().Logf("Configuring EDOT Collector with OpAMP extension (instanceUID=%s)", instanceUID)
+	tpl, err = template.ParseFiles(filepath.Join("testdata", "otelcol-opamp.tpl"))
+	suite.Require().NoError(err)
+	f, err = os.Create(filepath.Join(dir, "edot-otelcol.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]interface{}{
+		"OpAMP": map[string]string{
+			"InstanceUID": instanceUID,
+			"APIKey":      apiKey,
+		},
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Start the EDOT Collector
+	suite.T().Log("Starting EDOT Collector")
+	edotCmd := exec.CommandContext(ctx, edotBinaryPath, "--config", filepath.Join(dir, "edot-otelcol.yml"))
+	edotCmd.Cancel = func() error {
+		return edotCmd.Process.Signal(syscall.SIGTERM)
+	}
+	edotCmd.Stdout = os.Stdout
+	edotCmd.Stderr = os.Stderr
+	err = edotCmd.Start()
+	suite.Require().NoError(err)
+	defer edotCmd.Wait()
+
+	// Verify that the EDOT Collector was enrolled in Fleet by fetching its document from
+	// .fleet-agents and asserting on its contents.
+	suite.T().Logf("Waiting for EDOT agent %s to appear in .fleet-agents", instanceUID)
+	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
+
+	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
+	versionOut, err := exec.Command(edotBinaryPath, "--version").Output()
+	suite.Require().NoError(err)
+	edotVersion := strings.TrimPrefix(strings.TrimSpace(string(versionOut)), "elastic-agent-otelcol version ")
+	suite.Equal("OPAMP", agentDoc.Type, "expected type to be OPAMP")
+	suite.Equal("elastic-agent-otelcol", agentDoc.Agent.Type, "expected agent.type to be elastic-agent-otelcol")
+	suite.Equal(edotVersion, agentDoc.Agent.Version, "expected agent.version to match EDOT Collector binary version")
+	suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
+	suite.Contains(agentDoc.Tags, "elastic-agent-otelcol", "expected tags to contain elastic-agent-otelcol")
 }
