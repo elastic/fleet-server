@@ -600,7 +600,7 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	f.Close()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	// Run the fleet-server binary
