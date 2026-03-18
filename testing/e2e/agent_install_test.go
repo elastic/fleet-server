@@ -170,6 +170,7 @@ func (suite *AgentInstallSuite) extractTar(r io.Reader) {
 			suite.Require().NoError(err)
 			w, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm())
 			suite.Require().NoError(err)
+			// Use local fleet-server instead of the one from the archive
 			if strings.HasSuffix(header.Name, binaryName) {
 				suite.copyFleetServer(w)
 				continue
