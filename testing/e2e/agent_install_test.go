@@ -83,7 +83,7 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	rc := downloadElasticAgent(ctx, suite.T(), suite.Client)
 	defer rc.Close()
 
-	// Unarchive download in temp dir, replacing the bundled fleet-server with our local build
+	// Unarchive download in temp dir
 	suite.downloadPath = filepath.Join(os.TempDir(), "e2e-agent_install_test")
 	err = os.MkdirAll(suite.downloadPath, 0755)
 	suite.Require().NoError(err)
@@ -105,6 +105,7 @@ func (suite *AgentInstallSuite) SetupSuite() {
 // fleet-server binary in archive is replaced by a locally compiled version
 func (suite *AgentInstallSuite) extractZip(r io.Reader) {
 	suite.T().Helper()
+	// Extract zip stream
 	var b bytes.Buffer
 	n, err := io.Copy(&b, r)
 	suite.Require().NoError(err)
@@ -147,6 +148,7 @@ func (suite *AgentInstallSuite) extractZip(r io.Reader) {
 // fleet-server binary in archive is replaced by a locally compiled version
 func (suite *AgentInstallSuite) extractTar(r io.Reader) {
 	suite.T().Helper()
+	// Extract tar.gz stream
 	gs, err := gzip.NewReader(r)
 	suite.Require().NoError(err)
 	tarReader := tar.NewReader(gs)
