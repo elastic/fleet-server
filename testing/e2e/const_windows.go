@@ -7,4 +7,3 @@ package e2e
 const binaryName = "fleet-server.exe"
 const agentName = "elastic-agent.exe"
 const agentDevName = "elastic-development-agent.exe"
-const edotCollectorName = "elastic-agent-otelcol.exe"
