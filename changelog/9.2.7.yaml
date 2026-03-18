@@ -5,9 +5,7 @@ entries:
       description: "Elastic Agent policies can contain secret references in one of two formats: inline or path.\nWith the inline format, the reference looks like this: `<path>: $co.elastic.secret{<secret ref>}`. \nWith the path format, the reference looks like this: `secrets.<path>.id:<secret ref>`.\nThis change ensures that Fleet Server accepts secret references in policies in either format.\n"
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6581
-        - https://github.com/elastic/fleet-server/pull/6592
-        - https://github.com/elastic/fleet-server/pull/6597
+        - https://github.com/elastic/fleet-server/pull/5852
       issue: []
       impact: ""
       action: ""
@@ -20,10 +18,9 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6581
-        - https://github.com/elastic/fleet-server/pull/6592
-        - https://github.com/elastic/fleet-server/pull/6597
-      issue: []
+        - https://github.com/elastic/fleet-server/pull/5837
+      issue:
+        - https://github.com/elastic/fleet-server/issues/4470
       impact: ""
       action: ""
       timestamp: 1764192755
@@ -35,9 +32,7 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6581
-        - https://github.com/elastic/fleet-server/pull/6592
-        - https://github.com/elastic/fleet-server/pull/6597
+        - https://github.com/elastic/fleet-server/pull/5997
       issue: []
       impact: ""
       action: ""
@@ -51,9 +46,7 @@ entries:
         Added functionality to replace secrets in OTEL sections (receivers, exporters, processors, extensions, connectors) of a policy.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6581
-        - https://github.com/elastic/fleet-server/pull/6592
-        - https://github.com/elastic/fleet-server/pull/6597
+        - https://github.com/elastic/fleet-server/pull/6419
       issue:
         - https://github.com/elastic/fleet-server/issues/6277
       impact: ""
@@ -81,9 +74,7 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6581
-        - https://github.com/elastic/fleet-server/pull/6592
-        - https://github.com/elastic/fleet-server/pull/6597
+        - https://github.com/elastic/fleet-server/pull/6517
       issue: []
       impact: ""
       action: ""
