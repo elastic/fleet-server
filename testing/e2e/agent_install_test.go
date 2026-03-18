@@ -42,7 +42,6 @@ type AgentInstallSuite struct {
 
 }
 
-
 func TestAgentInstallSuite(t *testing.T) {
 	suite.Run(t, new(AgentInstallSuite))
 }
@@ -99,7 +98,6 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	suite.Require().NoError(err)
 	suite.T().Log("Setup complete.")
 }
-
 
 // extractZip treats the passed Reader as a zip stream and unarchives it to a temp dir
 // fleet-server binary in archive is replaced by a locally compiled version
