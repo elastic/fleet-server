@@ -32,12 +32,8 @@ type Artifact struct {
 }
 
 // agentCacheDir returns the directory used to cache downloaded elastic-agent archives.
-func agentCacheDir() (string, error) {
-	base, err := os.UserCacheDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(base, "fleet-server-e2e"), nil
+func agentCacheDir() string {
+	return filepath.Join(os.TempDir(), "fleet-server-e2e")
 }
 
 // downloadElasticAgent searches the artifacts API for the snapshot version
@@ -95,10 +91,7 @@ func downloadElasticAgent(ctx context.Context, t *testing.T, client *http.Client
 		t.Fatalf("unable to find package download for fileName=%s", fileName)
 	}
 
-	cacheDir, err := agentCacheDir()
-	if err != nil {
-		t.Fatalf("failed to determine cache dir: %v", err)
-	}
+	cacheDir := agentCacheDir()
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		t.Fatalf("failed to create cache dir: %v", err)
 	}
