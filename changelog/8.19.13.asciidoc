@@ -28,6 +28,6 @@ Review important information about the  8.19.13 release.
 
 
 * Fix checkin endpoint compression support. https://github.com/elastic/fleet-server/pull/6491[#6491] 
-* Fix inaccuracies with openapi spec. https://github.com/elastic/fleet-server/pull/6572[#6572] https://github.com/elastic/fleet-server/pull/6565[#6565] https://github.com/elastic/fleet-server/pull/6577[#6577] https://github.com/elastic/fleet-server/pull/6580[#6580] 
+* Fix inaccuracies with openapi spec. https://github.com/elastic/fleet-server/pull/6532[#6532] 
 
 // end 8.19.13 relnotes
