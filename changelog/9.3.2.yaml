@@ -6,9 +6,7 @@ entries:
         Added functionality to replace secrets in OTEL sections (receivers, exporters, processors, extensions, connectors) of a policy.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6565
-        - https://github.com/elastic/fleet-server/pull/6591
-        - https://github.com/elastic/fleet-server/pull/6597
+        - https://github.com/elastic/fleet-server/pull/6419
       issue:
         - https://github.com/elastic/fleet-server/issues/6277
       impact: ""
@@ -36,9 +34,7 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6565
-        - https://github.com/elastic/fleet-server/pull/6591
-        - https://github.com/elastic/fleet-server/pull/6597
+        - https://github.com/elastic/fleet-server/pull/6517
       issue: []
       impact: ""
       action: ""
