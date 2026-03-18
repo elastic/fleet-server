@@ -1,0 +1,33 @@
+// begin 8.19.13 relnotes
+
+[[release-notes-8.19.13]]
+==  8.19.13
+
+Review important information about the  8.19.13 release.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.13]]
+=== Bug fixes
+
+
+
+
+* Fix checkin endpoint compression support. https://github.com/elastic/fleet-server/pull/6491[#6491] 
+* Fix inaccuracies with openapi spec. https://github.com/elastic/fleet-server/pull/6532[#6532] 
+
+// end 8.19.13 relnotes
