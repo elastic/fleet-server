@@ -21,7 +21,7 @@ import (
 	"testing"
 )
 
-// SearchResp is the response body for the artifacts search API.
+// SearchResp is the response body for the artifacts search API
 type SearchResp struct {
 	Packages map[string]Artifact `json:"packages"`
 }
@@ -29,6 +29,9 @@ type SearchResp struct {
 // Artifact describes an elastic artifact available through the API.
 type Artifact struct {
 	URL string `json:"url"`
+	//SHAURL       string `json:"sha_url"`      // Unused
+	//Type         string `json:"type"`         // Unused
+	//Architecture string `json:"architecture"` // Unused
 }
 
 // agentCacheDir returns the directory used to cache downloaded elastic-agent archives.
