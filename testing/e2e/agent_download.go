@@ -7,15 +7,10 @@
 package e2e
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -206,121 +201,3 @@ func sha512OfFile(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// FileReplacer is an optional callback invoked during archive extraction.
-// If it handles the entry (writes to w and returns true) the normal copy is skipped.
-// name is the archive-relative path; w is the already-opened destination file.
-type FileReplacer func(name string, w io.WriteCloser) bool
-
-// extractAgentArchive extracts the elastic-agent archive from r into destDir.
-// An optional replacer may intercept individual entries (e.g. to swap in a
-// locally compiled binary). It returns a map of base binary names → absolute paths.
-func extractAgentArchive(t *testing.T, r io.Reader, destDir string, replacer FileReplacer) map[string]string {
-	t.Helper()
-	paths := make(map[string]string)
-	switch runtime.GOOS {
-	case "windows":
-		extractAgentZip(t, r, destDir, paths, replacer)
-	default:
-		extractAgentTar(t, r, destDir, paths, replacer)
-	}
-	return paths
-}
-
-func extractAgentTar(t *testing.T, r io.Reader, destDir string, paths map[string]string, replacer FileReplacer) {
-	t.Helper()
-	gs, err := gzip.NewReader(r)
-	if err != nil {
-		t.Fatalf("failed to create gzip reader: %v", err)
-	}
-	tarReader := tar.NewReader(gs)
-	for {
-		header, err := tarReader.Next()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			t.Fatalf("tar read error: %v", err)
-		}
-
-		path := filepath.Join(destDir, header.Name)
-		mode := header.FileInfo().Mode()
-		switch {
-		case mode.IsDir():
-			if err := os.MkdirAll(path, 0755); err != nil {
-				t.Fatalf("mkdir %s: %v", path, err)
-			}
-		case mode.IsRegular():
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-				t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
-			}
-			w, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm())
-			if err != nil {
-				t.Fatalf("open %s: %v", path, err)
-			}
-			if replacer != nil && replacer(header.Name, w) {
-				continue
-			}
-			if _, err := io.Copy(w, tarReader); err != nil {
-				t.Fatalf("copy %s: %v", path, err)
-			}
-			w.Close()
-			paths[filepath.Base(header.Name)] = path
-		case mode.Type()&os.ModeSymlink == os.ModeSymlink:
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-				t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
-			}
-			if err := os.Symlink(header.Linkname, path); err != nil {
-				t.Fatalf("symlink %s → %s: %v", path, header.Linkname, err)
-			}
-			paths[filepath.Base(header.Linkname)] = path
-		default:
-			t.Logf("unable to untar type=%c in file=%s", header.Typeflag, path)
-		}
-	}
-}
-
-func extractAgentZip(t *testing.T, r io.Reader, destDir string, paths map[string]string, replacer FileReplacer) {
-	t.Helper()
-	var b bytes.Buffer
-	n, err := io.Copy(&b, r)
-	if err != nil {
-		t.Fatalf("failed to buffer zip: %v", err)
-	}
-	zipReader, err := zip.NewReader(bytes.NewReader(b.Bytes()), n)
-	if err != nil {
-		t.Fatalf("failed to create zip reader: %v", err)
-	}
-	for _, file := range zipReader.File {
-		path := filepath.Join(destDir, file.Name)
-		mode := file.FileInfo().Mode()
-		switch {
-		case mode.IsDir():
-			if err := os.MkdirAll(path, 0755); err != nil {
-				t.Fatalf("mkdir %s: %v", path, err)
-			}
-		case mode.IsRegular():
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-				t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
-			}
-			w, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
-			if err != nil {
-				t.Fatalf("open %s: %v", path, err)
-			}
-			if replacer != nil && replacer(file.Name, w) {
-				continue
-			}
-			f, err := file.Open()
-			if err != nil {
-				t.Fatalf("zip open %s: %v", file.Name, err)
-			}
-			if _, err := io.Copy(w, f); err != nil {
-				t.Fatalf("copy %s: %v", path, err)
-			}
-			w.Close()
-			f.Close()
-			paths[filepath.Base(file.Name)] = path
-		default:
-			t.Logf("unable to unzip type=%+v in file=%s", mode, path)
-		}
-	}
-}
