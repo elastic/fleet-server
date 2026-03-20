@@ -121,7 +121,7 @@ func downloadElasticAgent(ctx context.Context, t *testing.T, client *http.Client
 	}
 	tmpName := tmp.Name()
 
-	req, err = http.NewRequestWithContext(ctx, "GET", pkg.URL, nil)
+	req, err = http.NewRequestWithContext(ctx, http.MethodGet, pkg.URL, nil)
 	if err != nil {
 		tmp.Close()
 		os.Remove(tmpName)
