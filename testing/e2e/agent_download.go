@@ -56,7 +56,7 @@ func downloadElasticAgent(ctx context.Context, t *testing.T, client *http.Client
 	if len(draSplit) == 3 {
 		draVersion = draSplit[0] + "-" + draSplit[2] // remove hash
 	} else if len(draSplit) > 3 {
-		t.Fatalf("Unsupported ELASTICSEARCH_VERSION format, expected 3 segments got: %s", draVersion)
+		t.Fatalf("Unsupported ELASTICSEARCH_VERSION format, expected 3 segments got: %v", draSplit)
 	}
 	t.Logf("Using ELASTICSEARCH_VERSION=%s for agent download", draVersion)
 
