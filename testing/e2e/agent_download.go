@@ -68,6 +68,10 @@ func downloadElasticAgent(ctx context.Context, t *testing.T, client *http.Client
 	if err != nil {
 		t.Fatalf("failed to query artifacts API: %v", err)
 	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		t.Fatalf("artifacts API returned unexpected status: %d", resp.StatusCode)
+	}
 
 	var body SearchResp
 	err = json.NewDecoder(resp.Body).Decode(&body)
