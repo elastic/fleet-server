@@ -167,7 +167,7 @@ func downloadElasticAgent(ctx context.Context, t *testing.T, client *http.Client
 // first whitespace-delimited field is returned.
 func fetchRemoteSHA512(ctx context.Context, t *testing.T, client *http.Client, url string) string {
 	t.Helper()
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("failed to create sha512 request: %v", err)
 	}
