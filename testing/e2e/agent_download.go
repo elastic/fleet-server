@@ -180,6 +180,9 @@ func fetchRemoteSHA512(ctx context.Context, t *testing.T, client *http.Client, u
 		t.Fatalf("failed to fetch sha512 file: %v", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("sha512 fetch returned unexpected status: %d", resp.StatusCode)
+	}
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("failed to read sha512 file: %v", err)
