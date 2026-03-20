@@ -58,7 +58,7 @@ func downloadElasticAgent(ctx context.Context, t *testing.T, client *http.Client
 	} else if len(draSplit) > 3 {
 		t.Fatalf("Unsupported ELASTICSEARCH_VERSION format, expected 3 segments got: %v", draSplit)
 	}
-	t.Logf("Using ELASTICSEARCH_VERSION=%s for agent download", draVersion)
+	t.Logf("Using version %s for agent download", draVersion)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://artifacts-api.elastic.co/v1/search/"+draVersion, nil)
 	if err != nil {
