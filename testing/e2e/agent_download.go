@@ -60,7 +60,7 @@ func downloadElasticAgent(ctx context.Context, t *testing.T, client *http.Client
 	}
 	t.Logf("Using version %s for agent download", draVersion)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://artifacts-api.elastic.co/v1/search/"+draVersion, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://artifacts-api.elastic.co/v1/search/"+draVersion, nil)
 	if err != nil {
 		t.Fatalf("failed to create search request: %v", err)
 	}
