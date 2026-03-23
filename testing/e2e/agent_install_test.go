@@ -7,12 +7,7 @@
 package e2e
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"bytes"
-	"compress/gzip"
 	"context"
-	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -20,7 +15,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -86,120 +80,40 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	suite.downloadPath = filepath.Join(os.TempDir(), "e2e-agent_install_test")
 	err = os.MkdirAll(suite.downloadPath, 0755)
 	suite.Require().NoError(err)
+	var paths extractedPaths
 	switch runtime.GOOS {
 	case "windows":
-		suite.extractZip(rc)
+		paths = extractZip(suite.T(), rc, suite.downloadPath)
 	case "darwin", "linux":
-		suite.extractTar(rc)
+		paths = extractTar(suite.T(), rc, suite.downloadPath)
 	default:
 		suite.Require().Failf("Unsupported OS", "OS %s is unsupported for tests", runtime.GOOS)
 	}
+
+	// Replace the fleet-server binary from the archive with the locally compiled version.
+	if paths.fleetServerBinary != "" {
+		suite.copyFleetServer(paths.fleetServerBinary)
+	}
+
+	suite.agentPath = paths.agentBinary
 	_, err = os.Stat(suite.agentPath)
 	suite.Require().NoError(err)
 	suite.T().Log("Setup complete.")
 }
 
-// extractZip treats the passed Reader as a zip stream and unarchives it to a temp dir
-// fleet-server binary in archive is replaced by a locally compiled version
-func (suite *AgentInstallSuite) extractZip(r io.Reader) {
-	suite.T().Helper()
-	// Extract zip stream
-	var b bytes.Buffer
-	n, err := io.Copy(&b, r)
-	suite.Require().NoError(err)
-	zipReader, err := zip.NewReader(bytes.NewReader(b.Bytes()), n)
-	suite.Require().NoError(err)
-	for _, file := range zipReader.File {
-		path := filepath.Join(suite.downloadPath, file.Name)
-		mode := file.FileInfo().Mode()
-		switch {
-		case mode.IsDir():
-			err := os.MkdirAll(path, 0755)
-			suite.Require().NoError(err)
-		case mode.IsRegular():
-			err := os.MkdirAll(filepath.Dir(path), 0755)
-			suite.Require().NoError(err)
-			w, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
-			suite.Require().NoError(err)
-			if strings.HasSuffix(file.Name, binaryName) {
-				suite.copyFleetServer(w)
-				continue
-			}
-			if strings.HasSuffix(file.Name, agentName) {
-				suite.agentPath = path
-			}
-			f, err := file.Open()
-			suite.Require().NoError(err)
-			_, err = io.Copy(w, f)
-			suite.Require().NoError(err)
-			err = w.Close()
-			suite.Require().NoError(err)
-			err = f.Close()
-			suite.Require().NoError(err)
-		default:
-			suite.T().Logf("Unable to unzip type=%+v in file=%s", mode, path)
-		}
-	}
-}
-
-// extractTar treats the passed Reader as a tar.gz stream and unarchives it to the suite.downloadPath
-// fleet-server binary in archive is replaced by a locally compiled version
-func (suite *AgentInstallSuite) extractTar(r io.Reader) {
-	suite.T().Helper()
-	// Extract tar.gz stream
-	gs, err := gzip.NewReader(r)
-	suite.Require().NoError(err)
-	tarReader := tar.NewReader(gs)
-	for {
-		header, err := tarReader.Next()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		suite.Require().NoError(err)
-
-		path := filepath.Join(suite.downloadPath, header.Name)
-		mode := header.FileInfo().Mode()
-		switch {
-		case mode.IsDir():
-			err := os.MkdirAll(path, 0755)
-			suite.Require().NoError(err)
-		case mode.IsRegular():
-			err := os.MkdirAll(filepath.Dir(path), 0755)
-			suite.Require().NoError(err)
-			w, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm())
-			suite.Require().NoError(err)
-			// Use local fleet-server instead of the one from the archive
-			if strings.HasSuffix(header.Name, binaryName) {
-				suite.copyFleetServer(w)
-				continue
-			}
-			_, err = io.Copy(w, tarReader)
-			suite.Require().NoError(err)
-			err = w.Close()
-			suite.Require().NoError(err)
-		case mode.Type()&os.ModeSymlink == os.ModeSymlink:
-			err := os.MkdirAll(filepath.Dir(path), 0755)
-			suite.Require().NoError(err)
-			err = os.Symlink(header.Linkname, path)
-			suite.Require().NoError(err)
-			if strings.HasSuffix(header.Linkname, agentName) {
-				suite.agentPath = path
-			}
-		default:
-			suite.T().Logf("Unable to untar type=%c in file=%s", header.Typeflag, path)
-		}
-	}
-}
-
-func (suite *AgentInstallSuite) copyFleetServer(w io.WriteCloser) {
+func (suite *AgentInstallSuite) copyFleetServer(destPath string) {
 	suite.T().Helper()
 	src, err := os.Open(suite.binaryPath)
 	suite.Require().NoError(err)
+	defer src.Close()
+
+	w, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	suite.Require().NoError(err)
+
 	_, err = io.Copy(w, src)
 	suite.Require().NoError(err)
+
 	err = w.Close()
-	suite.Require().NoError(err)
-	err = src.Close()
 	suite.Require().NoError(err)
 }
 

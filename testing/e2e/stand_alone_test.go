@@ -744,18 +744,26 @@ func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
 	downloadCtx, downloadCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer downloadCancel()
 	rc := downloadElasticAgent(downloadCtx, suite.T(), suite.Client)
-	paths := extractAgentArchive(suite.T(), rc, agentExtractDir, nil, nil)
+	var paths extractedPaths
+	switch runtime.GOOS {
+	case "windows":
+		paths = extractZip(suite.T(), rc, agentExtractDir)
+	case "darwin", "linux":
+		paths = extractTar(suite.T(), rc, agentExtractDir)
+	default:
+		suite.Require().Failf("Unsupported OS", "OS %s is unsupported for tests", runtime.GOOS)
+	}
 	rc.Close()
+
+	agentBinaryPath := paths.agentBinary
+	suite.Require().NotEmpty(agentBinaryPath, "elastic-agent binary not found in archive")
+
+	suite.T().Logf("Found elastic-agent binary at %s", agentBinaryPath)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	apiKey := suite.startFleetServerForOpAMP(ctx, dir, "edot-opamp-e2e-test-key")
-
-	agentBinaryPath, ok := paths[agentName]
-	suite.Require().Truef(ok, "elastic-agent binary %q not found in package", agentName)
-
-	suite.T().Logf("Found elastic-agent binary at %s", agentBinaryPath)
 
 	instanceUID := "029c9e8b-3eb9-8768-c63e-593b0ef44430"
 	suite.T().Logf("Configuring EDOT Collector with OpAMP extension (instanceUID=%s)", instanceUID)

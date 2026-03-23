@@ -7,10 +7,15 @@
 package e2e
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -188,6 +193,132 @@ func fetchRemoteSHA512(ctx context.Context, t *testing.T, client *http.Client, u
 		t.Fatalf("failed to read sha512 file: %v", err)
 	}
 	return strings.Fields(string(data))[0]
+}
+
+// extractedPaths holds paths to notable binaries found during archive extraction.
+type extractedPaths struct {
+	agentBinary       string // path to the elastic-agent binary
+	fleetServerBinary string // path to the fleet-server binary
+}
+
+// extractTar extracts a tar.gz archive from r into destDir, returning the
+// paths to notable binaries found during extraction.
+func extractTar(t *testing.T, r io.Reader, destDir string) extractedPaths {
+	t.Helper()
+	gs, err := gzip.NewReader(r)
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+
+	var paths extractedPaths
+	tarReader := tar.NewReader(gs)
+	for {
+		header, err := tarReader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("failed to read tar entry: %v", err)
+		}
+
+		path := filepath.Join(destDir, header.Name)
+		mode := header.FileInfo().Mode()
+		switch {
+		case mode.IsDir():
+			if err := os.MkdirAll(path, 0755); err != nil {
+				t.Fatalf("failed to create directory %s: %v", path, err)
+			}
+		case mode.IsRegular():
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				t.Fatalf("failed to create parent directory for %s: %v", path, err)
+			}
+			w, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm())
+			if err != nil {
+				t.Fatalf("failed to create file %s: %v", path, err)
+			}
+			if _, err := io.Copy(w, tarReader); err != nil {
+				w.Close()
+				t.Fatalf("failed to write file %s: %v", path, err)
+			}
+			w.Close()
+			if strings.HasSuffix(header.Name, agentName) {
+				paths.agentBinary = path
+			}
+			if strings.HasSuffix(header.Name, binaryName) {
+				paths.fleetServerBinary = path
+			}
+		case mode.Type()&os.ModeSymlink == os.ModeSymlink:
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				t.Fatalf("failed to create parent directory for symlink %s: %v", path, err)
+			}
+			if err := os.Symlink(header.Linkname, path); err != nil {
+				t.Fatalf("failed to create symlink %s: %v", path, err)
+			}
+			if strings.HasSuffix(header.Linkname, agentName) {
+				paths.agentBinary = path
+			}
+		default:
+			t.Logf("Unable to untar type=%c in file=%s", header.Typeflag, path)
+		}
+	}
+	return paths
+}
+
+// extractZip extracts a zip archive from r into destDir, returning the
+// paths to notable binaries found during extraction.
+func extractZip(t *testing.T, r io.Reader, destDir string) extractedPaths {
+	t.Helper()
+	var b bytes.Buffer
+	n, err := io.Copy(&b, r)
+	if err != nil {
+		t.Fatalf("failed to buffer zip archive: %v", err)
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(b.Bytes()), n)
+	if err != nil {
+		t.Fatalf("failed to create zip reader: %v", err)
+	}
+
+	var paths extractedPaths
+	for _, file := range zipReader.File {
+		path := filepath.Join(destDir, file.Name)
+		mode := file.FileInfo().Mode()
+		switch {
+		case mode.IsDir():
+			if err := os.MkdirAll(path, 0755); err != nil {
+				t.Fatalf("failed to create directory %s: %v", path, err)
+			}
+		case mode.IsRegular():
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				t.Fatalf("failed to create parent directory for %s: %v", path, err)
+			}
+			w, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+			if err != nil {
+				t.Fatalf("failed to create file %s: %v", path, err)
+			}
+			f, err := file.Open()
+			if err != nil {
+				w.Close()
+				t.Fatalf("failed to open zip entry %s: %v", file.Name, err)
+			}
+			if _, err := io.Copy(w, f); err != nil {
+				f.Close()
+				w.Close()
+				t.Fatalf("failed to write file %s: %v", path, err)
+			}
+			f.Close()
+			w.Close()
+			if strings.HasSuffix(file.Name, agentName) {
+				paths.agentBinary = path
+			}
+			if strings.HasSuffix(file.Name, binaryName) {
+				paths.fleetServerBinary = path
+			}
+		default:
+			t.Logf("Unable to unzip type=%+v in file=%s", mode, path)
+		}
+	}
+	return paths
 }
 
 // sha512OfFile returns the hex-encoded SHA-512 checksum of the file at path.
