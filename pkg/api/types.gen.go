@@ -1055,6 +1055,9 @@ type ArtifactParams struct {
 
 // GetFileParams defines parameters for GetFile.
 type GetFileParams struct {
+	// Source Requests file from an alternate index pattern in elasticsearch. Requires specific integration support for creating the corresponding index and files. Supporting integration clients are allowlisted in fleet server.
+	Source *string `form:"source,omitempty" json:"source,omitempty"`
+
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 
