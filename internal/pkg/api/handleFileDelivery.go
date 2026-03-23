@@ -63,10 +63,10 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 	// determine storage place for file lookup Can be either in integration libraries ( ?source=X ) OR agent-targeted, fleet-owned stream
 	var info file.MetaDoc
 	var idx string
-	libStorageSrc := sanitized_index_input(r.URL.Query().Get("source"))
+	libStorageSrc := sanitizedIndexInput(r.URL.Query().Get("source"))
 	if libStorageSrc != "" {
 		// determine integration client for library file
-		clientSrc := sanitized_index_input(r.Header.Get(HTTPProductOriginHeader))
+		clientSrc := sanitizedIndexInput(r.Header.Get(HTTPProductOriginHeader))
 		if clientSrc == "" {
 			return fmt.Errorf("%w: Client not specified", ErrClientFileForbidden)
 		}
@@ -115,7 +115,7 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 	return ft.deliverer.SendFile(r.Context(), zlog, w, chunks, fileID)
 }
 
-func sanitized_index_input(s string) string {
+func sanitizedIndexInput(s string) string {
 	r := regexp.MustCompile(`[*?"<>\\/,|#]`) // bad characters
 	return r.ReplaceAllString(strings.ToLower(strings.TrimSpace(s)), "")
 }
