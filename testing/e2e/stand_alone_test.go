@@ -776,9 +776,25 @@ func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
 	err = edotCmd.Start()
 	suite.Require().NoError(err)
 
-	// processExited owns the single Wait() call on edotCmd.
+	// edotCmd.Wait() must only be called once; the goroutine below is that
+	// single call site. Both the Cleanup handler and the early-exit select
+	// read from processExited instead of calling Wait() directly.
 	processExited := make(chan error, 1)
 	go func() { processExited <- edotCmd.Wait() }()
+
+	// Detect immediate exit — if the process dies within 5s it's a startup failure.
+	select {
+	case exitErr := <-processExited:
+		edotOutputFile.Close()
+		if out, readErr := os.ReadFile(edotOutputFile.Name()); readErr == nil {
+			suite.T().Logf("EDOT Collector output:\n%s", string(out))
+		}
+		suite.Require().NoError(exitErr, "EDOT Collector exited prematurely")
+		return
+	case <-time.After(5 * time.Second):
+		// Process is still running after 5s — proceed
+	}
+
 	suite.T().Cleanup(func() {
 		// Wait for the process to exit (context cancellation will have killed it)
 		// before closing the output file and reading it. The 30s fallback handles
@@ -792,18 +808,6 @@ func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
 			suite.T().Logf("EDOT Collector output:\n%s", string(out))
 		}
 	})
-	// Detect immediate exit — if the process dies within 5s it's a startup failure.
-	select {
-	case exitErr := <-processExited:
-		edotOutputFile.Close()
-		if out, readErr := os.ReadFile(edotOutputFile.Name()); readErr == nil {
-			suite.T().Logf("EDOT Collector output:\n%s", string(out))
-		}
-		suite.Require().NoError(exitErr, "EDOT Collector exited prematurely")
-		return
-	case <-time.After(5 * time.Second):
-		// Process is still running after 5s — proceed
-	}
 
 	// Verify that the EDOT Collector was enrolled in Fleet by fetching its document from
 	// .fleet-agents and asserting on its contents.
