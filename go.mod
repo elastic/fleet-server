@@ -19,10 +19,10 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-version v1.8.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/magefile/mage v1.16.0
-	github.com/mailru/easyjson v0.9.1
+	github.com/magefile/mage v1.16.1
+	github.com/mailru/easyjson v0.9.2
 	github.com/miolini/datacounter v1.0.3
-	github.com/oapi-codegen/runtime v1.2.0
+	github.com/oapi-codegen/runtime v1.3.0
 	github.com/open-telemetry/opamp-go v0.23.0
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.23.2
@@ -30,12 +30,12 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	go.elastic.co/apm/module/apmchiv5/v2 v2.7.4
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.4
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.4
-	go.elastic.co/apm/module/apmprometheus/v2 v2.7.4
-	go.elastic.co/apm/module/apmzerolog/v2 v2.7.4
-	go.elastic.co/apm/v2 v2.7.4
+	go.elastic.co/apm/module/apmchiv5/v2 v2.7.5
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.5
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.5
+	go.elastic.co/apm/module/apmprometheus/v2 v2.7.5
+	go.elastic.co/apm/module/apmzerolog/v2 v2.7.5
+	go.elastic.co/apm/v2 v2.7.5
 	go.elastic.co/ecszerolog v0.2.0
 	go.opentelemetry.io/otel v1.42.0
 	go.uber.org/zap v1.27.1

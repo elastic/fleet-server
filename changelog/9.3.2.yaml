@@ -1,0 +1,44 @@
+version: 9.3.2
+entries:
+    - kind: bug-fix
+      summary: Add support for OTEL secrets handling
+      description: |
+        Added functionality to replace secrets in OTEL sections (receivers, exporters, processors, extensions, connectors) of a policy.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6419
+      issue:
+        - https://github.com/elastic/fleet-server/issues/6277
+      impact: ""
+      action: ""
+      timestamp: 1771972977
+      file:
+        name: 1771972977-Add-support-for-OTEL-secrets-handling.yaml
+        checksum: a07d04d18be234304d8c4fff8be5e4c8a823e288
+    - kind: bug-fix
+      summary: Fix checkin endpoint compression support
+      description: |
+        Adds support for gzip compressed requests to the checkin endpoint.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6491
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1772577135
+      file:
+        name: 1772577135-Fix-checkin-compression-support.yaml
+        checksum: 5f7272396b0d42068d09e00b107adcf57b29f9a4
+    - kind: bug-fix
+      summary: Fix inaccuracies with openapi spec
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6517
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1772755112
+      file:
+        name: 1772755112-Fix-innacuracies-with-openapi-spec.yaml
+        checksum: f867db4c96d35d5c75a59ffe1e5584144de92366
