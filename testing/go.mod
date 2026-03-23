@@ -10,7 +10,7 @@ replace (
 require (
 	github.com/Shopify/toxiproxy/v2 v2.12.0
 	github.com/docker/docker v28.5.2+incompatible
-	github.com/elastic/elastic-agent-client/v7 v7.18.0
+	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.33.3
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
@@ -75,8 +75,8 @@ require (
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.4 // indirect
-	go.elastic.co/apm/v2 v2.7.4 // indirect
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.5 // indirect
+	go.elastic.co/apm/v2 v2.7.5 // indirect
 	go.elastic.co/ecszap v1.0.3 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -86,10 +86,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.42.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/net v0.51.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/net v0.52.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/grpc v1.79.3 // indirect
