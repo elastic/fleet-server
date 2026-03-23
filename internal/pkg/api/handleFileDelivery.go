@@ -35,6 +35,8 @@ var (
 	}
 )
 
+const HTTPProductOriginHeader = "X-elastic-product-origin"
+
 type FileDeliveryT struct {
 	bulker    bulk.Bulk
 	cache     cache.Cache
@@ -63,7 +65,7 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 	libStorageSrc := strings.TrimSpace(r.URL.Query().Get("source"))
 	if libStorageSrc != "" {
 		// determine integration client for library file
-		clientSrc := strings.ToLower(strings.TrimSpace(r.Header.Get("x-elastic-product-origin")))
+		clientSrc := strings.ToLower(strings.TrimSpace(r.Header.Get(HTTPProductOriginHeader)))
 		if clientSrc == "" {
 			return fmt.Errorf("%w: Client not specified", ErrClientFileForbidden)
 		}

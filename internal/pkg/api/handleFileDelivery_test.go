@@ -386,7 +386,7 @@ func TestFileLibraryDeliveryStopsEmptyClients(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source=foo", nil)
-	req.Header.Del("X-elastic-product-origin")
+	req.Header.Del(HTTPProductOriginHeader)
 	hr.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusForbidden, rec.Code)
@@ -397,7 +397,7 @@ func TestFileLibraryDeliveryStopsInvalidClients(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source=foo", nil)
-	req.Header.Add("X-elastic-product-origin", "bar")
+	req.Header.Add(HTTPProductOriginHeader, "bar")
 	hr.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusForbidden, rec.Code)
@@ -434,7 +434,7 @@ func TestFileLibraryDeliveryAllowsValidClients(t *testing.T) {
 	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source="+libName, nil)
-	req.Header.Set("X-elastic-product-origin", "endpoint-security")
+	req.Header.Set(HTTPProductOriginHeader, "endpoint-security")
 	hr.ServeHTTP(rec, req)
 
 	bulk.AssertCalled(t, "Read", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -485,7 +485,7 @@ func TestFileLibraryDelivery(t *testing.T) {
 	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source="+libName, nil)
-	req.Header.Set("X-elastic-product-origin", "endpoint-security")
+	req.Header.Set(HTTPProductOriginHeader, "endpoint-security")
 	hr.ServeHTTP(rec, req)
 
 	bulk.AssertCalled(t, "Read", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
