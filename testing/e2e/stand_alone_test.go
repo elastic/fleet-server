@@ -782,7 +782,7 @@ func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
 	processExited := make(chan error, 1)
 	go func() { processExited <- edotCmd.Wait() }()
 
-	// Detect immediate exit — if the process dies within 5s it's a startup failure.
+	// Detect early exit — if the process dies within 5s it's a startup failure.
 	select {
 	case exitErr := <-processExited:
 		edotOutputFile.Close()
@@ -797,8 +797,8 @@ func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
 
 	suite.T().Cleanup(func() {
 		// Wait for the process to exit (context cancellation will have killed it)
-		// before closing the output file and reading it. The 30s fallback handles
-		// the case where the early-exit path already consumed processExited.
+		// before closing the output file and reading it. The 30s fallback guards
+		// against the process not responding to SIGTERM.
 		select {
 		case <-processExited:
 		case <-time.After(30 * time.Second):
