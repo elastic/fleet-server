@@ -1303,20 +1303,20 @@ func (Test) IntegrationRun(ctx context.Context) error {
 	env["REMOTE_ELASTICSEARCH_SERVICE_TOKEN"] = esRemoteToken
 	env["REMOTE_ELASTICSEARCH_CA_CRT_BASE64"] = remoteCA
 	args := []string{
-	    "test",
-	    "-v",
-	    "-tags="+strings.Join([]string{"integration", getTagsString()}, ","),
-	    "-count=1",
-	    "-race",
-	    "-p",
-	    "1",
+		"test",
+		"-v",
+		"-tags=" + strings.Join([]string{"integration", getTagsString()}, ","),
+		"-count=1",
+		"-race",
+		"-p",
+		"1",
 	}
 	if v, ok := os.LookupEnv(envTestRun); ok && v != "" {
 		args = append(args, "-run", v)
 	}
 	args = append(args, "./...")
 
-	output, err := teeCommand(env, "go",
+	output, err := teeCommand(env, "go", args...)
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-int-"+runtime.GOOS+".out"), output, 0o644))
 	return err
 }

@@ -34,12 +34,10 @@ Build environment variables:
 - `DEV=true` — debug symbols
 - `SNAPSHOT=true` — relaxed version checks (development builds)
 - `PLATFORMS=os/arch` — target platforms (e.g. `linux/amd64,darwin/arm64`)
-- `TEST_RUN=pattern` — filters tests when using `mage test:unit`
+- `TEST_RUN=pattern` — filters tests when using `mage test:unit`, `mage test:integration`, or `mage test:e2e`
 - `FIPS` — FIPS-capable build (see [docs/fips.md](./docs/fips.md))
 
 All targets are defined in [magefile.go](./magefile.go); usage and environment variables for each target are documented in that target’s doc strings.
-
-Before considering a change complete, run **`mage check:all`** (imports, license headers, notice, `go mod tidy`, golangci-lint).
 
 ## Repository structure
 
@@ -159,11 +157,11 @@ Running a single test directly uses the `TEST_RUN=pattern` env var with the `mag
 Test output lands in `build/` (coverage files, JUnit XML, etc.).
 
 Ensure that `mage test:unit` passes before a change is considered complete.
-If an integration or e2e test has been added, ensure that it passes by running it with the relevent mage target.
+If an integration or e2e test has been added, ensure that it passes by running it with the relevant mage target.
 
 ## OpAMP
 
-Fleet-server is currently being expanded in order to support OpAMP, see the [docs](./docs/oppamp.md).
+Fleet-server is currently being expanded in order to support OpAMP, see the [docs](./docs/opamp.md).
 
 The OpAMP spec is defined externally in: https://github.com/open-telemetry/opamp-spec.
 
@@ -209,7 +207,10 @@ Guiding principles and expectations: [CONTRIBUTING.md](./CONTRIBUTING.md).
 - Make focused changes; avoid unrelated refactors.
 - Update docs and tests when behavior or usage changes.
 - Make non-obvious intent clear (naming, structure, or brief “why” comments when needed).
-- **Before opening a PR:** `mage check:all`; run `mage test:unit` at minimum; use integration or E2E tests when behavior depends on Elasticsearch or full HTTP flows (see **Testing** above).
+- All go files must be formatted with `go fmt`.
+- Include a changelog fragment when a notable change is made. The [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool) is used for this. The default usage is `elastic-agent-changelog-tool new $TITLE`.
+- When changing the `go.mod` file, the `mage check:notice` target must be ran to update the `NOTICE.txt` and `NOTICE-fips.txt` files.
+- **Before opening a PR:** `mage check:all` and `mage test:unit` must pass at minimum; integration or E2E tests must also pass when behavior depends on Elasticsearch or full HTTP flows (see **Testing** above).
 
 ## Further documentation
 
