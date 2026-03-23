@@ -62,7 +62,7 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 	// determine storage place for file lookup Can be either in integration libraries ( ?source=X ) OR agent-targeted, fleet-owned stream
 	var info file.MetaDoc
 	var idx string
-	libStorageSrc := strings.TrimSpace(r.URL.Query().Get("source"))
+	libStorageSrc := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("source")))
 	if libStorageSrc != "" {
 		// determine integration client for library file
 		clientSrc := strings.ToLower(strings.TrimSpace(r.Header.Get(HTTPProductOriginHeader)))
