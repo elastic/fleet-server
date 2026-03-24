@@ -117,9 +117,9 @@ func TestConfig(t *testing.T) {
 				},
 				Inputs: []Input{
 					{
-						Type: "fleet-server",
+						Type:   "fleet-server",
 						Server: inputCfgServer,
-						Cache: generateCache(0),
+						Cache:  generateCache(0),
 						Monitor: Monitor{
 							FetchSize:          defaultFetchSize,
 							PollTimeout:        defaultPollTimeout,
