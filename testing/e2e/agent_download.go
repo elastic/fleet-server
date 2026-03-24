@@ -229,9 +229,6 @@ func extractTar(t *testing.T, r io.Reader, destDir string) extractedPaths {
 				t.Fatalf("failed to create directory %s: %v", path, err)
 			}
 		case mode.IsRegular():
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-				t.Fatalf("failed to create parent directory for %s: %v", path, err)
-			}
 			w, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm())
 			if err != nil {
 				t.Fatalf("failed to create file %s: %v", path, err)
@@ -248,9 +245,6 @@ func extractTar(t *testing.T, r io.Reader, destDir string) extractedPaths {
 				paths.fleetServerBinary = path
 			}
 		case mode.Type()&os.ModeSymlink == os.ModeSymlink:
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-				t.Fatalf("failed to create parent directory for symlink %s: %v", path, err)
-			}
 			if err := os.Symlink(header.Linkname, path); err != nil {
 				t.Fatalf("failed to create symlink %s: %v", path, err)
 			}
@@ -289,9 +283,6 @@ func extractZip(t *testing.T, r io.Reader, destDir string) extractedPaths {
 				t.Fatalf("failed to create directory %s: %v", path, err)
 			}
 		case mode.IsRegular():
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-				t.Fatalf("failed to create parent directory for %s: %v", path, err)
-			}
 			w, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 			if err != nil {
 				t.Fatalf("failed to create file %s: %v", path, err)
