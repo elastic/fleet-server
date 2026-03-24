@@ -277,8 +277,8 @@ fleet:
 #        // POLICY_CHANGE actions need an explicit ack if this is set.
 #        ignore_checkin_policy_id: false
 #
-#        // enable OpAMP endpoint
-#        enable_opamp: false
+#        // enable OpAMP endpoint (enabled by default)
+#        enable_opamp: true
 #
 #    # monitor options are advanced configuration and should not be adjusted is most cases
 #    monitor:
