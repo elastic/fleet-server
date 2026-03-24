@@ -22,6 +22,7 @@ import (
 	"time"
 
 	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -693,7 +694,7 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	suite.Require().NoError(err)
 
 	// Configure it with the OpAMP extension
-	instanceUID := "019b8d7a-2da8-7657-b52d-492a9de33319"
+	instanceUID := uuid.Must(uuid.NewV7()).String()
 	suite.T().Logf("Configuring OTel Collector with OpAMP extension (instanceUID=%s)", instanceUID)
 	collectorConfig := filepath.Join(dir, "otelcol.yml")
 	suite.writeOpAMPCollectorConfig(collectorConfig, instanceUID, apiKey)
@@ -765,7 +766,7 @@ func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
 
 	apiKey := suite.startFleetServerForOpAMP(ctx, dir, "edot-opamp-e2e-test-key")
 
-	instanceUID := "029c9e8b-3eb9-8768-c63e-593b0ef44430"
+	instanceUID := uuid.Must(uuid.NewV7()).String()
 	suite.T().Logf("Configuring EDOT Collector with OpAMP extension (instanceUID=%s)", instanceUID)
 	collectorConfig := filepath.Join(dir, "edot-otelcol.yml")
 	suite.writeOpAMPCollectorConfig(collectorConfig, instanceUID, apiKey)
