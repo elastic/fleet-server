@@ -24,6 +24,14 @@ import (
 )
 
 func TestConfig(t *testing.T) {
+	// Expected server config for the "input-config" test case.
+	inputCfgServer := defaultServer()
+	inputCfgServer.Host = "localhost"
+	inputCfgServer.Port = 8888
+	inputCfgServer.Timeouts.Read = 20 * time.Second
+	inputCfgServer.Timeouts.Write = 5 * time.Second
+	inputCfgServer.Timeouts.CheckinMaxPoll = 10 * time.Minute
+
 	testcases := map[string]struct {
 		err string
 		cfg *Config
@@ -110,36 +118,7 @@ func TestConfig(t *testing.T) {
 				Inputs: []Input{
 					{
 						Type: "fleet-server",
-						Server: Server{
-							Host:         "localhost",
-							Port:         8888,
-							InternalPort: 8221,
-							Timeouts: ServerTimeouts{
-								Read:             20 * time.Second,
-								ReadHeader:       5 * time.Second,
-								Idle:             35 * time.Second,
-								Write:            5 * time.Second,
-								CheckinTimestamp: 30 * time.Second,
-								CheckinLongPoll:  5 * time.Minute,
-								CheckinJitter:    30 * time.Second,
-								CheckinMaxPoll:   10 * time.Minute,
-								Drain:            10 * time.Second,
-							},
-							Profiler: ServerProfiler{
-								Enabled: false,
-								Bind:    "localhost:6060",
-							},
-							CompressionLevel:  1,
-							CompressionThresh: 1024,
-							Limits:            generateServerLimits(0),
-							Bulk:              defaultServerBulk(),
-							GC:                defaultServerGC(),
-							PGP: PGP{
-								UpstreamURL: defaultPGPUpstreamURL,
-								Dir:         filepath.Join(retrieveExecutableDir(), defaultPGPDirectoryName),
-							},
-							PDKDF2: defaultPBKDF2(),
-						},
+						Server: inputCfgServer,
 						Cache: generateCache(0),
 						Monitor: Monitor{
 							FetchSize:          defaultFetchSize,
@@ -539,24 +518,6 @@ func generateServerLimits(maxAgents int) ServerLimits {
 	var d ServerLimits
 	d.MaxAgents = maxAgents
 	d.LoadLimits(loadLimits(&log, maxAgents))
-	return d
-}
-
-func defaultServerBulk() ServerBulk {
-	var d ServerBulk
-	d.InitDefaults()
-	return d
-}
-
-func defaultServerGC() GC {
-	var d GC
-	d.InitDefaults()
-	return d
-}
-
-func defaultPBKDF2() PBKDF2 {
-	var d PBKDF2
-	d.InitDefaults()
 	return d
 }
 
