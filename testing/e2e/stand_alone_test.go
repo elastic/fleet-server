@@ -717,7 +717,6 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
 
 	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
-<<<<<<< HEAD
 	// TODO: uncomment once https://github.com/elastic/fleet-server/pull/6400 is merged
 	// versionOut, err := exec.Command(otelBinaryPath, "--version").Output()
 	// suite.Require().NoError(err)
@@ -728,17 +727,6 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	// suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
 	// suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
 	// suite.Equal("online", agentDoc.Status, "expected status to be online")
-=======
-	versionOut, err := exec.Command(otelBinaryPath, "--version").Output()
-	suite.Require().NoError(err)
-
-	otelVersion := strings.TrimPrefix(strings.TrimSpace(string(versionOut)), "otelcontribcol version ")
-	suite.Equal("OPAMP", agentDoc.Type, "expected type to be OPAMP")
-	suite.Equal("otelcontribcol", agentDoc.Agent.Type, "expected agent.type to be otelcontribcol")
-	suite.Equal(otelVersion, agentDoc.Agent.Version, "expected agent.version to match otelcol-contrib binary version")
-	suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
-	suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
->>>>>>> 5ece964 ([OpAMP] Add `TestOpAMPWithEDOTCollector` E2E test (#6612))
 }
 
 // TestOpAMPWithEDOTCollector ensures that the EDOT Collector can connect to Fleet Server
