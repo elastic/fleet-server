@@ -1058,6 +1058,9 @@ type ArtifactParams struct {
 
 // GetFileParams defines parameters for GetFile.
 type GetFileParams struct {
+	// Source Requests file from an alternate index pattern in elasticsearch. Requires specific integration support for creating the corresponding index and files. Supporting integration clients are allowlisted in fleet server.
+	Source *string `form:"source,omitempty" json:"source,omitempty"`
+
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 
@@ -2494,6 +2497,14 @@ func (siw *ServerInterfaceWrapper) GetFile(w http.ResponseWriter, r *http.Reques
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetFileParams
+
+	// ------------- Optional query parameter "source" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "source", r.URL.Query(), &params.Source)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source", Err: err})
+		return
+	}
 
 	headers := r.Header
 

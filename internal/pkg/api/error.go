@@ -488,6 +488,24 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			ErrClientFileForbidden,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"ErrClientFileForbidden",
+				"client forbidden",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			ErrFileForDeliveryNotFound,
+			HTTPErrResp{
+				http.StatusNotFound,
+				"ErrFileForDeliveryNotFound",
+				"file not found",
+				zerolog.InfoLevel,
+			},
+		},
+		{
 			ErrPolicyNotFound,
 			HTTPErrResp{
 				http.StatusBadRequest,

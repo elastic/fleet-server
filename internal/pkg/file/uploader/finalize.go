@@ -49,7 +49,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 		return info, fmt.Errorf("unable to refresh chunk data index: %w", err)
 	}
 
-	chunks, err := file.GetChunkInfos(ctx, u.bulker, UploadDataIndexPattern, info.DocID, file.GetChunkInfoOpt{IncludeSize: true, RequireHash: true})
+	chunks, err := file.GetChunkInfos(ctx, u.bulker, fmt.Sprintf(UploadDataIndexPattern, info.Source), info.DocID, file.GetChunkInfoOpt{IncludeSize: true, RequireHash: true})
 	if err != nil {
 		return info, err
 	}

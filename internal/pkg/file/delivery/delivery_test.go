@@ -70,7 +70,7 @@ func TestFindFile(t *testing.T) {
 
 	d := New(nil, fakeBulk, nil)
 
-	info, err := d.FindFileForAgent(context.Background(), fileID, agentID)
+	info, _, err := d.FindFileForAgent(context.Background(), fileID, agentID)
 	require.NoError(t, err)
 
 	assert.NotNil(t, info.File.Hash)
@@ -94,7 +94,7 @@ func TestFindFileHandlesNoResults(t *testing.T) {
 
 	d := New(nil, fakeBulk, nil)
 
-	_, err := d.FindFileForAgent(context.Background(), "somefile", "anyagent")
+	_, _, err := d.FindFileForAgent(context.Background(), "somefile", "anyagent")
 	assert.ErrorIs(t, ErrNoFile, err)
 }
 
@@ -134,7 +134,7 @@ func TestLocateChunks(t *testing.T) {
 
 	d := New(nil, fakeBulk, nil)
 
-	chunks, err := d.LocateChunks(context.Background(), zerolog.Logger{}, baseID)
+	chunks, err := d.LocateChunks(context.Background(), zerolog.Logger{}, baseID, FileDataIndexPattern)
 	require.NoError(t, err)
 
 	assert.Len(t, chunks, 2)
@@ -156,7 +156,7 @@ func TestLocateChunksEmpty(t *testing.T) {
 
 	d := New(nil, fakeBulk, nil)
 
-	_, err := d.LocateChunks(context.Background(), zerolog.Logger{}, "afile")
+	_, err := d.LocateChunks(context.Background(), zerolog.Logger{}, "afile", FileDataIndexPattern)
 	assert.Error(t, err)
 }
 
