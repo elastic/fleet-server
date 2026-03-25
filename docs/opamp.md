@@ -9,12 +9,12 @@ This section describes how to connect a OpenTelemetry Collector instance to Flee
    ```
    POST /_security/service/elastic/fleet-server/credential/token/opamp
    ```
-3. Enable the OpAMP feature flag in the `fleet-server.yml` file by adding the following snippet to the `fleet-server` input
+3. The OpAMP endpoint is enabled by default. If you need to disable it, add the following to the `fleet-server` input
    section, as a sibling of the `policy.id` key:
    ```yml
    server:
      feature_flags:
-       enable_opamp: true
+       enable_opamp: false
    ```
 
 4. Build the Fleet Server binary for your platform.

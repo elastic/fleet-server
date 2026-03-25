@@ -16,11 +16,11 @@ func TestFeatureFlag(t *testing.T) {
 		FeatureFlagEnabled bool
 		WantEnabled        bool
 	}{
-		"feature flag is disabled": {
+		"feature flag is explicitly disabled": {
 			FeatureFlagEnabled: false,
 			WantEnabled:        false,
 		},
-		"feature flag is enabled": {
+		"feature flag is explicitly enabled": {
 			FeatureFlagEnabled: true,
 			WantEnabled:        true,
 		},
