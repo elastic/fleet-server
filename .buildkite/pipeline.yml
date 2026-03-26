@@ -197,7 +197,7 @@ steps:
         key: unit-test-macos-13
         command: ".buildkite/scripts/unit_test.sh"
         agents:
-          provider: orka
+          provider: orka3
           imagePrefix: generic-13-ventura-arm
         artifact_paths:
           - build/*.xml
