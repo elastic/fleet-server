@@ -717,7 +717,7 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
 
 	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
-	// TODO: uncomment once https://github.com/elastic/fleet-server/pull/6400 is merged
+	// TODO: uncomment once https://github.com/elastic/fleet-server/pull/6400 is backported
 	// versionOut, err := exec.Command(otelBinaryPath, "--version").Output()
 	// suite.Require().NoError(err)
 	// otelVersion := strings.TrimPrefix(strings.TrimSpace(string(versionOut)), "otelcontribcol version ")
