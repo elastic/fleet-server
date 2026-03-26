@@ -717,7 +717,7 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
 
 	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
-	// TODO: uncomment once https://github.com/elastic/fleet-server/pull/6400 is merged
+	// TODO: uncomment once https://github.com/elastic/fleet-server/pull/6400 is backported
 	// versionOut, err := exec.Command(otelBinaryPath, "--version").Output()
 	// suite.Require().NoError(err)
 	// otelVersion := strings.TrimPrefix(strings.TrimSpace(string(versionOut)), "otelcontribcol version ")
@@ -824,7 +824,7 @@ func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
 	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
 
 	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
-	// TODO: uncomment once https://github.com/elastic/fleet-server/pull/6400 is merged
+	// TODO: uncomment once https://github.com/elastic/fleet-server/pull/6400 is backported
 	// suite.Equal("OPAMP", agentDoc.Type, "expected type to be OPAMP")
 	// suite.Equal("elastic-otel-collector", agentDoc.Agent.Type, "expected agent.type to be elastic-otel-collector")
 	// suite.NotEmpty(agentDoc.Agent.Version, "expected agent.version to be set")
