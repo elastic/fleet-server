@@ -212,6 +212,14 @@ Guiding principles and expectations: [CONTRIBUTING.md](./CONTRIBUTING.md).
 - When changing the `go.mod` file, the `mage check:notice` target must be ran to update the `NOTICE.txt` and `NOTICE-fips.txt` files.
 - **Before opening a PR:** `mage check:all` and `mage test:unit` must pass at minimum; integration or E2E tests must also pass when behavior depends on Elasticsearch or full HTTP flows (see **Testing** above).
 
+## PR Preferences
+
+Always use the [pull request template](.github/PULL_REQUEST_TEMPLATE.md) when creating a pull request.
+Always asign the author to the pull request.
+
+Unless instructed otherwise, always add the `Team:Elastic-Agent-Control-Plane` label to the pull request.
+Unless instructed otherwise, always add the `backport-active-all` label to the pull request when fixing a bug.
+
 ## Further documentation
 
 - [README.md](./README.md) — quick start
