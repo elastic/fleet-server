@@ -25,8 +25,8 @@ const (
 	FileDataIndexPattern   = ".fleet-fileds-tohost-data-%s"
 
 	// Long-lived library files, owned by integrations. Integration & target library substituted in
-	LibraryFileHeaderIndexPattern = "%s-fleetfiles-%s-meta"
-	LibraryFileDataIndexPattern   = "%s-fleetfiles-%s-data"
+	LibraryFileHeaderIndexPattern = ".%s-fleetfiles-%s-meta"
+	LibraryFileDataIndexPattern   = ".%s-fleetfiles-%s-data"
 
 	FieldDocID        = "_id"
 	FieldTargetAgents = "file.Meta.target_agents"
