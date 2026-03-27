@@ -120,6 +120,6 @@ All involved bugs were fixed in versions 8.19.7, 9.1.7, and 9.2.1.
 
 Upgrade to versions 8.19.7, 9.1.7, and 9.2.1 or above. Temporary work arounds are available that use queries to delete the relevant fields from the .fleet-agents index, however the problem can reoccur until the system is upgraded to a fixed version.
 
-Refer to Elastic support knowledge base articles https://support.elastic.dev/knowledge/view/77a3e589 and https://support.elastic.dev/knowledge/view/19f2d377 for details of the work arounds.
+Refer to Elastic support knowledge base articles https://support.elastic.co/knowledge/19f2d377 and https://support.elastic.co/knowledge/77a3e589 for details of the work arounds.
 
 :::
