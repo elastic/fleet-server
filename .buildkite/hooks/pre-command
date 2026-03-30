@@ -16,7 +16,7 @@ check_if_branch_available() {
     local branch=${1}
     local url="https://storage.googleapis.com/artifacts-api/snapshots/branches.json"
     local response=$(curl --fail -s "${url}")
-    if echo "${response}" | jq -e --arg branch "${branch}" 'any(. == $branch)' > /dev/null 2>&1; then
+    if echo "${response}" | jq -e --arg branch "${branch}" '.branches | any(. == $branch)' > /dev/null 2>&1; then
         export FILE_EXISTS_IN_REPO=true
         echo "FILE_EXISTS_IN_REPO = true"
     else
