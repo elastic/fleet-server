@@ -3086,11 +3086,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/rs/zerolog
-Version: v1.34.0
+Version: v1.35.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/rs/zerolog@v1.34.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/rs/zerolog@v1.35.0/LICENSE:
 
 MIT License
 
@@ -7511,11 +7511,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/mattn/go-colorable
-Version: v0.1.13
+Version: v0.1.14
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/mattn/go-colorable@v0.1.13/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/mattn/go-colorable@v0.1.14/LICENSE:
 
 The MIT License (MIT)
 
