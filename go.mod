@@ -25,11 +25,7 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/xid v1.6.0
-<<<<<<< HEAD
-	github.com/rs/zerolog v1.32.0
-=======
 	github.com/rs/zerolog v1.35.0
->>>>>>> fb3145b (build(deps): bump github.com/rs/zerolog from 1.34.0 to 1.35.0 (#6685))
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	go.elastic.co/apm/module/apmchiv5/v2 v2.7.5
