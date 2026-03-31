@@ -2,8 +2,8 @@ commands_restrictions:
   backport:
     conditions:
       - or:
-        - sender-permission>=write
-        - sender=github-actions[bot]
+          - sender-permission>=write
+          - sender=github-actions[bot]
 queue_rules:
   - name: default
     merge_method: squash
@@ -32,16 +32,16 @@ pull_request_rules:
       - -closed
       - conflict
     actions:
-        comment:
-          message: |
-            This pull request is now in conflicts. Could you fix it @{{author}}? 🙏
-            To fixup this pull request, you can check out it locally. See documentation: https://help.github.com/articles/checking-out-pull-requests-locally/
-            ```
-            git fetch upstream
-            git checkout -b {{head}} upstream/{{head}}
-            git merge upstream/{{base}}
-            git push upstream {{head}}
-            ```
+      comment:
+        message: |
+          This pull request is now in conflicts. Could you fix it @{{author}}? 🙏
+          To fixup this pull request, you can check out it locally. See documentation: https://help.github.com/articles/checking-out-pull-requests-locally/
+          ```
+          git fetch upstream
+          git checkout -b {{head}} upstream/{{head}}
+          git merge upstream/{{base}}
+          git push upstream {{head}}
+          ```
   - name: close automated pull requests with bump updates if any conflict
     conditions:
       - -merged
@@ -99,17 +99,6 @@ pull_request_rules:
         message: Automatically approving mergify
       queue:
         name: default
-  - name: delete upstream branch with changes on dev-tools/integration/.env or .go-version after merging/closing it
-    conditions:
-      - or:
-        - merged
-        - closed
-      - and:
-        - label=automation
-        - head~=^updatecli.*
-        - files~=^(dev-tools/integration/.env|.go-version)$
-    actions:
-      delete_head_branch:
   - name: backport patches to 8.6 branch
     conditions:
       - merged
