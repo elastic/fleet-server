@@ -7,35 +7,35 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
-	github.com/elastic/elastic-agent-client/v7 v7.18.0
+	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.33.3
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
 	github.com/elastic/go-ucfg v0.9.1
-	github.com/fxamacker/cbor/v2 v2.9.0
+	github.com/fxamacker/cbor/v2 v2.9.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
-	github.com/hashicorp/go-version v1.8.0
+	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/magefile/mage v1.16.0
-	github.com/mailru/easyjson v0.9.1
+	github.com/magefile/mage v1.17.1
+	github.com/mailru/easyjson v0.9.2
 	github.com/miolini/datacounter v1.0.3
-	github.com/oapi-codegen/runtime v1.2.0
+	github.com/oapi-codegen/runtime v1.3.1
 	github.com/open-telemetry/opamp-go v0.23.0
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/xid v1.6.0
-	github.com/rs/zerolog v1.34.0
+	github.com/rs/zerolog v1.35.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	go.elastic.co/apm/module/apmchiv5/v2 v2.7.4
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.4
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.4
-	go.elastic.co/apm/module/apmprometheus/v2 v2.7.4
-	go.elastic.co/apm/module/apmzerolog/v2 v2.7.4
-	go.elastic.co/apm/v2 v2.7.4
+	go.elastic.co/apm/module/apmchiv5/v2 v2.7.6
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.6
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.6
+	go.elastic.co/apm/module/apmprometheus/v2 v2.7.6
+	go.elastic.co/apm/module/apmzerolog/v2 v2.7.6
+	go.elastic.co/apm/v2 v2.7.6
 	go.elastic.co/ecszerolog v0.2.0
 	go.opentelemetry.io/otel v1.42.0
 	go.uber.org/zap v1.27.1
@@ -69,7 +69,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

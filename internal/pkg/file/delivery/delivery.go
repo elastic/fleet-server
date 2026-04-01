@@ -39,28 +39,48 @@ func New(client *elasticsearch.Client, bulker bulk.Bulk, sizeLimit *uint64) *Del
 	}
 }
 
-func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID string) (file.MetaDoc, error) {
+// returns  file Metadata, the search index for the data chunks for the file, and err
+func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID string) (file.MetaDoc, string, error) {
 	span, ctx := apm.StartSpan(ctx, "findFile", "process")
 	defer span.End()
 	result, err := findFileForAgent(ctx, d.bulker, fileID, agentID)
 	if err != nil {
-		return file.MetaDoc{}, err
+		return file.MetaDoc{}, "", err
 	}
 	if result == nil || len(result.Hits) == 0 {
-		return file.MetaDoc{}, ErrNoFile
+		return file.MetaDoc{}, "", ErrNoFile
 	}
 
 	var fi file.MetaDoc
 	if err := json.Unmarshal(result.Hits[0].Source, &fi); err != nil {
-		return file.MetaDoc{}, fmt.Errorf("file meta doc parsing error: %w", err)
+		return file.MetaDoc{}, "", fmt.Errorf("file meta doc parsing error: %w", err)
 	}
 
-	return fi, nil
+	return fi, fmt.Sprintf(FileDataIndexPattern, "*"), nil
 }
 
-func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileID string) ([]file.ChunkInfo, error) {
+func (d *Deliverer) FindLibraryFile(ctx context.Context, fileID string, integration string, libsrc string) (file.MetaDoc, string, error) {
+	span, ctx := apm.StartSpan(ctx, "findFile", "process")
+	defer span.End()
+	result, err := findFileInLibrary(ctx, d.bulker, fileID, fmt.Sprintf(LibraryFileHeaderIndexPattern, integration, libsrc))
+	if err != nil {
+		return file.MetaDoc{}, "", err
+	}
+	if len(result) == 0 {
+		return file.MetaDoc{}, "", ErrNoFile
+	}
+
+	var fi file.MetaDoc
+	if err := json.Unmarshal(result, &fi); err != nil {
+		return file.MetaDoc{}, "", fmt.Errorf("file meta doc parsing error: %w", err)
+	}
+
+	return fi, fmt.Sprintf(LibraryFileDataIndexPattern, integration, libsrc), nil
+}
+
+func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileID string, dataIndex string) ([]file.ChunkInfo, error) {
 	// find chunk indices behind alias, doc IDs
-	infos, err := file.GetChunkInfos(ctx, d.bulker, FileDataIndexPattern, fileID, file.GetChunkInfoOpt{})
+	infos, err := file.GetChunkInfos(ctx, d.bulker, dataIndex, fileID, file.GetChunkInfoOpt{})
 	if err != nil {
 		zlog.Error().Err(err).Msg("problem getting infos")
 		return nil, err

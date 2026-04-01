@@ -1955,6 +1955,13 @@ paths:
             type: string
             examples:
               - ecb30383-6dd1-4b1d-bed0-2386b4e5df51
+        - name: source
+          in: query
+          description: Requests file from an alternate index pattern in elasticsearch. Requires specific integration support for creating the corresponding index and files. Supporting integration clients are allowlisted in fleet server.
+          required: false
+          schema:
+            type: string
+            example: archive
         - $ref: "#/components/parameters/apiVersion"
         - $ref: "#/components/parameters/requestId"
       responses:

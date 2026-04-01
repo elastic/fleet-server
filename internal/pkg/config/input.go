@@ -99,7 +99,7 @@ type (
 		// This setting restores previous behaviour where all POLICY_CHANGE actions need an explicit ack.
 		IgnoreCheckinPolicyID bool `config:"ignore_checkin_policy_id"`
 
-		// EnableOpAMP when true will enable the OpAMP endpoint.
+		// EnableOpAMP controls whether the OpAMP endpoint is enabled. Defaults to true.
 		EnableOpAMP bool `config:"enable_opamp"`
 	}
 )
@@ -119,6 +119,7 @@ func (c *Server) InitDefaults() {
 	c.GC.InitDefaults()
 	c.PGP.InitDefaults()
 	c.PDKDF2.InitDefaults()
+	c.Features.EnableOpAMP = true
 }
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.

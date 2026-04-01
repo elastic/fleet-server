@@ -76,7 +76,7 @@ func GetMetadata(ctx context.Context, bulker bulk.Bulk, indexPattern string, upl
 		return nil, err
 	}
 
-	return res.HitsT.Hits, nil
+	return res.Hits, nil
 }
 
 // Retrieves a file Metadata as an Info object
@@ -137,7 +137,7 @@ type GetChunkInfoOpt struct {
 // the chunk's ordered index position (Pos) is also parsed from the document ID.
 // Optionally adding the calculated field "size", that is the length, in bytes, of the Data field.
 // and optionally validating that a hash field is present
-func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, baseID string, opt GetChunkInfoOpt) ([]ChunkInfo, error) {
+func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, index string, baseID string, opt GetChunkInfoOpt) ([]ChunkInfo, error) {
 	span, ctx := apm.StartSpan(ctx, "getChunksInfo", "process")
 	defer span.End()
 	tpl := QueryChunkInfo
@@ -152,13 +152,13 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 	}
 
 	bSpan, bCtx := apm.StartSpan(ctx, "searchChunksInfo", "search")
-	res, err := bulker.Search(bCtx, fmt.Sprintf(indexPattern, "*"), query)
+	res, err := bulker.Search(bCtx, index, query)
 	bSpan.End()
 	if err != nil {
 		return nil, err
 	}
 
-	chunks := make([]ChunkInfo, len(res.HitsT.Hits))
+	chunks := make([]ChunkInfo, len(res.Hits))
 
 	var (
 		bid  string
@@ -170,7 +170,7 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 
 	vSpan, _ := apm.StartSpan(ctx, "validateChunksInfo", "validate")
 	defer vSpan.End()
-	for i, h := range res.HitsT.Hits {
+	for i, h := range res.Hits {
 		if bid, ok = getResultsFieldString(h.Fields, FieldBaseID); !ok {
 			return nil, fmt.Errorf("unable to retrieve %s field from chunk document", FieldBaseID)
 		}
@@ -211,7 +211,7 @@ func getResultField(fields map[string]interface{}, key string) (interface{}, boo
 	if !ok {
 		return nil, false
 	}
-	if array == nil || len(array) < 1 {
+	if len(array) < 1 {
 		return nil, false
 	}
 	return array[0], true

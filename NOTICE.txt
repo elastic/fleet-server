@@ -428,11 +428,11 @@ Contents of probable licence file $GOMODCACHE/github.com/docker/go-units@v0.5.0/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-client/v7
-Version: v7.18.0
+Version: v7.18.1
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.18.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.18.1/LICENSE.txt:
 
 ELASTIC LICENSE AGREEMENT
 
@@ -1505,11 +1505,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/go-ucfg@v0.9.1/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/fxamacker/cbor/v2
-Version: v2.9.0
+Version: v2.9.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/fxamacker/cbor/v2@v2.9.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/fxamacker/cbor/v2@v2.9.1/LICENSE:
 
 MIT License
 
@@ -1595,11 +1595,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/hashicorp/go-version
-Version: v1.8.0
+Version: v1.9.0
 Licence type (autodetected): MPL-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/hashicorp/go-version@v1.8.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/hashicorp/go-version@v1.9.0/LICENSE:
 
 Copyright IBM Corp. 2014, 2025
 
@@ -2335,11 +2335,11 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 --------------------------------------------------------------------------------
 Dependency : github.com/mailru/easyjson
-Version: v0.9.1
+Version: v0.9.2
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/mailru/easyjson@v0.9.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/mailru/easyjson@v0.9.2/LICENSE:
 
 Copyright (c) 2016 Mail.Ru Group
 
@@ -2384,11 +2384,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/oapi-codegen/runtime
-Version: v1.2.0
+Version: v1.3.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/oapi-codegen/runtime@v1.2.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/oapi-codegen/runtime@v1.3.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3086,11 +3086,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/rs/zerolog
-Version: v1.34.0
+Version: v1.35.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/rs/zerolog@v1.34.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/rs/zerolog@v1.35.0/LICENSE:
 
 MIT License
 
@@ -3301,11 +3301,11 @@ Contents of probable licence file $GOMODCACHE/github.com/spf13/cobra@v1.10.2/LIC
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmchiv5/v2
-Version: v2.7.4
+Version: v2.7.6
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/v2@v2.7.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/v2@v2.7.6/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3512,11 +3512,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmelasticsearch/v2
-Version: v2.7.4
+Version: v2.7.6
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.7.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.7.6/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3723,11 +3723,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasti
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmhttp/v2
-Version: v2.7.4
+Version: v2.7.6
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v2@v2.7.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v2@v2.7.6/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3934,11 +3934,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmprometheus/v2
-Version: v2.7.4
+Version: v2.7.6
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmprometheus/v2@v2.7.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmprometheus/v2@v2.7.6/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4145,11 +4145,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmpromet
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmzerolog/v2
-Version: v2.7.4
+Version: v2.7.6
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolog/v2@v2.7.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolog/v2@v2.7.6/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4356,11 +4356,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolo
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/v2
-Version: v2.7.4
+Version: v2.7.6
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/v2@v2.7.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/v2@v2.7.6/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7511,11 +7511,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/mattn/go-colorable
-Version: v0.1.13
+Version: v0.1.14
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/mattn/go-colorable@v0.1.13/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/mattn/go-colorable@v0.1.14/LICENSE:
 
 The MIT License (MIT)
 

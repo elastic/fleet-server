@@ -94,9 +94,9 @@ func TestUploadCompletePerformsRefreshBeforeChunkSearch(t *testing.T) {
 
 	fakeBulk.On("Search",
 		mock.MatchedBy(func(_ context.Context) bool { return true }), // match context.Context
-		".fleet-fileds-fromhost-data-*",                              // *DATA* (chunk) search
-		mock.Anything,                                                // query bytes
-		mock.Anything,                                                // bulk opts
+		".fleet-fileds-fromhost-data-"+fakeIntegrationSrc,            // *DATA* (chunk) search
+		mock.Anything, // query bytes
+		mock.Anything, // bulk opts
 
 	).Run(func(args mock.Arguments) {
 		// runs during execution, before return

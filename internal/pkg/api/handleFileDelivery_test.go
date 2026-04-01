@@ -37,6 +37,8 @@ var (
 	isFileChunkSearch = mock.MatchedBy(func(idx string) bool {
 		return strings.HasPrefix(idx, fmt.Sprintf(delivery.FileDataIndexPattern, ""))
 	})
+
+	sampleDocBody_ABCD = hexDecode("A7665F696E64657878212E666C6565742D66696C6564656C69766572792D646174612D656E64706F696E74635F69646578797A2E30685F76657273696F6E01675F7365715F6E6F016D5F7072696D6172795F7465726D0165666F756E64F5666669656C6473A164646174618142ABCD")
 )
 
 func TestFileDeliveryRouteDisallowedMethods(t *testing.T) {
@@ -172,7 +174,7 @@ func TestFileDelivery(t *testing.T) {
 		}, nil,
 	)
 
-	tx.Response = sendBodyBytes(hexDecode("A7665F696E64657878212E666C6565742D66696C6564656C69766572792D646174612D656E64706F696E74635F69646578797A2E30685F76657273696F6E01675F7365715F6E6F016D5F7072696D6172795F7465726D0165666F756E64F5666669656C6473A164646174618142ABCD"))
+	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
 
 	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fleet/file/X", nil))
 
@@ -310,7 +312,7 @@ func TestFileDeliverySetsHeaders(t *testing.T) {
 			},
 		}, nil,
 	)
-	tx.Response = sendBodyBytes(hexDecode("A7665F696E64657878212E666C6565742D66696C6564656C69766572792D646174612D656E64706F696E74635F69646578797A2E30685F76657273696F6E01675F7365715F6E6F016D5F7072696D6172795F7465726D0165666F756E64F5666669656C6473A164646174618142ABCD"))
+	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
 
 	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fleet/file/X", nil))
 
@@ -371,11 +373,127 @@ func TestFileDeliverySetsHashWhenPresent(t *testing.T) {
 			},
 		}, nil,
 	)
-	tx.Response = sendBodyBytes(hexDecode("A7665F696E64657878212E666C6565742D66696C6564656C69766572792D646174612D656E64706F696E74635F69646578797A2E30685F76657273696F6E01675F7365715F6E6F016D5F7072696D6172795F7465726D0165666F756E64F5666669656C6473A164646174618142ABCD"))
+	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
 
 	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fleet/file/X", nil))
 
 	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "deadbeef", rec.Header().Get("X-File-SHA2"))
+}
+
+func TestFileLibraryDeliveryStopsEmptyClients(t *testing.T) {
+	hr, _, _, _ := prepareFileDeliveryMock(t)
+	rec := httptest.NewRecorder()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source=foo", nil)
+	req.Header.Del(HTTPProductOriginHeader)
+	hr.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestFileLibraryDeliveryStopsInvalidClients(t *testing.T) {
+	hr, _, _, _ := prepareFileDeliveryMock(t)
+	rec := httptest.NewRecorder()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source=foo", nil)
+	req.Header.Add(HTTPProductOriginHeader, "bar")
+	hr.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestFileLibraryDeliveryAllowsValidClients(t *testing.T) {
+	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	rec := httptest.NewRecorder()
+
+	libName := "foolib"
+	dataIndex := fmt.Sprintf(delivery.LibraryFileDataIndexPattern, "endpoint", libName)
+
+	bulk.On("Read", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		[]byte(`{}`), nil,
+	)
+	bulk.On("Search", mock.Anything, dataIndex, mock.Anything, mock.Anything, mock.Anything).Return(
+		&es.ResultT{
+			HitsT: es.HitsT{
+				Hits: []es.HitT{
+					{
+						ID:      "X.0",
+						SeqNo:   1,
+						Version: 1,
+						Index:   fmt.Sprintf(delivery.LibraryFileDataIndexPattern, "endpoint", libName),
+						Fields: map[string]interface{}{
+							file.FieldBaseID: []interface{}{"X"},
+							file.FieldLast:   []interface{}{true},
+						},
+					},
+				},
+			},
+		}, nil,
+	)
+	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source="+libName, nil)
+	req.Header.Set(HTTPProductOriginHeader, "endpoint-security")
+	hr.ServeHTTP(rec, req)
+
+	bulk.AssertCalled(t, "Read", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestFileLibraryDelivery(t *testing.T) {
+	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	rec := httptest.NewRecorder()
+
+	libName := "script"
+	dataIndex := fmt.Sprintf(delivery.LibraryFileDataIndexPattern, "endpoint", libName)
+
+	bulk.On("Read", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		[]byte(`{
+				"file": {
+					"created": "2023-06-05T15:23:37.499Z",
+					"Status": "READY",
+					"Updated": "2023-06-05T15:23:37.499Z",
+					"name": "somefile.csv",
+					"mime_type": "text/csv",
+					"size": 4,
+					"hash": {
+						"sha256": "deadbeef"
+					}
+				}
+			}`), nil,
+	)
+	bulk.On("Search", mock.Anything, dataIndex, mock.Anything, mock.Anything, mock.Anything).Return(
+		&es.ResultT{
+			HitsT: es.HitsT{
+				Hits: []es.HitT{
+					{
+						ID:      "X.0",
+						SeqNo:   1,
+						Version: 1,
+						Index:   fmt.Sprintf(delivery.LibraryFileDataIndexPattern, "endpoint", libName),
+						Fields: map[string]interface{}{
+							file.FieldBaseID: []interface{}{"X"},
+							file.FieldLast:   []interface{}{true},
+						},
+					},
+				},
+			},
+		}, nil,
+	)
+	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source="+libName, nil)
+	req.Header.Set(HTTPProductOriginHeader, "endpoint-security")
+	hr.ServeHTTP(rec, req)
+
+	bulk.AssertCalled(t, "Read", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, []byte{0xAB, 0xCD}, rec.Body.Bytes())
+	assert.Equal(t, "text/csv", rec.Header().Get("Content-Type"))
+	assert.Equal(t, "4", rec.Header().Get("Content-Length"))
 	assert.Equal(t, "deadbeef", rec.Header().Get("X-File-SHA2"))
 }
 

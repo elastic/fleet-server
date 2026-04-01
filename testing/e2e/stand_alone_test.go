@@ -22,6 +22,7 @@ import (
 	"time"
 
 	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -581,59 +582,84 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 	cmd.Wait()
 }
 
-// TestOpAMP ensures that the OpAMP endpoint in Fleet Server works as expected by installing
-// an OTel Collector, configuring it with the OpAMP extension, and having it connect to Fleet
-// Server using OpAMP, and verifying that Fleet Server responds to this request with an HTTP
-// 200 OK status response.
-func (suite *StandAloneSuite) TestOpAMP() {
-	// Create a config file from a template in the test temp dir
-	dir := suite.T().TempDir()
+// startFleetServerForOpAMP creates the fleet-server config from stand-alone-opamp.tpl,
+// starts the fleet-server binary, waits for it to be healthy, fetches an enrollment token
+// for "dummy-policy", and enrolls a dummy agent (to ensure .fleet-agents exists before any
+// OpAMP collector connects). It returns the enrollment API key. Fleet-server is stopped when
+// ctx is cancelled; the caller owns the context lifetime.
+func (suite *StandAloneSuite) startFleetServerForOpAMP(ctx context.Context, dir, staticTokenKey string) string {
+	suite.T().Helper()
 	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-opamp.tpl"))
 	suite.Require().NoError(err)
+
 	f, err := os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
+
 	err = tpl.Execute(f, map[string]interface{}{
 		"Hosts":          suite.ESHosts,
 		"ServiceToken":   suite.ServiceToken,
-		"StaticTokenKey": "opamp-e2e-test-key",
+		"StaticTokenKey": staticTokenKey,
 	})
 	f.Close()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
 	// Run the fleet-server binary
 	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
-	cmd.Cancel = func() error {
-		return cmd.Process.Signal(syscall.SIGTERM)
-	}
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	err = cmd.Start()
 	suite.Require().NoError(err)
-	defer cmd.Wait()
+
+	suite.T().Cleanup(func() { cmd.Wait() })
 
 	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
 
 	apiKey := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+	// Enroll a dummy agent so the .fleet-agents index exists before any OpAMP collector connects.
+	tester := api_version.NewClientAPITesterCurrent(suite.Scaffold, "http://localhost:8220", apiKey)
+	tester.Enroll(ctx, apiKey)
+	return apiKey
+}
 
-	// Make sure the OpAMP endpoint works.
+// writeOpAMPCollectorConfig renders otelcol-opamp.tpl into configFilePath.
+func (suite *StandAloneSuite) writeOpAMPCollectorConfig(configFilePath, instanceUID, apiKey string) {
+	suite.T().Helper()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "otelcol-opamp.tpl"))
+	suite.Require().NoError(err)
+
+	f, err := os.Create(configFilePath)
+	suite.Require().NoError(err)
+
+	err = tpl.Execute(f, map[string]interface{}{
+		"OpAMP": map[string]string{
+			"InstanceUID": instanceUID,
+			"APIKey":      apiKey,
+		},
+	})
+	f.Close()
+	suite.Require().NoError(err)
+}
+
+// TestOpAMPWithUpstreamCollector ensures that the upstream OTel Collector contrib can connect
+// to Fleet Server over OpAMP and enroll as an agent in the .fleet-agents index.
+func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
+	dir := suite.T().TempDir()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	apiKey := suite.startFleetServerForOpAMP(ctx, dir, "opamp-e2e-test-key")
+
+	// Make sure the OpAMP endpoint works before proceeding to build the collector.
 	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:8220/v1/opamp", nil)
 	suite.Require().NoError(err)
+
 	req.Header.Set("Authorization", "ApiKey "+apiKey)
 	req.Header.Set("Content-Type", "application/x-protobuf")
-
 	resp, err := suite.Client.Do(req)
 	suite.Require().NoError(err)
 	resp.Body.Close()
 	suite.Require().Equal(http.StatusOK, resp.StatusCode)
-
-	// Enroll a dummy agent to initialize the .fleet-agents index before the OTel Collector connects.
-	// Without this, findEnrolledAgent fails with index_not_found_exception when the OTel Collector
-	// sends its first AgentToServer message, because .fleet-agents doesn't exist yet in a fresh
-	// standalone fleet-server environment (unlike agent-managed fleet-server which self-enrolls).
-	tester := api_version.NewClientAPITesterCurrent(suite.Scaffold, "http://localhost:8220", apiKey)
-	tester.Enroll(ctx, apiKey)
 
 	// Clone OTel Collector contrib repository (shallow clone of main branch)
 	cloneDir := filepath.Join(dir, "opentelemetry-collector-contrib")
@@ -651,6 +677,9 @@ func (suite *StandAloneSuite) TestOpAMP() {
 
 	// Build the OTel Collector binary
 	suite.T().Log("Building otelcol-contrib binary via make otelcontribcol")
+	err = os.MkdirAll(filepath.Join(cloneDir, "bin"), 0755)
+	suite.Require().NoError(err)
+
 	makeCmd := exec.CommandContext(ctx, "make", "otelcontribcol")
 	makeCmd.Dir = cloneDir
 	makeCmd.Stdout = os.Stdout
@@ -665,24 +694,14 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.Require().NoError(err)
 
 	// Configure it with the OpAMP extension
-	instanceUID := "019b8d7a-2da8-7657-b52d-492a9de33319"
+	instanceUID := uuid.Must(uuid.NewV7()).String()
 	suite.T().Logf("Configuring OTel Collector with OpAMP extension (instanceUID=%s)", instanceUID)
-	tpl, err = template.ParseFiles(filepath.Join("testdata", "otelcol-opamp.tpl"))
-	suite.Require().NoError(err)
-	f, err = os.Create(filepath.Join(dir, "otelcol.yml"))
-	suite.Require().NoError(err)
-	err = tpl.Execute(f, map[string]interface{}{
-		"OpAMP": map[string]string{
-			"InstanceUID": instanceUID,
-			"APIKey":      apiKey,
-		},
-	})
-	f.Close()
-	suite.Require().NoError(err)
+	collectorConfig := filepath.Join(dir, "otelcol.yml")
+	suite.writeOpAMPCollectorConfig(collectorConfig, instanceUID, apiKey)
 
 	// Start OTel Collector
 	suite.T().Log("Starting OTel Collector")
-	otelCmd := exec.CommandContext(ctx, otelBinaryPath, "--config", filepath.Join(dir, "otelcol.yml"))
+	otelCmd := exec.CommandContext(ctx, otelBinaryPath, "--config", collectorConfig)
 	otelCmd.Cancel = func() error {
 		return otelCmd.Process.Signal(syscall.SIGTERM)
 	}
@@ -690,6 +709,7 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	otelCmd.Stderr = os.Stderr
 	err = otelCmd.Start()
 	suite.Require().NoError(err)
+
 	defer otelCmd.Wait()
 
 	// Verify that the OTel Collector was enrolled in Fleet by fetching its document from
@@ -700,10 +720,113 @@ func (suite *StandAloneSuite) TestOpAMP() {
 	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
 	versionOut, err := exec.Command(otelBinaryPath, "--version").Output()
 	suite.Require().NoError(err)
+
 	otelVersion := strings.TrimPrefix(strings.TrimSpace(string(versionOut)), "otelcontribcol version ")
 	suite.Equal("OPAMP", agentDoc.Type, "expected type to be OPAMP")
 	suite.Equal("otelcontribcol", agentDoc.Agent.Type, "expected agent.type to be otelcontribcol")
 	suite.Equal(otelVersion, agentDoc.Agent.Version, "expected agent.version to match otelcol-contrib binary version")
 	suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
 	suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
+}
+
+// TestOpAMPWithEDOTCollector ensures that the EDOT Collector can connect to Fleet Server
+// over OpAMP and enroll as an agent in the .fleet-agents index.
+func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
+	dir := suite.T().TempDir()
+
+	// Download and extract the full Elastic Agent package before starting the timed
+	// portion of the test. The archive is cached on disk after the first run so this
+	// is fast on subsequent runs; extracting everything ensures all components
+	// (e.g. elastic-otel-collector) needed by elastic-agent otel are present.
+	suite.T().Log("Downloading Elastic Agent package")
+	agentExtractDir := filepath.Join(dir, "elastic-agent-package")
+	suite.Require().NoError(os.MkdirAll(agentExtractDir, 0755))
+
+	downloadCtx, downloadCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer downloadCancel()
+	rc := downloadElasticAgent(downloadCtx, suite.T(), suite.Client)
+	var paths extractedPaths
+	switch runtime.GOOS {
+	case "windows":
+		paths = extractZip(suite.T(), rc, agentExtractDir)
+	case "darwin", "linux":
+		paths = extractTar(suite.T(), rc, agentExtractDir)
+	default:
+		suite.Require().Failf("Unsupported OS", "OS %s is unsupported for tests", runtime.GOOS)
+	}
+	rc.Close()
+
+	agentBinaryPath := paths.agentBinary
+	suite.Require().NotEmpty(agentBinaryPath, "elastic-agent binary not found in archive")
+
+	suite.T().Logf("Found elastic-agent binary at %s", agentBinaryPath)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	apiKey := suite.startFleetServerForOpAMP(ctx, dir, "edot-opamp-e2e-test-key")
+
+	instanceUID := uuid.Must(uuid.NewV7()).String()
+	suite.T().Logf("Configuring EDOT Collector with OpAMP extension (instanceUID=%s)", instanceUID)
+	collectorConfig := filepath.Join(dir, "edot-otelcol.yml")
+	suite.writeOpAMPCollectorConfig(collectorConfig, instanceUID, apiKey)
+
+	// Start the EDOT Collector via `elastic-agent otel`
+	suite.T().Log("Starting EDOT Collector via elastic-agent otel")
+	edotOutputFile, err := os.CreateTemp(dir, "edot-output-*.log")
+	suite.Require().NoError(err)
+
+	edotCmd := exec.CommandContext(ctx, agentBinaryPath, "otel", "--config", collectorConfig)
+	edotCmd.Cancel = func() error {
+		return edotCmd.Process.Signal(syscall.SIGTERM)
+	}
+	edotCmd.Stdout = edotOutputFile
+	edotCmd.Stderr = edotOutputFile
+	err = edotCmd.Start()
+	suite.Require().NoError(err)
+
+	// edotCmd.Wait() must only be called once; the goroutine below is that
+	// single call site. Both the Cleanup handler and the early-exit select
+	// read from processExited instead of calling Wait() directly.
+	processExited := make(chan error, 1)
+	go func() { processExited <- edotCmd.Wait() }()
+
+	// Detect early exit — if the process dies within 5s it's a startup failure.
+	select {
+	case exitErr := <-processExited:
+		edotOutputFile.Close()
+		if out, readErr := os.ReadFile(edotOutputFile.Name()); readErr == nil {
+			suite.T().Logf("EDOT Collector output:\n%s", string(out))
+		}
+		suite.Require().NoError(exitErr, "EDOT Collector exited prematurely")
+		return
+	case <-time.After(5 * time.Second):
+		// Process is still running after 5s — proceed
+	}
+
+	suite.T().Cleanup(func() {
+		// Wait for the process to exit (context cancellation will have killed it)
+		// before closing the output file and reading it. The 30s fallback guards
+		// against the process not responding to SIGTERM.
+		select {
+		case <-processExited:
+		case <-time.After(30 * time.Second):
+		}
+		edotOutputFile.Close()
+		if out, readErr := os.ReadFile(edotOutputFile.Name()); readErr == nil {
+			suite.T().Logf("EDOT Collector output:\n%s", string(out))
+		}
+	})
+
+	// Verify that the EDOT Collector was enrolled in Fleet by fetching its document from
+	// .fleet-agents and asserting on its contents.
+	suite.T().Logf("Waiting for EDOT agent %s to appear in .fleet-agents", instanceUID)
+	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
+
+	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
+	suite.Equal("OPAMP", agentDoc.Type, "expected type to be OPAMP")
+	suite.Equal("elastic-otel-collector", agentDoc.Agent.Type, "expected agent.type to be elastic-otel-collector")
+	suite.NotEmpty(agentDoc.Agent.Version, "expected agent.version to be set")
+	suite.Contains(agentDoc.Tags, "elastic-otel-collector", "expected tags to contain elastic-otel-collector")
+	suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
 }
