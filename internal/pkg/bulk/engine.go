@@ -107,6 +107,7 @@ const (
 	defaultAPIKeyMaxParallel   = 32
 	defaultApikeyMaxReqSize    = 100 * 1024 * 1024
 	defaultFlushContextTimeout = time.Minute * 1
+	defaultDispatchTimeout     = time.Second * 30
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -598,12 +599,27 @@ func (b *Bulker) validateBody(body []byte) error {
 	return nil
 }
 
+var errDispatchTimeout = errors.New("dispatch timeout: ES backpressure detected")
+
 func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 	start := time.Now()
+
+	timeout := b.opts.dispatchTimeout
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
 	// Dispatch to bulk Run loop
 	select {
 	case b.ch <- blk:
+	case <-timer.C:
+		zerolog.Ctx(ctx).Error().
+			Str("mod", kModBulk).
+			Str("action", blk.action.String()).
+			Bool("refresh", blk.flags.Has(flagRefresh)).
+			Dur("rtt", time.Since(start)).
+			Dur("timeout", timeout).
+			Msg("Dispatch timeout queue")
+		return respT{err: errDispatchTimeout}
 	case <-ctx.Done():
 		zerolog.Ctx(ctx).Error().
 			Err(ctx.Err()).
@@ -627,6 +643,15 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Msg("Dispatch OK")
 
 		return resp
+	case <-timer.C:
+		zerolog.Ctx(ctx).Error().
+			Str("mod", kModBulk).
+			Str("action", blk.action.String()).
+			Bool("refresh", blk.flags.Has(flagRefresh)).
+			Dur("rtt", time.Since(start)).
+			Dur("timeout", timeout).
+			Msg("Dispatch timeout response")
+		return respT{err: errDispatchTimeout}
 	case <-ctx.Done():
 		zerolog.Ctx(ctx).Error().
 			Err(ctx.Err()).

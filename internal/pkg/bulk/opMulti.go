@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"time"
 )
 
 // TODO: Are multi requests used by anything? a quick grep shows no hits outside the bulk package.
@@ -114,11 +115,16 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 }
 
 func (b *Bulker) multiDispatch(ctx context.Context, blks []bulkT) error {
+	timeout := b.opts.dispatchTimeout
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
 	// Dispatch to bulk Run loop; Iterate by reference.
 	for i := range blks {
 		select {
 		case b.ch <- &blks[i]:
+		case <-timer.C:
+			return errDispatchTimeout
 		case <-ctx.Done():
 			return ctx.Err()
 		}

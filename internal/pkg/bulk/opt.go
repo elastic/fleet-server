@@ -86,6 +86,7 @@ type bulkOptT struct {
 	flushThresholdSz  int
 	maxPending        int
 	blockQueueSz      int
+	dispatchTimeout   time.Duration
 	apikeyMaxParallel int
 	apikeyMaxReqSize  int
 	policyTokens      []config.PolicyToken
@@ -166,6 +167,7 @@ func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		maxPending:        defaultMaxPending,
 		apikeyMaxParallel: defaultAPIKeyMaxParallel,
 		blockQueueSz:      defaultBlockQueueSz,
+		dispatchTimeout:   defaultDispatchTimeout,
 		apikeyMaxReqSize:  defaultApikeyMaxReqSize,
 		policyTokens:      []config.PolicyToken{}, // default is empty
 	}
@@ -183,6 +185,7 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Int("flushThresholdSz", o.flushThresholdSz)
 	e.Int("maxPending", o.maxPending)
 	e.Int("blockQueueSz", o.blockQueueSz)
+	e.Dur("dispatchTimeout", o.dispatchTimeout)
 	e.Int("apikeyMaxParallel", o.apikeyMaxParallel)
 	e.Int("apikeyMaxReqSize", o.apikeyMaxReqSize)
 }
