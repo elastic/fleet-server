@@ -22,22 +22,23 @@ Exception: cloud tooling under `dev-tools/cloud` uses `make -C dev-tools/cloud` 
 ### Common build commands
 
 ```bash
-mage build:local   # Build binary for local OS/arch → bin/fleet-server
-mage clean         # Remove build artifacts (bin/, build/)
-mage generate      # Regenerate code from OpenAPI/JSON schemas
+mage build:local      # Build binary for local OS/arch → bin/fleet-server
+mage clean            # Remove build artifacts (bin/, build/)
+mage check:go         # Run golangci-lint
+mage check:all        # Run all linter checks
+mage generate         # Regenerate code from OpenAPI/JSON schemas
+mage test:unit        # Run all unit tests
+mage test:integration # Run all integration tests
+mage test:e2e         # Run all E2E tests
+mage docker:image     # Produce a docker image for a stand-alone fleet-server
 ```
 
-Other targets agents often use: `check:all`, `check:go`, `test:unit`, `test:integration`, `test:e2e`, `docker:image`. FIPS-related builds: [docs/fips.md](./docs/fips.md).
-
-Build environment variables:
-
-- `DEV=true` — debug symbols
-- `SNAPSHOT=true` — relaxed version checks (development builds)
-- `PLATFORMS=os/arch` — target platforms (e.g. `linux/amd64,darwin/arm64`)
-- `TEST_RUN=pattern` — filters tests when using `mage test:unit`, `mage test:integration`, or `mage test:e2e`
-- `FIPS` — FIPS-capable build (see [docs/fips.md](./docs/fips.md))
-
 All targets are defined in [magefile.go](./magefile.go); usage and environment variables for each target are documented in that target’s doc strings.
+
+## Prerequisites
+
+- Go version in [.go-version](./.go-version)
+- Docker (build, integration and e2e tests)
 
 ## Repository structure
 
@@ -51,6 +52,14 @@ All targets are defined in [magefile.go](./magefile.go); usage and environment v
 | `testing/` | E2E and helpers; see [testing/e2e/README.md](./testing/e2e/README.md) |
 | `dev-tools/` | Developer and build tooling, contains Integration/E2E compose, licenser/goimports tooling, cloud scripts |
 | `docs/` | Developer and product documentation |
+| `changelog/` | Changelog fragments for releases |
+| `build/` | Produced build and testing artifacts |
+
+## Schema and code generation
+
+- [model/schema.json](./model/schema.json) and [model/openapi.yml](./model/openapi.yml) define the data model and API
+- `mage generate` regenerates code in `pkg/api/` and `internal/pkg/api/`
+- Do not manually edit generated files
 
 ## Architecture
 
@@ -91,26 +100,6 @@ Agent HTTP POST /checkin
   → monitor/ (watches ES indices for changes)
   → bulk/ (batched ES reads/writes)
   → response with updated policy or pending actions
-```
-
-### Schema and code generation
-
-- [model/schema.json](./model/schema.json) and [model/openapi.yml](./model/openapi.yml) define the data model and API
-- `mage generate` regenerates code in `pkg/api/` and `internal/pkg/api/`
-- Do not manually edit generated files
-
-### Configuration
-
-Reference config with all options: [fleet-server.reference.yml](./fleet-server.reference.yml)
-Local dev config (gitignored): `fleet-server.yml`
-
-Key standalone environment variables:
-
-```
-ELASTICSEARCH_HOSTS
-ELASTICSEARCH_CA_TRUSTED_FINGERPRINT
-ELASTICSEARCH_SERVICE_TOKEN
-FLEET_SERVER_POLICY_ID
 ```
 
 ## Deployment architecture
@@ -167,6 +156,17 @@ The OpAMP spec is defined externally in: https://github.com/open-telemetry/opamp
 
 The OpAMP go library is: https://github.com/open-telemetry/opamp-go.
 
+## Dependencies
+
+- `go-elasticsearch/v8` — Elasticsearch client
+- `go-chi/chi/v5` — HTTP routing
+- `rs/zerolog` — structured logging
+- `prometheus/client_golang` — metrics
+- `elastic/elastic-agent-client/v7` — agent supervision protocol
+- `go.elastic.co/apm/v2` — APM tracing
+- `open-telemetry/opamp-go` - OpAMP library.
+- `spf13/cobra` — CLI
+
 ## Style and code quality
 
 ### Lint commands
@@ -186,31 +186,20 @@ mage check:go    # golangci-lint only
 - **FIPS / crypto:** [docs/fips.md](./docs/fips.md).
   - Any changes that affect cryptography must have a mode that succeeds under the FIPS 140-2 standard.
   - The `requirefips` build tag is used to indicate that FIPS capable mode is used.
-- If go v1.26 is available, run `go fix` on any altered go files.
-
-## Dependencies
-
-- `go-elasticsearch/v8` — Elasticsearch client
-- `go-chi/chi/v5` — HTTP routing
-- `rs/zerolog` — structured logging
-- `prometheus/client_golang` — metrics
-- `elastic/elastic-agent-client/v7` — agent supervision protocol
-- `go.elastic.co/apm/v2` — APM tracing
-- `open-telemetry/opamp-go` - OpAMP library.
-- `spf13/cobra` — CLI
 
 ## Contribution hygiene
 
 Guiding principles and expectations: [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-- Fix root cause (not band-aid).
-- Make focused changes; avoid unrelated refactors.
-- Update docs and tests when behavior or usage changes.
-- Make non-obvious intent clear (naming, structure, or brief “why” comments when needed).
-- All go files must be formatted with `go fmt`.
-- Include a changelog fragment when a notable change is made. The [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool) is used for this. The default usage is `elastic-agent-changelog-tool new $TITLE`.
-- When changing the `go.mod` file, the `mage check:notice` target must be ran to update the `NOTICE.txt` and `NOTICE-fips.txt` files.
+- **Fix the root cause**, not a short-term workaround, when possible.
+- **Keep changes focused**; avoid unrelated refactors or scope creep.
+- **Update docs and tests** when behavior, configuration, or operator-facing workflow changes.
+- **Make non-obvious intent clear** through naming, structure, or brief “why” comments when needed.
+- **Formatting:** All go files must be formatted with `go fmt`, and imports must be ordereed with `goimports` which can be done with the `mage check:imports` target.
+- **Changelog:** For notable changes, add a fragment using **[elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool)**. Typical usage: `elastic-agent-changelog-tool new "$TITLE"` (see the tool’s [usage docs](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md)). PRs may use the **`skip-changelog`** label when appropriate; see `changelog/` for examples.
+- **`go.mod` / NOTICE:** If you change **`go.mod`** or add/update Go dependencies, regenerate **`NOTICE.txt`** and **`NOTICE-fips.txt`** with `mage check:notice`
 - **Before opening a PR:** `mage check:all` and `mage test:unit` must pass at minimum; integration or E2E tests must also pass when behavior depends on Elasticsearch or full HTTP flows (see **Testing** above).
+- **Integration / E2E:** When changes affect the API or client communication, run the relevant integration or E2E targets described in the magefile and [testing/e2e/README.md](./testing/e2e/README.md).
 
 ## PR Preferences
 
