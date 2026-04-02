@@ -1205,9 +1205,21 @@ func (Docker) CustomAgentImage() error {
 // Produces a unit test output file, and test coverage file in the build directory.
 // SNAPSHOT adds the snapshot build tag.
 // FIPS adds the requirefips build tag.
+// TEST_RUN can be used to pass the value to go test -run.
 func (Test) Unit() error {
 	mg.Deps(mg.F(mkDir, "build"))
-	output, err := teeCommand(environMap(), "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
+	args := []string{
+		"test",
+		"-tags=" + getTagsString(),
+		"-v",
+		"-race",
+		"-coverprofile=" + filepath.Join("build", "coverage-"+runtime.GOOS+".out"),
+	}
+	if v, ok := os.LookupEnv(envTestRun); ok && v != "" {
+		args = append(args, "-run", v)
+	}
+	args = append(args, "./...")
+	output, err := teeCommand(environMap(), "go", args...)
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-"+runtime.GOOS+".out"), output, 0o644))
 	return err
 }
@@ -1217,6 +1229,7 @@ func (Test) Unit() error {
 // Produces a unit test output file, and test coverage file in the build directory.
 // SNAPSHOT adds the snapshot build tag.
 // FIPS adds the requirefips build tag.
+// TEST_RUN can be used to pass the value to go test -run.
 func (Test) UnitFIPSOnly() error {
 	mg.Deps(mg.F(mkDir, "build"))
 
@@ -1227,8 +1240,19 @@ func (Test) UnitFIPSOnly() error {
 	// Note that we are only disabling this TLS key exchange mechanism in tests!
 	env := environMap()
 	env["GODEBUG"] = "fips140=only,tlsmlkem=0"
+	args := []string{
+		"test",
+		"-tags=" + getTagsString(),
+		"-v",
+		"-race",
+		"-coverprofile=" + filepath.Join("build", "coverage-"+runtime.GOOS+".out"),
+	}
+	if v, ok := os.LookupEnv(envTestRun); ok && v != "" {
+		args = append(args, "-run", v)
+	}
+	args = append(args, "./...")
 
-	output, err := teeCommand(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-"+runtime.GOOS+".out"), "./...")
+	output, err := teeCommand(env, "go", args...)
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fipsonly-"+runtime.GOOS+".out"), output, 0o644))
 	return err
 }
@@ -1236,6 +1260,7 @@ func (Test) UnitFIPSOnly() error {
 // Integration provisions the integration test environment with docker compose, runs the integration tests, then destroys the environment.
 // SNAPSHOT runs integration tests with the snapshot build tag.
 // FIPS runs the integration tests the requirefips build tag.
+// TEST_RUN can be used to pass the value to go test -run.
 func (Test) Integration() {
 	mg.SerialDeps(mg.F(mkDir, "build"), Test.IntegrationUp, Test.IntegrationRun, Test.IntegrationDown)
 }
@@ -1250,6 +1275,7 @@ func (Test) IntegrationUp() error {
 // Produces an integration test output file in the build directory.
 // SNAPSHOT runs integration tests with the snapshot build tag.
 // FIPS runs the integration tests the requirefips build tag.
+// TEST_RUN can be used to pass the value to go test -run.
 func (Test) IntegrationRun(ctx context.Context) error {
 	env, err := readEnvFile(filepath.Join("dev-tools", "integration", ".env"))
 	if err != nil {
@@ -1276,8 +1302,21 @@ func (Test) IntegrationRun(ctx context.Context) error {
 	env["ELASTICSEARCH_SERVICE_TOKEN"] = esToken
 	env["REMOTE_ELASTICSEARCH_SERVICE_TOKEN"] = esRemoteToken
 	env["REMOTE_ELASTICSEARCH_CA_CRT_BASE64"] = remoteCA
+	args := []string{
+		"test",
+		"-v",
+		"-tags=" + strings.Join([]string{"integration", getTagsString()}, ","),
+		"-count=1",
+		"-race",
+		"-p",
+		"1",
+	}
+	if v, ok := os.LookupEnv(envTestRun); ok && v != "" {
+		args = append(args, "-run", v)
+	}
+	args = append(args, "./...")
 
-	output, err := teeCommand(env, "go", "test", "-v", "-tags="+strings.Join([]string{"integration", getTagsString()}, ","), "-count=1", "-race", "-p", "1", "./...")
+	output, err := teeCommand(env, "go", args...)
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-int-"+runtime.GOOS+".out"), output, 0o644))
 	return err
 }
@@ -1733,6 +1772,7 @@ func (Test) Benchstat() error {
 // The e2e test will attempt to force DEV and SNAPSHOT to true, and set DOCKER_IMAGE to fleet-server-e2e-agent.
 // The PLATFORMS list will also be set to: [linux/arch, os/arch].
 // FIPS can be used to test a FIPS capable fleet-server (support in progress).
+// TEST_RUN can be used to pass the value to go test -run.
 func (Test) E2e() {
 	os.Setenv(envDev, "true")
 	os.Setenv(envSnapshot, "true")
