@@ -148,14 +148,6 @@ Test output lands in `build/` (coverage files, JUnit XML, etc.).
 Ensure that `mage test:unit` passes before a change is considered complete.
 If an integration or e2e test has been added, ensure that it passes by running it with the relevant mage target.
 
-## OpAMP
-
-Fleet-server is currently being expanded in order to support OpAMP, see the [docs](./docs/opamp.md).
-
-The OpAMP spec is defined externally in: https://github.com/open-telemetry/opamp-spec.
-
-The OpAMP go library is: https://github.com/open-telemetry/opamp-go.
-
 ## Dependencies
 
 - `go-elasticsearch/v8` — Elasticsearch client
@@ -164,7 +156,6 @@ The OpAMP go library is: https://github.com/open-telemetry/opamp-go.
 - `prometheus/client_golang` — metrics
 - `elastic/elastic-agent-client/v7` — agent supervision protocol
 - `go.elastic.co/apm/v2` — APM tracing
-- `open-telemetry/opamp-go` - OpAMP library.
 - `spf13/cobra` — CLI
 
 ## Style and code quality
