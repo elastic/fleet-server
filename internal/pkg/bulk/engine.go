@@ -656,12 +656,16 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort response")
-		// blk is in the Run loop's queue; drain response and free asynchronously
+		// blk is in the Run loop's queue; drain the response and free asynchronously.
+		// Use a timeout based on the flush interval so the goroutine doesn't block
+		// forever if the Run loop never processes this blk (e.g. during shutdown).
+		// Three flush intervals should give enough time for the blk to be picked up,
+		// sent to ES, and responded to, even under heavy load.
 		go func() {
 			select {
 			case <-blk.ch:
 				b.freeBlk(blk)
-			case <-time.After(defaultFlushContextTimeout):
+			case <-time.After(3 * defaultFlushInterval):
 			}
 		}()
 	}
