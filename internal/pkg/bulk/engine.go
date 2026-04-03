@@ -632,6 +632,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort queue")
+		b.freeBlk(blk)
 		return respT{err: ctx.Err()}
 	}
 
@@ -655,6 +656,14 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort response")
+		// blk is in the Run loop's queue; drain response and free asynchronously
+		go func() {
+			select {
+			case <-blk.ch:
+				b.freeBlk(blk)
+			case <-time.After(defaultFlushContextTimeout):
+			}
+		}()
 	}
 
 	return respT{err: ctx.Err()}
