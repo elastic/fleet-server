@@ -5,7 +5,7 @@
 ### Features and enhancements [fleet-server-9.3.3-features-enhancements]
 
 
-* Enable OpAMP feature flag by default. [#6711](https://github.com/elastic/fleet-server/pull/6711) [#6737](https://github.com/elastic/fleet-server/pull/6737) 
+* Add the `/v1/opamp` endpoint to allow OpAMP clients to connect to Fleet Server. [#6737](https://github.com/elastic/fleet-server/pull/6737) 
 
 
 
