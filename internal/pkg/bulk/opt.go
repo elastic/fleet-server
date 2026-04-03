@@ -88,7 +88,7 @@ type bulkOptT struct {
 	blockQueueSz         int
 	apikeyMaxParallel    int
 	apikeyMaxReqSize     int
-	maxPendingDispatches int
+	maxPendingBulkDispatches int
 	policyTokens         []config.PolicyToken
 	bi                   build.Info
 }
@@ -130,11 +130,11 @@ func WithBlockQueueSize(sz int) BulkOpt {
 	}
 }
 
-// WithMaxPendingDispatches sets the upper bound on concurrent dispatch goroutines.
-// When the limit is reached, new dispatches are rejected immediately. 0 means no limit.
-func WithMaxPendingDispatches(max int) BulkOpt {
+// WithMaxPendingBulkDispatches sets the upper bound on concurrent bulk dispatch goroutines.
+// When the limit is reached, new bulk dispatches are rejected immediately. 0 means no limit.
+func WithMaxPendingBulkDispatches(max int) BulkOpt {
 	return func(opt *bulkOptT) {
-		opt.maxPendingDispatches = max
+		opt.maxPendingBulkDispatches = max
 	}
 }
 
@@ -176,7 +176,7 @@ func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		apikeyMaxParallel:    defaultAPIKeyMaxParallel,
 		blockQueueSz:         defaultBlockQueueSz,
 		apikeyMaxReqSize:     defaultApikeyMaxReqSize,
-		maxPendingDispatches: defaultMaxPendingDispatches,
+		maxPendingBulkDispatches: defaultMaxPendingBulkDispatches,
 		policyTokens:         []config.PolicyToken{}, // default is empty
 	}
 
@@ -195,7 +195,7 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Int("blockQueueSz", o.blockQueueSz)
 	e.Int("apikeyMaxParallel", o.apikeyMaxParallel)
 	e.Int("apikeyMaxReqSize", o.apikeyMaxReqSize)
-	e.Int("maxPendingDispatches", o.maxPendingDispatches)
+	e.Int("maxPendingBulkDispatches", o.maxPendingBulkDispatches)
 }
 
 // BulkOptsFromCfg transforms config to a slize of BulkOpt
@@ -219,7 +219,7 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 		WithMaxPending(bulkCfg.FlushMaxPending),
 		WithAPIKeyMaxParallel(maxKeyParallel),
 		WithAPIKeyMaxRequestSize(cfg.Output.Elasticsearch.MaxContentLength),
-		WithMaxPendingDispatches(bulkCfg.MaxPendingDispatches),
+		WithMaxPendingBulkDispatches(bulkCfg.MaxPendingBulkDispatches),
 		WithPolicyTokens(policyTokens),
 	}
 }

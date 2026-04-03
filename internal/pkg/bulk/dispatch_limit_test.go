@@ -12,7 +12,7 @@ import (
 
 func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 	limit := 2
-	b := NewBulker(nil, nil, WithBlockQueueSize(limit+1), WithMaxPendingDispatches(limit))
+	b := NewBulker(nil, nil, WithBlockQueueSize(limit+1), WithMaxPendingBulkDispatches(limit))
 
 	// Fill the queue so dispatches block in Phase 1.
 	for i := 0; i < limit; i++ {
@@ -21,7 +21,7 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	// Saturate the pending dispatch limit with goroutines blocked on the full channel.
+	// Saturate the pending bulk dispatch limit with goroutines blocked on the full channel.
 	for i := 0; i < limit; i++ {
 		wg.Add(1)
 		go func() {
@@ -34,7 +34,7 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 
 	// Give the goroutines time to enter dispatch and increment the counter.
 	// They'll block on the channel send since it's full.
-	for b.pendingDispatches.Load() < int64(limit) {
+	for b.pendingBulkDispatches.Load() < int64(limit) {
 		// spin until both goroutines are pending
 	}
 
@@ -43,8 +43,8 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 	blk.buf.WriteString(`{"index":"test"}`)
 	resp := b.dispatch(context.Background(), blk)
 
-	if resp.err != ErrTooManyDispatches {
-		t.Fatalf("expected ErrTooManyDispatches, got: %v", resp.err)
+	if resp.err != ErrTooManyBulkDispatches {
+		t.Fatalf("expected ErrTooManyBulkDispatches, got: %v", resp.err)
 	}
 
 	// Clean up: drain the channel to unblock the goroutines.
@@ -59,7 +59,7 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 }
 
 func TestDispatchAllowsWhenUnderLimit(t *testing.T) {
-	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingDispatches(10))
+	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(10))
 
 	blk := b.newBlk(ActionSearch, optionsT{})
 	blk.buf.WriteString(`{"index":"test"}`)
@@ -76,14 +76,14 @@ func TestDispatchAllowsWhenUnderLimit(t *testing.T) {
 	}
 
 	// Counter should be back to 0 after dispatch completes.
-	if pending := b.pendingDispatches.Load(); pending != 0 {
-		t.Fatalf("expected 0 pending dispatches, got: %d", pending)
+	if pending := b.pendingBulkDispatches.Load(); pending != 0 {
+		t.Fatalf("expected 0 pending bulk dispatches, got: %d", pending)
 	}
 }
 
 func TestDispatchNoLimitWhenZero(t *testing.T) {
-	// With maxPendingDispatches=0, there should be no limit enforced.
-	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingDispatches(0))
+	// With maxPendingBulkDispatches=0, there should be no limit enforced.
+	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(0))
 
 	blk := b.newBlk(ActionSearch, optionsT{})
 	blk.buf.WriteString(`{"index":"test"}`)
@@ -99,7 +99,7 @@ func TestDispatchNoLimitWhenZero(t *testing.T) {
 	}
 
 	// Counter should not have been touched (0 means disabled).
-	if pending := b.pendingDispatches.Load(); pending != 0 {
-		t.Fatalf("expected 0 pending dispatches, got: %d", pending)
+	if pending := b.pendingBulkDispatches.Load(); pending != 0 {
+		t.Fatalf("expected 0 pending bulk dispatches, got: %d", pending)
 	}
 }

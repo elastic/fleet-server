@@ -179,11 +179,11 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
-			bulk.ErrTooManyDispatches,
+			bulk.ErrTooManyBulkDispatches,
 			HTTPErrResp{
 				http.StatusTooManyRequests,
-				"TooManyDispatches",
-				"too many pending dispatches",
+				"TooManyBulkDispatches",
+				"too many pending bulk dispatches",
 				zerolog.WarnLevel,
 			},
 		},

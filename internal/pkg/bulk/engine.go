@@ -36,7 +36,7 @@ type APIKeyMetadata = apikey.APIKeyMetadata
 
 var (
 	ErrNoQuotes            = errors.New("quoted literal not supported")
-	ErrTooManyDispatches   = errors.New("too many pending dispatches")
+	ErrTooManyBulkDispatches = errors.New("too many pending bulk dispatches")
 )
 
 type MultiOp struct {
@@ -94,7 +94,7 @@ type Bulker struct {
 	apikeyLimit       *semaphore.Weighted
 	tracer            *apm.Tracer
 	cancelFn          context.CancelFunc
-	pendingDispatches atomic.Int64
+	pendingBulkDispatches atomic.Int64
 
 	remoteOutputConfigMap map[string]map[string]interface{}
 	bulkerMap             map[string]Bulk
@@ -110,7 +110,7 @@ const (
 	defaultAPIKeyMaxParallel   = 32
 	defaultApikeyMaxReqSize    = 100 * 1024 * 1024
 	defaultFlushContextTimeout   = time.Minute * 1
-	defaultMaxPendingDispatches  = 0 // 0 means no limit
+	defaultMaxPendingBulkDispatches = 0 // 0 means no limit
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -605,19 +605,19 @@ func (b *Bulker) validateBody(body []byte) error {
 func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 	start := time.Now()
 
-	// Check pending dispatch limit before blocking on the channel.
-	if limit := b.opts.maxPendingDispatches; limit > 0 {
-		pending := b.pendingDispatches.Add(1)
-		defer b.pendingDispatches.Add(-1)
+	// Check pending bulk dispatch limit before blocking on the channel.
+	if limit := b.opts.maxPendingBulkDispatches; limit > 0 {
+		pending := b.pendingBulkDispatches.Add(1)
+		defer b.pendingBulkDispatches.Add(-1)
 		if pending > int64(limit) {
 			zerolog.Ctx(ctx).Warn().
 				Str("mod", kModBulk).
 				Str("action", blk.action.String()).
 				Int64("pending", pending).
 				Int("limit", limit).
-				Msg("Dispatch rejected: too many pending")
+				Msg("Bulk dispatch rejected: too many pending")
 			b.freeBlk(blk)
-			return respT{err: ErrTooManyDispatches}
+			return respT{err: ErrTooManyBulkDispatches}
 		}
 	}
 
