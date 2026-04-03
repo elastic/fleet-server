@@ -1,12 +1,11 @@
 version: 9.2.8
 entries:
     - kind: enhancement
-      summary: Enable OpAMP feature flag by default
+      summary: "Add the `/v1/opamp` endpoint to allow OpAMP clients to connect to Fleet Server."
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/6724
-        - https://github.com/elastic/fleet-server/pull/6736
+        - https://github.com/elastic/fleet-server/pull/6657
       issue: []
       impact: ""
       action: ""
