@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -34,7 +35,8 @@ type SecurityInfo = apikey.SecurityInfo
 type APIKeyMetadata = apikey.APIKeyMetadata
 
 var (
-	ErrNoQuotes = errors.New("quoted literal not supported")
+	ErrNoQuotes            = errors.New("quoted literal not supported")
+	ErrTooManyDispatches   = errors.New("too many pending dispatches")
 )
 
 type MultiOp struct {
@@ -85,13 +87,14 @@ type Bulk interface {
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es          esapi.Transport
-	ch          chan *bulkT
-	opts        bulkOptT
-	blkPool     sync.Pool
-	apikeyLimit *semaphore.Weighted
-	tracer      *apm.Tracer
-	cancelFn    context.CancelFunc
+	es                esapi.Transport
+	ch                chan *bulkT
+	opts              bulkOptT
+	blkPool           sync.Pool
+	apikeyLimit       *semaphore.Weighted
+	tracer            *apm.Tracer
+	cancelFn          context.CancelFunc
+	pendingDispatches atomic.Int64
 
 	remoteOutputConfigMap map[string]map[string]interface{}
 	bulkerMap             map[string]Bulk
@@ -106,7 +109,8 @@ const (
 	defaultBlockQueueSz        = 32 // Small capacity to allow multiOp to spin fast
 	defaultAPIKeyMaxParallel   = 32
 	defaultApikeyMaxReqSize    = 100 * 1024 * 1024
-	defaultFlushContextTimeout = time.Minute * 1
+	defaultFlushContextTimeout   = time.Minute * 1
+	defaultMaxPendingDispatches  = 0 // 0 means no limit
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -600,6 +604,22 @@ func (b *Bulker) validateBody(body []byte) error {
 
 func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 	start := time.Now()
+
+	// Check pending dispatch limit before blocking on the channel.
+	if limit := b.opts.maxPendingDispatches; limit > 0 {
+		pending := b.pendingDispatches.Add(1)
+		defer b.pendingDispatches.Add(-1)
+		if pending > int64(limit) {
+			zerolog.Ctx(ctx).Warn().
+				Str("mod", kModBulk).
+				Str("action", blk.action.String()).
+				Int64("pending", pending).
+				Int("limit", limit).
+				Msg("Dispatch rejected: too many pending")
+			b.freeBlk(blk)
+			return respT{err: ErrTooManyDispatches}
+		}
+	}
 
 	// Dispatch to bulk Run loop
 	select {

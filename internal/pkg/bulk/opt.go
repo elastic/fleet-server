@@ -81,15 +81,16 @@ func withAPMLinkedContext(ctx context.Context) Opt {
 // Bulk API options
 
 type bulkOptT struct {
-	flushInterval     time.Duration
-	flushThresholdCnt int
-	flushThresholdSz  int
-	maxPending        int
-	blockQueueSz      int
-	apikeyMaxParallel int
-	apikeyMaxReqSize  int
-	policyTokens      []config.PolicyToken
-	bi                build.Info
+	flushInterval        time.Duration
+	flushThresholdCnt    int
+	flushThresholdSz     int
+	maxPending           int
+	blockQueueSz         int
+	apikeyMaxParallel    int
+	apikeyMaxReqSize     int
+	maxPendingDispatches int
+	policyTokens         []config.PolicyToken
+	bi                   build.Info
 }
 
 type BulkOpt func(*bulkOptT)
@@ -129,6 +130,14 @@ func WithBlockQueueSize(sz int) BulkOpt {
 	}
 }
 
+// WithMaxPendingDispatches sets the upper bound on concurrent dispatch goroutines.
+// When the limit is reached, new dispatches are rejected immediately. 0 means no limit.
+func WithMaxPendingDispatches(max int) BulkOpt {
+	return func(opt *bulkOptT) {
+		opt.maxPendingDispatches = max
+	}
+}
+
 // WithAPIKeyMaxParallel sets the number of api key operations outstanding
 func WithAPIKeyMaxParallel(max int) BulkOpt {
 	return func(opt *bulkOptT) {
@@ -160,14 +169,15 @@ func WithBi(bi build.Info) BulkOpt {
 
 func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 	bopt := bulkOptT{
-		flushInterval:     defaultFlushInterval,
-		flushThresholdCnt: defaultFlushThresholdCnt,
-		flushThresholdSz:  defaultFlushThresholdSz,
-		maxPending:        defaultMaxPending,
-		apikeyMaxParallel: defaultAPIKeyMaxParallel,
-		blockQueueSz:      defaultBlockQueueSz,
-		apikeyMaxReqSize:  defaultApikeyMaxReqSize,
-		policyTokens:      []config.PolicyToken{}, // default is empty
+		flushInterval:        defaultFlushInterval,
+		flushThresholdCnt:    defaultFlushThresholdCnt,
+		flushThresholdSz:     defaultFlushThresholdSz,
+		maxPending:           defaultMaxPending,
+		apikeyMaxParallel:    defaultAPIKeyMaxParallel,
+		blockQueueSz:         defaultBlockQueueSz,
+		apikeyMaxReqSize:     defaultApikeyMaxReqSize,
+		maxPendingDispatches: defaultMaxPendingDispatches,
+		policyTokens:         []config.PolicyToken{}, // default is empty
 	}
 
 	for _, f := range opts {
@@ -185,6 +195,7 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Int("blockQueueSz", o.blockQueueSz)
 	e.Int("apikeyMaxParallel", o.apikeyMaxParallel)
 	e.Int("apikeyMaxReqSize", o.apikeyMaxReqSize)
+	e.Int("maxPendingDispatches", o.maxPendingDispatches)
 }
 
 // BulkOptsFromCfg transforms config to a slize of BulkOpt
@@ -208,6 +219,7 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 		WithMaxPending(bulkCfg.FlushMaxPending),
 		WithAPIKeyMaxParallel(maxKeyParallel),
 		WithAPIKeyMaxRequestSize(cfg.Output.Elasticsearch.MaxContentLength),
+		WithMaxPendingDispatches(bulkCfg.MaxPendingDispatches),
 		WithPolicyTokens(policyTokens),
 	}
 }
