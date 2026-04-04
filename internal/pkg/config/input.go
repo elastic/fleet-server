@@ -45,11 +45,11 @@ type ServerTLS struct {
 }
 
 type ServerBulk struct {
-	FlushInterval        time.Duration `config:"flush_interval"`
-	FlushThresholdCount  int           `config:"flush_threshold_cnt"`
-	FlushThresholdSize   int           `config:"flush_threshold_size"`
-	FlushMaxPending      int           `config:"flush_max_pending"`
-	MaxPendingBulkDispatches int       `config:"max_pending_bulk_dispatches"`
+	FlushInterval            time.Duration `config:"flush_interval"`
+	FlushThresholdCount      int           `config:"flush_threshold_cnt"`
+	FlushThresholdSize       int           `config:"flush_threshold_size"`
+	FlushMaxPending          int           `config:"flush_max_pending"`
+	MaxPendingBulkDispatches int           `config:"max_pending_bulk_dispatches"`
 }
 
 func (c *ServerBulk) InitDefaults() {

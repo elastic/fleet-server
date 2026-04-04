@@ -81,16 +81,16 @@ func withAPMLinkedContext(ctx context.Context) Opt {
 // Bulk API options
 
 type bulkOptT struct {
-	flushInterval        time.Duration
-	flushThresholdCnt    int
-	flushThresholdSz     int
-	maxPending           int
-	blockQueueSz         int
-	apikeyMaxParallel    int
-	apikeyMaxReqSize     int
+	flushInterval            time.Duration
+	flushThresholdCnt        int
+	flushThresholdSz         int
+	maxPending               int
+	blockQueueSz             int
+	apikeyMaxParallel        int
+	apikeyMaxReqSize         int
 	maxPendingBulkDispatches int
-	policyTokens         []config.PolicyToken
-	bi                   build.Info
+	policyTokens             []config.PolicyToken
+	bi                       build.Info
 }
 
 type BulkOpt func(*bulkOptT)
@@ -169,15 +169,15 @@ func WithBi(bi build.Info) BulkOpt {
 
 func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 	bopt := bulkOptT{
-		flushInterval:        defaultFlushInterval,
-		flushThresholdCnt:    defaultFlushThresholdCnt,
-		flushThresholdSz:     defaultFlushThresholdSz,
-		maxPending:           defaultMaxPending,
-		apikeyMaxParallel:    defaultAPIKeyMaxParallel,
-		blockQueueSz:         defaultBlockQueueSz,
-		apikeyMaxReqSize:     defaultApikeyMaxReqSize,
+		flushInterval:            defaultFlushInterval,
+		flushThresholdCnt:        defaultFlushThresholdCnt,
+		flushThresholdSz:         defaultFlushThresholdSz,
+		maxPending:               defaultMaxPending,
+		apikeyMaxParallel:        defaultAPIKeyMaxParallel,
+		blockQueueSz:             defaultBlockQueueSz,
+		apikeyMaxReqSize:         defaultApikeyMaxReqSize,
 		maxPendingBulkDispatches: defaultMaxPendingBulkDispatches,
-		policyTokens:         []config.PolicyToken{}, // default is empty
+		policyTokens:             []config.PolicyToken{}, // default is empty
 	}
 
 	for _, f := range opts {

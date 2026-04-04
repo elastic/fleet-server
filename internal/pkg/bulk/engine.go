@@ -35,7 +35,7 @@ type SecurityInfo = apikey.SecurityInfo
 type APIKeyMetadata = apikey.APIKeyMetadata
 
 var (
-	ErrNoQuotes            = errors.New("quoted literal not supported")
+	ErrNoQuotes              = errors.New("quoted literal not supported")
 	ErrTooManyBulkDispatches = errors.New("too many pending bulk dispatches")
 )
 
@@ -87,13 +87,13 @@ type Bulk interface {
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es                esapi.Transport
-	ch                chan *bulkT
-	opts              bulkOptT
-	blkPool           sync.Pool
-	apikeyLimit       *semaphore.Weighted
-	tracer            *apm.Tracer
-	cancelFn          context.CancelFunc
+	es                    esapi.Transport
+	ch                    chan *bulkT
+	opts                  bulkOptT
+	blkPool               sync.Pool
+	apikeyLimit           *semaphore.Weighted
+	tracer                *apm.Tracer
+	cancelFn              context.CancelFunc
 	pendingBulkDispatches atomic.Int64
 
 	remoteOutputConfigMap map[string]map[string]interface{}
@@ -102,14 +102,14 @@ type Bulker struct {
 }
 
 const (
-	defaultFlushInterval       = time.Second * 5
-	defaultFlushThresholdCnt   = 32768
-	defaultFlushThresholdSz    = 1024 * 1024 * 10
-	defaultMaxPending          = 32
-	defaultBlockQueueSz        = 32 // Small capacity to allow multiOp to spin fast
-	defaultAPIKeyMaxParallel   = 32
-	defaultApikeyMaxReqSize    = 100 * 1024 * 1024
-	defaultFlushContextTimeout   = time.Minute * 1
+	defaultFlushInterval            = time.Second * 5
+	defaultFlushThresholdCnt        = 32768
+	defaultFlushThresholdSz         = 1024 * 1024 * 10
+	defaultMaxPending               = 32
+	defaultBlockQueueSz             = 32 // Small capacity to allow multiOp to spin fast
+	defaultAPIKeyMaxParallel        = 32
+	defaultApikeyMaxReqSize         = 100 * 1024 * 1024
+	defaultFlushContextTimeout      = time.Minute * 1
 	defaultMaxPendingBulkDispatches = 0 // 0 means no limit
 )
 
