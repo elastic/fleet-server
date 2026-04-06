@@ -102,14 +102,14 @@ type Bulker struct {
 }
 
 const (
-	defaultFlushInterval            = time.Second * 5
-	defaultFlushThresholdCnt        = 32768
-	defaultFlushThresholdSz         = 1024 * 1024 * 10
-	defaultMaxPending               = 32
-	defaultBlockQueueSz             = 32 // Small capacity to allow multiOp to spin fast
-	defaultAPIKeyMaxParallel        = 32
-	defaultApikeyMaxReqSize         = 100 * 1024 * 1024
-	defaultFlushContextTimeout      = time.Minute * 1
+	defaultFlushInterval                  = time.Second * 5
+	defaultFlushThresholdCnt              = 32768
+	defaultFlushThresholdSz               = 1024 * 1024 * 10
+	defaultMaxPending                     = 32
+	defaultBlockQueueSz                   = 32 // Small capacity to allow multiOp to spin fast
+	defaultAPIKeyMaxParallel              = 32
+	defaultApikeyMaxReqSize               = 100 * 1024 * 1024
+	defaultFlushContextTimeout            = time.Minute * 1
 	defaultMaxPendingBulkDispatches int64 = 0 // 0 means no limit
 )
 
