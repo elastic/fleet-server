@@ -110,7 +110,7 @@ const (
 	defaultAPIKeyMaxParallel        = 32
 	defaultApikeyMaxReqSize         = 100 * 1024 * 1024
 	defaultFlushContextTimeout      = time.Minute * 1
-	defaultMaxPendingBulkDispatches = 0 // 0 means no limit
+	defaultMaxPendingBulkDispatches int64 = 0 // 0 means no limit
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -609,12 +609,12 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 	if limit := b.opts.maxPendingBulkDispatches; limit > 0 {
 		pending := b.pendingBulkDispatches.Add(1)
 		defer b.pendingBulkDispatches.Add(-1)
-		if pending > int64(limit) {
+		if pending > limit {
 			zerolog.Ctx(ctx).Warn().
 				Str("mod", kModBulk).
 				Str("action", blk.action.String()).
 				Int64("pending", pending).
-				Int("limit", limit).
+				Int64("limit", limit).
 				Msg("Bulk dispatch rejected: too many pending")
 			b.freeBlk(blk)
 			return respT{err: ErrTooManyBulkDispatches}

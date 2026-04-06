@@ -88,7 +88,7 @@ type bulkOptT struct {
 	blockQueueSz             int
 	apikeyMaxParallel        int
 	apikeyMaxReqSize         int
-	maxPendingBulkDispatches int
+	maxPendingBulkDispatches int64
 	policyTokens             []config.PolicyToken
 	bi                       build.Info
 }
@@ -132,7 +132,7 @@ func WithBlockQueueSize(sz int) BulkOpt {
 
 // WithMaxPendingBulkDispatches sets the upper bound on concurrent bulk dispatch goroutines.
 // When the limit is reached, new bulk dispatches are rejected immediately. 0 means no limit.
-func WithMaxPendingBulkDispatches(max int) BulkOpt {
+func WithMaxPendingBulkDispatches(max int64) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.maxPendingBulkDispatches = max
 	}
@@ -195,7 +195,7 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Int("blockQueueSz", o.blockQueueSz)
 	e.Int("apikeyMaxParallel", o.apikeyMaxParallel)
 	e.Int("apikeyMaxReqSize", o.apikeyMaxReqSize)
-	e.Int("maxPendingBulkDispatches", o.maxPendingBulkDispatches)
+	e.Int64("maxPendingBulkDispatches", o.maxPendingBulkDispatches)
 }
 
 // BulkOptsFromCfg transforms config to a slize of BulkOpt

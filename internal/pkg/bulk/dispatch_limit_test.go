@@ -13,18 +13,18 @@ import (
 )
 
 func TestDispatchRejectsWhenLimitReached(t *testing.T) {
-	limit := 2
-	b := NewBulker(nil, nil, WithBlockQueueSize(limit+1), WithMaxPendingBulkDispatches(limit))
+	var limit int64 = 2
+	b := NewBulker(nil, nil, WithBlockQueueSize(int(limit)+1), WithMaxPendingBulkDispatches(limit))
 
 	// Fill the queue so dispatches block in Phase 1.
-	for i := 0; i < limit; i++ {
+	for i := int64(0); i < limit; i++ {
 		b.ch <- &bulkT{ch: make(chan respT, 1)}
 	}
 
 	var wg sync.WaitGroup
 
 	// Saturate the pending bulk dispatch limit with goroutines blocked on the full channel.
-	for i := 0; i < limit; i++ {
+	for i := int64(0); i < limit; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -36,7 +36,7 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 
 	// Give the goroutines time to enter dispatch and increment the counter.
 	// They'll block on the channel send since it's full.
-	for b.pendingBulkDispatches.Load() < int64(limit) {
+	for b.pendingBulkDispatches.Load() < limit {
 		// spin until both goroutines are pending
 	}
 
@@ -48,10 +48,10 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 	require.ErrorIs(t, resp.err, ErrTooManyBulkDispatches)
 
 	// Clean up: drain the channel to unblock the goroutines.
-	for i := 0; i < limit; i++ {
+	for i := int64(0); i < limit; i++ {
 		<-b.ch // remove the filler items
 	}
-	for i := 0; i < limit; i++ {
+	for i := int64(0); i < limit; i++ {
 		item := <-b.ch // receive the dispatch items
 		item.ch <- respT{}
 	}
