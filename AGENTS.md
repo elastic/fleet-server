@@ -188,6 +188,7 @@ mage check:go    # golangci-lint only
 - **FIPS / crypto:** [docs/fips.md](./docs/fips.md).
   - Any changes that affect cryptography must have a mode that succeeds under the FIPS 140-2 standard.
   - The `requirefips` build tag is used to indicate that FIPS capable mode is used.
+- **Pre-commit:** Always run `mage check:all` before committing changes.
 
 ## Contribution hygiene
 
