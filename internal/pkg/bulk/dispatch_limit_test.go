@@ -8,6 +8,8 @@ import (
 	"context"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDispatchRejectsWhenLimitReached(t *testing.T) {
@@ -43,9 +45,7 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 	blk.buf.WriteString(`{"index":"test"}`)
 	resp := b.dispatch(context.Background(), blk)
 
-	if resp.err != ErrTooManyBulkDispatches {
-		t.Fatalf("expected ErrTooManyBulkDispatches, got: %v", resp.err)
-	}
+	require.ErrorIs(t, resp.err, ErrTooManyBulkDispatches)
 
 	// Clean up: drain the channel to unblock the goroutines.
 	for i := 0; i < limit; i++ {
@@ -71,14 +71,10 @@ func TestDispatchAllowsWhenUnderLimit(t *testing.T) {
 	}()
 
 	resp := b.dispatch(context.Background(), blk)
-	if resp.err != nil {
-		t.Fatalf("expected no error, got: %v", resp.err)
-	}
+	require.NoError(t, resp.err)
 
 	// Counter should be back to 0 after dispatch completes.
-	if pending := b.pendingBulkDispatches.Load(); pending != 0 {
-		t.Fatalf("expected 0 pending bulk dispatches, got: %d", pending)
-	}
+	require.Equal(t, int64(0), b.pendingBulkDispatches.Load())
 }
 
 func TestDispatchNoLimitWhenZero(t *testing.T) {
@@ -94,12 +90,8 @@ func TestDispatchNoLimitWhenZero(t *testing.T) {
 	}()
 
 	resp := b.dispatch(context.Background(), blk)
-	if resp.err != nil {
-		t.Fatalf("expected no error, got: %v", resp.err)
-	}
+	require.NoError(t, resp.err)
 
 	// Counter should not have been touched (0 means disabled).
-	if pending := b.pendingBulkDispatches.Load(); pending != 0 {
-		t.Fatalf("expected 0 pending bulk dispatches, got: %d", pending)
-	}
+	require.Equal(t, int64(0), b.pendingBulkDispatches.Load())
 }
