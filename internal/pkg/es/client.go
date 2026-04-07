@@ -166,9 +166,6 @@ func WithRetryOnTLSHandshakeError() ConfigOption {
 // and/or *net.OpError by the HTTP transport, so the check walks the unwrap
 // chain via errors.As.
 func isTLSHandshakeError(err error) bool {
-	if err == nil {
-		return false
-	}
 	var certErr *tls.CertificateVerificationError
 	return errors.As(err, &certErr)
 }
