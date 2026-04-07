@@ -148,7 +148,7 @@ Test output lands in `build/` (coverage files, JUnit XML, etc.).
 Ensure that `mage test:unit` passes before a change is considered complete.
 If an integration or e2e test has been added, ensure that it passes by running it with the relevant mage target.
 
-Always use `require` (from `github.com/stretchr/testify/require`) instead of `assert` in tests. `require` fails the test immediately on failure, preventing cascading errors from nil values or invalid state.
+When writing tests, use `github.com/stretchr/testify/require` if a check should cause a test to fail immediately and `github.com/stretchr/testify/assert` otherwise. Avoid using if statements with `t.Error()` or `t.Fatal()` in tests.
 
 ## OpAMP
 
