@@ -6,6 +6,7 @@ package es
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -40,6 +41,13 @@ func applyDefaultOptions(escfg *elasticsearch.Config) {
 
 	opts := []ConfigOption{
 		WithRetryOnErrs(syscall.ECONNREFUSED, syscall.ECONNRESET), // server may be restarting
+
+		// When the Elasticsearch output has multiple hosts whose certificates
+		// chain to different CAs, a single untrusted host would otherwise fail
+		// the request outright. Retrying lets the underlying connection pool's
+		// dead-host failover redirect the attempt to a host that is still in
+		// the live list.
+		WithRetryOnTLSHandshakeError(),
 
 		WithRetryOnStatus(http.StatusTooManyRequests),
 		WithRetryOnStatus(http.StatusRequestTimeout),
@@ -119,6 +127,50 @@ func WithRetryOnErrs(errs ...error) ConfigOption {
 			return false
 		}
 	}
+}
+
+// WithRetryOnTLSHandshakeError enables retries on TLS handshake failures such
+// as certificate verification errors ("x509: certificate signed by unknown
+// authority", expired certs, hostname mismatches, etc.).
+//
+// When the Elasticsearch output has multiple hosts whose certificates chain to
+// different CAs, the underlying connection pool already marks a failed host
+// dead via OnFailure on any transport error — but the request itself is only
+// retried on a different host if RetryOnError returns true. Without this
+// option, a TLS handshake failure against one host would abort the current
+// request even when another host in the pool is still live and reachable.
+//
+// This option composes with any RetryOnError predicate already set on the
+// config: the resulting predicate returns true if either the previously set
+// one does, or the error is a TLS handshake error.
+func WithRetryOnTLSHandshakeError() ConfigOption {
+	return func(config *elasticsearch.Config) {
+		prev := config.RetryOnError
+		config.RetryOnError = func(req *http.Request, err error) bool {
+			// Compose with any previously-installed RetryOnError predicate
+			// (e.g. WithRetryOnErrs) using OR semantics: if the prior
+			// predicate already wants to retry, honor that and short-circuit.
+			// This way, layering this option on top of an existing classifier
+			// only widens the set of retried errors and never clobbers it.
+			if prev != nil && prev(req, err) {
+				return true
+			}
+			return isTLSHandshakeError(err)
+		}
+	}
+}
+
+// isTLSHandshakeError reports whether err originated from a TLS certificate
+// verification failure. These errors are surfaced by crypto/tls as
+// *tls.CertificateVerificationError and are typically wrapped in a *url.Error
+// and/or *net.OpError by the HTTP transport, so the check walks the unwrap
+// chain via errors.As.
+func isTLSHandshakeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var certErr *tls.CertificateVerificationError
+	return errors.As(err, &certErr)
 }
 
 func WithMaxRetries(retries int) ConfigOption {
