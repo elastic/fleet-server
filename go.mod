@@ -35,10 +35,6 @@ require (
 	go.elastic.co/apm/module/apmzerolog/v2 v2.7.6
 	go.elastic.co/apm/v2 v2.7.6
 	go.elastic.co/ecszerolog v0.2.0
-<<<<<<< HEAD
-=======
-	go.opentelemetry.io/otel v1.43.0
->>>>>>> 01afdeb (build(deps): bump go.opentelemetry.io/otel from 1.42.0 to 1.43.0 (#6752))
 	go.uber.org/zap v1.27.1
 	golang.org/x/net v0.52.0
 	golang.org/x/sync v0.20.0
@@ -91,14 +87,9 @@ require (
 	go.elastic.co/ecszap v1.0.3 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-<<<<<<< HEAD
-	go.opentelemetry.io/otel v1.42.0 // indirect
-	go.opentelemetry.io/otel/metric v1.42.0 // indirect
-	go.opentelemetry.io/otel/trace v1.42.0 // indirect
-=======
+	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
->>>>>>> 01afdeb (build(deps): bump go.opentelemetry.io/otel from 1.42.0 to 1.43.0 (#6752))
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/crypto v0.49.0 // indirect
