@@ -23,9 +23,8 @@ func BenchmarkDispatchAbortQueue(b *testing.B) {
 	cancel() // pre-cancel so dispatch aborts immediately
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		blk := bulker.newBlk(ActionSearch, optionsT{})
 		blk.buf.WriteString(`{"index":"test"}`)
 		bulker.dispatch(ctx, blk)
@@ -39,15 +38,28 @@ func BenchmarkDispatchAbortQueue(b *testing.B) {
 // See TestDispatchAbortResponseDrainsAndFreesBlk for verification that the
 // drain completes correctly.
 func BenchmarkDispatchAbortResponse(b *testing.B) {
-	bulker := NewBulker(nil, nil, WithBlockQueueSize(b.N+1))
+	bulker := NewBulker(nil, nil, WithBlockQueueSize(1))
+
+	// Drain bulker.ch so dispatch's first select can always enqueue, forcing
+	// each iteration into Phase 2.
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		for {
+			select {
+			case <-bulker.ch:
+			case <-done:
+				return
+			}
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // pre-cancel so Phase 2 aborts immediately
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		blk := bulker.newBlk(ActionSearch, optionsT{})
 		blk.buf.WriteString(`{"index":"test"}`)
 		bulker.dispatch(ctx, blk)
@@ -60,9 +72,8 @@ func BenchmarkDispatchSuccess(b *testing.B) {
 	bulker := NewBulker(nil, nil, WithBlockQueueSize(1))
 
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		blk := bulker.newBlk(ActionSearch, optionsT{})
 		blk.buf.WriteString(`{"index":"test"}`)
 
