@@ -1,5 +1,0 @@
-kind: bug-fix
-
-summary: Retry Elasticsearch requests on TLS handshake errors so multi-host outputs can fail over
-
-component: fleet-server
