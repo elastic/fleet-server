@@ -25,11 +25,12 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 
 	// Saturate the pending bulk dispatch limit with goroutines blocked on the full channel.
 	for i := int64(0); i < limit; i++ {
+		blk := b.newBlk(ActionSearch, optionsT{})
+		_, err := blk.buf.WriteString(`{"index":"test"}`)
+		require.NoError(t, err)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			blk := b.newBlk(ActionSearch, optionsT{})
-			blk.buf.WriteString(`{"index":"test"}`)
 			b.dispatch(context.Background(), blk)
 		}()
 	}
@@ -42,7 +43,8 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 
 	// The next dispatch should be rejected immediately.
 	blk := b.newBlk(ActionSearch, optionsT{})
-	blk.buf.WriteString(`{"index":"test"}`)
+	_, err := blk.buf.WriteString(`{"index":"test"}`)
+	require.NoError(t, err)
 	resp := b.dispatch(context.Background(), blk)
 
 	require.ErrorIs(t, resp.err, ErrTooManyBulkDispatches)
@@ -62,7 +64,8 @@ func TestDispatchAllowsWhenUnderLimit(t *testing.T) {
 	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(10))
 
 	blk := b.newBlk(ActionSearch, optionsT{})
-	blk.buf.WriteString(`{"index":"test"}`)
+	_, err := blk.buf.WriteString(`{"index":"test"}`)
+	require.NoError(t, err)
 
 	// Simulate the Run loop responding.
 	go func() {
@@ -82,7 +85,8 @@ func TestDispatchNoLimitWhenZero(t *testing.T) {
 	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(0))
 
 	blk := b.newBlk(ActionSearch, optionsT{})
-	blk.buf.WriteString(`{"index":"test"}`)
+	_, err := blk.buf.WriteString(`{"index":"test"}`)
+	require.NoError(t, err)
 
 	go func() {
 		item := <-b.ch
