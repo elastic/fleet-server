@@ -8,6 +8,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDispatchAbortQueueFreesBlk(t *testing.T) {
@@ -25,19 +27,13 @@ func TestDispatchAbortQueueFreesBlk(t *testing.T) {
 	blk.buf.WriteString(`{"index":"test"}`)
 
 	resp := b.dispatch(ctx, blk)
-	if resp.err == nil {
-		t.Fatal("expected error from cancelled context")
-	}
+	require.Error(t, resp.err, "expected error from cancelled context")
 
 	// blk should have been returned to the pool. Getting from the pool should
 	// return the same (reset) object without a new allocation.
 	reused := b.blkPool.Get().(*bulkT)
-	if reused.buf.Len() != 0 {
-		t.Fatal("expected reused blk to have reset buf")
-	}
-	if reused.action != 0 {
-		t.Fatal("expected reused blk to have reset action")
-	}
+	require.Zero(t, reused.buf.Len(), "expected reused blk to have reset buf")
+	require.Zero(t, reused.action, "expected reused blk to have reset action")
 }
 
 func TestDispatchAbortResponseDrainsAndFreesBlk(t *testing.T) {
@@ -63,9 +59,7 @@ func TestDispatchAbortResponseDrainsAndFreesBlk(t *testing.T) {
 	}()
 
 	resp := b.dispatch(ctx, blk)
-	if resp.err == nil {
-		t.Fatal("expected error from cancelled context")
-	}
+	require.Error(t, resp.err, "expected error from cancelled context")
 
 	// Now simulate the Run loop sending a response. This should unblock
 	// the drain goroutine, which will call freeBlk.
@@ -76,9 +70,7 @@ func TestDispatchAbortResponseDrainsAndFreesBlk(t *testing.T) {
 
 	// blk should have been returned to the pool.
 	reused := b.blkPool.Get().(*bulkT)
-	if reused.buf.Len() != 0 {
-		t.Fatal("expected reused blk to have reset buf")
-	}
+	require.Zero(t, reused.buf.Len(), "expected reused blk to have reset buf")
 }
 
 func TestDispatchSuccess(t *testing.T) {
@@ -95,7 +87,5 @@ func TestDispatchSuccess(t *testing.T) {
 	}()
 
 	resp := b.dispatch(ctx, blk)
-	if resp.err != nil {
-		t.Fatalf("expected no error, got: %v", resp.err)
-	}
+	require.NoError(t, resp.err)
 }
