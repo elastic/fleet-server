@@ -1,0 +1,15 @@
+version: 9.2.8
+entries:
+    - kind: enhancement
+      summary: "Add the `/v1/opamp` endpoint to allow OpAMP clients to connect to Fleet Server."
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6657
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1774388797
+      file:
+        name: 1774388797-opamp-ff-default-enabled.yaml
+        checksum: 31288270c3119fd0e84aed39061353fdae6dbd8d
