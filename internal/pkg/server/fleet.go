@@ -614,7 +614,15 @@ func (f *Fleet) initTracer(ctx context.Context, cfg config.Instrumentation) (*ap
 }
 
 func elasticsearchOptions(instumented bool, bi build.Info) []es.ConfigOption {
-	options := []es.ConfigOption{es.WithUserAgent(kUAFleetServer, bi)}
+	options := []es.ConfigOption{
+		es.WithUserAgent(kUAFleetServer, bi),
+		// When the Elasticsearch output has multiple hosts whose certificates
+		// chain to different CAs, a single untrusted host would otherwise fail
+		// the request outright. Retrying lets the underlying connection pool's
+		// dead-host failover redirect the attempt to a host that is still in
+		// the live list.
+		es.WithRetryOnTLSHandshakeError(),
+	}
 	if instumented {
 		options = append(options, es.InstrumentRoundTripper())
 	}
