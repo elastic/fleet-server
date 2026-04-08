@@ -92,8 +92,10 @@ func TestDrainAndFreeAbortedBlkResponse(t *testing.T) {
 	blk.ch <- respT{}
 
 	// Run synchronously so blk is only touched by this goroutine, making
-	// the post-drain field reads race-free. blk.reset() is only called
-	// from freeBlk, so observing the reset proves freeBlk ran.
+	// the post-drain field reads race-free.
+	//
+	// blk.reset() is only called from freeBlk, so observing the reset
+	// below proves freeBlk ran.
 	b.drainAndFreeAbortedBlk(blk)
 
 	require.Zero(t, blk.action)
