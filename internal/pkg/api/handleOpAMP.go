@@ -177,6 +177,26 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			Bool("is_enrolled", agent != nil).
 			Msg("agent enrollment status")
 
+		// Handle agent disconnect: set status to offline for enrolled agents,
+		// return an error for unenrolled agents.
+		if message.AgentDisconnect != nil {
+			if agent == nil {
+				zlog.Debug().Msg("agent disconnect received from unenrolled agent")
+				return &protobufs.ServerToAgent{
+					InstanceUid: instanceUID.Bytes(),
+					ErrorResponse: &protobufs.ServerErrorResponse{
+						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
+						ErrorMessage: "agent is not enrolled",
+					},
+				}
+			}
+			zlog.Debug().Msg("agent disconnect received")
+			_ = oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus("disconnected"))
+			return &protobufs.ServerToAgent{
+				InstanceUid: instanceUID.Bytes(),
+			}
+		}
+
 		if agent == nil {
 			if agent, err = oa.enrollAgent(zlog, instanceUID.String(), message, apiKey); err != nil {
 				return &protobufs.ServerToAgent{

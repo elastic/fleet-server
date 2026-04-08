@@ -27,9 +27,8 @@ Fleet-server operates in monitoring-only mode. The `ServerToAgent` response only
 
 ### Agent-to-server fields ignored
 
-Fleet-server reads `instance_uid`, `agent_description`, `capabilities`, `health`, `effective_config`, and `sequence_num` from `AgentToServer` messages. The following fields are ignored:
+The following fields are ignored:
 
-- `agent_disconnect` — The spec says this MUST be set in the agent's last message.
 - `remote_config_status`
 - `package_statuses`
 - `flags` (e.g., `RequestInstanceUid`)
