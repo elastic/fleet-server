@@ -148,19 +148,8 @@ Test output lands in `build/` (coverage files, JUnit XML, etc.).
 Ensure that `mage test:unit` passes before a change is considered complete.
 If an integration or e2e test has been added, ensure that it passes by running it with the relevant mage target.
 
-<<<<<<< HEAD
-=======
 When writing tests, use `github.com/stretchr/testify/require` if a check should cause a test to fail immediately and `github.com/stretchr/testify/assert` otherwise. Avoid using if statements with `t.Error()` or `t.Fatal()` in tests.
 
-## OpAMP
-
-Fleet-server is currently being expanded in order to support OpAMP, see the [docs](./docs/opamp.md).
-
-The OpAMP spec is defined externally in: https://github.com/open-telemetry/opamp-spec.
-
-The OpAMP go library is: https://github.com/open-telemetry/opamp-go.
-
->>>>>>> d710dce (docs: add agent instructions for test assertions and pre-commit checks (#6756))
 ## Dependencies
 
 - `go-elasticsearch/v8` — Elasticsearch client
