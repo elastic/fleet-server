@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	kOpAMPMod = "opAMP"
+	kOpAMPMod   = "opAMP"
+	kNIATagsKey = "tags"
 )
 
 type OpAMPT struct {
@@ -274,7 +275,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 			case semconv.OSTypeKey:
 				osType := nia.GetValue().GetStringValue()
 				meta.Os.Platform = osType
-			case "tags":
+			case kNIATagsKey:
 				for _, t := range strings.Split(nia.GetValue().GetStringValue(), ",") {
 					if t = strings.TrimSpace(t); t != "" {
 						configTags = append(configTags, t)
@@ -291,7 +292,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 
 		filteredNIA := make([]*protobufs.KeyValue, 0, len(aToS.AgentDescription.NonIdentifyingAttributes))
 		for _, nia := range aToS.AgentDescription.NonIdentifyingAttributes {
-			if nia.Key != "tags" {
+			if nia.Key != kNIATagsKey {
 				filteredNIA = append(filteredNIA, nia)
 			}
 		}
