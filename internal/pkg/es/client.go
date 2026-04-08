@@ -6,11 +6,8 @@ package es
 
 import (
 	"context"
-<<<<<<< HEAD
-=======
 	"crypto/tls"
 	"errors"
->>>>>>> 52f9cbe (Retry on TLS handshake errors in ES client (#6767))
 	"fmt"
 	"net/http"
 	"runtime"
@@ -26,41 +23,6 @@ import (
 
 type ConfigOption func(config *elasticsearch.Config)
 
-<<<<<<< HEAD
-=======
-func applyDefaultOptions(escfg *elasticsearch.Config) {
-	exp := backoff.NewExponentialBackOff()
-	exp.InitialInterval = initialRetryBackoff
-	exp.RandomizationFactor = randomizationFactor
-	exp.MaxInterval = maxRetryBackoff
-
-	opts := []ConfigOption{
-		WithRetryOnErrs(syscall.ECONNREFUSED, syscall.ECONNRESET), // server may be restarting
-
-		// When the Elasticsearch output has multiple hosts whose certificates
-		// chain to different CAs, a single untrusted host would otherwise fail
-		// the request outright. Retrying lets the underlying connection pool's
-		// dead-host failover redirect the attempt to a host that is still in
-		// the live list.
-		WithRetryOnTLSHandshakeError(),
-
-		WithRetryOnStatus(http.StatusTooManyRequests),
-		WithRetryOnStatus(http.StatusRequestTimeout),
-		WithRetryOnStatus(http.StatusTooEarly),
-		WithRetryOnStatus(http.StatusBadGateway),
-		WithRetryOnStatus(http.StatusServiceUnavailable),
-		WithRetryOnStatus(http.StatusGatewayTimeout),
-
-		WithBackoff(exp),
-		WithMaxRetries(defaultMaxRetries),
-	}
-
-	for _, opt := range opts {
-		opt(escfg)
-	}
-}
-
->>>>>>> 52f9cbe (Retry on TLS handshake errors in ES client (#6767))
 func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...ConfigOption) (*elasticsearch.Client, error) {
 	escfg, err := cfg.Output.Elasticsearch.ToESConfig(longPoll)
 	if err != nil {
@@ -109,8 +71,6 @@ func InstrumentRoundTripper() ConfigOption {
 	}
 }
 
-<<<<<<< HEAD
-=======
 func WithRetryOnErrs(errs ...error) ConfigOption {
 	return func(config *elasticsearch.Config) {
 		config.RetryOnError = func(_ *http.Request, err error) bool {
@@ -165,43 +125,6 @@ func isTLSHandshakeError(err error) bool {
 	return errors.As(err, &certErr)
 }
 
-func WithMaxRetries(retries int) ConfigOption {
-	return func(config *elasticsearch.Config) {
-		config.MaxRetries = retries
-	}
-}
-
-func WithRetryOnStatus(status int) ConfigOption {
-	return func(config *elasticsearch.Config) {
-		for _, s := range config.RetryOnStatus {
-			// check for duplicities
-			if s == status {
-				return
-			}
-		}
-
-		config.RetryOnStatus = append(config.RetryOnStatus, status)
-	}
-}
-
-func WithBackoff(exp *backoff.ExponentialBackOff) ConfigOption {
-	return func(config *elasticsearch.Config) {
-		if exp == nil {
-			// no retry backoff
-			config.RetryBackoff = nil
-			return
-		}
-
-		config.RetryBackoff = func(attempt int) time.Duration {
-			if attempt == 1 {
-				exp.Reset()
-			}
-			return exp.NextBackOff()
-		}
-	}
-}
-
->>>>>>> 52f9cbe (Retry on TLS handshake errors in ES client (#6767))
 func userAgent(name string, bi build.Info) string {
 	return fmt.Sprintf("Elastic-%s/%s (%s; %s; %s; %s)",
 		name,
