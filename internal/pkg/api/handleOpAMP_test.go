@@ -217,6 +217,95 @@ func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 	bulker.AssertExpectations(t)
 }
 
+func TestEnrollAgentTags(t *testing.T) {
+	cases := []struct {
+		name         string
+		tagsValue    string
+		wantTags     []string
+		otherNIAKeys []string
+	}{
+		{
+			name:         "no tags attribute",
+			tagsValue:    "",
+			wantTags:     []string{"otel-collector"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+		{
+			name:         "single tag",
+			tagsValue:    "dev",
+			wantTags:     []string{"otel-collector", "dev"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+		{
+			name:         "multiple tags",
+			tagsValue:    "dev,west,us-west-1a",
+			wantTags:     []string{"otel-collector", "dev", "west", "us-west-1a"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+		{
+			name:         "tags with spaces",
+			tagsValue:    " dev , west , us-west-1a ",
+			wantTags:     []string{"otel-collector", "dev", "west", "us-west-1a"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			enrollKey := model.EnrollmentAPIKey{
+				APIKeyID: "enroll-key-id",
+				PolicyID: "policy-123",
+				Active:   true,
+			}
+			enrollKeyBytes, err := json.Marshal(enrollKey)
+			require.NoError(t, err)
+			bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
+				Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+			bulker.On("Create", mock.Anything, dl.FleetAgents, "agent-123", mock.Anything, mock.Anything).
+				Return("doc-id", nil)
+
+			nia := []*protobufs.KeyValue{
+				{
+					Key:   string(semconv.HostNameKey),
+					Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: "host-1"}},
+				},
+			}
+			if tc.tagsValue != "" {
+				nia = append(nia, &protobufs.KeyValue{
+					Key:   "tags",
+					Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: tc.tagsValue}},
+				})
+			}
+
+			msg := &protobufs.AgentToServer{
+				AgentDescription: &protobufs.AgentDescription{
+					IdentifyingAttributes: []*protobufs.KeyValue{
+						{
+							Key:   string(semconv.ServiceNameKey),
+							Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: "otel-collector"}},
+						},
+					},
+					NonIdentifyingAttributes: nia,
+				},
+			}
+
+			oa := &OpAMPT{bulk: bulker}
+			zlog := zerolog.New(io.Discard)
+			agent, err := oa.enrollAgent(zlog, "agent-123", msg, &apikey.APIKey{ID: "enroll-key-id"})
+			require.NoError(t, err)
+			require.Equal(t, tc.wantTags, agent.Tags)
+
+			// tags must not appear in stored NonIdentifyingAttributes
+			var niMap map[string]interface{}
+			require.NoError(t, json.Unmarshal(agent.NonIdentifyingAttributes, &niMap))
+			require.NotContains(t, niMap, "tags")
+			for _, k := range tc.otherNIAKeys {
+				require.Contains(t, niMap, k, "expected NIA key %q to be present", k)
+			}
+		})
+	}
+}
+
 func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	checker := &mockCheckin{}
 	oa := &OpAMPT{bc: checker}

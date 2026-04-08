@@ -249,6 +249,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 	meta := localMetadata{}
 	meta.Elastic.Agent.ID = agentID
 	agentType := ""
+	var configTags []string
 	var identifyingAttributes, nonIdentifyingAttributes json.RawMessage
 	if aToS.AgentDescription != nil {
 		// Extract agent version
@@ -263,7 +264,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 		}
 		zlog.Debug().Str("opamp.agent.version", meta.Elastic.Agent.Version).Msg("extracted agent version")
 
-		// Extract hostname
+		// Extract hostname and tags
 		for _, nia := range aToS.AgentDescription.NonIdentifyingAttributes {
 			switch attribute.Key(nia.Key) {
 			case semconv.HostNameKey:
@@ -273,6 +274,12 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 			case semconv.OSTypeKey:
 				osType := nia.GetValue().GetStringValue()
 				meta.Os.Platform = osType
+			case "tags":
+				for _, t := range strings.Split(nia.GetValue().GetStringValue(), ",") {
+					if t = strings.TrimSpace(t); t != "" {
+						configTags = append(configTags, t)
+					}
+				}
 			}
 		}
 		zlog.Debug().Str("hostname", meta.Host.Hostname).Msg("extracted hostname")
@@ -282,7 +289,13 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 			return nil, fmt.Errorf("failed to marshal identifying attributes: %w", err)
 		}
 
-		nonIdentifyingAttributes, err = ProtobufKVToRawMessage(zlog, aToS.AgentDescription.NonIdentifyingAttributes)
+		filteredNIA := make([]*protobufs.KeyValue, 0, len(aToS.AgentDescription.NonIdentifyingAttributes))
+		for _, nia := range aToS.AgentDescription.NonIdentifyingAttributes {
+			if nia.Key != "tags" {
+				filteredNIA = append(filteredNIA, nia)
+			}
+		}
+		nonIdentifyingAttributes, err = ProtobufKVToRawMessage(zlog, filteredNIA)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal non-identifying attributes: %w", err)
 		}
@@ -310,7 +323,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 		IdentifyingAttributes:    identifyingAttributes,
 		NonIdentifyingAttributes: nonIdentifyingAttributes,
 		Type:                     "OPAMP",
-		Tags:                     []string{agentType},
+		Tags:                     append([]string{agentType}, configTags...),
 	}
 
 	data, err = json.Marshal(agent)
