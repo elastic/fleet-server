@@ -88,6 +88,7 @@ type Bulk interface {
 
 const kModBulk = "bulk"
 
+<<<<<<< HEAD
 var bulkSpanNames = func() [ActionFleetSearch + 1]string {
 	var names [ActionFleetSearch + 1]string
 	for i := range names {
@@ -95,6 +96,17 @@ var bulkSpanNames = func() [ActionFleetSearch + 1]string {
 	}
 	return names
 }()
+=======
+type Bulker struct {
+	es                    esapi.Transport
+	ch                    chan *bulkT
+	opts                  bulkOptT
+	blkPool               sync.Pool
+	apikeyLimit           *semaphore.Weighted
+	tracer                *apm.Tracer
+	cancelFn              context.CancelFunc
+	pendingBulkDispatches atomic.Int64
+>>>>>>> 54caea6 (feat: add configurable limit on concurrent bulk dispatch goroutines (#6751))
 
 var flushQueueTxNames = func() [kNumQueues]string {
 	var names [kNumQueues]string
@@ -138,6 +150,7 @@ const (
 	defaultApikeyMaxReqSize               = 100 * 1024 * 1024
 	defaultFlushContextTimeout            = time.Minute * 1
 	defaultMaxPendingBulkDispatches int64 = 0 // 0 means no limit
+<<<<<<< HEAD
 
 	// dispatchAbortDrainTimeout bounds how long the drain helper waits for
 	// a late response from the Run loop on an abort from the second
@@ -145,6 +158,8 @@ const (
 	// Three flush intervals give enough headroom for the blk to be picked
 	// up, sent to ES, and responded to even under heavy load.
 	dispatchAbortDrainTimeout = 3 * defaultFlushInterval
+=======
+>>>>>>> 54caea6 (feat: add configurable limit on concurrent bulk dispatch goroutines (#6751))
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {

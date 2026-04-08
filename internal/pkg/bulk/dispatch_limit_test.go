@@ -1,6 +1,11 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+<<<<<<< HEAD
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
+=======
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+>>>>>>> 54caea6 (feat: add configurable limit on concurrent bulk dispatch goroutines (#6751))
 
 package bulk
 
@@ -17,13 +22,18 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 	b := NewBulker(nil, nil, WithBlockQueueSize(int(limit)+1), WithMaxPendingBulkDispatches(limit))
 
 	// Fill the queue so dispatches block in Phase 1.
+<<<<<<< HEAD
 	for range limit {
+=======
+	for i := int64(0); i < limit; i++ {
+>>>>>>> 54caea6 (feat: add configurable limit on concurrent bulk dispatch goroutines (#6751))
 		b.ch <- &bulkT{ch: make(chan respT, 1)}
 	}
 
 	var wg sync.WaitGroup
 
 	// Saturate the pending bulk dispatch limit with goroutines blocked on the full channel.
+<<<<<<< HEAD
 	for range limit {
 		blk := b.newBlk(ActionSearch, optionsT{})
 		_, err := blk.buf.WriteString(`{"index":"test"}`)
@@ -31,6 +41,17 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 		wg.Go(func() {
 			b.dispatch(context.Background(), blk)
 		})
+=======
+	for i := int64(0); i < limit; i++ {
+		blk := b.newBlk(ActionSearch, optionsT{})
+		_, err := blk.buf.WriteString(`{"index":"test"}`)
+		require.NoError(t, err)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			b.dispatch(context.Background(), blk)
+		}()
+>>>>>>> 54caea6 (feat: add configurable limit on concurrent bulk dispatch goroutines (#6751))
 	}
 
 	// Give the goroutines time to enter dispatch and increment the counter.
@@ -48,10 +69,17 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 	require.ErrorIs(t, resp.err, ErrTooManyBulkDispatches)
 
 	// Clean up: drain the channel to unblock the goroutines.
+<<<<<<< HEAD
 	for range limit {
 		<-b.ch // remove the filler items
 	}
 	for range limit {
+=======
+	for i := int64(0); i < limit; i++ {
+		<-b.ch // remove the filler items
+	}
+	for i := int64(0); i < limit; i++ {
+>>>>>>> 54caea6 (feat: add configurable limit on concurrent bulk dispatch goroutines (#6751))
 		item := <-b.ch // receive the dispatch items
 		item.ch <- respT{}
 	}
