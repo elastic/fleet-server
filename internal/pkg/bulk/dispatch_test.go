@@ -20,7 +20,9 @@ func TestDispatchAbortQueueFreesBlk(t *testing.T) {
 	b.ch <- &bulkT{ch: make(chan respT, 1)}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // pre-cancel
+	// Pre-cancel so the first select() deterministically aborts and blk
+	// is never enqueued.
+	cancel()
 
 	blk := b.newBlk(ActionSearch, optionsT{})
 	blk.buf.WriteString(`{"index":"test"}`)
