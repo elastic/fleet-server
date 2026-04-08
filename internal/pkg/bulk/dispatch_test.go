@@ -12,11 +12,11 @@ import (
 )
 
 func TestDispatchAbortQueueFreesBlk(t *testing.T) {
-	// When dispatch aborts in Phase 1 (blk never enqueued), blk must be freed
-	// back to the pool so it can be reused.
+	// When dispatch aborts in its first select() (blk never enqueued),
+	// blk must be freed back to the pool so it can be reused.
 	b := NewBulker(nil, nil, WithBlockQueueSize(1))
 
-	// Fill the queue so dispatch blocks in Phase 1.
+	// Fill the queue so dispatch blocks in its first select().
 	b.ch <- &bulkT{ch: make(chan respT, 1)}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -35,9 +35,10 @@ func TestDispatchAbortQueueFreesBlk(t *testing.T) {
 	require.Zero(t, reused.action, "expected reused blk to have reset action")
 }
 
-func TestDispatchAbortResponseReachesPhase2(t *testing.T) {
-	// When dispatch aborts in Phase 2 (blk enqueued, waiting for response),
-	// it must return ctx.Err() after the Run loop has already taken the blk.
+func TestDispatchAbortResponseReachesSecondSelect(t *testing.T) {
+	// When dispatch aborts in its second select() (blk enqueued, waiting
+	// for response), it must return ctx.Err() after the Run loop has
+	// already taken the blk.
 	b := NewBulker(nil, nil, WithBlockQueueSize(1))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -46,8 +47,9 @@ func TestDispatchAbortResponseReachesPhase2(t *testing.T) {
 	blk.buf.WriteString(`{"index":"test"}`)
 
 	// Drain b.ch and signal once dispatch has enqueued. After this signal,
-	// dispatch is guaranteed to be in (or about to enter) its second select,
-	// so cancelling ctx now deterministically triggers the Phase 2 abort.
+	// dispatch is guaranteed to be in (or about to enter) its second
+	// select(), so cancelling ctx now deterministically triggers the
+	// abort from that select().
 	enqueued := make(chan struct{})
 	go func() {
 		<-b.ch
@@ -55,7 +57,7 @@ func TestDispatchAbortResponseReachesPhase2(t *testing.T) {
 	}()
 
 	// Run dispatch in a goroutine so we can cancel its ctx after it has
-	// crossed into Phase 2.
+	// crossed into the second select().
 	respCh := make(chan respT, 1)
 	go func() {
 		respCh <- b.dispatch(ctx, blk)

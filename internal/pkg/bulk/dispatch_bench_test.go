@@ -10,13 +10,13 @@ import (
 )
 
 // BenchmarkDispatchAbortQueue measures allocation behavior when dispatch aborts
-// in Phase 1 (blk never enqueued) due to context cancellation. This simulates
-// the scenario where agents disconnect while their checkin request is waiting
-// to enter the bulk engine's channel.
+// in the first select() of dispatch (blk never enqueued) due to context
+// cancellation. This simulates the scenario where agents disconnect while
+// their checkin request is waiting to enter the bulk engine's channel.
 func BenchmarkDispatchAbortQueue(b *testing.B) {
 	bulker := NewBulker(nil, nil, WithBlockQueueSize(1))
 
-	// Fill the queue so dispatch always blocks in Phase 1.
+	// Fill the queue so dispatch always blocks in the first select().
 	bulker.ch <- &bulkT{ch: make(chan respT, 1)}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -32,16 +32,16 @@ func BenchmarkDispatchAbortQueue(b *testing.B) {
 }
 
 // BenchmarkDispatchAbortResponse measures the per-dispatch allocation cost
-// when dispatch aborts in Phase 2 (blk enqueued, waiting for response) due
-// to context cancellation. The drain goroutine is spawned but its cleanup
-// (freeBlk) is async and does not affect alloc counts reported here.
-// See TestDispatchAbortResponseDrainsAndFreesBlk for verification that the
-// drain completes correctly.
+// when dispatch aborts in the second select() of dispatch (blk enqueued,
+// waiting for response) due to context cancellation. The drain goroutine
+// is spawned but its cleanup (freeBlk) is async and does not affect alloc
+// counts reported here. See TestDrainAndFreeAbortedBlkResponse for
+// verification that the drain completes correctly.
 func BenchmarkDispatchAbortResponse(b *testing.B) {
 	bulker := NewBulker(nil, nil, WithBlockQueueSize(1))
 
-	// Drain bulker.ch so dispatch's first select can always enqueue, forcing
-	// each iteration into Phase 2.
+	// Drain bulker.ch so dispatch's first select() can always enqueue,
+	// forcing each iteration into the second select().
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -55,7 +55,7 @@ func BenchmarkDispatchAbortResponse(b *testing.B) {
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // pre-cancel so Phase 2 aborts immediately
+	cancel() // pre-cancel so the second select() aborts immediately
 
 	b.ReportAllocs()
 

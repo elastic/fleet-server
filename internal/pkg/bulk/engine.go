@@ -113,10 +113,10 @@ const (
 	defaultMaxPendingBulkDispatches int64 = 0 // 0 means no limit
 
 	// dispatchAbortDrainTimeout bounds how long the drain helper waits for
-	// a late response from the Run loop on a Phase 2 abort before giving
-	// up on freeing blk. Three flush intervals give enough headroom for
-	// the blk to be picked up, sent to ES, and responded to even under
-	// heavy load.
+	// a late response from the Run loop on an abort from the second
+	// select() of the dispatch method before giving up on freeing blk.
+	// Three flush intervals give enough headroom for the blk to be picked
+	// up, sent to ES, and responded to even under heavy load.
 	dispatchAbortDrainTimeout = 3 * defaultFlushInterval
 )
 
