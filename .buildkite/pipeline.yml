@@ -296,8 +296,13 @@ steps:
           PLATFORMS: "linux/amd64"
           TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
           FIPS: "true"
+<<<<<<< HEAD
           # PR #5536 redirects Cloud e2e test to prod as new deployments are not able to start on FRH-staging
           # The following env vars should be uncommented once FRH-staging is fixed
+=======
+          # Cloud e2e test is temporarily redirected to prod as new deployments are not able to start on FRH-staging.
+          # The following env vars should be uncommented once FRH-staging is fixed.
+>>>>>>> 1966852 (Temporarily redirect FIPS cloud e2e tests to prod (#6773))
           #EC_ENDPOINT: "https://api.staging.elastic-gov.com"
           #TF_VAR_ess_region: "us-gov-east-1"
           #TF_VAR_deployment_template_id: "aws-general-purpose"
