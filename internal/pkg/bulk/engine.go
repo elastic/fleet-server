@@ -111,6 +111,13 @@ const (
 	defaultApikeyMaxReqSize               = 100 * 1024 * 1024
 	defaultFlushContextTimeout            = time.Minute * 1
 	defaultMaxPendingBulkDispatches int64 = 0 // 0 means no limit
+
+	// dispatchAbortDrainTimeout bounds how long the drain helper waits for
+	// a late response from the Run loop on a Phase 2 abort before giving
+	// up on freeing blk. Three flush intervals give enough headroom for
+	// the blk to be picked up, sent to ES, and responded to even under
+	// heavy load.
+	dispatchAbortDrainTimeout = 3 * defaultFlushInterval
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -656,19 +663,22 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort response")
-		// blk is in the Run loop's queue; drain the response and free asynchronously.
-		// Use a timeout based on the flush interval so the goroutine doesn't block
-		// forever if the Run loop never processes this blk (e.g. during shutdown).
-		// Three flush intervals should give enough time for the blk to be picked up,
-		// sent to ES, and responded to, even under heavy load.
-		go func() {
-			select {
-			case <-blk.ch:
-				b.freeBlk(blk)
-			case <-time.After(3 * defaultFlushInterval):
-			}
-		}()
+		// blk is in the Run loop's queue; drain the response and free
+		// asynchronously so the caller can return immediately.
+		go b.drainAndFreeAbortedBlk(blk)
 	}
 
 	return respT{err: ctx.Err()}
+}
+
+// drainAndFreeAbortedBlk waits for the Run loop to deliver a response to an
+// abandoned blk, then returns it to the pool. If the response does not
+// arrive within dispatchAbortDrainTimeout (e.g. during shutdown), it gives
+// up rather than blocking forever; in that case blk is not reclaimed.
+func (b *Bulker) drainAndFreeAbortedBlk(blk *bulkT) {
+	select {
+	case <-blk.ch:
+		b.freeBlk(blk)
+	case <-time.After(dispatchAbortDrainTimeout):
+	}
 }

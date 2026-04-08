@@ -7,7 +7,6 @@ package bulk
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -36,9 +35,9 @@ func TestDispatchAbortQueueFreesBlk(t *testing.T) {
 	require.Zero(t, reused.action, "expected reused blk to have reset action")
 }
 
-func TestDispatchAbortResponseDrainsAndFreesBlk(t *testing.T) {
+func TestDispatchAbortResponseReachesPhase2(t *testing.T) {
 	// When dispatch aborts in Phase 2 (blk enqueued, waiting for response),
-	// a drain goroutine should wait for the flush response and then free blk.
+	// it must return ctx.Err() after the Run loop has already taken the blk.
 	b := NewBulker(nil, nil, WithBlockQueueSize(1))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -46,31 +45,55 @@ func TestDispatchAbortResponseDrainsAndFreesBlk(t *testing.T) {
 	blk := b.newBlk(ActionSearch, optionsT{})
 	blk.buf.WriteString(`{"index":"test"}`)
 
-	// Drain the Run loop channel so dispatch can enqueue.
+	// Drain b.ch and signal once dispatch has enqueued. After this signal,
+	// dispatch is guaranteed to be in (or about to enter) its second select,
+	// so cancelling ctx now deterministically triggers the Phase 2 abort.
+	enqueued := make(chan struct{})
 	go func() {
 		<-b.ch
-		// Don't respond yet — let dispatch enter Phase 2.
+		close(enqueued)
 	}()
 
-	// Let dispatch enqueue, then cancel context to trigger Phase 2 abort.
+	// Run dispatch in a goroutine so we can cancel its ctx after it has
+	// crossed into Phase 2.
+	respCh := make(chan respT, 1)
 	go func() {
-		time.Sleep(20 * time.Millisecond)
-		cancel()
+		respCh <- b.dispatch(ctx, blk)
 	}()
 
-	resp := b.dispatch(ctx, blk)
-	require.Error(t, resp.err, "expected error from cancelled context")
+	<-enqueued
+	cancel()
 
-	// Now simulate the Run loop sending a response. This should unblock
-	// the drain goroutine, which will call freeBlk.
+	resp := <-respCh
+	require.ErrorIs(t, resp.err, context.Canceled)
+
+	// Unblock the drain goroutine that dispatch spawned so it doesn't
+	// linger past the test.
+	blk.ch <- respT{}
+}
+
+func TestDrainAndFreeAbortedBlkResponse(t *testing.T) {
+	// When the Run loop delivers a response to an abandoned blk,
+	// drainAndFreeAbortedBlk must free it (which resets its fields and
+	// returns it to the pool).
+	b := NewBulker(nil, nil, WithBlockQueueSize(1))
+
+	blk := b.newBlk(ActionSearch, optionsT{})
+	blk.buf.WriteString(`{"index":"test"}`)
+	require.NotZero(t, blk.action)
+	require.NotZero(t, blk.buf.Len())
+
+	// Simulate the Run loop's late response before the drain runs. blk.ch
+	// is buffered cap 1, so this send does not block.
 	blk.ch <- respT{}
 
-	// Give the drain goroutine time to complete.
-	time.Sleep(50 * time.Millisecond)
+	// Run synchronously so blk is only touched by this goroutine, making
+	// the post-drain field reads race-free. blk.reset() is only called
+	// from freeBlk, so observing the reset proves freeBlk ran.
+	b.drainAndFreeAbortedBlk(blk)
 
-	// blk should have been returned to the pool.
-	reused := b.blkPool.Get().(*bulkT)
-	require.Zero(t, reused.buf.Len(), "expected reused blk to have reset buf")
+	require.Zero(t, blk.action)
+	require.Zero(t, blk.buf.Len())
 }
 
 func TestDispatchSuccess(t *testing.T) {
