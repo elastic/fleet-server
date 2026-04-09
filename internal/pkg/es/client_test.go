@@ -6,6 +6,7 @@ package es
 
 import (
 	"context"
+	"crypto/fips140"
 	"crypto/tls"
 	"crypto/x509"
 	_ "embed"
@@ -19,7 +20,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
 	"github.com/stretchr/testify/require"
@@ -205,8 +205,8 @@ func TestConnectionTLS(t *testing.T) {
 
 	_, err = FetchESVersion(ctx, client)
 
-	if build.FIPSDistribution {
-		require.ErrorContains(t, err, "tls: internal error")
+	if fips140.Enabled() {
+		require.Error(t, err)
 	} else {
 		require.NoError(t, err)
 	}
