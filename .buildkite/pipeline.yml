@@ -171,7 +171,7 @@ steps:
           FIPS: "true"
           GOEXPERIMENT: "systemcrypto"
           GO_DISTRO: "microsoft"
-          GODEBUG: "fips140=on"
+          GODEBUG: "fips140=on,tlsmlkem=0"
         agents:
           provider: "aws"
           imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
