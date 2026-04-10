@@ -205,7 +205,12 @@ func TestConnectionTLS(t *testing.T) {
 
 	_, err = FetchESVersion(ctx, client)
 
-	if fips140.Enabled() {
+	if fips140.Enforced() {
+		// When FIPS 140 is enforced (GODEBUG=fips140=only), Go's crypto
+		// stack rejects signing with a 1024-bit RSA key. Note: fips140=on
+		// with microsoft/go's systemcrypto backend silently falls back to
+		// stdlib in test binaries (via UnreachableExceptTests), so only
+		// fips140=only reliably enforces this.
 		require.Error(t, err)
 	} else {
 		require.NoError(t, err)
