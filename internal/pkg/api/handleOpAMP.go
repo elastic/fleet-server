@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	kOpAMPMod = "opAMP"
+	kOpAMPMod          = "opAMP"
+	statusDisconnected = "disconnected"
 )
 
 type OpAMPT struct {
@@ -191,7 +192,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 				}
 			}
 			zlog.Debug().Msg("agent disconnect received")
-			_ = oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus("disconnected"))
+			_ = oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus(statusDisconnected))
 			return &protobufs.ServerToAgent{
 				InstanceUid: instanceUID.Bytes(),
 			}

@@ -14,6 +14,12 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 
+	"github.com/open-telemetry/opamp-go/protobufs"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -21,11 +27,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
-	"github.com/open-telemetry/opamp-go/protobufs"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 )
 
 func TestFeatureFlag(t *testing.T) {
@@ -337,7 +338,7 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 				require.Equal(t, agentUID.String(), checker.id)
 
 				pending := pendingFromOptions(t, checker.opts)
-				require.Equal(t, "disconnected", getUnexportedField(pending, "status").String())
+				require.Equal(t, statusDisconnected, getUnexportedField(pending, "status").String())
 			}
 		})
 	}
