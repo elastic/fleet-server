@@ -122,15 +122,8 @@ github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3N
 github.com/moby/docker-image-spec v1.3.1/go.mod h1:eKmb5VW8vQEh/BAr2yvVNvuiJuY6UIocYsFu/DxxRpo=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-<<<<<<< HEAD
-github.com/oapi-codegen/runtime v1.3.1 h1:RgDY6J4OGQLbRXhG/Xpt3vSVqYpHQS7hN4m85+5xB9g=
-github.com/oapi-codegen/runtime v1.3.1/go.mod h1:kOdeacKy7t40Rclb1je37ZLFboFxh+YLy0zaPCMibPY=
-=======
 github.com/oapi-codegen/runtime v1.4.0 h1:KLOSFOp7UzkbS7Cs1ms6NBEKYr0WmH2wZG0KKbd2er4=
 github.com/oapi-codegen/runtime v1.4.0/go.mod h1:5sw5fxCDmnOzKNYmkVNF8d34kyUeejJEY8HNT2WaPec=
-github.com/open-telemetry/opamp-go v0.23.0 h1:k7h7w/muprut9/DAhUC4anX4v7hIdgO02gIsSjV4uq0=
-github.com/open-telemetry/opamp-go v0.23.0/go.mod h1:DIIVdkLefdqPW5L+4I2twmAicVrTB0Bp5XJAfedZzAM=
->>>>>>> f4a7879 (build(deps): bump github.com/oapi-codegen/runtime from 1.3.1 to 1.4.0 (#6794))
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.0.2 h1:9yCKha/T5XdGtO0q9Q9a6T5NUCsTn/DrBg0D7ufOcFM=
