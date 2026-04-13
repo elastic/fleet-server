@@ -324,7 +324,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 		IdentifyingAttributes:    identifyingAttributes,
 		NonIdentifyingAttributes: nonIdentifyingAttributes,
 		Type:                     "OPAMP",
-		Tags:                     append([]string{agentType}, configTags...),
+		Tags:                     dedupeTags(agentType, configTags),
 	}
 
 	data, err = json.Marshal(agent)
@@ -523,6 +523,20 @@ func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json
 	}
 
 	return json.RawMessage(b), nil
+}
+
+// dedupeTags returns a deduplicated slice with agentType first, followed by
+// configTags in order, skipping any that duplicate an earlier entry.
+func dedupeTags(agentType string, configTags []string) []string {
+	seen := make(map[string]struct{}, 1+len(configTags))
+	result := make([]string, 0, 1+len(configTags))
+	for _, t := range append([]string{agentType}, configTags...) {
+		if _, ok := seen[t]; !ok {
+			seen[t] = struct{}{}
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 // decodeCapabilities converts capability bitmask to human-readable strings

@@ -248,6 +248,18 @@ func TestEnrollAgentTags(t *testing.T) {
 			wantTags:     []string{"otel-collector", "dev", "west", "us-west-1a"},
 			otherNIAKeys: []string{string(semconv.HostNameKey)},
 		},
+		{
+			name:         "duplicate of agent type is removed",
+			tagsValue:    "otel-collector,dev",
+			wantTags:     []string{"otel-collector", "dev"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+		{
+			name:         "duplicate tags within list are removed",
+			tagsValue:    "dev,west,dev",
+			wantTags:     []string{"otel-collector", "dev", "west"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
