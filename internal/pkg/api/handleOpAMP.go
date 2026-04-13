@@ -37,6 +37,8 @@ import (
 const (
 	kOpAMPMod          = "opAMP"
 	statusDisconnected = "disconnected"
+	serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
+		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
 )
 
 type OpAMPT struct {
@@ -198,7 +200,9 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 		}
 
+		sendCapabilities := false
 		if agent == nil {
+			sendCapabilities = true
 			if agent, err = oa.enrollAgent(zlog, instanceUID.String(), message, apiKey); err != nil {
 				return &protobufs.ServerToAgent{
 					InstanceUid: instanceUID.Bytes(),
@@ -208,6 +212,8 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 					},
 				}
 			}
+		} else if !isActiveStatus(agent.LastCheckinStatus) {
+			sendCapabilities = true
 		}
 
 		if err := oa.updateAgent(zlog, agent, message); err != nil {
@@ -220,9 +226,11 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 		}
 
-		// Empty message for now since we're only using OpAMP for monitoring.
 		sToA := protobufs.ServerToAgent{
 			InstanceUid: instanceUID.Bytes(),
+		}
+		if sendCapabilities {
+			sToA.Capabilities = serverCapabilities
 		}
 
 		return &sToA
@@ -530,6 +538,10 @@ func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json
 	}
 
 	return json.RawMessage(b), nil
+}
+
+func isActiveStatus(status string) bool {
+	return status == "online" || status == "error" || status == "degraded"
 }
 
 // decodeCapabilities converts capability bitmask to human-readable strings

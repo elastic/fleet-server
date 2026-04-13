@@ -344,6 +344,102 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCapabilities(t *testing.T) {
+	const testAPIKeyID = "test-key"
+
+	cases := []struct {
+		name      string
+		getBulker func(t *testing.T) *ftesting.MockBulk
+		wantCaps  uint64
+	}{
+		{
+			name: "new enrollment sends capabilities",
+			getBulker: func(t *testing.T) *ftesting.MockBulk {
+				t.Helper()
+				bulker := ftesting.NewMockBulk()
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
+				enrollKey := model.EnrollmentAPIKey{
+					APIKeyID: testAPIKeyID,
+					PolicyID: "policy-123",
+					Active:   true,
+				}
+				enrollKeyBytes, err := json.Marshal(enrollKey)
+				require.NoError(t, err)
+				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
+					Return("doc-id", nil)
+				return bulker
+			},
+			wantCaps: serverCapabilities,
+		},
+		{
+			name: "offline agent sends capabilities",
+			getBulker: func(t *testing.T) *ftesting.MockBulk {
+				t.Helper()
+				bulker := ftesting.NewMockBulk()
+				agent := model.Agent{LastCheckinStatus: "offline"}
+				agentBytes, err := json.Marshal(agent)
+				require.NoError(t, err)
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+				return bulker
+			},
+			wantCaps: serverCapabilities,
+		},
+		{
+			name: "disconnected agent sends capabilities",
+			getBulker: func(t *testing.T) *ftesting.MockBulk {
+				t.Helper()
+				bulker := ftesting.NewMockBulk()
+				agent := model.Agent{LastCheckinStatus: "disconnected"}
+				agentBytes, err := json.Marshal(agent)
+				require.NoError(t, err)
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+				return bulker
+			},
+			wantCaps: serverCapabilities,
+		},
+		{
+			name: "online agent does not send capabilities",
+			getBulker: func(t *testing.T) *ftesting.MockBulk {
+				t.Helper()
+				bulker := ftesting.NewMockBulk()
+				agent := model.Agent{LastCheckinStatus: "online"}
+				agentBytes, err := json.Marshal(agent)
+				require.NoError(t, err)
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+				return bulker
+			},
+			wantCaps: 0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := tc.getBulker(t)
+			checker := &mockCheckin{}
+			oa := &OpAMPT{bulk: bulker, bc: checker}
+
+			agentUID := uuid.Must(uuid.NewV7())
+			zlog := zerolog.New(io.Discard)
+			apiKey := &apikey.APIKey{ID: testAPIKeyID}
+
+			handler := oa.handleMessage(zlog, apiKey)
+			msg := &protobufs.AgentToServer{
+				InstanceUid: agentUID.Bytes(),
+			}
+
+			resp := handler(t.Context(), nil, msg)
+
+			require.Nil(t, resp.ErrorResponse)
+			require.Equal(t, tc.wantCaps, resp.Capabilities)
+		})
+	}
+}
+
 type mockCheckin struct {
 	id   string
 	opts []checkin.Option
