@@ -138,12 +138,12 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 
-	enrollKey := model.EnrollmentAPIKey{ //nolint:gosec
+	enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // test data, not real credentials
 		APIKeyID: "enroll-key-id",
 		PolicyID: "policy-123",
 		Active:   true,
 	}
-	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec
+	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // test data, not real credentials
 	require.NoError(t, err)
 
 	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
@@ -264,12 +264,12 @@ func TestEnrollAgentTags(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
-			enrollKey := model.EnrollmentAPIKey{ //nolint:gosec
+			enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // test data, not real credentials
 				APIKeyID: "enroll-key-id",
 				PolicyID: "policy-123",
 				Active:   true,
 			}
-			enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec
+			enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // test data, not real credentials
 			require.NoError(t, err)
 			bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 				Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
