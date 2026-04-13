@@ -12,6 +12,14 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/gofrs/uuid/v5"
+
+	"github.com/open-telemetry/opamp-go/protobufs"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -19,11 +27,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
-	"github.com/open-telemetry/opamp-go/protobufs"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 )
 
 func TestFeatureFlag(t *testing.T) {
@@ -273,6 +276,72 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	require.NoError(t, json.Unmarshal(configBytes, &config))
 	require.Equal(t, "[REDACTED]", config["password"])
 	require.Equal(t, float64(2), config["num"])
+}
+
+func TestHandleMessageAgentDisconnect(t *testing.T) {
+	cases := []struct {
+		name      string
+		getBulker func(t *testing.T) *ftesting.MockBulk
+		wantError bool
+	}{
+		{
+			name: "enrolled agent sets status to offline",
+			getBulker: func(t *testing.T) *ftesting.MockBulk {
+				t.Helper()
+				bulker := ftesting.NewMockBulk()
+				agent := model.Agent{LastCheckinStatus: "online"}
+				agentBytes, err := json.Marshal(agent)
+				require.NoError(t, err)
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+				return bulker
+			},
+			wantError: false,
+		},
+		{
+			name: "unenrolled agent returns error",
+			getBulker: func(_ *testing.T) *ftesting.MockBulk {
+				bulker := ftesting.NewMockBulk()
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
+				return bulker
+			},
+			wantError: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := tc.getBulker(t)
+			checker := &mockCheckin{}
+			oa := &OpAMPT{bulk: bulker, bc: checker}
+
+			agentUID := uuid.Must(uuid.NewV7())
+			zlog := zerolog.New(io.Discard)
+			apiKey := &apikey.APIKey{ID: "test-key"}
+
+			handler := oa.handleMessage(zlog, apiKey)
+			msg := &protobufs.AgentToServer{
+				InstanceUid:     agentUID.Bytes(),
+				AgentDisconnect: &protobufs.AgentDisconnect{},
+			}
+
+			resp := handler(t.Context(), nil, msg)
+			require.Equal(t, agentUID.Bytes(), resp.InstanceUid)
+
+			if tc.wantError {
+				require.NotNil(t, resp.ErrorResponse)
+				require.Equal(t, protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest, resp.ErrorResponse.Type)
+				require.Empty(t, checker.id, "CheckIn should not be called for unenrolled agent")
+			} else {
+				require.Nil(t, resp.ErrorResponse)
+				require.Equal(t, uint64(0), resp.Capabilities)
+				require.Equal(t, agentUID.String(), checker.id)
+
+				pending := pendingFromOptions(t, checker.opts)
+				require.Equal(t, statusDisconnected, getUnexportedField(pending, "status").String())
+			}
+		})
+	}
 }
 
 type mockCheckin struct {
