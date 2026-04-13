@@ -20,7 +20,6 @@ Fleet-server operates in monitoring-only mode.
 - **No connection settings management.** The spec defines `ServerToAgent.connection_settings` for offering new connection settings, TLS certificates, etc.
 - **No package management.** The spec defines `ServerToAgent.packages_available` for offering downloadable packages and updates.
 - **No server-initiated commands.** The spec defines `ServerToAgent.command` (e.g., restart).
-- **No `ServerToAgent.flags`.** The spec defines `ReportFullState` for requesting full agent state re-delivery.
 - **No `ServerToAgent.agent_identification`.** The spec allows the server to reassign the agent's `instance_uid`.
 - **No custom messages.** The spec defines `custom_capabilities` and `custom_message` for extensible server-to-agent communication.
 

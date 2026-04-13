@@ -544,3 +544,305 @@ func getUnexportedField(v reflect.Value, name string) reflect.Value {
 	field := v.FieldByName(name)
 	return reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
 }
+
+func TestHasFullStatus(t *testing.T) {
+	baseCaps := uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus)
+
+	cases := []struct {
+		name string
+		msg  *protobufs.AgentToServer
+		want bool
+	}{
+		{
+			name: "capabilities unset",
+			msg: &protobufs.AgentToServer{
+				Capabilities:     0,
+				AgentDescription: &protobufs.AgentDescription{},
+				Health:           &protobufs.ComponentHealth{},
+			},
+			want: false,
+		},
+		{
+			name: "base fields only, no conditional capabilities",
+			msg: &protobufs.AgentToServer{
+				Capabilities:     baseCaps,
+				AgentDescription: &protobufs.AgentDescription{},
+				Health:           &protobufs.ComponentHealth{},
+			},
+			want: true,
+		},
+		{
+			name: "missing AgentDescription",
+			msg: &protobufs.AgentToServer{
+				Capabilities: baseCaps,
+				Health:       &protobufs.ComponentHealth{},
+			},
+			want: false,
+		},
+		{
+			name: "missing Health",
+			msg: &protobufs.AgentToServer{
+				Capabilities:     baseCaps,
+				AgentDescription: &protobufs.AgentDescription{},
+			},
+			want: false,
+		},
+		{
+			name: "ReportsEffectiveConfig capability without EffectiveConfig",
+			msg: &protobufs.AgentToServer{
+				Capabilities:     baseCaps | uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig),
+				AgentDescription: &protobufs.AgentDescription{},
+				Health:           &protobufs.ComponentHealth{},
+			},
+			want: false,
+		},
+		{
+			name: "ReportsEffectiveConfig capability with EffectiveConfig",
+			msg: &protobufs.AgentToServer{
+				Capabilities:     baseCaps | uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig),
+				AgentDescription: &protobufs.AgentDescription{},
+				Health:           &protobufs.ComponentHealth{},
+				EffectiveConfig:  &protobufs.EffectiveConfig{},
+			},
+			want: true,
+		},
+		{
+			name: "ReportsRemoteConfig capability without RemoteConfigStatus",
+			msg: &protobufs.AgentToServer{
+				Capabilities:     baseCaps | uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig),
+				AgentDescription: &protobufs.AgentDescription{},
+				Health:           &protobufs.ComponentHealth{},
+			},
+			want: false,
+		},
+		{
+			name: "ReportsPackageStatuses capability without PackageStatuses",
+			msg: &protobufs.AgentToServer{
+				Capabilities:     baseCaps | uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsPackageStatuses),
+				AgentDescription: &protobufs.AgentDescription{},
+				Health:           &protobufs.ComponentHealth{},
+			},
+			want: false,
+		},
+		{
+			name: "ReportsAvailableComponents capability without AvailableComponents",
+			msg: &protobufs.AgentToServer{
+				Capabilities:     baseCaps | uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents),
+				AgentDescription: &protobufs.AgentDescription{},
+				Health:           &protobufs.ComponentHealth{},
+			},
+			want: false,
+		},
+		{
+			name: "ReportsConnectionSettingsStatus capability without ConnectionSettingsStatus",
+			msg: &protobufs.AgentToServer{
+				Capabilities:     baseCaps | uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsConnectionSettingsStatus),
+				AgentDescription: &protobufs.AgentDescription{},
+				Health:           &protobufs.ComponentHealth{},
+			},
+			want: false,
+		},
+		{
+			name: "multiple capabilities all fields present",
+			msg: &protobufs.AgentToServer{
+				Capabilities: baseCaps |
+					uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig) |
+					uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig),
+				AgentDescription:   &protobufs.AgentDescription{},
+				Health:             &protobufs.ComponentHealth{},
+				EffectiveConfig:    &protobufs.EffectiveConfig{},
+				RemoteConfigStatus: &protobufs.RemoteConfigStatus{},
+			},
+			want: true,
+		},
+		{
+			name: "all fields missing",
+			msg:  &protobufs.AgentToServer{},
+			want: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, hasFullStatus(tc.msg))
+		})
+	}
+}
+
+func TestShouldRequestFullState(t *testing.T) {
+	baseCaps := uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus)
+
+	fullStatusMsg := func(seqNum uint64) *protobufs.AgentToServer {
+		return &protobufs.AgentToServer{
+			SequenceNum:      seqNum,
+			Capabilities:     baseCaps,
+			AgentDescription: &protobufs.AgentDescription{},
+			Health:           &protobufs.ComponentHealth{},
+		}
+	}
+
+	cases := []struct {
+		name          string
+		agent         *model.Agent
+		msg           *protobufs.AgentToServer
+		newlyEnrolled bool
+		want          bool
+	}{
+		{
+			name:          "sequence gap - missed message",
+			agent:         &model.Agent{SequenceNum: 5, LastCheckinStatus: "online"},
+			msg:           &protobufs.AgentToServer{SequenceNum: 7, Capabilities: baseCaps},
+			newlyEnrolled: false,
+			want:          true,
+		},
+		{
+			name:          "sequence gap - out of order",
+			agent:         &model.Agent{SequenceNum: 5, LastCheckinStatus: "online"},
+			msg:           &protobufs.AgentToServer{SequenceNum: 3, Capabilities: baseCaps},
+			newlyEnrolled: false,
+			want:          true,
+		},
+		{
+			name:          "no sequence gap - sequential",
+			agent:         &model.Agent{SequenceNum: 5, LastCheckinStatus: "online"},
+			msg:           fullStatusMsg(6),
+			newlyEnrolled: false,
+			want:          false,
+		},
+		{
+			name:          "new enrollment without full status",
+			agent:         &model.Agent{},
+			msg:           &protobufs.AgentToServer{SequenceNum: 1, Capabilities: baseCaps},
+			newlyEnrolled: true,
+			want:          true,
+		},
+		{
+			name:          "new enrollment with full status",
+			agent:         &model.Agent{},
+			msg:           fullStatusMsg(1),
+			newlyEnrolled: true,
+			want:          false,
+		},
+		{
+			name:          "reconnect from disconnect seq 0",
+			agent:         &model.Agent{LastCheckinStatus: "disconnected", SequenceNum: 10},
+			msg:           &protobufs.AgentToServer{SequenceNum: 0, Capabilities: baseCaps},
+			newlyEnrolled: false,
+			want:          false,
+		},
+		{
+			name:          "reconnect from disconnect seq continues",
+			agent:         &model.Agent{LastCheckinStatus: "disconnected", SequenceNum: 10},
+			msg:           &protobufs.AgentToServer{SequenceNum: 11, Capabilities: baseCaps},
+			newlyEnrolled: false,
+			want:          false,
+		},
+		{
+			name:          "reconnect from disconnect unexpected seq",
+			agent:         &model.Agent{LastCheckinStatus: "disconnected", SequenceNum: 10},
+			msg:           &protobufs.AgentToServer{SequenceNum: 5, Capabilities: baseCaps},
+			newlyEnrolled: false,
+			want:          true,
+		},
+		{
+			name:          "stored seq 0 incoming seq 0",
+			agent:         &model.Agent{SequenceNum: 0, LastCheckinStatus: "online"},
+			msg:           &protobufs.AgentToServer{SequenceNum: 0, Capabilities: baseCaps},
+			newlyEnrolled: false,
+			want:          true,
+		},
+		{
+			name:          "stored seq 0 incoming seq 1 - happy path",
+			agent:         &model.Agent{SequenceNum: 0, LastCheckinStatus: "online"},
+			msg:           fullStatusMsg(1),
+			newlyEnrolled: false,
+			want:          false,
+		},
+		{
+			name:          "online agent with gap",
+			agent:         &model.Agent{SequenceNum: 5, LastCheckinStatus: "online"},
+			msg:           &protobufs.AgentToServer{SequenceNum: 7, Capabilities: baseCaps},
+			newlyEnrolled: false,
+			want:          true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, shouldRequestFullState(tc.agent, tc.msg, tc.newlyEnrolled))
+		})
+	}
+}
+
+func TestHandleMessageReportFullState(t *testing.T) {
+	baseCaps := uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus)
+
+	//nolint:dupl // test cases
+	cases := []struct {
+		name      string
+		getBulker func(t *testing.T) *ftesting.MockBulk
+		msg       *protobufs.AgentToServer
+		wantFlags uint64
+	}{
+		{
+			name: "sequence gap sets ReportFullState flag",
+			getBulker: func(t *testing.T) *ftesting.MockBulk {
+				t.Helper()
+				bulker := ftesting.NewMockBulk()
+				agent := model.Agent{
+					LastCheckinStatus: "online",
+					SequenceNum:       5,
+				}
+				agentBytes, err := json.Marshal(agent)
+				require.NoError(t, err)
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+				return bulker
+			},
+			msg: &protobufs.AgentToServer{
+				SequenceNum:  7, // gap: expected 6
+				Capabilities: baseCaps,
+			},
+			wantFlags: uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState),
+		},
+		{
+			name: "sequential sequence number does not set flag",
+			getBulker: func(t *testing.T) *ftesting.MockBulk {
+				t.Helper()
+				bulker := ftesting.NewMockBulk()
+				agent := model.Agent{
+					LastCheckinStatus: "online",
+					SequenceNum:       5,
+				}
+				agentBytes, err := json.Marshal(agent)
+				require.NoError(t, err)
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+				return bulker
+			},
+			msg: &protobufs.AgentToServer{
+				SequenceNum:      6, // expected: 5 + 1
+				Capabilities:     baseCaps,
+				AgentDescription: &protobufs.AgentDescription{},
+				Health:           &protobufs.ComponentHealth{Healthy: true},
+			},
+			wantFlags: 0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := tc.getBulker(t)
+			checker := &mockCheckin{}
+			oa := &OpAMPT{bulk: bulker, bc: checker}
+
+			agentUID := uuid.Must(uuid.NewV7())
+			tc.msg.InstanceUid = agentUID.Bytes()
+			zlog := zerolog.New(io.Discard)
+			apiKey := &apikey.APIKey{ID: "test-key"}
+
+			handler := oa.handleMessage(zlog, apiKey)
+			resp := handler(t.Context(), nil, tc.msg)
+
+			require.Nil(t, resp.ErrorResponse)
+			require.Equal(t, tc.wantFlags, resp.Flags)
+		})
+	}
+}
