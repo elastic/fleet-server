@@ -36,7 +36,6 @@ import (
 
 const (
 	kOpAMPMod          = "opAMP"
-	statusDisconnected = "disconnected"
 	serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
 		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
 )
@@ -194,7 +193,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 				}
 			}
 			zlog.Debug().Msg("agent disconnect received")
-			_ = oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus(statusDisconnected))
+			_ = oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus(string(CheckinRequestStatusDisconnected)))
 			return &protobufs.ServerToAgent{
 				InstanceUid: instanceUID.Bytes(),
 			}
@@ -361,14 +360,14 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 
 	initialOpts := make([]checkin.Option, 0)
 
-	status := "online"
+	status := CheckinRequestStatusOnline
 
 	// Extract the health status from the health message if it exists.
 	if aToS.Health != nil {
 		if !aToS.Health.Healthy {
-			status = "error"
+			status = CheckinRequestStatusError
 		} else if aToS.Health.Status == "StatusRecoverableError" {
-			status = "degraded"
+			status = CheckinRequestStatusDegraded
 		}
 
 		// Extract the last_checkin_message from the health message if it exists.
@@ -384,7 +383,7 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 		initialOpts = append(initialOpts, checkin.WithHealth(healthBytes))
 	}
 
-	initialOpts = append(initialOpts, checkin.WithStatus(status))
+	initialOpts = append(initialOpts, checkin.WithStatus(string(status)))
 	initialOpts = append(initialOpts, checkin.WithSequenceNum(aToS.SequenceNum))
 
 	capabilities := decodeCapabilities(aToS.Capabilities)
@@ -541,7 +540,9 @@ func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json
 }
 
 func isActiveStatus(status string) bool {
-	return status == "online" || status == "error" || status == "degraded"
+	return status == string(CheckinRequestStatusOnline) ||
+		status == string(CheckinRequestStatusError) ||
+		status == string(CheckinRequestStatusDegraded)
 }
 
 // decodeCapabilities converts capability bitmask to human-readable strings

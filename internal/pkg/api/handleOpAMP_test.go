@@ -252,7 +252,7 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	require.Equal(t, "agent-123", checker.id)
 
 	pending := pendingFromOptions(t, checker.opts)
-	require.Equal(t, "degraded", getUnexportedField(pending, "status").String())
+	require.Equal(t, string(CheckinRequestStatusDegraded), getUnexportedField(pending, "status").String())
 	require.Equal(t, "boom", getUnexportedField(pending, "message").String())
 	require.Equal(t, uint64(7), getUnexportedField(pending, "sequenceNum").Uint())
 
@@ -289,7 +289,7 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 			getBulker: func(t *testing.T) *ftesting.MockBulk {
 				t.Helper()
 				bulker := ftesting.NewMockBulk()
-				agent := model.Agent{LastCheckinStatus: "online"}
+				agent := model.Agent{LastCheckinStatus: string(CheckinRequestStatusOnline)}
 				agentBytes, err := json.Marshal(agent)
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
@@ -338,7 +338,7 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 				require.Equal(t, agentUID.String(), checker.id)
 
 				pending := pendingFromOptions(t, checker.opts)
-				require.Equal(t, statusDisconnected, getUnexportedField(pending, "status").String())
+				require.Equal(t, string(CheckinRequestStatusDisconnected), getUnexportedField(pending, "status").String())
 			}
 		})
 	}
@@ -393,7 +393,7 @@ func TestHandleMessageCapabilities(t *testing.T) {
 			getBulker: func(t *testing.T) *ftesting.MockBulk {
 				t.Helper()
 				bulker := ftesting.NewMockBulk()
-				agent := model.Agent{LastCheckinStatus: "disconnected"}
+				agent := model.Agent{LastCheckinStatus: string(CheckinRequestStatusDisconnected)}
 				agentBytes, err := json.Marshal(agent)
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
@@ -407,7 +407,7 @@ func TestHandleMessageCapabilities(t *testing.T) {
 			getBulker: func(t *testing.T) *ftesting.MockBulk {
 				t.Helper()
 				bulker := ftesting.NewMockBulk()
-				agent := model.Agent{LastCheckinStatus: "online"}
+				agent := model.Agent{LastCheckinStatus: string(CheckinRequestStatusOnline)}
 				agentBytes, err := json.Marshal(agent)
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
