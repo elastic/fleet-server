@@ -25,14 +25,16 @@ func TestDispatchAbortQueueFreesBlk(t *testing.T) {
 	cancel()
 
 	blk := b.newBlk(ActionSearch, optionsT{})
-	blk.buf.WriteString(`{"index":"test"}`)
+	_, err := blk.buf.WriteString(`{"index":"test"}`)
+	require.NoError(t, err)
 
 	resp := b.dispatch(ctx, blk)
 	require.Error(t, resp.err, "expected error from cancelled context")
 
 	// blk should have been returned to the pool. Getting from the pool should
 	// return the same (reset) object without a new allocation.
-	reused := b.blkPool.Get().(*bulkT)
+	reused, ok := b.blkPool.Get().(*bulkT)
+	require.True(t, ok)
 	require.Zero(t, reused.buf.Len(), "expected reused blk to have reset buf")
 	require.Zero(t, reused.action, "expected reused blk to have reset action")
 }
@@ -46,7 +48,8 @@ func TestDispatchAbortResponseReachesSecondSelect(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	blk := b.newBlk(ActionSearch, optionsT{})
-	blk.buf.WriteString(`{"index":"test"}`)
+	_, err := blk.buf.WriteString(`{"index":"test"}`)
+	require.NoError(t, err)
 
 	// Drain b.ch and signal once dispatch has enqueued. After this signal,
 	// dispatch is guaranteed to be in (or about to enter) its second
@@ -83,7 +86,8 @@ func TestDrainAndFreeAbortedBlkResponse(t *testing.T) {
 	b := NewBulker(nil, nil, WithBlockQueueSize(1))
 
 	blk := b.newBlk(ActionSearch, optionsT{})
-	blk.buf.WriteString(`{"index":"test"}`)
+	_, err := blk.buf.WriteString(`{"index":"test"}`)
+	require.NoError(t, err)
 	require.NotZero(t, blk.action)
 	require.NotZero(t, blk.buf.Len())
 
@@ -107,7 +111,8 @@ func TestDispatchSuccess(t *testing.T) {
 
 	ctx := context.Background()
 	blk := b.newBlk(ActionSearch, optionsT{})
-	blk.buf.WriteString(`{"index":"test"}`)
+	_, err := blk.buf.WriteString(`{"index":"test"}`)
+	require.NoError(t, err)
 
 	// Simulate a fast ES response: send response before timeout.
 	go func() {

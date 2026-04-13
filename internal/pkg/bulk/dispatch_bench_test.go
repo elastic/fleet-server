@@ -26,7 +26,7 @@ func BenchmarkDispatchAbortQueue(b *testing.B) {
 
 	for b.Loop() {
 		blk := bulker.newBlk(ActionSearch, optionsT{})
-		blk.buf.WriteString(`{"index":"test"}`)
+		_, _ = blk.buf.WriteString(`{"index":"test"}`)
 		bulker.dispatch(ctx, blk)
 	}
 }
@@ -61,7 +61,7 @@ func BenchmarkDispatchAbortResponse(b *testing.B) {
 
 	for b.Loop() {
 		blk := bulker.newBlk(ActionSearch, optionsT{})
-		blk.buf.WriteString(`{"index":"test"}`)
+		_, _ = blk.buf.WriteString(`{"index":"test"}`)
 		bulker.dispatch(ctx, blk)
 	}
 }
@@ -75,7 +75,7 @@ func BenchmarkDispatchSuccess(b *testing.B) {
 
 	for b.Loop() {
 		blk := bulker.newBlk(ActionSearch, optionsT{})
-		blk.buf.WriteString(`{"index":"test"}`)
+		_, _ = blk.buf.WriteString(`{"index":"test"}`)
 
 		// Simulate the Run loop: drain channel and respond.
 		go func() {
