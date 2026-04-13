@@ -141,12 +141,12 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 
-	enrollKey := model.EnrollmentAPIKey{
+	enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
 		APIKeyID: "enroll-key-id",
 		PolicyID: "policy-123",
 		Active:   true,
 	}
-	enrollKeyBytes, err := json.Marshal(enrollKey)
+	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
 	require.NoError(t, err)
 
 	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
@@ -364,7 +364,7 @@ func TestHandleMessageCapabilities(t *testing.T) {
 					PolicyID: "policy-123",
 					Active:   true,
 				}
-				enrollKeyBytes, err := json.Marshal(enrollKey)
+				enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
