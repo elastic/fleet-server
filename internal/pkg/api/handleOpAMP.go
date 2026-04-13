@@ -538,7 +538,7 @@ func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json
 func decodeCapabilities(caps uint64) []string {
 	var result []string
 	for mask, name := range protobufs.AgentCapabilities_name {
-		if caps&uint64(mask) != 0 {
+		if caps&uint64(mask) != 0 { //nolint:gosec // mask values are not negative so no overflow is possible here
 			result = append(result, strings.TrimPrefix(name, "AgentCapabilities_"))
 		}
 	}
