@@ -412,6 +412,7 @@ components:
             - error
             - degraded
             - starting
+            - disconnected # special state added for opamp compatibility
         message:
           description: State message, may be overridden or use the error message of a failing component.
           type: string
