@@ -1,7 +1,5 @@
 # OpAMP
 
-<<<<<<< HEAD
-=======
 ## Implementation differences from the OpAMP specification
 
 Fleet-server implements a subset of the [OpAMP specification](https://github.com/open-telemetry/opamp-spec/blob/main/specification.md) focused on monitoring. The following describes how our implementation differs from the spec.
@@ -58,7 +56,6 @@ The following fields are ignored:
 
 ## Setup
 
->>>>>>> b8a9404 (fix: handle OpAMP AgentDisconnect message (#6792))
 This section describes how to connect a OpenTelemetry Collector instance to Fleet Server over OpAMP.
 
 1. Create a deployment in Elastic Cloud.  Integrations Server is not needed as we will instead be
