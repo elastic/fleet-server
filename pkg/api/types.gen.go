@@ -59,10 +59,11 @@ const (
 
 // Defines values for CheckinRequestStatus.
 const (
-	CheckinRequestStatusDegraded CheckinRequestStatus = "degraded"
-	CheckinRequestStatusError    CheckinRequestStatus = "error"
-	CheckinRequestStatusOnline   CheckinRequestStatus = "online"
-	CheckinRequestStatusStarting CheckinRequestStatus = "starting"
+	CheckinRequestStatusDegraded     CheckinRequestStatus = "degraded"
+	CheckinRequestStatusDisconnected CheckinRequestStatus = "disconnected"
+	CheckinRequestStatusError        CheckinRequestStatus = "error"
+	CheckinRequestStatusOnline       CheckinRequestStatus = "online"
+	CheckinRequestStatusStarting     CheckinRequestStatus = "starting"
 )
 
 // Defines values for EnrollRequestType.
