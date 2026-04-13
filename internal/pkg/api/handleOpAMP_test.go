@@ -279,6 +279,7 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 }
 
 func TestHandleMessageAgentDisconnect(t *testing.T) {
+	//nolint:dupl // test cases
 	cases := []struct {
 		name      string
 		getBulker func(t *testing.T) *ftesting.MockBulk
@@ -347,6 +348,7 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 func TestHandleMessageCapabilities(t *testing.T) {
 	const testAPIKeyID = "test-key"
 
+	//nolint:dupl // test cases
 	cases := []struct {
 		name      string
 		getBulker func(t *testing.T) *ftesting.MockBulk
