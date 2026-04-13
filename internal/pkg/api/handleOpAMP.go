@@ -379,8 +379,10 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 	initialOpts = append(initialOpts, checkin.WithStatus(status))
 	initialOpts = append(initialOpts, checkin.WithSequenceNum(aToS.SequenceNum))
 
-	capabilities := decodeCapabilities(aToS.Capabilities)
-	initialOpts = append(initialOpts, checkin.WithCapabilities(capabilities))
+	if aToS.Capabilities != 0 {
+		capabilities := decodeCapabilities(aToS.Capabilities)
+		initialOpts = append(initialOpts, checkin.WithCapabilities(capabilities))
+	}
 
 	if aToS.EffectiveConfig != nil {
 		effectiveConfigBytes, err := ParseEffectiveConfig(aToS.EffectiveConfig)
@@ -535,17 +537,9 @@ func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json
 // decodeCapabilities converts capability bitmask to human-readable strings
 func decodeCapabilities(caps uint64) []string {
 	var result []string
-	capMap := map[uint64]string{
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus):              "ReportsStatus",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig):        "AcceptsRemoteConfig",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig):     "ReportsEffectiveConfig",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth):              "ReportsHealth",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents): "ReportsAvailableComponents",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRestartCommand):      "AcceptsRestartCommand",
-	}
-	for mask, name := range capMap {
-		if caps&mask != 0 {
-			result = append(result, name)
+	for mask, name := range protobufs.AgentCapabilities_name {
+		if caps&uint64(mask) != 0 {
+			result = append(result, strings.TrimPrefix(name, "AgentCapabilities_"))
 		}
 	}
 	return result
