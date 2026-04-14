@@ -1,4 +1,4 @@
 kind: bug-fix
-summary: Set ReportFullState flag in OpAMP responses when drift is detected per the spec
+summary: Always Set ReportFullState flag in OpAMP responses
 component: fleet-server
 issue: https://github.com/elastic/fleet-server/issues/6783
