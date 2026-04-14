@@ -217,8 +217,8 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			sendCapabilities = true
 		}
 
-		if !newlyEnrolled && message.SequenceNum != uint64(agent.SequenceNum)+1 {
-			zlog.Warn().
+		if !newlyEnrolled && message.SequenceNum != uint64(agent.SequenceNum)+1 { //nolint:gosec // agent seq num will not be negative
+			zlog.Debug().
 				Int64("stored_seq", agent.SequenceNum).
 				Uint64("msg_seq", message.SequenceNum).
 				Str("last_status", agent.LastCheckinStatus).
