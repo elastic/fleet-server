@@ -217,7 +217,13 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			sendCapabilities = true
 		}
 
-		requestFullState := shouldRequestFullState(agent, message, newlyEnrolled)
+		if !newlyEnrolled && message.SequenceNum != uint64(agent.SequenceNum)+1 {
+			zlog.Warn().
+				Int64("stored_seq", agent.SequenceNum).
+				Uint64("msg_seq", message.SequenceNum).
+				Str("last_status", agent.LastCheckinStatus).
+				Msg("sequence number drift detected")
+		}
 
 		if err := oa.updateAgent(zlog, agent, message); err != nil {
 			return &protobufs.ServerToAgent{
@@ -231,19 +237,10 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 
 		sToA := protobufs.ServerToAgent{
 			InstanceUid: instanceUID.Bytes(),
+			Flags:       uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState),
 		}
 		if sendCapabilities {
 			sToA.Capabilities = serverCapabilities
-		}
-
-		if requestFullState {
-			sToA.Flags |= uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState)
-			zlog.Debug().
-				Int64("stored_seq", agent.SequenceNum).
-				Uint64("msg_seq", message.SequenceNum).
-				Bool("newly_enrolled", newlyEnrolled).
-				Str("last_status", agent.LastCheckinStatus).
-				Msg("requesting full state report from agent")
 		}
 
 		return &sToA
@@ -559,58 +556,6 @@ func isActiveStatus(status string) bool {
 	return status == string(CheckinRequestStatusOnline) ||
 		status == string(CheckinRequestStatusError) ||
 		status == string(CheckinRequestStatusDegraded)
-}
-
-// hasFullStatus returns true if the AgentToServer message includes all fields
-// expected for a complete status report given the agent's declared capabilities.
-// Capabilities must be non-zero. AgentDescription and Health are always required.
-// Each "Reports*" capability implies its corresponding field must be present.
-func hasFullStatus(aToS *protobufs.AgentToServer) bool {
-	if aToS.Capabilities == 0 {
-		return false
-	}
-	if aToS.AgentDescription == nil || aToS.Health == nil {
-		return false
-	}
-
-	caps := aToS.Capabilities
-	checks := []struct {
-		cap   uint64
-		field bool // true if the field IS present
-	}{
-		{uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig), aToS.EffectiveConfig != nil},
-		{uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig), aToS.RemoteConfigStatus != nil},
-		{uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsPackageStatuses), aToS.PackageStatuses != nil},
-		{uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents), aToS.AvailableComponents != nil},
-		{uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsConnectionSettingsStatus), aToS.ConnectionSettingsStatus != nil},
-	}
-	for _, c := range checks {
-		if caps&c.cap != 0 && !c.field {
-			return false
-		}
-	}
-	return true
-}
-
-// shouldRequestFullState determines whether the server should set the
-// ReportFullState flag in its response. False positives are harmless (the agent
-// resends full state) and expected when the stored sequence number lags due to
-// batched writes (flush interval is ~10s).
-func shouldRequestFullState(agent *model.Agent, aToS *protobufs.AgentToServer, newlyEnrolled bool) bool {
-	// Newly enrolled agent should send full status on first message.
-	if newlyEnrolled {
-		return !hasFullStatus(aToS)
-	}
-
-	// Sequence gap: seq_num is not exactly stored + 1.
-	// Disconnected agents are exempt if seq is 0 (known restart) or continues normally.
-	var storedSeq uint64
-	if agent.SequenceNum > 0 {
-		storedSeq = uint64(agent.SequenceNum)
-	}
-	hasGap := aToS.SequenceNum != storedSeq+1
-	isRestart := agent.LastCheckinStatus == string(CheckinRequestStatusDisconnected) && aToS.SequenceNum == 0
-	return hasGap && !isRestart
 }
 
 // decodeCapabilities converts capability bitmask to human-readable strings
