@@ -35,8 +35,9 @@ import (
 )
 
 const (
-	kOpAMPMod          = "opAMP"
-	serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
+	kOpAMPMod                    = "opAMP"
+	healthStatusRecoverableError = "StatusRecoverableError"
+	serverCapabilities           = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
 		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
 	tagsKey = "tags"
 )
@@ -248,9 +249,10 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 				Msg("sequence number drift detected")
 		}
 
-		// If the agent has request a new ID, and has not enrolled with this message we must reassign the ID
+		// If the agent has requested a new ID and has not enrolled with this message we must reassign the ID.
+		// reassignAgentID also applies the checkin fields from the message, so updateAgent is skipped.
 		if newInstanceUID != nil && newInstanceUID.String() != agent.Id {
-			if err := oa.reassignAgentID(ctx, zlog, agent, newInstanceUID.String()); err != nil {
+			if err := oa.reassignAgentID(ctx, zlog, agent, newInstanceUID.String(), message); err != nil {
 				return &protobufs.ServerToAgent{
 					InstanceUid: instanceUID.Bytes(),
 					ErrorResponse: &protobufs.ServerErrorResponse{
@@ -259,9 +261,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 					},
 				}
 			}
-		}
-
-		if err := oa.updateAgent(zlog, agent, message); err != nil {
+		} else if err := oa.updateAgent(zlog, agent, message); err != nil {
 			return &protobufs.ServerToAgent{
 				InstanceUid: instanceUID.Bytes(),
 				ErrorResponse: &protobufs.ServerErrorResponse{
@@ -313,10 +313,10 @@ func (oa *OpAMPT) findEnrolledAgent(ctx context.Context, zlog zerolog.Logger, ag
 }
 
 // reassignAgentID persists a new agent document under newID (copying the
-// existing agent data) and deletes the old document. The in-memory agent
-// model is updated so that subsequent operations (checkin, etc.) use the
-// new ID.
-func (oa *OpAMPT) reassignAgentID(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, newID string) error {
+// existing agent data) and deletes the old document. The checkin fields
+// from the AgentToServer message are applied to the agent before creating
+// the new document so that a separate updateAgent call is not needed.
+func (oa *OpAMPT) reassignAgentID(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, newID string, aToS *protobufs.AgentToServer) error {
 	oldID := agent.Id
 	zlog.Debug().
 		Str("old_id", oldID).
@@ -339,6 +339,46 @@ func (oa *OpAMPT) reassignAgentID(ctx context.Context, zlog zerolog.Logger, agen
 		}
 	}
 
+	// Apply checkin fields from the message so we don't need a separate updateAgent call.
+	now := time.Now().UTC().Format(time.RFC3339)
+	agent.LastCheckin = now
+	agent.UpdatedAt = now
+	agent.SequenceNum = int64(aToS.SequenceNum) //nolint:gosec // sequence numbers are not negative so no overflow is possible here
+
+	status := CheckinRequestStatusOnline
+	if aToS.Health != nil {
+		if !aToS.Health.Healthy {
+			status = CheckinRequestStatusError
+		} else if aToS.Health.Status == healthStatusRecoverableError {
+			status = CheckinRequestStatusDegraded
+		}
+		if aToS.Health.LastError != "" {
+			agent.LastCheckinMessage = aToS.Health.LastError
+		} else {
+			agent.LastCheckinMessage = aToS.Health.Status
+		}
+		healthBytes, err := json.Marshal(aToS.Health)
+		if err != nil {
+			return fmt.Errorf("failed to marshal health: %w", err)
+		}
+		agent.Health = healthBytes
+	}
+	agent.LastCheckinStatus = string(status)
+
+	if aToS.Capabilities != 0 {
+		agent.Capabilities = decodeCapabilities(aToS.Capabilities)
+	}
+
+	if aToS.EffectiveConfig != nil {
+		effectiveConfigBytes, err := ParseEffectiveConfig(aToS.EffectiveConfig)
+		if err != nil {
+			return fmt.Errorf("failed to parse effective config: %w", err)
+		}
+		if effectiveConfigBytes != nil {
+			agent.EffectiveConfig = effectiveConfigBytes
+		}
+	}
+
 	// Create a new agent document under the new ID.
 	data, err := json.Marshal(agent)
 	if err != nil {
@@ -355,7 +395,7 @@ func (oa *OpAMPT) reassignAgentID(ctx context.Context, zlog zerolog.Logger, agen
 		zlog.Warn().Err(err).Str("old_id", oldID).Str("new_id", newID).Msg("failed to delete old agent document after ID reassignment")
 	}
 
-	// Update the in-memory ID so that updateAgent/checkin targets the new document.
+	// Update the in-memory ID.
 	agent.Id = newID
 
 	return nil
@@ -480,7 +520,7 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 	if aToS.Health != nil {
 		if !aToS.Health.Healthy {
 			status = CheckinRequestStatusError
-		} else if aToS.Health.Status == "StatusRecoverableError" {
+		} else if aToS.Health.Status == healthStatusRecoverableError {
 			status = CheckinRequestStatusDegraded
 		}
 

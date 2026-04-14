@@ -552,6 +552,7 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 		flags                   uint64
 		getBulker               func(t *testing.T) *ftesting.MockBulk
 		wantAgentIdentification bool
+		wantCheckinSkipped      bool // true when reassignAgentID handles the update
 	}{
 		{
 			name:  "enrolled agent with RequestInstanceUid flag gets new UID",
@@ -572,6 +573,7 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 				return bulker
 			},
 			wantAgentIdentification: true,
+			wantCheckinSkipped:      true,
 		},
 		{
 			name:  "new enrollment with RequestInstanceUid flag gets new UID",
@@ -639,10 +641,14 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 				newUID, err := uuid.FromBytes(resp.AgentIdentification.NewInstanceUid)
 				require.NoError(t, err)
 				require.NotEqual(t, agentUID, newUID, "new instance UID must differ from original")
-				// Verify checkin was called with the new ID, not the original
-				require.Equal(t, newUID.String(), checker.id, "checkin should use the new instance UID")
 			} else {
 				require.Nil(t, resp.AgentIdentification)
+			}
+
+			if tc.wantCheckinSkipped {
+				require.Empty(t, checker.id, "checkin should not be called when reassignAgentID handles the update")
+			} else {
+				require.NotEmpty(t, checker.id, "checkin should be called")
 			}
 		})
 	}
@@ -745,7 +751,27 @@ func TestReassignAgentID(t *testing.T) {
 	oa := &OpAMPT{bulk: bulker}
 	zlog := zerolog.New(io.Discard)
 
-	require.NoError(t, oa.reassignAgentID(t.Context(), zlog, agent, newID))
+	msg := &protobufs.AgentToServer{
+		SequenceNum: 5,
+		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) |
+			uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
+		Health: &protobufs.ComponentHealth{
+			Healthy:   false,
+			LastError: "disk full",
+		},
+		EffectiveConfig: &protobufs.EffectiveConfig{
+			ConfigMap: &protobufs.AgentConfigMap{
+				ConfigMap: map[string]*protobufs.AgentConfigFile{
+					"": {
+						Body:        []byte("num: 42\n"),
+						ContentType: "text/yaml",
+					},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, oa.reassignAgentID(t.Context(), zlog, agent, newID, msg))
 
 	// Verify Create was called with the new ID
 	require.Equal(t, newID, createdID)
@@ -761,6 +787,20 @@ func TestReassignAgentID(t *testing.T) {
 	require.Equal(t, newID, meta.Elastic.Agent.ID)
 	require.Equal(t, "1.0.0", meta.Elastic.Agent.Version, "other metadata fields should be preserved")
 	require.Equal(t, "host-1", meta.Host.Hostname, "other metadata fields should be preserved")
+
+	// Verify checkin fields were applied to the created document
+	require.Equal(t, string(CheckinRequestStatusError), createdAgent.LastCheckinStatus)
+	require.Equal(t, "disk full", createdAgent.LastCheckinMessage)
+	require.NotEmpty(t, createdAgent.LastCheckin)
+	require.NotEmpty(t, createdAgent.UpdatedAt)
+	require.Equal(t, int64(5), createdAgent.SequenceNum)
+	require.ElementsMatch(t, []string{"ReportsHealth", "AcceptsRemoteConfig"}, createdAgent.Capabilities)
+	require.NotNil(t, createdAgent.Health)
+	require.NotNil(t, createdAgent.EffectiveConfig)
+
+	var config map[string]interface{}
+	require.NoError(t, json.Unmarshal(createdAgent.EffectiveConfig, &config))
+	require.Equal(t, float64(42), config["num"])
 
 	// Verify in-memory agent was updated
 	require.Equal(t, newID, agent.Id)
