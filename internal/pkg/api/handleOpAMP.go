@@ -35,13 +35,9 @@ import (
 )
 
 const (
-<<<<<<< HEAD
-	kOpAMPMod = "opAMP"
-=======
 	kOpAMPMod          = "opAMP"
 	serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
 		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
->>>>>>> bc20c8b (fix: report server capabilities in OpAMP responses (#6829))
 )
 
 type OpAMPT struct {
@@ -183,8 +179,6 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			Bool("is_enrolled", agent != nil).
 			Msg("agent enrollment status")
 
-<<<<<<< HEAD
-=======
 		// Handle agent disconnect: set status to offline for enrolled agents,
 		// return an error for unenrolled agents.
 		if message.AgentDisconnect != nil {
@@ -206,7 +200,6 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		}
 
 		sendCapabilities := false
->>>>>>> bc20c8b (fix: report server capabilities in OpAMP responses (#6829))
 		if agent == nil {
 			sendCapabilities = true
 			if agent, err = oa.enrollAgent(zlog, instanceUID.String(), message, apiKey); err != nil {
