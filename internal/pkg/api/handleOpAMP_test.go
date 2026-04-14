@@ -590,11 +590,9 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
-				// enrollAgent Create + reassignAgentID Create
+				// Only enrollAgent Create — no reassignAgentID since enrollment uses the new UID directly
 				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
 					Return("doc-id", nil)
-				bulker.On("Delete", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-					Return(nil)
 				return bulker
 			},
 			wantAgentIdentification: true,
@@ -648,6 +646,65 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandleMessageNewEnrollmentWithRequestInstanceUid(t *testing.T) {
+	const testAPIKeyID = "test-key"
+
+	bulker := ftesting.NewMockBulk()
+	// Agent not found — triggers enrollment
+	bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
+	enrollKey := model.EnrollmentAPIKey{
+		APIKeyID: testAPIKeyID,
+		PolicyID: "policy-123",
+		Active:   true,
+	}
+	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
+	require.NoError(t, err)
+	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
+		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+
+	var enrolledID string
+	bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			id, ok := args.Get(2).(string)
+			require.True(t, ok)
+			enrolledID = id
+		}).
+		Return("doc-id", nil)
+
+	checker := &mockCheckin{}
+	oa := &OpAMPT{bulk: bulker, bc: checker}
+
+	agentUID := uuid.Must(uuid.NewV7())
+	zlog := zerolog.New(io.Discard)
+	apiKey := &apikey.APIKey{ID: testAPIKeyID}
+
+	handler := oa.handleMessage(zlog, apiKey)
+	msg := &protobufs.AgentToServer{
+		InstanceUid: agentUID.Bytes(),
+		Flags:       uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid),
+	}
+
+	resp := handler(t.Context(), nil, msg)
+
+	require.Nil(t, resp.ErrorResponse)
+	require.NotNil(t, resp.AgentIdentification)
+
+	newUID, err := uuid.FromBytes(resp.AgentIdentification.NewInstanceUid)
+	require.NoError(t, err)
+	require.NotEqual(t, agentUID, newUID)
+
+	// Enrollment should use the new UID, not the original instance UID
+	require.Equal(t, newUID.String(), enrolledID, "enrollment should use the new instance UID")
+
+	// Checkin should also use the new UID
+	require.Equal(t, newUID.String(), checker.id, "checkin should use the new instance UID")
+
+	// reassignAgentID should not be called — no Delete expected
+	bulker.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	bulker.AssertExpectations(t)
 }
 
 func TestReassignAgentID(t *testing.T) {
