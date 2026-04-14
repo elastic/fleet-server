@@ -564,6 +564,11 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
 					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+				// reassignAgentID creates the new doc and deletes the old one
+				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
+					Return("doc-id", nil)
+				bulker.On("Delete", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(nil)
 				return bulker
 			},
 			wantAgentIdentification: true,
@@ -585,8 +590,11 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+				// enrollAgent Create + reassignAgentID Create
 				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
 					Return("doc-id", nil)
+				bulker.On("Delete", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(nil)
 				return bulker
 			},
 			wantAgentIdentification: true,
@@ -633,11 +641,75 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 				newUID, err := uuid.FromBytes(resp.AgentIdentification.NewInstanceUid)
 				require.NoError(t, err)
 				require.NotEqual(t, agentUID, newUID, "new instance UID must differ from original")
+				// Verify checkin was called with the new ID, not the original
+				require.Equal(t, newUID.String(), checker.id, "checkin should use the new instance UID")
 			} else {
 				require.Nil(t, resp.AgentIdentification)
 			}
 		})
 	}
+}
+
+func TestReassignAgentID(t *testing.T) {
+	oldID := "old-agent-id"
+	newID := "new-agent-id"
+
+	localMeta := localMetadata{}
+	localMeta.Elastic.Agent.ID = oldID
+	localMeta.Elastic.Agent.Version = "1.0.0"
+	localMeta.Host.Hostname = "host-1"
+	metaBytes, err := json.Marshal(localMeta)
+	require.NoError(t, err)
+
+	agent := &model.Agent{
+		ESDocument:    model.ESDocument{Id: oldID},
+		Active:        true,
+		PolicyID:      "policy-123",
+		Agent:         &model.AgentMetadata{ID: oldID, Version: "1.0.0"},
+		LocalMetadata: metaBytes,
+	}
+
+	var createdID string
+	var createdBody []byte
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			id, ok := args.Get(2).(string)
+			require.True(t, ok)
+			createdID = id
+			body, ok := args.Get(3).([]byte)
+			require.True(t, ok)
+			createdBody = body
+		}).
+		Return("doc-id", nil)
+	bulker.On("Delete", mock.Anything, dl.FleetAgents, oldID, mock.Anything).
+		Return(nil)
+
+	oa := &OpAMPT{bulk: bulker}
+	zlog := zerolog.New(io.Discard)
+
+	require.NoError(t, oa.reassignAgentID(t.Context(), zlog, agent, newID))
+
+	// Verify Create was called with the new ID
+	require.Equal(t, newID, createdID)
+
+	// Verify the created document body has the updated agent.id
+	var createdAgent model.Agent
+	require.NoError(t, json.Unmarshal(createdBody, &createdAgent))
+	require.Equal(t, newID, createdAgent.Agent.ID)
+
+	// Verify the local metadata was updated
+	var meta localMetadata
+	require.NoError(t, json.Unmarshal(createdAgent.LocalMetadata, &meta))
+	require.Equal(t, newID, meta.Elastic.Agent.ID)
+	require.Equal(t, "1.0.0", meta.Elastic.Agent.Version, "other metadata fields should be preserved")
+	require.Equal(t, "host-1", meta.Host.Hostname, "other metadata fields should be preserved")
+
+	// Verify in-memory agent was updated
+	require.Equal(t, newID, agent.Id)
+	require.Equal(t, newID, agent.Agent.ID)
+
+	bulker.AssertExpectations(t)
 }
 
 type mockCheckin struct {
