@@ -29,7 +29,6 @@ The following fields are ignored:
 
 - `remote_config_status`
 - `package_statuses`
-- `flags` (e.g., `RequestInstanceUid`)
 - `connection_settings_request`
 - `available_components`
 - `connection_settings_status`

@@ -164,6 +164,24 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		zlog.Debug().
 			Msg("received AgentToServer message from agent")
 
+		// Check if the agent requested a new instance UID per the OpAMP spec.
+		var newInstanceUID *uuid.UUID
+		if message.Flags&uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid) != 0 {
+			uid, err := uuid.NewV7()
+			if err != nil {
+				zlog.Error().Err(err).Msg("failed to generate new instance UID")
+				return &protobufs.ServerToAgent{
+					InstanceUid: instanceUID.Bytes(),
+					ErrorResponse: &protobufs.ServerErrorResponse{
+						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
+						ErrorMessage: "failed to generate new instance UID",
+					},
+				}
+			}
+			newInstanceUID = &uid
+			zlog.Debug().Str("opamp.agent.new_uid", uid.String()).Msg("agent requested new instance UID")
+		}
+
 		// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
 		agent, err := oa.findEnrolledAgent(ctx, zlog, instanceUID.String())
 		if err != nil {
@@ -242,6 +260,11 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		}
 		if sendCapabilities {
 			sToA.Capabilities = serverCapabilities
+		}
+		if newInstanceUID != nil {
+			sToA.AgentIdentification = &protobufs.AgentIdentification{
+				NewInstanceUid: newInstanceUID.Bytes(),
+			}
 		}
 
 		return &sToA

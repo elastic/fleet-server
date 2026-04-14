@@ -543,6 +543,103 @@ func TestHandleMessageCapabilities(t *testing.T) {
 	}
 }
 
+func TestHandleMessageRequestInstanceUid(t *testing.T) {
+	const testAPIKeyID = "test-key"
+
+	//nolint:dupl // test cases reuse bulker setup patterns from other handler tests
+	cases := []struct {
+		name                    string
+		flags                   uint64
+		getBulker               func(t *testing.T) *ftesting.MockBulk
+		wantAgentIdentification bool
+	}{
+		{
+			name:  "enrolled agent with RequestInstanceUid flag gets new UID",
+			flags: uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid),
+			getBulker: func(t *testing.T) *ftesting.MockBulk {
+				t.Helper()
+				bulker := ftesting.NewMockBulk()
+				agent := model.Agent{LastCheckinStatus: string(CheckinRequestStatusOnline)}
+				agentBytes, err := json.Marshal(agent)
+				require.NoError(t, err)
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+				return bulker
+			},
+			wantAgentIdentification: true,
+		},
+		{
+			name:  "new enrollment with RequestInstanceUid flag gets new UID",
+			flags: uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid),
+			getBulker: func(t *testing.T) *ftesting.MockBulk {
+				t.Helper()
+				bulker := ftesting.NewMockBulk()
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
+				enrollKey := model.EnrollmentAPIKey{
+					APIKeyID: testAPIKeyID,
+					PolicyID: "policy-123",
+					Active:   true,
+				}
+				enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
+				require.NoError(t, err)
+				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
+					Return("doc-id", nil)
+				return bulker
+			},
+			wantAgentIdentification: true,
+		},
+		{
+			name:  "enrolled agent without flag does not get AgentIdentification",
+			flags: 0,
+			getBulker: func(t *testing.T) *ftesting.MockBulk {
+				t.Helper()
+				bulker := ftesting.NewMockBulk()
+				agent := model.Agent{LastCheckinStatus: string(CheckinRequestStatusOnline)}
+				agentBytes, err := json.Marshal(agent)
+				require.NoError(t, err)
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+				return bulker
+			},
+			wantAgentIdentification: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := tc.getBulker(t)
+			checker := &mockCheckin{}
+			oa := &OpAMPT{bulk: bulker, bc: checker}
+
+			agentUID := uuid.Must(uuid.NewV7())
+			zlog := zerolog.New(io.Discard)
+			apiKey := &apikey.APIKey{ID: testAPIKeyID}
+
+			handler := oa.handleMessage(zlog, apiKey)
+			msg := &protobufs.AgentToServer{
+				InstanceUid: agentUID.Bytes(),
+				Flags:       tc.flags,
+			}
+
+			resp := handler(t.Context(), nil, msg)
+
+			require.Nil(t, resp.ErrorResponse)
+			require.Equal(t, agentUID.Bytes(), resp.InstanceUid)
+
+			if tc.wantAgentIdentification {
+				require.NotNil(t, resp.AgentIdentification)
+				newUID, err := uuid.FromBytes(resp.AgentIdentification.NewInstanceUid)
+				require.NoError(t, err)
+				require.NotEqual(t, agentUID, newUID, "new instance UID must differ from original")
+			} else {
+				require.Nil(t, resp.AgentIdentification)
+			}
+		})
+	}
+}
+
 type mockCheckin struct {
 	id   string
 	opts []checkin.Option
