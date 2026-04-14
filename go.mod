@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/v7
 
-go 1.25.8
+go 1.26.2
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
@@ -22,7 +22,7 @@ require (
 	github.com/magefile/mage v1.17.1
 	github.com/mailru/easyjson v0.9.2
 	github.com/miolini/datacounter v1.0.3
-	github.com/oapi-codegen/runtime v1.3.1
+	github.com/oapi-codegen/runtime v1.4.0
 	github.com/open-telemetry/opamp-go v0.23.0
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.23.2
@@ -39,7 +39,7 @@ require (
 	go.elastic.co/ecszerolog v0.2.0
 	go.opentelemetry.io/otel v1.43.0
 	go.uber.org/zap v1.27.1
-	golang.org/x/net v0.52.0
+	golang.org/x/net v0.53.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/time v0.15.0
 	google.golang.org/grpc v1.80.0
@@ -94,11 +94,11 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	golang.org/x/crypto v0.49.0 // indirect
-	golang.org/x/mod v0.33.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
-	golang.org/x/tools v0.42.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
+	golang.org/x/mod v0.34.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/tools v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260120221211-b8f7ae30c516 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect

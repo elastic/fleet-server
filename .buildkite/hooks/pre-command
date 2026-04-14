@@ -6,29 +6,22 @@ source .buildkite/scripts/common.sh
 
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 JOB_GCS_BUCKET="fleet-server-ci-internal"
-GITHUB_REPO_TOKEN=$VAULT_GITHUB_TOKEN
 
 export JOB_GCS_BUCKET
 
 # Usage:
-#check_if_file_exist_in_repo "infra" "main"
-#Returns FILE_EXISTS_IN_REPO=true if the defined file exists in the difined repo and FILE_EXISTS_IN_REPO=false if not exists
-check_if_file_exist_in_repo() {
-    local repoName=${1}
-    local branch=${2}
-    local fileName="build.gradle"
-    local branchName=${branch}
-    if [[ $branch == "main" ]]; then
-        branchName="master"
-    fi
-    local path_to_file="cd/release/release-manager/project-configs/${branchName}/${fileName}"
-    local response=$(curl --fail -s -H "Authorization: token $GITHUB_REPO_TOKEN" https://api.github.com/repos/elastic/${repoName}/contents/${path_to_file}| grep -c "\"path\"\: \"${path_to_file}\"")
-    if [[ ${response} -ge 1 ]]; then
+#check_if_branch_available "main"
+#Returns FILE_EXISTS_IN_REPO=true if the defined branch is available in the DRA snapshots and FILE_EXISTS_IN_REPO=false if not
+check_if_branch_available() {
+    local branch=${1}
+    local url="https://storage.googleapis.com/artifacts-api/snapshots/branches.json"
+    local response=$(curl --fail -s "${url}")
+    if echo "${response}" | jq -e --arg branch "${branch}" '.branches | any(. == $branch)' > /dev/null 2>&1; then
         export FILE_EXISTS_IN_REPO=true
-        echo "FILE_EXIST_IN_REPO = true"
+        echo "FILE_EXISTS_IN_REPO = true"
     else
         export FILE_EXISTS_IN_REPO=false
-        echo "FILE_EXIST_IN_REPO = false"
+        echo "FILE_EXISTS_IN_REPO = false"
     fi
 }
 
@@ -40,7 +33,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   # TODO remove and replace _branch with BUILDKITE_BRANCH after PR tests
   _branch="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 
-  check_if_file_exist_in_repo "infra" "${_branch}"                  #TODO should be changed to "main" for rollback...
+  check_if_branch_available "${_branch}"
 fi
 
 # TODO: use a builkite plugin to handle this
