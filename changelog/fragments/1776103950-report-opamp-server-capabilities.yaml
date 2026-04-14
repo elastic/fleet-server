@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Report server capabilities in OpAMP ServerToAgent responses as required by the spec
+component: fleet-server
+issue: https://github.com/elastic/fleet-server/issues/6785
