@@ -38,7 +38,7 @@ const (
 	kOpAMPMod          = "opAMP"
 	serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
 		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
-  kNIATagsKey = "tags"
+	kNIATagsKey = "tags"
 )
 
 type OpAMPT struct {
