@@ -466,6 +466,80 @@ func pendingFromOptions(t *testing.T, opts []checkin.Option) reflect.Value {
 	return pendingPtr.Elem()
 }
 
+func TestDecodeCapabilities(t *testing.T) {
+	cases := []struct {
+		name string
+		caps uint64
+		want []string
+	}{
+		{
+			name: "zero returns empty",
+			caps: 0,
+			want: nil,
+		},
+		{
+			name: "single capability",
+			caps: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth),
+			want: []string{"ReportsHealth"},
+		},
+		{
+			name: "multiple capabilities",
+			caps: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsOwnLogs),
+			want: []string{"AcceptsRemoteConfig", "ReportsOwnLogs", "ReportsHealth"},
+		},
+		{
+			name: "all capabilities",
+			caps: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsPackages) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsPackageStatuses) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsOwnTraces) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsOwnMetrics) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsOwnLogs) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsOpAMPConnectionSettings) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsOtherConnectionSettings) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRestartCommand) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsConnectionSettingsStatus),
+			want: []string{
+				"ReportsStatus",
+				"AcceptsRemoteConfig",
+				"ReportsEffectiveConfig",
+				"AcceptsPackages",
+				"ReportsPackageStatuses",
+				"ReportsOwnTraces",
+				"ReportsOwnMetrics",
+				"ReportsOwnLogs",
+				"AcceptsOpAMPConnectionSettings",
+				"AcceptsOtherConnectionSettings",
+				"AcceptsRestartCommand",
+				"ReportsHealth",
+				"ReportsRemoteConfig",
+				"ReportsHeartbeat",
+				"ReportsAvailableComponents",
+				"ReportsConnectionSettingsStatus",
+			},
+		},
+		{
+			name: "unknown bits are ignored",
+			caps: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) | (1 << 40),
+			want: []string{"ReportsHealth"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := decodeCapabilities(tc.caps)
+			require.ElementsMatch(t, tc.want, got)
+		})
+	}
+}
+
 func getUnexportedField(v reflect.Value, name string) reflect.Value {
 	field := v.FieldByName(name)
 	return reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
