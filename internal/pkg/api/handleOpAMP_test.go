@@ -550,25 +550,11 @@ func TestHandleMessageReportFullState(t *testing.T) {
 	wantFlags := uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState)
 
 	cases := []struct {
-		name      string
-		getBulker func(t *testing.T) *ftesting.MockBulk
-		msg       *protobufs.AgentToServer
+		name string
+		msg  *protobufs.AgentToServer
 	}{
 		{
 			name: "flag is set on sequence gap",
-			getBulker: func(t *testing.T) *ftesting.MockBulk {
-				t.Helper()
-				bulker := ftesting.NewMockBulk()
-				agent := model.Agent{
-					LastCheckinStatus: "online",
-					SequenceNum:       5,
-				}
-				agentBytes, err := json.Marshal(agent)
-				require.NoError(t, err)
-				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
-				return bulker
-			},
 			msg: &protobufs.AgentToServer{
 				SequenceNum:  7, // gap: expected 6
 				Capabilities: baseCaps,
@@ -576,19 +562,6 @@ func TestHandleMessageReportFullState(t *testing.T) {
 		},
 		{
 			name: "flag is set on sequential message",
-			getBulker: func(t *testing.T) *ftesting.MockBulk {
-				t.Helper()
-				bulker := ftesting.NewMockBulk()
-				agent := model.Agent{
-					LastCheckinStatus: "online",
-					SequenceNum:       5,
-				}
-				agentBytes, err := json.Marshal(agent)
-				require.NoError(t, err)
-				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
-				return bulker
-			},
 			msg: &protobufs.AgentToServer{
 				SequenceNum:  6, // sequential
 				Capabilities: baseCaps,
@@ -597,7 +570,15 @@ func TestHandleMessageReportFullState(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			bulker := tc.getBulker(t)
+			bulker := ftesting.NewMockBulk()
+			agent := model.Agent{
+				LastCheckinStatus: "online",
+				SequenceNum:       5,
+			}
+			agentBytes, err := json.Marshal(agent)
+			require.NoError(t, err)
+			bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+				Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
 			checker := &mockCheckin{}
 			oa := &OpAMPT{bulk: bulker, bc: checker}
 
