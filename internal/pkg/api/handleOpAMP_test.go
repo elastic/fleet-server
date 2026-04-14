@@ -12,7 +12,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
+
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
