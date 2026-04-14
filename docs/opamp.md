@@ -1,5 +1,59 @@
 # OpAMP
 
+## Implementation differences from the OpAMP specification
+
+Fleet-server implements a subset of the [OpAMP specification](https://github.com/open-telemetry/opamp-spec/blob/main/specification.md) focused on monitoring. The following describes how our implementation differs from the spec.
+
+### Transport
+
+- **HTTP only.** The spec defines both WebSocket and plain HTTP transports. Fleet-server only supports plain HTTP at `/v1/opamp`. WebSocket connections are not supported.
+
+### Authentication
+
+- **API key required.** The spec suggests standard HTTP auth (Basic/Bearer) as optional. Fleet-server requires an Elastic enrollment API key passed via the `Authorization: ApiKey ...` header. Unauthenticated requests are rejected with HTTP 401.
+
+### Server-to-agent features not implemented
+
+Fleet-server operates in monitoring-only mode.
+
+- **No remote configuration.** The spec defines `ServerToAgent.remote_config` for pushing configuration to agents.
+- **No connection settings management.** The spec defines `ServerToAgent.connection_settings` for offering new connection settings, TLS certificates, etc.
+- **No package management.** The spec defines `ServerToAgent.packages_available` for offering downloadable packages and updates.
+- **No server-initiated commands.** The spec defines `ServerToAgent.command` (e.g., restart).
+- **No `ServerToAgent.flags`.** The spec defines `ReportFullState` for requesting full agent state re-delivery.
+- **No `ServerToAgent.agent_identification`.** The spec allows the server to reassign the agent's `instance_uid`.
+- **No custom messages.** The spec defines `custom_capabilities` and `custom_message` for extensible server-to-agent communication.
+
+### Agent-to-server fields ignored
+
+The following fields are ignored:
+
+- `remote_config_status`
+- `package_statuses`
+- `flags` (e.g., `RequestInstanceUid`)
+- `connection_settings_request`
+- `available_components`
+- `connection_settings_status`
+- `custom_capabilities` / `custom_message`
+
+### Elastic-specific extensions
+
+- **Auto-enrollment.** The spec does not define enrollment. Fleet-server auto-enrolls unknown agents on first message using the enrollment API key's associated policy, creating a document in the `.fleet-agents` index with type `OPAMP`.
+- **Health-to-status mapping.** Fleet-server maps `ComponentHealth` to simplified statuses (`online`, `error`, `degraded`). The spec's nested `component_health_map` is not traversed; only the top-level health is used.
+- **Sensitive value redaction.** Fleet-server redacts keys containing `password`, `token`, `key`, `secret`, `auth`, `certificate`, or `passphrase` from the effective config before persisting.
+
+### Capabilities
+
+- **Partial capability decoding.** Fleet-server only decodes 6 of the 16 defined `AgentCapabilities` bits: `ReportsStatus`, `AcceptsRemoteConfig`, `ReportsEffectiveConfig`, `ReportsHealth`, `ReportsAvailableComponents`, `AcceptsRestartCommand`. Other capability bits are silently ignored.
+
+### Throttling
+
+- **HTTP-level rate limiting only.** The spec defines throttling via `ServerErrorResponse` with `UNAVAILABLE` type and `RetryInfo`. Fleet-server uses HTTP-level rate limiting middleware (returning 429) and returns 429 for Elasticsearch auth rate limits, but does not use the protobuf-level `RetryInfo` mechanism. Additionally, fleet-server may silenty drop connections before the TLS handshake completes if the server is overloaded.
+
+---
+
+## Setup
+
 This section describes how to connect a OpenTelemetry Collector instance to Fleet Server over OpAMP.
 
 1. Create a deployment in Elastic Cloud.  Integrations Server is not needed as we will instead be

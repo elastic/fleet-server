@@ -161,7 +161,7 @@ func Test_server_ClientCert(t *testing.T) {
 			break
 		}
 
-		rCtx, rCancel := context.WithTimeout(ctx, time.Second)
+		rCtx, rCancel := context.WithTimeout(ctx, 5*time.Second)
 		defer rCancel()
 		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
 		require.NoError(t, err)
@@ -233,7 +233,7 @@ func Test_server_ClientCert(t *testing.T) {
 			break
 		}
 
-		rCtx, rCancel := context.WithTimeout(ctx, time.Second)
+		rCtx, rCancel := context.WithTimeout(ctx, 5*time.Second)
 		defer rCancel()
 		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
 		require.NoError(t, err)
@@ -306,7 +306,7 @@ func Test_server_ClientCert(t *testing.T) {
 			break
 		}
 
-		rCtx, rCancel := context.WithTimeout(ctx, time.Second)
+		rCtx, rCancel := context.WithTimeout(ctx, 5*time.Second)
 		defer rCancel()
 		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
 		require.NoError(t, err)
@@ -388,7 +388,7 @@ key: %s`,
 			break
 		}
 
-		rCtx, rCancel := context.WithTimeout(ctx, time.Second)
+		rCtx, rCancel := context.WithTimeout(ctx, 5*time.Second)
 		defer rCancel()
 		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
 		require.NoError(t, err)

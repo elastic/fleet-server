@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -34,7 +35,8 @@ type SecurityInfo = apikey.SecurityInfo
 type APIKeyMetadata = apikey.APIKeyMetadata
 
 var (
-	ErrNoQuotes = errors.New("quoted literal not supported")
+	ErrNoQuotes              = errors.New("quoted literal not supported")
+	ErrTooManyBulkDispatches = errors.New("too many pending bulk dispatches")
 )
 
 type MultiOp struct {
@@ -85,13 +87,14 @@ type Bulk interface {
 const kModBulk = "bulk"
 
 type Bulker struct {
-	es          esapi.Transport
-	ch          chan *bulkT
-	opts        bulkOptT
-	blkPool     sync.Pool
-	apikeyLimit *semaphore.Weighted
-	tracer      *apm.Tracer
-	cancelFn    context.CancelFunc
+	es                    esapi.Transport
+	ch                    chan *bulkT
+	opts                  bulkOptT
+	blkPool               sync.Pool
+	apikeyLimit           *semaphore.Weighted
+	tracer                *apm.Tracer
+	cancelFn              context.CancelFunc
+	pendingBulkDispatches atomic.Int64
 
 	remoteOutputConfigMap map[string]map[string]interface{}
 	bulkerMap             map[string]Bulk
@@ -99,14 +102,22 @@ type Bulker struct {
 }
 
 const (
-	defaultFlushInterval       = time.Second * 5
-	defaultFlushThresholdCnt   = 32768
-	defaultFlushThresholdSz    = 1024 * 1024 * 10
-	defaultMaxPending          = 32
-	defaultBlockQueueSz        = 32 // Small capacity to allow multiOp to spin fast
-	defaultAPIKeyMaxParallel   = 32
-	defaultApikeyMaxReqSize    = 100 * 1024 * 1024
-	defaultFlushContextTimeout = time.Minute * 1
+	defaultFlushInterval                  = time.Second * 5
+	defaultFlushThresholdCnt              = 32768
+	defaultFlushThresholdSz               = 1024 * 1024 * 10
+	defaultMaxPending                     = 32
+	defaultBlockQueueSz                   = 32 // Small capacity to allow multiOp to spin fast
+	defaultAPIKeyMaxParallel              = 32
+	defaultApikeyMaxReqSize               = 100 * 1024 * 1024
+	defaultFlushContextTimeout            = time.Minute * 1
+	defaultMaxPendingBulkDispatches int64 = 0 // 0 means no limit
+
+	// dispatchAbortDrainTimeout bounds how long the drain helper waits for
+	// a late response from the Run loop on an abort from the second
+	// select() of the dispatch method before giving up on freeing blk.
+	// Three flush intervals give enough headroom for the blk to be picked
+	// up, sent to ES, and responded to even under heavy load.
+	dispatchAbortDrainTimeout = 3 * defaultFlushInterval
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -601,6 +612,22 @@ func (b *Bulker) validateBody(body []byte) error {
 func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 	start := time.Now()
 
+	// Check pending bulk dispatch limit before blocking on the channel.
+	if limit := b.opts.maxPendingBulkDispatches; limit > 0 {
+		pending := b.pendingBulkDispatches.Add(1)
+		defer b.pendingBulkDispatches.Add(-1)
+		if pending > limit {
+			zerolog.Ctx(ctx).Warn().
+				Str("mod", kModBulk).
+				Str("action", blk.action.String()).
+				Int64("pending", pending).
+				Int64("limit", limit).
+				Msg("Bulk dispatch rejected: too many pending")
+			b.freeBlk(blk)
+			return respT{err: ErrTooManyBulkDispatches}
+		}
+	}
+
 	// Dispatch to bulk Run loop
 	select {
 	case b.ch <- blk:
@@ -612,6 +639,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort queue")
+		b.freeBlk(blk)
 		return respT{err: ctx.Err()}
 	}
 
@@ -635,7 +663,22 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort response")
+		// blk is in the Run loop's queue; drain the response and free
+		// asynchronously so the caller can return immediately.
+		go b.drainAndFreeAbortedBlk(blk)
 	}
 
 	return respT{err: ctx.Err()}
+}
+
+// drainAndFreeAbortedBlk waits for the Run loop to deliver a response to an
+// abandoned blk, then returns it to the pool. If the response does not
+// arrive within dispatchAbortDrainTimeout (e.g. during shutdown), it gives
+// up rather than blocking forever; in that case blk is not reclaimed.
+func (b *Bulker) drainAndFreeAbortedBlk(blk *bulkT) {
+	select {
+	case <-blk.ch:
+		b.freeBlk(blk)
+	case <-time.After(dispatchAbortDrainTimeout):
+	}
 }
