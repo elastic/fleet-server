@@ -119,7 +119,7 @@ func Test_server_ClientCert(t *testing.T) {
 		cfg.Host = "localhost"
 		cfg.Port = port
 		addr := cfg.BindEndpoints()[0]
-		cfg.TLS = tlsCFG
+		cfg.TLS = &config.ServerTLSConfig{ServerConfig: *tlsCFG}
 
 		st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
 		srv := NewServer(addr, cfg, WithStatus(st))
@@ -187,7 +187,7 @@ func Test_server_ClientCert(t *testing.T) {
 		cfg.Host = "localhost"
 		cfg.Port = port
 		addr := cfg.BindEndpoints()[0]
-		cfg.TLS = tlsCFG
+		cfg.TLS = &config.ServerTLSConfig{ServerConfig: *tlsCFG}
 
 		st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
 		srv := NewServer(addr, cfg, WithStatus(st))
@@ -257,7 +257,7 @@ func Test_server_ClientCert(t *testing.T) {
 		cfg.Host = "localhost"
 		cfg.Port = port
 		addr := cfg.BindEndpoints()[0]
-		cfg.TLS = tlsCFG
+		cfg.TLS = &config.ServerTLSConfig{ServerConfig: *tlsCFG}
 
 		st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
 		srv := NewServer(addr, cfg, WithStatus(st))
@@ -338,7 +338,7 @@ key: %s`,
 		tlsCFG := &tlscommon.ServerConfig{}
 		err = tlsCFG.Unpack(libsconfig.C(*ucfg))
 		require.NoError(t, err)
-		cfg.TLS = tlsCFG
+		cfg.TLS = &config.ServerTLSConfig{ServerConfig: *tlsCFG}
 
 		st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
 		srv := NewServer(addr, cfg, WithStatus(st))

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	libsconfig "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
@@ -59,13 +60,41 @@ func (c *ServerBulk) InitDefaults() {
 	c.FlushMaxPending = 8
 }
 
+// CertificateReload is the configuration for hot-reloading TLS certificates.
+type CertificateReload struct {
+	Enabled bool `config:"enabled"`
+}
+
+// ServerTLSConfig wraps tlscommon.ServerConfig with additional Fleet Server
+// specific TLS settings like certificate hot-reload.
+type ServerTLSConfig struct {
+	tlscommon.ServerConfig
+	CertificateReload CertificateReload `config:"certificate_reload"`
+}
+
+// Unpack unpacks the TLS Server configuration including Fleet Server extensions.
+func (c *ServerTLSConfig) Unpack(cfg libsconfig.C) error {
+	if err := c.ServerConfig.Unpack(cfg); err != nil {
+		return err
+	}
+	type extra struct {
+		CertificateReload CertificateReload `config:"certificate_reload"`
+	}
+	var e extra
+	if err := cfg.Unpack(&e); err != nil {
+		return err
+	}
+	c.CertificateReload = e.CertificateReload
+	return nil
+}
+
 // Server is the configuration for the server
 type (
 	Server struct {
-		Host               string                  `config:"host"`
-		Port               uint16                  `config:"port"`
-		InternalPort       uint16                  `config:"internal_port"`
-		TLS                *tlscommon.ServerConfig `config:"ssl"`
+		Host               string           `config:"host"`
+		Port               uint16           `config:"port"`
+		InternalPort       uint16           `config:"internal_port"`
+		TLS                *ServerTLSConfig `config:"ssl"`
 		Timeouts           ServerTimeouts          `config:"timeouts"`
 		Profiler           ServerProfiler          `config:"profiler"`
 		CompressionLevel   int                     `config:"compression_level"`
