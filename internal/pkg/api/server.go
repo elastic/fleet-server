@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
+	tlsreload "github.com/elastic/fleet-server/v7/internal/pkg/reload/tls"
 )
 
 type server struct {
@@ -118,6 +119,24 @@ func (s *server) Run(ctx context.Context) error {
 		// Must enable http/2 in the configuration explicitly.
 		// (see https://golang.org/pkg/net/http/#Server.Serve)
 		srv.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
+
+		if s.cfg.TLS.CertificateReload.Enabled {
+			reloader, err := tlsreload.New(
+				s.cfg.TLS.Certificate.Certificate,
+				s.cfg.TLS.Certificate.Key,
+				0,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to initialize TLS cert reloader: %w", err)
+			}
+			srv.TLSConfig.GetCertificate = reloader.GetCertificate
+			srv.TLSConfig.Certificates = nil
+			go func() {
+				if err := reloader.Run(ctx); err != nil {
+					zerolog.Ctx(ctx).Error().Err(err).Msg("TLS cert reloader exited with error")
+				}
+			}()
+		}
 
 		ln = tls.NewListener(ln, srv.TLSConfig)
 
