@@ -7,6 +7,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -20,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -531,14 +531,13 @@ func Test_server_TLSCertReload(t *testing.T) {
 	cert2 := certs.GenCert(t, ca)
 	writeCertAndKey(cert2)
 
-	// Wait for the debounce period (default 5s) plus a buffer for fsnotify
-	// delivery and reload processing.
-	time.Sleep(7 * time.Second)
-
-	// After the reload, the server should present the new certificate.
-	newCert := getServerCert()
-	require.NotEmpty(t, newCert)
-	assert.NotEqual(t, initialCert, newCert, "server should present the new certificate after reload")
+	// Poll until the server presents the new certificate. The CertReloader
+	// uses a 5s default debounce, so we allow up to 10s for the full cycle
+	// (fsnotify delivery + debounce + reload).
+	require.Eventually(t, func() bool {
+		c := getServerCert()
+		return len(c) > 0 && !bytes.Equal(c, initialCert)
+	}, 10*time.Second, 500*time.Millisecond, "server should present the new certificate after reload")
 
 	// Clean shutdown.
 	cancel()

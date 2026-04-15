@@ -5,6 +5,7 @@
 package tls
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -142,13 +143,11 @@ func TestReload_CertChange(t *testing.T) {
 	cert2 := certs.GenCert(t, ca)
 	writeCertAndKey(t, dir, cert2)
 
-	// Wait for the debounce period (100ms) plus a buffer for fsnotify delivery.
-	time.Sleep(300 * time.Millisecond)
-
 	// After the debounce, GetCertificate should return the new cert.
-	got, err = r.GetCertificate(nil)
-	require.NoError(t, err)
-	assert.Equal(t, cert2.Certificate[0], got.Certificate[0])
+	require.Eventually(t, func() bool {
+		got, err := r.GetCertificate(nil)
+		return err == nil && bytes.Equal(got.Certificate[0], cert2.Certificate[0])
+	}, 2*time.Second, 50*time.Millisecond, "cert should have been reloaded")
 }
 
 func TestReload_InvalidNewCert_KeepsOld(t *testing.T) {
@@ -174,13 +173,15 @@ func TestReload_InvalidNewCert_KeepsOld(t *testing.T) {
 	// serving the original cert.
 	require.NoError(t, os.WriteFile(certPath, []byte("not a cert"), 0o644))
 
-	// Wait for debounce + buffer.
-	time.Sleep(300 * time.Millisecond)
-
-	// The original cert should still be served since the new one was invalid.
-	got, err := r.GetCertificate(nil)
-	require.NoError(t, err)
-	assert.Equal(t, cert1.Certificate[0], got.Certificate[0])
+	// The original cert should remain served for the entire debounce window
+	// and beyond, since the new cert is invalid and should be rejected.
+	require.Never(t, func() bool {
+		got, err := r.GetCertificate(nil)
+		if err != nil {
+			return true
+		}
+		return !bytes.Equal(got.Certificate[0], cert1.Certificate[0])
+	}, 500*time.Millisecond, 50*time.Millisecond, "cert should not have changed after invalid reload")
 }
 
 func TestReload_Debounce(t *testing.T) {
@@ -190,8 +191,8 @@ func TestReload_Debounce(t *testing.T) {
 	dir := t.TempDir()
 	certPath, keyPath := writeCertAndKey(t, dir, cert1)
 
-	// Use a 500ms debounce so we can test the timer reset behavior.
-	r, err := New(certPath, keyPath, 500*time.Millisecond)
+	// Use a 200ms debounce so we can test the timer reset behavior.
+	r, err := New(certPath, keyPath, 200*time.Millisecond)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -204,15 +205,15 @@ func TestReload_Debounce(t *testing.T) {
 
 	cert2 := certs.GenCert(t, ca)
 
-	// T=0ms: Write only the cert file. This starts the 500ms debounce timer.
+	// T=0ms: Write only the cert file. This starts the 200ms debounce timer.
 	certOut, err := os.Create(certPath)
 	require.NoError(t, err)
 	require.NoError(t, pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert2.Certificate[0]}))
 	require.NoError(t, certOut.Close())
 
-	// T=200ms: Write the key file. This should reset the debounce timer back
-	// to 500ms, so the reload won't happen until T=700ms.
-	time.Sleep(200 * time.Millisecond)
+	// T=80ms: Write the key file. This should reset the debounce timer back
+	// to 200ms, so the reload won't happen until ~T=280ms.
+	time.Sleep(80 * time.Millisecond)
 	keyBytes, err := x509.MarshalPKCS8PrivateKey(cert2.PrivateKey)
 	require.NoError(t, err)
 	keyOut, err := os.Create(keyPath)
@@ -220,19 +221,18 @@ func TestReload_Debounce(t *testing.T) {
 	require.NoError(t, pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}))
 	require.NoError(t, keyOut.Close())
 
-	// T=400ms: Only 200ms since the key write, still within the 500ms debounce
-	// window. The old cert should still be served.
-	time.Sleep(200 * time.Millisecond)
-	got, err := r.GetCertificate(nil)
-	require.NoError(t, err)
-	assert.Equal(t, cert1.Certificate[0], got.Certificate[0], "cert should not have reloaded yet")
+	// For 100ms after the key write, the cert should NOT have reloaded yet
+	// because we're still within the 200ms debounce window.
+	require.Never(t, func() bool {
+		got, _ := r.GetCertificate(nil)
+		return bytes.Equal(got.Certificate[0], cert2.Certificate[0])
+	}, 100*time.Millisecond, 10*time.Millisecond, "cert should not have reloaded yet")
 
-	// T=800ms: 600ms since the key write, past the 500ms debounce window.
-	// The new cert should now be loaded.
-	time.Sleep(400 * time.Millisecond)
-	got, err = r.GetCertificate(nil)
-	require.NoError(t, err)
-	assert.Equal(t, cert2.Certificate[0], got.Certificate[0], "cert should have reloaded after debounce")
+	// After the debounce window expires, the new cert should be loaded.
+	require.Eventually(t, func() bool {
+		got, err := r.GetCertificate(nil)
+		return err == nil && bytes.Equal(got.Certificate[0], cert2.Certificate[0])
+	}, 2*time.Second, 50*time.Millisecond, "cert should have reloaded after debounce")
 }
 
 func TestRun_ContextCancellation(t *testing.T) {
