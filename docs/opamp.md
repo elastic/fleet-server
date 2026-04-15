@@ -14,14 +14,13 @@ Fleet-server implements a subset of the [OpAMP specification](https://github.com
 
 ### Server-to-agent features not implemented
 
-Fleet-server operates in monitoring-only mode. The `ServerToAgent` response only contains `instance_uid`; all other fields are unset.
+Fleet-server operates in monitoring-only mode.
 
 - **No remote configuration.** The spec defines `ServerToAgent.remote_config` for pushing configuration to agents.
 - **No connection settings management.** The spec defines `ServerToAgent.connection_settings` for offering new connection settings, TLS certificates, etc.
 - **No package management.** The spec defines `ServerToAgent.packages_available` for offering downloadable packages and updates.
 - **No server-initiated commands.** The spec defines `ServerToAgent.command` (e.g., restart).
 - **No `ServerToAgent.flags`.** The spec defines `ReportFullState` for requesting full agent state re-delivery.
-- **No `ServerToAgent.capabilities`.** The spec says the server MUST report its capabilities bitmask in the first response. Fleet-server does not set this field.
 - **No `ServerToAgent.agent_identification`.** The spec allows the server to reassign the agent's `instance_uid`.
 - **No custom messages.** The spec defines `custom_capabilities` and `custom_message` for extensible server-to-agent communication.
 
@@ -42,11 +41,6 @@ The following fields are ignored:
 - **Auto-enrollment.** The spec does not define enrollment. Fleet-server auto-enrolls unknown agents on first message using the enrollment API key's associated policy, creating a document in the `.fleet-agents` index with type `OPAMP`.
 - **Health-to-status mapping.** Fleet-server maps `ComponentHealth` to simplified statuses (`online`, `error`, `degraded`). The spec's nested `component_health_map` is not traversed; only the top-level health is used.
 - **Sensitive value redaction.** Fleet-server redacts keys containing `password`, `token`, `key`, `secret`, `auth`, `certificate`, or `passphrase` from the effective config before persisting.
-- **YAML-to-JSON conversion.** Fleet-server parses the effective config body as YAML and re-serializes it to JSON for storage.
-
-### Capabilities
-
-- **Partial capability decoding.** Fleet-server only decodes 6 of the 16 defined `AgentCapabilities` bits: `ReportsStatus`, `AcceptsRemoteConfig`, `ReportsEffectiveConfig`, `ReportsHealth`, `ReportsAvailableComponents`, `AcceptsRestartCommand`. Other capability bits are silently ignored.
 
 ### Throttling
 

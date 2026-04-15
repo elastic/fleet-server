@@ -36,7 +36,8 @@ import (
 
 const (
 	kOpAMPMod          = "opAMP"
-	statusDisconnected = "disconnected"
+	serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
+		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
 )
 
 type OpAMPT struct {
@@ -192,13 +193,15 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 				}
 			}
 			zlog.Debug().Msg("agent disconnect received")
-			_ = oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus(statusDisconnected))
+			_ = oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus(string(CheckinRequestStatusDisconnected)))
 			return &protobufs.ServerToAgent{
 				InstanceUid: instanceUID.Bytes(),
 			}
 		}
 
+		sendCapabilities := false
 		if agent == nil {
+			sendCapabilities = true
 			if agent, err = oa.enrollAgent(zlog, instanceUID.String(), message, apiKey); err != nil {
 				return &protobufs.ServerToAgent{
 					InstanceUid: instanceUID.Bytes(),
@@ -208,6 +211,8 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 					},
 				}
 			}
+		} else if !isActiveStatus(agent.LastCheckinStatus) {
+			sendCapabilities = true
 		}
 
 		if err := oa.updateAgent(zlog, agent, message); err != nil {
@@ -220,9 +225,11 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 		}
 
-		// Empty message for now since we're only using OpAMP for monitoring.
 		sToA := protobufs.ServerToAgent{
 			InstanceUid: instanceUID.Bytes(),
+		}
+		if sendCapabilities {
+			sToA.Capabilities = serverCapabilities
 		}
 
 		return &sToA
@@ -353,14 +360,14 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 
 	initialOpts := make([]checkin.Option, 0)
 
-	status := "online"
+	status := CheckinRequestStatusOnline
 
 	// Extract the health status from the health message if it exists.
 	if aToS.Health != nil {
 		if !aToS.Health.Healthy {
-			status = "error"
+			status = CheckinRequestStatusError
 		} else if aToS.Health.Status == "StatusRecoverableError" {
-			status = "degraded"
+			status = CheckinRequestStatusDegraded
 		}
 
 		// Extract the last_checkin_message from the health message if it exists.
@@ -376,11 +383,13 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 		initialOpts = append(initialOpts, checkin.WithHealth(healthBytes))
 	}
 
-	initialOpts = append(initialOpts, checkin.WithStatus(status))
+	initialOpts = append(initialOpts, checkin.WithStatus(string(status)))
 	initialOpts = append(initialOpts, checkin.WithSequenceNum(aToS.SequenceNum))
 
-	capabilities := decodeCapabilities(aToS.Capabilities)
-	initialOpts = append(initialOpts, checkin.WithCapabilities(capabilities))
+	if aToS.Capabilities != 0 {
+		capabilities := decodeCapabilities(aToS.Capabilities)
+		initialOpts = append(initialOpts, checkin.WithCapabilities(capabilities))
+	}
 
 	if aToS.EffectiveConfig != nil {
 		effectiveConfigBytes, err := ParseEffectiveConfig(aToS.EffectiveConfig)
@@ -532,20 +541,18 @@ func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json
 	return json.RawMessage(b), nil
 }
 
+func isActiveStatus(status string) bool {
+	return status == string(CheckinRequestStatusOnline) ||
+		status == string(CheckinRequestStatusError) ||
+		status == string(CheckinRequestStatusDegraded)
+}
+
 // decodeCapabilities converts capability bitmask to human-readable strings
 func decodeCapabilities(caps uint64) []string {
 	var result []string
-	capMap := map[uint64]string{
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus):              "ReportsStatus",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig):        "AcceptsRemoteConfig",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig):     "ReportsEffectiveConfig",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth):              "ReportsHealth",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents): "ReportsAvailableComponents",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRestartCommand):      "AcceptsRestartCommand",
-	}
-	for mask, name := range capMap {
-		if caps&mask != 0 {
-			result = append(result, name)
+	for mask, name := range protobufs.AgentCapabilities_name {
+		if caps&uint64(mask) != 0 { //nolint:gosec // mask values are not negative so no overflow is possible here
+			result = append(result, strings.TrimPrefix(name, "AgentCapabilities_"))
 		}
 	}
 	return result
