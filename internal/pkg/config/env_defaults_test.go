@@ -44,15 +44,14 @@ func TestLoadLimits(t *testing.T) {
 	}
 }
 
+// TestDefaultLimitsYAML keys verifies that all embedded .yml files have keys that match go struct tags.
+// A typo in a yml key, e.g. "pgp_retieval_limit" instead of "pgp_retrieval_limit" causes a test failure.
 func TestDefaultLimitsYAMLKeys(t *testing.T) {
-	// Verify that all embedded YAML files have keys matching the Go struct tags.
-	// A key typo (e.g. "pgp_retieval_limit" instead of "pgp_retrieval_limit")
-	// causes the value to silently fall back to hardcoded defaults.
-	validTags := make(map[string]bool)
 	rt := reflect.TypeOf(serverLimitDefaults{})
-	for i := 0; i < rt.NumField(); i++ {
-		if tag := rt.Field(i).Tag.Get("config"); tag != "" {
-			validTags[tag] = true
+	validTags := make([]string, 0, rt.NumField())
+	for field := range rt.Fields() {
+		if tag := field.Tag.Get("config"); tag != "" {
+			validTags = append(validTags, tag)
 		}
 	}
 
@@ -72,15 +71,15 @@ func TestDefaultLimitsYAMLKeys(t *testing.T) {
 			data, err := io.ReadAll(f)
 			require.NoError(t, err)
 
-			var raw map[string]interface{}
+			var raw map[string]any
 			require.NoError(t, goyaml.Unmarshal(data, &raw))
 
-			serverLimits, ok := raw["server_limits"].(map[string]interface{})
-			require.True(t, ok, "server_limits key should exist in %s", path)
+			require.Containsf(raw, "server_limits", "%s does not contain server_limits attribute", path)
+			serverLimits, ok := raw["server_limits"].(map[string]any)
+			require.Truef(t, ok, "server_limits in %s is not type map[string]any detected type: %T", path, raw["server_limits"])
 
 			for key := range serverLimits {
-				assert.True(t, validTags[key],
-					"YAML key %q in %s has no matching config struct tag on serverLimitDefaults", key, path)
+				assert.Contains(t, validTags, key, "YAML key %q in %s has no matching config struct tag on serverLimitDefaults", key, path)
 			}
 		})
 		return nil
