@@ -101,6 +101,8 @@ fleet:
 #        certificate: /creds/cert.pem
 #        key: /creds/key.pem
 #        key_passphrase_path: /creds/key.pem
+#        certificate_reload:
+#          enabled: false  # Set to true to watch cert/key files and reload on change
 #
 #     # timeouts controls various api timeouts
 #     timeouts:
