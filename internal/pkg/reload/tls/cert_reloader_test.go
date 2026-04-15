@@ -7,14 +7,9 @@ package tls
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	stdtls "crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
-	"math/big"
-	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -263,42 +258,5 @@ func TestRun_ContextCancellation(t *testing.T) {
 		assert.NoError(t, err)
 	case <-time.After(2 * time.Second):
 		t.Fatal("Run did not return after context cancellation")
-	}
-}
-
-// genCertDirect generates a certificate without using testing.T helpers, for
-// cases where we need more control over the certificate content (e.g., different
-// serial numbers to distinguish certs).
-func genCertDirect(t *testing.T, ca stdtls.Certificate, serial int64) stdtls.Certificate {
-	t.Helper()
-
-	tmpl := &x509.Certificate{
-		SerialNumber: big.NewInt(serial),
-		IPAddresses:  []net.IP{{127, 0, 0, 1}},
-		DNSNames:     []string{"localhost"},
-		Subject: pkix.Name{
-			CommonName:   "fleet-server testing",
-			Organization: []string{"TESTING"},
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(24 * time.Hour),
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		BasicConstraintsValid: true,
-	}
-
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
-
-	certBytes, err := x509.CreateCertificate(rand.Reader, tmpl, ca.Leaf, &key.PublicKey, ca.PrivateKey)
-	require.NoError(t, err)
-
-	leaf, err := x509.ParseCertificate(certBytes)
-	require.NoError(t, err)
-
-	return stdtls.Certificate{
-		Certificate: [][]byte{certBytes},
-		PrivateKey:  key,
-		Leaf:        leaf,
 	}
 }
