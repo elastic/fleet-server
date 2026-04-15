@@ -91,23 +91,23 @@ func (c *ServerTLSConfig) Unpack(cfg libsconfig.C) error {
 // Server is the configuration for the server
 type (
 	Server struct {
-		Host               string           `config:"host"`
-		Port               uint16           `config:"port"`
-		InternalPort       uint16           `config:"internal_port"`
-		TLS                *ServerTLSConfig `config:"ssl"`
-		Timeouts           ServerTimeouts          `config:"timeouts"`
-		Profiler           ServerProfiler          `config:"profiler"`
-		CompressionLevel   int                     `config:"compression_level"`
-		CompressionThresh  int                     `config:"compression_threshold"`
-		Limits             ServerLimits            `config:"limits"`
-		Runtime            Runtime                 `config:"runtime"`
-		Bulk               ServerBulk              `config:"bulk"`
-		GC                 GC                      `config:"gc"`
-		Instrumentation    Instrumentation         `config:"instrumentation"`
-		StaticPolicyTokens StaticPolicyTokens      `config:"static_policy_tokens"`
-		PGP                PGP                     `config:"pgp"`
-		PDKDF2             PBKDF2                  `config:"pdkdf2"`
-		Features           FeatureFlags            `config:"feature_flags"`
+		Host               string             `config:"host"`
+		Port               uint16             `config:"port"`
+		InternalPort       uint16             `config:"internal_port"`
+		TLS                *ServerTLSConfig   `config:"ssl"`
+		Timeouts           ServerTimeouts     `config:"timeouts"`
+		Profiler           ServerProfiler     `config:"profiler"`
+		CompressionLevel   int                `config:"compression_level"`
+		CompressionThresh  int                `config:"compression_threshold"`
+		Limits             ServerLimits       `config:"limits"`
+		Runtime            Runtime            `config:"runtime"`
+		Bulk               ServerBulk         `config:"bulk"`
+		GC                 GC                 `config:"gc"`
+		Instrumentation    Instrumentation    `config:"instrumentation"`
+		StaticPolicyTokens StaticPolicyTokens `config:"static_policy_tokens"`
+		PGP                PGP                `config:"pgp"`
+		PDKDF2             PBKDF2             `config:"pdkdf2"`
+		Features           FeatureFlags       `config:"feature_flags"`
 	}
 
 	StaticPolicyTokens struct {
