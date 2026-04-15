@@ -25,7 +25,9 @@ type CertReloader struct {
 	certPath string
 	keyPath  string
 	debounce time.Duration
-	cert     atomic.Pointer[tls.Certificate]
+	// cert is accessed atomically because GetCertificate is called from TLS
+	// handshake goroutines while Run stores new certs from the fsnotify goroutine.
+	cert atomic.Pointer[tls.Certificate]
 }
 
 // New creates a CertReloader for the given cert and key file paths. It performs
