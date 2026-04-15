@@ -171,7 +171,7 @@ func TestReload_InvalidNewCert_KeepsOld(t *testing.T) {
 	// Overwrite the cert file with invalid data. The reloader should detect
 	// the change, attempt to load the new pair, fail validation, and keep
 	// serving the original cert.
-	require.NoError(t, os.WriteFile(certPath, []byte("not a cert"), 0o644))
+	require.NoError(t, os.WriteFile(certPath, []byte("not a cert"), 0o600))
 
 	// The original cert should remain served for the entire debounce window
 	// and beyond, since the new cert is invalid and should be rejected.
