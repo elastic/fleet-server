@@ -10,13 +10,17 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -395,4 +399,137 @@ key: %s`,
 		default:
 		}
 	})
+}
+
+func Test_server_TLSCertReload(t *testing.T) {
+	sm := mock.NewMockMonitor()
+	sm.On("State").Return(client.UnitStateHealthy)
+
+	ca := certs.GenCA(t)
+	cert1 := certs.GenCert(t, ca)
+
+	// Write cert and key to a shared directory so we can overwrite them
+	dir := t.TempDir()
+	certPath := filepath.Join(dir, "cert.pem")
+	keyPath := filepath.Join(dir, "key.pem")
+	caPath := certs.CertToFile(t, ca, "ca")
+
+	writePEM := func(path string, pemType string, data []byte) {
+		t.Helper()
+		f, err := os.Create(path)
+		require.NoError(t, err)
+		require.NoError(t, pem.Encode(f, &pem.Block{Type: pemType, Bytes: data}))
+		require.NoError(t, f.Close())
+	}
+	writeCertAndKey := func(cert tls.Certificate) {
+		t.Helper()
+		writePEM(certPath, "CERTIFICATE", cert.Certificate[0])
+		keyBytes, err := x509.MarshalPKCS8PrivateKey(cert.PrivateKey)
+		require.NoError(t, err)
+		writePEM(keyPath, "PRIVATE KEY", keyBytes)
+	}
+
+	writeCertAndKey(cert1)
+
+	tlsYML := fmt.Sprintf(tlsCFGTempl, caPath, certPath, keyPath)
+	ucfg, err := yaml.NewConfig([]byte(tlsYML))
+	require.NoError(t, err)
+	tlsCFG := &tlscommon.ServerConfig{}
+	err = tlsCFG.Unpack(libsconfig.C(*ucfg))
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	port, err := ftesting.FreePort()
+	require.NoError(t, err)
+	cfg := &config.Server{}
+	cfg.InitDefaults()
+	cfg.Host = "localhost"
+	cfg.Port = port
+	addr := cfg.BindEndpoints()[0]
+	cfg.TLS = &config.ServerTLSConfig{ServerConfig: *tlsCFG}
+	cfg.TLS.CertificateReload.Enabled = true
+
+	st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
+	srv := NewServer(addr, cfg, WithStatus(st))
+
+	certPool := x509.NewCertPool()
+	certPool.AddCert(ca.Leaf)
+
+	started := make(chan struct{}, 1)
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		started <- struct{}{}
+		if err := srv.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			errCh <- err
+		}
+		wg.Done()
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(500 * time.Millisecond):
+		require.Fail(t, "timed out waiting for server to start")
+	}
+	select {
+	case err := <-errCh:
+		require.NoError(t, err, "error during startup")
+	case <-time.After(500 * time.Millisecond):
+		break
+	}
+
+	// Make first request and capture the server cert
+	getServerCert := func() []byte {
+		t.Helper()
+		var serverCert []byte
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs: certPool,
+					VerifyConnection: func(cs tls.ConnectionState) error {
+						if len(cs.PeerCertificates) > 0 {
+							serverCert = cs.PeerCertificates[0].Raw
+						}
+						return nil
+					},
+				},
+			},
+		}
+		rCtx, rCancel := context.WithTimeout(ctx, 5*time.Second)
+		defer rCancel()
+		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
+		require.NoError(t, err)
+		resp, err := httpClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		return serverCert
+	}
+
+	initialCert := getServerCert()
+	require.NotEmpty(t, initialCert)
+
+	// Rotate the certificate
+	cert2 := certs.GenCert(t, ca)
+	writeCertAndKey(cert2)
+
+	// Wait for debounce (default 5s) + buffer
+	time.Sleep(7 * time.Second)
+
+	// Verify the server now presents the new cert
+	newCert := getServerCert()
+	require.NotEmpty(t, newCert)
+	assert.NotEqual(t, initialCert, newCert, "server should present the new certificate after reload")
+
+	cancel()
+	wg.Wait()
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	default:
+	}
 }
