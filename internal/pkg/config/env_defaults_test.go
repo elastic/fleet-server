@@ -5,7 +5,10 @@
 package config
 
 import (
-	"strconv"
+	"io"
+	"io/fs"
+	"reflect"
+	"strings"
 	"testing"
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
@@ -13,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	goyaml "gopkg.in/yaml.v3"
 )
 
 func TestLoadLimits(t *testing.T) {
@@ -44,31 +48,42 @@ func TestDefaultLimitsYAMLKeys(t *testing.T) {
 	// Verify that all embedded YAML files have keys matching the Go struct tags.
 	// A key typo (e.g. "pgp_retieval_limit" instead of "pgp_retrieval_limit")
 	// causes the value to silently fall back to hardcoded defaults.
-	require.NotEmpty(t, defaults, "embedded defaults should be loaded")
-	for _, l := range defaults {
-		name := "default"
-		if l.Agents.Max > 0 && l.Agents.Max < int(getMaxInt()) {
-			name = "lte" + strconv.Itoa(l.Agents.Max)
+	validTags := make(map[string]bool)
+	rt := reflect.TypeOf(serverLimitDefaults{})
+	for i := 0; i < rt.NumField(); i++ {
+		if tag := rt.Field(i).Tag.Get("config"); tag != "" {
+			validTags[tag] = true
 		}
-		t.Run(name, func(t *testing.T) {
-			require.NotNil(t, l.Server)
-
-			// Every YAML file should populate these limit fields with
-			// non-zero values that differ from the hardcoded defaults,
-			// proving the YAML key matched the struct tag.
-			assert.NotZero(t, l.Server.CheckinLimit.Interval, "checkin_limit.interval should be set")
-			assert.NotZero(t, l.Server.AckLimit.Interval, "ack_limit.interval should be set")
-			assert.NotZero(t, l.Server.EnrollLimit.Interval, "enroll_limit.interval should be set")
-			assert.NotZero(t, l.Server.ArtifactLimit.Interval, "artifact_limit.interval should be set")
-			assert.NotZero(t, l.Server.StatusLimit.Interval, "status_limit.interval should be set")
-			assert.NotZero(t, l.Server.PolicyLimit.Interval, "policy_limit.interval should be set")
-			assert.NotZero(t, l.Server.ActionLimit.Interval, "action_limit.interval should be set")
-			assert.NotZero(t, l.Server.UploadStartLimit.Interval, "upload_start_limit.interval should be set")
-			assert.NotZero(t, l.Server.UploadEndLimit.Interval, "upload_end_limit.interval should be set")
-			assert.NotZero(t, l.Server.UploadChunkLimit.Interval, "upload_chunk_limit.interval should be set")
-			assert.NotZero(t, l.Server.DeliverFileLimit.Interval, "file_delivery_limit.interval should be set")
-			assert.NotZero(t, l.Server.GetPGPKeyLimit.Interval, "pgp_retrieval_limit.interval should be set")
-			assert.NotZero(t, l.Server.AuditUnenrollLimit.Interval, "audit_unenroll_limit.interval should be set")
-		})
 	}
+
+	require.NotEmpty(t, defaults, "embedded defaults should be loaded")
+	err := fs.WalkDir(defaultsFS, ".", func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		name := strings.TrimSuffix(strings.TrimPrefix(path, "defaults/"), "_limits.yml")
+		t.Run(name, func(t *testing.T) {
+			f, err := defaultsFS.Open(path)
+			require.NoError(t, err)
+			data, err := io.ReadAll(f)
+			require.NoError(t, err)
+
+			var raw map[string]interface{}
+			require.NoError(t, goyaml.Unmarshal(data, &raw))
+
+			serverLimits, ok := raw["server_limits"].(map[string]interface{})
+			require.True(t, ok, "server_limits key should exist in %s", path)
+
+			for key := range serverLimits {
+				assert.True(t, validTags[key],
+					"YAML key %q in %s has no matching config struct tag on serverLimitDefaults", key, path)
+			}
+		})
+		return nil
+	})
+	require.NoError(t, err)
 }
