@@ -124,7 +124,6 @@ func (s *server) Run(ctx context.Context) error {
 			reloader, err := tlsreload.New(
 				s.cfg.TLS.Certificate.Certificate,
 				s.cfg.TLS.Certificate.Key,
-				0,
 			)
 			if err != nil {
 				return fmt.Errorf("failed to initialize TLS cert reloader: %w", err)

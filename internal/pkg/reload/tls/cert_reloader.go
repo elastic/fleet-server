@@ -30,22 +30,32 @@ type CertReloader struct {
 	cert atomic.Pointer[tls.Certificate]
 }
 
+// Option is a functional option for configuring a CertReloader.
+type Option func(*CertReloader)
+
+// WithDebounce sets the debounce delay for the file watcher. If not specified,
+// a default of 5 seconds is used.
+func WithDebounce(d time.Duration) Option {
+	return func(r *CertReloader) {
+		r.debounce = d
+	}
+}
+
 // New creates a CertReloader for the given cert and key file paths. It performs
 // an initial load of the certificate, returning an error if the initial load
-// fails. If debounce is zero, a default of 5 seconds is used.
-func New(certPath, keyPath string, debounce time.Duration) (*CertReloader, error) {
+// fails.
+func New(certPath, keyPath string, opts ...Option) (*CertReloader, error) {
 	if certPath == "" || keyPath == "" {
 		return nil, fmt.Errorf("certificate and key paths must be non-empty")
-	}
-
-	if debounce == 0 {
-		debounce = defaultDebounceDelay
 	}
 
 	r := &CertReloader{
 		certPath: certPath,
 		keyPath:  keyPath,
-		debounce: debounce,
+		debounce: defaultDebounceDelay,
+	}
+	for _, opt := range opts {
+		opt(r)
 	}
 
 	cert, err := tls.LoadX509KeyPair(certPath, keyPath)

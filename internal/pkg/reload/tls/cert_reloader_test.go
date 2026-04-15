@@ -56,7 +56,7 @@ func TestNew_ValidCertPair(t *testing.T) {
 	certPath, keyPath := writeCertAndKey(t, dir, cert)
 
 	// Creating a new CertReloader should succeed and load the cert.
-	r, err := New(certPath, keyPath, 0)
+	r, err := New(certPath, keyPath)
 	require.NoError(t, err)
 
 	// The loaded cert should match the one we wrote to disk.
@@ -92,20 +92,20 @@ func TestNew_InvalidCertPair(t *testing.T) {
 	require.NoError(t, keyOut.Close())
 
 	// New() should fail because the cert and key don't match.
-	_, err = New(certPath, keyPath, 0)
+	_, err = New(certPath, keyPath)
 	assert.Error(t, err)
 }
 
 func TestNew_MissingFiles(t *testing.T) {
 	// Attempting to create a reloader with paths that don't exist should fail
 	// on the initial certificate load.
-	_, err := New("/nonexistent/cert.pem", "/nonexistent/key.pem", 0)
+	_, err := New("/nonexistent/cert.pem", "/nonexistent/key.pem")
 	assert.Error(t, err)
 }
 
 func TestNew_EmptyPaths(t *testing.T) {
 	// Empty paths should be rejected before attempting any file I/O.
-	_, err := New("", "", 0)
+	_, err := New("", "")
 	assert.Error(t, err)
 }
 
@@ -117,7 +117,7 @@ func TestReload_CertChange(t *testing.T) {
 	certPath, keyPath := writeCertAndKey(t, dir, cert1)
 
 	// Use a short debounce (100ms) to keep the test fast.
-	r, err := New(certPath, keyPath, 100*time.Millisecond)
+	r, err := New(certPath, keyPath, WithDebounce(100*time.Millisecond))
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -152,7 +152,7 @@ func TestReload_InvalidNewCert_KeepsOld(t *testing.T) {
 	dir := t.TempDir()
 	certPath, keyPath := writeCertAndKey(t, dir, cert1)
 
-	r, err := New(certPath, keyPath, 100*time.Millisecond)
+	r, err := New(certPath, keyPath, WithDebounce(100*time.Millisecond))
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -187,7 +187,7 @@ func TestReload_Debounce(t *testing.T) {
 	certPath, keyPath := writeCertAndKey(t, dir, cert1)
 
 	// Use a 200ms debounce so we can test the timer reset behavior.
-	r, err := New(certPath, keyPath, 200*time.Millisecond)
+	r, err := New(certPath, keyPath, WithDebounce(200*time.Millisecond))
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -237,7 +237,7 @@ func TestRun_ContextCancellation(t *testing.T) {
 	dir := t.TempDir()
 	certPath, keyPath := writeCertAndKey(t, dir, cert)
 
-	r, err := New(certPath, keyPath, 100*time.Millisecond)
+	r, err := New(certPath, keyPath, WithDebounce(100*time.Millisecond))
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
