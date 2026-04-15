@@ -62,7 +62,8 @@ func (c *ServerBulk) InitDefaults() {
 
 // CertificateReload is the configuration for hot-reloading TLS certificates.
 type CertificateReload struct {
-	Enabled bool `config:"enabled"`
+	Enabled  bool          `config:"enabled"`
+	Debounce time.Duration `config:"debounce"`
 }
 
 // ServerTLSConfig wraps tlscommon.ServerConfig with additional Fleet Server

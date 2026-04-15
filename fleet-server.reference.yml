@@ -103,6 +103,7 @@ fleet:
 #        key_passphrase_path: /creds/key.pem
 #        certificate_reload:
 #          enabled: false  # Set to true to watch cert/key files and reload on change
+#          debounce: 5s    # How long to wait after a file change before reloading
 #
 #     # timeouts controls various api timeouts
 #     timeouts:

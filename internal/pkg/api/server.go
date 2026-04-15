@@ -121,9 +121,14 @@ func (s *server) Run(ctx context.Context) error {
 		srv.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
 
 		if s.cfg.TLS.CertificateReload.Enabled {
+			var opts []tlsreload.Option
+			if s.cfg.TLS.CertificateReload.Debounce > 0 {
+				opts = append(opts, tlsreload.WithDebounce(s.cfg.TLS.CertificateReload.Debounce))
+			}
 			reloader, err := tlsreload.New(
 				s.cfg.TLS.Certificate.Certificate,
 				s.cfg.TLS.Certificate.Key,
+				opts...,
 			)
 			if err != nil {
 				return fmt.Errorf("failed to initialize TLS cert reloader: %w", err)
