@@ -38,7 +38,7 @@ const (
 	kOpAMPMod          = "opAMP"
 	serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
 		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
-	kNIATagsKey = "tags"
+	tagsKey = "tags"
 )
 
 type OpAMPT struct {
@@ -278,7 +278,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 	meta := localMetadata{}
 	meta.Elastic.Agent.ID = agentID
 	agentType := ""
-	var configTags []string
+	var tags []string
 	var identifyingAttributes, nonIdentifyingAttributes json.RawMessage
 	if aToS.AgentDescription != nil {
 		// Extract agent version
@@ -303,10 +303,10 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 			case semconv.OSTypeKey:
 				osType := nia.GetValue().GetStringValue()
 				meta.Os.Platform = osType
-			case kNIATagsKey:
+			case tagsKey:
 				for _, t := range strings.Split(nia.GetValue().GetStringValue(), ",") {
 					if t = strings.TrimSpace(t); t != "" {
-						configTags = append(configTags, t)
+						tags = append(tags, t)
 					}
 				}
 			}
@@ -320,7 +320,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 
 		filteredNIA := make([]*protobufs.KeyValue, 0, len(aToS.AgentDescription.NonIdentifyingAttributes))
 		for _, nia := range aToS.AgentDescription.NonIdentifyingAttributes {
-			if nia.Key != kNIATagsKey {
+			if nia.Key != tagsKey {
 				filteredNIA = append(filteredNIA, nia)
 			}
 		}
@@ -352,7 +352,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 		IdentifyingAttributes:    identifyingAttributes,
 		NonIdentifyingAttributes: nonIdentifyingAttributes,
 		Type:                     "OPAMP",
-		Tags:                     dedupeTags(agentType, configTags),
+		Tags:                     dedupeSlice(append([]string{agentType}, tags...)),
 	}
 
 	data, err = json.Marshal(agent)
@@ -559,15 +559,14 @@ func isActiveStatus(status string) bool {
 		status == string(CheckinRequestStatusDegraded)
 }
 
-// dedupeTags returns a deduplicated slice with agentType first, followed by
-// configTags in order, skipping any that duplicate an earlier entry.
-func dedupeTags(agentType string, configTags []string) []string {
-	seen := make(map[string]struct{}, 1+len(configTags))
-	result := make([]string, 0, 1+len(configTags))
-	for _, t := range append([]string{agentType}, configTags...) {
-		if _, ok := seen[t]; !ok {
-			seen[t] = struct{}{}
-			result = append(result, t)
+// dedupeSlice returns a copy of s with duplicate entries removed, preserving order.
+func dedupeSlice(s []string) []string {
+	seen := make(map[string]struct{}, len(s))
+	result := make([]string, 0, len(s))
+	for _, v := range s {
+		if _, ok := seen[v]; !ok {
+			seen[v] = struct{}{}
+			result = append(result, v)
 		}
 	}
 	return result
