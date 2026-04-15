@@ -402,6 +402,10 @@ key: %s`,
 }
 
 func Test_server_TLSCertReload(t *testing.T) {
+	// This test verifies end-to-end TLS certificate hot-reload through a
+	// running server: start the server with cert1, rotate to cert2 on disk,
+	// and verify that new TLS connections receive cert2.
+
 	sm := mock.NewMockMonitor()
 	sm.On("State").Return(client.UnitStateHealthy)
 
@@ -409,6 +413,7 @@ func Test_server_TLSCertReload(t *testing.T) {
 	cert1 := certs.GenCert(t, ca)
 
 	// Write cert and key to a shared directory so we can overwrite them
+	// in place to simulate certificate rotation.
 	dir := t.TempDir()
 	certPath := filepath.Join(dir, "cert.pem")
 	keyPath := filepath.Join(dir, "key.pem")
@@ -429,8 +434,10 @@ func Test_server_TLSCertReload(t *testing.T) {
 		writePEM(keyPath, "PRIVATE KEY", keyBytes)
 	}
 
+	// Write the initial certificate pair.
 	writeCertAndKey(cert1)
 
+	// Build the TLS config via YAML, same as the other TLS tests.
 	tlsYML := fmt.Sprintf(tlsCFGTempl, caPath, certPath, keyPath)
 	ucfg, err := yaml.NewConfig([]byte(tlsYML))
 	require.NoError(t, err)
@@ -442,6 +449,7 @@ func Test_server_TLSCertReload(t *testing.T) {
 	defer cancel()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
+	// Configure the server with certificate reload enabled.
 	port, err := ftesting.FreePort()
 	require.NoError(t, err)
 	cfg := &config.Server{}
@@ -455,9 +463,11 @@ func Test_server_TLSCertReload(t *testing.T) {
 	st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
 	srv := NewServer(addr, cfg, WithStatus(st))
 
+	// Trust the test CA for client connections.
 	certPool := x509.NewCertPool()
 	certPool.AddCert(ca.Leaf)
 
+	// Start the server in a background goroutine.
 	started := make(chan struct{}, 1)
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
@@ -470,6 +480,7 @@ func Test_server_TLSCertReload(t *testing.T) {
 		wg.Done()
 	}()
 
+	// Wait for the server goroutine to start and verify no startup errors.
 	select {
 	case <-started:
 	case <-time.After(500 * time.Millisecond):
@@ -482,7 +493,8 @@ func Test_server_TLSCertReload(t *testing.T) {
 		break
 	}
 
-	// Make first request and capture the server cert
+	// getServerCert makes an HTTPS request to the server and captures the raw
+	// server certificate from the TLS handshake via VerifyConnection callback.
 	getServerCert := func() []byte {
 		t.Helper()
 		var serverCert []byte
@@ -510,21 +522,25 @@ func Test_server_TLSCertReload(t *testing.T) {
 		return serverCert
 	}
 
+	// Capture the server cert before rotation.
 	initialCert := getServerCert()
 	require.NotEmpty(t, initialCert)
 
-	// Rotate the certificate
+	// Simulate certificate rotation by writing a new cert/key pair to the
+	// same paths. The CertReloader's fsnotify watcher should detect this.
 	cert2 := certs.GenCert(t, ca)
 	writeCertAndKey(cert2)
 
-	// Wait for debounce (default 5s) + buffer
+	// Wait for the debounce period (default 5s) plus a buffer for fsnotify
+	// delivery and reload processing.
 	time.Sleep(7 * time.Second)
 
-	// Verify the server now presents the new cert
+	// After the reload, the server should present the new certificate.
 	newCert := getServerCert()
 	require.NotEmpty(t, newCert)
 	assert.NotEqual(t, initialCert, newCert, "server should present the new certificate after reload")
 
+	// Clean shutdown.
 	cancel()
 	wg.Wait()
 	select {

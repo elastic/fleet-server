@@ -51,15 +51,19 @@ func writeCertAndKey(t *testing.T, dir string, cert stdtls.Certificate) (certPat
 }
 
 func TestNew_ValidCertPair(t *testing.T) {
+	// Generate a valid CA and leaf certificate pair.
 	ca := certs.GenCA(t)
 	cert := certs.GenCert(t, ca)
 
+	// Write the cert and key to disk.
 	dir := t.TempDir()
 	certPath, keyPath := writeCertAndKey(t, dir, cert)
 
+	// Creating a new CertReloader should succeed and load the cert.
 	r, err := New(certPath, keyPath, 0)
 	require.NoError(t, err)
 
+	// The loaded cert should match the one we wrote to disk.
 	got, err := r.GetCertificate(nil)
 	require.NoError(t, err)
 	assert.NotNil(t, got)
@@ -67,13 +71,15 @@ func TestNew_ValidCertPair(t *testing.T) {
 }
 
 func TestNew_InvalidCertPair(t *testing.T) {
+	// Generate two different certs from the same CA.
 	ca := certs.GenCA(t)
 	cert1 := certs.GenCert(t, ca)
 	cert2 := certs.GenCert(t, ca)
 
 	dir := t.TempDir()
 
-	// Write cert from cert1 but key from cert2 (mismatched)
+	// Write the certificate from cert1 but the private key from cert2.
+	// This creates a mismatched pair that should fail validation.
 	certPath := filepath.Join(dir, "cert.pem")
 	keyPath := filepath.Join(dir, "key.pem")
 
@@ -89,16 +95,20 @@ func TestNew_InvalidCertPair(t *testing.T) {
 	require.NoError(t, pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}))
 	require.NoError(t, keyOut.Close())
 
+	// New() should fail because the cert and key don't match.
 	_, err = New(certPath, keyPath, 0)
 	assert.Error(t, err)
 }
 
 func TestNew_MissingFiles(t *testing.T) {
+	// Attempting to create a reloader with paths that don't exist should fail
+	// on the initial certificate load.
 	_, err := New("/nonexistent/cert.pem", "/nonexistent/key.pem", 0)
 	assert.Error(t, err)
 }
 
 func TestNew_EmptyPaths(t *testing.T) {
+	// Empty paths should be rejected before attempting any file I/O.
 	_, err := New("", "", 0)
 	assert.Error(t, err)
 }
@@ -110,6 +120,7 @@ func TestReload_CertChange(t *testing.T) {
 	dir := t.TempDir()
 	certPath, keyPath := writeCertAndKey(t, dir, cert1)
 
+	// Use a short debounce (100ms) to keep the test fast.
 	r, err := New(certPath, keyPath, 100*time.Millisecond)
 	require.NoError(t, err)
 
@@ -117,23 +128,24 @@ func TestReload_CertChange(t *testing.T) {
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 	defer cancel()
 
+	// Start the file watcher in the background.
 	go func() {
 		_ = r.Run(ctx)
 	}()
 
-	// Verify initial cert
+	// Verify the initial cert is served.
 	got, err := r.GetCertificate(nil)
 	require.NoError(t, err)
 	assert.Equal(t, cert1.Certificate[0], got.Certificate[0])
 
-	// Generate and write a new cert
+	// Overwrite both cert and key files with a new certificate.
 	cert2 := certs.GenCert(t, ca)
 	writeCertAndKey(t, dir, cert2)
 
-	// Wait for debounce + buffer
+	// Wait for the debounce period (100ms) plus a buffer for fsnotify delivery.
 	time.Sleep(300 * time.Millisecond)
 
-	// Verify new cert is served
+	// After the debounce, GetCertificate should return the new cert.
 	got, err = r.GetCertificate(nil)
 	require.NoError(t, err)
 	assert.Equal(t, cert2.Certificate[0], got.Certificate[0])
@@ -157,13 +169,15 @@ func TestReload_InvalidNewCert_KeepsOld(t *testing.T) {
 		_ = r.Run(ctx)
 	}()
 
-	// Overwrite cert with garbage
+	// Overwrite the cert file with invalid data. The reloader should detect
+	// the change, attempt to load the new pair, fail validation, and keep
+	// serving the original cert.
 	require.NoError(t, os.WriteFile(certPath, []byte("not a cert"), 0o644))
 
-	// Wait for debounce + buffer
+	// Wait for debounce + buffer.
 	time.Sleep(300 * time.Millisecond)
 
-	// Original cert should still be served
+	// The original cert should still be served since the new one was invalid.
 	got, err := r.GetCertificate(nil)
 	require.NoError(t, err)
 	assert.Equal(t, cert1.Certificate[0], got.Certificate[0])
@@ -176,6 +190,7 @@ func TestReload_Debounce(t *testing.T) {
 	dir := t.TempDir()
 	certPath, keyPath := writeCertAndKey(t, dir, cert1)
 
+	// Use a 500ms debounce so we can test the timer reset behavior.
 	r, err := New(certPath, keyPath, 500*time.Millisecond)
 	require.NoError(t, err)
 
@@ -187,16 +202,16 @@ func TestReload_Debounce(t *testing.T) {
 		_ = r.Run(ctx)
 	}()
 
-	// Generate a new cert
 	cert2 := certs.GenCert(t, ca)
 
-	// Write cert file first
+	// T=0ms: Write only the cert file. This starts the 500ms debounce timer.
 	certOut, err := os.Create(certPath)
 	require.NoError(t, err)
 	require.NoError(t, pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert2.Certificate[0]}))
 	require.NoError(t, certOut.Close())
 
-	// Wait 200ms, then write key file (resets debounce timer)
+	// T=200ms: Write the key file. This should reset the debounce timer back
+	// to 500ms, so the reload won't happen until T=700ms.
 	time.Sleep(200 * time.Millisecond)
 	keyBytes, err := x509.MarshalPKCS8PrivateKey(cert2.PrivateKey)
 	require.NoError(t, err)
@@ -205,13 +220,15 @@ func TestReload_Debounce(t *testing.T) {
 	require.NoError(t, pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}))
 	require.NoError(t, keyOut.Close())
 
-	// At 400ms total (200ms since key write), cert should NOT yet be reloaded
+	// T=400ms: Only 200ms since the key write, still within the 500ms debounce
+	// window. The old cert should still be served.
 	time.Sleep(200 * time.Millisecond)
 	got, err := r.GetCertificate(nil)
 	require.NoError(t, err)
 	assert.Equal(t, cert1.Certificate[0], got.Certificate[0], "cert should not have reloaded yet")
 
-	// At 800ms total (500ms+ since key write), cert should be reloaded
+	// T=800ms: 600ms since the key write, past the 500ms debounce window.
+	// The new cert should now be loaded.
 	time.Sleep(400 * time.Millisecond)
 	got, err = r.GetCertificate(nil)
 	require.NoError(t, err)
@@ -231,6 +248,8 @@ func TestRun_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
+	// Start the watcher and immediately cancel the context.
+	// Run should exit cleanly with no error.
 	done := make(chan error, 1)
 	go func() {
 		done <- r.Run(ctx)
@@ -238,6 +257,7 @@ func TestRun_ContextCancellation(t *testing.T) {
 
 	cancel()
 
+	// Verify Run exits promptly (within 2s) and returns nil.
 	select {
 	case err := <-done:
 		assert.NoError(t, err)
