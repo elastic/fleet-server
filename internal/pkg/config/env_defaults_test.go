@@ -74,7 +74,7 @@ func TestDefaultLimitsYAMLKeys(t *testing.T) {
 			var raw map[string]any
 			require.NoError(t, goyaml.Unmarshal(data, &raw))
 
-			require.Containsf(raw, "server_limits", "%s does not contain server_limits attribute", path)
+			require.Containsf(t, raw, "server_limits", "%s does not contain server_limits attribute", path)
 			serverLimits, ok := raw["server_limits"].(map[string]any)
 			require.Truef(t, ok, "server_limits in %s is not type map[string]any detected type: %T", path, raw["server_limits"])
 
