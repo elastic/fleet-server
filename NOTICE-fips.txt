@@ -3301,11 +3301,11 @@ Contents of probable licence file $GOMODCACHE/github.com/spf13/cobra@v1.10.2/LIC
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmchiv5/v2
-Version: v2.7.6
+Version: v2.7.7
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/v2@v2.7.6/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/v2@v2.7.7/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3512,11 +3512,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmelasticsearch/v2
-Version: v2.7.6
+Version: v2.7.7
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.7.6/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.7.7/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3723,11 +3723,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasti
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmhttp/v2
-Version: v2.7.6
+Version: v2.7.7
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v2@v2.7.6/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v2@v2.7.7/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3934,11 +3934,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmprometheus/v2
-Version: v2.7.6
+Version: v2.7.7
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmprometheus/v2@v2.7.6/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmprometheus/v2@v2.7.7/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4145,11 +4145,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmpromet
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmzerolog/v2
-Version: v2.7.6
+Version: v2.7.7
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolog/v2@v2.7.6/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolog/v2@v2.7.7/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4356,11 +4356,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolo
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/v2
-Version: v2.7.6
+Version: v2.7.7
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/v2@v2.7.6/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/v2@v2.7.7/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
