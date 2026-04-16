@@ -53,30 +53,6 @@ func CheckCompatibility(ctx context.Context, esCli *elasticsearch.Client, fleetV
 	return esVersion, checkCompatibility(ctx, fleetVersion, esVersion)
 }
 
-func checkCompatibility(ctx context.Context, fleetVersion, esVersion string) error {
-	verConst, err := buildVersionConstraint(fleetVersion)
-	if err != nil {
-		zerolog.Ctx(ctx).Error().Err(err).Str("fleet_version", fleetVersion).Msg("failed to build constraint")
-		return err
-	}
-
-	ver, err := parseVersion(esVersion)
-	if err != nil {
-		return err
-	}
-
-	if !verConst.Check(ver) {
-		zerolog.Ctx(ctx).Error().
-			Err(ErrUnsupportedVersion).
-			Str("constraint", verConst.String()).
-			Str("reported", ver.String()).
-			Msg("failed elasticsearch version check")
-		return ErrUnsupportedVersion
-	}
-	zerolog.Ctx(ctx).Info().Str("fleet_version", fleetVersion).Str("elasticsearch_version", esVersion).Msg("Elasticsearch compatibility check successful")
-	return nil
-}
-
 func buildVersionConstraint(fleetVersion string) (version.Constraints, error) {
 	ver, err := parseVersion(fleetVersion)
 	if err != nil {
