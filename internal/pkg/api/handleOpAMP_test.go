@@ -645,3 +645,54 @@ func getUnexportedField(v reflect.Value, name string) reflect.Value {
 	field := v.FieldByName(name)
 	return reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
 }
+
+func TestHandleMessageReportFullState(t *testing.T) {
+	baseCaps := uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus)
+	wantFlags := uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState)
+
+	cases := []struct {
+		name string
+		msg  *protobufs.AgentToServer
+	}{
+		{
+			name: "flag is set on sequence gap",
+			msg: &protobufs.AgentToServer{
+				SequenceNum:  7, // gap: expected 6
+				Capabilities: baseCaps,
+			},
+		},
+		{
+			name: "flag is set on sequential message",
+			msg: &protobufs.AgentToServer{
+				SequenceNum:  6, // sequential
+				Capabilities: baseCaps,
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			agent := model.Agent{
+				LastCheckinStatus: "online",
+				SequenceNum:       5,
+			}
+			agentBytes, err := json.Marshal(agent)
+			require.NoError(t, err)
+			bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+				Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+			checker := &mockCheckin{}
+			oa := &OpAMPT{bulk: bulker, bc: checker}
+
+			agentUID := uuid.Must(uuid.NewV7())
+			tc.msg.InstanceUid = agentUID.Bytes()
+			zlog := zerolog.New(io.Discard)
+			apiKey := &apikey.APIKey{ID: "test-key"}
+
+			handler := oa.handleMessage(zlog, apiKey)
+			resp := handler(t.Context(), nil, tc.msg)
+
+			require.Nil(t, resp.ErrorResponse)
+			require.Equal(t, wantFlags, resp.Flags)
+		})
+	}
+}
