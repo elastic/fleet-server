@@ -42,10 +42,6 @@ The following fields are ignored:
 - **Health-to-status mapping.** Fleet-server maps `ComponentHealth` to simplified statuses (`online`, `error`, `degraded`). The spec's nested `component_health_map` is not traversed; only the top-level health is used.
 - **Sensitive value redaction.** Fleet-server redacts keys containing `password`, `token`, `key`, `secret`, `auth`, `certificate`, or `passphrase` from the effective config before persisting.
 
-### Capabilities
-
-- **Partial capability decoding.** Fleet-server only decodes 6 of the 16 defined `AgentCapabilities` bits: `ReportsStatus`, `AcceptsRemoteConfig`, `ReportsEffectiveConfig`, `ReportsHealth`, `ReportsAvailableComponents`, `AcceptsRestartCommand`. Other capability bits are silently ignored.
-
 ### Throttling
 
 - **HTTP-level rate limiting only.** The spec defines throttling via `ServerErrorResponse` with `UNAVAILABLE` type and `RetryInfo`. Fleet-server uses HTTP-level rate limiting middleware (returning 429) and returns 429 for Elasticsearch auth rate limits, but does not use the protobuf-level `RetryInfo` mechanism. Additionally, fleet-server may silenty drop connections before the TLS handshake completes if the server is overloaded.
