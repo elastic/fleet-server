@@ -315,7 +315,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 				osType := nia.GetValue().GetStringValue()
 				meta.Os.Platform = osType
 			case tagsKey:
-				for _, t := range strings.Split(nia.GetValue().GetStringValue(), ",") {
+				for t := range strings.SplitSeq(nia.GetValue().GetStringValue(), ",") {
 					if t = strings.TrimSpace(t); t != "" {
 						tags = append(tags, t)
 					}

@@ -311,7 +311,7 @@ func TestEnrollAgentTags(t *testing.T) {
 			require.Equal(t, tc.wantTags, agent.Tags)
 
 			// tags must not appear in stored NonIdentifyingAttributes
-			var niMap map[string]interface{}
+			var niMap map[string]any
 			require.NoError(t, json.Unmarshal(agent.NonIdentifyingAttributes, &niMap))
 			require.NotContains(t, niMap, "tags")
 			for _, k := range tc.otherNIAKeys {
