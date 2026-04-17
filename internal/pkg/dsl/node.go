@@ -14,7 +14,7 @@ type nodeMapT map[string]*Node
 type nodeListT []*Node
 
 type Node struct {
-	leaf        interface{}
+	leaf        any
 	nodeMap     nodeMapT
 	nodeList    nodeListT
 	preventNull bool

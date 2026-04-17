@@ -28,7 +28,7 @@ import (
 
 func AgentCheckin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string) string {
 	cli := cleanhttp.DefaultClient()
-	var obj map[string]interface{}
+	var obj map[string]any
 
 	t.Logf("Fake a checkin for agent %s", agentID)
 	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(checkinBody))
@@ -48,10 +48,10 @@ func AgentCheckin(t *testing.T, ctx context.Context, srv *tserver, agentID, key 
 
 	actionsRaw, ok := obj["actions"]
 	require.True(t, ok, "expected actions is missing")
-	actions, ok := actionsRaw.([]interface{})
+	actions, ok := actionsRaw.([]any)
 	require.True(t, ok, "expected actions to be an array")
 	require.Equal(t, len(actions), 1, "expected 1 action")
-	action, ok := actions[0].(map[string]interface{})
+	action, ok := actions[0].(map[string]any)
 	require.True(t, ok, "expected action to be an object")
 
 	aIDRaw, ok := action["id"]
@@ -164,14 +164,14 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	t.Log("Create policy with namespace test1")
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
 	var policyDataNamespaceTest = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
+		Outputs: map[string]map[string]any{
 			"default": {
 				"type": "elasticsearch",
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {} }`),
-		Inputs:            []map[string]interface{}{},
-		Agent:             map[string]interface{}{"monitoring": map[string]string{"use_output": "default"}},
+		Inputs:            []map[string]any{},
+		Agent:             map[string]any{"monitoring": map[string]string{"use_output": "default"}},
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -196,7 +196,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 		    "resources": ["*"]
 		}]
 	    }
-	}`), map[string]interface{}{
+	}`), map[string]any{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",

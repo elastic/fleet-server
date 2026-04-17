@@ -47,7 +47,7 @@ func TestLoadLimits(t *testing.T) {
 // TestDefaultLimitsYAML keys verifies that all embedded .yml files have keys that match go struct tags.
 // A typo in a yml key, e.g. "pgp_retieval_limit" instead of "pgp_retrieval_limit" causes a test failure.
 func TestDefaultLimitsYAMLKeys(t *testing.T) {
-	rt := reflect.TypeOf(serverLimitDefaults{})
+	rt := reflect.TypeFor[serverLimitDefaults]()
 	validTags := make([]string, 0, rt.NumField())
 	for field := range rt.Fields() {
 		if tag := field.Tag.Get("config"); tag != "" {

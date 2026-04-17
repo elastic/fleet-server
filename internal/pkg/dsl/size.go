@@ -10,6 +10,6 @@ func (n *Node) Size(sz uint64) {
 }
 
 // WithSize allows to parameterize the size
-func (n *Node) WithSize(v interface{}) {
+func (n *Node) WithSize(v any) {
 	n.nodeMap[kKeywordSize] = &Node{leaf: v}
 }

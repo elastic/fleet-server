@@ -164,9 +164,9 @@ func TestFileDelivery(t *testing.T) {
 						SeqNo:   1,
 						Version: 1,
 						Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
-						Fields: map[string]interface{}{
-							file.FieldBaseID: []interface{}{"X"},
-							file.FieldLast:   []interface{}{true},
+						Fields: map[string]any{
+							file.FieldBaseID: []any{"X"},
+							file.FieldLast:   []any{true},
 						},
 					},
 				},
@@ -224,8 +224,8 @@ func TestFileDeliveryMultipleChunks(t *testing.T) {
 						SeqNo:   1,
 						Version: 1,
 						Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
-						Fields: map[string]interface{}{
-							file.FieldBaseID: []interface{}{"X"},
+						Fields: map[string]any{
+							file.FieldBaseID: []any{"X"},
 						},
 					},
 					{
@@ -233,9 +233,9 @@ func TestFileDeliveryMultipleChunks(t *testing.T) {
 						SeqNo:   1,
 						Version: 1,
 						Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
-						Fields: map[string]interface{}{
-							file.FieldBaseID: []interface{}{"X"},
-							file.FieldLast:   []interface{}{true},
+						Fields: map[string]any{
+							file.FieldBaseID: []any{"X"},
+							file.FieldLast:   []any{true},
 						},
 					},
 				},
@@ -303,9 +303,9 @@ func TestFileDeliverySetsHeaders(t *testing.T) {
 						SeqNo:   1,
 						Version: 1,
 						Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
-						Fields: map[string]interface{}{
-							file.FieldBaseID: []interface{}{"X"},
-							file.FieldLast:   []interface{}{true},
+						Fields: map[string]any{
+							file.FieldBaseID: []any{"X"},
+							file.FieldLast:   []any{true},
 						},
 					},
 				},
@@ -364,9 +364,9 @@ func TestFileDeliverySetsHashWhenPresent(t *testing.T) {
 						SeqNo:   1,
 						Version: 1,
 						Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
-						Fields: map[string]interface{}{
-							file.FieldBaseID: []interface{}{"X"},
-							file.FieldLast:   []interface{}{true},
+						Fields: map[string]any{
+							file.FieldBaseID: []any{"X"},
+							file.FieldLast:   []any{true},
 						},
 					},
 				},
@@ -422,9 +422,9 @@ func TestFileLibraryDeliveryAllowsValidClients(t *testing.T) {
 						SeqNo:   1,
 						Version: 1,
 						Index:   fmt.Sprintf(delivery.LibraryFileDataIndexPattern, "endpoint", libName),
-						Fields: map[string]interface{}{
-							file.FieldBaseID: []interface{}{"X"},
-							file.FieldLast:   []interface{}{true},
+						Fields: map[string]any{
+							file.FieldBaseID: []any{"X"},
+							file.FieldLast:   []any{true},
 						},
 					},
 				},
@@ -473,9 +473,9 @@ func TestFileLibraryDelivery(t *testing.T) {
 						SeqNo:   1,
 						Version: 1,
 						Index:   fmt.Sprintf(delivery.LibraryFileDataIndexPattern, "endpoint", libName),
-						Fields: map[string]interface{}{
-							file.FieldBaseID: []interface{}{"X"},
-							file.FieldLast:   []interface{}{true},
+						Fields: map[string]any{
+							file.FieldBaseID: []any{"X"},
+							file.FieldLast:   []any{true},
 						},
 					},
 				},

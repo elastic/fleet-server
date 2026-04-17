@@ -47,7 +47,7 @@ const (
 
 type clientUnit interface {
 	Expected() client.Expected
-	UpdateState(state client.UnitState, message string, payload map[string]interface{}) error
+	UpdateState(state client.UnitState, message string, payload map[string]any) error
 }
 
 // Agent is a fleet-server that runs under the elastic-agent.
@@ -223,7 +223,7 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 // UpdateState updates the state of the message and payload.
-func (a *Agent) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
+func (a *Agent) UpdateState(state client.UnitState, message string, payload map[string]any) error {
 	if a.inputUnit != nil {
 		_ = a.inputUnit.UpdateState(state, message, payload)
 	}
@@ -440,14 +440,11 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 	}
 	expInput := a.inputUnit.Expected()
 	expOutput := a.outputUnit.Expected()
-	logLevel := expInput.LogLevel
-	if expOutput.LogLevel > logLevel {
-		logLevel = expOutput.LogLevel
-	}
+	logLevel := max(expOutput.LogLevel, expInput.LogLevel)
 
 	// pass inputs from policy through go-ucfg in order to flatten keys
 	// if inputCfg.Source.AsMap() is passed directly, any additional server.* settings will be missed
-	var input map[string]interface{}
+	var input map[string]any
 	inputsConfig, err := ucfg.NewFrom(expInput.Config.Source.AsMap(), config.DefaultOptions...)
 	if err != nil {
 		return nil, err
@@ -465,7 +462,7 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 			a.outputCheckCanceller = nil
 		}
 
-		bootstrap, ok := bootstrapCfg.(map[string]interface{})
+		bootstrap, ok := bootstrapCfg.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("output bootstrap attribute is not an object, detected type: %T", bootstrapCfg)
 		}
@@ -491,20 +488,20 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 		}
 	}
 
-	cfgData, err := ucfg.NewFrom(map[string]interface{}{
-		"fleet": map[string]interface{}{
-			"agent": map[string]interface{}{
+	cfgData, err := ucfg.NewFrom(map[string]any{
+		"fleet": map[string]any{
+			"agent": map[string]any{
 				"id":      agentID,
 				"version": agentVersion,
 			},
 		},
-		"output": map[string]interface{}{
+		"output": map[string]any{
 			"elasticsearch": outMap,
 		},
-		"inputs": []interface{}{
+		"inputs": []any{
 			input,
 		},
-		"logging": map[string]interface{}{
+		"logging": map[string]any{
 			"level": logLevel.String(),
 		},
 	})
@@ -517,9 +514,9 @@ func (a *Agent) configFromUnits(ctx context.Context) (*config.Config, error) {
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Msg("Unable to parse expected APM config as instrumentation config")
 		} else {
-			obj := map[string]interface{}{
-				"inputs": []interface{}{map[string]interface{}{
-					"server": map[string]interface{}{
+			obj := map[string]any{
+				"inputs": []any{map[string]any{
+					"server": map[string]any{
 						"instrumentation": instrumentationCfg,
 					},
 				},
@@ -573,7 +570,7 @@ func apmConfigToInstrumentation(src *proto.APMConfig) (config.Instrumentation, e
 // injectMissingOutputAttributes will inject an explicit set of keys that may be present in bootstrap into outMap.
 // If outmap has a certificate_authorities or a fingerprint, verification_mode: none will not be injected if it is part of bootstrap.
 // Note that we avoiding a more generic injection here (iterating over all keys in bootstrap recursively) in order to avoid injecting any unnecessary/deprecated attributes.
-func injectMissingOutputAttributes(ctx context.Context, outMap, bootstrap map[string]interface{}) {
+func injectMissingOutputAttributes(ctx context.Context, outMap, bootstrap map[string]any) {
 	bootstrapKeys := []string{
 		"protocol",
 		"hosts",
@@ -600,9 +597,9 @@ func injectMissingOutputAttributes(ctx context.Context, outMap, bootstrap map[st
 	outputSSLUsesCA := false
 	injectVerificationNone := false
 	// handle nested structs in bootstrap, currently we just support some ssl config
-	var bootstrapSSL map[string]interface{}
+	var bootstrapSSL map[string]any
 	if mp, ok := bootstrap["ssl"]; ok {
-		bootstrapSSL, ok = mp.(map[string]interface{})
+		bootstrapSSL, ok = mp.(map[string]any)
 		if !ok {
 			zerolog.Ctx(ctx).Warn().Interface("ssl_attribute", mp).Msg("Bootstrap ssl attribute is not an object.")
 			// ssl is not a map
@@ -619,9 +616,9 @@ func injectMissingOutputAttributes(ctx context.Context, outMap, bootstrap map[st
 		return
 	}
 
-	outputSSL := map[string]interface{}{}
+	outputSSL := map[string]any{}
 	if mp, ok := outMap["ssl"]; ok {
-		outputSSL, ok = mp.(map[string]interface{})
+		outputSSL, ok = mp.(map[string]any)
 		if !ok {
 			zerolog.Ctx(ctx).Warn().Interface("ssl_attribute", mp).Msg("Policy ssl attribute is not an object.")
 			// output.ssl is not a map
@@ -639,7 +636,7 @@ func injectMissingOutputAttributes(ctx context.Context, outMap, bootstrap map[st
 }
 
 // injectKeys will inject any key in the passed list that exists in src but is missing from dst.
-func injectKeys(keys []string, dst, src map[string]interface{}) {
+func injectKeys(keys []string, dst, src map[string]any) {
 	for _, key := range keys {
 		// dst contains the key
 		if _, ok := dst[key]; ok {
@@ -654,7 +651,7 @@ func injectKeys(keys []string, dst, src map[string]interface{}) {
 }
 
 // checkForCA checks to see if the passed cfg contains a certificate_authorities list with one item or a non-empty ca_trusted_fingerprint value.
-func checkForCA(cfg map[string]interface{}) bool {
+func checkForCA(cfg map[string]any) bool {
 	// if the cfg contains verificaton_mode none return false
 	if tmp, ok := cfg["verification_mode"]; ok {
 		if verificationMode, ok := tmp.(string); ok && verificationMode == verifyNone {
@@ -662,7 +659,7 @@ func checkForCA(cfg map[string]interface{}) bool {
 		}
 	}
 	if tmp, ok := cfg["certificate_authorities"]; ok {
-		if cas, ok := tmp.([]interface{}); ok && len(cas) > 0 {
+		if cas, ok := tmp.([]any); ok && len(cas) > 0 {
 			return true
 		}
 	}
@@ -674,7 +671,7 @@ func checkForCA(cfg map[string]interface{}) bool {
 	return false
 }
 
-func toOutput(data map[string]interface{}) (config.Output, error) {
+func toOutput(data map[string]any) (config.Output, error) {
 	var esOut config.Elasticsearch
 	temp, err := ucfg.NewFrom(data, config.DefaultOptions...)
 	if err != nil {
@@ -700,7 +697,7 @@ func toOutput(data map[string]interface{}) (config.Output, error) {
 	}, nil
 }
 
-func (a *Agent) esOutputCheck(ctx context.Context, cfg map[string]interface{}) error {
+func (a *Agent) esOutputCheck(ctx context.Context, cfg map[string]any) error {
 	outCfg, err := toOutput(cfg)
 	if err != nil {
 		return fmt.Errorf("unable to convert map into output object: %w", err)
@@ -721,7 +718,7 @@ func (a *Agent) esOutputCheck(ctx context.Context, cfg map[string]interface{}) e
 
 // esOutputCheckLoop will periodically retest the passed (output) config and signal chReconfigure if it succeeds then return.
 // If the context ic canceled, or an ErrElasticVersionConflict is returned (by the test) it will return
-func (a *Agent) esOutputCheckLoop(ctx context.Context, delay time.Duration, cfg map[string]interface{}) {
+func (a *Agent) esOutputCheckLoop(ctx context.Context, delay time.Duration, cfg map[string]any) {
 	for {
 		if err := sleep.WithContext(ctx, delay); err != nil {
 			return // context cancelled

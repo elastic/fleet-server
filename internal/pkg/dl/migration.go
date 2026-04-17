@@ -222,7 +222,7 @@ func migrateAgentOutputs() (string, string, []byte, error) {
 	query := dsl.NewRoot()
 	query.Query().Bool().Must().Exists(fieldDefaultAPIKeyID)
 
-	fields := map[string]interface{}{fieldRetiredAt: timeNow().UTC().Format(time.RFC3339)}
+	fields := map[string]any{fieldRetiredAt: timeNow().UTC().Format(time.RFC3339)}
 	painless := `
 // set up the new fields
 ctx._source['` + fieldOutputs + `']=new HashMap();
@@ -254,7 +254,7 @@ ctx._source.default_api_key=null;
 ctx._source.default_api_key_id=null;
 ctx._source.policy_output_permissions_hash=null;
 `
-	query.Param("script", map[string]interface{}{
+	query.Param("script", map[string]any{
 		"lang":   "painless",
 		"source": painless,
 		"params": fields,

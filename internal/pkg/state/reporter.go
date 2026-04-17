@@ -14,7 +14,7 @@ import (
 // Reporter is interface that reports updated state on.
 type Reporter interface {
 	// UpdateState triggers updating the state.
-	UpdateState(state client.UnitState, message string, payload map[string]interface{}) error
+	UpdateState(state client.UnitState, message string, payload map[string]any) error
 }
 
 // Log will write state' to log.
@@ -30,7 +30,7 @@ func NewLog(l *zerolog.Logger) *Log {
 }
 
 // UpdateState triggers updating the state.
-func (l *Log) UpdateState(state client.UnitState, message string, _ map[string]interface{}) error {
+func (l *Log) UpdateState(state client.UnitState, message string, _ map[string]any) error {
 	l.Info().Str("state", state.String()).Msg(message)
 	return nil
 }
@@ -46,7 +46,7 @@ func NewChained(reporters ...Reporter) *Chained {
 }
 
 // UpdateState triggers updating the state.
-func (l *Chained) UpdateState(state client.UnitState, message string, payload map[string]interface{}) error {
+func (l *Chained) UpdateState(state client.UnitState, message string, payload map[string]any) error {
 	for _, reporter := range l.reporters {
 		if err := reporter.UpdateState(state, message, payload); err != nil {
 			return err

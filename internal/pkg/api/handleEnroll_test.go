@@ -63,8 +63,7 @@ func TestRemoveDuplicateStr(t *testing.T) {
 }
 
 func TestEnroll(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	enrollmentID := "1234"
@@ -102,8 +101,7 @@ func TestEnroll(t *testing.T) {
 }
 
 func TestEnrollWithAgentID(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"
@@ -144,8 +142,7 @@ func TestEnrollWithAgentID(t *testing.T) {
 }
 
 func TestEnrollWithAgentIDExistingNonActive(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"
@@ -191,8 +188,7 @@ func TestEnrollWithAgentIDExistingNonActive(t *testing.T) {
 }
 
 func TestEnrollWithAgentIDExistingActive_NotReplaceable(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"
@@ -226,8 +222,7 @@ func TestEnrollWithAgentIDExistingActive_NotReplaceable(t *testing.T) {
 }
 
 func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Missing(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"
@@ -269,8 +264,7 @@ func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Missing(t *testing.
 }
 
 func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Mismatch(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"
@@ -314,8 +308,7 @@ func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Mismatch(t *testing
 }
 
 func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"
@@ -359,8 +352,7 @@ func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
 }
 
 func TestEnrollWithAgentIDExistingActive(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"

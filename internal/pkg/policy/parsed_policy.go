@@ -49,9 +49,9 @@ type ParsedPolicy struct {
 	Roles      RoleMapT
 	Outputs    map[string]Output
 	Default    ParsedPolicyDefaults
-	Inputs     []map[string]interface{}
-	Agent      map[string]interface{}
-	Fleet      map[string]interface{}
+	Inputs     []map[string]any
+	Agent      map[string]any
+	Fleet      map[string]any
 	SecretKeys []string
 	Links      apm.SpanLink
 }
@@ -94,7 +94,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 
 	// Replace secrets in 'agent.download' section of policy
 	if agentDownload, exists := p.Data.Agent["download"]; exists {
-		if section, ok := agentDownload.(map[string]interface{}); ok {
+		if section, ok := agentDownload.(map[string]any); ok {
 			agentDownloadSecretKeys, err := secret.ProcessMapSecrets(section, secretValues)
 			if err != nil {
 				return nil, fmt.Errorf("failed to replace secrets in agent.download section of policy: %w", err)
@@ -170,7 +170,7 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 	return pp, nil
 }
 
-func constructPolicyOutputs(outputs map[string]map[string]interface{}, roles map[string]RoleT) (map[string]Output, error) {
+func constructPolicyOutputs(outputs map[string]map[string]any, roles map[string]RoleT) (map[string]Output, error) {
 	result := make(map[string]Output, len(outputs))
 
 	for k, v := range outputs {
@@ -227,7 +227,7 @@ func parsePerms(permsRaw json.RawMessage) (RoleMapT, error) {
 // findDefaultName returns the name of the 1st output with the "elasticsearch" type or falls back to behaviour that relies on deprecated fields.
 //
 // Previous fleet-server and elastic-agent released had a default output which was removed Sept 2021.
-func findDefaultOutputName(outputs map[string]map[string]interface{}) (string, error) {
+func findDefaultOutputName(outputs map[string]map[string]any) (string, error) {
 	// iterate across the keys finding the defaults
 	var defaults []string
 	var ESdefaults []string
@@ -244,7 +244,7 @@ func findDefaultOutputName(outputs map[string]map[string]interface{}) (string, e
 				defaults = append(defaults, k)
 				continue
 			}
-			fsMap, ok := fleetServer.(map[string]interface{})
+			fsMap, ok := fleetServer.(map[string]any)
 			if ok {
 				str, ok := fsMap[FieldOutputServiceToken].(string)
 				if ok && str == "" {

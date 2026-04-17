@@ -23,7 +23,7 @@ func TestBufGrowWhileWrite(t *testing.T) {
 	ptrs := make([][]byte, 0, nBytes)
 
 	var dst Buf
-	for i := 0; i < nBytes; i++ {
+	for i := range nBytes {
 
 		if err = dst.WriteByte(src[i]); err != nil {
 			t.Fatal(err)

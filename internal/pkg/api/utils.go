@@ -7,8 +7,9 @@ package api
 // ptr is a helper function to get a pointer to whatever is passed, including a literal
 //
 //nolint:deadcode,unused // used in tests at the moment
+//go:fix inline
 func ptr[T any](v T) *T {
-	return &v
+	return new(v)
 }
 
 // fromPtr takes a pointer to a val and returns the val, or the zero-type of it if it's nil

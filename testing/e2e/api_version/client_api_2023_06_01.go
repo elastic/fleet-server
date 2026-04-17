@@ -204,7 +204,7 @@ func (tester *ClientAPITester20230601) FullFileUpload(ctx context.Context, apiKe
 
 	chunkCount := int(math.Ceil(float64(size) / float64(chunkSize)))
 	tHash := sha256.New()
-	for i := 0; i < chunkCount; i++ {
+	for i := range chunkCount {
 		var body bytes.Buffer
 		n := int64(math.Min(float64(chunkSize), float64(size)))
 		size = size - n

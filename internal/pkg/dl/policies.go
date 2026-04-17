@@ -91,7 +91,7 @@ func prepareQueryPolicies() *dsl.Tmpl {
 // can't filter on output in ES as the field is not mapped
 func QueryOutputFromPolicy(ctx context.Context, bulker bulk.Bulk, outputName string, opt ...Option) (*model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
-	params := map[string]interface{}{}
+	params := map[string]any{}
 	res, err := Search(ctx, bulker, tmplQueryPolicies, o.indexName, params)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {

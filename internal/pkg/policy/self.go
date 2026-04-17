@@ -217,7 +217,7 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 
 	state := client.UnitStateHealthy
 	extendMsg := ""
-	var payload map[string]interface{}
+	var payload map[string]any
 	if m.fleet.Agent.ID == "" {
 		state = client.UnitStateDegraded
 		extendMsg = "; missing config fleet.agent.id (expected during bootstrap process)"
@@ -237,7 +237,7 @@ func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error
 			}
 			return client.UnitStateStarting, nil
 		}
-		payload = map[string]interface{}{
+		payload = map[string]any{
 			"enrollment_token": tokens[0].APIKey,
 		}
 	}
@@ -288,7 +288,7 @@ func reportOutputHealth(ctx context.Context, bulker bulk.Bulk, zlog zerolog.Logg
 	}
 }
 
-func HasFleetServerInput(inputs []map[string]interface{}) bool {
+func HasFleetServerInput(inputs []map[string]any) bool {
 	for _, input := range inputs {
 		attr, ok := input["type"].(string)
 		if !ok {

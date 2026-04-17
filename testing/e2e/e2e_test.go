@@ -20,7 +20,7 @@ type logger struct {
 	*testing.T
 }
 
-func (l *logger) Printf(format string, v ...interface{}) {
+func (l *logger) Printf(format string, v ...any) {
 	l.Helper()
 	l.Logf(format, v...)
 }

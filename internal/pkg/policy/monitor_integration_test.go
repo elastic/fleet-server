@@ -26,7 +26,7 @@ import (
 )
 
 var intPolData = model.PolicyData{
-	Outputs: map[string]map[string]interface{}{
+	Outputs: map[string]map[string]any{
 		"default": {
 			"type": "elasticsearch",
 		},
@@ -48,14 +48,12 @@ func TestMonitor_Integration(t *testing.T) {
 	// Start index monitor
 	var imerr error
 	var imwg sync.WaitGroup
-	imwg.Add(1)
-	go func() {
-		defer imwg.Done()
+	imwg.Go(func() {
 		imerr = im.Run(ctx)
 		if errors.Is(imerr, context.Canceled) {
 			imerr = nil
 		}
-	}()
+	})
 
 	m := NewMonitor(bulker, im, config.ServerLimits{})
 	pm, ok := m.(*monitorT)
@@ -66,14 +64,12 @@ func TestMonitor_Integration(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = m.Run(ctx)
 		if errors.Is(merr, context.Canceled) {
 			merr = nil
 		}
-	}()
+	})
 	err = pm.waitStart(ctx)
 	require.NoError(t, err)
 
@@ -144,14 +140,12 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 	// Start index monitor
 	var imerr error
 	var imwg sync.WaitGroup
-	imwg.Add(1)
-	go func() {
-		defer imwg.Done()
+	imwg.Go(func() {
 		imerr = im.Run(ctx)
 		if errors.Is(imerr, context.Canceled) {
 			imerr = nil
 		}
-	}()
+	})
 
 	m := NewMonitor(bulker, im, config.ServerLimits{})
 	pm, ok := m.(*monitorT)
@@ -162,14 +156,12 @@ func TestMonitor_Debounce_Integration(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = m.Run(ctx)
 		if errors.Is(merr, context.Canceled) {
 			merr = nil
 		}
-	}()
+	})
 	err = pm.waitStart(ctx)
 	require.NoError(t, err)
 
@@ -335,14 +327,12 @@ func TestMonitor_Revisions(t *testing.T) {
 	// Start index monitor
 	var imerr error
 	var imwg sync.WaitGroup
-	imwg.Add(1)
-	go func() {
-		defer imwg.Done()
+	imwg.Go(func() {
 		imerr = im.Run(ctx)
 		if errors.Is(imerr, context.Canceled) {
 			imerr = nil
 		}
-	}()
+	})
 
 	m := NewMonitor(bulker, im, config.ServerLimits{})
 	pm, ok := m.(*monitorT)
@@ -353,14 +343,12 @@ func TestMonitor_Revisions(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = m.Run(ctx)
 		if errors.Is(merr, context.Canceled) {
 			merr = nil
 		}
-	}()
+	})
 	err = pm.waitStart(ctx)
 	require.NoError(t, err)
 
@@ -457,14 +445,12 @@ func TestMonitor_KickDeploy(t *testing.T) {
 	// Start index monitor
 	var imerr error
 	var imwg sync.WaitGroup
-	imwg.Add(1)
-	go func() {
-		defer imwg.Done()
+	imwg.Go(func() {
 		imerr = im.Run(ctx)
 		if errors.Is(imerr, context.Canceled) {
 			imerr = nil
 		}
-	}()
+	})
 
 	m := NewMonitor(bulker, im, config.ServerLimits{})
 	pm, ok := m.(*monitorT)
@@ -475,14 +461,12 @@ func TestMonitor_KickDeploy(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = m.Run(ctx)
 		if errors.Is(merr, context.Canceled) {
 			merr = nil
 		}
-	}()
+	})
 	err = pm.waitStart(ctx)
 	require.NoError(t, err)
 

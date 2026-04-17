@@ -102,10 +102,10 @@ func TestGetActionDataWithSecrets(t *testing.T) {
 		{ID: "ref2"},
 	}
 	// Input JSON with secret references
-	input := map[string]interface{}{
+	input := map[string]any{
 		"username": "user1",
 		"password": "$co.elastic.secret{ref1}",
-		"nested": map[string]interface{}{
+		"nested": map[string]any{
 			"token": "$co.elastic.secret{ref2}",
 		},
 	}
@@ -116,14 +116,14 @@ func TestGetActionDataWithSecrets(t *testing.T) {
 	result, err := GetActionDataWithSecrets(t.Context(), b, refs, bulker)
 	require.NoError(t, err)
 
-	var out map[string]interface{}
+	var out map[string]any
 	err = json.Unmarshal(result, &out)
 	require.NoError(t, err)
 
 	assert.Equal(t, "user1", out["username"])
 	assert.Equal(t, "ref1_value", out["password"])
 
-	nestedMap, ok := out["nested"].(map[string]interface{})
+	nestedMap, ok := out["nested"].(map[string]any)
 	assert.True(t, ok)
 
 	require.NoError(t, err)
@@ -132,11 +132,11 @@ func TestGetActionDataWithSecrets(t *testing.T) {
 
 func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 	refs := []model.SecretReferencesItems{{ID: "ref1"}, {ID: "ref2"}, {ID: "ref3"}}
-	inputs := []map[string]interface{}{
+	inputs := []map[string]any{
 		{"id": "input1", "package_var_secret": "$co.elastic.secret{ref1}",
 			"input_var_secret": "$co.elastic.secret{ref2}"},
-		{"id": "input2", "streams": []interface{}{
-			map[string]interface{}{
+		{"id": "input2", "streams": []any{
+			map[string]any{
 				"id":                 "stream1",
 				"package_var_secret": "$co.elastic.secret{ref1}",
 				"input_var_secret":   "$co.elastic.secret{ref2}",
@@ -148,16 +148,16 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 		SecretReferences: refs,
 		Inputs:           inputs,
 	}
-	expectedStream := map[string]interface{}{
+	expectedStream := map[string]any{
 		"id":                 "stream1",
 		"package_var_secret": "ref1_value",
 		"input_var_secret":   "ref2_value",
 		"stream_var_secret":  "ref3_value",
 	}
-	expectedResult := []map[string]interface{}{
+	expectedResult := []map[string]any{
 		{"id": "input1", "package_var_secret": "ref1_value",
 			"input_var_secret": "ref2_value"},
-		{"id": "input2", "streams": []interface{}{expectedStream}},
+		{"id": "input2", "streams": []any{expectedStream}},
 	}
 
 	secretValues := map[string]string{
@@ -173,15 +173,15 @@ func TestGetPolicyInputsWithSecretsAndStreams(t *testing.T) {
 
 func TestPolicyInputSteamsEmbedded(t *testing.T) {
 	refs := []model.SecretReferencesItems{{ID: "ref1"}}
-	inputs := []map[string]interface{}{
-		{"id": "input1", "streams": []interface{}{
-			map[string]interface{}{
+	inputs := []map[string]any{
+		{"id": "input1", "streams": []any{
+			map[string]any{
 				"id":  "stream1",
 				"key": "val",
-				"embedded": map[string]interface{}{
+				"embedded": map[string]any{
 					"embedded-key": "embedded-val",
-					"embedded-arr": []interface{}{
-						map[string]interface{}{
+					"embedded-arr": []any{
+						map[string]any{
 							"embedded-secret": "$co.elastic.secret{ref1}",
 						},
 					}},
@@ -193,16 +193,16 @@ func TestPolicyInputSteamsEmbedded(t *testing.T) {
 		SecretReferences: refs,
 		Inputs:           inputs,
 	}
-	expected := []map[string]interface{}{{
+	expected := []map[string]any{{
 		"id": "input1",
-		"streams": []interface{}{
-			map[string]interface{}{
+		"streams": []any{
+			map[string]any{
 				"id":  "stream1",
 				"key": "val",
-				"embedded": map[string]interface{}{
+				"embedded": map[string]any{
 					"embedded-key": "embedded-val",
-					"embedded-arr": []interface{}{
-						map[string]interface{}{
+					"embedded-arr": []any{
+						map[string]any{
 							"embedded-secret": "ref1_value",
 						},
 					}},
@@ -220,10 +220,10 @@ func TestPolicyInputSteamsEmbedded(t *testing.T) {
 }
 
 func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
-	inputs := []map[string]interface{}{
+	inputs := []map[string]any{
 		{"id": "input1"},
-		{"id": "input2", "streams": []interface{}{
-			map[string]interface{}{
+		{"id": "input2", "streams": []any{
+			map[string]any{
 				"id": "stream1",
 			},
 		}},
@@ -231,12 +231,12 @@ func TestGetPolicyInputsNoopWhenNoSecrets(t *testing.T) {
 	pData := model.PolicyData{
 		Inputs: inputs,
 	}
-	expectedStream := map[string]interface{}{
+	expectedStream := map[string]any{
 		"id": "stream1",
 	}
-	expectedResult := []map[string]interface{}{
+	expectedResult := []map[string]any{
 		{"id": "input1"},
-		{"id": "input2", "streams": []interface{}{expectedStream}},
+		{"id": "input2", "streams": []any{expectedStream}},
 	}
 
 	result, keys := ProcessInputsSecrets(&pData, nil)

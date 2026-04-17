@@ -266,7 +266,7 @@ func (suite *StandAloneSuite) TestStaticTokenAuthentication() {
 	suite.Require().NoError(err)
 	f, err := os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
-	err = tpl.Execute(f, map[string]interface{}{
+	err = tpl.Execute(f, map[string]any{
 		"Hosts":                    suite.ESHosts,
 		"ServiceToken":             suite.ServiceToken,
 		"CertPath":                 filepath.Join(suite.CertPath, "fleet-server.crt"),
@@ -594,8 +594,7 @@ func (suite *StandAloneSuite) startFleetServerForOpAMP(ctx context.Context, dir,
 
 	f, err := os.Create(filepath.Join(dir, "config.yml"))
 	suite.Require().NoError(err)
-
-	err = tpl.Execute(f, map[string]interface{}{
+	err = tpl.Execute(f, map[string]any{
 		"Hosts":          suite.ESHosts,
 		"ServiceToken":   suite.ServiceToken,
 		"StaticTokenKey": staticTokenKey,
@@ -630,7 +629,7 @@ func (suite *StandAloneSuite) writeOpAMPCollectorConfig(configFilePath, instance
 	f, err := os.Create(configFilePath)
 	suite.Require().NoError(err)
 
-	err = tpl.Execute(f, map[string]interface{}{
+	err = tpl.Execute(f, map[string]any{
 		"OpAMP": map[string]string{
 			"InstanceUID": instanceUID,
 			"APIKey":      apiKey,

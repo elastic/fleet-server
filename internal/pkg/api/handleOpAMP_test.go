@@ -126,7 +126,7 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 	raw, err := ProtobufKVToRawMessage(zlog, input)
 	require.NoError(t, err)
 
-	var got map[string]interface{}
+	var got map[string]any
 	require.NoError(t, json.Unmarshal(raw, &got))
 
 	require.Equal(t, "hello", got["string_key"])
@@ -134,8 +134,8 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 	require.Equal(t, 3.14, got["double_key"])
 	require.Equal(t, true, got["bool_key"])
 	require.Equal(t, base64.StdEncoding.EncodeToString([]byte("bin")), got["bytes_key"])
-	require.Equal(t, []interface{}{"elem1", float64(2)}, got["array_key"])
-	require.Equal(t, map[string]interface{}{"nested_string_key": "nested", "nested_int_key": float64(99)}, got["kvlist_key"])
+	require.Equal(t, []any{"elem1", float64(2)}, got["array_key"])
+	require.Equal(t, map[string]any{"nested_string_key": "nested", "nested_int_key": float64(99)}, got["kvlist_key"])
 }
 
 func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
@@ -311,7 +311,7 @@ func TestEnrollAgentTags(t *testing.T) {
 			require.Equal(t, tc.wantTags, agent.Tags)
 
 			// tags must not appear in stored NonIdentifyingAttributes
-			var niMap map[string]interface{}
+			var niMap map[string]any
 			require.NoError(t, json.Unmarshal(agent.NonIdentifyingAttributes, &niMap))
 			require.NotContains(t, niMap, "tags")
 			for _, k := range tc.otherNIAKeys {
@@ -373,7 +373,7 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	require.Equal(t, "StatusRecoverableError", health.Status)
 
 	configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
-	var config map[string]interface{}
+	var config map[string]any
 	require.NoError(t, json.Unmarshal(configBytes, &config))
 	require.Equal(t, "[REDACTED]", config["password"])
 	require.Equal(t, float64(2), config["num"])
@@ -558,8 +558,8 @@ func pendingFromOptions(t *testing.T, opts []checkin.Option) reflect.Value {
 	t.Helper()
 	require.NotEmpty(t, opts)
 
-	sampleOpt := checkin.WithStatus("")
-	argType := reflect.TypeOf(sampleOpt).In(0)
+	_ = checkin.WithStatus("")
+	argType := reflect.TypeFor[checkin.Option]().In(0)
 	pendingPtr := reflect.New(argType.Elem())
 	for _, opt := range opts {
 		reflect.ValueOf(opt).Call([]reflect.Value{pendingPtr})

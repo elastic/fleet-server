@@ -24,10 +24,10 @@ import (
 
 // convenience function for making a typical file request structure
 // with defaults when specific values are not checked or required
-func makeUploadRequestDict(input map[string]interface{}) JSDict {
+func makeUploadRequestDict(input map[string]any) JSDict {
 	// defaults
 	d := JSDict{
-		"file": map[string]interface{}{
+		"file": map[string]any{
 			"name":      "foo.png",
 			"mime_type": "image/png",
 			"size":      1024,
@@ -43,11 +43,11 @@ func makeUploadRequestDict(input map[string]interface{}) JSDict {
 
 	// fill in any provided values, e.g.  "file.name": "test.zip"
 	for k, v := range input {
-		dict := map[string]interface{}(d)
+		dict := map[string]any(d)
 		keys := strings.Split(k, ".")
 		for i, key := range keys {
 			if i < len(keys)-1 {
-				dict, _ = dict[key].(map[string]interface{})
+				dict, _ = dict[key].(map[string]any)
 				continue
 			}
 			dict[key] = v
@@ -63,7 +63,7 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 	src := "mysource"
 	action := "abc"
 	agent := "XYZ"
-	data := makeUploadRequestDict(map[string]interface{}{
+	data := makeUploadRequestDict(map[string]any{
 		"action_id": action,
 		"agent_id":  agent,
 		"src":       src,
@@ -106,7 +106,7 @@ func TestUploadBeginWritesDocumentFromInputs(t *testing.T) {
 	agent := "xyz-123"
 	name := "test.zip"
 
-	data := makeUploadRequestDict(map[string]interface{}{
+	data := makeUploadRequestDict(map[string]any{
 		"action_id": action,
 		"agent_id":  agent,
 		"src":       src,
@@ -168,7 +168,7 @@ func TestUploadBeginCalculatesCorrectChunkCount(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
-			data := makeUploadRequestDict(map[string]interface{}{
+			data := makeUploadRequestDict(map[string]any{
 				"file.size": tc.FileSize,
 			})
 			info, err := u.Begin(t.Context(), []string{}, data)
@@ -211,7 +211,7 @@ func TestUploadBeginMaxFileSize(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 			u := New(nil, fakeBulk, c, tc.UploadSizeLimit, time.Hour)
-			data := makeUploadRequestDict(map[string]interface{}{
+			data := makeUploadRequestDict(map[string]any{
 				"file.size": tc.FileSize,
 			})
 			_, err := u.Begin(t.Context(), []string{}, data)
@@ -261,13 +261,13 @@ func TestUploadRejectsMissingRequiredFields(t *testing.T) {
 			data := makeUploadRequestDict(nil)
 
 			// now delete this field and expect failure below
-			d := map[string]interface{}(data)
+			d := map[string]any(data)
 			parts := strings.Split(field, ".")
 			for i, part := range parts {
 				if i == len(parts)-1 { // leaf of an object tree
 					delete(d, part)
 				} else {
-					d, ok = d[part].(map[string]interface{})
+					d, ok = d[part].(map[string]any)
 					assert.Truef(t, ok, "incorrect key path '%s' when testing required fields", field)
 				}
 			}
@@ -283,11 +283,11 @@ func TestUploadRejectsMissingRequiredFields(t *testing.T) {
 func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 
 	// convert info into how it's stored/returned in ES
-	out, _ := json.Marshal(map[string]interface{}{
+	out, _ := json.Marshal(map[string]any{
 		"action_id": info.ActionID,
 		"agent_id":  info.AgentID,
 		"src":       info.Source,
-		"file": map[string]interface{}{
+		"file": map[string]any{
 			"size":      info.Total,
 			"ChunkSize": info.ChunkSize,
 			"Status":    info.Status,
@@ -346,7 +346,7 @@ func TestChunkMarksFinal(t *testing.T) {
 
 			u := New(nil, fakeBulk, c, size_ptr(8388608000), time.Hour)
 
-			data := makeUploadRequestDict(map[string]interface{}{
+			data := makeUploadRequestDict(map[string]any{
 				"file.size": tc.FileSize,
 			})
 
