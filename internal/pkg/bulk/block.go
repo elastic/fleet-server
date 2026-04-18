@@ -82,5 +82,5 @@ func (blk *bulkT) reset() {
 type respT struct {
 	err  error
 	idx  int32
-	data interface{}
+	data any
 }

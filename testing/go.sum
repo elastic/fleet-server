@@ -47,8 +47,8 @@ github.com/ebitengine/purego v0.10.0 h1:QIw4xfpWT6GWTzaW5XEKy3HXoqrJGx1ijYHzTF0/
 github.com/ebitengine/purego v0.10.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
 github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
 github.com/elastic/elastic-agent-client/v7 v7.18.1/go.mod h1:uDpSGZ+YCKgqgtkwCA0qjwX0gU/wmixDsVbPjY3GkPs=
-github.com/elastic/elastic-agent-libs v0.34.0 h1:ju2FMjE5Obvy42O/MAKafbt5jLGlC769wn/2+/jrRlE=
-github.com/elastic/elastic-agent-libs v0.34.0/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
+github.com/elastic/elastic-agent-libs v0.36.0 h1:46O0MFInVGyvFdtPzoQdtDUeOWA3hGaJ+1PTDf2JEGA=
+github.com/elastic/elastic-agent-libs v0.36.0/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
 github.com/elastic/go-sysinfo v1.15.1 h1:zBmTnFEXxIQ3iwcQuk7MzaUotmKRp3OabbbWM8TdzIQ=
 github.com/elastic/go-sysinfo v1.15.1/go.mod h1:jPSuTgXG+dhhh0GKIyI2Cso+w5lPJ5PvVqKlL8LV/Hk=
 github.com/elastic/go-ucfg v0.9.1 h1:OwbVLC9pAmHqlBDq5owRC7HbfldsLuqPqrwg23n17BQ=
@@ -162,10 +162,10 @@ github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 h1:ilQV1hzziu+LLM3zU
 github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78/go.mod h1:aL8wCCfTfSfmXjznFBSZNN13rSJjlIOI1fUNAtF7rmI=
 github.com/yusufpapurcu/wmi v1.2.4 h1:zFUKzehAFReQwLys1b/iSMl+JQGSCSjtVqQn9bBrPo0=
 github.com/yusufpapurcu/wmi v1.2.4/go.mod h1:SBZ9tNy3G9/m5Oi98Zks0QjeHVDvuK0qfxQmPyzfmi0=
-go.elastic.co/apm/module/apmhttp/v2 v2.7.6 h1:GvYxWKtb3EwGoKkOQjqb8YksD0WK9ZePAzGoEo/tAnQ=
-go.elastic.co/apm/module/apmhttp/v2 v2.7.6/go.mod h1:MKTDKld7XmTlEQIVQwW1/wB2jLzZlIS7ya0Mu8pAovI=
-go.elastic.co/apm/v2 v2.7.6 h1:s2PfC3iuhlqGr+hR1Ot5+50bEoggm2uoAV9TdVwHoWI=
-go.elastic.co/apm/v2 v2.7.6/go.mod h1:KJcwwsaouDzcLd8EviAO+y8yrfZzD6PhUCEg82bvLV4=
+go.elastic.co/apm/module/apmhttp/v2 v2.7.8 h1:laYyt8BmOcPwPRzRIkagJe23vagcJzl1NiSnvUiYzq0=
+go.elastic.co/apm/module/apmhttp/v2 v2.7.8/go.mod h1:4Anmta+IJXpm5SsFeDN/ywwlQ5uXXtv7jiJa2L2Izfs=
+go.elastic.co/apm/v2 v2.7.8 h1:JMHH5kWrvhoyhVfuwr0t9staMEOXzCRecWYm9LZkUGI=
+go.elastic.co/apm/v2 v2.7.8/go.mod h1:3AiG6bggloWi+qaDIr8ndL6429QzkFg+krECc6GW2cE=
 go.elastic.co/ecszap v1.0.3 h1:RQtagS3uSftE8mPZ3msqb6mVI67jgcDuy1PUqiMv8ow=
 go.elastic.co/ecszap v1.0.3/go.mod h1:fM1RLWDU25TB/L48RUJgz5Le2AnoCeY/g0zf2op8gDU=
 go.elastic.co/fastjson v1.5.1 h1:zeh1xHrFH79aQ6Xsw7YxixvnOdAl3OSv0xch/jRDzko=

@@ -126,7 +126,7 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 	raw, err := ProtobufKVToRawMessage(zlog, input)
 	require.NoError(t, err)
 
-	var got map[string]interface{}
+	var got map[string]any
 	require.NoError(t, json.Unmarshal(raw, &got))
 
 	require.Equal(t, "hello", got["string_key"])
@@ -134,8 +134,8 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 	require.Equal(t, 3.14, got["double_key"])
 	require.Equal(t, true, got["bool_key"])
 	require.Equal(t, base64.StdEncoding.EncodeToString([]byte("bin")), got["bytes_key"])
-	require.Equal(t, []interface{}{"elem1", float64(2)}, got["array_key"])
-	require.Equal(t, map[string]interface{}{"nested_string_key": "nested", "nested_int_key": float64(99)}, got["kvlist_key"])
+	require.Equal(t, []any{"elem1", float64(2)}, got["array_key"])
+	require.Equal(t, map[string]any{"nested_string_key": "nested", "nested_int_key": float64(99)}, got["kvlist_key"])
 }
 
 func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
@@ -220,6 +220,107 @@ func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 	bulker.AssertExpectations(t)
 }
 
+func TestEnrollAgentTags(t *testing.T) {
+	cases := []struct {
+		name         string
+		tagsValue    string
+		wantTags     []string
+		otherNIAKeys []string
+	}{
+		{
+			name:         "no tags attribute",
+			tagsValue:    "",
+			wantTags:     []string{"otel-collector"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+		{
+			name:         "single tag",
+			tagsValue:    "dev",
+			wantTags:     []string{"otel-collector", "dev"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+		{
+			name:         "multiple tags",
+			tagsValue:    "dev,west,us-west-1a",
+			wantTags:     []string{"otel-collector", "dev", "west", "us-west-1a"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+		{
+			name:         "tags with spaces",
+			tagsValue:    " dev , west , us-west-1a ",
+			wantTags:     []string{"otel-collector", "dev", "west", "us-west-1a"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+		{
+			name:         "duplicate of agent type is removed",
+			tagsValue:    "otel-collector,dev",
+			wantTags:     []string{"otel-collector", "dev"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+		{
+			name:         "duplicate tags within list are removed",
+			tagsValue:    "dev,west,dev",
+			wantTags:     []string{"otel-collector", "dev", "west"},
+			otherNIAKeys: []string{string(semconv.HostNameKey)},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // test data, not real credentials
+				APIKeyID: "enroll-key-id",
+				PolicyID: "policy-123",
+				Active:   true,
+			}
+			enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // test data, not real credentials
+			require.NoError(t, err)
+			bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
+				Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+			bulker.On("Create", mock.Anything, dl.FleetAgents, "agent-123", mock.Anything, mock.Anything).
+				Return("doc-id", nil)
+
+			nia := []*protobufs.KeyValue{
+				{
+					Key:   string(semconv.HostNameKey),
+					Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: "host-1"}},
+				},
+			}
+			if tc.tagsValue != "" {
+				nia = append(nia, &protobufs.KeyValue{
+					Key:   "tags",
+					Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: tc.tagsValue}},
+				})
+			}
+
+			msg := &protobufs.AgentToServer{
+				AgentDescription: &protobufs.AgentDescription{
+					IdentifyingAttributes: []*protobufs.KeyValue{
+						{
+							Key:   string(semconv.ServiceNameKey),
+							Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: "otel-collector"}},
+						},
+					},
+					NonIdentifyingAttributes: nia,
+				},
+			}
+
+			oa := &OpAMPT{bulk: bulker}
+			zlog := zerolog.New(io.Discard)
+			agent, err := oa.enrollAgent(zlog, "agent-123", msg, &apikey.APIKey{ID: "enroll-key-id"})
+			require.NoError(t, err)
+			require.Equal(t, tc.wantTags, agent.Tags)
+
+			// tags must not appear in stored NonIdentifyingAttributes
+			var niMap map[string]any
+			require.NoError(t, json.Unmarshal(agent.NonIdentifyingAttributes, &niMap))
+			require.NotContains(t, niMap, "tags")
+			for _, k := range tc.otherNIAKeys {
+				require.Contains(t, niMap, k, "expected NIA key %q to be present", k)
+			}
+		})
+	}
+}
+
 func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	checker := &mockCheckin{}
 	oa := &OpAMPT{bc: checker}
@@ -272,7 +373,7 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	require.Equal(t, "StatusRecoverableError", health.Status)
 
 	configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
-	var config map[string]interface{}
+	var config map[string]any
 	require.NoError(t, json.Unmarshal(configBytes, &config))
 	require.Equal(t, "[REDACTED]", config["password"])
 	require.Equal(t, float64(2), config["num"])
@@ -457,8 +558,8 @@ func pendingFromOptions(t *testing.T, opts []checkin.Option) reflect.Value {
 	t.Helper()
 	require.NotEmpty(t, opts)
 
-	sampleOpt := checkin.WithStatus("")
-	argType := reflect.TypeOf(sampleOpt).In(0)
+	_ = checkin.WithStatus("")
+	argType := reflect.TypeFor[checkin.Option]().In(0)
 	pendingPtr := reflect.New(argType.Elem())
 	for _, opt := range opts {
 		reflect.ValueOf(opt).Call([]reflect.Value{pendingPtr})
@@ -543,4 +644,55 @@ func TestDecodeCapabilities(t *testing.T) {
 func getUnexportedField(v reflect.Value, name string) reflect.Value {
 	field := v.FieldByName(name)
 	return reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
+}
+
+func TestHandleMessageReportFullState(t *testing.T) {
+	baseCaps := uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus)
+	wantFlags := uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState)
+
+	cases := []struct {
+		name string
+		msg  *protobufs.AgentToServer
+	}{
+		{
+			name: "flag is set on sequence gap",
+			msg: &protobufs.AgentToServer{
+				SequenceNum:  7, // gap: expected 6
+				Capabilities: baseCaps,
+			},
+		},
+		{
+			name: "flag is set on sequential message",
+			msg: &protobufs.AgentToServer{
+				SequenceNum:  6, // sequential
+				Capabilities: baseCaps,
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			agent := model.Agent{
+				LastCheckinStatus: "online",
+				SequenceNum:       5,
+			}
+			agentBytes, err := json.Marshal(agent)
+			require.NoError(t, err)
+			bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+				Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+			checker := &mockCheckin{}
+			oa := &OpAMPT{bulk: bulker, bc: checker}
+
+			agentUID := uuid.Must(uuid.NewV7())
+			tc.msg.InstanceUid = agentUID.Bytes()
+			zlog := zerolog.New(io.Discard)
+			apiKey := &apikey.APIKey{ID: "test-key"}
+
+			handler := oa.handleMessage(zlog, apiKey)
+			resp := handler(t.Context(), nil, tc.msg)
+
+			require.Nil(t, resp.ErrorResponse)
+			require.Equal(t, wantFlags, resp.Flags)
+		})
+	}
 }

@@ -102,7 +102,7 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 	root.Query().MatchAll()
 	q := tmpl.MustResolve(root)
 
-	query, err := q.Render(make(map[string]interface{}))
+	query, err := q.Render(make(map[string]any))
 	if err != nil {
 		t.Fatalf("could not clean index: failed to render query template: %v", err)
 	}

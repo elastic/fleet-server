@@ -14,11 +14,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type UpdateFields map[string]interface{}
+type UpdateFields map[string]any
 
 func (u UpdateFields) Marshal() ([]byte, error) {
 	doc := struct {
-		Doc map[string]interface{} `json:"doc"`
+		Doc map[string]any `json:"doc"`
 	}{
 		u,
 	}

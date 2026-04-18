@@ -29,8 +29,7 @@ import (
 )
 
 func TestSimpleMonitorEmptyIndex(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetActions)
@@ -39,8 +38,7 @@ func TestSimpleMonitorEmptyIndex(t *testing.T) {
 }
 
 func TestSimpleMonitorNonEmptyIndex(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker, _ := ftesting.SetupActions(ctx, t, 1, 12)

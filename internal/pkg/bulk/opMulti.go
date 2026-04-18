@@ -96,7 +96,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 	var lastErr error
 	items := make([]BulkIndexerResponseItem, len(ops))
 
-	for i := 0; i < len(ops); i++ {
+	for range ops {
 		select {
 		case r := <-ch:
 			if r.err != nil {

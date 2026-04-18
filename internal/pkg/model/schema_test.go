@@ -40,7 +40,7 @@ func validateSerialization(t *testing.T, action Action) {
 	b, err := json.Marshal(action)
 	assert.NoError(t, err)
 
-	var m map[string]interface{}
+	var m map[string]any
 	err = json.Unmarshal(b, &m)
 	assert.NoError(t, err)
 
@@ -56,7 +56,7 @@ func validateSerialization(t *testing.T, action Action) {
 	if action.Signed == nil {
 		assert.False(t, ok)
 	} else {
-		sm, ok := signed.(map[string]interface{})
+		sm, ok := signed.(map[string]any)
 		assert.True(t, ok)
 		assert.Equal(t, action.Signed.Data, sm["data"])
 		assert.Equal(t, action.Signed.Signature, sm["signature"])

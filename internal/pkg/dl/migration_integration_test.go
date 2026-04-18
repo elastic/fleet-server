@@ -31,7 +31,7 @@ func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIK
 
 	var createdAgents []string
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		outputAPIKey := bulk.APIKey{
 			ID:  fmt.Sprint(apiKey.ID, i),
 			Key: fmt.Sprint(apiKey.Key, i),

@@ -392,7 +392,7 @@ func (m *simpleMonitorT) fetch(ctx context.Context, checkpoint, maxCheckpoint sq
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	// Run check query that detects that there are new documents available
-	params := map[string]interface{}{
+	params := map[string]any{
 		dl.FieldSeqNo:    checkpoint.Value(),
 		dl.FieldMaxSeqNo: maxCheckpoint.Value(),
 	}
@@ -408,7 +408,7 @@ func (m *simpleMonitorT) fetch(ctx context.Context, checkpoint, maxCheckpoint sq
 	return hits, nil
 }
 
-func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[string]interface{}, seqNos sqn.SeqNo) ([]es.HitT, error) {
+func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[string]any, seqNos sqn.SeqNo) ([]es.HitT, error) {
 	span, ctx := apm.StartSpan(ctx, "action", "fleet_search")
 	defer span.End()
 	query, err := tmpl.Render(params)

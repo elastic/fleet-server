@@ -384,7 +384,7 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 		// If the agent version is not empty it needs to be updated
 		// Assuming the agent can by upgraded keeping the same id, but incrementing the version
 		if pending.extra.ver != "" {
-			fields[dl.FieldAgent] = map[string]interface{}{
+			fields[dl.FieldAgent] = map[string]any{
 				dl.FieldAgentVersion: pending.extra.ver,
 			}
 		}

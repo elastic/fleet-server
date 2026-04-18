@@ -212,7 +212,7 @@ func benchmarkBulk(n int, b *testing.B) {
 	bc := NewBulk(mockBulk)
 
 	ids := make([]string, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		id := xid.New().String()
 		ids = append(ids, id)
 	}
@@ -236,7 +236,7 @@ func benchmarkFlush(n int, b *testing.B) {
 	bc := NewBulk(mockBulk)
 
 	ids := make([]string, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		id := xid.New().String()
 		ids = append(ids, id)
 	}
