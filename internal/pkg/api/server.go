@@ -24,7 +24,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
-	tlsreload "github.com/elastic/fleet-server/v7/internal/pkg/reload/tls"
 )
 
 type server struct {
@@ -121,11 +120,11 @@ func (s *server) Run(ctx context.Context) error {
 		srv.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
 
 		if s.cfg.TLS.CertificateReload.Enabled {
-			var opts []tlsreload.Option
-			if s.cfg.TLS.CertificateReload.Debounce > 0 {
-				opts = append(opts, tlsreload.WithDebounce(s.cfg.TLS.CertificateReload.Debounce))
+			var opts []tlscommon.CertReloaderOption
+			if s.cfg.TLS.CertificateReload.ReloadInterval > 0 {
+				opts = append(opts, tlscommon.WithReloadInterval(s.cfg.TLS.CertificateReload.ReloadInterval))
 			}
-			reloader, err := tlsreload.New(
+			reloader, err := tlscommon.NewCertReloader(
 				s.cfg.TLS.Certificate.Certificate,
 				s.cfg.TLS.Certificate.Key,
 				opts...,
@@ -135,11 +134,6 @@ func (s *server) Run(ctx context.Context) error {
 			}
 			srv.TLSConfig.GetCertificate = reloader.GetCertificate
 			srv.TLSConfig.Certificates = nil
-			go func() {
-				if err := reloader.Run(ctx); err != nil {
-					zerolog.Ctx(ctx).Error().Err(err).Msg("TLS cert reloader exited with error")
-				}
-			}()
 		}
 
 		ln = tls.NewListener(ln, srv.TLSConfig)

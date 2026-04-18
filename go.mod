@@ -12,7 +12,6 @@ require (
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/go-elasticsearch/v8 v8.19.5
 	github.com/elastic/go-ucfg v0.9.1
-	github.com/fsnotify/fsnotify v1.9.0
 	github.com/fxamacker/cbor/v2 v2.9.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/gofrs/uuid/v5 v5.4.0
@@ -104,3 +103,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect
 )
+
+replace github.com/elastic/elastic-agent-libs => /Users/shaunak/development/github/elastic-agent-libs

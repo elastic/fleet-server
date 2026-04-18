@@ -102,10 +102,10 @@ fleet:
 #        key: /creds/key.pem
 #        key_passphrase_path: /creds/key.pem
 #        certificate_reload:
-#          enabled: false  # Set to true to watch cert/key files and reload on change
-#          debounce: 5s    # How long to wait after a file change before reloading.
-#                          # Cert and key files are often written separately; the
-#                          # debounce avoids loading a mismatched pair mid-rotation.
+#          enabled: false    # Set to true to periodically reload cert/key files
+#          reload_interval: 5s  # How often to re-read cert/key files from disk.
+#                               # After rotation, new certs are picked up within
+#                               # this interval on the next TLS handshake.
 #
 #     # timeouts controls various api timeouts
 #     timeouts:
