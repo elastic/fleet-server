@@ -32,7 +32,11 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install Updatecli in the runner
+<<<<<<< HEAD
         uses: updatecli/updatecli-action@9a21b6911fe58865c8346d4fde3470010f49bf31 # v2.97.0
+=======
+        uses: updatecli/updatecli-action@af341a800cdbcde3ddcebb7a62410ac06a78a207 # v3.1.2
+>>>>>>> 4a54dc6 (build(deps): bump updatecli/updatecli-action (#6860))
 
       - name: Run Updatecli in Apply mode
         run: updatecli apply --config .ci/bump-elastic-stack-snapshot.yml
