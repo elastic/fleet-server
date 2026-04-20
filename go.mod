@@ -30,21 +30,12 @@ require (
 	github.com/rs/zerolog v1.35.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-<<<<<<< HEAD
-	go.elastic.co/apm/module/apmchiv5/v2 v2.7.6
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.6
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.6
-	go.elastic.co/apm/module/apmprometheus/v2 v2.7.6
-	go.elastic.co/apm/module/apmzerolog/v2 v2.7.6
-	go.elastic.co/apm/v2 v2.7.6
-=======
 	go.elastic.co/apm/module/apmchiv5/v2 v2.7.8
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.8
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.8
 	go.elastic.co/apm/module/apmprometheus/v2 v2.7.8
 	go.elastic.co/apm/module/apmzerolog/v2 v2.7.8
 	go.elastic.co/apm/v2 v2.7.8
->>>>>>> da7a607 (build(deps): bump the elastic-apm group across 1 directory with 6 updates (#6848))
 	go.elastic.co/ecszerolog v0.2.0
 	go.opentelemetry.io/otel v1.43.0
 	go.uber.org/zap v1.27.1
