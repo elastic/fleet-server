@@ -109,7 +109,7 @@ func (s *server) Run(ctx context.Context) error {
 	ln = wrapConnLimitter(ctx, ln, s.cfg)
 
 	if s.cfg.TLS != nil && s.cfg.TLS.IsEnabled() {
-		commonTLSCfg, err := tlscommon.LoadTLSServerConfig(&s.cfg.TLS.ServerConfig, s.logger)
+		commonTLSCfg, err := tlscommon.LoadTLSServerConfig(s.cfg.TLS, s.logger)
 		if err != nil {
 			return err
 		}

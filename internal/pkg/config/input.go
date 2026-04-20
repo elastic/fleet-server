@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	libsconfig "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
@@ -60,55 +59,26 @@ func (c *ServerBulk) InitDefaults() {
 	c.FlushMaxPending = 8
 }
 
-// CertificateReload is the configuration for hot-reloading TLS certificates.
-type CertificateReload struct {
-	Enabled        bool          `config:"enabled"`
-	ReloadInterval time.Duration `config:"reload_interval"`
-}
-
-// ServerTLSConfig wraps tlscommon.ServerConfig with additional Fleet Server
-// specific TLS settings like certificate hot-reload.
-type ServerTLSConfig struct {
-	tlscommon.ServerConfig
-	CertificateReload CertificateReload `config:"certificate_reload"`
-}
-
-// Unpack unpacks the TLS Server configuration including Fleet Server extensions.
-func (c *ServerTLSConfig) Unpack(cfg libsconfig.C) error {
-	if err := c.ServerConfig.Unpack(cfg); err != nil {
-		return err
-	}
-	type extra struct {
-		CertificateReload CertificateReload `config:"certificate_reload"`
-	}
-	var e extra
-	if err := cfg.Unpack(&e); err != nil {
-		return err
-	}
-	c.CertificateReload = e.CertificateReload
-	return nil
-}
-
 // Server is the configuration for the server
 type (
 	Server struct {
-		Host               string             `config:"host"`
-		Port               uint16             `config:"port"`
-		InternalPort       uint16             `config:"internal_port"`
-		TLS                *ServerTLSConfig   `config:"ssl"`
-		Timeouts           ServerTimeouts     `config:"timeouts"`
-		Profiler           ServerProfiler     `config:"profiler"`
-		CompressionLevel   int                `config:"compression_level"`
-		CompressionThresh  int                `config:"compression_threshold"`
-		Limits             ServerLimits       `config:"limits"`
-		Runtime            Runtime            `config:"runtime"`
-		Bulk               ServerBulk         `config:"bulk"`
-		GC                 GC                 `config:"gc"`
-		Instrumentation    Instrumentation    `config:"instrumentation"`
-		StaticPolicyTokens StaticPolicyTokens `config:"static_policy_tokens"`
-		PGP                PGP                `config:"pgp"`
-		PDKDF2             PBKDF2             `config:"pdkdf2"`
-		Features           FeatureFlags       `config:"feature_flags"`
+		Host               string                  `config:"host"`
+		Port               uint16                  `config:"port"`
+		InternalPort       uint16                  `config:"internal_port"`
+		TLS                *tlscommon.ServerConfig `config:"ssl"`
+		Timeouts           ServerTimeouts          `config:"timeouts"`
+		Profiler           ServerProfiler          `config:"profiler"`
+		CompressionLevel   int                     `config:"compression_level"`
+		CompressionThresh  int                     `config:"compression_threshold"`
+		Limits             ServerLimits            `config:"limits"`
+		Runtime            Runtime                 `config:"runtime"`
+		Bulk               ServerBulk              `config:"bulk"`
+		GC                 GC                      `config:"gc"`
+		Instrumentation    Instrumentation         `config:"instrumentation"`
+		StaticPolicyTokens StaticPolicyTokens      `config:"static_policy_tokens"`
+		PGP                PGP                     `config:"pgp"`
+		PDKDF2             PBKDF2                  `config:"pdkdf2"`
+		Features           FeatureFlags            `config:"feature_flags"`
 	}
 
 	StaticPolicyTokens struct {
