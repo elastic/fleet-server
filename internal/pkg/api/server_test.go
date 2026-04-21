@@ -471,14 +471,12 @@ func Test_server_TLSCertReload(t *testing.T) {
 	started := make(chan struct{}, 1)
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		started <- struct{}{}
 		if err := srv.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			errCh <- err
 		}
-		wg.Done()
-	}()
+	})
 
 	// Wait for the server goroutine to start and verify no startup errors.
 	select {
