@@ -458,7 +458,6 @@ func Test_server_TLSCertReload(t *testing.T) {
 	cfg.Port = port
 	addr := cfg.BindEndpoints()[0]
 	cfg.TLS = tlsCFG
-	cfg.TLS.CertificateReload.Enabled = true
 
 	st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
 	srv := NewServer(addr, cfg, WithStatus(st))

@@ -119,7 +119,7 @@ func (s *server) Run(ctx context.Context) error {
 		// (see https://golang.org/pkg/net/http/#Server.Serve)
 		srv.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
 
-		if s.cfg.TLS.CertificateReload.Enabled {
+		if s.cfg.TLS.CertificateReload.IsEnabled() {
 			var opts []tlscommon.CertReloaderOption
 			if s.cfg.TLS.CertificateReload.ReloadInterval > 0 {
 				opts = append(opts, tlscommon.WithReloadInterval(s.cfg.TLS.CertificateReload.ReloadInterval))

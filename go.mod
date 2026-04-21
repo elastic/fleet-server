@@ -104,4 +104,4 @@ require (
 	howett.net/plist v1.0.1 // indirect
 )
 
-replace github.com/elastic/elastic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20260420194330-6ca42b1bfadb
+replace github.com/elastic/elastic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20260421215550-8dd50ef6385f

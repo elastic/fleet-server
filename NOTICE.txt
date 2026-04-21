@@ -661,11 +661,11 @@ SOFTWARE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/ycombinator/elastic-agent-libs
-Version: v0.0.0-20260420194330-6ca42b1bfadb
+Version: v0.0.0-20260421215550-8dd50ef6385f
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/ycombinator/elastic-agent-libs@v0.0.0-20260420194330-6ca42b1bfadb/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/ycombinator/elastic-agent-libs@v0.0.0-20260421215550-8dd50ef6385f/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
