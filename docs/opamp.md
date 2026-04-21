@@ -41,6 +41,10 @@ The following fields are ignored:
 - **Sensitive value redaction.** Fleet-server redacts keys containing `password`, `token`, `key`, `secret`, `auth`, `certificate`, or `passphrase` from the effective config before persisting.
 - **Always requests full state.** Fleet-server sets the `ReportFullState` flag in every `ServerToAgent` response, requesting the agent to include all status fields on every message. This is an intentional change intended to improve reliability by having constant load in order avoid rapid changes in workload.
 
+### Limitations
+
+- **`RequestInstanceUid` for enrolled agents.** Fleet-server honors the `AgentToServer.flags.RequestInstanceUid` flag only when an agent is not yet enrolled — a new instance UID is generated and the agent is enrolled under it. If an already-enrolled agent sets the flag, fleet-server returns an error response since reassigning an existing agent's instance UID is not yet supported.
+
 ### Throttling
 
 - **HTTP-level rate limiting only.** The spec defines throttling via `ServerErrorResponse` with `UNAVAILABLE` type and `RetryInfo`. Fleet-server uses HTTP-level rate limiting middleware (returning 429) and returns 429 for Elasticsearch auth rate limits, but does not use the protobuf-level `RetryInfo` mechanism. Additionally, fleet-server may silenty drop connections before the TLS handshake completes if the server is overloaded.

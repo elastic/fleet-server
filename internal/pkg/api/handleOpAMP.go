@@ -256,7 +256,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 				return &protobufs.ServerToAgent{
 					InstanceUid: instanceUID.Bytes(),
 					ErrorResponse: &protobufs.ServerErrorResponse{
-						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
+						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
 						ErrorMessage: fmt.Sprintf("failed to reassign agent ID: %v", err),
 					},
 				}
@@ -312,93 +312,15 @@ func (oa *OpAMPT) findEnrolledAgent(ctx context.Context, zlog zerolog.Logger, ag
 	return &agent, nil
 }
 
-// reassignAgentID persists a new agent document under newID (copying the
-// existing agent data) and deletes the old document. The checkin fields
-// from the AgentToServer message are applied to the agent before creating
-// the new document so that a separate updateAgent call is not needed.
-func (oa *OpAMPT) reassignAgentID(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, newID string, aToS *protobufs.AgentToServer) error {
-	oldID := agent.Id
+// reassignAgentID functions as a special checkin that associates an existing agent with a new ID.
+//
+// Currently will return an error as reassiging an enrolled agent is not supported.
+func (oa *OpAMPT) reassignAgentID(_ context.Context, zlog zerolog.Logger, agent *model.Agent, newID string, _ *protobufs.AgentToServer) error {
 	zlog.Debug().
-		Str("old_id", oldID).
+		Str("old_id", agent.Id).
 		Str("new_id", newID).
-		Msg("reassigning agent ID")
-
-	// Update the agent ID in the metadata field.
-	if agent.Agent != nil {
-		agent.Agent.ID = newID
-	}
-
-	// Update the embedded agent ID in local metadata.
-	if len(agent.LocalMetadata) > 0 {
-		var meta localMetadata
-		if err := json.Unmarshal(agent.LocalMetadata, &meta); err == nil {
-			meta.Elastic.Agent.ID = newID
-			if data, err := json.Marshal(meta); err == nil {
-				agent.LocalMetadata = data
-			}
-		}
-	}
-
-	// Apply checkin fields from the message so we don't need a separate updateAgent call.
-	now := time.Now().UTC().Format(time.RFC3339)
-	agent.LastCheckin = now
-	agent.UpdatedAt = now
-	agent.SequenceNum = int64(aToS.SequenceNum) //nolint:gosec // sequence numbers are not negative so no overflow is possible here
-
-	status := CheckinRequestStatusOnline
-	if aToS.Health != nil {
-		if !aToS.Health.Healthy {
-			status = CheckinRequestStatusError
-		} else if aToS.Health.Status == healthStatusRecoverableError {
-			status = CheckinRequestStatusDegraded
-		}
-		if aToS.Health.LastError != "" {
-			agent.LastCheckinMessage = aToS.Health.LastError
-		} else {
-			agent.LastCheckinMessage = aToS.Health.Status
-		}
-		healthBytes, err := json.Marshal(aToS.Health)
-		if err != nil {
-			return fmt.Errorf("failed to marshal health: %w", err)
-		}
-		agent.Health = healthBytes
-	}
-	agent.LastCheckinStatus = string(status)
-
-	if aToS.Capabilities != 0 {
-		agent.Capabilities = decodeCapabilities(aToS.Capabilities)
-	}
-
-	if aToS.EffectiveConfig != nil {
-		effectiveConfigBytes, err := ParseEffectiveConfig(aToS.EffectiveConfig)
-		if err != nil {
-			return fmt.Errorf("failed to parse effective config: %w", err)
-		}
-		if effectiveConfigBytes != nil {
-			agent.EffectiveConfig = effectiveConfigBytes
-		}
-	}
-
-	// Create a new agent document under the new ID.
-	data, err := json.Marshal(agent)
-	if err != nil {
-		return fmt.Errorf("failed to marshal agent: %w", err)
-	}
-
-	if _, err := oa.bulk.Create(ctx, dl.FleetAgents, newID, data, bulk.WithRefresh()); err != nil {
-		return fmt.Errorf("failed to create agent with new ID: %w", err)
-	}
-
-	// Delete the old agent document. Log a warning on failure since the new
-	// document was already created successfully.
-	if err := oa.bulk.Delete(ctx, dl.FleetAgents, oldID); err != nil {
-		zlog.Warn().Err(err).Str("old_id", oldID).Str("new_id", newID).Msg("failed to delete old agent document after ID reassignment")
-	}
-
-	// Update the in-memory ID.
-	agent.Id = newID
-
-	return nil
+		Msg("reassigning agent ID unsupported")
+	return errors.ErrUnsupported
 }
 
 func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobufs.AgentToServer, apiKey *apikey.APIKey) (*model.Agent, error) {

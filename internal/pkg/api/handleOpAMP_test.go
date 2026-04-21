@@ -7,6 +7,7 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"reflect"
 	"testing"
@@ -552,10 +553,10 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 		flags                   uint64
 		getBulker               func(t *testing.T) *ftesting.MockBulk
 		wantAgentIdentification bool
-		wantCheckinSkipped      bool // true when reassignAgentID handles the update
+		wantError               bool // reassignment of an enrolled agent is unsupported
 	}{
 		{
-			name:  "enrolled agent with RequestInstanceUid flag gets new UID",
+			name:  "enrolled agent with RequestInstanceUid flag returns error",
 			flags: uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid),
 			getBulker: func(t *testing.T) *ftesting.MockBulk {
 				t.Helper()
@@ -565,15 +566,9 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
 					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
-				// reassignAgentID creates the new doc and deletes the old one
-				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
-					Return("doc-id", nil)
-				bulker.On("Delete", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-					Return(nil)
 				return bulker
 			},
-			wantAgentIdentification: true,
-			wantCheckinSkipped:      true,
+			wantError: true,
 		},
 		{
 			name:  "new enrollment with RequestInstanceUid flag gets new UID",
@@ -592,7 +587,7 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
-				// Only enrollAgent Create — no reassignAgentID since enrollment uses the new UID directly
+				// enrollment uses the new UID directly, no separate reassignment
 				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
 					Return("doc-id", nil)
 				return bulker
@@ -612,7 +607,6 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
 				return bulker
 			},
-			wantAgentIdentification: false,
 		},
 	}
 	for _, tc := range cases {
@@ -632,10 +626,16 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 			}
 
 			resp := handler(t.Context(), nil, msg)
-
-			require.Nil(t, resp.ErrorResponse)
 			require.Equal(t, agentUID.Bytes(), resp.InstanceUid)
 
+			if tc.wantError {
+				require.NotNil(t, resp.ErrorResponse)
+				require.Nil(t, resp.AgentIdentification)
+				require.Empty(t, checker.id, "checkin should not be called when reassignment errors")
+				return
+			}
+
+			require.Nil(t, resp.ErrorResponse)
 			if tc.wantAgentIdentification {
 				require.NotNil(t, resp.AgentIdentification)
 				newUID, err := uuid.FromBytes(resp.AgentIdentification.NewInstanceUid)
@@ -644,12 +644,7 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 			} else {
 				require.Nil(t, resp.AgentIdentification)
 			}
-
-			if tc.wantCheckinSkipped {
-				require.Empty(t, checker.id, "checkin should not be called when reassignAgentID handles the update")
-			} else {
-				require.NotEmpty(t, checker.id, "checkin should be called")
-			}
+			require.NotEmpty(t, checker.id, "checkin should be called")
 		})
 	}
 }
@@ -714,99 +709,16 @@ func TestHandleMessageNewEnrollmentWithRequestInstanceUid(t *testing.T) {
 }
 
 func TestReassignAgentID(t *testing.T) {
-	oldID := "old-agent-id"
-	newID := "new-agent-id"
-
-	localMeta := localMetadata{}
-	localMeta.Elastic.Agent.ID = oldID
-	localMeta.Elastic.Agent.Version = "1.0.0"
-	localMeta.Host.Hostname = "host-1"
-	metaBytes, err := json.Marshal(localMeta)
-	require.NoError(t, err)
-
 	agent := &model.Agent{
-		ESDocument:    model.ESDocument{Id: oldID},
-		Active:        true,
-		PolicyID:      "policy-123",
-		Agent:         &model.AgentMetadata{ID: oldID, Version: "1.0.0"},
-		LocalMetadata: metaBytes,
+		ESDocument: model.ESDocument{Id: "old-agent-id"},
+		Agent:      &model.AgentMetadata{ID: "old-agent-id"},
 	}
 
-	var createdID string
-	var createdBody []byte
-	bulker := ftesting.NewMockBulk()
-	bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			id, ok := args.Get(2).(string)
-			require.True(t, ok)
-			createdID = id
-			body, ok := args.Get(3).([]byte)
-			require.True(t, ok)
-			createdBody = body
-		}).
-		Return("doc-id", nil)
-	bulker.On("Delete", mock.Anything, dl.FleetAgents, oldID, mock.Anything).
-		Return(nil)
-
-	oa := &OpAMPT{bulk: bulker}
+	oa := &OpAMPT{bulk: ftesting.NewMockBulk()}
 	zlog := zerolog.New(io.Discard)
 
-	msg := &protobufs.AgentToServer{
-		SequenceNum: 5,
-		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) |
-			uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
-		Health: &protobufs.ComponentHealth{
-			Healthy:   false,
-			LastError: "disk full",
-		},
-		EffectiveConfig: &protobufs.EffectiveConfig{
-			ConfigMap: &protobufs.AgentConfigMap{
-				ConfigMap: map[string]*protobufs.AgentConfigFile{
-					"": {
-						Body:        []byte("num: 42\n"),
-						ContentType: "text/yaml",
-					},
-				},
-			},
-		},
-	}
-
-	require.NoError(t, oa.reassignAgentID(t.Context(), zlog, agent, newID, msg))
-
-	// Verify Create was called with the new ID
-	require.Equal(t, newID, createdID)
-
-	// Verify the created document body has the updated agent.id
-	var createdAgent model.Agent
-	require.NoError(t, json.Unmarshal(createdBody, &createdAgent))
-	require.Equal(t, newID, createdAgent.Agent.ID)
-
-	// Verify the local metadata was updated
-	var meta localMetadata
-	require.NoError(t, json.Unmarshal(createdAgent.LocalMetadata, &meta))
-	require.Equal(t, newID, meta.Elastic.Agent.ID)
-	require.Equal(t, "1.0.0", meta.Elastic.Agent.Version, "other metadata fields should be preserved")
-	require.Equal(t, "host-1", meta.Host.Hostname, "other metadata fields should be preserved")
-
-	// Verify checkin fields were applied to the created document
-	require.Equal(t, string(CheckinRequestStatusError), createdAgent.LastCheckinStatus)
-	require.Equal(t, "disk full", createdAgent.LastCheckinMessage)
-	require.NotEmpty(t, createdAgent.LastCheckin)
-	require.NotEmpty(t, createdAgent.UpdatedAt)
-	require.Equal(t, int64(5), createdAgent.SequenceNum)
-	require.ElementsMatch(t, []string{"ReportsHealth", "AcceptsRemoteConfig"}, createdAgent.Capabilities)
-	require.NotNil(t, createdAgent.Health)
-	require.NotNil(t, createdAgent.EffectiveConfig)
-
-	var config map[string]interface{}
-	require.NoError(t, json.Unmarshal(createdAgent.EffectiveConfig, &config))
-	require.Equal(t, float64(42), config["num"])
-
-	// Verify in-memory agent was updated
-	require.Equal(t, newID, agent.Id)
-	require.Equal(t, newID, agent.Agent.ID)
-
-	bulker.AssertExpectations(t)
+	err := oa.reassignAgentID(t.Context(), zlog, agent, "new-agent-id", &protobufs.AgentToServer{})
+	require.ErrorIs(t, err, errors.ErrUnsupported)
 }
 
 type mockCheckin struct {
