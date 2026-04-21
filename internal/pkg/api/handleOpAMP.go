@@ -424,6 +424,13 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 		if effectiveConfigBytes != nil {
 			initialOpts = append(initialOpts, checkin.WithEffectiveConfig(effectiveConfigBytes))
 		}
+
+		configHash, err := HashEffectiveConfig(aToS.EffectiveConfig)
+		if err != nil {
+			zlog.Warn().Err(err).Msg("failed to compute effective config hash")
+		} else if configHash != "" {
+			initialOpts = append(initialOpts, checkin.WithEffectiveConfigHash(configHash))
+		}
 	}
 
 	return oa.bc.CheckIn(agent.Id, initialOpts...)

@@ -775,6 +775,10 @@
         "effective_config": {
           "description": "The effective config that the collector is running",
           "format": "raw"
+        },
+        "effective_config_hash": {
+          "description": "SHA-256 hex hash of collector pipeline topology (receivers, processors, exporters, connectors, service.pipelines, service.extensions)",
+          "type": "string"
         }
       },
       "required": ["_id", "type", "active", "enrolled_at", "status"]
