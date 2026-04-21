@@ -196,6 +196,7 @@ steps:
 
       - label: ":smartbear-testexecute: Run unit tests: MacOS 13"
         key: unit-test-macos-13
+        skip: "Incident 2968, Orka 3 upgrade. Unskip after it's resolved."
         command: ".buildkite/scripts/unit_test.sh"
         agents:
           provider: orka
