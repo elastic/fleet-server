@@ -12,6 +12,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	// baseTopologyConfig is a minimal valid collector config with otlp→debug pipeline.
+	baseTopologyConfig = `
+receivers:
+  otlp: {}
+exporters:
+  debug: {}
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [debug]
+`
+	// simpleTopologyConfig is like baseTopologyConfig but omits the exporters block.
+	simpleTopologyConfig = `
+receivers:
+  otlp: {}
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [debug]
+`
+)
+
 func makeEffectiveConfig(body string) *protobufs.EffectiveConfig {
 	return &protobufs.EffectiveConfig{
 		ConfigMap: &protobufs.AgentConfigMap{
@@ -78,17 +103,7 @@ service:
 
 func TestHashEffectiveConfig_KeyOrderInvariant(t *testing.T) {
 	// Key order in the YAML must not affect the hash.
-	orderA := `
-receivers:
-  otlp: {}
-exporters:
-  debug: {}
-service:
-  pipelines:
-    logs:
-      receivers: [otlp]
-      exporters: [debug]
-`
+	orderA := baseTopologyConfig
 	orderB := `
 exporters:
   debug: {}
@@ -109,17 +124,7 @@ receivers:
 
 func TestHashEffectiveConfig_TopologyChange(t *testing.T) {
 	// Changing a receiver must produce a different hash.
-	configA := `
-receivers:
-  otlp: {}
-exporters:
-  debug: {}
-service:
-  pipelines:
-    logs:
-      receivers: [otlp]
-      exporters: [debug]
-`
+	configA := baseTopologyConfig
 	configB := `
 receivers:
   prometheus: {}
@@ -140,15 +145,7 @@ service:
 
 func TestHashEffectiveConfig_AllowlistEnforcement(t *testing.T) {
 	// Adding extensions config (outside allowlist) must not change the hash.
-	withoutExtensionsConfig := `
-receivers:
-  otlp: {}
-service:
-  pipelines:
-    logs:
-      receivers: [otlp]
-      exporters: [debug]
-`
+	withoutExtensionsConfig := simpleTopologyConfig
 	withExtensionsConfig := `
 receivers:
   otlp: {}
@@ -170,15 +167,7 @@ service:
 
 func TestHashEffectiveConfig_ServiceExtensionsIncluded(t *testing.T) {
 	// service.extensions (the active extension list) IS part of the topology.
-	withoutExtensions := `
-receivers:
-  otlp: {}
-service:
-  pipelines:
-    logs:
-      receivers: [otlp]
-      exporters: [debug]
-`
+	withoutExtensions := simpleTopologyConfig
 	withExtensions := `
 receivers:
   otlp: {}
