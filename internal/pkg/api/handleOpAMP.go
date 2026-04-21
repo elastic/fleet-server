@@ -220,15 +220,13 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		}
 
 		sendCapabilities := false
-		newlyEnrolled := false
 		if agent == nil {
 			sendCapabilities = true
-			newlyEnrolled = true
-			uid := instanceUID.String()
+			agentID := instanceUID.String()
 			if newInstanceUID != nil {
-				uid = newInstanceUID.String()
+				agentID = newInstanceUID.String()
 			}
-			if agent, err = oa.enrollAgent(zlog, uid, message, apiKey); err != nil {
+			if agent, err = oa.enrollAgent(zlog, agentID, message, apiKey); err != nil {
 				return &protobufs.ServerToAgent{
 					InstanceUid: instanceUID.Bytes(),
 					ErrorResponse: &protobufs.ServerErrorResponse{
@@ -237,21 +235,25 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 					},
 				}
 			}
-		} else if !isActiveStatus(agent.LastCheckinStatus) {
-			sendCapabilities = true
+		} else {
+			if !isActiveStatus(agent.LastCheckinStatus) {
+				sendCapabilities = true
+			}
+			if message.SequenceNum != uint64(agent.SequenceNum)+1 { //nolint:gosec // agent seq num will not be negative
+				zlog.Debug().
+					Int64("stored_seq", agent.SequenceNum).
+					Uint64("msg_seq", message.SequenceNum).
+					Str("last_status", agent.LastCheckinStatus).
+					Msg("sequence number drift detected")
+			}
 		}
 
-		if !newlyEnrolled && message.SequenceNum != uint64(agent.SequenceNum)+1 { //nolint:gosec // agent seq num will not be negative
-			zlog.Debug().
-				Int64("stored_seq", agent.SequenceNum).
-				Uint64("msg_seq", message.SequenceNum).
-				Str("last_status", agent.LastCheckinStatus).
-				Msg("sequence number drift detected")
-		}
-
-		// If the agent has requested a new ID and has not enrolled with this message we must reassign the ID.
-		// reassignAgentID also applies the checkin fields from the message, so updateAgent is skipped.
-		if newInstanceUID != nil && newInstanceUID.String() != agent.Id {
+		// An enrolled agent requesting a new UID is handled by reassignAgentID, which
+		// functions as a special checkin (applies the message updates under the new ID)
+		// in place of updateAgent. Currently returns an error since reassignment of an
+		// enrolled agent is not yet supported. Newly-enrolled agents whose ID was just
+		// chosen from newInstanceUID fall through to the regular updateAgent path.
+		if newInstanceUID != nil && agent.Id != newInstanceUID.String() {
 			if err := oa.reassignAgentID(ctx, zlog, agent, newInstanceUID.String(), message); err != nil {
 				return &protobufs.ServerToAgent{
 					InstanceUid: instanceUID.Bytes(),
