@@ -20,7 +20,6 @@ Fleet-server operates in monitoring-only mode.
 - **No connection settings management.** The spec defines `ServerToAgent.connection_settings` for offering new connection settings, TLS certificates, etc.
 - **No package management.** The spec defines `ServerToAgent.packages_available` for offering downloadable packages and updates.
 - **No server-initiated commands.** The spec defines `ServerToAgent.command` (e.g., restart).
-- **No `ServerToAgent.agent_identification`.** The spec allows the server to reassign the agent's `instance_uid`.
 - **No custom messages.** The spec defines `custom_capabilities` and `custom_message` for extensible server-to-agent communication.
 
 ### Agent-to-server fields ignored
@@ -44,6 +43,7 @@ The following fields are ignored:
 ### Limitations
 
 - **`RequestInstanceUid` for enrolled agents.** Fleet-server honors the `AgentToServer.flags.RequestInstanceUid` flag only when an agent is not yet enrolled — a new instance UID is generated and the agent is enrolled under it. If an already-enrolled agent sets the flag, fleet-server returns an error response since reassigning an existing agent's instance UID is not yet supported.
+  - **`ServerToAgent.agent_identification`** As described above, the `ServerToAgent.agent_identification` message is only used for newly enrolled agents. The server does not yet have the capability to reassign instance_uid values for enrolled agents.
 
 ### Throttling
 
