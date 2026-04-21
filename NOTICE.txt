@@ -3086,11 +3086,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/rs/zerolog
-Version: v1.35.0
+Version: v1.35.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/rs/zerolog@v1.35.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/rs/zerolog@v1.35.1/LICENSE:
 
 MIT License
 
