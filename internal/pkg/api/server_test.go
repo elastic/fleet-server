@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -467,28 +468,15 @@ func Test_server_TLSCertReload(t *testing.T) {
 	certPool.AddCert(ca.Leaf)
 
 	// Start the server in a background goroutine.
-	started := make(chan struct{}, 1)
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
 	wg.Go(func() {
-		started <- struct{}{}
 		if err := srv.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			errCh <- err
 		}
 	})
 
-	// Wait for the server goroutine to start and verify no startup errors.
-	select {
-	case <-started:
-	case <-time.After(500 * time.Millisecond):
-		require.Fail(t, "timed out waiting for server to start")
-	}
-	select {
-	case err := <-errCh:
-		require.NoError(t, err, "error during startup")
-	case <-time.After(500 * time.Millisecond):
-		break
-	}
+	statusURL := "https://" + addr + "/api/status"
 
 	// getServerCert makes an HTTPS request to the server and captures the raw
 	// server certificate from the TLS handshake via VerifyConnection callback.
@@ -510,7 +498,7 @@ func Test_server_TLSCertReload(t *testing.T) {
 		}
 		rCtx, rCancel := context.WithTimeout(ctx, 5*time.Second)
 		defer rCancel()
-		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
+		req, err := http.NewRequestWithContext(rCtx, "GET", statusURL, nil)
 		require.NoError(t, err)
 		resp, err := httpClient.Do(req)
 		require.NoError(t, err)
@@ -518,6 +506,23 @@ func Test_server_TLSCertReload(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		return serverCert
 	}
+
+	// Wait until the server is ready by hitting the status endpoint.
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		rCtx, rCancel := context.WithTimeout(ctx, 1*time.Second)
+		defer rCancel()
+
+		req, err := http.NewRequestWithContext(rCtx, "GET", statusURL, nil)
+		require.NoError(ct, err)
+
+		resp, err := (&http.Client{Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: certPool},
+		}}).Do(req)
+		require.NoError(ct, err)
+		resp.Body.Close()
+
+		require.Equal(ct, http.StatusOK, resp.StatusCode)
+	}, 5*time.Second, 10*time.Millisecond, "server should be serving TLS")
 
 	// Capture the server cert before rotation.
 	initialCert := getServerCert()
