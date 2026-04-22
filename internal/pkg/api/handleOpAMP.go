@@ -316,7 +316,7 @@ func (oa *OpAMPT) findEnrolledAgent(ctx context.Context, zlog zerolog.Logger, ag
 
 // reassignAgentID functions as a special checkin that associates an existing agent with a new ID.
 //
-// Currently will return an error as reassiging an enrolled agent is not supported.
+// Currently will return an error as reassigning an enrolled agent is not supported.
 func (oa *OpAMPT) reassignAgentID(_ context.Context, zlog zerolog.Logger, agent *model.Agent, newID string, _ *protobufs.AgentToServer) error {
 	zlog.Debug().
 		Str("old_id", agent.Id).
