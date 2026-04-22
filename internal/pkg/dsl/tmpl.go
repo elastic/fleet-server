@@ -129,7 +129,7 @@ func (t *Tmpl) MustResolve(n *Node) *Tmpl {
 }
 
 // RenderOne is a convenience function to avoid map when only one token
-func (t *Tmpl) RenderOne(name string, v interface{}) ([]byte, error) {
+func (t *Tmpl) RenderOne(name string, v any) ([]byte, error) {
 	d, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
@@ -139,7 +139,7 @@ func (t *Tmpl) RenderOne(name string, v interface{}) ([]byte, error) {
 	return t.render(m, len(d))
 }
 
-func (t *Tmpl) Render(m map[string]interface{}) ([]byte, error) {
+func (t *Tmpl) Render(m map[string]any) ([]byte, error) {
 
 	// Marshal all targets, get byte count
 	marshalMap := make(map[string][]byte, len(m))
@@ -157,7 +157,7 @@ func (t *Tmpl) Render(m map[string]interface{}) ([]byte, error) {
 	return t.render(marshalMap, sum)
 }
 
-func (t *Tmpl) MustRender(m map[string]interface{}) []byte {
+func (t *Tmpl) MustRender(m map[string]any) []byte {
 	b, err := t.Render(m)
 	if err != nil {
 		panic(err)

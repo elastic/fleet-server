@@ -104,14 +104,14 @@ func createBaseActionsQuery() (tmpl *dsl.Tmpl, root, filter *dsl.Node) {
 
 func FindAction(ctx context.Context, bulker bulk.Bulk, id string, opts ...Option) ([]model.Action, error) {
 	o := newOption(FleetActions, opts...)
-	return findActions(ctx, bulker, QueryAction, o.indexName, map[string]interface{}{
+	return findActions(ctx, bulker, QueryAction, o.indexName, map[string]any{
 		FieldActionID: id,
 	}, nil)
 }
 
 func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo sqn.SeqNo, agentID string) ([]model.Action, error) {
 	const index = FleetActions
-	params := map[string]interface{}{
+	params := map[string]any{
 		FieldSeqNo:      minSeqNo.Value(),
 		FieldMaxSeqNo:   maxSeqNo.Value(),
 		FieldExpiration: time.Now().UTC().Format(time.RFC3339),
@@ -127,7 +127,7 @@ func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo 
 }
 
 func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, cleanupIntervalAfterExpired string) (int64, error) {
-	params := map[string]interface{}{
+	params := map[string]any{
 		FieldExpiration: "now-" + cleanupIntervalAfterExpired,
 	}
 
@@ -166,7 +166,7 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 }
 
 func FindExpiredActionsHitsForIndex(ctx context.Context, index string, bulker bulk.Bulk, expiredBefore time.Time, size int) ([]es.HitT, error) {
-	params := map[string]interface{}{
+	params := map[string]any{
 		FieldExpiration: expiredBefore.UTC().Format(time.RFC3339),
 		FieldSize:       size,
 	}
@@ -181,7 +181,7 @@ func FindExpiredActionsHitsForIndex(ctx context.Context, index string, bulker bu
 	return nil, nil
 }
 
-func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}, seqNos []int64) (*es.HitsT, error) {
+func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]any, seqNos []int64) (*es.HitsT, error) {
 	var ops []bulk.Opt
 	if len(seqNos) > 0 {
 		ops = append(ops, bulk.WithWaitForCheckpoints(seqNos))
@@ -197,7 +197,7 @@ func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, inde
 	return res, nil
 }
 
-func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}, seqNos []int64) ([]model.Action, error) {
+func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]any, seqNos []int64) ([]model.Action, error) {
 	res, err := findActionsHits(ctx, bulker, tmpl, index, params, seqNos)
 	if err != nil || res == nil {
 		return nil, err

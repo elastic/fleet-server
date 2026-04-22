@@ -23,8 +23,7 @@ import (
 )
 
 func TestMonitorEmptyIndex(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetActions)
@@ -32,8 +31,7 @@ func TestMonitorEmptyIndex(t *testing.T) {
 }
 
 func TestMonitorNonEmptyIndex(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker, _ := ftesting.SetupActions(ctx, t, 1, 12)
@@ -51,14 +49,12 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 	var wg sync.WaitGroup
 	mctx, mcn := context.WithCancel(ctx)
 	var merr error
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		merr = mon.Run(mctx)
 		if errors.Is(merr, context.Canceled) {
 			merr = nil
 		}
-	}()
+	})
 
 	// Wait until monitor is running
 	err = <-readyCh
@@ -79,7 +75,7 @@ func runMonitorTest(t *testing.T, ctx context.Context, index string, bulker bulk
 	// Listen monitor updates
 	var mwg sync.WaitGroup
 	mwg.Add(2)
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		go func(i int, s Subscription) {
 			defer mwg.Done()
 			defer mon.Unsubscribe(s)

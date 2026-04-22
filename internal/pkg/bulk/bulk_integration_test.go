@@ -22,8 +22,7 @@ import (
 )
 
 func TestBulkCreate(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy, WithFlushThresholdCount(1))
 
@@ -124,8 +123,7 @@ func TestBulkCreate(t *testing.T) {
 }
 
 func TestBulkCreateBody(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy, WithFlushThresholdCount(1))
 
@@ -177,8 +175,7 @@ func TestBulkCreateBody(t *testing.T) {
 }
 
 func TestBulkIndex(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy, WithFlushThresholdCount(1))
@@ -201,8 +198,7 @@ func TestBulkIndex(t *testing.T) {
 }
 
 func TestBulkUpdate(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy)
@@ -240,8 +236,7 @@ func TestBulkUpdate(t *testing.T) {
 }
 
 func TestBulkSearch(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy)
@@ -283,8 +278,7 @@ func TestBulkSearch(t *testing.T) {
 }
 
 func TestBulkSearchWithIgnoreUnavailable(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	_, bulker := SetupIndexWithBulk(ctx, t, testPolicy)
@@ -306,8 +300,7 @@ func TestBulkSearchWithIgnoreUnavailable(t *testing.T) {
 }
 
 func TestBulkDelete(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy)
@@ -353,7 +346,7 @@ func benchmarkCreate(n int, b *testing.B) {
 	ch := make(chan error, n)
 	var wait sync.WaitGroup
 	wait.Add(n)
-	for i := 0; i < n; i++ {
+	for range n {
 
 		go func() {
 			defer wait.Done()
@@ -415,7 +408,7 @@ func benchmarkCRUD(n int, b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for i := 0; i < n; i++ {
+	for range n {
 		go func() {
 			defer wait.Done()
 

@@ -48,7 +48,7 @@ type errorResponse struct {
 	Error struct {
 		Type   string `json:"type"`
 		Reason string `json:"reason"`
-	} `json:"error,omitempty"`
+	} `json:"error"`
 	Status int `json:"status,omitempty"`
 }
 

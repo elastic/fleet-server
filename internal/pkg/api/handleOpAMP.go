@@ -35,7 +35,10 @@ import (
 )
 
 const (
-	kOpAMPMod = "opAMP"
+	kOpAMPMod          = "opAMP"
+	serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
+		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
+	tagsKey = "tags"
 )
 
 type OpAMPT struct {
@@ -177,7 +180,31 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			Bool("is_enrolled", agent != nil).
 			Msg("agent enrollment status")
 
+		// Handle agent disconnect: set status to offline for enrolled agents,
+		// return an error for unenrolled agents.
+		if message.AgentDisconnect != nil {
+			if agent == nil {
+				zlog.Debug().Msg("agent disconnect received from unenrolled agent")
+				return &protobufs.ServerToAgent{
+					InstanceUid: instanceUID.Bytes(),
+					ErrorResponse: &protobufs.ServerErrorResponse{
+						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
+						ErrorMessage: "agent is not enrolled",
+					},
+				}
+			}
+			zlog.Debug().Msg("agent disconnect received")
+			_ = oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus(string(CheckinRequestStatusDisconnected)))
+			return &protobufs.ServerToAgent{
+				InstanceUid: instanceUID.Bytes(),
+			}
+		}
+
+		sendCapabilities := false
+		newlyEnrolled := false
 		if agent == nil {
+			sendCapabilities = true
+			newlyEnrolled = true
 			if agent, err = oa.enrollAgent(zlog, instanceUID.String(), message, apiKey); err != nil {
 				return &protobufs.ServerToAgent{
 					InstanceUid: instanceUID.Bytes(),
@@ -187,6 +214,16 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 					},
 				}
 			}
+		} else if !isActiveStatus(agent.LastCheckinStatus) {
+			sendCapabilities = true
+		}
+
+		if !newlyEnrolled && message.SequenceNum != uint64(agent.SequenceNum)+1 { //nolint:gosec // agent seq num will not be negative
+			zlog.Debug().
+				Int64("stored_seq", agent.SequenceNum).
+				Uint64("msg_seq", message.SequenceNum).
+				Str("last_status", agent.LastCheckinStatus).
+				Msg("sequence number drift detected")
 		}
 
 		if err := oa.updateAgent(zlog, agent, message); err != nil {
@@ -199,9 +236,12 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 		}
 
-		// Empty message for now since we're only using OpAMP for monitoring.
 		sToA := protobufs.ServerToAgent{
 			InstanceUid: instanceUID.Bytes(),
+			Flags:       uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState),
+		}
+		if sendCapabilities {
+			sToA.Capabilities = serverCapabilities
 		}
 
 		return &sToA
@@ -249,6 +289,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 	meta := localMetadata{}
 	meta.Elastic.Agent.ID = agentID
 	agentType := ""
+	var tags []string
 	var identifyingAttributes, nonIdentifyingAttributes json.RawMessage
 	if aToS.AgentDescription != nil {
 		// Extract agent version
@@ -263,7 +304,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 		}
 		zlog.Debug().Str("opamp.agent.version", meta.Elastic.Agent.Version).Msg("extracted agent version")
 
-		// Extract hostname
+		// Extract hostname and tags
 		for _, nia := range aToS.AgentDescription.NonIdentifyingAttributes {
 			switch attribute.Key(nia.Key) {
 			case semconv.HostNameKey:
@@ -273,6 +314,12 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 			case semconv.OSTypeKey:
 				osType := nia.GetValue().GetStringValue()
 				meta.Os.Platform = osType
+			case tagsKey:
+				for t := range strings.SplitSeq(nia.GetValue().GetStringValue(), ",") {
+					if t = strings.TrimSpace(t); t != "" {
+						tags = append(tags, t)
+					}
+				}
 			}
 		}
 		zlog.Debug().Str("hostname", meta.Host.Hostname).Msg("extracted hostname")
@@ -282,7 +329,13 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 			return nil, fmt.Errorf("failed to marshal identifying attributes: %w", err)
 		}
 
-		nonIdentifyingAttributes, err = ProtobufKVToRawMessage(zlog, aToS.AgentDescription.NonIdentifyingAttributes)
+		filteredNIA := make([]*protobufs.KeyValue, 0, len(aToS.AgentDescription.NonIdentifyingAttributes))
+		for _, nia := range aToS.AgentDescription.NonIdentifyingAttributes {
+			if nia.Key != tagsKey {
+				filteredNIA = append(filteredNIA, nia)
+			}
+		}
+		nonIdentifyingAttributes, err = ProtobufKVToRawMessage(zlog, filteredNIA)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal non-identifying attributes: %w", err)
 		}
@@ -310,7 +363,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 		IdentifyingAttributes:    identifyingAttributes,
 		NonIdentifyingAttributes: nonIdentifyingAttributes,
 		Type:                     "OPAMP",
-		Tags:                     []string{agentType},
+		Tags:                     dedupeSlice(append([]string{agentType}, tags...)),
 	}
 
 	data, err = json.Marshal(agent)
@@ -332,14 +385,14 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 
 	initialOpts := make([]checkin.Option, 0)
 
-	status := "online"
+	status := CheckinRequestStatusOnline
 
 	// Extract the health status from the health message if it exists.
 	if aToS.Health != nil {
 		if !aToS.Health.Healthy {
-			status = "error"
+			status = CheckinRequestStatusError
 		} else if aToS.Health.Status == "StatusRecoverableError" {
-			status = "degraded"
+			status = CheckinRequestStatusDegraded
 		}
 
 		// Extract the last_checkin_message from the health message if it exists.
@@ -355,11 +408,13 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 		initialOpts = append(initialOpts, checkin.WithHealth(healthBytes))
 	}
 
-	initialOpts = append(initialOpts, checkin.WithStatus(status))
+	initialOpts = append(initialOpts, checkin.WithStatus(string(status)))
 	initialOpts = append(initialOpts, checkin.WithSequenceNum(aToS.SequenceNum))
 
-	capabilities := decodeCapabilities(aToS.Capabilities)
-	initialOpts = append(initialOpts, checkin.WithCapabilities(capabilities))
+	if aToS.Capabilities != 0 {
+		capabilities := decodeCapabilities(aToS.Capabilities)
+		initialOpts = append(initialOpts, checkin.WithCapabilities(capabilities))
+	}
 
 	if aToS.EffectiveConfig != nil {
 		effectiveConfigBytes, err := ParseEffectiveConfig(aToS.EffectiveConfig)
@@ -380,15 +435,15 @@ type localMetadata struct {
 			ID      string `json:"id,omitempty"`
 			Version string `json:"version,omitempty"`
 			Name    string `json:"name,omitempty"`
-		} `json:"agent,omitempty"`
-	} `json:"elastic,omitempty"`
+		} `json:"agent"`
+	} `json:"elastic"`
 	Host struct {
 		Hostname string `json:"hostname,omitempty"`
 		Name     string `json:"name,omitempty"`
-	} `json:"host,omitempty"`
+	} `json:"host"`
 	Os struct {
 		Platform string `json:"platform,omitempty"`
-	} `json:"os,omitempty"`
+	} `json:"os"`
 }
 
 func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, error) {
@@ -398,7 +453,7 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 		if len(configMap.Body) != 0 {
 			bodyBytes := configMap.Body
 
-			obj := make(map[string]interface{})
+			obj := make(map[string]any)
 			if err := yaml.Unmarshal(bodyBytes, &obj); err != nil {
 				return nil, fmt.Errorf("unmarshal effective config failure: %w", err)
 			}
@@ -413,10 +468,10 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 	return nil, nil
 }
 
-func redactSensitive(v interface{}) {
+func redactSensitive(v any) {
 	const redacted = "[REDACTED]"
 	switch typed := v.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		for key, val := range typed {
 			if redactKey(key) {
 				typed[key] = redacted
@@ -424,7 +479,7 @@ func redactSensitive(v interface{}) {
 			}
 			redactSensitive(val)
 		}
-	case map[interface{}]interface{}:
+	case map[any]any:
 		for rawKey, val := range typed {
 			key, ok := rawKey.(string)
 			if ok && redactKey(key) {
@@ -433,7 +488,7 @@ func redactSensitive(v interface{}) {
 			}
 			redactSensitive(val)
 		}
-	case []interface{}:
+	case []any:
 		for i := range typed {
 			redactSensitive(typed[i])
 		}
@@ -459,7 +514,7 @@ func redactKey(k string) bool {
 }
 
 // anyValueToInterface recursively converts protobufs.AnyValue to Go interface{} for JSON marshalling
-func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) interface{} {
+func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) any {
 	switch v := av.GetValue().(type) {
 	case *protobufs.AnyValue_StringValue:
 		return v.StringValue
@@ -472,13 +527,13 @@ func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) interface{
 	case *protobufs.AnyValue_BytesValue:
 		return v.BytesValue
 	case *protobufs.AnyValue_ArrayValue:
-		arr := make([]interface{}, 0, len(v.ArrayValue.Values))
+		arr := make([]any, 0, len(v.ArrayValue.Values))
 		for _, av2 := range v.ArrayValue.Values {
 			arr = append(arr, anyValueToInterface(zlog, av2))
 		}
 		return arr
 	case *protobufs.AnyValue_KvlistValue:
-		m := make(map[string]interface{}, len(v.KvlistValue.Values))
+		m := make(map[string]any, len(v.KvlistValue.Values))
 		for _, kv := range v.KvlistValue.Values {
 			if kv.Value != nil {
 				m[kv.Key] = anyValueToInterface(zlog, kv.Value)
@@ -493,7 +548,7 @@ func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) interface{
 
 func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json.RawMessage, error) {
 	// 1. Build an intermediate map to represent the JSON object
-	data := make(map[string]interface{}, len(kv))
+	data := make(map[string]any, len(kv))
 	for _, item := range kv {
 		if item.Value == nil {
 			continue
@@ -511,20 +566,31 @@ func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json
 	return json.RawMessage(b), nil
 }
 
+func isActiveStatus(status string) bool {
+	return status == string(CheckinRequestStatusOnline) ||
+		status == string(CheckinRequestStatusError) ||
+		status == string(CheckinRequestStatusDegraded)
+}
+
+// dedupeSlice returns a copy of s with duplicate entries removed, preserving order.
+func dedupeSlice(s []string) []string {
+	seen := make(map[string]struct{}, len(s))
+	result := make([]string, 0, len(s))
+	for _, v := range s {
+		if _, ok := seen[v]; !ok {
+			seen[v] = struct{}{}
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
 // decodeCapabilities converts capability bitmask to human-readable strings
 func decodeCapabilities(caps uint64) []string {
 	var result []string
-	capMap := map[uint64]string{
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus):              "ReportsStatus",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig):        "AcceptsRemoteConfig",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig):     "ReportsEffectiveConfig",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth):              "ReportsHealth",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents): "ReportsAvailableComponents",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRestartCommand):      "AcceptsRestartCommand",
-	}
-	for mask, name := range capMap {
-		if caps&mask != 0 {
-			result = append(result, name)
+	for mask, name := range protobufs.AgentCapabilities_name {
+		if caps&uint64(mask) != 0 { //nolint:gosec // mask values are not negative so no overflow is possible here
+			result = append(result, strings.TrimPrefix(name, "AgentCapabilities_"))
 		}
 	}
 	return result

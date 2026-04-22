@@ -6,7 +6,7 @@ package dl
 
 import "github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 
-func prepareFindByField(field string, params map[string]interface{}) *dsl.Tmpl {
+func prepareFindByField(field string, params map[string]any) *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
 

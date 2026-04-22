@@ -28,22 +28,22 @@ func TestChunkInfoResultsParseCorrectly(t *testing.T) {
 					ID:     baseID + ".0",
 					Index:  "",
 					Source: []byte(""),
-					Fields: map[string]interface{}{
-						"bid":  []interface{}{baseID},
-						"last": []interface{}{false},
-						"sha2": []interface{}{sha2},
-						"size": []interface{}{float64(size)},
+					Fields: map[string]any{
+						"bid":  []any{baseID},
+						"last": []any{false},
+						"sha2": []any{sha2},
+						"size": []any{float64(size)},
 					},
 				},
 				{
 					ID:     baseID + ".1",
 					Index:  "",
 					Source: []byte(""),
-					Fields: map[string]interface{}{
-						"bid":  []interface{}{baseID},
-						"last": []interface{}{true},
-						"sha2": []interface{}{sha2},
-						"size": []interface{}{float64(size)},
+					Fields: map[string]any{
+						"bid":  []any{baseID},
+						"last": []any{true},
+						"sha2": []any{sha2},
+						"size": []any{float64(size)},
 					},
 				},
 			},

@@ -164,13 +164,14 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
-      - label: ":smartbear-testexecute: Run unit tests with requirefips build tag and FIPS provider"
+      - label: ":smartbear-testexecute: Run fips140=on unit tests with FIPS provider and microsoft/go"
         key: unit-test-fips-tag
         command: ".buildkite/scripts/unit_test.sh"
         env:
           FIPS: "true"
           GOEXPERIMENT: "systemcrypto"
           GO_DISTRO: "microsoft"
+          GODEBUG: "fips140=on,tlsmlkem=0"
         agents:
           provider: "aws"
           imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
@@ -179,7 +180,7 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
-      - label: ":smartbear-testexecute: Run fips140=only unit tests with FIPS provider"
+      - label: ":smartbear-testexecute: Run fips140=only unit tests with FIPS provider and upstream go"
         key: unit-test-fips140-only
         command: ".buildkite/scripts/unit_test_fipsonly.sh"
         env:

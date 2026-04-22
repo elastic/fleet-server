@@ -67,6 +67,9 @@ func (a actionT) String() string {
 	return actionStrings[a]
 }
 
+// reset zeros blk's fields so it can be reused from the pool. Only freeBlk
+// should call this; tests rely on this invariant to use reset as a proxy
+// for observing that freeBlk ran.
 func (blk *bulkT) reset() {
 	blk.action = 0
 	blk.flags = 0
@@ -79,5 +82,5 @@ func (blk *bulkT) reset() {
 type respT struct {
 	err  error
 	idx  int32
-	data interface{}
+	data any
 }

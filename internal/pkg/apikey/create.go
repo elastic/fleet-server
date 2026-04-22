@@ -17,12 +17,12 @@ import (
 )
 
 // Create generates a new APIKey in Elasticsearch using the given client.
-func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refresh string, roles []byte, meta interface{}) (*APIKey, error) {
+func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refresh string, roles []byte, meta any) (*APIKey, error) {
 	payload := struct {
 		Name       string          `json:"name,omitempty"`
 		Expiration string          `json:"expiration,omitempty"`
 		Roles      json.RawMessage `json:"role_descriptors,omitempty"`
-		Metadata   interface{}     `json:"metadata"`
+		Metadata   any             `json:"metadata"`
 	}{
 		Name:       name,
 		Expiration: ttl,

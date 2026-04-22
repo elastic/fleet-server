@@ -27,16 +27,16 @@ type AckResponse struct {
 }
 
 type HitT struct {
-	ID      string                 `json:"_id"`
-	SeqNo   int64                  `json:"_seq_no"`
-	Version int64                  `json:"version"`
-	Index   string                 `json:"_index"`
-	Source  json.RawMessage        `json:"_source"`
-	Score   *float64               `json:"_score"`
-	Fields  map[string]interface{} `json:"fields"`
+	ID      string          `json:"_id"`
+	SeqNo   int64           `json:"_seq_no"`
+	Version int64           `json:"version"`
+	Index   string          `json:"_index"`
+	Source  json.RawMessage `json:"_source"`
+	Score   *float64        `json:"_score"`
+	Fields  map[string]any  `json:"fields"`
 }
 
-func (hit *HitT) Unmarshal(v interface{}) error {
+func (hit *HitT) Unmarshal(v any) error {
 	err := json.Unmarshal(hit.Source, v)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func (b *Bucket) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	var aggs map[string]interface{}
+	var aggs map[string]any
 	err = json.Unmarshal(data, &aggs)
 	if err != nil {
 		return err
@@ -84,7 +84,7 @@ func (b *Bucket) UnmarshalJSON(data []byte) error {
 	delete(aggs, "doc_count")
 	b2.Aggregations = make(map[string]HitsT)
 	for name, value := range aggs {
-		vMap, ok := value.(map[string]interface{})
+		vMap, ok := value.(map[string]any)
 		if !ok {
 			continue
 		}

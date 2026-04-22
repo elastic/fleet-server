@@ -98,7 +98,7 @@ func CreateRandomActions(opts ...CreateActionsOpt) ([]model.Action, error) {
 		start := r.Int(0, len(agentIds))
 		end := start + r.Int(0, len(agentIds)-start)
 
-		payload := map[string]interface{}{
+		payload := map[string]any{
 			uuid.Must(uuid.NewV4()).String(): uuid.Must(uuid.NewV4()).String(),
 		}
 

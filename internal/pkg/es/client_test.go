@@ -6,6 +6,7 @@ package es
 
 import (
 	"context"
+	"crypto/fips140"
 	"crypto/tls"
 	"crypto/x509"
 	_ "embed"
@@ -19,7 +20,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
 	"github.com/stretchr/testify/require"
@@ -205,8 +205,13 @@ func TestConnectionTLS(t *testing.T) {
 
 	_, err = FetchESVersion(ctx, client)
 
-	if build.FIPSDistribution {
-		require.ErrorContains(t, err, "tls: internal error")
+	if fips140.Enforced() {
+		// When FIPS 140 is enforced (GODEBUG=fips140=only), Go's crypto
+		// stack rejects signing with a 1024-bit RSA key. Note: fips140=on
+		// with microsoft/go's systemcrypto backend silently falls back to
+		// stdlib in test binaries (via UnreachableExceptTests), so only
+		// fips140=only reliably enforces this.
+		require.Error(t, err)
 	} else {
 		require.NoError(t, err)
 	}

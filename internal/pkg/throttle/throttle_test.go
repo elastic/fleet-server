@@ -26,7 +26,7 @@ func TestThrottleZero(t *testing.T) {
 	N := rand.Intn(64) + 10 //nolint:gosec // random number is used for testing
 
 	var tokens []*Token
-	for i := 0; i < N; i++ {
+	for i := range N {
 
 		key := strconv.Itoa(i)
 
@@ -46,7 +46,7 @@ func TestThrottleZero(t *testing.T) {
 	}
 
 	// Validate again that all tokens are blocked after allocating N
-	for i := 0; i < N; i++ {
+	for i := range N {
 
 		key := strconv.Itoa(i)
 
@@ -115,7 +115,7 @@ func TestThrottleN(t *testing.T) {
 
 		// Any subsequent request should fail because at max
 		try := rand.Intn(64) + 1 //nolint:gosec // random number is used for testing
-		for i := 0; i < try; i++ {
+		for i := range try {
 
 			key := strconv.Itoa(N + i)
 

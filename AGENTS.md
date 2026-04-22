@@ -199,6 +199,7 @@ Guiding principles and expectations: [CONTRIBUTING.md](./CONTRIBUTING.md).
 - **Update docs and tests** when behavior, configuration, or operator-facing workflow changes.
 - **Make non-obvious intent clear** through naming, structure, or brief “why” comments when needed.
 - **Formatting:** All go files must be formatted with `go fmt`, and imports must be ordereed with `goimports` which can be done with the `mage check:imports` target.
+- **Go Fix:** All .go files must be updated with `go fix`, this can be done with the `mage check:fix` target.
 - **Changelog:** For notable changes, add a fragment using **[elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool)**. Typical usage: `elastic-agent-changelog-tool new "$TITLE"` (see the tool’s [usage docs](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md)). PRs may use the **`skip-changelog`** label when appropriate; see `changelog/` for examples.
 - **`go.mod` / NOTICE:** If you change **`go.mod`** or add/update Go dependencies, regenerate **`NOTICE.txt`** and **`NOTICE-fips.txt`** with `mage check:notice`
 - **Before opening a PR:** `mage check:all` and `mage test:unit` must pass at minimum; integration or E2E tests must also pass when behavior depends on Elasticsearch or full HTTP flows (see **Testing** above).

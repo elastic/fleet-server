@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"sync"
@@ -66,7 +67,7 @@ type Bulk interface {
 	MDelete(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
 
 	// APIKey operations
-	APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*APIKey, error)
+	APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta any) (*APIKey, error)
 	APIKeyRead(ctx context.Context, id string, withOwner bool) (*APIKeyMetadata, error)
 	APIKeyAuth(ctx context.Context, key APIKey) (*SecurityInfo, error)
 	APIKeyInvalidate(ctx context.Context, ids ...string) error
@@ -75,11 +76,11 @@ type Bulk interface {
 	// Accessor used to talk to elastic search direcly bypassing bulk engine
 	Client() *elasticsearch.Client
 
-	CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (Bulk, bool, error)
+	CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]any) (Bulk, bool, error)
 	GetBulker(outputName string) Bulk
 	GetBulkerMap() map[string]Bulk
 	CancelFn() context.CancelFunc
-	RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool
+	RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]any) bool
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
 }
@@ -96,7 +97,7 @@ type Bulker struct {
 	cancelFn              context.CancelFunc
 	pendingBulkDispatches atomic.Int64
 
-	remoteOutputConfigMap map[string]map[string]interface{}
+	remoteOutputConfigMap map[string]map[string]any
 	bulkerMap             map[string]Bulk
 	remoteOutputMutex     sync.RWMutex
 }
@@ -111,13 +112,20 @@ const (
 	defaultApikeyMaxReqSize               = 100 * 1024 * 1024
 	defaultFlushContextTimeout            = time.Minute * 1
 	defaultMaxPendingBulkDispatches int64 = 0 // 0 means no limit
+
+	// dispatchAbortDrainTimeout bounds how long the drain helper waits for
+	// a late response from the Run loop on an abort from the second
+	// select() of the dispatch method before giving up on freeing blk.
+	// Three flush intervals give enough headroom for the blk to be picked
+	// up, sent to ES, and responded to even under heavy load.
+	dispatchAbortDrainTimeout = 3 * defaultFlushInterval
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
 
 	bopts := parseBulkOpts(opts...)
 
-	poolFunc := func() interface{} {
+	poolFunc := func() any {
 		return &bulkT{ch: make(chan respT, 1)}
 	}
 
@@ -128,7 +136,7 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		blkPool:               sync.Pool{New: poolFunc},
 		apikeyLimit:           semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
 		tracer:                tracer,
-		remoteOutputConfigMap: make(map[string]map[string]interface{}),
+		remoteOutputConfigMap: make(map[string]map[string]any),
 		// remote ES bulkers
 		bulkerMap: make(map[string]Bulk),
 	}
@@ -144,9 +152,7 @@ func (b *Bulker) GetBulker(outputName string) Bulk {
 func (b *Bulker) GetBulkerMap() map[string]Bulk {
 	mp := make(map[string]Bulk)
 	b.remoteOutputMutex.RLock()
-	for k, v := range b.bulkerMap {
-		mp[k] = v
-	}
+	maps.Copy(mp, b.bulkerMap)
 	b.remoteOutputMutex.RUnlock()
 	return mp
 }
@@ -167,7 +173,7 @@ func (b *Bulker) updateBulkerMap(outputName string, newBulker *Bulker) {
 // if bulker exists for output, check if config changed
 // if not changed, return the existing bulker
 // if changed, stop the existing bulker and create a new one
-func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]interface{}) (Bulk, bool, error) {
+func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]any) (Bulk, bool, error) {
 	hasConfigChanged := b.hasChangedAndUpdateRemoteOutputConfig(zlog, outputName, outputMap[outputName])
 	b.remoteOutputMutex.RLock()
 	bulker := b.bulkerMap[outputName]
@@ -217,7 +223,7 @@ func (b *Bulker) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, ou
 
 var newESClient = es.NewClient
 
-func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, outputMap map[string]map[string]interface{}) (*elasticsearch.Client, error) {
+func (b *Bulker) createRemoteEsClient(ctx context.Context, outputName string, outputMap map[string]map[string]any) (*elasticsearch.Client, error) {
 	var esOutput config.Elasticsearch
 	esConfig, err := ucfg.NewFrom(outputMap[outputName], config.DefaultOptions...)
 	if err != nil {
@@ -263,7 +269,7 @@ func (b *Bulker) Client() *elasticsearch.Client {
 	return client
 }
 
-func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]any) bool {
 	b.remoteOutputMutex.RLock()
 	defer b.remoteOutputMutex.RUnlock()
 	curCfg := b.remoteOutputConfigMap[name]
@@ -278,16 +284,14 @@ func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, new
 }
 
 // check if remote output cfg changed
-func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name string, newCfg map[string]interface{}) bool {
+func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name string, newCfg map[string]any) bool {
 	hasChanged := b.RemoteOutputConfigChanged(zlog, name, newCfg)
 	if hasChanged {
 		zlog.Debug().Str("name", name).Msg("remote output configuration has changed")
 	}
 
-	newCfgCopy := make(map[string]interface{})
-	for k, v := range newCfg {
-		newCfgCopy[k] = v
-	}
+	newCfgCopy := make(map[string]any)
+	maps.Copy(newCfgCopy, newCfg)
 	b.remoteOutputMutex.Lock()
 	b.remoteOutputConfigMap[name] = newCfgCopy
 	b.remoteOutputMutex.Unlock()
@@ -632,6 +636,7 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort queue")
+		b.freeBlk(blk)
 		return respT{err: ctx.Err()}
 	}
 
@@ -655,7 +660,22 @@ func (b *Bulker) dispatch(ctx context.Context, blk *bulkT) respT {
 			Bool("refresh", blk.flags.Has(flagRefresh)).
 			Dur("rtt", time.Since(start)).
 			Msg("Dispatch abort response")
+		// blk is in the Run loop's queue; drain the response and free
+		// asynchronously so the caller can return immediately.
+		go b.drainAndFreeAbortedBlk(blk)
 	}
 
 	return respT{err: ctx.Err()}
+}
+
+// drainAndFreeAbortedBlk waits for the Run loop to deliver a response to an
+// abandoned blk, then returns it to the pool. If the response does not
+// arrive within dispatchAbortDrainTimeout (e.g. during shutdown), it gives
+// up rather than blocking forever; in that case blk is not reclaimed.
+func (b *Bulker) drainAndFreeAbortedBlk(blk *bulkT) {
+	select {
+	case <-blk.ch:
+		b.freeBlk(blk)
+	case <-time.After(dispatchAbortDrainTimeout):
+	}
 }
