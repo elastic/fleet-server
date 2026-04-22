@@ -50,6 +50,7 @@ const (
 	FieldCapabilities                  = "capabilities"
 	FieldEffectiveConfig               = "effective_config"
 	FieldEffectiveConfigHash           = "effective_config_hash"
+	FieldEffectiveConfigLabel          = "effective_config_label"
 
 	FieldActive             = "active"
 	FieldNamespaces         = "namespaces"

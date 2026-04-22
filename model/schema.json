@@ -779,6 +779,10 @@
         "effective_config_hash": {
           "description": "SHA-256 hex hash of collector pipeline topology (receivers, processors, exporters, connectors, service.pipelines, service.extensions)",
           "type": "string"
+        },
+        "effective_config_label": {
+          "description": "Human-readable adjective-noun label derived from the first two bytes of effective_config_hash",
+          "type": "string"
         }
       },
       "required": ["_id", "type", "active", "enrolled_at", "status"]

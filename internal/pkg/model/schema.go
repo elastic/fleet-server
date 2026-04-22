@@ -162,6 +162,9 @@ type Agent struct {
 	// SHA-256 hex hash of collector pipeline topology (receivers, processors, exporters, connectors, service.pipelines, service.extensions)
 	EffectiveConfigHash string `json:"effective_config_hash,omitempty"`
 
+	// Human-readable adjective-noun label derived from the first two bytes of effective_config_hash
+	EffectiveConfigLabel string `json:"effective_config_label,omitempty"`
+
 	// Date/time the Elastic Agent enrolled
 	EnrolledAt string `json:"enrolled_at"`
 

@@ -430,6 +430,7 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 			zlog.Warn().Err(err).Msg("failed to compute effective config hash")
 		} else if configHash != "" {
 			initialOpts = append(initialOpts, checkin.WithEffectiveConfigHash(configHash))
+			initialOpts = append(initialOpts, checkin.WithEffectiveConfigLabel(LabelFromHash(configHash)))
 		}
 	}
 

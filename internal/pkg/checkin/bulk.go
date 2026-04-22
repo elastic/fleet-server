@@ -167,6 +167,15 @@ func WithEffectiveConfigHash(hash string) Option {
 	}
 }
 
+func WithEffectiveConfigLabel(label string) Option {
+	return func(pending *pendingT) {
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.effectiveConfigLabel = label
+	}
+}
+
 func WithAvailableRollbacks(availableRollbacks []byte) Option {
 	return func(pending *pendingT) {
 		if pending.extra == nil {
@@ -177,16 +186,17 @@ func WithAvailableRollbacks(availableRollbacks []byte) Option {
 }
 
 type extraT struct {
-	meta                []byte
-	seqNo               sqn.SeqNo
-	ver                 string
-	components          []byte
-	deleteAudit         bool
-	availableRollbacks  []byte
-	health              []byte
-	capabilities        []string
-	effectiveConfig     []byte
-	effectiveConfigHash string
+	meta                 []byte
+	seqNo                sqn.SeqNo
+	ver                  string
+	components           []byte
+	deleteAudit          bool
+	availableRollbacks   []byte
+	health               []byte
+	capabilities         []string
+	effectiveConfig      []byte
+	effectiveConfigHash  string
+	effectiveConfigLabel string
 }
 
 // Minimize the size of this structure.
@@ -426,6 +436,10 @@ func toUpdateBody(now string, pending pendingT) ([]byte, error) {
 
 		if pending.extra.effectiveConfigHash != "" {
 			fields[dl.FieldEffectiveConfigHash] = pending.extra.effectiveConfigHash
+		}
+
+		if pending.extra.effectiveConfigLabel != "" {
+			fields[dl.FieldEffectiveConfigLabel] = pending.extra.effectiveConfigLabel
 		}
 
 		// If seqNo changed, set the field appropriately
