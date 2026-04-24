@@ -18,7 +18,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/magefile/mage v1.17.1
+	github.com/magefile/mage v1.17.2
 	github.com/mailru/easyjson v0.9.2
 	github.com/miolini/datacounter v1.0.3
 	github.com/oapi-codegen/runtime v1.4.0
