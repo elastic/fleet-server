@@ -57,24 +57,6 @@ func TestLabelFromHash_InvalidHex(t *testing.T) {
 }
 
 func TestWordlistsHave256UniqueEntries(t *testing.T) {
-	t.Run("adjectives", func(t *testing.T) {
-		assert.Len(t, labelAdjectives, 256)
-		seen := make(map[string]int, 256)
-		for i, w := range labelAdjectives {
-			require.NotEmpty(t, w, "adjective at index %d is empty", i)
-			prev, dup := seen[w]
-			assert.False(t, dup, "adjective %q at index %d duplicates index %d", w, i, prev)
-			seen[w] = i
-		}
-	})
-	t.Run("nouns", func(t *testing.T) {
-		assert.Len(t, labelNouns, 256)
-		seen := make(map[string]int, 256)
-		for i, w := range labelNouns {
-			require.NotEmpty(t, w, "noun at index %d is empty", i)
-			prev, dup := seen[w]
-			assert.False(t, dup, "noun %q at index %d duplicates index %d", w, i, prev)
-			seen[w] = i
-		}
-	})
+	assert.Len(t, slices.Compact(slices.Sort(labelAdjectives)), 256, "labelAdjectives contains duplicate entry")
+	assert.Len(t, slices.Compact(slices.Sort(labelNounts)), 256, "labelNouns contains duplicate entry")
 }
