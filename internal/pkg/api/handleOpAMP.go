@@ -150,90 +150,72 @@ func (oa *OpAMPT) Enabled() bool {
 
 func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func(ctx context.Context, conn types.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
 	return func(ctx context.Context, conn types.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
+		response := &protobufs.ServerToAgent{
+			InstanceUid: message.InstanceUid,
+		}
+
 		instanceUID, err := uuid.FromBytes(message.InstanceUid)
 		if err != nil {
-			return &protobufs.ServerToAgent{
-				ErrorResponse: &protobufs.ServerErrorResponse{
-					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
-					ErrorMessage: "failed to parse instance_uid from AgentToServer message",
-				},
+			zlog.Error().Err(err).Msg("failed to parse agent instance_uid")
+			response.ErrorResponse = &protobufs.ServerErrorResponse{
+				Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
+				ErrorMessage: "failed to parse instance_uid",
 			}
+			return response
 		}
+		zlog = zlog.With().Str("opamp.agent.instance_uid", instanceUID.String()).Logger()
 
-		zlog = zlog.With().Str("opamp.agent.uid", instanceUID.String()).Logger()
+		zlog.Debug().Uint64("sequence_num", message.SequenceNum).Msg("received message from agent")
 
-		zlog.Debug().
-			Msg("received AgentToServer message from agent")
-
-		// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
-		agent, err := oa.findEnrolledAgent(ctx, zlog, instanceUID.String())
-		if err != nil {
-			return &protobufs.ServerToAgent{
-				InstanceUid: instanceUID.Bytes(),
-				ErrorResponse: &protobufs.ServerErrorResponse{
+		enrollRequest := message.Flags&uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid) != 0
+		agentFound := false
+		var agent *model.Agent
+		if !enrollRequest {
+			// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
+			agent, err = oa.findEnrolledAgent(ctx, zlog, instanceUID.String())
+			if err != nil {
+				zlog.Error().Err(err).Msg("agent search failed")
+				response.ErrorResponse = &protobufs.ServerErrorResponse{
 					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
-					ErrorMessage: fmt.Sprintf("failed to check if agent is enrolled: %v", err),
-				},
+					ErrorMessage: "agent search failed",
+				}
+				return response
 			}
+			agentFound = agent != nil
 		}
-
 		zlog.Debug().
-			Bool("is_enrolled", agent != nil).
-			Msg("agent enrollment status")
+			Bool("agent_found", agentFound).
+			Bool("enroll_request", enrollRequest).
+			Msg("agent enrollment check")
 
 		// Handle agent disconnect: set status to offline for enrolled agents,
 		// return an error for unenrolled agents.
 		if message.AgentDisconnect != nil {
-			if agent == nil {
-				zlog.Debug().Msg("agent disconnect received from unenrolled agent")
-				return &protobufs.ServerToAgent{
-					InstanceUid: instanceUID.Bytes(),
-					ErrorResponse: &protobufs.ServerErrorResponse{
-						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
-						ErrorMessage: "agent is not enrolled",
-					},
+			if !agentFound || enrollRequest {
+				zlog.Debug().Msg("agent_disconnect set on enroll request")
+				response.ErrorResponse = &protobufs.ServerErrorResponse{
+					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
+					ErrorMessage: "agent_disconnect set on new enrollment message",
 				}
+				return response
 			}
-			zlog.Debug().Msg("agent disconnect received")
-			_ = oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus(string(CheckinRequestStatusDisconnected)))
-			return &protobufs.ServerToAgent{
-				InstanceUid: instanceUID.Bytes(),
+			zlog.Debug().Msg("agent_disconnect received")
+			if err := oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus(string(CheckinRequestStatusDisconnected))); err != nil {
+				zlog.Error().Err(err).Msg("checkin failed, disconnect status may be lost")
 			}
-		}
-
-		// Check if the agent requested a new instance UID per the OpAMP spec.
-		var newInstanceUID *uuid.UUID
-		if message.Flags&uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid) != 0 {
-			uid, err := uuid.NewV7()
-			if err != nil {
-				zlog.Error().Err(err).Msg("failed to generate new instance UID")
-				return &protobufs.ServerToAgent{
-					InstanceUid: instanceUID.Bytes(),
-					ErrorResponse: &protobufs.ServerErrorResponse{
-						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
-						ErrorMessage: "failed to generate new instance UID",
-					},
-				}
-			}
-			newInstanceUID = &uid
-			zlog.Debug().Str("opamp.agent.new_uid", uid.String()).Msg("agent requested new instance UID")
+			return response
 		}
 
 		sendCapabilities := false
-		if agent == nil {
+		if !agentFound || enrollRequest {
 			sendCapabilities = true
-			agentID := instanceUID.String()
-			if newInstanceUID != nil {
-				agentID = newInstanceUID.String()
-			}
-			if agent, err = oa.enrollAgent(zlog, agentID, message, apiKey); err != nil {
-				return &protobufs.ServerToAgent{
-					InstanceUid: instanceUID.Bytes(),
-					ErrorResponse: &protobufs.ServerErrorResponse{
-						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
-						ErrorMessage: fmt.Sprintf("failed to enroll agent: %v", err),
-					},
+			if agent, err = oa.enrollAgent(ctx, zlog, instanceUID, message, apiKey); err != nil {
+				zlog.Error().Err(err).Msg("failed to enroll agent")
+				response.ErrorResponse = &protobufs.ServerErrorResponse{
+					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
+					ErrorMessage: "failed to enroll agent",
 				}
+				return response
 			}
 		} else {
 			if !isActiveStatus(agent.LastCheckinStatus) {
@@ -241,52 +223,33 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 			if message.SequenceNum != uint64(agent.SequenceNum)+1 { //nolint:gosec // agent seq num will not be negative
 				zlog.Debug().
-					Int64("stored_seq", agent.SequenceNum).
-					Uint64("msg_seq", message.SequenceNum).
+					Int64("stored_sequence", agent.SequenceNum).
+					Uint64("sequence_num", message.SequenceNum).
 					Str("last_status", agent.LastCheckinStatus).
 					Msg("sequence number drift detected")
 			}
 		}
 
-		// An enrolled agent requesting a new UID is handled by reassignAgentID, which
-		// functions as a special checkin (applies the message updates under the new ID)
-		// in place of updateAgent. Currently returns an error since reassignment of an
-		// enrolled agent is not yet supported. Newly-enrolled agents whose ID was just
-		// chosen from newInstanceUID fall through to the regular updateAgent path.
-		if newInstanceUID != nil && agent.Id != newInstanceUID.String() {
-			if err := oa.reassignAgentID(ctx, zlog, agent, newInstanceUID.String(), message); err != nil {
-				return &protobufs.ServerToAgent{
-					InstanceUid: instanceUID.Bytes(),
-					ErrorResponse: &protobufs.ServerErrorResponse{
-						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
-						ErrorMessage: fmt.Sprintf("failed to reassign agent ID: %v", err),
-					},
-				}
+		if err := oa.updateAgent(zlog, agent, message); err != nil {
+			zlog.Error().Err(err).Msg("failed to update agent")
+			response.ErrorResponse = &protobufs.ServerErrorResponse{
+				Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
+				ErrorMessage: "failed to update agent",
 			}
-		} else if err := oa.updateAgent(zlog, agent, message); err != nil {
-			return &protobufs.ServerToAgent{
-				InstanceUid: instanceUID.Bytes(),
-				ErrorResponse: &protobufs.ServerErrorResponse{
-					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
-					ErrorMessage: fmt.Sprintf("failed to update persisted Agent information: %v", err),
-				},
-			}
+			return response
 		}
 
-		sToA := protobufs.ServerToAgent{
-			InstanceUid: instanceUID.Bytes(),
-			Flags:       uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState),
-		}
+		response.Flags = uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState)
 		if sendCapabilities {
-			sToA.Capabilities = serverCapabilities
+			response.Capabilities = serverCapabilities
 		}
-		if newInstanceUID != nil {
-			sToA.AgentIdentification = &protobufs.AgentIdentification{
-				NewInstanceUid: newInstanceUID.Bytes(),
+		if enrollRequest {
+			response.AgentIdentification = &protobufs.AgentIdentification{
+				NewInstanceUid: uuid.Must(uuid.FromString(agent.Id)).Bytes(),
 			}
 		}
 
-		return &sToA
+		return response
 	}
 }
 
@@ -314,21 +277,19 @@ func (oa *OpAMPT) findEnrolledAgent(ctx context.Context, zlog zerolog.Logger, ag
 	return &agent, nil
 }
 
-// reassignAgentID functions as a special checkin that associates an existing agent with a new ID.
-//
-// Currently will return an error as reassigning an enrolled agent is not supported.
-func (oa *OpAMPT) reassignAgentID(_ context.Context, zlog zerolog.Logger, agent *model.Agent, newID string, _ *protobufs.AgentToServer) error {
-	zlog.Debug().
-		Str("old_id", agent.Id).
-		Str("new_id", newID).
-		Msg("reassigning agent ID unsupported")
-	return errors.ErrUnsupported
-}
+func (oa *OpAMPT) enrollAgent(ctx context.Context, zlog zerolog.Logger, uid uuid.UUID, aToS *protobufs.AgentToServer, apiKey *apikey.APIKey) (*model.Agent, error) {
+	instanceUID := uid.String()
+	if aToS.Flags&uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid) != 0 {
+		// Incoming message requests a new uid
+		newUID, err := uuid.NewV7()
+		if err != nil {
+			zlog.Error().Err(err).Msg("generate new UUID failed")
+			return nil, fmt.Errorf("failed to generate new UUID")
+		}
+		instanceUID = newUID.String()
+	}
+	zlog.Debug().Str("enroll_instance_uid", instanceUID).Msg("enrolling agent")
 
-func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobufs.AgentToServer, apiKey *apikey.APIKey) (*model.Agent, error) {
-	zlog.Debug().
-		Msg("enrolling agent")
-	ctx := context.TODO()
 	rec, err := dl.FindEnrollmentAPIKey(ctx, oa.bulk, dl.QueryEnrollmentAPIKeyByID, dl.FieldAPIKeyID, apiKey.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find enrollment API key: %w", err)
@@ -340,7 +301,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 	// the hostname from the agent description's non-identifying attributes. However, the agent
 	// description is only sent if any of its fields change.
 	meta := localMetadata{}
-	meta.Elastic.Agent.ID = agentID
+	meta.Elastic.Agent.ID = instanceUID
 	agentType := ""
 	var tags []string
 	var identifyingAttributes, nonIdentifyingAttributes json.RawMessage
@@ -401,12 +362,12 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 	}
 
 	agent := model.Agent{
-		ESDocument: model.ESDocument{Id: agentID},
+		ESDocument: model.ESDocument{Id: instanceUID},
 		Active:     true,
 		EnrolledAt: now.UTC().Format(time.RFC3339),
 		PolicyID:   rec.PolicyID,
 		Agent: &model.AgentMetadata{
-			ID:      agentID,
+			ID:      instanceUID,
 			Version: meta.Elastic.Agent.Version,
 			Type:    agentType,
 		},
@@ -426,7 +387,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 
 	zlog.Debug().
 		Msg("creating .fleet-agents doc")
-	if _, err = oa.bulk.Create(ctx, dl.FleetAgents, agentID, data, bulk.WithRefresh()); err != nil {
+	if _, err = oa.bulk.Create(ctx, dl.FleetAgents, instanceUID, data, bulk.WithRefresh()); err != nil {
 		return nil, err
 	}
 
