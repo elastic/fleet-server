@@ -38,12 +38,16 @@ service:
 )
 
 func makeEffectiveConfig(body string) *protobufs.EffectiveConfig {
+	return makeEffectiveConfigMulti(map[string]string{"": body})
+}
+
+func makeEffectiveConfigMulti(files map[string]string) *protobufs.EffectiveConfig {
+	cm := make(map[string]*protobufs.AgentConfigFile, len(files))
+	for k, v := range files {
+		cm[k] = &protobufs.AgentConfigFile{Body: []byte(v)}
+	}
 	return &protobufs.EffectiveConfig{
-		ConfigMap: &protobufs.AgentConfigMap{
-			ConfigMap: map[string]*protobufs.AgentConfigFile{
-				"": {Body: []byte(body)},
-			},
-		},
+		ConfigMap: &protobufs.AgentConfigMap{ConfigMap: cm},
 	}
 }
 
@@ -183,6 +187,39 @@ service:
 	h2, err := HashEffectiveConfig(makeEffectiveConfig(withExtensions))
 	require.NoError(t, err)
 	assert.NotEqual(t, h1, h2, "service.extensions must be included in the hash")
+}
+
+func TestHashEffectiveConfig_MultiFile(t *testing.T) {
+	receivers := `
+receivers:
+  otlp: {}
+`
+	pipeline := `
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [debug]
+`
+	// Two separate files should hash differently from the same content in one file.
+	single := makeEffectiveConfig(receivers + pipeline)
+	multi := makeEffectiveConfigMulti(map[string]string{
+		"":         receivers,
+		"pipeline": pipeline,
+	})
+	hSingle, err := HashEffectiveConfig(single)
+	require.NoError(t, err)
+	hMulti, err := HashEffectiveConfig(multi)
+	require.NoError(t, err)
+	assert.NotEqual(t, hSingle, hMulti, "single-file and multi-file configs must produce different hashes")
+
+	// Multi-file hash must be deterministic regardless of Go map iteration order.
+	hMulti2, err := HashEffectiveConfig(makeEffectiveConfigMulti(map[string]string{
+		"pipeline": pipeline,
+		"":         receivers,
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, hMulti, hMulti2, "multi-file hash must be deterministic")
 }
 
 func TestHashEffectiveConfig_HexEncoded(t *testing.T) {

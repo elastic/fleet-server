@@ -5,6 +5,7 @@
 package api
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -14,7 +15,7 @@ import (
 
 func TestLabelFromHash_Format(t *testing.T) {
 	// A valid 64-char hex hash must produce "adjective-noun".
-	hash, err := hashConfigBody([]byte("receivers:\n  otlp: {}\n"))
+	hash, err := HashEffectiveConfig(makeEffectiveConfig("receivers:\n  otlp: {}\n"))
 	require.NoError(t, err)
 
 	label := LabelFromHash(hash)
@@ -40,9 +41,9 @@ func TestLabelFromHash_DifferentBytesGiveDifferentLabels(t *testing.T) {
 
 func TestLabelFromHash_SameLabelForSameTopology(t *testing.T) {
 	// Same topology → same hash → same label.
-	h1, err := hashConfigBody([]byte(baseTopologyConfig))
+	h1, err := HashEffectiveConfig(makeEffectiveConfig(baseTopologyConfig))
 	require.NoError(t, err)
-	h2, err := hashConfigBody([]byte(baseTopologyConfig))
+	h2, err := HashEffectiveConfig(makeEffectiveConfig(baseTopologyConfig))
 	require.NoError(t, err)
 	assert.Equal(t, LabelFromHash(h1), LabelFromHash(h2))
 }
@@ -57,6 +58,12 @@ func TestLabelFromHash_InvalidHex(t *testing.T) {
 }
 
 func TestWordlistsHave256UniqueEntries(t *testing.T) {
-	assert.Len(t, slices.Compact(slices.Sort(labelAdjectives)), 256, "labelAdjectives contains duplicate entry")
-	assert.Len(t, slices.Compact(slices.Sort(labelNounts)), 256, "labelNouns contains duplicate entry")
+	t.Run("adjectives", func(t *testing.T) {
+		s := slices.Sorted(slices.Values(labelAdjectives[:]))
+		assert.Len(t, slices.Compact(s), 256, "labelAdjectives contains duplicate entry")
+	})
+	t.Run("nouns", func(t *testing.T) {
+		s := slices.Sorted(slices.Values(labelNouns[:]))
+		assert.Len(t, slices.Compact(s), 256, "labelNouns contains duplicate entry")
+	})
 }
