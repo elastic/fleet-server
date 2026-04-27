@@ -12,6 +12,7 @@ import (
 	slog "log"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
@@ -123,6 +124,13 @@ func (s *server) Run(ctx context.Context) error {
 			var opts []tlscommon.CertReloaderOption
 			if s.cfg.TLS.CertificateReload.ReloadInterval > 0 {
 				opts = append(opts, tlscommon.WithReloadInterval(s.cfg.TLS.CertificateReload.ReloadInterval))
+			}
+			passphrase, err := resolvePassphrase(s.cfg.TLS.Certificate)
+			if err != nil {
+				return fmt.Errorf("failed to resolve TLS key passphrase: %w", err)
+			}
+			if passphrase != "" {
+				opts = append(opts, tlscommon.WithPassphrase(passphrase))
 			}
 			reloader, err := tlscommon.NewCertReloader(
 				s.cfg.TLS.Certificate.Certificate,
@@ -237,4 +245,18 @@ func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) 
 	}
 
 	return ln
+}
+
+func resolvePassphrase(cert tlscommon.CertificateConfig) (string, error) {
+	if cert.Passphrase != "" {
+		return cert.Passphrase, nil
+	}
+	if cert.PassphrasePath != "" {
+		p, err := os.ReadFile(cert.PassphrasePath)
+		if err != nil {
+			return "", fmt.Errorf("unable to read key passphrase file: %w", err)
+		}
+		return string(p), nil
+	}
+	return "", nil
 }
