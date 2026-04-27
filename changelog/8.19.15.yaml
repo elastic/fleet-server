@@ -18,7 +18,7 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - hhttps://github.com/elastic/fleet-server/pull/6800
+        - https://github.com/elastic/fleet-server/pull/6800
       issue: []
       impact: ""
       action: ""
