@@ -207,26 +207,15 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 
 		sendCapabilities := false
 		if !agentFound || enrollRequest {
+			sendCapabilities = true
+			// record the audit_unenrolled_reason if the agent exists
+			// the reason is used to determine if we need to update the existing agent
 			auditReason := ""
 			if agentFound {
 				auditReason = agent.AuditUnenrolledReason
 			}
 
-			// Check if enroll limits are reached
-			// release is called immediately after agent is enrolled, not deferred
-			release, err := oa.enrollLimit.Acquire()
-			if err != nil {
-				zlog.Error().Err(err).Msg("opamp enroll rate limit reached")
-				response.ErrorResponse = &protobufs.ServerErrorResponse{
-					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
-					ErrorMessage: "enroll rate limit reached",
-				}
-				return response
-			}
-
-			sendCapabilities = true
 			if agent, err = oa.enrollAgent(ctx, zlog, instanceUID, message, apiKey); err != nil {
-				release()
 				zlog.Error().Err(err).Msg("failed to enroll agent")
 				response.ErrorResponse = &protobufs.ServerErrorResponse{
 					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
@@ -234,7 +223,6 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 				}
 				return response
 			}
-			release()
 
 			if agentFound && enrollRequest && auditReason != string(Orphaned) && auditReason != reenrolled {
 				if err := oa.unenrollAgent(ctx, zlog, instanceUID.String()); err != nil {
@@ -302,6 +290,12 @@ func (oa *OpAMPT) findEnrolledAgent(ctx context.Context, zlog zerolog.Logger, ag
 }
 
 func (oa *OpAMPT) enrollAgent(ctx context.Context, zlog zerolog.Logger, uid uuid.UUID, aToS *protobufs.AgentToServer, apiKey *apikey.APIKey) (*model.Agent, error) {
+	release, err := oa.enrollLimit.Acquire()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	instanceUID := uid.String()
 	if aToS.Flags&uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid) != 0 {
 		// Incoming message requests a new uid
@@ -446,8 +440,11 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 		initialOpts = append(initialOpts, checkin.WithHealth(healthBytes))
 	}
 
-	initialOpts = append(initialOpts, checkin.WithStatus(string(status)))
-	initialOpts = append(initialOpts, checkin.WithSequenceNum(aToS.SequenceNum))
+	initialOpts = append(initialOpts,
+		checkin.WithStatus(string(status)),
+		checkin.WithSequenceNum(aToS.SequenceNum),
+		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != ""),
+	)
 
 	if aToS.Capabilities != 0 {
 		capabilities := decodeCapabilities(aToS.Capabilities)

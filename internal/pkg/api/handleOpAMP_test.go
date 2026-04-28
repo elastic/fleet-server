@@ -10,6 +10,8 @@ import (
 	"io"
 	"reflect"
 	"testing"
+	"testing/synctest"
+	"time"
 	"unsafe"
 
 	"github.com/gofrs/uuid/v5"
@@ -167,7 +169,7 @@ func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 		}).
 		Return("doc-id", nil)
 
-	oa := &OpAMPT{bulk: bulker}
+	oa := &OpAMPT{bulk: bulker, enrollLimit: limit.NewLimiter(nil)}
 	msg := &protobufs.AgentToServer{
 		AgentDescription: &protobufs.AgentDescription{
 			IdentifyingAttributes: []*protobufs.KeyValue{
@@ -223,6 +225,52 @@ func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 	bulker.AssertExpectations(t)
 }
 
+func TestEnrollAgentRateLimiter(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
+			APIKeyID: "enroll-key-id",
+			PolicyID: "policy-123",
+			Active:   true,
+		}
+		enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
+		require.NoError(t, err)
+
+		bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
+			Return(&es.ResultT{
+				HitsT: es.HitsT{
+					Hits: []es.HitT{{Source: enrollKeyBytes}},
+				},
+			}, nil)
+
+		agentUID := uuid.Must(uuid.NewV7())
+		oa := &OpAMPT{bulk: bulker, enrollLimit: limit.NewLimiter(&config.Limit{Max: 1})}
+
+		ch := make(chan struct{})
+		bulker.On("Create", mock.Anything, dl.FleetAgents, agentUID.String(), mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				ch <- struct{}{}
+			}).
+			Return("doc-id", nil)
+
+		apiKey := &apikey.APIKey{ID: "enroll-key-id"}
+		zlog := zerolog.New(io.Discard)
+
+		go func() {
+			_, err := oa.enrollAgent(t.Context(), zlog, agentUID, &protobufs.AgentToServer{}, apiKey)
+			require.NoError(t, err, "expected one enrollment to succeed")
+		}()
+
+		synctest.Wait()
+
+		_, err = oa.enrollAgent(t.Context(), zlog, agentUID, &protobufs.AgentToServer{}, apiKey)
+		require.Error(t, err, "expected max limit to be reached")
+
+		<-ch
+		synctest.Wait()
+	})
+}
+
 // TestEnrollAgentGeneratesNewUIDWhenFlagSet verifies enrollAgent generates a
 // fresh UUID when the AgentToServer message sets the RequestInstanceUid flag,
 // ignoring the incoming uid argument.
@@ -249,7 +297,7 @@ func TestEnrollAgentGeneratesNewUIDWhenFlagSet(t *testing.T) {
 		}).
 		Return("doc-id", nil)
 
-	oa := &OpAMPT{bulk: bulker}
+	oa := &OpAMPT{bulk: bulker, enrollLimit: limit.NewLimiter(nil)}
 	incomingUID := uuid.Must(uuid.NewV7())
 	msg := &protobufs.AgentToServer{
 		Flags: uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid),
@@ -350,7 +398,7 @@ func TestEnrollAgentTags(t *testing.T) {
 				},
 			}
 
-			oa := &OpAMPT{bulk: bulker}
+			oa := &OpAMPT{bulk: bulker, enrollLimit: limit.NewLimiter(nil)}
 			zlog := zerolog.New(io.Discard)
 			agent, err := oa.enrollAgent(t.Context(), zlog, agentUID, msg, &apikey.APIKey{ID: "enroll-key-id"})
 			require.NoError(t, err)
@@ -368,61 +416,103 @@ func TestEnrollAgentTags(t *testing.T) {
 }
 
 func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
-	checker := &mockCheckin{}
-	oa := &OpAMPT{bc: checker}
+	t.Run("normal checkin", func(t *testing.T) {
+		checker := &mockCheckin{}
+		oa := &OpAMPT{bc: checker}
 
-	agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent-123"}}
+		agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent-123"}}
 
-	msg := &protobufs.AgentToServer{
-		SequenceNum: 7,
-		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) |
-			uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
-		Health: &protobufs.ComponentHealth{
-			Healthy:   true,
-			Status:    "StatusRecoverableError",
-			LastError: "boom",
-		},
-		EffectiveConfig: &protobufs.EffectiveConfig{
-			ConfigMap: &protobufs.AgentConfigMap{
-				ConfigMap: map[string]*protobufs.AgentConfigFile{
-					"": {
-						Body:        []byte("password: 12345\nnum: 2\n"),
-						ContentType: "text/yaml",
+		msg := &protobufs.AgentToServer{
+			SequenceNum: 7,
+			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
+			Health: &protobufs.ComponentHealth{
+				Healthy:   true,
+				Status:    "StatusRecoverableError",
+				LastError: "boom",
+			},
+			EffectiveConfig: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{
+					ConfigMap: map[string]*protobufs.AgentConfigFile{
+						"": {
+							Body:        []byte("password: 12345\nnum: 2\n"),
+							ContentType: "text/yaml",
+						},
 					},
 				},
 			},
-		},
-	}
+		}
 
-	zlog := zerolog.New(io.Discard)
-	require.NoError(t, oa.updateAgent(zlog, agent, msg))
-	require.Equal(t, "agent-123", checker.id)
+		zlog := zerolog.New(io.Discard)
+		require.NoError(t, oa.updateAgent(zlog, agent, msg))
+		require.Equal(t, "agent-123", checker.id)
 
-	pending := pendingFromOptions(t, checker.opts)
-	require.Equal(t, string(CheckinRequestStatusDegraded), getUnexportedField(pending, "status").String())
-	require.Equal(t, "boom", getUnexportedField(pending, "message").String())
-	require.Equal(t, uint64(7), getUnexportedField(pending, "sequenceNum").Uint())
+		pending := pendingFromOptions(t, checker.opts)
+		require.Equal(t, string(CheckinRequestStatusDegraded), getUnexportedField(pending, "status").String())
+		require.Equal(t, "boom", getUnexportedField(pending, "message").String())
+		require.Equal(t, uint64(7), getUnexportedField(pending, "sequenceNum").Uint())
 
-	extra := getUnexportedField(pending, "extra")
-	require.False(t, extra.IsNil())
-	extraVal := extra.Elem()
+		extra := getUnexportedField(pending, "extra")
+		require.False(t, extra.IsNil())
+		extraVal := extra.Elem()
 
-	capabilitiesVal := getUnexportedField(extraVal, "capabilities")
-	capabilities, ok := capabilitiesVal.Interface().([]string)
-	require.True(t, ok)
-	require.ElementsMatch(t, []string{"ReportsHealth", "AcceptsRemoteConfig"}, capabilities)
+		capabilitiesVal := getUnexportedField(extraVal, "capabilities")
+		capabilities, ok := capabilitiesVal.Interface().([]string)
+		require.True(t, ok)
+		require.ElementsMatch(t, []string{"ReportsHealth", "AcceptsRemoteConfig"}, capabilities)
 
-	healthBytes := getUnexportedField(extraVal, "health").Bytes()
-	var health protobufs.ComponentHealth
-	require.NoError(t, json.Unmarshal(healthBytes, &health))
-	require.Equal(t, "boom", health.LastError)
-	require.Equal(t, "StatusRecoverableError", health.Status)
+		healthBytes := getUnexportedField(extraVal, "health").Bytes()
+		var health protobufs.ComponentHealth
+		require.NoError(t, json.Unmarshal(healthBytes, &health))
+		require.Equal(t, "boom", health.LastError)
+		require.Equal(t, "StatusRecoverableError", health.Status)
 
-	configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
-	var config map[string]any
-	require.NoError(t, json.Unmarshal(configBytes, &config))
-	require.Equal(t, "[REDACTED]", config["password"])
-	require.Equal(t, float64(2), config["num"])
+		configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
+		var config map[string]any
+		require.NoError(t, json.Unmarshal(configBytes, &config))
+		require.Equal(t, "[REDACTED]", config["password"])
+		require.Equal(t, float64(2), config["num"])
+	})
+
+	t.Run("checkin clears audit_unenroll attributes", func(t *testing.T) {
+		checker := &mockCheckin{}
+		oa := &OpAMPT{bc: checker}
+
+		agent := &model.Agent{
+			ESDocument:            model.ESDocument{Id: "agent-123"},
+			AuditUnenrolledReason: reenrolled,
+			AuditUnenrolledTime:   time.Now().UTC().Format(time.RFC3339),
+		}
+
+		msg := &protobufs.AgentToServer{
+			SequenceNum:  3,
+			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth),
+			Health: &protobufs.ComponentHealth{
+				Healthy: true,
+			},
+		}
+
+		zlog := zerolog.New(io.Discard)
+		require.NoError(t, oa.updateAgent(zlog, agent, msg))
+		require.Equal(t, "agent-123", checker.id)
+
+		pending := pendingFromOptions(t, checker.opts)
+		require.Equal(t, string(CheckinRequestStatusOnline), getUnexportedField(pending, "status").String())
+
+		extra := getUnexportedField(pending, "extra")
+		require.False(t, extra.IsNil())
+		extraVal := extra.Elem()
+
+		capabilitiesVal := getUnexportedField(extraVal, "capabilities")
+		capabilities, ok := capabilitiesVal.Interface().([]string)
+		require.True(t, ok)
+		require.ElementsMatch(t, []string{"ReportsHealth"}, capabilities)
+
+		deleteAuditVal := getUnexportedField(extraVal, "deleteAudit")
+		deleteAudit, ok := deleteAuditVal.Interface().(bool)
+		require.True(t, ok)
+		require.True(t, deleteAudit)
+	})
 }
 
 func TestHandleMessageAgentDisconnect(t *testing.T) {
