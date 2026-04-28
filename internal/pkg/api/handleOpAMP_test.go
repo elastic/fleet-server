@@ -426,7 +426,6 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 }
 
 func TestHandleMessageAgentDisconnect(t *testing.T) {
-	//nolint:dupl // test cases
 	cases := []struct {
 		name      string
 		getBulker func(t *testing.T) *ftesting.MockBulk
