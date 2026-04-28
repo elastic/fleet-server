@@ -38,7 +38,6 @@ The following fields are ignored:
 - **Auto-enrollment.** The spec does not define enrollment. Fleet-server auto-enrolls unknown agents on first message using the enrollment API key's associated policy, creating a document in the `.fleet-agents` index with type `OPAMP`.
 - **Health-to-status mapping.** Fleet-server maps `ComponentHealth` to simplified statuses (`online`, `error`, `degraded`). The spec's nested `component_health_map` is not traversed; only the top-level health is used.
 - **Sensitive value redaction.** Fleet-server redacts keys containing `password`, `token`, `key`, `secret`, `auth`, `certificate`, or `passphrase` from the effective config before persisting.
-- **Always requests full state.** Fleet-server sets the `ReportFullState` flag in every `ServerToAgent` response, requesting the agent to include all status fields on every message. This is an intentional change intended to improve reliability by having constant load in order avoid rapid changes in workload.
 - **`RequestInstanceUid` forces new enrollment.** Fleet-server honors the `AgentToServer.flags.RequestInstanceUid` flag by treating the request as a new enrollment.
 
 ### Throttling
