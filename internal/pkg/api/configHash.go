@@ -8,7 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"gopkg.in/yaml.v3"
@@ -22,7 +23,7 @@ import (
 // sorted deterministically by yaml.v3 Marshal. Returns "" with no error when
 // the config is nil or all files are empty.
 func HashEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) (string, error) {
-	if effectiveConfig.ConfigMap == nil || len(effectiveConfig.ConfigMap.ConfigMap) == 0 {
+	if effectiveConfig == nil || effectiveConfig.ConfigMap == nil || len(effectiveConfig.ConfigMap.ConfigMap) == 0 {
 		return "", nil
 	}
 
