@@ -26,11 +26,7 @@ func HashEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) (string, er
 		return "", nil
 	}
 
-	keys := make([]string, 0, len(effectiveConfig.ConfigMap.ConfigMap))
-	for k := range effectiveConfig.ConfigMap.ConfigMap {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(effectiveConfig.ConfigMap.ConfigMap))
 
 	h := sha256.New()
 	hasData := false
