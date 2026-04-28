@@ -22,6 +22,17 @@ import (
 // and service.extensions are included from each file. Keys within each file are
 // sorted deterministically by yaml.v3 Marshal. Returns "" with no error when
 // the config is nil or all files are empty.
+//
+// This hash describes what the collector is actually running (EffectiveConfig,
+// reported by the collector in AgentToServer). It is stored as
+// effective_config_hash on the .fleet-agents document and is used to group
+// collectors by topology.
+//
+// It is distinct from the RemoteConfig hash embedded in AgentToServer/
+// ServerToAgent messages, which is the OpAMP protocol hash used to detect
+// whether the collector has acknowledged and applied a config pushed by
+// fleet-server. Those hashes cover the raw config bytes and are not topology-
+// normalised; they must not be compared to or confused with this value.
 func HashEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) (string, error) {
 	if effectiveConfig == nil || effectiveConfig.ConfigMap == nil || len(effectiveConfig.ConfigMap.ConfigMap) == 0 {
 		return "", nil
