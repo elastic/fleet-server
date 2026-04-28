@@ -13,22 +13,11 @@ import (
 )
 
 const (
-	// baseTopologyConfig is a minimal valid collector config with otlp→debug pipeline.
-	baseTopologyConfig = `
+	baseConfig = `
 receivers:
   otlp: {}
 exporters:
   debug: {}
-service:
-  pipelines:
-    logs:
-      receivers: [otlp]
-      exporters: [debug]
-`
-	// simpleTopologyConfig is like baseTopologyConfig but omits the exporters block.
-	simpleTopologyConfig = `
-receivers:
-  otlp: {}
 service:
   pipelines:
     logs:
@@ -63,51 +52,9 @@ func TestHashEffectiveConfig_EmptyBody(t *testing.T) {
 	assert.Empty(t, hash)
 }
 
-func TestHashEffectiveConfig_Determinism(t *testing.T) {
-	// Same topology with different service.telemetry must produce the same hash.
-	withTelemetry := `
-receivers:
-  otlp:
-    protocols:
-      grpc: {}
-
-exporters:
-  debug: {}
-
-service:
-  telemetry:
-    logs:
-      level: debug
-  pipelines:
-    logs:
-      receivers: [otlp]
-      exporters: [debug]
-`
-	withoutTelemetry := `
-receivers:
-  otlp:
-    protocols:
-      grpc: {}
-
-exporters:
-  debug: {}
-
-service:
-  pipelines:
-    logs:
-      receivers: [otlp]
-      exporters: [debug]
-`
-	h1, err := HashEffectiveConfig(makeEffectiveConfig(withTelemetry))
-	require.NoError(t, err)
-	h2, err := HashEffectiveConfig(makeEffectiveConfig(withoutTelemetry))
-	require.NoError(t, err)
-	assert.Equal(t, h1, h2, "telemetry section must not affect the hash")
-}
-
 func TestHashEffectiveConfig_KeyOrderInvariant(t *testing.T) {
 	// Key order in the YAML must not affect the hash.
-	orderA := baseTopologyConfig
+	orderA := baseConfig
 	orderB := `
 exporters:
   debug: {}
@@ -126,9 +73,9 @@ receivers:
 	assert.Equal(t, h1, h2, "key order must not affect the hash")
 }
 
-func TestHashEffectiveConfig_TopologyChange(t *testing.T) {
+func TestHashEffectiveConfig_ContentChange(t *testing.T) {
 	// Changing a receiver must produce a different hash.
-	configA := baseTopologyConfig
+	configA := baseConfig
 	configB := `
 receivers:
   prometheus: {}
@@ -144,13 +91,35 @@ service:
 	require.NoError(t, err)
 	h2, err := HashEffectiveConfig(makeEffectiveConfig(configB))
 	require.NoError(t, err)
-	assert.NotEqual(t, h1, h2, "different topology must produce different hash")
+	assert.NotEqual(t, h1, h2, "different config must produce different hash")
 }
 
-func TestHashEffectiveConfig_AllowlistEnforcement(t *testing.T) {
-	// Adding extensions config (outside allowlist) must not change the hash.
-	withoutExtensionsConfig := simpleTopologyConfig
-	withExtensionsConfig := `
+func TestHashEffectiveConfig_TelemetryAffectsHash(t *testing.T) {
+	// service.telemetry is part of the full config and must affect the hash.
+	withTelemetry := `
+receivers:
+  otlp: {}
+exporters:
+  debug: {}
+service:
+  telemetry:
+    logs:
+      level: debug
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [debug]
+`
+	h1, err := HashEffectiveConfig(makeEffectiveConfig(baseConfig))
+	require.NoError(t, err)
+	h2, err := HashEffectiveConfig(makeEffectiveConfig(withTelemetry))
+	require.NoError(t, err)
+	assert.NotEqual(t, h1, h2, "service.telemetry must affect the hash")
+}
+
+func TestHashEffectiveConfig_ExtensionsAffectHash(t *testing.T) {
+	// All config fields, including extensions, must affect the hash.
+	withExtensions := `
 receivers:
   otlp: {}
 extensions:
@@ -162,31 +131,20 @@ service:
       receivers: [otlp]
       exporters: [debug]
 `
-	h1, err := HashEffectiveConfig(makeEffectiveConfig(withoutExtensionsConfig))
-	require.NoError(t, err)
-	h2, err := HashEffectiveConfig(makeEffectiveConfig(withExtensionsConfig))
-	require.NoError(t, err)
-	assert.Equal(t, h1, h2, "extensions config must not affect the hash")
-}
-
-func TestHashEffectiveConfig_ServiceExtensionsIncluded(t *testing.T) {
-	// service.extensions (the active extension list) IS part of the topology.
-	withoutExtensions := simpleTopologyConfig
-	withExtensions := `
+	withoutExtensions := `
 receivers:
   otlp: {}
 service:
-  extensions: [health_check]
   pipelines:
     logs:
       receivers: [otlp]
       exporters: [debug]
 `
-	h1, err := HashEffectiveConfig(makeEffectiveConfig(withoutExtensions))
+	h1, err := HashEffectiveConfig(makeEffectiveConfig(withExtensions))
 	require.NoError(t, err)
-	h2, err := HashEffectiveConfig(makeEffectiveConfig(withExtensions))
+	h2, err := HashEffectiveConfig(makeEffectiveConfig(withoutExtensions))
 	require.NoError(t, err)
-	assert.NotEqual(t, h1, h2, "service.extensions must be included in the hash")
+	assert.NotEqual(t, h1, h2, "extensions config must affect the hash")
 }
 
 func TestHashEffectiveConfig_MultiFile(t *testing.T) {

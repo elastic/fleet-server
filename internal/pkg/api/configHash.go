@@ -15,24 +15,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// HashEffectiveConfig computes a SHA-256 hash of the pipeline topology fields
-// across all config files in the OpAMP ConfigMap. Each file is processed in
-// sorted key order so the hash is deterministic regardless of map iteration
-// order. Only receivers, processors, exporters, connectors, service.pipelines,
-// and service.extensions are included from each file. Keys within each file are
-// sorted deterministically by yaml.v3 Marshal. Returns "" with no error when
-// the config is nil or all files are empty.
+// HashEffectiveConfig computes a SHA-256 hash of all config files in the OpAMP
+// ConfigMap. Each file body is parsed and re-marshalled so that key ordering
+// differences produce the same hash. Files are processed in sorted key order
+// for determinism. Returns "" with no error when the config is nil or all
+// files are empty.
 //
 // This hash describes what the collector is actually running (EffectiveConfig,
 // reported by the collector in AgentToServer). It is stored as
-// effective_config_hash on the .fleet-agents document and is used to group
-// collectors by topology.
+// effective_config_hash on the .fleet-agents document.
 //
 // It is distinct from the RemoteConfig hash embedded in AgentToServer/
 // ServerToAgent messages, which is the OpAMP protocol hash used to detect
 // whether the collector has acknowledged and applied a config pushed by
-// fleet-server. Those hashes cover the raw config bytes and are not topology-
-// normalised; they must not be compared to or confused with this value.
+// fleet-server.
 func HashEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) (string, error) {
 	if effectiveConfig == nil || effectiveConfig.ConfigMap == nil || len(effectiveConfig.ConfigMap.ConfigMap) == 0 {
 		return "", nil
@@ -47,11 +43,11 @@ func HashEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) (string, er
 		if file == nil || len(file.Body) == 0 {
 			continue
 		}
-		topology, err := extractTopologyFields(file.Body)
-		if err != nil {
-			return "", err
+		var parsed map[string]any
+		if err := yaml.Unmarshal(file.Body, &parsed); err != nil {
+			return "", fmt.Errorf("unmarshal config %q for hashing: %w", k, err)
 		}
-		canonical, err := yaml.Marshal(topology)
+		canonical, err := yaml.Marshal(parsed)
 		if err != nil {
 			return "", fmt.Errorf("canonicalize config %q for hashing: %w", k, err)
 		}
@@ -66,33 +62,4 @@ func HashEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) (string, er
 		return "", nil
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// extractTopologyFields parses a YAML config body and returns only the
-// allowlisted topology keys: receivers, processors, exporters, connectors,
-// service.pipelines, and service.extensions.
-func extractTopologyFields(body []byte) (map[string]any, error) {
-	var full map[string]any
-	if err := yaml.Unmarshal(body, &full); err != nil {
-		return nil, fmt.Errorf("unmarshal config for hashing: %w", err)
-	}
-
-	topology := make(map[string]any)
-	for _, k := range []string{"receivers", "processors", "exporters", "connectors"} {
-		if v, ok := full[k]; ok {
-			topology[k] = v
-		}
-	}
-	if svc, ok := full["service"].(map[string]any); ok {
-		svcTopology := make(map[string]any)
-		for _, k := range []string{"pipelines", "extensions"} {
-			if v, ok := svc[k]; ok {
-				svcTopology[k] = v
-			}
-		}
-		if len(svcTopology) > 0 {
-			topology["service"] = svcTopology
-		}
-	}
-	return topology, nil
 }
