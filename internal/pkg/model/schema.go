@@ -162,9 +162,6 @@ type Agent struct {
 	// SHA-256 hex hash of the collector pipeline topology (receivers, processors, exporters, connectors, service.pipelines, service.extensions) reported in AgentToServer.EffectiveConfig. Topology-normalised: service.telemetry and other non-structural fields are excluded so the hash changes only when the pipeline wiring changes. Distinct from the RemoteConfig hash in the OpAMP protocol, which covers raw config bytes and is used by the collector to acknowledge a config pushed by fleet-server.
 	EffectiveConfigHash string `json:"effective_config_hash,omitempty"`
 
-	// Human-readable adjective-noun label derived from the first two bytes of effective_config_hash
-	EffectiveConfigLabel string `json:"effective_config_label,omitempty"`
-
 	// Date/time the Elastic Agent enrolled
 	EnrolledAt string `json:"enrolled_at"`
 
