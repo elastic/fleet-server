@@ -5019,11 +5019,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : go.uber.org/zap
-Version: v1.27.1
+Version: v1.28.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.uber.org/zap@v1.27.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.uber.org/zap@v1.28.0/LICENSE:
 
 Copyright (c) 2016-2024 Uber Technologies, Inc.
 
