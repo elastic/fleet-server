@@ -31,6 +31,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
@@ -39,14 +40,16 @@ const (
 	healthStatusRecoverableError = "StatusRecoverableError"
 	serverCapabilities           = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
 		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
-	tagsKey = "tags"
+	tagsKey    = "tags"
+	reenrolled = "reenrolled"
 )
 
 type OpAMPT struct {
-	cfg   *config.Server
-	bulk  bulk.Bulk
-	cache cache.Cache
-	bc    checkinBulk
+	cfg         *config.Server
+	bulk        bulk.Bulk
+	cache       cache.Cache
+	bc          checkinBulk
+	enrollLimit *limit.Limiter
 
 	srv     oaServer.OpAMPServer
 	handler oaServer.HTTPHandlerFunc
@@ -65,11 +68,12 @@ func NewOpAMPT(
 	bc *checkin.Bulk,
 ) *OpAMPT {
 	oa := &OpAMPT{
-		cfg:   cfg,
-		bulk:  bulker,
-		cache: cache,
-		bc:    bc,
-		srv:   oaServer.New(nil),
+		cfg:         cfg,
+		bulk:        bulker,
+		cache:       cache,
+		bc:          bc,
+		enrollLimit: limit.NewLimiter(&cfg.Limits.EnrollLimit),
+		srv:         oaServer.New(nil),
 	}
 
 	return oa
@@ -168,21 +172,16 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		zlog.Debug().Uint64("sequence_num", message.SequenceNum).Msg("received message from agent")
 
 		enrollRequest := message.Flags&uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid) != 0
-		agentFound := false
-		var agent *model.Agent
-		if !enrollRequest {
-			// Check if Agent is "enrolled"; if it is, update it; otherwise, enroll it.
-			agent, err = oa.findEnrolledAgent(ctx, zlog, instanceUID.String())
-			if err != nil {
-				zlog.Error().Err(err).Msg("agent search failed")
-				response.ErrorResponse = &protobufs.ServerErrorResponse{
-					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
-					ErrorMessage: "agent search failed",
-				}
-				return response
+		agent, err := oa.findEnrolledAgent(ctx, zlog, instanceUID.String())
+		if err != nil {
+			zlog.Error().Err(err).Msg("agent search failed")
+			response.ErrorResponse = &protobufs.ServerErrorResponse{
+				Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
+				ErrorMessage: "agent search failed",
 			}
-			agentFound = agent != nil
+			return response
 		}
+		agentFound := agent != nil
 		zlog.Debug().
 			Bool("agent_found", agentFound).
 			Bool("enroll_request", enrollRequest).
@@ -208,14 +207,39 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 
 		sendCapabilities := false
 		if !agentFound || enrollRequest {
+			auditReason := ""
+			if agentFound {
+				auditReason = agent.AuditUnenrolledReason
+			}
+
+			// Check if enroll limits are reached
+			// release is called immediately after agent is enrolled, not deferred
+			release, err := oa.enrollLimit.Acquire()
+			if err != nil {
+				zlog.Error().Err(err).Msg("opamp enroll rate limit reached")
+				response.ErrorResponse = &protobufs.ServerErrorResponse{
+					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
+					ErrorMessage: "enroll rate limit reached",
+				}
+				return response
+			}
+
 			sendCapabilities = true
 			if agent, err = oa.enrollAgent(ctx, zlog, instanceUID, message, apiKey); err != nil {
+				release()
 				zlog.Error().Err(err).Msg("failed to enroll agent")
 				response.ErrorResponse = &protobufs.ServerErrorResponse{
 					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
 					ErrorMessage: "failed to enroll agent",
 				}
 				return response
+			}
+			release()
+
+			if agentFound && enrollRequest && auditReason != string(Orphaned) && auditReason != reenrolled {
+				if err := oa.unenrollAgent(ctx, zlog, instanceUID.String()); err != nil {
+					zlog.Error().Err(err).Msg("failed to mark the previous doc as reenrolled")
+				}
 			}
 		} else {
 			if !isActiveStatus(agent.LastCheckinStatus) {
@@ -608,4 +632,19 @@ func decodeCapabilities(caps uint64) []string {
 		}
 	}
 	return result
+}
+
+func (oa *OpAMPT) unenrollAgent(ctx context.Context, zlog zerolog.Logger, agentID string) error {
+	ts := time.Now().UTC().Format(time.RFC3339)
+	zlog.Debug().Msg("Marking agent as re-enrolled")
+	doc := bulk.UpdateFields{
+		dl.FieldUpdatedAt:             ts,
+		dl.FieldAuditUnenrolledTime:   ts,
+		dl.FieldAuditUnenrolledReason: reenrolled,
+	}
+	body, err := doc.Marshal()
+	if err != nil {
+		return err
+	}
+	return oa.bulk.Update(ctx, dl.FleetAgents, agentID, body, bulk.WithRetryOnConflict(3))
 }

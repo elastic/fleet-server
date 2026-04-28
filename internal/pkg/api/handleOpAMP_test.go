@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
@@ -460,7 +461,7 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bulker := tc.getBulker(t)
 			checker := &mockCheckin{}
-			oa := &OpAMPT{bulk: bulker, bc: checker}
+			oa := &OpAMPT{bulk: bulker, bc: checker, enrollLimit: limit.NewLimiter(nil)}
 
 			agentUID := uuid.Must(uuid.NewV7())
 			zlog := zerolog.New(io.Discard)
@@ -569,7 +570,7 @@ func TestHandleMessageCapabilities(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bulker := tc.getBulker(t)
 			checker := &mockCheckin{}
-			oa := &OpAMPT{bulk: bulker, bc: checker}
+			oa := &OpAMPT{bulk: bulker, bc: checker, enrollLimit: limit.NewLimiter(nil)}
 
 			agentUID := uuid.Must(uuid.NewV7())
 			zlog := zerolog.New(io.Discard)
@@ -604,7 +605,9 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 			getBulker: func(t *testing.T) *ftesting.MockBulk {
 				t.Helper()
 				bulker := ftesting.NewMockBulk()
-				// findEnrolledAgent is skipped when the flag is set, so no FleetAgents Search is mocked.
+				// agent not found in .fleet-agents under the incoming UID
+				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
 				enrollKey := model.EnrollmentAPIKey{
 					APIKeyID: testAPIKeyID,
 					PolicyID: "policy-123",
@@ -639,7 +642,7 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bulker := tc.getBulker(t)
 			checker := &mockCheckin{}
-			oa := &OpAMPT{bulk: bulker, bc: checker}
+			oa := &OpAMPT{bulk: bulker, bc: checker, enrollLimit: limit.NewLimiter(nil)}
 
 			agentUID := uuid.Must(uuid.NewV7())
 			zlog := zerolog.New(io.Discard)
@@ -675,9 +678,10 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 func TestHandleMessageNewEnrollmentWithRequestInstanceUid(t *testing.T) {
 	const testAPIKeyID = "test-key"
 
-	// When the flag is set handleMessage skips findEnrolledAgent, so no
-	// FleetAgents Search is mocked here.
 	bulker := ftesting.NewMockBulk()
+	// no agent enrolled under the incoming UID
+	bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
 	enrollKey := model.EnrollmentAPIKey{
 		APIKeyID: testAPIKeyID,
 		PolicyID: "policy-123",
@@ -698,7 +702,7 @@ func TestHandleMessageNewEnrollmentWithRequestInstanceUid(t *testing.T) {
 		Return("doc-id", nil)
 
 	checker := &mockCheckin{}
-	oa := &OpAMPT{bulk: bulker, bc: checker}
+	oa := &OpAMPT{bulk: bulker, bc: checker, enrollLimit: limit.NewLimiter(nil)}
 
 	agentUID := uuid.Must(uuid.NewV7())
 	zlog := zerolog.New(io.Discard)
@@ -728,6 +732,144 @@ func TestHandleMessageNewEnrollmentWithRequestInstanceUid(t *testing.T) {
 	require.Equal(t, newUID.String(), checker.id, "checkin should use the new instance UID")
 
 	bulker.AssertExpectations(t)
+}
+
+// TestUnenrollAgent verifies the body and options used when marking the old
+// agent doc as reenrolled.
+func TestUnenrollAgent(t *testing.T) {
+	const oldID = "old-agent-id"
+
+	bulker := ftesting.NewMockBulk()
+	var capturedBody []byte
+	bulker.On("Update", mock.Anything, dl.FleetAgents, oldID, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			body, ok := args.Get(3).([]byte)
+			require.True(t, ok)
+			capturedBody = body
+		}).
+		Return(nil)
+
+	oa := &OpAMPT{bulk: bulker}
+	zlog := zerolog.New(io.Discard)
+	require.NoError(t, oa.unenrollAgent(t.Context(), zlog, oldID))
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(capturedBody, &doc))
+	fields, ok := doc["doc"].(map[string]any)
+	require.True(t, ok, "expected update body to wrap fields under \"doc\"")
+	require.Equal(t, reenrolled, fields[dl.FieldAuditUnenrolledReason])
+	require.NotEmpty(t, fields[dl.FieldAuditUnenrolledTime])
+	require.NotEmpty(t, fields[dl.FieldUpdatedAt])
+
+	bulker.AssertExpectations(t)
+}
+
+// TestHandleMessageReenrollOldDocBehavior covers when handleMessage marks the
+// previous agent document as reenrolled. With the RequestInstanceUid flag set,
+// the old doc is updated only when its existing audit_unenrolled_reason is
+// neither "orphaned" nor "reenrolled".
+func TestHandleMessageReenrollOldDocBehavior(t *testing.T) {
+	const testAPIKeyID = "test-key"
+
+	enrollKey := model.EnrollmentAPIKey{
+		APIKeyID: testAPIKeyID,
+		PolicyID: "policy-123",
+		Active:   true,
+	}
+	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
+	require.NoError(t, err)
+
+	cases := []struct {
+		name             string
+		flags            uint64
+		auditReason      string
+		wantUpdateCalled bool
+	}{
+		{
+			name:             "active enrolled agent with flag marks old doc",
+			flags:            uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid),
+			auditReason:      "",
+			wantUpdateCalled: true,
+		},
+		{
+			name:             "orphaned enrolled agent with flag does not re-mark",
+			flags:            uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid),
+			auditReason:      string(Orphaned),
+			wantUpdateCalled: false,
+		},
+		{
+			name:             "reenrolled enrolled agent with flag does not re-mark",
+			flags:            uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid),
+			auditReason:      reenrolled,
+			wantUpdateCalled: false,
+		},
+		{
+			name:             "uninstall enrolled agent with flag marks old doc",
+			flags:            uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid),
+			auditReason:      string(Uninstall),
+			wantUpdateCalled: true,
+		},
+		{
+			name:             "enrolled agent without flag does not mark old doc",
+			flags:            0,
+			auditReason:      "",
+			wantUpdateCalled: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			agent := model.Agent{
+				LastCheckinStatus:     string(CheckinRequestStatusOnline),
+				AuditUnenrolledReason: tc.auditReason,
+			}
+			agentBytes, err := json.Marshal(agent)
+			require.NoError(t, err)
+			bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+				Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+
+			if tc.flags&uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid) != 0 {
+				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
+					Return("doc-id", nil)
+			}
+
+			var updatedID string
+			if tc.wantUpdateCalled {
+				bulker.On("Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
+					Run(func(args mock.Arguments) {
+						id, ok := args.Get(2).(string)
+						require.True(t, ok)
+						updatedID = id
+					}).
+					Return(nil)
+			}
+
+			checker := &mockCheckin{}
+			oa := &OpAMPT{bulk: bulker, bc: checker, enrollLimit: limit.NewLimiter(nil)}
+
+			agentUID := uuid.Must(uuid.NewV7())
+			zlog := zerolog.New(io.Discard)
+			apiKey := &apikey.APIKey{ID: testAPIKeyID}
+
+			handler := oa.handleMessage(zlog, apiKey)
+			msg := &protobufs.AgentToServer{
+				InstanceUid: agentUID.Bytes(),
+				Flags:       tc.flags,
+			}
+
+			resp := handler(t.Context(), nil, msg)
+			require.Nil(t, resp.ErrorResponse)
+
+			if tc.wantUpdateCalled {
+				require.Equal(t, agentUID.String(), updatedID, "Update should target the original instance UID (the old doc)")
+			} else {
+				bulker.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			}
+			bulker.AssertExpectations(t)
+		})
+	}
 }
 
 type mockCheckin struct {
@@ -868,7 +1010,7 @@ func TestHandleMessageReportFullState(t *testing.T) {
 			bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
 				Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
 			checker := &mockCheckin{}
-			oa := &OpAMPT{bulk: bulker, bc: checker}
+			oa := &OpAMPT{bulk: bulker, bc: checker, enrollLimit: limit.NewLimiter(nil)}
 
 			agentUID := uuid.Must(uuid.NewV7())
 			tc.msg.InstanceUid = agentUID.Bytes()

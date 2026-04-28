@@ -17,7 +17,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-type releaseFunc func()
+type ReleaseFunc func()
 
 // StatIncer is the interface used to count statistics associated with an endpoint.
 type StatIncer interface {
@@ -48,7 +48,7 @@ func NewLimiter(cfg *config.Limit) *Limiter {
 	return l
 }
 
-func (l *Limiter) acquire() (releaseFunc, error) {
+func (l *Limiter) Acquire() (ReleaseFunc, error) {
 	releaseFunc := noop
 
 	if l.rateLimit != nil && !l.rateLimit.Allow() {
@@ -79,7 +79,7 @@ func (l *Limiter) Wrap(name string, si StatIncer, ll zerolog.Level) func(http.Ha
 				defer dfunc()
 			}
 
-			lf, err := l.acquire()
+			lf, err := l.Acquire()
 			if err != nil {
 				hlog.FromRequest(r).WithLevel(ll).Str("route", name).Err(err).Msg("limit reached")
 				if wErr := writeError(hlog.FromRequest(r), w, err); wErr != nil {
